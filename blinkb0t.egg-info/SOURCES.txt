@@ -7,15 +7,12 @@ blinkb0t.egg-info/requires.txt
 blinkb0t.egg-info/top_level.txt
 tests/test_beat_alignment_quantization.py
 tests/test_channel_state.py
-tests/test_gap_filler_final_gaps.py
 tests/test_geometry.py
 tests/test_geometry_adjustment_e2e.py
 tests/test_geometry_coverage.py
 tests/test_geometry_optimization.py
 tests/test_geometry_smart_fallback.py
-tests/test_handlers.py
 tests/test_json_utils.py
 tests/test_math_utils.py
 tests/test_plan_generator.py
 tests/test_tilt_roles.py
-tests/test_version_resolver.py

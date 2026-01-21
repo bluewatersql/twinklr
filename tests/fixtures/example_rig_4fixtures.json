@@ -1,0 +1,102 @@
+{
+  "rig_id": "example_4fixture_rig",
+  "fixtures": [
+    {
+      "fixture_id": "front_left",
+      "universe": 1,
+      "start_address": 1,
+      "role": "FRONT_LEFT",
+      "spatial_position": [-1.0, 0.0],
+      "calibration": {
+        "pan_min_dmx": 0,
+        "pan_max_dmx": 255,
+        "tilt_min_dmx": 0,
+        "tilt_max_dmx": 255,
+        "pan_inverted": false,
+        "tilt_inverted": false,
+        "dimmer_floor_dmx": 60,
+        "dimmer_ceiling_dmx": 255
+      }
+    },
+    {
+      "fixture_id": "front_right",
+      "universe": 1,
+      "start_address": 17,
+      "role": "FRONT_RIGHT",
+      "spatial_position": [1.0, 0.0],
+      "calibration": {
+        "pan_min_dmx": 0,
+        "pan_max_dmx": 255,
+        "tilt_min_dmx": 0,
+        "tilt_max_dmx": 255,
+        "pan_inverted": true,
+        "tilt_inverted": false,
+        "dimmer_floor_dmx": 60,
+        "dimmer_ceiling_dmx": 255
+      }
+    },
+    {
+      "fixture_id": "back_left",
+      "universe": 1,
+      "start_address": 33,
+      "role": "BACK_LEFT",
+      "spatial_position": [-1.0, 1.0],
+      "calibration": {
+        "pan_min_dmx": 0,
+        "pan_max_dmx": 255,
+        "tilt_min_dmx": 0,
+        "tilt_max_dmx": 255,
+        "pan_inverted": false,
+        "tilt_inverted": true,
+        "dimmer_floor_dmx": 60,
+        "dimmer_ceiling_dmx": 255
+      }
+    },
+    {
+      "fixture_id": "back_right",
+      "universe": 1,
+      "start_address": 49,
+      "role": "BACK_RIGHT",
+      "spatial_position": [1.0, 1.0],
+      "calibration": {
+        "pan_min_dmx": 0,
+        "pan_max_dmx": 255,
+        "tilt_min_dmx": 0,
+        "tilt_max_dmx": 255,
+        "pan_inverted": true,
+        "tilt_inverted": true,
+        "dimmer_floor_dmx": 60,
+        "dimmer_ceiling_dmx": 255
+      }
+    }
+  ],
+  "groups": [
+    {
+      "group_id": "fronts",
+      "fixture_ids": ["front_left", "front_right"],
+      "order": "LEFT_TO_RIGHT"
+    },
+    {
+      "group_id": "backs",
+      "fixture_ids": ["back_left", "back_right"],
+      "order": "LEFT_TO_RIGHT"
+    },
+    {
+      "group_id": "lefts",
+      "fixture_ids": ["front_left", "back_left"],
+      "order": "OUTSIDE_IN"
+    },
+    {
+      "group_id": "rights",
+      "fixture_ids": ["front_right", "back_right"],
+      "order": "OUTSIDE_IN"
+    },
+    {
+      "group_id": "all",
+      "fixture_ids": ["front_left", "front_right", "back_left", "back_right"],
+      "order": "LEFT_TO_RIGHT"
+    }
+  ],
+  "default_dimmer_floor_dmx": 60,
+  "default_dimmer_ceiling_dmx": 255
+}

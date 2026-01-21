@@ -6,18 +6,18 @@
 ██║     ██║██╔╝ ██╗███████╗███████╗██║     ██║███████╗╚██████╔╝   ██║   
 ╚═╝     ╚═╝╚═╝  ╚═╝╚══════╝╚══════╝╚═╝     ╚═╝╚══════╝ ╚═════╝    ╚═╝   
 
-                        PIXELPILOT
+                        Twinklr
               intelligent choreography for xLights
 ───────────────────────────────────────────────────────── ✈
 ```
 
-# PixelPilot
+# Twinklr
 
-**PixelPilot** is an AI-powered choreography engine for **xLights** that transforms music into professional DMX moving head sequences. Using advanced audio analysis, template-based composition, and multi-agent orchestration, it creates synchronized lighting shows that intelligently respond to musical structure, energy, and emotion.
+**Twinklr** is an AI-powered choreography engine for **xLights** that transforms music into professional DMX moving head sequences. Using advanced audio analysis, template-based composition, and multi-agent orchestration, it creates synchronized lighting shows that intelligently respond to musical structure, energy, and emotion.
 
 ---
 
-## Why PixelPilot?
+## Why Twinklr?
 
 ### 🎯 Intelligent Design Philosophy
 
@@ -123,7 +123,7 @@ Open the generated `.xsq` file in xLights to view your AI-generated moving head 
 
 ## How It Works
 
-PixelPilot processes your music through a sophisticated pipeline orchestrated by `MovingHeadManager`:
+Twinklr processes your music through a sophisticated pipeline orchestrated by `MovingHeadManager`:
 
 ### 1. Audio Analysis
 - Extracts beats, bars, and musical timing using librosa
@@ -291,7 +291,7 @@ Define your moving head fixtures:
 
 ## Architecture
 
-PixelPilot is built as a modern monorepo with clean separation of concerns:
+Twinklr is built as a modern monorepo with clean separation of concerns:
 
 ### Core Package (`blinkb0t-core`)
 
@@ -552,4 +552,4 @@ Built with:
 
 ---
 
-**PixelPilot** — Transforming music into intelligent light ✨
+**Twinklr** — Transforming music into intelligent light ✨

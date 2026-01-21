@@ -1,0 +1,48 @@
+# Implementation Refinement Task
+
+## Context
+
+The previous implementation validation identified issues that need resolution.
+
+### Issues Identified
+{issues_list}
+
+---
+
+## Song Context
+- **Duration**: {duration_s}s
+- **Tempo**: {tempo_bpm} BPM
+- **Total Bars**: {bar_count}
+
+---
+
+## Current Plan
+{current_plan}
+
+---
+
+## Available Templates
+{template_library}
+
+---
+
+## Required Fixes
+
+{required_fixes}
+
+---
+
+## Output Schema
+
+{json_schema}
+
+---
+
+## Your Task
+
+1. **Review** the identified issues
+2. **Fix** invalid template_ids, preset_ids, or timing
+3. **Ensure** coverage is complete
+4. **Output** corrected plan as valid JSON
+
+**Generate the corrected plan now.**

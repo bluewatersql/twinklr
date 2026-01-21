@@ -1,7 +1,20 @@
-"""Agent plan models
+"""Agent plan models (DEPRECATED).
 
-These models represent the LLM-generated strategic plans (template-based).
-Extended inwith channel specifications.
+DEPRECATED: These models are from the old LLM planning paradigm.
+For new code, use the simplified template-selection models from:
+
+    from blinkb0t.core.agents.moving_heads.models_llm_plan import (
+        SectionSelection,
+        LLMChoreographyPlan,
+    )
+
+The new paradigm simplifies LLM output to categorical selection:
+- template_id: Which template to use
+- preset_id: Which preset to apply (optional)
+- modifiers: Categorical knobs like {"intensity": "HIGH"} (optional)
+
+These old models are retained for backward compatibility with the existing
+pipeline but should not be used in new development.
 """
 
 from __future__ import annotations

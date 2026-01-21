@@ -1,0 +1,118 @@
+{
+  "template": {
+    "template_id": "fan_pulse",
+    "version": 1,
+    "name": "Fan Pulse",
+    "category": "movement",
+    "roles": ["FRONT_LEFT", "FRONT_RIGHT", "BACK_LEFT", "BACK_RIGHT"],
+    "groups": {
+      "all": ["FRONT_LEFT", "FRONT_RIGHT", "BACK_LEFT", "BACK_RIGHT"],
+      "fronts": ["FRONT_LEFT", "FRONT_RIGHT"],
+      "backs": ["BACK_LEFT", "BACK_RIGHT"]
+    },
+    "repeat": {
+      "repeatable": true,
+      "mode": "PING_PONG",
+      "cycle_bars": 4.0,
+      "loop_step_ids": ["main"],
+      "remainder_policy": "HOLD_LAST_POSE"
+    },
+    "defaults": {
+      "intensity": "SMOOTH",
+      "spread_degrees": 90
+    },
+    "steps": [
+      {
+        "step_id": "main",
+        "target": "all",
+        "timing": {
+          "base_timing": {
+            "start_offset_bars": 0.0,
+            "duration_bars": 4.0
+          },
+          "phase_offset": {
+            "mode": "GROUP_ORDER",
+            "group": "all",
+            "order": "LEFT_TO_RIGHT",
+            "spread_bars": 0.5,
+            "distribution": "LINEAR",
+            "wrap": true
+          }
+        },
+        "geometry": {
+          "geometry_id": "ROLE_POSE",
+          "params": {},
+          "pan_pose_by_role": {
+            "FRONT_LEFT": "LEFT",
+            "FRONT_RIGHT": "RIGHT",
+            "BACK_LEFT": "CENTER",
+            "BACK_RIGHT": "CENTER"
+          },
+          "tilt_pose": "HORIZON",
+          "aim_zone": "CROWD"
+        },
+        "movement": {
+          "movement_id": "SWEEP_LR",
+          "intensity": "SMOOTH",
+          "cycles": 2.0,
+          "params": {
+            "amplitude_degrees": 30
+          }
+        },
+        "dimmer": {
+          "dimmer_id": "PULSE",
+          "intensity": "SMOOTH",
+          "min_norm": 0.2,
+          "max_norm": 1.0,
+          "cycles": 4.0,
+          "params": {}
+        }
+      }
+    ],
+    "metadata": {
+      "tags": ["energetic", "sweep", "chase"],
+      "energy_range": [60, 100],
+      "description": "Fan formation with left-right sweep and pulsing dimmer"
+    }
+  },
+  "presets": [
+    {
+      "preset_id": "CHILL",
+      "name": "Chill",
+      "defaults": {
+        "intensity": "SLOW"
+      },
+      "step_patches": {
+        "main": {
+          "movement": {
+            "cycles": 1.0
+          },
+          "dimmer": {
+            "min_norm": 0.1,
+            "max_norm": 0.6,
+            "cycles": 2.0
+          }
+        }
+      }
+    },
+    {
+      "preset_id": "PEAK",
+      "name": "Peak Energy",
+      "defaults": {
+        "intensity": "FAST"
+      },
+      "step_patches": {
+        "main": {
+          "movement": {
+            "cycles": 4.0
+          },
+          "dimmer": {
+            "min_norm": 0.3,
+            "max_norm": 1.0,
+            "cycles": 8.0
+          }
+        }
+      }
+    }
+  ]
+}

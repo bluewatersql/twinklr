@@ -4,9 +4,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-BlinkB0t (PixelPilot) is an AI-powered choreography engine for xLights that transforms music into DMX moving head sequences using audio analysis, template composition, and multi-agent LLM orchestration.
+BlinkB0t (Twinklr) is an AI-powered choreography engine for xLights that transforms music into DMX moving head sequences using audio analysis, template composition, and multi-agent LLM orchestration.
 
 ## Commands
+- Always run ruff/mypy/pytest via uv run
+- When running code that requires secrets run via uv run --env-file .env -- <cmd>
+- Never cat or printenv secrets; treat .env as sensitive
 
 ```bash
 # Install dependencies

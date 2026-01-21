@@ -8,21 +8,29 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class PoseID(str, Enum):
-    """Standard pose identifiers."""
+    """Standard pose identifiers.
 
-    CENTER = "CENTER"
-    CENTER_SOFT = "CENTER_SOFT"
-    MID_LEFT = "MID_LEFT"
-    MID_RIGHT = "MID_RIGHT"
-    WIDE_LEFT = "WIDE_LEFT"
-    WIDE_RIGHT = "WIDE_RIGHT"
-    MAX_LEFT = "MAX_LEFT"
-    MAX_RIGHT = "MAX_RIGHT"
-    CURRENT = "CURRENT"
+    All enum values must have corresponding definitions in STANDARD_POSES.
+    """
+
+    # Horizontal reference poses
     FORWARD = "FORWARD"
+    LEFT_45 = "LEFT_45"
+    RIGHT_45 = "RIGHT_45"
+    LEFT_90 = "LEFT_90"
+    RIGHT_90 = "RIGHT_90"
+
+    # Vertical reference poses
     UP = "UP"
     DOWN = "DOWN"
     CEILING = "CEILING"
+
+    # Audience-facing poses
+    AUDIENCE_CENTER = "AUDIENCE_CENTER"
+    AUDIENCE_LEFT = "AUDIENCE_LEFT"
+    AUDIENCE_RIGHT = "AUDIENCE_RIGHT"
+
+    # Neutral/home positions
     SOFT_HOME = "SOFT_HOME"
 
 

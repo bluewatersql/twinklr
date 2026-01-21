@@ -1,0 +1,49 @@
+# Choreography Evaluation Task
+
+## Song Context
+- **Duration**: {duration_s}s
+- **Tempo**: {tempo_bpm} BPM
+- **Total Bars**: {bar_count}
+
+---
+
+## Plan to Evaluate
+
+{plan_summary}
+
+---
+
+## Available Templates (for reference)
+
+{template_library}
+
+---
+
+## Evaluation Requirements
+
+### Pass Threshold: {pass_threshold}
+
+Evaluate the plan across all 5 categories:
+1. Energy Alignment (0-100)
+2. Template Variety (0-100)
+3. Preset Selection (0-100)
+4. Section Coverage (0-100)
+5. Choreographic Flow (0-100)
+
+---
+
+## Output Schema
+
+{json_schema}
+
+---
+
+## Your Task
+
+1. **Evaluate** each category with specific evidence
+2. **Calculate** overall score (average of categories)
+3. **Determine** pass/fail against threshold
+4. **Provide** actionable feedback if improvements needed
+5. **Output** valid JSON matching the schema
+
+**Evaluate the choreography plan now.**

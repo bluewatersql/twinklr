@@ -228,6 +228,20 @@ clean-install: clean-venv install ## Complete clean reinstall (removes .venv and
 	@echo "$(GREEN)✓ Clean installation complete!$(NC)"
 
 #############################################################################
+# Installation Verification
+#############################################################################
+
+verify-install: ## Verify installation is working correctly
+	@echo "$(BLUE)→ Verifying blinkb0t installation...$(NC)"
+	@echo "$(YELLOW)  Checking packages installed...$(NC)"
+	@uv pip list | grep blinkb0t || { echo "$(RED)✗ BlinkB0t packages not found$(NC)"; exit 1; }
+	@echo "$(YELLOW)  Testing core import...$(NC)"
+	@uv run python -c "import blinkb0t.core" || { echo "$(RED)✗ Cannot import blinkb0t.core$(NC)"; exit 1; }
+	@echo "$(YELLOW)  Testing CLI...$(NC)"
+	@uv run blinkb0t --help >/dev/null || { echo "$(RED)✗ CLI not working$(NC)"; exit 1; }
+	@echo "$(GREEN)✓ Installation verified$(NC)"
+
+#############################################################################
 # Documentation
 #############################################################################
 

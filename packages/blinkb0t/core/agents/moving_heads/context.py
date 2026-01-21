@@ -64,6 +64,94 @@ def build_channel_library_context() -> dict[str, Any]:
     }
 
 
+def build_template_context_for_llm(
+    template_docs: list[Any],
+) -> list[dict[str, Any]]:
+    """Build compact template context for LLM choreography planning.
+
+    Creates a simplified view of templates suitable for the LLM to make
+    categorical selections (template_id + preset_id). Excludes implementation
+    details that aren't needed for selection decisions.
+
+    Args:
+        template_docs: List of TemplateDoc objects (from Phase 0 models).
+
+    Returns:
+        List of compact template entries with:
+        - template_id, name, category
+        - description, energy_range, tags
+        - presets (id, name for each)
+        - behavior summary (movement/dimmer patterns)
+
+    Example:
+        >>> from blinkb0t.core.sequencer.moving_heads.compile.loader import TemplateLoader
+        >>> loader = TemplateLoader()
+        >>> loader.load_directory(Path("templates/"))
+        >>> docs = [loader.get(tid) for tid in loader.list_templates()]
+        >>> context = build_template_context_for_llm(docs)
+        >>> context[0]["template_id"]
+        'fan_pulse'
+    """
+    if not template_docs:
+        return []
+
+    context: list[dict[str, Any]] = []
+
+    for doc in template_docs:
+        template = doc.template
+        presets = doc.presets
+
+        # Core identification
+        entry: dict[str, Any] = {
+            "template_id": template.template_id,
+            "name": template.name,
+            "category": template.category,
+        }
+
+        # Metadata for selection reasoning
+        if template.metadata:
+            entry["description"] = template.metadata.description or ""
+            entry["energy_range"] = template.metadata.energy_range
+            entry["tags"] = list(template.metadata.tags)[:5]  # Limit tags
+        else:
+            entry["description"] = ""
+            entry["energy_range"] = None
+            entry["tags"] = []
+
+        # Presets available for this template
+        entry["presets"] = [{"preset_id": p.preset_id, "name": p.name} for p in presets]
+
+        # Behavior summary for choreography reasoning
+        # Extract distinct movement and dimmer patterns from steps
+        movement_ids: set[str] = set()
+        dimmer_ids: set[str] = set()
+        has_phase_offset = False
+
+        for step in template.steps:
+            movement_ids.add(step.movement.movement_id)
+            dimmer_ids.add(step.dimmer.dimmer_id)
+            if step.timing.phase_offset is not None:
+                from blinkb0t.core.sequencer.moving_heads.models.template import (
+                    PhaseOffsetMode,
+                )
+
+                if step.timing.phase_offset.mode != PhaseOffsetMode.NONE:
+                    has_phase_offset = True
+
+        entry["behavior"] = {
+            "movement_patterns": sorted(movement_ids),
+            "dimmer_patterns": sorted(dimmer_ids),
+            "has_chase_effect": has_phase_offset,
+            "step_count": len(template.steps),
+            "cycle_bars": template.repeat.cycle_bars,
+            "repeat_mode": template.repeat.mode.value,
+        }
+
+        context.append(entry)
+
+    return context
+
+
 class Stage(str, Enum):
     """Agent stages for context shaping."""
 

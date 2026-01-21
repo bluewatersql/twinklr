@@ -1,0 +1,56 @@
+# Choreography Planning Task
+
+## Song Information
+- **Duration**: {duration_s}s
+- **Tempo**: {tempo_bpm} BPM
+- **Time Signature**: {time_signature}
+- **Total Bars**: {bar_count}
+
+---
+
+## Musical Analysis
+
+### Energy Profile
+{energy_summary}
+
+### Section Recommendations
+- **Target bars per section**: {recommended_bars_per_section}
+- **Suggested section count**: {min_sections}-{max_sections} sections
+
+---
+
+## Available Templates
+
+{template_library}
+
+---
+
+## Hard Constraints
+
+### Section Coverage
+- First section MUST start at bar 1
+- Final section MUST end at bar {bar_count}
+- No gaps between sections
+- No overlapping sections
+
+### Template Selection
+- Select ONE template per section
+- Template energy_range should align with section energy (allow some flexibility)
+- Avoid same template in 3+ consecutive sections
+
+---
+
+## Output Schema
+
+{json_schema}
+
+---
+
+## Your Task
+
+1. **Divide** the song into logical sections (bars 1-{bar_count})
+2. **Select** one template + optional preset for each section
+3. **Explain** your reasoning briefly for each choice
+4. **Output** valid JSON matching the schema
+
+**Generate the choreography plan now.**
