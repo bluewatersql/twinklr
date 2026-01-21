@@ -1,0 +1,16 @@
+.archive/
+.venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage*
+changes/*
+data/*
+.dev/*
+
+.env*
+.cursorrules
+config.json
+# IDE support - namespace package symlinks
+/blinkb0t/__pycache__
+*.bak*

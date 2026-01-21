@@ -1,0 +1,124 @@
+{
+  "template_id": "freeze_frame",
+  "name": "Freeze Frame",
+  "category": "accent",
+  "timing": {
+    "mode": "musical",
+    "default_duration_bars": 1.0
+  },
+  "steps": [
+    {
+      "step_id": "freeze_snap",
+      "target": "ALL",
+      "timing": {
+        "base_timing": {
+          "mode": "musical",
+          "start_offset_bars": 0.0,
+          "duration_bars": 0.25,
+          "quantize_start": "downbeat",
+          "quantize_end": "sixteenth_bar"
+        },
+        "loop": false
+      },
+      "movement_id": "accent_snap",
+      "movement_params": {
+        "intensity": "INTENSE"
+      },
+      "geometry_id": "mirror_lr",
+      "geometry_params": {},
+      "dimmer_id": "strobe",
+      "dimmer_params": {
+        "intensity": "DRAMATIC"
+      },
+      "entry_transition": {
+        "mode": "snap",
+        "duration_bars": 0.0,
+        "curve": "linear"
+      },
+      "exit_transition": {
+        "mode": "snap",
+        "duration_bars": 0.0,
+        "curve": "linear"
+      },
+      "priority": 10,
+      "blend_mode": "override"
+    },
+    {
+      "step_id": "freeze_hold",
+      "target": "ALL",
+      "timing": {
+        "base_timing": {
+          "mode": "musical",
+          "start_offset_bars": 0.25,
+          "duration_bars": 0.75,
+          "quantize_start": "sixteenth_bar",
+          "quantize_end": "downbeat"
+        },
+        "loop": false
+      },
+      "movement_id": "hold",
+      "movement_params": {
+        "intensity": "SMOOTH"
+      },
+      "geometry_id": "mirror_lr",
+      "geometry_params": {},
+      "dimmer_id": "hold",
+      "dimmer_params": {
+        "intensity": "DRAMATIC"
+      },
+      "entry_transition": {
+        "mode": "snap",
+        "duration_bars": 0.0,
+        "curve": "linear"
+      },
+      "exit_transition": {
+        "mode": "crossfade",
+        "duration_bars": 0.25,
+        "curve": "ease_out_sine"
+      },
+      "priority": 10,
+      "blend_mode": "override"
+    }
+  ],
+  "metadata": {
+    "description": "Instant snap to new mirrored freeze position on accent/downbeat with flash, then hold both position and intensity for musical stop-time effect. Creates dramatic pause in motion - all fixtures snap together to symmetrical position and freeze, holding intensity. Perfect for emphasizing musical breaks, stop-time moments, and percussive accents. The mirror geometry creates balanced visual impact.",
+    "recommended_sections": [
+      "accent",
+      "hit",
+      "breakdown",
+      "drop",
+      "transition",
+      "fill"
+    ],
+    "energy_range": [
+      60,
+      95
+    ],
+    "tags": [
+      "freeze",
+      "freeze_frame",
+      "snap",
+      "stop_time",
+      "staccato",
+      "percussive",
+      "downbeat",
+      "accent",
+      "synchronized",
+      "mirror"
+    ],
+    "best_with": {
+      "tempo_range": [
+        70,
+        150
+      ],
+      "genres": [
+        "edm",
+        "hip-hop",
+        "trap",
+        "pop",
+        "rock",
+        "dubstep"
+      ]
+    }
+  }
+}

@@ -1,0 +1,124 @@
+# Lighting Choreography Planning Task
+
+## Song Information
+- **Duration**: {duration_s}s
+- **Tempo**: {tempo_bpm} BPM
+- **Time Signature**: {time_signature}
+- **Total Bars**: {bar_count}
+- **Beats per Bar**: {beats_per_bar}
+
+---
+
+## Musical Analysis
+
+### Energy Profile
+{energy_summary}
+
+### Existing Sequence Fingerprint
+{fingerprint_summary}
+
+### Section Recommendations
+- **Target bars per section**: {recommended_bars_per_section}
+- **Suggested section count**: {min_sections}-{max_sections} sections
+- **Target section duration**: {target_section_duration_s}s
+
+---
+
+## Available Resources
+
+### Template Library
+{template_library}
+
+### Channel Options
+{channel_libraries}
+
+### Defined Poses
+Use only these pose abstractions in your output:
+- **Audience reference**: AUDIENCE_CENTER, AUDIENCE_LEFT, AUDIENCE_RIGHT
+- **Horizontal**: FORWARD, LEFT_45, RIGHT_45, LEFT_90, RIGHT_90
+- **Vertical**: UP, DOWN, CEILING
+- **Neutral**: SOFT_HOME
+
+**CRITICAL**: These are the ONLY valid pose IDs. Do NOT use UP_LEFT, UP_RIGHT, DOWN_LEFT, DOWN_RIGHT, or CENTER (those don't exist).
+
+---
+
+## Hard Constraints
+
+### Section Coverage
+- First section MUST start at bar 1
+- Final section MUST end at bar {bar_count}
+- No gaps between sections (next start_bar = previous end_bar + 1)
+- No overlapping sections
+
+### Template Selection
+- Use 1-3 templates per section only
+- Template energy_range must be within ±0.3 of section energy_level
+- When layering (2+ templates), they MUST be complementary per system prompt rules
+- DO NOT specify fixture targets (ALL, LEFT, RIGHT, etc.) - implementation agent handles this
+
+### Channel Selection
+- All shutter, color, and gobo values must be from provided channel options
+- Verify strobe usage stays below 30% of total song duration
+- Limit total color changes to 5 or fewer across entire song
+- Limit gobo usage to 50% or less of total bars
+
+### Output Format
+- Follow the JSON schema exactly (provided below)
+- Include all required reasoning fields for every section
+- Include confidence score (1-5) for every section
+- Include overall_strategy summary
+
+---
+
+## Output Schema
+
+{json_schema}
+
+---
+
+## Validation Checklist
+
+Before submitting your plan, verify:
+
+**Coverage:**
+- [ ] Bars 1 through {bar_count} are completely covered with no gaps
+- [ ] Section boundaries align properly (no overlaps)
+
+**Energy & Templates:**
+- [ ] All templates exist in the provided template library
+- [ ] All template energy ranges match section energy (±0.3 tolerance)
+- [ ] Layering percentage is between 40-60% of total sections
+- [ ] All layered sections use complementary templates (reference specific rule)
+
+**Channels:**
+- [ ] All channel values exist in provided channel options
+- [ ] Strobe usage ≤ 30% of bars (count: ___ / {bar_count})
+- [ ] Total color changes ≤ 5 (count: ___)
+- [ ] Gobo usage ≤ 50% of bars (count: ___ / {bar_count})
+
+**Reasoning:**
+- [ ] Every section includes all 6 required reasoning points
+- [ ] All reasoning references specific rules from system prompt
+- [ ] Confidence scores are justified with specific explanations
+
+**Variety:**
+- [ ] Not using same template in 3+ consecutive sections
+- [ ] Mix of single and layered sections throughout
+- [ ] Template variety across different section types
+
+---
+
+## Your Task
+
+Using the design principles from your system prompt and the data provided above:
+
+1. **Analyze** the energy profile to identify natural section boundaries
+2. **Plan sections** covering bars 1-{bar_count} completely with no gaps
+3. **Select templates** (1-3 per section) following energy matching and layering rules
+4. **Select channels** (shutter, color, gobo) following restraint budgets and integration rules
+5. **Write detailed reasoning** for every section addressing all 6 required points
+6. **Validate** your complete plan against all checklists above
+7. **Output** the JSON matching the schema exactly
+
+**Generate the choreography plan now.**

@@ -1,0 +1,18 @@
+[project]
+name = "blinkb0t-cli"
+version = "0.1.0"
+description = "BlinkB0t CLI - Command-line interface"
+requires-python = ">=3.10"
+dependencies = [
+    "blinkb0t-core",
+    "rich>=13.7",
+    "tqdm>=4.65"
+]
+
+[project.scripts]
+blinkb0t = "blinkb0t.cli.main:main"
+
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+

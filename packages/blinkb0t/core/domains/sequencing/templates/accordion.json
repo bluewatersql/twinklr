@@ -1,0 +1,88 @@
+{
+  "template_id": "accordion",
+  "name": "Accordion",
+  "category": "low_energy",
+  "timing": {
+    "mode": "musical",
+    "default_duration_bars": 4.0
+  },
+  "steps": [
+    {
+      "step_id": "accordion_main",
+      "target": "ALL",
+      "timing": {
+        "base_timing": {
+          "mode": "musical",
+          "start_offset_bars": 0.0,
+          "duration_bars": 4.0,
+          "quantize_start": "downbeat",
+          "quantize_end": "downbeat"
+        },
+        "loop": true,
+        "per_fixture_offsets": [0.0, 0.0, 2.0, 2.0, 0.0, 0.0, 2.0, 2.0]
+      },
+      "movement_id": "fan_iris",
+      "movement_params": {
+        "intensity": "SMOOTH"
+      },
+      "geometry_id": "mirror_lr",
+      "geometry_params": {},
+      "dimmer_id": "breathe",
+      "dimmer_params": {
+        "intensity": "SMOOTH"
+      },
+      "entry_transition": {
+        "mode": "crossfade",
+        "duration_bars": 1.0,
+        "curve": "ease_in_out_sine"
+      },
+      "exit_transition": {
+        "mode": "crossfade",
+        "duration_bars": 1.0,
+        "curve": "ease_in_out_sine"
+      },
+      "priority": 0,
+      "blend_mode": "override"
+    }
+  ],
+  "metadata": {
+    "description": "Accordion-like open/close pan motion with synchronized breathing dimmer creating organic expansion and contraction. Uses paired fixture phasing with 2-bar offsets (alternating pairs at 0 and +2 bars) so that when one pair opens the fan, the other closes, creating continuous accordion bellows motion. The mirror geometry ensures symmetrical left-right movement while the breathe dimmer adds depth to the expansion/compression cycle.",
+    "recommended_sections": [
+      "intro",
+      "verse",
+      "breakdown",
+      "ambient",
+      "bridge"
+    ],
+    "energy_range": [
+      15,
+      45
+    ],
+    "tags": [
+      "accordion",
+      "breathe",
+      "fan_iris",
+      "paired",
+      "phase_offset",
+      "smooth",
+      "symmetric",
+      "low_energy",
+      "organic",
+      "mirror"
+    ],
+    "best_with": {
+      "tempo_range": [
+        60,
+        100
+      ],
+      "genres": [
+        "ambient",
+        "folk",
+        "acoustic",
+        "indie",
+        "downtempo",
+        "singer-songwriter"
+      ]
+    }
+  }
+}

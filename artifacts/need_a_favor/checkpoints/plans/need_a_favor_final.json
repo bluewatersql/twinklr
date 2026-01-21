@@ -1,0 +1,686 @@
+{
+  "status": "SUCCESS",
+  "plan": {
+    "sections": [
+      {
+        "name": "intro_1_ambient_establish",
+        "start_bar": 1,
+        "end_bar": 16,
+        "section_role": "intro",
+        "energy_level": 25,
+        "templates": [
+          "gentle_sweep_breathe"
+        ],
+        "params": {
+          "intensity": "SMOOTH",
+          "start_pose": "SOFT_HOME",
+          "end_pose": "FORWARD"
+        },
+        "base_pose": "SOFT_HOME",
+        "reasoning": "Energy Match: Energy 25 (LOW 0.0–0.4) fits an intro where the goal is space and anticipation rather than impact; a gentle sweep supports early musical elements (likely light percussion/pads) without demanding attention. Layering Decision: Single template is chosen because low energy sections should default to open/simple and avoid layering overkill (\"Less is Often More\" + SINGLE template when energy < 0.5). Template Compatibility: N/A (single template) — the point here is clarity and calm. Channel Choices: Shutter=open to match energy <0.5 and preserve strobe budget for later peaks; Color=blue to set a cool, spacious mood and establish palette continuity; Gobo=open to keep a clean readable look and because this is foundational atmosphere (default open gobo 50–60%). Flow: Starts at SOFT_HOME and gently moves toward FORWARD, giving a smooth on-ramp for the next medium-energy verse without a pose jump; keeping the same cool color also avoids early visual churn. Confidence: 5/5 — clean low-energy choice, fully aligned with restraint budgets and sets up the song’s visual language.",
+        "channels": {
+          "shutter": "open",
+          "color": "blue",
+          "gobo": "open"
+        }
+      },
+      {
+        "name": "verse_1_groove_support",
+        "start_bar": 17,
+        "end_bar": 32,
+        "section_role": "verse",
+        "energy_level": 55,
+        "templates": [
+          "verse_sweep_pulse",
+          "ping_pong_chase"
+        ],
+        "params": {
+          "intensity": "SMOOTH",
+          "start_pose": "FORWARD",
+          "end_pose": "AUDIENCE_CENTER"
+        },
+        "base_pose": "FORWARD",
+        "reasoning": "Energy Match: Energy 55 (MEDIUM 0.5–0.7) suits a verse groove where rhythmic definition increases but vocals still need support rather than spectacle. Layering Decision: Two templates are used because medium energy can benefit from a main movement + accent layer, and this section is long enough to justify added texture without escalating to peak intensity (2-template layering rule for 0.5–0.8). Template Compatibility: Complementary by movement type + plane separation: verse_sweep_pulse provides smooth positional sweep (tilt/overall sweep feel) while ping_pong_chase is dimmer-only motion on static positions; this is \"static hold + dynamic movement\" and avoids competing large sweeps. Channel Choices: Shutter=pulse (not strobe) because energy is moderate and we want beat reinforcement without spending strobe budget early (pulse budget 10–20% overall); Color stays blue for continuity across multiple sections (color restraint: hold 2–4 sections); Gobo=open to keep readability since we already added a second template layer. Flow: Continues from the intro’s gentle sweep into a more defined verse pulse; end pose moves toward AUDIENCE_CENTER to set up a transition/build that can tighten focus. Confidence: 4/5 — strong groove layering with good restraint; minor compromise is that pulse shutter adds intensity, but it remains within medium-energy rules and preserves strobes for later.",
+        "channels": {
+          "shutter": "pulse",
+          "color": "blue",
+          "gobo": "open"
+        }
+      },
+      {
+        "name": "transition_1_palette_cleanse",
+        "start_bar": 33,
+        "end_bar": 40,
+        "section_role": "transition",
+        "energy_level": 45,
+        "templates": [
+          "smooth_fade_transition"
+        ],
+        "params": {
+          "intensity": "SMOOTH",
+          "start_pose": "AUDIENCE_CENTER",
+          "end_pose": "SOFT_HOME"
+        },
+        "base_pose": "AUDIENCE_CENTER",
+        "reasoning": "Energy Match: Energy 45 sits at the low-medium boundary, ideal for a section boundary where musical phrasing likely shifts (end of verse into a new idea) without needing peak intensity. Layering Decision: Single template because transitions benefit from clean pose changes and clarity (SINGLE template during transitions rule). Template Compatibility: N/A — the transition template already includes fade-through-black repositioning, which should not be visually competed against. Channel Choices: Shutter=open to keep the transition elegant and avoid strobe/pulse fatigue; Color=white marks a major structural boundary (allowed color change at major transitions) and provides a neutral \"palette cleanse\"; Gobo=open because the transition’s purpose is clarity and repositioning in darkness. Flow: This intentionally breaks the prior groove, resetting to SOFT_HOME so the next build can re-enter with controlled tension; the white color also sets up a more dramatic warm/cool choice later. Confidence: 5/5 — textbook use of a smooth transition with restrained channels and a justified major color shift.",
+        "channels": {
+          "shutter": "open",
+          "color": "white",
+          "gobo": "open"
+        }
+      },
+      {
+        "name": "build_1_tension_ramp",
+        "start_bar": 41,
+        "end_bar": 56,
+        "section_role": "build",
+        "energy_level": 70,
+        "templates": [
+          "tension_mirror_build",
+          "locked_with_tremble"
+        ],
+        "params": {
+          "intensity": "DRAMATIC",
+          "start_pose": "SOFT_HOME",
+          "end_pose": "AUDIENCE_CENTER"
+        },
+        "base_pose": "SOFT_HOME",
+        "reasoning": "Energy Match: Energy 70 is upper-medium, consistent with a pre-drop build where percussion density and harmonic tension rise. Layering Decision: Two templates because builds often benefit from a foundational motion plus a tension micro-layer to ramp energy without spending strobe budget too early (2-template layering for 0.5–0.8 and build sections). Template Compatibility: Complementary via scale contrast + movement type: tension_mirror_build provides larger accelerating pendulum/sweep arcs, while locked_with_tremble adds high-frequency micro-motion while staying position-locked; this is \"large sweeping + small detail\" and avoids two big sweeps fighting. Channel Choices: Shutter=pulse (not strobe) because we’re building energy but saving strobe for the actual drop/chorus peaks (shutter rules + strobe restraint); Color stays white to maintain the build’s “tension/neutral” feel and avoid too many color scenes; Gobo=clouds is added because movement is not at maximum speed and the build benefits from atmosphere/texture (gobo allowed when movement is slower/moderate). This also keeps gobo usage limited (we’ll keep gobos off for many other sections). Flow: Comes out of the smooth transition already in white and intensifies motion/tension without a jarring pose jump; ends centered to set up a focused impact template next. Confidence: 4/5 — strong complementary layering; the only caution is adding a gobo during a build, but it’s a moderate-density breakup (clouds) and movement isn’t “fast+complex gobo,” so compatibility is maintained.",
+        "channels": {
+          "shutter": "pulse",
+          "color": "white",
+          "gobo": "clouds"
+        }
+      },
+      {
+        "name": "drop_hit_1_signature_impact",
+        "start_bar": 57,
+        "end_bar": 64,
+        "section_role": "drop",
+        "energy_level": 90,
+        "templates": [
+          "explosive_drop_strobe"
+        ],
+        "params": {
+          "intensity": "INTENSE",
+          "start_pose": "AUDIENCE_CENTER",
+          "end_pose": "FORWARD"
+        },
+        "base_pose": "AUDIENCE_CENTER",
+        "reasoning": "Energy Match: Energy 90 (HIGH 0.8–1.0) indicates a true drop/impact moment where the music likely has a strong downbeat transient and sustained high-energy groove. Layering Decision: Single template because this is a signature moment where the template IS the moment; also avoids compounding intensity (single powerful template rule for signature hits). Template Compatibility: N/A — explosive_drop_strobe already contains a hit phase and sustain phase; adding more would risk sensory overload. Channel Choices: Shutter=strobe_medium to honor the drop intensity while managing fatigue (strobe only at peaks; medium rather than fast to reduce overload). Strobe budget check: this section is 8 bars; cumulative strobe so far becomes 8/164 = 4.9%, well under 30%. Color changes to red to mark the major transition into the first peak (allowed at major transition; warm color increases perceived intensity). Gobo=open because the movement is intense and strobing is already complex—per integration rule, keep other channels simple when one is intense (avoid fast movement + complex gobo). Flow: The build ended centered and tense; this snaps into a focused explosive look, then ends FORWARD to open the stage for a longer chorus sustain pattern next. Confidence: 5/5 — perfect peak deployment: strobe reserved for a true high-energy moment, warm color shift signals the drop, and gobo restraint prevents overload.",
+        "channels": {
+          "shutter": "strobe_medium",
+          "color": "red",
+          "gobo": "open"
+        }
+      },
+      {
+        "name": "chorus_1_sustain_motion",
+        "start_bar": 65,
+        "end_bar": 80,
+        "section_role": "chorus",
+        "energy_level": 85,
+        "templates": [
+          "energetic_fan_pulse",
+          "sequential_tilt_drop"
+        ],
+        "params": {
+          "intensity": "DRAMATIC",
+          "start_pose": "FORWARD",
+          "end_pose": "AUDIENCE_CENTER"
+        },
+        "base_pose": "FORWARD",
+        "reasoning": "Energy Match: Energy 85 is still high, but more “sustain” than “initial hit,” fitting a chorus where the groove continues and needs hypnotic movement rather than constant impact-only accents. Layering Decision: Two templates because high-energy chorus sections benefit from main movement + accent, and we can create spatial dialogue/texture without resorting to triple-layer complexity (2-template layering for 0.5–0.8+; allowed here because it’s chorus sustain, not a single drop hit). Template Compatibility: Complementary by rhythm offset + movement type: energetic_fan_pulse provides continuous circular/pulsing motion, while sequential_tilt_drop adds occasional left-to-right cascading vertical hits that read as fills on top of the main bed. This is “continuous + punctuated sequential,” avoiding redundancy. Channel Choices: Shutter=open (not strobe) to prevent strobe fatigue after the drop and to keep the chorus readable despite layered movement (rule: avoid strobe→strobe transitions; also keep ONE intense element at a time). Color remains red to hold the same scene across multiple peak sections (color restraint: don’t change every section). Gobo=open because movement is energetic; adding dense gobos would overload. Flow: Smoothly continues from the drop’s red palette but relaxes shutter intensity from strobe to open, giving the audience’s eyes a break while keeping motion energy high; ends centered to set up a potential breakdown/glitch contrast. Confidence: 4/5 — strong restraint choice (open shutter) immediately after a strobe hit; minor compromise is that energy is high yet shutter is open, but this is intentional per strobe budget/fatigue rules.",
+        "channels": {
+          "shutter": "open",
+          "color": "red",
+          "gobo": "open"
+        }
+      },
+      {
+        "name": "breakdown_1_glitch_contrast",
+        "start_bar": 81,
+        "end_bar": 96,
+        "section_role": "breakdown",
+        "energy_level": 75,
+        "templates": [
+          "digital_glitch",
+          "random_bounce"
+        ],
+        "params": {
+          "intensity": "DRAMATIC",
+          "start_pose": "AUDIENCE_CENTER",
+          "end_pose": "SOFT_HOME"
+        },
+        "base_pose": "AUDIENCE_CENTER",
+        "reasoning": "Energy Match: Energy 75 is medium-high, appropriate for a breakdown that may reduce melodic density but increases rhythmic/texture interest (glitch/stutter feel). Layering Decision: Two templates because this is a contrast section where complexity can come from texture rather than sheer brightness; layering adds richness without needing strobe. Template Compatibility: Complementary via rhythm offset and movement type: digital_glitch is rapid irregular snap/stutter, while random_bounce is more organic physics-like motion; the contrast between “digital” and “organic” prevents redundancy and creates a layered texture that doesn’t compete in identical timing. Channel Choices: Shutter=pulse to give rhythmic definition without escalating to strobe (energy 0.5–0.7 rule; at 75 it’s slightly above, but within ±0.3 tolerance reasoning: we’re deliberately keeping shutter moderate to preserve strobe budget for the next peak). Color changes to purple to mark a major structural contrast (chorus → breakdown), and to shift mood cooler/edgier without introducing a totally new rainbow scene. Gobo=dots to add a “digital pixel” texture, but we keep shutter at pulse (not strobe) so we don’t stack too many intense elements; dots density is moderate-high but acceptable because the movement is not a sustained fast sweep—it's snap-based where the texture reads. Flow: This deliberately pivots away from the red chorus into a cooler breakdown scene; ending at SOFT_HOME prepares a clean re-build. Confidence: 3/5 — the concept is strong, but it’s a busier visual section (snap texture + gobo). I mitigated by using pulse instead of strobe and by making this the main “textural” gobo moment to stay within gobo budget.",
+        "channels": {
+          "shutter": "pulse",
+          "color": "purple",
+          "gobo": "dots"
+        }
+      },
+      {
+        "name": "build_2_crescendo_to_final_peak",
+        "start_bar": 97,
+        "end_bar": 112,
+        "section_role": "build",
+        "energy_level": 80,
+        "templates": [
+          "crescendo_sweep_build",
+          "chase_from_point"
+        ],
+        "params": {
+          "intensity": "DRAMATIC",
+          "start_pose": "SOFT_HOME",
+          "end_pose": "AUDIENCE_CENTER"
+        },
+        "base_pose": "SOFT_HOME",
+        "reasoning": "Energy Match: Energy 80 indicates a strong build where the music likely reintroduces drive and anticipates a bigger final chorus/climax. Layering Decision: Two templates because this is a long ramp; a reveal/formation layer helps the build feel like it is “assembling” toward the peak (layering for builds). Template Compatibility: Complementary by scale contrast + plane separation: crescendo_sweep_build provides broad sweep acceleration, while chase_from_point is a sequential activation/reveal that reads as structural staging rather than another competing sweep. This is “large sweep + formation reveal,” not “fast+fast.” Channel Choices: Shutter=open (not strobe) despite high build energy to preserve strobe budget for the final peak and to avoid strobe fatigue (strobe reserved for peaks >0.7, but not mandatory; restraint principle). Color stays purple to maintain continuity from breakdown through the build (color restraint: hold 2–4 sections). Gobo=open to reduce visual load because we already used dots in the prior section; also avoids complex gobo with accelerating movement. Flow: Starts from SOFT_HOME (end of breakdown) and progressively tightens to AUDIENCE_CENTER, making the next drop/chorus impact feel earned; keeping purple maintains a coherent “act 2” palette. Confidence: 4/5 — strong build logic and good budget management; slight compromise is using open shutter at energy 80, but it’s justified as a strategic hold-back for the final strobe peak.",
+        "channels": {
+          "shutter": "open",
+          "color": "purple",
+          "gobo": "open"
+        }
+      },
+      {
+        "name": "chorus_2_peak_strobe_moment",
+        "start_bar": 113,
+        "end_bar": 128,
+        "section_role": "chorus",
+        "energy_level": 95,
+        "templates": [
+          "chorus_circle_strobe"
+        ],
+        "params": {
+          "intensity": "INTENSE",
+          "start_pose": "AUDIENCE_CENTER",
+          "end_pose": "FORWARD"
+        },
+        "base_pose": "AUDIENCE_CENTER",
+        "reasoning": "Energy Match: Energy 95 is the climactic peak tier (HIGH 0.8–1.0), appropriate for the biggest chorus where the song’s maximal density and excitement likely occur. Layering Decision: Single template because this is one of the 1–2 climactic moments where a dedicated peak template should dominate; adding layers risks chaos and reduces readability (single powerful template for signature moments + avoid fast+fast). Template Compatibility: N/A — chorus_circle_strobe already provides sustained hypnotic motion plus strobe. Channel Choices: Shutter=strobe_fast to clearly differentiate this as the biggest peak, while still respecting the strobe budget. Strobe budget check: strobe sections are bars 57–64 (8 bars) + 113–128 (16 bars) = 24 bars strobing; 24/164 = 14.6%, under 30%. Color changes back to red to signal “return to peak” and to complete a simple 3-scene palette (blue intro/verse, white transition/build, red peaks, purple breakdown/build). This is a major transition, so color change is justified and still within ≤5 total changes. Gobo=open to avoid stacking dense texture on top of fast circular motion + fast strobe (integration rule: keep ONE intense, others simple). Flow: The prior build held back on strobe; this release into fast strobe feels earned and maximally impactful. Ending FORWARD opens the look to decrescendo/outro without a hard stop. Confidence: 5/5 — strong climax execution with clean integration and healthy strobe budget remaining.",
+        "channels": {
+          "shutter": "strobe_fast",
+          "color": "red",
+          "gobo": "open"
+        }
+      },
+      {
+        "name": "outro_release_and_resolve",
+        "start_bar": 129,
+        "end_bar": 164,
+        "section_role": "outro",
+        "energy_level": 35,
+        "templates": [
+          "pendulum",
+          "converge_diverge"
+        ],
+        "params": {
+          "intensity": "SMOOTH",
+          "start_pose": "FORWARD",
+          "end_pose": "SOFT_HOME"
+        },
+        "base_pose": "FORWARD",
+        "reasoning": "Energy Match: Energy 35 returns to LOW-MED territory, consistent with an outro where musical elements thin out and the goal is resolution rather than drive. Layering Decision: Two templates are used (rather than single) because the outro is long (36 bars) and benefits from slow evolving depth without increasing intensity; this is a controlled, complementary ambient layering rather than “more energy.” Template Compatibility: Complementary via movement type + scale contrast: pendulum provides gentle organic sway with offsets, while converge_diverge provides slow breathing expansion/contraction; both are slow (not fast+fast) and operate with different motion character (sway vs iris-like expansion), creating texture without competition. Channel Choices: Shutter=open to match energy <0.5 and to give full relief after the peak strobing (avoid strobe fatigue). Color returns to blue to “cool down” emotionally and mirror the intro, creating narrative symmetry; this is a major transition (peak → outro) and remains within the ≤5 color change limit. Gobo=open to keep the outro clean and readable and to keep total gobo usage under 50% of bars. Flow: Smoothly decrescendos from the peak by removing strobe and slowing motion; pose eases back to SOFT_HOME for a final rest state. Confidence: 5/5 — strong release strategy with complementary slow layers and excellent restraint after the climax.",
+        "channels": {
+          "shutter": "open",
+          "color": "blue",
+          "gobo": "open"
+        }
+      }
+    ],
+    "overall_strategy": "Overall Strategy: Build a clear 4-scene color narrative with restraint: BLUE (intro/verse calm), WHITE (transition + tension build), RED (drop/chorus peaks), PURPLE (breakdown + rebuild), then back to BLUE for resolution. Movement hierarchy follows the design philosophy: low-energy sections use single ambient templates; medium sections use 2-layer complementary combinations where one layer is structural (sweep/pose) and the other is rhythmic (dimmer chase/pulse) to avoid redundancy. Peak moments are intentionally isolated as single-template signatures with strobe reserved for only the true drops/chorus climax, keeping total strobe well under the 30% fatigue threshold. Gobos are treated as rare texture accents (clouds in build, dots in breakdown) and otherwise kept open to preserve beam readability, especially during fast/high-energy movement. Transitions prioritize clean pose changes (fade-through-black) and avoid abrupt vertical jumps by ending sections in poses that naturally set up the next (SOFT_HOME ↔ FORWARD ↔ AUDIENCE_CENTER).",
+    "template_variety_score": 8,
+    "energy_alignment_score": 9
+  },
+  "implementation": {
+    "sections": [
+      {
+        "name": "intro_1_ambient_establish__gentle_sweep_breathe_ALL",
+        "plan_section_name": "intro_1_ambient_establish",
+        "start_bar": 1,
+        "end_bar": 16,
+        "template_id": "gentle_sweep_breathe",
+        "params": {
+          "intensity": "SMOOTH",
+          "color": "BLUE",
+          "shutter": "OPEN",
+          "gobo": "OPEN"
+        },
+        "base_pose": "SOFT_HOME",
+        "targets": [
+          "ALL"
+        ],
+        "layer_priority": 0,
+        "reasoning": "Targeting: Single low-energy ambient look, so ALL fixtures run one template for calm clarity (no layering). Intensity: Plan energy 25 maps to SMOOTH. Layer priority: Only layer, so 0. Timing: Bars 1–16 match plan exactly with no gaps/overlaps."
+      },
+      {
+        "name": "verse_1_groove_support__verse_sweep_pulse_LEFT",
+        "plan_section_name": "verse_1_groove_support",
+        "start_bar": 17,
+        "end_bar": 32,
+        "template_id": "verse_sweep_pulse",
+        "params": {
+          "intensity": "DRAMATIC",
+          "color": "BLUE",
+          "shutter": "PULSE",
+          "gobo": "OPEN"
+        },
+        "base_pose": "FORWARD",
+        "targets": [
+          "LEFT"
+        ],
+        "layer_priority": 0,
+        "reasoning": "Targeting: Two-template medium section uses disjoint LEFT+RIGHT; LEFT carries the structural sweep bed. Intensity: Plan energy 55 maps to DRAMATIC. Layer priority: Structural sweep is main (0), chase becomes accent (1). Timing: Bars 17–32 match plan exactly."
+      },
+      {
+        "name": "verse_1_groove_support__ping_pong_chase_RIGHT",
+        "plan_section_name": "verse_1_groove_support",
+        "start_bar": 17,
+        "end_bar": 32,
+        "template_id": "ping_pong_chase",
+        "params": {
+          "intensity": "DRAMATIC",
+          "color": "BLUE",
+          "shutter": "PULSE",
+          "gobo": "OPEN"
+        },
+        "base_pose": "AUDIENCE_CENTER",
+        "targets": [
+          "RIGHT"
+        ],
+        "layer_priority": 1,
+        "reasoning": "Targeting: RIGHT is disjoint from LEFT, enabling concurrent accent without fixture conflicts; ping-pong reads as rhythmic counterpoint. Intensity: Energy 55 → DRAMATIC. Layer priority: Accent layer sits above the sweep bed (1). Timing: Bars 17–32 match plan exactly."
+      },
+      {
+        "name": "transition_1_palette_cleanse__smooth_fade_transition_ALL",
+        "plan_section_name": "transition_1_palette_cleanse",
+        "start_bar": 33,
+        "end_bar": 40,
+        "template_id": "smooth_fade_transition",
+        "params": {
+          "intensity": "SMOOTH",
+          "color": "WHITE",
+          "shutter": "OPEN",
+          "gobo": "OPEN"
+        },
+        "base_pose": "SOFT_HOME",
+        "targets": [
+          "ALL"
+        ],
+        "layer_priority": 0,
+        "reasoning": "Targeting: Transition is intentionally single-template for clean fade-through-black repositioning, so ALL only. Intensity: Energy 45 is treated as low-medium boundary but maps to SMOOTH per the plan’s transition intent (keeps it elegant). Layer priority: Single layer (0). Timing: Bars 33–40 match plan exactly."
+      },
+      {
+        "name": "build_1_tension_ramp__tension_mirror_build_LEFT",
+        "plan_section_name": "build_1_tension_ramp",
+        "start_bar": 41,
+        "end_bar": 56,
+        "template_id": "tension_mirror_build",
+        "params": {
+          "intensity": "DRAMATIC",
+          "color": "WHITE",
+          "shutter": "PULSE",
+          "gobo": "CLOUDS"
+        },
+        "base_pose": "AUDIENCE_CENTER",
+        "targets": [
+          "LEFT"
+        ],
+        "layer_priority": 0,
+        "reasoning": "Targeting: Two-template build uses disjoint LEFT+RIGHT; LEFT runs the large-scale accelerating mirror/sweep as the structural foundation. Intensity: Energy 70 maps to DRAMATIC. Layer priority: Large build motion is main (0), micro-tremble is accent (1). Timing: Bars 41–56 match plan exactly."
+      },
+      {
+        "name": "build_1_tension_ramp__locked_with_tremble_RIGHT",
+        "plan_section_name": "build_1_tension_ramp",
+        "start_bar": 41,
+        "end_bar": 56,
+        "template_id": "locked_with_tremble",
+        "params": {
+          "intensity": "DRAMATIC",
+          "color": "WHITE",
+          "shutter": "PULSE",
+          "gobo": "CLOUDS"
+        },
+        "base_pose": "AUDIENCE_CENTER",
+        "targets": [
+          "RIGHT"
+        ],
+        "layer_priority": 1,
+        "reasoning": "Targeting: RIGHT is disjoint from LEFT, allowing the locked micro-motion to add tension detail without conflicting with the main sweep. Intensity: Energy 70 → DRAMATIC. Layer priority: Micro-detail sits above the structural build (1). Timing: Bars 41–56 match plan exactly."
+      },
+      {
+        "name": "drop_hit_1_signature_impact__explosive_drop_strobe_ALL",
+        "plan_section_name": "drop_hit_1_signature_impact",
+        "start_bar": 57,
+        "end_bar": 64,
+        "template_id": "explosive_drop_strobe",
+        "params": {
+          "intensity": "INTENSE",
+          "color": "RED",
+          "shutter": "STROBE_MEDIUM",
+          "gobo": "OPEN"
+        },
+        "base_pose": "AUDIENCE_CENTER",
+        "targets": [
+          "ALL"
+        ],
+        "layer_priority": 0,
+        "reasoning": "Targeting: Signature drop is a single-template moment, so ALL for unified impact and no competing layers. Intensity: Energy 90 maps to INTENSE. Layer priority: Single layer (0). Timing: Bars 57–64 match plan exactly."
+      },
+      {
+        "name": "chorus_1_sustain_motion__energetic_fan_pulse_LEFT",
+        "plan_section_name": "chorus_1_sustain_motion",
+        "start_bar": 65,
+        "end_bar": 80,
+        "template_id": "energetic_fan_pulse",
+        "params": {
+          "intensity": "INTENSE",
+          "color": "RED",
+          "shutter": "OPEN",
+          "gobo": "OPEN"
+        },
+        "base_pose": "FORWARD",
+        "targets": [
+          "LEFT"
+        ],
+        "layer_priority": 0,
+        "reasoning": "Targeting: Two-template high-energy sustain uses disjoint LEFT+RIGHT; LEFT carries the continuous fan/pulse bed for readability. Intensity: Energy 85 maps to INTENSE. Layer priority: Continuous bed is main (0), sequential tilt drops become accents (1). Timing: Bars 65–80 match plan exactly."
+      },
+      {
+        "name": "chorus_1_sustain_motion__sequential_tilt_drop_RIGHT",
+        "plan_section_name": "chorus_1_sustain_motion",
+        "start_bar": 65,
+        "end_bar": 80,
+        "template_id": "sequential_tilt_drop",
+        "params": {
+          "intensity": "INTENSE",
+          "color": "RED",
+          "shutter": "OPEN",
+          "gobo": "OPEN"
+        },
+        "base_pose": "AUDIENCE_CENTER",
+        "targets": [
+          "RIGHT"
+        ],
+        "layer_priority": 1,
+        "reasoning": "Targeting: RIGHT is disjoint from LEFT so the sequential vertical hits read as spatial fills without conflicts. Intensity: Energy 85 → INTENSE. Layer priority: Punctuated cascade is an accent above the continuous bed (1). Timing: Bars 65–80 match plan exactly."
+      },
+      {
+        "name": "breakdown_1_glitch_contrast__digital_glitch_ODD",
+        "plan_section_name": "breakdown_1_glitch_contrast",
+        "start_bar": 81,
+        "end_bar": 96,
+        "template_id": "digital_glitch",
+        "params": {
+          "intensity": "INTENSE",
+          "color": "PURPLE",
+          "shutter": "PULSE",
+          "gobo": "DOTS"
+        },
+        "base_pose": "AUDIENCE_CENTER",
+        "targets": [
+          "ODD"
+        ],
+        "layer_priority": 0,
+        "reasoning": "Targeting: Two-template texture section uses disjoint ODD+EVEN to emphasize alternating glitch/organic contrast across the rig with no overlap. Intensity: Energy 75 maps to INTENSE per required mapping. Layer priority: Digital glitch is the defining texture, so it is main (0); bounce is supporting motion (1). Timing: Bars 81–96 match plan exactly."
+      },
+      {
+        "name": "breakdown_1_glitch_contrast__random_bounce_EVEN",
+        "plan_section_name": "breakdown_1_glitch_contrast",
+        "start_bar": 81,
+        "end_bar": 96,
+        "template_id": "random_bounce",
+        "params": {
+          "intensity": "INTENSE",
+          "color": "PURPLE",
+          "shutter": "PULSE",
+          "gobo": "DOTS"
+        },
+        "base_pose": "SOFT_HOME",
+        "targets": [
+          "EVEN"
+        ],
+        "layer_priority": 1,
+        "reasoning": "Targeting: EVEN is disjoint from ODD, enabling concurrent organic bounce without fixture conflicts and reinforcing the breakdown’s contrast. Intensity: Energy 75 → INTENSE (per mapping). Layer priority: Bounce is secondary texture under the glitch identity (1). Timing: Bars 81–96 match plan exactly."
+      },
+      {
+        "name": "build_2_crescendo_to_final_peak__crescendo_sweep_build_LEFT",
+        "plan_section_name": "build_2_crescendo_to_final_peak",
+        "start_bar": 97,
+        "end_bar": 112,
+        "template_id": "crescendo_sweep_build",
+        "params": {
+          "intensity": "INTENSE",
+          "color": "PURPLE",
+          "shutter": "OPEN",
+          "gobo": "OPEN"
+        },
+        "base_pose": "SOFT_HOME",
+        "targets": [
+          "LEFT"
+        ],
+        "layer_priority": 0,
+        "reasoning": "Targeting: Two-template build uses disjoint LEFT+RIGHT; LEFT runs the broad accelerating sweep as the main ramp. Intensity: Energy 80 maps to INTENSE. Layer priority: Broad sweep is structural main (0); chase-from-point is the formation/reveal accent (1). Timing: Bars 97–112 match plan exactly."
+      },
+      {
+        "name": "build_2_crescendo_to_final_peak__chase_from_point_RIGHT",
+        "plan_section_name": "build_2_crescendo_to_final_peak",
+        "start_bar": 97,
+        "end_bar": 112,
+        "template_id": "chase_from_point",
+        "params": {
+          "intensity": "INTENSE",
+          "color": "PURPLE",
+          "shutter": "OPEN",
+          "gobo": "OPEN"
+        },
+        "base_pose": "AUDIENCE_CENTER",
+        "targets": [
+          "RIGHT"
+        ],
+        "layer_priority": 1,
+        "reasoning": "Targeting: RIGHT is disjoint from LEFT, so the sequential reveal can play against the sweep without conflicts and reads as staging toward the peak. Intensity: Energy 80 → INTENSE. Layer priority: Reveal/chase is an accent layer (1). Timing: Bars 97–112 match plan exactly."
+      },
+      {
+        "name": "chorus_2_peak_strobe_moment__chorus_circle_strobe_ALL",
+        "plan_section_name": "chorus_2_peak_strobe_moment",
+        "start_bar": 113,
+        "end_bar": 128,
+        "template_id": "chorus_circle_strobe",
+        "params": {
+          "intensity": "INTENSE",
+          "color": "RED",
+          "shutter": "STROBE_FAST",
+          "gobo": "OPEN"
+        },
+        "base_pose": "AUDIENCE_CENTER",
+        "targets": [
+          "ALL"
+        ],
+        "layer_priority": 0,
+        "reasoning": "Targeting: Climactic peak is intentionally single-template, so ALL fixtures unify into the signature circle+strobe look (no layering). Intensity: Energy 95 maps to INTENSE. Layer priority: Single layer (0). Timing: Bars 113–128 match plan exactly."
+      },
+      {
+        "name": "outro_release_and_resolve__pendulum_LEFT",
+        "plan_section_name": "outro_release_and_resolve",
+        "start_bar": 129,
+        "end_bar": 164,
+        "template_id": "pendulum",
+        "params": {
+          "intensity": "SMOOTH",
+          "color": "BLUE",
+          "shutter": "OPEN",
+          "gobo": "OPEN"
+        },
+        "base_pose": "FORWARD",
+        "targets": [
+          "LEFT"
+        ],
+        "layer_priority": 0,
+        "reasoning": "Targeting: Two-template long outro uses disjoint LEFT+RIGHT to add slow evolving depth without raising intensity; LEFT carries the gentle sway as the main ambient motion. Intensity: Energy 35 maps to SMOOTH. Layer priority: Pendulum sway is the primary motion bed (0); converge/diverge is the breathing accent (1). Timing: Bars 129–164 match plan exactly."
+      },
+      {
+        "name": "outro_release_and_resolve__converge_diverge_RIGHT",
+        "plan_section_name": "outro_release_and_resolve",
+        "start_bar": 129,
+        "end_bar": 164,
+        "template_id": "converge_diverge",
+        "params": {
+          "intensity": "SMOOTH",
+          "color": "BLUE",
+          "shutter": "OPEN",
+          "gobo": "OPEN"
+        },
+        "base_pose": "SOFT_HOME",
+        "targets": [
+          "RIGHT"
+        ],
+        "layer_priority": 1,
+        "reasoning": "Targeting: RIGHT is disjoint from LEFT, allowing the slow expansion/contraction to complement the sway without conflicts and create a gentle stereo field. Intensity: Energy 35 → SMOOTH. Layer priority: Breathing motion is secondary to the sway bed (1). Timing: Bars 129–164 match plan exactly."
+      }
+    ],
+    "total_duration_bars": 164,
+    "quantization_applied": true,
+    "timing_precision": "bar_aligned",
+    "overall_strategy": "Overall Strategy: Build a clear 4-scene color narrative with restraint: BLUE (intro/verse calm), WHITE (transition + tension build), RED (drop/chorus peaks), PURPLE (breakdown + rebuild), then back to BLUE for resolution. Movement hierarchy follows the design philosophy: low-energy sections use single ambient templates; medium sections use 2-layer complementary combinations where one layer is structural (sweep/pose) and the other is rhythmic (dimmer chase/pulse) to avoid redundancy. Peak moments are intentionally isolated as single-template signatures with strobe reserved for only the true drops/chorus climax, keeping total strobe well under the 30% fatigue threshold. Gobos are treated as rare texture accents (clouds in build, dots in breakdown) and otherwise kept open to preserve beam readability, especially during fast/high-energy movement. Transitions prioritize clean pose changes (fade-through-black) and avoid abrupt vertical jumps by ending sections in poses that naturally set up the next (SOFT_HOME ↔ FORWARD ↔ AUDIENCE_CENTER).",
+    "implementation_approach": "Implemented each plan section as bar-aligned blocks matching the plan exactly. Single-template sections target ALL fixtures with layer_priority 0 for maximum clarity (intro, transition, drop hit, final peak). Two-template sections use only disjoint target pairs to avoid conflicts: LEFT+RIGHT for spatial dialogue where a main bed plus accent reads clearly, and ODD+EVEN for alternating/texture sections to enhance rhythmic separation. Intensity is mapped strictly from plan energy to SMOOTH/DRAMATIC/INTENSE. Base poses follow the plan’s flow goals (SOFT_HOME → FORWARD → AUDIENCE_CENTER) to minimize pose jumps at transitions; priority 0 is always the structural/main layer, priority 1 the rhythmic/texture accent."
+  },
+  "evaluation": {
+    "story_overview": "The sequence opens in a cool, spacious BLUE with a single ambient sweep to establish mood, then splits into LEFT/RIGHT conversational movement through the verse to build spatial interest. Tension builds through two mirror/locked layers into isolated strobe signature hits for the drops, a gritty digital breakdown that contrasts motion language, and a final release that returns to calm BLUE resolution.",
+    "overall_score": 90.61,
+    "category_scores": [
+      {
+        "category": "Musical Alignment",
+        "score": 95,
+        "reasoning": "All plan section boundaries are bar-aligned and implementation metadata states beat_aligned and bar_aligned. Every planned section (e.g., 'intro_1_ambient_establish' bars 1-16, 'verse_1_groove_support' bars 17-32, 'drop_hit_1_signature_impact' bars 57-64) begins on downbeats and matches the intended musical phrases, with no off-beat starts.",
+        "strengths": [
+          "Sections start on downbeats and adhere to bar boundaries (implementation: bar_aligned).",
+          "'intro_1_ambient_establish' (bars 1-16) and 'verse_1_groove_support' (bars 17-32) respect phrase lengths for establishing and answering."
+        ],
+        "weaknesses": [
+          "No explicit sub-bar micro-timing (±50ms) verification beyond metadata; assume bar alignment implies tight sync but micro-adjustments could further tighten hits for percussion accents."
+        ]
+      },
+      {
+        "category": "Energy Matching",
+        "score": 88,
+        "reasoning": "Energy progression is coherent: low-energy intro (25) → medium verse (55) → tension builds (70-80) → high-energy drops/chorus (90-95) → restrained outro (35). Templates chosen generally match the stated energies. Minor mismatch: 'breakdown_1_glitch_contrast' (energy=75) uses two aggressive templates (digital_glitch, random_bounce) which can read slightly higher than the stated intent.",
+        "strengths": [
+          "'intro_1_ambient_establish' uses a low-energy ambient template (gentle_sweep_breathe) consistent with energy=25.",
+          "'drop_hit_1_signature_impact' (bars 57-64) and 'chorus_2_peak_strobe_moment' (bars 113-128) reserve high-intensity templates as expected for peaks."
+        ],
+        "weaknesses": [
+          "'breakdown_1_glitch_contrast' (bars 81-96) pairing digital_glitch + random_bounce may push perceived energy above the stated 75, reducing contrast with the following build.",
+          "'build_1_tension_ramp' (bars 41-56) uses locked_with_tremble which can compete with the mirror build if not dialed to lower amplitude."
+        ]
+      },
+      {
+        "category": "Template Variety & Layering Quality",
+        "score": 82,
+        "reasoning": "Good template variety overall and layering reaches plan target (60% of sections layered). Several layered sections use complementary Left/Right roles (e.g., verse, build_1, chorus_1). However, one layered pairing risks redundancy/chaos: 'breakdown_1_glitch_contrast' stacks two motion-heavy templates (digital_glitch + random_bounce).",
+        "strengths": [
+          "Wide range of templates across the plan (no single template >40% of time).",
+          "Layering occurs in 6 of 10 plan sections (60%) which meets the 40-60% target: verse_1, build_1, chorus_1, breakdown_1, build_2, outro_release."
+        ],
+        "weaknesses": [
+          "'breakdown_1_glitch_contrast' (bars 81-96) layers two fast/dynamic templates (digital_glitch + random_bounce) — overlapping movement types risk visual clutter.",
+          "'build_1_tension_ramp' (tension_mirror_build + locked_with_tremble) could become two competing structural layers if tremble amplitude isn't constrained."
+        ]
+      },
+      {
+        "category": "Timing Coverage & Target Validity",
+        "score": 95,
+        "reasoning": "Full song coverage with no temporal gaps or overlaps that create fixture conflicts. Overlapping sections correctly use disjoint fixture groups (LEFT+RIGHT, ODD+EVEN). No instance of ALL overlapping with another group.",
+        "strengths": [
+          "No target conflicts detected: LEFT+RIGHT overlaps (e.g., bars 17-32, 41-56, 65-80, 97-112, 129-164) are valid disjoint pairs.",
+          "ODD+EVEN overlap for 'breakdown_1_glitch_contrast' (bars 81-96) is valid and avoids conflicts."
+        ],
+        "weaknesses": [
+          "Implementation uses 'ALL' for transitions/drops (e.g., 'transition_1_palette_cleanse' bars 33-40, 'drop_hit_1_signature_impact' bars 57-64, 'chorus_2_peak_strobe_moment' bars 113-128) — this is safe here but leaves no room for simultaneous secondary layers during those bars; if a future designer attempts to layer, it will create conflicts."
+        ]
+      },
+      {
+        "category": "Shutter Appropriateness & Restraint",
+        "score": 95,
+        "reasoning": "Strobe usage is conservative and reserved for true peaks. Strobe appears only in 'drop_hit_1_signature_impact' (bars 57-64) and 'chorus_2_peak_strobe_moment' (bars 113-128) -> 24 strobe bars out of 164 total bars = 14.63% strobe usage, well under the 30% fatigue threshold.",
+        "strengths": [
+          "Strobe limited to major impact moments: 'drop_hit_1_signature_impact' and 'chorus_2_peak_strobe_moment'.",
+          "Most of the song uses open shutter or pulse for builds and verses, preserving strobe impact."
+        ],
+        "weaknesses": [
+          "No specific mention of pulse vs open on medium-energy sections (e.g., 'verse_1_groove_support') — ensure pulses are subtle to avoid creeping strobe-like fatigue."
+        ]
+      },
+      {
+        "category": "Color Appropriateness & Restraint",
+        "score": 95,
+        "reasoning": "Plan defines a coherent 4-scene palette (BLUE, WHITE, RED, PURPLE → BACK TO BLUE) and holds colors across logical transitions. Unique color scenes = 4, within the 3-5 recommended range, and color changes mark major transitions (intro→build→drop→breakdown→resolution).",
+        "strengths": [
+          "Four clear color scenes (BLUE, WHITE, RED, PURPLE) with narrative mapping to energy levels.",
+          "Color changes occur at major transitions: e.g., switch to WHITE for tension ('build_1' bars 41-56), RED for drop/chorus ('drop_hit_1' and 'chorus_1')."
+        ],
+        "weaknesses": [
+          "Implementation doesn't explicitly list colors per implementation section — ensure color holds across adjacent sections (e.g., maintain WHITE through transition_1_palette_cleanse into build_1 to preserve narrative)."
+        ]
+      },
+      {
+        "category": "Gobo & Visual Impact",
+        "score": 88,
+        "reasoning": "Gobos are used sparingly as planned. Plan applies textures in build and breakdown (clouds in builds, dots in breakdown) and keeps gobo open otherwise. Estimated gobo usage in plan: build_1 (bars 41-56), breakdown_1 (81-96), build_2 (97-112) → 3/10 sections with gobos = 30% gobo usage; open gobo ~70%. This is slightly above the 50-60% open target but still conservative and preserves beam readability during fast movement.",
+        "strengths": [
+          "'build_1' and 'build_2' (bars 41-56 and 97-112) reserved for cloud-like gobo texture — appropriate for tension.",
+          "'breakdown_1_glitch_contrast' (bars 81-96) uses dot/breakup for atmosphere contrast, creating memorable texture moments."
+        ],
+        "weaknesses": [
+          "Open gobo is at ~70% (7/10 sections) rather than the ideal 50-60%; result is safe but slightly over-conservative and misses opportunities to texture additional mid-energy moments.",
+          "Potential mismatch: complex gobos applied on builds with non-trivial movement (e.g., 'crescendo_sweep_build') risk visual overload unless gobo scale is adjusted."
+        ]
+      },
+      {
+        "category": "Choreography Complexity & Depth",
+        "score": 90,
+        "reasoning": "Layering depth is strong (6/10 sections layered = 60%), and targeting uses a healthy variety of semantic groups (ALL, LEFT, RIGHT, ODD, EVEN). Channels are coordinated with LEFT/RIGHT dialogues in verse/chorus and ODD/EVEN for breakdown, demonstrating spatial thinking and temporal layering without flattening to ALL.",
+        "strengths": [
+          "Layering present in key moments: verse_1, build_1, chorus_1, breakdown_1, build_2, outro_release (6/10 = 60%).",
+          "Good use of semantic target groups: LEFT/RIGHT for dialogue; ODD/EVEN for textural breakdowns."
+        ],
+        "weaknesses": [
+          "A few layered pairings (notably 'breakdown_1_glitch_contrast') risk being two competing rhythmic layers—consider making one layer structural or tonal to improve depth.",
+          "Implementation uses ALL for signature hits which reduces potential for additional layered accents during those same bars."
+        ]
+      }
+    ],
+    "summary": "Overall the plan and implementation demonstrate a mature, restrained design philosophy: bar-aligned sections, a clear 4-color narrative (BLUE → WHITE → RED → PURPLE → BLUE), and intentional strobe and gobo usage reserved for climactic moments ('drop_hit_1_signature_impact' bars 57-64 and 'chorus_2_peak_strobe_moment' bars 113-128). Layering is deliberately used in 6/10 sections (60%) with LEFT/RIGHT and ODD/EVEN targeting avoiding any fixture conflicts; timing coverage is complete and implementation is beat-aligned.\n\nPrimary areas to tighten are micro-level layering compatibility and texture assignment. Specifically, 'breakdown_1_glitch_contrast' (bars 81-96) layers two aggressive motion templates (digital_glitch + random_bounce) that can compete visually; consider converting one layer to a subtle texture or slower rhythmic pulse. Also verify gobo scale on fast sweep builds so patterns read cleanly (see 'crescendo_sweep_build' bars 97-112). Overall, this is a high-quality plan and implementation that passes the 70 threshold comfortably.",
+    "actionable_feedback": [
+      "Breakdown layering fix: For 'breakdown_1_glitch_contrast' (bars 81-96), change one layer to a slower texture or tonal layer — e.g., replace random_bounce with a muted 'low_pulse_dimmer' or 'soft_spot_hold' to create contrast with digital_glitch.",
+      "Tremble restraint in build_1: In 'build_1_tension_ramp' (bars 41-56) lower locked_with_tremble amplitude or change it to 'locked_subtle_tremble' so tension_mirror_build remains the dominant structural element.",
+      "Gobo usage tuning: Move one gobo texture from build_2 ('crescendo_sweep_build' bars 97-112) to a later sub-section or reduce gobo scale when paired with fast sweeps. If gobo must be present on sweep, use large-scale breakup or very soft edge gobos to maintain beam legibility.",
+      "Color hold guidance: Ensure 'transition_1_palette_cleanse' (bars 33-40) remains in WHITE and flows into 'build_1' WHITE to avoid an unnecessary color flicker; reserve RED for 'drop_hit_1' and 'chorus_1' to keep the RED scene impactful.",
+      "ALL usage strategy: Consider changing one of the ALL signature bars to LEFT+RIGHT with a synchronized quick ALL flash at the downbeat to allow layered accents directly before/after the main ALL hit. For example, make 'drop_hit_1' use a 1-bar ALL impact at the downbeat and surrounding 1–2 bars use LEFT/RIGHT accents so secondary layers can sit adjacent without conflict.",
+      "Micro-timing: Though implementation is bar_aligned, audition ±1-2 sub-beat offsets for percussion-heavy hits (e.g., the initial hit of 'drop_hit_1') to tighten perceived synchronization with percussive transients."
+    ],
+    "pass_threshold": true,
+    "channel_scoring": {
+      "shutter_appropriateness": 9,
+      "shutter_issues": [
+        "No major issues; ensure medium-energy pulses (verse) remain subtle and not strobe-like."
+      ],
+      "color_appropriateness": 9,
+      "color_issues": [
+        "Ensure transition_1_palette_cleanse holds WHITE into build_1 to avoid distracting micro-changes."
+      ],
+      "gobo_appropriateness": 8,
+      "gobo_issues": [
+        "Gobos on fast sweeps (e.g., 'crescendo_sweep_build') must be large-scale or low-contrast to avoid busy visual noise."
+      ],
+      "visual_impact": 9,
+      "visual_impact_issues": [
+        "Breakdown layering and gobo scale could be tuned to increase clarity of peak moments."
+      ]
+    }
+  },
+  "iterations": 1,
+  "tokens_used": 85294,
+  "execution_time_s": 237.855397939682
+}

@@ -1,0 +1,87 @@
+{
+  "template_id": "head_nod_bounce",
+  "name": "Head Nod Bounce",
+  "category": "medium_energy",
+  "timing": {
+    "mode": "musical",
+    "default_duration_bars": 2.0
+  },
+  "steps": [
+    {
+      "step_id": "nod_bounce_loop",
+      "target": "ALL",
+      "timing": {
+        "base_timing": {
+          "mode": "musical",
+          "start_offset_bars": 0.0,
+          "duration_bars": 2.0,
+          "quantize_start": "downbeat",
+          "quantize_end": "downbeat"
+        },
+        "loop": true
+      },
+      "movement_id": "tilt_bounce",
+      "movement_params": {
+        "intensity": "DRAMATIC"
+      },
+      "geometry_id": "mirror_lr",
+      "geometry_params": {},
+      "dimmer_id": "pulse",
+      "dimmer_params": {
+        "intensity": "SMOOTH"
+      },
+      "entry_transition": {
+        "mode": "crossfade",
+        "duration_bars": 0.5,
+        "curve": "ease_in_out_sine"
+      },
+      "exit_transition": {
+        "mode": "crossfade",
+        "duration_bars": 0.5,
+        "curve": "ease_in_out_sine"
+      },
+      "priority": 0,
+      "blend_mode": "override"
+    }
+  ],
+  "metadata": {
+    "description": "Laid-back head-nod bounce with hip-hop feel - quick downward hit on the kick with slower, deliberate rise into the next beat. Mirror geometry creates symmetrical bobbing motion. The 2-bar loop provides half-time groove feel perfect for verses and breakdowns. Intensity pulse subtly reinforces the rhythmic bounce without overwhelming the groove.",
+    "recommended_sections": [
+      "verse",
+      "groove",
+      "breakdown",
+      "pre-chorus",
+      "bridge"
+    ],
+    "energy_range": [
+      35,
+      70
+    ],
+    "tags": [
+      "head_nod",
+      "bounce",
+      "tilt",
+      "groove",
+      "half_time",
+      "hip_hop_feel",
+      "laid_back",
+      "kick_aligned",
+      "rhythmic",
+      "mirror"
+    ],
+    "best_with": {
+      "tempo_range": [
+        65,
+        100
+      ],
+      "genres": [
+        "hip-hop",
+        "trap",
+        "r&b",
+        "lo-fi",
+        "chillhop",
+        "boom_bap"
+      ]
+    }
+  }
+}

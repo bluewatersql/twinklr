@@ -1,0 +1,121 @@
+{
+  "template_id": "808_punch",
+  "name": "808 Punch",
+  "category": "accent",
+  "timing": {
+    "mode": "musical",
+    "default_duration_bars": 1.0
+  },
+  "steps": [
+    {
+      "step_id": "punch_attack_down",
+      "target": "ALL",
+      "timing": {
+        "base_timing": {
+          "mode": "musical",
+          "start_offset_bars": 0.0,
+          "duration_bars": 0.25,
+          "quantize_start": "downbeat",
+          "quantize_end": "quarter_bar"
+        },
+        "loop": false
+      },
+      "movement_id": "stomp",
+      "movement_params": {
+        "intensity": "INTENSE"
+      },
+      "geometry_id": "wall_wash",
+      "geometry_params": {},
+      "dimmer_id": "hold",
+      "dimmer_params": {
+        "intensity": "DRAMATIC"
+      },
+      "entry_transition": {
+        "mode": "snap",
+        "duration_bars": 0.0,
+        "curve": "linear"
+      },
+      "exit_transition": {
+        "mode": "snap",
+        "duration_bars": 0.0,
+        "curve": "linear"
+      },
+      "priority": 10,
+      "blend_mode": "override"
+    },
+    {
+      "step_id": "punch_vibrate_return",
+      "target": "ALL",
+      "timing": {
+        "base_timing": {
+          "mode": "musical",
+          "start_offset_bars": 0.25,
+          "duration_bars": 0.75,
+          "quantize_start": "quarter_bar",
+          "quantize_end": "downbeat"
+        },
+        "loop": false
+      },
+      "movement_id": "bounce",
+      "movement_params": {
+        "intensity": "INTENSE"
+      },
+      "geometry_id": "wall_wash",
+      "geometry_params": {},
+      "dimmer_id": "hold",
+      "dimmer_params": {
+        "intensity": "DRAMATIC"
+      },
+      "entry_transition": {
+        "mode": "snap",
+        "duration_bars": 0.0,
+        "curve": "linear"
+      },
+      "exit_transition": {
+        "mode": "crossfade",
+        "duration_bars": 0.125,
+        "curve": "ease_out_quad"
+      },
+      "priority": 10,
+      "blend_mode": "override"
+    }
+  ],
+  "metadata": {
+    "description": "Percussive 808-style tilt punch: a heavy downward stomp on the transient followed by a fast decaying bounce/vibration return. Runs all fixtures in sync for maximum impact.",
+    "recommended_sections": [
+      "drop",
+      "chorus",
+      "breakdown",
+      "impact",
+      "fills"
+    ],
+    "energy_range": [
+      80,
+      100
+    ],
+    "tags": [
+      "808",
+      "punch",
+      "bass",
+      "percussive",
+      "stomp",
+      "bounce",
+      "sync",
+      "accent",
+      "impact",
+      "tilt"
+    ],
+    "best_with": {
+      "tempo_range": [
+        60,
+        150
+      ],
+      "genres": [
+        "trap",
+        "hip-hop",
+        "edm",
+        "dubstep"
+      ]
+    }
+  }
+}

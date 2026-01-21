@@ -1,0 +1,9 @@
+blinkb0t-core>=0.1.0
+blinkb0t-cli>=0.1.0
+tqdm>=4.67.1
+
+[dev]
+pytest>=7.0
+pytest-cov>=4.0
+ruff>=0.1.0
+mypy>=1.0

@@ -1,0 +1,193 @@
+{
+  "template_id": "smooth_fade_transition",
+  "name": "Smooth Fade Transition",
+  "category": "transition",
+  "timing": {
+    "mode": "musical",
+    "default_duration_bars": 4.0
+  },
+  "steps": [
+    {
+      "step_id": "fade_out_phase",
+      "target": "ALL",
+      "timing": {
+        "base_timing": {
+          "mode": "musical",
+          "start_offset_bars": 0.0,
+          "duration_bars": 1.0,
+          "quantize_start": "downbeat",
+          "quantize_end": "downbeat"
+        },
+        "loop": false
+      },
+      "movement_id": "hold",
+      "movement_params": {
+        "intensity": "SMOOTH"
+      },
+      "geometry_id": "wall_wash",
+      "geometry_params": {},
+      "dimmer_id": "fade_out",
+      "dimmer_params": {
+        "intensity": "SMOOTH"
+      },
+      "entry_transition": {
+        "mode": "crossfade",
+        "duration_bars": 0.5,
+        "curve": "ease_in_sine"
+      },
+      "exit_transition": {
+        "mode": "fade_through_black",
+        "duration_bars": 0.5,
+        "curve": "ease_in_out_sine"
+      },
+      "priority": 0,
+      "blend_mode": "override"
+    },
+    {
+      "step_id": "reposition_dark",
+      "target": "ALL",
+      "timing": {
+        "base_timing": {
+          "mode": "musical",
+          "start_offset_bars": 1.0,
+          "duration_bars": 1.0,
+          "quantize_start": "downbeat",
+          "quantize_end": "downbeat"
+        },
+        "loop": false
+      },
+      "movement_id": "sweep_lr",
+      "movement_params": {
+        "intensity": "SMOOTH"
+      },
+      "geometry_id": "mirror_lr",
+      "geometry_params": {},
+      "dimmer_id": "hold",
+      "dimmer_params": {
+        "intensity": "SMOOTH"
+      },
+      "entry_transition": {
+        "mode": "snap",
+        "duration_bars": 0.0,
+        "curve": "linear"
+      },
+      "exit_transition": {
+        "mode": "snap",
+        "duration_bars": 0.0,
+        "curve": "linear"
+      },
+      "priority": 0,
+      "blend_mode": "override"
+    },
+    {
+      "step_id": "settle_position",
+      "target": "ALL",
+      "timing": {
+        "base_timing": {
+          "mode": "musical",
+          "start_offset_bars": 2.0,
+          "duration_bars": 1.0,
+          "quantize_start": "downbeat",
+          "quantize_end": "downbeat"
+        },
+        "loop": false
+      },
+      "movement_id": "hold",
+      "movement_params": {
+        "intensity": "SMOOTH"
+      },
+      "geometry_id": "mirror_lr",
+      "geometry_params": {},
+      "dimmer_id": "hold",
+      "dimmer_params": {
+        "intensity": "SMOOTH"
+      },
+      "entry_transition": {
+        "mode": "snap",
+        "duration_bars": 0.0,
+        "curve": "linear"
+      },
+      "exit_transition": {
+        "mode": "snap",
+        "duration_bars": 0.0,
+        "curve": "linear"
+      },
+      "priority": 0,
+      "blend_mode": "override"
+    },
+    {
+      "step_id": "fade_in_phase",
+      "target": "ALL",
+      "timing": {
+        "base_timing": {
+          "mode": "musical",
+          "start_offset_bars": 3.0,
+          "duration_bars": 1.0,
+          "quantize_start": "downbeat",
+          "quantize_end": "downbeat"
+        },
+        "loop": false
+      },
+      "movement_id": "hold",
+      "movement_params": {
+        "intensity": "SMOOTH"
+      },
+      "geometry_id": "mirror_lr",
+      "geometry_params": {},
+      "dimmer_id": "fade_in",
+      "dimmer_params": {
+        "intensity": "SMOOTH"
+      },
+      "entry_transition": {
+        "mode": "fade_through_black",
+        "duration_bars": 0.5,
+        "curve": "ease_in_out_sine"
+      },
+      "exit_transition": {
+        "mode": "crossfade",
+        "duration_bars": 0.5,
+        "curve": "ease_out_sine"
+      },
+      "priority": 0,
+      "blend_mode": "override"
+    }
+  ],
+  "metadata": {
+    "description": "Professional 4-bar section transition using fade-through-black technique. Smoothly fades out current position, repositions fixtures in darkness, settles briefly, then reveals new mirrored geometry. Creates clean visual break between sections while maintaining musical continuity. The blackout repositioning prevents distracting mid-air movement and provides a true 'palette cleanse' between different musical sections.",
+    "recommended_sections": [
+      "transition",
+      "bridge",
+      "section_change",
+      "breakdown",
+      "build_entry"
+    ],
+    "energy_range": [
+      25,
+      60
+    ],
+    "tags": [
+      "transition",
+      "fade",
+      "smooth",
+      "bridge",
+      "section_change",
+      "fade_through_black",
+      "reposition",
+      "palette_cleanse"
+    ],
+    "best_with": {
+      "tempo_range": [
+        60,
+        140
+      ],
+      "genres": [
+        "pop",
+        "rock",
+        "ballad",
+        "indie",
+        "electronic",
+        "singer-songwriter"
+      ]
+    }
+  }
+}

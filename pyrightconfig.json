@@ -1,0 +1,31 @@
+{
+  "include": [
+    "packages",
+    "scripts",
+    "tests"
+  ],
+  "exclude": [
+    "**/__pycache__",
+    ".venv",
+    ".archive",
+    "**/node_modules",
+    "**/*.egg-info"
+  ],
+  "executionEnvironments": [
+    {
+      "root": ".",
+      "pythonVersion": "3.12",
+      "extraPaths": [
+        "./packages/blinkb0t/core",
+        "./packages/blinkb0t/cli"
+      ]
+    }
+  ],
+  "venvPath": ".",
+  "venv": ".venv",
+  "typeCheckingMode": "basic",
+  "useLibraryCodeForTypes": true,
+  "reportMissingImports": "none",
+  "reportMissingTypeStubs": false
+}
+

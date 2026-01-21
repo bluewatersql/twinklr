@@ -1,0 +1,83 @@
+{
+  "template_id": "balanced_fan_swell",
+  "name": "Balanced Fan with Swelling Dimmer",
+  "category": "medium_energy",
+  "timing": {
+    "mode": "musical",
+    "default_duration_bars": 8.0
+  },
+  "steps": [
+    {
+      "step_id": "fan_swell",
+      "target": "ALL",
+      "timing": {
+        "base_timing": {
+          "mode": "musical",
+          "start_offset_bars": 0.0,
+          "duration_bars": 8.0,
+          "quantize_start": "downbeat",
+          "quantize_end": "downbeat"
+        },
+        "loop": true
+      },
+      "movement_id": "sweep_lr",
+      "movement_params": {
+        "intensity": "SMOOTH"
+      },
+      "geometry_id": "fan",
+      "geometry_params": {},
+      "dimmer_id": "swell",
+      "dimmer_params": {
+        "intensity": "SMOOTH"
+      },
+      "entry_transition": {
+        "mode": "crossfade",
+        "duration_bars": 1.0,
+        "curve": "ease_in_out_sine"
+      },
+      "exit_transition": {
+        "mode": "crossfade",
+        "duration_bars": 1.0,
+        "curve": "ease_in_out_sine"
+      },
+      "priority": 0,
+      "blend_mode": "override"
+    }
+  ],
+  "metadata": {
+    "description": "Balanced fan sweep with swelling dimmer. Smooth, flowing pattern ideal for verses and bridges with moderate energy. The 8-bar loop creates a breathing rhythm that complements vocal sections.",
+    "recommended_sections": [
+      "verse",
+      "bridge",
+      "transition",
+      "pre-chorus"
+    ],
+    "energy_range": [
+      40,
+      70
+    ],
+    "tags": [
+      "balanced",
+      "fan",
+      "swell",
+      "verse",
+      "medium_energy",
+      "smooth",
+      "breathing",
+      "vocal_support"
+    ],
+    "best_with": {
+      "tempo_range": [
+        85,
+        135
+      ],
+      "genres": [
+        "pop",
+        "rock",
+        "indie",
+        "alternative",
+        "singer-songwriter"
+      ]
+    }
+  }
+}

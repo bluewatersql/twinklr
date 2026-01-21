@@ -1,0 +1,86 @@
+{
+  "template_id": "impact_hold_flash",
+  "name": "Impact Hold Flash",
+  "category": "accent",
+  "timing": {
+    "mode": "musical",
+    "default_duration_bars": 0.5
+  },
+  "steps": [
+    {
+      "step_id": "impact",
+      "target": "ALL",
+      "timing": {
+        "base_timing": {
+          "mode": "musical",
+          "start_offset_bars": 0.0,
+          "duration_bars": 0.5,
+          "quantize_start": "downbeat",
+          "quantize_end": "eighth_bar"
+        },
+        "loop": false
+      },
+      "movement_id": "hold",
+      "movement_params": {
+        "intensity": "SMOOTH"
+      },
+      "geometry_id": "spotlight_cluster",
+      "geometry_params": {},
+      "dimmer_id": "strobe",
+      "dimmer_params": {
+        "intensity": "DRAMATIC"
+      },
+      "entry_transition": {
+        "mode": "snap",
+        "duration_bars": 0.0,
+        "curve": "linear"
+      },
+      "exit_transition": {
+        "mode": "snap",
+        "duration_bars": 0.0,
+        "curve": "linear"
+      },
+      "priority": 10,
+      "blend_mode": "override"
+    }
+  ],
+  "metadata": {
+    "description": "Instant flash at drop moment with spotlight cluster positioning for maximum focused impact. Half-bar duration provides quick, punchy accent perfect for beat-synchronized hits. All fixtures snap to focused cluster positions and flash simultaneously for concentrated visual punch. Short, impactful, immediate - ideal for drop moments, downbeat hits, and percussive accents.",
+    "recommended_sections": [
+      "drop",
+      "impact",
+      "hit",
+      "accent",
+      "downbeat"
+    ],
+    "energy_range": [
+      90,
+      100
+    ],
+    "tags": [
+      "impact",
+      "snap",
+      "flash",
+      "drop",
+      "hit",
+      "instant",
+      "spotlight",
+      "focused",
+      "percussive"
+    ],
+    "best_with": {
+      "tempo_range": [
+        80,
+        180
+      ],
+      "genres": [
+        "edm",
+        "dubstep",
+        "trap",
+        "drum_and_bass",
+        "hardstyle",
+        "bass_music"
+      ]
+    }
+  }
+}

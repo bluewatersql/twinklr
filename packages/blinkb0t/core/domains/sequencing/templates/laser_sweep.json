@@ -1,0 +1,160 @@
+{
+  "template_id": "laser_sweep",
+  "name": "Laser Sweep",
+  "category": "accent",
+  "timing": {
+    "mode": "musical",
+    "default_duration_bars": 1.0
+  },
+  "steps": [
+    {
+      "step_id": "visible_sweep",
+      "target": "ALL",
+      "timing": {
+        "base_timing": {
+          "mode": "musical",
+          "start_offset_bars": 0.0,
+          "duration_bars": 0.5,
+          "quantize_start": "downbeat",
+          "quantize_end": "eighth_bar"
+        },
+        "loop": false
+      },
+      "movement_id": "sweep_lr",
+      "movement_params": {
+        "intensity": "INTENSE"
+      },
+      "geometry_id": "wall_wash",
+      "geometry_params": {},
+      "dimmer_id": "strobe",
+      "dimmer_params": {
+        "intensity": "DRAMATIC"
+      },
+      "entry_transition": {
+        "mode": "snap",
+        "duration_bars": 0.0,
+        "curve": "linear"
+      },
+      "exit_transition": {
+        "mode": "snap",
+        "duration_bars": 0.0,
+        "curve": "linear"
+      },
+      "priority": 8,
+      "blend_mode": "override"
+    },
+    {
+      "step_id": "dark_return_reset",
+      "target": "ALL",
+      "timing": {
+        "base_timing": {
+          "mode": "musical",
+          "start_offset_bars": 0.5,
+          "duration_bars": 0.25,
+          "quantize_start": "eighth_bar",
+          "quantize_end": "quarter_bar"
+        },
+        "loop": false
+      },
+      "movement_id": "laser_snap",
+      "movement_params": {
+        "intensity": "INTENSE"
+      },
+      "geometry_id": "wall_wash",
+      "geometry_params": {},
+      "dimmer_id": "hold",
+      "dimmer_params": {
+        "intensity": "INTENSE"
+      },
+      "entry_transition": {
+        "mode": "snap",
+        "duration_bars": 0.0,
+        "curve": "linear"
+      },
+      "exit_transition": {
+        "mode": "snap",
+        "duration_bars": 0.0,
+        "curve": "linear"
+      },
+      "priority": 8,
+      "blend_mode": "override"
+    },
+    {
+      "step_id": "dark_hold",
+      "target": "ALL",
+      "timing": {
+        "base_timing": {
+          "mode": "musical",
+          "start_offset_bars": 0.75,
+          "duration_bars": 0.25,
+          "quantize_start": "quarter_bar",
+          "quantize_end": "downbeat"
+        },
+        "loop": false
+      },
+      "movement_id": "hold",
+      "movement_params": {
+        "intensity": "SMOOTH"
+      },
+      "geometry_id": "wall_wash",
+      "geometry_params": {},
+      "dimmer_id": "hold",
+      "dimmer_params": {
+        "intensity": "SMOOTH"
+      },
+      "entry_transition": {
+        "mode": "snap",
+        "duration_bars": 0.0,
+        "curve": "linear"
+      },
+      "exit_transition": {
+        "mode": "snap",
+        "duration_bars": 0.0,
+        "curve": "linear"
+      },
+      "priority": 8,
+      "blend_mode": "override"
+    }
+  ],
+  "metadata": {
+    "description": "Fast, bright left-to-right laser sweep with instant flash, followed by blackout snap-back reset. The audience sees a rapid sweep blur, then fixtures instantly return to start position in darkness, ready to repeat. Perfect for percussive accents on downbeats. High-impact, minimal duration accent ideal for tight musical hits.",
+    "recommended_sections": [
+      "drop",
+      "chorus",
+      "impact",
+      "breakdown",
+      "fill",
+      "accent"
+    ],
+    "energy_range": [
+      85,
+      100
+    ],
+    "tags": [
+      "laser",
+      "sweep",
+      "snap_back",
+      "blackout_reset",
+      "motion_blur",
+      "high_speed",
+      "accent",
+      "percussive",
+      "flash",
+      "synchronized"
+    ],
+    "best_with": {
+      "tempo_range": [
+        80,
+        180
+      ],
+      "genres": [
+        "edm",
+        "dubstep",
+        "trap",
+        "drum_and_bass",
+        "hardstyle",
+        "techno"
+      ]
+    }
+  }
+}

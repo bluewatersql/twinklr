@@ -1,0 +1,91 @@
+================================================================================
+REACHABILITY ANALYSIS REPORT
+================================================================================
+
+SUMMARY
+--------------------------------------------------------------------------------
+Total Python files:     253
+Reachable (IN SCOPE):   197 (77.9%)
+Unreachable (OUT):      56 (22.1%)
+
+UNREACHABLE FILES BY CATEGORY
+--------------------------------------------------------------------------------
+
+EMPTY (4 files):
+  - packages/blinkb0t/core/domains/sequencer/__init__.py
+  - packages/blinkb0t/core/domains/sequencer/moving_heads/__init__.py
+  - packages/blinkb0t/core/domains/sequencer/moving_heads/dimmer/__init__.py
+  - packages/blinkb0t/core/domains/sequencer/moving_heads/resolver/__init__.py
+
+OTHER (52 files):
+  - packages/blinkb0t/core/agents/moving_heads/agent_patterns.py
+  - packages/blinkb0t/core/domains/sequencer/moving_heads/curves/__init__.py
+  - packages/blinkb0t/core/domains/sequencer/moving_heads/curves/curve_ops.py
+  - packages/blinkb0t/core/domains/sequencer/moving_heads/dimmer/generator.py
+  - packages/blinkb0t/core/domains/sequencer/moving_heads/geometry/__init__.py
+  - packages/blinkb0t/core/domains/sequencer/moving_heads/geometry/role_pose.py
+  - packages/blinkb0t/core/domains/sequencer/moving_heads/models/__init__.py
+  - packages/blinkb0t/core/domains/sequencer/moving_heads/models/base.py
+  - packages/blinkb0t/core/domains/sequencer/moving_heads/models/dimmer.py
+  - packages/blinkb0t/core/domains/sequencer/moving_heads/models/geometry.py
+  - packages/blinkb0t/core/domains/sequencer/moving_heads/models/ir.py
+  - packages/blinkb0t/core/domains/sequencer/moving_heads/models/movement.py
+  - packages/blinkb0t/core/domains/sequencer/moving_heads/models/plan.py
+  - packages/blinkb0t/core/domains/sequencer/moving_heads/models/presets.py
+  - packages/blinkb0t/core/domains/sequencer/moving_heads/models/rig.py
+  - packages/blinkb0t/core/domains/sequencer/moving_heads/models/rig_adapters.py
+  - packages/blinkb0t/core/domains/sequencer/moving_heads/models/templates.py
+  - packages/blinkb0t/core/domains/sequencer/moving_heads/movement/generator.py
+  - packages/blinkb0t/core/domains/sequencer/moving_heads/resolver/interfaces.py
+  - packages/blinkb0t/core/domains/sequencer/moving_heads/resolver/noop.py
+  - packages/blinkb0t/core/domains/sequencer/moving_heads/templates/__init__.py
+  - packages/blinkb0t/core/domains/sequencer/moving_heads/templates/compiler.py
+  - packages/blinkb0t/core/domains/sequencer/moving_heads/templates/loader.py
+  - packages/blinkb0t/core/domains/sequencer/moving_heads/templates/specs/fan_pulse.py
+  - packages/blinkb0t/core/domains/sequencing/infrastructure/curves/adapters/__init__.py
+  - packages/blinkb0t/core/domains/sequencing/infrastructure/curves/adapters/xlights_formatter.py
+  - packages/blinkb0t/core/domains/sequencing/infrastructure/curves/functions/__init__.py
+  - packages/blinkb0t/core/domains/sequencing/infrastructure/curves/functions/advanced.py
+  - packages/blinkb0t/core/domains/sequencing/infrastructure/curves/functions/basic.py
+  - packages/blinkb0t/core/domains/sequencing/infrastructure/curves/functions/easing.py
+  - packages/blinkb0t/core/domains/sequencing/infrastructure/curves/functions/motion.py
+  - packages/blinkb0t/core/domains/sequencing/infrastructure/curves/functions/musical.py
+  - packages/blinkb0t/core/domains/sequencing/infrastructure/curves/functions/native_equivalents.py
+  - packages/blinkb0t/core/domains/sequencing/infrastructure/curves/functions/registry.py
+  - packages/blinkb0t/core/domains/sequencing/infrastructure/curves/modifiers/__init__.py
+  - packages/blinkb0t/core/domains/sequencing/infrastructure/curves/modifiers/functions.py
+  - packages/blinkb0t/core/domains/sequencing/infrastructure/curves/modifiers/registry.py
+  - packages/blinkb0t/core/domains/sequencing/moving_heads/templates/geometry/base.py
+  - packages/blinkb0t/core/domains/sequencing/moving_heads/templates/geometry/patterns/__init__.py
+  - packages/blinkb0t/core/domains/sequencing/moving_heads/templates/geometry/patterns/alternating_updown.py
+  - packages/blinkb0t/core/domains/sequencing/moving_heads/templates/geometry/patterns/audience_scan.py
+  - packages/blinkb0t/core/domains/sequencing/moving_heads/templates/geometry/patterns/center_out.py
+  - packages/blinkb0t/core/domains/sequencing/moving_heads/templates/geometry/patterns/chevron_v.py
+  - packages/blinkb0t/core/domains/sequencing/moving_heads/templates/geometry/patterns/fan.py
+  - packages/blinkb0t/core/domains/sequencing/moving_heads/templates/geometry/patterns/mirror_lr.py
+  - packages/blinkb0t/core/domains/sequencing/moving_heads/templates/geometry/patterns/rainbow_arc.py
+  - packages/blinkb0t/core/domains/sequencing/moving_heads/templates/geometry/patterns/scattered_chaos.py
+  - packages/blinkb0t/core/domains/sequencing/moving_heads/templates/geometry/patterns/spotlight_cluster.py
+  - packages/blinkb0t/core/domains/sequencing/moving_heads/templates/geometry/patterns/tunnel_cone.py
+  - packages/blinkb0t/core/domains/sequencing/moving_heads/templates/geometry/patterns/wall_wash.py
+  - packages/blinkb0t/core/domains/sequencing/moving_heads/templates/geometry/patterns/wave_lr.py
+  - packages/blinkb0t/core/domains/sequencing/moving_heads/templates/geometry/patterns/x_cross.py
+
+================================================================================
+RECOMMENDATIONS
+================================================================================
+
+1. IMMEDIATE (Remove Today):
+   - All backup files (*.bak)
+   - All files in 'legacy' category
+   - Empty placeholder files
+
+2. VERIFY (Manual Review):
+   - Files in 'other' category
+   - Check for dynamic imports (eval, importlib)
+   - Check git history for context
+
+3. DOCUMENT:
+   - Create docs/architecture/in_scope.md
+   - List all entry points
+   - Document dependency flow

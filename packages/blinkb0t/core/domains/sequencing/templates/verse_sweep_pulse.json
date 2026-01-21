@@ -1,0 +1,83 @@
+{
+  "template_id": "verse_sweep_pulse",
+  "name": "Verse Sweep with Pulse",
+  "category": "medium_energy",
+  "timing": {
+    "mode": "musical",
+    "default_duration_bars": 8.0
+  },
+  "steps": [
+    {
+      "step_id": "sweep_pulse",
+      "target": "ALL",
+      "timing": {
+        "base_timing": {
+          "mode": "musical",
+          "start_offset_bars": 0.0,
+          "duration_bars": 8.0,
+          "quantize_start": "downbeat",
+          "quantize_end": "downbeat"
+        },
+        "loop": true
+      },
+      "movement_id": "sweep_ud",
+      "movement_params": {
+        "intensity": "SMOOTH"
+      },
+      "geometry_id": "mirror_lr",
+      "geometry_params": {},
+      "dimmer_id": "pulse",
+      "dimmer_params": {
+        "intensity": "SMOOTH"
+      },
+      "entry_transition": {
+        "mode": "crossfade",
+        "duration_bars": 1.0,
+        "curve": "ease_in_out_sine"
+      },
+      "exit_transition": {
+        "mode": "crossfade",
+        "duration_bars": 1.0,
+        "curve": "ease_in_out_sine"
+      },
+      "priority": 0,
+      "blend_mode": "override"
+    }
+  ],
+  "metadata": {
+    "description": "Smooth up-down sweep with symmetrical mirrored geometry and pulsing dimmer for steady verse sections. The mirror geometry creates visual balance and interest while maintaining a calm, supportive backdrop for vocals. The 8-bar loop provides breathing room for extended verse sections.",
+    "recommended_sections": [
+      "verse",
+      "transition",
+      "bridge",
+      "pre-chorus"
+    ],
+    "energy_range": [
+      35,
+      65
+    ],
+    "tags": [
+      "verse",
+      "sweep",
+      "pulse",
+      "steady",
+      "medium_energy",
+      "mirror",
+      "balanced",
+      "vocal_support"
+    ],
+    "best_with": {
+      "tempo_range": [
+        80,
+        125
+      ],
+      "genres": [
+        "pop",
+        "rock",
+        "electronic",
+        "indie",
+        "singer-songwriter"
+      ]
+    }
+  }
+}

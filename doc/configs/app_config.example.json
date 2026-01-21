@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "BlinkB0t Application Configuration - Shared settings for all jobs/tasks",
+  
+  "output_dir": "artifacts",
+  "cache_dir": "data/audio_cache",
+  
+  "audio_processing": {
+    "description": "Audio analysis configuration for feature extraction",
+    "hop_length": 512,
+    "frame_length": 2048,
+    "cache_enabled": true,
+    "_comments": {
+      "hop_length": "Number of samples between successive frames (64-2048). Lower = more detail, higher CPU",
+      "frame_length": "Size of FFT window in samples (512-8192). Must be >= hop_length",
+      "cache_enabled": "Cache audio analysis results to disk for faster re-runs"
+    }
+  },
+  
+  "planning": {
+    "description": "LLM context building configuration - controls token budget for audio features",
+    "max_beats": 600,
+    "max_energy_points": 768,
+    "max_spectral_points": 256,
+    "max_transients": 20,
+    "max_sections": 12,
+    "_comments": {
+      "max_beats": "Maximum beat timestamps to include in LLM context (100-2000)",
+      "max_energy_points": "Maximum energy envelope points (100-2000)",
+      "max_spectral_points": "Maximum spectral feature points (50-1000)",
+      "max_transients": "Maximum transient events to include (5-100)",
+      "max_sections": "Maximum structural sections to include (4-50)",
+      "_note": "Reduce these values if hitting LLM token limits. Increase for longer songs or more detail."
+    }
+  },
+  
+  "logging": {
+    "description": "Application logging configuration",
+    "level": "INFO",
+    "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    "_comments": {
+      "level": "Log level: DEBUG (verbose), INFO (normal), WARNING, ERROR, CRITICAL",
+      "format": "Python logging format string"
+    }
+  },
+  
+  "sequencing": {
+    "description": "Version configuration for sequencing components - controls which library versions to use",
+    "prompt": "1.0.0",
+    "response_schema": "1.0.0",
+    "templates": "1.0.0",
+    "curves": "1.0.0",
+    "dimmer": "1.0.0",
+    "geometry": "1.0.0",
+    "movements": "2.0.0",
+    "_comments": {
+      "prompt": "LLM prompt template version",
+      "response_schema": "JSON schema version for LLM responses",
+      "templates": "Effect template library version",
+      "curves": "Value curve preset library version",
+      "dimmer": "Dimmer pattern library version",
+      "geometry": "Geometry pattern library version",
+      "movements": "Movement pattern library version (2.0.0 is current)"
+    }
+  },
+  
+  "_usage": {
+    "description": "How to use this configuration file",
+    "location": "Save as 'config.json' in project root",
+    "validation": "Validated by AppConfig Pydantic model (packages/blinkb0t/core/config/models.py)",
+    "defaults": "All fields shown here are defaults - you can omit fields to use defaults",
+    "forward_compatibility": "Unknown fields are ignored for forward compatibility"
+  }
+}

@@ -1,0 +1,87 @@
+{
+  "template_id": "random_position_per_strobe",
+  "name": "Random Position Per Strobe",
+  "category": "high_energy",
+  "timing": {
+    "mode": "musical",
+    "default_duration_bars": 5.0
+  },
+  "steps": [
+    {
+      "step_id": "random_snap_strobe_loop",
+      "target": "ALL",
+      "timing": {
+        "base_timing": {
+          "mode": "musical",
+          "start_offset_bars": 0.0,
+          "duration_bars": 4.0,
+          "quantize_start": "downbeat",
+          "quantize_end": "downbeat"
+        },
+        "loop": true
+      },
+      "movement_id": "laser_snap",
+      "movement_params": {
+        "intensity": "INTENSE"
+      },
+      "geometry_id": "scattered_chaos",
+      "geometry_params": {},
+      "dimmer_id": "strobe",
+      "dimmer_params": {
+        "intensity": "INTENSE"
+      },
+      "entry_transition": {
+        "mode": "snap",
+        "duration_bars": 0.0,
+        "curve": "linear"
+      },
+      "exit_transition": {
+        "mode": "fade_through_black",
+        "duration_bars": 1.0,
+        "curve": "ease_out_sine"
+      },
+      "priority": 5,
+      "blend_mode": "override"
+    }
+  ],
+  "metadata": {
+    "description": "High-speed random repositions synced to strobe effect creating glitchy, unpredictable visual chaos. Fixtures snap to new scattered positions during strobe dark gaps so each flash reveals a completely different random configuration. The laser_snap movement combined with scattered chaos geometry and strobing creates disorienting, high-impact moments perfect for drops and climaxes. Each strobe hit is a surprise.",
+    "recommended_sections": [
+      "drop",
+      "breakdown",
+      "climax",
+      "impact",
+      "chaos"
+    ],
+    "energy_range": [
+      85,
+      100
+    ],
+    "tags": [
+      "strobe",
+      "random",
+      "glitch",
+      "unpredictable",
+      "snap",
+      "laser_snap",
+      "high_energy",
+      "chaos",
+      "disorienting",
+      "scattered"
+    ],
+    "best_with": {
+      "tempo_range": [
+        120,
+        180
+      ],
+      "genres": [
+        "dubstep",
+        "drum_and_bass",
+        "hardstyle",
+        "industrial",
+        "glitch_hop",
+        "bass_music"
+      ]
+    }
+  }
+}

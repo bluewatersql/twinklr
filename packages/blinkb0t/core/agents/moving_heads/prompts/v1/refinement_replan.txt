@@ -1,0 +1,29 @@
+# Refinement Task: Replan
+
+## Previous Plan Had Issues
+Score: {overall_score}/100 (FAILED)
+
+### Failing Categories
+{failing_categories}
+
+### Root Cause
+{root_cause}
+
+### Specific Issues
+{previous_issues}
+
+### Actionable Feedback
+{actionable_feedback}
+
+## Your Task
+Create an improved plan that fixes all these issues.
+
+Use the same context (song, templates, etc.) but make better choices:
+- Select different templates where appropriate
+- Improve energy matching
+- Add more variety
+- Better reasoning
+
+{context}
+
+Generate the improved plan now.

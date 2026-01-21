@@ -1,0 +1,48 @@
+# Refinement Task: Improve Implementation
+
+## Previous Implementation Had Issues
+Score: {overall_score}/100 (FAILED)
+
+### Failing Categories
+{failing_categories}
+
+### Specific Issues
+{previous_issues}
+
+### Actionable Feedback
+{actionable_feedback}
+
+## Your Task
+Create an improved implementation that fixes these issues.
+
+Keep the strategic plan (template selections) but improve:
+- Bar-level timing and alignment
+- Coverage (no gaps/overlaps)
+- Targeting (choreographic decisions)
+
+{context}
+
+**Output Schema:**
+```json
+{{
+  "sections": [
+    {{
+      "name": "section_name",
+      "plan_section_name": "original_section_name",
+      "start_bar": 1,
+      "end_bar": 16,
+      "template_id": "template_id",
+      "params": {{"intensity": "SMOOTH"}},
+      "base_pose": "AUDIENCE_CENTER",
+      "targets": ["ALL"],
+      "layer_priority": 0,
+      "reasoning": "Why this implementation was chosen"
+    }}
+  ],
+  "total_duration_bars": 64,
+  "quantization_applied": true,
+  "timing_precision": "bar_aligned"
+}}
+```
+
+Generate the improved implementation now.

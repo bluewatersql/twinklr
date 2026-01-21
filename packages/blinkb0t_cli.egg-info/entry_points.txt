@@ -1,0 +1,2 @@
+[console_scripts]
+blinkb0t = blinkb0t.cli.main:main

@@ -1,0 +1,11 @@
+pyproject.toml
+setup.py
+../../blinkb0t/cli/__init__.py
+../../blinkb0t/cli/main.py
+../../blinkb0t/cli/setup.py
+../../blinkb0t_cli.egg-info/PKG-INFO
+../../blinkb0t_cli.egg-info/SOURCES.txt
+../../blinkb0t_cli.egg-info/dependency_links.txt
+../../blinkb0t_cli.egg-info/entry_points.txt
+../../blinkb0t_cli.egg-info/requires.txt
+../../blinkb0t_cli.egg-info/top_level.txt

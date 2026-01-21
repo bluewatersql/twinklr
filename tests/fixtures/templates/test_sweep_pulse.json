@@ -1,0 +1,95 @@
+{
+  "template_id": "test_sweep_pulse",
+  "name": "Test Sweep Pulse",
+  "category": "medium_energy",
+  
+  "timing": {
+    "mode": "musical",
+    "default_duration_bars": 4.0
+  },
+  
+  "steps": [
+    {
+      "step_id": "sweep",
+      "target": "ALL",
+      
+      "timing": {
+        "base_timing": {
+          "mode": "musical",
+          "start_offset_bars": 0.0,
+          "duration_bars": 2.0,
+          "quantize_start": "any_beat",
+          "quantize_end": "any_beat"
+        },
+        "loop": false
+      },
+      
+      "movement_id": "sweep_lr",
+      "movement_params": {
+        "intensity": "{{intensity}}"
+      },
+      
+      "geometry_id": "fan",
+      "geometry_params": {},
+      
+      "dimmer_id": "fade_in",
+      "dimmer_params": {},
+      
+      "entry_transition": {
+        "mode": "snap",
+        "duration_bars": 0.0
+      },
+      
+      "exit_transition": {
+        "mode": "crossfade",
+        "duration_bars": 0.5
+      },
+      
+      "priority": 0,
+      "blend_mode": "override"
+    },
+    {
+      "step_id": "pulse",
+      "target": "ALL",
+      
+      "timing": {
+        "base_timing": {
+          "mode": "musical",
+          "start_offset_bars": 2.0,
+          "duration_bars": 2.0,
+          "quantize_start": "any_beat",
+          "quantize_end": "any_beat"
+        },
+        "loop": false
+      },
+      
+      "movement_id": "hold",
+      "movement_params": {},
+      
+      "dimmer_id": "pulse",
+      "dimmer_params": {
+        "intensity": "{{intensity}}"
+      },
+      
+      "entry_transition": {
+        "mode": "crossfade",
+        "duration_bars": 0.5
+      },
+      
+      "exit_transition": {
+        "mode": "fade_through_black",
+        "duration_bars": 1.0
+      },
+      
+      "priority": 0,
+      "blend_mode": "override"
+    }
+  ],
+  
+  "metadata": {
+    "description": "Test template: sweep followed by pulse",
+    "recommended_sections": ["verse", "chorus"],
+    "energy_range": [40, 70],
+    "tags": ["test", "sweep", "pulse"]
+  }
+}

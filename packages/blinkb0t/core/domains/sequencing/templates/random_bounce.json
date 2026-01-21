@@ -1,0 +1,123 @@
+{
+  "template_id": "random_bounce",
+  "name": "Random Bounce",
+  "category": "medium_energy",
+  "timing": {
+    "mode": "musical",
+    "default_duration_bars": 4.0
+  },
+  "steps": [
+    {
+      "step_id": "ignite_fade_in",
+      "target": "ALL",
+      "timing": {
+        "base_timing": {
+          "mode": "musical",
+          "start_offset_bars": 0.0,
+          "duration_bars": 0.5,
+          "quantize_start": "downbeat",
+          "quantize_end": "eighth_bar"
+        },
+        "loop": false,
+        "per_fixture_offsets": [0.0, 0.0625, 0.125, 0.1875, 0.0, 0.0625, 0.125, 0.1875]
+      },
+      "movement_id": "hold",
+      "movement_params": {
+        "intensity": "SMOOTH"
+      },
+      "geometry_id": "scattered_chaos",
+      "geometry_params": {},
+      "dimmer_id": "fade_in",
+      "dimmer_params": {
+        "intensity": "DRAMATIC"
+      },
+      "entry_transition": {
+        "mode": "crossfade",
+        "duration_bars": 0.25,
+        "curve": "ease_in_sine"
+      },
+      "exit_transition": {
+        "mode": "snap",
+        "duration_bars": 0.0,
+        "curve": "linear"
+      },
+      "priority": 0,
+      "blend_mode": "override"
+    },
+    {
+      "step_id": "random_bounce_main",
+      "target": "ALL",
+      "timing": {
+        "base_timing": {
+          "mode": "musical",
+          "start_offset_bars": 0.5,
+          "duration_bars": 3.5,
+          "quantize_start": "eighth_bar",
+          "quantize_end": "downbeat"
+        },
+        "loop": true,
+        "per_fixture_offsets": [0.0, 0.4375, 0.875, 1.3125, 1.75, 2.1875, 2.625, 3.0625]
+      },
+      "movement_id": "bounce",
+      "movement_params": {
+        "intensity": "DRAMATIC"
+      },
+      "geometry_id": "scattered_chaos",
+      "geometry_params": {},
+      "dimmer_id": "hold",
+      "dimmer_params": {
+        "intensity": "DRAMATIC"
+      },
+      "entry_transition": {
+        "mode": "snap",
+        "duration_bars": 0.0,
+        "curve": "linear"
+      },
+      "exit_transition": {
+        "mode": "crossfade",
+        "duration_bars": 0.5,
+        "curve": "ease_out_sine"
+      },
+      "priority": 0,
+      "blend_mode": "override"
+    }
+  ],
+  "metadata": {
+    "description": "Organic, physics-like random bounces with unpredictable timing and scattered chaos geometry. Each fixture operates independently with staggered offsets creating a lively, chaotic texture. The irregular timing offsets combined with scattered positioning creates a truly organic feel where no two fixtures are in sync, perfect for breakdowns and instrumental sections that need visual complexity without rigid structure.",
+    "recommended_sections": [
+      "breakdown",
+      "bridge",
+      "instrumental",
+      "build",
+      "transition"
+    ],
+    "energy_range": [
+      45,
+      80
+    ],
+    "tags": [
+      "random",
+      "bounce",
+      "organic",
+      "unpredictable",
+      "chaotic",
+      "independent",
+      "texture",
+      "scattered",
+      "asymmetric"
+    ],
+    "best_with": {
+      "tempo_range": [
+        90,
+        140
+      ],
+      "genres": [
+        "electronic",
+        "indie",
+        "alternative",
+        "progressive",
+        "experimental"
+      ]
+    }
+  }
+}

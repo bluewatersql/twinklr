@@ -1,0 +1,115 @@
+# Choreography Evaluation Task
+
+## Song Information
+- **Duration**: {duration_s}s
+- **Tempo**: {tempo_bpm} BPM
+- **Time Signature**: {time_signature}
+- **Total Bars**: {bar_count}
+
+---
+
+## Plan to Evaluate
+
+### Overall Strategy
+{overall_strategy}
+
+### Plan Sections ({section_count} total)
+{plan_sections}
+
+### Plan Self-Assessment
+- Template Variety Score: {template_variety_score}/10
+- Energy Alignment Score: {energy_alignment_score}/10
+
+---
+
+## Implementation to Evaluate
+
+### Implementation Metadata
+- **Total Duration**: {total_duration_bars}ms
+- **Beat Aligned**: {quantization_applied}
+- **Timing Precision**: {timing_precision}
+
+### Implementation Sections ({impl_section_count} total)
+{implementation_sections}
+
+---
+
+## Evaluation Criteria
+
+Evaluate across **9 categories** using the scoring bands and evidence requirements defined in your system prompt:
+
+1. **Musical Alignment** (0-100) - Section boundaries, beat sync, phrase alignment
+2. **Energy Matching** (0-100) - Template energy vs section energy, dynamic progression
+3. **Template Variety & Layering Quality** (0-100) - Mix of templates, 40-60% layering target, complementary layers
+4. **Timing Coverage & Target Validity** (0-100) - Full coverage, NO target conflicts (CRITICAL)
+5. **Shutter Appropriateness & Restraint** (0-100) - Energy match, ≤30% strobe usage (CRITICAL)
+6. **Color Appropriateness & Restraint** (0-100) - Mood match, 3-5 color scenes (CRITICAL)
+7. **Gobo & Visual Impact** (0-100) - 50-60% open gobo, atmosphere match (CRITICAL)
+8. **Choreography Complexity & Depth** (0-100) - Layering depth, target variety, sophistication
+
+**Pass Threshold**: {pass_threshold}/100
+
+---
+
+## Critical Validation Rules
+
+**Automatic fail conditions (score < {pass_threshold}):**
+
+1. **Target Conflicts** (Timing Coverage category):
+   - ANY overlapping sections with non-disjoint targets = CRITICAL FAILURE
+   - Valid pairs: LEFT+RIGHT, ODD+EVEN, INNER+OUTER, CENTER+OUTER
+   - Invalid: ALL+anything, LEFT+ODD, LEFT+INNER, etc.
+   - Cite specific overlapping sections and explain fixture conflicts
+
+2. **No Layering** (Choreography Complexity category):
+   - 0% layering (all sections use single template with ALL) = score <60
+   - Target: 40-60% of sections should use layering
+
+3. **Excessive Strobe** (Shutter Restraint category):
+   - >60% strobe usage = score <60
+   - Target: ≤30% strobe usage
+
+4. **Rainbow Cycling** (Color Restraint category):
+   - >15 unique colors = score <60
+   - Target: 3-5 color scenes
+
+---
+
+## Required Output
+
+Your evaluation JSON must include:
+
+**Top-level fields:**
+- `story_overview`: 2-3 sentence choreographic narrative (REQUIRED)
+- `overall_score`: Weighted average of all 9 categories (0-100)
+- `pass`: Boolean (overall_score >= {pass_threshold})
+- `category_scores`: Object with all 9 scores
+- `summary`: Overall assessment (2-3 paragraphs with citations)
+- `strengths`: List of specific strengths (cite sections)
+- `weaknesses`: List of specific issues (cite sections)
+- `actionable_feedback`: List of concrete improvements (cite sections, name templates)
+
+**If fail (overall_score < {pass_threshold}):**
+- `primary_issue`: "plan" or "implementation" or "both"
+- `recommended_action`: "replan" or "refine_implementation" or "full_replan"
+- `critical_failures`: List of automatic fail conditions triggered (if any)
+
+---
+
+## Output Schema
+
+{json_schema}
+
+---
+
+## Your Task
+
+1. **Evaluate** the plan and implementation across all 9 categories
+2. **Calculate** restraint percentages (strobe %, color count, gobo %, layering %)
+3. **Validate** target conflicts in overlapping sections (CRITICAL)
+4. **Cite** specific sections for all feedback (strengths and weaknesses)
+5. **Provide** actionable improvements with concrete fixes
+6. **Write** story_overview describing choreographic vision
+7. **Determine** pass/fail and recommended action if failing
+
+**Generate the evaluation now.**

@@ -1,0 +1,86 @@
+{
+  "template_id": "ambient_hold_pulse",
+  "name": "Ambient Hold with Subtle Pulse",
+  "category": "low_energy",
+  "timing": {
+    "mode": "musical",
+    "default_duration_bars": 8.0
+  },
+  "steps": [
+    {
+      "step_id": "hold_pulse",
+      "target": "ALL",
+      "timing": {
+        "base_timing": {
+          "mode": "musical",
+          "start_offset_bars": 0.0,
+          "duration_bars": 8.0,
+          "quantize_start": "downbeat",
+          "quantize_end": "downbeat"
+        },
+        "loop": true,
+        "per_fixture_offsets": [0.0, 2.0, 4.0, 6.0, 0.0, 2.0, 4.0, 6.0]
+      },
+      "movement_id": "hold",
+      "movement_params": {
+        "intensity": "SMOOTH"
+      },
+      "geometry_id": "scattered_chaos",
+      "geometry_params": {},
+      "dimmer_id": "breathe",
+      "dimmer_params": {
+        "intensity": "SMOOTH"
+      },
+      "entry_transition": {
+        "mode": "fade_through_black",
+        "duration_bars": 2.0,
+        "curve": "ease_in_out_sine"
+      },
+      "exit_transition": {
+        "mode": "fade_through_black",
+        "duration_bars": 2.0,
+        "curve": "ease_in_out_sine"
+      },
+      "priority": 0,
+      "blend_mode": "override"
+    }
+  ],
+  "metadata": {
+    "description": "Static scattered positions with gentle breathing dimmer creating organic ambient atmosphere. Fixtures hold different positions with staggered 2-bar offsets on their breathing cycles, creating slow, evolving shimmer effect. The scattered geometry provides visual interest while minimal movement maintains calm ambience. Perfect for atmospheric backgrounds and contemplative moments.",
+    "recommended_sections": [
+      "ambient",
+      "breakdown",
+      "intro",
+      "outro",
+      "interlude"
+    ],
+    "energy_range": [
+      5,
+      30
+    ],
+    "tags": [
+      "ambient",
+      "hold",
+      "breathe",
+      "minimal",
+      "background",
+      "scattered",
+      "organic",
+      "shimmer",
+      "atmospheric"
+    ],
+    "best_with": {
+      "tempo_range": [
+        40,
+        95
+      ],
+      "genres": [
+        "ambient",
+        "downtempo",
+        "chillout",
+        "experimental",
+        "post-rock"
+      ]
+    }
+  }
+}

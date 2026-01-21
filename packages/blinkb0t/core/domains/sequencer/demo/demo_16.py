@@ -1,0 +1,122 @@
+from __future__ import annotations
+
+from types import SimpleNamespace
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from blinkb0t.core.domains.sequencer.moving_heads.models.ir import ChannelSegment
+
+from blinkb0t.core.domains.sequencer.demo.helper import (
+    apply_template_preset,
+    build_demo_rig,
+    print_segment,
+)
+from blinkb0t.core.domains.sequencer.moving_heads.curves.curve_ops import CurveOps
+from blinkb0t.core.domains.sequencer.moving_heads.dimmer.generator import DimmerGenerator
+from blinkb0t.core.domains.sequencer.moving_heads.geometry.role_pose import (
+    RolePoseGeometryResolver,
+)
+from blinkb0t.core.domains.sequencer.moving_heads.models.base import IntensityLevel
+from blinkb0t.core.domains.sequencer.moving_heads.models.presets import (
+    DefaultsPatch,
+    DimmerPatch,
+    MovementPatch,
+    StepPatch,
+    TemplatePreset,
+)
+from blinkb0t.core.domains.sequencer.moving_heads.movement.generator import MovementGenerator
+from blinkb0t.core.domains.sequencer.moving_heads.templates.compiler import TemplateCompiler
+from blinkb0t.core.domains.sequencer.moving_heads.templates.specs import fan_pulse_base
+from blinkb0t.core.domains.sequencing.libraries.moving_heads.dimmers import DimmerID
+
+
+def _build_compiler():
+    pan_pose_table = {
+        "WIDE_LEFT": 64,
+        "MID_LEFT": 96,
+        "CENTER": 128,
+        "MID_RIGHT": 160,
+        "WIDE_RIGHT": 192,
+    }
+    tilt_pose_table = {"HORIZON": 128}
+
+    curve_ops = CurveOps()
+    geometry = RolePoseGeometryResolver(
+        pan_pose_table=pan_pose_table, tilt_pose_table=tilt_pose_table
+    )
+    movement = MovementGenerator(curve_ops=curve_ops, default_samples=16)
+    dimmer = DimmerGenerator(curve_ops=curve_ops, default_samples=16)
+
+    return TemplateCompiler(
+        geometry_resolver=geometry,
+        movement_generator=movement,
+        dimmer_generator=dimmer,
+        curve_ops=curve_ops,
+    )
+
+
+def _print_segments(label: str, segments: list[ChannelSegment]) -> None:
+    print(f"\n=== {label} SEGMENTS (normalized) ===\n")
+    for seg in segments:
+        print_segment(seg)
+
+
+def main() -> None:
+    rig = build_demo_rig()
+    compiler = _build_compiler()
+    plan = SimpleNamespace(bpm=120, beats_per_bar=4)
+
+    template = fan_pulse_base.TEMPLATE
+
+    smooth = TemplatePreset(
+        preset_id="smooth",
+        name="Smooth",
+        defaults=DefaultsPatch(),
+        step_patches={
+            "main": StepPatch(
+                movement=MovementPatch(intensity=IntensityLevel.SMOOTH, cycles=1.0),
+                dimmer=DimmerPatch(min_norm=0.20, cycles=1.0),
+            )
+        },
+    )
+
+    energetic = TemplatePreset(
+        preset_id="energetic",
+        name="Energetic",
+        defaults=DefaultsPatch(),
+        step_patches={
+            "main": StepPatch(
+                movement=MovementPatch(intensity=IntensityLevel.DRAMATIC, cycles=1.0),
+                dimmer=DimmerPatch(min_norm=0.25, cycles=4.0),
+            )
+        },
+    )
+
+    minimal = TemplatePreset(
+        preset_id="minimal",
+        name="Minimal",
+        defaults=DefaultsPatch(),
+        step_patches={
+            "main": StepPatch(
+                movement=MovementPatch(intensity=IntensityLevel.SMOOTH, cycles=1.0),
+                dimmer=DimmerPatch(dimmer_params={"dimmer_id": DimmerID.HOLD}),
+            )
+        },
+    )
+
+    variants = [
+        ("16A Smooth", smooth),
+        ("16B Energetic", energetic),
+        ("16C Minimal", minimal),
+    ]
+
+    for label, preset in variants:
+        patched = apply_template_preset(template, preset)
+        segments = compiler.compile(rig=rig, plan=plan, template_doc=patched)
+        print(f"\n=== DEMO {label} ===\n")
+        print("Template:", patched.template_id, "Preset:", preset.preset_id)
+        _print_segments(label, segments)
+
+
+if __name__ == "__main__":
+    main()

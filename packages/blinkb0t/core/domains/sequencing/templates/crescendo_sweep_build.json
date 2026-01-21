@@ -1,0 +1,120 @@
+{
+  "template_id": "crescendo_sweep_build",
+  "name": "Crescendo Sweep Build",
+  "category": "build",
+  "timing": {
+    "mode": "musical",
+    "default_duration_bars": 8.0
+  },
+  "steps": [
+    {
+      "step_id": "build_start",
+      "target": "ALL",
+      "timing": {
+        "base_timing": {
+          "mode": "musical",
+          "start_offset_bars": 0.0,
+          "duration_bars": 4.0,
+          "quantize_start": "downbeat",
+          "quantize_end": "downbeat"
+        },
+        "loop": false
+      },
+      "movement_id": "sweep_lr",
+      "movement_params": {
+        "intensity": "SMOOTH"
+      },
+      "geometry_id": "wall_wash",
+      "geometry_params": {},
+      "dimmer_id": "swell",
+      "dimmer_params": {
+        "intensity": "SMOOTH"
+      },
+      "entry_transition": {
+        "mode": "fade_through_black",
+        "duration_bars": 1.0,
+        "curve": "ease_in_sine"
+      },
+      "exit_transition": {
+        "mode": "crossfade",
+        "duration_bars": 0.5,
+        "curve": "ease_in_sine"
+      },
+      "priority": 0,
+      "blend_mode": "override"
+    },
+    {
+      "step_id": "build_intensify",
+      "target": "ALL",
+      "timing": {
+        "base_timing": {
+          "mode": "musical",
+          "start_offset_bars": 4.0,
+          "duration_bars": 4.0,
+          "quantize_start": "downbeat",
+          "quantize_end": "downbeat"
+        },
+        "loop": false,
+        "per_fixture_offsets": [0.0, 0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75]
+      },
+      "movement_id": "sweep_lr",
+      "movement_params": {
+        "intensity": "DRAMATIC"
+      },
+      "geometry_id": "fan",
+      "geometry_params": {},
+      "dimmer_id": "swell",
+      "dimmer_params": {
+        "intensity": "DRAMATIC"
+      },
+      "entry_transition": {
+        "mode": "crossfade",
+        "duration_bars": 0.5,
+        "curve": "ease_in_quad"
+      },
+      "exit_transition": {
+        "mode": "snap",
+        "duration_bars": 0.0,
+        "curve": "linear"
+      },
+      "priority": 0,
+      "blend_mode": "override"
+    }
+  ],
+  "metadata": {
+    "description": "Two-phase crescendo build from smooth unified sweep to intense cascading fan motion. Phase 1 (bars 0-4): gentle wall wash sweep with smooth ramp-up creates foundation. Phase 2 (bars 4-8): transitions to fan geometry with quarter-bar cascading offsets and dramatic intensity, creating accelerating wave effect that builds tension perfectly for pre-drop moments. Snap exit delivers directly into drop.",
+    "recommended_sections": [
+      "build",
+      "pre-chorus",
+      "pre-drop",
+      "buildup"
+    ],
+    "energy_range": [
+      30,
+      85
+    ],
+    "tags": [
+      "build",
+      "crescendo",
+      "sweep",
+      "tension",
+      "pre_drop",
+      "cascade",
+      "ramp",
+      "accelerating"
+    ],
+    "best_with": {
+      "tempo_range": [
+        100,
+        150
+      ],
+      "genres": [
+        "edm",
+        "rock",
+        "pop",
+        "progressive",
+        "dubstep"
+      ]
+    }
+  }
+}

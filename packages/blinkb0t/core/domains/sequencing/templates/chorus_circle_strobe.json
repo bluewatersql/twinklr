@@ -1,0 +1,84 @@
+{
+  "template_id": "chorus_circle_strobe",
+  "name": "Chorus Circle with Strobe",
+  "category": "high_energy",
+  "timing": {
+    "mode": "musical",
+    "default_duration_bars": 8.0
+  },
+  "steps": [
+    {
+      "step_id": "circle_strobe",
+      "target": "ALL",
+      "timing": {
+        "base_timing": {
+          "mode": "musical",
+          "start_offset_bars": 0.0,
+          "duration_bars": 8.0,
+          "quantize_start": "downbeat",
+          "quantize_end": "downbeat"
+        },
+        "loop": true
+      },
+      "movement_id": "circle",
+      "movement_params": {
+        "intensity": "DRAMATIC"
+      },
+      "geometry_id": "fan",
+      "geometry_params": {},
+      "dimmer_id": "strobe",
+      "dimmer_params": {
+        "intensity": "DRAMATIC"
+      },
+      "entry_transition": {
+        "mode": "snap",
+        "duration_bars": 0.0,
+        "curve": "linear"
+      },
+      "exit_transition": {
+        "mode": "fade_through_black",
+        "duration_bars": 0.5,
+        "curve": "ease_out_sine"
+      },
+      "priority": 5,
+      "blend_mode": "override"
+    }
+  ],
+  "metadata": {
+    "description": "Intense circular movement with synchronized strobing effect for peak chorus moments. All fixtures move in unified circular patterns with fan geometry spread while strobing creates maximum visual impact. The synchronized circle creates hypnotic motion perfect for sustaining high energy through extended chorus sections. Clean fade-through-black exit for safe strobe usage.",
+    "recommended_sections": [
+      "chorus",
+      "peak",
+      "climax",
+      "drop"
+    ],
+    "energy_range": [
+      85,
+      100
+    ],
+    "tags": [
+      "intense",
+      "circle",
+      "strobe",
+      "chorus",
+      "peak",
+      "high_energy",
+      "synchronized",
+      "hypnotic"
+    ],
+    "best_with": {
+      "tempo_range": [
+        128,
+        180
+      ],
+      "genres": [
+        "edm",
+        "electronic",
+        "dubstep",
+        "techno",
+        "trance",
+        "hardstyle"
+      ]
+    }
+  }
+}

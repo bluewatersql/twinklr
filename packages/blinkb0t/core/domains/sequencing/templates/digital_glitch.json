@@ -1,0 +1,124 @@
+{
+  "template_id": "digital_glitch",
+  "name": "Digital Glitch",
+  "category": "breakdown",
+  "timing": {
+    "mode": "musical",
+    "default_duration_bars": 4.0
+  },
+  "steps": [
+    {
+      "step_id": "glitch_burst",
+      "target": "ALL",
+      "timing": {
+        "base_timing": {
+          "mode": "musical",
+          "start_offset_bars": 0.0,
+          "duration_bars": 3.0,
+          "quantize_start": "downbeat",
+          "quantize_end": "downbeat"
+        },
+        "loop": true,
+        "per_fixture_offsets": [0.0, 0.125, 0.25, 0.375, 0.5, 0.625, 0.75, 0.875]
+      },
+      "movement_id": "laser_snap",
+      "movement_params": {
+        "intensity": "INTENSE"
+      },
+      "geometry_id": "scattered_chaos",
+      "geometry_params": {},
+      "dimmer_id": "strobe",
+      "dimmer_params": {
+        "intensity": "DRAMATIC"
+      },
+      "entry_transition": {
+        "mode": "snap",
+        "duration_bars": 0.0,
+        "curve": "linear"
+      },
+      "exit_transition": {
+        "mode": "snap",
+        "duration_bars": 0.0,
+        "curve": "linear"
+      },
+      "priority": 5,
+      "blend_mode": "override"
+    },
+    {
+      "step_id": "relock_hold",
+      "target": "ALL",
+      "timing": {
+        "base_timing": {
+          "mode": "musical",
+          "start_offset_bars": 3.0,
+          "duration_bars": 1.0,
+          "quantize_start": "downbeat",
+          "quantize_end": "downbeat"
+        },
+        "loop": false
+      },
+      "movement_id": "hold",
+      "movement_params": {
+        "intensity": "SMOOTH"
+      },
+      "geometry_id": "wall_wash",
+      "geometry_params": {},
+      "dimmer_id": "hold",
+      "dimmer_params": {
+        "intensity": "DRAMATIC"
+      },
+      "entry_transition": {
+        "mode": "snap",
+        "duration_bars": 0.0,
+        "curve": "linear"
+      },
+      "exit_transition": {
+        "mode": "crossfade",
+        "duration_bars": 0.5,
+        "curve": "ease_out_sine"
+      },
+      "priority": 5,
+      "blend_mode": "override"
+    }
+  ],
+  "metadata": {
+    "description": "Rapid, irregular glitch effect with staggered laser snaps and strobing pulse creating digital malfunction aesthetic. Fixtures snap to random scattered positions at eighth-bar intervals offset from each other, creating continuous chaotic motion. After 3 bars of glitching, all fixtures snap together into unified wall wash hold, punctuating the phrase. Perfect for EDM breakdowns and glitch-hop sections.",
+    "recommended_sections": [
+      "breakdown",
+      "bridge",
+      "transition",
+      "fill",
+      "drop_intro"
+    ],
+    "energy_range": [
+      65,
+      95
+    ],
+    "tags": [
+      "glitch",
+      "digital",
+      "snap",
+      "stutter",
+      "random",
+      "chaotic",
+      "breakdown",
+      "strobe",
+      "scattered",
+      "malfunction"
+    ],
+    "best_with": {
+      "tempo_range": [
+        100,
+        170
+      ],
+      "genres": [
+        "glitch_hop",
+        "dubstep",
+        "drum_and_bass",
+        "edm",
+        "experimental",
+        "bass_music"
+      ]
+    }
+  }
+}

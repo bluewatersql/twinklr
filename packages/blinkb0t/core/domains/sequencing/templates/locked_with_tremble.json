@@ -1,0 +1,159 @@
+{
+  "template_id": "locked_with_tremble",
+  "name": "Locked with Tremble",
+  "category": "build",
+  "timing": {
+    "mode": "musical",
+    "default_duration_bars": 4.0
+  },
+  "steps": [
+    {
+      "step_id": "lock_snap_in",
+      "target": "ALL",
+      "timing": {
+        "base_timing": {
+          "mode": "musical",
+          "start_offset_bars": 0.0,
+          "duration_bars": 0.25,
+          "quantize_start": "downbeat",
+          "quantize_end": "sixteenth_bar"
+        },
+        "loop": false
+      },
+      "movement_id": "hold",
+      "movement_params": {
+        "intensity": "SMOOTH"
+      },
+      "geometry_id": "audience_scan",
+      "geometry_params": {},
+      "dimmer_id": "hold",
+      "dimmer_params": {
+        "intensity": "DRAMATIC"
+      },
+      "entry_transition": {
+        "mode": "snap",
+        "duration_bars": 0.0,
+        "curve": "linear"
+      },
+      "exit_transition": {
+        "mode": "snap",
+        "duration_bars": 0.0,
+        "curve": "linear"
+      },
+      "priority": 0,
+      "blend_mode": "override"
+    },
+    {
+      "step_id": "tremble_locked",
+      "target": "ALL",
+      "timing": {
+        "base_timing": {
+          "mode": "musical",
+          "start_offset_bars": 0.25,
+          "duration_bars": 3.0,
+          "quantize_start": "sixteenth_bar",
+          "quantize_end": "quarter_bar"
+        },
+        "loop": true
+      },
+      "movement_id": "pan_shake",
+      "movement_params": {
+        "intensity": "DRAMATIC"
+      },
+      "geometry_id": "audience_scan",
+      "geometry_params": {},
+      "dimmer_id": "swell",
+      "dimmer_params": {
+        "intensity": "DRAMATIC"
+      },
+      "entry_transition": {
+        "mode": "snap",
+        "duration_bars": 0.0,
+        "curve": "linear"
+      },
+      "exit_transition": {
+        "mode": "crossfade",
+        "duration_bars": 0.25,
+        "curve": "ease_in_quad"
+      },
+      "priority": 0,
+      "blend_mode": "override"
+    },
+    {
+      "step_id": "release_settle",
+      "target": "ALL",
+      "timing": {
+        "base_timing": {
+          "mode": "musical",
+          "start_offset_bars": 3.25,
+          "duration_bars": 0.75,
+          "quantize_start": "quarter_bar",
+          "quantize_end": "downbeat"
+        },
+        "loop": false
+      },
+      "movement_id": "hold",
+      "movement_params": {
+        "intensity": "SMOOTH"
+      },
+      "geometry_id": "audience_scan",
+      "geometry_params": {},
+      "dimmer_id": "hold",
+      "dimmer_params": {
+        "intensity": "SMOOTH"
+      },
+      "entry_transition": {
+        "mode": "crossfade",
+        "duration_bars": 0.25,
+        "curve": "ease_out_quad"
+      },
+      "exit_transition": {
+        "mode": "crossfade",
+        "duration_bars": 0.5,
+        "curve": "ease_out_sine"
+      },
+      "priority": 0,
+      "blend_mode": "override"
+    }
+  ],
+  "metadata": {
+    "description": "Locks fixtures into audience scan position, then adds high-frequency nervous tremble with gradually intensifying dimmer. Creates mounting tension through micro-motion while maintaining focused positioning. The trembling grows more intense, then releases smoothly into settle. Perfect for suspenseful build moments and pre-drop tension.",
+    "recommended_sections": [
+      "build",
+      "pre-chorus",
+      "breakdown",
+      "bridge",
+      "tension",
+      "pre-drop"
+    ],
+    "energy_range": [
+      35,
+      75
+    ],
+    "tags": [
+      "locked",
+      "tremble",
+      "shake",
+      "tension",
+      "suspense",
+      "nervous",
+      "micro_motion",
+      "build",
+      "audience_scan"
+    ],
+    "best_with": {
+      "tempo_range": [
+        80,
+        140
+      ],
+      "genres": [
+        "edm",
+        "dubstep",
+        "trap",
+        "progressive",
+        "rock",
+        "cinematic"
+      ]
+    }
+  }
+}
