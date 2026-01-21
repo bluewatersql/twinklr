@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 from blinkb0t.core.domains.sequencer.moving_heads.models.base import IntensityLevel, OrderMode
-from blinkb0t.core.domains.sequencer.moving_heads.models.templates import StepSpec
+from blinkb0t.core.domains.sequencer.moving_heads.models.templates import Step
 
 
 class IterationPolicy:
-    def apply(self, step: StepSpec, iteration_index: int, total_iterations: int) -> StepSpec:
+    def apply(self, step: Step, iteration_index: int, total_iterations: int) -> Step:
         return step
 
 
@@ -20,7 +20,7 @@ class PumpUpIterationPolicy(IterationPolicy):
         self.start_intensity = start_intensity
         self.end_intensity = end_intensity
 
-    def apply(self, step: StepSpec, iteration_index: int, total_iterations: int) -> StepSpec:
+    def apply(self, step: Step, iteration_index: int, total_iterations: int) -> Step:
         if total_iterations <= 1:
             return step
 
@@ -46,7 +46,7 @@ class PumpUpIterationPolicy(IterationPolicy):
 
 
 class ReverseEveryOtherPolicy(IterationPolicy):
-    def apply(self, step: StepSpec, iteration_index: int, total_iterations: int) -> StepSpec:
+    def apply(self, step: Step, iteration_index: int, total_iterations: int) -> Step:
         phase = getattr(step.timing, "phase_offset", None)
         if phase is None:
             return step

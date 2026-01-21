@@ -26,7 +26,7 @@ from blinkb0t.core.domains.sequencer.moving_heads.models.presets import (
 )
 from blinkb0t.core.domains.sequencer.moving_heads.movement.generator import MovementGenerator
 from blinkb0t.core.domains.sequencer.moving_heads.templates.compiler import TemplateCompiler
-from blinkb0t.core.domains.sequencer.moving_heads.templates.specs import fan_pulse_base
+from blinkb0t.core.domains.sequencer.moving_heads.templates.types import fan_pulse_base
 from blinkb0t.core.domains.sequencing.libraries.moving_heads.dimmers import DimmerID
 
 

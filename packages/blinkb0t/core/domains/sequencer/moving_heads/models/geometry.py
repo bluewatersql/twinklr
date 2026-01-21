@@ -15,13 +15,13 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from blinkb0t.core.domains.sequencing.libraries.moving_heads.geometry import GeometryID
 
 
-class GeometryIdSpec(BaseModel):
+class GeometryType(BaseModel):
     type: Literal["GEOMETRY_ID"] = "GEOMETRY_ID"
     geometry_id: GeometryID
     geometry_params: dict[str, Any] = Field(default_factory=dict)
 
 
-class RolePoseGeometrySpec(BaseModel):
+class RolePoseGeometry(BaseModel):
     """ROLE_POSE geometry spec.
 
     pan_pose_by_role maps a *role name* (from RigProfile.role_bindings) to a pose token
@@ -45,13 +45,13 @@ class RolePoseGeometrySpec(BaseModel):
     )
 
     @model_validator(mode="after")
-    def _validate_non_empty(self) -> RolePoseGeometrySpec:
+    def _validate_non_empty(self) -> RolePoseGeometry:
         if not self.pan_pose_by_role:
             raise ValueError("pan_pose_by_role must not be empty")
         return self
 
 
-GeometrySpec = Annotated[
-    RolePoseGeometrySpec | GeometryIdSpec,
+Geometry = Annotated[
+    RolePoseGeometry | GeometryType,
     Field(discriminator="type"),
 ]

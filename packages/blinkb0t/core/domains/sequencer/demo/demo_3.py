@@ -18,7 +18,7 @@ from blinkb0t.core.domains.sequencer.moving_heads.templates.compiler import Temp
 from blinkb0t.core.domains.sequencer.moving_heads.templates.iteration import (
     PumpUpIterationPolicy,
 )
-from blinkb0t.core.domains.sequencer.moving_heads.templates.specs import pump_up_loop
+from blinkb0t.core.domains.sequencer.moving_heads.templates.types import pump_up_loop
 
 
 def main() -> None:

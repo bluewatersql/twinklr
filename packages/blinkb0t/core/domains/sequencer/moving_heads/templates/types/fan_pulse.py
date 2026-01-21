@@ -13,22 +13,22 @@ from blinkb0t.core.domains.sequencer.moving_heads.models.base import (
     TimingMode,
     TransitionMode,
 )
-from blinkb0t.core.domains.sequencer.moving_heads.models.dimmer import DimmerID, DimmerSpec
-from blinkb0t.core.domains.sequencer.moving_heads.models.geometry import RolePoseGeometrySpec
-from blinkb0t.core.domains.sequencer.moving_heads.models.movement import MovementID, MovementSpec
+from blinkb0t.core.domains.sequencer.moving_heads.models.dimmer import Dimmer, DimmerID
+from blinkb0t.core.domains.sequencer.moving_heads.models.geometry import RolePoseGeometry
+from blinkb0t.core.domains.sequencer.moving_heads.models.movement import Movement, MovementID
 from blinkb0t.core.domains.sequencer.moving_heads.models.templates import (
     BaseTiming,
-    PhaseOffsetSpec,
-    RepeatSpec,
-    StepSpec,
+    PhaseOffset,
+    Repeat,
+    Step,
     StepTiming,
+    Template,
     TemplateDefaults,
     TemplateMetadata,
-    TemplateSpec,
-    TransitionSpec,
+    Transition,
 )
 
-TEMPLATE = TemplateSpec(
+TEMPLATE = Template(
     template_id="fan_pulse",
     version=1,
     name="Fan Pulse",
@@ -47,7 +47,7 @@ TEMPLATE = TemplateSpec(
     # Template timing defaults (compiler may not use yet; ok to include)
     timing={"mode": "musical", "default_cycle_bars": 4.0},
     # Repeat contract: loop the "main" step to fill section windows
-    repeat=RepeatSpec(
+    repeat=Repeat(
         repeatable=True,
         mode=RepeatMode.PING_PONG,
         cycle_bars=4.0,
@@ -62,7 +62,7 @@ TEMPLATE = TemplateSpec(
     ),
     steps=[
         # Phase 1: intro “set the shape”, quick ramp-in, slight cascade (no per-fixture arrays)
-        StepSpec(
+        Step(
             step_id="intro",
             target="ALL",
             timing=StepTiming(
@@ -73,7 +73,7 @@ TEMPLATE = TemplateSpec(
                     quantize_start=QuantizePoint.DOWNBEAT,
                     quantize_end=QuantizePoint.DOWNBEAT,
                 ),
-                phase_offset=PhaseOffsetSpec(
+                phase_offset=PhaseOffset(
                     unit=PhaseUnit.BARS,
                     mode=PhaseOffsetMode.GROUP_ORDER,
                     group="ALL",
@@ -83,7 +83,7 @@ TEMPLATE = TemplateSpec(
                     wrap=True,
                 ),
             ),
-            geometry=RolePoseGeometrySpec(
+            geometry=RolePoseGeometry(
                 pan_pose_by_role={
                     "OUTER_LEFT": "WIDE_LEFT",
                     "INNER_LEFT": "MID_LEFT",
@@ -92,29 +92,29 @@ TEMPLATE = TemplateSpec(
                 },
                 tilt_pose="HORIZON",
             ),
-            movement=MovementSpec(
+            movement=Movement(
                 movement_id=MovementID.SWEEP_LR,
                 intensity=IntensityLevel.SMOOTH,
                 cycles=0.5,  # half-sweep over the intro bar
             ),
-            dimmer=DimmerSpec(
+            dimmer=Dimmer(
                 dimmer_id=DimmerID.FADE_IN,
                 intensity=IntensityLevel.DRAMATIC,
                 min_norm=0.0,
                 max_norm=1.0,
                 cycles=1.0,
             ),
-            entry_transition=TransitionSpec(
+            entry_transition=Transition(
                 mode=TransitionMode.SNAP, duration_bars=0.0, curve="linear"
             ),
-            exit_transition=TransitionSpec(
+            exit_transition=Transition(
                 mode=TransitionMode.CROSSFADE, duration_bars=0.25, curve="sine"
             ),
             priority=0,
             blend_mode=BlendMode.OVERRIDE,
         ),
         # Phase 2: main loop (repeat-ready)
-        StepSpec(
+        Step(
             step_id="main",
             target="ALL",
             timing=StepTiming(
@@ -129,7 +129,7 @@ TEMPLATE = TemplateSpec(
                 internal_loop_enabled=False,
                 internal_loop_mode=None,
             ),
-            geometry=RolePoseGeometrySpec(
+            geometry=RolePoseGeometry(
                 pan_pose_by_role={
                     "OUTER_LEFT": "WIDE_LEFT",
                     "INNER_LEFT": "MID_LEFT",
@@ -138,22 +138,22 @@ TEMPLATE = TemplateSpec(
                 },
                 tilt_pose="HORIZON",
             ),
-            movement=MovementSpec(
+            movement=Movement(
                 movement_id=MovementID.SWEEP_LR,
                 intensity=IntensityLevel.DRAMATIC,
                 cycles=1.0,  # one sweep per 4-bar cycle window
             ),
-            dimmer=DimmerSpec(
+            dimmer=Dimmer(
                 dimmer_id=DimmerID.PULSE,
                 intensity=IntensityLevel.DRAMATIC,
                 min_norm=0.20,
                 max_norm=1.00,
                 cycles=2.0,  # two pulses per cycle window
             ),
-            entry_transition=TransitionSpec(
+            entry_transition=Transition(
                 mode=TransitionMode.CROSSFADE, duration_bars=0.25, curve="sine"
             ),
-            exit_transition=TransitionSpec(
+            exit_transition=Transition(
                 mode=TransitionMode.CROSSFADE, duration_bars=0.50, curve="sine"
             ),
             priority=0,

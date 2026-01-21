@@ -12,7 +12,7 @@ from blinkb0t.core.domains.sequencer.moving_heads.dimmer.generator import Dimmer
 from blinkb0t.core.domains.sequencer.moving_heads.geometry.role_pose import RolePoseGeometryResolver
 from blinkb0t.core.domains.sequencer.moving_heads.movement.generator import MovementGenerator
 from blinkb0t.core.domains.sequencer.moving_heads.templates.compiler import TemplateCompiler
-from blinkb0t.core.domains.sequencer.moving_heads.templates.specs import fan_pulse
+from blinkb0t.core.domains.sequencer.moving_heads.templates.types import fan_pulse
 
 
 def main() -> None:

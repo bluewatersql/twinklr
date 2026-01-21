@@ -24,14 +24,14 @@ from blinkb0t.core.domains.sequencer.moving_heads.models.base import (
 )
 
 # ----------------------------
-# V2 specs (single source of truth)
+# single source of truth
 # ----------------------------
-from blinkb0t.core.domains.sequencer.moving_heads.models.dimmer import DimmerSpec
+from blinkb0t.core.domains.sequencer.moving_heads.models.dimmer import Dimmer
 from blinkb0t.core.domains.sequencer.moving_heads.models.geometry import (
-    GeometrySpec,
-    RolePoseGeometrySpec,
+    Geometry,
+    RolePoseGeometry,
 )
-from blinkb0t.core.domains.sequencer.moving_heads.models.movement import MovementSpec
+from blinkb0t.core.domains.sequencer.moving_heads.models.movement import Movement
 
 # ----------------------------
 # Timing / phase offsets
@@ -50,7 +50,7 @@ class BaseTiming(BaseModel):
     quantize_end: QuantizePoint = QuantizePoint.DOWNBEAT
 
 
-class PhaseOffsetSpec(BaseModel):
+class PhaseOffset(BaseModel):
     """Group+order phase spreading (replaces per_fixture_offsets arrays)."""
 
     model_config = ConfigDict(extra="forbid")
@@ -67,7 +67,7 @@ class PhaseOffsetSpec(BaseModel):
     wrap: bool = True
 
     @model_validator(mode="after")
-    def _validate(self) -> PhaseOffsetSpec:
+    def _validate(self) -> PhaseOffset:
         if self.mode == PhaseOffsetMode.NONE:
             return self
         if not self.group:
@@ -81,7 +81,7 @@ class StepTiming(BaseModel):
     base_timing: BaseTiming
 
     # Replaces per_fixture_offsets arrays
-    phase_offset: PhaseOffsetSpec | None = None
+    phase_offset: PhaseOffset | None = None
 
     # Optional internal step looping (secondary; prefer template.repeat)
     internal_loop_enabled: bool = False
@@ -93,7 +93,7 @@ class StepTiming(BaseModel):
 # ----------------------------
 
 
-class TransitionSpec(BaseModel):
+class Transition(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     mode: TransitionMode = TransitionMode.CROSSFADE
@@ -106,7 +106,7 @@ class TransitionSpec(BaseModel):
 # ----------------------------
 
 
-class RepeatSpec(BaseModel):
+class Repeat(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     repeatable: bool = True
@@ -128,7 +128,7 @@ class RepeatSpec(BaseModel):
     joiner_step_id: str | None = None
 
     @model_validator(mode="after")
-    def _validate(self) -> RepeatSpec:
+    def _validate(self) -> Repeat:
         if self.repeatable and not self.loop_step_ids:
             raise ValueError("repeat.loop_step_ids must be non-empty when repeatable == true")
         if self.mode == RepeatMode.JOINER and not self.joiner_step_id:
@@ -141,7 +141,7 @@ class RepeatSpec(BaseModel):
 # ----------------------------
 
 
-class StepSpec(BaseModel):
+class Step(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     step_id: str = Field(..., min_length=1)
@@ -149,12 +149,12 @@ class StepSpec(BaseModel):
 
     timing: StepTiming
 
-    movement: MovementSpec
-    geometry: GeometrySpec
-    dimmer: DimmerSpec
+    movement: Movement
+    geometry: Geometry
+    dimmer: Dimmer
 
-    entry_transition: TransitionSpec | None = None
-    exit_transition: TransitionSpec | None = None
+    entry_transition: Transition | None = None
+    exit_transition: Transition | None = None
 
     dimmer_floor_dmx: int | None = Field(default=None, ge=0, le=255)
     dimmer_ceiling_dmx: int | None = Field(default=None, ge=0, le=255)
@@ -181,7 +181,7 @@ class TemplateMetadata(BaseModel):
     best_with: dict[str, Any] = Field(default_factory=dict)
 
 
-class TemplateSpec(BaseModel):
+class Template(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     template_id: str = Field(..., min_length=1)
@@ -203,14 +203,14 @@ class TemplateSpec(BaseModel):
         default_factory=lambda: {"mode": "musical", "default_cycle_bars": 4.0}
     )
 
-    repeat: RepeatSpec
+    repeat: Repeat
     defaults: TemplateDefaults = Field(default_factory=TemplateDefaults)
 
-    steps: list[StepSpec] = Field(..., min_length=1)
+    steps: list[Step] = Field(..., min_length=1)
     metadata: TemplateMetadata = Field(default_factory=TemplateMetadata)
 
     @model_validator(mode="after")
-    def _validate_template(self) -> TemplateSpec:
+    def _validate_template(self) -> Template:
         # Unique step_ids
         step_ids = [s.step_id for s in self.steps]
         if len(step_ids) != len(set(step_ids)):
@@ -237,7 +237,7 @@ class TemplateSpec(BaseModel):
 
         role_set = set(self.roles)
         for st in self.steps:
-            if isinstance(st.geometry, RolePoseGeometrySpec):
+            if isinstance(st.geometry, RolePoseGeometry):
                 if not self.roles:
                     raise ValueError("Template.roles must be defined when using ROLE_POSE geometry")
 

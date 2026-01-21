@@ -15,7 +15,7 @@ from blinkb0t.core.domains.sequencer.moving_heads.geometry.role_pose import (
 from blinkb0t.core.domains.sequencer.moving_heads.models.plan import PlaybackWindowBars
 from blinkb0t.core.domains.sequencer.moving_heads.movement.generator import MovementGenerator
 from blinkb0t.core.domains.sequencer.moving_heads.templates.compiler import TemplateCompiler
-from blinkb0t.core.domains.sequencer.moving_heads.templates.specs import (
+from blinkb0t.core.domains.sequencer.moving_heads.templates.types import (
     sweep_lr_continuous_phase,
     sweep_lr_pingpong_phase,
 )

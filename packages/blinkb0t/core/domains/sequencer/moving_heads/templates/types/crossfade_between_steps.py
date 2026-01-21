@@ -9,21 +9,21 @@ from blinkb0t.core.domains.sequencer.moving_heads.models.base import (
     TimingMode,
     TransitionMode,
 )
-from blinkb0t.core.domains.sequencer.moving_heads.models.dimmer import DimmerID, DimmerSpec
-from blinkb0t.core.domains.sequencer.moving_heads.models.geometry import RolePoseGeometrySpec
-from blinkb0t.core.domains.sequencer.moving_heads.models.movement import MovementID, MovementSpec
+from blinkb0t.core.domains.sequencer.moving_heads.models.dimmer import Dimmer, DimmerID
+from blinkb0t.core.domains.sequencer.moving_heads.models.geometry import RolePoseGeometry
+from blinkb0t.core.domains.sequencer.moving_heads.models.movement import Movement, MovementID
 from blinkb0t.core.domains.sequencer.moving_heads.models.templates import (
     BaseTiming,
-    RepeatSpec,
-    StepSpec,
+    Repeat,
+    Step,
     StepTiming,
+    Template,
     TemplateDefaults,
     TemplateMetadata,
-    TemplateSpec,
-    TransitionSpec,
+    Transition,
 )
 
-TEMPLATE = TemplateSpec(
+TEMPLATE = Template(
     template_id="crossfade_between_steps",
     version=1,
     name="Crossfade Between Steps",
@@ -31,7 +31,7 @@ TEMPLATE = TemplateSpec(
     roles=["OUTER_LEFT", "INNER_LEFT", "INNER_RIGHT", "OUTER_RIGHT"],
     groups={"ALL": ["OUTER_LEFT", "INNER_LEFT", "INNER_RIGHT", "OUTER_RIGHT"]},
     timing={"mode": "musical", "default_cycle_bars": 4.0},
-    repeat=RepeatSpec(
+    repeat=Repeat(
         repeatable=True,
         mode=RepeatMode.PING_PONG,
         cycle_bars=4.0,
@@ -41,7 +41,7 @@ TEMPLATE = TemplateSpec(
     ),
     defaults=TemplateDefaults(dimmer_floor_dmx=60, dimmer_ceiling_dmx=255),
     steps=[
-        StepSpec(
+        Step(
             step_id="a",
             target="ALL",
             timing=StepTiming(
@@ -53,7 +53,7 @@ TEMPLATE = TemplateSpec(
                     quantize_end=QuantizePoint.DOWNBEAT,
                 )
             ),
-            geometry=RolePoseGeometrySpec(
+            geometry=RolePoseGeometry(
                 pan_pose_by_role={
                     "OUTER_LEFT": "WIDE_LEFT",
                     "INNER_LEFT": "MID_LEFT",
@@ -62,28 +62,28 @@ TEMPLATE = TemplateSpec(
                 },
                 tilt_pose="HORIZON",
             ),
-            movement=MovementSpec(
+            movement=Movement(
                 movement_id=MovementID.HOLD,
                 intensity=IntensityLevel.SMOOTH,
                 cycles=1.0,
             ),
-            dimmer=DimmerSpec(
+            dimmer=Dimmer(
                 dimmer_id=DimmerID.PULSE,
                 intensity=IntensityLevel.DRAMATIC,
                 min_norm=0.20,
                 max_norm=1.00,
                 cycles=2.0,
             ),
-            entry_transition=TransitionSpec(
+            entry_transition=Transition(
                 mode=TransitionMode.SNAP, duration_bars=0.0, curve="linear"
             ),
-            exit_transition=TransitionSpec(
+            exit_transition=Transition(
                 mode=TransitionMode.CROSSFADE, duration_bars=0.5, curve="linear"
             ),
             priority=0,
             blend_mode=BlendMode.OVERRIDE,
         ),
-        StepSpec(
+        Step(
             step_id="b",
             target="ALL",
             timing=StepTiming(
@@ -95,7 +95,7 @@ TEMPLATE = TemplateSpec(
                     quantize_end=QuantizePoint.DOWNBEAT,
                 )
             ),
-            geometry=RolePoseGeometrySpec(
+            geometry=RolePoseGeometry(
                 pan_pose_by_role={
                     "OUTER_LEFT": "CENTER",
                     "INNER_LEFT": "CENTER",
@@ -104,24 +104,22 @@ TEMPLATE = TemplateSpec(
                 },
                 tilt_pose="HORIZON",
             ),
-            movement=MovementSpec(
+            movement=Movement(
                 movement_id=MovementID.HOLD,
                 intensity=IntensityLevel.SMOOTH,
                 cycles=1.0,
             ),
-            dimmer=DimmerSpec(
+            dimmer=Dimmer(
                 dimmer_id=DimmerID.HOLD,
                 intensity=IntensityLevel.SMOOTH,
                 min_norm=0.10,
                 max_norm=1.00,
                 cycles=1.0,
             ),
-            entry_transition=TransitionSpec(
+            entry_transition=Transition(
                 mode=TransitionMode.CROSSFADE, duration_bars=0.5, curve="linear"
             ),
-            exit_transition=TransitionSpec(
-                mode=TransitionMode.SNAP, duration_bars=0.0, curve="linear"
-            ),
+            exit_transition=Transition(mode=TransitionMode.SNAP, duration_bars=0.0, curve="linear"),
             priority=0,
             blend_mode=BlendMode.OVERRIDE,
         ),

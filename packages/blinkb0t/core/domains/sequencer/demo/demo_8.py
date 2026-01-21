@@ -20,7 +20,7 @@ from blinkb0t.core.domains.sequencer.moving_heads.geometry.role_pose import (
 )
 from blinkb0t.core.domains.sequencer.moving_heads.movement.generator import MovementGenerator
 from blinkb0t.core.domains.sequencer.moving_heads.templates.compiler import TemplateCompiler
-from blinkb0t.core.domains.sequencer.moving_heads.templates.specs import (
+from blinkb0t.core.domains.sequencer.moving_heads.templates.types import (
     circle_asym_left_strobe,
     circle_asym_right_pulse,
     circle_fan_hold,
@@ -43,9 +43,7 @@ def _build_compiler():
     )
     geometry = GeometryDispatchResolver(
         role_pose_resolver=role_pose,
-        geometry_id_resolver=GeometryIdResolver(
-            default_tilt_dmx=128, role_pose_resolver=role_pose
-        ),
+        geometry_id_resolver=GeometryIdResolver(default_tilt_dmx=128, role_pose_resolver=role_pose),
     )
     movement = MovementGenerator(curve_ops=curve_ops, default_samples=16)
     dimmer = DimmerGenerator(curve_ops=curve_ops, default_samples=16)

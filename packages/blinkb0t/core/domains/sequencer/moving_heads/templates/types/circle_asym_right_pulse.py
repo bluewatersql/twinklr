@@ -9,29 +9,30 @@ from blinkb0t.core.domains.sequencer.moving_heads.models.base import (
     TimingMode,
     TransitionMode,
 )
-from blinkb0t.core.domains.sequencer.moving_heads.models.dimmer import DimmerID, DimmerSpec
-from blinkb0t.core.domains.sequencer.moving_heads.models.geometry import RolePoseGeometrySpec
-from blinkb0t.core.domains.sequencer.moving_heads.models.movement import MovementID, MovementSpec
+from blinkb0t.core.domains.sequencer.moving_heads.models.dimmer import Dimmer, DimmerID
+from blinkb0t.core.domains.sequencer.moving_heads.models.geometry import GeometryType
+from blinkb0t.core.domains.sequencer.moving_heads.models.movement import Movement, MovementID
 from blinkb0t.core.domains.sequencer.moving_heads.models.templates import (
     BaseTiming,
-    RepeatSpec,
-    StepSpec,
+    Repeat,
+    Step,
     StepTiming,
+    Template,
     TemplateDefaults,
     TemplateMetadata,
-    TemplateSpec,
-    TransitionSpec,
+    Transition,
 )
+from blinkb0t.core.domains.sequencing.libraries.moving_heads.geometry import GeometryID
 
-TEMPLATE = TemplateSpec(
-    template_id="bounce_fan_pulse",
+TEMPLATE = Template(
+    template_id="circle_asym_right_pulse",
     version=1,
-    name="Bounce Fan Pulse",
+    name="Circle Asym Right Pulse",
     category=Category.MEDIUM_ENERGY,
-    roles=["OUTER_LEFT", "INNER_LEFT", "INNER_RIGHT", "OUTER_RIGHT"],
-    groups={"ALL": ["OUTER_LEFT", "INNER_LEFT", "INNER_RIGHT", "OUTER_RIGHT"]},
+    roles=[],
+    groups={},
     timing={"mode": "musical", "default_cycle_bars": 4.0},
-    repeat=RepeatSpec(
+    repeat=Repeat(
         repeatable=True,
         mode=RepeatMode.PING_PONG,
         cycle_bars=4.0,
@@ -41,7 +42,7 @@ TEMPLATE = TemplateSpec(
     ),
     defaults=TemplateDefaults(dimmer_floor_dmx=60, dimmer_ceiling_dmx=255),
     steps=[
-        StepSpec(
+        Step(
             step_id="main",
             target="ALL",
             timing=StepTiming(
@@ -53,31 +54,30 @@ TEMPLATE = TemplateSpec(
                     quantize_end=QuantizePoint.DOWNBEAT,
                 )
             ),
-            geometry=RolePoseGeometrySpec(
-                pan_pose_by_role={
-                    "OUTER_LEFT": "WIDE_LEFT",
-                    "INNER_LEFT": "MID_LEFT",
-                    "INNER_RIGHT": "MID_RIGHT",
-                    "OUTER_RIGHT": "WIDE_RIGHT",
+            geometry=GeometryType(
+                geometry_id=GeometryID.AUDIENCE_SCAN_ASYM,
+                geometry_params={
+                    "order": "LEFT_TO_RIGHT",
+                    "pan_positions": [104, 124, 156, 188],
+                    "tilt_dmx": 128,
                 },
-                tilt_pose="HORIZON",
             ),
-            movement=MovementSpec(
-                movement_id=MovementID.BOUNCE,
+            movement=Movement(
+                movement_id=MovementID.CIRCLE,
                 intensity=IntensityLevel.DRAMATIC,
-                cycles=2.0,
+                cycles=1.0,
             ),
-            dimmer=DimmerSpec(
+            dimmer=Dimmer(
                 dimmer_id=DimmerID.PULSE,
                 intensity=IntensityLevel.DRAMATIC,
                 min_norm=0.20,
                 max_norm=1.00,
-                cycles=2.0,
+                cycles=4.0,
             ),
-            entry_transition=TransitionSpec(
+            entry_transition=Transition(
                 mode=TransitionMode.SNAP, duration_bars=0.0, curve="linear"
             ),
-            exit_transition=TransitionSpec(
+            exit_transition=Transition(
                 mode=TransitionMode.CROSSFADE, duration_bars=0.0, curve="linear"
             ),
             priority=0,
@@ -85,9 +85,9 @@ TEMPLATE = TemplateSpec(
         )
     ],
     metadata=TemplateMetadata(
-        description="Fan bounce with pulsing dimmer hits.",
+        description="Asymmetric right-leaning circle with pulsing dimmer.",
         recommended_sections=["chorus", "drop"],
         energy_range=[55, 85],
-        tags=["demo09", "bounce", "fan", "pulse"],
+        tags=["demo08b", "circle", "asym", "pulse"],
     ),
 )

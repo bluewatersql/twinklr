@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from math import isfinite
 
-from blinkb0t.core.domains.sequencer.moving_heads.models.ir import CurvePoint, PointsCurveSpec
+from blinkb0t.core.domains.sequencer.moving_heads.models.ir import CurvePoint, PointsBaseCurve
 
 
 def _round_t(t: float, ndigits: int = 6) -> float:
@@ -84,14 +84,14 @@ def _interp_piecewise(points: list[CurvePoint], t: float) -> float:
 
 class CurveOps:
     """
-    Pure curve operations for PointsCurveSpec.
+    Pure curve operations for PointsBaseCurve.
 
     Design notes:
     - Points are normalized: t,v in [0,1]
     - Prefer fixed-grid sampling for stability (phase shift via rotation)
     """
 
-    def sample(self, fn: Callable[[float], float], n_samples: int) -> PointsCurveSpec:
+    def sample(self, fn: Callable[[float], float], n_samples: int) -> PointsBaseCurve:
         """
         Sample fn(t) at uniform grid t = 0..1 with n_samples intervals.
         Produces n_samples+1 points including endpoints.
@@ -105,9 +105,9 @@ class CurveOps:
             if not isfinite(v):
                 raise ValueError(f"fn produced non-finite v at t={t}: {v}")
             pts.append(CurvePoint(t=_round_t(t), v=_clamp01(v)))
-        return PointsCurveSpec(points=pts)
+        return PointsBaseCurve(points=pts)
 
-    def resample_to_grid(self, curve: PointsCurveSpec, n_samples: int) -> PointsCurveSpec:
+    def resample_to_grid(self, curve: PointsBaseCurve, n_samples: int) -> PointsBaseCurve:
         """
         Resample an arbitrary curve to a uniform grid using linear interpolation.
         Useful as a fallback when time-shifting non-uniform curves.
@@ -120,16 +120,16 @@ class CurveOps:
             t = i / n_samples
             v = _interp_piecewise(src, t)
             pts.append(CurvePoint(t=_round_t(t), v=_clamp01(v)))
-        return PointsCurveSpec(points=pts)
+        return PointsBaseCurve(points=pts)
 
     def time_shift(
         self,
-        curve: PointsCurveSpec,
+        curve: PointsBaseCurve,
         offset_norm: float,
         *,
         wrap: bool = True,
         grid_samples: int | None = None,
-    ) -> PointsCurveSpec:
+    ) -> PointsBaseCurve:
         """
         Shift curve in time by offset_norm in [0,1] (can be any float; mod applied).
         - If curve is uniform grid, uses rotation for exactness.
@@ -171,16 +171,16 @@ class CurveOps:
         rotated[-1] = rotated[0]
 
         out = [CurvePoint(t=p.t, v=_clamp01(rotated[i])) for i, p in enumerate(pts)]
-        return PointsCurveSpec(points=out)
+        return PointsBaseCurve(points=out)
 
-    def invert(self, curve: PointsCurveSpec) -> PointsCurveSpec:
+    def invert(self, curve: PointsBaseCurve) -> PointsBaseCurve:
         """Invert values: v -> 1 - v (time unchanged)."""
         out = [CurvePoint(t=p.t, v=_clamp01(1.0 - p.v)) for p in curve.points]
-        return PointsCurveSpec(points=out)
+        return PointsBaseCurve(points=out)
 
     def clamp(
-        self, curve: PointsCurveSpec, vmin: float = 0.0, vmax: float = 1.0
-    ) -> PointsCurveSpec:
+        self, curve: PointsBaseCurve, vmin: float = 0.0, vmax: float = 1.0
+    ) -> PointsBaseCurve:
         """Clamp values into [vmin, vmax] then renormalize to [0,1] if desired later (MVP: just clamp)."""
         lo, hi = float(vmin), float(vmax)
         if hi < lo:
@@ -193,9 +193,9 @@ class CurveOps:
             elif v > hi:
                 v = hi
             out.append(CurvePoint(t=p.t, v=_clamp01(v)))
-        return PointsCurveSpec(points=out)
+        return PointsBaseCurve(points=out)
 
-    def multiply(self, a: PointsCurveSpec, b: PointsCurveSpec) -> PointsCurveSpec:
+    def multiply(self, a: PointsBaseCurve, b: PointsBaseCurve) -> PointsBaseCurve:
         """
         Multiply two curves (envelope application).
         If grids differ, b is interpolated onto a's t grid.
@@ -207,11 +207,11 @@ class CurveOps:
             vb = _interp_piecewise(b_pts, p.t) if b_pts else 1.0
             out.append(CurvePoint(t=p.t, v=_clamp01(p.v * vb)))
 
-        return PointsCurveSpec(points=out)
+        return PointsBaseCurve(points=out)
 
     def simplify_near_collinear(
-        self, curve: PointsCurveSpec, epsilon: float = 0.01
-    ) -> PointsCurveSpec:
+        self, curve: PointsBaseCurve, epsilon: float = 0.01
+    ) -> PointsBaseCurve:
         """
         Drop points that lie nearly on the line between neighbors.
         Keeps first and last points.
@@ -244,4 +244,4 @@ class CurveOps:
                 kept.append(p1)
 
         kept.append(pts[-1])
-        return PointsCurveSpec(points=kept)
+        return PointsBaseCurve(points=kept)

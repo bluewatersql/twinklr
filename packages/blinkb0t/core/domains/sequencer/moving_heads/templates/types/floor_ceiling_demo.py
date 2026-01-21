@@ -9,29 +9,29 @@ from blinkb0t.core.domains.sequencer.moving_heads.models.base import (
     TimingMode,
     TransitionMode,
 )
-from blinkb0t.core.domains.sequencer.moving_heads.models.dimmer import DimmerID, DimmerSpec
-from blinkb0t.core.domains.sequencer.moving_heads.models.geometry import RolePoseGeometrySpec
-from blinkb0t.core.domains.sequencer.moving_heads.models.movement import MovementID, MovementSpec
+from blinkb0t.core.domains.sequencer.moving_heads.models.dimmer import Dimmer, DimmerID
+from blinkb0t.core.domains.sequencer.moving_heads.models.geometry import RolePoseGeometry
+from blinkb0t.core.domains.sequencer.moving_heads.models.movement import Movement, MovementID
 from blinkb0t.core.domains.sequencer.moving_heads.models.templates import (
     BaseTiming,
-    RepeatSpec,
-    StepSpec,
+    Repeat,
+    Step,
     StepTiming,
+    Template,
     TemplateDefaults,
     TemplateMetadata,
-    TemplateSpec,
-    TransitionSpec,
+    Transition,
 )
 
-TEMPLATE = TemplateSpec(
-    template_id="sweep_lr_fan_pulse",
+TEMPLATE = Template(
+    template_id="floor_ceiling_demo",
     version=1,
-    name="Sweep LR Fan Pulse",
-    category=Category.MEDIUM_ENERGY,
+    name="Floor/Ceiling Demo",
+    category=Category.LOW_ENERGY,
     roles=["OUTER_LEFT", "INNER_LEFT", "INNER_RIGHT", "OUTER_RIGHT"],
     groups={"ALL": ["OUTER_LEFT", "INNER_LEFT", "INNER_RIGHT", "OUTER_RIGHT"]},
     timing={"mode": "musical", "default_cycle_bars": 4.0},
-    repeat=RepeatSpec(
+    repeat=Repeat(
         repeatable=True,
         mode=RepeatMode.PING_PONG,
         cycle_bars=4.0,
@@ -39,9 +39,9 @@ TEMPLATE = TemplateSpec(
         boundary_transition=BoundaryTransition.CONTINUOUS,
         remainder_policy=RemainderPolicy.HOLD_LAST_POSE,
     ),
-    defaults=TemplateDefaults(dimmer_floor_dmx=60, dimmer_ceiling_dmx=255),
+    defaults=TemplateDefaults(dimmer_floor_dmx=80, dimmer_ceiling_dmx=220),
     steps=[
-        StepSpec(
+        Step(
             step_id="main",
             target="ALL",
             timing=StepTiming(
@@ -53,41 +53,43 @@ TEMPLATE = TemplateSpec(
                     quantize_end=QuantizePoint.DOWNBEAT,
                 )
             ),
-            geometry=RolePoseGeometrySpec(
+            geometry=RolePoseGeometry(
                 pan_pose_by_role={
-                    "OUTER_LEFT": "WIDE_LEFT",
-                    "INNER_LEFT": "MID_LEFT",
-                    "INNER_RIGHT": "MID_RIGHT",
-                    "OUTER_RIGHT": "WIDE_RIGHT",
+                    "OUTER_LEFT": "CENTER",
+                    "INNER_LEFT": "CENTER",
+                    "INNER_RIGHT": "CENTER",
+                    "OUTER_RIGHT": "CENTER",
                 },
                 tilt_pose="HORIZON",
             ),
-            movement=MovementSpec(
-                movement_id=MovementID.SWEEP_LR,
+            movement=Movement(
+                movement_id=MovementID.HOLD,
                 intensity=IntensityLevel.SMOOTH,
                 cycles=1.0,
             ),
-            dimmer=DimmerSpec(
+            dimmer=Dimmer(
                 dimmer_id=DimmerID.PULSE,
                 intensity=IntensityLevel.DRAMATIC,
-                min_norm=0.15,
+                min_norm=0.05,
                 max_norm=1.00,
                 cycles=2.0,
             ),
-            entry_transition=TransitionSpec(
+            entry_transition=Transition(
                 mode=TransitionMode.SNAP, duration_bars=0.0, curve="linear"
             ),
-            exit_transition=TransitionSpec(
+            exit_transition=Transition(
                 mode=TransitionMode.CROSSFADE, duration_bars=0.0, curve="linear"
             ),
+            dimmer_floor_dmx=100,
+            dimmer_ceiling_dmx=200,
             priority=0,
             blend_mode=BlendMode.OVERRIDE,
         )
     ],
     metadata=TemplateMetadata(
-        description="Fan sweep with pulsing dimmer hits.",
-        recommended_sections=["chorus", "build"],
-        energy_range=[45, 75],
-        tags=["demo06b", "sweep_lr", "fan", "pulse"],
+        description="Clamp precedence demo: rig vs template vs step.",
+        recommended_sections=["verse"],
+        energy_range=[10, 30],
+        tags=["clamp", "floor", "ceiling", "demo05"],
     ),
 )

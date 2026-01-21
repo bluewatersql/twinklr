@@ -1,15 +1,15 @@
 from __future__ import annotations
 
+import random
 from collections.abc import Callable
 from typing import Any
-import random
 
 from blinkb0t.core.domains.sequencer.moving_heads.geometry.role_pose import (
     RolePoseGeometryResolver,
 )
 from blinkb0t.core.domains.sequencer.moving_heads.models.geometry import (
-    GeometryIdSpec,
-    RolePoseGeometrySpec,
+    GeometryType,
+    RolePoseGeometry,
 )
 from blinkb0t.core.domains.sequencing.libraries.moving_heads.geometry import GeometryID
 
@@ -36,7 +36,7 @@ class GeometryIdResolver:
         self,
         rig: object,
         fixtures: list[str],
-        geometry: GeometryIdSpec,
+        geometry: GeometryType,
     ) -> dict[str, tuple[int, int]]:
         handler = self._registry.get(geometry.geometry_id)
         if handler is None:
@@ -109,7 +109,7 @@ class GeometryIdResolver:
         base_pose = self.role_pose_resolver.resolve_base_pose(
             rig=rig,
             fixtures=fixtures,
-            geometry=RolePoseGeometrySpec(
+            geometry=RolePoseGeometry(
                 pan_pose_by_role=dict(pan_pose_by_role),
                 tilt_pose=str(tilt_pose),
             ),

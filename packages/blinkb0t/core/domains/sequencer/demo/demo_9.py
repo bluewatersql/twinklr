@@ -14,7 +14,7 @@ from blinkb0t.core.domains.sequencer.moving_heads.geometry.role_pose import (
 )
 from blinkb0t.core.domains.sequencer.moving_heads.movement.generator import MovementGenerator
 from blinkb0t.core.domains.sequencer.moving_heads.templates.compiler import TemplateCompiler
-from blinkb0t.core.domains.sequencer.moving_heads.templates.specs import bounce_fan_pulse
+from blinkb0t.core.domains.sequencer.moving_heads.templates.types import bounce_fan_pulse
 
 
 def main() -> None:

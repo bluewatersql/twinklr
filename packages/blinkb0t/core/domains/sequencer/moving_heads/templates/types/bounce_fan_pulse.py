@@ -9,44 +9,41 @@ from blinkb0t.core.domains.sequencer.moving_heads.models.base import (
     TimingMode,
     TransitionMode,
 )
-from blinkb0t.core.domains.sequencer.moving_heads.models.dimmer import DimmerID, DimmerSpec
-from blinkb0t.core.domains.sequencer.moving_heads.models.geometry import RolePoseGeometrySpec
-from blinkb0t.core.domains.sequencer.moving_heads.models.movement import MovementID, MovementSpec
+from blinkb0t.core.domains.sequencer.moving_heads.models.dimmer import Dimmer, DimmerID
+from blinkb0t.core.domains.sequencer.moving_heads.models.geometry import RolePoseGeometry
+from blinkb0t.core.domains.sequencer.moving_heads.models.movement import Movement, MovementID
 from blinkb0t.core.domains.sequencer.moving_heads.models.templates import (
     BaseTiming,
-    RepeatSpec,
-    StepSpec,
+    Repeat,
+    Step,
     StepTiming,
+    Template,
     TemplateDefaults,
     TemplateMetadata,
-    TemplateSpec,
-    TransitionSpec,
+    Transition,
 )
 
-TEMPLATE = TemplateSpec(
-    template_id="inner_pendulum_breathe",
+TEMPLATE = Template(
+    template_id="bounce_fan_pulse",
     version=1,
-    name="Inner Pendulum Breathe",
-    category=Category.LOW_ENERGY,
+    name="Bounce Fan Pulse",
+    category=Category.MEDIUM_ENERGY,
     roles=["OUTER_LEFT", "INNER_LEFT", "INNER_RIGHT", "OUTER_RIGHT"],
-    groups={
-        "ALL": ["OUTER_LEFT", "INNER_LEFT", "INNER_RIGHT", "OUTER_RIGHT"],
-        "INNER": ["INNER_LEFT", "INNER_RIGHT"],
-    },
+    groups={"ALL": ["OUTER_LEFT", "INNER_LEFT", "INNER_RIGHT", "OUTER_RIGHT"]},
     timing={"mode": "musical", "default_cycle_bars": 4.0},
-    repeat=RepeatSpec(
-        repeatable=False,
-        mode=RepeatMode.CLOSED,
+    repeat=Repeat(
+        repeatable=True,
+        mode=RepeatMode.PING_PONG,
         cycle_bars=4.0,
-        loop_step_ids=[],
+        loop_step_ids=["main"],
         boundary_transition=BoundaryTransition.CONTINUOUS,
         remainder_policy=RemainderPolicy.HOLD_LAST_POSE,
     ),
     defaults=TemplateDefaults(dimmer_floor_dmx=60, dimmer_ceiling_dmx=255),
     steps=[
-        StepSpec(
+        Step(
             step_id="main",
-            target="INNER",
+            target="ALL",
             timing=StepTiming(
                 base_timing=BaseTiming(
                     mode=TimingMode.MUSICAL,
@@ -56,7 +53,7 @@ TEMPLATE = TemplateSpec(
                     quantize_end=QuantizePoint.DOWNBEAT,
                 )
             ),
-            geometry=RolePoseGeometrySpec(
+            geometry=RolePoseGeometry(
                 pan_pose_by_role={
                     "OUTER_LEFT": "WIDE_LEFT",
                     "INNER_LEFT": "MID_LEFT",
@@ -65,22 +62,22 @@ TEMPLATE = TemplateSpec(
                 },
                 tilt_pose="HORIZON",
             ),
-            movement=MovementSpec(
-                movement_id=MovementID.PENDULUM,
-                intensity=IntensityLevel.SMOOTH,
-                cycles=1.0,
+            movement=Movement(
+                movement_id=MovementID.BOUNCE,
+                intensity=IntensityLevel.DRAMATIC,
+                cycles=2.0,
             ),
-            dimmer=DimmerSpec(
-                dimmer_id=DimmerID.BREATHE,
-                intensity=IntensityLevel.SMOOTH,
+            dimmer=Dimmer(
+                dimmer_id=DimmerID.PULSE,
+                intensity=IntensityLevel.DRAMATIC,
                 min_norm=0.20,
                 max_norm=1.00,
-                cycles=1.0,
+                cycles=2.0,
             ),
-            entry_transition=TransitionSpec(
+            entry_transition=Transition(
                 mode=TransitionMode.SNAP, duration_bars=0.0, curve="linear"
             ),
-            exit_transition=TransitionSpec(
+            exit_transition=Transition(
                 mode=TransitionMode.CROSSFADE, duration_bars=0.0, curve="linear"
             ),
             priority=0,
@@ -88,9 +85,9 @@ TEMPLATE = TemplateSpec(
         )
     ],
     metadata=TemplateMetadata(
-        description="INNER group only to validate targeting integrity.",
-        recommended_sections=["verse"],
-        energy_range=[15, 40],
-        tags=["demo14", "group_target", "inner"],
+        description="Fan bounce with pulsing dimmer hits.",
+        recommended_sections=["chorus", "drop"],
+        energy_range=[55, 85],
+        tags=["demo09", "bounce", "fan", "pulse"],
     ),
 )

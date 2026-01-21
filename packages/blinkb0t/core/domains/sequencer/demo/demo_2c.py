@@ -17,7 +17,7 @@ from blinkb0t.core.domains.sequencer.moving_heads.geometry.role_pose import (
 from blinkb0t.core.domains.sequencer.moving_heads.models.ir import ChannelSegment
 from blinkb0t.core.domains.sequencer.moving_heads.movement.generator import MovementGenerator
 from blinkb0t.core.domains.sequencer.moving_heads.templates.compiler import TemplateCompiler
-from blinkb0t.core.domains.sequencer.moving_heads.templates.specs import tilt_bias_groups
+from blinkb0t.core.domains.sequencer.moving_heads.templates.types import tilt_bias_groups
 
 
 def main() -> None:

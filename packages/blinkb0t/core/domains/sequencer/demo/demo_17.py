@@ -22,7 +22,7 @@ from blinkb0t.core.domains.sequencer.moving_heads.models.presets import (
 )
 from blinkb0t.core.domains.sequencer.moving_heads.movement.generator import MovementGenerator
 from blinkb0t.core.domains.sequencer.moving_heads.templates.compiler import TemplateCompiler
-from blinkb0t.core.domains.sequencer.moving_heads.templates.specs import (
+from blinkb0t.core.domains.sequencer.moving_heads.templates.types import (
     clamp_extremes_strobe,
 )
 

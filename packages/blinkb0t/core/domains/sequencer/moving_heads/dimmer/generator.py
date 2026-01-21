@@ -2,8 +2,8 @@
 
 
 from blinkb0t.core.domains.sequencer.moving_heads.curves.curve_ops import CurveOps
-from blinkb0t.core.domains.sequencer.moving_heads.models.dimmer import DimmerSpec
-from blinkb0t.core.domains.sequencer.moving_heads.models.ir import PointsCurveSpec
+from blinkb0t.core.domains.sequencer.moving_heads.models.dimmer import Dimmer
+from blinkb0t.core.domains.sequencer.moving_heads.models.ir import PointsBaseCurve
 from blinkb0t.core.domains.sequencing.libraries.moving_heads.dimmers import DimmerID
 
 _INTENSITY_TO_DEPTH = {
@@ -18,7 +18,7 @@ class DimmerGenerator:
         self.curve_ops = curve_ops
         self.default_samples = default_samples
 
-    def generate(self, spec: DimmerSpec, duration_ms: int) -> PointsCurveSpec | None:
+    def generate(self, spec: Dimmer, duration_ms: int) -> PointsBaseCurve | None:
         dimmer_id = spec.dimmer_id
         depth = _INTENSITY_TO_DEPTH.get(spec.intensity.lower(), 0.5)
 
@@ -49,10 +49,7 @@ class DimmerGenerator:
             return self.curve_ops.sample(
                 lambda t: spec.min_norm
                 + (spec.max_norm - spec.min_norm)
-                * (
-                    1.0
-                    - abs(2.0 * ((t * spec.cycles) % 1.0) - 1.0)
-                ),
+                * (1.0 - abs(2.0 * ((t * spec.cycles) % 1.0) - 1.0)),
                 self.default_samples,
             )
 

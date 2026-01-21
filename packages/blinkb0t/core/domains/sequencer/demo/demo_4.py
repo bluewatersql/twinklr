@@ -14,7 +14,7 @@ from blinkb0t.core.domains.sequencer.moving_heads.geometry.role_pose import (
 )
 from blinkb0t.core.domains.sequencer.moving_heads.movement.generator import MovementGenerator
 from blinkb0t.core.domains.sequencer.moving_heads.templates.compiler import TemplateCompiler
-from blinkb0t.core.domains.sequencer.moving_heads.templates.specs import (
+from blinkb0t.core.domains.sequencer.moving_heads.templates.types import (
     crossfade_between_steps,
     snap_in_fade_out,
 )

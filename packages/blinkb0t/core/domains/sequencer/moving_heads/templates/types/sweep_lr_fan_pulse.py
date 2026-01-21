@@ -9,30 +9,29 @@ from blinkb0t.core.domains.sequencer.moving_heads.models.base import (
     TimingMode,
     TransitionMode,
 )
-from blinkb0t.core.domains.sequencer.moving_heads.models.dimmer import DimmerID, DimmerSpec
-from blinkb0t.core.domains.sequencer.moving_heads.models.geometry import GeometryIdSpec
-from blinkb0t.core.domains.sequencer.moving_heads.models.movement import MovementID, MovementSpec
+from blinkb0t.core.domains.sequencer.moving_heads.models.dimmer import Dimmer, DimmerID
+from blinkb0t.core.domains.sequencer.moving_heads.models.geometry import RolePoseGeometry
+from blinkb0t.core.domains.sequencer.moving_heads.models.movement import Movement, MovementID
 from blinkb0t.core.domains.sequencer.moving_heads.models.templates import (
     BaseTiming,
-    RepeatSpec,
-    StepSpec,
+    Repeat,
+    Step,
     StepTiming,
+    Template,
     TemplateDefaults,
     TemplateMetadata,
-    TemplateSpec,
-    TransitionSpec,
+    Transition,
 )
-from blinkb0t.core.domains.sequencing.libraries.moving_heads.geometry import GeometryID
 
-TEMPLATE = TemplateSpec(
-    template_id="circle_asym_left_strobe",
+TEMPLATE = Template(
+    template_id="sweep_lr_fan_pulse",
     version=1,
-    name="Circle Asym Left Strobe",
-    category=Category.HIGH_ENERGY,
-    roles=[],
-    groups={},
+    name="Sweep LR Fan Pulse",
+    category=Category.MEDIUM_ENERGY,
+    roles=["OUTER_LEFT", "INNER_LEFT", "INNER_RIGHT", "OUTER_RIGHT"],
+    groups={"ALL": ["OUTER_LEFT", "INNER_LEFT", "INNER_RIGHT", "OUTER_RIGHT"]},
     timing={"mode": "musical", "default_cycle_bars": 4.0},
-    repeat=RepeatSpec(
+    repeat=Repeat(
         repeatable=True,
         mode=RepeatMode.PING_PONG,
         cycle_bars=4.0,
@@ -42,7 +41,7 @@ TEMPLATE = TemplateSpec(
     ),
     defaults=TemplateDefaults(dimmer_floor_dmx=60, dimmer_ceiling_dmx=255),
     steps=[
-        StepSpec(
+        Step(
             step_id="main",
             target="ALL",
             timing=StepTiming(
@@ -54,30 +53,31 @@ TEMPLATE = TemplateSpec(
                     quantize_end=QuantizePoint.DOWNBEAT,
                 )
             ),
-            geometry=GeometryIdSpec(
-                geometry_id=GeometryID.AUDIENCE_SCAN_ASYM,
-                geometry_params={
-                    "order": "LEFT_TO_RIGHT",
-                    "pan_positions": [68, 92, 132, 160],
-                    "tilt_dmx": 128,
+            geometry=RolePoseGeometry(
+                pan_pose_by_role={
+                    "OUTER_LEFT": "WIDE_LEFT",
+                    "INNER_LEFT": "MID_LEFT",
+                    "INNER_RIGHT": "MID_RIGHT",
+                    "OUTER_RIGHT": "WIDE_RIGHT",
                 },
+                tilt_pose="HORIZON",
             ),
-            movement=MovementSpec(
-                movement_id=MovementID.CIRCLE,
-                intensity=IntensityLevel.DRAMATIC,
+            movement=Movement(
+                movement_id=MovementID.SWEEP_LR,
+                intensity=IntensityLevel.SMOOTH,
                 cycles=1.0,
             ),
-            dimmer=DimmerSpec(
-                dimmer_id=DimmerID.STROBE,
-                intensity=IntensityLevel.INTENSE,
-                min_norm=0.05,
+            dimmer=Dimmer(
+                dimmer_id=DimmerID.PULSE,
+                intensity=IntensityLevel.DRAMATIC,
+                min_norm=0.15,
                 max_norm=1.00,
-                cycles=8.0,
+                cycles=2.0,
             ),
-            entry_transition=TransitionSpec(
+            entry_transition=Transition(
                 mode=TransitionMode.SNAP, duration_bars=0.0, curve="linear"
             ),
-            exit_transition=TransitionSpec(
+            exit_transition=Transition(
                 mode=TransitionMode.CROSSFADE, duration_bars=0.0, curve="linear"
             ),
             priority=0,
@@ -85,9 +85,9 @@ TEMPLATE = TemplateSpec(
         )
     ],
     metadata=TemplateMetadata(
-        description="Asymmetric left-leaning circle with strobe dimmer.",
-        recommended_sections=["drop", "peak"],
-        energy_range=[70, 100],
-        tags=["demo08c", "circle", "asym", "strobe"],
+        description="Fan sweep with pulsing dimmer hits.",
+        recommended_sections=["chorus", "build"],
+        energy_range=[45, 75],
+        tags=["demo06b", "sweep_lr", "fan", "pulse"],
     ),
 )

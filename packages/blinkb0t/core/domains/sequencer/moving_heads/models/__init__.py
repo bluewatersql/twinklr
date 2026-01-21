@@ -13,17 +13,17 @@ from blinkb0t.core.domains.sequencer.moving_heads.models.base import (
     IntensityLevel,
 )
 from blinkb0t.core.domains.sequencer.moving_heads.models.dimmer import (
-    DimmerSpec,
+    Dimmer,
 )
 from blinkb0t.core.domains.sequencer.moving_heads.models.geometry import (
-    RolePoseGeometrySpec,
+    RolePoseGeometry,
 )
 from blinkb0t.core.domains.sequencer.moving_heads.models.ir import (
     CurvePoint,
-    PointsCurveSpec,
+    PointsBaseCurve,
 )
 from blinkb0t.core.domains.sequencer.moving_heads.models.movement import (
-    MovementSpec,
+    Movement,
 )
 from blinkb0t.core.domains.sequencer.moving_heads.models.plan import (
     PlaybackWindowBars,
@@ -45,20 +45,20 @@ __all__ = [
     "BlendMode",
     "ChannelName",
     # Dimmer
-    "DimmerSpec",
+    "Dimmer",
     # Movement
-    "MovementSpec",
+    "Movement",
     # Plan
     "PlaybackWindowBars",
     # Geometry
-    "RolePoseGeometrySpec",
+    "RolePoseGeometry",
     # IR
     "CurvePoint",
-    "PointsCurveSpec",
+    "PointsBaseCurve",
     # Rig
     "RigProfile",
     # Plan
     "PlaybackWindowBars",
     # Geometry
-    "RolePoseGeometrySpec",
+    "RolePoseGeometry",
 ]

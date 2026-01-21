@@ -7,7 +7,7 @@ from blinkb0t.core.domains.sequencer.moving_heads.models.base import IntensityLe
 from blinkb0t.core.domains.sequencing.libraries.moving_heads.movements import MovementID
 
 
-class MovementSpec(BaseModel):
+class Movement(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     movement_id: MovementID

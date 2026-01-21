@@ -9,22 +9,22 @@ from blinkb0t.core.domains.sequencer.moving_heads.models.base import (
     TimingMode,
     TransitionMode,
 )
-from blinkb0t.core.domains.sequencer.moving_heads.models.dimmer import DimmerID, DimmerSpec
-from blinkb0t.core.domains.sequencer.moving_heads.models.geometry import GeometryIdSpec
-from blinkb0t.core.domains.sequencer.moving_heads.models.movement import MovementID, MovementSpec
+from blinkb0t.core.domains.sequencer.moving_heads.models.dimmer import Dimmer, DimmerID
+from blinkb0t.core.domains.sequencer.moving_heads.models.geometry import GeometryType
+from blinkb0t.core.domains.sequencer.moving_heads.models.movement import Movement, MovementID
 from blinkb0t.core.domains.sequencer.moving_heads.models.templates import (
     BaseTiming,
-    RepeatSpec,
-    StepSpec,
+    Repeat,
+    Step,
     StepTiming,
+    Template,
     TemplateDefaults,
     TemplateMetadata,
-    TemplateSpec,
-    TransitionSpec,
+    Transition,
 )
 from blinkb0t.core.domains.sequencing.libraries.moving_heads.geometry import GeometryID
 
-TEMPLATE = TemplateSpec(
+TEMPLATE = Template(
     template_id="split_tilt_contrast",
     version=1,
     name="Split Tilt Contrast",
@@ -32,7 +32,7 @@ TEMPLATE = TemplateSpec(
     roles=[],
     groups={},
     timing={"mode": "musical", "default_cycle_bars": 4.0},
-    repeat=RepeatSpec(
+    repeat=Repeat(
         repeatable=True,
         mode=RepeatMode.PING_PONG,
         cycle_bars=4.0,
@@ -42,7 +42,7 @@ TEMPLATE = TemplateSpec(
     ),
     defaults=TemplateDefaults(dimmer_floor_dmx=60, dimmer_ceiling_dmx=255),
     steps=[
-        StepSpec(
+        Step(
             step_id="main",
             target="ALL",
             timing=StepTiming(
@@ -54,7 +54,7 @@ TEMPLATE = TemplateSpec(
                     quantize_end=QuantizePoint.DOWNBEAT,
                 )
             ),
-            geometry=GeometryIdSpec(
+            geometry=GeometryType(
                 geometry_id=GeometryID.ROLE_POSE_TILT_BIAS,
                 geometry_params={
                     "pan_pose_by_role": {
@@ -67,22 +67,22 @@ TEMPLATE = TemplateSpec(
                     "tilt_bias_by_group": {"LEFT": -18, "RIGHT": 18},
                 },
             ),
-            movement=MovementSpec(
+            movement=Movement(
                 movement_id=MovementID.HOLD,
                 intensity=IntensityLevel.SMOOTH,
                 cycles=1.0,
             ),
-            dimmer=DimmerSpec(
+            dimmer=Dimmer(
                 dimmer_id=DimmerID.HOLD,
                 intensity=IntensityLevel.SMOOTH,
                 min_norm=0.10,
                 max_norm=1.00,
                 cycles=1.0,
             ),
-            entry_transition=TransitionSpec(
+            entry_transition=Transition(
                 mode=TransitionMode.SNAP, duration_bars=0.0, curve="linear"
             ),
-            exit_transition=TransitionSpec(
+            exit_transition=Transition(
                 mode=TransitionMode.CROSSFADE, duration_bars=0.0, curve="linear"
             ),
             priority=0,

@@ -19,11 +19,11 @@ class _StepWindow:
 
 class TemplateCompiler:
     """
-    MVP compiler that turns a validated TemplateSpec into IR ChannelSegments.
+    MVP compiler that turns a validated Template into IR ChannelSegments.
 
     Demo 01 additions:
     - Resolve step timing from plan + BaseTiming when available (fallback to stub)
-    - Apply PhaseOffsetSpec (GROUP_ORDER) to per-fixture segment time windows
+    - Apply PhaseOffset (GROUP_ORDER) to per-fixture segment time windows
     """
 
     def __init__(
@@ -156,9 +156,7 @@ class TemplateCompiler:
         """
         try:
             base = step.timing.base_timing
-            t0 = self._bars_to_ms(
-                plan, float(base.start_offset_bars) + float(cycle_offset_bars)
-            )
+            t0 = self._bars_to_ms(plan, float(base.start_offset_bars) + float(cycle_offset_bars))
             t1 = t0 + self._bars_to_ms(plan, float(base.duration_bars))
             return _StepWindow(t0_ms=t0, t1_ms=t1)
         except Exception:
@@ -408,9 +406,7 @@ class TemplateCompiler:
         if curve is None:
             return None
         pts = list(curve.points)
-        reversed_pts = [
-            p.model_copy(update={"t": 1.0 - p.t}) for p in reversed(pts)
-        ]
+        reversed_pts = [p.model_copy(update={"t": 1.0 - p.t}) for p in reversed(pts)]
         return curve.model_copy(update={"points": reversed_pts})
 
     def _compile_dimmer_transitions(

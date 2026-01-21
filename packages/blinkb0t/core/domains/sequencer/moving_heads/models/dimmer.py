@@ -7,7 +7,7 @@ from blinkb0t.core.domains.sequencer.moving_heads.models.base import IntensityLe
 from blinkb0t.core.domains.sequencing.libraries.moving_heads.dimmers import DimmerID
 
 
-class DimmerSpec(BaseModel):
+class Dimmer(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     dimmer_id: DimmerID

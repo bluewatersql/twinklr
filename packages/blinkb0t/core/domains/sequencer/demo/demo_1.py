@@ -9,7 +9,7 @@ from blinkb0t.core.domains.sequencer.moving_heads.geometry.role_pose import Role
 from blinkb0t.core.domains.sequencer.moving_heads.models.ir import ChannelSegment
 from blinkb0t.core.domains.sequencer.moving_heads.movement.generator import MovementGenerator
 from blinkb0t.core.domains.sequencer.moving_heads.templates.compiler import TemplateCompiler
-from blinkb0t.core.domains.sequencer.moving_heads.templates.specs import cascade_pulse_lr
+from blinkb0t.core.domains.sequencer.moving_heads.templates.types import cascade_pulse_lr
 
 
 def main() -> None:

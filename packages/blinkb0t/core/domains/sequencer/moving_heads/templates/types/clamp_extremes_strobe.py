@@ -2,41 +2,36 @@ from blinkb0t.core.domains.sequencer.moving_heads.models.base import (
     BlendMode,
     BoundaryTransition,
     Category,
-    Distribution,
     IntensityLevel,
-    OrderMode,
-    PhaseOffsetMode,
-    PhaseUnit,
     QuantizePoint,
     RemainderPolicy,
     RepeatMode,
     TimingMode,
     TransitionMode,
 )
-from blinkb0t.core.domains.sequencer.moving_heads.models.dimmer import DimmerID, DimmerSpec
-from blinkb0t.core.domains.sequencer.moving_heads.models.geometry import RolePoseGeometrySpec
-from blinkb0t.core.domains.sequencer.moving_heads.models.movement import MovementID, MovementSpec
+from blinkb0t.core.domains.sequencer.moving_heads.models.dimmer import Dimmer, DimmerID
+from blinkb0t.core.domains.sequencer.moving_heads.models.geometry import RolePoseGeometry
+from blinkb0t.core.domains.sequencer.moving_heads.models.movement import Movement, MovementID
 from blinkb0t.core.domains.sequencer.moving_heads.models.templates import (
     BaseTiming,
-    PhaseOffsetSpec,
-    RepeatSpec,
-    StepSpec,
+    Repeat,
+    Step,
     StepTiming,
+    Template,
     TemplateDefaults,
     TemplateMetadata,
-    TemplateSpec,
-    TransitionSpec,
+    Transition,
 )
 
-TEMPLATE = TemplateSpec(
-    template_id="wave_fan_hold",
+TEMPLATE = Template(
+    template_id="clamp_extremes_strobe",
     version=1,
-    name="Wave Fan Hold",
-    category=Category.MEDIUM_ENERGY,
+    name="Clamp Extremes Strobe",
+    category=Category.HIGH_ENERGY,
     roles=["OUTER_LEFT", "INNER_LEFT", "INNER_RIGHT", "OUTER_RIGHT"],
     groups={"ALL": ["OUTER_LEFT", "INNER_LEFT", "INNER_RIGHT", "OUTER_RIGHT"]},
     timing={"mode": "musical", "default_cycle_bars": 4.0},
-    repeat=RepeatSpec(
+    repeat=Repeat(
         repeatable=True,
         mode=RepeatMode.PING_PONG,
         cycle_bars=4.0,
@@ -44,9 +39,9 @@ TEMPLATE = TemplateSpec(
         boundary_transition=BoundaryTransition.CONTINUOUS,
         remainder_policy=RemainderPolicy.HOLD_LAST_POSE,
     ),
-    defaults=TemplateDefaults(dimmer_floor_dmx=60, dimmer_ceiling_dmx=255),
+    defaults=TemplateDefaults(dimmer_floor_dmx=80, dimmer_ceiling_dmx=255),
     steps=[
-        StepSpec(
+        Step(
             step_id="main",
             target="ALL",
             timing=StepTiming(
@@ -56,18 +51,9 @@ TEMPLATE = TemplateSpec(
                     duration_bars=4.0,
                     quantize_start=QuantizePoint.DOWNBEAT,
                     quantize_end=QuantizePoint.DOWNBEAT,
-                ),
-                phase_offset=PhaseOffsetSpec(
-                    unit=PhaseUnit.BARS,
-                    mode=PhaseOffsetMode.GROUP_ORDER,
-                    group="ALL",
-                    order=OrderMode.LEFT_TO_RIGHT,
-                    spread_bars=1.0,
-                    distribution=Distribution.LINEAR,
-                    wrap=True,
-                ),
+                )
             ),
-            geometry=RolePoseGeometrySpec(
+            geometry=RolePoseGeometry(
                 pan_pose_by_role={
                     "OUTER_LEFT": "WIDE_LEFT",
                     "INNER_LEFT": "MID_LEFT",
@@ -76,22 +62,22 @@ TEMPLATE = TemplateSpec(
                 },
                 tilt_pose="HORIZON",
             ),
-            movement=MovementSpec(
-                movement_id=MovementID.WAVE_HORIZONTAL,
+            movement=Movement(
+                movement_id=MovementID.HOLD,
                 intensity=IntensityLevel.SMOOTH,
                 cycles=1.0,
             ),
-            dimmer=DimmerSpec(
-                dimmer_id=DimmerID.HOLD,
-                intensity=IntensityLevel.SMOOTH,
-                min_norm=0.10,
+            dimmer=Dimmer(
+                dimmer_id=DimmerID.STROBE,
+                intensity=IntensityLevel.INTENSE,
+                min_norm=0.05,
                 max_norm=1.00,
-                cycles=1.0,
+                cycles=8.0,
             ),
-            entry_transition=TransitionSpec(
+            entry_transition=Transition(
                 mode=TransitionMode.SNAP, duration_bars=0.0, curve="linear"
             ),
-            exit_transition=TransitionSpec(
+            exit_transition=Transition(
                 mode=TransitionMode.CROSSFADE, duration_bars=0.0, curve="linear"
             ),
             priority=0,
@@ -99,9 +85,9 @@ TEMPLATE = TemplateSpec(
         )
     ],
     metadata=TemplateMetadata(
-        description="Horizontal wave across fan formation with steady dimmer.",
-        recommended_sections=["verse", "groove"],
-        energy_range=[35, 60],
-        tags=["demo11a", "wave_horizontal", "fan", "hold"],
+        description="Clamp precedence stress test with aggressive strobe.",
+        recommended_sections=["drop", "peak"],
+        energy_range=[70, 100],
+        tags=["demo17", "clamp", "strobe"],
     ),
 )

@@ -2,8 +2,8 @@
 from __future__ import annotations
 
 from blinkb0t.core.domains.sequencer.moving_heads.curves.curve_ops import CurveOps
-from blinkb0t.core.domains.sequencer.moving_heads.models.ir import PointsCurveSpec
-from blinkb0t.core.domains.sequencer.moving_heads.models.movement import MovementSpec
+from blinkb0t.core.domains.sequencer.moving_heads.models.ir import PointsBaseCurve
+from blinkb0t.core.domains.sequencer.moving_heads.models.movement import Movement
 from blinkb0t.core.domains.sequencing.libraries.moving_heads.movements import MovementID
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -35,8 +35,8 @@ class MovementCurves(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    pan: PointsCurveSpec | None = None
-    tilt: PointsCurveSpec | None = None
+    pan: PointsBaseCurve | None = None
+    tilt: PointsBaseCurve | None = None
 
     # amplitude is returned separately so compiler can map to DMX range consistently
     amplitude_norm: float = Field(0.35, ge=0.0, le=1.0)
@@ -47,7 +47,7 @@ class MovementGenerator:
         self.curve_ops: CurveOps = curve_ops
         self.default_samples: int = default_samples
 
-    def generate(self, spec: MovementSpec, duration_ms: int) -> MovementCurves:
+    def generate(self, spec: Movement, duration_ms: int) -> MovementCurves:
         movement_id = spec.movement_id
         amp = _INTENSITY_TO_AMPLITUDE.get(spec.intensity.value, 0.35)
         cycles = float(spec.cycles)
@@ -67,7 +67,7 @@ class MovementGenerator:
 
             pts = list(curve.points)
             pts[-1] = pts[-1].model_copy(update={"v": pts[0].v})
-            curve = PointsCurveSpec(points=pts)
+            curve = PointsBaseCurve(points=pts)
 
             return MovementCurves(pan=curve, tilt=None, amplitude_norm=amp)
 
@@ -81,7 +81,7 @@ class MovementGenerator:
 
             pts = list(curve.points)
             pts[-1] = pts[-1].model_copy(update={"v": pts[0].v})
-            curve = PointsCurveSpec(points=pts)
+            curve = PointsBaseCurve(points=pts)
 
             return MovementCurves(pan=None, tilt=curve, amplitude_norm=amp)
 
@@ -89,21 +89,23 @@ class MovementGenerator:
             n = self.default_samples
 
             pan_curve = self.curve_ops.sample(
-                lambda t: 0.5 + 0.5 * __import__("math").sin(2 * __import__("math").pi * cycles * t),
+                lambda t: 0.5
+                + 0.5 * __import__("math").sin(2 * __import__("math").pi * cycles * t),
                 n_samples=n,
             )
             tilt_curve = self.curve_ops.sample(
-                lambda t: 0.5 + 0.5 * __import__("math").cos(2 * __import__("math").pi * cycles * t),
+                lambda t: 0.5
+                + 0.5 * __import__("math").cos(2 * __import__("math").pi * cycles * t),
                 n_samples=n,
             )
 
             pan_pts = list(pan_curve.points)
             pan_pts[-1] = pan_pts[-1].model_copy(update={"v": pan_pts[0].v})
-            pan_curve = PointsCurveSpec(points=pan_pts)
+            pan_curve = PointsBaseCurve(points=pan_pts)
 
             tilt_pts = list(tilt_curve.points)
             tilt_pts[-1] = tilt_pts[-1].model_copy(update={"v": tilt_pts[0].v})
-            tilt_curve = PointsCurveSpec(points=tilt_pts)
+            tilt_curve = PointsBaseCurve(points=tilt_pts)
 
             return MovementCurves(pan=pan_curve, tilt=tilt_curve, amplitude_norm=amp)
 
@@ -118,7 +120,7 @@ class MovementGenerator:
 
             pts = list(curve.points)
             pts[-1] = pts[-1].model_copy(update={"v": pts[0].v})
-            curve = PointsCurveSpec(points=pts)
+            curve = PointsBaseCurve(points=pts)
 
             return MovementCurves(pan=None, tilt=curve, amplitude_norm=amp)
 
@@ -126,13 +128,14 @@ class MovementGenerator:
             n = self.default_samples
 
             curve = self.curve_ops.sample(
-                lambda t: 0.5 + 0.5 * __import__("math").sin(2 * __import__("math").pi * cycles * t),
+                lambda t: 0.5
+                + 0.5 * __import__("math").sin(2 * __import__("math").pi * cycles * t),
                 n_samples=n,
             )
 
             pts = list(curve.points)
             pts[-1] = pts[-1].model_copy(update={"v": pts[0].v})
-            curve = PointsCurveSpec(points=pts)
+            curve = PointsBaseCurve(points=pts)
 
             return MovementCurves(pan=curve, tilt=None, amplitude_norm=amp)
 
@@ -140,13 +143,14 @@ class MovementGenerator:
             n = self.default_samples
 
             curve = self.curve_ops.sample(
-                lambda t: 0.5 + 0.5 * __import__("math").sin(2 * __import__("math").pi * cycles * t),
+                lambda t: 0.5
+                + 0.5 * __import__("math").sin(2 * __import__("math").pi * cycles * t),
                 n_samples=n,
             )
 
             pts = list(curve.points)
             pts[-1] = pts[-1].model_copy(update={"v": pts[0].v})
-            curve = PointsCurveSpec(points=pts)
+            curve = PointsBaseCurve(points=pts)
 
             return MovementCurves(pan=curve, tilt=None, amplitude_norm=amp)
 

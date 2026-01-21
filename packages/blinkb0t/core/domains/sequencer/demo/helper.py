@@ -5,12 +5,12 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from blinkb0t.core.domains.sequencer.moving_heads.models.ir import ChannelSegment
 
-from blinkb0t.core.domains.sequencer.moving_heads.models.ir import PointsCurveSpec
+from blinkb0t.core.domains.sequencer.moving_heads.models.ir import PointsBaseCurve
 from blinkb0t.core.domains.sequencer.moving_heads.models.presets import TemplatePreset
 from blinkb0t.core.domains.sequencer.moving_heads.models.rig import RigProfile
 from blinkb0t.core.domains.sequencer.moving_heads.models.templates import (
-    StepSpec,
-    TemplateSpec,
+    Step,
+    Template,
 )
 from blinkb0t.core.domains.sequencing.libraries.moving_heads.dimmers import DimmerID
 
@@ -20,7 +20,7 @@ def fmt_points(points: list[tuple[float, float]], precision: int = 3) -> str:
     return f"[{inner}]"
 
 
-def curve_points_normalized(curve: PointsCurveSpec) -> list[tuple[float, float]]:
+def curve_points_normalized(curve: PointsBaseCurve) -> list[tuple[float, float]]:
     return [(float(p.t), float(p.v)) for p in curve.points]
 
 
@@ -38,7 +38,7 @@ def print_segment(seg: ChannelSegment) -> None:
         return
 
     assert seg.curve is not None
-    if isinstance(seg.curve, PointsCurveSpec):
+    if isinstance(seg.curve, PointsBaseCurve):
         pts = curve_points_normalized(seg.curve)
         print(f"  points_norm: {fmt_points(pts)}")
     else:
@@ -83,11 +83,11 @@ def build_demo_rig() -> RigProfile:
 
 
 def apply_template_preset(
-    template: TemplateSpec,
+    template: Template,
     preset: TemplatePreset,
     *,
     clamp_floor_to_template: bool = False,
-) -> TemplateSpec:
+) -> Template:
     defaults = template.defaults
     if preset.defaults:
         floor = preset.defaults.dimmer_floor_dmx
@@ -96,16 +96,14 @@ def apply_template_preset(
             floor = max(int(defaults.dimmer_floor_dmx), int(floor))
         defaults = defaults.model_copy(
             update={
-                "dimmer_floor_dmx": int(floor)
-                if floor is not None
-                else defaults.dimmer_floor_dmx,
+                "dimmer_floor_dmx": int(floor) if floor is not None else defaults.dimmer_floor_dmx,
                 "dimmer_ceiling_dmx": int(ceiling)
                 if ceiling is not None
                 else defaults.dimmer_ceiling_dmx,
             }
         )
 
-    steps_by_id: dict[str, StepSpec] = {s.step_id: s for s in template.steps}
+    steps_by_id: dict[str, Step] = {s.step_id: s for s in template.steps}
     for step_id, patch in preset.step_patches.items():
         if step_id not in steps_by_id:
             continue

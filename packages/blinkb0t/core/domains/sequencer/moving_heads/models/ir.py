@@ -28,25 +28,25 @@ class CurvePoint(BaseModel):
     v: float = Field(..., ge=0.0, le=1.0, description="Normalized value")
 
 
-class PointsCurveSpec(BaseModel):
+class PointsBaseCurve(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     kind: Literal["POINTS"] = "POINTS"
     points: list[CurvePoint] = Field(..., min_length=2)
 
     @model_validator(mode="after")
-    def _validate_monotonic_t(self) -> PointsCurveSpec:
+    def _validate_monotonic_t(self) -> PointsBaseCurve:
         # xLights-style point arrays typically assume non-decreasing t.
         last_t = -1.0
         for p in self.points:
             if p.t < last_t:
-                raise ValueError("PointsCurveSpec.points must have non-decreasing t")
+                raise ValueError("PointsBaseCurve.points must have non-decreasing t")
             last_t = p.t
         # Encourage 0 and 1 endpoints (not strictly required, but helpful).
         return self
 
 
-class NativeCurveSpec(BaseModel):
+class NativeCurve(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     kind: Literal["NATIVE"] = "NATIVE"
@@ -54,7 +54,7 @@ class NativeCurveSpec(BaseModel):
     params: dict[str, Any] = Field(default_factory=dict)
 
 
-CurveSpec = PointsCurveSpec | NativeCurveSpec
+BaseCurve = PointsBaseCurve | NativeCurve
 
 
 class ChannelSegment(BaseModel):
@@ -81,7 +81,7 @@ class ChannelSegment(BaseModel):
     static_dmx: int | None = Field(default=None, ge=0, le=255)
 
     # Option B: curve
-    curve: CurveSpec | None = Field(default=None)
+    curve: BaseCurve | None = Field(default=None)
 
     # Composition hints (primarily for movement offset curves)
     base_dmx: int | None = Field(default=None, ge=0, le=255)

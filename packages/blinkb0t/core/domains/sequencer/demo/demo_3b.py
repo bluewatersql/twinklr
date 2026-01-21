@@ -18,7 +18,7 @@ from blinkb0t.core.domains.sequencer.moving_heads.templates.compiler import Temp
 from blinkb0t.core.domains.sequencer.moving_heads.templates.iteration import (
     ReverseEveryOtherPolicy,
 )
-from blinkb0t.core.domains.sequencer.moving_heads.templates.specs import reverse_every_other
+from blinkb0t.core.domains.sequencer.moving_heads.templates.types import reverse_every_other
 
 
 def main() -> None:

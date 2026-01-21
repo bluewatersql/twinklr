@@ -13,7 +13,7 @@ Inject:
 
 from __future__ import annotations
 
-from blinkb0t.core.domains.sequencer.moving_heads.models.geometry import RolePoseGeometrySpec
+from blinkb0t.core.domains.sequencer.moving_heads.models.geometry import RolePoseGeometry
 
 
 class RolePoseGeometryResolver:
@@ -33,7 +33,7 @@ class RolePoseGeometryResolver:
         self,
         rig: object,
         fixtures: list[str],
-        geometry: RolePoseGeometrySpec,
+        geometry: RolePoseGeometry,
     ) -> dict[str, tuple[int, int]]:
         """Return {fixture_id: (pan_dmx, tilt_dmx)} for each fixture."""
 

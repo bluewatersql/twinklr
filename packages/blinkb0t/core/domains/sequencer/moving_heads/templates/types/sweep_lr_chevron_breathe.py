@@ -9,29 +9,30 @@ from blinkb0t.core.domains.sequencer.moving_heads.models.base import (
     TimingMode,
     TransitionMode,
 )
-from blinkb0t.core.domains.sequencer.moving_heads.models.dimmer import DimmerID, DimmerSpec
-from blinkb0t.core.domains.sequencer.moving_heads.models.geometry import RolePoseGeometrySpec
-from blinkb0t.core.domains.sequencer.moving_heads.models.movement import MovementID, MovementSpec
+from blinkb0t.core.domains.sequencer.moving_heads.models.dimmer import Dimmer, DimmerID
+from blinkb0t.core.domains.sequencer.moving_heads.models.geometry import GeometryType
+from blinkb0t.core.domains.sequencer.moving_heads.models.movement import Movement, MovementID
 from blinkb0t.core.domains.sequencer.moving_heads.models.templates import (
     BaseTiming,
-    RepeatSpec,
-    StepSpec,
+    Repeat,
+    Step,
     StepTiming,
+    Template,
     TemplateDefaults,
     TemplateMetadata,
-    TemplateSpec,
-    TransitionSpec,
+    Transition,
 )
+from blinkb0t.core.domains.sequencing.libraries.moving_heads.geometry import GeometryID
 
-TEMPLATE = TemplateSpec(
-    template_id="sweep_lr_fan_hold",
+TEMPLATE = Template(
+    template_id="sweep_lr_chevron_breathe",
     version=1,
-    name="Sweep LR Fan Hold",
+    name="Sweep LR Chevron Breathe",
     category=Category.MEDIUM_ENERGY,
     roles=["OUTER_LEFT", "INNER_LEFT", "INNER_RIGHT", "OUTER_RIGHT"],
     groups={"ALL": ["OUTER_LEFT", "INNER_LEFT", "INNER_RIGHT", "OUTER_RIGHT"]},
     timing={"mode": "musical", "default_cycle_bars": 4.0},
-    repeat=RepeatSpec(
+    repeat=Repeat(
         repeatable=True,
         mode=RepeatMode.PING_PONG,
         cycle_bars=4.0,
@@ -41,7 +42,7 @@ TEMPLATE = TemplateSpec(
     ),
     defaults=TemplateDefaults(dimmer_floor_dmx=60, dimmer_ceiling_dmx=255),
     steps=[
-        StepSpec(
+        Step(
             step_id="main",
             target="ALL",
             timing=StepTiming(
@@ -53,31 +54,33 @@ TEMPLATE = TemplateSpec(
                     quantize_end=QuantizePoint.DOWNBEAT,
                 )
             ),
-            geometry=RolePoseGeometrySpec(
-                pan_pose_by_role={
-                    "OUTER_LEFT": "WIDE_LEFT",
-                    "INNER_LEFT": "MID_LEFT",
-                    "INNER_RIGHT": "MID_RIGHT",
-                    "OUTER_RIGHT": "WIDE_RIGHT",
+            geometry=GeometryType(
+                geometry_id=GeometryID.CHEVRON_V,
+                geometry_params={
+                    "order": "LEFT_TO_RIGHT",
+                    "pan_start_dmx": 96,
+                    "pan_end_dmx": 176,
+                    "tilt_base_dmx": 128,
+                    "tilt_inner_bias_dmx": 18,
+                    "tilt_outer_bias_dmx": 0,
                 },
-                tilt_pose="HORIZON",
             ),
-            movement=MovementSpec(
+            movement=Movement(
                 movement_id=MovementID.SWEEP_LR,
                 intensity=IntensityLevel.SMOOTH,
                 cycles=1.0,
             ),
-            dimmer=DimmerSpec(
-                dimmer_id=DimmerID.HOLD,
+            dimmer=Dimmer(
+                dimmer_id=DimmerID.BREATHE,
                 intensity=IntensityLevel.SMOOTH,
-                min_norm=0.10,
+                min_norm=0.25,
                 max_norm=1.00,
                 cycles=1.0,
             ),
-            entry_transition=TransitionSpec(
+            entry_transition=Transition(
                 mode=TransitionMode.SNAP, duration_bars=0.0, curve="linear"
             ),
-            exit_transition=TransitionSpec(
+            exit_transition=Transition(
                 mode=TransitionMode.CROSSFADE, duration_bars=0.0, curve="linear"
             ),
             priority=0,
@@ -85,9 +88,9 @@ TEMPLATE = TemplateSpec(
         )
     ],
     metadata=TemplateMetadata(
-        description="Fan sweep with steady dimmer hold.",
-        recommended_sections=["verse", "groove"],
-        energy_range=[30, 55],
-        tags=["demo06a", "sweep_lr", "fan", "hold"],
+        description="Chevron sweep with breathing dimmer.",
+        recommended_sections=["verse", "chorus"],
+        energy_range=[40, 70],
+        tags=["demo06c", "sweep_lr", "chevron", "breathe"],
     ),
 )
