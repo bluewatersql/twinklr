@@ -4,7 +4,6 @@
 .ruff_cache/
 .mypy_cache/
 .coverage*
-changes/*
 data/*
 .dev/*
 
