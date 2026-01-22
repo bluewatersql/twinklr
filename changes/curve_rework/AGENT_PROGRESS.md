@@ -1,8 +1,8 @@
 # Curve Rework Progress
 
 ## Status
+
 - **Phase:** 6 — Integration & perf
-- **Current task:** Complete
 - **State:** complete
 
 ## Completed
@@ -26,6 +26,7 @@
 - [x] Task 5.2 — Add native curve tuning + serialization
 - [x] Task 6.1 — Add integration tests
 - [x] Task 6.2 — Perf checks (existing curve perf tests)
+- [x] Task 6.3 — Curve library wiring
 
 ## Notes
 - Native curve helpers live in `core/curves/native.py` with tests in `tests/core/curves/test_native.py`.
