@@ -1,8 +1,8 @@
 # Curve Rework Progress
 
 ## Status
-- **Phase:** Complete
-- **Current task:** Done
+
+- **Phase:** 6 — Integration & perf
 - **State:** complete
 
 ## Completed
@@ -29,4 +29,6 @@
 - [x] Task 6.3 — Curve library wiring
 
 ## Notes
-- Curve library lives in `core/curves/library.py` and registers all built-in curve generators.
+- Native curve helpers live in `core/curves/native.py` with tests in `tests/core/curves/test_native.py`.
+- Phase 6 integration tests in `tests/core/curves/test_phase6_integration.py`.
+- Perf coverage already exists in `tests/core/curves/test_integration.py` and related performance tests.

@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Callable
+from typing import Any
 
 from blinkb0t.core.curves.models import CurvePoint
 from blinkb0t.core.curves.semantics import CurveKind
@@ -37,9 +38,7 @@ def _apply_modifiers(points: list[CurvePoint], modifiers: list[str]) -> list[Cur
     result = points
     for modifier in modifiers:
         if modifier == "reverse":
-            reversed_points = [
-                CurvePoint(t=1.0 - p.t, v=p.v) for p in reversed(result)
-            ]
+            reversed_points = [CurvePoint(t=1.0 - p.t, v=p.v) for p in reversed(result)]
             result = reversed_points
         elif modifier == "mirror":
             result = [CurvePoint(t=p.t, v=1.0 - p.v) for p in result]
@@ -63,7 +62,9 @@ class CurveRegistry:
         except KeyError as exc:
             raise ValueError(f"Curve '{curve_id}' is not registered") from exc
 
-    def resolve(self, definition: CurveDefinition, *, n_samples: int | None = None) -> list[CurvePoint]:
+    def resolve(
+        self, definition: CurveDefinition, *, n_samples: int | None = None
+    ) -> list[CurvePoint]:
         """Resolve a curve definition into points.
 
         Args:

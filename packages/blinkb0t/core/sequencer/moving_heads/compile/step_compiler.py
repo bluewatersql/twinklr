@@ -6,49 +6,14 @@ by invoking the appropriate handlers for geometry, movement, and dimmer.
 
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict
 
 from blinkb0t.core.curves.models import PointsCurve
 from blinkb0t.core.curves.phase import apply_phase_shift_samples
-from blinkb0t.core.sequencer.moving_heads.handlers.registry import (
-    DimmerRegistry,
-    GeometryRegistry,
-    MovementRegistry,
-)
+from blinkb0t.core.sequencer.moving_heads.channels.state import FixtureSegment
 from blinkb0t.core.sequencer.moving_heads.models.channel import ChannelName
-from blinkb0t.core.sequencer.moving_heads.models.ir import ChannelSegment
+from blinkb0t.core.sequencer.moving_heads.models.context import StepCompileContext
 from blinkb0t.core.sequencer.moving_heads.models.template import TemplateStep
-
-
-class StepCompileContext(BaseModel):
-    """Context for compiling a single step.
-
-    Contains all information needed to compile a step for a specific fixture.
-
-    Attributes:
-        fixture_id: Unique identifier for the fixture.
-        role: Role assigned to this fixture (e.g., "FRONT_LEFT").
-        calibration: Fixture calibration data.
-        start_ms: Start time in milliseconds.
-        duration_ms: Duration in milliseconds.
-        n_samples: Number of samples for curves.
-        geometry_registry: Registry of geometry handlers.
-        movement_registry: Registry of movement handlers.
-        dimmer_registry: Registry of dimmer handlers.
-    """
-
-    model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
-
-    fixture_id: str
-    role: str
-    calibration: dict[str, Any]
-    start_ms: int
-    duration_ms: int
-    n_samples: int = Field(default=64, ge=2)
-
-    geometry_registry: GeometryRegistry
-    movement_registry: MovementRegistry
-    dimmer_registry: DimmerRegistry
 
 
 class StepCompileResult(BaseModel):
@@ -67,14 +32,7 @@ class StepCompileResult(BaseModel):
     model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
 
     step_id: str
-    fixture_id: str
-    pan_segment: ChannelSegment
-    tilt_segment: ChannelSegment
-    dimmer_segment: ChannelSegment
-
-    def all_segments(self) -> list[ChannelSegment]:
-        """Get all segments as a list."""
-        return [self.pan_segment, self.tilt_segment, self.dimmer_segment]
+    segment: FixtureSegment
 
 
 def compile_step(
@@ -170,12 +128,15 @@ def compile_step(
     # This can be configured via movement params if needed
     movement_amplitude_dmx = 64
 
-    # Build pan segment
-    pan_segment = ChannelSegment(
+    segment = FixtureSegment(
         fixture_id=context.fixture_id,
-        channel=ChannelName.PAN,
         t0_ms=t0_ms,
         t1_ms=t1_ms,
+    )
+
+    # Build pan segment
+    segment.add_channel(
+        channel=ChannelName.PAN,
         curve=PointsCurve(points=pan_points),
         offset_centered=True,
         base_dmx=pan_base_dmx,
@@ -183,11 +144,8 @@ def compile_step(
     )
 
     # Build tilt segment
-    tilt_segment = ChannelSegment(
-        fixture_id=context.fixture_id,
+    segment.add_channel(
         channel=ChannelName.TILT,
-        t0_ms=t0_ms,
-        t1_ms=t1_ms,
         curve=PointsCurve(points=tilt_points),
         offset_centered=True,
         base_dmx=tilt_base_dmx,
@@ -195,19 +153,13 @@ def compile_step(
     )
 
     # Build dimmer segment (absolute, not offset-centered)
-    dimmer_segment = ChannelSegment(
-        fixture_id=context.fixture_id,
+    segment.add_channel(
         channel=ChannelName.DIMMER,
-        t0_ms=t0_ms,
-        t1_ms=t1_ms,
         curve=PointsCurve(points=dimmer_points),
         offset_centered=False,
     )
 
     return StepCompileResult(
         step_id=step.step_id,
-        fixture_id=context.fixture_id,
-        pan_segment=pan_segment,
-        tilt_segment=tilt_segment,
-        dimmer_segment=dimmer_segment,
+        segment=segment,
     )

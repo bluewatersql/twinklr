@@ -48,6 +48,7 @@ from blinkb0t.core.curves.semantics import CurveKind
 class CurveId(str, Enum):
     """Identifiers for built-in curves."""
 
+    RAMP = "ramp"
     LINEAR = "linear"
     HOLD = "hold"
     SINE = "sine"
@@ -118,29 +119,19 @@ def build_default_registry() -> CurveRegistry:
     # Easing
     register(CurveId.EASE_IN_SINE, generate_ease_in_sine, CurveKind.DIMMER_ABSOLUTE)
     register(CurveId.EASE_OUT_SINE, generate_ease_out_sine, CurveKind.DIMMER_ABSOLUTE)
-    register(
-        CurveId.EASE_IN_OUT_SINE, generate_ease_in_out_sine, CurveKind.DIMMER_ABSOLUTE
-    )
+    register(CurveId.EASE_IN_OUT_SINE, generate_ease_in_out_sine, CurveKind.DIMMER_ABSOLUTE)
     register(CurveId.EASE_IN_QUAD, generate_ease_in_quad, CurveKind.DIMMER_ABSOLUTE)
     register(CurveId.EASE_OUT_QUAD, generate_ease_out_quad, CurveKind.DIMMER_ABSOLUTE)
-    register(
-        CurveId.EASE_IN_OUT_QUAD, generate_ease_in_out_quad, CurveKind.DIMMER_ABSOLUTE
-    )
+    register(CurveId.EASE_IN_OUT_QUAD, generate_ease_in_out_quad, CurveKind.DIMMER_ABSOLUTE)
     register(CurveId.EASE_IN_CUBIC, generate_ease_in_cubic, CurveKind.DIMMER_ABSOLUTE)
     register(CurveId.EASE_OUT_CUBIC, generate_ease_out_cubic, CurveKind.DIMMER_ABSOLUTE)
-    register(
-        CurveId.EASE_IN_OUT_CUBIC, generate_ease_in_out_cubic, CurveKind.DIMMER_ABSOLUTE
-    )
+    register(CurveId.EASE_IN_OUT_CUBIC, generate_ease_in_out_cubic, CurveKind.DIMMER_ABSOLUTE)
     register(CurveId.EASE_IN_EXPO, generate_ease_in_expo, CurveKind.DIMMER_ABSOLUTE)
     register(CurveId.EASE_OUT_EXPO, generate_ease_out_expo, CurveKind.DIMMER_ABSOLUTE)
-    register(
-        CurveId.EASE_IN_OUT_EXPO, generate_ease_in_out_expo, CurveKind.DIMMER_ABSOLUTE
-    )
+    register(CurveId.EASE_IN_OUT_EXPO, generate_ease_in_out_expo, CurveKind.DIMMER_ABSOLUTE)
     register(CurveId.EASE_IN_BACK, generate_ease_in_back, CurveKind.DIMMER_ABSOLUTE)
     register(CurveId.EASE_OUT_BACK, generate_ease_out_back, CurveKind.DIMMER_ABSOLUTE)
-    register(
-        CurveId.EASE_IN_OUT_BACK, generate_ease_in_out_back, CurveKind.DIMMER_ABSOLUTE
-    )
+    register(CurveId.EASE_IN_OUT_BACK, generate_ease_in_out_back, CurveKind.DIMMER_ABSOLUTE)
 
     # Dynamics
     register(CurveId.BOUNCE_IN, generate_bounce_in, CurveKind.DIMMER_ABSOLUTE)

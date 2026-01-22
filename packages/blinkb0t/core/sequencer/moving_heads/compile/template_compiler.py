@@ -4,10 +4,9 @@ This module provides the top-level compilation function that orchestrates
 all components to compile a complete template to IR segments.
 """
 
-from typing import Any
-
 from pydantic import BaseModel, ConfigDict, Field
 
+from blinkb0t.core.sequencer.moving_heads.channels.state import FixtureSegment
 from blinkb0t.core.sequencer.moving_heads.compile.phase_offset import (
     calculate_fixture_offsets,
 )
@@ -17,74 +16,12 @@ from blinkb0t.core.sequencer.moving_heads.compile.step_compiler import (
     StepCompileContext,
     compile_step,
 )
-from blinkb0t.core.sequencer.moving_heads.handlers.registry import (
-    DimmerRegistry,
-    GeometryRegistry,
-    MovementRegistry,
-)
-from blinkb0t.core.sequencer.moving_heads.models.channel import ChannelName
-from blinkb0t.core.sequencer.moving_heads.models.ir import ChannelSegment
+from blinkb0t.core.sequencer.moving_heads.models.context import TemplateCompileContext
 from blinkb0t.core.sequencer.moving_heads.models.template import (
     Template,
     TemplatePreset,
     TemplateStep,
 )
-
-
-class FixtureContext(BaseModel):
-    """Context for a single fixture.
-
-    Attributes:
-        fixture_id: Unique identifier for the fixture.
-        role: Role assigned to this fixture (e.g., "FRONT_LEFT").
-        calibration: Fixture calibration data.
-    """
-
-    model_config = ConfigDict(extra="forbid")
-
-    fixture_id: str
-    role: str
-    calibration: dict[str, Any] = Field(default_factory=dict)
-
-
-class TemplateCompileContext(BaseModel):
-    """Context for compiling a template.
-
-    Contains all information needed to compile a template.
-
-    Attributes:
-        fixtures: List of fixture contexts to compile for.
-        start_ms: Start time in milliseconds.
-        window_ms: Total window duration in milliseconds.
-        bpm: Beats per minute for timing calculations.
-        n_samples: Number of samples for curves.
-        geometry_registry: Registry of geometry handlers.
-        movement_registry: Registry of movement handlers.
-        dimmer_registry: Registry of dimmer handlers.
-    """
-
-    model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
-
-    fixtures: list[FixtureContext]
-    start_ms: int = Field(default=0, ge=0)
-    window_ms: int = Field(..., ge=0)
-    bpm: float = Field(default=120.0, gt=0)
-    n_samples: int = Field(default=64, ge=2)
-
-    geometry_registry: GeometryRegistry
-    movement_registry: MovementRegistry
-    dimmer_registry: DimmerRegistry
-
-    @property
-    def ms_per_bar(self) -> float:
-        """Calculate milliseconds per bar (assuming 4/4 time)."""
-        ms_per_beat = 60000.0 / self.bpm
-        return ms_per_beat * 4  # 4 beats per bar
-
-    @property
-    def window_bars(self) -> float:
-        """Calculate window duration in bars."""
-        return self.window_ms / self.ms_per_bar
 
 
 class TemplateCompileResult(BaseModel):
@@ -102,17 +39,13 @@ class TemplateCompileResult(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     template_id: str
-    segments: list[ChannelSegment] = Field(default_factory=list)
+    segments: list[FixtureSegment] = Field(default_factory=list)
     num_complete_cycles: int = Field(default=0)
     provenance: list[str] = Field(default_factory=list)
 
-    def segments_by_fixture(self, fixture_id: str) -> list[ChannelSegment]:
+    def segments_by_fixture(self, fixture_id: str) -> list[FixtureSegment]:
         """Get segments for a specific fixture."""
         return [seg for seg in self.segments if seg.fixture_id == fixture_id]
-
-    def segments_by_channel(self, channel: ChannelName) -> list[ChannelSegment]:
-        """Get segments for a specific channel type."""
-        return [seg for seg in self.segments if seg.channel == channel]
 
 
 def compile_template(
@@ -165,7 +98,7 @@ def compile_template(
     )
 
     # Compile each scheduled instance for each fixture
-    all_segments: list[ChannelSegment] = []
+    all_segments: list[FixtureSegment] = []
 
     for instance in schedule_result.instances:
         step = step_map[instance.step_id]
@@ -214,7 +147,7 @@ def compile_template(
             step_result = compile_step(step, step_context, phase_offset_norm)
 
             # Add segments
-            all_segments.extend(step_result.all_segments())
+            all_segments.append(step_result.segment)
 
     return TemplateCompileResult(
         template_id=working_template.template_id,
