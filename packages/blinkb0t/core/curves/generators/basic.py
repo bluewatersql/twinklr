@@ -1,8 +1,4 @@
-"""Standard curve generators.
-
-This module provides functions for generating common curve shapes
-as uniformly-sampled points. All generators produce points in [0, 1].
-"""
+"""Basic curve generators."""
 
 import math
 
@@ -38,7 +34,6 @@ def generate_linear(
     points: list[CurvePoint] = []
 
     for i, t in enumerate(t_grid):
-        # Linear interpolation: v goes from 0 to 1 over n_samples
         v = i / (n_samples - 1) if n_samples > 1 else 0.0
         if not ascending:
             v = 1.0 - v
@@ -71,7 +66,6 @@ def generate_hold(
     if n_samples < 2:
         raise ValueError("n_samples must be >= 2")
 
-    # Clamp value to [0, 1]
     clamped_value = max(0.0, min(1.0, value))
 
     t_grid = sample_uniform_grid(n_samples)
@@ -100,11 +94,6 @@ def generate_sine(
 
     Raises:
         ValueError: If n_samples < 2 or cycles <= 0.
-
-    Example:
-        >>> result = generate_sine(8, cycles=1.0)
-        >>> result[0].v  # Starts at midpoint
-        0.5
     """
     if n_samples < 2:
         raise ValueError("n_samples must be >= 2")
@@ -115,7 +104,6 @@ def generate_sine(
     points: list[CurvePoint] = []
 
     for t in t_grid:
-        # Sine normalized to [0, 1]
         angle = 2 * math.pi * cycles * t + phase
         v = 0.5 + 0.5 * math.sin(angle)
         points.append(CurvePoint(t=t, v=v))
@@ -140,11 +128,6 @@ def generate_triangle(
 
     Raises:
         ValueError: If n_samples < 2 or cycles <= 0.
-
-    Example:
-        >>> result = generate_triangle(8, cycles=1.0)
-        >>> result[0].v  # Starts at 0
-        0.0
     """
     if n_samples < 2:
         raise ValueError("n_samples must be >= 2")
@@ -155,14 +138,12 @@ def generate_triangle(
     points: list[CurvePoint] = []
 
     for t in t_grid:
-        # Position within cycle [0, 1)
         cycle_pos = (t * cycles) % 1.0
 
-        # Triangle: rise for first half, fall for second half
         if cycle_pos < 0.5:
-            v = cycle_pos * 2.0  # 0 → 1
+            v = cycle_pos * 2.0
         else:
-            v = 2.0 - cycle_pos * 2.0  # 1 → 0
+            v = 2.0 - cycle_pos * 2.0
 
         points.append(CurvePoint(t=t, v=v))
 
@@ -190,18 +171,12 @@ def generate_pulse(
 
     Raises:
         ValueError: If n_samples < 2 or cycles <= 0.
-
-    Example:
-        >>> result = generate_pulse(8, cycles=1.0, duty_cycle=0.5)
-        >>> result[0].v  # First half is high
-        1.0
     """
     if n_samples < 2:
         raise ValueError("n_samples must be >= 2")
     if cycles <= 0:
         raise ValueError("cycles must be > 0")
 
-    # Clamp values
     high = max(0.0, min(1.0, high))
     low = max(0.0, min(1.0, low))
     duty_cycle = max(0.0, min(1.0, duty_cycle))
@@ -210,10 +185,8 @@ def generate_pulse(
     points: list[CurvePoint] = []
 
     for t in t_grid:
-        # Position within cycle [0, 1)
         cycle_pos = (t * cycles) % 1.0
 
-        # High if within duty cycle, low otherwise
         v = high if cycle_pos < duty_cycle else low
         points.append(CurvePoint(t=t, v=v))
 

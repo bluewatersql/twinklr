@@ -7,9 +7,37 @@ All generators produce uniformly-sampled points in [0, 1].
 import pytest
 
 from blinkb0t.core.curves.generators import (
+    generate_bounce_in,
+    generate_bounce_out,
+    generate_ease_in_back,
+    generate_ease_in_cubic,
+    generate_ease_in_expo,
+    generate_ease_in_out_back,
+    generate_ease_in_out_cubic,
+    generate_ease_in_out_expo,
+    generate_ease_in_out_quad,
+    generate_ease_in_out_sine,
+    generate_ease_in_quad,
+    generate_ease_in_sine,
+    generate_ease_out_back,
+    generate_ease_out_cubic,
+    generate_ease_out_expo,
+    generate_ease_out_quad,
+    generate_ease_out_sine,
+    generate_elastic_in,
+    generate_elastic_out,
     generate_hold,
     generate_linear,
+    generate_movement_hold,
+    generate_movement_sine,
+    generate_movement_triangle,
+    generate_anticipate,
+    generate_bezier,
+    generate_lissajous,
+    generate_overshoot,
+    generate_perlin_noise,
     generate_pulse,
+    generate_simplex_noise,
     generate_sine,
     generate_triangle,
 )
@@ -199,6 +227,29 @@ class TestGeneratorEdgeCases:
         with pytest.raises(ValueError, match="n_samples must be >= 2"):
             generate_linear(n_samples=1)
 
+
+class TestMovementGenerators:
+    """Tests for movement curve wrappers."""
+
+    def test_movement_sine_loop_ready_append(self) -> None:
+        """Movement sine should append loop-ready endpoint by default."""
+        result = generate_movement_sine(n_samples=8, cycles=1.0)
+        assert len(result) == 9
+        assert result[-1].t == 1.0
+        assert abs(result[0].v - result[-1].v) < 1e-10
+
+    def test_movement_triangle_loop_ready_adjust_last(self) -> None:
+        """Movement triangle should adjust last value when mode is adjust_last."""
+        result = generate_movement_triangle(n_samples=8, cycles=1.0, loop_mode="adjust_last")
+        assert len(result) == 8
+        assert abs(result[0].v - result[-1].v) < 1e-10
+
+    def test_movement_hold_centered(self) -> None:
+        """Movement hold should center constant values to 0.5."""
+        result = generate_movement_hold(n_samples=4, value=0.2)
+        for p in result:
+            assert abs(p.v - 0.5) < 1e-10
+
     def test_cycles_must_be_positive(self) -> None:
         """Test cycles must be positive."""
         with pytest.raises(ValueError, match="cycles must be > 0"):
@@ -224,3 +275,125 @@ class TestGeneratorTimeSampling:
         for result in generators:
             for i, p in enumerate(result):
                 assert abs(p.t - expected_times[i]) < 1e-10
+
+
+class TestEasingGenerators:
+    """Tests for easing curve generators."""
+
+    def test_easing_generators_in_bounds(self) -> None:
+        """Easing curves should remain within [0, 1] for default params."""
+        generators = [
+            generate_bounce_in,
+            generate_bounce_out,
+            generate_ease_in_sine,
+            generate_ease_out_sine,
+            generate_ease_in_out_sine,
+            generate_ease_in_quad,
+            generate_ease_out_quad,
+            generate_ease_in_out_quad,
+            generate_ease_in_cubic,
+            generate_ease_out_cubic,
+            generate_ease_in_out_cubic,
+            generate_ease_in_expo,
+            generate_ease_out_expo,
+            generate_ease_in_out_expo,
+            generate_ease_in_back,
+            generate_ease_out_back,
+            generate_ease_in_out_back,
+            generate_elastic_in,
+            generate_elastic_out,
+            generate_perlin_noise,
+            generate_simplex_noise,
+        ]
+
+        for generator in generators:
+            if "back" in generator.__name__ or "elastic" in generator.__name__:
+                continue
+            result = generator(n_samples=32)
+            for p in result:
+                assert 0.0 <= p.v <= 1.0
+
+    def test_easing_generators_start_at_zero(self) -> None:
+        """Easing curves should start at 0 for default params."""
+        generators = [
+            generate_bounce_in,
+            generate_bounce_out,
+            generate_ease_in_sine,
+            generate_ease_out_sine,
+            generate_ease_in_out_sine,
+            generate_ease_in_quad,
+            generate_ease_out_quad,
+            generate_ease_in_out_quad,
+            generate_ease_in_cubic,
+            generate_ease_out_cubic,
+            generate_ease_in_out_cubic,
+            generate_ease_in_expo,
+            generate_ease_out_expo,
+            generate_ease_in_out_expo,
+            generate_ease_in_back,
+            generate_ease_out_back,
+            generate_ease_in_out_back,
+            generate_elastic_in,
+            generate_elastic_out,
+            generate_perlin_noise,
+            generate_simplex_noise,
+        ]
+
+        for generator in generators:
+            if "noise" in generator.__name__:
+                continue
+            result = generator(n_samples=16)
+            assert abs(result[0].v - 0.0) < 1e-10
+
+    def test_back_ease_can_overshoot(self) -> None:
+        """Back easing should allow undershoot/overshoot around bounds."""
+        result = generate_ease_in_back(n_samples=32)
+        assert min(p.v for p in result) < 0.0
+
+    def test_elastic_can_overshoot(self) -> None:
+        """Elastic easing should allow overshoot around bounds."""
+        result = generate_elastic_out(n_samples=32)
+        assert max(p.v for p in result) > 1.0
+
+
+class TestNoiseGenerators:
+    """Tests for noise curve generators."""
+
+    def test_noise_generators_in_bounds(self) -> None:
+        """Noise curves should remain within [0, 1]."""
+        for generator in (generate_perlin_noise, generate_simplex_noise):
+            result = generator(n_samples=32)
+            for p in result:
+                assert 0.0 <= p.v <= 1.0
+
+
+class TestParametricGenerators:
+    """Tests for parametric curve generators."""
+
+    def test_bezier_in_bounds(self) -> None:
+        """Bezier curve should remain within [0, 1]."""
+        result = generate_bezier(n_samples=32)
+        for p in result:
+            assert 0.0 <= p.v <= 1.0
+
+    def test_lissajous_in_bounds(self) -> None:
+        """Lissajous curve should remain within [0, 1]."""
+        result = generate_lissajous(n_samples=32, b=2)
+        for p in result:
+            assert 0.0 <= p.v <= 1.0
+
+
+class TestMotionGenerators:
+    """Tests for anticipate/overshoot curves."""
+
+    def test_anticipate_in_bounds(self) -> None:
+        """Anticipate curve should stay within [0, 1]."""
+        result = generate_anticipate(n_samples=32)
+        for p in result:
+            assert 0.0 <= p.v <= 1.0
+
+    def test_overshoot_in_bounds(self) -> None:
+        """Overshoot curve should stay within [0, 1]."""
+        result = generate_overshoot(n_samples=32)
+        for p in result:
+            assert 0.0 <= p.v <= 1.0
