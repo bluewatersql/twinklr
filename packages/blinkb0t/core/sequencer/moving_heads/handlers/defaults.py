@@ -8,14 +8,12 @@ Use these functions to get ready-to-use registries in your application.
 
 from typing import TypedDict
 
-from blinkb0t.core.sequencer.moving_heads.handlers.dimmer import (
-    FadeInHandler,
-    FadeOutHandler,
-    HoldHandler,
-    PulseHandler,
-)
-from blinkb0t.core.sequencer.moving_heads.handlers.geometry import RolePoseHandler
-from blinkb0t.core.sequencer.moving_heads.handlers.movement import SweepLRHandler
+from blinkb0t.core.sequencer.moving_heads.handlers.dimmers.fade_in import FadeInHandler
+from blinkb0t.core.sequencer.moving_heads.handlers.dimmers.fade_out import FadeOutHandler
+from blinkb0t.core.sequencer.moving_heads.handlers.dimmers.hold import HoldHandler
+from blinkb0t.core.sequencer.moving_heads.handlers.dimmers.pulse import PulseHandler
+from blinkb0t.core.sequencer.moving_heads.handlers.geometry.role_pose import RolePoseHandler
+from blinkb0t.core.sequencer.moving_heads.handlers.movement.sweep_lr import SweepLRHandler
 from blinkb0t.core.sequencer.moving_heads.handlers.registry import (
     DimmerRegistry,
     GeometryRegistry,

@@ -14,6 +14,7 @@ from blinkb0t.core.sequencer.moving_heads.handlers.protocols import (
     GeometryResult,
     MovementResult,
 )
+from blinkb0t.core.sequencer.moving_heads.models.base import Intensity
 
 
 class HasHandlerId(Protocol):
@@ -204,7 +205,7 @@ class MovementHandlerProtocol(Protocol):
         params: dict[str, Any],
         n_samples: int,
         cycles: float,
-        intensity: str,
+        intensity: Intensity,
     ) -> MovementResult: ...
 
 
@@ -218,7 +219,7 @@ class DimmerHandlerProtocol(Protocol):
         params: dict[str, Any],
         n_samples: int,
         cycles: float,
-        intensity: str,
+        intensity: Intensity,
         min_norm: float,
         max_norm: float,
     ) -> DimmerResult: ...

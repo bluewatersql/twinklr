@@ -13,6 +13,8 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from sequencer.moving_heads.models.base import Intensity
+
 
 class RepeatMode(str, Enum):
     """How to repeat template sections.
@@ -203,7 +205,7 @@ class Movement(BaseModel):
     Example:
         >>> mov = Movement(
         ...     movement_id="SWEEP_LR",
-        ...     intensity="FAST",
+        ...     intensity=Intensity.FAST,
         ...     cycles=2.0,
         ... )
     """
@@ -211,7 +213,7 @@ class Movement(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     movement_id: str = Field(..., min_length=1)
-    intensity: str = Field("SMOOTH")
+    intensity: Intensity = Field(Intensity.SMOOTH)
     cycles: float = Field(1.0, gt=0.0)
     params: dict[str, Any] = Field(default_factory=dict)
 
@@ -241,7 +243,7 @@ class Dimmer(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     dimmer_id: str = Field(..., min_length=1)
-    intensity: str = Field("SMOOTH")
+    intensity: Intensity = Field(Intensity.SMOOTH)
     min_norm: float = Field(0.0, ge=0.0, le=1.0)
     max_norm: float = Field(1.0, ge=0.0, le=1.0)
     cycles: float = Field(1.0, gt=0.0)
@@ -389,7 +391,7 @@ class TemplatePreset(BaseModel):
         >>> preset = TemplatePreset(
         ...     preset_id="CHILL",
         ...     name="Chill",
-        ...     defaults={"intensity": "SMOOTH"},
+        ...     defaults={"intensity": Intensity.SMOOTH},
         ...     step_patches={"main": StepPatch(movement={"cycles": 1.0})},
         ... )
     """

@@ -15,6 +15,7 @@ from typing import Any, Protocol
 from pydantic import BaseModel, ConfigDict, Field
 
 from blinkb0t.core.curves.models import CurvePoint
+from blinkb0t.core.sequencer.moving_heads.models.base import Intensity
 
 # =============================================================================
 # Result Models (immutable data containers)
@@ -140,7 +141,7 @@ class MovementHandler(Protocol):
         params: dict[str, Any],
         n_samples: int,
         cycles: float,
-        intensity: str,
+        intensity: Intensity,
     ) -> MovementResult:
         """Generate movement curves.
 
@@ -173,7 +174,7 @@ class DimmerHandler(Protocol):
         params: dict[str, Any],
         n_samples: int,
         cycles: float,
-        intensity: str,
+        intensity: Intensity,
         min_norm: float,
         max_norm: float,
     ) -> DimmerResult:

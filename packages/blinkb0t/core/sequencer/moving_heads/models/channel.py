@@ -23,9 +23,12 @@ class ChannelName(str, Enum):
         'PAN'
     """
 
-    PAN = "PAN"
-    TILT = "TILT"
-    DIMMER = "DIMMER"
+    PAN = "pan"
+    TILT = "tilt"
+    DIMMER = "dimmer"
+    SHUTTER = "shutter"
+    COLOR = "color"
+    GOBO = "gobo"
 
 
 class BlendMode(str, Enum):

@@ -387,9 +387,7 @@ def generate_ease_out_back(n_samples: int, overshoot: float = 1.70158) -> list[C
     return points
 
 
-def generate_ease_in_out_back(
-    n_samples: int, overshoot: float = 1.70158
-) -> list[CurvePoint]:
+def generate_ease_in_out_back(n_samples: int, overshoot: float = 1.70158) -> list[CurvePoint]:
     """Generate a back ease-in-out curve."""
     if n_samples < 2:
         raise ValueError("n_samples must be >= 2")
@@ -488,7 +486,7 @@ def generate_perlin_noise(n_samples: int) -> list[CurvePoint]:
         scale = max_val - min_val
         normalized = [(v - min_val) / scale for v in values]
 
-    return [CurvePoint(t=t, v=v) for t, v in zip(t_grid, normalized)]
+    return [CurvePoint(t=t, v=v) for t, v in zip(t_grid, normalized, strict=False)]
 
 
 def generate_simplex_noise(n_samples: int) -> list[CurvePoint]:
@@ -515,7 +513,7 @@ def generate_simplex_noise(n_samples: int) -> list[CurvePoint]:
         scale = max_val - min_val
         normalized = [(v - min_val) / scale for v in values]
 
-    return [CurvePoint(t=t, v=v) for t, v in zip(t_grid, normalized)]
+    return [CurvePoint(t=t, v=v) for t, v in zip(t_grid, normalized, strict=False)]
 
 
 def generate_bezier(
@@ -533,11 +531,7 @@ def generate_bezier(
     t_grid = sample_uniform_grid(n_samples)
     points: list[CurvePoint] = []
     for t in t_grid:
-        v = (
-            3 * (1 - t) * (1 - t) * t * p1
-            + 3 * (1 - t) * t * t * p2
-            + t * t * t
-        )
+        v = 3 * (1 - t) * (1 - t) * t * p1 + 3 * (1 - t) * t * t * p2 + t * t * t
         points.append(CurvePoint(t=t, v=v))
     return points
 
@@ -554,10 +548,7 @@ def generate_lissajous(
         raise ValueError("b must be > 0")
 
     t_grid = sample_uniform_grid(n_samples)
-    return [
-        CurvePoint(t=t, v=(math.sin(b * 2 * math.pi * t + delta) + 1) / 2)
-        for t in t_grid
-    ]
+    return [CurvePoint(t=t, v=(math.sin(b * 2 * math.pi * t + delta) + 1) / 2) for t in t_grid]
 
 
 def generate_anticipate(n_samples: int) -> list[CurvePoint]:
@@ -573,9 +564,10 @@ def generate_anticipate(n_samples: int) -> list[CurvePoint]:
         if t <= pullback_phase:
             v = pullback_min * math.sin((t / pullback_phase) * math.pi / 2)
         else:
-            v = pullback_min + (1.0 - pullback_min) * (
-                (t - pullback_phase) / (1 - pullback_phase)
-            ) ** 2
+            v = (
+                pullback_min
+                + (1.0 - pullback_min) * ((t - pullback_phase) / (1 - pullback_phase)) ** 2
+            )
         points.append(CurvePoint(t=t, v=v))
     return points
 
@@ -591,9 +583,7 @@ def generate_overshoot(n_samples: int) -> list[CurvePoint]:
         base = t * t * (3 - 2 * t)
         if 0.6 <= t <= 0.9:
             t_local = (t - 0.6) / 0.3
-            bounce = 0.05 * (1.0 - base) * math.sin(t_local * math.pi * 3) * math.exp(
-                -t_local * 3
-            )
+            bounce = 0.05 * (1.0 - base) * math.sin(t_local * math.pi * 3) * math.exp(-t_local * 3)
             v = base + bounce
         else:
             v = base
