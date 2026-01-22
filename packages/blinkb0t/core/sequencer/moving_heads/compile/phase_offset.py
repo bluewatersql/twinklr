@@ -6,7 +6,7 @@ based on the PhaseOffset configuration in templates.
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from blinkb0t.core.sequencer.moving_heads.models.template import (
+from blinkb0t.core.sequencer.models.template import (
     PhaseOffset,
     PhaseOffsetMode,
 )

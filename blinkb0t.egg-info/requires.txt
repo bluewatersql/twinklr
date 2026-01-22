@@ -1,6 +1,8 @@
 blinkb0t-core>=0.1.0
 blinkb0t-cli>=0.1.0
 tqdm>=4.67.1
+bezier>=2024.6.20
+noise>=1.2.2
 
 [dev]
 pytest>=7.0

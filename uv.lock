@@ -125,8 +125,10 @@ name = "blinkb0t"
 version = "0.2.0"
 source = { editable = "." }
 dependencies = [
+    { name = "bezier" },
     { name = "blinkb0t-cli" },
     { name = "blinkb0t-core" },
+    { name = "noise" },
     { name = "tqdm" },
 ]
 
@@ -140,9 +142,11 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "bezier", specifier = ">=2024.6.20" },
     { name = "blinkb0t-cli", editable = "packages/blinkb0t/cli" },
     { name = "blinkb0t-core", editable = "packages/blinkb0t/core" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.0" },
+    { name = "noise", specifier = ">=1.2.2" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.0" },
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=4.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.1.0" },

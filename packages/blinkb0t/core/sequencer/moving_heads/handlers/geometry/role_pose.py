@@ -1,7 +1,7 @@
 from typing import Any
 
+from blinkb0t.core.config.poses import PanPose, TiltPose
 from blinkb0t.core.sequencer.moving_heads.handlers.protocols import GeometryResult
-from blinkb0t.core.sequencer.moving_heads.models.base import PanPose, TiltPose
 
 
 class RolePoseHandler:
@@ -88,7 +88,8 @@ class RolePoseHandler:
             return self._pan_pose_to_norm(params["pan_pose"])
 
         # Default to CENTER
-        return PanPose.CENTER.norm_value
+        default_pan: float = PanPose.CENTER.norm_value
+        return default_pan
 
     def _resolve_tilt(self, params: dict[str, Any]) -> float:
         """Resolve tilt position from params.
@@ -99,7 +100,8 @@ class RolePoseHandler:
             return self._tilt_pose_to_norm(params["tilt_pose"])
 
         # Default to HORIZON
-        return TiltPose.HORIZON.norm_value
+        default_tilt: float = TiltPose.HORIZON.norm_value
+        return default_tilt
 
     def _pan_pose_to_norm(self, pose_name: str) -> float:
         """Convert pan pose name to normalized value.
@@ -115,7 +117,8 @@ class RolePoseHandler:
         """
         try:
             pose = PanPose(pose_name)
-            return pose.norm_value
+            norm_val: float = pose.norm_value
+            return norm_val
         except ValueError as e:
             raise ValueError(f"Unknown pan pose: {pose_name}") from e
 
@@ -133,6 +136,7 @@ class RolePoseHandler:
         """
         try:
             pose = TiltPose(pose_name)
-            return pose.norm_value
+            norm_val: float = pose.norm_value
+            return norm_val
         except ValueError as e:
             raise ValueError(f"Unknown tilt pose: {pose_name}") from e

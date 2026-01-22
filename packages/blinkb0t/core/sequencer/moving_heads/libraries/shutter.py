@@ -56,8 +56,8 @@ class ShutterLibrary:
     DMX_STROBE_MEDIUM = 200
     DMX_STROBE_FAST = 250
 
-    PATTERNS: dict[str, ShutterPatternDefinition] = {
-        "open": ShutterPatternDefinition(
+    PATTERNS: dict[ShutterPattern, ShutterPatternDefinition] = {
+        ShutterPattern.OPEN: ShutterPatternDefinition(
             pattern_id="open",
             name="Open",
             description="Shutter fully open (continuous light)",
@@ -65,7 +65,7 @@ class ShutterLibrary:
             is_dynamic=False,
             energy_level=5,
         ),
-        "closed": ShutterPatternDefinition(
+        ShutterPattern.CLOSED: ShutterPatternDefinition(
             pattern_id="closed",
             name="Closed",
             description="Shutter closed (blackout)",
@@ -73,7 +73,7 @@ class ShutterLibrary:
             is_dynamic=False,
             energy_level=1,  # Changed from 0 to meet validation (ge=1)
         ),
-        "strobe_fast": ShutterPatternDefinition(
+        ShutterPattern.STROBE_FAST: ShutterPatternDefinition(
             pattern_id="strobe_fast",
             name="Fast Strobe",
             description="Fast strobe effect",
@@ -81,7 +81,7 @@ class ShutterLibrary:
             is_dynamic=False,
             energy_level=10,
         ),
-        "strobe_medium": ShutterPatternDefinition(
+        ShutterPattern.STROBE_MEDIUM: ShutterPatternDefinition(
             pattern_id="strobe_medium",
             name="Medium Strobe",
             description="Medium speed strobe",
@@ -89,7 +89,7 @@ class ShutterLibrary:
             is_dynamic=False,
             energy_level=7,
         ),
-        "strobe_slow": ShutterPatternDefinition(
+        ShutterPattern.STROBE_SLOW: ShutterPatternDefinition(
             pattern_id="strobe_slow",
             name="Slow Strobe",
             description="Slow strobe effect",
@@ -97,7 +97,7 @@ class ShutterLibrary:
             is_dynamic=False,
             energy_level=5,
         ),
-        "pulse": ShutterPatternDefinition(
+        ShutterPattern.PULSE: ShutterPatternDefinition(
             pattern_id="pulse",
             name="Pulse",
             description="Beat-synchronized pulsing (open/closed)",
@@ -108,11 +108,11 @@ class ShutterLibrary:
     }
 
     @classmethod
-    def get_pattern(cls, pattern_id: str) -> ShutterPatternDefinition:
+    def get_pattern(cls, pattern_id: str | ShutterPattern) -> ShutterPatternDefinition:
         """Get shutter pattern definition.
 
         Args:
-            pattern_id: Pattern identifier
+            pattern_id: Pattern identifier (string or enum)
 
         Returns:
             ShutterPatternDefinition
@@ -120,10 +120,21 @@ class ShutterLibrary:
         Raises:
             ValueError: If pattern_id is unknown
         """
-        pattern = cls.PATTERNS.get(pattern_id)
+        # Convert string to enum if needed
+        if isinstance(pattern_id, str):
+            try:
+                pattern_key = ShutterPattern(pattern_id)
+            except ValueError as e:
+                raise ValueError(
+                    f"Unknown shutter pattern: '{pattern_id}'. Valid: {[p.value for p in ShutterPattern]}"
+                ) from e
+        else:
+            pattern_key = pattern_id
+
+        pattern = cls.PATTERNS.get(pattern_key)
         if not pattern:
             raise ValueError(
-                f"Unknown shutter pattern: '{pattern_id}'. Valid: {sorted(cls.PATTERNS.keys())}"
+                f"Unknown shutter pattern: '{pattern_id}'. Valid: {[p.value for p in ShutterPattern]}"
             )
         return pattern
 

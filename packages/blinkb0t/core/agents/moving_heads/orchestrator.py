@@ -13,7 +13,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from blinkb0t.core.agents.moving_heads.context import ContextShaper
+from blinkb0t.core.agents.moving_heads.context import ContextShaper, build_template_context_for_llm
 from blinkb0t.core.agents.moving_heads.heuristic_validator import HeuristicValidator
 from blinkb0t.core.agents.moving_heads.implementation_expander import ImplementationExpander
 from blinkb0t.core.agents.moving_heads.judge_critic import CategoryScore, Evaluation, JudgeCritic
@@ -22,10 +22,11 @@ from blinkb0t.core.agents.moving_heads.refinement_agent import RefinementAgent
 from blinkb0t.core.agents.moving_heads.stage_coordinator import StageCoordinator
 from blinkb0t.core.agents.moving_heads.token_budget_manager import TokenBudgetManager
 from blinkb0t.core.api.llm.openai.client import OpenAIClient
+from blinkb0t.core.audio.analyzer import AudioAnalyzer
 from blinkb0t.core.config.loader import get_openai_api_key, load_app_config
 from blinkb0t.core.config.models import JobConfig
-from blinkb0t.core.domains.audio.analyzer import AudioAnalyzer
-from blinkb0t.core.domains.sequencing.moving_heads.templates.loader import TemplateLoader
+from blinkb0t.core.sequencer.analyzer import SequenceAnalyzer
+from blinkb0t.core.sequencer.moving_heads.templates.library import TemplateRegistry
 from blinkb0t.core.utils.checkpoint import CheckpointManager, CheckpointType
 
 logger = logging.getLogger(__name__)
@@ -136,10 +137,8 @@ class AgentOrchestrator:
 
         # Template loader
         # Find templates directory relative to this file
-        from pathlib import Path
 
-        template_dir = Path(__file__).parent.parent.parent / "domains/sequencing/templates"
-        self.template_loader = TemplateLoader(template_dir=template_dir)
+        self.template_registry = TemplateRegistry()
 
         # Config
         self.max_iterations = self.agent_config.max_iterations
@@ -179,7 +178,13 @@ class AgentOrchestrator:
 
             song_features = self._analyze_audio(audio_path)
             seq_fingerprint = self._analyze_sequence(xsq_path) if xsq_path else None
-            template_metadata = self.template_loader.get_all_metadata()
+
+            # Get all templates from registry (each factory creates a TemplateDoc)
+            template_docs = [
+                self.template_registry.get(info.template_id)
+                for info in self.template_registry.list_all()
+            ]
+            template_metadata = build_template_context_for_llm(template_docs)
 
             # Check for existing checkpoint FIRST (skip everything if available)
             checkpoint_result = self._try_load_checkpoint(song_features, seq_fingerprint)
@@ -460,9 +465,6 @@ class AgentOrchestrator:
             Sequence fingerprint dictionary
         """
         logger.info(f"Analyzing sequence: {xsq_path}")
-
-        # Use SequenceAnalyzer to fingerprint the existing sequence
-        from blinkb0t.core.domains.sequencing.analyzer import SequenceAnalyzer
 
         try:
             analyzer = SequenceAnalyzer(self.app_config, self.job_config)

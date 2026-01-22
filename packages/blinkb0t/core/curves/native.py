@@ -20,7 +20,7 @@ class NativeCurveType(str, Enum):
     SAW_TOOTH = "saw tooth"
 
 
-class NativeCurveSpec(BaseModel):
+class xLightsNativeCurve(BaseModel):
     """Specification for native parametric curves."""
 
     model_config = ConfigDict(frozen=False)
@@ -63,29 +63,47 @@ class NativeCurveSpec(BaseModel):
         return "|".join(parts) + "|"
 
 
-def generate_native_spec(curve_type: NativeCurveType, params: dict[str, float] | None = None) -> NativeCurveSpec:
+def generate_native_spec(
+    curve_type: NativeCurveType, params: dict[str, float] | None = None
+) -> xLightsNativeCurve:
     """Map high-level parameters to a native curve spec."""
     params = params or {}
     if curve_type == NativeCurveType.SINE:
-        return NativeCurveSpec(type=curve_type, p2=params.get("amplitude", 100.0), p4=params.get("center", 128.0))
+        return xLightsNativeCurve(
+            type=curve_type, p2=params.get("amplitude", 100.0), p4=params.get("center", 128.0)
+        )
     if curve_type == NativeCurveType.ABS_SINE:
-        return NativeCurveSpec(type=curve_type, p2=params.get("amplitude", 100.0), p4=params.get("center", 128.0))
+        return xLightsNativeCurve(
+            type=curve_type, p2=params.get("amplitude", 100.0), p4=params.get("center", 128.0)
+        )
     if curve_type == NativeCurveType.PARABOLIC:
-        return NativeCurveSpec(type=curve_type, p2=params.get("amplitude", 100.0), p4=params.get("center", 128.0))
+        return xLightsNativeCurve(
+            type=curve_type, p2=params.get("amplitude", 100.0), p4=params.get("center", 128.0)
+        )
     if curve_type == NativeCurveType.RAMP:
-        return NativeCurveSpec(type=curve_type, p1=params.get("min", 0.0), p2=params.get("max", 255.0))
+        return xLightsNativeCurve(
+            type=curve_type, p1=params.get("min", 0.0), p2=params.get("max", 255.0)
+        )
     if curve_type == NativeCurveType.SAW_TOOTH:
-        return NativeCurveSpec(type=curve_type, p1=params.get("min", 0.0), p2=params.get("max", 255.0))
+        return xLightsNativeCurve(
+            type=curve_type, p1=params.get("min", 0.0), p2=params.get("max", 255.0)
+        )
     if curve_type == NativeCurveType.LOGARITHMIC:
-        return NativeCurveSpec(type=curve_type, p1=params.get("min", 0.0), p2=params.get("max", 255.0))
+        return xLightsNativeCurve(
+            type=curve_type, p1=params.get("min", 0.0), p2=params.get("max", 255.0)
+        )
     if curve_type == NativeCurveType.EXPONENTIAL:
-        return NativeCurveSpec(type=curve_type, p1=params.get("min", 0.0), p2=params.get("max", 255.0))
+        return xLightsNativeCurve(
+            type=curve_type, p1=params.get("min", 0.0), p2=params.get("max", 255.0)
+        )
     if curve_type == NativeCurveType.FLAT:
-        return NativeCurveSpec(type=curve_type, p1=params.get("value", 128.0))
+        return xLightsNativeCurve(type=curve_type, p1=params.get("value", 128.0))
     raise ValueError(f"Unsupported native curve type: {curve_type}")
 
 
-def tune_native_spec(spec: NativeCurveSpec, min_limit: float, max_limit: float) -> NativeCurveSpec:
+def tune_native_spec(
+    spec: xLightsNativeCurve, min_limit: float, max_limit: float
+) -> xLightsNativeCurve:
     """Tune native curve parameters to fit within boundaries."""
     if spec.type in {NativeCurveType.SINE, NativeCurveType.ABS_SINE, NativeCurveType.PARABOLIC}:
         current_min = spec.p4 - spec.p2
@@ -96,7 +114,12 @@ def tune_native_spec(spec: NativeCurveSpec, min_limit: float, max_limit: float) 
         amplitude = (max_limit - min_limit) / 2
         return spec.model_copy(update={"p2": amplitude, "p4": center})
 
-    if spec.type in {NativeCurveType.RAMP, NativeCurveType.SAW_TOOTH, NativeCurveType.EXPONENTIAL, NativeCurveType.LOGARITHMIC}:
+    if spec.type in {
+        NativeCurveType.RAMP,
+        NativeCurveType.SAW_TOOTH,
+        NativeCurveType.EXPONENTIAL,
+        NativeCurveType.LOGARITHMIC,
+    }:
         new_p1 = max(spec.p1, min_limit)
         new_p2 = min(spec.p2, max_limit)
         if new_p1 == spec.p1 and new_p2 == spec.p2:

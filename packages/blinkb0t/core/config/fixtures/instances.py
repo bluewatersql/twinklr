@@ -10,6 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from blinkb0t.core.config.fixtures.capabilities import FixtureCapabilities, MovementSpeed
 from blinkb0t.core.config.fixtures.dmx import ChannelInversions, DmxMapping
 from blinkb0t.core.config.fixtures.physical import MovementLimits, Orientation, PanTiltRange
+from blinkb0t.core.config.poses import STANDARD_POSES, PoseLibrary
 
 
 class Pose(BaseModel):
@@ -143,21 +144,18 @@ class FixtureConfig(BaseModel):
         """Get a standard pose by ID.
 
         Args:
-            pose_id: Pose ID from PoseID enum (e.g., "FORWARD", "SOFT_HOME")
+            pose_id: Pose ID from PoseLibrary enum (e.g., "FORWARD", "SOFT_HOME")
 
         Returns:
             Pose object for the standard position (config Pose, not domain Pose)
 
         Note:
-            This returns a config.fixtures.Pose object. For domain poses,
-            use STANDARD_POSES[PoseID.X] from domains.sequencing.poses.
+            This returns a config.fixtures.Pose object.
         """
-        from blinkb0t.core.domains.sequencing.models.poses import PoseID
-        from blinkb0t.core.domains.sequencing.poses.standards import STANDARD_POSES
 
-        # Convert string to PoseID enum
+        # Convert string to PoseLibrary enum
         try:
-            pose_enum = PoseID(pose_id)
+            pose_enum = PoseLibrary(pose_id.lower())
         except ValueError:
             raise ValueError(f"Unknown pose ID: {pose_id}") from None
 

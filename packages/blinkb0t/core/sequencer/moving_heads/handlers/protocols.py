@@ -14,8 +14,9 @@ from typing import Any, Protocol
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from blinkb0t.core.curves.library import CurveLibrary
 from blinkb0t.core.curves.models import CurvePoint
-from blinkb0t.core.sequencer.moving_heads.models.base import Intensity
+from blinkb0t.core.sequencer.models.enum import Intensity
 
 # =============================================================================
 # Result Models (immutable data containers)
@@ -61,6 +62,8 @@ class MovementResult(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
+    pan_curve_type: CurveLibrary
+    tilt_curve_type: CurveLibrary
     pan_curve: list[CurvePoint] = Field(..., min_length=2)
     tilt_curve: list[CurvePoint] = Field(..., min_length=2)
 

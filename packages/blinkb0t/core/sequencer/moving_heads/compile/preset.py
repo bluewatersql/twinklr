@@ -9,8 +9,7 @@ by overriding default values and step properties.
 
 from typing import Literal, overload
 
-from blinkb0t.core.sequencer.moving_heads.compile.patch import deep_merge
-from blinkb0t.core.sequencer.moving_heads.models.template import (
+from blinkb0t.core.sequencer.models.template import (
     BaseTiming,
     Dimmer,
     Geometry,
@@ -22,6 +21,7 @@ from blinkb0t.core.sequencer.moving_heads.models.template import (
     TemplatePreset,
     TemplateStep,
 )
+from blinkb0t.core.sequencer.moving_heads.compile.patch import deep_merge
 
 
 def apply_step_patch(step: TemplateStep, patch: StepPatch) -> TemplateStep:
@@ -65,11 +65,12 @@ def apply_step_patch(step: TemplateStep, patch: StepPatch) -> TemplateStep:
 
     # Reconstruct timing (nested structure)
     base_timing = BaseTiming(**timing_dict["base_timing"])
-    phase_offset = None
+
     if timing_dict.get("phase_offset") is not None:
         phase_offset = PhaseOffset(**timing_dict["phase_offset"])
-
-    new_timing = StepTiming(base_timing=base_timing, phase_offset=phase_offset)
+        new_timing = StepTiming(base_timing=base_timing, phase_offset=phase_offset)
+    else:
+        new_timing = StepTiming(base_timing=base_timing)
 
     # Create new step with patched components
     return TemplateStep(

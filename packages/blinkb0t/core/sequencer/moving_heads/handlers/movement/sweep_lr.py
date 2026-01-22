@@ -10,9 +10,10 @@ All movement curves are offset-centered where v=0.5 means "no offset".
 from typing import Any
 
 from blinkb0t.core.curves.generators import generate_hold, generate_sine
+from blinkb0t.core.curves.library import CurveLibrary
 from blinkb0t.core.curves.models import CurvePoint
+from blinkb0t.core.sequencer.models.enum import Intensity
 from blinkb0t.core.sequencer.moving_heads.handlers.protocols import MovementResult
-from blinkb0t.core.sequencer.moving_heads.models.base import Intensity
 
 
 class SweepLRHandler:
@@ -42,6 +43,9 @@ class SweepLRHandler:
 
     handler_id: str = "SWEEP_LR"
 
+    pan_curve_type: CurveLibrary = CurveLibrary.SINE
+    tilt_curve_type: CurveLibrary = CurveLibrary.HOLD
+
     def generate(
         self,
         params: dict[str, Any],
@@ -70,7 +74,12 @@ class SweepLRHandler:
         # Generate tilt curve: static at 0.5 (no motion)
         tilt_curve = generate_hold(n_samples=n_samples, value=0.5)
 
-        return MovementResult(pan_curve=pan_curve, tilt_curve=tilt_curve)
+        return MovementResult(
+            pan_curve_type=self.pan_curve_type,
+            pan_curve=pan_curve,
+            tilt_curve_type=self.tilt_curve_type,
+            tilt_curve=tilt_curve,
+        )
 
     def _resolve_amplitude(self, params: dict[str, Any], intensity: Intensity) -> float:
         """Resolve amplitude from params or intensity.
@@ -88,10 +97,12 @@ class SweepLRHandler:
 
         # Use intensity mapping
         try:
-            return intensity.amplitude
+            amp: float = intensity.amplitude
+            return amp
         except ValueError:
             # Unknown intensity, default to SMOOTH
-            return Intensity.SMOOTH.amplitude
+            default_amp: float = Intensity.SMOOTH.amplitude
+            return default_amp
 
     def _generate_pan_curve(
         self,

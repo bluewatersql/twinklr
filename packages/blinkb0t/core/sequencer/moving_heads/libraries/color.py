@@ -23,6 +23,25 @@ class ColorMood(str, Enum):
     NEUTRAL = "neutral"
 
 
+class ColorPreset(str, Enum):
+    """Predefined color preset identifiers."""
+
+    RED = "red"
+    BLUE = "blue"
+    GREEN = "green"
+    YELLOW = "yellow"
+    MAGENTA = "magenta"
+    CYAN = "cyan"
+    ORANGE = "orange"
+    PURPLE = "purple"
+    AMBER = "amber"
+    LIME = "lime"
+    WHITE = "white"
+    WARM_WHITE = "warm_white"
+    COOL_WHITE = "cool_white"
+    UV = "uv"
+
+
 class ColorPresetDefinition(BaseModel):
     """Definition of a color preset.
 
@@ -52,9 +71,9 @@ class ColorLibrary:
     Note: These are typical values, actual values are fixture-specific.
     """
 
-    PRESETS: dict[str, ColorPresetDefinition] = {
+    PRESETS: dict[ColorPreset, ColorPresetDefinition] = {
         # Primary colors
-        "red": ColorPresetDefinition(
+        ColorPreset.RED: ColorPresetDefinition(
             color_id="red",
             name="Red",
             description="Primary red",
@@ -62,7 +81,7 @@ class ColorLibrary:
             category=ColorCategory.PRIMARY,
             mood=ColorMood.WARM,
         ),
-        "blue": ColorPresetDefinition(
+        ColorPreset.BLUE: ColorPresetDefinition(
             color_id="blue",
             name="Blue",
             description="Primary blue",
@@ -70,7 +89,7 @@ class ColorLibrary:
             category=ColorCategory.PRIMARY,
             mood=ColorMood.COOL,
         ),
-        "green": ColorPresetDefinition(
+        ColorPreset.GREEN: ColorPresetDefinition(
             color_id="green",
             name="Green",
             description="Primary green",
@@ -78,7 +97,7 @@ class ColorLibrary:
             category=ColorCategory.PRIMARY,
             mood=ColorMood.COOL,
         ),
-        "yellow": ColorPresetDefinition(
+        ColorPreset.YELLOW: ColorPresetDefinition(
             color_id="yellow",
             name="Yellow",
             description="Primary yellow",
@@ -86,7 +105,7 @@ class ColorLibrary:
             category=ColorCategory.PRIMARY,
             mood=ColorMood.WARM,
         ),
-        "magenta": ColorPresetDefinition(
+        ColorPreset.MAGENTA: ColorPresetDefinition(
             color_id="magenta",
             name="Magenta",
             description="Primary magenta",
@@ -94,7 +113,7 @@ class ColorLibrary:
             category=ColorCategory.PRIMARY,
             mood=ColorMood.COOL,
         ),
-        "cyan": ColorPresetDefinition(
+        ColorPreset.CYAN: ColorPresetDefinition(
             color_id="cyan",
             name="Cyan",
             description="Primary cyan",
@@ -103,7 +122,7 @@ class ColorLibrary:
             mood=ColorMood.COOL,
         ),
         # Secondary colors
-        "orange": ColorPresetDefinition(
+        ColorPreset.ORANGE: ColorPresetDefinition(
             color_id="orange",
             name="Orange",
             description="Orange",
@@ -111,7 +130,7 @@ class ColorLibrary:
             category=ColorCategory.SECONDARY,
             mood=ColorMood.WARM,
         ),
-        "purple": ColorPresetDefinition(
+        ColorPreset.PURPLE: ColorPresetDefinition(
             color_id="purple",
             name="Purple",
             description="Purple/violet",
@@ -119,7 +138,7 @@ class ColorLibrary:
             category=ColorCategory.SECONDARY,
             mood=ColorMood.COOL,
         ),
-        "amber": ColorPresetDefinition(
+        ColorPreset.AMBER: ColorPresetDefinition(
             color_id="amber",
             name="Amber",
             description="Amber/gold",
@@ -127,7 +146,7 @@ class ColorLibrary:
             category=ColorCategory.SECONDARY,
             mood=ColorMood.WARM,
         ),
-        "lime": ColorPresetDefinition(
+        ColorPreset.LIME: ColorPresetDefinition(
             color_id="lime",
             name="Lime",
             description="Lime green",
@@ -136,7 +155,7 @@ class ColorLibrary:
             mood=ColorMood.COOL,
         ),
         # Special
-        "white": ColorPresetDefinition(
+        ColorPreset.WHITE: ColorPresetDefinition(
             color_id="white",
             name="White",
             description="Open/white (no color)",
@@ -144,7 +163,7 @@ class ColorLibrary:
             category=ColorCategory.SPECIAL,
             mood=ColorMood.NEUTRAL,
         ),
-        "warm_white": ColorPresetDefinition(
+        ColorPreset.WARM_WHITE: ColorPresetDefinition(
             color_id="warm_white",
             name="Warm White",
             description="Warm white (CTO)",
@@ -152,7 +171,7 @@ class ColorLibrary:
             category=ColorCategory.SPECIAL,
             mood=ColorMood.WARM,
         ),
-        "cool_white": ColorPresetDefinition(
+        ColorPreset.COOL_WHITE: ColorPresetDefinition(
             color_id="cool_white",
             name="Cool White",
             description="Cool white (CTB)",
@@ -160,7 +179,7 @@ class ColorLibrary:
             category=ColorCategory.SPECIAL,
             mood=ColorMood.COOL,
         ),
-        "uv": ColorPresetDefinition(
+        ColorPreset.UV: ColorPresetDefinition(
             color_id="uv",
             name="UV",
             description="Ultraviolet",
@@ -171,11 +190,11 @@ class ColorLibrary:
     }
 
     @classmethod
-    def get_preset(cls, color_id: str) -> ColorPresetDefinition:
+    def get_preset(cls, color_id: str | ColorPreset) -> ColorPresetDefinition:
         """Get color preset definition.
 
         Args:
-            color_id: Color identifier
+            color_id: Color identifier (string or enum)
 
         Returns:
             ColorPresetDefinition
@@ -183,10 +202,21 @@ class ColorLibrary:
         Raises:
             ValueError: If color_id is unknown
         """
-        preset = cls.PRESETS.get(color_id)
+        # Convert string to enum if needed
+        if isinstance(color_id, str):
+            try:
+                preset_key = ColorPreset(color_id)
+            except ValueError as e:
+                raise ValueError(
+                    f"Unknown color preset: '{color_id}'. Valid: {[p.value for p in ColorPreset]}"
+                ) from e
+        else:
+            preset_key = color_id
+
+        preset = cls.PRESETS.get(preset_key)
         if not preset:
             raise ValueError(
-                f"Unknown color preset: '{color_id}'. Valid: {sorted(cls.PRESETS.keys())}"
+                f"Unknown color preset: '{color_id}'. Valid: {[p.value for p in ColorPreset]}"
             )
         return preset
 

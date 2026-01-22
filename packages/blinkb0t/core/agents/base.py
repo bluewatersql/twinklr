@@ -359,7 +359,8 @@ class PromptRenderer:
             undefined=jinja2.StrictUndefined, autoescape=False, trim_blocks=True, lstrip_blocks=True
         )
         tmpl = env.from_string(template_text)
-        return tmpl.render(**dict(variables))
+        result: str = tmpl.render(**dict(variables))
+        return result
 
     def _render_strict_dollar(self, template_text: str, variables: Mapping[str, Any]) -> str:
         # A minimal strict renderer for "$var" placeholders.

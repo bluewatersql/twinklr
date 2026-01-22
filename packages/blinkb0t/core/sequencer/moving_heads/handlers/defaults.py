@@ -8,12 +8,14 @@ Use these functions to get ready-to-use registries in your application.
 
 from typing import TypedDict
 
-from blinkb0t.core.sequencer.moving_heads.handlers.dimmers.fade_in import FadeInHandler
-from blinkb0t.core.sequencer.moving_heads.handlers.dimmers.fade_out import FadeOutHandler
-from blinkb0t.core.sequencer.moving_heads.handlers.dimmers.hold import HoldHandler
-from blinkb0t.core.sequencer.moving_heads.handlers.dimmers.pulse import PulseHandler
+from blinkb0t.core.sequencer.moving_heads.handlers.dimmers.default import (
+    DefaultDimmerHandler,
+)
+from blinkb0t.core.sequencer.moving_heads.handlers.geometry.none import NoneGeometryHandler
 from blinkb0t.core.sequencer.moving_heads.handlers.geometry.role_pose import RolePoseHandler
-from blinkb0t.core.sequencer.moving_heads.handlers.movement.sweep_lr import SweepLRHandler
+from blinkb0t.core.sequencer.moving_heads.handlers.movement.default import (
+    DefaultMovementHandler,
+)
 from blinkb0t.core.sequencer.moving_heads.handlers.registry import (
     DimmerRegistry,
     GeometryRegistry,
@@ -26,6 +28,7 @@ def create_default_geometry_registry() -> GeometryRegistry:
 
     Currently includes:
     - ROLE_POSE: Maps role tokens to base poses
+    - NONE: Returns center position
 
     Returns:
         GeometryRegistry with default handlers registered.
@@ -36,48 +39,63 @@ def create_default_geometry_registry() -> GeometryRegistry:
     """
     registry = GeometryRegistry()
     registry.register(RolePoseHandler())
+    registry.register(NoneGeometryHandler())
     return registry
 
 
 def create_default_movement_registry() -> MovementRegistry:
     """Create a movement registry with default handlers.
 
-    Currently includes:
-    - SWEEP_LR: Left-to-right sinusoidal sweep
+    Uses DefaultMovementHandler which looks up patterns from MovementLibrary.
+    This provides automatic support for all 29 movement patterns without
+    requiring individual handler implementations.
+
+    Supported movements include:
+    - SWEEP_LR, SWEEP_UD: Horizontal/vertical sweeps
+    - CIRCLE, FIGURE8, INFINITY: Parametric patterns
+    - HOLD, NONE: Static positions
+    - PAN_SHAKE, TILT_ROCK, BOUNCE, PENDULUM: Oscillations
+    - And 20+ more patterns from MovementLibrary
 
     Returns:
-        MovementRegistry with default handlers registered.
+        MovementRegistry with default handler registered.
 
     Example:
         >>> registry = create_default_movement_registry()
-        >>> handler = registry.get("SWEEP_LR")
+        >>> handler = registry.get("SWEEP_LR")  # Uses default
+        >>> handler = registry.get("CIRCLE")    # Uses default
     """
     registry = MovementRegistry()
-    registry.register(SweepLRHandler())
+    # Register default handler to handle all movements from library
+    registry.register_default(DefaultMovementHandler())
     return registry
 
 
 def create_default_dimmer_registry() -> DimmerRegistry:
     """Create a dimmer registry with default handlers.
 
-    Currently includes:
+    Uses DefaultDimmerHandler which looks up patterns from DimmerLibrary.
+    This provides automatic support for all dimmer patterns without
+    requiring individual handler implementations.
+
+    Supported dimmers include:
     - FADE_IN: Linear fade from min to max
     - FADE_OUT: Linear fade from max to min
     - PULSE: Sinusoidal pulsing effect
     - HOLD: Constant brightness
+    - NONE: Zero brightness (lights off)
 
     Returns:
-        DimmerRegistry with default handlers registered.
+        DimmerRegistry with default handler registered.
 
     Example:
         >>> registry = create_default_dimmer_registry()
-        >>> handler = registry.get("PULSE")
+        >>> handler = registry.get("PULSE")     # Uses default
+        >>> handler = registry.get("FADE_IN")   # Uses default
     """
     registry = DimmerRegistry()
-    registry.register(FadeInHandler())
-    registry.register(FadeOutHandler())
-    registry.register(PulseHandler())
-    registry.register(HoldHandler())
+    # Register default handler to handle all dimmers from library
+    registry.register_default(DefaultDimmerHandler())
     return registry
 
 

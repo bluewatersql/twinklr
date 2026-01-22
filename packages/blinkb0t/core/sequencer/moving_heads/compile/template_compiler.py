@@ -6,6 +6,12 @@ all components to compile a complete template to IR segments.
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from blinkb0t.core.sequencer.models.context import TemplateCompileContext
+from blinkb0t.core.sequencer.models.template import (
+    Template,
+    TemplatePreset,
+    TemplateStep,
+)
 from blinkb0t.core.sequencer.moving_heads.channels.state import FixtureSegment
 from blinkb0t.core.sequencer.moving_heads.compile.phase_offset import (
     calculate_fixture_offsets,
@@ -15,12 +21,6 @@ from blinkb0t.core.sequencer.moving_heads.compile.scheduler import schedule_repe
 from blinkb0t.core.sequencer.moving_heads.compile.step_compiler import (
     StepCompileContext,
     compile_step,
-)
-from blinkb0t.core.sequencer.moving_heads.models.context import TemplateCompileContext
-from blinkb0t.core.sequencer.moving_heads.models.template import (
-    Template,
-    TemplatePreset,
-    TemplateStep,
 )
 
 
@@ -93,7 +93,7 @@ def compile_template(
     # Schedule repeats
     schedule_result = schedule_repeats(
         working_template.repeat,
-        context.window_bars,
+        context.duration_bars,
         step_durations=step_durations,
     )
 
@@ -138,6 +138,7 @@ def compile_template(
                 start_ms=start_ms,
                 duration_ms=duration_ms,
                 n_samples=context.n_samples,
+                curve_registry=context.curve_registry,
                 geometry_registry=context.geometry_registry,
                 movement_registry=context.movement_registry,
                 dimmer_registry=context.dimmer_registry,

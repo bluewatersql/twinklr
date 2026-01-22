@@ -7,8 +7,8 @@ and remainder policies.
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from blinkb0t.core.sequencer.moving_heads.models.compiler import ScheduledInstance
-from blinkb0t.core.sequencer.moving_heads.models.template import (
+from blinkb0t.core.sequencer.models.compiler import ScheduledInstance
+from blinkb0t.core.sequencer.models.template import (
     RemainderPolicy,
     RepeatContract,
     RepeatMode,
@@ -45,7 +45,7 @@ class ScheduleResult(BaseModel):
 
 def schedule_repeats(
     contract: RepeatContract,
-    window_bars: float,
+    duration_bars: float,
     step_durations: dict[str, float] | None = None,
 ) -> ScheduleResult:
     """Schedule template repeats within a playback window.
@@ -55,7 +55,7 @@ def schedule_repeats(
 
     Args:
         contract: The repeat contract defining cycle behavior.
-        window_bars: Total window duration in bars.
+        duration_bars: Total window duration in bars.
         step_durations: Optional mapping of step_id to duration in bars.
             If not provided, steps split the cycle evenly.
 
@@ -68,9 +68,9 @@ def schedule_repeats(
         ...     loop_step_ids=["step1", "step2"],
         ...     mode=RepeatMode.PING_PONG,
         ... )
-        >>> result = schedule_repeats(contract, window_bars=8.0)
+        >>> result = schedule_repeats(contract, duration_bars=8.0)
     """
-    if window_bars <= 0.0:
+    if duration_bars <= 0.0:
         return ScheduleResult(
             instances=[],
             num_complete_cycles=0,
@@ -85,15 +85,15 @@ def schedule_repeats(
         step_durations = dict.fromkeys(contract.loop_step_ids, default_duration)
 
     # Calculate number of complete cycles
-    num_complete_cycles = int(window_bars // contract.cycle_bars)
-    remainder_bars = window_bars - (num_complete_cycles * contract.cycle_bars)
+    num_complete_cycles = int(duration_bars // contract.cycle_bars)
+    remainder_bars = duration_bars - (num_complete_cycles * contract.cycle_bars)
 
     # Handle case where window is smaller than one cycle
     if num_complete_cycles == 0:
         return ScheduleResult(
             instances=[],
             num_complete_cycles=0,
-            remainder_bars=window_bars,
+            remainder_bars=duration_bars,
             remainder_policy=contract.remainder_policy,
         )
 

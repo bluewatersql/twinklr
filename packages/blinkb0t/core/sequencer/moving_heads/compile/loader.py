@@ -11,12 +11,12 @@ from typing import Any
 
 from pydantic import ValidationError
 
-from blinkb0t.core.sequencer.moving_heads.compile.preset import apply_preset
-from blinkb0t.core.sequencer.moving_heads.models.template import (
+from blinkb0t.core.sequencer.models.template import (
     Template,
     TemplateDoc,
     TemplatePreset,
 )
+from blinkb0t.core.sequencer.moving_heads.compile.preset import apply_preset
 
 
 class TemplateNotFoundError(Exception):

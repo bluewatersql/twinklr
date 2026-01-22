@@ -9,14 +9,6 @@ The session provides shared infrastructure that all domains need:
 Domain-specific functionality (moving heads, RGB, lasers) is provided
 by separate DomainManager classes that use the session.
 
-Example:
-    # Simple usage
-    session = BlinkB0tSession.from_directory(".")
-
-    # Use with domain manager
-    from blinkb0t.core.domains.sequencing.moving_heads import MovingHeadManager
-    mh = MovingHeadManager(session)
-    mh.run_pipeline("song.mp3", "input.xsq", "output.xsq")
 """
 
 from __future__ import annotations
@@ -30,8 +22,7 @@ from blinkb0t.core.config.models import AppConfig, ConfigBase, JobConfig
 T = TypeVar("T", bound=ConfigBase)
 
 if TYPE_CHECKING:
-    from blinkb0t.core.domains.audio.analyzer import AudioAnalyzer
-    from blinkb0t.core.domains.sequencing.analyzer import SequenceAnalyzer
+    from blinkb0t.core.audio.analyzer import AudioAnalyzer
 
 logger = logging.getLogger(__name__)
 
@@ -42,29 +33,6 @@ class BlinkB0tSession:
     Manages configuration and provides shared services (audio analysis,
     sequence fingerprinting) that all domains need. Domain-specific logic
     lives in separate DomainManager classes.
-
-    Supports flexible initialization patterns:
-
-    1. From directory (simple):
-        session = BlinkB0tSession.from_directory(".")
-
-    2. From explicit configs:
-        session = BlinkB0tSession(
-            app_config=app_cfg,
-            job_config=job_cfg
-        )
-
-    3. From paths:
-        session = BlinkB0tSession(
-            app_config="config.json",
-            job_config="job_config.json"
-        )
-
-    4. Mixed (some loaded, some provided):
-        session = BlinkB0tSession(
-            app_config=my_app_config,  # Already loaded
-            job_config="job_config.json"  # Will load
-        )
     """
 
     def __init__(
@@ -160,22 +128,7 @@ class BlinkB0tSession:
             AudioAnalyzer instance configured with session configs
         """
         if not hasattr(self, "_audio"):
-            from blinkb0t.core.domains.audio.analyzer import AudioAnalyzer
+            from blinkb0t.core.audio.analyzer import AudioAnalyzer
 
             self._audio = AudioAnalyzer(self.app_config, self.job_config)
         return self._audio
-
-    @property
-    def sequence(self) -> SequenceAnalyzer:
-        """Get sequence analyzer for this session (universal service).
-
-        Lazy-loaded on first access.
-
-        Returns:
-            SequenceAnalyzer instance configured with session configs
-        """
-        if not hasattr(self, "_sequence"):
-            from blinkb0t.core.domains.sequencing.analyzer import SequenceAnalyzer
-
-            self._sequence = SequenceAnalyzer(self.app_config, self.job_config)
-        return self._sequence

@@ -232,7 +232,7 @@ class BlendMode(str, Enum):
 ```python
 from pydantic import BaseModel, Field, ConfigDict, model_validator
 from packages.blinkb0t.core.curves.models import BaseCurve
-from packages.blinkb0t.core.sequencer.moving_heads.models.channel import ChannelName, BlendMode
+from packages.blinkb0t.core.sequencer.models.channel import ChannelName, BlendMode
 
 class ChannelSegment(BaseModel):
     """IR segment for a single fixture + channel over a time range.

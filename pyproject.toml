@@ -10,6 +10,8 @@ dependencies = [
     "blinkb0t-core>=0.1.0",
     "blinkb0t-cli>=0.1.0",
     "tqdm>=4.67.1",
+    "bezier>=2024.6.20",
+    "noise>=1.2.2",
 ]
 
 [project.optional-dependencies]
@@ -104,6 +106,7 @@ disallow_untyped_defs = false
 disallow_incomplete_defs = false
 check_untyped_defs = true
 ignore_missing_imports = true
+plugins = ["pydantic.mypy"]
 exclude = [
     "tests/",
     "tests/.*",
@@ -111,6 +114,11 @@ exclude = [
     ".dev/.*",
     "scripts/*",
 ]
+
+[tool.pydantic-mypy]
+init_forbid_extra = true
+init_typed = true
+warn_required_dynamic_aliases = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

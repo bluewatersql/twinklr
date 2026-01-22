@@ -7,23 +7,28 @@ from dataclasses import dataclass
 from typing import Any
 
 from blinkb0t.core.curves.models import CurvePoint
+from blinkb0t.core.curves.modifiers import (
+    CurveModifier,
+    bounce_curve,
+    mirror_curve,
+    ping_pong_curve,
+    repeat_curve,
+    reverse_curve,
+)
 from blinkb0t.core.curves.semantics import CurveKind
 
 
 @dataclass(frozen=True)
-class CurveDefinition:
-    """Curve definition or preset."""
+class NativeCurveDefinition:
+    """Registry entry for curve generation."""
 
     curve_id: str
-    base_curve_id: str | None = None
-    params: dict[str, Any] | None = None
-    modifiers: list[str] | None = None
-    kind: CurveKind = CurveKind.DIMMER_ABSOLUTE
+    default_params: dict[str, Any] | None = None
     description: str | None = None
 
 
 @dataclass(frozen=True)
-class CurveGeneratorSpec:
+class CurveDefinition:
     """Registry entry for curve generation."""
 
     curve_id: str
@@ -31,17 +36,24 @@ class CurveGeneratorSpec:
     kind: CurveKind
     default_samples: int
     default_params: dict[str, Any] | None = None
+    modifiers: list[CurveModifier] | None = None
+    description: str | None = None
 
 
-def _apply_modifiers(points: list[CurvePoint], modifiers: list[str]) -> list[CurvePoint]:
+def _apply_modifiers(points: list[CurvePoint], modifiers: list[CurveModifier]) -> list[CurvePoint]:
     """Apply modifier transformations to curve points."""
     result = points
     for modifier in modifiers:
-        if modifier == "reverse":
-            reversed_points = [CurvePoint(t=1.0 - p.t, v=p.v) for p in reversed(result)]
-            result = reversed_points
-        elif modifier == "mirror":
-            result = [CurvePoint(t=p.t, v=1.0 - p.v) for p in result]
+        if modifier == CurveModifier.REVERSE:
+            result = reverse_curve(result)
+        elif modifier == CurveModifier.MIRROR:
+            result = mirror_curve(result)
+        elif modifier == CurveModifier.BOUNCE:
+            result = bounce_curve(result)
+        elif modifier == CurveModifier.PINGPONG:
+            result = ping_pong_curve(result)
+        elif modifier == CurveModifier.REPEAT:
+            result = repeat_curve(result)
     return result
 
 
@@ -49,14 +61,14 @@ class CurveRegistry:
     """Registry for curve generators and preset resolution."""
 
     def __init__(self) -> None:
-        self._registry: dict[str, CurveGeneratorSpec] = {}
+        self._registry: dict[str, CurveDefinition] = {}
 
-    def register(self, spec: CurveGeneratorSpec) -> None:
+    def register(self, spec: CurveDefinition) -> None:
         if spec.curve_id in self._registry:
             raise ValueError(f"Curve '{spec.curve_id}' already registered")
         self._registry[spec.curve_id] = spec
 
-    def get(self, curve_id: str) -> CurveGeneratorSpec:
+    def get(self, curve_id: str) -> CurveDefinition:
         try:
             return self._registry[curve_id]
         except KeyError as exc:
@@ -71,13 +83,9 @@ class CurveRegistry:
             definition: Curve definition or preset.
             n_samples: Optional override for sample count.
         """
-        if definition.base_curve_id:
-            spec = self.get(definition.base_curve_id)
-        else:
-            spec = self.get(definition.curve_id)
+        spec = self.get(definition.curve_id)
 
         params = dict(spec.default_params or {})
-        params.update(definition.params or {})
         sample_count = n_samples or spec.default_samples
         points = spec.generator(sample_count, **params)
 
@@ -86,13 +94,3 @@ class CurveRegistry:
             points = _apply_modifiers(points, modifiers)
 
         return points
-
-
-def resolve_curve(
-    registry: CurveRegistry,
-    definition: CurveDefinition,
-    *,
-    n_samples: int | None = None,
-) -> list[CurvePoint]:
-    """Convenience wrapper for resolving a curve definition."""
-    return registry.resolve(definition, n_samples=n_samples)

@@ -18,49 +18,36 @@ from blinkb0t.core.utils.fixtures import build_semantic_groups  # noqa: F401
 
 if TYPE_CHECKING:
     from blinkb0t.core.config.models import JobConfig
-from blinkb0t.core.domains.sequencing.libraries.moving_heads.dimmers import DIMMER_LIBRARY, DimmerID
-from blinkb0t.core.domains.sequencing.libraries.moving_heads.geometry import (
-    GEOMETRY_LIBRARY,
-    GeometryID,
-)
-from blinkb0t.core.domains.sequencing.libraries.moving_heads.movements import (
-    MOVEMENT_LIBRARY,
-    MovementID,
-)
-from blinkb0t.core.domains.sequencing.moving_heads.templates.geometry.classification import (
-    is_asymmetric,
-)
+
+from blinkb0t.core.sequencer.moving_heads.libraries.dimmer import DimmerLibrary
+from blinkb0t.core.sequencer.moving_heads.libraries.geometry import GeometryLibrary
+from blinkb0t.core.sequencer.moving_heads.libraries.movement import MovementLibrary
 
 logger = logging.getLogger(__name__)
 
 
-def build_channel_library_context() -> dict[str, Any]:
-    """Build channel library context for LLM planning.
+def build_library_metadata() -> dict[str, Any]:
+    """Build library metadata for LLM planning.
 
-    Extracts metadata from shutter, color, and gobo libraries
+    Extracts metadata from movement, geometry, and dimmer libraries
     for inclusion in planning prompts.
 
     Returns:
-        Dictionary with channel library metadata
+        Dictionary with library metadata
 
     Example:
-        >>> context = build_channel_library_context()
-        >>> context["shutter"][0]["pattern_id"]
-        'open'
-        >>> context["color"][0]["name"]
-        'White'
+        >>> context = build_library_metadata()
+        >>> context["movements"][0]["movement_id"]
+        'sweep_lr'
+        >>> context["geometries"][0]["geometry_id"]
+        'fan'
     """
-    from blinkb0t.core.domains.sequencing.libraries.channels import (
-        ColorLibrary,
-        GoboLibrary,
-        ShutterLibrary,
-    )
 
     # Use the built-in metadata methods (optimized for LLM context)
     return {
-        "shutter": ShutterLibrary.get_all_metadata(),
-        "color": ColorLibrary.get_all_metadata(),
-        "gobo": GoboLibrary.get_all_metadata(),
+        "movements": MovementLibrary.get_all_metadata(),
+        "geometries": GeometryLibrary.get_all_metadata(),
+        "dimmers": DimmerLibrary.get_all_metadata(),
     }
 
 
@@ -82,15 +69,6 @@ def build_template_context_for_llm(
         - description, energy_range, tags
         - presets (id, name for each)
         - behavior summary (movement/dimmer patterns)
-
-    Example:
-        >>> from blinkb0t.core.sequencer.moving_heads.compile.loader import TemplateLoader
-        >>> loader = TemplateLoader()
-        >>> loader.load_directory(Path("templates/"))
-        >>> docs = [loader.get(tid) for tid in loader.list_templates()]
-        >>> context = build_template_context_for_llm(docs)
-        >>> context[0]["template_id"]
-        'fan_pulse'
     """
     if not template_docs:
         return []
@@ -131,7 +109,7 @@ def build_template_context_for_llm(
             movement_ids.add(step.movement.movement_id)
             dimmer_ids.add(step.dimmer.dimmer_id)
             if step.timing.phase_offset is not None:
-                from blinkb0t.core.sequencer.moving_heads.models.template import (
+                from blinkb0t.core.sequencer.models.template import (
                     PhaseOffsetMode,
                 )
 
@@ -240,7 +218,7 @@ class ContextShaper:
         seq_fingerprint: dict[str, Any] | None = None,
         template_metadata: list[dict[str, Any]] | None = None,
         plan: dict[str, Any] | None = None,
-        channel_libraries: dict[str, Any] | None = None,
+        library_metadata: dict[str, Any] | None = None,
     ) -> ShapedContext:
         """Shape context for specific stage.
 
@@ -250,14 +228,14 @@ class ContextShaper:
             seq_fingerprint: Sequence fingerprint (optional)
             template_metadata: Template metadata list (optional)
             plan: Approved plan (for implementation/judge stages)
-            channel_libraries: Channel library metadata (addition)
+            library_metadata: Library metadata (movements, geometries, dimmers)
 
         Returns:
             ShapedContext with reduced data
         """
         if stage == Stage.PLAN:
             shaped_data = self._shape_for_plan(
-                song_features, seq_fingerprint, template_metadata, channel_libraries
+                song_features, seq_fingerprint, template_metadata, library_metadata
             )
         elif stage == Stage.IMPLEMENTATION:
             shaped_data = self._shape_for_implementation(
@@ -300,7 +278,7 @@ class ContextShaper:
         song_features: dict[str, Any],
         seq_fingerprint: dict[str, Any] | None,
         template_metadata: list[dict[str, Any]] | None,
-        channel_libraries: dict[str, Any] | None = None,
+        library_metadata: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Shape context for planning stage.
 
@@ -339,9 +317,9 @@ class ContextShaper:
         # 6. Recommendations (calculated) - ~200 tokens
         shaped["recommendations"] = self._calculate_recommendations(song_features)
 
-        # 7. Channel library metadata - ~1000 tokens
-        if channel_libraries:
-            shaped["channels"] = self._compact_channel_libraries(channel_libraries)
+        # 7. Library metadata (movements, geometries, dimmers) - ~1500 tokens
+        if library_metadata:
+            shaped["libraries"] = self._compact_library_metadata(library_metadata)
 
         return shaped
 
@@ -361,7 +339,7 @@ class ContextShaper:
         - Unified song map (bars/beats/timing aligned in single view)
         - Selected template details
         """
-        from blinkb0t.core.domains.audio.context import build_unified_song_map
+        from blinkb0t.core.audio.context import build_unified_song_map
 
         shaped: dict[str, Any] = {}
 
@@ -527,56 +505,31 @@ class ContextShaper:
             if "steps" in meta:
                 steps = meta["steps"]
 
-                # Extract distinct movements
-                movement_ids = set()
-                for step in steps:
-                    movement_ids.add(step.get("movement_id"))
-
-                movements = []
-                for mov_id in sorted(movement_ids):
-                    try:
-                        pattern = MOVEMENT_LIBRARY[MovementID(mov_id)]
-                        movements.append({"id": mov_id, "name": pattern.name})
-                    except (KeyError, ValueError):
-                        movements.append({"id": mov_id, "name": mov_id})
-
-                compact_meta["movements"] = movements
-
-                # Extract distinct geometries
-                geometry_ids = set()
+                # Extract unique patterns from steps
+                movements = set()
+                geometries = set()
+                dimmers = set()
                 has_asymmetric = False
+
                 for step in steps:
-                    geo_id = step.get("geometry_id")
-                    if geo_id:
-                        geometry_ids.add(geo_id)
-                        if is_asymmetric(geo_id):
+                    if "movement" in step and "movement_type" in step["movement"]:
+                        movements.add(step["movement"]["movement_type"])
+                    if "geometry" in step and "geometry_type" in step["geometry"]:
+                        geo_type = step["geometry"]["geometry_type"]
+                        geometries.add(geo_type)
+                        # Check for asymmetric geometry
+                        if "asym" in geo_type.lower() or geo_type in [
+                            "SCATTERED_CHAOS",
+                            "RANDOM_WALK",
+                        ]:
                             has_asymmetric = True
+                    if "dimmer" in step and "dimmer_type" in step["dimmer"]:
+                        dimmers.add(step["dimmer"]["dimmer_type"])
 
-                geometries = []
-                for geo_id in sorted(geometry_ids):
-                    try:
-                        geometry_def = GEOMETRY_LIBRARY[GeometryID(geo_id)]
-                        geometries.append({"id": geo_id, "summary": geometry_def.summary})
-                    except (KeyError, ValueError):
-                        geometries.append({"id": geo_id, "summary": geo_id})
-
-                compact_meta["geometries"] = geometries
+                compact_meta["movements"] = sorted(movements)
+                compact_meta["geometries"] = sorted(geometries)
                 compact_meta["geometry_type"] = "ASYMMETRIC" if has_asymmetric else "SYMMETRIC"
-
-                # Extract distinct dimmers
-                dimmer_ids = set()
-                for step in steps:
-                    dimmer_ids.add(step.get("dimmer_id"))
-
-                dimmers = []
-                for dim_id in sorted(dimmer_ids):
-                    try:
-                        dimmer_def = DIMMER_LIBRARY[DimmerID(dim_id)]
-                        dimmers.append({"id": dim_id, "description": dimmer_def.description})
-                    except (KeyError, ValueError):
-                        dimmers.append({"id": dim_id, "description": dim_id})
-
-                compact_meta["dimmers"] = dimmers
+                compact_meta["dimmers"] = sorted(dimmers)
 
             # Add timing information if available
             if "timing" in meta:
@@ -588,60 +541,60 @@ class ContextShaper:
 
         return compacted
 
-    def _compact_channel_libraries(self, channel_libraries: dict[str, Any]) -> dict[str, Any]:
-        """Compact channel library metadata for planning.
+    def _compact_library_metadata(self, library_metadata: dict[str, Any]) -> dict[str, Any]:
+        """Compact library metadata for planning.
 
-        From: Full library metadata (~2k tokens)
-        To: Compact version (~1k tokens)
+        From: Full library metadata (~3k tokens)
+        To: Compact version (~1.5k tokens)
 
         Includes:
-        - Shutter patterns with energy levels
-        - Color presets with moods
-        - Gobo patterns with visual density
+        - Movement patterns with curve types
+        - Geometry patterns with descriptions
+        - Dimmer patterns with curve types
         """
         compacted: dict[str, Any] = {}
 
-        # Shutter library
-        if "shutter" in channel_libraries:
-            shutter_patterns = []
-            for pattern in channel_libraries["shutter"]:
-                shutter_patterns.append(
+        # Movement library
+        if "movements" in library_metadata:
+            movement_patterns = []
+            for pattern in library_metadata["movements"]:
+                movement_patterns.append(
                     {
-                        "pattern_id": pattern["pattern_id"],
+                        "movement_id": pattern["movement_id"],
                         "name": pattern["name"],
-                        "energy_level": pattern.get("energy_level", 5),
-                        "description": pattern.get("description", "")[:80],  # Truncate
+                        "description": pattern.get("description", "")[:100],  # Truncate
+                        "pan_curve": pattern.get("pan_curve", ""),
+                        "tilt_curve": pattern.get("tilt_curve", ""),
                     }
                 )
-            compacted["shutter"] = shutter_patterns
+            compacted["movements"] = movement_patterns
 
-        # Color library
-        if "color" in channel_libraries:
-            color_presets = []
-            for preset in channel_libraries["color"]:
-                color_presets.append(
+        # Geometry library
+        if "geometries" in library_metadata:
+            geometry_patterns = []
+            for pattern in library_metadata["geometries"]:
+                geometry_patterns.append(
                     {
-                        "color_id": preset["color_id"],
-                        "name": preset["name"],
-                        "mood": preset.get("mood", "neutral"),
-                        "category": preset.get("category", "neutral"),
-                    }
-                )
-            compacted["color"] = color_presets
-
-        # Gobo library
-        if "gobo" in channel_libraries:
-            gobo_patterns = []
-            for pattern in channel_libraries["gobo"]:
-                gobo_patterns.append(
-                    {
-                        "gobo_id": pattern["gobo_id"],
+                        "geometry_id": pattern["geometry_id"],
                         "name": pattern["name"],
-                        "visual_density": pattern.get("visual_density", 5),
-                        "category": pattern.get("category", "geometric"),
+                        "summary": pattern.get("summary", "")[:80],  # Truncate
                     }
                 )
-            compacted["gobo"] = gobo_patterns
+            compacted["geometries"] = geometry_patterns
+
+        # Dimmer library
+        if "dimmers" in library_metadata:
+            dimmer_patterns = []
+            for pattern in library_metadata["dimmers"]:
+                dimmer_patterns.append(
+                    {
+                        "dimmer_id": pattern["dimmer_id"],
+                        "name": pattern["name"],
+                        "description": pattern.get("description", "")[:100],  # Truncate
+                        "curve": pattern.get("curve", ""),
+                    }
+                )
+            compacted["dimmers"] = dimmer_patterns
 
         return compacted
 
@@ -678,7 +631,7 @@ class ContextShaper:
             "existing_effects": {
                 "total_count": total_effects,
                 "by_type": effect_hist,
-                "coverage_pct": 0,  # TODO: Calculate if needed
+                "coverage_pct": 0,  # Calculated from bins if needed
             },
             "color_palette": [],  # Not extracted by current SequenceAnalyzer
             "timing_density": timing_density,

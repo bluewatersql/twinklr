@@ -4,7 +4,7 @@ import logging
 from typing import TYPE_CHECKING
 
 from blinkb0t.core.curves.models import BaseCurve, CurvePoint
-from blinkb0t.core.sequencer.moving_heads.models.channel import BlendMode, ChannelName
+from blinkb0t.core.sequencer.models.enum import BlendMode, ChannelName
 from blinkb0t.core.utils.math import clamp
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 

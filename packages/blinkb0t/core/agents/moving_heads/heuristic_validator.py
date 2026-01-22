@@ -11,9 +11,8 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from blinkb0t.core.agents.moving_heads.channel_validator import ChannelHeuristicValidator
 from blinkb0t.core.agents.moving_heads.models_agent_plan import AgentPlan
-from blinkb0t.core.domains.sequencing.models.poses import PoseID
+from blinkb0t.core.config.poses import PoseLibrary
 
 logger = logging.getLogger(__name__)
 
@@ -154,14 +153,11 @@ class HeuristicValidator:
         self.template_metadata = {meta["template_id"]: meta for meta in template_metadata}
 
         # Get valid pose IDs
-        self.valid_poses = {pose.value for pose in PoseID}
+        self.valid_poses = {pose.value for pose in PoseLibrary}
 
         # Get valid categorical parameters
         self.valid_intensity = ["SMOOTH", "DRAMATIC", "INTENSE"]
         self.valid_speed = ["SLOW", "MODERATE", "FAST"]
-
-        # Channel validator
-        self.channel_validator = ChannelHeuristicValidator()
 
         logger.debug("HeuristicValidator initialized")
 
@@ -411,28 +407,15 @@ class HeuristicValidator:
     def _validate_channels(self, plan: AgentPlan, result: ValidationResult) -> None:
         """Validate channel specifications.
 
-        Checks:
+        NOTE: Channel validation is not yet implemented. SectionPlan does not
+        have a 'channels' attribute yet. This method is a placeholder.
+
+        Checks (when implemented):
         - Channel appropriateness for energy level
         - Conflicts (e.g., closed shutter with gobo)
         """
-        for section in plan.sections:
-            # Skip if no channel overrides
-            if not section.channels.get_overrides():
-                continue
-
-            # Validate channel appropriateness
-            is_valid, warnings = self.channel_validator.validate_section_channels(
-                section=section,
-                song_features=self.song_features,
-            )
-
-            # Add warnings to result
-            for warning in warnings:
-                result.add_warning(
-                    "channels",
-                    warning,
-                    section.name,
-                )
+        # Channel validation not implemented - SectionPlan has no channels attribute
+        pass
 
     def _targets_conflict(self, target1: str, target2: str) -> bool:
         """Check if two targets have potential fixture conflicts.

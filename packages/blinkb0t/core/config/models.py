@@ -8,7 +8,7 @@ from typing import Self
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from blinkb0t.core.domains.sequencing.models.poses import PoseConfig
+from blinkb0t.core.config.poses import PoseConfig
 
 
 class AgentConfig(BaseModel):

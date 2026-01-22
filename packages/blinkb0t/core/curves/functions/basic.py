@@ -1,3 +1,5 @@
+"""Basic curve generators."""
+
 import math
 
 from blinkb0t.core.curves.models import CurvePoint
@@ -32,7 +34,6 @@ def generate_linear(
     points: list[CurvePoint] = []
 
     for i, t in enumerate(t_grid):
-        # Linear interpolation: v goes from 0 to 1 over n_samples
         v = i / (n_samples - 1) if n_samples > 1 else 0.0
         if not ascending:
             v = 1.0 - v
@@ -65,7 +66,6 @@ def generate_hold(
     if n_samples < 2:
         raise ValueError("n_samples must be >= 2")
 
-    # Clamp value to [0, 1]
     clamped_value = max(0.0, min(1.0, value))
 
     t_grid = sample_uniform_grid(n_samples)
@@ -94,11 +94,6 @@ def generate_sine(
 
     Raises:
         ValueError: If n_samples < 2 or cycles <= 0.
-
-    Example:
-        >>> result = generate_sine(8, cycles=1.0)
-        >>> result[0].v  # Starts at midpoint
-        0.5
     """
     if n_samples < 2:
         raise ValueError("n_samples must be >= 2")
@@ -109,7 +104,6 @@ def generate_sine(
     points: list[CurvePoint] = []
 
     for t in t_grid:
-        # Sine normalized to [0, 1]
         angle = 2 * math.pi * cycles * t + phase
         v = 0.5 + 0.5 * math.sin(angle)
         points.append(CurvePoint(t=t, v=v))
@@ -134,11 +128,6 @@ def generate_triangle(
 
     Raises:
         ValueError: If n_samples < 2 or cycles <= 0.
-
-    Example:
-        >>> result = generate_triangle(8, cycles=1.0)
-        >>> result[0].v  # Starts at 0
-        0.0
     """
     if n_samples < 2:
         raise ValueError("n_samples must be >= 2")
@@ -149,15 +138,234 @@ def generate_triangle(
     points: list[CurvePoint] = []
 
     for t in t_grid:
-        # Position within cycle [0, 1)
         cycle_pos = (t * cycles) % 1.0
 
-        # Triangle: rise for first half, fall for second half
         if cycle_pos < 0.5:
-            v = cycle_pos * 2.0  # 0 → 1
+            v = cycle_pos * 2.0
         else:
-            v = 2.0 - cycle_pos * 2.0  # 1 → 0
+            v = 2.0 - cycle_pos * 2.0
 
+        points.append(CurvePoint(t=t, v=v))
+
+    return points
+
+
+def generate_pulse(
+    n_samples: int,
+    cycles: float = 1.0,
+    duty_cycle: float = 0.5,
+    high: float = 1.0,
+    low: float = 0.0,
+) -> list[CurvePoint]:
+    """Generate a pulse (square) wave curve.
+
+    Args:
+        n_samples: Number of samples to generate (must be >= 2).
+        cycles: Number of complete cycles in the output.
+        duty_cycle: Fraction of cycle that is high (0.0 to 1.0).
+        high: Value during high portion (clamped to [0, 1]).
+        low: Value during low portion (clamped to [0, 1]).
+
+    Returns:
+        List of CurvePoints forming a pulse wave.
+
+    Raises:
+        ValueError: If n_samples < 2 or cycles <= 0.
+    """
+    if n_samples < 2:
+        raise ValueError("n_samples must be >= 2")
+    if cycles <= 0:
+        raise ValueError("cycles must be > 0")
+
+    high = max(0.0, min(1.0, high))
+    low = max(0.0, min(1.0, low))
+    duty_cycle = max(0.0, min(1.0, duty_cycle))
+
+    t_grid = sample_uniform_grid(n_samples)
+    points: list[CurvePoint] = []
+
+    for t in t_grid:
+        cycle_pos = (t * cycles) % 1.0
+
+        v = high if cycle_pos < duty_cycle else low
+        points.append(CurvePoint(t=t, v=v))
+
+    return points
+
+
+def generate_cosine(
+    n_samples: int,
+    cycles: float = 1.0,
+    phase: float = 0.0,
+) -> list[CurvePoint]:
+    """Generate a cosine wave curve (complementary to sine).
+
+    The cosine wave is normalized to [0, 1] where:
+    - 1.0 is the peak (at phase = 0)
+    - 0.0 is the trough (half-cycle later)
+
+    Formula:
+        v(t) = (cos(2π * cycles * t + phase) + 1) / 2
+
+    Args:
+        n_samples: Number of samples to generate (must be >= 2).
+        cycles: Number of complete cycles in the output.
+        phase: Phase offset in radians (default 0 = start at peak).
+
+    Returns:
+        List of CurvePoints forming a cosine wave.
+
+    Raises:
+        ValueError: If n_samples < 2 or cycles <= 0.
+    """
+    if n_samples < 2:
+        raise ValueError("n_samples must be >= 2")
+    if cycles <= 0:
+        raise ValueError("cycles must be > 0")
+
+    t_grid = sample_uniform_grid(n_samples)
+    points: list[CurvePoint] = []
+
+    for t in t_grid:
+        angle = 2 * math.pi * cycles * t + phase
+        v = 0.5 + 0.5 * math.cos(angle)
+        points.append(CurvePoint(t=t, v=v))
+
+    return points
+
+
+def generate_s_curve(
+    n_samples: int,
+    steepness: float = 12.0,
+) -> list[CurvePoint]:
+    """Generate an S-curve (sigmoid) easing curve.
+
+    Smooth transition from 0 to 1 with slow start/end and fast middle.
+
+    Formula:
+        v(t) = 1 / (1 + e^(-k(t - 0.5)))
+
+    Where k is the steepness parameter.
+
+    Args:
+        n_samples: Number of samples to generate (must be >= 2).
+        steepness: Controls how steep the transition is (must be > 0).
+
+    Returns:
+        List of CurvePoints forming an S-curve.
+
+    Raises:
+        ValueError: If n_samples < 2 or steepness <= 0.
+    """
+    if n_samples < 2:
+        raise ValueError("n_samples must be >= 2")
+    if steepness <= 0:
+        raise ValueError("steepness must be > 0")
+
+    t_grid = sample_uniform_grid(n_samples)
+    points: list[CurvePoint] = []
+
+    for t in t_grid:
+        x = (t - 0.5) * steepness
+        v = 1.0 / (1.0 + math.exp(-x))
+        points.append(CurvePoint(t=t, v=v))
+
+    return points
+
+
+def generate_square(
+    n_samples: int,
+    cycles: float = 1.0,
+    duty_cycle: float = 0.5,
+    high: float = 1.0,
+    low: float = 0.0,
+) -> list[CurvePoint]:
+    """Generate a square wave curve (binary on/off).
+
+    This is a convenience wrapper around :func:`generate_pulse` with a default
+    duty_cycle of 0.5.
+
+    Args:
+        n_samples: Number of samples to generate (must be >= 2).
+        cycles: Number of complete cycles in the output.
+        duty_cycle: Fraction of cycle that is high (0.0 to 1.0).
+        high: Value during high portion (clamped to [0, 1]).
+        low: Value during low portion (clamped to [0, 1]).
+
+    Returns:
+        List of CurvePoints forming a square wave.
+
+    Raises:
+        ValueError: If n_samples < 2 or cycles <= 0.
+    """
+    return generate_pulse(
+        n_samples=n_samples,
+        cycles=cycles,
+        duty_cycle=duty_cycle,
+        high=high,
+        low=low,
+    )
+
+
+def generate_smooth_step(
+    n_samples: int,
+) -> list[CurvePoint]:
+    """Generate smooth-step function (Hermite interpolation).
+
+    Smooth transition from 0 to 1, smoother than linear.
+
+    Formula:
+        v(t) = 3t² - 2t³
+
+    Args:
+        n_samples: Number of samples to generate (must be >= 2).
+
+    Returns:
+        List of CurvePoints forming a smooth-step curve.
+
+    Raises:
+        ValueError: If n_samples < 2.
+    """
+    if n_samples < 2:
+        raise ValueError("n_samples must be >= 2")
+
+    t_grid = sample_uniform_grid(n_samples)
+    points: list[CurvePoint] = []
+
+    for t in t_grid:
+        v = t * t * (3.0 - 2.0 * t)
+        points.append(CurvePoint(t=t, v=v))
+
+    return points
+
+
+def generate_smoother_step(
+    n_samples: int,
+) -> list[CurvePoint]:
+    """Generate smoother-step function (Ken Perlin's improved smoothstep).
+
+    Even smoother transition than smooth_step.
+
+    Formula:
+        v(t) = 6t⁵ - 15t⁴ + 10t³
+
+    Args:
+        n_samples: Number of samples to generate (must be >= 2).
+
+    Returns:
+        List of CurvePoints forming a smoother-step curve.
+
+    Raises:
+        ValueError: If n_samples < 2.
+    """
+    if n_samples < 2:
+        raise ValueError("n_samples must be >= 2")
+
+    t_grid = sample_uniform_grid(n_samples)
+    points: list[CurvePoint] = []
+
+    for t in t_grid:
+        v = t * t * t * (t * (t * 6.0 - 15.0) + 10.0)
         points.append(CurvePoint(t=t, v=v))
 
     return points

@@ -11,9 +11,6 @@ import yaml
 
 from blinkb0t.core.config.fixtures import FixtureGroup
 from blinkb0t.core.config.models import AppConfig, JobConfig
-from blinkb0t.core.domains.sequencing.libraries.channels.color import COLOR_LIBRARY
-from blinkb0t.core.domains.sequencing.libraries.channels.gobo import GOBO_LIBRARY
-from blinkb0t.core.domains.sequencing.libraries.channels.shutter import SHUTTER_LIBRARY
 from blinkb0t.core.utils.json import read_json
 
 logger = logging.getLogger(__name__)
@@ -229,56 +226,6 @@ def load_full_config(job_config_path: str | Path) -> tuple[JobConfig, FixtureGro
     fixtures = load_fixture_group(fixture_path)
 
     return (job_cfg, fixtures)
-
-
-def validate_channel_config(config: JobConfig) -> tuple[bool, list[str]]:
-    """Validate channel configuration (Component 5).
-
-    Validates that channel defaults reference valid library values.
-
-    Args:
-        config: JobConfig to validate
-
-    Returns:
-        (is_valid, errors) tuple where is_valid is True if no errors
-
-    Example:
-        >>> config = JobConfig()
-        >>> is_valid, errors = validate_channel_config(config)
-        >>> assert is_valid
-        >>> assert len(errors) == 0
-    """
-    errors = []
-
-    # Validate shutter default
-    try:
-        SHUTTER_LIBRARY.get_pattern(config.channel_defaults.shutter)
-    except (KeyError, ValueError) as e:
-        errors.append(f"Invalid shutter default '{config.channel_defaults.shutter}': {e}")
-
-    # Validate color default
-    try:
-        COLOR_LIBRARY.get_preset(config.channel_defaults.color)
-    except (KeyError, ValueError) as e:
-        errors.append(f"Invalid color default '{config.channel_defaults.color}': {e}")
-
-    # Validate gobo default
-    try:
-        GOBO_LIBRARY.get_pattern(config.channel_defaults.gobo)
-    except (KeyError, ValueError) as e:
-        errors.append(f"Invalid gobo default '{config.channel_defaults.gobo}': {e}")
-
-    is_valid = len(errors) == 0
-
-    if is_valid:
-        logger.debug(
-            f"Channel config valid: shutter={config.channel_defaults.shutter}, "
-            f"color={config.channel_defaults.color}, gobo={config.channel_defaults.gobo}"
-        )
-    else:
-        logger.error(f"Channel config validation failed: {errors}")
-
-    return (is_valid, errors)
 
 
 def get_openai_api_key() -> str | None:

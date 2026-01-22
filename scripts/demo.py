@@ -5,7 +5,7 @@ from pathlib import Path
 
 from rich.console import Console
 
-from blinkb0t.core.domains.sequencing.moving_heads.manager import MovingHeadManager
+from blinkb0t.core.sequencer.moving_heads.manager import MovingHeadManager
 from blinkb0t.core.session import BlinkB0tSession
 
 logging.basicConfig(level=logging.DEBUG)

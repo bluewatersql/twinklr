@@ -10,10 +10,10 @@ from pydantic import BaseModel, ConfigDict
 
 from blinkb0t.core.curves.models import PointsCurve
 from blinkb0t.core.curves.phase import apply_phase_shift_samples
+from blinkb0t.core.sequencer.models.context import StepCompileContext
+from blinkb0t.core.sequencer.models.enum import ChannelName
+from blinkb0t.core.sequencer.models.template import TemplateStep
 from blinkb0t.core.sequencer.moving_heads.channels.state import FixtureSegment
-from blinkb0t.core.sequencer.moving_heads.models.channel import ChannelName
-from blinkb0t.core.sequencer.moving_heads.models.context import StepCompileContext
-from blinkb0t.core.sequencer.moving_heads.models.template import TemplateStep
 
 
 class StepCompileResult(BaseModel):
@@ -61,9 +61,9 @@ def compile_step(
         ChannelName.PAN
     """
     # Get handlers
-    geometry_handler = context.geometry_registry.get(step.geometry.geometry_id)
-    movement_handler = context.movement_registry.get(step.movement.movement_id)
-    dimmer_handler = context.dimmer_registry.get(step.dimmer.dimmer_id)
+    geometry_handler = context.geometry_registry.get(step.geometry.geometry_type.value)
+    movement_handler = context.movement_registry.get(step.movement.movement_type.value)
+    dimmer_handler = context.dimmer_registry.get(step.dimmer.dimmer_type.value)
 
     # Build geometry params
     geometry_params: dict[str, Any] = dict(step.geometry.params)

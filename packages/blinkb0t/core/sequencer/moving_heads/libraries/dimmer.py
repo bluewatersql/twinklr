@@ -1,7 +1,9 @@
 from __future__ import annotations
 
-from blinkb0t.core.curves.library import CurveId
-from blinkb0t.core.sequencer.moving_heads.models.intensity import Intensity
+from enum import Enum
+
+from blinkb0t.core.curves.library import CurveLibrary
+from blinkb0t.core.sequencer.models.enum import Intensity
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -24,7 +26,7 @@ class DimmerPattern(BaseModel):
     name: str
     description: str
 
-    curve: CurveId
+    curve: CurveLibrary
     base_params: dict[str, float | int | str] = Field(default_factory=dict)
     categorical_params: dict[Intensity, DimmerCategoricalParams]
 
@@ -36,15 +38,23 @@ DEFAULT_DIMMER_PARAMS = {
 }
 
 
+class DimmerType(str, Enum):
+    FADE_IN = "fade_in"
+    FADE_OUT = "fade_out"
+    HOLD = "hold"
+    PULSE = "pulse"
+    NONE = "none"
+
+
 class DimmerLibrary:
     """Library of predefined dimmer patterns."""
 
-    PATTERNS: dict[str, DimmerPattern] = {
-        "fade_in": DimmerPattern(
+    PATTERNS: dict[DimmerType, DimmerPattern] = {
+        DimmerType.FADE_IN: DimmerPattern(
             id="fade_in",
             name="Fade In",
             description="Linear fade from 0 to full intensity",
-            curve=CurveId.RAMP,
+            curve=CurveLibrary.LINEAR,
             categorical_params={
                 Intensity.SMOOTH: DimmerCategoricalParams(
                     min_intensity=0, max_intensity=128, period=4.0
@@ -57,11 +67,11 @@ class DimmerLibrary:
                 ),
             },
         ),
-        "fade_out": DimmerPattern(
+        DimmerType.FADE_OUT: DimmerPattern(
             id="fade_out",
             name="Fade Out",
             description="Linear fade from full intensity to 0",
-            curve=CurveId.RAMP,
+            curve=CurveLibrary.LINEAR,
             categorical_params={
                 Intensity.SMOOTH: DimmerCategoricalParams(
                     min_intensity=0, max_intensity=128, period=4.0
@@ -74,11 +84,11 @@ class DimmerLibrary:
                 ),
             },
         ),
-        "hold": DimmerPattern(
+        DimmerType.HOLD: DimmerPattern(
             id="hold",
             name="Hold",
             description="Hold intensity at full",
-            curve=CurveId.HOLD,
+            curve=CurveLibrary.HOLD,
             categorical_params={
                 Intensity.SMOOTH: DimmerCategoricalParams(
                     min_intensity=0, max_intensity=128, period=4.0
@@ -91,11 +101,11 @@ class DimmerLibrary:
                 ),
             },
         ),
-        "pulse": DimmerPattern(
+        DimmerType.PULSE: DimmerPattern(
             id="pulse",
             name="Pulse",
             description="Pulse intensity between min and max",
-            curve=CurveId.PULSE,
+            curve=CurveLibrary.PULSE,
             categorical_params={
                 Intensity.SMOOTH: DimmerCategoricalParams(
                     min_intensity=0, max_intensity=128, period=4.0
@@ -109,3 +119,25 @@ class DimmerLibrary:
             },
         ),
     }
+
+    @classmethod
+    def get_all_metadata(cls) -> list[dict[str, str]]:
+        """Get metadata for all dimmer patterns (optimized for LLM context).
+
+        Returns:
+            List of dictionaries with pattern metadata
+
+        Example:
+            >>> meta = DimmerLibrary.get_all_metadata()
+            >>> meta[0]["dimmer_id"]
+            'fade_in'
+        """
+        return [
+            {
+                "dimmer_id": pattern.id,
+                "name": pattern.name,
+                "description": pattern.description,
+                "curve": pattern.curve.value,
+            }
+            for pattern in cls.PATTERNS.values()
+        ]

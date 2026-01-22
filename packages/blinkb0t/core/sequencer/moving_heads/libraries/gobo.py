@@ -16,6 +16,24 @@ class GoboCategory(str, Enum):
     SPECIAL = "special"
 
 
+class GoboPattern(str, Enum):
+    """Predefined gobo pattern identifiers."""
+
+    OPEN = "open"
+    CIRCLES = "circles"
+    TRIANGLES = "triangles"
+    STARS = "stars"
+    DIAMONDS = "diamonds"
+    CLOUDS = "clouds"
+    PRISM = "prism"
+    SHATTER = "shatter"
+    DOTS = "dots"
+    FLAME = "flame"
+    WATER = "water"
+    FOLIAGE = "foliage"
+    ABSTRACT = "abstract"
+
+
 class GoboPatternDefinition(BaseModel):
     """Definition of a gobo pattern.
 
@@ -45,9 +63,9 @@ class GoboLibrary:
     Note: These are typical values, actual values are fixture-specific.
     """
 
-    PATTERNS: dict[str, GoboPatternDefinition] = {
+    PATTERNS: dict[GoboPattern, GoboPatternDefinition] = {
         # Basic
-        "open": GoboPatternDefinition(
+        GoboPattern.OPEN: GoboPatternDefinition(
             gobo_id="open",
             name="Open",
             description="No gobo (open aperture)",
@@ -56,7 +74,7 @@ class GoboLibrary:
             visual_density=1,  # Changed from 0 to meet validation (ge=1)
         ),
         # Geometric patterns
-        "circles": GoboPatternDefinition(
+        GoboPattern.CIRCLES: GoboPatternDefinition(
             gobo_id="circles",
             name="Circles",
             description="Circular patterns",
@@ -64,7 +82,7 @@ class GoboLibrary:
             category=GoboCategory.GEOMETRIC,
             visual_density=5,
         ),
-        "triangles": GoboPatternDefinition(
+        GoboPattern.TRIANGLES: GoboPatternDefinition(
             gobo_id="triangles",
             name="Triangles",
             description="Triangle patterns",
@@ -72,7 +90,7 @@ class GoboLibrary:
             category=GoboCategory.GEOMETRIC,
             visual_density=6,
         ),
-        "stars": GoboPatternDefinition(
+        GoboPattern.STARS: GoboPatternDefinition(
             gobo_id="stars",
             name="Stars",
             description="Star patterns",
@@ -80,7 +98,7 @@ class GoboLibrary:
             category=GoboCategory.GEOMETRIC,
             visual_density=7,
         ),
-        "diamonds": GoboPatternDefinition(
+        GoboPattern.DIAMONDS: GoboPatternDefinition(
             gobo_id="diamonds",
             name="Diamonds",
             description="Diamond patterns",
@@ -89,7 +107,7 @@ class GoboLibrary:
             visual_density=6,
         ),
         # Breakup patterns
-        "clouds": GoboPatternDefinition(
+        GoboPattern.CLOUDS: GoboPatternDefinition(
             gobo_id="clouds",
             name="Clouds",
             description="Cloud/fog breakup",
@@ -97,7 +115,7 @@ class GoboLibrary:
             category=GoboCategory.BREAKUP,
             visual_density=4,
         ),
-        "prism": GoboPatternDefinition(
+        GoboPattern.PRISM: GoboPatternDefinition(
             gobo_id="prism",
             name="Prism",
             description="Prism shatter effect",
@@ -105,7 +123,7 @@ class GoboLibrary:
             category=GoboCategory.BREAKUP,
             visual_density=8,
         ),
-        "shatter": GoboPatternDefinition(
+        GoboPattern.SHATTER: GoboPatternDefinition(
             gobo_id="shatter",
             name="Shatter",
             description="Glass shatter pattern",
@@ -113,7 +131,7 @@ class GoboLibrary:
             category=GoboCategory.BREAKUP,
             visual_density=9,
         ),
-        "dots": GoboPatternDefinition(
+        GoboPattern.DOTS: GoboPatternDefinition(
             gobo_id="dots",
             name="Dots",
             description="Dot breakup pattern",
@@ -122,7 +140,7 @@ class GoboLibrary:
             visual_density=7,
         ),
         # Special patterns
-        "flame": GoboPatternDefinition(
+        GoboPattern.FLAME: GoboPatternDefinition(
             gobo_id="flame",
             name="Flame",
             description="Flame/fire pattern",
@@ -130,7 +148,7 @@ class GoboLibrary:
             category=GoboCategory.SPECIAL,
             visual_density=6,
         ),
-        "water": GoboPatternDefinition(
+        GoboPattern.WATER: GoboPatternDefinition(
             gobo_id="water",
             name="Water",
             description="Water/ripple pattern",
@@ -138,7 +156,7 @@ class GoboLibrary:
             category=GoboCategory.SPECIAL,
             visual_density=5,
         ),
-        "foliage": GoboPatternDefinition(
+        GoboPattern.FOLIAGE: GoboPatternDefinition(
             gobo_id="foliage",
             name="Foliage",
             description="Leaf/foliage pattern",
@@ -146,7 +164,7 @@ class GoboLibrary:
             category=GoboCategory.SPECIAL,
             visual_density=7,
         ),
-        "abstract": GoboPatternDefinition(
+        GoboPattern.ABSTRACT: GoboPatternDefinition(
             gobo_id="abstract",
             name="Abstract",
             description="Abstract organic pattern",
@@ -157,11 +175,11 @@ class GoboLibrary:
     }
 
     @classmethod
-    def get_pattern(cls, gobo_id: str) -> GoboPatternDefinition:
+    def get_pattern(cls, gobo_id: str | GoboPattern) -> GoboPatternDefinition:
         """Get gobo pattern definition.
 
         Args:
-            gobo_id: Gobo identifier
+            gobo_id: Gobo identifier (string or enum)
 
         Returns:
             GoboPatternDefinition
@@ -169,10 +187,21 @@ class GoboLibrary:
         Raises:
             ValueError: If gobo_id is unknown
         """
-        pattern = cls.PATTERNS.get(gobo_id)
+        # Convert string to enum if needed
+        if isinstance(gobo_id, str):
+            try:
+                pattern_key = GoboPattern(gobo_id)
+            except ValueError as e:
+                raise ValueError(
+                    f"Unknown gobo pattern: '{gobo_id}'. Valid: {[p.value for p in GoboPattern]}"
+                ) from e
+        else:
+            pattern_key = gobo_id
+
+        pattern = cls.PATTERNS.get(pattern_key)
         if not pattern:
             raise ValueError(
-                f"Unknown gobo pattern: '{gobo_id}'. Valid: {sorted(cls.PATTERNS.keys())}"
+                f"Unknown gobo pattern: '{gobo_id}'. Valid: {[p.value for p in GoboPattern]}"
             )
         return pattern
 

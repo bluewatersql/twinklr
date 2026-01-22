@@ -21,7 +21,28 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from blinkb0t.core.domains.sequencing.models.channels import ChannelSpecification
+
+class ChannelScoring(BaseModel):
+    """Channel usage scoring for evaluation.
+
+    Evaluates how well channel settings (color, gobo, shutter) match
+    the section's energy and mood.
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
+    color_appropriateness: int = Field(
+        default=5, description="How well colors match energy/mood (0-10)", ge=0, le=10
+    )
+    gobo_usage: int = Field(
+        default=5, description="Gobo pattern appropriateness (0-10)", ge=0, le=10
+    )
+    shutter_timing: int = Field(
+        default=5, description="Shutter timing musicality (0-10)", ge=0, le=10
+    )
+    overall_channel_score: int = Field(
+        default=5, description="Overall channel usage score (0-10)", ge=0, le=10
+    )
 
 
 class SectionPlan(BaseModel):
@@ -59,12 +80,6 @@ class SectionPlan(BaseModel):
         description="Base pose ID (e.g., 'AUDIENCE_CENTER') - Optional, can be refined by implementation agent",
     )
     reasoning: str = Field(description="Why these templates were chosen")
-
-    # Channel specifications (optional for backward compatibility)
-    channels: ChannelSpecification = Field(
-        default_factory=ChannelSpecification,
-        description="Channel specifications (shutter, color, gobo) -addition",
-    )
 
 
 class AgentPlan(BaseModel):
@@ -163,28 +178,4 @@ class AgentImplementation(BaseModel):
     implementation_approach: str = Field(
         default="",
         description="How the plan was implemented (layering strategy, targeting choices)",
-    )
-
-
-class ChannelScoring(BaseModel):
-    """Scoring for channel usage (extension).
-
-    Evaluates the quality of shutter, color, and gobo selections
-    in relation to section energy and musical context.
-    """
-
-    model_config = ConfigDict(extra="ignore")
-
-    shutter_appropriateness: int = Field(ge=1, le=10, description="Shutter usage quality (1-10)")
-    shutter_issues: list[str] = Field(default_factory=list, description="Issues with shutter usage")
-
-    color_appropriateness: int = Field(ge=1, le=10, description="Color usage quality (1-10)")
-    color_issues: list[str] = Field(default_factory=list, description="Issues with color usage")
-
-    gobo_appropriateness: int = Field(ge=1, le=10, description="Gobo usage quality (1-10)")
-    gobo_issues: list[str] = Field(default_factory=list, description="Issues with gobo usage")
-
-    visual_impact: int = Field(ge=1, le=10, description="Overall visual impact (1-10)")
-    visual_impact_issues: list[str] = Field(
-        default_factory=list, description="Issues with visual impact"
     )

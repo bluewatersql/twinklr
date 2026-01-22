@@ -16,7 +16,6 @@ You translate high-level choreography plans into bar-level implementation sectio
 
 **CRITICAL: Work in BARS, not milliseconds**
 - All timing is specified in bar numbers (1-indexed)
-- Renderer converts bars → milliseconds using BeatGrid (single source of truth)
 - Musical alignment happens naturally when working in bars
 - Downbeats and phrase boundaries align to bar boundaries
 
@@ -173,7 +172,7 @@ When groups overlap, fixtures receive conflicting instructions (two different te
 - ❌ NEVER use "CENTER" (that's a target GROUP, not a pose)
 - ❌ NEVER use lowercase: "forward", "audience_center"
 - ❌ NEVER use "FRONT" or "MIDDLE" or other variations
-- ✅ ALWAYS use exact PoseID strings from the list above
+- ✅ ALWAYS use exact Pose Library strings from the list above
 - ✅ Most common default: "AUDIENCE_CENTER" (facing audience)
 - ✅ For template-specific poses, reference the template definition
 
@@ -298,7 +297,7 @@ Before submitting implementation, verify:
 - [ ] All intensity values are exactly "SMOOTH", "DRAMATIC", or "INTENSE"
 - [ ] No numeric intensity values (0.25, 0.5, etc.)
 - [ ] Intensity matches plan energy level appropriately
-- [ ] All base_pose values are valid PoseIDs (NOT "CENTER" - use "AUDIENCE_CENTER")
+- [ ] All base_pose values are valid Pose Library ids
 
 **Layering:**
 - [ ] layer_priority starts at 0 for each plan section

@@ -42,7 +42,6 @@ Expand the approved plan into precise bar-level implementation sections.
 2. **Bar-Level Timing**
    - Use start_bar and end_bar matching plan sections exactly
    - Work in musical units (bars), not milliseconds
-   - Renderer converts bars→ms using BeatGrid
 
 3. **Fixture Targeting**
    - Single template → targets: ["ALL"]
@@ -53,7 +52,7 @@ Expand the approved plan into precise bar-level implementation sections.
 4. **Template Parameters**
    - intensity: MUST be exactly "SMOOTH", "DRAMATIC", or "INTENSE" (no other values)
    - Map from plan energy: 0.0-0.4→SMOOTH, 0.5-0.7→DRAMATIC, 0.8-1.0→INTENSE
-   - base_pose: MUST be valid PoseID (AUDIENCE_CENTER, FORWARD, LEFT_45, etc.)
+   - base_pose: MUST be valid Pose Library id (AUDIENCE_CENTER, FORWARD, LEFT_45, etc.)
      - ❌ NOT "CENTER" (that's a target group)
      - ✅ Use "AUDIENCE_CENTER" for default audience-facing
 

@@ -116,28 +116,10 @@ class PlanGenerator:
         """
         logger.info("Generating choreography plan...")
 
-        # Load channel libraries
-        from blinkb0t.core.domains.sequencing.libraries.channels import (
-            ColorLibrary,
-            GoboLibrary,
-            ShutterLibrary,
-        )
+        # Load library metadata (movements, geometries, dimmers)
+        from blinkb0t.core.agents.moving_heads.context import build_library_metadata
 
-        channel_libraries: dict[str, Any] = {
-            "shutter": [],
-            "color": [],
-            "gobo": [],
-        }
-
-        if self.job_config.planner_features.enable_shutter:
-            shutter_lib = ShutterLibrary()
-            channel_libraries["shutter"] = shutter_lib.get_all_metadata()
-        if self.job_config.planner_features.enable_color:
-            color_lib = ColorLibrary()
-            channel_libraries["color"] = color_lib.get_all_metadata()
-        if self.job_config.planner_features.enable_gobo:
-            gobo_lib = GoboLibrary()
-            channel_libraries["gobo"] = gobo_lib.get_all_metadata()
+        library_metadata = build_library_metadata()
 
         # Shape context
         shaped_context = self.context_shaper.shape_for_stage(
@@ -145,7 +127,7 @@ class PlanGenerator:
             song_features=song_features,
             seq_fingerprint=seq_fingerprint,
             template_metadata=template_metadata,
-            channel_libraries=channel_libraries,
+            library_metadata=library_metadata,
         )
 
         logger.info(
@@ -158,7 +140,7 @@ class PlanGenerator:
 
         logger.info(f"Shaped context keys: {list(shaped_context.data.keys())}")
         logger.info(
-            f"Channel libraries in context: {list(shaped_context.data.get('channel_libraries', {}).keys())}"
+            f"Libraries in context: {list(shaped_context.data.get('libraries', {}).keys())}"
         )
         logger.info(f"Template count: {len(template_metadata)}")
         logger.info(f"Plan prompt: {prompt}")

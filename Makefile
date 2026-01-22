@@ -155,34 +155,6 @@ validate: ## Run format, lint-fix, type-check, and test (shows all errors/warnin
 	fi
 
 #############################################################################
-# Running
-#############################################################################
-
-run-demo: ## Run demo pipeline (requires audio/xsq files in data/)
-	@echo "$(BLUE)→ Running demo pipeline...$(NC)"
-	@if [ ! -f "data/11 - Need A Favor.mp3" ]; then \
-		echo "$(RED)Error: Demo audio file not found$(NC)"; \
-		echo "Place audio file at: data/11 - Need A Favor.mp3"; \
-		exit 1; \
-	fi
-	@if [ ! -f "data/Need A Favor.xsq" ]; then \
-		echo "$(RED)Error: Demo sequence file not found$(NC)"; \
-		echo "Place sequence file at: data/Need A Favor.xsq"; \
-		exit 1; \
-	fi
-	@if [ ! -f ".env" ] || ! grep -q "OPENAI_API_KEY" .env; then \
-		echo "$(YELLOW)Warning: OPENAI_API_KEY not set in .env$(NC)"; \
-		echo "Create .env file with: OPENAI_API_KEY=your_key_here"; \
-		exit 1; \
-	fi
-	uv run blinkb0t run \
-		--audio "data/11 - Need A Favor.mp3" \
-		--xsq "data/Need A Favor.xsq" \
-		--config job_config.json \
-		--out demo_output
-	@echo "$(GREEN)✓ Demo complete! Check demo_output/ for results$(NC)"
-
-#############################################################################
 # Building
 #############################################################################
 
@@ -241,16 +213,6 @@ verify-install: ## Verify installation is working correctly
 	@uv run blinkb0t --help >/dev/null || { echo "$(RED)✗ CLI not working$(NC)"; exit 1; }
 	@echo "$(GREEN)✓ Installation verified$(NC)"
 
-#############################################################################
-# Documentation
-#############################################################################
-
-docs: ## Open documentation in browser
-	@echo "$(BLUE)→ Opening documentation...$(NC)"
-	@command -v open >/dev/null 2>&1 && open README.md || echo "README.md"
-
-quickstart: ## Show developer quick start guide
-	@cat QUICKSTART_DEV.md
 
 #############################################################################
 # Development Utilities
@@ -300,11 +262,6 @@ env-check: ## Check environment setup
 	else \
 		echo "  $(YELLOW)⚠ .env not found (copy from .env.example)$(NC)"; \
 	fi
-	@echo ""
-	@echo "$(YELLOW)Data Files:$(NC)"
-	@[ -d "data" ] && echo "  ✓ data/ directory exists" || echo "  $(YELLOW)⚠ data/ directory not found$(NC)"
-	@[ -f "data/11 - Need A Favor.mp3" ] && echo "  ✓ Demo audio file exists" || echo "  $(YELLOW)⚠ Demo audio file not found$(NC)"
-	@[ -f "data/Need A Favor.xsq" ] && echo "  ✓ Demo sequence file exists" || echo "  $(YELLOW)⚠ Demo sequence file not found$(NC)"
 
 #############################################################################
 # Git Helpers
