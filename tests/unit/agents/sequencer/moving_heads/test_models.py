@@ -9,59 +9,88 @@ from blinkb0t.core.agents.sequencer.moving_heads.models import (
     JudgeIssue,
     JudgeResponse,
     PlanSection,
-    PlanSequence,
-    SequenceTiming,
     ValidationIssue,
     ValidationResponse,
 )
 
 
-def test_sequence_timing_model():
-    """Test sequence timing model."""
-    timing = SequenceTiming(start="0.1", duration_bars=4)
-
-    assert timing.start == "0.1"
-    assert timing.duration_bars == 4
-
-
-def test_plan_sequence_model():
-    """Test plan sequence model."""
-    sequence = PlanSequence(
-        template="sweep_lr_fan_pulse",
-        timing=SequenceTiming(start="0.1", duration_bars=8),
-        movement="sweep_lr",
-        geometry="fan",
-        dimmer="pulse",
-    )
-
-    assert sequence.template == "sweep_lr_fan_pulse"
-    assert sequence.movement == "sweep_lr"
-    assert sequence.timing.duration_bars == 8
-
-
 def test_plan_section_model():
     """Test plan section model."""
     section = PlanSection(
-        name="intro",
-        start_bar=0,
+        section_name="intro",
+        start_bar=1,
         end_bar=8,
-        energy="low",
-        sequences=[
-            PlanSequence(
-                template="test",
-                timing=SequenceTiming(start="0.1", duration_bars=4),
-                movement="sweep_lr",
-                geometry="fan",
-                dimmer="pulse",
-            )
-        ],
+        template_id="sweep_lr_fan_pulse",
+        preset_id="CHILL",
+        modifiers={"intensity": "HIGH"},
+        reasoning="Low energy section needs calm movement",
     )
 
-    assert section.name == "intro"
-    assert section.start_bar == 0
+    assert section.section_name == "intro"
+    assert section.start_bar == 1
     assert section.end_bar == 8
-    assert section.energy == "low"
-    assert len(section.sequences) == 1
+    assert section.template_id == "sweep_lr_fan_pulse"
+    assert section.preset_id == "CHILL"
+    assert section.modifiers == {"intensity": "HIGH"}
+
+
+def test_plan_section_minimal():
+    """Test plan section with minimal required fields."""
+    section = PlanSection(
+        section_name="verse",
+        start_bar=1,
+        end_bar=16,
+        template_id="circle_fan_hold",
+    )
+
+    assert section.section_name == "verse"
+    assert section.start_bar == 1
+    assert section.end_bar == 16
+    assert section.template_id == "circle_fan_hold"
+    assert section.preset_id is None
+    assert section.modifiers == {}
+
+
+def test_plan_section_bar_validation():
+    """Test plan section validates bar range."""
+    # Valid section
+    section = PlanSection(
+        section_name="intro",
+        start_bar=1,
+        end_bar=8,
+        template_id="test",
+    )
+    assert section.end_bar >= section.start_bar
+
+    # Invalid: end_bar before start_bar
+    with pytest.raises(ValidationError):
+        PlanSection(
+            section_name="intro",
+            start_bar=8,
+            end_bar=1,
+            template_id="test",
+        )
+
+
+def test_plan_section_start_bar_minimum():
+    """Test plan section enforces minimum start_bar of 1."""
+    # Test valid case with start_bar = 1
+    section = PlanSection(
+        section_name="intro",
+        start_bar=1,
+        end_bar=8,
+        template_id="test",
+    )
+    assert section.start_bar == 1
+
+    # Test invalid case with start_bar = 0 (bars are 1-indexed)
+    with pytest.raises(ValidationError):
+        PlanSection(
+            section_name="intro",
+            start_bar=0,
+            end_bar=8,
+            template_id="test",
+        )
 
 
 def test_choreography_plan_model():
@@ -69,17 +98,18 @@ def test_choreography_plan_model():
     plan = ChoreographyPlan(
         sections=[
             PlanSection(
-                name="intro",
-                start_bar=0,
+                section_name="intro",
+                start_bar=1,
                 end_bar=8,
-                energy="low",
-                sequences=[],
+                template_id="sweep_lr_fan_pulse",
             )
-        ]
+        ],
+        overall_strategy="Start calm and build energy",
     )
 
     assert len(plan.sections) == 1
-    assert plan.sections[0].name == "intro"
+    assert plan.sections[0].section_name == "intro"
+    assert plan.overall_strategy == "Start calm and build energy"
 
 
 def test_choreography_plan_validation():
@@ -92,15 +122,15 @@ def test_choreography_plan_validation():
     plan = ChoreographyPlan(
         sections=[
             PlanSection(
-                name="intro",
-                start_bar=0,
+                section_name="intro",
+                start_bar=1,
                 end_bar=8,
-                energy="medium",
-                sequences=[],
+                template_id="circle_fan_hold",
             )
         ]
     )
     assert plan.sections is not None
+    assert len(plan.sections) == 1
 
 
 def test_validation_issue_model():
@@ -279,11 +309,10 @@ def test_models_are_serializable():
     plan = ChoreographyPlan(
         sections=[
             PlanSection(
-                name="intro",
-                start_bar=0,
+                section_name="intro",
+                start_bar=1,
                 end_bar=8,
-                energy="low",
-                sequences=[],
+                template_id="sweep_lr_fan_pulse",
             )
         ]
     )

@@ -18,7 +18,7 @@ def test_agent_spec_minimal():
     assert spec.prompt_pack == "test_pack"
     assert spec.response_model is dict
     assert spec.mode == AgentMode.ONESHOT  # Default
-    assert spec.model == "gpt-5.2-mini"  # Default
+    assert spec.model == "gpt-5.2"  # Default
     assert spec.temperature == 0.7  # Default
     assert spec.max_schema_repair_attempts == 2  # Default
 

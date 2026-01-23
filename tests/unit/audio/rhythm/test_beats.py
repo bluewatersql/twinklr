@@ -372,3 +372,234 @@ class TestDetectDownbeatsPhaseAligned:
 
         # Should have processed without error
         assert isinstance(result["downbeats"], list)
+
+    def test_low_phase_confidence_case(
+        self,
+        sample_rate: int,
+        hop_length: int,
+    ) -> None:
+        """Test when phase scores are too low for confidence."""
+        # Create uniform onset env - all phases will score similarly
+        onset_env = np.ones(1000, dtype=np.float32) * 0.5
+        beat_frames = np.arange(0, 900, 20, dtype=int)
+        chroma = np.ones((12, 1000), dtype=np.float32) * 0.5
+
+        result = detect_downbeats_phase_aligned(
+            beat_frames=beat_frames,
+            sr=sample_rate,
+            hop_length=hop_length,
+            onset_env=onset_env,
+            chroma_cqt=chroma,
+            beats_per_bar=4,
+        )
+
+        # Should return low or zero confidence when phases are similar
+        assert result["phase_confidence"] >= 0.0
+        assert result["phase_confidence"] <= 1.0
+
+
+class TestDetectTempoChanges:
+    """Tests for detect_tempo_changes function."""
+
+    def test_returns_expected_structure(
+        self,
+        sine_wave_440hz: np.ndarray,
+        sample_rate: int,
+        hop_length: int,
+    ) -> None:
+        """Function returns expected dictionary structure."""
+        from blinkb0t.core.audio.rhythm.beats import detect_tempo_changes
+
+        result = detect_tempo_changes(
+            sine_wave_440hz,
+            sample_rate,
+            hop_length=hop_length,
+        )
+
+        assert "tempo_curve" in result
+        assert "tempo_changes" in result
+        assert "average_tempo_bpm" in result
+        assert "tempo_std" in result
+        assert "is_stable" in result
+
+    def test_short_audio_returns_single_tempo(
+        self,
+        sample_rate: int,
+        hop_length: int,
+    ) -> None:
+        """Short audio (< 10s window) returns single tempo point."""
+        from blinkb0t.core.audio.rhythm.beats import detect_tempo_changes
+
+        # Create 5 second audio (shorter than 10s window)
+        duration = 5.0
+        t = np.linspace(0, duration, int(sample_rate * duration), dtype=np.float32)
+        short_audio = np.sin(2 * np.pi * 440 * t).astype(np.float32)
+
+        result = detect_tempo_changes(
+            short_audio,
+            sample_rate,
+            hop_length=hop_length,
+        )
+
+        # Should have single tempo point
+        assert len(result["tempo_curve"]) == 1
+        assert result["tempo_changes"] == []
+        assert result["is_stable"] is True
+
+    def test_very_short_audio_fallback(
+        self,
+        sample_rate: int,
+        hop_length: int,
+    ) -> None:
+        """Very short or silent audio uses fallback values."""
+        from blinkb0t.core.audio.rhythm.beats import detect_tempo_changes
+
+        # Create very short audio with some content (not silent)
+        very_short = np.random.rand(int(sample_rate * 0.5)).astype(np.float32) * 0.5
+
+        result = detect_tempo_changes(
+            very_short,
+            sample_rate,
+            hop_length=hop_length,
+        )
+
+        # Should return valid structure with fallback
+        assert "tempo_curve" in result
+        assert isinstance(result["average_tempo_bpm"], float)
+        # Tempo can be 0 for silent audio, or a valid value
+        assert result["average_tempo_bpm"] >= 0
+
+    def test_stable_tempo_detection(
+        self,
+        sample_rate: int,
+        hop_length: int,
+    ) -> None:
+        """Stable tempo is correctly detected."""
+        from blinkb0t.core.audio.rhythm.beats import detect_tempo_changes
+
+        # Create click track with consistent tempo (120 BPM)
+        duration = 15.0
+        n_samples = int(sample_rate * duration)
+        y = np.zeros(n_samples, dtype=np.float32)
+
+        # Add clicks at 120 BPM (0.5s intervals)
+        beat_interval_samples = int(0.5 * sample_rate)
+        for i in range(0, n_samples, beat_interval_samples):
+            end = min(i + int(0.01 * sample_rate), n_samples)
+            y[i:end] = 0.8
+
+        result = detect_tempo_changes(
+            y,
+            sample_rate,
+            hop_length=hop_length,
+        )
+
+        # Should be stable
+        assert result["tempo_std"] < 20.0  # Relatively stable
+
+    def test_tempo_curve_structure(
+        self,
+        long_audio: np.ndarray,
+        sample_rate: int,
+        hop_length: int,
+    ) -> None:
+        """Tempo curve entries have correct structure."""
+        from blinkb0t.core.audio.rhythm.beats import detect_tempo_changes
+
+        result = detect_tempo_changes(
+            long_audio,
+            sample_rate,
+            hop_length=hop_length,
+        )
+
+        if result["tempo_curve"]:
+            entry = result["tempo_curve"][0]
+            assert "time_s" in entry
+            assert "tempo_bpm" in entry
+            assert isinstance(entry["time_s"], float)
+            assert isinstance(entry["tempo_bpm"], float)
+
+    def test_tempo_changes_structure(
+        self,
+        sample_rate: int,
+        hop_length: int,
+    ) -> None:
+        """Tempo changes have correct structure when detected."""
+        from blinkb0t.core.audio.rhythm.beats import detect_tempo_changes
+
+        # Create audio with tempo change
+        duration = 20.0
+        n_samples = int(sample_rate * duration)
+        y = np.zeros(n_samples, dtype=np.float32)
+
+        # First 10 seconds: 120 BPM
+        for i in range(0, int(sample_rate * 10), int(0.5 * sample_rate)):
+            end = min(i + int(0.01 * sample_rate), n_samples)
+            y[i:end] = 0.8
+
+        # Second 10 seconds: 180 BPM (much faster)
+        for i in range(int(sample_rate * 10), n_samples, int(0.333 * sample_rate)):
+            end = min(i + int(0.01 * sample_rate), n_samples)
+            y[i:end] = 0.8
+
+        result = detect_tempo_changes(
+            y,
+            sample_rate,
+            hop_length=hop_length,
+        )
+
+        # If changes detected, check structure
+        if result["tempo_changes"]:
+            change = result["tempo_changes"][0]
+            assert "time_s" in change
+            assert "from_bpm" in change
+            assert "to_bpm" in change
+            assert "change_bpm" in change
+
+
+class TestTimeSignatureEdgeCases:
+    """Additional edge case tests for time signature detection."""
+
+    def test_very_low_strength_beats(self) -> None:
+        """Test with very low onset strength."""
+        # Create onset envelope with very low values
+        n_frames = 1000
+        onset_env = np.full(n_frames, 0.001, dtype=np.float32)
+        beat_frames = np.arange(10, 900, 20, dtype=int)
+
+        result = detect_time_signature(
+            beat_frames=beat_frames,
+            onset_env=onset_env,
+        )
+
+        # Should handle gracefully
+        assert "time_signature" in result
+        assert result["time_signature"] in {"2/4", "3/4", "4/4", "6/8"}
+
+    def test_insufficient_beats_for_grouping(self) -> None:
+        """Test when beats are insufficient for proper grouping analysis."""
+        n_frames = 200
+        onset_env = np.random.rand(n_frames).astype(np.float32)
+        beat_frames = np.array([10, 30, 50, 70, 90, 110, 130, 150, 170, 190], dtype=int)
+
+        result = detect_time_signature(
+            beat_frames=beat_frames,
+            onset_env=onset_env,
+        )
+
+        # Should handle gracefully
+        assert "time_signature" in result
+
+    def test_uniform_onset_strengths(self) -> None:
+        """Test with uniform onset strengths (no accent pattern)."""
+        n_frames = 1000
+        onset_env = np.ones(n_frames, dtype=np.float32)
+        beat_frames = np.arange(10, 900, 20, dtype=int)
+
+        result = detect_time_signature(
+            beat_frames=beat_frames,
+            onset_env=onset_env,
+        )
+
+        # Should default to 4/4 with low confidence
+        assert result["time_signature"] == "4/4"

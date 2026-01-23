@@ -130,6 +130,12 @@ def compile_step(
     t0_ms = context.start_ms
     t1_ms = context.start_ms + context.duration_ms
 
+    # Extract calibration boundaries for clamping
+    pan_min = context.calibration.get("pan_min_dmx", 0) if context.calibration else 0
+    pan_max = context.calibration.get("pan_max_dmx", 255) if context.calibration else 255
+    tilt_min = context.calibration.get("tilt_min_dmx", 0) if context.calibration else 0
+    tilt_max = context.calibration.get("tilt_max_dmx", 255) if context.calibration else 255
+
     # Convert normalized geometry to DMX base values (0-255)
     pan_base_dmx = int(geometry_result.pan_norm * 255)
     tilt_base_dmx = int(geometry_result.tilt_norm * 255)
@@ -138,30 +144,38 @@ def compile_step(
     # This can be configured via movement params if needed
     movement_amplitude_dmx = 64
 
+    # NOTE: DO NOT remap curve values! Movement curves are offset-centered around 0.5.
+    # Export formula: dmx = base_dmx + amplitude_dmx * (curve_value - 0.5)
+    # The clamp_min/clamp_max will enforce boundaries at export time.
+
     segment = FixtureSegment(
         fixture_id=context.fixture_id,
         t0_ms=t0_ms,
         t1_ms=t1_ms,
     )
 
-    # Build pan segment
+    # Build pan segment (offset-centered movement curve)
     segment.add_channel(
         channel=ChannelName.PAN,
         curve=PointsCurve(points=pan_points),
-        value_points=pan_points,  # Pass points for xLights value curve export
+        value_points=pan_points,  # Keep curve [0,1] centered at 0.5
         offset_centered=True,
         base_dmx=pan_base_dmx,
         amplitude_dmx=movement_amplitude_dmx,
+        clamp_min=pan_min,
+        clamp_max=pan_max,
     )
 
-    # Build tilt segment
+    # Build tilt segment (offset-centered movement curve)
     segment.add_channel(
         channel=ChannelName.TILT,
         curve=PointsCurve(points=tilt_points),
-        value_points=tilt_points,  # Pass points for xLights value curve export
+        value_points=tilt_points,  # Keep curve [0,1] centered at 0.5
         offset_centered=True,
         base_dmx=tilt_base_dmx,
         amplitude_dmx=movement_amplitude_dmx,
+        clamp_min=tilt_min,
+        clamp_max=tilt_max,
     )
 
     # Build dimmer segment (absolute, not offset-centered)

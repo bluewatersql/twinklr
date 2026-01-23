@@ -10,7 +10,7 @@ import logging
 from collections import defaultdict
 from typing import TYPE_CHECKING
 
-from blinkb0t.core.formats.xlights.xsq.effect_placement import EffectPlacement
+from blinkb0t.core.formats.xlights.models.effect_placement import EffectPlacement
 from blinkb0t.core.sequencer.moving_heads.export.dmx_settings_builder import (
     DmxSettingsBuilder,
 )

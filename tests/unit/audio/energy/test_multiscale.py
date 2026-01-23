@@ -208,3 +208,79 @@ class TestExtractSmoothedEnergy:
 
         # All normalized values should be 0 (since constant)
         assert all(v == 0.0 for v in result["raw"])
+
+
+class TestFallbackSmoothing:
+    """Tests for fallback smoothing when scipy is not available."""
+
+    def test_fallback_smoothing_produces_valid_output(
+        self,
+        sine_wave_440hz: np.ndarray,
+        sample_rate: int,
+        hop_length: int,
+        frame_length: int,
+    ) -> None:
+        """Test that fallback smoothing works correctly."""
+        from unittest.mock import patch
+
+        # Patch HAS_SCIPY to False to test fallback path
+        with patch("blinkb0t.core.audio.energy.multiscale.HAS_SCIPY", False):
+            # Need to reimport the module to get the patched version
+            import importlib
+
+            import blinkb0t.core.audio.energy.multiscale as multiscale_module
+
+            importlib.reload(multiscale_module)
+
+            result = multiscale_module.extract_smoothed_energy(
+                sine_wave_440hz,
+                sample_rate,
+                hop_length=hop_length,
+                frame_length=frame_length,
+            )
+
+            # Should still return valid structure
+            assert "raw" in result
+            assert "beat_level" in result
+            assert "phrase_level" in result
+            assert "section_level" in result
+
+            # All should have same length
+            assert len(result["raw"]) == len(result["beat_level"])
+            assert len(result["raw"]) == len(result["phrase_level"])
+            assert len(result["raw"]) == len(result["section_level"])
+
+            # Reload with scipy available again
+            importlib.reload(multiscale_module)
+
+    def test_fallback_smoothing_with_short_array(
+        self,
+        sample_rate: int,
+        hop_length: int,
+        frame_length: int,
+    ) -> None:
+        """Fallback smoothing handles short arrays."""
+        from unittest.mock import patch
+
+        # Very short audio
+        short_audio = np.random.rand(sample_rate).astype(np.float32)
+
+        with patch("blinkb0t.core.audio.energy.multiscale.HAS_SCIPY", False):
+            import importlib
+
+            import blinkb0t.core.audio.energy.multiscale as multiscale_module
+
+            importlib.reload(multiscale_module)
+
+            result = multiscale_module.extract_smoothed_energy(
+                short_audio,
+                sample_rate,
+                hop_length=hop_length,
+                frame_length=frame_length,
+            )
+
+            # Should handle short audio
+            assert "raw" in result
+            assert len(result["raw"]) > 0
+
+            importlib.reload(multiscale_module)

@@ -128,3 +128,47 @@ class TestComputeOnsetEnv:
         onset_env = compute_onset_env(y_perc, sample_rate, hop_length=hop_length)
 
         assert np.all(onset_env >= 0)
+
+
+class TestHPSSFallback:
+    """Tests for HPSS fallback behavior when librosa fails."""
+
+    def test_hpss_fallback_on_exception(self) -> None:
+        """HPSS returns copies of input on exception."""
+        from unittest.mock import patch
+
+        test_audio = np.random.rand(1000).astype(np.float32)
+
+        # Mock librosa.effects.hpss to raise an exception
+        with patch("librosa.effects.hpss", side_effect=Exception("HPSS failed")):
+            y_harm, y_perc = compute_hpss(test_audio)
+
+            # Should return copies of input
+            assert len(y_harm) == len(test_audio)
+            assert len(y_perc) == len(test_audio)
+            np.testing.assert_array_equal(y_harm, test_audio)
+            np.testing.assert_array_equal(y_perc, test_audio)
+
+    def test_hpss_fallback_returns_correct_dtype(self) -> None:
+        """Fallback returns float32 arrays."""
+        from unittest.mock import patch
+
+        test_audio = np.random.rand(1000).astype(np.float32)
+
+        with patch("librosa.effects.hpss", side_effect=Exception("HPSS failed")):
+            y_harm, y_perc = compute_hpss(test_audio)
+
+            assert y_harm.dtype == np.float32
+            assert y_perc.dtype == np.float32
+
+    def test_hpss_fallback_with_empty_array(self) -> None:
+        """Fallback handles empty array on exception."""
+        from unittest.mock import patch
+
+        empty_audio = np.array([], dtype=np.float32)
+
+        with patch("librosa.effects.hpss", side_effect=Exception("HPSS failed")):
+            y_harm, y_perc = compute_hpss(empty_audio)
+
+            assert len(y_harm) == 0
+            assert len(y_perc) == 0

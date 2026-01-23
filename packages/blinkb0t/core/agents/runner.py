@@ -78,7 +78,8 @@ class AgentRunner:
             merged_vars = {**spec.default_variables, **variables}
 
             # Auto-inject response schema to avoid drift between prompts and models
-            if spec.response_model:
+            # Only for Pydantic models (not dict or other types)
+            if spec.response_model and hasattr(spec.response_model, "model_json_schema"):
                 merged_vars["response_schema"] = get_json_schema_example(spec.response_model)
 
             # Load and render prompts

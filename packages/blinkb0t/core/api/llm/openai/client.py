@@ -347,7 +347,6 @@ class OpenAIClient:
             elif effort is not None and is_mini_model:
                 logger.debug(f"Model {model} does not support reasoning parameter, skipping")
 
-            logger.debug(f"Request parameters: {request_params}")
             response = self.client.responses.create(**request_params)
 
             # Extract metadata

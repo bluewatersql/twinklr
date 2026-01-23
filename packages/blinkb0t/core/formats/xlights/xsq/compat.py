@@ -1,7 +1,7 @@
 from __future__ import annotations
 
+from blinkb0t.core.formats.xlights.models.effect_placement import EffectPlacement
 from blinkb0t.core.formats.xlights.models.xsq import Effect
-from blinkb0t.core.formats.xlights.xsq.effect_placement import EffectPlacement
 
 
 def effect_placement_to_effect(placement: EffectPlacement) -> Effect:

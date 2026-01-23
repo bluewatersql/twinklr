@@ -1,6 +1,5 @@
 """Tests for feedback manager."""
 
-
 from blinkb0t.core.agents.feedback import (
     FeedbackEntry,
     FeedbackManager,

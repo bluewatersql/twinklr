@@ -260,7 +260,6 @@ class RenderingPipeline:
                 )
             )
 
-        # Convert segments to EffectPlacements
         adapter = XsqAdapter()
         placements = adapter.convert(segments, self.fixture_group, xsq)
 

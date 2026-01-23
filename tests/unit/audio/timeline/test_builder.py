@@ -291,3 +291,232 @@ class TestBuildTimelineExport:
 
         intensity = result["composites"]["show_intensity"]
         assert all(0.0 <= i <= 1.0 for i in intensity)
+
+
+class TestTimelineEdgeCases:
+    """Tests for timeline builder edge cases."""
+
+    def test_hpss_exception_fallback(
+        self,
+        sine_wave_440hz: np.ndarray,
+        sample_chroma: np.ndarray,
+        sample_rate: int,
+        hop_length: int,
+        frame_length: int,
+    ) -> None:
+        """When HPSS fails, returns zeros for hpss_perc_ratio."""
+        from unittest.mock import patch
+
+        n_frames = 200
+        onset_env = np.random.rand(n_frames).astype(np.float32)
+        rms_norm = np.random.rand(n_frames).astype(np.float32)
+        brightness_norm = np.random.rand(n_frames).astype(np.float32)
+        flatness_norm = np.random.rand(n_frames).astype(np.float32)
+        motion_norm = np.random.rand(n_frames).astype(np.float32)
+
+        # Mock librosa.feature.rms to raise exception
+        with patch("librosa.feature.rms", side_effect=Exception("RMS failed")):
+            result = build_timeline_export(
+                y=sine_wave_440hz,
+                sr=sample_rate,
+                hop_length=hop_length,
+                frame_length=frame_length,
+                onset_env=onset_env,
+                rms_norm=rms_norm,
+                brightness_norm=brightness_norm,
+                flatness_norm=flatness_norm,
+                motion_norm=motion_norm,
+                chroma_cqt=sample_chroma[:, :n_frames],
+                beats_s=[0.5, 1.0],
+                downbeats_s=[0.5],
+                section_bounds_s=[0.0, 2.0],
+            )
+
+            # Should still return valid result with zeros for hpss_perc_ratio
+            assert "hpss_perc_ratio" in result["timeline"]
+            assert all(v == 0.0 for v in result["timeline"]["hpss_perc_ratio"])
+
+    def test_1d_chroma_input(
+        self,
+        sine_wave_440hz: np.ndarray,
+        sample_rate: int,
+        hop_length: int,
+        frame_length: int,
+    ) -> None:
+        """Handles 1D chroma input (reshapes to 2D)."""
+        n_frames = 200
+        onset_env = np.random.rand(n_frames).astype(np.float32)
+        rms_norm = np.random.rand(n_frames).astype(np.float32)
+        brightness_norm = np.random.rand(n_frames).astype(np.float32)
+        flatness_norm = np.random.rand(n_frames).astype(np.float32)
+        motion_norm = np.random.rand(n_frames).astype(np.float32)
+
+        # 1D chroma array
+        chroma_1d = np.random.rand(n_frames).astype(np.float32)
+
+        result = build_timeline_export(
+            y=sine_wave_440hz,
+            sr=sample_rate,
+            hop_length=hop_length,
+            frame_length=frame_length,
+            onset_env=onset_env,
+            rms_norm=rms_norm,
+            brightness_norm=brightness_norm,
+            flatness_norm=flatness_norm,
+            motion_norm=motion_norm,
+            chroma_cqt=chroma_1d,
+            beats_s=[0.5, 1.0],
+            downbeats_s=[0.5],
+            section_bounds_s=[0.0, 2.0],
+        )
+
+        # Should still compute tonal novelty
+        assert "tonal_novelty" in result["timeline"]
+
+    def test_chroma_longer_than_frames(
+        self,
+        sine_wave_440hz: np.ndarray,
+        sample_chroma: np.ndarray,
+        sample_rate: int,
+        hop_length: int,
+        frame_length: int,
+    ) -> None:
+        """Handles chroma longer than n_frames (truncates)."""
+        n_frames = 100  # Smaller than chroma
+        onset_env = np.random.rand(n_frames).astype(np.float32)
+        rms_norm = np.random.rand(n_frames).astype(np.float32)
+        brightness_norm = np.random.rand(n_frames).astype(np.float32)
+        flatness_norm = np.random.rand(n_frames).astype(np.float32)
+        motion_norm = np.random.rand(n_frames).astype(np.float32)
+
+        # Chroma is 500 frames (from fixture), n_frames is 100
+        result = build_timeline_export(
+            y=sine_wave_440hz,
+            sr=sample_rate,
+            hop_length=hop_length,
+            frame_length=frame_length,
+            onset_env=onset_env,
+            rms_norm=rms_norm,
+            brightness_norm=brightness_norm,
+            flatness_norm=flatness_norm,
+            motion_norm=motion_norm,
+            chroma_cqt=sample_chroma,  # 12 x 500
+            beats_s=[0.5, 1.0],
+            downbeats_s=[0.5],
+            section_bounds_s=[0.0, 2.0],
+        )
+
+        # tonal_novelty should be n_frames length
+        assert len(result["timeline"]["tonal_novelty"]) == n_frames
+
+    def test_chroma_shorter_than_frames(
+        self,
+        sine_wave_440hz: np.ndarray,
+        sample_rate: int,
+        hop_length: int,
+        frame_length: int,
+    ) -> None:
+        """Handles chroma shorter than n_frames (pads)."""
+        n_frames = 200
+        onset_env = np.random.rand(n_frames).astype(np.float32)
+        rms_norm = np.random.rand(n_frames).astype(np.float32)
+        brightness_norm = np.random.rand(n_frames).astype(np.float32)
+        flatness_norm = np.random.rand(n_frames).astype(np.float32)
+        motion_norm = np.random.rand(n_frames).astype(np.float32)
+
+        # Short chroma array
+        short_chroma = np.random.rand(12, 50).astype(np.float32)
+
+        result = build_timeline_export(
+            y=sine_wave_440hz,
+            sr=sample_rate,
+            hop_length=hop_length,
+            frame_length=frame_length,
+            onset_env=onset_env,
+            rms_norm=rms_norm,
+            brightness_norm=brightness_norm,
+            flatness_norm=flatness_norm,
+            motion_norm=motion_norm,
+            chroma_cqt=short_chroma,  # 12 x 50 (shorter than n_frames)
+            beats_s=[0.5, 1.0],
+            downbeats_s=[0.5],
+            section_bounds_s=[0.0, 2.0],
+        )
+
+        # tonal_novelty should be n_frames length
+        assert len(result["timeline"]["tonal_novelty"]) == n_frames
+
+    def test_with_hpss_components_provided(
+        self,
+        sine_wave_440hz: np.ndarray,
+        sample_chroma: np.ndarray,
+        sample_rate: int,
+        hop_length: int,
+        frame_length: int,
+    ) -> None:
+        """Test with pre-computed HPSS components."""
+        n_frames = 200
+        onset_env = np.random.rand(n_frames).astype(np.float32)
+        rms_norm = np.random.rand(n_frames).astype(np.float32)
+        brightness_norm = np.random.rand(n_frames).astype(np.float32)
+        flatness_norm = np.random.rand(n_frames).astype(np.float32)
+        motion_norm = np.random.rand(n_frames).astype(np.float32)
+
+        # Pre-computed HPSS
+        y_harm = sine_wave_440hz * 0.8
+        y_perc = sine_wave_440hz * 0.2
+
+        result = build_timeline_export(
+            y=sine_wave_440hz,
+            sr=sample_rate,
+            hop_length=hop_length,
+            frame_length=frame_length,
+            onset_env=onset_env,
+            rms_norm=rms_norm,
+            brightness_norm=brightness_norm,
+            flatness_norm=flatness_norm,
+            motion_norm=motion_norm,
+            chroma_cqt=sample_chroma[:, :n_frames],
+            beats_s=[0.5, 1.0],
+            downbeats_s=[0.5],
+            section_bounds_s=[0.0, 2.0],
+            y_harm=y_harm,
+            y_perc=y_perc,
+        )
+
+        # Should use pre-computed HPSS
+        assert "hpss_perc_ratio" in result["timeline"]
+
+    def test_single_frame(
+        self,
+        sine_wave_440hz: np.ndarray,
+        sample_rate: int,
+        hop_length: int,
+        frame_length: int,
+    ) -> None:
+        """Handles single frame input."""
+        n_frames = 1
+        onset_env = np.array([0.5], dtype=np.float32)
+        rms_norm = np.array([0.5], dtype=np.float32)
+        brightness_norm = np.array([0.5], dtype=np.float32)
+        flatness_norm = np.array([0.5], dtype=np.float32)
+        motion_norm = np.array([0.5], dtype=np.float32)
+        chroma = np.random.rand(12, n_frames).astype(np.float32)
+
+        result = build_timeline_export(
+            y=sine_wave_440hz,
+            sr=sample_rate,
+            hop_length=hop_length,
+            frame_length=frame_length,
+            onset_env=onset_env,
+            rms_norm=rms_norm,
+            brightness_norm=brightness_norm,
+            flatness_norm=flatness_norm,
+            motion_norm=motion_norm,
+            chroma_cqt=chroma,
+            beats_s=[],
+            downbeats_s=[],
+            section_bounds_s=[],
+        )
+
+        assert len(result["timeline"]["times_s"]) == 1

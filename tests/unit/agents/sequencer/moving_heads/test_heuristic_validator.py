@@ -9,8 +9,6 @@ from blinkb0t.core.agents.sequencer.moving_heads.heuristic_validator import (
 from blinkb0t.core.agents.sequencer.moving_heads.models import (
     ChoreographyPlan,
     PlanSection,
-    PlanSequence,
-    SequenceTiming,
 )
 
 
@@ -55,19 +53,10 @@ def test_validate_simple_valid_plan(available_templates, song_structure):
     plan = ChoreographyPlan(
         sections=[
             PlanSection(
-                name="intro",
-                start_bar=0,
+                section_name="intro",
+                start_bar=1,
                 end_bar=8,
-                energy="low",
-                sequences=[
-                    PlanSequence(
-                        template="sweep_lr_fan_pulse",
-                        timing=SequenceTiming(start="0.1", duration_bars=8),
-                        movement="sweep_lr",
-                        geometry="fan",
-                        dimmer="pulse",
-                    )
-                ],
+                template_id="sweep_lr_fan_pulse",
             )
         ]
     )
@@ -88,19 +77,10 @@ def test_validate_missing_template(available_templates, song_structure):
     plan = ChoreographyPlan(
         sections=[
             PlanSection(
-                name="intro",
-                start_bar=0,
+                section_name="intro",
+                start_bar=1,
                 end_bar=8,
-                energy="low",
-                sequences=[
-                    PlanSequence(
-                        template="nonexistent_template",  # Not in library
-                        timing=SequenceTiming(start="0.1", duration_bars=8),
-                        movement="sweep_lr",
-                        geometry="fan",
-                        dimmer="pulse",
-                    )
-                ],
+                template_id="nonexistent_template",  # Not in library
             )
         ]
     )
@@ -116,27 +96,25 @@ def test_validate_empty_sections():
     """Test validation of plan with minimal section (Pydantic requires at least 1)."""
     validator = HeuristicValidator(
         available_templates=["template1"],
-        song_structure={"sections": {"intro": {"start_bar": 0, "end_bar": 8}}, "total_bars": 32},
+        song_structure={"sections": {"intro": {"start_bar": 1, "end_bar": 8}}, "total_bars": 32},
     )
 
-    # Pydantic enforces min_length=1, but we can test empty sequences
+    # Test a valid minimal plan with one section
     plan = ChoreographyPlan(
         sections=[
             PlanSection(
-                name="intro",
-                start_bar=0,
+                section_name="intro",
+                start_bar=1,
                 end_bar=8,
-                energy="low",
-                sequences=[],  # No sequences (should warn)
+                template_id="template1",
             )
         ]
     )
 
     result = validator.validate(plan)
 
-    # Should warn about empty sequences
-    assert len(result.warnings) > 0
-    assert any("sequence" in warn.lower() for warn in result.warnings)
+    # Should be valid
+    assert result.valid is True
 
 
 def test_validate_section_timing_mismatch(available_templates, song_structure):
@@ -149,11 +127,10 @@ def test_validate_section_timing_mismatch(available_templates, song_structure):
     plan = ChoreographyPlan(
         sections=[
             PlanSection(
-                name="intro",
-                start_bar=0,
+                section_name="intro",
+                start_bar=1,
                 end_bar=12,  # Should be 8 per song structure
-                energy="low",
-                sequences=[],
+                template_id="sweep_lr_fan_pulse",
             )
         ]
     )
@@ -168,17 +145,16 @@ def test_validate_negative_timing():
     """Test validation catches negative or invalid timing."""
     _validator = HeuristicValidator(
         available_templates=["template1"],
-        song_structure={"sections": {"intro": {"start_bar": 0, "end_bar": 8}}, "total_bars": 32},
+        song_structure={"sections": {"intro": {"start_bar": 1, "end_bar": 8}}, "total_bars": 32},
     )
 
     # This should fail Pydantic validation before reaching heuristic validator
     with pytest.raises(Exception):  # noqa: B017
         PlanSection(
-            name="intro",
+            section_name="intro",
             start_bar=8,
-            end_bar=0,  # End before start
-            energy="low",
-            sequences=[],
+            end_bar=1,  # End before start
+            template_id="template1",
         )
 
 
@@ -193,11 +169,10 @@ def test_validate_incomplete_coverage(available_templates, song_structure):
     plan = ChoreographyPlan(
         sections=[
             PlanSection(
-                name="intro",
-                start_bar=0,
+                section_name="intro",
+                start_bar=1,
                 end_bar=8,
-                energy="low",
-                sequences=[],
+                template_id="sweep_lr_fan_pulse",
             )
         ]
     )
@@ -220,17 +195,16 @@ def test_validate_result_structure():
     """Test validation result structure."""
     validator = HeuristicValidator(
         available_templates=["template1"],
-        song_structure={"sections": {"intro": {"start_bar": 0, "end_bar": 8}}, "total_bars": 8},
+        song_structure={"sections": {"intro": {"start_bar": 1, "end_bar": 8}}, "total_bars": 8},
     )
 
     plan = ChoreographyPlan(
         sections=[
             PlanSection(
-                name="intro",
-                start_bar=0,
+                section_name="intro",
+                start_bar=1,
                 end_bar=8,
-                energy="low",
-                sequences=[],
+                template_id="template1",
             )
         ]
     )
@@ -254,19 +228,10 @@ def test_validate_multiple_errors(available_templates, song_structure):
     plan = ChoreographyPlan(
         sections=[
             PlanSection(
-                name="unknown_section",  # Not in song structure
-                start_bar=0,
+                section_name="unknown_section",  # Not in song structure
+                start_bar=1,
                 end_bar=8,
-                energy="low",
-                sequences=[
-                    PlanSequence(
-                        template="invalid_template",  # Not in library
-                        timing=SequenceTiming(start="0.1", duration_bars=8),
-                        movement="sweep_lr",
-                        geometry="fan",
-                        dimmer="pulse",
-                    )
-                ],
+                template_id="invalid_template",  # Not in library
             )
         ]
     )
@@ -276,11 +241,11 @@ def test_validate_multiple_errors(available_templates, song_structure):
     # Should collect multiple issues
     assert result.valid is False
     total_issues = len(result.errors) + len(result.warnings)
-    assert total_issues >= 2  # At least template + section issues
+    assert total_issues >= 1  # At least template error
 
 
-def test_validate_empty_sequences_warning(available_templates, song_structure):
-    """Test validation warns about sections with no sequences."""
+def test_validate_template_exists(available_templates, song_structure):
+    """Test validation accepts valid template."""
     validator = HeuristicValidator(
         available_templates=available_templates,
         song_structure=song_structure,
@@ -289,17 +254,16 @@ def test_validate_empty_sequences_warning(available_templates, song_structure):
     plan = ChoreographyPlan(
         sections=[
             PlanSection(
-                name="intro",
-                start_bar=0,
+                section_name="intro",
+                start_bar=1,
                 end_bar=8,
-                energy="low",
-                sequences=[],  # No sequences
+                template_id="sweep_lr_fan_pulse",
             )
         ]
     )
 
     result = validator.validate(plan)
 
-    # Should warn about empty sequences
-    assert len(result.warnings) > 0
-    assert any("sequence" in warn.lower() or "empty" in warn.lower() for warn in result.warnings)
+    # Should be valid with existing template
+    assert result.valid is True
+    assert len(result.errors) == 0

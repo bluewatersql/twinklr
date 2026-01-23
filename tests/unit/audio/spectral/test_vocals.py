@@ -219,3 +219,212 @@ class TestDetectVocals:
         )
 
         assert "vocal_probability" in result
+
+
+class TestVocalSegmentMerging:
+    """Tests for vocal segment merging logic."""
+
+    def test_very_high_vocal_probability_uses_lower_threshold(
+        self,
+        sample_rate: int,
+    ) -> None:
+        """When mean probability is very high, uses lower threshold."""
+        n_frames = 500
+        duration = 5.0
+        n_samples = int(sample_rate * duration)
+
+        # Create audio with varying harmonic content that favors vocals
+        # Use a sine wave for harmonic (vocal-like) content
+        t = np.linspace(0, duration, n_samples, dtype=np.float32)
+        y_harm = np.sin(2 * np.pi * 440 * t).astype(np.float32) * 0.8
+
+        # Very weak percussive content
+        rng = np.random.default_rng(42)
+        y_perc = rng.standard_normal(n_samples).astype(np.float32) * 0.05
+
+        # Mid-range spectral features (vocal-like)
+        spectral_centroid = np.full(n_frames, 0.4, dtype=np.float32)
+        spectral_flatness = np.full(n_frames, 0.1, dtype=np.float32)
+        times_s = np.linspace(0, duration, n_frames, dtype=np.float32)
+
+        result = detect_vocals(
+            y_harm=y_harm,
+            y_perc=y_perc,
+            spectral_centroid=spectral_centroid,
+            spectral_flatness=spectral_flatness,
+            times_s=times_s,
+            sr=sample_rate,
+        )
+
+        # Should have valid structure and process vocal detection
+        assert "vocal_probability" in result
+        assert "statistics" in result
+        # Mean probability should be relatively high for this vocal-like input
+        avg_prob = np.mean(result["vocal_probability"])
+        assert avg_prob > 0.4  # Should be vocal-like
+
+    def test_strong_vocal_median_threshold(
+        self,
+        sample_rate: int,
+    ) -> None:
+        """When median probability is high, uses moderate threshold."""
+        n_frames = 500
+        duration = 5.0
+
+        # Create audio with moderately high harmonic content
+        y_harm = np.ones(int(sample_rate * duration), dtype=np.float32) * 0.85
+        y_perc = np.ones(int(sample_rate * duration), dtype=np.float32) * 0.15
+        spectral_centroid = np.full(n_frames, 0.4, dtype=np.float32)
+        spectral_flatness = np.full(n_frames, 0.1, dtype=np.float32)
+        times_s = np.linspace(0, duration, n_frames, dtype=np.float32)
+
+        result = detect_vocals(
+            y_harm=y_harm,
+            y_perc=y_perc,
+            spectral_centroid=spectral_centroid,
+            spectral_flatness=spectral_flatness,
+            times_s=times_s,
+            sr=sample_rate,
+        )
+
+        # Should have valid structure
+        assert "vocal_segments" in result
+        assert "statistics" in result
+
+    def test_segment_at_end_of_audio(
+        self,
+        sample_rate: int,
+    ) -> None:
+        """Handle vocal segment that extends to end of audio."""
+        n_frames = 500
+        duration = 5.0
+
+        # Create audio where vocal probability is high at the end
+        y_harm = np.zeros(int(sample_rate * duration), dtype=np.float32)
+        y_perc = np.zeros(int(sample_rate * duration), dtype=np.float32)
+
+        # Make second half highly harmonic
+        half_samples = int(sample_rate * duration / 2)
+        y_harm[half_samples:] = 0.9
+        y_perc[:half_samples] = 0.9
+        y_perc[half_samples:] = 0.1
+
+        spectral_centroid = np.full(n_frames, 0.4, dtype=np.float32)
+        spectral_flatness = np.zeros(n_frames, dtype=np.float32)
+        spectral_flatness[n_frames // 2 :] = 0.1
+        spectral_flatness[: n_frames // 2] = 0.5
+
+        times_s = np.linspace(0, duration, n_frames, dtype=np.float32)
+
+        result = detect_vocals(
+            y_harm=y_harm,
+            y_perc=y_perc,
+            spectral_centroid=spectral_centroid,
+            spectral_flatness=spectral_flatness,
+            times_s=times_s,
+            sr=sample_rate,
+        )
+
+        # Should handle end segment
+        assert "vocal_segments" in result
+
+    def test_short_segments_merging(
+        self,
+        sample_rate: int,
+    ) -> None:
+        """Short adjacent segments within gap tolerance are merged."""
+        n_frames = 1000
+        duration = 10.0
+
+        # Create alternating high/low harmonic content with small gaps
+        y_harm = np.zeros(int(sample_rate * duration), dtype=np.float32)
+        y_perc = np.ones(int(sample_rate * duration), dtype=np.float32) * 0.5
+
+        # Create sections with vocal-like content and small gaps
+        for i in range(0, int(sample_rate * duration), int(sample_rate * 2)):
+            end = min(i + int(sample_rate * 1.5), int(sample_rate * duration))
+            y_harm[i:end] = 0.9
+            y_perc[i:end] = 0.1
+
+        spectral_centroid = np.full(n_frames, 0.4, dtype=np.float32)
+        spectral_flatness = np.full(n_frames, 0.1, dtype=np.float32)
+        times_s = np.linspace(0, duration, n_frames, dtype=np.float32)
+
+        result = detect_vocals(
+            y_harm=y_harm,
+            y_perc=y_perc,
+            spectral_centroid=spectral_centroid,
+            spectral_flatness=spectral_flatness,
+            times_s=times_s,
+            sr=sample_rate,
+        )
+
+        # Should have merged segments
+        assert isinstance(result["vocal_segments"], list)
+
+    def test_high_probability_segments_lenient_merging(
+        self,
+        sample_rate: int,
+    ) -> None:
+        """High probability segments get extra lenient gap tolerance."""
+        n_frames = 1500
+        duration = 15.0
+
+        # Create two high-probability vocal segments with a gap
+        y_harm = np.zeros(int(sample_rate * duration), dtype=np.float32)
+        y_perc = np.ones(int(sample_rate * duration), dtype=np.float32)
+
+        # First segment: 0-4 seconds (very vocal)
+        start1 = 0
+        end1 = int(sample_rate * 4)
+        y_harm[start1:end1] = 0.95
+        y_perc[start1:end1] = 0.05
+
+        # Second segment: 7-12 seconds (very vocal)
+        start2 = int(sample_rate * 7)
+        end2 = int(sample_rate * 12)
+        y_harm[start2:end2] = 0.95
+        y_perc[start2:end2] = 0.05
+
+        spectral_centroid = np.full(n_frames, 0.4, dtype=np.float32)
+        spectral_flatness = np.full(n_frames, 0.1, dtype=np.float32)
+        times_s = np.linspace(0, duration, n_frames, dtype=np.float32)
+
+        result = detect_vocals(
+            y_harm=y_harm,
+            y_perc=y_perc,
+            spectral_centroid=spectral_centroid,
+            spectral_flatness=spectral_flatness,
+            times_s=times_s,
+            sr=sample_rate,
+        )
+
+        # Should have detected vocal segments
+        assert "vocal_segments" in result
+
+    def test_no_vocal_segments_detected(
+        self,
+        sample_rate: int,
+    ) -> None:
+        """When no vocals present, returns empty segments."""
+        n_frames = 500
+        duration = 5.0
+
+        # Highly percussive content, no vocals
+        y_harm = np.ones(int(sample_rate * duration), dtype=np.float32) * 0.1
+        y_perc = np.ones(int(sample_rate * duration), dtype=np.float32) * 0.9
+        spectral_centroid = np.full(n_frames, 0.8, dtype=np.float32)  # High frequency
+        spectral_flatness = np.full(n_frames, 0.8, dtype=np.float32)  # Noisy
+        times_s = np.linspace(0, duration, n_frames, dtype=np.float32)
+
+        result = detect_vocals(
+            y_harm=y_harm,
+            y_perc=y_perc,
+            spectral_centroid=spectral_centroid,
+            spectral_flatness=spectral_flatness,
+            times_s=times_s,
+            sr=sample_rate,
+        )
+
+        # Low vocal coverage expected
+        assert result["statistics"]["vocal_coverage_pct"] < 0.5

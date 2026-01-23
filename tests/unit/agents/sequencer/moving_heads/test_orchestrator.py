@@ -50,11 +50,10 @@ def valid_plan():
     return ChoreographyPlan(
         sections=[
             PlanSection(
-                name="intro",
-                start_bar=0,
+                section_name="intro",
+                start_bar=1,
                 end_bar=8,
-                energy="low",
-                sequences=[],
+                template_id="sweep_lr_fan_pulse",
             )
         ]
     )
@@ -263,11 +262,10 @@ def test_orchestrate_heuristic_validation_failure(mock_provider, context):
     bad_plan = ChoreographyPlan(
         sections=[
             PlanSection(
-                name="intro",
-                start_bar=0,
+                section_name="intro",
+                start_bar=1,
                 end_bar=8,
-                energy="low",
-                sequences=[],
+                template_id="sweep_lr_fan_pulse",
             )
         ]
     )
@@ -366,7 +364,11 @@ def test_orchestrate_planner_failure(mock_provider, context):
 def test_orchestration_result_structure():
     """Test orchestration result structure."""
     plan = ChoreographyPlan(
-        sections=[PlanSection(name="intro", start_bar=0, end_bar=8, energy="low", sequences=[])]
+        sections=[
+            PlanSection(
+                section_name="intro", start_bar=1, end_bar=8, template_id="sweep_lr_fan_pulse"
+            )
+        ]
     )
 
     result = OrchestrationResult(

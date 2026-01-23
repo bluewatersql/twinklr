@@ -134,9 +134,33 @@ class DmxSettingsBuilder:
 
         # Get value curve if present
         if channel_value.value_points:
-            # xLights expects normalized [0,1] values in custom curve Values array
-            # Store the normalized points directly - no DMX conversion needed
-            channel_curves[dmx_channel] = channel_value.value_points
+            # Convert curve to DMX and normalize for xLights export
+            from blinkb0t.core.curves.dmx_conversion import (
+                dimmer_curve_to_dmx,
+                movement_curve_to_dmx,
+            )
+
+            if channel_value.offset_centered:
+                # Movement curve (pan/tilt): apply offset formula with base and amplitude
+                # Formula: dmx = base_dmx + amplitude_dmx * (v - 0.5), then clamp
+                normalized_points = movement_curve_to_dmx(
+                    points=channel_value.value_points,
+                    base_dmx=float(channel_value.base_dmx or 128),
+                    amplitude_dmx=float(channel_value.amplitude_dmx or 64),
+                    clamp_min=float(channel_value.clamp_min),
+                    clamp_max=float(channel_value.clamp_max),
+                )
+            else:
+                # Dimmer curve: scale directly to [clamp_min, clamp_max]
+                # Formula: dmx = clamp_min + v * (clamp_max - clamp_min)
+                normalized_points = dimmer_curve_to_dmx(
+                    points=channel_value.value_points,
+                    clamp_min=float(channel_value.clamp_min),
+                    clamp_max=float(channel_value.clamp_max),
+                )
+
+            # Store normalized points for xLights value curve format
+            channel_curves[dmx_channel] = normalized_points
 
     def _get_dmx_channel_number(self, channel_name: ChannelName) -> int | None:
         """Map logical channel name to DMX channel number.

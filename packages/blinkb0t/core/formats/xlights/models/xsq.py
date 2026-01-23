@@ -10,6 +10,8 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from blinkb0t.core.formats.xlights.models.effect_placement import EffectPlacement
+
 
 class TimeMarker(BaseModel):
     """A timing marker in a timing track."""
@@ -317,9 +319,6 @@ class XSequence(BaseModel):
         Returns:
             List of EffectPlacement objects (for backward compatibility)
         """
-        from blinkb0t.core.formats.xlights.xsq.effect_placement import (
-            EffectPlacement,
-        )
 
         placements = []
         for element in self.element_effects:

@@ -1,4 +1,4 @@
-.PHONY: help install install-dev sync clean lint format type-check test test-cov test-watch run-demo build verify-install check-all pre-commit validate
+.PHONY: help install install-dev sync clean lint format type-check test test-cov test-watch run-demo build verify-install check-all pre-commit validate coverage coverage-detailed
 
 # Default target
 .DEFAULT_GOAL := help
@@ -96,9 +96,17 @@ test: ## Run all tests
 
 test-cov: ## Run tests with coverage report
 	@echo "$(BLUE)→ Running tests with coverage...$(NC)"
-	uv run pytest tests/ --cov=blinkb0t.core --cov-report=term-missing --cov-report=html
+	uv run pytest tests/ --cov=blinkb0t.core --cov-report=term-missing --cov-report=html --cov-report=json
 	@echo "$(GREEN)✓ Tests complete$(NC)"
 	@echo "$(YELLOW)→ Coverage report: htmlcov/index.html$(NC)"
+
+coverage: ## Show coverage breakdown by component
+	@echo "$(BLUE)→ Test coverage by component...$(NC)"
+	@uv run python scripts/show_coverage_by_component.py
+
+coverage-detailed: ## Show detailed coverage breakdown by component
+	@echo "$(BLUE)→ Detailed test coverage by component...$(NC)"
+	@uv run python scripts/show_coverage_by_component.py --detailed
 
 test-watch: ## Run tests in watch mode (requires pytest-watch)
 	@echo "$(BLUE)→ Running tests in watch mode...$(NC)"

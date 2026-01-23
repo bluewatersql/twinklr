@@ -100,6 +100,7 @@ def test_render_planner_user_prompt(prompt_loader, renderer):
             },
         },
         "feedback": None,
+        "response_schema": "{}",  # Add response_schema variable
     }
 
     rendered = renderer.render(prompts["user"], variables)
@@ -122,6 +123,7 @@ def test_render_planner_with_feedback(prompt_loader, renderer):
             "beat_grid": {"tempo": 120, "time_signature": "4/4", "total_bars": 32},
         },
         "feedback": ["Needs more variety in verse", "Chorus energy too low"],
+        "response_schema": "{}",  # Add response_schema variable
     }
 
     rendered = renderer.render(prompts["user"], variables)
@@ -149,6 +151,7 @@ def test_render_validator_user_prompt(prompt_loader, renderer):
             "available_templates": ["sweep_lr", "fan_pulse"],
             "beat_grid": {"total_bars": 32},
         },
+        "response_schema": "{}",  # Add response_schema variable
     }
 
     rendered = renderer.render(prompts["user"], variables)
@@ -167,6 +170,7 @@ def test_render_judge_user_prompt(prompt_loader, renderer):
         "context": {"song_structure": {"intro": [0, 8]}},
         "iteration": 1,
         "previous_feedback": [],
+        "response_schema": "{}",  # Add response_schema variable
     }
 
     rendered = renderer.render(prompts["user"], variables)
@@ -185,6 +189,7 @@ def test_render_judge_with_iteration(prompt_loader, renderer):
         "context": {"song_structure": {}},
         "iteration": 3,
         "previous_feedback": ["Fix timing", "Add variety"],
+        "response_schema": "{}",  # Add response_schema variable
     }
 
     rendered = renderer.render(prompts["user"], variables)
