@@ -1,69 +1,35 @@
-# Implementation Expansion Task
+# Implementation Validation Task
 
-## Approved Plan
-
-### Overall Strategy (from Plan)
-{overall_strategy}
-
-### Plan Sections
-{plan_sections}
+## Song Context
+- **Duration**: {duration_s}s
+- **Tempo**: {tempo_bpm} BPM
+- **Total Bars**: {bar_count}
 
 ---
 
-## Musical Timeline Reference
+## Plan to Validate
 
-**Unified timeline combining audio analysis and sequence timing. Each event shows bar #, beat #, and timestamp (in milliseconds) aligned together.**
-
-{song_map_formatted}
+{plan_json}
 
 ---
 
-## Available Fixture Groups
+## Available Templates
 
-**Groups available for targeting:**
-{target_groups}
-
-**Group composition details:**
-{target_groups_detail}
+{template_library}
 
 ---
 
-## Your Task
+## Validation Checklist
 
-Expand the approved plan into precise bar-level implementation sections.
+### Coverage
+- [ ] First section starts at bar 1
+- [ ] Last section ends at bar {bar_count}
+- [ ] No gaps between sections
 
-**Requirements:**
-
-1. **Preserve Strategic Narrative**
-   - Copy `overall_strategy` from plan exactly
-   - Add `implementation_approach` describing your targeting/layering strategy
-   - Include per-section reasoning for all targeting/intensity/priority choices
-
-2. **Bar-Level Timing**
-   - Use start_bar and end_bar matching plan sections exactly
-   - Work in musical units (bars), not milliseconds
-
-3. **Fixture Targeting**
-   - Single template → targets: ["ALL"]
-   - 2 templates → Use valid disjoint pair (LEFT+RIGHT, ODD+EVEN, INNER+OUTER, or CENTER+OUTER)
-   - 3+ templates → Use individual fixtures only (e.g., ["MH1"], ["MH2"], ["MH3"])
-   - Reference system prompt for complete disjoint pair rules
-
-4. **Template Parameters**
-   - intensity: MUST be exactly "SMOOTH", "DRAMATIC", or "INTENSE" (no other values)
-   - Map from plan energy: 0.0-0.4→SMOOTH, 0.5-0.7→DRAMATIC, 0.8-1.0→INTENSE
-   - base_pose: MUST be valid Pose Library id (AUDIENCE_CENTER, FORWARD, LEFT_45, etc.)
-     - ❌ NOT "CENTER" (that's a target group)
-     - ✅ Use "AUDIENCE_CENTER" for default audience-facing
-
-5. **Section Naming**
-   - name: Your descriptive name (format: {{plan_section_name}}__{{template_id}}_{{target}})
-   - plan_section_name: ORIGINAL plan section name (REQUIRED for traceability)
-
-6. **Layer Priority**
-   - Start at 0 for each plan section
-   - Increment by 1 for each additional concurrent template
-   - Main effect: priority 0, Accent effects: priority 1+
+### Templates
+- [ ] All template_ids exist in library
+- [ ] All preset_ids exist for their templates
+- [ ] All modifiers are valid
 
 ---
 
@@ -73,35 +39,10 @@ Expand the approved plan into precise bar-level implementation sections.
 
 ---
 
-## Validation Checklist
+## Your Task
 
-Before submitting, verify:
+1. **Validate** the plan against all checklist items
+2. **Confirm** plan is ready for compilation OR identify issues
+3. **Output** validation result as valid JSON
 
-**Timing:**
-- [ ] All start_bar/end_bar match plan sections exactly
-- [ ] No gaps or overlaps between sections
-
-**Targeting:**
-- [ ] Single template sections use ["ALL"]
-- [ ] 2-template sections use ONLY: LEFT+RIGHT, ODD+EVEN, INNER+OUTER, or CENTER+OUTER
-- [ ] 3+ template sections use individual fixtures ONLY
-- [ ] NO "ALL" used with any other group
-- [ ] NO overlapping target combinations
-
-**Parameters:**
-- [ ] All intensity values are exactly "SMOOTH", "DRAMATIC", or "INTENSE"
-- [ ] No numeric values (0.25, 0.5, etc.) or other strings
-
-**Traceability:**
-- [ ] Every section has both name AND plan_section_name
-- [ ] plan_section_name matches original plan exactly
-- [ ] Reasoning provided for every implementation section
-
-**Narrative:**
-- [ ] overall_strategy copied from plan
-- [ ] implementation_approach describes targeting/layering strategy
-- [ ] Per-section reasoning explains targeting/intensity/priority choices
-
----
-
-**Generate the implementation now.**
+**Validate the choreography plan now.**

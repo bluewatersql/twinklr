@@ -124,7 +124,6 @@ class MovingHeadManager(DomainManager):
         # Step 1: Analyze audio (universal service)
         logger.info("Step 1/4: Analyzing audio...")
         song_features = self.session.audio.analyze(str(audio_path))
-        logger.info(f"Song features: {song_features}")
 
         # Step 2: Fingerprint sequence (universal service)
         # Note: orchestrator handles fingerprinting internally, so we don't need to call it here

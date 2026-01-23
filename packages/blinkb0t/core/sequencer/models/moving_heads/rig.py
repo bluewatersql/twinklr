@@ -217,22 +217,25 @@ def rig_profile_from_fixture_group(
     )
     """
 
+    # Order left->right using position_index when present, otherwise fixture_id.
+    # Sort the original FixtureInstance objects first, then create FixtureDefinition objects
+    def _sort_key(fx_instance):
+        pos = getattr(fx_instance.config, "position", None)
+        if pos is not None and getattr(pos, "position_index", None) is not None:
+            return (int(pos.position_index), fx_instance.fixture_id)
+        return (10_000, fx_instance.fixture_id)
+
+    fixture_instances_sorted = sorted(group.expand_fixtures(), key=_sort_key)
+
     fixtures: list[FixtureDefinition] = []
-    for fixture in group.expand_fixtures():
+    for fixture in fixture_instances_sorted:
         fixtures.append(
             FixtureDefinition(
                 fixture_id=fixture.fixture_id,
             )
         )
 
-    # Order left->right using position_index when present, otherwise fixture_id.
-    def _sort_key(fx):
-        pos = getattr(fx.config, "position", None)
-        if pos is not None and getattr(pos, "position_index", None) is not None:
-            return (int(pos.position_index), fx.fixture_id)
-        return (10_000, fx.fixture_id)
-
-    fixtures_sorted = sorted(fixtures, key=_sort_key)
+    fixtures_sorted = fixtures
     fixture_ids = [f.fixture_id for f in fixtures_sorted]
 
     groups: list[SemanticGroup] = []

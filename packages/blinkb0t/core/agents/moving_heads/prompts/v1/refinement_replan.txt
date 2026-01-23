@@ -1,29 +1,62 @@
-# Refinement Task: Replan
+# Choreography Refinement Task
 
-## Previous Plan Had Issues
-Score: {overall_score}/100 (FAILED)
+## Context
 
-### Failing Categories
-{failing_categories}
+The previous choreography plan was evaluated and needs improvement.
 
-### Root Cause
-{root_cause}
+### Feedback Summary
+{feedback_summary}
 
-### Specific Issues
-{previous_issues}
+### Specific Issues to Address
+{issues_list}
 
-### Actionable Feedback
+---
+
+## Song Information
+- **Duration**: {duration_s}s
+- **Tempo**: {tempo_bpm} BPM
+- **Total Bars**: {bar_count}
+
+---
+
+## Previous Plan
+{previous_plan}
+
+---
+
+## Available Templates
+{template_library}
+
+---
+
+## Refinement Guidelines
+
+### Address These Issues:
 {actionable_feedback}
 
+### Maintain These Strengths:
+{strengths_to_keep}
+
+### Key Changes Needed:
+1. Review sections with energy mismatches
+2. Improve template variety where repetitive
+3. Adjust presets to better match energy
+4. Fix any coverage gaps
+
+---
+
+## Output Schema
+
+{json_schema}
+
+---
+
 ## Your Task
-Create an improved plan that fixes all these issues.
 
-Use the same context (song, templates, etc.) but make better choices:
-- Select different templates where appropriate
-- Improve energy matching
-- Add more variety
-- Better reasoning
+1. **Review** the feedback carefully
+2. **Identify** sections that need changes
+3. **Select** better templates/presets for problem sections
+4. **Preserve** what worked well
+5. **Output** improved plan as valid JSON
 
-{context}
-
-Generate the improved plan now.
+**Generate the refined choreography plan now.**

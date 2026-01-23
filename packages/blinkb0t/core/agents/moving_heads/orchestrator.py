@@ -26,7 +26,7 @@ from blinkb0t.core.audio.analyzer import AudioAnalyzer
 from blinkb0t.core.config.loader import get_openai_api_key, load_app_config
 from blinkb0t.core.config.models import JobConfig
 from blinkb0t.core.sequencer.analyzer import SequenceAnalyzer
-from blinkb0t.core.sequencer.moving_heads.templates.library import TemplateRegistry
+from blinkb0t.core.sequencer.moving_heads.templates.library import REGISTRY
 from blinkb0t.core.utils.checkpoint import CheckpointManager, CheckpointType
 
 logger = logging.getLogger(__name__)
@@ -135,10 +135,13 @@ class AgentOrchestrator:
         # Audio analyzer (will be initialized in run() with proper config)
         self.audio_analyzer: AudioAnalyzer | None = None
 
-        # Template loader
-        # Find templates directory relative to this file
+        # Template loader - use global registry and ensure templates are loaded
+        from blinkb0t.core.sequencer.moving_heads.templates import load_builtin_templates
 
-        self.template_registry = TemplateRegistry()
+        # Load builtin templates (registers them in global REGISTRY)
+        load_builtin_templates()
+        # Use the global registry instance that templates are registered in
+        self.template_registry = REGISTRY
 
         # Config
         self.max_iterations = self.agent_config.max_iterations

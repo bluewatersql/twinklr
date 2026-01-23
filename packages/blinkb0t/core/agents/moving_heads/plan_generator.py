@@ -12,11 +12,12 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
-from blinkb0t.core.agents.moving_heads.context import ContextShaper, Stage
+from blinkb0t.core.agents.moving_heads.context import ContextShaper, Stage, build_library_metadata
 from blinkb0t.core.agents.moving_heads.models_agent_plan import AgentPlan
+from blinkb0t.core.agents.schema_utils import get_json_schema_example
 from blinkb0t.core.api.llm.openai.client import OpenAIClient, Verbosity
 from blinkb0t.core.config.loader import load_app_config
-from blinkb0t.core.config.models import JobConfig
+from blinkb0t.core.config.models import JobConfig, SequencingVersionConfig
 
 logger = logging.getLogger(__name__)
 
@@ -115,9 +116,6 @@ class PlanGenerator:
             PlanGenerationResult with plan or error
         """
         logger.info("Generating choreography plan...")
-
-        # Load library metadata (movements, geometries, dimmers)
-        from blinkb0t.core.agents.moving_heads.context import build_library_metadata
 
         library_metadata = build_library_metadata()
 
@@ -257,11 +255,6 @@ class PlanGenerator:
         Returns:
             Formatted prompt string
         """
-        from pathlib import Path
-
-        from blinkb0t.core.agents.moving_heads.models_agent_plan import AgentPlan
-        from blinkb0t.core.agents.schema_utils import get_json_schema_example
-        from blinkb0t.core.config.models import SequencingVersionConfig
 
         # Load user prompt template
         version_config = SequencingVersionConfig()
@@ -276,7 +269,8 @@ class PlanGenerator:
         templates = shaped_context.get("templates", [])
         recommendations = shaped_context.get("recommendations", {})
         fingerprint = shaped_context.get("sequence_fingerprint", {})
-        channels = shaped_context.get("channels", {})
+        # Library metadata is stored under "libraries" key, not "channels"
+        libraries = shaped_context.get("libraries", {})
 
         # Generate JSON schema from Pydantic model (clean, no deprecated fields)
         json_schema = get_json_schema_example(AgentPlan)
@@ -290,7 +284,7 @@ class PlanGenerator:
             beats_per_bar=timing.get("beats_per_bar"),
             energy_summary=self._format_energy_summary(energy),
             template_library=self._format_template_library(templates),
-            channel_libraries=self._format_channel_libraries(channels),
+            channel_libraries=self._format_channel_libraries(libraries),
             fingerprint_summary=self._format_fingerprint_summary(fingerprint),
             recommended_bars_per_section=recommendations.get("recommended_bars_per_section"),
             min_sections=recommendations.get("min_sections"),
@@ -349,47 +343,45 @@ class PlanGenerator:
 
         return "\n".join(lines)
 
-    def _format_channel_libraries(self, channels: dict[str, Any]) -> str:
-        """Format channel libraries for prompt."""
-        if not channels:
-            return "No channel libraries available"
+    def _format_channel_libraries(self, libraries: dict[str, Any]) -> str:
+        """Format library metadata (movements, geometries, dimmers) for prompt."""
+        if not libraries:
+            return "No library metadata available"
 
         lines = []
 
-        # Shutter patterns
-        lines.append("### Shutter Patterns")
-        if "shutter" in channels:
-            for pattern in channels["shutter"]:
+        # Movement patterns
+        if "movements" in libraries and libraries["movements"]:
+            lines.append("### Movement Patterns")
+            for pattern in libraries["movements"][:10]:  # Limit to 10
                 lines.append(
-                    f"- **{pattern['pattern_id']}**: {pattern['name']} "
-                    f"(energy: {pattern.get('energy_level', 'N/A')})"
+                    f"- **{pattern['movement_id']}**: {pattern['name']} "
+                    f"({pattern.get('description', '')[:50]})"
                 )
             lines.append("")
-        else:
-            lines.append("- **open**: Open (continuous light) - MANDATORY")
 
-        # Color presets (uses 'color_id' not 'pattern_id')
-        lines.append("### Color Presets")
-        if "color" in channels:
-            for preset in channels["color"]:
+        # Geometry patterns
+        if "geometries" in libraries and libraries["geometries"]:
+            lines.append("### Geometry Patterns")
+            for pattern in libraries["geometries"][:10]:  # Limit to 10
                 lines.append(
-                    f"- **{preset['color_id']}**: {preset['name']} "
-                    f"(mood: {preset.get('mood', 'N/A')})"
+                    f"- **{pattern['geometry_id']}**: {pattern['name']} "
+                    f"({pattern.get('summary', '')[:50]})"
                 )
             lines.append("")
-        else:
-            lines.append("- **white**: White (no color) - MANDATORY")
 
-        # Gobo patterns (uses 'gobo_id' not 'pattern_id')
-        lines.append("### Gobo Patterns")
-        if "gobo" in channels:
-            for pattern in channels["gobo"]:
+        # Dimmer patterns
+        if "dimmers" in libraries and libraries["dimmers"]:
+            lines.append("### Dimmer Patterns")
+            for pattern in libraries["dimmers"][:10]:  # Limit to 10
                 lines.append(
-                    f"- **{pattern['gobo_id']}**: {pattern['name']} "
-                    f"(density: {pattern.get('visual_density', 'N/A')})"
+                    f"- **{pattern['dimmer_id']}**: {pattern['name']} "
+                    f"({pattern.get('description', '')[:50]})"
                 )
-        else:
-            lines.append("- **open**: Open (no gobo) - MANDATORY")
+            lines.append("")
+
+        if not lines:
+            return "No library metadata available"
 
         return "\n".join(lines)
 

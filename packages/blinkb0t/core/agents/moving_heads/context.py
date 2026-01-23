@@ -106,8 +106,9 @@ def build_template_context_for_llm(
         has_phase_offset = False
 
         for step in template.steps:
-            movement_ids.add(step.movement.movement_id)
-            dimmer_ids.add(step.dimmer.dimmer_id)
+            # Movement and Dimmer use enum types, convert to string
+            movement_ids.add(step.movement.movement_type.value)
+            dimmer_ids.add(step.dimmer.dimmer_type.value)
             if step.timing.phase_offset is not None:
                 from blinkb0t.core.sequencer.models.template import (
                     PhaseOffsetMode,
@@ -494,11 +495,11 @@ class ContextShaper:
                 "template_id": meta["template_id"],
                 "name": meta["name"],
                 "category": meta["category"],
-                "description": meta["metadata"].get("description", ""),
-                "energy_range": meta["metadata"].get("energy_range", [0, 100]),
-                "recommended_sections": meta["metadata"].get("recommended_sections", []),
-                "tags": meta["metadata"].get("tags", [])[:5],  # First 5 tags
-                "step_count": meta["step_count"],
+                "description": meta.get("description", ""),
+                "energy_range": meta.get("energy_range", [0, 100]),
+                "recommended_sections": meta.get("recommended_sections", []),
+                "tags": meta.get("tags", [])[:5],  # First 5 tags
+                "step_count": meta.get("behavior", {}).get("step_count", 0),
             }
 
             # Add step summaries if steps are available
