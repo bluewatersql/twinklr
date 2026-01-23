@@ -1,0 +1,46 @@
+Validate the following choreography plan:
+
+## Plan to Validate
+
+{{ plan | tojson(indent=2) }}
+
+## Validation Context
+
+**Song Structure**: {{ context.song_structure | tojson }}
+**Available Templates**: {{ context.available_templates | tojson }}
+**Total Duration**: {{ context.beat_grid.total_bars }} bars
+
+## Validation Checklist
+
+Perform these checks:
+
+### 1. Completeness
+- [ ] All song sections have choreography
+- [ ] All sections have required fields (section_name, start_bar, end_bar, template_id)
+- [ ] No missing or null values
+
+### 2. Timing Correctness
+- [ ] Start/end bars align with song structure
+- [ ] Bar ranges are valid (end_bar >= start_bar)
+- [ ] No timing gaps or overlaps
+- [ ] Timing covers full song duration
+
+### 3. Template Validity
+- [ ] All template_ids exist in library
+- [ ] Preset_ids are valid (if specified)
+- [ ] Templates are appropriate for section energy/mood
+
+### 4. Consistency
+- [ ] Section timing matches song structure
+- [ ] Template choices make sense for section types
+- [ ] Energy progression feels appropriate
+
+## Required Output Format
+
+Provide your validation result matching this schema:
+
+```json
+{{ response_schema }}
+```
+
+**Important**: If `valid` is false, the plan CANNOT proceed to rendering. Provide clear, actionable error messages with specific locations.

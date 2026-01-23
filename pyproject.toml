@@ -12,6 +12,7 @@ dependencies = [
     "tqdm>=4.67.1",
     "bezier>=2024.6.20",
     "noise>=1.2.2",
+    "jinja2>=3.1.6",
 ]
 
 [project.optional-dependencies]
@@ -123,4 +124,15 @@ warn_required_dynamic_aliases = true
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = "test_*.py"
-addopts = "--cov=blinkb0t.core --cov-report=term-missing --cov-report=html"
+pythonpath = "."
+addopts = "--cov=blinkb0t.core --cov-report=term-missing --cov-report=html --import-mode=importlib"
+markers = [
+    "integration: marks tests as integration tests (deselect with '-m \"not integration\"')",
+    "slow: marks tests as slow running (deselect with '-m \"not slow\"')",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning:audioread.*",
+    "ignore::FutureWarning:librosa.*",
+    "ignore::UserWarning:librosa.*",
+    "ignore:PySoundFile failed:UserWarning",
+]

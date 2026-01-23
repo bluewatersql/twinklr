@@ -9,6 +9,7 @@ Requires-Dist: blinkb0t-cli>=0.1.0
 Requires-Dist: tqdm>=4.67.1
 Requires-Dist: bezier>=2024.6.20
 Requires-Dist: noise>=1.2.2
+Requires-Dist: jinja2>=3.1.6
 Provides-Extra: dev
 Requires-Dist: pytest>=7.0; extra == "dev"
 Requires-Dist: pytest-cov>=4.0; extra == "dev"

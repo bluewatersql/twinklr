@@ -6,6 +6,7 @@
 .coverage*
 data/*
 .dev/*
+.egg-info/*
 
 .env*
 .cursorrules
@@ -13,3 +14,4 @@ config.json
 # IDE support - namespace package symlinks
 /blinkb0t/__pycache__
 *.bak*
+artifacts/*

@@ -154,9 +154,7 @@ class RepeatContract(BaseModel):
     def _validate_loop_step_ids(self) -> "RepeatContract":
         """Validate loop_step_ids has at least 1 item when repeatable=True."""
         if self.repeatable and len(self.loop_step_ids) == 0:
-            raise ValueError(
-                "loop_step_ids must have at least 1 item when repeatable=True"
-            )
+            raise ValueError("loop_step_ids must have at least 1 item when repeatable=True")
         return self
 
 

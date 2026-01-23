@@ -210,6 +210,8 @@ class OpenAIClient:
             # Don't retry 4xx errors except rate limits (handled above)
             # Use APIStatusError for status_code access
             if isinstance(error, APIStatusError) and 400 <= error.status_code < 500:
+                # Log the full error details for debugging
+                logger.error(f"Client error {error.status_code} details: {error}")
                 return False, f"Client error {error.status_code} - not retrying"
 
             if attempt < self.retry_config.max_retries:
@@ -273,7 +275,7 @@ class OpenAIClient:
         *,
         reasoning_effort: ReasoningEffort | None = None,
         temperature: float | None = None,
-        verbosity: Verbosity = Verbosity.LOW,
+        verbosity: Verbosity = Verbosity.MEDIUM,
         validate_json: Callable[[Any], bool] | None = None,
         return_metadata: bool = False,
     ) -> Any | tuple[Any, ResponseMetadata]:
@@ -329,15 +331,23 @@ class OpenAIClient:
                 "text": text_param,
             }
 
-            # Add temperature as top-level parameter if provided
-            if temperature is not None:
-                request_params["temperature"] = temperature
+            # Mini models (gpt-5-mini, gpt-4o-mini, etc.) don't support temperature or reasoning
+            is_mini_model = "mini" in model.lower()
 
-            # Only add reasoning if effort is specified
-            if effort is not None:
+            # Add temperature as top-level parameter if provided and supported
+            if temperature is not None and not is_mini_model:
+                request_params["temperature"] = temperature
+            elif temperature is not None and is_mini_model:
+                logger.debug(f"Model {model} does not support temperature parameter, skipping")
+
+            # Only add reasoning if effort is specified AND model supports it
+            if effort is not None and not is_mini_model:
                 reasoning_param: Reasoning = {"effort": effort}  # type: ignore[typeddict-item]
                 request_params["reasoning"] = reasoning_param
+            elif effort is not None and is_mini_model:
+                logger.debug(f"Model {model} does not support reasoning parameter, skipping")
 
+            logger.debug(f"Request parameters: {request_params}")
             response = self.client.responses.create(**request_params)
 
             # Extract metadata

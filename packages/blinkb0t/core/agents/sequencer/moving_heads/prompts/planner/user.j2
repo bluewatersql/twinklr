@@ -1,0 +1,57 @@
+Design a choreography plan for the following song:
+
+## Song Context
+
+{{ context.song_structure | tojson(indent=2) }}
+
+## Available Resources
+
+**Fixtures**: {{ context.fixtures.count }} moving heads
+**Rig Layout**: {{ context.fixtures.groups | tojson }}
+
+**Template Library** ({{ context.available_templates | length }} templates):
+{% for template in context.available_templates %}
+- {{ template }}
+{% endfor %}
+
+## Beat Grid
+
+- **Tempo**: {{ context.beat_grid.tempo }} BPM
+- **Time Signature**: {{ context.beat_grid.time_signature }}
+- **Total Bars**: {{ context.beat_grid.total_bars }}
+
+{% if feedback %}
+## Feedback from Previous Iteration
+
+{% for item in feedback %}
+- {{ item }}
+{% endfor %}
+
+Please address the above feedback in your revised plan.
+{% endif %}
+
+## Instructions
+
+Create a complete choreography plan that:
+
+1. **Maps to song structure**: Design sequences for each section (intro, verse, chorus, bridge, outro)
+2. **Matches energy levels**: Use appropriate template intensities for each section
+3. **Creates visual interest**: Vary templates and timing throughout
+4. **Maintains flow**: Plan smooth transitions between sections
+5. **Uses templates effectively**: Select from available templates (which already define movement, geometry, and dimmer patterns)
+
+## Required Output Format
+
+Provide your plan as a JSON object matching this schema:
+
+```json
+{{ response_schema }}
+```
+
+**CRITICAL REQUIREMENTS**:
+1. **Template Selection**: Use ONLY template IDs from the Template Library list above (exactly as written)
+2. **Template Composition**: Each template (like "fan_pulse" or "sweep_lr_chevron_breathe") is a complete choreography unit with movement, geometry, and dimmer patterns already configured
+3. **Your Job**: Select which template + preset to use for each song section
+4. **Bar Numbering**: Bar numbers are 1-indexed. First bar is 1, not 0. Use `start_bar >= 1` for all sections
+5. **Presets**: Use preset_id for variations (CHILL, MODERATE, ENERGETIC, etc.) - optional
+6. **Modifiers** (optional): Use the `modifiers` field for additional customization (e.g., `{"intensity": "HIGH"}`)

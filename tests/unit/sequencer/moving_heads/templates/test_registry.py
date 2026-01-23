@@ -112,7 +112,7 @@ def test_templates_have_valid_categories():
     assert len(category_counts) >= 3, "Templates should span multiple energy categories"
 
     # Each category should have at least one template
-    for category, count in category_counts.items():
+    for count in category_counts.values():
         assert count > 0
 
 

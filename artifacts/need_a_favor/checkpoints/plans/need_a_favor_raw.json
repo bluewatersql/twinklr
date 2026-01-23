@@ -1,259 +1,145 @@
 {
   "sections": [
     {
-      "name": "intro_1_settle",
+      "section_name": "verse_1",
       "start_bar": 1,
-      "end_bar": 12,
+      "end_bar": 20,
       "section_role": "verse",
-      "energy_level": 28,
-      "templates": [
-        "inner_pendulum_breathe"
-      ],
-      "params": {
-        "preset": "CHILL",
+      "energy_level": 38,
+      "template_id": "wave_scattered_fade_in",
+      "preset_id": "CHILL",
+      "modifiers": {
         "intensity": "LOW",
-        "speed": "SLOW",
-        "variation": "A"
+        "focus": "INTRO_ESTABLISH"
       },
-      "base_pose": "AUDIENCE_CENTER",
-      "reasoning": "Start with a restrained, musical intro look: INNER-only subtle pendulum reads as 'waking up' without demanding attention. CHILL/slow keeps it airy and matches a low energy opening. Template energy (15-40) aligns well with ~28."
+      "reasoning": "Opens with a gentle, spacious look that can settle into the groove without over-selling energy."
     },
     {
-      "name": "intro_2_widen_scan",
-      "start_bar": 13,
-      "end_bar": 24,
-      "section_role": "build",
-      "energy_level": 35,
-      "templates": [
-        "lean_right_scan"
-      ],
-      "params": {
-        "preset": "CHILL",
+      "section_name": "chorus_1",
+      "start_bar": 21,
+      "end_bar": 39,
+      "section_role": "chorus",
+      "energy_level": 71,
+      "template_id": "sweep_lr_fan_pulse",
+      "preset_id": "MODERATE",
+      "modifiers": {
+        "intensity": "MED",
+        "readability": "HIGH"
+      },
+      "reasoning": "First lift: lateral fan sweeps read clearly on 4 heads and the pulse supports the chorus rhythm."
+    },
+    {
+      "section_name": "chorus_2_peak",
+      "start_bar": 40,
+      "end_bar": 64,
+      "section_role": "chorus",
+      "energy_level": 97,
+      "template_id": "pump_up_loop",
+      "preset_id": "ENERGETIC",
+      "modifiers": {
+        "intensity": "HIGH",
+        "density": "HIGH"
+      },
+      "reasoning": "Sustained high-energy chorus block calls for a driving loop that maintains momentum through repeated phrases."
+    },
+    {
+      "section_name": "chorus_3_release",
+      "start_bar": 65,
+      "end_bar": 73,
+      "section_role": "chorus",
+      "energy_level": 61,
+      "template_id": "crossfade_between_steps",
+      "preset_id": "MODERATE",
+      "modifiers": {
+        "intensity": "MEDLOW",
+        "transition": "SMOOTH"
+      },
+      "reasoning": "A short chorus segment benefits from a calmer, stepping look to reset the eye after the peak block."
+    },
+    {
+      "section_name": "chorus_4_drive",
+      "start_bar": 74,
+      "end_bar": 104,
+      "section_role": "chorus",
+      "energy_level": 96,
+      "template_id": "cascade_pulse_lr",
+      "preset_id": "ENERGETIC",
+      "modifiers": {
+        "intensity": "HIGH",
+        "motion": "FORWARD"
+      },
+      "reasoning": "Rebuilds intensity with directional left-right cascading pulses that feel like forward motion through the long chorus."
+    },
+    {
+      "section_name": "verse_2_breakdown",
+      "start_bar": 105,
+      "end_bar": 114,
+      "section_role": "verse",
+      "energy_level": 48,
+      "template_id": "inner_pendulum_breathe",
+      "preset_id": "CHILL",
+      "modifiers": {
         "intensity": "LOW",
-        "speed": "MEDIUM",
-        "variation": "B"
+        "space": "WIDE"
       },
-      "base_pose": "AUDIENCE_CENTER",
-      "reasoning": "Expand from inner motion to a more outward-facing audience scan to signal the song is moving forward. Keeping it asymmetric avoids feeling like a 'chorus' too early. Energy fit: template (10-40) supports a gentle build around 35."
+      "reasoning": "Drops back to a breathing pendulum to create contrast and make the next chorus hit bigger."
     },
     {
-      "name": "pre_verse_motion_bed",
-      "start_bar": 25,
-      "end_bar": 36,
-      "section_role": "verse",
-      "energy_level": 45,
-      "templates": [
-        "sweep_lr_continuous_phase"
-      ],
-      "params": {
-        "preset": "CHILL",
-        "intensity": "MEDIUM",
-        "speed": "MEDIUM",
-        "variation": "A"
-      },
-      "base_pose": "AUDIENCE_CENTER",
-      "reasoning": "Introduce a dependable loop-safe sweep to create a rhythmic motion bed without making it too punchy yet. Continuous phase offsets add life while staying smooth. Energy match: (35-60) overlaps cleanly with ~45."
-    },
-    {
-      "name": "verse_1_gentle_fan_wave",
-      "start_bar": 37,
-      "end_bar": 48,
-      "section_role": "verse",
-      "energy_level": 50,
-      "templates": [
-        "wave_fan_hold"
-      ],
-      "params": {
-        "preset": "CHILL",
-        "intensity": "MEDIUM",
-        "speed": "SLOW",
-        "variation": "B"
-      },
-      "base_pose": "AUDIENCE_CENTER",
-      "reasoning": "A wave over a fan formation provides visible choreography while staying 'steady' (hold dimmer) for verse intelligibility. This also contrasts the prior sweep by changing geometry/feel. Energy alignment: (25-55) supports a mid-low ~50 while remaining controlled."
-    },
-    {
-      "name": "transition_1_snap_clear",
-      "start_bar": 49,
-      "end_bar": 60,
-      "section_role": "transition",
-      "energy_level": 32,
-      "templates": [
-        "snap_in_fade_out"
-      ],
-      "params": {
-        "preset": "CHILL",
-        "intensity": "LOW",
-        "speed": "MEDIUM",
-        "variation": "A"
-      },
-      "base_pose": "AUDIENCE_CENTER",
-      "reasoning": "Use a clear snap/fade phrase to articulate a structural boundary and reset the eye before the next ramp. The decay helps create space and anticipation. Energy match: template (10-30) is slightly below 32, but acceptable for a deliberate 'pull back' transition moment."
-    },
-    {
-      "name": "build_1_chevron_breathe",
-      "start_bar": 61,
-      "end_bar": 72,
-      "section_role": "build",
-      "energy_level": 58,
-      "templates": [
-        "sweep_lr_chevron_breathe"
-      ],
-      "params": {
-        "preset": "PEAK/ENERGETIC",
-        "intensity": "MEDIUM",
-        "speed": "MEDIUM",
-        "variation": "B"
-      },
-      "base_pose": "AUDIENCE_CENTER",
-      "reasoning": "Chevron sweep + breathing dimmer naturally reads as 'lifting' into a bigger section without going fully punchy yet. Switching to PEAK/ENERGETIC increases urgency while staying musical. Energy match: (40-70) fits 58 comfortably."
-    },
-    {
-      "name": "chorus_1_pulse_fan_anchor",
-      "start_bar": 73,
-      "end_bar": 84,
+      "section_name": "chorus_5_lift",
+      "start_bar": 115,
+      "end_bar": 122,
       "section_role": "chorus",
-      "energy_level": 66,
-      "templates": [
-        "fan_pulse"
-      ],
-      "params": {
-        "preset": "PEAK/ENERGETIC",
-        "intensity": "HIGH",
-        "speed": "MEDIUM",
-        "variation": "A"
+      "energy_level": 71,
+      "template_id": "circle_fan_hold",
+      "preset_id": "MODERATE",
+      "modifiers": {
+        "intensity": "MED",
+        "shape": "CLEAN"
       },
-      "base_pose": "AUDIENCE_CENTER",
-      "reasoning": "Lock into a strong chorus identity: a static fan keeps geometry readable while pulsing dimmer provides the needed impact on beats. PEAK/ENERGETIC pushes brightness/punch without requiring frantic movement. Energy match: (40-70) overlaps well with ~66."
+      "reasoning": "Short chorus: a strong, stable circle/fan statement that reads immediately without needing a long build."
     },
     {
-      "name": "chorus_1_drive_sweep_hits",
-      "start_bar": 85,
-      "end_bar": 96,
+      "section_name": "chorus_6_final_peak",
+      "start_bar": 123,
+      "end_bar": 154,
       "section_role": "chorus",
-      "energy_level": 72,
-      "templates": [
-        "sweep_lr_fan_pulse"
-      ],
-      "params": {
-        "preset": "PEAK/ENERGETIC",
-        "intensity": "HIGH",
-        "speed": "FAST",
-        "variation": "B"
+      "energy_level": 100,
+      "template_id": "bounce_fan_pulse",
+      "preset_id": "ENERGETIC",
+      "modifiers": {
+        "intensity": "VERY_HIGH",
+        "impact": "MAX"
       },
-      "base_pose": "AUDIENCE_CENTER",
-      "reasoning": "Escalate within the chorus by adding lateral travel while retaining pulse hits—this feels like the chorus 'opens up' and moves air. Faster sweep supports the higher energy tail of the chorus. Energy match: (45-75) tightly supports ~72."
+      "reasoning": "Final chorus peak: bouncy fan pulses maximize perceived energy and match repeated hook phrasing."
     },
     {
-      "name": "post_chorus_cascade_release",
-      "start_bar": 97,
-      "end_bar": 108,
-      "section_role": "transition",
-      "energy_level": 60,
-      "templates": [
-        "cascade_pulse_lr"
-      ],
-      "params": {
-        "preset": "CHILL",
-        "intensity": "MEDIUM",
-        "speed": "MEDIUM",
-        "variation": "A"
-      },
-      "base_pose": "AUDIENCE_CENTER",
-      "reasoning": "After the chorus peak, use a left-to-right cascade to keep rhythmic interest while psychologically 'releasing' intensity (more pattern-based than brute-force). Dropping to CHILL prevents it from feeling like a second chorus. Energy match: (45-80) covers 60 well."
-    },
-    {
-      "name": "verse_2_circle_hold_reset",
-      "start_bar": 109,
-      "end_bar": 120,
-      "section_role": "verse",
-      "energy_level": 52,
-      "templates": [
-        "circle_fan_hold"
-      ],
-      "params": {
-        "preset": "CHILL",
-        "intensity": "MEDIUM",
-        "speed": "SLOW",
-        "variation": "A"
-      },
-      "base_pose": "AUDIENCE_CENTER",
-      "reasoning": "Re-center the show with symmetric circular motion and steady dimmer—reads calmer and more 'verse' while still animated. This also contrasts the earlier chevron/sweep language to maintain variety. Energy match: (35-60) aligns with ~52."
-    },
-    {
-      "name": "build_2_pump_loop",
-      "start_bar": 121,
-      "end_bar": 132,
-      "section_role": "build",
-      "energy_level": 70,
-      "templates": [
-        "pump_up_loop"
-      ],
-      "params": {
-        "preset": "PEAK/ENERGETIC",
-        "intensity": "HIGH",
-        "speed": "FAST",
-        "variation": "B"
-      },
-      "base_pose": "AUDIENCE_CENTER",
-      "reasoning": "A dedicated build template that loops sweep + pulse is ideal for driving momentum and signaling 'something big is coming.' PEAK/ENERGETIC and faster speed increase tension. Energy match: (45-85) supports a strong build at ~70."
-    },
-    {
-      "name": "drop_1_bounce_impact",
-      "start_bar": 133,
-      "end_bar": 144,
-      "section_role": "drop",
-      "energy_level": 82,
-      "templates": [
-        "bounce_fan_pulse"
-      ],
-      "params": {
-        "preset": "PEAK/ENERGETIC",
-        "intensity": "HIGH",
-        "speed": "FAST",
-        "variation": "A"
-      },
-      "base_pose": "AUDIENCE_CENTER",
-      "reasoning": "For the drop, the bounce motion plus pulsing hits reads as physically impactful and clearly 'bigger' than earlier chorus material. This is a natural climax behavior without going straight to full strobe. Energy match: (55-85) fits ~82 strongly."
-    },
-    {
-      "name": "climax_strobe_circle_left",
-      "start_bar": 145,
-      "end_bar": 156,
+      "section_name": "chorus_6_final_peak_strobe_accent",
+      "start_bar": 155,
+      "end_bar": 160,
       "section_role": "chorus",
-      "energy_level": 92,
-      "templates": [
-        "circle_asym_left_strobe"
-      ],
-      "params": {
-        "preset": "PEAK/ENERGETIC",
-        "intensity": "HIGH",
-        "speed": "FAST",
-        "variation": "B"
+      "energy_level": 100,
+      "template_id": "clamp_extremes_strobe",
+      "preset_id": "ENERGETIC",
+      "modifiers": {
+        "intensity": "VERY_HIGH",
+        "accent": "SECTION_ENDER"
       },
-      "base_pose": "AUDIENCE_CENTER",
-      "reasoning": "Reserve the true strobe-like look for the late-song climax so it feels earned. The asymmetric circle adds aggression and directional character beyond a generic strobe. Energy match: (70-100) directly supports a very high ~92 peak."
+      "reasoning": "End-of-run intensifier: extreme clamp + strobe as the final punctuation before the outro."
     },
     {
-      "name": "outro_decompress_pingpong",
-      "start_bar": 157,
+      "section_name": "outro",
+      "start_bar": 161,
       "end_bar": 164,
       "section_role": "outro",
-      "energy_level": 55,
-      "templates": [
-        "sweep_lr_pingpong_phase"
-      ],
-      "params": {
-        "preset": "CHILL",
-        "intensity": "MEDIUM",
-        "speed": "SLOW",
-        "variation": "A"
+      "energy_level": 0,
+      "template_id": "wave_scattered_fade_out",
+      "preset_id": "CHILL",
+      "modifiers": {
+        "intensity": "MIN",
+        "ending": "FADE"
       },
-      "base_pose": "AUDIENCE_CENTER",
-      "reasoning": "Come down from the climax with a loop-safe ping-pong sweep that feels like a controlled cooldown and provides visual closure. CHILL and slower speed reduce intensity while keeping motion until the final bar. Energy match: (35-60) aligns well with ~55."
+      "reasoning": "Clean, controlled exit that visually signals the track ending without lingering high-intensity motion."
     }
   ],
-  "overall_strategy": "Shape the song as a clear arc: start with restrained inner movement, widen to audience scans and smooth continuous sweeps, then introduce chevron/breathe vocabulary for builds. Establish the chorus with readable fan-based pulsing, escalate via sweep+hits, and use cascades/circle-holds to reset between peaks. Reserve the only strobe template for the late climax (bars 145-156) so the highest-intensity look is unique and impactful, then finish with a controlled ping-pong sweep outro to decompress while maintaining motion through the end.",
-  "template_variety_score": 9,
-  "energy_alignment_score": 8
+  "overall_strategy": "3/4 at ~159 BPM benefits from strong phrasing and frequent, readable motion changes. Verses use breathable pendulum/wave looks with lower intensity and occasional step-crossfades to keep interest. Choruses escalate by rotating through fan/sweep/circle templates, reserving strobe/clamp accents for peak moments and section transitions. Final chorus is the densest (more pulse + strobe hits), then a clean fade-out outro."
 }

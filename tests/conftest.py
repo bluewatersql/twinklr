@@ -14,7 +14,6 @@ from blinkb0t.core.config.poses import PanPose, TiltPose
 from blinkb0t.core.sequencer.models.enum import TemplateRole
 from blinkb0t.core.sequencer.timing.beat_grid import BeatGrid
 
-
 # ============================================================================
 # Path Fixtures
 # ============================================================================
@@ -43,7 +42,7 @@ def simple_song_features() -> dict:
     return {
         "tempo_bpm": 120.0,
         "duration_s": 8.0,  # 4 bars at 120 BPM
-        "beats_s": [i * 0.5 for i in range(16)],  # 16 beats (4 bars × 4 beats)
+        "beats_s": [i * 0.5 for i in range(16)],  # 16 beats (4 bars - 4 beats)
         "bars_s": [i * 2.0 for i in range(4)],  # 4 bars
         "assumptions": {"beats_per_bar": 4},
     }
@@ -64,7 +63,7 @@ def beat_grid(simple_song_features: dict) -> BeatGrid:
 def mock_fixture_instance() -> FixtureInstance:
     """Create a mock FixtureInstance for testing."""
     from blinkb0t.core.config.fixtures.base import FixtureConfig
-    from blinkb0t.core.config.fixtures.enums import FixtureType, ChannelName
+    from blinkb0t.core.config.fixtures.enums import ChannelName, FixtureType
 
     config = FixtureConfig(
         fixture_type=FixtureType.MOVING_HEAD,
@@ -105,9 +104,9 @@ def mock_fixture_group(mock_fixture_instance: FixtureInstance) -> list[FixtureIn
     ]
     pan_poses = [PanPose.WIDE_LEFT, PanPose.MID_LEFT, PanPose.MID_RIGHT, PanPose.WIDE_RIGHT]
 
-    for i, (role, pan_pose) in enumerate(zip(roles, pan_poses)):
+    for i, (role, pan_pose) in enumerate(zip(roles, pan_poses, strict=False)):
         fixture = FixtureInstance(
-            fixture_id=f"test_fixture_{i+1}",
+            fixture_id=f"test_fixture_{i + 1}",
             start_channel=(i * 10) + 1,
             config=mock_fixture_instance.config,
             role=role,
@@ -127,12 +126,12 @@ def mock_fixture_group(mock_fixture_instance: FixtureInstance) -> list[FixtureIn
 @pytest.fixture
 def mock_template_doc():
     """Create a mock TemplateDoc for testing.
-    
+
     Note: Imports moved inside fixture to avoid circular dependencies.
     """
     from blinkb0t.core.sequencer.moving_heads.templates import (
-        load_builtin_templates,
         get_template,
+        load_builtin_templates,
     )
 
     load_builtin_templates()

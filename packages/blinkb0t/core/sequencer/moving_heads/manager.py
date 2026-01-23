@@ -7,14 +7,25 @@ moving head sequencing pipeline while leveraging universal session services.
 from __future__ import annotations
 
 import logging
+import os
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from blinkb0t.core.agents.providers import OpenAIProvider
+from blinkb0t.core.agents.sequencer.moving_heads import (
+    ChoreographyPlan,
+    OrchestrationConfig,
+    Orchestrator,
+)
 from blinkb0t.core.config.fixtures import FixtureGroup
+from blinkb0t.core.config.loader import load_fixture_group
 from blinkb0t.core.sequencer.moving_heads.base import DomainManager
+from blinkb0t.core.sequencer.moving_heads.pipeline import RenderingPipeline
+from blinkb0t.core.sequencer.moving_heads.templates import load_builtin_templates
+from blinkb0t.core.sequencer.moving_heads.templates.library import list_templates
+from blinkb0t.core.sequencer.timing.beat_grid import BeatGrid
 
 if TYPE_CHECKING:
-    from blinkb0t.core.agents.moving_heads.orchestrator import AgentOrchestrator
     from blinkb0t.core.session import BlinkB0tSession
 
 logger = logging.getLogger(__name__)
@@ -58,9 +69,6 @@ class MovingHeadManager(DomainManager):
 
         # Load fixtures
         if fixtures is None:
-            # Import locally to avoid circular dependency
-            from blinkb0t.core.config.loader import load_fixture_group
-
             # Load from job_config.fixture_config_path
             fixture_path = Path(session.job_config.fixture_config_path)
             if not fixture_path.is_absolute():
@@ -70,9 +78,6 @@ class MovingHeadManager(DomainManager):
             self.fixtures = load_fixture_group(fixture_path)
             logger.debug(f"Loaded fixtures from {fixture_path}")
         elif isinstance(fixtures, (Path, str)):
-            # Import locally to avoid circular dependency
-            from blinkb0t.core.config.loader import load_fixture_group
-
             self.fixtures = load_fixture_group(Path(fixtures))
             logger.debug(f"Loaded fixtures from {fixtures}")
         else:
@@ -80,19 +85,37 @@ class MovingHeadManager(DomainManager):
             logger.debug("Using provided FixtureGroup")
 
     @property
-    def planner(self) -> AgentOrchestrator:
-        """Getagent orchestrator for moving heads (lazy-loaded).
+    def planner(self) -> Orchestrator:
+        """Get agent orchestrator for moving heads (lazy-loaded).
 
         Returns:
-            AgentOrchestrator configured with session configs
+            Orchestrator configured with session configs
         """
         if not hasattr(self, "_planner"):
-            from blinkb0t.core.agents.moving_heads.orchestrator import AgentOrchestrator
+            # Initialize LLM provider (get API key from environment)
+            api_key = os.getenv("OPENAI_API_KEY")
+            if not api_key:
+                raise ValueError("OPENAI_API_KEY environment variable not set")
 
-            self._planner = AgentOrchestrator(
-                job_config=self.session.job_config,
+            provider = OpenAIProvider(api_key=api_key)
+
+            # Create checkpoint manager
+            from blinkb0t.core.utils.checkpoint import CheckpointManager
+
+            checkpoint_manager = CheckpointManager(job_config=self.session.job_config)
+
+            # Configure orchestrator
+            config = OrchestrationConfig(
+                max_iterations=self.session.job_config.agent.max_iterations,
+                token_budget=self.session.job_config.agent.token_budget,
+                checkpoint_manager=checkpoint_manager,
             )
-            logger.debug("AgentOrchestrator initialized")
+
+            self._planner = Orchestrator(
+                provider=provider,
+                config=config,
+            )
+            logger.debug("Orchestrator initialized")
         return self._planner
 
     def run_pipeline(
@@ -119,108 +142,90 @@ class MovingHeadManager(DomainManager):
             mh = MovingHeadManager(session)
             mh.run_pipeline("song.mp3", "input.xsq", "output.xsq")
         """
-        logger.info(f"Runningmoving head pipeline: {audio_path} -> {xsq_out}")
+        logger.info(f"Running moving head pipeline: {audio_path} -> {xsq_out}")
 
         # Step 1: Analyze audio (universal service)
         logger.info("Step 1/4: Analyzing audio...")
-        song_features = self.session.audio.analyze(str(audio_path))
+        song_features: dict[str, Any] = self.session.audio.analyze(str(audio_path))
 
-        # Step 2: Fingerprint sequence (universal service)
-        # Note: orchestrator handles fingerprinting internally, so we don't need to call it here
-        # The orchestrator will fingerprint the sequence when it runs
-        logger.info("Step 2/4: Fingerprinting sequence (handled by orchestrator)...")
-
-        # Step 3: Generate plan usingorchestrator (multi-stage agent pipeline)
-        logger.info("Step 3/4: Runningagent orchestration...")
-        orchestrator_result = self.planner.run(
-            audio_path=str(audio_path),
-            xsq_path=str(xsq_in),
-        )
-
-        # Check orchestrator status
-        from blinkb0t.core.agents.moving_heads.orchestrator import OrchestratorStatus
-
-        if orchestrator_result.status == OrchestratorStatus.FAILED:
-            error_msg = f"Agent orchestration failed: {orchestrator_result.error}"
-            logger.error(error_msg)
-            raise RuntimeError(error_msg)
-
-        # Check if we have a valid implementation
-        if not orchestrator_result.implementation:
-            if orchestrator_result.status == OrchestratorStatus.INCOMPLETE:
-                error_msg = (
-                    f"Agent orchestration incomplete after {orchestrator_result.iterations} iterations. "
-                    f"No valid implementation was generated. "
-                    f"Best score: {orchestrator_result.evaluation.overall_score if orchestrator_result.evaluation else 'N/A'}/100. "
-                    f"The agent may be struggling with the song structure or timing. "
-                    f"Check the orchestrator logs for details."
-                )
-                logger.error(error_msg)
-                raise RuntimeError(error_msg)
-            else:
-                error_msg = "No implementation generated by orchestrator (unknown reason)"
-                logger.error(error_msg)
-                raise RuntimeError(error_msg)
-
-        # Log orchestration status
-        if orchestrator_result.status == OrchestratorStatus.INCOMPLETE:
-            logger.warning(
-                f"Agent orchestration incomplete after {orchestrator_result.iterations} iterations. "
-                f"Using best attempt (score: {orchestrator_result.evaluation.overall_score if orchestrator_result.evaluation else 'N/A'})"
-            )
-        else:
-            logger.info(
-                f"Agent orchestration successful: {orchestrator_result.iterations} iterations, "
-                f"score: {orchestrator_result.evaluation.overall_score if orchestrator_result.evaluation else 'N/A'}"
-            )
-
-        # Step 4: Apply implementation to sequence
-        logger.info("Step 4/4: Applying implementation to sequence...")
-
-        # Convert AgentImplementation to LLMChoreographyPlan
-        from blinkb0t.core.agents.moving_heads.models_llm_plan import (
-            LLMChoreographyPlan,
-            SectionSelection,
-        )
-
-        # Build LLMChoreographyPlan from AgentImplementation
-        # AgentImplementation has sections with template_id, params, etc.
-        sections = []
-        for impl_section in orchestrator_result.implementation.sections:
-            section = SectionSelection(
-                section_name=impl_section.name,
-                start_bar=impl_section.start_bar,
-                end_bar=impl_section.end_bar,
-                section_role=impl_section.params.get("section_role"),  # Optional context
-                energy_level=impl_section.params.get("energy_level"),  # Optional context
-                template_id=impl_section.template_id,
-                preset_id=impl_section.params.get("preset_id"),  # Extract preset from params
-                modifiers=impl_section.params,  # Pass all params as modifiers
-                reasoning=impl_section.reasoning,
-            )
-            sections.append(section)
-
-        llm_plan = LLMChoreographyPlan(
-            sections=sections,
-            overall_strategy=orchestrator_result.implementation.overall_strategy
-            or "Generated choreography",
-            template_variety_notes=None,  # Optional field
-        )
-
-        # Create beat grid from song features
-        from blinkb0t.core.sequencer.timing.beat_grid import BeatGrid
-
+        # Step 2: Build beat grid
+        logger.info("Step 2/4: Building beat grid...")
         beat_grid = BeatGrid.from_song_features(song_features)
         logger.debug(
             f"Created beat grid: tempo={beat_grid.tempo_bpm} BPM, "
             f"duration={beat_grid.duration_ms}ms"
         )
 
-        # Create and run rendering pipeline
-        from blinkb0t.core.sequencer.moving_heads.pipeline import RenderingPipeline
+        # Step 3: Generate plan using orchestrator (multi-agent pipeline)
+        logger.info("Step 3/4: Running agent orchestration...")
+
+        # Load builtin templates (registers them in global REGISTRY)
+
+        load_builtin_templates()
+
+        # Build context for orchestrator
+        available_templates = [t.template_id for t in list_templates()]
+
+        # Extract song structure from features dict
+        structure_sections = song_features.get("structure", {}).get("sections", {})
+        total_bars = song_features.get("structure", {}).get(
+            "total_bars", len(beat_grid.bar_boundaries)
+        )
+
+        context: dict[str, Any] = {
+            "song_structure": {
+                "sections": structure_sections,
+                "total_bars": total_bars,
+            },
+            "fixtures": {
+                "count": len(self.fixtures.fixtures),
+                "groups": [],  # FixtureGroup doesn't have groups attribute
+            },
+            "available_templates": available_templates,
+            "beat_grid": {
+                "tempo": beat_grid.tempo_bpm,
+                "time_signature": f"{beat_grid.beats_per_bar}/4",
+                "total_bars": len(beat_grid.bar_boundaries),
+            },
+        }
+
+        # Run orchestration
+        orchestration_result = self.planner.orchestrate(context)
+
+        # Handle orchestration result
+        choreography_plan: ChoreographyPlan
+        if not orchestration_result.success:
+            error_msg = (
+                f"Agent orchestration failed: {orchestration_result.error_message or 'Unknown error'}. "
+                f"Iterations: {orchestration_result.iterations}, "
+                f"Tokens: {orchestration_result.total_tokens}, "
+                f"Final state: {orchestration_result.final_state.value}"
+            )
+            logger.error(error_msg)
+
+            # If we have a partial plan, use it as best attempt
+            if orchestration_result.plan:
+                logger.warning(
+                    f"Using best attempt plan from {orchestration_result.iterations} iterations"
+                )
+                choreography_plan = orchestration_result.plan
+            else:
+                raise RuntimeError(error_msg)
+        else:
+            logger.info(
+                f"Agent orchestration successful: {orchestration_result.iterations} iterations, "
+                f"tokens: {orchestration_result.total_tokens}, "
+                f"duration: {orchestration_result.duration_seconds:.1f}s"
+            )
+            if not orchestration_result.plan:
+                raise RuntimeError("Orchestration succeeded but no plan returned")
+            choreography_plan = orchestration_result.plan
+
+        # Step 4: Apply plan to sequence
+        logger.info("Step 4/4: Applying plan to sequence...")
 
         pipeline = RenderingPipeline(
-            llm_plan=llm_plan,
+            choreography_plan=choreography_plan,
             beat_grid=beat_grid,
             fixture_group=self.fixtures,
             job_config=self.session.job_config,
@@ -234,135 +239,6 @@ class MovingHeadManager(DomainManager):
 
         logger.info(
             f"Pipeline complete: {xsq_out} "
-            f"(tokens: {orchestrator_result.tokens_used}, time: {orchestrator_result.execution_time_s:.1f}s)"
+            f"(tokens: {orchestration_result.total_tokens}, "
+            f"time: {orchestration_result.duration_seconds:.1f}s)"
         )
-
-    def generate_plan_only(
-        self,
-        audio_path: str | Path,
-        xsq_in: str | Path,
-    ) -> dict[str, Any]:
-        """Generate plan without applying it to sequence.
-
-        Useful for:
-        - Previewing plans
-        - Debugging plan generation
-        - Saving plans for later use
-
-        Args:
-            audio_path: Path to audio file
-            xsq_in: Input xLights sequence path
-
-        Returns:
-            Generated plan dictionary (from AgentImplementation)
-
-        Example:
-            plan = mh.generate_plan_only("song.mp3", "input.xsq")
-            # Inspect plan before applying
-            print(f"Generated {len(plan['sections'])} sections")
-        """
-        logger.info("Generatingplan only (no sequencing)")
-
-        # Runorchestrator
-        orchestrator_result = self.planner.run(
-            audio_path=str(audio_path),
-            xsq_path=str(xsq_in),
-        )
-
-        # Check status
-        from blinkb0t.core.agents.moving_heads.orchestrator import OrchestratorStatus
-
-        if orchestrator_result.status == OrchestratorStatus.FAILED:
-            raise RuntimeError(f"Agent orchestration failed: {orchestrator_result.error}")
-
-        if orchestrator_result.status == OrchestratorStatus.INCOMPLETE:
-            logger.warning(
-                f"Agent orchestration incomplete. Using best attempt "
-                f"(score: {orchestrator_result.evaluation.overall_score if orchestrator_result.evaluation else 'N/A'})"
-            )
-
-        # Convert implementation to dict
-        if orchestrator_result.implementation:
-            plan_dict: dict[str, Any] = orchestrator_result.implementation.model_dump()
-        else:
-            raise RuntimeError("No implementation generated by orchestrator")
-
-        logger.info("plan generation complete")
-        return plan_dict
-
-    def apply_plan_only(
-        self,
-        xsq_in: str | Path,
-        xsq_out: str | Path,
-        plan: dict[str, Any],
-        song_features: dict[str, Any],
-    ) -> None:
-        """Apply an existing plan to a sequence.
-
-        Useful for:
-        - Reapplying plans
-        - Testing plan modifications
-        - Applying saved plans
-
-        Args:
-            xsq_in: Input xLights sequence path
-            xsq_out: Output xLights sequence path
-            plan: Pre-generated plan dictionary (AgentImplementation format)
-            song_features: Pre-analyzed song features
-
-        Example:
-            # Load saved plan and features
-            plan = json.load(open("saved_plan.json"))
-            features = json.load(open("saved_features.json"))
-
-            # Apply to sequence
-            mh.apply_plan_only("input.xsq", "output.xsq", plan, features)
-        """
-        logger.info("Applying plan to sequence...")
-
-        # Convert plan dict to LLMChoreographyPlan
-        from blinkb0t.core.agents.moving_heads.models_llm_plan import (
-            LLMChoreographyPlan,
-            SectionSelection,
-        )
-
-        sections = []
-        for section_data in plan.get("sections", []):
-            section = SectionSelection(
-                section_name=section_data["name"],
-                start_bar=section_data["start_bar"],
-                end_bar=section_data["end_bar"],
-                section_role=section_data.get("section_role"),  # Optional context
-                energy_level=section_data.get("energy_level"),  # Optional context
-                template_id=section_data["template_id"],
-                preset_id=section_data.get("params", {}).get("preset_id"),
-                modifiers=section_data.get("params", {}),
-                reasoning=section_data.get("reasoning", ""),
-            )
-            sections.append(section)
-
-        llm_plan = LLMChoreographyPlan(
-            sections=sections,
-            overall_strategy=plan.get("overall_strategy", ""),
-            template_variety_notes=plan.get("template_variety_notes"),  # Optional field
-        )
-
-        # Create beat grid
-        from blinkb0t.core.sequencer.timing.beat_grid import BeatGrid
-
-        beat_grid = BeatGrid.from_song_features(song_features)
-
-        # Create and run rendering pipeline
-        from blinkb0t.core.sequencer.moving_heads.pipeline import RenderingPipeline
-
-        pipeline = RenderingPipeline(
-            llm_plan=llm_plan,
-            beat_grid=beat_grid,
-            fixture_group=self.fixtures,
-            job_config=self.session.job_config,
-            output_path=Path(xsq_out),
-            template_xsq=Path(xsq_in),
-        )
-
-        segments = pipeline.render()
-        logger.info(f"Applied plan: {len(segments)} segments written to {xsq_out}")

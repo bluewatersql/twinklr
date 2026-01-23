@@ -62,8 +62,18 @@ def compile_step(
     """
     # Get handlers
     geometry_handler = context.geometry_registry.get(step.geometry.geometry_type.value)
-    movement_handler = context.movement_registry.get(step.movement.movement_type.value)
-    dimmer_handler = context.dimmer_registry.get(step.dimmer.dimmer_type.value)
+
+    # Use get_with_params() for movement and dimmer to inject handler_id into params
+    # when using default handlers (required by DefaultMovementHandler/DefaultDimmerHandler)
+    movement_params = dict(step.movement.params)
+    movement_handler = context.movement_registry.get_with_params(
+        step.movement.movement_type.value, movement_params
+    )
+
+    dimmer_params = dict(step.dimmer.params)
+    dimmer_handler = context.dimmer_registry.get_with_params(
+        step.dimmer.dimmer_type.value, dimmer_params
+    )
 
     # Build geometry params
     geometry_params: dict[str, Any] = dict(step.geometry.params)
@@ -82,17 +92,17 @@ def compile_step(
         calibration=context.calibration,
     )
 
-    # Generate movement curves
+    # Generate movement curves (use the params dict that has movement_id injected)
     movement_result = movement_handler.generate(
-        params=step.movement.params,
+        params=movement_params,
         n_samples=context.n_samples,
         cycles=step.movement.cycles,
         intensity=step.movement.intensity,
     )
 
-    # Generate dimmer curve
+    # Generate dimmer curve (use the params dict that has dimmer_id injected)
     dimmer_result = dimmer_handler.generate(
-        params=step.dimmer.params,
+        params=dimmer_params,
         n_samples=context.n_samples,
         cycles=step.dimmer.cycles,
         intensity=step.dimmer.intensity,
@@ -138,6 +148,7 @@ def compile_step(
     segment.add_channel(
         channel=ChannelName.PAN,
         curve=PointsCurve(points=pan_points),
+        value_points=pan_points,  # Pass points for xLights value curve export
         offset_centered=True,
         base_dmx=pan_base_dmx,
         amplitude_dmx=movement_amplitude_dmx,
@@ -147,6 +158,7 @@ def compile_step(
     segment.add_channel(
         channel=ChannelName.TILT,
         curve=PointsCurve(points=tilt_points),
+        value_points=tilt_points,  # Pass points for xLights value curve export
         offset_centered=True,
         base_dmx=tilt_base_dmx,
         amplitude_dmx=movement_amplitude_dmx,
@@ -156,6 +168,7 @@ def compile_step(
     segment.add_channel(
         channel=ChannelName.DIMMER,
         curve=PointsCurve(points=dimmer_points),
+        value_points=dimmer_points,  # Pass points for xLights value curve export
         offset_centered=False,
     )
 

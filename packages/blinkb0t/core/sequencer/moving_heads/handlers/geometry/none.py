@@ -14,7 +14,7 @@ class NoneGeometryHandler:
         handler_id: Unique identifier ("NONE").
     """
 
-    handler_id: str = "NONE"
+    handler_id: str = "none"
 
     def resolve(
         self,

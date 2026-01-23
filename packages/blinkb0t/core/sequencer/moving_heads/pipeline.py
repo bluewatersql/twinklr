@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from blinkb0t.core.agents.moving_heads.models_llm_plan import LLMChoreographyPlan
+from blinkb0t.core.agents.sequencer.moving_heads import ChoreographyPlan
 from blinkb0t.core.config.fixtures import FixtureGroup
 from blinkb0t.core.config.models import JobConfig
 from blinkb0t.core.curves.generator import CurveGenerator
@@ -34,7 +34,7 @@ class RenderingPipeline:
     def __init__(
         self,
         *,
-        llm_plan: LLMChoreographyPlan,
+        choreography_plan: ChoreographyPlan,
         beat_grid: BeatGrid,
         fixture_group: FixtureGroup,
         job_config: JobConfig,
@@ -44,14 +44,14 @@ class RenderingPipeline:
         """Initialize rendering pipeline.
 
         Args:
-            llm_plan: LLM choreography plan with section selections
+            choreography_plan: Choreography plan from agent orchestrator
             beat_grid: Beat grid for musical timing
             fixture_group: Fixture configuration
             job_config: Job configuration
             output_path: Optional output path for XSQ file
             template_xsq: Optional template XSQ path
         """
-        self.llm_plan = llm_plan
+        self.choreography_plan = choreography_plan
         self.fixture_group = fixture_group
         self.job_config = job_config
         self.beat_grid = beat_grid
@@ -76,15 +76,15 @@ class RenderingPipeline:
 
         logger.info(
             f"Initialized RenderingPipeline with {len(self.rig_profile.fixtures)} fixtures "
-            f"and {len(self.llm_plan.sections)} sections"
+            f"and {len(self.choreography_plan.sections)} sections"
         )
 
     def render(self) -> list[FixtureSegment]:
         """Render the choreography plan to fixture segments.
 
-        Processes each section in the LLM plan:
-        1. Load template by ID
-        2. Apply preset if specified
+        Processes each section in the choreography plan:
+        1. For each sequence in section, build template ID from components
+        2. Load template and apply energy-based preset
         3. Build compile context aligned to beat grid
         4. Compile template to IR segments
         5. Aggregate all segments
@@ -97,9 +97,9 @@ class RenderingPipeline:
         """
         all_segments: list[FixtureSegment] = []
 
-        logger.info(f"Starting render of {len(self.llm_plan.sections)} sections")
+        logger.info(f"Starting render of {len(self.choreography_plan.sections)} sections")
 
-        for section in self.llm_plan.sections:
+        for section in self.choreography_plan.sections:
             logger.info(
                 f"Rendering section '{section.section_name}' "
                 f"(bars {section.start_bar}-{section.end_bar}, "
@@ -115,7 +115,7 @@ class RenderingPipeline:
                 logger.error(f"Failed to load template '{section.template_id}': {e}")
                 raise ValueError(f"Template not found: {section.template_id}") from e
 
-            # Apply preset if specified
+            # Apply preset if available
             preset = None
             if section.preset_id:
                 try:

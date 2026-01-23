@@ -229,9 +229,24 @@ def rig_profile_from_fixture_group(
 
     fixtures: list[FixtureDefinition] = []
     for fixture in fixture_instances_sorted:
+        # Extract calibration from fixture config if available
+        calibration = None
+        if hasattr(fixture.config, "limits") and fixture.config.limits:
+            calibration = FixtureCalibration(
+                pan_min_dmx=fixture.config.limits.pan_min,
+                pan_max_dmx=fixture.config.limits.pan_max,
+                tilt_min_dmx=fixture.config.limits.tilt_min,
+                tilt_max_dmx=fixture.config.limits.tilt_max,
+                pan_inverted=False,  # Not in fixture config yet
+                tilt_inverted=False,  # Not in fixture config yet
+                dimmer_floor_dmx=dimmer_floor_dmx or 0,
+                dimmer_ceiling_dmx=255,
+            )
+
         fixtures.append(
             FixtureDefinition(
                 fixture_id=fixture.fixture_id,
+                calibration=calibration,
             )
         )
 

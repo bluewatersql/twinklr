@@ -119,6 +119,20 @@ def schedule_repeats(
             )
             current_time = end_time
 
+    # Handle remainder based on policy
+    if remainder_bars > 0.0 and contract.remainder_policy == RemainderPolicy.HOLD_LAST_POSE:
+        # Add an instance for the last step that extends to fill the remainder
+        if instances:
+            last_step_id = instances[-1].step_id
+            instances.append(
+                ScheduledInstance(
+                    step_id=last_step_id,
+                    start_bars=current_time,
+                    end_bars=current_time + remainder_bars,
+                    cycle_number=num_complete_cycles,  # Remainder cycle
+                )
+            )
+
     return ScheduleResult(
         instances=instances,
         num_complete_cycles=num_complete_cycles,

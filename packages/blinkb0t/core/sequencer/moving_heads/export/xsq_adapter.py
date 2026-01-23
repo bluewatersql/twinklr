@@ -174,9 +174,17 @@ class XsqAdapter:
         placements = []
         covered_fixture_ids: set[str] = set()
 
-        # Build semantic groups from fixture IDs
+        # Build semantic groups ONLY for groups that have xLights mappings
+        # This prevents unnecessary processing of unmapped semantic groups
         all_fixture_ids = [f.fixture_id for f in fixture_group.fixtures]
-        semantic_groups = build_semantic_groups(all_fixture_ids)
+        all_possible_groups = build_semantic_groups(all_fixture_ids)
+
+        # Filter to only groups that have xLights mappings
+        mapped_semantic_groups = {
+            name: fixture_ids
+            for name, fixture_ids in all_possible_groups.items()
+            if name in fixture_group.xlights_semantic_groups
+        }
 
         # Group segments by time range
         # Key: (t0_ms, t1_ms), Value: list of segments
@@ -189,15 +197,12 @@ class XsqAdapter:
             # Get fixture IDs in this time range
             fixture_ids_in_range = {s.fixture_id for s in time_range_segments}
 
-            # Check if any semantic group is fully covered
-            for group_name, group_fixture_ids in semantic_groups.items():
+            # Check if any MAPPED semantic group is fully covered
+            for group_name, group_fixture_ids in mapped_semantic_groups.items():
                 if set(group_fixture_ids).issubset(fixture_ids_in_range):
                     # This semantic group is fully covered at this time
-                    # Create a group effect if the group has an xLights mapping
-
-                    # Determine group xLights name (e.g., "GROUP - MH LEFT")
-                    # This is a convention - might need to be configurable
-                    group_xlights_name = f"GROUP - {group_name.upper()}"
+                    # Look up the actual xLights group name (we know it exists since we filtered above)
+                    group_xlights_name = fixture_group.xlights_semantic_groups[group_name]
 
                     # Check if all fixtures in the group have identical channel settings
                     # (simplification: we'll write the first fixture's settings for the group)

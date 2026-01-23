@@ -11,8 +11,46 @@ from typing import TypedDict
 from blinkb0t.core.sequencer.moving_heads.handlers.dimmers.default import (
     DefaultDimmerHandler,
 )
+from blinkb0t.core.sequencer.moving_heads.handlers.geometry.alternating_updown import (
+    AlternatingUpDownHandler,
+)
+from blinkb0t.core.sequencer.moving_heads.handlers.geometry.audience_scan import (
+    AudienceScanAsymHandler,
+    AudienceScanHandler,
+)
+from blinkb0t.core.sequencer.moving_heads.handlers.geometry.center_out import (
+    CenterOutHandler,
+)
+from blinkb0t.core.sequencer.moving_heads.handlers.geometry.chevron import ChevronVHandler
+from blinkb0t.core.sequencer.moving_heads.handlers.geometry.fan import FanHandler
+from blinkb0t.core.sequencer.moving_heads.handlers.geometry.mirror_lr import (
+    MirrorLRHandler,
+)
 from blinkb0t.core.sequencer.moving_heads.handlers.geometry.none import NoneGeometryHandler
+from blinkb0t.core.sequencer.moving_heads.handlers.geometry.rainbow_arc import (
+    RainbowArcHandler,
+)
 from blinkb0t.core.sequencer.moving_heads.handlers.geometry.role_pose import RolePoseHandler
+from blinkb0t.core.sequencer.moving_heads.handlers.geometry.role_pose_tilt_bias import (
+    RolePoseTiltBiasHandler,
+)
+from blinkb0t.core.sequencer.moving_heads.handlers.geometry.scattered import (
+    ScatteredChaosHandler,
+)
+from blinkb0t.core.sequencer.moving_heads.handlers.geometry.spotlight_cluster import (
+    SpotlightClusterHandler,
+)
+from blinkb0t.core.sequencer.moving_heads.handlers.geometry.tilt_bias_by_group import (
+    TiltBiasByGroupHandler,
+)
+from blinkb0t.core.sequencer.moving_heads.handlers.geometry.tunnel_cone import (
+    TunnelConeHandler,
+)
+from blinkb0t.core.sequencer.moving_heads.handlers.geometry.wall_wash import (
+    WallWashHandler,
+)
+from blinkb0t.core.sequencer.moving_heads.handlers.geometry.wave_lr import WaveLRHandler
+from blinkb0t.core.sequencer.moving_heads.handlers.geometry.x_cross import XCrossHandler
 from blinkb0t.core.sequencer.moving_heads.handlers.movement.default import (
     DefaultMovementHandler,
 )
@@ -26,20 +64,63 @@ from blinkb0t.core.sequencer.moving_heads.handlers.registry import (
 def create_default_geometry_registry() -> GeometryRegistry:
     """Create a geometry registry with default handlers.
 
-    Currently includes:
+    Includes commonly used geometry patterns:
     - ROLE_POSE: Maps role tokens to base poses
     - NONE: Returns center position
+    - FAN: Fan spread formation
+    - CHEVRON_V: V-shaped chevron pattern
+    - SCATTERED_CHAOS: Randomized positions
+    - AUDIENCE_SCAN: Symmetric audience spread
+    - AUDIENCE_SCAN_ASYM: Asymmetric audience spread
+    - ALTERNATING_UPDOWN: Alternating up/down tilt positions
+    - CENTER_OUT: Center-outward radiating pattern
+    - MIRROR_LR: Left/right mirror symmetry
+    - RAINBOW_ARC: Rainbow arc formation
+    - ROLE_POSE_TILT_BIAS: Role-based pan with group tilt bias
+    - TILT_BIAS_BY_GROUP: Constant pan with group tilt offsets
+    - SPOTLIGHT_CLUSTER: Converging beams to focal point
+    - TUNNEL_CONE: Circular overhead cone pattern
+    - WALL_WASH: Unified parallel beams
+    - WAVE_LR: Sequential wave progression left-to-right
+    - X_CROSS: Diagonal crossing pattern
+
+    Uses RolePoseHandler as default fallback for unimplemented geometry types.
 
     Returns:
-        GeometryRegistry with default handlers registered.
+        GeometryRegistry with handlers registered.
 
     Example:
         >>> registry = create_default_geometry_registry()
-        >>> handler = registry.get("ROLE_POSE")
+        >>> handler = registry.get("FAN")
     """
     registry = GeometryRegistry()
-    registry.register(RolePoseHandler())
+
+    # Core handlers
+    role_pose_handler = RolePoseHandler()
+    registry.register(role_pose_handler)
     registry.register(NoneGeometryHandler())
+
+    # Pattern handlers
+    registry.register(FanHandler())
+    registry.register(ChevronVHandler())
+    registry.register(ScatteredChaosHandler())
+    registry.register(AudienceScanHandler())
+    registry.register(AudienceScanAsymHandler())
+    registry.register(AlternatingUpDownHandler())
+    registry.register(CenterOutHandler())
+    registry.register(MirrorLRHandler())
+    registry.register(RainbowArcHandler())
+    registry.register(RolePoseTiltBiasHandler())
+    registry.register(TiltBiasByGroupHandler())
+    registry.register(SpotlightClusterHandler())
+    registry.register(TunnelConeHandler())
+    registry.register(WallWashHandler())
+    registry.register(WaveLRHandler())
+    registry.register(XCrossHandler())
+
+    # Register RolePoseHandler as default fallback for unimplemented geometry types
+    registry.register_default(role_pose_handler)
+
     return registry
 
 

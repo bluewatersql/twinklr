@@ -1,0 +1,50 @@
+Evaluate the following choreography plan:
+
+## Plan to Judge
+
+{{ plan | tojson(indent=2) }}
+
+## Musical Context
+
+{{ context.song_structure | tojson(indent=2) }}
+
+{% if context.get('audio_features') %}
+**Energy Profile**: {{ context.audio_features.get('energy_summary', 'Not available') }}
+**Key Moments**: {{ context.audio_features.get('key_moments', []) | tojson }}
+{% endif %}
+
+{% if iteration > 1 %}
+## Iteration Context
+
+This is iteration {{ iteration }}. Previous feedback:
+{% for item in previous_feedback %}
+- {{ item }}
+{% endfor %}
+
+Has the planner addressed the feedback effectively?
+{% endif %}
+
+## Evaluation Instructions
+
+Judge this choreography plan across all criteria:
+
+1. **Musical Synchronization**: Does it serve the music?
+2. **Visual Interest**: Is it engaging and varied?
+3. **Flow and Transitions**: Does it feel cohesive?
+4. **Creative Template Use**: Are templates used effectively?
+5. **Energy Arc**: Does the overall energy make sense?
+
+## Required Output Format
+
+Provide your evaluation matching this schema:
+
+```json
+{{ response_schema }}
+```
+
+**Decision Guidelines**:
+- **APPROVE** (score >= 7.0): Ready to render, no revision needed
+- **SOFT_FAIL** (score 5.0-6.9): Needs minor improvements, specific feedback provided
+- **HARD_FAIL** (score < 5.0): Major issues, fundamental rethinking required
+
+Be honest but constructive. Specific feedback is more valuable than general praise or criticism.

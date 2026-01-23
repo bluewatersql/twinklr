@@ -108,7 +108,7 @@ class DmxSettingsBuilder:
     def _extract_channel_data(
         self,
         channel_name: ChannelName,
-        channel_value: "ChannelValue",
+        channel_value: ChannelValue,
         channel_values: dict[int, int],
         channel_curves: dict[int, list[CurvePoint]],
     ) -> None:
@@ -134,38 +134,9 @@ class DmxSettingsBuilder:
 
         # Get value curve if present
         if channel_value.value_points:
-            # For offset-centered curves, need to convert to DMX space
-            if channel_value.offset_centered and channel_value.base_dmx is not None:
-                amplitude = channel_value.amplitude_dmx or 0
-                base = channel_value.base_dmx
-
-                # Convert normalized offset curve to DMX curve
-                dmx_points = []
-                for point in channel_value.value_points:
-                    # Curve is in normalized [0, 1] space centered at 0.5
-                    # offset = (point.v - 0.5) * 2  # Convert to [-1, 1]
-                    # dmx_value = base + (offset * amplitude)
-                    offset = point.v - 0.5  # [-0.5, 0.5]
-                    dmx_value = base + (offset * amplitude * 2)  # Scale amplitude
-                    dmx_value = max(0, min(255, int(dmx_value)))  # Clamp
-
-                    dmx_points.append(CurvePoint(t=point.t, v=float(dmx_value)))
-
-                channel_curves[dmx_channel] = dmx_points
-            else:
-                # Absolute curve - convert normalized to DMX
-                clamp_min = channel_value.clamp_min
-                clamp_max = channel_value.clamp_max
-
-                dmx_points = []
-                for point in channel_value.value_points:
-                    # Curve is in normalized [0, 1] space
-                    dmx_value = clamp_min + (point.v * (clamp_max - clamp_min))
-                    dmx_value = max(0, min(255, int(dmx_value)))  # Clamp
-
-                    dmx_points.append(CurvePoint(t=point.t, v=float(dmx_value)))
-
-                channel_curves[dmx_channel] = dmx_points
+            # xLights expects normalized [0,1] values in custom curve Values array
+            # Store the normalized points directly - no DMX conversion needed
+            channel_curves[dmx_channel] = channel_value.value_points
 
     def _get_dmx_channel_number(self, channel_name: ChannelName) -> int | None:
         """Map logical channel name to DMX channel number.
@@ -286,35 +257,61 @@ class DmxSettingsBuilder:
 
         Args:
             dmx_channel: DMX channel number
-            curve_points: List of curve points in DMX space
+            curve_points: List of normalized curve points (t and v both in [0,1])
 
         Returns:
-            xLights value curve string
+            xLights value curve string with time:value pairs anchored at 0.0 and 1.0
 
         Example:
             >>> builder._curve_points_to_xlights_string(1, [
             ...     CurvePoint(t=0.0, v=0.0),
-            ...     CurvePoint(t=0.5, v=128.0),
-            ...     CurvePoint(t=1.0, v=255.0),
+            ...     CurvePoint(t=0.5, v=0.5),
+            ...     CurvePoint(t=1.0, v=1.0),
             ... ])
-            "Active=TRUE|Id=ID_VALUECURVE_DMX1|Type=Custom|Min=0.00|Max=255.00|Values=0.0,128.0,255.0"
+            "Active=TRUE|Id=ID_VALUECURVE_DMX1|Type=Custom|Min=0.00|Max=255.00|RV=FALSE|Values=0.00:0.00;0.50:0.50;1.00:1.00|"
         """
         if not curve_points:
             return ""
 
-        # Extract values from curve points
-        values = [str(int(p.v)) for p in curve_points]
-        values_str = ",".join(values)
+        # Build time:value pairs
+        # Both time and value are already normalized [0, 1]
+        pairs = []
+        for point in curve_points:
+            # Format: time:value (both normalized 0-1)
+            # Use 2 decimal places for both time and value
+            # Round values safely to avoid precision issues
+            t_rounded = round(point.t, 2)
+            v_rounded = round(point.v, 2)
+            pair = f"{t_rounded:.2f}:{v_rounded:.2f}"
+            pairs.append(pair)
+
+        # Ensure anchors at 0.0 and 1.0
+        # Check if first point is at t=0.0
+        if curve_points and curve_points[0].t > 0.01:
+            # Prepend anchor at 0.0 using first point's value
+            v_start = round(curve_points[0].v, 2)
+            pairs.insert(0, f"0.00:{v_start:.2f}")
+
+        # Check if last point is at t=1.0
+        if curve_points and curve_points[-1].t < 0.99:
+            # Append anchor at 1.0 using last point's value
+            v_end = round(curve_points[-1].v, 2)
+            pairs.append(f"1.00:{v_end:.2f}")
+
+        # Join with semicolons
+        values_str = ";".join(pairs)
 
         # Build xLights value curve string
-        # Format: Active=TRUE|Id=ID_VALUECURVE_DMXn|Type=Custom|Min=0.00|Max=255.00|Values=...
+        # Format: Active=TRUE|Id=ID_VALUECURVE_DMXn|Type=Custom|Min=0.00|Max=255.00|RV=FALSE|Values=t:v;t:v;...|
         parts = [
             "Active=TRUE",
             f"Id=ID_VALUECURVE_DMX{dmx_channel}",
             "Type=Custom",
             "Min=0.00",
             "Max=255.00",
+            "RV=FALSE",
             f"Values={values_str}",
         ]
 
-        return "|".join(parts)
+        # xLights format requires trailing pipe
+        return "|".join(parts) + "|"

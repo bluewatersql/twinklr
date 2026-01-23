@@ -36,7 +36,11 @@ def compute_beats(
         start_bpm=start_bpm,
         tightness=100,
     )
-    tempo_f = float(tempo) if tempo is not None else 0.0
+    # Convert numpy array/scalar to Python float using .item()
+    if tempo is not None:
+        tempo_f = float(tempo.item()) if hasattr(tempo, "item") else float(tempo)
+    else:
+        tempo_f = 0.0
     return tempo_f, np.asarray(beat_frames, dtype=int)
 
 
