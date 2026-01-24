@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from blinkb0t.core.config.poses import PanPose, TiltPose
 from blinkb0t.core.sequencer.models.enum import (
     BlendMode,
     ChaseOrder,
@@ -88,12 +89,18 @@ def make_template() -> TemplateDoc:
                     ),
                     geometry=Geometry(
                         geometry_type=GeometryType.SCATTERED_CHAOS,
+                        pan_pose_by_role={
+                            TemplateRole.OUTER_LEFT: PanPose.WIDE_LEFT,
+                            TemplateRole.INNER_LEFT: PanPose.MID_LEFT,
+                            TemplateRole.INNER_RIGHT: PanPose.MID_RIGHT,
+                            TemplateRole.OUTER_RIGHT: PanPose.WIDE_RIGHT,
+                        },
                         params={
-                            "seed": 5,
-                            "pan_center_dmx": 128,
-                            "pan_spread_dmx": 36,
-                            "tilt_center_dmx": 128,
-                            "tilt_spread_dmx": 18,
+                            "seed": 7,
+                            "pan_center_dmx": PanPose.CENTER.value,
+                            "tilt_center_dmx": TiltPose.HORIZON_UP_45.value,
+                            "pan_spread_dmx": 70,
+                            "tilt_spread_dmx": 40,
                         },
                     ),
                     movement=Movement(

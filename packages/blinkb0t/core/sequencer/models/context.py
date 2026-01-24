@@ -46,6 +46,10 @@ class StepCompileContext(BaseModel):
 
     model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
 
+    section_id: str
+    template_id: str
+    preset_id: str | None = None
+
     fixture_id: str
     role: str
     calibration: dict[str, Any]
@@ -67,6 +71,9 @@ class TemplateCompileContext(BaseModel):
 
     model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
 
+    section_id: str
+    template_id: str
+    preset_id: str | None = None
     fixtures: list[FixtureContext]
     beat_grid: BeatGrid
 
@@ -98,9 +105,12 @@ class TemplateCompileContext(BaseModel):
 
     @property
     def ms_per_bar(self) -> float:
-        """Calculate milliseconds per bar (assuming 4/4 time)."""
-        ms_per_beat = 60000.0 / self.bpm
-        return ms_per_beat * 4  # 4 beats per bar
+        """Get milliseconds per bar from beat grid.
+
+        Uses detected beat boundaries to stay synced with actual music,
+        not tempo-based calculation which can drift.
+        """
+        return self.beat_grid.ms_per_bar
 
     def _bar_to_ms(self, bar: int) -> int:
         """Convert bar number to milliseconds.

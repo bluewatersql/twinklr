@@ -40,6 +40,7 @@ from blinkb0t.core.sequencer.moving_heads.templates.library import register_temp
 @register_template(aliases=["Intro Main Outro Phrase", "intro main outro phrase"])
 def make_template() -> TemplateDoc:
     return TemplateDoc(
+        enabled=False,
         template=Template(
             template_id="intro_main_outro_phrase",
             version=1,

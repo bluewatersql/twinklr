@@ -60,10 +60,10 @@ def make_template() -> TemplateDoc:
                 ],
             },
             repeat=RepeatContract(
-                repeatable=False,
-                mode=RepeatMode.JOINER,  # CLOSED → JOINER
+                repeatable=True,  # Changed to True to allow repeating
+                mode=RepeatMode.JOINER,
                 cycle_bars=4.0,
-                loop_step_ids=[],
+                loop_step_ids=["main"],  # Added "main" step
                 remainder_policy=RemainderPolicy.HOLD_LAST_POSE,
             ),
             defaults={"dimmer_floor_dmx": 60, "dimmer_ceiling_dmx": 255},

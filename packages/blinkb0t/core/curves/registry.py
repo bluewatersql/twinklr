@@ -75,7 +75,11 @@ class CurveRegistry:
             raise ValueError(f"Curve '{curve_id}' is not registered") from exc
 
     def resolve(
-        self, definition: CurveDefinition, *, n_samples: int | None = None
+        self,
+        definition: CurveDefinition,
+        *,
+        n_samples: int | None = None,
+        **kwargs: Any,
     ) -> list[CurvePoint]:
         """Resolve a curve definition into points.
 
@@ -86,6 +90,13 @@ class CurveRegistry:
         spec = self.get(definition.curve_id)
 
         params = dict(spec.default_params or {})
+
+        # Override only known/defaulted params (prevents silent typos creating new params)
+        if kwargs:
+            for k, v in kwargs.items():
+                if k in params:
+                    params[k] = v
+
         sample_count = n_samples or spec.default_samples
         points = spec.generator(sample_count, **params)
 

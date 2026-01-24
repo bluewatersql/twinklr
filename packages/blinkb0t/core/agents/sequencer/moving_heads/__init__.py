@@ -13,8 +13,6 @@ from blinkb0t.core.agents.sequencer.moving_heads.models import (
     JudgeIssue,
     JudgeResponse,
     PlanSection,
-    ValidationIssue,
-    ValidationResponse,
 )
 from blinkb0t.core.agents.sequencer.moving_heads.orchestrator import (
     OrchestrationConfig,
@@ -24,7 +22,6 @@ from blinkb0t.core.agents.sequencer.moving_heads.orchestrator import (
 from blinkb0t.core.agents.sequencer.moving_heads.specs import (
     get_judge_spec,
     get_planner_spec,
-    get_validator_spec,
 )
 
 __all__ = [
@@ -33,14 +30,11 @@ __all__ = [
     # Models
     "PlanSection",
     "ChoreographyPlan",
-    "ValidationIssue",
-    "ValidationResponse",
     "JudgeDecision",
     "JudgeIssue",
     "JudgeResponse",
     # Specs
     "get_planner_spec",
-    "get_validator_spec",
     "get_judge_spec",
     # Validator
     "HeuristicValidator",

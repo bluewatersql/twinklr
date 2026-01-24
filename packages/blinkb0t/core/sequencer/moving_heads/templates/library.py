@@ -1,11 +1,13 @@
-# blinkb0t/core/domains/sequencer/moving_heads/templates/library.py
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from typing import Any
 
 from blinkb0t.core.sequencer.models.template import TemplateDoc
+
+logger = logging.getLogger(__name__)
 
 
 class TemplateNotFoundError(KeyError):
@@ -49,6 +51,10 @@ class TemplateRegistry:
     ) -> None:
         t = factory()  # materialize once for validation + metadata
         tid = template_id or t.template.template_id
+
+        if not t.enabled:
+            logger.warning(f"Template {tid} is disabled, skipping registration")
+            return
 
         if tid in self._factories_by_id:
             raise ValueError(f"Template already registered: {tid}")

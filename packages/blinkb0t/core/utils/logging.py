@@ -78,11 +78,11 @@ def get_logger(name: str, **kwargs: Any) -> logging.Logger | logging.LoggerAdapt
     Example:
         >>> # Simple logger
         >>> logger = get_logger(__name__)
-        >>> logger.info("Starting process")
+        >>> logger.debug("Starting process")
 
         >>> # Logger with context
         >>> logger = get_logger(__name__, request_id="123", user="alice")
-        >>> logger.info("Processing request")
+        >>> logger.debug("Processing request")
         >>> # Output: ... - Processing request - 123
     """
     logger = logging.getLogger(name)

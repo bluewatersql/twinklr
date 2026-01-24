@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from blinkb0t.core.config.poses import PanPose, TiltPose
 from blinkb0t.core.sequencer.models.enum import (
     BlendMode,
     Intensity,
@@ -76,7 +77,13 @@ def make_template() -> TemplateDoc:
                     ),
                     geometry=Geometry(
                         geometry_type=GeometryType.FAN,
-                        params={},
+                        pan_pose_by_role={
+                            TemplateRole.OUTER_LEFT: PanPose.WIDE_LEFT,
+                            TemplateRole.INNER_LEFT: PanPose.LEFT,
+                            TemplateRole.INNER_RIGHT: PanPose.RIGHT,
+                            TemplateRole.OUTER_RIGHT: PanPose.WIDE_RIGHT,
+                        },
+                        tilt_pose=TiltPose.HORIZON,
                     ),
                     movement=Movement(
                         movement_type=MovementType.HOLD,

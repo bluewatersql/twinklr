@@ -36,6 +36,7 @@ from blinkb0t.core.sequencer.moving_heads.templates.library import register_temp
 @register_template(aliases=["Pump Up Loop", "pump up loop"])
 def make_template() -> TemplateDoc:
     return TemplateDoc(
+        enabled=False,
         template=Template(
             template_id="pump_up_loop",
             version=1,

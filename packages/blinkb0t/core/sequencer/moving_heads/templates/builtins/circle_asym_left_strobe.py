@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from blinkb0t.core.config.poses import PanPose, TiltPose
 from blinkb0t.core.sequencer.models.enum import (
     BlendMode,
+    ChaseOrder,
     Intensity,
     QuantizeMode,
     SemanticGroupType,
@@ -13,8 +15,11 @@ from blinkb0t.core.sequencer.models.enum import (
 from blinkb0t.core.sequencer.models.template import (
     BaseTiming,
     Dimmer,
+    Distribution,
     Geometry,
     Movement,
+    PhaseOffset,
+    PhaseOffsetMode,
     RemainderPolicy,
     RepeatContract,
     RepeatMode,
@@ -72,15 +77,25 @@ def make_template() -> TemplateDoc:
                             start_offset_bars=0.0,
                             duration_bars=4.0,
                             quantize_type=QuantizeMode.DOWNBEAT,
-                        )
+                        ),
+                        phase_offset=PhaseOffset(
+                            mode=PhaseOffsetMode.GROUP_ORDER,
+                            group=SemanticGroupType.ALL,
+                            order=ChaseOrder.LEFT_TO_RIGHT,
+                            spread_bars=1.0,
+                            distribution=Distribution.LINEAR,
+                            wrap=True,
+                        ),
                     ),
                     geometry=Geometry(
                         geometry_type=GeometryType.AUDIENCE_SCAN_ASYM,
-                        params={
-                            "order": "LEFT_TO_RIGHT",
-                            "pan_positions": [68, 92, 132, 160],
-                            "tilt_dmx": 128,
+                        pan_pose_by_role={
+                            TemplateRole.OUTER_LEFT: PanPose.WIDE_LEFT,
+                            TemplateRole.INNER_LEFT: PanPose.MID_LEFT,
+                            TemplateRole.INNER_RIGHT: PanPose.MID_RIGHT,
+                            TemplateRole.OUTER_RIGHT: PanPose.WIDE_RIGHT,
                         },
+                        tilt_pose=TiltPose.AUDIENCE_CENTER,
                     ),
                     movement=Movement(
                         movement_type=MovementType.CIRCLE,

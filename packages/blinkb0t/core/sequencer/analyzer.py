@@ -6,7 +6,7 @@ import math
 from typing import Any
 
 from blinkb0t.core.config.models import AppConfig, JobConfig
-from blinkb0t.core.formats.xlights.xsq import XSQParser
+from blinkb0t.core.formats.xlights.sequence.parser import XSQParser
 from blinkb0t.core.utils.checkpoint import CheckpointManager, CheckpointType
 
 

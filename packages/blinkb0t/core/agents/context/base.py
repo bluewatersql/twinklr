@@ -120,7 +120,7 @@ class BaseContextShaper:
             shaped_tokens: Shaped token count
             reduction_pct: Reduction percentage
         """
-        logger.info(
+        logger.debug(
             f"Context shaped for {agent_name}: "
             f"{original_tokens} → {shaped_tokens} tokens "
             f"(reduced {reduction_pct:.1f}%)"

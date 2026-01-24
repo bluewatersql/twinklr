@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from enum import Enum
+from typing import Any
 
 from blinkb0t.core.curves.functions import (
     generate_anticipate,
@@ -39,7 +40,6 @@ from blinkb0t.core.curves.functions import (
     generate_perlin_noise,
     generate_pulse,
     generate_s_curve,
-    generate_simplex_noise,
     generate_sine,
     generate_smooth_step,
     generate_smoother_step,
@@ -100,10 +100,6 @@ class CurveLibrary(str, Enum):
     MUSICAL_SWELL = "musical_swell"  # Smooth rise (90%), sharp cutoff (10%)
     BEAT_PULSE = "beat_pulse"  # Rhythmic pulse aligned to beat subdivisions
 
-    # Natural Motion - Noise Algorithms
-    PERLIN_NOISE = "perlin_noise"  # True Perlin noise (smooth, organic, configurable)
-    SIMPLEX_NOISE = "simplex_noise"  # Simplex noise (faster, similar quality)
-
     # Parametric
     BEZIER = "bezier"  # Bezier curve (controllable control points)
     LISSAJOUS = "lissajous"  # Figure-8 like patterns (Lissajous curves)
@@ -118,6 +114,9 @@ class CurveLibrary(str, Enum):
     MOVEMENT_SINE = "movement_sine"  # Sine wave
     MOVEMENT_TRIANGLE = "movement_triangle"  # Triangle wave
     MOVEMENT_PULSE = "movement_pulse"  # Pulse wave
+    MOVEMENT_PERLIN_NOISE = "movement_perlin_noise"  # Perlin noise as movement offset
+    MOVEMENT_COSINE = "movement_cosine"
+    MOVEMENT_LISSAJOUS = "movement_lissajous"
 
 
 _DEFAULT_SAMPLES = 64
@@ -127,13 +126,16 @@ def build_default_registry() -> CurveRegistry:
     """Construct a registry containing all built-in curves."""
     registry = CurveRegistry()
 
-    def register(curve_id: CurveLibrary, generator, kind: CurveKind) -> None:
+    def register(
+        curve_id: CurveLibrary, generator, kind: CurveKind, params: dict[str, Any] | None = None
+    ) -> None:
         registry.register(
             CurveDefinition(
                 curve_id=curve_id.value,
                 generator=generator,
                 kind=kind,
                 default_samples=_DEFAULT_SAMPLES,
+                default_params=params,
             )
         )
 
@@ -170,12 +172,16 @@ def build_default_registry() -> CurveRegistry:
     register(CurveLibrary.ELASTIC_OUT, generate_elastic_out, CurveKind.DIMMER_ABSOLUTE)
 
     # Noise
-    register(CurveLibrary.PERLIN_NOISE, generate_perlin_noise, CurveKind.DIMMER_ABSOLUTE)
-    register(CurveLibrary.SIMPLEX_NOISE, generate_simplex_noise, CurveKind.DIMMER_ABSOLUTE)
+    register(CurveLibrary.MOVEMENT_PERLIN_NOISE, generate_perlin_noise, CurveKind.DIMMER_ABSOLUTE)
 
     # Parametric
     register(CurveLibrary.BEZIER, generate_bezier, CurveKind.DIMMER_ABSOLUTE)
-    register(CurveLibrary.LISSAJOUS, generate_lissajous, CurveKind.DIMMER_ABSOLUTE)
+    register(
+        CurveLibrary.LISSAJOUS,
+        generate_lissajous,
+        CurveKind.DIMMER_ABSOLUTE,
+        params={"b": 2, "delta": 0},
+    )
 
     # Motion helpers
     register(CurveLibrary.ANTICIPATE, generate_anticipate, CurveKind.DIMMER_ABSOLUTE)
@@ -187,6 +193,8 @@ def build_default_registry() -> CurveRegistry:
     register(CurveLibrary.MOVEMENT_SINE, generate_movement_sine, CurveKind.MOVEMENT_OFFSET)
     register(CurveLibrary.MOVEMENT_TRIANGLE, generate_movement_triangle, CurveKind.MOVEMENT_OFFSET)
     register(CurveLibrary.MOVEMENT_PULSE, generate_movement_pulse, CurveKind.MOVEMENT_OFFSET)
+    register(CurveLibrary.MOVEMENT_COSINE, generate_cosine, CurveKind.MOVEMENT_OFFSET)
+    register(CurveLibrary.MOVEMENT_LISSAJOUS, generate_lissajous, CurveKind.MOVEMENT_OFFSET)
 
     # Musical curves
     register(CurveLibrary.MUSICAL_ACCENT, generate_musical_accent, CurveKind.DIMMER_ABSOLUTE)

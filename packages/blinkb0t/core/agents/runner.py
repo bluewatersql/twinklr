@@ -227,7 +227,7 @@ class AgentRunner:
             # Try to validate response
             try:
                 validated = spec.response_model(**response.content)
-                logger.info(f"Agent {spec.name} succeeded (repair attempts: {repair_attempts})")
+                logger.debug(f"Agent {spec.name} succeeded (repair attempts: {repair_attempts})")
                 return validated, repair_attempts
 
             except ValidationError as e:

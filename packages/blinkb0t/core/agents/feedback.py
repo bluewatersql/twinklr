@@ -79,7 +79,7 @@ class FeedbackManager:
         )
 
         self._add_entry(entry)
-        logger.info(f"Added validation failure feedback (iteration {iteration})")
+        logger.debug(f"Added validation failure feedback (iteration {iteration})")
 
     def add_judge_soft_failure(
         self,
@@ -109,7 +109,7 @@ class FeedbackManager:
         )
 
         self._add_entry(entry)
-        logger.info(f"Added judge soft failure feedback (iteration {iteration}, score={score})")
+        logger.debug(f"Added judge soft failure feedback (iteration {iteration}, score={score})")
 
     def add_judge_hard_failure(
         self,
@@ -139,7 +139,7 @@ class FeedbackManager:
         )
 
         self._add_entry(entry)
-        logger.info(f"Added judge hard failure feedback (iteration {iteration}, score={score})")
+        logger.debug(f"Added judge hard failure feedback (iteration {iteration}, score={score})")
 
     def _add_entry(self, entry: FeedbackEntry) -> None:
         """Add entry and trim to max_entries (FIFO).

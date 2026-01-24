@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import math
 from enum import Enum
 
 from blinkb0t.core.curves.library import CurveLibrary
 from blinkb0t.core.sequencer.models.enum import Intensity
+from blinkb0t.core.sequencer.moving_heads.libraries.geometry import GeometryType
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -17,6 +19,12 @@ class MovementCategoricalParams(BaseModel):
     center: int = Field(default=128, ge=0, le=255, description="Center DMX value")
 
 
+class MovementFlags(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    disable_geometry_overrides: bool = False
+
+
 class MovementPattern(BaseModel):
     """Definition of a movement pattern."""
 
@@ -27,9 +35,25 @@ class MovementPattern(BaseModel):
     description: str
 
     pan_curve: CurveLibrary
-    tilt_curve: CurveLibrary
+    base_tilt_curve: CurveLibrary
     base_params: dict[str, float | int | str] = Field(default_factory=dict)
     categorical_params: dict[Intensity, MovementCategoricalParams]
+    flags: MovementFlags = Field(default_factory=MovementFlags)
+    geometry_modifiers: dict[GeometryType, CurveLibrary] = Field(default_factory=dict)
+
+    def resolve_tilt_curve(self, geometry_type: GeometryType) -> CurveLibrary:
+        """Resolve tilt curve based on geometry type.
+
+        Args:
+            geometry_type: Geometry type.
+        """
+        if self.flags.disable_geometry_overrides:
+            return self.base_tilt_curve
+
+        if geometry_type in self.geometry_modifiers:
+            return self.geometry_modifiers[geometry_type]
+
+        return self.base_tilt_curve
 
 
 DEFAULT_MOVEMENT_PARAMS = {
@@ -92,9 +116,10 @@ class MovementLibrary:
             id="sweep_lr",
             name="Left/Right Sweep",
             description="Smooth horizontal sweep across the performance space",
-            pan_curve=CurveLibrary.EASE_IN_OUT_SINE,
-            tilt_curve=CurveLibrary.HOLD,
+            pan_curve=CurveLibrary.MOVEMENT_TRIANGLE,
+            base_tilt_curve=CurveLibrary.MOVEMENT_HOLD,
             base_params={"amplitude": 0.8, "center": 128, "frequency": 1.0},
+            geometry_modifiers={GeometryType.SCATTERED_CHAOS: CurveLibrary.MOVEMENT_PERLIN_NOISE},
             categorical_params={
                 Intensity.SMOOTH: MovementCategoricalParams(
                     amplitude=0.3, frequency=0.5, center=128
@@ -108,8 +133,8 @@ class MovementLibrary:
             id="sweep_ud",
             name="Up/Down Sweep",
             description="Smooth vertical sweep across the performance space",
-            pan_curve=CurveLibrary.HOLD,
-            tilt_curve=CurveLibrary.EASE_IN_OUT_SINE,
+            pan_curve=CurveLibrary.MOVEMENT_HOLD,
+            base_tilt_curve=CurveLibrary.MOVEMENT_TRIANGLE,
             base_params={"amplitude": 0.6, "center": 128, "frequency": 1.0},
             categorical_params={
                 Intensity.SMOOTH: MovementCategoricalParams(
@@ -124,8 +149,8 @@ class MovementLibrary:
             id="circle",
             name="Circular Motion",
             description="Pan and tilt coordinated for circular path",
-            pan_curve=CurveLibrary.SINE,
-            tilt_curve=CurveLibrary.COSINE,
+            pan_curve=CurveLibrary.MOVEMENT_SINE,
+            base_tilt_curve=CurveLibrary.MOVEMENT_COSINE,
             base_params={"amplitude": 0.7, "frequency": 1.0, "center": 128},
             categorical_params={
                 Intensity.SMOOTH: MovementCategoricalParams(
@@ -140,9 +165,15 @@ class MovementLibrary:
             id="figure8",
             name="Figure-8 Pattern",
             description="Creates figure-8 or infinity symbol pattern",
-            pan_curve=CurveLibrary.LISSAJOUS,
-            tilt_curve=CurveLibrary.LISSAJOUS,
-            base_params={"amplitude": 0.7, "frequency": 1.0, "center": 128},
+            pan_curve=CurveLibrary.MOVEMENT_LISSAJOUS,
+            base_tilt_curve=CurveLibrary.MOVEMENT_LISSAJOUS,
+            base_params={
+                "amplitude": 0.7,
+                "frequency": 1.0,
+                "center": 128,
+                "curve_tilt_b": 2,
+                "curve_tilt_delta": math.pi / 2,
+            },
             categorical_params={
                 Intensity.SMOOTH: MovementCategoricalParams(
                     amplitude=0.3, frequency=0.5, center=128
@@ -156,8 +187,8 @@ class MovementLibrary:
             id="infinity",
             name="Infinity Symbol",
             description="Infinity/figure-8 pattern",
-            pan_curve=CurveLibrary.LISSAJOUS,
-            tilt_curve=CurveLibrary.LISSAJOUS,
+            pan_curve=CurveLibrary.MOVEMENT_LISSAJOUS,
+            base_tilt_curve=CurveLibrary.MOVEMENT_LISSAJOUS,
             base_params={},
             categorical_params={
                 Intensity.SMOOTH: MovementCategoricalParams(
@@ -172,8 +203,8 @@ class MovementLibrary:
             id="hold",
             name="Hold Position",
             description="Maintain current position (no movement)",
-            pan_curve=CurveLibrary.HOLD,
-            tilt_curve=CurveLibrary.HOLD,
+            pan_curve=CurveLibrary.MOVEMENT_HOLD,
+            base_tilt_curve=CurveLibrary.MOVEMENT_HOLD,
             base_params={},
             categorical_params={
                 Intensity.SMOOTH: MovementCategoricalParams(
@@ -188,8 +219,8 @@ class MovementLibrary:
             id="random_walk",
             name="Random Walk",
             description="Organic random movement",
-            pan_curve=CurveLibrary.PERLIN_NOISE,
-            tilt_curve=CurveLibrary.PERLIN_NOISE,
+            pan_curve=CurveLibrary.MOVEMENT_PERLIN_NOISE,
+            base_tilt_curve=CurveLibrary.MOVEMENT_PERLIN_NOISE,
             base_params={},
             categorical_params={
                 Intensity.SMOOTH: MovementCategoricalParams(
@@ -207,9 +238,10 @@ class MovementLibrary:
             id="pan_shake",
             name="Pan Shake",
             description="Horizontal shake/vibrate",
-            pan_curve=CurveLibrary.TRIANGLE,
-            tilt_curve=CurveLibrary.HOLD,
+            pan_curve=CurveLibrary.MOVEMENT_TRIANGLE,
+            base_tilt_curve=CurveLibrary.MOVEMENT_HOLD,
             base_params={},
+            geometry_modifiers={GeometryType.SCATTERED_CHAOS: CurveLibrary.MOVEMENT_PERLIN_NOISE},
             categorical_params={
                 Intensity.SMOOTH: MovementCategoricalParams(
                     amplitude=0.15, frequency=2.0, center=128
@@ -223,8 +255,8 @@ class MovementLibrary:
             id="tilt_rock",
             name="Tilt Rock",
             description="Vertical rocking motion",
-            pan_curve=CurveLibrary.HOLD,
-            tilt_curve=CurveLibrary.COSINE,
+            pan_curve=CurveLibrary.MOVEMENT_HOLD,
+            base_tilt_curve=CurveLibrary.MOVEMENT_SINE,
             base_params={},
             categorical_params={
                 Intensity.SMOOTH: MovementCategoricalParams(
@@ -239,8 +271,8 @@ class MovementLibrary:
             id="bounce",
             name="Bounce",
             description="Bouncing motion with decay",
-            pan_curve=CurveLibrary.BOUNCE_OUT,
-            tilt_curve=CurveLibrary.BOUNCE_OUT,
+            pan_curve=CurveLibrary.MOVEMENT_TRIANGLE,
+            base_tilt_curve=CurveLibrary.MOVEMENT_TRIANGLE,
             base_params={},
             categorical_params={
                 Intensity.SMOOTH: MovementCategoricalParams(
@@ -255,9 +287,10 @@ class MovementLibrary:
             id="pendulum",
             name="Pendulum",
             description="Pendulum swing motion",
-            pan_curve=CurveLibrary.SINE,
-            tilt_curve=CurveLibrary.HOLD,
+            pan_curve=CurveLibrary.MOVEMENT_SINE,
+            base_tilt_curve=CurveLibrary.MOVEMENT_HOLD,
             base_params={},
+            geometry_modifiers={GeometryType.SCATTERED_CHAOS: CurveLibrary.MOVEMENT_PERLIN_NOISE},
             categorical_params={
                 Intensity.SMOOTH: MovementCategoricalParams(
                     amplitude=0.3, frequency=0.3, center=128
@@ -271,8 +304,8 @@ class MovementLibrary:
             id="tilt_bounce",
             name="Tilt Bounce",
             description="Vertical bounce (trampoline, stomp)",
-            pan_curve=CurveLibrary.HOLD,
-            tilt_curve=CurveLibrary.BOUNCE_OUT,
+            pan_curve=CurveLibrary.MOVEMENT_HOLD,
+            base_tilt_curve=CurveLibrary.MOVEMENT_TRIANGLE,
             base_params={"amplitude": 0.8, "center": 128, "frequency": 1.0},
             categorical_params={
                 Intensity.SMOOTH: MovementCategoricalParams(
@@ -287,8 +320,8 @@ class MovementLibrary:
             id="groove_sway",
             name="Groove Sway",
             description="Subtle organic sway (breathing)",
-            pan_curve=CurveLibrary.PERLIN_NOISE,
-            tilt_curve=CurveLibrary.PERLIN_NOISE,
+            pan_curve=CurveLibrary.MOVEMENT_PERLIN_NOISE,
+            base_tilt_curve=CurveLibrary.MOVEMENT_PERLIN_NOISE,
             base_params={"amplitude": 0.5, "center": 128, "frequency": 0.8},
             categorical_params={
                 Intensity.SMOOTH: MovementCategoricalParams(
@@ -303,8 +336,8 @@ class MovementLibrary:
             id="trampoline",
             name="Trampoline",
             description="Gentle bounce (floating)",
-            pan_curve=CurveLibrary.HOLD,
-            tilt_curve=CurveLibrary.BOUNCE_OUT,
+            pan_curve=CurveLibrary.MOVEMENT_HOLD,
+            base_tilt_curve=CurveLibrary.MOVEMENT_TRIANGLE,
             base_params={"amplitude": 0.7, "center": 128, "frequency": 1.0},
             categorical_params={
                 Intensity.SMOOTH: MovementCategoricalParams(
@@ -322,9 +355,10 @@ class MovementLibrary:
             id="accent_snap",
             name="Accent Snap",
             description="Sharp snap to accent beat",
-            pan_curve=CurveLibrary.HOLD,
-            tilt_curve=CurveLibrary.HOLD,
+            pan_curve=CurveLibrary.MOVEMENT_HOLD,
+            base_tilt_curve=CurveLibrary.MOVEMENT_HOLD,
             base_params={},
+            geometry_modifiers={GeometryType.SCATTERED_CHAOS: CurveLibrary.MOVEMENT_PERLIN_NOISE},
             categorical_params={
                 Intensity.SMOOTH: MovementCategoricalParams(
                     amplitude=0.4, frequency=0.5, center=128
@@ -338,8 +372,8 @@ class MovementLibrary:
             id="pop_lock",
             name="Pop Lock",
             description="Sharp snap to positions",
-            pan_curve=CurveLibrary.SQUARE,
-            tilt_curve=CurveLibrary.SQUARE,
+            pan_curve=CurveLibrary.MOVEMENT_PULSE,
+            base_tilt_curve=CurveLibrary.MOVEMENT_PULSE,
             base_params={},
             categorical_params={
                 Intensity.SMOOTH: MovementCategoricalParams(
@@ -354,8 +388,8 @@ class MovementLibrary:
             id="laser_snap",
             name="Laser Snap",
             description="Quick precise repositions",
-            pan_curve=CurveLibrary.TRIANGLE,
-            tilt_curve=CurveLibrary.TRIANGLE,
+            pan_curve=CurveLibrary.MOVEMENT_TRIANGLE,
+            base_tilt_curve=CurveLibrary.MOVEMENT_TRIANGLE,
             base_params={"amplitude": 0.8, "center": 128, "frequency": 2.0},
             categorical_params={
                 Intensity.SMOOTH: MovementCategoricalParams(
@@ -370,8 +404,8 @@ class MovementLibrary:
             id="hit",
             name="Hit",
             description="Fast snap to position, hold, then return",
-            pan_curve=CurveLibrary.EASE_IN_CUBIC,
-            tilt_curve=CurveLibrary.EASE_IN_CUBIC,
+            pan_curve=CurveLibrary.MOVEMENT_PULSE,
+            base_tilt_curve=CurveLibrary.MOVEMENT_PULSE,
             base_params={
                 "hit_pan_offset_deg": 90,
                 "hit_tilt_offset_deg": 30,
@@ -392,8 +426,8 @@ class MovementLibrary:
             id="stomp",
             name="Stomp",
             description="Heavy downward hits",
-            pan_curve=CurveLibrary.HOLD,
-            tilt_curve=CurveLibrary.BOUNCE_OUT,
+            pan_curve=CurveLibrary.MOVEMENT_HOLD,
+            base_tilt_curve=CurveLibrary.MOVEMENT_TRIANGLE,
             base_params={"amplitude": 0.8, "center": 128, "frequency": 1.0},
             categorical_params={
                 Intensity.SMOOTH: MovementCategoricalParams(
@@ -411,9 +445,10 @@ class MovementLibrary:
             id="wave_horizontal",
             name="Horizontal Wave",
             description="Horizontal wave across fixtures",
-            pan_curve=CurveLibrary.SINE,
-            tilt_curve=CurveLibrary.HOLD,
+            pan_curve=CurveLibrary.MOVEMENT_SINE,
+            base_tilt_curve=CurveLibrary.MOVEMENT_HOLD,
             base_params={},
+            geometry_modifiers={GeometryType.SCATTERED_CHAOS: CurveLibrary.MOVEMENT_PERLIN_NOISE},
             categorical_params={
                 Intensity.SMOOTH: MovementCategoricalParams(
                     amplitude=0.4, frequency=0.5, center=128
@@ -427,8 +462,8 @@ class MovementLibrary:
             id="wave_vertical",
             name="Vertical Wave",
             description="Vertical wave across fixtures",
-            pan_curve=CurveLibrary.HOLD,
-            tilt_curve=CurveLibrary.SINE,
+            pan_curve=CurveLibrary.MOVEMENT_HOLD,
+            base_tilt_curve=CurveLibrary.MOVEMENT_SINE,
             base_params={},
             categorical_params={
                 Intensity.SMOOTH: MovementCategoricalParams(
@@ -443,8 +478,8 @@ class MovementLibrary:
             id="zigzag",
             name="Zigzag",
             description="Sharp angular zigzag motion",
-            pan_curve=CurveLibrary.TRIANGLE,
-            tilt_curve=CurveLibrary.TRIANGLE,
+            pan_curve=CurveLibrary.MOVEMENT_TRIANGLE,
+            base_tilt_curve=CurveLibrary.MOVEMENT_TRIANGLE,
             base_params={},
             categorical_params={
                 Intensity.SMOOTH: MovementCategoricalParams(
@@ -460,7 +495,7 @@ class MovementLibrary:
             name="Spiral",
             description="Spiral pattern with varying radius",
             pan_curve=CurveLibrary.LISSAJOUS,
-            tilt_curve=CurveLibrary.LISSAJOUS,
+            base_tilt_curve=CurveLibrary.LISSAJOUS,
             base_params={},
             categorical_params={
                 Intensity.SMOOTH: MovementCategoricalParams(
@@ -475,8 +510,8 @@ class MovementLibrary:
             id="diagonal_sweep",
             name="Diagonal Sweep",
             description="Diagonal sweep motion",
-            pan_curve=CurveLibrary.SINE,
-            tilt_curve=CurveLibrary.SINE,
+            pan_curve=CurveLibrary.MOVEMENT_SINE,
+            base_tilt_curve=CurveLibrary.MOVEMENT_SINE,
             base_params={},
             categorical_params={
                 Intensity.SMOOTH: MovementCategoricalParams(
@@ -491,8 +526,8 @@ class MovementLibrary:
             id="corner_to_corner",
             name="Corner to Corner",
             description="Corner-to-corner movement",
-            pan_curve=CurveLibrary.SINE,
-            tilt_curve=CurveLibrary.SINE,
+            pan_curve=CurveLibrary.MOVEMENT_SINE,
+            base_tilt_curve=CurveLibrary.MOVEMENT_SINE,
             base_params={},
             categorical_params={
                 Intensity.SMOOTH: MovementCategoricalParams(
@@ -507,8 +542,8 @@ class MovementLibrary:
             id="dual_sweep",
             name="Dual Sweep",
             description="Dual-axis simultaneous sweep",
-            pan_curve=CurveLibrary.SINE,
-            tilt_curve=CurveLibrary.SINE,
+            pan_curve=CurveLibrary.MOVEMENT_SINE,
+            base_tilt_curve=CurveLibrary.MOVEMENT_SINE,
             base_params={},
             categorical_params={
                 Intensity.SMOOTH: MovementCategoricalParams(
@@ -523,8 +558,8 @@ class MovementLibrary:
             id="fan_iris",
             name="Fan Iris",
             description="Progressive fan expansion/collapse",
-            pan_curve=CurveLibrary.SMOOTH_STEP,
-            tilt_curve=CurveLibrary.SMOOTH_STEP,
+            pan_curve=CurveLibrary.MOVEMENT_LINEAR,
+            base_tilt_curve=CurveLibrary.MOVEMENT_LINEAR,
             base_params={"amplitude": 0.8, "center": 128, "frequency": 1.0},
             categorical_params={
                 Intensity.SMOOTH: MovementCategoricalParams(
@@ -539,8 +574,8 @@ class MovementLibrary:
             id="radial_fan",
             name="Radial Fan",
             description="Radial fan pattern",
-            pan_curve=CurveLibrary.EASE_IN_OUT_SINE,
-            tilt_curve=CurveLibrary.EASE_IN_OUT_SINE,
+            pan_curve=CurveLibrary.MOVEMENT_TRIANGLE,
+            base_tilt_curve=CurveLibrary.MOVEMENT_TRIANGLE,
             base_params={"amplitude": 0.8, "center": 128, "frequency": 1.0},
             categorical_params={
                 Intensity.SMOOTH: MovementCategoricalParams(
@@ -556,7 +591,7 @@ class MovementLibrary:
             name="Cross Pattern",
             description="X-pattern movement",
             pan_curve=CurveLibrary.LISSAJOUS,
-            tilt_curve=CurveLibrary.LISSAJOUS,
+            base_tilt_curve=CurveLibrary.LISSAJOUS,
             base_params={},
             categorical_params={
                 Intensity.SMOOTH: MovementCategoricalParams(
@@ -570,16 +605,20 @@ class MovementLibrary:
     }
 
     @classmethod
+    def get_pattern(cls, movement_type: MovementType) -> MovementPattern:
+        """Get movement pattern definition.
+
+        Args:
+            pattern_id: Pattern identifier (string or enum)
+        """
+        return cls.PATTERNS[movement_type]
+
+    @classmethod
     def get_all_metadata(cls) -> list[dict[str, str]]:
         """Get metadata for all movement patterns (optimized for LLM context).
 
         Returns:
             List of dictionaries with pattern metadata
-
-        Example:
-            >>> meta = MovementLibrary.get_all_metadata()
-            >>> meta[0]["movement_id"]
-            'sweep_lr'
         """
         return [
             {
@@ -587,7 +626,7 @@ class MovementLibrary:
                 "name": pattern.name,
                 "description": pattern.description,
                 "pan_curve": pattern.pan_curve.value,
-                "tilt_curve": pattern.tilt_curve.value,
+                "base_tilt_curve": pattern.base_tilt_curve.value,
             }
             for pattern in cls.PATTERNS.values()
         ]

@@ -64,12 +64,8 @@ class DmxSettingsBuilder:
         channel_values: dict[int, int] = {}
         channel_curves: dict[int, list[CurvePoint]] = {}
 
-        logger.debug(f"Building settings for {len(segment.channels)} channels")
-
         for channel_name, channel_value in segment.channels.items():
             self._extract_channel_data(channel_name, channel_value, channel_values, channel_curves)
-
-        logger.debug(f"Extracted {len(channel_values)} static values, {len(channel_curves)} curves")
 
         # Determine max channel for output
         max_channel = self._calculate_max_channel(channel_values, channel_curves)
@@ -307,6 +303,9 @@ class DmxSettingsBuilder:
             t_rounded = round(point.t, 2)
             v_rounded = round(point.v, 2)
             pair = f"{t_rounded:.2f}:{v_rounded:.2f}"
+
+            # if dmx_channel == 13:
+            #     logger.debug(f"{dmx_channel}: {point.t}|{t_rounded}|{point.v}|{v_rounded}")
             pairs.append(pair)
 
         # Ensure anchors at 0.0 and 1.0

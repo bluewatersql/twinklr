@@ -1,6 +1,6 @@
 """Orchestrator for moving heads choreography generation.
 
-Coordinates the multi-agent pipeline: Planner -> Validator -> Judge with iteration.
+Coordinates the multi-agent pipeline: Planner -> Heuristic Validation -> Judge with iteration.
 """
 
 from __future__ import annotations
@@ -23,12 +23,10 @@ from blinkb0t.core.agents.sequencer.moving_heads.models import (
     ChoreographyPlan,
     JudgeDecision,
     JudgeResponse,
-    ValidationResponse,
 )
 from blinkb0t.core.agents.sequencer.moving_heads.specs import (
     get_judge_spec,
     get_planner_spec,
-    get_validator_spec,
 )
 from blinkb0t.core.agents.state import AgentState
 from blinkb0t.core.agents.state_machine import (
@@ -119,7 +117,7 @@ class Orchestrator:
         Returns:
             Orchestration result with plan, metrics, and status
         """
-        logger.info("Starting orchestration")
+        logger.debug("Starting orchestration")
 
         # Check for existing checkpoint before starting (if checkpoints enabled)
         if self.checkpoint_manager and self.checkpoint_manager.job_config.checkpoint:
@@ -127,14 +125,14 @@ class Orchestrator:
 
             checkpoint = self.checkpoint_manager.read_checkpoint(CheckpointType.FINAL)
             if checkpoint:
-                logger.info("Found FINAL checkpoint, restoring previous orchestration result")
+                logger.debug("Found FINAL checkpoint, restoring previous orchestration result")
 
                 # Restore plan from checkpoint
                 plan_data = checkpoint.get("plan")
                 if plan_data:
                     try:
                         restored_plan = ChoreographyPlan.model_validate(plan_data)
-                        logger.info(
+                        logger.debug(
                             f"Restored plan with {len(restored_plan.sections)} sections from checkpoint"
                         )
 
@@ -160,7 +158,6 @@ class Orchestrator:
 
         # Get agent specs
         planner_spec = get_planner_spec(token_budget=self.config.token_budget)
-        validator_spec = get_validator_spec()
         judge_spec = get_judge_spec()
 
         # Initialize planner state (conversational)
@@ -197,7 +194,7 @@ class Orchestrator:
 
             iterations += 1
             iteration_tokens = 0
-            logger.info(f"Starting iteration {iterations}/{self.config.max_iterations}")
+            logger.debug(f"Starting iteration {iterations}/{self.config.max_iterations}")
 
             # Prepare planner variables
             planner_vars = {
@@ -206,7 +203,7 @@ class Orchestrator:
             }
 
             # 1. Run planner
-            logger.info("Running planner agent")
+            logger.debug("Running planner agent")
             planner_result = self.runner.run(
                 spec=planner_spec,
                 variables=planner_vars,
@@ -244,7 +241,7 @@ class Orchestrator:
                 logger.debug(f"Saved RAW checkpoint for iteration {iterations}")
 
             # 2. Heuristic validation
-            logger.info("Running heuristic validator")
+            logger.debug("Running heuristic validator")
             heuristic_result = heuristic_validator.validate(plan)
 
             if not heuristic_result.valid:
@@ -263,64 +260,8 @@ class Orchestrator:
             for warning in heuristic_result.warnings:
                 self.feedback_manager.add_judge_soft_failure(warning, iteration=iterations)
 
-            # 3. LLM Validator
-            logger.info("Running validator agent")
-            self.state_machine.transition(
-                OrchestrationState.VALIDATING,
-                duration_seconds=total_duration,
-                tokens_consumed=iteration_tokens,
-            )
-
-            validator_vars = {
-                "plan": plan.model_dump(),
-                "context": shaped_context,
-            }
-
-            validator_result = self.runner.run(
-                spec=validator_spec,
-                variables=validator_vars,
-            )
-
-            iteration_tokens += validator_result.tokens_used
-            total_duration += validator_result.duration_seconds
-
-            if not validator_result.success:
-                logger.warning(f"Validator agent failed: {validator_result.error_message}")
-                self.feedback_manager.add_validation_failure(
-                    f"Validator error: {validator_result.error_message}", iteration=iterations
-                )
-                total_tokens += iteration_tokens
-                # Transition back to planning
-                self.state_machine.transition(
-                    OrchestrationState.PLANNING,
-                    duration_seconds=total_duration,
-                    tokens_consumed=iteration_tokens,
-                )
-                continue
-
-            validation_response = validator_result.data
-            assert isinstance(validation_response, ValidationResponse), (
-                "Validator must return ValidationResponse"
-            )
-
-            if not validation_response.valid:
-                logger.warning(f"Validation failed: {len(validation_response.errors)} errors")
-                # Add errors to feedback
-                for validation_error in validation_response.errors:
-                    self.feedback_manager.add_validation_failure(
-                        validation_error.message, iteration=iterations
-                    )
-                total_tokens += iteration_tokens
-                # Transition back to planning
-                self.state_machine.transition(
-                    OrchestrationState.PLANNING,
-                    duration_seconds=total_duration,
-                    tokens_consumed=iteration_tokens,
-                )
-                continue
-
-            # 4. Judge
-            logger.info("Running judge agent")
+            # 3. Judge (with technical validation)
+            logger.debug("Running judge agent")
             self.state_machine.transition(
                 OrchestrationState.JUDGING,
                 duration_seconds=total_duration,
@@ -348,6 +289,13 @@ class Orchestrator:
                 # Keep plan as best attempt
                 if best_plan is None:
                     best_plan = plan
+                # Transition back to PLANNING before continuing to next iteration
+                self.state_machine.transition(
+                    OrchestrationState.PLANNING,
+                    duration_seconds=total_duration,
+                    tokens_consumed=iteration_tokens,
+                    reason=f"Judge failed: {judge_result.error_message}",
+                )
                 continue
 
             judge_response = judge_result.data
@@ -369,7 +317,7 @@ class Orchestrator:
 
             # Handle judge decision
             if judge_response.decision == JudgeDecision.APPROVE:
-                logger.info(f"Judge approved plan with score {judge_response.score}")
+                logger.debug(f"Judge approved plan with score {judge_response.score}")
 
                 # Save final approved plan checkpoint
                 if self.checkpoint_manager and self.checkpoint_manager.job_config.checkpoint:
@@ -402,7 +350,7 @@ class Orchestrator:
                 )
 
             elif judge_response.decision == JudgeDecision.SOFT_FAIL:
-                logger.info(f"Judge soft fail (score {judge_response.score}), iterating")
+                logger.debug(f"Judge soft fail (score {judge_response.score}), iterating")
                 self.feedback_manager.add_judge_soft_failure(
                     judge_response.feedback_for_planner, iteration=iterations
                 )

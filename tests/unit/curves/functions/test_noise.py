@@ -7,7 +7,6 @@ import pytest
 from blinkb0t.core.curves.functions.noise import (
     _normalize_noise,
     generate_perlin_noise,
-    generate_simplex_noise,
 )
 
 
@@ -84,66 +83,6 @@ class TestGeneratePerlinNoise:
         """Different base values produce different curves."""
         result_base0 = generate_perlin_noise(20, base=0)
         result_base1 = generate_perlin_noise(20, base=1)
-        # At least some values should differ
-        differences = [abs(a.v - b.v) for a, b in zip(result_base0, result_base1, strict=True)]
-        assert any(d > 0.01 for d in differences)
-
-
-@pytest.mark.skip(reason="snoise2 requires 2 positional args; source implementation has bug")
-class TestGenerateSimplexNoise:
-    """Tests for generate_simplex_noise function.
-
-    Note: These tests are skipped because the source implementation of
-    generate_simplex_noise calls snoise2() with only 1 positional argument,
-    but snoise2 requires 2 (x and y coordinates).
-    """
-
-    def test_returns_correct_count(self) -> None:
-        """Returns requested number of samples."""
-        result = generate_simplex_noise(10)
-        assert len(result) == 10
-
-    def test_values_in_valid_range(self) -> None:
-        """All values are in [0, 1]."""
-        result = generate_simplex_noise(50)
-        for p in result:
-            assert 0.0 <= p.v <= 1.0
-
-    def test_times_in_valid_range(self) -> None:
-        """All times are in [0, 1)."""
-        result = generate_simplex_noise(10)
-        for p in result:
-            assert 0.0 <= p.t < 1.0
-
-    def test_n_less_than_two_raises(self) -> None:
-        """n < 2 raises ValueError."""
-        with pytest.raises(ValueError, match="n_samples must be >= 2"):
-            generate_simplex_noise(1)
-
-    def test_custom_scale(self) -> None:
-        """Custom scale parameter works."""
-        result = generate_simplex_noise(20, scale=8.0)
-        assert len(result) == 20
-
-    def test_custom_octaves(self) -> None:
-        """Custom octaves parameter works."""
-        result = generate_simplex_noise(20, octaves=2)
-        assert len(result) == 20
-
-    def test_custom_repeat(self) -> None:
-        """Custom repeat parameter works."""
-        result = generate_simplex_noise(20, repeat=512)
-        assert len(result) == 20
-
-    def test_custom_base(self) -> None:
-        """Custom base parameter works."""
-        result = generate_simplex_noise(20, base=42)
-        assert len(result) == 20
-
-    def test_different_bases_produce_different_curves(self) -> None:
-        """Different base values produce different curves."""
-        result_base0 = generate_simplex_noise(20, base=0)
-        result_base1 = generate_simplex_noise(20, base=1)
         # At least some values should differ
         differences = [abs(a.v - b.v) for a, b in zip(result_base0, result_base1, strict=True)]
         assert any(d > 0.01 for d in differences)

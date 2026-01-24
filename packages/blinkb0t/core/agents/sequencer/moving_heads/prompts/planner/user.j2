@@ -39,6 +39,7 @@ Create a complete choreography plan that:
 3. **Creates visual interest**: Vary templates and timing throughout
 4. **Maintains flow**: Plan smooth transitions between sections
 5. **Uses templates effectively**: Select from available templates (which already define movement, geometry, and dimmer patterns)
+6. **Default to 1 per section**: Only split a section into 2–3 segments if there’s a clear musical change within the section.
 
 ## Required Output Format
 
@@ -50,8 +51,15 @@ Provide your plan as a JSON object matching this schema:
 
 **CRITICAL REQUIREMENTS**:
 1. **Template Selection**: Use ONLY template IDs from the Template Library list above (exactly as written)
-2. **Template Composition**: Each template (like "fan_pulse" or "sweep_lr_chevron_breathe") is a complete choreography unit with movement, geometry, and dimmer patterns already configured
-3. **Your Job**: Select which template + preset to use for each song section
-4. **Bar Numbering**: Bar numbers are 1-indexed. First bar is 1, not 0. Use `start_bar >= 1` for all sections
-5. **Presets**: Use preset_id for variations (CHILL, MODERATE, ENERGETIC, etc.) - optional
-6. **Modifiers** (optional): Use the `modifiers` field for additional customization (e.g., `{"intensity": "HIGH"}`)
+2. **Template Composition**: Each template is a complete choreography unit with movement, geometry, and dimmer patterns already configured
+3. **Your Job**: For each song section, choose either:
+   - **Single-template section**: provide `template_id` (+ optional `preset_id`, `modifiers`) for the entire section bar range, OR
+   - **Segmented section**: provide `segments` (1 to 3 items). Each segment must include `segment_id`, `start_bar`, `end_bar`, `template_id` (+ optional `preset_id`, `modifiers`).
+4. **Segmentation Rules** (only if using `segments`):
+   - Max **3** segments per section
+   - Segments must be **contiguous** and **non-overlapping**
+   - Segments must **fully cover** the section range (first segment starts at section `start_bar`, last segment ends at section `end_bar`)
+   - Prefer not to create segments shorter than **1 bar**
+   - Default is **1 segment**; only split when musically justified (pickup/build/drop/hit/A-B change)
+5. **Bar Numbering**: Bar numbers are 1-indexed. First bar is 1, not 0. Use `start_bar >= 1` for all sections
+6. **Presets**: Use `preset_id` for variations (CHILL, MODERATE, ENERGETIC, etc.) - optional

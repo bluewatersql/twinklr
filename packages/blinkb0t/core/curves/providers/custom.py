@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 from blinkb0t.core.curves.models import (
     CurvePoint,
 )
@@ -25,6 +27,7 @@ class CustomCurveProvider:
         self,
         curve_def: CurveDefinition,
         num_points: int = 100,
+        **kwargs: Any,
     ) -> list[CurvePoint]:
         """Generate custom curve as point array in DMX space.
 
@@ -40,4 +43,4 @@ class CustomCurveProvider:
         Raises:
             ValueError: If curve type is unknown
         """
-        return self.registry.resolve(curve_def, n_samples=num_points)
+        return self.registry.resolve(curve_def, n_samples=num_points, **kwargs)

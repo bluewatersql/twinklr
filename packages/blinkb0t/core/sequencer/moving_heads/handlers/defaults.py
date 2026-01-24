@@ -140,11 +140,6 @@ def create_default_movement_registry() -> MovementRegistry:
 
     Returns:
         MovementRegistry with default handler registered.
-
-    Example:
-        >>> registry = create_default_movement_registry()
-        >>> handler = registry.get("SWEEP_LR")  # Uses default
-        >>> handler = registry.get("CIRCLE")    # Uses default
     """
     registry = MovementRegistry()
     # Register default handler to handle all movements from library
@@ -168,11 +163,6 @@ def create_default_dimmer_registry() -> DimmerRegistry:
 
     Returns:
         DimmerRegistry with default handler registered.
-
-    Example:
-        >>> registry = create_default_dimmer_registry()
-        >>> handler = registry.get("PULSE")     # Uses default
-        >>> handler = registry.get("FADE_IN")   # Uses default
     """
     registry = DimmerRegistry()
     # Register default handler to handle all dimmers from library
@@ -196,12 +186,6 @@ def create_default_registries() -> DefaultRegistries:
 
     Returns:
         Dict with 'geometry', 'movement', and 'dimmer' keys.
-
-    Example:
-        >>> registries = create_default_registries()
-        >>> geo_handler = registries["geometry"].get("ROLE_POSE")
-        >>> mov_handler = registries["movement"].get("SWEEP_LR")
-        >>> dim_handler = registries["dimmer"].get("PULSE")
     """
     return {
         "geometry": create_default_geometry_registry(),

@@ -157,7 +157,7 @@ class TokenBudgetManager:
         self.stage_usage.append(usage)
         self.total_used += total_tokens
 
-        logger.info(
+        logger.debug(
             f"Stage {stage.value}: {total_tokens} tokens "
             f"(in={input_tokens}, out={output_tokens}), "
             f"total used={self.total_used}/{self.total_budget}"

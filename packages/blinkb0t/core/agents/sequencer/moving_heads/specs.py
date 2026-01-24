@@ -5,7 +5,6 @@ from __future__ import annotations
 from blinkb0t.core.agents.sequencer.moving_heads.models import (
     ChoreographyPlan,
     JudgeResponse,
-    ValidationResponse,
 )
 from blinkb0t.core.agents.spec import AgentMode, AgentSpec
 
@@ -40,36 +39,6 @@ def get_planner_spec(
     )
 
 
-def get_validator_spec(
-    model: str = "gpt-5-mini",
-    temperature: float = 0.2,
-    token_budget: int | None = None,
-) -> AgentSpec:
-    """Get validator agent specification.
-
-    The validator is stateless and analytical, checking plans for
-    completeness and technical correctness.
-
-    Args:
-        model: LLM model to use (default: gpt-5-mini for validation)
-        temperature: Sampling temperature (default: 0.2 for consistency)
-        token_budget: Optional token budget
-
-    Returns:
-        Validator agent spec
-    """
-    return AgentSpec(
-        name="validator",
-        prompt_pack="validator",
-        response_model=ValidationResponse,
-        mode=AgentMode.ONESHOT,  # Stateless validation
-        model=model,
-        temperature=temperature,
-        max_schema_repair_attempts=2,
-        token_budget=token_budget,
-    )
-
-
 def get_judge_spec(
     model: str = "gpt-5.2",
     temperature: float = 0.5,
@@ -77,8 +46,9 @@ def get_judge_spec(
 ) -> AgentSpec:
     """Get judge agent specification.
 
-    The judge is stateless but creative, evaluating plans for quality
-    and providing constructive feedback.
+    The judge is stateless but creative, performing technical validation
+    first, then evaluating plans for creative quality and providing
+    constructive feedback.
 
     Args:
         model: LLM model to use (default: gpt-5.2 for nuanced evaluation)

@@ -5,17 +5,18 @@ generates curves based on the library configuration. It serves as a
 catch-all for dimmers that don't need specialized logic.
 """
 
+import logging
 from typing import Any
 
 from blinkb0t.core.curves.generator import CurveGenerator
+from blinkb0t.core.curves.library import CurveLibrary
 from blinkb0t.core.curves.models import CurvePoint
 from blinkb0t.core.curves.semantics import CurveKind
 from blinkb0t.core.sequencer.models.enum import Intensity
 from blinkb0t.core.sequencer.moving_heads.handlers.protocols import DimmerResult
-from blinkb0t.core.sequencer.moving_heads.libraries.dimmer import (
-    DimmerLibrary,
-    DimmerType,
-)
+
+logger = logging.getLogger(__name__)
+renderer_log = logging.getLogger("DMX_MH_RENDER")
 
 
 class DefaultDimmerHandler:
@@ -31,20 +32,8 @@ class DefaultDimmerHandler:
     Attributes:
         handler_id: Unique identifier ("__default__").
 
-    Example:
-        >>> handler = DefaultDimmerHandler()
-        >>> # This will look up "fade_in" from DimmerLibrary
-        >>> result = handler.generate(
-        ...     params={"dimmer_id": "fade_in"},
-        ...     n_samples=64,
-        ...     cycles=1.0,
-        ...     intensity=Intensity.SMOOTH,
-        ...     min_norm=0.0,
-        ...     max_norm=1.0,
-        ... )
-
     Raises:
-        ValueError: If dimmer_id not in params or not in library.
+        ValueError: If handler is not correctly configured.
     """
 
     handler_id: str = "__default__"
@@ -77,29 +66,21 @@ class DefaultDimmerHandler:
             DimmerResult with dimmer curve.
 
         Raises:
-            ValueError: If dimmer_id not in params.
-            ValueError: If dimmer_id not found in library.
+            ValueError: If handler is not correctly configured.
         """
-        # Extract dimmer_id from params
-        if "dimmer_id" not in params:
+        pattern = params.get("dimmer_pattern")
+        if not pattern:
             raise ValueError(
-                "DefaultDimmerHandler requires 'dimmer_id' in params. "
-                "This should be set automatically by the handler registry."
+                "Handler is not correctly configured. 'dimmer_pattern' is missing from params."
             )
 
-        dimmer_id_str = params["dimmer_id"]
+        calibration = params.get("calibration", {})
+        dimmer_min = calibration.get("dimmer_floor_dmx", 0) if calibration else 0
+        dimmer_max = calibration.get("dimmer_ceiling_dmx", 255) if calibration else 255
+        dimmer_amplitude_dmx = int((dimmer_max - dimmer_min) / 2)
 
-        # Look up pattern in library
-        try:
-            # Convert string to enum
-            dimmer_type = DimmerType(dimmer_id_str)
-        except ValueError as e:
-            raise ValueError(
-                f"Dimmer '{dimmer_id_str}' not found in DimmerLibrary. "
-                f"Valid: {[d.value for d in DimmerType]}"
-            ) from e
-
-        pattern = DimmerLibrary.PATTERNS[dimmer_type]
+        renderer_log.info(f"Dimmer Min: {dimmer_min}, Dimmer Max: {dimmer_max}")
+        renderer_log.info(f"Dimmer Amplitude DMX: {dimmer_amplitude_dmx}")
 
         # Get categorical params for intensity
         if intensity not in pattern.categorical_params:
@@ -109,16 +90,45 @@ class DefaultDimmerHandler:
         cat_params = pattern.categorical_params[intensity]
 
         # Generate dimmer curve
-        dimmer_curve = self._generate_curve(
-            curve_type=pattern.curve,
-            n_samples=n_samples,
-            min_intensity=cat_params.min_intensity,
-            max_intensity=cat_params.max_intensity,
-            min_norm=min_norm,
-            max_norm=max_norm,
-        )
+        if pattern.curve == CurveLibrary.HOLD:
+            dimmer_floor_dmx = calibration.get("dimmer_floor_dmx", 0) if calibration else 0
+            dimmer_ceiling_dmx = calibration.get("dimmer_ceiling_dmx", 255) if calibration else 255
+            dimmer_static_dmx = self._resolve_static_dmx_value(
+                cat_params.max_intensity, dimmer_floor_dmx, dimmer_ceiling_dmx
+            )
 
-        return DimmerResult(dimmer_curve=dimmer_curve)
+            return DimmerResult(dimmer_static_dmx=dimmer_static_dmx)
+        else:
+            dimmer_curve = self._generate_curve(
+                curve_type=pattern.curve,
+                n_samples=n_samples,
+                min_intensity=cat_params.min_intensity,
+                max_intensity=cat_params.max_intensity,
+                min_norm=min_norm,
+                max_norm=max_norm,
+            )
+            return DimmerResult(dimmer_curve=dimmer_curve)
+
+    def _resolve_static_dmx_value(
+        self, normalized_value: float, clamp_min: int = 0, clamp_max: int = 255
+    ) -> int:
+        """Resolve static DMX value from normalized value.
+
+        Args:
+            normalized_value: Normalized value [0, 1].
+            clamp_min: Minimum DMX value [0, 255].
+            clamp_max: Maximum DMX value [0, 255].
+
+        Returns:
+            Static DMX value [0, 255].
+        """
+        renderer_log.info(
+            f"Resolving static DMX value: {normalized_value}, {clamp_min}, {clamp_max}"
+        )
+        floor = max(clamp_min, 0)
+        ceiling = min(clamp_max, 255)
+        value = int(normalized_value * 255)
+        return max(floor, min(ceiling, value))
 
     def _generate_curve(
         self,

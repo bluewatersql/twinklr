@@ -15,6 +15,8 @@ from blinkb0t.core.sequencer.moving_heads.handlers.protocols import (
     GeometryResult,
     MovementResult,
 )
+from blinkb0t.core.sequencer.moving_heads.libraries.dimmer import DimmerLibrary, DimmerType
+from blinkb0t.core.sequencer.moving_heads.libraries.movement import MovementLibrary, MovementType
 
 
 class HasHandlerId(Protocol):
@@ -33,11 +35,6 @@ class HandlerNotFoundError(Exception):
         handler_id: The ID that was not found.
         handler_type: The type of handler (geometry, movement, dimmer).
         available: List of available handler IDs.
-
-    Example:
-        >>> raise HandlerNotFoundError("UNKNOWN", "geometry", ["ROLE_POSE"])
-        HandlerNotFoundError: Geometry handler 'UNKNOWN' not found.
-        Available: ROLE_POSE
     """
 
     def __init__(
@@ -75,13 +72,6 @@ class HandlerRegistry(Generic[T]):
 
     Type Parameters:
         T: The handler type (must have handler_id attribute).
-
-    Example:
-        >>> registry: HandlerRegistry[SomeHandler] = HandlerRegistry()
-        >>> registry.register(MyHandler())
-        >>> registry.register_default(DefaultHandler())
-        >>> handler = registry.get("MY_HANDLER")  # Returns MyHandler
-        >>> handler = registry.get("UNKNOWN")  # Returns DefaultHandler
     """
 
     def __init__(self, handler_type: str = "handler") -> None:
@@ -111,10 +101,6 @@ class HandlerRegistry(Generic[T]):
 
         Args:
             handler: Default handler to use for unregistered IDs.
-
-        Example:
-            >>> registry.register_default(DefaultMovementHandler())
-            >>> handler = registry.get("UNREGISTERED")  # Uses default
         """
         self._default_handler = handler
 
@@ -177,17 +163,8 @@ class HandlerRegistry(Generic[T]):
         return list(self._handlers.keys())
 
 
-# Type-specific registries with appropriate error messages
-
-
 class GeometryRegistry(HandlerRegistry["GeometryHandlerProtocol"]):
-    """Registry for geometry handlers.
-
-    Example:
-        >>> registry = GeometryRegistry()
-        >>> registry.register(RolePoseHandler())
-        >>> handler = registry.get("ROLE_POSE")
-    """
+    """Registry for geometry handlers."""
 
     def __init__(self) -> None:
         """Initialize geometry registry."""
@@ -198,19 +175,11 @@ class MovementRegistry(HandlerRegistry["MovementHandlerProtocol"]):
     """Registry for movement handlers.
 
     Supports default handler that receives movement_id in params.
-
-    Example:
-        >>> registry = MovementRegistry()
-        >>> registry.register(SweepLRHandler())
-        >>> registry.register_default(DefaultMovementHandler())
-        >>> handler = registry.get("SWEEP_LR")  # Specific handler
-        >>> handler = registry.get("CIRCLE")  # Falls back to default
     """
 
     def __init__(self) -> None:
         """Initialize movement registry."""
         super().__init__(handler_type="movement")
-        self._movement_id_key = "movement_id"
 
     def get_with_params(self, handler_id: str, params: dict[str, Any]) -> Any:
         """Get handler and inject handler_id into params if using default.
@@ -225,10 +194,18 @@ class MovementRegistry(HandlerRegistry["MovementHandlerProtocol"]):
         if handler_id in self._handlers:
             return self._handlers[handler_id]
 
+        try:
+            movement_type = MovementType(handler_id)
+            movement_pattern = MovementLibrary.get_pattern(movement_type)
+        except ValueError as e:
+            raise ValueError(
+                f"Movement pattern '{handler_id}' not found in MovementLibrary."
+            ) from e
+
         # Use default handler if available
         if self._default_handler is not None:
-            # Inject movement_id into params for default handler
-            params[self._movement_id_key] = handler_id
+            params["movement_pattern"] = movement_pattern
+
             return self._default_handler
 
         # No specific handler and no default - raise error
@@ -243,19 +220,11 @@ class DimmerRegistry(HandlerRegistry["DimmerHandlerProtocol"]):
     """Registry for dimmer handlers.
 
     Supports default handler that receives dimmer_id in params.
-
-    Example:
-        >>> registry = DimmerRegistry()
-        >>> registry.register(PulseHandler())
-        >>> registry.register_default(DefaultDimmerHandler())
-        >>> handler = registry.get("PULSE")  # Specific handler
-        >>> handler = registry.get("FADE_IN")  # Falls back to default
     """
 
     def __init__(self) -> None:
         """Initialize dimmer registry."""
         super().__init__(handler_type="dimmer")
-        self._dimmer_id_key = "dimmer_id"
 
     def get_with_params(self, handler_id: str, params: dict[str, Any]) -> Any:
         """Get handler and inject handler_id into params if using default.
@@ -270,10 +239,15 @@ class DimmerRegistry(HandlerRegistry["DimmerHandlerProtocol"]):
         if handler_id in self._handlers:
             return self._handlers[handler_id]
 
+        try:
+            dimmer_type = DimmerType(handler_id)
+            dimmer_pattern = DimmerLibrary.get_pattern(dimmer_type)
+        except ValueError as e:
+            raise ValueError(f"Dimmer pattern '{handler_id}' not found in DimmerLibrary.") from e
+
         # Use default handler if available
         if self._default_handler is not None:
-            # Inject dimmer_id into params for default handler
-            params[self._dimmer_id_key] = handler_id
+            params["dimmer_pattern"] = dimmer_pattern
             return self._default_handler
 
         # No specific handler and no default - raise error

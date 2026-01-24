@@ -10,7 +10,7 @@ import logging
 from collections import defaultdict
 from typing import TYPE_CHECKING
 
-from blinkb0t.core.formats.xlights.models.effect_placement import EffectPlacement
+from blinkb0t.core.formats.xlights.sequence.models.effect_placement import EffectPlacement
 from blinkb0t.core.sequencer.moving_heads.export.dmx_settings_builder import (
     DmxSettingsBuilder,
 )
@@ -19,7 +19,7 @@ from blinkb0t.core.utils.fixtures import build_semantic_groups
 if TYPE_CHECKING:
     from blinkb0t.core.config.fixtures.groups import FixtureGroup
     from blinkb0t.core.config.fixtures.instances import FixtureInstance
-    from blinkb0t.core.formats.xlights.models.xsq import XSequence
+    from blinkb0t.core.formats.xlights.sequence.models.xsq import XSequence
     from blinkb0t.core.sequencer.moving_heads.channels.state import FixtureSegment
 
 logger = logging.getLogger(__name__)
@@ -71,23 +71,29 @@ class XsqAdapter:
         xlights_mapping = fixture_group.get_xlights_mapping()
 
         # 1. Try to create group effects first
-        group_placements, covered_fixture_ids = self._write_group_effects(
+        # Returns segments that were actually grouped (not just fixture IDs)
+        group_placements, grouped_segments = self._write_group_effects(
             segments, xlights_mapping, fixture_group, xsq
         )
         placements.extend(group_placements)
 
-        # 2. Write individual fixture effects ONLY for fixtures NOT covered by groups
-        uncovered_segments = [s for s in segments if s.fixture_id not in covered_fixture_ids]
-        if uncovered_segments:
+        # 2. Write individual fixture effects for segments NOT grouped
+        # Convert grouped segments to a set of (fixture_id, t0_ms, t1_ms) for fast lookup
+        grouped_keys = {(s.fixture_id, s.t0_ms, s.t1_ms) for s in grouped_segments}
+        ungrouped_segments = [
+            s for s in segments if (s.fixture_id, s.t0_ms, s.t1_ms) not in grouped_keys
+        ]
+
+        if ungrouped_segments:
             individual_placements = self._write_individual_effects(
-                uncovered_segments, xlights_mapping, fixture_group, xsq
+                ungrouped_segments, xlights_mapping, fixture_group, xsq
             )
             placements.extend(individual_placements)
 
         logger.debug(
             f"Converted {len(segments)} segments to {len(placements)} placements "
             f"({len(group_placements)} group, {len(placements) - len(group_placements)} individual, "
-            f"{len(covered_fixture_ids)} fixtures covered by groups)"
+            f"{len(grouped_segments)} segments grouped)"
         )
 
         return placements
@@ -112,7 +118,10 @@ class XsqAdapter:
         """
         placements = []
 
-        for segment in segments:
+        # Sort segments by fixture ID and start time to avoid overlapping effects
+        sorted_segments = sorted(segments, key=lambda s: (s.fixture_id, s.t0_ms))
+
+        for segment in sorted_segments:
             # Skip segments with no channels
             if not segment.channels:
                 logger.debug(f"Skipping empty segment for {segment.fixture_id}")
@@ -145,7 +154,7 @@ class XsqAdapter:
                     effect_name="DMX",
                     start_ms=segment.t0_ms,
                     end_ms=segment.t1_ms,
-                    effect_label="",  # Could add metadata here
+                    effect_label=segment.metatag,
                     ref=ref,
                     palette=0,
                 )
@@ -159,7 +168,7 @@ class XsqAdapter:
         xlights_mapping: dict[str, str],
         fixture_group: FixtureGroup,
         xsq: XSequence | None,
-    ) -> tuple[list[EffectPlacement], set[str]]:
+    ) -> tuple[list[EffectPlacement], list[FixtureSegment]]:
         """Write effects to group models when possible.
 
         Args:
@@ -169,10 +178,10 @@ class XsqAdapter:
             xsq: XSequence object for EffectDB
 
         Returns:
-            Tuple of (EffectPlacement list, set of covered fixture IDs)
+            Tuple of (EffectPlacement list, list of grouped segments)
         """
         placements = []
-        covered_fixture_ids: set[str] = set()
+        grouped_segments: list[FixtureSegment] = []
 
         # Build semantic groups ONLY for groups that have xLights mappings
         # This prevents unnecessary processing of unmapped semantic groups
@@ -197,61 +206,148 @@ class XsqAdapter:
             # Get fixture IDs in this time range
             fixture_ids_in_range = {s.fixture_id for s in time_range_segments}
 
-            # Check if any MAPPED semantic group is fully covered
+            # Find ALL semantic groups that are fully covered
+            # Then pick the best one based on priority:
+            # 1. Largest group (ALL > LEFT/RIGHT > ODD/EVEN)
+            # 2. If same size, prefer position-based (LEFT/RIGHT) over parity-based (ODD/EVEN)
+            covered_groups = []
             for group_name, group_fixture_ids in mapped_semantic_groups.items():
                 if set(group_fixture_ids).issubset(fixture_ids_in_range):
-                    # This semantic group is fully covered at this time
-                    # Look up the actual xLights group name (we know it exists since we filtered above)
-                    group_xlights_name = fixture_group.xlights_semantic_groups[group_name]
+                    covered_groups.append((group_name, group_fixture_ids, len(group_fixture_ids)))
 
-                    # Check if all fixtures in the group have identical channel settings
-                    # (simplification: we'll write the first fixture's settings for the group)
-                    group_segments = [
-                        s for s in time_range_segments if s.fixture_id in group_fixture_ids
-                    ]
+            # Sort by: size descending, then position groups before parity groups
+            # LEFT/RIGHT/CENTER/OUTER are position-based
+            # ODD/EVEN are parity-based
+            def group_priority(item):
+                name, _, size = item
+                position_groups = {"ALL", "LEFT", "RIGHT", "CENTER", "OUTER", "INNER"}
+                is_position = name in position_groups
+                return (
+                    -size,
+                    0 if is_position else 1,
+                    name,
+                )  # Larger size first, position before parity, alphabetical
 
-                    if not group_segments:
-                        continue
+            covered_groups.sort(key=group_priority)
 
-                    # Use first segment as representative (assumes identical settings)
-                    representative_segment = group_segments[0]
-                    representative_fixture = fixture_group.get_fixture(
-                        representative_segment.fixture_id
+            # Use the best group (highest priority)
+            best_group = covered_groups[0] if covered_groups else None
+
+            # Write effect for the best matching group
+            if best_group is not None:
+                group_name, group_fixture_ids, _ = best_group
+
+                # Look up the actual xLights group name
+                group_xlights_name = fixture_group.xlights_semantic_groups[group_name]
+
+                # Get all segments for this group
+                group_segments = [
+                    s for s in time_range_segments if s.fixture_id in group_fixture_ids
+                ]
+
+                # All must be true to allow grouping:
+                # 1. There are segments in the group
+                # 2. All segments allow grouping
+                # 3. All segments have identical curves
+                if (
+                    not group_segments
+                    or not all(seg.allow_grouping for seg in group_segments)
+                    or not self._segments_have_identical_curves(group_segments)
+                ):
+                    continue
+
+                # Use first segment as representative (verified identical above)
+                representative_segment = group_segments[0]
+                representative_fixture = fixture_group.get_fixture(
+                    representative_segment.fixture_id
+                )
+
+                if not representative_fixture:
+                    continue
+
+                # Convert to DMX settings string
+                ref = 0
+                if xsq is not None:
+                    settings_str = self._segment_to_settings(
+                        representative_segment, representative_fixture
                     )
+                    ref = xsq.append_effectdb(settings_str)
 
-                    if not representative_fixture:
-                        continue
-
-                    # Convert to DMX settings string
-                    ref = 0
-                    if xsq is not None:
-                        settings_str = self._segment_to_settings(
-                            representative_segment, representative_fixture
-                        )
-                        ref = xsq.append_effectdb(settings_str)
-
-                    # Create group effect
-                    placements.append(
-                        EffectPlacement(
-                            element_name=group_xlights_name,
-                            effect_name="DMX",
-                            start_ms=t0_ms,
-                            end_ms=t1_ms,
-                            effect_label="",
-                            ref=ref,
-                            palette=0,
-                        )
+                # Create group effect
+                placements.append(
+                    EffectPlacement(
+                        element_name=group_xlights_name,
+                        effect_name="DMX",
+                        start_ms=t0_ms,
+                        end_ms=t1_ms,
+                        effect_label=representative_segment.metatag,
+                        ref=ref,
+                        palette=0,
                     )
+                )
 
-                    # Mark these fixtures as covered
-                    covered_fixture_ids.update(group_fixture_ids)
+                # Track which segments were grouped
+                grouped_segments.extend(group_segments)
 
-                    logger.debug(
-                        f"Created group effect for {group_name} "
-                        f"({len(group_fixture_ids)} fixtures) at {t0_ms}-{t1_ms}ms"
-                    )
+                logger.debug(
+                    f"Created group effect for {group_name} "
+                    f"({len(group_fixture_ids)} fixtures) at {t0_ms}-{t1_ms}ms"
+                )
 
-        return placements, covered_fixture_ids
+        return placements, grouped_segments
+
+    def _segments_have_identical_curves(self, segments: list[FixtureSegment]) -> bool:
+        """Check if all segments have identical channel curves.
+
+        Args:
+            segments: List of segments to compare
+
+        Returns:
+            True if all segments have identical channel values/curves, False otherwise
+        """
+        if len(segments) <= 1:
+            return True
+
+        # Use first segment as reference
+        reference = segments[0]
+
+        # Compare all other segments to the reference
+        for segment in segments[1:]:
+            # Check if they have the same channels
+            if set(segment.channels.keys()) != set(reference.channels.keys()):
+                return False
+
+            # Check if channel values match
+            for channel_name, channel_value in segment.channels.items():
+                ref_channel_value = reference.channels[channel_name]
+
+                # Compare static DMX values
+                if channel_value.static_dmx != ref_channel_value.static_dmx:
+                    return False
+
+                # Compare curve (the curve type/reference)
+                if channel_value.curve != ref_channel_value.curve:
+                    return False
+
+                # Compare value_points (the actual curve data - KEY for phase offsets!)
+                if channel_value.value_points != ref_channel_value.value_points:
+                    return False
+
+                # Compare offset-centered parameters
+                if channel_value.offset_centered != ref_channel_value.offset_centered:
+                    return False
+                if channel_value.base_dmx != ref_channel_value.base_dmx:
+                    return False
+                if channel_value.amplitude_dmx != ref_channel_value.amplitude_dmx:
+                    return False
+
+                # Compare clamping bounds
+                if channel_value.clamp_min != ref_channel_value.clamp_min:
+                    return False
+                if channel_value.clamp_max != ref_channel_value.clamp_max:
+                    return False
+
+        return True
 
     def _segment_to_settings(self, segment: FixtureSegment, fixture: FixtureInstance) -> str:
         """Convert FixtureSegment to DMX settings string.

@@ -8,7 +8,11 @@ from rich.console import Console
 from blinkb0t.core.sequencer.moving_heads.manager import MovingHeadManager
 from blinkb0t.core.session import BlinkB0tSession
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
 logger = logging.getLogger(__name__)
 
 logging.getLogger("httpx").setLevel(logging.WARNING)

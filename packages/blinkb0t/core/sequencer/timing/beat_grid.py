@@ -83,6 +83,55 @@ class BeatGrid(BaseModel):
         )
 
     @classmethod
+    def from_tempo(
+        cls,
+        tempo_bpm: float,
+        total_bars: int,
+        beats_per_bar: int = 4,
+        start_offset_ms: float = 0.0,
+    ) -> BeatGrid:
+        """Create BeatGrid from tempo with evenly-spaced boundaries.
+
+        This method generates mathematically precise boundaries based on tempo,
+        ignoring potentially inaccurate beat detection. Use this when tempo is
+        known to be accurate but beat tracking has locked onto the wrong rhythm.
+
+        Args:
+            tempo_bpm: Tempo in beats per minute
+            total_bars: Total number of bars in the song
+            beats_per_bar: Beats per bar (default 4 for 4/4 time)
+            start_offset_ms: Offset of first downbeat in milliseconds
+
+        Returns:
+            BeatGrid with tempo-based boundaries
+
+        Example:
+            >>> beat_grid = BeatGrid.from_tempo(tempo_bpm=120, total_bars=64)
+            >>> print(f"Bar 1 starts at {beat_grid.bar_boundaries[0]}ms")
+        """
+        ms_per_beat = 60000.0 / tempo_bpm
+        ms_per_bar = ms_per_beat * beats_per_bar
+
+        # Generate evenly-spaced bar boundaries
+        bar_boundaries = [start_offset_ms + (i * ms_per_bar) for i in range(total_bars)]
+
+        # Generate evenly-spaced beat boundaries
+        total_beats = total_bars * beats_per_bar
+        beat_boundaries = [start_offset_ms + (i * ms_per_beat) for i in range(total_beats)]
+
+        duration_ms = bar_boundaries[-1] + ms_per_bar
+
+        return cls(
+            bar_boundaries=bar_boundaries,
+            beat_boundaries=beat_boundaries,
+            eighth_boundaries=cls._calculate_eighth_boundaries(beat_boundaries),
+            sixteenth_boundaries=cls._calculate_sixteenth_boundaries(beat_boundaries),
+            tempo_bpm=tempo_bpm,
+            beats_per_bar=beats_per_bar,
+            duration_ms=duration_ms,
+        )
+
+    @classmethod
     def from_song_features(
         cls, song_features: dict[str, Any], duration_ms: float | None = None
     ) -> BeatGrid:

@@ -2,6 +2,7 @@
 
 from typing import Any
 
+from blinkb0t.core.config.poses import STANDARD_POSES, PoseLibrary
 from blinkb0t.core.sequencer.moving_heads.handlers.protocols import GeometryResult
 
 
@@ -45,22 +46,37 @@ class ChevronVHandler:
             fixture_id: Unique identifier for the fixture.
             role: Role assigned to this fixture (e.g., "OUTER_LEFT").
             params: Handler parameters:
-                - pan_start_dmx: Start pan position in DMX (default: 96)
-                - pan_end_dmx: End pan position in DMX (default: 176)
-                - tilt_base_dmx: Base tilt position in DMX (default: 128)
-                - tilt_inner_bias_dmx: Tilt offset for inner fixtures (default: 18)
-                - tilt_outer_bias_dmx: Tilt offset for outer fixtures (default: 0)
-            calibration: Fixture calibration data (unused).
+                - pan_start_deg: Start pan position in degrees (default: -120°, WIDE_LEFT)
+                - pan_end_deg: End pan position in degrees (default: 120°, WIDE_RIGHT)
+                - tilt_base_deg: Base tilt position in degrees (default: 80°, CEILING)
+                - tilt_inner_bias_deg: Tilt bias for inner fixtures in degrees (default: 5°)
+                - tilt_outer_bias_deg: Tilt bias for outer fixtures in degrees (default: 0°)
+            calibration: Fixture calibration data with 'fixture_config' for degree->DMX conversion.
 
         Returns:
             GeometryResult with chevron V-shape pan/tilt positions.
         """
-        # Get params (convert DMX to normalized [0, 1])
-        pan_start_dmx = params.get("pan_start_dmx", 96)
-        pan_end_dmx = params.get("pan_end_dmx", 176)
-        tilt_base_dmx = params.get("tilt_base_dmx", 128)
+        # Get fixture config for degree->DMX conversion
+        fixture_config = calibration.get("fixture_config")
+        if not fixture_config:
+            raise ValueError(
+                f"Missing fixture_config in calibration for {fixture_id}. "
+                "Geometry handlers require FixtureConfig for degree->DMX conversion."
+            )
+
+        # Get params in degrees (using STANDARD_POSES defaults)
+        pan_start_deg = params.get("pan_start_deg", STANDARD_POSES[PoseLibrary.WIDE_LEFT].pan_deg)
+        pan_end_deg = params.get("pan_end_deg", STANDARD_POSES[PoseLibrary.WIDE_RIGHT].pan_deg)
+        tilt_base_deg = params.get("tilt_base_deg", STANDARD_POSES[PoseLibrary.CEILING].tilt_deg)
+
+        # Bias values are already in DMX from templates, not degrees
         tilt_inner_bias_dmx = params.get("tilt_inner_bias_dmx", 18)
         tilt_outer_bias_dmx = params.get("tilt_outer_bias_dmx", 0)
+
+        # Convert degrees to DMX using fixture config
+        pan_start_dmx = fixture_config.deg_to_pan_dmx(pan_start_deg)
+        pan_end_dmx = fixture_config.deg_to_pan_dmx(pan_end_deg)
+        tilt_base_dmx = fixture_config.deg_to_tilt_dmx(tilt_base_deg)
 
         # Convert DMX to normalized
         pan_start = pan_start_dmx / 255.0

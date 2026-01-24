@@ -10,7 +10,7 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any
 
-from blinkb0t.core.formats.xlights.models.xsq import (
+from blinkb0t.core.formats.xlights.sequence.models.xsq import (
     ColorPalette,
     Effect,
     EffectDB,

@@ -5,17 +5,18 @@ generates curves based on the library configuration. It serves as a
 catch-all for movements that don't need specialized logic.
 """
 
+import logging
 from typing import Any
 
 from blinkb0t.core.curves.generator import CurveGenerator
+from blinkb0t.core.curves.library import CurveLibrary
 from blinkb0t.core.curves.models import CurvePoint
 from blinkb0t.core.curves.semantics import CurveKind
 from blinkb0t.core.sequencer.models.enum import Intensity
 from blinkb0t.core.sequencer.moving_heads.handlers.protocols import MovementResult
-from blinkb0t.core.sequencer.moving_heads.libraries.movement import (
-    MovementLibrary,
-    MovementType,
-)
+
+logger = logging.getLogger(__name__)
+renderer_log = logging.getLogger("DMX_MH_RENDER")
 
 
 class DefaultMovementHandler:
@@ -30,16 +31,6 @@ class DefaultMovementHandler:
 
     Attributes:
         handler_id: Unique identifier ("__default__").
-
-    Example:
-        >>> handler = DefaultMovementHandler()
-        >>> # This will look up "sweep_lr" from MovementLibrary
-        >>> result = handler.generate(
-        ...     params={"movement_id": "sweep_lr"},
-        ...     n_samples=64,
-        ...     cycles=2.0,
-        ...     intensity=Intensity.SMOOTH,
-        ... )
 
     Raises:
         ValueError: If movement_id not in params or not in library.
@@ -62,39 +53,67 @@ class DefaultMovementHandler:
 
         Args:
             params: Handler parameters:
-                - movement_id: Movement pattern ID (required)
-                - amplitude_degrees: Override amplitude (0-180)
+                - movement_pattern: Movement pattern (required)
+                - geometry: Geometry type (required)
+                - calibration: Calibration dictionary (optional)
+                - base_pan_norm: Base pan position [0, 1] from geometry
+                - base_tilt_norm: Base tilt position [0, 1] from geometry
             n_samples: Number of samples to generate.
             cycles: Number of movement cycles.
             intensity: Intensity level (SLOW, SMOOTH, FAST, DRAMATIC).
 
         Returns:
-            MovementResult with offset-centered pan/tilt curves.
+            MovementResult with curves scaled to fit within DMX constraints.
 
         Raises:
-            ValueError: If movement_id not in params.
-            ValueError: If movement_id not found in library.
+            ValueError: If handler is not correctly configured.
         """
-        # Extract movement_id from params
-        if "movement_id" not in params:
+        pattern = params.get("movement_pattern")
+        if not pattern:
             raise ValueError(
-                "DefaultMovementHandler requires 'movement_id' in params. "
-                "This should be set automatically by the handler registry."
+                "Handler is not correctly configured. 'movement_pattern' is missing from params."
+            )
+        base_params = {**pattern.base_params, **params.get("base_params", {})}
+
+        geometry = params.get("geometry")
+        if not geometry:
+            raise ValueError(
+                "Handler is not correctly configured. 'geometry' is missing from params."
             )
 
-        movement_id_str = params["movement_id"]
+        calibration = params.get("calibration", {})
+        pan_min = calibration.get("pan_min_dmx", 0) if calibration else 0
+        pan_max = calibration.get("pan_max_dmx", 255) if calibration else 255
+        tilt_min = calibration.get("tilt_min_dmx", 0) if calibration else 0
+        tilt_max = calibration.get("tilt_max_dmx", 255) if calibration else 255
+        renderer_log.info(f"Pan Min: {pan_min}, Pan Max: {pan_max}")
+        renderer_log.info(f"Tilt Min: {tilt_min}, Tilt Max: {tilt_max}")
 
-        # Look up pattern in library
-        try:
-            # Convert string to enum
-            movement_type = MovementType(movement_id_str)
-        except ValueError as e:
-            raise ValueError(
-                f"Movement '{movement_id_str}' not found in MovementLibrary. "
-                f"Valid: {[m.value for m in MovementType]}"
-            ) from e
+        base_pan_norm = params.get("base_pan_norm", 0.5)
+        base_tilt_norm = params.get("base_tilt_norm", 0.5)
 
-        pattern = MovementLibrary.PATTERNS[movement_type]
+        # Calculate maximum amplitude that fits within DMX constraints
+        # Base position is in normalized [0,1] space relative to full DMX range [0-255]
+        # We need to ensure curves stay within [min_dmx, max_dmx] constraints
+
+        # Convert DMX limits to normalized space
+        pan_min_norm = pan_min / 255.0
+        pan_max_norm = pan_max / 255.0
+        tilt_min_norm = tilt_min / 255.0
+        tilt_max_norm = tilt_max / 255.0
+
+        # Calculate how far we can extend from base position before hitting boundaries
+        pan_dist_to_min = base_pan_norm - pan_min_norm
+        pan_dist_to_max = pan_max_norm - base_pan_norm
+        pan_max_amplitude_norm = min(pan_dist_to_min, pan_dist_to_max)
+
+        tilt_dist_to_min = base_tilt_norm - tilt_min_norm
+        tilt_dist_to_max = tilt_max_norm - base_tilt_norm
+        tilt_max_amplitude_norm = min(tilt_dist_to_min, tilt_dist_to_max)
+
+        renderer_log.info(
+            f"Max safe amplitude (norm): pan={pan_max_amplitude_norm:.3f}, tilt={tilt_max_amplitude_norm:.3f}"
+        )
 
         # Get categorical params for intensity
         if intensity not in pattern.categorical_params:
@@ -106,7 +125,12 @@ class DefaultMovementHandler:
         # Resolve amplitude (allow param override)
         amplitude = self._resolve_amplitude(params, cat_params.amplitude)
 
-        # Generate pan curve
+        renderer_log.info(f"Resolved Amplitude: {amplitude}")
+
+        # Generate pan curve scaled to fit within pan_min/pan_max
+        renderer_log.info(
+            f"Generating Pan Curve - type: {pattern.pan_curve.value}, amplitude: {amplitude}, frequency: {cat_params.frequency}, center: {cat_params.center}"
+        )
         pan_curve = self._generate_curve(
             curve_type=pattern.pan_curve,
             n_samples=n_samples,
@@ -114,24 +138,68 @@ class DefaultMovementHandler:
             amplitude=amplitude,
             frequency=cat_params.frequency,
             center=cat_params.center,
+            base_norm=base_pan_norm,
+            max_amplitude_norm=pan_max_amplitude_norm,
+            params=self._filter_base_params("curve", "pan", base_params),
         )
 
-        # Generate tilt curve
+        if not pan_curve:
+            pan_static_dmx = self._resolve_static_dmx_value(base_pan_norm, pan_min, pan_max)
+        else:
+            pan_static_dmx = None
+
+        # Generate tilt curve scaled to fit within tilt_min/tilt_max
+        tilt_curve_def = pattern.resolve_tilt_curve(geometry)
+
         tilt_curve = self._generate_curve(
-            curve_type=pattern.tilt_curve,
+            curve_type=tilt_curve_def,
             n_samples=n_samples,
             cycles=cycles,
             amplitude=amplitude,
             frequency=cat_params.frequency,
             center=cat_params.center,
+            base_norm=base_tilt_norm,
+            max_amplitude_norm=tilt_max_amplitude_norm,
+            params=self._filter_base_params("curve", "tilt", base_params),
         )
+
+        if not tilt_curve:
+            tilt_static_dmx = self._resolve_static_dmx_value(base_tilt_norm, tilt_min, tilt_max)
+        else:
+            tilt_static_dmx = None
 
         return MovementResult(
             pan_curve_type=pattern.pan_curve,
             pan_curve=pan_curve,
-            tilt_curve_type=pattern.tilt_curve,
+            pan_static_dmx=pan_static_dmx,
+            tilt_curve_type=tilt_curve_def,
             tilt_curve=tilt_curve,
+            tilt_static_dmx=tilt_static_dmx,
         )
+
+    def _filter_base_params(self, prefix: str, type: str, params: dict[str, Any]) -> dict[str, Any]:
+        key_prefix = f"{prefix}_{type}_"
+        return {
+            k.removeprefix(key_prefix): v for k, v in params.items() if k.startswith(key_prefix)
+        }
+
+    def _resolve_static_dmx_value(
+        self, normalized_value: float, clamp_min: int = 0, clamp_max: int = 255
+    ) -> int:
+        """Resolve static DMX value from normalized value.
+
+        Args:
+            normalized_value: Normalized value [0, 1].
+            clamp_min: Minimum DMX value [0, 255].
+            clamp_max: Maximum DMX value [0, 255].
+
+        Returns:
+            Static DMX value [0, 255].
+        """
+        floor = max(clamp_min, 0)
+        ceiling = min(clamp_max, 255)
+        value = int(normalized_value * 255)
+        return max(floor, min(ceiling, value))
 
     def _resolve_amplitude(self, params: dict[str, Any], default_amplitude: float) -> float:
         """Resolve amplitude from params or categorical default.
@@ -154,63 +222,84 @@ class DefaultMovementHandler:
 
     def _generate_curve(
         self,
-        curve_type: Any,
+        *,
+        curve_type: CurveLibrary,
         n_samples: int,
         cycles: float,
         amplitude: float,
         frequency: float,
         center: int,
-    ) -> list[CurvePoint]:
-        """Generate a movement curve with specified parameters.
+        base_norm: float,
+        max_amplitude_norm: float,
+        params: dict[str, Any] | None = None,
+    ) -> list[CurvePoint] | None:
+        """Generate a movement curve scaled to fit within DMX constraints.
 
         Args:
             curve_type: CurveLibrary enum value.
             n_samples: Number of samples.
             cycles: Number of cycles (may be scaled by frequency).
-            amplitude: Normalized amplitude [0, 1].
+            amplitude: Requested amplitude [0, 1] from template.
             frequency: Frequency multiplier.
             center: DMX center value [0, 255] (unused - curves are normalized).
-
+            base_norm: Base position from geometry [0, 1].
+            max_amplitude_norm: Maximum safe amplitude in normalized space before hitting constraints.
+            params: Optional parameters to override defaults/presets
         Returns:
-            List of curve points, offset-centered at 0.5.
+            List of curve points scaled to fit within fixture DMX limits.
+
+        Note:
+            The curve is generated centered at base_norm with amplitude scaled to stay
+            within fixture movement limits. This preserves curve shape without clipping.
         """
+        if curve_type == CurveLibrary.HOLD:
+            return None
+
         # Generate base curve - already in normalized [0, 1] space
         base_curve = self._curve_gen.generate_custom_points(
             curve_id=curve_type.value,
             num_points=n_samples,
+            **(params or {}),
         )
 
         # Get curve definition to check kind
         curve_def = self._curve_gen._registry.get(curve_type.value)
+
+        # Apply requested amplitude scaling to the maximum safe amplitude
+        # This gives us the actual amplitude to use
+        effective_amplitude = max_amplitude_norm * amplitude
 
         # Build scaled points based on curve kind
         scaled_points: list[CurvePoint] = []
 
         if curve_def.kind == CurveKind.MOVEMENT_OFFSET:
             # Movement offset curves are already centered at 0.5
-            # Scale amplitude around center
+            # Re-center at base_norm and scale amplitude
             for point in base_curve:
-                # Convert from [0, 1] centered at 0.5 to scaled version
-                offset = point.v - 0.5  # Now in [-0.5, 0.5]
-                scaled_offset = offset * (amplitude / 0.5)  # Scale amplitude
-                new_v = 0.5 + scaled_offset
+                # Convert from [0, 1] centered at 0.5 to offset [-0.5, 0.5]
+                offset = point.v - 0.5
+                # Scale by effective amplitude
+                scaled_offset = offset * (effective_amplitude / 0.5)
+                # Apply to base position
+                new_v = base_norm + scaled_offset
 
-                # Clamp to [0, 1]
+                # Final safety clamp (should be unnecessary if math is correct)
                 new_v = max(0.0, min(1.0, new_v))
 
                 scaled_points.append(CurvePoint(t=point.t, v=new_v))
 
         elif curve_def.kind == CurveKind.DIMMER_ABSOLUTE:
             # Absolute curves go from 0 to 1
-            # Center them at 0.5 and apply amplitude
+            # Center them at base_norm and apply amplitude
             for point in base_curve:
-                # Convert absolute [0, 1] to offset-centered [-amplitude, +amplitude]
-                # First normalize to [-0.5, 0.5], then scale by amplitude
-                normalized_offset = point.v - 0.5  # [-0.5, 0.5]
-                scaled_offset = normalized_offset * (amplitude / 0.5)  # Scale amplitude
-                new_v = 0.5 + scaled_offset
+                # Convert absolute [0, 1] to offset [-0.5, 0.5]
+                normalized_offset = point.v - 0.5
+                # Scale by effective amplitude
+                scaled_offset = normalized_offset * (effective_amplitude / 0.5)
+                # Apply to base position
+                new_v = base_norm + scaled_offset
 
-                # Clamp to [0, 1]
+                # Final safety clamp
                 new_v = max(0.0, min(1.0, new_v))
 
                 scaled_points.append(CurvePoint(t=point.t, v=new_v))
@@ -219,8 +308,8 @@ class DefaultMovementHandler:
             # Unknown curve kind - treat as offset for safety
             for point in base_curve:
                 offset = point.v - 0.5
-                scaled_offset = offset * (amplitude / 0.5)
-                new_v = 0.5 + scaled_offset
+                scaled_offset = offset * (effective_amplitude / 0.5)
+                new_v = base_norm + scaled_offset
                 new_v = max(0.0, min(1.0, new_v))
                 scaled_points.append(CurvePoint(t=point.t, v=new_v))
 

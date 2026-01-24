@@ -10,7 +10,6 @@ from blinkb0t.core.agents.sequencer.moving_heads.models import (
     JudgeDecision,
     JudgeResponse,
     PlanSection,
-    ValidationResponse,
 )
 from blinkb0t.core.agents.sequencer.moving_heads.orchestrator import (
     OrchestrationConfig,
@@ -103,13 +102,6 @@ def test_orchestrate_success_first_iteration(mock_provider, context, valid_plan)
                 duration_seconds=1.0,
                 tokens_used=100,
             )
-        elif spec.name == "validator":
-            return AgentResult(
-                success=True,
-                data=ValidationResponse(valid=True, errors=[], warnings=[], summary="OK"),
-                duration_seconds=0.5,
-                tokens_used=50,
-            )
         elif spec.name == "judge":
             return AgentResult(
                 success=True,
@@ -153,13 +145,6 @@ def test_orchestrate_requires_iterations(mock_provider, context, valid_plan):
                 data=valid_plan,
                 duration_seconds=1.0,
                 tokens_used=100,
-            )
-        elif spec.name == "validator":
-            return AgentResult(
-                success=True,
-                data=ValidationResponse(valid=True, errors=[], warnings=[], summary="OK"),
-                duration_seconds=0.5,
-                tokens_used=50,
             )
         elif spec.name == "judge":
             # First 2 iterations: soft fail, 3rd: approve
@@ -217,13 +202,6 @@ def test_orchestrate_max_iterations_exhausted(mock_provider, context, valid_plan
                 duration_seconds=1.0,
                 tokens_used=100,
             )
-        elif spec.name == "validator":
-            return AgentResult(
-                success=True,
-                data=ValidationResponse(valid=True, errors=[], warnings=[], summary="OK"),
-                duration_seconds=0.5,
-                tokens_used=50,
-            )
         elif spec.name == "judge":
             # Always soft fail
             return AgentResult(
@@ -255,17 +233,17 @@ def test_orchestrate_max_iterations_exhausted(mock_provider, context, valid_plan
 
 def test_orchestrate_heuristic_validation_failure(mock_provider, context):
     """Test orchestration when heuristic validation fails."""
-    config = OrchestrationConfig()
+    config = OrchestrationConfig(max_iterations=2)
     orch = Orchestrator(provider=mock_provider, config=config)
 
-    # Plan with invalid template
+    # Plan with invalid template (not in available_templates list)
     bad_plan = ChoreographyPlan(
         sections=[
             PlanSection(
                 section_name="intro",
                 start_bar=1,
                 end_bar=8,
-                template_id="sweep_lr_fan_pulse",
+                template_id="nonexistent_template",  # This template doesn't exist
             )
         ]
     )
@@ -278,16 +256,18 @@ def test_orchestrate_heuristic_validation_failure(mock_provider, context):
                 duration_seconds=1.0,
                 tokens_used=100,
             )
+        # Judge should not be called since heuristic validation fails
         return AgentResult(success=False, duration_seconds=0, tokens_used=0)
 
     orch.runner = MagicMock()
     orch.runner.run.side_effect = mock_run_side_effect
 
-    # Heuristic validation should catch issues and add to feedback
+    # Heuristic validation should catch the invalid template
     result = orch.orchestrate(context)
 
-    # Should continue even with warnings, but fail if critical errors
-    assert result.iterations >= 1
+    # Should fail after max_iterations due to heuristic validation rejecting all plans
+    assert not result.success
+    assert result.iterations == config.max_iterations
 
 
 def test_orchestrate_token_budget_exceeded(mock_provider, context, valid_plan):
@@ -302,13 +282,6 @@ def test_orchestrate_token_budget_exceeded(mock_provider, context, valid_plan):
                 data=valid_plan,
                 duration_seconds=1.0,
                 tokens_used=150,  # Uses most of budget
-            )
-        elif spec.name == "validator":
-            return AgentResult(
-                success=True,
-                data=ValidationResponse(valid=True, errors=[], warnings=[], summary="OK"),
-                duration_seconds=0.5,
-                tokens_used=50,
             )
         elif spec.name == "judge":
             return AgentResult(
@@ -407,13 +380,6 @@ def test_orchestrate_collects_feedback(mock_provider, context, valid_plan):
                 data=valid_plan,
                 duration_seconds=1.0,
                 tokens_used=100,
-            )
-        elif spec.name == "validator":
-            return AgentResult(
-                success=True,
-                data=ValidationResponse(valid=True, errors=[], warnings=[], summary="OK"),
-                duration_seconds=0.5,
-                tokens_used=50,
             )
         elif spec.name == "judge":
             if call_count == 1:

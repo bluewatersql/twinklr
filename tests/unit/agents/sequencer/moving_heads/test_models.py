@@ -9,8 +9,6 @@ from blinkb0t.core.agents.sequencer.moving_heads.models import (
     JudgeIssue,
     JudgeResponse,
     PlanSection,
-    ValidationIssue,
-    ValidationResponse,
 )
 
 
@@ -131,47 +129,6 @@ def test_choreography_plan_validation():
     )
     assert plan.sections is not None
     assert len(plan.sections) == 1
-
-
-def test_validation_issue_model():
-    """Test validation issue model."""
-    issue = ValidationIssue(
-        location="intro.sequence_0",
-        message="Missing required field",
-        severity="error",
-    )
-
-    assert issue.location == "intro.sequence_0"
-    assert issue.message == "Missing required field"
-    assert issue.severity == "error"
-
-
-def test_validation_response_valid():
-    """Test validation response for valid plan."""
-    response = ValidationResponse(
-        valid=True,
-        errors=[],
-        warnings=[ValidationIssue(location="verse", message="Short sequence", severity="warning")],
-        summary="Plan is valid with 1 warning",
-    )
-
-    assert response.valid is True
-    assert len(response.errors) == 0
-    assert len(response.warnings) == 1
-
-
-def test_validation_response_invalid():
-    """Test validation response for invalid plan."""
-    response = ValidationResponse(
-        valid=False,
-        errors=[ValidationIssue(location="intro", message="Template not found", severity="error")],
-        warnings=[],
-        summary="Plan has critical errors",
-    )
-
-    assert response.valid is False
-    assert len(response.errors) == 1
-    assert len(response.warnings) == 0
 
 
 def test_judge_issue_model():
@@ -317,8 +274,6 @@ def test_models_are_serializable():
         ]
     )
 
-    validation = ValidationResponse(valid=True, errors=[], warnings=[], summary="OK")
-
     judge = JudgeResponse(
         decision=JudgeDecision.APPROVE,
         score=8.0,
@@ -330,5 +285,4 @@ def test_models_are_serializable():
 
     # All should serialize
     assert plan.model_dump()
-    assert validation.model_dump()
     assert judge.model_dump()

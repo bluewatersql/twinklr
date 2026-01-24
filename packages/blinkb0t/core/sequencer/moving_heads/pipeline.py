@@ -1,16 +1,23 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterator
 from pathlib import Path
 
 from blinkb0t.core.agents.sequencer.moving_heads import ChoreographyPlan
+from blinkb0t.core.agents.sequencer.moving_heads.models import PlanSection
 from blinkb0t.core.config.fixtures import FixtureGroup
 from blinkb0t.core.config.models import JobConfig
 from blinkb0t.core.curves.generator import CurveGenerator
 from blinkb0t.core.curves.registry import CurveRegistry
-from blinkb0t.core.formats.xlights.models.xsq import Effect, XSequence
-from blinkb0t.core.formats.xlights.xsq.exporter import XSQExporter
-from blinkb0t.core.formats.xlights.xsq.parser import XSQParser
+from blinkb0t.core.formats.xlights.sequence.exporter import XSQExporter
+from blinkb0t.core.formats.xlights.sequence.models.xsq import (
+    Effect,
+    SequenceHead,
+    TimeMarker,
+    XSequence,
+)
+from blinkb0t.core.formats.xlights.sequence.parser import XSQParser
 from blinkb0t.core.sequencer.models.context import FixtureContext, TemplateCompileContext
 from blinkb0t.core.sequencer.models.moving_heads.rig import rig_profile_from_fixture_group
 from blinkb0t.core.sequencer.moving_heads.channels.state import FixtureSegment
@@ -74,7 +81,7 @@ class RenderingPipeline:
         self.movement_registry = registries["movement"]
         self.dimmer_registry = registries["dimmer"]
 
-        logger.info(
+        logger.debug(
             f"Initialized RenderingPipeline with {len(self.rig_profile.fixtures)} fixtures "
             f"and {len(self.choreography_plan.sections)} sections"
         )
@@ -97,10 +104,14 @@ class RenderingPipeline:
         """
         all_segments: list[FixtureSegment] = []
 
-        logger.info(f"Starting render of {len(self.choreography_plan.sections)} sections")
+        logger.debug("Starting plan rendering...")
+        time_markers: list[TimeMarker] = []
 
-        for section in self.choreography_plan.sections:
-            logger.info(
+        for section in self.iterate_plan_sections(self.choreography_plan):
+            if not section.template_id:
+                raise ValueError(f"Section '{section.section_name}' has no template_id")
+
+            logger.debug(
                 f"Rendering section '{section.section_name}' "
                 f"(bars {section.start_bar}-{section.end_bar}, "
                 f"template: {section.template_id}, preset: {section.preset_id})"
@@ -134,6 +145,9 @@ class RenderingPipeline:
 
             # Build compile context aligned to beat grid
             context = TemplateCompileContext(
+                section_id=section.section_name,
+                template_id=template.template_id,
+                preset_id=preset.preset_id if preset else None,
                 fixtures=fixture_contexts,
                 beat_grid=self.beat_grid,
                 start_bar=section.start_bar,
@@ -145,6 +159,12 @@ class RenderingPipeline:
                 dimmer_registry=self.dimmer_registry,
             )
 
+            time_markers.append(
+                TimeMarker(
+                    name=section.section_name, time_ms=context.start_ms, end_time_ms=context.end_ms
+                )
+            )
+
             logger.debug(
                 f"Compile context: start={context.start_ms}ms, "
                 f"duration={context.duration_ms}ms, "
@@ -154,7 +174,7 @@ class RenderingPipeline:
             # Compile template
             try:
                 result = compile_template(template, context, preset)
-                logger.info(
+                logger.debug(
                     f"Compiled {len(result.segments)} segments "
                     f"({result.num_complete_cycles} complete cycles)"
                 )
@@ -163,13 +183,41 @@ class RenderingPipeline:
                 logger.error(f"Compilation failed for section '{section.section_name}': {e}")
                 raise
 
-        logger.info(f"Render complete: {len(all_segments)} total segments")
+        logger.debug(f"Render complete: {len(all_segments)} total segments")
 
-        # Stub: Export to XSQ (placeholder)
+        # Export to XSQ
         if self.output_path:
-            self._export_to_xsq(all_segments)
+            self._export_to_xsq(all_segments, time_markers)
 
         return all_segments
+
+    def iterate_plan_sections(self, plan: ChoreographyPlan) -> Iterator[PlanSection]:
+        """Iterate over the plan sections and yield each section.
+
+        Args:
+            plan: The choreography plan to iterate over.
+
+        Returns:
+            An iterator over the plan sections.
+        """
+        for section in plan.sections:
+            if section.segments:
+                for seg in section.segments:
+                    yield PlanSection(
+                        section_name=section.section_name,
+                        start_bar=seg.start_bar,
+                        end_bar=seg.end_bar,
+                        section_role=section.section_role,
+                        energy_level=section.energy_level,
+                        template_id=seg.template_id,
+                        preset_id=seg.preset_id,
+                        modifiers=seg.modifiers,
+                        reasoning=seg.reasoning or section.reasoning,
+                        # IMPORTANT: do not carry segments forward once flattened
+                        segments=None,
+                    )
+            else:
+                yield section
 
     def _build_fixture_contexts(self) -> list[FixtureContext]:
         """Build fixture contexts from rig profile.
@@ -178,6 +226,10 @@ class RenderingPipeline:
             List of FixtureContext objects for all fixtures in the rig.
         """
         contexts = []
+
+        # Get actual fixture configs from fixture_group for degree->DMX conversion
+        fixture_configs = {fx.fixture_id: fx.config for fx in self.fixture_group.expand_fixtures()}
+
         for fixture_def in self.rig_profile.fixtures:
             # Build calibration dict from FixtureCalibration model
             calibration = {}
@@ -192,6 +244,10 @@ class RenderingPipeline:
                     "dimmer_floor_dmx": fixture_def.calibration.dimmer_floor_dmx,
                     "dimmer_ceiling_dmx": fixture_def.calibration.dimmer_ceiling_dmx,
                 }
+
+            # Add the full FixtureConfig for degree->DMX conversion in geometry handlers
+            if fixture_def.fixture_id in fixture_configs:
+                calibration["fixture_config"] = fixture_configs[fixture_def.fixture_id]
 
             # Infer role from fixture groups (first group that contains this fixture)
             role = "UNKNOWN"
@@ -214,15 +270,16 @@ class RenderingPipeline:
                 )
             )
 
-        logger.debug(f"Built {len(contexts)} fixture contexts")
         return contexts
 
-    def _export_to_xsq(self, segments: list[FixtureSegment]) -> None:
+    def _export_to_xsq(
+        self, segments: list[FixtureSegment], time_markers: list[TimeMarker]
+    ) -> None:
         """Export segments to XSQ file.
 
         Args:
             segments: List of fixture segments to export.
-
+            time_markers: List of time markers to export.
         Raises:
             ValueError: If output_path is not set or XSQ operations fail.
         """
@@ -230,11 +287,11 @@ class RenderingPipeline:
             logger.warning("No output_path specified, skipping XSQ export")
             return
 
-        logger.info(f"Exporting {len(segments)} segments to {self.output_path}")
+        logger.debug(f"Exporting {len(segments)} segments to {self.output_path}")
 
         # Load template XSQ if provided, otherwise create new
         if self.template_xsq and Path(self.template_xsq).exists():
-            logger.info(f"Loading template XSQ from {self.template_xsq}")
+            logger.debug(f"Loading template XSQ from {self.template_xsq}")
             parser = XSQParser()
             xsq = parser.parse(self.template_xsq)
             logger.debug(
@@ -243,9 +300,7 @@ class RenderingPipeline:
             )
         else:
             # Create minimal XSQ
-            logger.info("Creating new XSQ (no template provided)")
-            from blinkb0t.core.formats.xlights.models.xsq import SequenceHead
-
+            logger.debug("Creating new XSQ (no template provided)")
             # Calculate duration from segments
             duration_ms = max((s.t1_ms for s in segments), default=0)
 
@@ -260,10 +315,13 @@ class RenderingPipeline:
                 )
             )
 
+        # Add timing markers to XSQ
+        xsq.add_timing_layer(timing_name="BlinkB0t AudioSections", markers=time_markers)
+
         adapter = XsqAdapter()
         placements = adapter.convert(segments, self.fixture_group, xsq)
 
-        logger.info(f"Converted to {len(placements)} effect placements")
+        logger.debug(f"Converted to {len(placements)} effect placements")
 
         # Add placements to XSQ
         for placement in placements:
@@ -289,4 +347,4 @@ class RenderingPipeline:
         exporter = XSQExporter()
         exporter.export(xsq, self.output_path, pretty=True)
 
-        logger.info(f"Successfully exported XSQ to {self.output_path}")
+        logger.debug(f"Successfully exported XSQ to {self.output_path}")

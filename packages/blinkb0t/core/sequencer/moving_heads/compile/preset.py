@@ -36,13 +36,6 @@ def apply_step_patch(step: TemplateStep, patch: StepPatch) -> TemplateStep:
 
     Returns:
         A new TemplateStep with patches applied.
-
-    Example:
-        >>> step = TemplateStep(...)
-        >>> patch = StepPatch(movement={"cycles": 4.0})
-        >>> patched = apply_step_patch(step, patch)
-        >>> patched.movement.cycles
-        4.0
     """
     # Convert step components to dicts for merging
     geometry_dict = step.geometry.model_dump()

@@ -1,6 +1,6 @@
 """Noise curve generators backed by the noise library."""
 
-from noise import pnoise1, snoise2
+from noise import pnoise1
 
 from blinkb0t.core.curves.models import CurvePoint
 from blinkb0t.core.curves.sampling import sample_uniform_grid
@@ -28,35 +28,6 @@ def generate_perlin_noise(
             t=t,
             v=_normalize_noise(
                 pnoise1(
-                    t * scale,
-                    octaves=octaves,
-                    repeat=repeat,
-                    base=base,
-                )
-            ),
-        )
-        for t in t_grid
-    ]
-
-
-def generate_simplex_noise(
-    n_samples: int,
-    *,
-    scale: float = 4.0,
-    octaves: int = 4,
-    repeat: int = 1024,
-    base: int = 0,
-) -> list[CurvePoint]:
-    """Generate a Simplex noise curve sampled on the uniform grid."""
-    if n_samples < 2:
-        raise ValueError("n_samples must be >= 2")
-
-    t_grid = sample_uniform_grid(n_samples)
-    return [
-        CurvePoint(
-            t=t,
-            v=_normalize_noise(
-                snoise2(
                     t * scale,
                     octaves=octaves,
                     repeat=repeat,

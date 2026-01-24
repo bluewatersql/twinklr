@@ -61,6 +61,7 @@ class CurveGenerator:
         self,
         curve_id: str,
         num_points: int = 100,
+        **kwargs: Any,
     ) -> list[CurvePoint]:
         """Generate custom curve as point array in DMX space.
 
@@ -81,4 +82,4 @@ class CurveGenerator:
         if curve_def is None:
             raise ValueError(f"Curve '{curve_id}' not found in library")
 
-        return self._custom.generate(curve_def, num_points)
+        return self._custom.generate(curve_def, num_points, **kwargs)

@@ -69,8 +69,7 @@ class TestCurveLibrary:
 
     def test_noise_values(self) -> None:
         """Noise curve values exist."""
-        assert CurveLibrary.PERLIN_NOISE.value == "perlin_noise"
-        assert CurveLibrary.SIMPLEX_NOISE.value == "simplex_noise"
+        assert CurveLibrary.MOVEMENT_PERLIN_NOISE.value == "movement_perlin_noise"
 
     def test_parametric_values(self) -> None:
         """Parametric curve values exist."""

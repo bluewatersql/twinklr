@@ -142,22 +142,23 @@ class MovingHeadManager(DomainManager):
             mh = MovingHeadManager(session)
             mh.run_pipeline("song.mp3", "input.xsq", "output.xsq")
         """
-        logger.info(f"Running moving head pipeline: {audio_path} -> {xsq_out}")
+        logger.debug(f"Running moving head pipeline: {audio_path} -> {xsq_out}")
 
         # Step 1: Analyze audio (universal service)
-        logger.info("Step 1/4: Analyzing audio...")
+        logger.debug("Step 1/4: Analyzing audio...")
         song_features: dict[str, Any] = self.session.audio.analyze(str(audio_path))
 
         # Step 2: Build beat grid
-        logger.info("Step 2/4: Building beat grid...")
+        logger.debug("Step 2/4: Building beat grid...")
         beat_grid = BeatGrid.from_song_features(song_features)
         logger.debug(
             f"Created beat grid: tempo={beat_grid.tempo_bpm} BPM, "
-            f"duration={beat_grid.duration_ms}ms"
+            f"total_bars={beat_grid.total_bars}, ms_per_bar={beat_grid.ms_per_bar:.2f}ms, "
+            f"duration={beat_grid.duration_ms:.0f}ms"
         )
 
         # Step 3: Generate plan using orchestrator (multi-agent pipeline)
-        logger.info("Step 3/4: Running agent orchestration...")
+        logger.debug("Step 3/4: Running agent orchestration...")
 
         # Load builtin templates (registers them in global REGISTRY)
 
@@ -212,7 +213,7 @@ class MovingHeadManager(DomainManager):
             else:
                 raise RuntimeError(error_msg)
         else:
-            logger.info(
+            logger.debug(
                 f"Agent orchestration successful: {orchestration_result.iterations} iterations, "
                 f"tokens: {orchestration_result.total_tokens}, "
                 f"duration: {orchestration_result.duration_seconds:.1f}s"
@@ -222,7 +223,7 @@ class MovingHeadManager(DomainManager):
             choreography_plan = orchestration_result.plan
 
         # Step 4: Apply plan to sequence
-        logger.info("Step 4/4: Applying plan to sequence...")
+        logger.debug("Step 4/4: Applying plan to sequence...")
 
         pipeline = RenderingPipeline(
             choreography_plan=choreography_plan,
@@ -235,9 +236,9 @@ class MovingHeadManager(DomainManager):
 
         # Render segments and export to XSQ
         segments = pipeline.render()
-        logger.info(f"Rendered {len(segments)} fixture segments")
+        logger.debug(f"Rendered {len(segments)} fixture segments")
 
-        logger.info(
+        logger.debug(
             f"Pipeline complete: {xsq_out} "
             f"(tokens: {orchestration_result.total_tokens}, "
             f"time: {orchestration_result.duration_seconds:.1f}s)"

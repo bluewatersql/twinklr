@@ -11,6 +11,27 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 # ============================================================================
 
 
+class PlanSegment(BaseModel):
+    """LLM selection for a contiguous sub-range within a section."""
+
+    segment_id: str = Field(description="Short id within the section (e.g., 'A', 'B', 'C')")
+    start_bar: int = Field(ge=1, description="Start bar (1-indexed)")
+    end_bar: int = Field(ge=1, description="End bar (1-indexed, inclusive)")
+
+    template_id: str = Field(description="Template ID to use for this segment")
+    preset_id: str | None = Field(None, description="Optional preset ID")
+    modifiers: dict[str, str] = Field(default_factory=dict, description="Optional modifiers")
+    reasoning: str = Field(default="", description="Why this segment choice was made")
+
+    model_config = ConfigDict(frozen=True)
+
+    @model_validator(mode="after")
+    def _validate_bar_range(self) -> PlanSegment:
+        if self.end_bar < self.start_bar:
+            raise ValueError(f"end_bar ({self.end_bar}) must be >= start_bar ({self.start_bar})")
+        return self
+
+
 class PlanSection(BaseModel):
     """LLM selection for a single song section.
 
@@ -30,28 +51,55 @@ class PlanSection(BaseModel):
     energy_level: int | None = Field(None, ge=0, le=100, description="Energy level 0-100")
 
     # Template selection (the LLM's choice)
-    template_id: str = Field(description="Template ID to use (e.g., 'fan_pulse')")
-    preset_id: str | None = Field(
-        None, description="Optional preset ID (e.g., 'CHILL', 'ENERGETIC')"
+    template_id: str | None = Field(
+        None,
+        description="Template ID to use when not providing segments",
     )
-    modifiers: dict[str, str] = Field(
-        default_factory=dict,
-        description="Optional categorical modifiers (e.g., {'intensity': 'HIGH'})",
-    )
+    preset_id: str | None = Field(None, description="Optional preset ID")
+    modifiers: dict[str, str] = Field(default_factory=dict, description="Optional modifiers")
+    reasoning: str = Field(default="", description="Why this template/preset was chosen")
 
-    # Reasoning (helps LLM explain its choices)
-    reasoning: str = Field(
-        default="",
-        description="Why this template/preset was chosen",
+    # New: optional segmented plan
+    segments: list[PlanSegment] | None = Field(
+        None,
+        description="Optional 1–3 contiguous segments that partition this section",
+        min_length=1,
+        max_length=3,
     )
 
     model_config = ConfigDict(frozen=True)
 
     @model_validator(mode="after")
-    def _validate_bar_range(self) -> PlanSection:
-        """Validate end_bar >= start_bar."""
+    def _validate_section(self) -> PlanSection:
         if self.end_bar < self.start_bar:
             raise ValueError(f"end_bar ({self.end_bar}) must be >= start_bar ({self.start_bar})")
+
+        has_segments = bool(self.segments)
+        has_single = bool(self.template_id)
+
+        # Require exactly one of: segments OR single template
+        if has_segments and has_single:
+            raise ValueError("Provide either 'segments' OR 'template_id', not both.")
+        if not has_segments and not has_single:
+            raise ValueError("Must provide either 'segments' or 'template_id'.")
+
+        # If segmented, enforce full coverage + contiguity + within section bounds
+        if self.segments:
+            segs = sorted(self.segments, key=lambda s: (s.start_bar, s.end_bar))
+
+            if segs[0].start_bar != self.start_bar:
+                raise ValueError("First segment must start at section start_bar.")
+            if segs[-1].end_bar != self.end_bar:
+                raise ValueError("Last segment must end at section end_bar.")
+
+            for i in range(len(segs) - 1):
+                if segs[i].end_bar + 1 != segs[i + 1].start_bar:
+                    raise ValueError("Segments must be contiguous and non-overlapping.")
+
+            for s in segs:
+                if s.start_bar < self.start_bar or s.end_bar > self.end_bar:
+                    raise ValueError("Segment bar range must be within the section bar range.")
+
         return self
 
 
@@ -67,36 +115,6 @@ class ChoreographyPlan(BaseModel):
     overall_strategy: str = Field(
         default="", description="High-level choreography strategy description"
     )
-
-    model_config = ConfigDict(frozen=True)
-
-
-# ============================================================================
-# Validator Models
-# ============================================================================
-
-
-class ValidationIssue(BaseModel):
-    """Validation issue (error or warning)."""
-
-    location: str = Field(description="Location of issue (section.sequence)")
-    message: str = Field(description="Issue description")
-    severity: str = Field(description="Severity: 'error' or 'warning'")
-
-    model_config = ConfigDict(frozen=True)
-
-
-class ValidationResponse(BaseModel):
-    """Validation result from validator agent."""
-
-    valid: bool = Field(description="Whether plan is valid")
-    errors: list[ValidationIssue] = Field(
-        description="Critical errors (must fix)", default_factory=list
-    )
-    warnings: list[ValidationIssue] = Field(
-        description="Non-critical warnings (should fix)", default_factory=list
-    )
-    summary: str = Field(description="Summary of validation result")
 
     model_config = ConfigDict(frozen=True)
 

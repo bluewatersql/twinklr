@@ -61,7 +61,7 @@ def classify_song_energy_profile(
     # Get adaptive parameters for this profile
     params = _get_profile_parameters(profile_name, energy_cv, gradient_std)
 
-    logger.info(
+    logger.debug(
         f"Song profile: {profile_name} "
         f"(energy_mean={energy_mean:.2f}, cv={energy_cv:.2f}, tempo={tempo_bpm:.0f})"
     )

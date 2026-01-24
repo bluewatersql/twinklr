@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from blinkb0t.core.config.poses import PanPose
 from blinkb0t.core.sequencer.models.enum import (
     BlendMode,
     ChaseOrder,
@@ -88,7 +89,12 @@ def make_template() -> TemplateDoc:
                     ),
                     geometry=Geometry(
                         geometry_type=GeometryType.FAN,
-                        params={},
+                        pan_pose_by_role={
+                            TemplateRole.OUTER_LEFT: PanPose.WIDE_LEFT,
+                            TemplateRole.INNER_LEFT: PanPose.MID_LEFT,
+                            TemplateRole.INNER_RIGHT: PanPose.MID_RIGHT,
+                            TemplateRole.OUTER_RIGHT: PanPose.WIDE_RIGHT,
+                        },
                     ),
                     movement=Movement(
                         movement_type=MovementType.WAVE_HORIZONTAL,

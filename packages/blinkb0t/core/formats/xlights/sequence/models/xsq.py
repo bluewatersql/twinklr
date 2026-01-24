@@ -10,7 +10,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from blinkb0t.core.formats.xlights.models.effect_placement import EffectPlacement
+from blinkb0t.core.formats.xlights.sequence.models.effect_placement import EffectPlacement
 
 
 class TimeMarker(BaseModel):
@@ -18,7 +18,9 @@ class TimeMarker(BaseModel):
 
     name: str = Field(..., description="Marker name")
     time_ms: int = Field(..., ge=0, description="Time in milliseconds (startTime)")
-    position: float = Field(..., ge=0.0, description="Normalized position (0.0-1.0)")
+    position: float | None = Field(
+        default=None, ge=0.0, description="Normalized position (0.0-1.0)"
+    )
     end_time_ms: int | None = Field(
         default=None, description="Optional end time in milliseconds (endTime as offset from start)"
     )
@@ -274,6 +276,22 @@ class XSequence(BaseModel):
         element = self.get_element(element_name)
         if element is not None:
             element.layers = [EffectLayer(index=0, name="", effects=[])]
+
+    def add_timing_layer(self, timing_name: str, markers: list[TimeMarker]) -> None:
+        """Add timing layer to sequence.
+
+        Args:
+            timing_name: Name of timing layer
+            label: Label for timing layer
+            start_time_ms: Start time in milliseconds
+            end_time_ms: End time in milliseconds
+        """
+        self.timing_tracks.append(
+            TimingTrack(
+                name=timing_name,
+                markers=markers,
+            )
+        )
 
     def add_effect(self, element_name: str, effect: Effect, layer_index: int = 0) -> None:
         """Add effect to an element's layer.

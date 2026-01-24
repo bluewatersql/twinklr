@@ -28,11 +28,14 @@ Has the planner addressed the feedback effectively?
 
 Judge this choreography plan across all criteria:
 
-1. **Musical Synchronization**: Does it serve the music?
-2. **Visual Interest**: Is it engaging and varied?
-3. **Flow and Transitions**: Does it feel cohesive?
-4. **Creative Template Use**: Are templates used effectively?
-5. **Energy Arc**: Does the overall energy make sense?
+1. **Technical Validation (Phase 1)**: First verify completeness, timing, coverage, and consistency
+2. **Musical Synchronization**: Does it serve the music?
+3. **Visual Interest**: Is it engaging and varied?
+4. **Flow and Transitions**: Does it feel cohesive?
+5. **Creative Template Use**: Are templates used effectively?
+6. **Energy Arc**: Does the overall energy make sense?
+
+Remember: If technically invalid, return HARD_FAIL immediately. Otherwise, evaluate creative quality.
 
 ## Required Output Format
 
@@ -41,10 +44,3 @@ Provide your evaluation matching this schema:
 ```json
 {{ response_schema }}
 ```
-
-**Decision Guidelines**:
-- **APPROVE** (score >= 7.0): Ready to render, no revision needed
-- **SOFT_FAIL** (score 5.0-6.9): Needs minor improvements, specific feedback provided
-- **HARD_FAIL** (score < 5.0): Major issues, fundamental rethinking required
-
-Be honest but constructive. Specific feedback is more valuable than general praise or criticism.

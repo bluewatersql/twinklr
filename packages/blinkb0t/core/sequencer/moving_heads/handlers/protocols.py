@@ -63,9 +63,12 @@ class MovementResult(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     pan_curve_type: CurveLibrary
+    pan_curve: list[CurvePoint] | None = None
+    pan_static_dmx: int | None = None
+
     tilt_curve_type: CurveLibrary
-    pan_curve: list[CurvePoint] = Field(..., min_length=2)
-    tilt_curve: list[CurvePoint] = Field(..., min_length=2)
+    tilt_curve: list[CurvePoint] | None = None
+    tilt_static_dmx: int | None = None
 
 
 class DimmerResult(BaseModel):
@@ -76,15 +79,13 @@ class DimmerResult(BaseModel):
 
     Attributes:
         dimmer_curve: Dimmer curve (absolute, v=0 to v=1).
-
-    Example:
-        >>> points = [CurvePoint(t=0.0, v=0.0), CurvePoint(t=1.0, v=1.0)]
-        >>> result = DimmerResult(dimmer_curve=points)
+        dimmer_static_dmx: Static DMX value (if any).
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    dimmer_curve: list[CurvePoint] = Field(..., min_length=2)
+    dimmer_curve: list[CurvePoint] | None = None
+    dimmer_static_dmx: int | None = None
 
 
 # =============================================================================

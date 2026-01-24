@@ -14,10 +14,10 @@ import zlib
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
-from blinkb0t.core.formats.xlights.xsq.parser import XSQParser
+from blinkb0t.core.formats.xlights.sequence.parser import XSQParser
 
 if TYPE_CHECKING:
-    from blinkb0t.core.formats.xlights.models.xsq import XSequence
+    from blinkb0t.core.formats.xlights.sequence.models.xsq import XSequence
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -75,6 +75,15 @@ def compress_config(obj: Any) -> tuple[str, str, str]:
     blob = zlib.compress(payload, level=6)
     blob_b64 = base64.b64encode(blob).decode("ascii")
     return ("zlib+json", fp, blob_b64)
+
+
+def strip_nulls(data):
+    if isinstance(data, dict):
+        return {key: strip_nulls(value) for key, value in data.items() if value is not None}
+    elif isinstance(data, list):
+        return [strip_nulls(element) for element in data if element is not None]
+    else:
+        return data
 
 
 def clean_effectdb_settings(s: str) -> str:
@@ -336,7 +345,6 @@ def extract_effect_events_from_sequence(
                         effect_type=eff.effect_type,
                         start_ms=eff.start_time_ms,
                         end_ms=eff.end_time_ms,
-                        config_plain=cfg_dict,
                         config_codec=None,
                         config_fingerprint=fp,
                         config_blob_b64=None,
@@ -357,7 +365,6 @@ def extract_effect_events_from_sequence(
                         effect_type=eff.effect_type,
                         start_ms=eff.start_time_ms,
                         end_ms=eff.end_time_ms,
-                        config_plain=None,
                         config_codec=codec,
                         config_fingerprint=fp,
                         config_blob_b64=blob_b64,
@@ -486,21 +493,7 @@ def enrich_events(events: list[EffectEventOut], targets: list[TargetFact]) -> li
     for e in events:
         row = e.model_dump(exclude_none=True)
         t = by_name.get(e.target_name)
-        if t is None:
-            row.update(
-                {
-                    "layout_id": None,
-                    "rgb_effects_sha256": None,
-                    "target_kind_resolved": None,
-                    "target_x0": None,
-                    "target_y0": None,
-                    "target_x1": None,
-                    "target_y1": None,
-                    "target_cx": None,
-                    "target_cy": None,
-                }
-            )
-        else:
+        if t is not None:
             row.update(
                 {
                     "layout_id": t.layout_id,
@@ -518,7 +511,7 @@ def enrich_events(events: list[EffectEventOut], targets: list[TargetFact]) -> li
         duration = max(0, e.end_ms - e.start_ms)
         row["feat_duration_ms"] = duration
 
-        out.append(row)
+        out.append(strip_nulls(row))
 
     return out
 
@@ -553,7 +546,6 @@ def main(zip_path: str, out_dir: str, config_mode: ConfigMode) -> None:
     # Parse XSQ using your parser
     parser = XSQParser()
     sequence: XSequence = parser.parse(seq_path)
-    sequence.optimize_and_validate()
 
     # Sequence metadata + inventories
     seq_meta = {
@@ -616,7 +608,12 @@ def main(zip_path: str, out_dir: str, config_mode: ConfigMode) -> None:
                     {
                         "layout_id": layout_id,
                         "rgb_sha256": rgb_sha,
-                        "targets": [t.model_dump(exclude_none=True) for t in targets],
+                        "targets": [
+                            t.model_dump(
+                                exclude_none=True, exclude_unset=True, exclude_defaults=True
+                            )
+                            for t in targets
+                        ],
                     },
                     indent=2,
                     ensure_ascii=False,
@@ -629,7 +626,10 @@ def main(zip_path: str, out_dir: str, config_mode: ConfigMode) -> None:
             {
                 "layout_id": layout_id,
                 "rgb_sha256": rgb_sha,
-                "targets": [t.model_dump(exclude_none=True) for t in targets],
+                "targets": [
+                    t.model_dump(exclude_none=True, exclude_unset=True, exclude_defaults=True)
+                    for t in targets
+                ],
             },
         )
     else:

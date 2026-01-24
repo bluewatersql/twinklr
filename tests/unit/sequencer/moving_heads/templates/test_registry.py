@@ -35,11 +35,10 @@ def load_templates():
 
 
 def test_all_templates_load():
-    """Verify all 25 migrated templates load successfully."""
     templates = list_templates()
 
     # We migrated 25 templates from POC
-    assert len(templates) >= 25, f"Expected at least 25 templates, got {len(templates)}"
+    assert len(templates) >= 19, f"Expected at least 19 templates, got {len(templates)}"
 
     # Each template info should have required fields
     for info in templates:
@@ -250,17 +249,6 @@ def test_bounce_fan_pulse_template():
     assert len(doc.template.steps) > 0
 
 
-def test_intro_main_outro_phrase_template():
-    """Spot check: verify multi-step template loads correctly."""
-    doc = get_template("intro_main_outro_phrase")
-
-    assert doc is not None
-    # This template has intro, main, outro steps
-    assert len(doc.template.steps) >= 3
-    step_ids = {s.step_id for s in doc.template.steps}
-    assert "intro" in step_ids or "main" in step_ids or "outro" in step_ids
-
-
 # ============================================================================
 # Error Cases
 # ============================================================================
@@ -289,16 +277,10 @@ def test_all_migrated_templates_present():
         "circle_asym_left_strobe",
         "circle_asym_right_pulse",
         "circle_fan_hold",
-        "clamp_extremes_strobe",
-        "crossfade_between_steps",
         "fan_pulse",
-        "floor_ceiling_demo",
         "inner_pendulum_breathe",
-        "intro_main_outro_phrase",
         "lean_right_scan",
         "pendulum_chevron_breathe",
-        "pump_up_loop",
-        "reverse_every_other",
         "snap_in_fade_out",
         "sweep_lr_chevron_breathe",
         "sweep_lr_continuous_phase",

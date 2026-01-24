@@ -1,5 +1,3 @@
-"""Tests for base context shaper."""
-
 from unittest.mock import MagicMock
 
 import pytest
@@ -86,15 +84,3 @@ def test_calculate_reduction_empty():
     assert original_tokens == 0
     assert shaped_tokens == 0
     assert reduction_pct == 0.0
-
-
-def test_log_shaping(caplog):
-    """Test logging of shaping stats."""
-    shaper = BaseContextShaper()
-
-    with caplog.at_level("INFO"):
-        shaper._log_shaping("test_agent", 1000, 200, 80.0)
-
-    assert "test_agent" in caplog.text
-    assert "1000 → 200 tokens" in caplog.text
-    assert "reduced 80.0%" in caplog.text

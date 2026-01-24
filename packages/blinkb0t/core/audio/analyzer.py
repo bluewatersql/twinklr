@@ -113,7 +113,7 @@ class AudioAnalyzer:
                 return cached
 
         # Process audio
-        logger.info(f"Analyzing audio: {audio_path}")
+        logger.debug(f"Analyzing audio: {audio_path}")
         features = self._process_audio(audio_path)
 
         # Save to cache and checkpoint

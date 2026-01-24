@@ -93,16 +93,16 @@ def test_iteration_counting():
     sm.transition(OrchestrationState.PLANNING)
     assert sm.iteration_count == 0
 
-    # PLANNING → VALIDATING (increment)
-    sm.transition(OrchestrationState.VALIDATING)
+    # PLANNING → JUDGING (increment)
+    sm.transition(OrchestrationState.JUDGING)
     assert sm.iteration_count == 1
 
-    # VALIDATING → PLANNING (no increment)
+    # JUDGING → PLANNING (no increment)
     sm.transition(OrchestrationState.PLANNING)
     assert sm.iteration_count == 1
 
-    # PLANNING → VALIDATING (increment)
-    sm.transition(OrchestrationState.VALIDATING)
+    # PLANNING → JUDGING (increment)
+    sm.transition(OrchestrationState.JUDGING)
     assert sm.iteration_count == 2
 
 
@@ -114,9 +114,9 @@ def test_exceeded_max_iterations():
 
     # Simulate 2 iterations
     sm.transition(OrchestrationState.PLANNING)
-    sm.transition(OrchestrationState.VALIDATING)  # iteration 1
+    sm.transition(OrchestrationState.JUDGING)  # iteration 1
     sm.transition(OrchestrationState.PLANNING)
-    sm.transition(OrchestrationState.VALIDATING)  # iteration 2
+    sm.transition(OrchestrationState.JUDGING)  # iteration 2
 
     assert sm.exceeded_max_iterations()
 
@@ -128,12 +128,12 @@ def test_get_state_metrics():
     # Multiple transitions FROM PLANNING
     # INITIALIZED → PLANNING (duration=5.0, tokens=100)
     sm.transition(OrchestrationState.PLANNING, duration_seconds=5.0, tokens_consumed=100)
-    # PLANNING → VALIDATING (duration=1.0, tokens=0) - metrics tracked for PLANNING
-    sm.transition(OrchestrationState.VALIDATING, duration_seconds=1.0, tokens_consumed=0)
-    # VALIDATING → PLANNING (duration=7.0, tokens=200)
+    # PLANNING → JUDGING (duration=1.0, tokens=0) - metrics tracked for PLANNING
+    sm.transition(OrchestrationState.JUDGING, duration_seconds=1.0, tokens_consumed=0)
+    # JUDGING → PLANNING (duration=7.0, tokens=200)
     sm.transition(OrchestrationState.PLANNING, duration_seconds=7.0, tokens_consumed=200)
-    # PLANNING → VALIDATING (duration=1.5, tokens=0) - metrics tracked for PLANNING
-    sm.transition(OrchestrationState.VALIDATING, duration_seconds=1.5, tokens_consumed=0)
+    # PLANNING → JUDGING (duration=1.5, tokens=0) - metrics tracked for PLANNING
+    sm.transition(OrchestrationState.JUDGING, duration_seconds=1.5, tokens_consumed=0)
 
     # Get metrics for PLANNING state (transitions FROM planning)
     metrics = sm.get_state_metrics(OrchestrationState.PLANNING)
@@ -151,15 +151,14 @@ def test_get_all_state_metrics():
     sm = OrchestrationStateMachine()
 
     sm.transition(OrchestrationState.PLANNING)
-    sm.transition(OrchestrationState.VALIDATING)
     sm.transition(OrchestrationState.JUDGING)
+    sm.transition(OrchestrationState.PLANNING)
 
     all_metrics = sm.get_all_state_metrics()
 
     # Should have metrics for all non-terminal states
     assert OrchestrationState.INITIALIZED in all_metrics
     assert OrchestrationState.PLANNING in all_metrics
-    assert OrchestrationState.VALIDATING in all_metrics
 
 
 def test_get_total_metrics():
@@ -167,8 +166,8 @@ def test_get_total_metrics():
     sm = OrchestrationStateMachine()
 
     sm.transition(OrchestrationState.PLANNING, duration_seconds=5.0, tokens_consumed=100)
-    sm.transition(OrchestrationState.VALIDATING, duration_seconds=1.0, tokens_consumed=0)
-    sm.transition(OrchestrationState.JUDGING, duration_seconds=3.0, tokens_consumed=50)
+    sm.transition(OrchestrationState.JUDGING, duration_seconds=1.0, tokens_consumed=0)
+    sm.transition(OrchestrationState.PLANNING, duration_seconds=3.0, tokens_consumed=50)
 
     total = sm.get_total_metrics()
 
@@ -176,25 +175,23 @@ def test_get_total_metrics():
     assert total["total_tokens"] == 150
     assert total["total_transitions"] == 3
     assert total["iteration_count"] == 1
-    assert total["current_state"] == "judging"
+    assert total["current_state"] == "planning"
 
 
 def test_get_transition_metrics():
     """Test transition pattern metrics."""
     sm = OrchestrationStateMachine()
 
-    # Simulate validation failure loop
+    # Simulate heuristic validation failure loop (stays in planning)
     sm.transition(OrchestrationState.PLANNING)
-    sm.transition(OrchestrationState.VALIDATING)
-    sm.transition(OrchestrationState.PLANNING)  # Retry
-    sm.transition(OrchestrationState.VALIDATING)
+    sm.transition(OrchestrationState.PLANNING)  # Retry after heuristic failure
     sm.transition(OrchestrationState.JUDGING)
 
     metrics = sm.get_transition_metrics()
 
-    assert metrics["unique_transitions"] == 4
-    assert "validating → planning" in metrics["transition_counts"]
-    assert metrics["transition_counts"]["validating → planning"] == 1
+    assert metrics["unique_transitions"] == 3
+    assert "planning → planning" in metrics["transition_counts"]
+    assert metrics["transition_counts"]["planning → planning"] == 1
 
 
 def test_get_bottleneck_analysis():
@@ -203,26 +200,25 @@ def test_get_bottleneck_analysis():
 
     # Transition with metrics (duration/tokens are for time spent IN that state)
     sm.transition(OrchestrationState.PLANNING, duration_seconds=5.0, tokens_consumed=100)
-    sm.transition(OrchestrationState.VALIDATING, duration_seconds=8.0, tokens_consumed=500)
-    sm.transition(OrchestrationState.JUDGING, duration_seconds=15.0, tokens_consumed=800)
+    sm.transition(OrchestrationState.JUDGING, duration_seconds=8.0, tokens_consumed=500)
+    sm.transition(OrchestrationState.PLANNING, duration_seconds=15.0, tokens_consumed=800)
 
     bottlenecks = sm.get_bottleneck_analysis()
 
-    # Validating spent most time (8.0s in PLANNING, then transitioned to VALIDATING)
-    # Wait, let me think about this more carefully...
+    # Judging spent most time (15.0s in JUDGING state)
     # When we call transition(PLANNING, duration=5.0, tokens=100),
     # we're saying "we spent 5.0s in INITIALIZED state"
     # So the metrics for INITIALIZED would be duration=5.0, tokens=100
 
     # Let me check what state spent the most time:
     # INITIALIZED → PLANNING: 5.0s, 100 tokens
-    # PLANNING → VALIDATING: 8.0s, 500 tokens
-    # VALIDATING → JUDGING: 15.0s, 800 tokens
+    # PLANNING → JUDGING: 8.0s, 500 tokens
+    # JUDGING → PLANNING: 15.0s, 800 tokens
 
-    assert bottlenecks["slowest_state"]["state"] == "validating"  # Spent 15.0s
+    assert bottlenecks["slowest_state"]["state"] == "judging"  # Spent 15.0s
     assert bottlenecks["slowest_state"]["avg_duration_seconds"] == 15.0
 
-    assert bottlenecks["highest_token_state"]["state"] == "validating"  # Used 800 tokens
+    assert bottlenecks["highest_token_state"]["state"] == "judging"  # Used 800 tokens
     assert bottlenecks["highest_token_state"]["avg_tokens"] == 800.0
 
 
@@ -231,15 +227,16 @@ def test_format_metrics_report():
     sm = OrchestrationStateMachine()
 
     sm.transition(OrchestrationState.PLANNING, duration_seconds=5.0, tokens_consumed=100)
-    sm.transition(OrchestrationState.VALIDATING)
-    sm.transition(OrchestrationState.JUDGING, duration_seconds=3.0, tokens_consumed=50)
+    sm.transition(OrchestrationState.JUDGING)
+    sm.transition(OrchestrationState.PLANNING, duration_seconds=3.0, tokens_consumed=50)
+    sm.transition(OrchestrationState.JUDGING)
     sm.transition(OrchestrationState.SUCCEEDED)
 
     report = sm.format_metrics_report()
 
     assert "Orchestration Metrics Report" in report
     assert "Final State: succeeded" in report
-    assert "Iterations: 1" in report
+    assert "Iterations: 2" in report  # Two iterations (PLANNING→JUDGING twice)
     assert "Total Duration:" in report
     assert "Total Tokens:" in report
 
@@ -250,7 +247,7 @@ def test_reset():
 
     # Make some transitions
     sm.transition(OrchestrationState.PLANNING)
-    sm.transition(OrchestrationState.VALIDATING)
+    sm.transition(OrchestrationState.JUDGING)
 
     # Reset
     sm.reset()
@@ -261,21 +258,17 @@ def test_reset():
 
 
 def test_complete_planning_flow():
-    """Test complete planning flow: PLANNING → VALIDATING → JUDGING → SUCCEEDED."""
+    """Test complete planning flow: PLANNING → JUDGING → SUCCEEDED."""
     sm = OrchestrationStateMachine()
 
     # Start planning
     sm.transition(OrchestrationState.PLANNING)
     assert sm.current_state == OrchestrationState.PLANNING
 
-    # Validate
-    sm.transition(OrchestrationState.VALIDATING)
-    assert sm.current_state == OrchestrationState.VALIDATING
-    assert sm.iteration_count == 1
-
     # Judge
     sm.transition(OrchestrationState.JUDGING)
     assert sm.current_state == OrchestrationState.JUDGING
+    assert sm.iteration_count == 1
 
     # Success
     sm.transition(OrchestrationState.SUCCEEDED)
@@ -283,22 +276,22 @@ def test_complete_planning_flow():
     assert sm.is_terminal()
 
 
-def test_validation_failure_loop():
-    """Test validation failure loop: PLANNING → VALIDATING → PLANNING."""
+def test_heuristic_validation_failure_loop():
+    """Test heuristic validation failure loop: PLANNING → PLANNING (retry)."""
     sm = OrchestrationStateMachine()
 
     sm.transition(OrchestrationState.PLANNING)
-    sm.transition(OrchestrationState.VALIDATING)
-    assert sm.iteration_count == 1
+    assert sm.iteration_count == 0
 
-    # Validation fails, back to planning
-    sm.transition(OrchestrationState.PLANNING, reason="Validation failed")
+    # Heuristic validation fails, retry planning (stays in PLANNING)
+    # PLANNING → PLANNING increments counter (leaves PLANNING state)
+    sm.transition(OrchestrationState.PLANNING, reason="Heuristic validation failed")
     assert sm.current_state == OrchestrationState.PLANNING
-    assert sm.iteration_count == 1  # Doesn't increment when entering PLANNING
+    assert sm.iteration_count == 1  # Increments because we "left" PLANNING
 
-    # Try again
-    sm.transition(OrchestrationState.VALIDATING)
-    assert sm.iteration_count == 2
+    # Try again with successful heuristic validation, now go to JUDGING
+    sm.transition(OrchestrationState.JUDGING)
+    assert sm.iteration_count == 2  # Increments again leaving PLANNING
 
 
 def test_judge_failure_retry():
@@ -306,7 +299,6 @@ def test_judge_failure_retry():
     sm = OrchestrationStateMachine()
 
     sm.transition(OrchestrationState.PLANNING)
-    sm.transition(OrchestrationState.VALIDATING)
     sm.transition(OrchestrationState.JUDGING)
 
     # Judge fails, retry planning
@@ -331,7 +323,6 @@ def test_budget_exhausted_from_judging():
     sm = OrchestrationStateMachine()
 
     sm.transition(OrchestrationState.PLANNING)
-    sm.transition(OrchestrationState.VALIDATING)
     sm.transition(OrchestrationState.JUDGING)
 
     # Budget exhausted

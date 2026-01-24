@@ -3,6 +3,7 @@
 import hashlib
 from typing import Any
 
+from blinkb0t.core.config.poses import STANDARD_POSES, PoseLibrary
 from blinkb0t.core.sequencer.moving_heads.handlers.protocols import GeometryResult
 
 
@@ -10,7 +11,8 @@ class ScatteredChaosHandler:
     """Geometry handler for scattered/randomized positions.
 
     Applies controlled randomization to create scattered, chaotic patterns.
-    Uses fixture_id and seed for deterministic pseudo-random positions.
+    Uses role, fixture_id, and seed for deterministic pseudo-random positions.
+    Different roles will produce different scattered positions.
 
     Attributes:
         handler_id: Unique identifier ("SCATTERED_CHAOS").
@@ -38,24 +40,38 @@ class ScatteredChaosHandler:
 
         Args:
             fixture_id: Unique identifier for the fixture.
-            role: Role assigned to this fixture.
+            role: Role assigned to this fixture (used in randomization).
             params: Handler parameters:
                 - seed: Random seed for reproducibility (default: 0)
-                - pan_center_dmx: Center pan position in DMX (default: 128)
-                - pan_spread_dmx: Pan spread range in DMX (default: 36)
-                - tilt_center_dmx: Center tilt position in DMX (default: 128)
-                - tilt_spread_dmx: Tilt spread range in DMX (default: 18)
-            calibration: Fixture calibration data (unused).
+                - pan_center_deg: Center pan position in degrees (default: 0°, CENTER)
+                - pan_spread_deg: Pan spread range in degrees (default: 140°)
+                - tilt_center_deg: Center tilt position in degrees (default: -20°, CROWD)
+                - tilt_spread_deg: Tilt spread range in degrees (default: 80°)
+            calibration: Fixture calibration data with 'fixture_config' for degree->DMX conversion.
 
         Returns:
             GeometryResult with randomized pan/tilt positions.
         """
-        # Get params
+        # Get fixture config for degree->DMX conversion
+        fixture_config = calibration.get("fixture_config")
+        if not fixture_config:
+            raise ValueError(
+                f"Missing fixture_config in calibration for {fixture_id}. "
+                "Geometry handlers require FixtureConfig for degree->DMX conversion."
+            )
+
+        # Get params in degrees (using STANDARD_POSES defaults)
         seed = params.get("seed", 0)
-        pan_center_dmx = params.get("pan_center_dmx", 128)
-        pan_spread_dmx = params.get("pan_spread_dmx", 36)
-        tilt_center_dmx = params.get("tilt_center_dmx", 128)
-        tilt_spread_dmx = params.get("tilt_spread_dmx", 18)
+        pan_center_deg = params.get("pan_center_deg", STANDARD_POSES[PoseLibrary.CENTER].pan_deg)
+        tilt_center_deg = params.get("tilt_center_deg", STANDARD_POSES[PoseLibrary.CROWD].tilt_deg)
+
+        # Spread values are already in DMX from templates, not degrees
+        pan_spread_dmx = params.get("pan_spread_dmx", 70)
+        tilt_spread_dmx = params.get("tilt_spread_dmx", 40)
+
+        # Convert degrees to DMX using fixture config
+        pan_center_dmx = fixture_config.deg_to_pan_dmx(pan_center_deg)
+        tilt_center_dmx = fixture_config.deg_to_tilt_dmx(tilt_center_deg)
 
         # Convert DMX to normalized
         pan_center = pan_center_dmx / 255.0
@@ -63,10 +79,11 @@ class ScatteredChaosHandler:
         tilt_center = tilt_center_dmx / 255.0
         tilt_spread = tilt_spread_dmx / 255.0
 
-        # Generate deterministic random offset based on fixture_id and seed
+        # Generate deterministic random offset based on role, fixture_id, and seed
+        # IMPORTANT: Include role so different roles get different scattered positions
         # Use separate hashes for pan and tilt for independent randomization
-        pan_hash_input = f"{fixture_id}_pan_{seed}"
-        tilt_hash_input = f"{fixture_id}_tilt_{seed}"
+        pan_hash_input = f"{role}_{fixture_id}_pan_{seed}"
+        tilt_hash_input = f"{role}_{fixture_id}_tilt_{seed}"
 
         pan_hash = int(hashlib.md5(pan_hash_input.encode()).hexdigest(), 16)
         tilt_hash = int(hashlib.md5(tilt_hash_input.encode()).hexdigest(), 16)

@@ -4,6 +4,7 @@ This module compiles a single TemplateStep into IR ChannelSegments
 by invoking the appropriate handlers for geometry, movement, and dimmer.
 """
 
+import logging
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict
@@ -14,6 +15,9 @@ from blinkb0t.core.sequencer.models.context import StepCompileContext
 from blinkb0t.core.sequencer.models.enum import ChannelName
 from blinkb0t.core.sequencer.models.template import TemplateStep
 from blinkb0t.core.sequencer.moving_heads.channels.state import FixtureSegment
+
+logger = logging.getLogger(__name__)
+renderer_log = logging.getLogger("DMX_MH_RENDER")
 
 
 class StepCompileResult(BaseModel):
@@ -52,27 +56,17 @@ def compile_step(
 
     Returns:
         StepCompileResult with pan, tilt, and dimmer segments.
-
-    Example:
-        >>> step = TemplateStep(...)
-        >>> context = StepCompileContext(...)
-        >>> result = compile_step(step, context)
-        >>> result.pan_segment.channel
-        ChannelName.PAN
     """
+    # Calculate timing
+    t0_ms = context.start_ms
+    t1_ms = context.start_ms + context.duration_ms
+    renderer_log.info(f"Timing: {t0_ms} - {t1_ms}")
+
     # Get handlers
     geometry_handler = context.geometry_registry.get(step.geometry.geometry_type.value)
 
-    # Use get_with_params() for movement and dimmer to inject handler_id into params
-    # when using default handlers (required by DefaultMovementHandler/DefaultDimmerHandler)
-    movement_params = dict(step.movement.params)
-    movement_handler = context.movement_registry.get_with_params(
-        step.movement.movement_type.value, movement_params
-    )
-
-    dimmer_params = dict(step.dimmer.params)
-    dimmer_handler = context.dimmer_registry.get_with_params(
-        step.dimmer.dimmer_type.value, dimmer_params
+    renderer_log.info(
+        f"Geometry Handler for {step.geometry.geometry_type.value}: {geometry_handler.handler_id}"
     )
 
     # Build geometry params
@@ -84,12 +78,29 @@ def compile_step(
     if step.geometry.aim_zone:
         geometry_params["aim_zone"] = step.geometry.aim_zone
 
-    # Resolve geometry (static base pose)
+    # Resolve geometry
     geometry_result = geometry_handler.resolve(
         fixture_id=context.fixture_id,
         role=context.role,
         params=geometry_params,
         calibration=context.calibration,
+    )
+
+    base_pan_norm = geometry_result.pan_norm
+    base_tilt_norm = geometry_result.tilt_norm
+    renderer_log.info(f"Base Pose (normalized): {base_pan_norm}, {base_tilt_norm}")
+
+    movement_params = dict(step.movement.params)
+    movement_params["base_pan_norm"] = base_pan_norm
+    movement_params["base_tilt_norm"] = base_tilt_norm
+    movement_params["calibration"] = context.calibration
+    movement_params["geometry"] = step.geometry.geometry_type
+
+    movement_handler = context.movement_registry.get_with_params(
+        step.movement.movement_type.value, movement_params
+    )
+    renderer_log.info(
+        f"Movement Handler for {step.movement.movement_type.value}: {movement_handler.handler_id}"
     )
 
     # Generate movement curves (use the params dict that has movement_id injected)
@@ -100,6 +111,17 @@ def compile_step(
         intensity=step.movement.intensity,
     )
 
+    # renderer_log.debug(f"Movement Result: {movement_result}")
+
+    # Build dimmer segment (absolute, not offset-centered)
+    dimmer_params = dict(step.dimmer.params)
+    dimmer_params["calibration"] = context.calibration
+    dimmer_handler = context.dimmer_registry.get_with_params(
+        step.dimmer.dimmer_type.value, dimmer_params
+    )
+    renderer_log.info(
+        f"Dimmer Handler for {step.dimmer.dimmer_type.value}: {dimmer_handler.handler_id}"
+    )
     # Generate dimmer curve (use the params dict that has dimmer_id injected)
     dimmer_result = dimmer_handler.generate(
         params=dimmer_params,
@@ -110,79 +132,74 @@ def compile_step(
         max_norm=step.dimmer.max_norm,
     )
 
+    # renderer_log.debug(f"Dimmer Result: {dimmer_result}")
+
     # Apply phase offset if needed
     pan_points = movement_result.pan_curve
     tilt_points = movement_result.tilt_curve
     dimmer_points = dimmer_result.dimmer_curve
 
     if phase_offset_norm != 0.0:
-        pan_points = apply_phase_shift_samples(
-            pan_points, phase_offset_norm, context.n_samples, wrap=True
-        )
-        tilt_points = apply_phase_shift_samples(
-            tilt_points, phase_offset_norm, context.n_samples, wrap=True
-        )
-        dimmer_points = apply_phase_shift_samples(
-            dimmer_points, phase_offset_norm, context.n_samples, wrap=True
-        )
+        # Phase Offsets are time-domain based only shifts curves, no impact on static DMX values
+        if pan_points is not None:
+            pan_points = apply_phase_shift_samples(
+                pan_points, phase_offset_norm, context.n_samples, wrap=True
+            )
+        if tilt_points is not None:
+            tilt_points = apply_phase_shift_samples(
+                tilt_points, phase_offset_norm, context.n_samples, wrap=True
+            )
+        if dimmer_points is not None:
+            dimmer_points = apply_phase_shift_samples(
+                dimmer_points, phase_offset_norm, context.n_samples, wrap=True
+            )
 
-    # Calculate timing
-    t0_ms = context.start_ms
-    t1_ms = context.start_ms + context.duration_ms
-
-    # Extract calibration boundaries for clamping
-    pan_min = context.calibration.get("pan_min_dmx", 0) if context.calibration else 0
-    pan_max = context.calibration.get("pan_max_dmx", 255) if context.calibration else 255
-    tilt_min = context.calibration.get("tilt_min_dmx", 0) if context.calibration else 0
-    tilt_max = context.calibration.get("tilt_max_dmx", 255) if context.calibration else 255
-
-    # Convert normalized geometry to DMX base values (0-255)
-    pan_base_dmx = int(geometry_result.pan_norm * 255)
-    tilt_base_dmx = int(geometry_result.tilt_norm * 255)
-
-    # Movement amplitude - use a reasonable default (about 1/4 of range)
-    # This can be configured via movement params if needed
-    movement_amplitude_dmx = 64
-
-    # NOTE: DO NOT remap curve values! Movement curves are offset-centered around 0.5.
-    # Export formula: dmx = base_dmx + amplitude_dmx * (curve_value - 0.5)
-    # The clamp_min/clamp_max will enforce boundaries at export time.
+    # renderer_log.debug(f"Pan Points: {pan_points}")
+    # renderer_log.debug(f"Tilt Points: {tilt_points}")
+    # renderer_log.debug(f"Dimmer Points: {dimmer_points}")
 
     segment = FixtureSegment(
+        section_id=context.section_id,
+        step_id=step.step_id,
+        template_id=context.template_id,
+        preset_id=context.preset_id,
         fixture_id=context.fixture_id,
         t0_ms=t0_ms,
         t1_ms=t1_ms,
     )
 
-    # Build pan segment (offset-centered movement curve)
+    if movement_result.pan_static_dmx is not None:
+        renderer_log.info(f"Pan Static DMX: {movement_result.pan_static_dmx}")
+
+    # Build pan segment - scale [0,1] curve to DMX boundaries
     segment.add_channel(
         channel=ChannelName.PAN,
-        curve=PointsCurve(points=pan_points),
-        value_points=pan_points,  # Keep curve [0,1] centered at 0.5
-        offset_centered=True,
-        base_dmx=pan_base_dmx,
-        amplitude_dmx=movement_amplitude_dmx,
-        clamp_min=pan_min,
-        clamp_max=pan_max,
+        curve=PointsCurve(points=pan_points) if pan_points is not None else None,
+        static_dmx=movement_result.pan_static_dmx,
+        value_points=pan_points,
+        offset_centered=False,
     )
 
-    # Build tilt segment (offset-centered movement curve)
+    # Build tilt segment - scale [0,1] curve to DMX boundaries
+    if movement_result.tilt_static_dmx is not None:
+        renderer_log.info(f"Tilt Static DMX: {movement_result.tilt_static_dmx}")
+
     segment.add_channel(
         channel=ChannelName.TILT,
-        curve=PointsCurve(points=tilt_points),
-        value_points=tilt_points,  # Keep curve [0,1] centered at 0.5
-        offset_centered=True,
-        base_dmx=tilt_base_dmx,
-        amplitude_dmx=movement_amplitude_dmx,
-        clamp_min=tilt_min,
-        clamp_max=tilt_max,
+        curve=PointsCurve(points=tilt_points) if tilt_points is not None else None,
+        static_dmx=movement_result.tilt_static_dmx,
+        value_points=tilt_points,
+        offset_centered=False,
     )
 
-    # Build dimmer segment (absolute, not offset-centered)
+    if dimmer_result.dimmer_static_dmx is not None:
+        renderer_log.info(f"Dimmer Static DMX: {dimmer_result.dimmer_static_dmx}")
+
     segment.add_channel(
         channel=ChannelName.DIMMER,
-        curve=PointsCurve(points=dimmer_points),
-        value_points=dimmer_points,  # Pass points for xLights value curve export
+        curve=PointsCurve(points=dimmer_points) if dimmer_points is not None else None,
+        static_dmx=dimmer_result.dimmer_static_dmx,
+        value_points=dimmer_points,
         offset_centered=False,
     )
 

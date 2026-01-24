@@ -450,5 +450,6 @@ class TemplateDoc(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
+    enabled: bool = True
     template: Template
     presets: list[TemplatePreset] = Field(default_factory=list)

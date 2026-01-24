@@ -101,6 +101,7 @@ def schedule_repeats(
     instances: list[ScheduledInstance] = []
     current_time = 0.0
 
+    # TODO: Handle TRUNCATE AND FADE_OUT repeat policy, currently only handles HOLD_LAST_POSE
     for cycle_num in range(num_complete_cycles):
         # Determine step order based on mode
         step_ids = _get_step_order(contract, cycle_num)

@@ -440,7 +440,7 @@ class OpenAIClient:
         self._last_response_id = None
         self._total_token_usage = TokenUsage()
         self._response_metadata_history.clear()
-        logger.info("Conversation state reset")
+        logger.debug("Conversation state reset")
 
     def get_conversation_history(self) -> list[ResponseInputItemParam]:
         """Get the current conversation history"""

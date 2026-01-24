@@ -388,7 +388,7 @@ def build_unified_song_map(
                     }
                 )
 
-            logger.info(f"Integrated {len(sequence_events)} meaningful sequence timing events")
+            logger.debug(f"Integrated {len(sequence_events)} meaningful sequence timing events")
 
     # Build final map
     return {

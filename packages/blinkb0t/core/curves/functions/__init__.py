@@ -44,7 +44,9 @@ from blinkb0t.core.curves.functions.musical import (
     generate_musical_accent,
     generate_musical_swell,
 )
-from blinkb0t.core.curves.functions.noise import generate_perlin_noise, generate_simplex_noise
+from blinkb0t.core.curves.functions.noise import (
+    generate_perlin_noise,
+)
 from blinkb0t.core.curves.functions.parametric import generate_bezier, generate_lissajous
 
 __all__ = [
@@ -76,7 +78,6 @@ __all__ = [
     "generate_elastic_in",
     "generate_elastic_in_out",
     "generate_perlin_noise",
-    "generate_simplex_noise",
     "generate_bezier",
     "generate_lissajous",
     "generate_anticipate",

@@ -36,6 +36,7 @@ from blinkb0t.core.sequencer.moving_heads.templates.library import register_temp
 @register_template(aliases=["Crossfade Between Steps", "crossfade between steps"])
 def make_template() -> TemplateDoc:
     return TemplateDoc(
+        enabled=False,
         template=Template(
             template_id="crossfade_between_steps",
             version=1,

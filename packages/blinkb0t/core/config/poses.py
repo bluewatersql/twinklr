@@ -34,6 +34,8 @@ class PoseLibrary(str, Enum):
 
     # Tilt normalized anchors
     SKY = "sky"
+    CEILING = "ceiling"
+    HORIZON_UP_45 = "horizon_up_45"
     HORIZON = "horizon"
     CROWD = "crowd"
     STAGE = "stage"
@@ -144,6 +146,8 @@ class TiltPose(str, Enum):
     """
 
     SKY = PoseLibrary.SKY.value
+    CEILING = PoseLibrary.CEILING.value
+    HORIZON_UP_45 = PoseLibrary.HORIZON_UP_45.value
     HORIZON = PoseLibrary.HORIZON.value
     CROWD = PoseLibrary.CROWD.value
     STAGE = PoseLibrary.STAGE.value
@@ -158,7 +162,9 @@ class TiltPose(str, Enum):
     @property
     def norm_value(self) -> float:
         values = {
-            TiltPose.SKY: 0.9,
+            TiltPose.SKY: 1.0,
+            TiltPose.CEILING: 0.85,
+            TiltPose.HORIZON_UP_45: 0.65,
             TiltPose.HORIZON: 0.5,
             TiltPose.CROWD: 0.3,
             TiltPose.STAGE: 0.1,
@@ -207,6 +213,7 @@ STANDARD_POSES: dict[PoseLibrary, Pose] = {
         pose_id=PoseLibrary.WIDE_RIGHT, name="Wide Right", pan_deg=120.0, tilt_deg=0.0
     ),
     PoseLibrary.SKY: Pose(pose_id=PoseLibrary.SKY, name="Sky", pan_deg=0.0, tilt_deg=80.0),
+    PoseLibrary.CEILING: Pose(pose_id=PoseLibrary.CEILING, name="Sky", pan_deg=0.0, tilt_deg=80.0),
     PoseLibrary.HORIZON: Pose(
         pose_id=PoseLibrary.HORIZON, name="Horizon", pan_deg=0.0, tilt_deg=0.0
     ),

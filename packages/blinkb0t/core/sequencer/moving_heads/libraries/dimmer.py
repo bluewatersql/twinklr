@@ -41,6 +41,7 @@ DEFAULT_DIMMER_PARAMS = {
 class DimmerType(str, Enum):
     FADE_IN = "fade_in"
     FADE_OUT = "fade_out"
+    BLACKOUT = "blackout"
     HOLD = "hold"
     PULSE = "pulse"
     NONE = "none"
@@ -84,6 +85,17 @@ class DimmerLibrary:
                 ),
             },
         ),
+        DimmerType.BLACKOUT: DimmerPattern(
+            id="blackout",
+            name="Blackout",
+            description="Blackout intensity at 0",
+            curve=CurveLibrary.HOLD,
+            categorical_params={
+                Intensity.SMOOTH: DimmerCategoricalParams(
+                    min_intensity=0, max_intensity=0, period=1.0
+                ),
+            },
+        ),
         DimmerType.HOLD: DimmerPattern(
             id="hold",
             name="Hold",
@@ -91,13 +103,13 @@ class DimmerLibrary:
             curve=CurveLibrary.HOLD,
             categorical_params={
                 Intensity.SMOOTH: DimmerCategoricalParams(
-                    min_intensity=0, max_intensity=128, period=4.0
+                    min_intensity=0, max_intensity=255, period=1.0
                 ),
                 Intensity.DRAMATIC: DimmerCategoricalParams(
                     min_intensity=0, max_intensity=255, period=1.0
                 ),
                 Intensity.INTENSE: DimmerCategoricalParams(
-                    min_intensity=0, max_intensity=255, period=0.5
+                    min_intensity=0, max_intensity=255, period=1.0
                 ),
             },
         ),
@@ -141,3 +153,12 @@ class DimmerLibrary:
             }
             for pattern in cls.PATTERNS.values()
         ]
+
+    @classmethod
+    def get_pattern(cls, dimmer_type: DimmerType) -> DimmerPattern:
+        """Get dimmer pattern definition.
+
+        Args:
+            dimmer_type: Dimmer pattern identifier (enum).
+        """
+        return cls.PATTERNS[dimmer_type]

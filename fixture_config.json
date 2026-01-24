@@ -312,6 +312,7 @@
   ],
   "xlights_group": "90 - MH",
   "xlights_semantic_groups": {
+    "ALL": "90 - MH",
     "LEFT": "90.02 - MH - LEFT",
     "RIGHT": "90.01 - MH - RIGHT",
     "ODD": "90.03 - MH - ODD",

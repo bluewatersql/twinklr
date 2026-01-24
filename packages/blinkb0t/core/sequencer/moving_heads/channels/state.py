@@ -39,8 +39,8 @@ class ChannelValue(BaseModel):
     value_points: list[CurvePoint] | None = Field(default=None)
 
     # Composition hints (for movement offset curves)
-    base_dmx: int | None = Field(default=None, ge=0, le=255)
-    amplitude_dmx: int | None = Field(default=None, ge=0, le=255)
+    base_dmx: int | None = None
+    amplitude_dmx: int | None = None
     offset_centered: bool = Field(
         default=False,
         description="If true, interpret curve values as offset around 0.5",
@@ -64,11 +64,6 @@ class ChannelValue(BaseModel):
         if self.clamp_max < self.clamp_min:
             raise ValueError("clamp_max must be >= clamp_min")
 
-        # Offset-centered validation
-        if self.curve is not None and self.offset_centered:
-            if self.base_dmx is None or self.amplitude_dmx is None:
-                raise ValueError("offset_centered curves require base_dmx and amplitude_dmx")
-
         return self
 
 
@@ -83,36 +78,31 @@ class FixtureSegment(BaseModel):
         t0_ms: Start time in milliseconds (inclusive)
         t1_ms: End time in milliseconds (inclusive)
         channels: Dict mapping channel names to their value specifications
-
-    Example:
-        >>> from blinkb0t.core.curves.models import NativeCurve
-        >>> segment = FixtureSegment(
-        ...     fixture_id="fix1",
-        ...     t0_ms=0,
-        ...     t1_ms=2000,
-        ...     channels={
-        ...         ChannelName.PAN: ChannelValue(
-        ...             channel=ChannelName.PAN,
-        ...             curve=NativeCurve(curve_id="LINEAR"),
-        ...             offset_centered=True,
-        ...             base_dmx=128,
-        ...             amplitude_dmx=64
-        ...         ),
-        ...         ChannelName.DIMMER: ChannelValue(
-        ...             channel=ChannelName.DIMMER,
-        ...             static_dmx=255
-        ...         )
-        ...     }
-        ... )
     """
 
     model_config = ConfigDict(extra="forbid")
+
+    section_id: str
+    step_id: str
+    template_id: str
+    preset_id: str | None = None
 
     fixture_id: str = Field(..., min_length=1)
     t0_ms: int = Field(..., ge=0)
     t1_ms: int = Field(..., ge=0)
 
     channels: dict[ChannelName, ChannelValue] = Field(default_factory=dict)
+
+    # Grouping hint: if False, this segment should not be grouped with others
+    # Set to False when template uses per-fixture phase offsets
+    allow_grouping: bool = Field(default=True)
+
+    @property
+    def metatag(self) -> str:
+        if self.preset_id:
+            return f"{self.section_id}_{self.step_id}_{self.template_id}_{self.preset_id}"
+        else:
+            return f"{self.section_id}_{self.step_id}_{self.template_id}"
 
     @model_validator(mode="after")
     def _validate_constraints(self) -> FixtureSegment:

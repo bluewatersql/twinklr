@@ -38,14 +38,6 @@ def test_planner_prompts_exist():
     assert (planner_dir / "user.j2").exists()
 
 
-def test_validator_prompts_exist():
-    """Test validator prompt files exist."""
-    validator_dir = PROMPTS_BASE / "validator"
-    assert validator_dir.exists()
-    assert (validator_dir / "system.j2").exists()
-    assert (validator_dir / "user.j2").exists()
-
-
 def test_judge_prompts_exist():
     """Test judge prompt files exist."""
     judge_dir = PROMPTS_BASE / "judge"
@@ -57,16 +49,6 @@ def test_judge_prompts_exist():
 def test_load_planner_prompts(prompt_loader):
     """Test loading planner prompts."""
     prompts = prompt_loader.load("planner")
-
-    assert "system" in prompts
-    assert "user" in prompts
-    assert len(prompts["system"]) > 0
-    assert len(prompts["user"]) > 0
-
-
-def test_load_validator_prompts(prompt_loader):
-    """Test loading validator prompts."""
-    prompts = prompt_loader.load("validator")
 
     assert "system" in prompts
     assert "user" in prompts
@@ -133,34 +115,6 @@ def test_render_planner_with_feedback(prompt_loader, renderer):
     assert "Needs more variety in verse" in rendered
 
 
-def test_render_validator_user_prompt(prompt_loader, renderer):
-    """Test rendering validator user prompt."""
-    prompts = prompt_loader.load("validator")
-
-    variables = {
-        "plan": {
-            "sections": [
-                {
-                    "name": "intro",
-                    "sequences": [{"template": "sweep_lr", "timing": {}}],
-                }
-            ]
-        },
-        "context": {
-            "song_structure": {"intro": [0, 8]},
-            "available_templates": ["sweep_lr", "fan_pulse"],
-            "beat_grid": {"total_bars": 32},
-        },
-        "response_schema": "{}",  # Add response_schema variable
-    }
-
-    rendered = renderer.render(prompts["user"], variables)
-
-    # Should contain plan and context
-    assert "intro" in rendered
-    assert "sweep_lr" in rendered
-
-
 def test_render_judge_user_prompt(prompt_loader, renderer):
     """Test rendering judge user prompt."""
     prompts = prompt_loader.load("judge")
@@ -201,7 +155,7 @@ def test_render_judge_with_iteration(prompt_loader, renderer):
 
 def test_all_prompts_have_required_keys(prompt_loader):
     """Test all prompt packs have required prompts."""
-    for pack_name in ["planner", "validator", "judge"]:
+    for pack_name in ["planner", "judge"]:
         prompts = prompt_loader.load(pack_name)
 
         # All should have system and user
@@ -222,10 +176,8 @@ def test_prompts_contain_key_concepts():
     assert "template" in planner["system"].lower()
     assert "choreography" in planner["system"].lower()
 
-    # Validator should mention validation, checks
-    validator = loader.load("validator")
-    assert "validation" in validator["system"].lower() or "validate" in validator["system"].lower()
-
-    # Judge should mention evaluation, quality
+    # Judge should mention technical validation, evaluation, quality
     judge = loader.load("judge")
-    assert "evaluat" in judge["system"].lower() or "judge" in judge["system"].lower()
+    judge_system = judge["system"].lower()
+    assert "evaluat" in judge_system or "judge" in judge_system
+    assert "technical" in judge_system  # Now includes technical validation

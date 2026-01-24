@@ -3,12 +3,10 @@
 from blinkb0t.core.agents.sequencer.moving_heads.models import (
     ChoreographyPlan,
     JudgeResponse,
-    ValidationResponse,
 )
 from blinkb0t.core.agents.sequencer.moving_heads.specs import (
     get_judge_spec,
     get_planner_spec,
-    get_validator_spec,
 )
 from blinkb0t.core.agents.spec import AgentMode
 
@@ -35,26 +33,6 @@ def test_get_planner_spec_with_overrides():
     assert spec.token_budget == 5000
 
 
-def test_get_validator_spec():
-    """Test validator spec factory."""
-    spec = get_validator_spec()
-
-    assert spec.name == "validator"
-    assert spec.prompt_pack == "validator"
-    assert spec.response_model == ValidationResponse
-    assert spec.mode == AgentMode.ONESHOT  # Validator is stateless
-    assert spec.temperature < 0.5  # Analytical, deterministic
-    assert spec.max_schema_repair_attempts >= 2
-
-
-def test_get_validator_spec_with_overrides():
-    """Test validator spec with custom parameters."""
-    spec = get_validator_spec(model="gpt-5.2", temperature=0.3)
-
-    assert spec.model == "gpt-5.2"
-    assert spec.temperature == 0.3
-
-
 def test_get_judge_spec():
     """Test judge spec factory."""
     spec = get_judge_spec()
@@ -79,31 +57,28 @@ def test_get_judge_spec_with_overrides():
 def test_all_specs_have_different_names():
     """Test all specs have unique names."""
     planner = get_planner_spec()
-    validator = get_validator_spec()
     judge = get_judge_spec()
 
-    names = {planner.name, validator.name, judge.name}
-    assert len(names) == 3  # All unique
+    names = {planner.name, judge.name}
+    assert len(names) == 2  # All unique
 
 
 def test_all_specs_have_different_prompt_packs():
     """Test all specs use different prompt packs."""
     planner = get_planner_spec()
-    validator = get_validator_spec()
     judge = get_judge_spec()
 
-    packs = {planner.prompt_pack, validator.prompt_pack, judge.prompt_pack}
-    assert len(packs) == 3  # All unique
+    packs = {planner.prompt_pack, judge.prompt_pack}
+    assert len(packs) == 2  # All unique
 
 
 def test_all_specs_have_different_response_models():
     """Test all specs use different response models."""
     planner = get_planner_spec()
-    validator = get_validator_spec()
     judge = get_judge_spec()
 
-    models = {planner.response_model, validator.response_model, judge.response_model}
-    assert len(models) == 3  # All unique
+    models = {planner.response_model, judge.response_model}
+    assert len(models) == 2  # All unique
 
 
 def test_specs_are_immutable():
@@ -118,15 +93,13 @@ def test_specs_are_immutable():
         spec.name = "modified"
 
 
-def test_planner_conversational_validator_judge_oneshot():
+def test_planner_conversational_judge_oneshot():
     """Test mode configuration matches design."""
     planner = get_planner_spec()
-    validator = get_validator_spec()
     judge = get_judge_spec()
 
     # Planner maintains conversation context across iterations
     assert planner.mode == AgentMode.CONVERSATIONAL
 
-    # Validator and judge are stateless
-    assert validator.mode == AgentMode.ONESHOT
+    # Judge is stateless
     assert judge.mode == AgentMode.ONESHOT

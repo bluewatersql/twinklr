@@ -14,13 +14,12 @@ logger = logging.getLogger(__name__)
 class OrchestrationState(str, Enum):
     """Orchestration state machine states.
 
-    Note: Implementation step has been removed. The planner now generates
-    complete implementation directly (simplified pipeline).
+    Pipeline: PLANNING -> JUDGING (with code-based heuristic validation in between).
+    Validator LLM agent removed - heuristics catch technical errors, judge evaluates quality.
     """
 
     INITIALIZED = "initialized"
     PLANNING = "planning"
-    VALIDATING = "validating"
     JUDGING = "judging"
     SUCCEEDED = "succeeded"
     FAILED = "failed"
@@ -78,14 +77,10 @@ class OrchestrationStateMachine:
             OrchestrationState.FAILED,
         ],
         OrchestrationState.PLANNING: [
-            OrchestrationState.VALIDATING,
+            OrchestrationState.PLANNING,  # Heuristic validation failure retry
+            OrchestrationState.JUDGING,  # Direct to judge after heuristic validation
             OrchestrationState.FAILED,
             OrchestrationState.BUDGET_EXHAUSTED,
-        ],
-        OrchestrationState.VALIDATING: [
-            OrchestrationState.PLANNING,  # Retry on failure
-            OrchestrationState.JUDGING,
-            OrchestrationState.FAILED,
         ],
         OrchestrationState.JUDGING: [
             OrchestrationState.SUCCEEDED,
@@ -171,7 +166,7 @@ class OrchestrationStateMachine:
         if old_state == OrchestrationState.PLANNING:
             self.iteration_count += 1
 
-        logger.info(
+        logger.debug(
             f"State transition: {old_state.value} → {to_state.value} "
             f"(iteration {self.iteration_count}, duration: {duration_seconds:.2f}s, "
             f"tokens: {tokens_consumed}, reason: {reason or 'none'})"
