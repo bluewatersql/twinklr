@@ -13,15 +13,6 @@ class AlternatingUpDownHandler:
 
     Attributes:
         handler_id: Unique identifier ("ALTERNATING_UPDOWN").
-
-    Example:
-        >>> handler = AlternatingUpDownHandler()
-        >>> result = handler.resolve(
-        ...     fixture_id="fx1",
-        ...     role="OUTER_LEFT",
-        ...     params={"pan_center_norm": 0.5, "tilt_up_norm": 0.7, "tilt_horizon_norm": 0.3},
-        ...     calibration={},
-        ... )
     """
 
     handler_id: str = "alternating_updown"

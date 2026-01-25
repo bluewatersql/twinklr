@@ -101,7 +101,7 @@ def schedule_repeats(
     instances: list[ScheduledInstance] = []
     current_time = 0.0
 
-    # TODO: Handle TRUNCATE AND FADE_OUT repeat policy, currently only handles HOLD_LAST_POSE
+    # Schedule complete cycles
     for cycle_num in range(num_complete_cycles):
         # Determine step order based on mode
         step_ids = _get_step_order(contract, cycle_num)
@@ -121,18 +121,70 @@ def schedule_repeats(
             current_time = end_time
 
     # Handle remainder based on policy
-    if remainder_bars > 0.0 and contract.remainder_policy == RemainderPolicy.HOLD_LAST_POSE:
-        # Add an instance for the last step that extends to fill the remainder
-        if instances:
-            last_step_id = instances[-1].step_id
-            instances.append(
-                ScheduledInstance(
-                    step_id=last_step_id,
-                    start_bars=current_time,
-                    end_bars=current_time + remainder_bars,
-                    cycle_number=num_complete_cycles,  # Remainder cycle
+    if remainder_bars > 0.0:
+        if contract.remainder_policy == RemainderPolicy.HOLD_LAST_POSE:
+            # Add an instance for the last step that extends to fill the remainder
+            if instances:
+                last_step_id = instances[-1].step_id
+                instances.append(
+                    ScheduledInstance(
+                        step_id=last_step_id,
+                        start_bars=current_time,
+                        end_bars=current_time + remainder_bars,
+                        cycle_number=num_complete_cycles,  # Remainder cycle
+                    )
                 )
-            )
+
+        elif contract.remainder_policy == RemainderPolicy.TRUNCATE:
+            # Schedule a partial cycle that will be clipped to window boundary
+            # This renders the start of the next cycle, then clips at section end
+            step_ids = _get_step_order(contract, num_complete_cycles)
+
+            for step_id in step_ids:
+                duration = step_durations.get(step_id, contract.cycle_bars)
+                end_time = current_time + duration
+
+                # Schedule the full step even if it exceeds window
+                # Will be clipped later in template_compiler
+                instances.append(
+                    ScheduledInstance(
+                        step_id=step_id,
+                        start_bars=current_time,
+                        end_bars=end_time,
+                        cycle_number=num_complete_cycles,
+                        is_partial=True,  # Mark as partial for clipping
+                    )
+                )
+                current_time = end_time
+
+                # Stop if we've exceeded the available remainder significantly
+                # (allow some overage for clipping)
+                if current_time >= duration_bars + contract.cycle_bars:
+                    break
+
+        elif contract.remainder_policy == RemainderPolicy.FADE_OUT:
+            # Schedule a partial cycle with fade-out dimmer
+            # Similar to TRUNCATE but will apply fade to dimmer channel
+            step_ids = _get_step_order(contract, num_complete_cycles)
+
+            for step_id in step_ids:
+                duration = step_durations.get(step_id, contract.cycle_bars)
+                end_time = current_time + duration
+
+                instances.append(
+                    ScheduledInstance(
+                        step_id=step_id,
+                        start_bars=current_time,
+                        end_bars=end_time,
+                        cycle_number=num_complete_cycles,
+                        is_partial=True,  # Mark as partial
+                        is_fade_out=True,  # Mark for fade-out treatment
+                    )
+                )
+                current_time = end_time
+
+                if current_time >= duration_bars + contract.cycle_bars:
+                    break
 
     return ScheduleResult(
         instances=instances,

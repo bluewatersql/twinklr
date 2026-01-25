@@ -359,6 +359,6 @@ class HeuristicValidator:
                 if isinstance(s, dict) and isinstance(s.get("end_bar"), int):
                     ends.append(s["end_bar"])
             if ends:
-                return max(ends)
+                return int(max(ends))
 
         return None

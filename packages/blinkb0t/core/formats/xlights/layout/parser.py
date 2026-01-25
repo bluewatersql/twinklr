@@ -101,7 +101,7 @@ class LayoutParser:
 
         return result
 
-    def _parse_element(self, element: Any) -> dict[str, Any]:
+    def _parse_element(self, element: Any):
         """Recursively parse an XML element into a dictionary.
 
         Args:

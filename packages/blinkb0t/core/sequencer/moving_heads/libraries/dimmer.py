@@ -28,13 +28,13 @@ class DimmerPattern(BaseModel):
 
     curve: CurveLibrary
     base_params: dict[str, float | int | str] = Field(default_factory=dict)
-    categorical_params: dict[Intensity, DimmerCategoricalParams]
+    categorical_params: dict[Intensity, DimmerCategoricalParams] = Field(default_factory=dict)
 
 
 DEFAULT_DIMMER_PARAMS = {
     Intensity.SMOOTH: DimmerCategoricalParams(min_intensity=0, max_intensity=128, period=4.0),
-    Intensity.DRAMATIC: DimmerCategoricalParams(min_intensity=0, max_intensity=224, period=1.25),
-    Intensity.INTENSE: DimmerCategoricalParams(min_intensity=0, max_intensity=255, period=0.25),
+    Intensity.DRAMATIC: DimmerCategoricalParams(min_intensity=100, max_intensity=255, period=1.25),
+    Intensity.INTENSE: DimmerCategoricalParams(min_intensity=150, max_intensity=255, period=0.25),
 }
 
 
@@ -56,34 +56,12 @@ class DimmerLibrary:
             name="Fade In",
             description="Linear fade from 0 to full intensity",
             curve=CurveLibrary.LINEAR,
-            categorical_params={
-                Intensity.SMOOTH: DimmerCategoricalParams(
-                    min_intensity=0, max_intensity=128, period=4.0
-                ),
-                Intensity.DRAMATIC: DimmerCategoricalParams(
-                    min_intensity=0, max_intensity=255, period=1.0
-                ),
-                Intensity.INTENSE: DimmerCategoricalParams(
-                    min_intensity=0, max_intensity=255, period=0.5
-                ),
-            },
         ),
         DimmerType.FADE_OUT: DimmerPattern(
             id="fade_out",
             name="Fade Out",
             description="Linear fade from full intensity to 0",
             curve=CurveLibrary.LINEAR,
-            categorical_params={
-                Intensity.SMOOTH: DimmerCategoricalParams(
-                    min_intensity=0, max_intensity=128, period=4.0
-                ),
-                Intensity.DRAMATIC: DimmerCategoricalParams(
-                    min_intensity=0, max_intensity=255, period=1.0
-                ),
-                Intensity.INTENSE: DimmerCategoricalParams(
-                    min_intensity=0, max_intensity=255, period=0.5
-                ),
-            },
         ),
         DimmerType.BLACKOUT: DimmerPattern(
             id="blackout",
@@ -104,13 +82,7 @@ class DimmerLibrary:
             categorical_params={
                 Intensity.SMOOTH: DimmerCategoricalParams(
                     min_intensity=0, max_intensity=255, period=1.0
-                ),
-                Intensity.DRAMATIC: DimmerCategoricalParams(
-                    min_intensity=0, max_intensity=255, period=1.0
-                ),
-                Intensity.INTENSE: DimmerCategoricalParams(
-                    min_intensity=0, max_intensity=255, period=1.0
-                ),
+                )
             },
         ),
         DimmerType.PULSE: DimmerPattern(
@@ -118,17 +90,6 @@ class DimmerLibrary:
             name="Pulse",
             description="Pulse intensity between min and max",
             curve=CurveLibrary.PULSE,
-            categorical_params={
-                Intensity.SMOOTH: DimmerCategoricalParams(
-                    min_intensity=0, max_intensity=128, period=4.0
-                ),
-                Intensity.DRAMATIC: DimmerCategoricalParams(
-                    min_intensity=0, max_intensity=255, period=1.0
-                ),
-                Intensity.INTENSE: DimmerCategoricalParams(
-                    min_intensity=0, max_intensity=255, period=0.5
-                ),
-            },
         ),
     }
 

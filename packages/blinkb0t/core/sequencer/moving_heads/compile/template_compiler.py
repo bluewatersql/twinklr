@@ -8,14 +8,16 @@ import logging
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from blinkb0t.core.curves.models import CurvePoint, PointsCurve
 from blinkb0t.core.sequencer.models.context import FixtureContext, TemplateCompileContext
-from blinkb0t.core.sequencer.models.enum import ChaseOrder
+from blinkb0t.core.sequencer.models.enum import ChannelName, ChaseOrder
 from blinkb0t.core.sequencer.models.template import (
+    RemainderPolicy,
     Template,
     TemplatePreset,
     TemplateStep,
 )
-from blinkb0t.core.sequencer.moving_heads.channels.state import FixtureSegment
+from blinkb0t.core.sequencer.moving_heads.channels.state import ChannelValue, FixtureSegment
 from blinkb0t.core.sequencer.moving_heads.compile.phase_offset import (
     PhaseOffsetResult,
     calculate_fixture_offsets,
@@ -26,9 +28,11 @@ from blinkb0t.core.sequencer.moving_heads.compile.step_compiler import (
     StepCompileContext,
     compile_step,
 )
+from blinkb0t.core.sequencer.moving_heads.utils import resolve_semantic_group
+from blinkb0t.core.utils.logging import get_renderer_logger, log_performance
 
 logger = logging.getLogger(__name__)
-renderer_log = logging.getLogger("DMX_MH_RENDER")
+renderer_log = get_renderer_logger()
 
 
 class TemplateCompileResult(BaseModel):
@@ -55,6 +59,7 @@ class TemplateCompileResult(BaseModel):
         return [seg for seg in self.segments if seg.fixture_id == fixture_id]
 
 
+@log_performance
 def compile_template(
     template: Template,
     context: TemplateCompileContext,
@@ -67,6 +72,7 @@ def compile_template(
     2. Schedule repeat cycles
     3. Calculate phase offsets
     4. Compile each step for each fixture
+    5. Clip segments to boundaries for TRUNCATE/FADE_OUT policies
 
     Args:
         template: The template to compile.
@@ -115,8 +121,7 @@ def compile_template(
         step = step_map[instance.step_id]
 
         # Filter fixtures based on step's target semantic group
-        target_group = step.target
-        target_roles = working_template.groups.get(target_group.value, [])
+        target_roles = resolve_semantic_group(step.target, template.roles)
 
         if not target_roles:
             # If group not defined in template, default to all fixtures
@@ -126,7 +131,6 @@ def compile_template(
             target_fixtures = [f for f in context.fixtures if f.role in target_roles]
 
         renderer_log.info(f"Target group: {step.target}")
-        renderer_log.info(f"Target roles: {working_template.groups.get(step.target.value, [])}")
         renderer_log.info(f"# of Target fixtures: {len(target_fixtures)}")
 
         if not target_fixtures:
@@ -194,12 +198,17 @@ def compile_template(
             if uses_phase_offsets:
                 step_result.segment.allow_grouping = False
 
-            # TODO: Handle TRUNCATE repeat policy
-            # TODO: Need to apply time clipping to boundaries to handle section boundaries and truncate repeat policy
-            # - See _clip_segments_to_window from demo compiler
-
             # Add segments
             all_segments.append(step_result.segment)
+
+    # Clip segments to section boundary for TRUNCATE/FADE_OUT policies
+    if schedule_result.remainder_policy in (RemainderPolicy.TRUNCATE, RemainderPolicy.FADE_OUT):
+        section_end_ms = context.start_ms + int(context.duration_bars * context.ms_per_bar)
+        all_segments = _clip_segments_to_boundary(
+            all_segments,
+            section_end_ms,
+            fade_out=(schedule_result.remainder_policy == RemainderPolicy.FADE_OUT),
+        )
 
     return TemplateCompileResult(
         template_id=working_template.template_id,
@@ -284,3 +293,152 @@ def _order_fixtures_for_chase(
     else:
         # Default: maintain current order
         return list(fixtures)
+
+
+def _clip_segments_to_boundary(
+    segments: list[FixtureSegment],
+    boundary_ms: int,
+    fade_out: bool = False,
+) -> list[FixtureSegment]:
+    """Clip segments to a time boundary for TRUNCATE/FADE_OUT remainder policies.
+
+    For TRUNCATE: Hard clip all segments at boundary_ms
+    For FADE_OUT: Clip segments and apply fade to dimmer channel in clipped region
+
+    Args:
+        segments: List of fixture segments to clip
+        boundary_ms: Time boundary in milliseconds (section end)
+        fade_out: If True, apply fade-out to dimmer channel
+
+    Returns:
+        List of clipped segments (some may be removed entirely if beyond boundary)
+    """
+    clipped_segments: list[FixtureSegment] = []
+
+    for segment in segments:
+        # Segment entirely before boundary - keep as-is
+        if segment.t1_ms <= boundary_ms:
+            clipped_segments.append(segment)
+            continue
+
+        # Segment entirely after boundary - discard
+        if segment.t0_ms >= boundary_ms:
+            continue
+
+        # Segment crosses boundary - clip it
+        # Calculate what fraction of the segment to keep
+        original_duration = segment.t1_ms - segment.t0_ms
+        clipped_duration = boundary_ms - segment.t0_ms
+        keep_fraction = clipped_duration / original_duration if original_duration > 0 else 1.0
+
+        # Clip curves for each channel
+        clipped_channels: dict[ChannelName, ChannelValue] = {}
+
+        for channel_name, channel_value in segment.channels.items():
+            # If channel has a curve, clip it
+            if channel_value.curve and channel_value.value_points:
+                clipped_points = _clip_curve_points(channel_value.value_points, keep_fraction)
+
+                # For FADE_OUT on dimmer channel, apply fade
+                if fade_out and channel_name.value == "DIMMER":
+                    clipped_points = _apply_fade_out(clipped_points)
+
+                clipped_channels[channel_name] = ChannelValue(
+                    channel=channel_name,
+                    curve=PointsCurve(points=clipped_points),
+                    value_points=clipped_points,
+                    static_dmx=None,
+                    offset_centered=channel_value.offset_centered,
+                    base_dmx=channel_value.base_dmx,
+                    amplitude_dmx=channel_value.amplitude_dmx,
+                    clamp_min=channel_value.clamp_min,
+                    clamp_max=channel_value.clamp_max,
+                )
+            else:
+                # Static value - keep as-is
+                clipped_channels[channel_name] = channel_value
+
+        # Create clipped segment
+        clipped_segment = FixtureSegment(
+            section_id=segment.section_id,
+            step_id=segment.step_id,
+            template_id=segment.template_id,
+            preset_id=segment.preset_id,
+            fixture_id=segment.fixture_id,
+            t0_ms=segment.t0_ms,
+            t1_ms=boundary_ms,  # Clip end time
+            channels=clipped_channels,
+            allow_grouping=segment.allow_grouping,
+        )
+
+        clipped_segments.append(clipped_segment)
+
+    return clipped_segments
+
+
+def _clip_curve_points(points: list[CurvePoint], keep_fraction: float) -> list[CurvePoint]:
+    """Clip curve points to a fraction of the original duration.
+
+    Args:
+        points: Original curve points (t in [0, 1])
+        keep_fraction: Fraction of curve to keep (0.0 to 1.0)
+
+    Returns:
+        Clipped curve points with t values rescaled to [0, 1]
+    """
+    if keep_fraction >= 1.0:
+        return points
+
+    # Find points within the keep fraction
+    clipped: list[CurvePoint] = []
+
+    for point in points:
+        if point.t <= keep_fraction:
+            # Rescale t to [0, 1] over the clipped duration
+            new_t = point.t / keep_fraction if keep_fraction > 0 else 0.0
+            clipped.append(CurvePoint(t=new_t, v=point.v))
+        else:
+            # Interpolate the final point at exactly keep_fraction
+            if clipped and point.t > keep_fraction:
+                # Find the previous point
+                prev_point = clipped[-1]
+                # Linear interpolation to get value at keep_fraction
+                t_range = point.t - prev_point.t * keep_fraction
+                if t_range > 0:
+                    alpha = (keep_fraction - prev_point.t * keep_fraction) / t_range
+                    interpolated_v = prev_point.v + alpha * (point.v - prev_point.v)
+                    clipped.append(CurvePoint(t=1.0, v=interpolated_v))
+                break
+
+    # Ensure we have at least 2 points for a valid curve
+    if len(clipped) < 2 and points:
+        # Add final point at t=1.0 with last value
+        if clipped:
+            clipped.append(CurvePoint(t=1.0, v=clipped[-1].v))
+        else:
+            # Use first point of original curve
+            clipped = [CurvePoint(t=0.0, v=points[0].v), CurvePoint(t=1.0, v=points[0].v)]
+
+    return clipped
+
+
+def _apply_fade_out(points: list[CurvePoint]) -> list[CurvePoint]:
+    """Apply a linear fade-out to curve points.
+
+    Multiplies the value by (1 - t) to create a fade to zero.
+
+    Args:
+        points: Original curve points
+
+    Returns:
+        Curve points with fade-out applied
+    """
+    faded: list[CurvePoint] = []
+
+    for point in points:
+        # Fade multiplier: 1.0 at t=0, 0.0 at t=1.0
+        fade_multiplier = 1.0 - point.t
+        faded_value = point.v * fade_multiplier
+        faded.append(CurvePoint(t=point.t, v=faded_value))
+
+    return faded

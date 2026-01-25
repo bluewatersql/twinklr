@@ -144,23 +144,6 @@ def test_templates_have_valid_roles():
             assert role in TemplateRole
 
 
-def test_templates_have_semantic_groups():
-    """Verify templates define semantic groups."""
-    templates = list_templates()
-
-    for info in templates:
-        doc = get_template(info.template_id)
-
-        # Most templates should have at least an "ALL" group
-        assert len(doc.template.groups) > 0, f"Template {info.template_id} has no semantic groups"
-
-        # Verify group members are from template roles
-        for group_type, members in doc.template.groups.items():
-            assert group_type in SemanticGroupType
-            for member in members:
-                assert member in doc.template.roles, f"Group member {member} not in template roles"
-
-
 def test_templates_have_steps():
     """Verify templates have at least one step."""
     templates = list_templates()
@@ -195,32 +178,6 @@ def test_templates_have_repeat_contracts():
             step_ids = {s.step_id for s in doc.template.steps}
             for loop_id in doc.template.repeat.loop_step_ids:
                 assert loop_id in step_ids, f"Loop step '{loop_id}' not found in template steps"
-
-
-# ============================================================================
-# Template Preset Tests
-# ============================================================================
-
-
-def test_templates_with_presets():
-    """Verify templates with presets have valid configurations."""
-    templates = list_templates()
-
-    templates_with_presets = [
-        info for info in templates if len(get_template(info.template_id).presets) > 0
-    ]
-
-    # Some templates should have presets
-    assert len(templates_with_presets) > 0, "No templates have presets"
-
-    for info in templates_with_presets:
-        doc = get_template(info.template_id)
-
-        # Each preset should have required fields
-        for preset in doc.presets:
-            assert preset.preset_id
-            assert preset.name
-            assert preset.defaults is not None
 
 
 # ============================================================================

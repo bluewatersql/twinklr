@@ -153,6 +153,11 @@ class Orchestrator:
             else:
                 logger.debug("No FINAL checkpoint found, running orchestration from scratch")
 
+        # Start new run and generate unique run ID
+        if self.checkpoint_manager:
+            run_id = self.checkpoint_manager.start_run()
+            logger.info(f"Starting new orchestration run: {run_id}")
+
         # Initialize state machine
         self.state_machine.transition(OrchestrationState.PLANNING)
 
@@ -233,12 +238,18 @@ class Orchestrator:
             plan = planner_result.data
             assert isinstance(plan, ChoreographyPlan), "Planner must return ChoreographyPlan"
 
-            # Save raw plan checkpoint
+            # Save raw plan checkpoint (both current and iteration-specific)
             if self.checkpoint_manager and self.checkpoint_manager.job_config.checkpoint:
                 from blinkb0t.core.utils.checkpoint import CheckpointType
 
+                # Save current raw plan (gets overwritten each iteration)
                 self.checkpoint_manager.write_checkpoint(CheckpointType.RAW, plan.model_dump())
-                logger.debug(f"Saved RAW checkpoint for iteration {iterations}")
+
+                # Save iteration-specific raw plan (preserved)
+                self.checkpoint_manager.write_iteration_checkpoint(
+                    CheckpointType.RAW, {"plan": plan.model_dump()}, iterations
+                )
+                logger.debug(f"Saved RAW checkpoints for iteration {iterations}")
 
             # 2. Heuristic validation
             logger.debug("Running heuristic validator")
@@ -306,14 +317,27 @@ class Orchestrator:
                 best_score = judge_response.score
                 best_plan = plan
 
-            # Save evaluation checkpoint
+            # Save evaluation checkpoint (both current and iteration-specific)
             if self.checkpoint_manager and self.checkpoint_manager.job_config.checkpoint:
                 from blinkb0t.core.utils.checkpoint import CheckpointType
 
+                # Save current evaluation (gets overwritten each iteration)
                 self.checkpoint_manager.write_checkpoint(
                     CheckpointType.EVALUATION, judge_response.model_dump()
                 )
-                logger.debug(f"Saved EVALUATION checkpoint for iteration {iterations}")
+
+                # Save iteration-specific evaluation (preserved)
+                self.checkpoint_manager.write_iteration_checkpoint(
+                    CheckpointType.EVALUATION,
+                    {
+                        "evaluation": judge_response.model_dump(),
+                        "plan_sections": len(plan.sections),
+                        "score": judge_response.score,
+                        "decision": judge_response.decision.value,
+                    },
+                    iterations,
+                )
+                logger.debug(f"Saved EVALUATION checkpoints for iteration {iterations}")
 
             # Handle judge decision
             if judge_response.decision == JudgeDecision.APPROVE:

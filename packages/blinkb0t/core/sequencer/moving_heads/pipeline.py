@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Iterator
 from pathlib import Path
+from typing import Any
 
 from blinkb0t.core.agents.sequencer.moving_heads import ChoreographyPlan
 from blinkb0t.core.agents.sequencer.moving_heads.models import PlanSection
@@ -232,7 +233,7 @@ class RenderingPipeline:
 
         for fixture_def in self.rig_profile.fixtures:
             # Build calibration dict from FixtureCalibration model
-            calibration = {}
+            calibration: dict[str, Any] = {}
             if fixture_def.calibration:
                 calibration = {
                     "pan_min_dmx": fixture_def.calibration.pan_min_dmx,

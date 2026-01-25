@@ -19,12 +19,6 @@ class PatchResult(BaseModel):
     Attributes:
         data: The merged dictionary data.
         provenance: List of source identifiers in application order.
-
-    Example:
-        >>> result = PatchResult(
-        ...     data={"a": 1},
-        ...     provenance=["template:fan_pulse", "preset:CHILL"],
-        ... )
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -46,12 +40,6 @@ def deep_merge(base: dict[str, Any], patch: dict[str, Any]) -> dict[str, Any]:
 
     Returns:
         A new dictionary with patch applied to base.
-
-    Example:
-        >>> base = {"a": {"b": 1, "c": 2}}
-        >>> patch = {"a": {"c": 99}}
-        >>> deep_merge(base, patch)
-        {'a': {'b': 1, 'c': 99}}
     """
     result: dict[str, Any] = {}
 
@@ -105,12 +93,6 @@ def merge_with_provenance(
 
     Returns:
         New PatchResult with merged data and updated provenance.
-
-    Example:
-        >>> base = PatchResult(data={"a": 1}, provenance=["template"])
-        >>> result = merge_with_provenance(base, {"b": 2}, "preset:X")
-        >>> result.provenance
-        ['template', 'preset:X']
     """
     merged_data = deep_merge(base.data, patch)
     new_provenance = list(base.provenance) + [source]

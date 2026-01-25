@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import json
 import logging
-from typing import TYPE_CHECKING
+from enum import Enum
+from typing import TYPE_CHECKING, Any
 
 from blinkb0t.core.curves.models import BaseCurve, CurvePoint
 from blinkb0t.core.sequencer.models.enum import BlendMode, ChannelName
@@ -92,6 +94,7 @@ class FixtureSegment(BaseModel):
     t1_ms: int = Field(..., ge=0)
 
     channels: dict[ChannelName, ChannelValue] = Field(default_factory=dict)
+    metadata: dict[str, str] = Field(default_factory=dict)
 
     # Grouping hint: if False, this segment should not be grouped with others
     # Set to False when template uses per-fixture phase offsets
@@ -182,6 +185,30 @@ class FixtureSegment(BaseModel):
             True if channel is configured
         """
         return channel in self.channels
+
+    def metadata_json_encoder(self, obj: Any) -> str:
+        """Custom JSON encoder for metadata values."""
+        if isinstance(obj, BaseModel):
+            return str(obj.model_dump(exclude_none=True, exclude_defaults=True, exclude_unset=True))
+
+        if isinstance(obj, Enum):
+            return str(obj.value)
+
+        if isinstance(obj, list):
+            return ",".join([self.metadata_json_encoder(item) for item in obj])
+
+        return str(obj)
+
+    def add_metadata(self, key: str, value: Any) -> None:
+        """Add metadata to the segment."""
+        if value is None:
+            return
+        if isinstance(value, dict):
+            value = json.dumps(value, default=self.metadata_json_encoder)
+        elif not isinstance(value, str):
+            value = str(value)
+
+        self.metadata[key] = value
 
 
 class ChannelState:

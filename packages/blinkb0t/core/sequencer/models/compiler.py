@@ -11,6 +11,8 @@ class ScheduledInstance(BaseModel):
         start_bars: Start time in bars from window start.
         end_bars: End time in bars from window start.
         cycle_number: Which cycle this instance belongs to (0-indexed).
+        is_partial: Whether this is a partial cycle (for TRUNCATE/FADE_OUT).
+        is_fade_out: Whether this instance should fade out (for FADE_OUT policy).
 
     Example:
         >>> instance = ScheduledInstance(
@@ -27,6 +29,8 @@ class ScheduledInstance(BaseModel):
     start_bars: float = Field(..., ge=0.0)
     end_bars: float = Field(..., ge=0.0)
     cycle_number: int = Field(..., ge=0)
+    is_partial: bool = Field(default=False)
+    is_fade_out: bool = Field(default=False)
 
     @property
     def duration_bars(self) -> float:

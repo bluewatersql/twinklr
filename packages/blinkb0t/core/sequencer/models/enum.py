@@ -81,6 +81,8 @@ class TemplateRole(str, Enum):
     CENTER_LEFT = "CENTER_LEFT"
     CENTER_RIGHT = "CENTER_RIGHT"
     CENTER = "CENTER"
+    LEFT = "LEFT"
+    RIGHT = "RIGHT"
 
 
 class AimZone(str, Enum):

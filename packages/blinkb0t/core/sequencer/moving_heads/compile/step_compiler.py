@@ -15,9 +15,10 @@ from blinkb0t.core.sequencer.models.context import StepCompileContext
 from blinkb0t.core.sequencer.models.enum import ChannelName
 from blinkb0t.core.sequencer.models.template import TemplateStep
 from blinkb0t.core.sequencer.moving_heads.channels.state import FixtureSegment
+from blinkb0t.core.utils.logging import get_renderer_logger, log_performance
 
 logger = logging.getLogger(__name__)
-renderer_log = logging.getLogger("DMX_MH_RENDER")
+renderer_log = get_renderer_logger()
 
 
 class StepCompileResult(BaseModel):
@@ -39,6 +40,7 @@ class StepCompileResult(BaseModel):
     segment: FixtureSegment
 
 
+@log_performance
 def compile_step(
     step: TemplateStep,
     context: StepCompileContext,
@@ -111,17 +113,13 @@ def compile_step(
         intensity=step.movement.intensity,
     )
 
-    # renderer_log.debug(f"Movement Result: {movement_result}")
-
     # Build dimmer segment (absolute, not offset-centered)
     dimmer_params = dict(step.dimmer.params)
     dimmer_params["calibration"] = context.calibration
     dimmer_handler = context.dimmer_registry.get_with_params(
         step.dimmer.dimmer_type.value, dimmer_params
     )
-    renderer_log.info(
-        f"Dimmer Handler for {step.dimmer.dimmer_type.value}: {dimmer_handler.handler_id}"
-    )
+
     # Generate dimmer curve (use the params dict that has dimmer_id injected)
     dimmer_result = dimmer_handler.generate(
         params=dimmer_params,
@@ -131,8 +129,6 @@ def compile_step(
         min_norm=step.dimmer.min_norm,
         max_norm=step.dimmer.max_norm,
     )
-
-    # renderer_log.debug(f"Dimmer Result: {dimmer_result}")
 
     # Apply phase offset if needed
     pan_points = movement_result.pan_curve
@@ -154,10 +150,6 @@ def compile_step(
                 dimmer_points, phase_offset_norm, context.n_samples, wrap=True
             )
 
-    # renderer_log.debug(f"Pan Points: {pan_points}")
-    # renderer_log.debug(f"Tilt Points: {tilt_points}")
-    # renderer_log.debug(f"Dimmer Points: {dimmer_points}")
-
     segment = FixtureSegment(
         section_id=context.section_id,
         step_id=step.step_id,
@@ -168,8 +160,36 @@ def compile_step(
         t1_ms=t1_ms,
     )
 
-    if movement_result.pan_static_dmx is not None:
-        renderer_log.info(f"Pan Static DMX: {movement_result.pan_static_dmx}")
+    # Geometry Metadata
+    segment.add_metadata("geometry_handler", geometry_handler.handler_id)
+    segment.add_metadata("geometry_params", geometry_params)
+    segment.add_metadata("base_pan_norm", base_pan_norm)
+    segment.add_metadata("base_tilt_norm", base_tilt_norm)
+
+    # Movement Metadata
+    segment.add_metadata("movement_handler", movement_handler.handler_id)
+    segment.add_metadata("movement_params", movement_params)
+
+    # Pan Metadata
+    segment.add_metadata("pan_curve_type", str(movement_result.pan_curve_type))
+    segment.add_metadata("pan_static_dmx", movement_result.pan_static_dmx)
+    segment.add_metadata("base_pan_norm", base_pan_norm)
+
+    # Tilt Metadata
+    segment.add_metadata("tilt_curve_type", str(movement_result.tilt_curve_type))
+    segment.add_metadata("tilt_static_dmx", movement_result.tilt_static_dmx)
+    segment.add_metadata("base_tilt_norm", base_tilt_norm)
+
+    # Dimmer Metadata
+    segment.add_metadata("dimmer_handler", dimmer_handler.handler_id)
+    segment.add_metadata("dimmer_params", dimmer_params)
+    segment.add_metadata("dimmer_curve_type", str(dimmer_result.dimmer_curve_type))
+    segment.add_metadata("dimmer_static_dmx", dimmer_result.dimmer_static_dmx)
+
+    # Misc Metadata
+    segment.add_metadata("start_ms", t0_ms)
+    segment.add_metadata("end_ms", t1_ms)
+    segment.add_metadata("phase_offset_norm", phase_offset_norm)
 
     # Build pan segment - scale [0,1] curve to DMX boundaries
     segment.add_channel(

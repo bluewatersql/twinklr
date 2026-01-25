@@ -14,9 +14,11 @@ from blinkb0t.core.curves.models import CurvePoint
 from blinkb0t.core.curves.semantics import CurveKind
 from blinkb0t.core.sequencer.models.enum import Intensity
 from blinkb0t.core.sequencer.moving_heads.handlers.protocols import MovementResult
+from blinkb0t.core.sequencer.moving_heads.libraries.movement import DEFAULT_MOVEMENT_PARAMS
+from blinkb0t.core.utils.logging import get_renderer_logger, log_performance
 
 logger = logging.getLogger(__name__)
-renderer_log = logging.getLogger("DMX_MH_RENDER")
+renderer_log = get_renderer_logger()
 
 
 class DefaultMovementHandler:
@@ -42,6 +44,7 @@ class DefaultMovementHandler:
         """Initialize default handler with curve generator."""
         self._curve_gen = CurveGenerator()
 
+    @log_performance
     def generate(
         self,
         params: dict[str, Any],
@@ -74,6 +77,13 @@ class DefaultMovementHandler:
                 "Handler is not correctly configured. 'movement_pattern' is missing from params."
             )
         base_params = {**pattern.base_params, **params.get("base_params", {})}
+
+        intensity = params.get("intensity", Intensity.SMOOTH)
+        categorical_params_set = pattern.categorical_params or DEFAULT_MOVEMENT_PARAMS
+        categorical_params = categorical_params_set[intensity]
+
+        renderer_log.info(f"Categorical Params: {categorical_params}")
+        renderer_log.info(f"Intensity: {intensity}")
 
         geometry = params.get("geometry")
         if not geometry:
@@ -115,29 +125,21 @@ class DefaultMovementHandler:
             f"Max safe amplitude (norm): pan={pan_max_amplitude_norm:.3f}, tilt={tilt_max_amplitude_norm:.3f}"
         )
 
-        # Get categorical params for intensity
-        if intensity not in pattern.categorical_params:
-            # Fall back to SMOOTH if intensity not defined
-            intensity = Intensity.SMOOTH
-
-        cat_params = pattern.categorical_params[intensity]
-
         # Resolve amplitude (allow param override)
-        amplitude = self._resolve_amplitude(params, cat_params.amplitude)
-
+        amplitude = self._resolve_amplitude(params, categorical_params.amplitude)
         renderer_log.info(f"Resolved Amplitude: {amplitude}")
 
         # Generate pan curve scaled to fit within pan_min/pan_max
         renderer_log.info(
-            f"Generating Pan Curve - type: {pattern.pan_curve.value}, amplitude: {amplitude}, frequency: {cat_params.frequency}, center: {cat_params.center}"
+            f"Generating Pan Curve - type: {pattern.pan_curve.value}, amplitude: {amplitude}, frequency: {categorical_params.frequency}, center: {categorical_params.center_offset}"
         )
         pan_curve = self._generate_curve(
             curve_type=pattern.pan_curve,
             n_samples=n_samples,
             cycles=cycles,
             amplitude=amplitude,
-            frequency=cat_params.frequency,
-            center=cat_params.center,
+            frequency=categorical_params.frequency,
+            center=categorical_params.center_offset,
             base_norm=base_pan_norm,
             max_amplitude_norm=pan_max_amplitude_norm,
             params=self._filter_base_params("curve", "pan", base_params),
@@ -156,8 +158,8 @@ class DefaultMovementHandler:
             n_samples=n_samples,
             cycles=cycles,
             amplitude=amplitude,
-            frequency=cat_params.frequency,
-            center=cat_params.center,
+            frequency=categorical_params.frequency,
+            center=categorical_params.center_offset,
             base_norm=base_tilt_norm,
             max_amplitude_norm=tilt_max_amplitude_norm,
             params=self._filter_base_params("curve", "tilt", base_params),
@@ -228,7 +230,7 @@ class DefaultMovementHandler:
         cycles: float,
         amplitude: float,
         frequency: float,
-        center: int,
+        center: float,
         base_norm: float,
         max_amplitude_norm: float,
         params: dict[str, Any] | None = None,

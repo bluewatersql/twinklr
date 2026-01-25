@@ -14,6 +14,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from blinkb0t.core.config.poses import PanPose, TiltPose
+from blinkb0t.core.curves.library import CurveLibrary
 from blinkb0t.core.sequencer.models.enum import (
     AimZone,
     BlendMode,
@@ -21,6 +22,7 @@ from blinkb0t.core.sequencer.models.enum import (
     Intensity,
     QuantizeMode,
     SemanticGroupType,
+    TemplateCategory,
     TemplateRole,
     TimingMode,
     TransitionMode,
@@ -31,50 +33,22 @@ from blinkb0t.core.sequencer.moving_heads.libraries.movement import MovementType
 
 
 class RepeatMode(str, Enum):
-    """How to repeat template sections.
-
-    Attributes:
-        PING_PONG: Alternate forward and backward through steps.
-        JOINER: Play steps in sequence, then repeat from beginning.
-    """
-
     PING_PONG = "PING_PONG"
     JOINER = "JOINER"
 
 
 class RemainderPolicy(str, Enum):
-    """What to do when template duration doesn't divide evenly into repeats.
-
-    Attributes:
-        HOLD_LAST_POSE: Maintain the final pose until window ends.
-        FADE_OUT: Fade dimmer to zero over the remainder.
-        TRUNCATE: Cut off abruptly at the end of the last complete cycle.
-    """
-
     HOLD_LAST_POSE = "HOLD_LAST_POSE"
     FADE_OUT = "FADE_OUT"
     TRUNCATE = "TRUNCATE"
 
 
 class PhaseOffsetMode(str, Enum):
-    """How to apply phase offsets across fixtures.
-
-    Attributes:
-        NONE: No phase offset - all fixtures move in sync.
-        GROUP_ORDER: Apply offsets based on fixture order in a group.
-    """
-
     NONE = "NONE"
     GROUP_ORDER = "GROUP_ORDER"
 
 
 class Distribution(str, Enum):
-    """How to distribute phase offsets across fixtures.
-
-    Attributes:
-        LINEAR: Evenly distributed offsets (0, 0.25, 0.5, 0.75 for 4 fixtures).
-    """
-
     LINEAR = "LINEAR"
 
 
@@ -93,8 +67,8 @@ class BaseTiming(BaseModel):
     model_config = ConfigDict(extra="forbid")
     mode: TimingMode = TimingMode.MUSICAL
     quantize_type: QuantizeMode = QuantizeMode.DOWNBEAT
-    start_offset_bars: float = Field(..., ge=0.0)
-    duration_bars: float = Field(..., gt=0.0)
+    start_offset_bars: float
+    duration_bars: float
 
 
 class PhaseOffset(BaseModel):
@@ -144,11 +118,11 @@ class RepeatContract(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    repeatable: bool = Field(True)
-    mode: RepeatMode = Field(RepeatMode.PING_PONG)
-    cycle_bars: float = Field(..., gt=0.0)
+    repeatable: bool = True
+    mode: RepeatMode = RepeatMode.PING_PONG
+    cycle_bars: float
     loop_step_ids: list[str] = Field(default_factory=list)
-    remainder_policy: RemainderPolicy = Field(RemainderPolicy.HOLD_LAST_POSE)
+    remainder_policy: RemainderPolicy = RemainderPolicy.HOLD_LAST_POSE
 
     @model_validator(mode="after")
     def _validate_loop_step_ids(self) -> "RepeatContract":
@@ -183,7 +157,7 @@ class Geometry(BaseModel):
     params: dict[str, Any] = Field(default_factory=dict)
 
     # ROLE_POSE specific fields
-    pan_pose_by_role: dict[TemplateRole, PanPose] | None = Field(None)
+    pan_pose_by_role: dict[TemplateRole, PanPose] | None = None
     tilt_pose: TiltPose = TiltPose.HORIZON
     aim_zone: AimZone = AimZone.HORIZON
 
@@ -205,7 +179,7 @@ class Movement(BaseModel):
 
     movement_type: MovementType = MovementType.NONE
     intensity: Intensity = Intensity.SMOOTH
-    cycles: float = Field(1.0, gt=0.0)
+    cycles: float = 1.0
     params: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -227,9 +201,9 @@ class Dimmer(BaseModel):
 
     dimmer_type: DimmerType = DimmerType.NONE
     intensity: Intensity = Intensity.SMOOTH
-    min_norm: float = Field(0.0, ge=0.0, le=1.0)
-    max_norm: float = Field(1.0, ge=0.0, le=1.0)
-    cycles: float = Field(1.0, gt=0.0)
+    min_norm: float = 0.0
+    max_norm: float = 1.0
+    cycles: float = 1.0
     params: dict[str, Any] = Field(default_factory=dict)
 
     @model_validator(mode="after")
@@ -272,8 +246,8 @@ class Transition(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     mode: TransitionMode = TransitionMode.CROSSFADE
-    duration_bars: float = Field(0.0, ge=0.0)
-    curve: str = Field("sine", min_length=1)
+    duration_bars: float = 0.0
+    curve: CurveLibrary = CurveLibrary.LINEAR
 
 
 class TemplateStep(BaseModel):
@@ -301,8 +275,8 @@ class TemplateStep(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    step_id: str = Field(..., min_length=1)
-    target: SemanticGroupType = Field(SemanticGroupType.ALL)
+    step_id: str
+    target: SemanticGroupType = SemanticGroupType.ALL
     timing: StepTiming
     geometry: Geometry
     movement: Movement
@@ -333,8 +307,8 @@ class TemplateMetadata(BaseModel):
 
     tags: list[str] = Field(default_factory=list)
     recommended_sections: list[str] = Field(default_factory=list)
-    energy_range: tuple[int, int] | None = Field(None)
-    description: str | None = Field(None)
+    energy_range: tuple[int, int] | None = None
+    description: str | None = None
 
 
 class StepPatch(BaseModel):
@@ -351,10 +325,10 @@ class StepPatch(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    geometry: dict[str, Any] | None = Field(None)
-    movement: dict[str, Any] | None = Field(None)
-    dimmer: dict[str, Any] | None = Field(None)
-    timing: dict[str, Any] | None = Field(None)
+    geometry: dict[str, Any] | None = None
+    movement: dict[str, Any] | None = None
+    dimmer: dict[str, Any] | None = None
+    timing: dict[str, Any] | None = None
 
 
 class TemplatePreset(BaseModel):
@@ -372,8 +346,8 @@ class TemplatePreset(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    preset_id: str = Field(..., min_length=1)
-    name: str = Field(..., min_length=1)
+    preset_id: str
+    name: str
     defaults: dict[str, Any] = Field(default_factory=dict)
     step_patches: dict[str, StepPatch] = Field(default_factory=dict)
 
@@ -399,18 +373,16 @@ class Template(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    template_id: str = Field(..., min_length=1)
-    version: int = Field(..., ge=1)
-    name: str = Field(..., min_length=1)
-    category: str = Field(..., min_length=1)
+    template_id: str
+    version: int
+    name: str
+    category: TemplateCategory
 
-    roles: list[str] = Field(..., min_length=1)
-    groups: dict[str, list[str]] = Field(..., min_length=1)
-
+    roles: list[TemplateRole] = Field(default_factory=list)
     repeat: RepeatContract
     defaults: dict[str, Any] = Field(default_factory=dict)
-    steps: list["TemplateStep"] = Field(..., min_length=1)
-    metadata: TemplateMetadata | None = Field(default=None)
+    steps: list["TemplateStep"] = Field(default_factory=list)
+    metadata: TemplateMetadata | None = None
 
     @model_validator(mode="before")
     @classmethod
@@ -432,7 +404,7 @@ class Template(BaseModel):
 
         # Validate step targets reference existing groups
         for step in self.steps:
-            if step.target not in self.groups:
+            if step.target not in list(SemanticGroupType):
                 raise ValueError(f"Step '{step.step_id}' targets unknown group: '{step.target}'")
 
         return self

@@ -22,13 +22,6 @@ class PhaseOffsetResult(BaseModel):
         offsets: Mapping of fixture_id to offset in bars.
         spread_bars: The spread value from the configuration.
         wrap: Whether offsets should wrap at cycle boundaries.
-
-    Example:
-        >>> result = PhaseOffsetResult(
-        ...     offsets={"f1": 0.0, "f2": 0.25},
-        ...     spread_bars=0.5,
-        ...     wrap=True,
-        ... )
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -76,16 +69,6 @@ def calculate_fixture_offsets(
 
     Returns:
         PhaseOffsetResult with offset for each fixture.
-
-    Example:
-        >>> config = PhaseOffset(
-        ...     mode=PhaseOffsetMode.GROUP_ORDER,
-        ...     group="fronts",
-        ...     spread_bars=1.0,
-        ... )
-        >>> result = calculate_fixture_offsets(config, ["f1", "f2", "f3", "f4"])
-        >>> result.offsets["f2"]  # Second fixture gets 1/3 of spread
-        0.333...
     """
     if not fixture_ids:
         return PhaseOffsetResult(
@@ -156,12 +139,6 @@ def calculate_normalized_offset(
 
     Returns:
         Normalized offset.
-
-    Example:
-        >>> calculate_normalized_offset(0.5, 4.0)  # 0.5 bars in 4 bar step
-        0.125
-        >>> calculate_normalized_offset(5.0, 4.0, wrap=True)  # Wraps
-        0.25
     """
     if step_duration_bars <= 0:
         return 0.0

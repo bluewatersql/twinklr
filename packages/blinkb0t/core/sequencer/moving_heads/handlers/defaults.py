@@ -64,34 +64,10 @@ from blinkb0t.core.sequencer.moving_heads.handlers.registry import (
 def create_default_geometry_registry() -> GeometryRegistry:
     """Create a geometry registry with default handlers.
 
-    Includes commonly used geometry patterns:
-    - ROLE_POSE: Maps role tokens to base poses
-    - NONE: Returns center position
-    - FAN: Fan spread formation
-    - CHEVRON_V: V-shaped chevron pattern
-    - SCATTERED_CHAOS: Randomized positions
-    - AUDIENCE_SCAN: Symmetric audience spread
-    - AUDIENCE_SCAN_ASYM: Asymmetric audience spread
-    - ALTERNATING_UPDOWN: Alternating up/down tilt positions
-    - CENTER_OUT: Center-outward radiating pattern
-    - MIRROR_LR: Left/right mirror symmetry
-    - RAINBOW_ARC: Rainbow arc formation
-    - ROLE_POSE_TILT_BIAS: Role-based pan with group tilt bias
-    - TILT_BIAS_BY_GROUP: Constant pan with group tilt offsets
-    - SPOTLIGHT_CLUSTER: Converging beams to focal point
-    - TUNNEL_CONE: Circular overhead cone pattern
-    - WALL_WASH: Unified parallel beams
-    - WAVE_LR: Sequential wave progression left-to-right
-    - X_CROSS: Diagonal crossing pattern
-
     Uses RolePoseHandler as default fallback for unimplemented geometry types.
 
     Returns:
         GeometryRegistry with handlers registered.
-
-    Example:
-        >>> registry = create_default_geometry_registry()
-        >>> handler = registry.get("FAN")
     """
     registry = GeometryRegistry()
 
@@ -131,13 +107,6 @@ def create_default_movement_registry() -> MovementRegistry:
     This provides automatic support for all 29 movement patterns without
     requiring individual handler implementations.
 
-    Supported movements include:
-    - SWEEP_LR, SWEEP_UD: Horizontal/vertical sweeps
-    - CIRCLE, FIGURE8, INFINITY: Parametric patterns
-    - HOLD, NONE: Static positions
-    - PAN_SHAKE, TILT_ROCK, BOUNCE, PENDULUM: Oscillations
-    - And 20+ more patterns from MovementLibrary
-
     Returns:
         MovementRegistry with default handler registered.
     """
@@ -153,13 +122,6 @@ def create_default_dimmer_registry() -> DimmerRegistry:
     Uses DefaultDimmerHandler which looks up patterns from DimmerLibrary.
     This provides automatic support for all dimmer patterns without
     requiring individual handler implementations.
-
-    Supported dimmers include:
-    - FADE_IN: Linear fade from min to max
-    - FADE_OUT: Linear fade from max to min
-    - PULSE: Sinusoidal pulsing effect
-    - HOLD: Constant brightness
-    - NONE: Zero brightness (lights off)
 
     Returns:
         DimmerRegistry with default handler registered.

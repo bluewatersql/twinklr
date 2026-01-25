@@ -84,8 +84,13 @@ class DimmerResult(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
+    dimmer_curve_type: CurveLibrary
     dimmer_curve: list[CurvePoint] | None = None
     dimmer_static_dmx: int | None = None
+    intensity: Intensity
+    min_intensity: int
+    max_intensity: int
+    period: float
 
 
 # =============================================================================

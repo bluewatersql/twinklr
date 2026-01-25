@@ -14,9 +14,11 @@ from blinkb0t.core.curves.models import CurvePoint
 from blinkb0t.core.curves.semantics import CurveKind
 from blinkb0t.core.sequencer.models.enum import Intensity
 from blinkb0t.core.sequencer.moving_heads.handlers.protocols import DimmerResult
+from blinkb0t.core.sequencer.moving_heads.libraries.dimmer import DEFAULT_DIMMER_PARAMS
+from blinkb0t.core.utils.logging import get_renderer_logger, log_performance
 
 logger = logging.getLogger(__name__)
-renderer_log = logging.getLogger("DMX_MH_RENDER")
+renderer_log = get_renderer_logger()
 
 
 class DefaultDimmerHandler:
@@ -42,6 +44,7 @@ class DefaultDimmerHandler:
         """Initialize default handler with curve generator."""
         self._curve_gen = CurveGenerator()
 
+    @log_performance
     def generate(
         self,
         params: dict[str, Any],
@@ -74,6 +77,15 @@ class DefaultDimmerHandler:
                 "Handler is not correctly configured. 'dimmer_pattern' is missing from params."
             )
 
+        categorical_params_set = pattern.categorical_params or DEFAULT_DIMMER_PARAMS
+        categorical_params = (
+            categorical_params_set[intensity]
+            if intensity in categorical_params_set
+            else DEFAULT_DIMMER_PARAMS[Intensity.SMOOTH]
+        )
+        renderer_log.info(f"Categorical Params: {categorical_params}")
+        renderer_log.info(f"Intensity: {intensity}")
+
         calibration = params.get("calibration", {})
         dimmer_min = calibration.get("dimmer_floor_dmx", 0) if calibration else 0
         dimmer_max = calibration.get("dimmer_ceiling_dmx", 255) if calibration else 255
@@ -82,32 +94,39 @@ class DefaultDimmerHandler:
         renderer_log.info(f"Dimmer Min: {dimmer_min}, Dimmer Max: {dimmer_max}")
         renderer_log.info(f"Dimmer Amplitude DMX: {dimmer_amplitude_dmx}")
 
-        # Get categorical params for intensity
-        if intensity not in pattern.categorical_params:
-            # Fall back to SMOOTH if intensity not defined
-            intensity = Intensity.SMOOTH
-
-        cat_params = pattern.categorical_params[intensity]
-
         # Generate dimmer curve
         if pattern.curve == CurveLibrary.HOLD:
             dimmer_floor_dmx = calibration.get("dimmer_floor_dmx", 0) if calibration else 0
             dimmer_ceiling_dmx = calibration.get("dimmer_ceiling_dmx", 255) if calibration else 255
             dimmer_static_dmx = self._resolve_static_dmx_value(
-                cat_params.max_intensity, dimmer_floor_dmx, dimmer_ceiling_dmx
+                categorical_params.max_intensity, dimmer_floor_dmx, dimmer_ceiling_dmx
             )
 
-            return DimmerResult(dimmer_static_dmx=dimmer_static_dmx)
+            return DimmerResult(
+                dimmer_static_dmx=dimmer_static_dmx,
+                dimmer_curve_type=pattern.curve,
+                intensity=intensity,
+                min_intensity=categorical_params.min_intensity,
+                max_intensity=categorical_params.max_intensity,
+                period=categorical_params.period,
+            )
         else:
             dimmer_curve = self._generate_curve(
                 curve_type=pattern.curve,
                 n_samples=n_samples,
-                min_intensity=cat_params.min_intensity,
-                max_intensity=cat_params.max_intensity,
+                min_intensity=categorical_params.min_intensity,
+                max_intensity=categorical_params.max_intensity,
                 min_norm=min_norm,
                 max_norm=max_norm,
             )
-            return DimmerResult(dimmer_curve=dimmer_curve)
+            return DimmerResult(
+                dimmer_curve=dimmer_curve,
+                dimmer_curve_type=pattern.curve,
+                intensity=intensity,
+                min_intensity=categorical_params.min_intensity,
+                max_intensity=categorical_params.max_intensity,
+                period=categorical_params.period,
+            )
 
     def _resolve_static_dmx_value(
         self, normalized_value: float, clamp_min: int = 0, clamp_max: int = 255

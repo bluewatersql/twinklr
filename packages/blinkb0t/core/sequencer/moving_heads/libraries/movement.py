@@ -16,7 +16,9 @@ class MovementCategoricalParams(BaseModel):
 
     amplitude: float = Field(ge=0.0, le=1.0, description="Movement amplitude [0,1]")
     frequency: float = Field(ge=0.0, le=10.0, description="Movement frequency [0,10]")
-    center: int = Field(default=128, ge=0, le=255, description="Center DMX value")
+    center_offset: float = Field(
+        default=0.5, ge=0.0, le=1.0, description="Movement center offset [0,1]"
+    )
 
 
 class MovementFlags(BaseModel):
@@ -37,7 +39,7 @@ class MovementPattern(BaseModel):
     pan_curve: CurveLibrary
     base_tilt_curve: CurveLibrary
     base_params: dict[str, float | int | str] = Field(default_factory=dict)
-    categorical_params: dict[Intensity, MovementCategoricalParams]
+    categorical_params: dict[Intensity, MovementCategoricalParams] = Field(default_factory=dict)
     flags: MovementFlags = Field(default_factory=MovementFlags)
     geometry_modifiers: dict[GeometryType, CurveLibrary] = Field(default_factory=dict)
 
@@ -57,8 +59,11 @@ class MovementPattern(BaseModel):
 
 
 DEFAULT_MOVEMENT_PARAMS = {
-    Intensity.SMOOTH: MovementCategoricalParams(amplitude=0.3, frequency=0.5, center=128),
-    Intensity.DRAMATIC: MovementCategoricalParams(amplitude=0.65, frequency=1.5, center=128),
+    Intensity.SLOW: MovementCategoricalParams(amplitude=0.2, frequency=0.25, center_offset=0.5),
+    Intensity.SMOOTH: MovementCategoricalParams(amplitude=0.4, frequency=0.5, center_offset=0.5),
+    Intensity.DRAMATIC: MovementCategoricalParams(amplitude=0.65, frequency=1.5, center_offset=0.5),
+    Intensity.FAST: MovementCategoricalParams(amplitude=0.8, frequency=2.0, center_offset=0.5),
+    Intensity.INTENSE: MovementCategoricalParams(amplitude=1.0, frequency=3.0, center_offset=0.5),
 }
 
 
@@ -120,14 +125,6 @@ class MovementLibrary:
             base_tilt_curve=CurveLibrary.MOVEMENT_HOLD,
             base_params={"amplitude": 0.8, "center": 128, "frequency": 1.0},
             geometry_modifiers={GeometryType.SCATTERED_CHAOS: CurveLibrary.MOVEMENT_PERLIN_NOISE},
-            categorical_params={
-                Intensity.SMOOTH: MovementCategoricalParams(
-                    amplitude=0.3, frequency=0.5, center=128
-                ),
-                Intensity.DRAMATIC: MovementCategoricalParams(
-                    amplitude=0.6, frequency=1.25, center=128
-                ),
-            },
         ),
         MovementType.SWEEP_UD: MovementPattern(
             id="sweep_ud",
@@ -135,14 +132,8 @@ class MovementLibrary:
             description="Smooth vertical sweep across the performance space",
             pan_curve=CurveLibrary.MOVEMENT_HOLD,
             base_tilt_curve=CurveLibrary.MOVEMENT_TRIANGLE,
-            base_params={"amplitude": 0.6, "center": 128, "frequency": 1.0},
             categorical_params={
-                Intensity.SMOOTH: MovementCategoricalParams(
-                    amplitude=0.3, frequency=0.5, center=128
-                ),
-                Intensity.DRAMATIC: MovementCategoricalParams(
-                    amplitude=0.6, frequency=1.25, center=128
-                ),
+                Intensity.SMOOTH: MovementCategoricalParams(amplitude=0.6, frequency=1.0),
             },
         ),
         MovementType.CIRCLE: MovementPattern(
@@ -151,14 +142,8 @@ class MovementLibrary:
             description="Pan and tilt coordinated for circular path",
             pan_curve=CurveLibrary.MOVEMENT_SINE,
             base_tilt_curve=CurveLibrary.MOVEMENT_COSINE,
-            base_params={"amplitude": 0.7, "frequency": 1.0, "center": 128},
             categorical_params={
-                Intensity.SMOOTH: MovementCategoricalParams(
-                    amplitude=0.3, frequency=0.5, center=128
-                ),
-                Intensity.DRAMATIC: MovementCategoricalParams(
-                    amplitude=0.6, frequency=1.25, center=128
-                ),
+                Intensity.SMOOTH: MovementCategoricalParams(amplitude=0.7, frequency=1.0),
             },
         ),
         MovementType.FIGURE8: MovementPattern(
@@ -168,19 +153,11 @@ class MovementLibrary:
             pan_curve=CurveLibrary.MOVEMENT_LISSAJOUS,
             base_tilt_curve=CurveLibrary.MOVEMENT_LISSAJOUS,
             base_params={
-                "amplitude": 0.7,
-                "frequency": 1.0,
-                "center": 128,
                 "curve_tilt_b": 2,
                 "curve_tilt_delta": math.pi / 2,
             },
             categorical_params={
-                Intensity.SMOOTH: MovementCategoricalParams(
-                    amplitude=0.3, frequency=0.5, center=128
-                ),
-                Intensity.DRAMATIC: MovementCategoricalParams(
-                    amplitude=0.6, frequency=1.25, center=128
-                ),
+                Intensity.SMOOTH: MovementCategoricalParams(amplitude=0.7, frequency=1.0),
             },
         ),
         MovementType.INFINITY: MovementPattern(
@@ -189,14 +166,9 @@ class MovementLibrary:
             description="Infinity/figure-8 pattern",
             pan_curve=CurveLibrary.MOVEMENT_LISSAJOUS,
             base_tilt_curve=CurveLibrary.MOVEMENT_LISSAJOUS,
-            base_params={},
             categorical_params={
-                Intensity.SMOOTH: MovementCategoricalParams(
-                    amplitude=0.3, frequency=0.5, center=128
-                ),
-                Intensity.DRAMATIC: MovementCategoricalParams(
-                    amplitude=0.525, frequency=0.95, center=128
-                ),
+                Intensity.SMOOTH: MovementCategoricalParams(amplitude=0.3, frequency=0.5),
+                Intensity.DRAMATIC: MovementCategoricalParams(amplitude=0.525, frequency=0.95),
             },
         ),
         MovementType.HOLD: MovementPattern(
@@ -205,15 +177,6 @@ class MovementLibrary:
             description="Maintain current position (no movement)",
             pan_curve=CurveLibrary.MOVEMENT_HOLD,
             base_tilt_curve=CurveLibrary.MOVEMENT_HOLD,
-            base_params={},
-            categorical_params={
-                Intensity.SMOOTH: MovementCategoricalParams(
-                    amplitude=0.0, frequency=0.0, center=128
-                ),
-                Intensity.DRAMATIC: MovementCategoricalParams(
-                    amplitude=0.0, frequency=0.0, center=128
-                ),
-            },
         ),
         MovementType.RANDOM_WALK: MovementPattern(
             id="random_walk",
@@ -221,14 +184,9 @@ class MovementLibrary:
             description="Organic random movement",
             pan_curve=CurveLibrary.MOVEMENT_PERLIN_NOISE,
             base_tilt_curve=CurveLibrary.MOVEMENT_PERLIN_NOISE,
-            base_params={},
             categorical_params={
-                Intensity.SMOOTH: MovementCategoricalParams(
-                    amplitude=0.2, frequency=0.3, center=128
-                ),
-                Intensity.DRAMATIC: MovementCategoricalParams(
-                    amplitude=0.425, frequency=0.75, center=128
-                ),
+                Intensity.SMOOTH: MovementCategoricalParams(amplitude=0.2, frequency=0.3),
+                Intensity.DRAMATIC: MovementCategoricalParams(amplitude=0.425, frequency=0.75),
             },
         ),
         # ============================================================================
@@ -240,15 +198,10 @@ class MovementLibrary:
             description="Horizontal shake/vibrate",
             pan_curve=CurveLibrary.MOVEMENT_TRIANGLE,
             base_tilt_curve=CurveLibrary.MOVEMENT_HOLD,
-            base_params={},
             geometry_modifiers={GeometryType.SCATTERED_CHAOS: CurveLibrary.MOVEMENT_PERLIN_NOISE},
             categorical_params={
-                Intensity.SMOOTH: MovementCategoricalParams(
-                    amplitude=0.15, frequency=2.0, center=128
-                ),
-                Intensity.DRAMATIC: MovementCategoricalParams(
-                    amplitude=0.32, frequency=4.25, center=128
-                ),
+                Intensity.SMOOTH: MovementCategoricalParams(amplitude=0.15, frequency=2.0),
+                Intensity.DRAMATIC: MovementCategoricalParams(amplitude=0.32, frequency=4.25),
             },
         ),
         MovementType.TILT_ROCK: MovementPattern(
@@ -257,14 +210,9 @@ class MovementLibrary:
             description="Vertical rocking motion",
             pan_curve=CurveLibrary.MOVEMENT_HOLD,
             base_tilt_curve=CurveLibrary.MOVEMENT_SINE,
-            base_params={},
             categorical_params={
-                Intensity.SMOOTH: MovementCategoricalParams(
-                    amplitude=0.2, frequency=0.5, center=128
-                ),
-                Intensity.DRAMATIC: MovementCategoricalParams(
-                    amplitude=0.39, frequency=1.05, center=128
-                ),
+                Intensity.SMOOTH: MovementCategoricalParams(amplitude=0.2, frequency=0.5),
+                Intensity.DRAMATIC: MovementCategoricalParams(amplitude=0.39, frequency=1.05),
             },
         ),
         MovementType.BOUNCE: MovementPattern(
@@ -273,14 +221,9 @@ class MovementLibrary:
             description="Bouncing motion with decay",
             pan_curve=CurveLibrary.MOVEMENT_TRIANGLE,
             base_tilt_curve=CurveLibrary.MOVEMENT_TRIANGLE,
-            base_params={},
             categorical_params={
-                Intensity.SMOOTH: MovementCategoricalParams(
-                    amplitude=0.3, frequency=0.8, center=128
-                ),
-                Intensity.DRAMATIC: MovementCategoricalParams(
-                    amplitude=0.525, frequency=1.65, center=128
-                ),
+                Intensity.SMOOTH: MovementCategoricalParams(amplitude=0.3, frequency=0.8),
+                Intensity.DRAMATIC: MovementCategoricalParams(amplitude=0.525, frequency=1.65),
             },
         ),
         MovementType.PENDULUM: MovementPattern(
@@ -289,15 +232,10 @@ class MovementLibrary:
             description="Pendulum swing motion",
             pan_curve=CurveLibrary.MOVEMENT_SINE,
             base_tilt_curve=CurveLibrary.MOVEMENT_HOLD,
-            base_params={},
             geometry_modifiers={GeometryType.SCATTERED_CHAOS: CurveLibrary.MOVEMENT_PERLIN_NOISE},
             categorical_params={
-                Intensity.SMOOTH: MovementCategoricalParams(
-                    amplitude=0.3, frequency=0.3, center=128
-                ),
-                Intensity.DRAMATIC: MovementCategoricalParams(
-                    amplitude=0.485, frequency=0.75, center=128
-                ),
+                Intensity.SMOOTH: MovementCategoricalParams(amplitude=0.3, frequency=0.3),
+                Intensity.DRAMATIC: MovementCategoricalParams(amplitude=0.485, frequency=0.75),
             },
         ),
         MovementType.TILT_BOUNCE: MovementPattern(
@@ -306,14 +244,8 @@ class MovementLibrary:
             description="Vertical bounce (trampoline, stomp)",
             pan_curve=CurveLibrary.MOVEMENT_HOLD,
             base_tilt_curve=CurveLibrary.MOVEMENT_TRIANGLE,
-            base_params={"amplitude": 0.8, "center": 128, "frequency": 1.0},
             categorical_params={
-                Intensity.SMOOTH: MovementCategoricalParams(
-                    amplitude=0.3, frequency=0.5, center=128
-                ),
-                Intensity.DRAMATIC: MovementCategoricalParams(
-                    amplitude=0.6, frequency=1.25, center=128
-                ),
+                Intensity.SMOOTH: MovementCategoricalParams(amplitude=0.8, frequency=1.0),
             },
         ),
         MovementType.GROOVE_SWAY: MovementPattern(
@@ -322,14 +254,8 @@ class MovementLibrary:
             description="Subtle organic sway (breathing)",
             pan_curve=CurveLibrary.MOVEMENT_PERLIN_NOISE,
             base_tilt_curve=CurveLibrary.MOVEMENT_PERLIN_NOISE,
-            base_params={"amplitude": 0.5, "center": 128, "frequency": 0.8},
             categorical_params={
-                Intensity.SMOOTH: MovementCategoricalParams(
-                    amplitude=0.3, frequency=0.5, center=128
-                ),
-                Intensity.DRAMATIC: MovementCategoricalParams(
-                    amplitude=0.6, frequency=1.25, center=128
-                ),
+                Intensity.SMOOTH: MovementCategoricalParams(amplitude=0.5, frequency=0.8),
             },
         ),
         MovementType.TRAMPOLINE: MovementPattern(
@@ -338,14 +264,8 @@ class MovementLibrary:
             description="Gentle bounce (floating)",
             pan_curve=CurveLibrary.MOVEMENT_HOLD,
             base_tilt_curve=CurveLibrary.MOVEMENT_TRIANGLE,
-            base_params={"amplitude": 0.7, "center": 128, "frequency": 1.0},
             categorical_params={
-                Intensity.SMOOTH: MovementCategoricalParams(
-                    amplitude=0.3, frequency=0.5, center=128
-                ),
-                Intensity.DRAMATIC: MovementCategoricalParams(
-                    amplitude=0.6, frequency=1.25, center=128
-                ),
+                Intensity.SMOOTH: MovementCategoricalParams(amplitude=0.7, frequency=1.0),
             },
         ),
         # ============================================================================
@@ -357,15 +277,10 @@ class MovementLibrary:
             description="Sharp snap to accent beat",
             pan_curve=CurveLibrary.MOVEMENT_HOLD,
             base_tilt_curve=CurveLibrary.MOVEMENT_HOLD,
-            base_params={},
             geometry_modifiers={GeometryType.SCATTERED_CHAOS: CurveLibrary.MOVEMENT_PERLIN_NOISE},
             categorical_params={
-                Intensity.SMOOTH: MovementCategoricalParams(
-                    amplitude=0.4, frequency=0.5, center=128
-                ),
-                Intensity.DRAMATIC: MovementCategoricalParams(
-                    amplitude=0.625, frequency=1.05, center=128
-                ),
+                Intensity.SMOOTH: MovementCategoricalParams(amplitude=0.4, frequency=0.5),
+                Intensity.DRAMATIC: MovementCategoricalParams(amplitude=0.625, frequency=1.05),
             },
         ),
         MovementType.POP_LOCK: MovementPattern(
@@ -374,14 +289,9 @@ class MovementLibrary:
             description="Sharp snap to positions",
             pan_curve=CurveLibrary.MOVEMENT_PULSE,
             base_tilt_curve=CurveLibrary.MOVEMENT_PULSE,
-            base_params={},
             categorical_params={
-                Intensity.SMOOTH: MovementCategoricalParams(
-                    amplitude=0.3, frequency=1.0, center=128
-                ),
-                Intensity.DRAMATIC: MovementCategoricalParams(
-                    amplitude=0.525, frequency=2.15, center=128
-                ),
+                Intensity.SMOOTH: MovementCategoricalParams(amplitude=0.3, frequency=1.0),
+                Intensity.DRAMATIC: MovementCategoricalParams(amplitude=0.525, frequency=2.15),
             },
         ),
         MovementType.LASER_SNAP: MovementPattern(
@@ -390,14 +300,8 @@ class MovementLibrary:
             description="Quick precise repositions",
             pan_curve=CurveLibrary.MOVEMENT_TRIANGLE,
             base_tilt_curve=CurveLibrary.MOVEMENT_TRIANGLE,
-            base_params={"amplitude": 0.8, "center": 128, "frequency": 2.0},
             categorical_params={
-                Intensity.SMOOTH: MovementCategoricalParams(
-                    amplitude=0.3, frequency=0.5, center=128
-                ),
-                Intensity.DRAMATIC: MovementCategoricalParams(
-                    amplitude=0.6, frequency=1.25, center=128
-                ),
+                Intensity.SMOOTH: MovementCategoricalParams(amplitude=0.8, frequency=2.0),
             },
         ),
         MovementType.HIT: MovementPattern(
@@ -414,12 +318,8 @@ class MovementLibrary:
                 "return_time_ms": 150,
             },
             categorical_params={
-                Intensity.SMOOTH: MovementCategoricalParams(
-                    amplitude=0.5, frequency=0.3, center=128
-                ),
-                Intensity.DRAMATIC: MovementCategoricalParams(
-                    amplitude=0.775, frequency=0.75, center=128
-                ),
+                Intensity.SMOOTH: MovementCategoricalParams(amplitude=0.5, frequency=0.3),
+                Intensity.DRAMATIC: MovementCategoricalParams(amplitude=0.775, frequency=0.75),
             },
         ),
         MovementType.STOMP: MovementPattern(
@@ -428,14 +328,8 @@ class MovementLibrary:
             description="Heavy downward hits",
             pan_curve=CurveLibrary.MOVEMENT_HOLD,
             base_tilt_curve=CurveLibrary.MOVEMENT_TRIANGLE,
-            base_params={"amplitude": 0.8, "center": 128, "frequency": 1.0},
             categorical_params={
-                Intensity.SMOOTH: MovementCategoricalParams(
-                    amplitude=0.3, frequency=0.5, center=128
-                ),
-                Intensity.DRAMATIC: MovementCategoricalParams(
-                    amplitude=0.6, frequency=1.25, center=128
-                ),
+                Intensity.SMOOTH: MovementCategoricalParams(amplitude=0.8, frequency=1.0),
             },
         ),
         # ============================================================================
@@ -447,15 +341,10 @@ class MovementLibrary:
             description="Horizontal wave across fixtures",
             pan_curve=CurveLibrary.MOVEMENT_SINE,
             base_tilt_curve=CurveLibrary.MOVEMENT_HOLD,
-            base_params={},
             geometry_modifiers={GeometryType.SCATTERED_CHAOS: CurveLibrary.MOVEMENT_PERLIN_NOISE},
             categorical_params={
-                Intensity.SMOOTH: MovementCategoricalParams(
-                    amplitude=0.4, frequency=0.5, center=128
-                ),
-                Intensity.DRAMATIC: MovementCategoricalParams(
-                    amplitude=0.565, frequency=1.05, center=128
-                ),
+                Intensity.SMOOTH: MovementCategoricalParams(amplitude=0.4, frequency=0.5),
+                Intensity.DRAMATIC: MovementCategoricalParams(amplitude=0.565, frequency=1.05),
             },
         ),
         MovementType.WAVE_VERTICAL: MovementPattern(
@@ -464,14 +353,9 @@ class MovementLibrary:
             description="Vertical wave across fixtures",
             pan_curve=CurveLibrary.MOVEMENT_HOLD,
             base_tilt_curve=CurveLibrary.MOVEMENT_SINE,
-            base_params={},
             categorical_params={
-                Intensity.SMOOTH: MovementCategoricalParams(
-                    amplitude=0.4, frequency=0.5, center=128
-                ),
-                Intensity.DRAMATIC: MovementCategoricalParams(
-                    amplitude=0.55, frequency=1.05, center=128
-                ),
+                Intensity.SMOOTH: MovementCategoricalParams(amplitude=0.4, frequency=0.5),
+                Intensity.DRAMATIC: MovementCategoricalParams(amplitude=0.55, frequency=1.05),
             },
         ),
         MovementType.ZIGZAG: MovementPattern(
@@ -480,14 +364,9 @@ class MovementLibrary:
             description="Sharp angular zigzag motion",
             pan_curve=CurveLibrary.MOVEMENT_TRIANGLE,
             base_tilt_curve=CurveLibrary.MOVEMENT_TRIANGLE,
-            base_params={},
             categorical_params={
-                Intensity.SMOOTH: MovementCategoricalParams(
-                    amplitude=0.4, frequency=1.0, center=128
-                ),
-                Intensity.DRAMATIC: MovementCategoricalParams(
-                    amplitude=0.59, frequency=1.75, center=128
-                ),
+                Intensity.SMOOTH: MovementCategoricalParams(amplitude=0.4, frequency=1.0),
+                Intensity.DRAMATIC: MovementCategoricalParams(amplitude=0.59, frequency=1.75),
             },
         ),
         MovementType.SPIRAL: MovementPattern(
@@ -496,14 +375,9 @@ class MovementLibrary:
             description="Spiral pattern with varying radius",
             pan_curve=CurveLibrary.LISSAJOUS,
             base_tilt_curve=CurveLibrary.LISSAJOUS,
-            base_params={},
             categorical_params={
-                Intensity.SMOOTH: MovementCategoricalParams(
-                    amplitude=0.3, frequency=0.4, center=128
-                ),
-                Intensity.DRAMATIC: MovementCategoricalParams(
-                    amplitude=0.525, frequency=0.85, center=128
-                ),
+                Intensity.SMOOTH: MovementCategoricalParams(amplitude=0.3, frequency=0.4),
+                Intensity.DRAMATIC: MovementCategoricalParams(amplitude=0.525, frequency=0.85),
             },
         ),
         MovementType.DIAGONAL_SWEEP: MovementPattern(
@@ -512,14 +386,9 @@ class MovementLibrary:
             description="Diagonal sweep motion",
             pan_curve=CurveLibrary.MOVEMENT_SINE,
             base_tilt_curve=CurveLibrary.MOVEMENT_SINE,
-            base_params={},
             categorical_params={
-                Intensity.SMOOTH: MovementCategoricalParams(
-                    amplitude=0.4, frequency=0.5, center=128
-                ),
-                Intensity.DRAMATIC: MovementCategoricalParams(
-                    amplitude=0.59, frequency=1.05, center=128
-                ),
+                Intensity.SMOOTH: MovementCategoricalParams(amplitude=0.4, frequency=0.5),
+                Intensity.DRAMATIC: MovementCategoricalParams(amplitude=0.59, frequency=1.05),
             },
         ),
         MovementType.CORNER_TO_CORNER: MovementPattern(
@@ -528,14 +397,9 @@ class MovementLibrary:
             description="Corner-to-corner movement",
             pan_curve=CurveLibrary.MOVEMENT_SINE,
             base_tilt_curve=CurveLibrary.MOVEMENT_SINE,
-            base_params={},
             categorical_params={
-                Intensity.SMOOTH: MovementCategoricalParams(
-                    amplitude=0.5, frequency=0.4, center=128
-                ),
-                Intensity.DRAMATIC: MovementCategoricalParams(
-                    amplitude=0.685, frequency=0.85, center=128
-                ),
+                Intensity.SMOOTH: MovementCategoricalParams(amplitude=0.5, frequency=0.4),
+                Intensity.DRAMATIC: MovementCategoricalParams(amplitude=0.685, frequency=0.85),
             },
         ),
         MovementType.DUAL_SWEEP: MovementPattern(
@@ -544,14 +408,9 @@ class MovementLibrary:
             description="Dual-axis simultaneous sweep",
             pan_curve=CurveLibrary.MOVEMENT_SINE,
             base_tilt_curve=CurveLibrary.MOVEMENT_SINE,
-            base_params={},
             categorical_params={
-                Intensity.SMOOTH: MovementCategoricalParams(
-                    amplitude=0.4, frequency=0.5, center=128
-                ),
-                Intensity.DRAMATIC: MovementCategoricalParams(
-                    amplitude=0.59, frequency=1.05, center=128
-                ),
+                Intensity.SMOOTH: MovementCategoricalParams(amplitude=0.4, frequency=0.5),
+                Intensity.DRAMATIC: MovementCategoricalParams(amplitude=0.59, frequency=1.05),
             },
         ),
         MovementType.FAN_IRIS: MovementPattern(
@@ -560,14 +419,8 @@ class MovementLibrary:
             description="Progressive fan expansion/collapse",
             pan_curve=CurveLibrary.MOVEMENT_LINEAR,
             base_tilt_curve=CurveLibrary.MOVEMENT_LINEAR,
-            base_params={"amplitude": 0.8, "center": 128, "frequency": 1.0},
             categorical_params={
-                Intensity.SMOOTH: MovementCategoricalParams(
-                    amplitude=0.3, frequency=0.5, center=128
-                ),
-                Intensity.DRAMATIC: MovementCategoricalParams(
-                    amplitude=0.6, frequency=1.25, center=128
-                ),
+                Intensity.SMOOTH: MovementCategoricalParams(amplitude=0.8, frequency=1.0),
             },
         ),
         MovementType.RADIAL_FAN: MovementPattern(
@@ -576,14 +429,8 @@ class MovementLibrary:
             description="Radial fan pattern",
             pan_curve=CurveLibrary.MOVEMENT_TRIANGLE,
             base_tilt_curve=CurveLibrary.MOVEMENT_TRIANGLE,
-            base_params={"amplitude": 0.8, "center": 128, "frequency": 1.0},
             categorical_params={
-                Intensity.SMOOTH: MovementCategoricalParams(
-                    amplitude=0.3, frequency=0.5, center=128
-                ),
-                Intensity.DRAMATIC: MovementCategoricalParams(
-                    amplitude=0.6, frequency=1.25, center=128
-                ),
+                Intensity.SMOOTH: MovementCategoricalParams(amplitude=0.8, frequency=1.0),
             },
         ),
         MovementType.CROSS_PATTERN: MovementPattern(
@@ -592,14 +439,9 @@ class MovementLibrary:
             description="X-pattern movement",
             pan_curve=CurveLibrary.LISSAJOUS,
             base_tilt_curve=CurveLibrary.LISSAJOUS,
-            base_params={},
             categorical_params={
-                Intensity.SMOOTH: MovementCategoricalParams(
-                    amplitude=0.4, frequency=0.6, center=128
-                ),
-                Intensity.DRAMATIC: MovementCategoricalParams(
-                    amplitude=0.565, frequency=1.1, center=128
-                ),
+                Intensity.SMOOTH: MovementCategoricalParams(amplitude=0.4, frequency=0.6),
+                Intensity.DRAMATIC: MovementCategoricalParams(amplitude=0.565, frequency=1.1),
             },
         ),
     }

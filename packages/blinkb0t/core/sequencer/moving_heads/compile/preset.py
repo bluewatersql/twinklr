@@ -1,12 +1,3 @@
-"""Preset Application for template compilation.
-
-This module provides functions to apply presets (parameter overrides)
-to templates using immutable deep merge operations.
-
-Presets allow variations of templates (e.g., "CHILL", "ENERGETIC")
-by overriding default values and step properties.
-"""
-
 from typing import Literal, overload
 
 from blinkb0t.core.sequencer.models.template import (
@@ -117,11 +108,6 @@ def apply_preset(
     Returns:
         If return_provenance is False: New Template with preset applied.
         If return_provenance is True: Tuple of (Template, provenance list).
-
-    Example:
-        >>> template = Template(...)
-        >>> preset = TemplatePreset(preset_id="CHILL", ...)
-        >>> patched = apply_preset(template, preset)
     """
     # Initialize provenance
     provenance: list[str] = list(base_provenance) if base_provenance else []
@@ -161,7 +147,6 @@ def apply_preset(
         name=template.name,
         category=template.category,
         roles=list(template.roles),
-        groups={k: list(v) for k, v in template.groups.items()},
         repeat=template.repeat,
         defaults=new_defaults,
         steps=new_steps,
