@@ -1,316 +1,260 @@
 {
   "sections": [
     {
-      "section_name": "verse_1",
+      "section_name": "verse_1_intro",
       "start_bar": 1,
       "end_bar": 21,
       "section_role": "verse",
-      "energy_level": 38,
+      "energy_level": 12,
+      "template_id": "wave_scattered_fade_in",
+      "preset_id": "CHILL",
+      "modifiers": {
+        "intensity": "low",
+        "color_note": "cool open, gradual reveal"
+      },
+      "reasoning": "Low-energy open: scattered fade-in builds presence without demanding attention; suits repeated 3/4 phrasing.",
+      "segments": null
+    },
+    {
+      "section_name": "chorus_1_tag",
+      "start_bar": 22,
+      "end_bar": 26,
+      "section_role": "chorus",
+      "energy_level": 35,
+      "template_id": "wave_fan_hold",
+      "preset_id": "MODERATE",
+      "modifiers": {
+        "look": "wider fan picture, minimal pulsing"
+      },
+      "reasoning": "First chorus is short—use a clear ‘open up’ moment via a held fan texture rather than jumping straight to heavy pulse vocabulary.",
+      "segments": null
+    },
+    {
+      "section_name": "verse_2_reset",
+      "start_bar": 27,
+      "end_bar": 42,
+      "section_role": "verse",
+      "energy_level": 10,
       "template_id": "inner_pendulum_breathe",
       "preset_id": "CHILL",
       "modifiers": {
-        "tilt_range": "compact",
-        "dimmer": "soft_breathe_3-4",
+        "movement_size": "small",
         "focus": "center-weighted"
       },
-      "reasoning": "Establishes the 3/4 sway immediately with a restrained pendulum and breathing dimmer—clear musical support without overstatement.",
+      "reasoning": "Energy drops back down: pendulum+breathe keeps motion musical and intimate, resetting contrast after the chorus tag.",
       "segments": null
     },
     {
-      "section_name": "chorus_1",
-      "start_bar": 22,
-      "end_bar": 42,
-      "section_role": "chorus",
-      "energy_level": 71,
-      "template_id": null,
-      "preset_id": null,
-      "modifiers": {},
-      "reasoning": "",
-      "segments": [
-        {
-          "segment_id": "A",
-          "start_bar": 22,
-          "end_bar": 29,
-          "template_id": "sweep_lr_chevron_breathe",
-          "preset_id": "MODERATE",
-          "modifiers": {
-            "width": "medium-wide",
-            "downbeat": "accent_bar1_each_2bars",
-            "ramp": "gradual_open"
-          },
-          "reasoning": "First chorus statement: chevron keeps structure while the breathe/ramp avoids a hard jump from verse."
-        },
-        {
-          "segment_id": "B",
-          "start_bar": 30,
-          "end_bar": 39,
-          "template_id": "sweep_lr_fan_pulse",
-          "preset_id": "ENERGETIC",
-          "modifiers": {
-            "width": "wide",
-            "accent": "strong_downbeat_every_bar",
-            "pulse_shape": "short_hit_long_tail"
-          },
-          "reasoning": "Main drive: fan pulse with explicit downbeat punctuation reads ‘3/4’ instead of generic even pulsing."
-        },
-        {
-          "segment_id": "C",
-          "start_bar": 40,
-          "end_bar": 42,
-          "template_id": "sweep_lr_continuous_phase",
-          "preset_id": "MODERATE",
-          "modifiers": {
-            "phase": "tighten_to_center",
-            "speed": "slightly_slower",
-            "handoff": "prep_next_section"
-          },
-          "reasoning": "2–3 bar handoff ramp into chorus_2: keeps LR motion but smooths intensity/geometry so the next impact lands cleanly."
-        }
-      ]
-    },
-    {
-      "section_name": "chorus_2",
+      "section_name": "verse_3_develop",
       "start_bar": 43,
-      "end_bar": 69,
-      "section_role": "chorus",
-      "energy_level": 97,
-      "template_id": null,
-      "preset_id": null,
-      "modifiers": {},
-      "reasoning": "",
-      "segments": [
-        {
-          "segment_id": "A",
-          "start_bar": 43,
-          "end_bar": 46,
-          "template_id": "sweep_lr_fan_hold",
-          "preset_id": "ENERGETIC",
-          "modifiers": {
-            "impact": "hard_on_bar1",
-            "hold": "visible_1beat_each_bar",
-            "width": "max"
-          },
-          "reasoning": "Addresses ‘impact shouldn’t immediately fade’: this gives a punchy arrival but with holds so the hit reads and stays present."
-        },
-        {
-          "segment_id": "B",
-          "start_bar": 47,
-          "end_bar": 60,
-          "template_id": "cascade_pulse_lr",
-          "preset_id": "ENERGETIC",
-          "modifiers": {
-            "cascade": "staggered_3-4",
-            "direction": "lr_emphasis",
-            "density": "high"
-          },
-          "reasoning": "High-energy engine room: cascading pulses create layered motion across 4 heads while still feeling directional (not random)."
-        },
-        {
-          "segment_id": "C",
-          "start_bar": 61,
-          "end_bar": 69,
-          "template_id": "wave_fan_hold",
-          "preset_id": "ENERGETIC",
-          "modifiers": {
-            "hold": "downbeat_freeze",
-            "wave": "broader",
-            "breath": "micro_swells"
-          },
-          "reasoning": "Sustain with phrasing: wave+holds keeps size and intensity but introduces clearer ‘bar-1 freeze’ punctuation for the 3/4 grid."
-        }
-      ]
-    },
-    {
-      "section_name": "chorus_3_short",
-      "start_bar": 70,
-      "end_bar": 78,
-      "section_role": "chorus",
-      "energy_level": 61,
-      "template_id": "pendulum_chevron_breathe",
+      "end_bar": 68,
+      "section_role": "verse",
+      "energy_level": 22,
+      "template_id": "lean_right_scan",
       "preset_id": "MODERATE",
       "modifiers": {
-        "width": "medium",
-        "dimmer": "breath_with_downbeat_peak",
-        "motion": "less_busy"
+        "scan_speed": "steady",
+        "stage_note": "create a single-direction ‘lean’ identity"
       },
-      "reasoning": "Short lower-energy chorus: keeps chorus identity (chevron) but relaxes motion to create contrast before the long run.",
+      "reasoning": "Adds a new texture (directional scan/lean) to avoid overusing sweeps and fans, while still feeling controlled in 3/4.",
       "segments": null
     },
     {
-      "section_name": "chorus_4_long",
-      "start_bar": 79,
-      "end_bar": 120,
-      "section_role": "chorus",
-      "energy_level": 96,
+      "section_name": "verse_4_pre_chorus_cue",
+      "start_bar": 69,
+      "end_bar": 78,
+      "section_role": "build",
+      "energy_level": 32,
       "template_id": null,
       "preset_id": null,
       "modifiers": {},
-      "reasoning": "",
+      "reasoning": "Split is musically justified as a pre-chorus cue; the final 3 bars act as a runway into the drop/chorus.",
+      "segments": [
+        {
+          "segment_id": "A",
+          "start_bar": 69,
+          "end_bar": 75,
+          "template_id": "pendulum_chevron_breathe",
+          "preset_id": "MODERATE",
+          "modifiers": {
+            "shape": "tight chevron"
+          },
+          "reasoning": "Introduce chevron geometry to signal a coming lift while retaining verse-like breathing."
+        },
+        {
+          "segment_id": "B",
+          "start_bar": 76,
+          "end_bar": 78,
+          "template_id": "sweep_lr_fan_hold",
+          "preset_id": "MODERATE",
+          "modifiers": {
+            "pre_hit": "hold and widen on bar 78"
+          },
+          "reasoning": "Short pre-hit cue to smooth the key transition into the big chorus at bar 79—visually ‘set’ the stage picture."
+        }
+      ]
+    },
+    {
+      "section_name": "chorus_2_main",
+      "start_bar": 79,
+      "end_bar": 110,
+      "section_role": "chorus",
+      "energy_level": 66,
+      "template_id": null,
+      "preset_id": null,
+      "modifiers": {},
+      "reasoning": "Long chorus gets three purposeful textures: drive (phase sweep) → picture (circle hold) → rhythmic lift (cascade).",
       "segments": [
         {
           "segment_id": "A",
           "start_bar": 79,
-          "end_bar": 90,
-          "template_id": "sweep_lr_pingpong_phase",
+          "end_bar": 88,
+          "template_id": "sweep_lr_continuous_phase",
           "preset_id": "ENERGETIC",
           "modifiers": {
-            "pingpong": "call_response_pairs",
-            "downbeat": "hard_left_on_bar1",
-            "phase": "staggered"
+            "phase": "staggered for width",
+            "feel": "driving but smooth"
           },
-          "reasoning": "Re-launch with playful tension and clear 3/4 ‘bar-1’ orientation (always re-grounding on the downbeat)."
+          "reasoning": "Arrival with continuous phased motion reads bigger than verse without relying on pulse/fan; strong lateral momentum for the chorus groove."
         },
         {
           "segment_id": "B",
-          "start_bar": 91,
-          "end_bar": 108,
-          "template_id": "sweep_ud_chevron_swell",
-          "preset_id": "ENERGETIC",
-          "modifiers": {
-            "swell": "3bar_phrases",
-            "ud": "bigger_lifts_on_bar1",
-            "contrast": "vertical_break_from_lr"
-          },
-          "reasoning": "Uniquely phrases the long-chorus midsection: vertical chevron swells in 3-bar groupings make the 3/4 feel intentional and distinct from earlier LR material."
-        },
-        {
-          "segment_id": "C",
-          "start_bar": 109,
-          "end_bar": 120,
+          "start_bar": 89,
+          "end_bar": 100,
           "template_id": "circle_fan_hold",
           "preset_id": "ENERGETIC",
           "modifiers": {
-            "circle": "broad",
-            "hold": "downbeat_lock",
-            "look": "anthemic"
+            "texture": "hold/geometry emphasis"
           },
-          "reasoning": "Big, readable ‘anthem’ picture to close the long chorus while maintaining downbeat locks for musical clarity."
-        }
-      ]
-    },
-    {
-      "section_name": "verse_2",
-      "start_bar": 121,
-      "end_bar": 130,
-      "section_role": "verse",
-      "energy_level": 48,
-      "template_id": "wave_scattered_fade_in",
-      "preset_id": "CHILL",
-      "modifiers": {
-        "scatter": "high",
-        "dimmer": "slow_reset",
-        "speed": "reduced"
-      },
-      "reasoning": "A clear reset after the long chorus: scattered wave reintroduces space and anticipation without going static.",
-      "segments": null
-    },
-    {
-      "section_name": "chorus_5_short",
-      "start_bar": 131,
-      "end_bar": 138,
-      "section_role": "chorus",
-      "energy_level": 71,
-      "template_id": null,
-      "preset_id": null,
-      "modifiers": {},
-      "reasoning": "",
-      "segments": [
-        {
-          "segment_id": "A",
-          "start_bar": 131,
-          "end_bar": 132,
-          "template_id": "lean_right_scan",
-          "preset_id": "MODERATE",
-          "modifiers": {
-            "scan": "tight",
-            "downbeat": "single_strong_hit",
-            "setup": "directional"
-          },
-          "reasoning": "2-bar pickup that points the room and sets a directional cue into the final peak."
-        },
-        {
-          "segment_id": "B",
-          "start_bar": 133,
-          "end_bar": 138,
-          "template_id": "sweep_lr_fan_pulse",
-          "preset_id": "ENERGETIC",
-          "modifiers": {
-            "accent": "bar1_heavy_bar2-3_lighter",
-            "width": "wide",
-            "transition_out": "open_to_max"
-          },
-          "reasoning": "Keeps chorus identity while explicitly shaping pulses across the 3 beats (heavy-then-lighter) to avoid generic pumping."
-        }
-      ]
-    },
-    {
-      "section_name": "chorus_6_final_peak",
-      "start_bar": 139,
-      "end_bar": 158,
-      "section_role": "chorus",
-      "energy_level": 100,
-      "template_id": null,
-      "preset_id": null,
-      "modifiers": {},
-      "reasoning": "",
-      "segments": [
-        {
-          "segment_id": "A",
-          "start_bar": 139,
-          "end_bar": 145,
-          "template_id": "circle_asym_right_pulse",
-          "preset_id": "ENERGETIC",
-          "modifiers": {
-            "pulse": "downbeat_punctuated",
-            "asymmetry": "clear_stage_motion",
-            "rate": "fast_not_strobe"
-          },
-          "reasoning": "Peak opens with asymmetry for urgency; pulsing is shaped to bar-1 hits rather than constant intensity."
-        },
-        {
-          "segment_id": "B",
-          "start_bar": 146,
-          "end_bar": 154,
-          "template_id": "bounce_fan_pulse",
-          "preset_id": "ENERGETIC",
-          "modifiers": {
-            "bounce": "triplet_feel",
-            "accent": "downbeat_plus_beat2_ghost",
-            "width": "max"
-          },
-          "reasoning": "Makes the finale feel ‘3/4-native’: bounce implies a triplet feel, with a strong downbeat and lighter internal motion."
+          "reasoning": "Insert a contrasting ‘held lattice/geometry’ feel inside the long chorus span to reduce pulse/fan dependence and give the audience a memorable picture."
         },
         {
           "segment_id": "C",
-          "start_bar": 155,
-          "end_bar": 158,
-          "template_id": "circle_asym_left_strobe",
+          "start_bar": 101,
+          "end_bar": 110,
+          "template_id": "cascade_pulse_lr",
           "preset_id": "ENERGETIC",
           "modifiers": {
-            "strobe": "bar1_bursts_only",
-            "pattern": "hit-hold-hit",
-            "finale": "highest"
+            "accent": "stronger on phrase starts"
           },
-          "reasoning": "Final strobe is uniquely phrased: strobe bursts only on downbeats with hit/hold structure so it reads musical (not a flat strobe wash)."
+          "reasoning": "Bring back rhythmic emphasis late in the chorus to re-energize and set up the next chorus section."
         }
       ]
     },
     {
-      "section_name": "outro",
-      "start_bar": 159,
-      "end_bar": 164,
-      "section_role": "outro",
-      "energy_level": 5,
-      "template_id": "wave_scattered_fade_out",
-      "preset_id": "CHILL",
+      "section_name": "chorus_3_lift",
+      "start_bar": 111,
+      "end_bar": 121,
+      "section_role": "chorus",
+      "energy_level": 78,
+      "template_id": "bounce_fan_pulse",
+      "preset_id": "ENERGETIC",
       "modifiers": {
-        "dimmer": "fade_to_black",
-        "motion": "slow_release",
-        "focus": "de-center"
+        "bounce": "pronounced",
+        "crowd_read": "high"
       },
-      "reasoning": "Clean resolution: motion relaxes and dissolves, giving a clear end without an abrupt blackout.",
+      "reasoning": "Clear kinetic step-up: bounce reads as celebratory and syncs well with 3/4’s recurring downbeat.",
       "segments": null
+    },
+    {
+      "section_name": "chorus_4_peak_entry",
+      "start_bar": 122,
+      "end_bar": 129,
+      "section_role": "chorus",
+      "energy_level": 83,
+      "template_id": "circle_asym_right_pulse",
+      "preset_id": "ENERGETIC",
+      "modifiers": {
+        "focal_point": "asymmetry to break symmetry fatigue"
+      },
+      "reasoning": "Introduce asymmetry at higher energy to keep the visual story evolving rather than repeating the same fan/pulse language.",
+      "segments": null
+    },
+    {
+      "section_name": "chorus_5_final_run",
+      "start_bar": 130,
+      "end_bar": 157,
+      "section_role": "chorus",
+      "energy_level": 90,
+      "template_id": null,
+      "preset_id": null,
+      "modifiers": {},
+      "reasoning": "Final chorus escalates with contrast (UD swell) → drive (pingpong) → controlled strobe peak (beat-1 accented).",
+      "segments": [
+        {
+          "segment_id": "A",
+          "start_bar": 130,
+          "end_bar": 141,
+          "template_id": "sweep_ud_chevron_swell",
+          "preset_id": "ENERGETIC",
+          "modifiers": {
+            "plane_change": "vertical emphasis",
+            "feel": "climbing"
+          },
+          "reasoning": "Start the final run with a plane change (UD swell) to feel like a new chapter—big lift without immediate strobe."
+        },
+        {
+          "segment_id": "B",
+          "start_bar": 142,
+          "end_bar": 151,
+          "template_id": "sweep_lr_pingpong_phase",
+          "preset_id": "ENERGETIC",
+          "modifiers": {
+            "endpoints": "harder snaps on beat 1"
+          },
+          "reasoning": "Add urgency through pingpong endpoints; emphasize beat 1 to keep the 3/4 groove legible at peak speed."
+        },
+        {
+          "segment_id": "C",
+          "start_bar": 152,
+          "end_bar": 157,
+          "template_id": "circle_asym_left_strobe",
+          "preset_id": "PEAK",
+          "modifiers": {
+            "strobe_rule": "accent beat 1 only",
+            "duration_note": "keep brief to preserve impact"
+          },
+          "reasoning": "Brief maximum-impact moment, explicitly constrained to beat-1 accents so it reads rhythmically in 3/4 instead of becoming a blur."
+        }
+      ]
+    },
+    {
+      "section_name": "bridge_outro_finale",
+      "start_bar": 158,
+      "end_bar": 164,
+      "section_role": "bridge/outro",
+      "energy_level": 96,
+      "template_id": null,
+      "preset_id": null,
+      "modifiers": {},
+      "reasoning": "Bridge is highest energy but should resolve: brief decompression then a decisive final held picture.",
+      "segments": [
+        {
+          "segment_id": "A",
+          "start_bar": 158,
+          "end_bar": 160,
+          "template_id": "wave_scattered_fade_out",
+          "preset_id": "DRAMATIC",
+          "modifiers": {
+            "silhouette": "reduce front light feel, emphasize beams",
+            "breath": "let music breathe after strobe"
+          },
+          "reasoning": "Post-peak release: a quick textural fade-out creates negative space and makes the finale hit feel bigger."
+        },
+        {
+          "segment_id": "B",
+          "start_bar": 161,
+          "end_bar": 164,
+          "template_id": "sweep_lr_fan_hold",
+          "preset_id": "FINAL",
+          "modifiers": {
+            "final_picture": "wide, symmetrical fan hold",
+            "movement": "minimize motion; hold silhouette/plane"
+          },
+          "reasoning": "Unique ‘final’ moment via a stable plane/silhouette hold rather than more movement—reads like an ending and photographs well."
+        }
+      ]
     }
   ],
-  "overall_strategy": "Keep the 3/4 identity front-and-center: verses breathe/pendulum with gentle swells; choruses expand into LR sweeps and fan geometry with clear bar-1 punctuation. Smooth the big chorus-to-chorus handoffs (especially chorus_1→chorus_2) using 1–2 bar transitional ramps that preserve motion direction/geometry. Avoid “impact then vanish” by replacing snap+fade moments with impact+hold behaviors, and make the long-chorus midsection + final strobe uniquely phrased to the 3/4 grid (strong downbeat hits, less generic constant pulsing)."
+  "overall_strategy": "Keep the early 3/4 feel elegant and phrase-led (breathe/pendulum/scan), then evolve choruses with contrasting textures beyond pulse/fan (holds, plane changes, circular asymmetry). Use short pre-hit cues at key transitions (notably bar 78→79) and make the strobe moment explicitly beat-1 accented for 3/4 legibility. End with a uniquely ‘final’ silhouette/plane hold (less motion, more picture)."
 }

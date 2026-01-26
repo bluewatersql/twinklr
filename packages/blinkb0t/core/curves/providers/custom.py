@@ -29,18 +29,20 @@ class CustomCurveProvider:
         num_points: int = 100,
         **kwargs: Any,
     ) -> list[CurvePoint]:
-        """Generate custom curve as point array in DMX space.
+        """Generate custom curve as point array.
+
+        All kwargs (including intensity parameters) are passed through
+        to the registry resolver and ultimately to the curve function.
 
         Args:
-            curve_def: Curve definition from library
-            num_points: Number of points to generate
-            min_dmx: Minimum DMX value (generate curve for this range)
-            max_dmx: Maximum DMX value (generate curve for this range)
+            curve_def: Curve definition from library.
+            num_points: Number of points to generate.
+            **kwargs: Intensity params (amplitude, frequency, etc.) + curve-specific params.
 
         Returns:
-            List of curve points with time [0,1] and value in [min_dmx, max_dmx]
+            List of curve points with time [0,1] and value in [0, 1].
 
         Raises:
-            ValueError: If curve type is unknown
+            ValueError: If curve type is unknown.
         """
         return self.registry.resolve(curve_def, n_samples=num_points, **kwargs)

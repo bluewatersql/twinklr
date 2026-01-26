@@ -223,8 +223,20 @@ class AudioAnalyzer:
         )
         pitch = extract_pitch_tracking(y, sr, hop_length=hop_length)
 
-        # Structure analysis
-        sections = detect_song_sections(y, sr, hop_length=hop_length)
+        # Structure analysis - pass context for improved detection
+        sections = detect_song_sections(
+            y,
+            sr,
+            hop_length=hop_length,
+            rms_for_energy=rms_norm,
+            chroma_cqt=chroma,
+            beats_s=beats_s,
+            bars_s=bars_s,
+            builds=builds,
+            drops=drops,
+            vocal_segments=vocal_regions,
+            chords=chords["chords"],  # Extract chord list from result dict
+        )
         tempo_changes = detect_tempo_changes(y, sr, hop_length=hop_length)
 
         # Tension curve

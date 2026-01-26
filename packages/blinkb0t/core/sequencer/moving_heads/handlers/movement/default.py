@@ -237,71 +237,127 @@ class DefaultMovementHandler:
     ) -> list[CurvePoint] | None:
         """Generate a movement curve scaled to fit within DMX constraints.
 
+        Intensity parameters (amplitude, frequency) are passed to the curve generator
+        to modulate the base curve shape. The center_offset parameter is applied here
+        at the handler level by offsetting the base position.
+
         Args:
             curve_type: CurveLibrary enum value.
             n_samples: Number of samples.
-            cycles: Number of cycles (may be scaled by frequency).
-            amplitude: Requested amplitude [0, 1] from template.
-            frequency: Frequency multiplier.
-            center: DMX center value [0, 255] (unused - curves are normalized).
+            cycles: Number of cycles (base value, multiplied by frequency in curve).
+            amplitude: Requested amplitude [0, 1] from categorical params (scaled later).
+            frequency: Frequency multiplier from categorical params (passed to curve).
+            center: Center offset [0, 1] from categorical params (applied to base_norm).
             base_norm: Base position from geometry [0, 1].
             max_amplitude_norm: Maximum safe amplitude in normalized space before hitting constraints.
-            params: Optional parameters to override defaults/presets
+            params: Optional parameters to override defaults/presets.
+
         Returns:
             List of curve points scaled to fit within fixture DMX limits.
 
         Note:
-            The curve is generated centered at base_norm with amplitude scaled to stay
-            within fixture movement limits. This preserves curve shape without clipping.
+            The curve is generated centered at base_norm (adjusted by center offset)
+            with amplitude scaled to stay within fixture movement limits.
         """
         if curve_type == CurveLibrary.HOLD:
             return None
+
+        # Apply center offset to base position (center is [0, 1] where 0.5 = no shift)
+        # Convert center [0, 1] to offset [-0.5, 0.5] and scale by max amplitude
+        # The multiplier should be 1.0, not 2.0, to keep offset within one amplitude unit
+        center_offset_normalized = (center - 0.5) * max_amplitude_norm * 1.0
+        adjusted_base_norm = base_norm + center_offset_normalized
+
+        # Assert instead of clamp during development to catch math errors
+        # TODO: Replace with proper error handling in production
+        if not (0.0 <= adjusted_base_norm <= 1.0):
+            logger.warning(
+                f"adjusted_base_norm {adjusted_base_norm:.3f} out of bounds [0, 1] "
+                f"(base={base_norm:.3f}, center_offset={center_offset_normalized:.3f})"
+            )
+        adjusted_base_norm = max(0.0, min(1.0, adjusted_base_norm))
+
+        # Build curve generation parameters with intensity params
+        curve_params = {
+            "cycles": cycles,
+            "frequency": frequency,  # Pass frequency to curve function
+            # NOTE: amplitude is NOT passed here - it's applied to the generated curve below
+            # This is because we need to scale by max_amplitude_norm first
+            **(params or {}),
+        }
 
         # Generate base curve - already in normalized [0, 1] space
         base_curve = self._curve_gen.generate_custom_points(
             curve_id=curve_type.value,
             num_points=n_samples,
-            **(params or {}),
+            **curve_params,
         )
 
         # Get curve definition to check kind
         curve_def = self._curve_gen._registry.get(curve_type.value)
 
-        # Apply requested amplitude scaling to the maximum safe amplitude
-        # This gives us the actual amplitude to use
-        effective_amplitude = max_amplitude_norm * amplitude
+        # Calculate desired amplitude based on intensity (relative to full [0,1] range)
+        # This ensures consistent movement regardless of base position
+        desired_amplitude = amplitude * 0.5  # e.g., SMOOTH (0.4) → 0.2 (±20% of full range)
+
+        # Calculate how much we can actually move from base position
+        # These are the maximum excursions before hitting boundaries
+        max_positive_excursion = 1.0 - adjusted_base_norm
+        max_negative_excursion = adjusted_base_norm - 0.0
+
+        # Effective amplitude is the desired amplitude, constrained by boundaries
+        # This prevents artificial reduction based on base position
+        effective_amplitude = min(desired_amplitude, max_positive_excursion, max_negative_excursion)
+
+        # Log if amplitude was constrained by boundaries
+        if effective_amplitude < desired_amplitude:
+            renderer_log.debug(
+                f"Amplitude constrained: desired={desired_amplitude:.3f}, "
+                f"effective={effective_amplitude:.3f}, "
+                f"base={adjusted_base_norm:.3f}"
+            )
 
         # Build scaled points based on curve kind
         scaled_points: list[CurvePoint] = []
 
         if curve_def.kind == CurveKind.MOVEMENT_OFFSET:
             # Movement offset curves are already centered at 0.5
-            # Re-center at base_norm and scale amplitude
+            # Re-center at adjusted_base_norm and scale amplitude
             for point in base_curve:
                 # Convert from [0, 1] centered at 0.5 to offset [-0.5, 0.5]
                 offset = point.v - 0.5
                 # Scale by effective amplitude
                 scaled_offset = offset * (effective_amplitude / 0.5)
-                # Apply to base position
-                new_v = base_norm + scaled_offset
+                # Apply to adjusted base position (already has center offset applied)
+                new_v = adjusted_base_norm + scaled_offset
 
-                # Final safety clamp (should be unnecessary if math is correct)
+                # Safety clamp with warning if triggered
+                if not (0.0 <= new_v <= 1.0):
+                    logger.debug(
+                        f"Curve point out of bounds: {new_v:.3f} "
+                        f"(adjusted_base={adjusted_base_norm:.3f}, scaled_offset={scaled_offset:.3f})"
+                    )
                 new_v = max(0.0, min(1.0, new_v))
 
                 scaled_points.append(CurvePoint(t=point.t, v=new_v))
 
         elif curve_def.kind == CurveKind.DIMMER_ABSOLUTE:
             # Absolute curves go from 0 to 1
-            # Center them at base_norm and apply amplitude
+            # Center them at adjusted_base_norm and apply amplitude
             for point in base_curve:
                 # Convert absolute [0, 1] to offset [-0.5, 0.5]
                 normalized_offset = point.v - 0.5
                 # Scale by effective amplitude
                 scaled_offset = normalized_offset * (effective_amplitude / 0.5)
-                # Apply to base position
-                new_v = base_norm + scaled_offset
+                # Apply to adjusted base position (already has center offset applied)
+                new_v = adjusted_base_norm + scaled_offset
 
-                # Final safety clamp
+                # Safety clamp with warning if triggered
+                if not (0.0 <= new_v <= 1.0):
+                    logger.debug(
+                        f"Curve point out of bounds: {new_v:.3f} "
+                        f"(adjusted_base={adjusted_base_norm:.3f}, scaled_offset={scaled_offset:.3f})"
+                    )
                 new_v = max(0.0, min(1.0, new_v))
 
                 scaled_points.append(CurvePoint(t=point.t, v=new_v))
@@ -311,7 +367,14 @@ class DefaultMovementHandler:
             for point in base_curve:
                 offset = point.v - 0.5
                 scaled_offset = offset * (effective_amplitude / 0.5)
-                new_v = base_norm + scaled_offset
+                new_v = adjusted_base_norm + scaled_offset
+
+                # Safety clamp with warning if triggered
+                if not (0.0 <= new_v <= 1.0):
+                    logger.debug(
+                        f"Curve point out of bounds: {new_v:.3f} "
+                        f"(adjusted_base={adjusted_base_norm:.3f}, scaled_offset={scaled_offset:.3f})"
+                    )
                 new_v = max(0.0, min(1.0, new_v))
                 scaled_points.append(CurvePoint(t=point.t, v=new_v))
 

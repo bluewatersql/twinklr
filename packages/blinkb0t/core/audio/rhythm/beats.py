@@ -51,7 +51,6 @@ def detect_time_signature(
 ) -> dict[str, Any]:
     """Detect time signature using accent pattern analysis.
 
-    FIXED: Original used autocorrelation lag which doesn't directly map to meter.
     New approach: Score how well beats group into n-beat patterns with strong first beat.
 
     Args:
@@ -175,7 +174,6 @@ def detect_downbeats_phase_aligned(
     phase_scores = [float(score[p::beats_per_bar].sum()) for p in range(beats_per_bar)]
     best_phase = int(np.argmax(phase_scores))
 
-    # FIXED: Better confidence calculation
     sorted_scores = sorted(phase_scores, reverse=True)
     if len(sorted_scores) >= 2 and sorted_scores[0] > 0.1:
         # Confidence = margin between best and second-best, normalized

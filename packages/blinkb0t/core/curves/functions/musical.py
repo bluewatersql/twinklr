@@ -9,6 +9,7 @@ def generate_musical_accent(
     cycles: float = 1.0,
     attack_frac: float = 0.1,
     decay_rate: float = 3.0,
+    **kwargs,  # Accept but ignore extra intensity params
 ) -> list[CurvePoint]:
     """Musical accent: sharp attack, smooth decay.
 
@@ -63,6 +64,7 @@ def generate_musical_swell(
     cycles: float = 1.0,
     rise_frac: float = 0.9,
     rise_rate: float = 3.0,
+    **kwargs,  # Accept but ignore extra intensity params
 ) -> list[CurvePoint]:
     """Musical swell: smooth rise, sharp cutoff.
 
@@ -117,6 +119,7 @@ def generate_beat_pulse(
     cycles: float = 1.0,
     beat_subdivision: int = 4,
     phase: float = 0.0,
+    **kwargs,  # Accept but ignore extra intensity params
 ) -> list[CurvePoint]:
     """Beat-aligned pulse: rhythmic oscillation.
 

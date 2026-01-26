@@ -5,6 +5,11 @@ from __future__ import annotations
 from enum import Enum
 from typing import Any
 
+from blinkb0t.core.curves.defaults import (
+    DEFAULT_MOVEMENT_PARAMS,
+    DEFAULT_PARAMETRIC_PARAMS,
+    DEFAULT_WAVE_PARAMS,
+)
 from blinkb0t.core.curves.functions import (
     generate_anticipate,
     generate_beat_pulse,
@@ -139,17 +144,30 @@ def build_default_registry() -> CurveRegistry:
             )
         )
 
-    # Base curves
-    register(CurveLibrary.LINEAR, generate_linear, CurveKind.DIMMER_ABSOLUTE)
-    register(CurveLibrary.HOLD, generate_hold, CurveKind.DIMMER_ABSOLUTE)
-    register(CurveLibrary.SINE, generate_sine, CurveKind.DIMMER_ABSOLUTE)
-    register(CurveLibrary.TRIANGLE, generate_triangle, CurveKind.DIMMER_ABSOLUTE)
-    register(CurveLibrary.PULSE, generate_pulse, CurveKind.DIMMER_ABSOLUTE)
-    register(CurveLibrary.COSINE, generate_cosine, CurveKind.DIMMER_ABSOLUTE)
-    register(CurveLibrary.SQUARE, generate_square, CurveKind.DIMMER_ABSOLUTE)
-    register(CurveLibrary.S_CURVE, generate_s_curve, CurveKind.DIMMER_ABSOLUTE)
-    register(CurveLibrary.SMOOTH_STEP, generate_smooth_step, CurveKind.DIMMER_ABSOLUTE)
-    register(CurveLibrary.SMOOTHER_STEP, generate_smoother_step, CurveKind.DIMMER_ABSOLUTE)
+    # Base curves - USE GLOBAL DEFAULTS
+    register(CurveLibrary.LINEAR, generate_linear, CurveKind.DIMMER_ABSOLUTE, params={})
+    register(CurveLibrary.HOLD, generate_hold, CurveKind.DIMMER_ABSOLUTE, params={})
+    register(
+        CurveLibrary.SINE, generate_sine, CurveKind.DIMMER_ABSOLUTE, params=DEFAULT_WAVE_PARAMS
+    )
+    register(
+        CurveLibrary.TRIANGLE,
+        generate_triangle,
+        CurveKind.DIMMER_ABSOLUTE,
+        params=DEFAULT_WAVE_PARAMS,
+    )
+    register(
+        CurveLibrary.PULSE, generate_pulse, CurveKind.DIMMER_ABSOLUTE, params=DEFAULT_WAVE_PARAMS
+    )
+    register(
+        CurveLibrary.COSINE, generate_cosine, CurveKind.DIMMER_ABSOLUTE, params=DEFAULT_WAVE_PARAMS
+    )
+    register(CurveLibrary.SQUARE, generate_square, CurveKind.DIMMER_ABSOLUTE, params={})
+    register(CurveLibrary.S_CURVE, generate_s_curve, CurveKind.DIMMER_ABSOLUTE, params={})
+    register(CurveLibrary.SMOOTH_STEP, generate_smooth_step, CurveKind.DIMMER_ABSOLUTE, params={})
+    register(
+        CurveLibrary.SMOOTHER_STEP, generate_smoother_step, CurveKind.DIMMER_ABSOLUTE, params={}
+    )
 
     # Easing
     register(CurveLibrary.EASE_IN_SINE, generate_ease_in_sine, CurveKind.DIMMER_ABSOLUTE)
@@ -172,29 +190,65 @@ def build_default_registry() -> CurveRegistry:
     register(CurveLibrary.ELASTIC_OUT, generate_elastic_out, CurveKind.DIMMER_ABSOLUTE)
 
     # Noise
-    register(CurveLibrary.MOVEMENT_PERLIN_NOISE, generate_perlin_noise, CurveKind.DIMMER_ABSOLUTE)
+    register(CurveLibrary.MOVEMENT_PERLIN_NOISE, generate_perlin_noise, CurveKind.MOVEMENT_OFFSET)
 
-    # Parametric
-    register(CurveLibrary.BEZIER, generate_bezier, CurveKind.DIMMER_ABSOLUTE)
+    # Parametric - USE PARAMETRIC DEFAULTS
+    register(CurveLibrary.BEZIER, generate_bezier, CurveKind.DIMMER_ABSOLUTE, params={})
     register(
         CurveLibrary.LISSAJOUS,
         generate_lissajous,
         CurveKind.DIMMER_ABSOLUTE,
-        params={"b": 2, "delta": 0},
+        params=DEFAULT_PARAMETRIC_PARAMS
+        | {"b": 2, "delta": 0},  # Merge defaults with specific params
     )
 
     # Motion helpers
     register(CurveLibrary.ANTICIPATE, generate_anticipate, CurveKind.DIMMER_ABSOLUTE)
     register(CurveLibrary.OVERSHOOT, generate_overshoot, CurveKind.DIMMER_ABSOLUTE)
 
-    # Movement curves
-    register(CurveLibrary.MOVEMENT_LINEAR, generate_movement_linear, CurveKind.MOVEMENT_OFFSET)
-    register(CurveLibrary.MOVEMENT_HOLD, generate_movement_hold, CurveKind.MOVEMENT_OFFSET)
-    register(CurveLibrary.MOVEMENT_SINE, generate_movement_sine, CurveKind.MOVEMENT_OFFSET)
-    register(CurveLibrary.MOVEMENT_TRIANGLE, generate_movement_triangle, CurveKind.MOVEMENT_OFFSET)
-    register(CurveLibrary.MOVEMENT_PULSE, generate_movement_pulse, CurveKind.MOVEMENT_OFFSET)
-    register(CurveLibrary.MOVEMENT_COSINE, generate_cosine, CurveKind.MOVEMENT_OFFSET)
-    register(CurveLibrary.MOVEMENT_LISSAJOUS, generate_lissajous, CurveKind.MOVEMENT_OFFSET)
+    # Movement curves - USE MOVEMENT/WAVE DEFAULTS
+    register(
+        CurveLibrary.MOVEMENT_LINEAR, generate_movement_linear, CurveKind.MOVEMENT_OFFSET, params={}
+    )
+    register(
+        CurveLibrary.MOVEMENT_HOLD, generate_movement_hold, CurveKind.MOVEMENT_OFFSET, params={}
+    )
+    register(
+        CurveLibrary.MOVEMENT_SINE,
+        generate_movement_sine,
+        CurveKind.MOVEMENT_OFFSET,
+        params=DEFAULT_WAVE_PARAMS,
+    )
+    register(
+        CurveLibrary.MOVEMENT_TRIANGLE,
+        generate_movement_triangle,
+        CurveKind.MOVEMENT_OFFSET,
+        params=DEFAULT_MOVEMENT_PARAMS,
+    )
+    register(
+        CurveLibrary.MOVEMENT_PULSE,
+        generate_movement_pulse,
+        CurveKind.MOVEMENT_OFFSET,
+        params={
+            "cycles": 1.0,
+            "duty_cycle": 0.5,
+            "high": 1.0,
+            "low": 0.0,
+            "frequency": 1.0,
+        },
+    )
+    register(
+        CurveLibrary.MOVEMENT_COSINE,
+        generate_cosine,
+        CurveKind.MOVEMENT_OFFSET,
+        params=DEFAULT_WAVE_PARAMS,
+    )
+    register(
+        CurveLibrary.MOVEMENT_LISSAJOUS,
+        generate_lissajous,
+        CurveKind.MOVEMENT_OFFSET,
+        params=DEFAULT_PARAMETRIC_PARAMS | {"b": 2, "delta": 0},
+    )
 
     # Musical curves
     register(CurveLibrary.MUSICAL_ACCENT, generate_musical_accent, CurveKind.DIMMER_ABSOLUTE)

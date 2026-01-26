@@ -81,11 +81,11 @@ def make_template() -> TemplateDoc:
                         cycles=1.0,
                     ),
                     dimmer=Dimmer(
-                        dimmer_type=DimmerType.HOLD,
+                        dimmer_type=DimmerType.PULSE,
                         intensity=Intensity.SMOOTH,
                         min_norm=0.10,
                         max_norm=1.00,
-                        cycles=1.0,
+                        cycles=2.0,
                     ),
                 )
             ],

@@ -66,6 +66,18 @@ def write_report_markdown(report: EvaluationReport, output_path: Path) -> None:
     lines.append(f"- **Sections**: {report.summary.sections}")
     lines.append(f"- **Templates Used**: {', '.join(report.summary.templates_used)}")
     lines.append(f"- **Roles Targeted**: {', '.join(report.summary.roles_targeted)}")
+
+    # Add note about which roles have curves plotted
+    roles_with_curves = set()
+    for section in report.sections:
+        for curve in section.curves:
+            roles_with_curves.add(curve.role)
+    if roles_with_curves:
+        if len(roles_with_curves) < len(report.summary.roles_targeted):
+            lines.append(f"- **Curves Plotted For**: {', '.join(sorted(roles_with_curves))} *(showing subset of roles)*")
+        else:
+            lines.append("- **Curves Plotted For**: All roles")
+
     lines.append(f"- **Max Concurrent Layers**: {report.summary.max_concurrent_layers}")
 
     # Phase 2: Advanced metrics

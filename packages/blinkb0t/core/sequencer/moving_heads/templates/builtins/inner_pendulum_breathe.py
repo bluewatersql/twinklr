@@ -61,7 +61,7 @@ def make_template() -> TemplateDoc:
                     ),
                     geometry=Geometry(
                         geometry_type=GeometryType.ROLE_POSE,
-                        pan_pose_by_role=PoseByRoleHelper.FAN_POSE_WIDE,
+                        pan_pose_by_role=PoseByRoleHelper.FAN_POSE_NARROW,
                         tilt_pose=TiltPose.HORIZON,
                     ),
                     movement=Movement(

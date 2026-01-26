@@ -128,6 +128,8 @@ def compile_step(
         intensity=step.dimmer.intensity,
         min_norm=step.dimmer.min_norm,
         max_norm=step.dimmer.max_norm,
+        template_duration_ms=context.duration_ms,  # Pass template duration for period conversion
+        beat_grid=context.beat_grid,  # Pass beat grid for period conversion
     )
 
     # Apply phase offset if needed
@@ -152,6 +154,7 @@ def compile_step(
 
     segment = FixtureSegment(
         section_id=context.section_id,
+        segment_id=context.segment_id,
         step_id=step.step_id,
         template_id=context.template_id,
         preset_id=context.preset_id,

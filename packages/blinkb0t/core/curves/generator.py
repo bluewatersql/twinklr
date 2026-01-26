@@ -63,20 +63,21 @@ class CurveGenerator:
         num_points: int = 100,
         **kwargs: Any,
     ) -> list[CurvePoint]:
-        """Generate custom curve as point array in DMX space.
+        """Generate custom curve as point array.
 
-        Supports preset resolution: if curve is a preset, resolves to base curve
-        and applies modifiers.
+        Supports preset resolution and intensity parameter injection.
 
         Args:
-            curve_id: Unique curve identifier
-            num_points: Number of points to generate
+            curve_id: Unique curve identifier.
+            num_points: Number of points to generate.
+            **kwargs: Intensity params (amplitude, frequency, center_offset)
+                      and curve-specific params (cycles, phase, etc.).
 
         Returns:
-            List of curve points with time [0,1] and value in [0, 255]
+            List of curve points with time [0,1] and value in [0, 1].
 
         Raises:
-            ValueError: If curve not found or not a custom/preset curve
+            ValueError: If curve not found in library.
         """
         curve_def = self._registry.get(curve_id)
         if curve_def is None:

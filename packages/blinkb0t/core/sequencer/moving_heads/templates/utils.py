@@ -12,9 +12,18 @@ class TemplateRoleHelper:
 
 
 class PoseByRoleHelper:
+    """Preset pan pose mappings for common layouts."""
+
     FAN_POSE_WIDE = {
         TemplateRole.OUTER_LEFT: PanPose.WIDE_LEFT,
         TemplateRole.INNER_LEFT: PanPose.LEFT,
         TemplateRole.INNER_RIGHT: PanPose.RIGHT,
         TemplateRole.OUTER_RIGHT: PanPose.WIDE_RIGHT,
+    }
+
+    FAN_POSE_NARROW = {
+        TemplateRole.OUTER_LEFT: PanPose.MID_LEFT,
+        TemplateRole.INNER_LEFT: PanPose.LEFT,
+        TemplateRole.INNER_RIGHT: PanPose.RIGHT,
+        TemplateRole.OUTER_RIGHT: PanPose.MID_RIGHT,
     }

@@ -37,9 +37,6 @@ from blinkb0t.core.sequencer.moving_heads.templates.builtins.pendulum_chevron_br
 from blinkb0t.core.sequencer.moving_heads.templates.builtins.pump_up_loop import (
     make_template as _pump_up_loop,  # noqa: F401
 )
-from blinkb0t.core.sequencer.moving_heads.templates.builtins.snap_in_fade_out import (
-    make_template as _snap_in_fade_out,  # noqa: F401
-)
 from blinkb0t.core.sequencer.moving_heads.templates.builtins.sweep_lr_chevron_breathe import (
     make_template as _sweep_lr_chevron_breathe,  # noqa: F401
 )

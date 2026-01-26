@@ -41,10 +41,10 @@ def test_extract_curves_with_static_value():
     )
 
     assert "test_fixture" in result
-    assert "PAN" in result["test_fixture"]
+    assert "pan" in result["test_fixture"]
 
     # Static values should be consistent (normalized)
-    pan_samples = result["test_fixture"]["PAN"]
+    pan_samples = result["test_fixture"]["pan"]
     assert len(pan_samples) > 0
     # All samples should be ~0.5 (128/255)
     assert all(abs(s - 128 / 255) < 0.02 for s in pan_samples)
@@ -77,8 +77,8 @@ def test_extract_curves_multiple_fixtures():
 
     assert "fixture_a" in result
     assert "fixture_b" in result
-    assert "PAN" in result["fixture_a"]
-    assert "PAN" in result["fixture_b"]
+    assert "pan" in result["fixture_a"]
+    assert "pan" in result["fixture_b"]
 
 
 def test_extract_curves_windowing():
@@ -99,7 +99,7 @@ def test_extract_curves_windowing():
         bar_duration_ms=500.0,
     )
 
-    pan_samples = result["test_fixture"]["PAN"]
+    pan_samples = result["test_fixture"]["pan"]
     # Should have ~20 samples (1 bar at 20 samples/bar)
     assert 15 <= len(pan_samples) <= 25
 

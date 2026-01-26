@@ -17,8 +17,21 @@ def generate_perlin_noise(
     octaves: int = 4,
     repeat: int = 1024,
     base: int = 0,
+    **kwargs,  # Accept but ignore intensity params
 ) -> list[CurvePoint]:
-    """Generate a Perlin noise curve sampled on the uniform grid."""
+    """Generate a Perlin noise curve sampled on the uniform grid.
+
+    Args:
+        n_samples: Number of samples to generate (must be >= 2).
+        scale: Noise scale factor.
+        octaves: Number of octaves for noise.
+        repeat: Repeat parameter for noise.
+        base: Base seed for noise.
+        **kwargs: Ignored parameters (for compatibility).
+
+    Returns:
+        List of CurvePoints with Perlin noise values.
+    """
     if n_samples < 2:
         raise ValueError("n_samples must be >= 2")
 

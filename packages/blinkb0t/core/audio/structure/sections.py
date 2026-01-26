@@ -1,9 +1,18 @@
-"""Song section detection and analysis."""
+"""Song section detection and analysis with advanced multi-feature segmentation.
+
+IMPROVEMENTS:
+1. Multi-Feature Fusion: Combines MFCC, chroma, spectral contrast, tonnetz
+2. Hierarchical Segmentation: Detects at multiple scales (coarse + fine)
+3. Beat-Aligned Boundaries: Snaps to bar boundaries for musical alignment
+4. Novelty-Based Refinement: Catches subtle transitions
+5. Context-Aware Labeling: Uses builds, drops, vocals, chords
+6. Subsection Detection: Splits sections with internal structure
+"""
 
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import Any, cast
 
 import librosa
 import numpy as np
@@ -20,11 +29,23 @@ def detect_song_sections(
     hop_length: int,
     min_section_s: float = 6.0,
     rms_for_energy: np.ndarray | None = None,
+    chroma_cqt: np.ndarray | None = None,
+    beats_s: list[float] | None = None,
+    bars_s: list[float] | None = None,
+    builds: list[dict[str, Any]] | None = None,
+    drops: list[dict[str, Any]] | None = None,
+    vocal_segments: list[dict[str, Any]] | None = None,
+    chords: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
-    """Detect song structure using MFCC-based segmentation.
+    """Detect song structure using advanced multi-feature segmentation.
 
-    IMPROVED: Better section labeling with intro/outro detection and energy ranking.
-    FIXED: Section merge algorithm preserves important boundaries.
+    IMPROVEMENTS:
+    - Multi-feature fusion (MFCC + chroma + spectral contrast + tonnetz)
+    - Hierarchical segmentation (coarse + fine)
+    - Beat-aligned boundaries
+    - Novelty-based refinement
+    - Context-aware labeling
+    - Subsection detection
 
     Args:
         y: Audio time series
@@ -32,6 +53,13 @@ def detect_song_sections(
         hop_length: Hop length
         min_section_s: Minimum section duration
         rms_for_energy: Pre-computed RMS for energy ranking
+        chroma_cqt: Pre-computed chroma features (12 x n_frames)
+        beats_s: Beat times in seconds
+        bars_s: Downbeat/bar times in seconds
+        builds: Energy build detections
+        drops: Energy drop detections
+        vocal_segments: Vocal presence segments
+        chords: Chord detections
 
     Returns:
         Dict with sections, boundary_times_s, meta
@@ -58,11 +86,21 @@ def detect_song_sections(
 
     hop_struct = hop_length * 4
 
-    mfcc = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=13, hop_length=hop_struct).astype(np.float32)
-    k = int(np.clip(round(duration / 15.0), 4, 14))
+    # IMPROVEMENT 1: Multi-Feature Fusion
+    features = _extract_multi_features(y, sr, hop_struct, chroma_cqt)
+
+    # IMPROVEMENT 2: Hierarchical Segmentation
+    k_coarse = int(np.clip(round(duration / 20.0), 4, 10))
+    k_fine = int(np.clip(round(duration / 10.0), 8, 20))
 
     try:
-        boundary_frames = librosa.segment.agglomerative(mfcc, k=k)
+        coarse_boundaries = librosa.segment.agglomerative(features, k=k_coarse)
+        fine_boundaries = librosa.segment.agglomerative(features, k=k_fine)
+
+        # Merge hierarchical boundaries
+        boundary_frames = _merge_hierarchical_boundaries(
+            coarse_boundaries, fine_boundaries, features.shape[1]
+        )
         boundary_times = frames_to_time(boundary_frames, sr=sr, hop_length=hop_struct)
 
         # Ensure start/end
@@ -73,11 +111,21 @@ def detect_song_sections(
                 times.append(tf)
         times.append(duration)
 
-        # FIXED: Improved section merge that doesn't lose important boundaries
+        # IMPROVEMENT 4: Novelty-Based Refinement
+        frame_times = frames_to_time(np.arange(features.shape[1]), sr=sr, hop_length=hop_struct)
+        additional_boundaries = _detect_novelty_boundaries(
+            features, frame_times, np.array(times), threshold_percentile=85
+        )
+        times = sorted(set(list(times) + list(additional_boundaries)))
+
+        # Merge short sections
         cleaned = merge_short_sections(times, min_section_s, duration)
 
+        # IMPROVEMENT 3: Beat-Aligned Boundaries
+        if bars_s:
+            cleaned = _align_boundaries_to_bars(cleaned, bars_s, tolerance_s=2.0)
+
         # Compute section features
-        frame_times = frames_to_time(np.arange(mfcc.shape[1]), sr=sr, hop_length=hop_struct)
         centroids: list[np.ndarray] = []
         section_energies: list[float] = []
 
@@ -88,6 +136,9 @@ def detect_song_sections(
         else:
             rms_energy = rms_for_energy
         rms_times = frames_to_time(np.arange(len(rms_energy)), sr=sr, hop_length=hop_struct)
+
+        # Use MFCC for centroids (first 13 features)
+        mfcc = features[:13, :]
 
         for i in range(len(cleaned) - 1):
             s, e = cleaned[i], cleaned[i + 1]
@@ -114,7 +165,7 @@ def detect_song_sections(
                     sim_mat[i, j] = cosine_similarity(centroids[i], centroids[j])
 
         # Repetition analysis
-        repeat_thresh = 0.88  # Slightly lowered for better detection
+        repeat_thresh = 0.88
         repeat_counts = (sim_mat >= repeat_thresh).sum(axis=1).astype(int)
         max_sim = sim_mat.max(axis=1) if n > 0 else np.array([])
 
@@ -125,7 +176,7 @@ def detect_song_sections(
         else:
             energy_ranks = np.array([])
 
-        # IMPROVED: Labeling with intro/outro and energy consideration
+        # Build section list
         sections = []
         for i in range(len(cleaned) - 1):
             start_s = float(cleaned[i])
@@ -134,38 +185,56 @@ def detect_song_sections(
             reps = int(repeat_counts[i]) if i < len(repeat_counts) else 0
             energy_rank = float(energy_ranks[i]) if i < len(energy_ranks) else 0.5
 
-            label = label_section(
-                idx=i,
-                total_sections=n,
-                repeat_count=reps,
-                max_similarity=sim,
-                energy_rank=energy_rank,
-                start_s=start_s,
-                end_s=end_s,
-                duration=duration,
-            )
-
             sections.append(
                 {
                     "section_id": int(i),
                     "start_s": start_s,
                     "end_s": end_s,
                     "duration_s": float(end_s - start_s),
-                    "label": label,
                     "similarity": sim,
                     "repeat_count": reps,
                     "energy_rank": round(energy_rank, 3),
+                    "label": "",  # Placeholder, will be set below
                 }
             )
+
+        # IMPROVEMENT 5: Context-Aware Labeling
+        for i, section in enumerate(sections):
+            label = label_section_contextual(
+                idx=i,
+                sections=sections,
+                chords=chords or [],
+                builds=builds or [],
+                drops=drops or [],
+                vocal_segments=vocal_segments or [],
+                energy_rank=cast(float, section["energy_rank"]),
+                repeat_count=cast(int, section["repeat_count"]),
+                max_similarity=cast(float, section["similarity"]),
+                relative_pos=cast(float, section["start_s"]) / duration if duration > 0 else 0.0,
+                duration=duration,
+            )
+            section["label"] = label
+
+        # IMPROVEMENT 6: Subsection Detection
+        sections = _detect_subsections(sections, mfcc, frame_times, similarity_threshold=0.75)
 
         return {
             "sections": sections,
             "boundary_times_s": [float(x) for x in cleaned],
             "meta": {
-                "k": k,
+                "k_coarse": k_coarse,
+                "k_fine": k_fine,
                 "hop_struct": hop_struct,
                 "min_section_s": float(min_section_s),
                 "repeat_thresh": repeat_thresh,
+                "improvements": [
+                    "multi_feature_fusion",
+                    "hierarchical_segmentation",
+                    "beat_alignment",
+                    "novelty_refinement",
+                    "context_aware_labeling",
+                    "subsection_detection",
+                ],
             },
         }
 
@@ -174,14 +243,427 @@ def detect_song_sections(
         return {
             "sections": [],
             "boundary_times_s": [0.0, duration],
-            "meta": {"k": k, "hop_struct": hop_struct, "error": str(e)},
+            "meta": {"k_coarse": 0, "k_fine": 0, "hop_struct": hop_struct, "error": str(e)},
         }
+
+
+def _extract_multi_features(
+    y: np.ndarray, sr: int, hop_length: int, chroma_cqt: np.ndarray | None = None
+) -> np.ndarray:
+    """Extract and combine multiple feature types for segmentation.
+
+    IMPROVEMENT 1: Multi-Feature Fusion
+
+    Args:
+        y: Audio time series
+        sr: Sample rate
+        hop_length: Hop length
+        chroma_cqt: Pre-computed chroma (optional)
+
+    Returns:
+        Stacked features (n_features x n_frames)
+    """
+    # 1. MFCC for timbre
+    mfcc = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=13, hop_length=hop_length).astype(np.float32)
+
+    # 2. Chroma for harmonic content
+    if chroma_cqt is not None and chroma_cqt.shape[1] == mfcc.shape[1]:
+        chroma = chroma_cqt.astype(np.float32)
+    else:
+        chroma = librosa.feature.chroma_cqt(y=y, sr=sr, hop_length=hop_length).astype(np.float32)
+        # Align to mfcc length
+        if chroma.shape[1] != mfcc.shape[1]:
+            if chroma.shape[1] > mfcc.shape[1]:
+                chroma = chroma[:, : mfcc.shape[1]]
+            else:
+                chroma = np.pad(chroma, ((0, 0), (0, mfcc.shape[1] - chroma.shape[1])), mode="edge")
+
+    # 3. Spectral contrast for instrumentation
+    try:
+        contrast = librosa.feature.spectral_contrast(y=y, sr=sr, hop_length=hop_length).astype(
+            np.float32
+        )
+        if contrast.shape[1] != mfcc.shape[1]:
+            if contrast.shape[1] > mfcc.shape[1]:
+                contrast = contrast[:, : mfcc.shape[1]]
+            else:
+                contrast = np.pad(
+                    contrast, ((0, 0), (0, mfcc.shape[1] - contrast.shape[1])), mode="edge"
+                )
+    except Exception:
+        # Fallback: use zeros if spectral contrast fails
+        contrast = np.zeros((7, mfcc.shape[1]), dtype=np.float32)
+
+    # 4. Tonnetz for tonal relationships
+    try:
+        y_harm = librosa.effects.harmonic(y)
+        tonnetz = librosa.feature.tonnetz(y=y_harm, sr=sr, hop_length=hop_length).astype(np.float32)
+        if tonnetz.shape[1] != mfcc.shape[1]:
+            if tonnetz.shape[1] > mfcc.shape[1]:
+                tonnetz = tonnetz[:, : mfcc.shape[1]]
+            else:
+                tonnetz = np.pad(
+                    tonnetz, ((0, 0), (0, mfcc.shape[1] - tonnetz.shape[1])), mode="edge"
+                )
+    except Exception:
+        # Fallback: use zeros if tonnetz fails
+        tonnetz = np.zeros((6, mfcc.shape[1]), dtype=np.float32)
+
+    # Stack features with weights
+    features = np.vstack(
+        [
+            mfcc * 1.0,  # Timbre (baseline)
+            chroma * 0.8,  # Harmony (important for section changes)
+            contrast * 0.6,  # Instrumentation
+            tonnetz * 0.5,  # Tonal relationships
+        ]
+    )
+
+    return features
+
+
+def _merge_hierarchical_boundaries(
+    coarse: np.ndarray, fine: np.ndarray, n_frames: int
+) -> np.ndarray:
+    """Merge coarse and fine boundaries intelligently.
+
+    IMPROVEMENT 2: Hierarchical Segmentation
+
+    Args:
+        coarse: Coarse-level boundary frames
+        fine: Fine-level boundary frames
+        n_frames: Total number of frames
+
+    Returns:
+        Merged boundary frames
+    """
+    # Start with all coarse boundaries
+    boundaries = set(coarse.tolist())
+
+    # Add fine boundaries that are far enough from coarse boundaries
+    min_distance_frames = int(n_frames / 50)  # At least 2% of song apart
+
+    for fb in fine:
+        # Check distance to nearest coarse boundary
+        distances = np.abs(coarse - fb)
+        if distances.min() > min_distance_frames:
+            boundaries.add(int(fb))
+
+    return np.sort(np.array(list(boundaries), dtype=int))
+
+
+def _align_boundaries_to_bars(
+    boundary_times: list[float], bars_s: list[float], tolerance_s: float = 2.0
+) -> list[float]:
+    """Snap section boundaries to nearest bar start.
+
+    IMPROVEMENT 3: Beat-Aligned Boundaries
+
+    Args:
+        boundary_times: Original boundary times in seconds
+        bars_s: Bar/downbeat times in seconds
+        tolerance_s: Maximum distance to snap (seconds)
+
+    Returns:
+        Aligned boundary times
+    """
+    if not bars_s:
+        return boundary_times
+
+    bars = np.array(bars_s, dtype=np.float32)
+    aligned = []
+
+    for boundary in boundary_times:
+        # Find nearest bar within tolerance
+        distances = np.abs(bars - boundary)
+        nearest_idx = int(np.argmin(distances))
+
+        if distances[nearest_idx] < tolerance_s:
+            # Snap to bar
+            aligned.append(float(bars[nearest_idx]))
+        else:
+            # Keep original (might be mid-section break)
+            aligned.append(float(boundary))
+
+    # Remove duplicates while preserving order
+    seen = set()
+    result = []
+    for val in aligned:
+        if val not in seen:
+            seen.add(val)
+            result.append(val)
+
+    return sorted(result)
+
+
+def _detect_novelty_boundaries(
+    features: np.ndarray,
+    times_s: np.ndarray,
+    existing_boundaries: np.ndarray,
+    threshold_percentile: float = 85,
+) -> list[float]:
+    """Detect additional boundaries using novelty curve.
+
+    IMPROVEMENT 4: Novelty-Based Refinement
+
+    Args:
+        features: Feature matrix (n_features x n_frames)
+        times_s: Time points in seconds
+        existing_boundaries: Already detected boundaries
+        threshold_percentile: Percentile threshold for peak detection
+
+    Returns:
+        Additional boundary times
+    """
+    try:
+        # Compute self-similarity matrix
+        similarity = librosa.segment.recurrence_matrix(
+            features, mode="affinity", metric="cosine", sparse=False
+        )
+
+        # Compute novelty curve (checkerboard kernel)
+        novelty_curve: np.ndarray = librosa.segment.timelag_filter(  # type: ignore[type-var]  # pyright: ignore[reportArgumentType]
+            similarity  # pyright: ignore[reportArgumentType]
+        )
+
+        # Detect peaks in novelty
+        peaks = librosa.util.peak_pick(
+            novelty_curve,
+            pre_max=3,
+            post_max=3,
+            pre_avg=3,
+            post_avg=5,
+            delta=0.1,
+            wait=10,
+        )
+
+        # Convert to times
+        peak_times = times_s[peaks] if len(peaks) > 0 else np.array([])
+
+        # Add peaks above threshold that aren't near existing boundaries
+        threshold = np.percentile(novelty_curve, threshold_percentile)
+        additional = []
+
+        for pt in peak_times:
+            pt_idx = int(np.searchsorted(times_s, pt))
+            if pt_idx < len(novelty_curve) and novelty_curve[pt_idx] > threshold:
+                # Check if far enough from existing boundaries (at least 3s)
+                if np.min(np.abs(existing_boundaries - pt)) > 3.0:
+                    additional.append(float(pt))
+
+        return additional
+
+    except Exception as e:
+        logger.debug(f"Novelty boundary detection failed: {e}")
+        return []
+
+
+def label_section_contextual(
+    *,
+    idx: int,
+    sections: list[dict[str, Any]],
+    chords: list[dict[str, Any]],
+    builds: list[dict[str, Any]],
+    drops: list[dict[str, Any]],
+    vocal_segments: list[dict[str, Any]],
+    energy_rank: float,
+    repeat_count: int,
+    max_similarity: float,
+    relative_pos: float,
+    duration: float,
+) -> str:
+    """Context-aware section labeling using musical features.
+
+    IMPROVEMENT 5: Context-Aware Labeling
+
+    Args:
+        idx: Section index
+        sections: All sections
+        chords: Chord detections
+        builds: Energy builds
+        drops: Energy drops
+        vocal_segments: Vocal segments
+        energy_rank: Energy rank (0-1)
+        repeat_count: Number of similar sections
+        max_similarity: Max similarity to any other section
+        relative_pos: Relative position in song (0-1)
+        duration: Total song duration
+
+    Returns:
+        Section label
+    """
+    section = sections[idx]
+    start_s, end_s = section["start_s"], section["end_s"]
+    section_duration = end_s - start_s
+    total_sections = len(sections)
+
+    # 1. Check if this section contains a drop (often marks chorus start)
+    has_drop = any(start_s <= d["time_s"] <= end_s for d in drops)
+
+    # 2. Check if preceded by build (pre-chorus or build-up to chorus)
+    preceded_by_build = False
+    if idx > 0:
+        prev_section = sections[idx - 1]
+        preceded_by_build = any(
+            b["end_s"] >= prev_section["start_s"] and b["end_s"] <= start_s for b in builds
+        )
+
+    # 3. Check vocal density
+    vocal_coverage = 0.0
+    if vocal_segments:
+        vocal_time = sum(
+            max(0.0, min(v["end_s"], end_s) - max(v["start_s"], start_s))
+            for v in vocal_segments
+            if v["start_s"] < end_s and v["end_s"] > start_s
+        )
+        vocal_coverage = vocal_time / max(section_duration, 1e-9)
+
+    # 4. Chord progression complexity
+    section_chords = [c for c in chords if start_s <= c["time_s"] < end_s]
+    unique_chords = len({c["chord"] for c in section_chords if c["chord"] != "N"})
+    chord_changes = len([c for c in section_chords if c["chord"] != "N"])
+
+    # Intro: first section, typically lower energy, short
+    if idx == 0 and total_sections > 3:
+        if section_duration < 20 and energy_rank < 0.6:
+            return "intro"
+
+    # Outro: last section, often fading
+    if idx == total_sections - 1 and total_sections > 3:
+        if section_duration < 30 and energy_rank < 0.5:
+            return "outro"
+
+    # Pre-chorus detection (build + high energy + before likely chorus)
+    if preceded_by_build and energy_rank > 0.6 and idx < total_sections - 1:
+        next_section = sections[idx + 1]
+        next_repeat_count = next_section.get("repeat_count", 0)
+        next_energy = next_section.get("energy_rank", 0)
+
+        if next_repeat_count >= 2 and next_energy > energy_rank:
+            return "pre_chorus"
+
+    # Breakdown/drop section (drop + low vocal + low energy relative to context)
+    if has_drop and vocal_coverage < 0.3 and energy_rank < 0.4:
+        return "breakdown"
+
+    # Chorus detection (improved with drops and vocal presence)
+    if repeat_count >= 3 and energy_rank > 0.5:
+        return "chorus"
+    if repeat_count >= 2 and energy_rank > 0.85:
+        return "chorus"
+    if repeat_count >= 2 and has_drop:
+        return "chorus"
+    if repeat_count >= 2 and max_similarity > 0.90 and energy_rank > 0.75:
+        return "chorus"
+    if repeat_count >= 2 and vocal_coverage > 0.7 and energy_rank > 0.65:
+        return "chorus"  # Vocal chorus
+
+    # Bridge: late in song, low repetition, often different harmony
+    if relative_pos > 0.55 and repeat_count <= 1 and max_similarity < 0.75:
+        return "bridge"
+    if (
+        repeat_count == 0
+        and relative_pos > 0.45
+        and chord_changes > 0
+        and unique_chords > chord_changes * 0.6
+    ):
+        return "bridge"  # More diverse harmony
+
+    # Verse: Moderate repetition with lower-to-mid energy
+    if repeat_count >= 2 and energy_rank <= 0.65 and vocal_coverage > 0.6:
+        return "verse"
+    if repeat_count >= 2 and energy_rank <= 0.65:
+        return "verse"
+
+    # Instrumental/solo (low vocal, moderate-high energy)
+    if vocal_coverage < 0.2 and 0.4 < energy_rank < 0.8 and relative_pos > 0.2:
+        return "instrumental"
+
+    # Verse: Low repetition, mid energy, not at extremes
+    if repeat_count <= 1 and 0.3 <= energy_rank <= 0.7 and 0.15 < relative_pos < 0.85:
+        return "verse"
+
+    # Default to verse
+    return "verse"
+
+
+def _detect_subsections(
+    sections: list[dict[str, Any]],
+    features: np.ndarray,
+    times_s: np.ndarray,
+    similarity_threshold: float = 0.75,
+) -> list[dict[str, Any]]:
+    """Split sections into subsections based on internal structure.
+
+    IMPROVEMENT 6: Subsection Detection
+
+    Args:
+        sections: Section list
+        features: Feature matrix (n_features x n_frames)
+        times_s: Time points for features
+        similarity_threshold: Threshold for splitting
+
+    Returns:
+        Refined section list with possible subsections
+    """
+    refined_sections: list[dict[str, Any]] = []
+
+    for section in sections:
+        start_s, end_s = section["start_s"], section["end_s"]
+
+        # Extract features for this section
+        start_idx = int(np.searchsorted(times_s, start_s))
+        end_idx = int(np.searchsorted(times_s, end_s))
+        end_idx = max(end_idx, start_idx + 1)
+
+        section_features = features[:, start_idx:end_idx]
+
+        # Check for internal change point (e.g., verse 1a→1b)
+        if section_features.shape[1] > 20:  # Minimum frames for split
+            # Try to split in half, check if two halves are different
+            mid = section_features.shape[1] // 2
+            first_half = section_features[:, :mid]
+            second_half = section_features[:, mid:]
+
+            first_centroid = np.mean(first_half, axis=1)
+            second_centroid = np.mean(second_half, axis=1)
+
+            sim = cosine_similarity(first_centroid, second_centroid)
+
+            if sim < similarity_threshold:
+                # Split into subsections
+                mid_time = float(times_s[min(start_idx + mid, len(times_s) - 1)])
+
+                # Only split if both halves are reasonable length (at least 4s each)
+                if mid_time - start_s >= 4.0 and end_s - mid_time >= 4.0:
+                    refined_sections.append(
+                        {
+                            **section,
+                            "end_s": mid_time,
+                            "duration_s": mid_time - start_s,
+                            "subsection": "a",
+                        }
+                    )
+                    refined_sections.append(
+                        {
+                            **section,
+                            "section_id": section["section_id"] + 0.1,
+                            "start_s": mid_time,
+                            "end_s": end_s,
+                            "duration_s": end_s - mid_time,
+                            "subsection": "b",
+                        }
+                    )
+                    continue
+
+        # No split, keep original
+        refined_sections.append(section)
+
+    return refined_sections
 
 
 def merge_short_sections(times: list[float], min_s: float, duration: float) -> list[float]:
     """Merge sections shorter than min_s while preserving important boundaries.
-
-    FIXED: Original could lose final section entirely.
 
     Args:
         times: Boundary times
@@ -226,9 +708,9 @@ def label_section(
     end_s: float,
     duration: float,
 ) -> str:
-    """Heuristic section labeling with more nuance.
+    """Heuristic section labeling (legacy function for backward compatibility).
 
-    IMPROVED: Considers position, repetition, and energy.
+    NOTE: Use label_section_contextual for better results with musical context.
 
     Args:
         idx: Section index
@@ -269,7 +751,6 @@ def label_section(
         return "chorus"
 
     # Bridge: late in song, low repetition, often different
-    # Check bridge BEFORE verse since bridge is more specific
     if relative_pos > 0.55 and repeat_count <= 1 and max_similarity < 0.75:
         return "bridge"
 
@@ -278,16 +759,12 @@ def label_section(
         return "bridge"
 
     # Verse: Moderate repetition with lower-to-mid energy
-    # Verses often repeat (verse 1, verse 2) but are less energetic than chorus
     if repeat_count >= 2 and energy_rank <= 0.65:
         return "verse"
 
     # Verse: Low repetition, mid energy, not at extremes of song
     if repeat_count <= 1 and 0.3 <= energy_rank <= 0.7 and 0.15 < relative_pos < 0.85:
         return "verse"
-
-    # Pre-chorus: just before high-energy repeated section
-    # (would need lookahead - simplified here)
 
     # Default to verse
     return "verse"

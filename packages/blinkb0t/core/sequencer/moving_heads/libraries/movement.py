@@ -66,6 +66,111 @@ DEFAULT_MOVEMENT_PARAMS = {
     Intensity.INTENSE: MovementCategoricalParams(amplitude=1.0, frequency=3.0, center_offset=0.5),
 }
 
+# Curve-specific optimized intensity parameters
+# Generated from optimization script with target energy ratios:
+# SLOW (0.5x), SMOOTH (1.0x baseline), FAST (1.25x), DRAMATIC (1.5x), INTENSE (2.0x)
+CURVE_INTENSITY_PARAMS: dict[CurveLibrary, dict[Intensity, MovementCategoricalParams]] = {
+    CurveLibrary.MOVEMENT_SINE: {
+        Intensity.SLOW: MovementCategoricalParams(amplitude=0.200, frequency=0.500, center_offset=0.5),
+        Intensity.SMOOTH: MovementCategoricalParams(amplitude=0.600, frequency=1.000, center_offset=0.5),
+        Intensity.FAST: MovementCategoricalParams(amplitude=0.800, frequency=1.625, center_offset=0.5),
+        Intensity.DRAMATIC: MovementCategoricalParams(
+            amplitude=0.900, frequency=1.050, center_offset=0.5
+        ),
+        Intensity.INTENSE: MovementCategoricalParams(
+            amplitude=1.000, frequency=2.600, center_offset=0.5
+        ),
+    },
+    CurveLibrary.MOVEMENT_TRIANGLE: {
+        Intensity.SLOW: MovementCategoricalParams(amplitude=0.300, frequency=0.650, center_offset=0.5),
+        Intensity.SMOOTH: MovementCategoricalParams(amplitude=0.600, frequency=1.000, center_offset=0.5),
+        Intensity.FAST: MovementCategoricalParams(amplitude=0.800, frequency=1.062, center_offset=0.5),
+        Intensity.DRAMATIC: MovementCategoricalParams(
+            amplitude=0.900, frequency=1.050, center_offset=0.5
+        ),
+        Intensity.INTENSE: MovementCategoricalParams(
+            amplitude=1.000, frequency=2.000, center_offset=0.5
+        ),
+    },
+    CurveLibrary.MOVEMENT_PULSE: {
+        Intensity.SLOW: MovementCategoricalParams(amplitude=0.200, frequency=0.350, center_offset=0.5),
+        Intensity.SMOOTH: MovementCategoricalParams(amplitude=0.600, frequency=1.150, center_offset=0.5),
+        Intensity.FAST: MovementCategoricalParams(amplitude=0.800, frequency=1.625, center_offset=0.5),
+        Intensity.DRAMATIC: MovementCategoricalParams(
+            amplitude=0.900, frequency=1.725, center_offset=0.5
+        ),
+        Intensity.INTENSE: MovementCategoricalParams(
+            amplitude=1.000, frequency=2.600, center_offset=0.5
+        ),
+    },
+    CurveLibrary.MOVEMENT_COSINE: {
+        Intensity.SLOW: MovementCategoricalParams(amplitude=0.200, frequency=0.350, center_offset=0.5),
+        Intensity.SMOOTH: MovementCategoricalParams(amplitude=0.400, frequency=0.850, center_offset=0.5),
+        Intensity.FAST: MovementCategoricalParams(amplitude=0.600, frequency=0.875, center_offset=0.5),
+        Intensity.DRAMATIC: MovementCategoricalParams(
+            amplitude=0.700, frequency=1.050, center_offset=0.5
+        ),
+        Intensity.INTENSE: MovementCategoricalParams(
+            amplitude=0.900, frequency=2.600, center_offset=0.5
+        ),
+    },
+    CurveLibrary.MOVEMENT_LISSAJOUS: {
+        Intensity.SLOW: MovementCategoricalParams(amplitude=0.200, frequency=0.350, center_offset=0.5),
+        Intensity.SMOOTH: MovementCategoricalParams(amplitude=0.400, frequency=1.000, center_offset=0.5),
+        Intensity.FAST: MovementCategoricalParams(amplitude=0.600, frequency=1.625, center_offset=0.5),
+        Intensity.DRAMATIC: MovementCategoricalParams(
+            amplitude=0.700, frequency=1.500, center_offset=0.5
+        ),
+        Intensity.INTENSE: MovementCategoricalParams(
+            amplitude=0.900, frequency=2.600, center_offset=0.5
+        ),
+    },
+    CurveLibrary.MOVEMENT_PERLIN_NOISE: {
+        Intensity.SLOW: MovementCategoricalParams(amplitude=0.400, frequency=0.350, center_offset=0.5),
+        Intensity.SMOOTH: MovementCategoricalParams(amplitude=0.450, frequency=0.700, center_offset=0.5),
+        Intensity.FAST: MovementCategoricalParams(amplitude=0.600, frequency=0.875, center_offset=0.5),
+        Intensity.DRAMATIC: MovementCategoricalParams(
+            amplitude=0.700, frequency=1.050, center_offset=0.5
+        ),
+        Intensity.INTENSE: MovementCategoricalParams(
+            amplitude=0.900, frequency=1.400, center_offset=0.5
+        ),
+    },
+}
+
+
+def get_curve_categorical_params(
+    curve_id: CurveLibrary,
+    intensity: Intensity,
+) -> MovementCategoricalParams:
+    """Get categorical parameters for a curve at a given intensity.
+
+    Returns curve-specific optimized params if available, otherwise falls back
+    to DEFAULT_MOVEMENT_PARAMS.
+
+    Args:
+        curve_id: Curve identifier
+        intensity: Intensity level
+
+    Returns:
+        Categorical parameters for the curve at the given intensity
+
+    Example:
+        >>> params = get_curve_categorical_params(CurveLibrary.MOVEMENT_SINE, Intensity.SMOOTH)
+        >>> params.amplitude
+        0.6
+        >>> params.frequency
+        1.0
+    """
+    # Check for curve-specific params first
+    if curve_id in CURVE_INTENSITY_PARAMS:
+        curve_params = CURVE_INTENSITY_PARAMS[curve_id]
+        if intensity in curve_params:
+            return curve_params[intensity]
+
+    # Fall back to defaults
+    return DEFAULT_MOVEMENT_PARAMS[intensity]
+
 
 class MovementType(str, Enum):
     """All available movement pattern identifiers."""

@@ -6,8 +6,16 @@ from blinkb0t.core.curves.models import CurvePoint
 from blinkb0t.core.curves.sampling import sample_uniform_grid
 
 
-def generate_anticipate(n_samples: int) -> list[CurvePoint]:
-    """Generate an anticipate curve (pull back then accelerate forward)."""
+def generate_anticipate(n_samples: int, **kwargs) -> list[CurvePoint]:
+    """Generate an anticipate curve (pull back then accelerate forward).
+
+    Args:
+        n_samples: Number of samples to generate (must be >= 2).
+        **kwargs: Ignored parameters (for compatibility).
+
+    Returns:
+        List of CurvePoints with anticipate motion.
+    """
     if n_samples < 2:
         raise ValueError("n_samples must be >= 2")
 
@@ -27,8 +35,16 @@ def generate_anticipate(n_samples: int) -> list[CurvePoint]:
     return points
 
 
-def generate_overshoot(n_samples: int) -> list[CurvePoint]:
-    """Generate an overshoot curve that settles at 1.0."""
+def generate_overshoot(n_samples: int, **kwargs) -> list[CurvePoint]:
+    """Generate an overshoot curve that settles at 1.0.
+
+    Args:
+        n_samples: Number of samples to generate (must be >= 2).
+        **kwargs: Ignored parameters (for compatibility).
+
+    Returns:
+        List of CurvePoints with overshoot motion.
+    """
     if n_samples < 2:
         raise ValueError("n_samples must be >= 2")
 

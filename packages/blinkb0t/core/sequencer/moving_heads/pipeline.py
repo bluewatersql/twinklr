@@ -136,10 +136,43 @@ class RenderingPipeline:
                     )
                     logger.debug(f"Applying preset: {preset.name}")
                 except StopIteration:
-                    logger.warning(
-                        f"Preset '{section.preset_id}' not found for template "
-                        f"'{section.template_id}', using base template"
-                    )
+                    # Preset not found - try to infer intensity from preset_id
+                    from blinkb0t.core.sequencer.models.enum import Intensity
+                    from blinkb0t.core.sequencer.models.template import StepPatch, TemplatePreset
+
+                    intensity_map = {
+                        "CHILL": Intensity.SLOW,
+                        "MODERATE": Intensity.SMOOTH,
+                        "ENERGETIC": Intensity.DRAMATIC,
+                        "INTENSE": Intensity.FAST,
+                    }
+
+                    preset_id_upper = section.preset_id.upper()
+                    if preset_id_upper in intensity_map:
+                        # Auto-create preset with inferred intensity
+                        intensity = intensity_map[preset_id_upper]
+                        step_patches = {
+                            step.step_id: StepPatch(
+                                movement={"intensity": intensity.value},
+                                dimmer={"intensity": intensity.value},
+                            )
+                            for step in template.steps
+                        }
+                        preset = TemplatePreset(
+                            preset_id=section.preset_id,
+                            name=section.preset_id.title(),
+                            defaults={},
+                            step_patches=step_patches,
+                        )
+                        logger.info(
+                            f"Auto-generated preset '{section.preset_id}' "
+                            f"with intensity {intensity.value} for template '{section.template_id}'"
+                        )
+                    else:
+                        logger.warning(
+                            f"Preset '{section.preset_id}' not found for template "
+                            f"'{section.template_id}' and couldn't infer intensity, using base template"
+                        )
 
             # Build fixture contexts
             fixture_contexts = self._build_fixture_contexts()
@@ -205,7 +238,7 @@ class RenderingPipeline:
             if section.segments:
                 for seg in section.segments:
                     yield PlanSection(
-                        section_name=section.section_name,
+                        section_name=f"{section.section_name}|{seg.segment_id}",
                         start_bar=seg.start_bar,
                         end_bar=seg.end_bar,
                         section_role=section.section_role,

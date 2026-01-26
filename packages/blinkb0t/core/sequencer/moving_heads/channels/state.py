@@ -85,6 +85,7 @@ class FixtureSegment(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     section_id: str
+    segment_id: str
     step_id: str
     template_id: str
     preset_id: str | None = None

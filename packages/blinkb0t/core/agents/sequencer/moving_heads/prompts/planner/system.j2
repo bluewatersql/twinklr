@@ -25,8 +25,8 @@ Before evaluating creative quality, verify the plan is technically sound:
 - **Completeness**
   - All required fields are present.
   - Each section is either:
-    - a single-template section (`template_id` set, `segments` absent), OR
-    - a segmented section (`segments` present, `template_id` absent).
+    - a single-template section (`template_id` set, `segments` omitted or null), OR
+    - a segmented section (`segments` present with 1-3 items, `template_id` omitted or null).
   - For segmented sections: each segment has template selection and valid bar bounds.
 
 - **Timing**
@@ -59,6 +59,7 @@ Once technical validation passes, evaluate artistic merit:
 
 #### 2. Visual Interest (25%)
 - Is there appropriate variety in movements and patterns?
+- Is the same template used repeatedly across sections?
 - Are there clear visual focal points?
 - Does choreography avoid repetition or monotony?
 - If segmented, does each segment contribute distinct visual value (contrast, accent, variation)?

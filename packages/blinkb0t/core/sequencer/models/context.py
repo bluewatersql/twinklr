@@ -39,6 +39,7 @@ class StepCompileContext(BaseModel):
         start_ms: Start time in milliseconds.
         duration_ms: Duration in milliseconds.
         n_samples: Number of samples for curves.
+        beat_grid: Beat grid for timing conversions (needed for period_bars → cycles).
         geometry_registry: Registry of geometry handlers.
         movement_registry: Registry of movement handlers.
         dimmer_registry: Registry of dimmer handlers.
@@ -47,6 +48,7 @@ class StepCompileContext(BaseModel):
     model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
 
     section_id: str
+    segment_id: str
     template_id: str
     preset_id: str | None = None
 
@@ -57,6 +59,7 @@ class StepCompileContext(BaseModel):
     duration_ms: int
     n_samples: int = Field(default=64, ge=2)
 
+    beat_grid: BeatGrid  # Added for period_bars → cycles conversion
     curve_registry: CurveRegistry
     geometry_registry: GeometryRegistry
     movement_registry: MovementRegistry

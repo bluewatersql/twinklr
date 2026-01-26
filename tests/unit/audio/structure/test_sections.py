@@ -129,7 +129,17 @@ class TestDetectSongSections:
             hop_length=hop_length,
         )
 
-        valid_labels = {"intro", "verse", "chorus", "bridge", "outro", "full"}
+        valid_labels = {
+            "intro",
+            "verse",
+            "chorus",
+            "bridge",
+            "outro",
+            "full",
+            "pre_chorus",
+            "breakdown",
+            "instrumental",
+        }
         for section in result["sections"]:
             assert section["label"] in valid_labels
 
@@ -139,15 +149,19 @@ class TestDetectSongSections:
         sample_rate: int,
         hop_length: int,
     ) -> None:
-        """Meta dict contains clustering parameter k."""
+        """Meta dict contains clustering parameters."""
         result = detect_song_sections(
             long_audio,
             sample_rate,
             hop_length=hop_length,
         )
 
-        assert "k" in result["meta"]
-        assert result["meta"]["k"] >= 1
+        # New version uses k_coarse and k_fine
+        assert "k_coarse" in result["meta"] or "k" in result["meta"]
+        if "k_coarse" in result["meta"]:
+            assert result["meta"]["k_coarse"] >= 1
+        if "k" in result["meta"]:
+            assert result["meta"]["k"] >= 1
 
     def test_custom_min_section_duration(
         self,

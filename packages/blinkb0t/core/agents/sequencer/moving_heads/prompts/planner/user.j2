@@ -53,8 +53,8 @@ Provide your plan as a JSON object matching this schema:
 1. **Template Selection**: Use ONLY template IDs from the Template Library list above (exactly as written)
 2. **Template Composition**: Each template is a complete choreography unit with movement, geometry, and dimmer patterns already configured
 3. **Your Job**: For each song section, choose either:
-   - **Single-template section**: provide `template_id` (+ optional `preset_id`, `modifiers`) for the entire section bar range, OR
-   - **Segmented section**: provide `segments` (1 to 3 items). Each segment must include `segment_id`, `start_bar`, `end_bar`, `template_id` (+ optional `preset_id`, `modifiers`).
+   - **Single-template section**: provide `template_id` (+ optional `preset_id`, `modifiers`) for the entire section bar range. Leave `segments` omitted or set to `null`.
+   - **Segmented section**: provide `segments` (1 to 3 items, not null or empty). Each segment must include `segment_id`, `start_bar`, `end_bar`, `template_id` (+ optional `preset_id`, `modifiers`). Leave section-level `template_id` omitted or `null`.
 4. **Segmentation Rules** (only if using `segments`):
    - Max **3** segments per section
    - Segments must be **contiguous** and **non-overlapping**

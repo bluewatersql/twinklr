@@ -214,6 +214,9 @@ STANDARD_POSES: dict[PoseLibrary, Pose] = {
     ),
     PoseLibrary.SKY: Pose(pose_id=PoseLibrary.SKY, name="Sky", pan_deg=0.0, tilt_deg=80.0),
     PoseLibrary.CEILING: Pose(pose_id=PoseLibrary.CEILING, name="Sky", pan_deg=0.0, tilt_deg=80.0),
+    PoseLibrary.HORIZON_UP_45: Pose(
+        pose_id=PoseLibrary.HORIZON_UP_45, name="Horizon Up 45", pan_deg=0.0, tilt_deg=30.0
+    ),
     PoseLibrary.HORIZON: Pose(
         pose_id=PoseLibrary.HORIZON, name="Horizon", pan_deg=0.0, tilt_deg=0.0
     ),

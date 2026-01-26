@@ -59,7 +59,6 @@ class PlanSection(BaseModel):
     modifiers: dict[str, str] = Field(default_factory=dict, description="Optional modifiers")
     reasoning: str = Field(default="", description="Why this template/preset was chosen")
 
-    # New: optional segmented plan
     segments: list[PlanSegment] | None = Field(
         None,
         description="Optional 1–3 contiguous segments that partition this section",

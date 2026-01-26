@@ -140,7 +140,9 @@ class HeuristicValidator:
             )
 
         # 2) schema form: either single-template OR segmented
-        has_segments = bool(getattr(section, "segments", None))
+        # Note: segments can be None (null in JSON) or omitted entirely - both are treated as "no segments"
+        segments_value = getattr(section, "segments", None)
+        has_segments = bool(segments_value)  # None, [], or missing all evaluate to False
         has_single = bool(getattr(section, "template_id", None))
 
         if has_segments and has_single:

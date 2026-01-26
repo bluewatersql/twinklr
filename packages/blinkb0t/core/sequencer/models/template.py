@@ -173,6 +173,9 @@ class Movement(BaseModel):
         intensity: Movement intensity preset (e.g., "SMOOTH", "FAST").
         cycles: Number of movement cycles in the step duration.
         params: Additional parameters for the movement handler.
+        amplitude_override: Optional amplitude override [0, 1].
+        frequency_override: Optional frequency override [0, 10].
+        center_offset_override: Optional center offset override [0, 1].
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -181,6 +184,47 @@ class Movement(BaseModel):
     intensity: Intensity = Intensity.SMOOTH
     cycles: float = 1.0
     params: dict[str, Any] = Field(default_factory=dict)
+
+    # Categorical parameter overrides
+    amplitude_override: float | None = Field(default=None, ge=0.0, le=1.0)
+    frequency_override: float | None = Field(default=None, ge=0.0, le=10.0)
+    center_offset_override: float | None = Field(default=None, ge=0.0, le=1.0)
+
+    def get_categorical_params(self, curve_id: "CurveLibrary") -> Any:
+        """Get categorical parameters for this movement, applying any overrides.
+
+        Args:
+            curve_id: Curve identifier to get base params for
+
+        Returns:
+            Categorical parameters with overrides applied
+
+        Example:
+            >>> from blinkb0t.core.curves.library import CurveLibrary
+            >>> movement = Movement(
+            ...     movement_type=MovementType.SWEEP_LR,
+            ...     intensity=Intensity.SMOOTH,
+            ...     amplitude_override=0.8,
+            ... )
+            >>> params = movement.get_categorical_params(CurveLibrary.MOVEMENT_SINE)
+            >>> params.amplitude
+            0.8
+        """
+        # Import here to avoid circular dependency
+        from blinkb0t.core.sequencer.moving_heads.libraries.movement import (
+            MovementCategoricalParams,
+            get_curve_categorical_params,
+        )
+
+        # Get base params from curve and intensity
+        base_params = get_curve_categorical_params(curve_id, self.intensity)
+
+        # Apply overrides
+        return MovementCategoricalParams(
+            amplitude=self.amplitude_override if self.amplitude_override is not None else base_params.amplitude,
+            frequency=self.frequency_override if self.frequency_override is not None else base_params.frequency,
+            center_offset=self.center_offset_override if self.center_offset_override is not None else base_params.center_offset,
+        )
 
 
 class Dimmer(BaseModel):

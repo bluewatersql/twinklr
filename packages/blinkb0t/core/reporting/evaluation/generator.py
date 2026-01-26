@@ -42,6 +42,45 @@ from blinkb0t.core.reporting.evaluation.validate import (
 logger = logging.getLogger(__name__)
 
 
+def _expand_plan_sections(plan):
+    """Expand plan sections into individual sections per segment.
+
+    This mimics the behavior of RenderingPipeline.iterate_plan_sections().
+
+    Args:
+        plan: ChoreographyPlan with potentially segmented sections
+
+    Returns:
+        List of PlanSection objects (one per segment)
+    """
+    from blinkb0t.core.agents.sequencer.moving_heads.models import PlanSection
+
+    expanded = []
+    for section in plan.sections:
+        if section.segments:
+            # Expand each segment into its own PlanSection
+            for seg in section.segments:
+                expanded.append(
+                    PlanSection(
+                        section_name=f"{section.section_name}|{seg.segment_id}",
+                        start_bar=seg.start_bar,
+                        end_bar=seg.end_bar,
+                        section_role=section.section_role,
+                        energy_level=section.energy_level,
+                        template_id=seg.template_id,
+                        preset_id=seg.preset_id,
+                        modifiers=seg.modifiers,
+                        reasoning=seg.reasoning or section.reasoning,
+                        segments=None,  # Don't carry segments forward
+                    )
+                )
+        else:
+            # No segments, keep as-is
+            expanded.append(section)
+
+    return expanded
+
+
 def generate_evaluation_report(
     *,
     checkpoint_path: Path,
@@ -149,8 +188,14 @@ def generate_evaluation_report(
         song_structure=structure_info,
     )
 
+    # Expand plan sections (segments → individual sections)
+    # This matches the rendering pipeline's behavior
+    expanded_sections = _expand_plan_sections(plan)
+
     # Process sections
-    logger.info("Processing sections...")
+    logger.info(
+        f"Processing {len(expanded_sections)} sections (expanded from {len(plan.sections)} plan sections)..."
+    )
     section_reports = []
     all_templates = set()
     all_roles = set()
@@ -159,7 +204,7 @@ def generate_evaluation_report(
     physics_violations_count = 0
     compliance_issues_count = 0
 
-    for plan_section in plan.sections:
+    for plan_section in expanded_sections:
         section_report = _process_section(
             plan_section=plan_section,
             render_data=render_data,
@@ -202,12 +247,14 @@ def generate_evaluation_report(
             # Check if there's a next section to transition to
             if i < len(section_reports) - 1:
                 # Extract boundary curves for transition analysis
-                current_end_ms = int(plan.sections[i].end_bar * song_metadata.bar_duration_ms)
-                next_start_ms = int(plan.sections[i + 1].start_bar * song_metadata.bar_duration_ms)
+                current_end_ms = int(expanded_sections[i].end_bar * song_metadata.bar_duration_ms)
+                next_start_ms = int(
+                    expanded_sections[i + 1].start_bar * song_metadata.bar_duration_ms
+                )
 
                 # Extract last 10% of current section
                 current_duration_ms = current_end_ms - int(
-                    plan.sections[i].start_bar * song_metadata.bar_duration_ms
+                    expanded_sections[i].start_bar * song_metadata.bar_duration_ms
                 )
                 boundary_window_ms = max(
                     100, int(current_duration_ms * 0.1)
@@ -223,7 +270,7 @@ def generate_evaluation_report(
 
                 # Extract first 10% of next section
                 next_duration_ms = (
-                    int(plan.sections[i + 1].end_bar * song_metadata.bar_duration_ms)
+                    int(expanded_sections[i + 1].end_bar * song_metadata.bar_duration_ms)
                     - next_start_ms
                 )
                 next_boundary_window_ms = max(
@@ -260,8 +307,8 @@ def generate_evaluation_report(
 
                 # Analyze transition
                 transition = analyze_section_transition(
-                    from_section_name=plan.sections[i].section_name,
-                    to_section_name=plan.sections[i + 1].section_name,
+                    from_section_name=expanded_sections[i].section_name,
+                    to_section_name=expanded_sections[i + 1].section_name,
                     from_curves=from_curves_by_role,
                     to_curves=to_curves_by_role,
                     config=config,
@@ -342,12 +389,26 @@ def _process_section(
     Returns:
         SectionReport with analysis and plots
     """
+    # Parse section_id and segment_id from section_name
+    # Format: "section_name|segment_id" or just "section_name"
+    if "|" in plan_section.section_name:
+        section_id, segment_id = plan_section.section_name.split("|", 1)
+    else:
+        section_id = plan_section.section_name
+        segment_id = None
+
     # Calculate time window
     start_ms = int(plan_section.start_bar * song_metadata.bar_duration_ms)
     end_ms = int(plan_section.end_bar * song_metadata.bar_duration_ms)
 
+    # Create display label
+    if segment_id:
+        display_label = f"{section_id.replace('_', ' ').title()} (Segment {segment_id})"
+    else:
+        display_label = section_id.replace("_", " ").title()
+
     logger.debug(
-        f"Processing {plan_section.section_name}: "
+        f"Processing {display_label}: "
         f"bars {plan_section.start_bar}-{plan_section.end_bar}, "
         f"time {start_ms}-{end_ms}ms"
     )
@@ -399,7 +460,13 @@ def _process_section(
             static_dmx = None
 
             for seg in render_data.segments:
-                if seg.fixture_id == fixture_id and seg.t0_ms >= start_ms and seg.t1_ms <= end_ms:
+                # Check if segment overlaps with section time window
+                seg_overlaps = (
+                    seg.fixture_id == fixture_id
+                    and seg.t0_ms < end_ms  # Segment starts before section ends
+                    and seg.t1_ms > start_ms  # Segment ends after section starts
+                )
+                if seg_overlaps:
                     if channel_name in seg.channels:
                         # Extract channel-specific metadata based on channel type
                         # channel_name is lowercase string like "pan", "tilt", "dimmer"
@@ -433,8 +500,10 @@ def _process_section(
                         break
 
             # Analyze
-            stats, flags = analyze_curve(samples, config)
-            continuity = check_loop_continuity(samples, config.loop_delta_threshold)
+            stats, flags = analyze_curve(samples, config, curve_type=curve_type)
+            continuity = check_loop_continuity(
+                samples, config.loop_delta_threshold, curve_type=curve_type, channel=channel_name
+            )
 
             # Phase 2: Physics constraints check (if enabled)
             physics_check = None
@@ -479,7 +548,11 @@ def _process_section(
                 )
 
             # Plot
-            plot_filename = f"{plan_section.section_name}__{role}__{channel_name.lower()}.png"
+            # Create filename with section_id and segment_id
+            if segment_id:
+                plot_filename = f"{section_id}_seg{segment_id}__{role}__{channel_name.lower()}.png"
+            else:
+                plot_filename = f"{section_id}__{role}__{channel_name.lower()}.png"
             plot_path = output_dir / "plots" / plot_filename
 
             # Format curve type for display
@@ -490,7 +563,7 @@ def _process_section(
 
             plot_curve(
                 samples=samples,
-                title=f"{plan_section.section_name.replace('_', ' ').title()} • {role} • {channel_name.upper()}",
+                title=f"{display_label} • {role} • {channel_name.upper()}",
                 output_path=plot_path,
                 space="dmx",
                 bar_range=(plan_section.start_bar, plan_section.end_bar),
@@ -552,12 +625,12 @@ def _process_section(
         )
 
     return SectionReport(
-        section_id=plan_section.section_name,
-        label=plan_section.section_name.replace("_", " ").title(),
+        section_id=section_id,
+        label=display_label,
         bar_range=(plan_section.start_bar, plan_section.end_bar),
         time_range_ms=(start_ms, end_ms),
         selected_template=template_selection,
-        segments=None,  # TODO: handle segmented sections
+        segments=None,  # Segments are now processed individually
         targets=TargetResolution(
             bindings={},
             resolved_roles=[f.role for f in render_data.fixture_contexts],

@@ -174,9 +174,14 @@ def compile_template(
                 f"Fixture {fixture.fixture_id} Offset: {offset_bars} - Phase offset norm: {phase_offset_norm} - Wrap: {phase_offsets.wrap}"
             )
 
+            section_segment = context.section_id.split("|")
+            section_id = section_segment[0]
+            segment_id = section_segment[1] if len(section_segment) > 1 else "A"
+
             # Build step compile context
             step_context = StepCompileContext(
-                section_id=context.section_id,
+                section_id=section_id,
+                segment_id=segment_id,
                 template_id=context.template_id,
                 preset_id=context.preset_id,
                 fixture_id=fixture.fixture_id,
@@ -185,6 +190,7 @@ def compile_template(
                 start_ms=start_ms,
                 duration_ms=duration_ms,
                 n_samples=context.n_samples,
+                beat_grid=context.beat_grid,  # Added for period_bars → cycles conversion
                 curve_registry=context.curve_registry,
                 geometry_registry=context.geometry_registry,
                 movement_registry=context.movement_registry,
@@ -361,6 +367,7 @@ def _clip_segments_to_boundary(
         # Create clipped segment
         clipped_segment = FixtureSegment(
             section_id=segment.section_id,
+            segment_id=segment.segment_id,
             step_id=segment.step_id,
             template_id=segment.template_id,
             preset_id=segment.preset_id,

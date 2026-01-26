@@ -103,7 +103,8 @@ class TestBuildRunMetadata:
         checkpoint_data = {}
 
         metadata = build_run_metadata(checkpoint_path, checkpoint_data)
-        assert metadata.run_id == "unknown"
+        # When run_id is missing, it uses the filename stem
+        assert metadata.run_id == "test"
 
     def test_metadata_includes_timestamp(self, tmp_path):
         """Test that metadata includes timestamp."""

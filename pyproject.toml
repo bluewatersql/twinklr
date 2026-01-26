@@ -86,6 +86,7 @@ ignore = [
     "PERF401", # Manual list comprehension
     "T201",    # print() statements
     "N806",
+    "RUF001",
 ]
 
 [tool.ruff.lint.isort]

@@ -53,17 +53,21 @@ class DefaultDimmerHandler:
         intensity: Intensity,
         min_norm: float,
         max_norm: float,
+        template_duration_ms: int | None = None,
+        beat_grid: Any | None = None,
     ) -> DimmerResult:
         """Generate dimmer curves from library pattern.
 
         Args:
             params: Handler parameters:
-                - dimmer_id: Dimmer pattern ID (required)
+                - dimmer_pattern: Dimmer pattern (required).
             n_samples: Number of samples to generate.
-            cycles: Number of dimmer cycles (unused for most dimmers).
+            cycles: Number of dimmer cycles (base value, may be unused).
             intensity: Intensity level (used to select categorical params).
             min_norm: Starting brightness [0, 1].
             max_norm: Ending brightness [0, 1].
+            template_duration_ms: Template duration in milliseconds (for period conversion).
+            beat_grid: Beat grid for converting period_bars to milliseconds.
 
         Returns:
             DimmerResult with dimmer curve.
@@ -111,9 +115,29 @@ class DefaultDimmerHandler:
                 period=categorical_params.period,
             )
         else:
+            # Convert period_bars to cycles if both template_duration_ms and beat_grid are available
+            computed_cycles = cycles  # Default to passed cycles
+            period_bars = categorical_params.period
+
+            if template_duration_ms is not None and beat_grid is not None and period_bars > 0:
+                # Convert period from bars to milliseconds using beat_grid.ms_per_bar
+                period_ms = period_bars * beat_grid.ms_per_bar
+                # Calculate cycles: how many periods fit in the template duration
+                computed_cycles = template_duration_ms / period_ms
+                renderer_log.info(
+                    f"Period conversion: {period_bars} bars = {period_ms:.0f}ms → {computed_cycles:.2f} cycles (template: {template_duration_ms}ms)"
+                )
+            else:
+                renderer_log.warning(
+                    f"Cannot compute cycles from period_bars ({period_bars}): "
+                    f"template_duration_ms={template_duration_ms}, beat_grid={'present' if beat_grid else 'missing'}"
+                )
+
             dimmer_curve = self._generate_curve(
                 curve_type=pattern.curve,
                 n_samples=n_samples,
+                cycles=computed_cycles,  # Use computed cycles
+                amplitude=1.0,  # Amplitude handled via min/max intensity
                 min_intensity=categorical_params.min_intensity,
                 max_intensity=categorical_params.max_intensity,
                 min_norm=min_norm,
@@ -153,6 +177,8 @@ class DefaultDimmerHandler:
         self,
         curve_type: Any,
         n_samples: int,
+        cycles: float,
+        amplitude: float,
         min_intensity: int,
         max_intensity: int,
         min_norm: float,
@@ -160,9 +186,15 @@ class DefaultDimmerHandler:
     ) -> list[CurvePoint]:
         """Generate a dimmer curve with specified parameters.
 
+        Intensity parameters (amplitude, cycles) are passed to the curve generator.
+        The amplitude parameter is typically 1.0 for dimmers since min/max_intensity
+        already control the range.
+
         Args:
             curve_type: CurveLibrary enum value.
             n_samples: Number of samples.
+            cycles: Number of cycles (converted from period_bars by caller).
+            amplitude: Amplitude scaling [0, 1] (typically 1.0 for dimmers).
             min_intensity: Min DMX intensity from categorical params [0, 255].
             max_intensity: Max DMX intensity from categorical params [0, 255].
             min_norm: Min normalized brightness [0, 1].
@@ -171,10 +203,18 @@ class DefaultDimmerHandler:
         Returns:
             List of curve points in normalized space [0, 1].
         """
+        # Build curve generation parameters with intensity params
+        curve_params = {
+            "cycles": cycles,
+            "amplitude": amplitude,
+            # frequency is NOT passed - cycles already incorporates timing
+        }
+
         # Generate base curve - already in normalized [0, 1] space
         base_curve = self._curve_gen.generate_custom_points(
             curve_id=curve_type.value,
             num_points=n_samples,
+            **curve_params,
         )
 
         # Get curve definition to check kind

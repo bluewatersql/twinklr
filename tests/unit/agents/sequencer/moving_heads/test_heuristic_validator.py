@@ -267,3 +267,37 @@ def test_validate_template_exists(available_templates, song_structure):
     # Should be valid with existing template
     assert result.valid is True
     assert len(result.errors) == 0
+
+
+def test_validate_segments_null_accepted(available_templates, song_structure):
+    """Test that segments: null is accepted as equivalent to omitting segments."""
+    validator = HeuristicValidator(
+        available_templates=available_templates,
+        song_structure=song_structure,
+    )
+
+    # Create a plan with segments explicitly set to None (null in JSON)
+    plan = ChoreographyPlan(
+        sections=[
+            PlanSection(
+                section_name="intro",
+                start_bar=1,
+                end_bar=8,
+                template_id="sweep_lr_fan_pulse",
+                segments=None,  # Explicitly set to None (null in JSON)
+            ),
+            PlanSection(
+                section_name="verse",
+                start_bar=9,
+                end_bar=24,
+                template_id="circle_fan_hold",
+                segments=None,  # Explicitly set to None
+            ),
+        ]
+    )
+
+    result = validator.validate(plan)
+
+    # Should be valid - segments: null is treated the same as omitting segments
+    assert result.valid is True
+    assert len(result.errors) == 0

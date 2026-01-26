@@ -86,7 +86,15 @@ def build_run_metadata(checkpoint_path: Path, checkpoint_data: dict) -> RunMetad
         'a3f9b2c1'
     """
     # Extract run ID from checkpoint
-    run_id = checkpoint_data.get("run_id", "unknown")
+    # Try multiple sources: explicit run_id, project_name from context, or checkpoint filename
+    run_id = checkpoint_data.get("run_id")
+    if not run_id:
+        # Try to get project name from context
+        context = checkpoint_data.get("context", {})
+        run_id = context.get("project_name")
+    if not run_id:
+        # Fall back to checkpoint filename (without extension)
+        run_id = checkpoint_path.stem
 
     # Get git SHA (if in git repo)
     git_sha = None

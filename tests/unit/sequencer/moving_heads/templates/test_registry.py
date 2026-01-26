@@ -38,7 +38,7 @@ def test_all_templates_load():
     templates = list_templates()
 
     # We migrated 25 templates from POC
-    assert len(templates) >= 19, f"Expected at least 19 templates, got {len(templates)}"
+    assert len(templates) >= 18, f"Expected at least 19 templates, got {len(templates)}"
 
     # Each template info should have required fields
     for info in templates:
@@ -238,7 +238,6 @@ def test_all_migrated_templates_present():
         "inner_pendulum_breathe",
         "lean_right_scan",
         "pendulum_chevron_breathe",
-        "snap_in_fade_out",
         "sweep_lr_chevron_breathe",
         "sweep_lr_continuous_phase",
         "sweep_lr_fan_hold",

@@ -95,6 +95,41 @@ class NativeCurve(BaseModel):
     params: dict[str, Any] = Field(default_factory=dict)
 
 
+class CurveIntensityParams(BaseModel):
+    """Standard intensity parameters for curve generation.
+
+    These parameters are derived from categorical params based on Intensity level.
+    Not all parameters are relevant to all curve types - functions should
+    ignore irrelevant parameters.
+
+    NOTE: This model is for documentation/validation purposes. Curve functions
+    receive these as **kwargs, not as a model instance.
+
+    Period is NOT included here - it's a planning-level concept in bars that
+    handlers convert to cycles before passing to curve functions.
+
+    Attributes:
+        amplitude: Amplitude scaling factor [0, 1] (default: 1.0).
+        frequency: Frequency multiplier [0, 10] (default: 1.0).
+        center_offset: Center offset for movement curves [0, 1] (default: 0.5).
+
+    Example:
+        >>> params = CurveIntensityParams(amplitude=0.5, frequency=2.0)
+        >>> params.to_dict()
+        {'amplitude': 0.5, 'frequency': 2.0, 'center_offset': 0.5}
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    amplitude: float = Field(default=1.0, ge=0.0, le=1.0)
+    frequency: float = Field(default=1.0, ge=0.0, le=10.0)
+    center_offset: float = Field(default=0.5, ge=0.0, le=1.0)
+
+    def to_dict(self) -> dict[str, float]:
+        """Convert to dictionary for **kwargs expansion."""
+        return self.model_dump()
+
+
 # Union type for curve specifications.
 # Use this when accepting any curve type.
 BaseCurve = PointsCurve | NativeCurve

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from blinkb0t.core.config.poses import PanPose, TiltPose
 from blinkb0t.core.sequencer.models.enum import (
     ChaseOrder,
     Intensity,
@@ -75,8 +74,8 @@ def make_template() -> TemplateDoc:
                         pan_pose_by_role=PoseByRoleHelper.FAN_POSE_WIDE,
                         params={
                             "seed": 7,
-                            "pan_center_dmx": PanPose.CENTER.value,
-                            "tilt_center_dmx": TiltPose.HORIZON_UP_45.value,
+                            "pan_center_deg": 0.0,  # CENTER
+                            "tilt_center_deg": 30.0,  # HORIZON_UP_45
                             "pan_spread_dmx": 70,
                             "tilt_spread_dmx": 40,
                         },

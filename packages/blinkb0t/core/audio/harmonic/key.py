@@ -14,8 +14,6 @@ logger = logging.getLogger(__name__)
 def detect_musical_key(y: np.ndarray, sr: int, *, hop_length: int) -> dict[str, Any]:
     """Krumhansl-Schmuckler key estimation.
 
-    FIXED: Was rotating chroma instead of profile. Now correctly rotates profile.
-
     Args:
         y: Audio time series
         sr: Sample rate
@@ -47,7 +45,6 @@ def detect_musical_key(y: np.ndarray, sr: int, *, hop_length: int) -> dict[str, 
         keys = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
 
         for i in range(12):
-            # FIXED: Rotate the PROFILE to test each key, not the chroma
             # Rolling profile by -i is equivalent to testing key i
             major_rotated = np.roll(major_profile, -i)
             minor_rotated = np.roll(minor_profile, -i)
