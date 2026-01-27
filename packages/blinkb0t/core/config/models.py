@@ -161,12 +161,145 @@ class SequencingVersionConfig(BaseModel):
     movements: str = Field(default="2.0.0", description="Movement library version")
 
 
+class AudioEnhancementConfig(BaseModel):
+    """Audio enhancement configuration (v3.0 features).
+
+    Controls metadata enrichment, lyrics resolution, and phoneme generation.
+    Follows "reasonable defaults" philosophy: all features work with zero config,
+    network features require explicit enablement + API keys.
+    """
+
+    model_config = ConfigDict(extra="ignore")  # Forward compatibility
+
+    # Feature flags (gradual rollout support)
+    enable_metadata: bool = Field(
+        default=True, description="Enable metadata enrichment (embedded tags + providers)"
+    )
+    enable_lyrics: bool = Field(default=True, description="Enable lyrics resolution pipeline")
+    enable_phonemes: bool = Field(default=True, description="Enable phoneme/viseme generation")
+
+    # Network features (optional, require API keys)
+    enable_acoustid: bool = Field(
+        default=False,
+        description="Enable AcoustID fingerprinting (requires chromaprint binary)",
+    )
+    enable_musicbrainz: bool = Field(
+        default=False, description="Enable MusicBrainz lookups (rate limited)"
+    )
+    enable_lyrics_lookup: bool = Field(
+        default=False, description="Enable online lyrics providers (LRCLib, Genius, etc.)"
+    )
+    enable_whisperx: bool = Field(
+        default=False,
+        description="Enable WhisperX for lyrics transcription (requires model download)",
+    )
+    enable_diarization: bool = Field(
+        default=False,
+        description="Enable speaker diarization (requires pyannote models)",
+    )
+
+    # Lyrics pipeline
+    lyrics_require_timed: bool = Field(
+        default=False, description="Require word-level timing (triggers WhisperX if needed)"
+    )
+    lyrics_min_coverage: float = Field(
+        default=0.80,
+        ge=0.0,
+        le=1.0,
+        description="Minimum lyrics time coverage to avoid WhisperX fallback",
+    )
+    lyrics_language: str = Field(default="en", description="Language for lyrics processing")
+
+    # WhisperX
+    whisperx_model: str = Field(
+        default="base",
+        description="WhisperX model size (tiny, base, small, medium, large)",
+    )
+    whisperx_device: str = Field(default="cpu", description="Device for WhisperX (cpu, cuda, mps)")
+    whisperx_batch_size: int = Field(
+        default=16, ge=1, description="Batch size for WhisperX processing"
+    )
+    whisperx_return_char_alignments: bool = Field(
+        default=False,
+        description="Return character-level alignments (slower, more detailed)",
+    )
+
+    # Phonemes
+    phoneme_enable_g2p_fallback: bool = Field(
+        default=True, description="Use g2p_en for words not in CMUdict"
+    )
+    phoneme_min_duration_ms: int = Field(
+        default=30, ge=10, description="Minimum phoneme duration (ms)"
+    )
+    phoneme_vowel_weight: float = Field(
+        default=2.0, ge=0.1, description="Relative weight for vowel phoneme duration"
+    )
+    phoneme_consonant_weight: float = Field(
+        default=1.0, ge=0.1, description="Relative weight for consonant phoneme duration"
+    )
+
+    # Viseme smoothing
+    viseme_min_hold_ms: int = Field(
+        default=50, ge=10, description="Minimum viseme hold duration (ms)"
+    )
+    viseme_min_burst_ms: int = Field(
+        default=40, ge=10, description="Minimum burst duration before merging (ms)"
+    )
+    viseme_boundary_soften_ms: int = Field(
+        default=15, ge=0, description="Boundary softening window (ms)"
+    )
+    viseme_mapping_version: str = Field(default="1.0", description="Viseme mapping table version")
+
+    # Provider configuration
+    acoustid_api_key: str | None = Field(
+        default=None, description="AcoustID API key (load from env: ACOUSTID_API_KEY)"
+    )
+    musicbrainz_rate_limit_rps: float = Field(
+        default=1.0,
+        ge=0.1,
+        le=10.0,
+        description="MusicBrainz rate limit (requests per second)",
+    )
+    musicbrainz_timeout_s: float = Field(
+        default=10.0, ge=1.0, description="MusicBrainz request timeout (seconds)"
+    )
+
+    # HTTP client defaults
+    http_max_retries: int = Field(default=3, ge=0, description="Maximum HTTP request retries")
+    http_timeout_s: float = Field(
+        default=30.0, ge=1.0, description="HTTP request timeout (seconds)"
+    )
+    http_circuit_breaker_threshold: int = Field(
+        default=5, ge=1, description="Circuit breaker failure threshold"
+    )
+    http_circuit_breaker_timeout_s: float = Field(
+        default=60.0, ge=1.0, description="Circuit breaker reset timeout (seconds)"
+    )
+
+    # Metadata merge policy
+    metadata_merge_policy_version: str = Field(
+        default="1.0", description="Metadata merge policy version"
+    )
+    metadata_min_confidence_warn: float = Field(
+        default=0.55,
+        ge=0.0,
+        le=1.0,
+        description="Minimum confidence before warning",
+    )
+
+
 class AudioProcessingConfig(BaseModel):
     """Audio processing configuration."""
 
     hop_length: int = Field(default=512, ge=64, le=2048)
     frame_length: int = Field(default=2048, ge=512, le=8192)
     cache_enabled: bool = True
+
+    # NEW: v3.0 enhancements
+    enhancements: AudioEnhancementConfig = Field(
+        default_factory=AudioEnhancementConfig,
+        description="Audio enhancement features (metadata, lyrics, phonemes)",
+    )
 
     def model_post_init(self, __context: object) -> None:
         """Validate audio processing parameters."""

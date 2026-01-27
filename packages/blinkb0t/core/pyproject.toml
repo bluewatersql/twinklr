@@ -21,6 +21,11 @@ dependencies = [
     "aiofiles>=25.1.0",
     "jinja2>=3.1.6",
     "httpx>=0.28.1",
+    # Audio enhancement dependencies (v3.0)
+    "mutagen>=1.47.0",       # Audio file tag extraction
+    "pyacoustid>=1.3.0",     # AcoustID fingerprinting
+    "musicbrainzngs>=0.7.1", # MusicBrainz API client
+    "g2p-en>=2.1.0",         # Grapheme-to-phoneme for English (includes CMUdict)
 ]
 
 [project.optional-dependencies]
@@ -33,6 +38,13 @@ dev = [
     "types-pyyaml>=6.0",
     "matplotlib>=3.7",
     "pandas>=2.0"
+]
+# Heavy ML models for WhisperX and diarization (optional install)
+ml = [
+    "whisperx>=3.1.1",       # Lyrics transcription/alignment
+    "torch>=2.0.0",          # PyTorch (WhisperX dependency)
+    "torchaudio>=2.0.0",     # Audio processing for PyTorch
+    "pyannote-audio>=3.1.0", # Speaker diarization
 ]
 
 [build-system]

@@ -27,6 +27,7 @@ from blinkb0t.core.config.loader import (
 )
 from blinkb0t.core.config.models import (
     AppConfig,
+    AudioEnhancementConfig,
     AudioProcessingConfig,
     JobConfig,
     LoggingConfig,
@@ -44,6 +45,7 @@ __all__ = [
     # App-level config
     "AppConfig",
     "AudioProcessingConfig",
+    "AudioEnhancementConfig",
     "LoggingConfig",
     "PlanningContextConfig",
     # Job-level config
