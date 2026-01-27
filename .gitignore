@@ -1,23 +1,49 @@
+# Development directories
 .archive/
 .venv/
+.dev/
+
+# Python cache and test artifacts
 .pytest_cache/
 .ruff_cache/
 .mypy_cache/
 .coverage*
-data/*
-.dev/
-.egg-info/*
+__pycache__/
+*.py[cod]
+*$py.class
 
+# Python distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# Project data and artifacts (never check in)
+data/
+artifacts/
+changes/
+
+# Environment and configuration
 .env*
 .cursorrules
 config.json
 fixture_config.json
 job_config.json
-# IDE support - namespace package symlinks
-/blinkb0t/__pycache__
-*.bak*
-artifacts/
-changes/
+
+# Documentation (local only)
 CLAUDE.md
 .cursor/
 .claude/
+
+# IDEs
+.vscode/settings.json
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Backups
+*.bak*
