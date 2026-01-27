@@ -9,6 +9,9 @@ from typing import Self
 from pydantic import BaseModel, ConfigDict, Field
 
 from blinkb0t.core.config.poses import PoseConfig
+from blinkb0t.core.curves.library import CurveLibrary
+from blinkb0t.core.sequencer.models.enum import TransitionMode
+from blinkb0t.core.sequencer.models.transition import TransitionStrategy
 
 
 class AgentConfig(BaseModel):
@@ -243,6 +246,59 @@ class AppConfig(ConfigBase):
         return Path("config.json")
 
 
+class TransitionConfig(BaseModel):
+    """Global transition behavior configuration.
+
+    Controls default transition behavior and global settings.
+
+    Attributes:
+        enabled: Enable/disable transitions globally.
+        default_duration_bars: Default transition duration when not specified.
+        default_mode: Default transition mode.
+        default_curve: Default interpolation curve.
+        min_section_duration_bars: Minimum section duration to allow transitions.
+        allow_overlaps: Allow transition overlap regions.
+        per_channel_defaults: Default strategy per channel type.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    enabled: bool = Field(default=True, description="Enable transitions globally")
+
+    default_duration_bars: float = Field(
+        default=0.5,
+        ge=0.0,
+        le=4.0,
+        description="Default transition duration when not specified",
+    )
+
+    default_mode: TransitionMode = Field(
+        default=TransitionMode.CROSSFADE, description="Default transition mode"
+    )
+
+    default_curve: CurveLibrary = Field(
+        default=CurveLibrary.EASE_IN_OUT_SINE, description="Default transition curve"
+    )
+
+    min_section_duration_bars: float = Field(
+        default=1.0, ge=0.5, description="Minimum section duration to allow transitions"
+    )
+
+    allow_overlaps: bool = Field(default=True, description="Allow transition overlap regions")
+
+    per_channel_defaults: dict[str, TransitionStrategy] = Field(
+        default_factory=lambda: {
+            "pan": TransitionStrategy.SMOOTH_INTERPOLATION,
+            "tilt": TransitionStrategy.SMOOTH_INTERPOLATION,
+            "dimmer": TransitionStrategy.CROSSFADE,
+            "shutter": TransitionStrategy.SEQUENCE,
+            "color": TransitionStrategy.FADE_VIA_BLACK,
+            "gobo": TransitionStrategy.FADE_VIA_BLACK,
+        },
+        description="Default strategy per channel type",
+    )
+
+
 class JobConfig(ConfigBase):
     """Job/task-specific configuration.
 
@@ -293,6 +349,12 @@ class JobConfig(ConfigBase):
             "Default channel states for entire sequence. "
             "Applied to all sections unless overridden by agent plan."
         ),
+    )
+
+    # Transitions Configuration
+    transitions: TransitionConfig = Field(
+        default_factory=TransitionConfig,
+        description="Transition behavior configuration for smooth blending between sections and steps",
     )
 
     @classmethod

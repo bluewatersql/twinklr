@@ -21,8 +21,13 @@ class QuantizeMode(str, Enum):
 
 
 class TransitionMode(str, Enum):
-    SNAP = "snap"
-    CROSSFADE = "crossfade"
+    """Transition mode between segments."""
+
+    SNAP = "snap"  # Instant change (no blend)
+    CROSSFADE = "crossfade"  # Overlapping fade out/in
+    MORPH = "morph"  # Smooth morphing (Bezier curves)
+    FADE_VIA_BLACK = "fade_via_black"  # Fade to black, change, fade up
+    SWEEP = "sweep"  # Sweeping motion (advanced)
 
 
 class BlendMode(str, Enum):

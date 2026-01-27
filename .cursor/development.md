@@ -133,7 +133,7 @@ When stopping early (for tokens or any other reason), create/update a single han
 **Format constraint:** concise bullet points, no prose walls, no code samples.
 
 ### Early warning threshold
-- As soon as you estimate **< ~15% remaining token/context budget**, issue a warning and shift to “wrap-up mode”:
+- As soon as you estimate **< ~10% remaining token/context budget**, issue a warning and shift to “wrap-up mode”:
   - stop starting new tasks
   - prioritize clean boundary + handoff doc
   - ensure status is not misleading

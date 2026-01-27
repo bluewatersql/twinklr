@@ -413,13 +413,21 @@ def generate_report(results: dict[CurveLibrary, dict[Intensity, ParamResult]], o
     lines.append("")
     lines.append("## Overview")
     lines.append("")
-    lines.append("This report presents optimized amplitude and frequency parameters for each curve type")
+    lines.append(
+        "This report presents optimized amplitude and frequency parameters for each curve type"
+    )
     lines.append("across intensity levels. Parameters are tuned to achieve target behaviors:")
     lines.append("")
     lines.append("| Intensity | Speed | Amplitude Range | Target Energy |")
     lines.append("|-----------|-------|-----------------|---------------|")
 
-    for intensity in [Intensity.SLOW, Intensity.SMOOTH, Intensity.FAST, Intensity.DRAMATIC, Intensity.INTENSE]:
+    for intensity in [
+        Intensity.SLOW,
+        Intensity.SMOOTH,
+        Intensity.FAST,
+        Intensity.DRAMATIC,
+        Intensity.INTENSE,
+    ]:
         target = INTENSITY_TARGETS[intensity]
         lines.append(
             f"| **{target.name}** | {target.frequency_multiplier}x | "
@@ -496,7 +504,13 @@ def generate_report(results: dict[CurveLibrary, dict[Intensity, ParamResult]], o
             lines.append("|-----------|-----------|-----------|--------|-------|-------|")
 
             curve_results = results[curve_id]
-            for intensity in [Intensity.SLOW, Intensity.SMOOTH, Intensity.FAST, Intensity.DRAMATIC, Intensity.INTENSE]:
+            for intensity in [
+                Intensity.SLOW,
+                Intensity.SMOOTH,
+                Intensity.FAST,
+                Intensity.DRAMATIC,
+                Intensity.INTENSE,
+            ]:
                 if intensity not in curve_results:
                     continue
 
@@ -529,7 +543,13 @@ def generate_report(results: dict[CurveLibrary, dict[Intensity, ParamResult]], o
         lines.append(f"    CurveLibrary.{curve_id.name}: {{")
 
         curve_results = results[curve_id]
-        for intensity in [Intensity.SLOW, Intensity.SMOOTH, Intensity.FAST, Intensity.DRAMATIC, Intensity.INTENSE]:
+        for intensity in [
+            Intensity.SLOW,
+            Intensity.SMOOTH,
+            Intensity.FAST,
+            Intensity.DRAMATIC,
+            Intensity.INTENSE,
+        ]:
             if intensity not in curve_results:
                 continue
 
@@ -551,7 +571,13 @@ def generate_report(results: dict[CurveLibrary, dict[Intensity, ParamResult]], o
     lines.append("")
 
     # Analyze variance across curves
-    intensity_levels = [Intensity.SLOW, Intensity.SMOOTH, Intensity.FAST, Intensity.DRAMATIC, Intensity.INTENSE]
+    intensity_levels = [
+        Intensity.SLOW,
+        Intensity.SMOOTH,
+        Intensity.FAST,
+        Intensity.DRAMATIC,
+        Intensity.INTENSE,
+    ]
 
     for intensity in intensity_levels:
         target = INTENSITY_TARGETS[intensity]
@@ -583,7 +609,9 @@ def generate_report(results: dict[CurveLibrary, dict[Intensity, ParamResult]], o
 
     lines.append("### Migration Path")
     lines.append("")
-    lines.append("1. **Phase 1**: Add `CURVE_INTENSITY_PARAMS` alongside existing `DEFAULT_MOVEMENT_PARAMS`")
+    lines.append(
+        "1. **Phase 1**: Add `CURVE_INTENSITY_PARAMS` alongside existing `DEFAULT_MOVEMENT_PARAMS`"
+    )
     lines.append("2. **Phase 2**: Update movement handlers to check curve-specific params first")
     lines.append("3. **Phase 3**: Migrate all templates to use curve-specific params")
     lines.append("4. **Phase 4**: Remove global defaults, require explicit curve params")
@@ -644,12 +672,22 @@ def main():
         print(f"Testing {curve_id.value}...")
         results[curve_id] = {}
 
-        for intensity in [Intensity.SLOW, Intensity.SMOOTH, Intensity.FAST, Intensity.DRAMATIC, Intensity.INTENSE]:
-            result = test_curve_params(curve_id, intensity, n_samples=args.samples, debug=args.debug)
+        for intensity in [
+            Intensity.SLOW,
+            Intensity.SMOOTH,
+            Intensity.FAST,
+            Intensity.DRAMATIC,
+            Intensity.INTENSE,
+        ]:
+            result = test_curve_params(
+                curve_id, intensity, n_samples=args.samples, debug=args.debug
+            )
             results[curve_id][intensity] = result
 
-            print(f"  {intensity.value:10s}: amp={result.amplitude:.3f}, "
-                  f"freq={result.frequency:.3f}, score={result.score:.3f}")
+            print(
+                f"  {intensity.value:10s}: amp={result.amplitude:.3f}, "
+                f"freq={result.frequency:.3f}, score={result.score:.3f}"
+            )
 
         print()
 

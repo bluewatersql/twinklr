@@ -2,7 +2,7 @@
 name = "blinkb0t-core"
 version = "0.1.0"
 description = "BlinkB0t Core - AI-powered lighting sequencer for xLights"
-requires-python = ">=3.10"
+requires-python = ">=3.10,<3.13"
 dependencies = [
     "numpy>=2.0,<3.0",
     "librosa>=0.10.2", # Minimum version with numpy 2.0 support
@@ -18,12 +18,16 @@ dependencies = [
     "noise>=1.2",
     "easing-functions>=1.0.4",
     "bezier>=2024.6.20",
+    "aiofiles>=25.1.0",
+    "jinja2>=3.1.6",
+    "httpx>=0.28.1",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0",
     "pytest-cov>=4.0",
+    "pytest-asyncio>=0.23.0", # Async test support for cache system
     "ruff>=0.8.0",
     "mypy>=1.7",
     "types-pyyaml>=6.0",
@@ -66,4 +70,5 @@ ignore_missing_imports = true
 testpaths = ["../../../tests"]
 python_files = "test_*.py"
 addopts = "--cov=blinkb0t.core --cov-report=term-missing --cov-report=html"
+asyncio_mode = "auto"
 

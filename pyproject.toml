@@ -5,14 +5,11 @@ name = "blinkb0t"
 version = "0.2.0"
 description = "BlinkB0t - AI-powered lighting sequencer for xLights"
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.12,<3.13"
 dependencies = [
     "blinkb0t-core>=0.1.0",
     "blinkb0t-cli>=0.1.0",
     "tqdm>=4.67.1",
-    "bezier>=2024.6.20",
-    "noise>=1.2.2",
-    "jinja2>=3.1.6",
 ]
 
 [project.optional-dependencies]
@@ -87,6 +84,7 @@ ignore = [
     "T201",    # print() statements
     "N806",
     "RUF001",
+    "ERA001"
 ]
 
 [tool.ruff.lint.isort]
@@ -127,6 +125,7 @@ testpaths = ["tests"]
 python_files = "test_*.py"
 pythonpath = "."
 addopts = "--cov=blinkb0t.core --cov-report=term-missing --cov-report=html --import-mode=importlib"
+asyncio_mode = "auto"
 markers = [
     "integration: marks tests as integration tests (deselect with '-m \"not integration\"')",
     "slow: marks tests as slow running (deselect with '-m \"not slow\"')",

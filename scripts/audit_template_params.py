@@ -42,9 +42,7 @@ def get_curve_for_movement(movement_type: MovementType) -> CurveLibrary:
     return CurveLibrary.MOVEMENT_HOLD  # Default fallback
 
 
-def analyze_movement(
-    movement: Movement, step_id: str, template_id: str
-) -> dict[str, Any]:
+def analyze_movement(movement: Movement, step_id: str, template_id: str) -> dict[str, Any]:
     """Analyze a movement for categorical parameter usage.
 
     Args:
@@ -99,9 +97,7 @@ def audit_template(template_doc: TemplateDoc) -> list[dict[str, Any]]:
 
     for step in template.steps:
         if step.movement.movement_type != MovementType.NONE:
-            result = analyze_movement(
-                step.movement, step.step_id, template.template_id
-            )
+            result = analyze_movement(step.movement, step.step_id, template.template_id)
             results.append(result)
 
     return results
@@ -131,7 +127,7 @@ def generate_report(all_results: list[dict[str, Any]]) -> str:
     report.append(f"- **Total Movements**: {total_movements}")
     report.append(
         f"- **Movements with Overrides**: {movements_with_overrides} "
-        f"({100*movements_with_overrides/total_movements:.1f}%)"
+        f"({100 * movements_with_overrides / total_movements:.1f}%)"
     )
     report.append("")
 
@@ -161,7 +157,9 @@ def generate_report(all_results: list[dict[str, Any]]) -> str:
 
     report.append("| Movement Type | Count | Percentage |")
     report.append("|---------------|-------|------------|")
-    for movement in sorted(movement_counts.keys(), key=lambda x: movement_counts[x], reverse=True)[:10]:
+    for movement in sorted(movement_counts.keys(), key=lambda x: movement_counts[x], reverse=True)[
+        :10
+    ]:
         count = movement_counts[movement]
         pct = 100 * count / total_movements
         report.append(f"| {movement} | {count} | {pct:.1f}% |")
@@ -193,8 +191,12 @@ def generate_report(all_results: list[dict[str, Any]]) -> str:
     amplitudes = [r["amplitude"] for r in all_results]
     frequencies = [r["frequency"] for r in all_results]
 
-    report.append(f"- **Amplitude**: min={min(amplitudes):.2f}, max={max(amplitudes):.2f}, avg={sum(amplitudes)/len(amplitudes):.2f}")
-    report.append(f"- **Frequency**: min={min(frequencies):.2f}, max={max(frequencies):.2f}, avg={sum(frequencies)/len(frequencies):.2f}")
+    report.append(
+        f"- **Amplitude**: min={min(amplitudes):.2f}, max={max(amplitudes):.2f}, avg={sum(amplitudes) / len(amplitudes):.2f}"
+    )
+    report.append(
+        f"- **Frequency**: min={min(frequencies):.2f}, max={max(frequencies):.2f}, avg={sum(frequencies) / len(frequencies):.2f}"
+    )
     report.append("")
 
     # Detailed results by template
@@ -294,14 +296,18 @@ def main():
             print(f"  ERROR: {e}")
 
     print()
-    print(f"Analyzed {len(all_results)} movements from {len({r['template_id'] for r in all_results})} templates")
+    print(
+        f"Analyzed {len(all_results)} movements from {len({r['template_id'] for r in all_results})} templates"
+    )
     print()
 
     # Generate report
     report = generate_report(all_results)
 
     # Write to file
-    output_path = Path(__file__).parent.parent / "changes" / "vnext" / "optimization" / "TEMPLATE_AUDIT.md"
+    output_path = (
+        Path(__file__).parent.parent / "changes" / "vnext" / "optimization" / "TEMPLATE_AUDIT.md"
+    )
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(report)
 

@@ -92,13 +92,9 @@ class TestGetCurveCategoricalParams:
         # Compare multiple curves across multiple intensities
         # Some may converge to same values, but we should see variation
         sine_slow = get_curve_categorical_params(CurveLibrary.MOVEMENT_SINE, Intensity.SLOW)
-        triangle_slow = get_curve_categorical_params(
-            CurveLibrary.MOVEMENT_TRIANGLE, Intensity.SLOW
-        )
+        triangle_slow = get_curve_categorical_params(CurveLibrary.MOVEMENT_TRIANGLE, Intensity.SLOW)
         pulse_smooth = get_curve_categorical_params(CurveLibrary.MOVEMENT_PULSE, Intensity.SMOOTH)
-        cosine_smooth = get_curve_categorical_params(
-            CurveLibrary.MOVEMENT_COSINE, Intensity.SMOOTH
-        )
+        cosine_smooth = get_curve_categorical_params(CurveLibrary.MOVEMENT_COSINE, Intensity.SMOOTH)
 
         # At least one pair should have different optimizations
         # (Some curves may converge to same values at certain intensities)
@@ -132,9 +128,7 @@ class TestCurveIntensityParamsStructure:
 
         for curve_id, intensity_map in CURVE_INTENSITY_PARAMS.items():
             for intensity in Intensity:
-                assert intensity in intensity_map, (
-                    f"{curve_id} missing {intensity}"
-                )
+                assert intensity in intensity_map, f"{curve_id} missing {intensity}"
                 params = intensity_map[intensity]
                 assert isinstance(params, MovementCategoricalParams)
 
@@ -187,9 +181,7 @@ class TestBackwardCompatibility:
     def test_defaults_are_fallback_for_undefined_curves(self):
         """Test that defaults are used when curve not optimized."""
         # Use a curve that shouldn't have optimized params
-        result = get_curve_categorical_params(
-            CurveLibrary.MOVEMENT_HOLD, Intensity.DRAMATIC
-        )
+        result = get_curve_categorical_params(CurveLibrary.MOVEMENT_HOLD, Intensity.DRAMATIC)
 
         # Should match default
         assert result == DEFAULT_MOVEMENT_PARAMS[Intensity.DRAMATIC]

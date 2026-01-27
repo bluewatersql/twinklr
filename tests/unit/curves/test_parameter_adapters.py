@@ -233,9 +233,7 @@ class TestParameterAdapterRegistry:
 
         registry.register("test_curve", custom_adapter)
 
-        categorical = MovementCategoricalParams(
-            amplitude=0.5, frequency=1.0, center_offset=0.5
-        )
+        categorical = MovementCategoricalParams(amplitude=0.5, frequency=1.0, center_offset=0.5)
         result = registry.adapt("test_curve", categorical, {})
 
         assert result["custom"] is True
@@ -244,9 +242,7 @@ class TestParameterAdapterRegistry:
         """Test registry uses default adapter for unregistered curves."""
         registry = ParameterAdapterRegistry()
 
-        categorical = MovementCategoricalParams(
-            amplitude=0.7, frequency=1.5, center_offset=0.5
-        )
+        categorical = MovementCategoricalParams(amplitude=0.7, frequency=1.5, center_offset=0.5)
         result = registry.adapt("unknown_curve", categorical, {"cycles": 2.0})
 
         # Should apply default mapping
@@ -258,9 +254,7 @@ class TestParameterAdapterRegistry:
         """Test adapter preserves base parameters."""
         registry = ParameterAdapterRegistry()
 
-        categorical = MovementCategoricalParams(
-            amplitude=0.5, frequency=1.0, center_offset=0.5
-        )
+        categorical = MovementCategoricalParams(amplitude=0.5, frequency=1.0, center_offset=0.5)
         base_params = {"cycles": 3.0, "phase": 0.5}
         result = registry.adapt("unknown_curve", categorical, base_params)
 
@@ -275,9 +269,7 @@ class TestDefaultAdapterRegistry:
         """Test default registry includes pulse adapters."""
         registry = build_default_adapter_registry()
 
-        categorical = MovementCategoricalParams(
-            amplitude=0.8, frequency=2.0, center_offset=0.5
-        )
+        categorical = MovementCategoricalParams(amplitude=0.8, frequency=2.0, center_offset=0.5)
 
         # Test pulse adapter
         pulse_result = registry.adapt("pulse", categorical, {})
@@ -293,14 +285,10 @@ class TestDefaultAdapterRegistry:
         """Test default registry includes parametric adapters."""
         registry = build_default_adapter_registry()
 
-        categorical = MovementCategoricalParams(
-            amplitude=0.6, frequency=1.5, center_offset=0.5
-        )
+        categorical = MovementCategoricalParams(amplitude=0.6, frequency=1.5, center_offset=0.5)
 
         # Test bezier adapter
-        bezier_result = registry.adapt(
-            "bezier", categorical, {"control_points": [(0, 0), (1, 1)]}
-        )
+        bezier_result = registry.adapt("bezier", categorical, {"control_points": [(0, 0), (1, 1)]})
         assert "control_points" in bezier_result
 
         # Test lissajous adapter
@@ -311,9 +299,7 @@ class TestDefaultAdapterRegistry:
         """Test default registry includes fixed behavior adapters."""
         registry = build_default_adapter_registry()
 
-        categorical = MovementCategoricalParams(
-            amplitude=0.8, frequency=2.0, center_offset=0.5
-        )
+        categorical = MovementCategoricalParams(amplitude=0.8, frequency=2.0, center_offset=0.5)
 
         # Test easing curves
         for curve in ["ease_in_sine", "ease_out_sine", "bounce_in", "elastic_out"]:

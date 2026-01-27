@@ -100,9 +100,7 @@ class TestGetCategoricalParamsMethod:
         )
 
         # Get base params for SWEEP_LR (uses MOVEMENT_TRIANGLE)
-        base_params = get_curve_categorical_params(
-            CurveLibrary.MOVEMENT_TRIANGLE, Intensity.SMOOTH
-        )
+        base_params = get_curve_categorical_params(CurveLibrary.MOVEMENT_TRIANGLE, Intensity.SMOOTH)
 
         result = movement.get_categorical_params(CurveLibrary.MOVEMENT_TRIANGLE)
 
@@ -124,9 +122,7 @@ class TestGetCategoricalParamsMethod:
         assert result.amplitude == 0.9
 
         # Other params should come from base
-        base_params = get_curve_categorical_params(
-            CurveLibrary.MOVEMENT_TRIANGLE, Intensity.SMOOTH
-        )
+        base_params = get_curve_categorical_params(CurveLibrary.MOVEMENT_TRIANGLE, Intensity.SMOOTH)
         assert result.frequency == base_params.frequency
         assert result.center_offset == base_params.center_offset
 
@@ -144,9 +140,7 @@ class TestGetCategoricalParamsMethod:
         assert result.frequency == 2.5
 
         # Other params should come from base
-        base_params = get_curve_categorical_params(
-            CurveLibrary.MOVEMENT_TRIANGLE, Intensity.SMOOTH
-        )
+        base_params = get_curve_categorical_params(CurveLibrary.MOVEMENT_TRIANGLE, Intensity.SMOOTH)
         assert result.amplitude == base_params.amplitude
         assert result.center_offset == base_params.center_offset
 
@@ -164,9 +158,7 @@ class TestGetCategoricalParamsMethod:
         assert result.center_offset == 0.7
 
         # Other params should come from base
-        base_params = get_curve_categorical_params(
-            CurveLibrary.MOVEMENT_TRIANGLE, Intensity.SMOOTH
-        )
+        base_params = get_curve_categorical_params(CurveLibrary.MOVEMENT_TRIANGLE, Intensity.SMOOTH)
         assert result.amplitude == base_params.amplitude
         assert result.frequency == base_params.frequency
 

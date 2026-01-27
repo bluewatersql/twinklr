@@ -1,7 +1,0 @@
-README.md
-pyproject.toml
-blinkb0t.egg-info/PKG-INFO
-blinkb0t.egg-info/SOURCES.txt
-blinkb0t.egg-info/dependency_links.txt
-blinkb0t.egg-info/requires.txt
-blinkb0t.egg-info/top_level.txt

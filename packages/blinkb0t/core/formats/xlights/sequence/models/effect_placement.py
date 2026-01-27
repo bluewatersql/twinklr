@@ -25,6 +25,7 @@ class EffectPlacement:
         effect_label: Optional label for the effect
         ref: Optional reference index into EffectDB
         palette: Palette index (default: 0)
+        layer_index: Layer index for multi-layer effects (default: 0)
     """
 
     element_name: str
@@ -34,3 +35,4 @@ class EffectPlacement:
     effect_label: str | None = None
     ref: int | None = None
     palette: int = 0
+    layer_index: int = 0

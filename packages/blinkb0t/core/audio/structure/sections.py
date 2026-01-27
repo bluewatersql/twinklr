@@ -1,12 +1,18 @@
-"""Song section detection and analysis with advanced multi-feature segmentation.
+"""Song section detection and analysis using hybrid segmentation.
+
+METHODOLOGY:
+Hybrid approach combining baseline segmentation with aggressive novelty detection.
+More robust and predictable than pure Laplacian while still being data-driven.
 
 IMPROVEMENTS:
 1. Multi-Feature Fusion: Combines MFCC, chroma, spectral contrast, tonnetz
-2. Hierarchical Segmentation: Detects at multiple scales (coarse + fine)
+2. Hybrid Segmentation: Baseline + aggressive novelty-based boundary detection
 3. Beat-Aligned Boundaries: Snaps to bar boundaries for musical alignment
-4. Novelty-Based Refinement: Catches subtle transitions
-5. Context-Aware Labeling: Uses builds, drops, vocals, chords
-6. Subsection Detection: Splits sections with internal structure
+4. Context-Aware Labeling: Uses builds, drops, vocals, chords
+5. Subsection Detection: Splits sections with internal structure
+
+This approach is more robust than pure Laplacian clustering while still finding
+data-driven boundaries based on the music's actual structure.
 """
 
 from __future__ import annotations
@@ -37,13 +43,15 @@ def detect_song_sections(
     vocal_segments: list[dict[str, Any]] | None = None,
     chords: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
-    """Detect song structure using advanced multi-feature segmentation.
+    """Detect song structure using hybrid segmentation.
+
+    Combines baseline segmentation with aggressive novelty detection for robust,
+    data-driven boundary detection.
 
     IMPROVEMENTS:
     - Multi-feature fusion (MFCC + chroma + spectral contrast + tonnetz)
-    - Hierarchical segmentation (coarse + fine)
+    - Hybrid segmentation (baseline + novelty detection)
     - Beat-aligned boundaries
-    - Novelty-based refinement
     - Context-aware labeling
     - Subsection detection
 
@@ -89,17 +97,12 @@ def detect_song_sections(
     # IMPROVEMENT 1: Multi-Feature Fusion
     features = _extract_multi_features(y, sr, hop_struct, chroma_cqt)
 
-    # IMPROVEMENT 2: Hierarchical Segmentation
-    k_coarse = int(np.clip(round(duration / 20.0), 4, 10))
-    k_fine = int(np.clip(round(duration / 10.0), 8, 20))
-
+    # IMPROVEMENT 2: Hybrid Segmentation (Baseline + Novelty Detection)
+    # This is more robust than pure Laplacian while still being data-driven
     try:
-        coarse_boundaries = librosa.segment.agglomerative(features, k=k_coarse)
-        fine_boundaries = librosa.segment.agglomerative(features, k=k_fine)
-
-        # Merge hierarchical boundaries
-        boundary_frames = _merge_hierarchical_boundaries(
-            coarse_boundaries, fine_boundaries, features.shape[1]
+        # Step 1: Create intelligent baseline using recurrence-based detection
+        boundary_frames = _hybrid_segmentation(
+            features, n_frames=features.shape[1], duration_s=duration
         )
         boundary_times = frames_to_time(boundary_frames, sr=sr, hop_length=hop_struct)
 
@@ -111,10 +114,14 @@ def detect_song_sections(
                 times.append(tf)
         times.append(duration)
 
-        # IMPROVEMENT 4: Novelty-Based Refinement
+        # Step 2: AGGRESSIVE novelty-based refinement
+        # This finds data-driven boundaries that the baseline might have missed
         frame_times = frames_to_time(np.arange(features.shape[1]), sr=sr, hop_length=hop_struct)
         additional_boundaries = _detect_novelty_boundaries(
-            features, frame_times, np.array(times), threshold_percentile=85
+            features,
+            frame_times,
+            np.array(times),
+            threshold_percentile=75,  # More aggressive (was 85)
         )
         times = sorted(set(list(times) + list(additional_boundaries)))
 
@@ -222,16 +229,15 @@ def detect_song_sections(
             "sections": sections,
             "boundary_times_s": [float(x) for x in cleaned],
             "meta": {
-                "k_coarse": k_coarse,
-                "k_fine": k_fine,
+                "method": "hybrid_segmentation",
                 "hop_struct": hop_struct,
                 "min_section_s": float(min_section_s),
                 "repeat_thresh": repeat_thresh,
                 "improvements": [
                     "multi_feature_fusion",
-                    "hierarchical_segmentation",
+                    "hybrid_segmentation",
                     "beat_alignment",
-                    "novelty_refinement",
+                    "aggressive_novelty_detection",
                     "context_aware_labeling",
                     "subsection_detection",
                 ],
@@ -243,7 +249,7 @@ def detect_song_sections(
         return {
             "sections": [],
             "boundary_times_s": [0.0, duration],
-            "meta": {"k_coarse": 0, "k_fine": 0, "hop_struct": hop_struct, "error": str(e)},
+            "meta": {"method": "hybrid_segmentation", "hop_struct": hop_struct, "error": str(e)},
         }
 
 
@@ -322,12 +328,109 @@ def _extract_multi_features(
     return features
 
 
+def _hybrid_segmentation(features: np.ndarray, n_frames: int, duration_s: float) -> np.ndarray:
+    """Hybrid segmentation: recurrence-based baseline with intelligent scaling.
+
+    IMPROVEMENT 2: Hybrid Segmentation
+
+    Uses recurrence matrix to detect repetition structure, then applies intelligent
+    boundary detection. More robust and predictable than pure Laplacian.
+
+    Args:
+        features: Feature matrix (n_features x n_frames)
+        n_frames: Total number of frames
+        duration_s: Song duration in seconds
+
+    Returns:
+        Boundary frame indices
+    """
+    try:
+        # Build recurrence matrix (self-similarity)
+        R = librosa.segment.recurrence_matrix(
+            features, mode="affinity", metric="cosine", sparse=False, width=3
+        )
+
+        # Apply path enhancement to emphasize diagonal structure
+        R_enhanced = librosa.segment.path_enhance(R, n=3)
+
+        # Use spectral clustering with intelligent k estimation
+        # Scale with duration but allow more sections for variety
+        min_sections = max(8, int(duration_s / 25))  # At least 1 per 25s
+        max_sections = min(24, int(duration_s / 8))  # Up to 1 per 8s
+
+        # Try different k values and pick the best based on boundary strength
+        best_boundaries = None
+        best_score = -np.inf
+
+        for k in range(min_sections, min(max_sections + 1, n_frames // 5)):
+            try:
+                # Agglomerative clustering on enhanced recurrence
+                boundaries = librosa.segment.agglomerative(R_enhanced, k=k)
+
+                # Score boundaries by novelty strength
+                score = _score_boundaries(features, boundaries)
+
+                if score > best_score:
+                    best_score = score
+                    best_boundaries = boundaries
+            except Exception:
+                continue
+
+        if best_boundaries is not None:
+            logger.debug(f"Hybrid segmentation: k={len(best_boundaries)}, score={best_score:.3f}")
+            return best_boundaries
+
+        # Fallback to reasonable default
+        k_default = int(np.clip(duration_s / 15.0, min_sections, max_sections))
+        return librosa.segment.agglomerative(R_enhanced, k=k_default)
+
+    except Exception as e:
+        logger.warning(f"Hybrid segmentation failed, using fallback: {e}")
+        # Fallback: duration-based with reasonable scaling
+        k_fallback = int(np.clip(duration_s / 15.0, 8, 20))
+        # Create evenly spaced boundaries
+        return np.linspace(0, n_frames - 1, k_fallback, dtype=int)
+
+
+def _score_boundaries(features: np.ndarray, boundaries: np.ndarray) -> float:
+    """Score boundary quality based on feature novelty at transitions.
+
+    Args:
+        features: Feature matrix
+        boundaries: Boundary frame indices
+
+    Returns:
+        Quality score (higher is better)
+    """
+    if len(boundaries) < 2:
+        return 0.0
+
+    score = 0.0
+    window = 3  # Frames before/after boundary
+
+    for b in boundaries[1:-1]:  # Skip first and last
+        if b < window or b >= features.shape[1] - window:
+            continue
+
+        # Compare features before and after boundary
+        before = features[:, max(0, b - window) : b].mean(axis=1)
+        after = features[:, b : min(features.shape[1], b + window)].mean(axis=1)
+
+        # Novelty = dissimilarity across boundary
+        novelty = 1.0 - cosine_similarity(before, after)
+        score += novelty
+
+    # Normalize by number of boundaries
+    return score / max(1, len(boundaries) - 2)
+
+
 def _merge_hierarchical_boundaries(
     coarse: np.ndarray, fine: np.ndarray, n_frames: int
 ) -> np.ndarray:
-    """Merge coarse and fine boundaries intelligently.
+    """DEPRECATED: Merge coarse and fine boundaries intelligently.
 
-    IMPROVEMENT 2: Hierarchical Segmentation
+    This function is kept for backward compatibility but is no longer used
+    by the Laplacian segmentation approach.
 
     Args:
         coarse: Coarse-level boundary frames

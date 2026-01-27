@@ -38,11 +38,12 @@ class TestTrianglePhaseParameter:
     def test_generate_triangle_phase_ignored(self):
         """Test triangle generator ignores phase (for now)."""
         # Phase should be accepted but not affect output (for now)
-        result_no_phase = generate_triangle(
-            n_samples=20, cycles=1.0, amplitude=1.0, phase=0.0
-        )
+        result_no_phase = generate_triangle(n_samples=20, cycles=1.0, amplitude=1.0, phase=0.0)
         result_with_phase = generate_triangle(
-            n_samples=20, cycles=1.0, amplitude=1.0, phase=1.57  # π/2 radians
+            n_samples=20,
+            cycles=1.0,
+            amplitude=1.0,
+            phase=1.57,  # π/2 radians
         )
 
         # Output should be identical (phase not implemented yet)

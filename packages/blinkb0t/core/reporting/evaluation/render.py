@@ -74,7 +74,9 @@ def write_report_markdown(report: EvaluationReport, output_path: Path) -> None:
             roles_with_curves.add(curve.role)
     if roles_with_curves:
         if len(roles_with_curves) < len(report.summary.roles_targeted):
-            lines.append(f"- **Curves Plotted For**: {', '.join(sorted(roles_with_curves))} *(showing subset of roles)*")
+            lines.append(
+                f"- **Curves Plotted For**: {', '.join(sorted(roles_with_curves))} *(showing subset of roles)*"
+            )
         else:
             lines.append("- **Curves Plotted For**: All roles")
 

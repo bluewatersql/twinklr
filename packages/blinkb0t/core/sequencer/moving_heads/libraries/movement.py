@@ -71,9 +71,15 @@ DEFAULT_MOVEMENT_PARAMS = {
 # SLOW (0.5x), SMOOTH (1.0x baseline), FAST (1.25x), DRAMATIC (1.5x), INTENSE (2.0x)
 CURVE_INTENSITY_PARAMS: dict[CurveLibrary, dict[Intensity, MovementCategoricalParams]] = {
     CurveLibrary.MOVEMENT_SINE: {
-        Intensity.SLOW: MovementCategoricalParams(amplitude=0.200, frequency=0.500, center_offset=0.5),
-        Intensity.SMOOTH: MovementCategoricalParams(amplitude=0.600, frequency=1.000, center_offset=0.5),
-        Intensity.FAST: MovementCategoricalParams(amplitude=0.800, frequency=1.625, center_offset=0.5),
+        Intensity.SLOW: MovementCategoricalParams(
+            amplitude=0.200, frequency=0.500, center_offset=0.5
+        ),
+        Intensity.SMOOTH: MovementCategoricalParams(
+            amplitude=0.600, frequency=1.000, center_offset=0.5
+        ),
+        Intensity.FAST: MovementCategoricalParams(
+            amplitude=0.800, frequency=1.625, center_offset=0.5
+        ),
         Intensity.DRAMATIC: MovementCategoricalParams(
             amplitude=0.900, frequency=1.050, center_offset=0.5
         ),
@@ -82,9 +88,15 @@ CURVE_INTENSITY_PARAMS: dict[CurveLibrary, dict[Intensity, MovementCategoricalPa
         ),
     },
     CurveLibrary.MOVEMENT_TRIANGLE: {
-        Intensity.SLOW: MovementCategoricalParams(amplitude=0.300, frequency=0.650, center_offset=0.5),
-        Intensity.SMOOTH: MovementCategoricalParams(amplitude=0.600, frequency=1.000, center_offset=0.5),
-        Intensity.FAST: MovementCategoricalParams(amplitude=0.800, frequency=1.062, center_offset=0.5),
+        Intensity.SLOW: MovementCategoricalParams(
+            amplitude=0.300, frequency=0.650, center_offset=0.5
+        ),
+        Intensity.SMOOTH: MovementCategoricalParams(
+            amplitude=0.600, frequency=1.000, center_offset=0.5
+        ),
+        Intensity.FAST: MovementCategoricalParams(
+            amplitude=0.800, frequency=1.062, center_offset=0.5
+        ),
         Intensity.DRAMATIC: MovementCategoricalParams(
             amplitude=0.900, frequency=1.050, center_offset=0.5
         ),
@@ -93,9 +105,15 @@ CURVE_INTENSITY_PARAMS: dict[CurveLibrary, dict[Intensity, MovementCategoricalPa
         ),
     },
     CurveLibrary.MOVEMENT_PULSE: {
-        Intensity.SLOW: MovementCategoricalParams(amplitude=0.200, frequency=0.350, center_offset=0.5),
-        Intensity.SMOOTH: MovementCategoricalParams(amplitude=0.600, frequency=1.150, center_offset=0.5),
-        Intensity.FAST: MovementCategoricalParams(amplitude=0.800, frequency=1.625, center_offset=0.5),
+        Intensity.SLOW: MovementCategoricalParams(
+            amplitude=0.200, frequency=0.350, center_offset=0.5
+        ),
+        Intensity.SMOOTH: MovementCategoricalParams(
+            amplitude=0.600, frequency=1.150, center_offset=0.5
+        ),
+        Intensity.FAST: MovementCategoricalParams(
+            amplitude=0.800, frequency=1.625, center_offset=0.5
+        ),
         Intensity.DRAMATIC: MovementCategoricalParams(
             amplitude=0.900, frequency=1.725, center_offset=0.5
         ),
@@ -104,9 +122,15 @@ CURVE_INTENSITY_PARAMS: dict[CurveLibrary, dict[Intensity, MovementCategoricalPa
         ),
     },
     CurveLibrary.MOVEMENT_COSINE: {
-        Intensity.SLOW: MovementCategoricalParams(amplitude=0.200, frequency=0.350, center_offset=0.5),
-        Intensity.SMOOTH: MovementCategoricalParams(amplitude=0.400, frequency=0.850, center_offset=0.5),
-        Intensity.FAST: MovementCategoricalParams(amplitude=0.600, frequency=0.875, center_offset=0.5),
+        Intensity.SLOW: MovementCategoricalParams(
+            amplitude=0.200, frequency=0.350, center_offset=0.5
+        ),
+        Intensity.SMOOTH: MovementCategoricalParams(
+            amplitude=0.400, frequency=0.850, center_offset=0.5
+        ),
+        Intensity.FAST: MovementCategoricalParams(
+            amplitude=0.600, frequency=0.875, center_offset=0.5
+        ),
         Intensity.DRAMATIC: MovementCategoricalParams(
             amplitude=0.700, frequency=1.050, center_offset=0.5
         ),
@@ -115,9 +139,15 @@ CURVE_INTENSITY_PARAMS: dict[CurveLibrary, dict[Intensity, MovementCategoricalPa
         ),
     },
     CurveLibrary.MOVEMENT_LISSAJOUS: {
-        Intensity.SLOW: MovementCategoricalParams(amplitude=0.200, frequency=0.350, center_offset=0.5),
-        Intensity.SMOOTH: MovementCategoricalParams(amplitude=0.400, frequency=1.000, center_offset=0.5),
-        Intensity.FAST: MovementCategoricalParams(amplitude=0.600, frequency=1.625, center_offset=0.5),
+        Intensity.SLOW: MovementCategoricalParams(
+            amplitude=0.200, frequency=0.350, center_offset=0.5
+        ),
+        Intensity.SMOOTH: MovementCategoricalParams(
+            amplitude=0.400, frequency=1.000, center_offset=0.5
+        ),
+        Intensity.FAST: MovementCategoricalParams(
+            amplitude=0.600, frequency=1.625, center_offset=0.5
+        ),
         Intensity.DRAMATIC: MovementCategoricalParams(
             amplitude=0.700, frequency=1.500, center_offset=0.5
         ),
@@ -126,9 +156,15 @@ CURVE_INTENSITY_PARAMS: dict[CurveLibrary, dict[Intensity, MovementCategoricalPa
         ),
     },
     CurveLibrary.MOVEMENT_PERLIN_NOISE: {
-        Intensity.SLOW: MovementCategoricalParams(amplitude=0.400, frequency=0.350, center_offset=0.5),
-        Intensity.SMOOTH: MovementCategoricalParams(amplitude=0.450, frequency=0.700, center_offset=0.5),
-        Intensity.FAST: MovementCategoricalParams(amplitude=0.600, frequency=0.875, center_offset=0.5),
+        Intensity.SLOW: MovementCategoricalParams(
+            amplitude=0.400, frequency=0.350, center_offset=0.5
+        ),
+        Intensity.SMOOTH: MovementCategoricalParams(
+            amplitude=0.450, frequency=0.700, center_offset=0.5
+        ),
+        Intensity.FAST: MovementCategoricalParams(
+            amplitude=0.600, frequency=0.875, center_offset=0.5
+        ),
         Intensity.DRAMATIC: MovementCategoricalParams(
             amplitude=0.700, frequency=1.050, center_offset=0.5
         ),

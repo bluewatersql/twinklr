@@ -141,7 +141,3 @@ class CheckpointManager:
             logger.debug(f"No checkpoint found for {checkpoint_type}")
 
         return {}
-
-
-# "artifacts/need_a_favor/checkpoints "
-# "artifacts/need_a_favor/checkpoints/plans "

@@ -5,14 +5,19 @@
 .mypy_cache/
 .coverage*
 data/*
-.dev/*
+.dev/
 .egg-info/*
 
 .env*
 .cursorrules
 config.json
+fixture_config.json
+job_config.json
 # IDE support - namespace package symlinks
 /blinkb0t/__pycache__
 *.bak*
-artifacts/*
-changes/*
+artifacts/
+changes/
+CLAUDE.md
+.cursor/
+.claude/

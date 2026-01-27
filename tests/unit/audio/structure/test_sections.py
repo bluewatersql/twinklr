@@ -143,25 +143,22 @@ class TestDetectSongSections:
         for section in result["sections"]:
             assert section["label"] in valid_labels
 
-    def test_meta_contains_k(
+    def test_meta_contains_method(
         self,
         long_audio: np.ndarray,
         sample_rate: int,
         hop_length: int,
     ) -> None:
-        """Meta dict contains clustering parameters."""
+        """Meta dict contains segmentation method."""
         result = detect_song_sections(
             long_audio,
             sample_rate,
             hop_length=hop_length,
         )
 
-        # New version uses k_coarse and k_fine
-        assert "k_coarse" in result["meta"] or "k" in result["meta"]
-        if "k_coarse" in result["meta"]:
-            assert result["meta"]["k_coarse"] >= 1
-        if "k" in result["meta"]:
-            assert result["meta"]["k"] >= 1
+        # Hybrid segmentation uses method field
+        assert "method" in result["meta"]
+        assert result["meta"]["method"] == "hybrid_segmentation"
 
     def test_custom_min_section_duration(
         self,

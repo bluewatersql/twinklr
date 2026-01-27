@@ -46,14 +46,14 @@ class XsqAdapter:
         fixture_group: FixtureGroup,
         xsq: XSequence | None = None,
     ) -> list[EffectPlacement]:
-        """Convert FixtureSegments to xLights EffectPlacement.
+        """Convert FixtureSegments to xLights EffectPlacement with layer assignment.
 
         Writes effects to either:
         - Group models (GROUP - MOVING HEADS, GROUP - MH LEFT, etc.) when semantic groups match
         - Individual fixture models (Dmx MH1, MH2, etc.) when no group match
 
-        IMPORTANT: Never writes both group AND individual for the same fixtures at the same time.
-        This follows the rule: if semantic group is mapped, render to group; otherwise explode to individuals.
+        IMPORTANT: Assigns effects to different layers to prevent overlaps.
+        Transition segments are placed on higher layers than regular section segments.
 
         Args:
             segments: List of FixtureSegments to convert
@@ -61,7 +61,7 @@ class XsqAdapter:
             xsq: Optional XSequence object to add settings to EffectDB (required for DMX channel data)
 
         Returns:
-            List of EffectPlacement objects (groups when possible, individuals otherwise)
+            List of EffectPlacement objects with layer_index assigned
 
         Example:
             >>> adapter = XsqAdapter()
@@ -70,15 +70,64 @@ class XsqAdapter:
         placements = []
         xlights_mapping = fixture_group.get_xlights_mapping()
 
+        # Separate transition and regular segments
+        transition_segments = [s for s in segments if s.metadata.get("is_transition") == "true"]
+        regular_segments = [s for s in segments if s.metadata.get("is_transition") != "true"]
+
+        logger.debug(
+            f"Converting {len(segments)} segments: "
+            f"{len(regular_segments)} regular, {len(transition_segments)} transitions"
+        )
+
+        # 1. Process regular segments on layer 0
+        regular_placements = self._process_segments(
+            regular_segments, xlights_mapping, fixture_group, xsq, layer_index=0
+        )
+        placements.extend(regular_placements)
+
+        # 2. Process transition segments on layer 1
+        if transition_segments:
+            transition_placements = self._process_segments(
+                transition_segments, xlights_mapping, fixture_group, xsq, layer_index=1
+            )
+            placements.extend(transition_placements)
+
+        logger.debug(
+            f"Converted {len(segments)} segments to {len(placements)} placements "
+            f"across {2 if transition_segments else 1} layers"
+        )
+
+        return placements
+
+    def _process_segments(
+        self,
+        segments: list[FixtureSegment],
+        xlights_mapping: dict[str, str],
+        fixture_group: FixtureGroup,
+        xsq: XSequence | None,
+        layer_index: int,
+    ) -> list[EffectPlacement]:
+        """Process segments for a specific layer.
+
+        Args:
+            segments: Segments to process
+            xlights_mapping: Fixture ID -> xLights model name mapping
+            fixture_group: Fixture group
+            xsq: XSequence object for EffectDB
+            layer_index: Layer index to assign to effects
+
+        Returns:
+            List of EffectPlacement objects with layer_index set
+        """
+        placements = []
+
         # 1. Try to create group effects first
-        # Returns segments that were actually grouped (not just fixture IDs)
         group_placements, grouped_segments = self._write_group_effects(
-            segments, xlights_mapping, fixture_group, xsq
+            segments, xlights_mapping, fixture_group, xsq, layer_index
         )
         placements.extend(group_placements)
 
         # 2. Write individual fixture effects for segments NOT grouped
-        # Convert grouped segments to a set of (fixture_id, t0_ms, t1_ms) for fast lookup
         grouped_keys = {(s.fixture_id, s.t0_ms, s.t1_ms) for s in grouped_segments}
         ungrouped_segments = [
             s for s in segments if (s.fixture_id, s.t0_ms, s.t1_ms) not in grouped_keys
@@ -86,15 +135,9 @@ class XsqAdapter:
 
         if ungrouped_segments:
             individual_placements = self._write_individual_effects(
-                ungrouped_segments, xlights_mapping, fixture_group, xsq
+                ungrouped_segments, xlights_mapping, fixture_group, xsq, layer_index
             )
             placements.extend(individual_placements)
-
-        logger.debug(
-            f"Converted {len(segments)} segments to {len(placements)} placements "
-            f"({len(group_placements)} group, {len(placements) - len(group_placements)} individual, "
-            f"{len(grouped_segments)} segments grouped)"
-        )
 
         return placements
 
@@ -104,6 +147,7 @@ class XsqAdapter:
         xlights_mapping: dict[str, str],
         fixture_group: FixtureGroup,
         xsq: XSequence | None,
+        layer_index: int,
     ) -> list[EffectPlacement]:
         """Write effects to individual fixture models.
 
@@ -112,6 +156,7 @@ class XsqAdapter:
             xlights_mapping: Fixture ID -> xLights model name mapping
             fixture_group: Fixture group
             xsq: XSequence object for EffectDB
+            layer_index: Layer index to assign to effects
 
         Returns:
             List of EffectPlacement for individual fixtures
@@ -147,7 +192,7 @@ class XsqAdapter:
             else:
                 logger.debug("No XSQ provided, using ref=0 (no DMX channel data)")
 
-            # Create EffectPlacement
+            # Create EffectPlacement with layer_index
             placements.append(
                 EffectPlacement(
                     element_name=xlights_name,
@@ -157,6 +202,7 @@ class XsqAdapter:
                     effect_label=segment.metatag,
                     ref=ref,
                     palette=0,
+                    layer_index=layer_index,
                 )
             )
 
@@ -168,6 +214,7 @@ class XsqAdapter:
         xlights_mapping: dict[str, str],
         fixture_group: FixtureGroup,
         xsq: XSequence | None,
+        layer_index: int,
     ) -> tuple[list[EffectPlacement], list[FixtureSegment]]:
         """Write effects to group models when possible.
 
@@ -176,6 +223,7 @@ class XsqAdapter:
             xlights_mapping: Fixture ID -> xLights model name mapping
             fixture_group: Fixture group
             xsq: XSequence object for EffectDB
+            layer_index: Layer index to assign to effects
 
         Returns:
             Tuple of (EffectPlacement list, list of grouped segments)
@@ -273,7 +321,7 @@ class XsqAdapter:
                     )
                     ref = xsq.append_effectdb(settings_str)
 
-                # Create group effect
+                # Create group effect with layer_index
                 placements.append(
                     EffectPlacement(
                         element_name=group_xlights_name,
@@ -283,6 +331,7 @@ class XsqAdapter:
                         effect_label=representative_segment.metatag,
                         ref=ref,
                         palette=0,
+                        layer_index=layer_index,
                     )
                 )
 

@@ -221,9 +221,15 @@ class Movement(BaseModel):
 
         # Apply overrides
         return MovementCategoricalParams(
-            amplitude=self.amplitude_override if self.amplitude_override is not None else base_params.amplitude,
-            frequency=self.frequency_override if self.frequency_override is not None else base_params.frequency,
-            center_offset=self.center_offset_override if self.center_offset_override is not None else base_params.center_offset,
+            amplitude=self.amplitude_override
+            if self.amplitude_override is not None
+            else base_params.amplitude,
+            frequency=self.frequency_override
+            if self.frequency_override is not None
+            else base_params.frequency,
+            center_offset=self.center_offset_override
+            if self.center_offset_override is not None
+            else base_params.center_offset,
         )
 
 

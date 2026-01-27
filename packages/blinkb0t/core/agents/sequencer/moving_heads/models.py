@@ -6,6 +6,8 @@ from enum import Enum
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from blinkb0t.core.sequencer.models.transition import TransitionHint
+
 # ============================================================================
 # Planner Models
 # ============================================================================
@@ -64,6 +66,15 @@ class PlanSection(BaseModel):
         description="Optional 1–3 contiguous segments that partition this section",
         min_length=1,
         max_length=3,
+    )
+
+    # Transition fields
+    transition_in: TransitionHint | None = Field(
+        None, description="How to transition INTO this section (from previous section)"
+    )
+
+    transition_out: TransitionHint | None = Field(
+        None, description="How to transition OUT OF this section (to next section)"
     )
 
     model_config = ConfigDict(frozen=True)

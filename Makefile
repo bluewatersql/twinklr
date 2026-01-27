@@ -38,8 +38,6 @@ install: ## Install project for development (first time setup)
 	@$(MAKE) verify-install
 	@echo "$(GREEN)✓ Installation complete!$(NC)"
 
-install-dev: install ## Alias for install (for muscle memory)
-
 sync: ## Sync dependencies (update after pyproject.toml changes)
 	@echo "$(BLUE)→ Syncing all dependencies (including dev)...$(NC)"
 	uv sync --extra dev --all-packages
@@ -179,22 +177,38 @@ build: ## Build distribution packages
 #############################################################################
 
 clean: ## Clean build artifacts and caches
-	@echo "$(BLUE)→ Cleaning build artifacts...$(NC)"
+	@echo "$(BLUE)→ Cleaning build artifacts and caches...$(NC)"
+	@echo "$(YELLOW)  Removing Python cache files...$(NC)"
 	find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+	find . -type f -name "*.pyc" -delete 2>/dev/null || true
+	find . -type f -name "*.pyo" -delete 2>/dev/null || true
+	@echo "$(YELLOW)  Removing build artifacts...$(NC)"
 	find . -type d -name "*.egg-info" -exec rm -rf {} + 2>/dev/null || true
-	find . -type d -name ".pytest_cache" -exec rm -rf {} + 2>/dev/null || true
-	find . -type d -name ".mypy_cache" -exec rm -rf {} + 2>/dev/null || true
-	find . -type d -name ".ruff_cache" -exec rm -rf {} + 2>/dev/null || true
-	find . -type d -name "htmlcov" -exec rm -rf {} + 2>/dev/null || true
-	find . -type f -name ".coverage" -delete 2>/dev/null || true
 	find . -type d -name "dist" -exec rm -rf {} + 2>/dev/null || true
 	find . -type d -name "build" -exec rm -rf {} + 2>/dev/null || true
+	@echo "$(YELLOW)  Removing test/coverage artifacts...$(NC)"
+	find . -type d -name ".pytest_cache" -exec rm -rf {} + 2>/dev/null || true
+	find . -type f -name ".coverage" -delete 2>/dev/null || true
+	find . -type f -name "coverage.json" -delete 2>/dev/null || true
+	find . -type d -name "htmlcov" -exec rm -rf {} + 2>/dev/null || true
+	@echo "$(YELLOW)  Removing linter/type checker caches...$(NC)"
+	find . -type d -name ".mypy_cache" -exec rm -rf {} + 2>/dev/null || true
+	find . -type d -name ".ruff_cache" -exec rm -rf {} + 2>/dev/null || true
+	@echo "$(YELLOW)  Removing editor/OS temporary files...$(NC)"
+	find . -type f -name ".DS_Store" -delete 2>/dev/null || true
+	find . -type f -name "*.swp" -delete 2>/dev/null || true
+	find . -type f -name "*.swo" -delete 2>/dev/null || true
+	find . -type f -name "*~" -delete 2>/dev/null || true
+	find . -type d -name ".ipynb_checkpoints" -exec rm -rf {} + 2>/dev/null || true
 	@echo "$(GREEN)✓ Cleanup complete$(NC)"
 
-clean-cache: ## Clean audio cache
-	@echo "$(BLUE)→ Cleaning audio cache...$(NC)"
-	rm -rf data/audio_cache/*
-	@echo "$(GREEN)✓ Cache cleaned$(NC)"
+clean-cache: ## Clean application caches (audio, step cache, etc)
+	@echo "$(BLUE)→ Cleaning application caches...$(NC)"
+	@echo "$(YELLOW)  Removing audio cache...$(NC)"
+	@rm -rf data/audio_cache/* 2>/dev/null || true
+	@echo "$(YELLOW)  Removing step result cache...$(NC)"
+	@rm -rf .cache/* 2>/dev/null || true
+	@echo "$(GREEN)✓ Application caches cleaned$(NC)"
 
 clean-all: clean clean-cache ## Clean everything including caches
 	@echo "$(GREEN)✓ Full cleanup complete$(NC)"
