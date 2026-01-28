@@ -22,10 +22,11 @@ dependencies = [
     "jinja2>=3.1.6",
     "httpx>=0.28.1",
     # Audio enhancement dependencies (v3.0)
-    "mutagen>=1.47.0",       # Audio file tag extraction
-    "pyacoustid>=1.3.0",     # AcoustID fingerprinting
-    "musicbrainzngs>=0.7.1", # MusicBrainz API client
-    "g2p-en>=2.1.0",         # Grapheme-to-phoneme for English (includes CMUdict)
+    "mutagen>=1.47.0",           # Audio file tag extraction
+    "pyacoustid>=1.3.0",         # AcoustID fingerprinting
+    "musicbrainzngs>=0.7.1",     # MusicBrainz API client
+    "g2p-en>=2.1.0",             # Grapheme-to-phoneme for English (includes CMUdict)
+    "python-Levenshtein>=0.25.0", # Levenshtein distance for mismatch ratio
 ]
 
 [project.optional-dependencies]

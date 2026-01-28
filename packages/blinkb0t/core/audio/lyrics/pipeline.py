@@ -1,6 +1,6 @@
-"""Lyrics resolution pipeline (Phase 4).
+"""Lyrics resolution pipeline (Phase 4 + Phase 5).
 
-Orchestrates stage gating: embedded → synced → plain.
+Orchestrates stage gating: embedded → synced → plain → whisperx_align → whisperx_transcribe.
 """
 
 import logging
@@ -11,6 +11,8 @@ from pydantic import BaseModel, ConfigDict, Field
 from blinkb0t.core.audio.lyrics.embedded import extract_embedded_lyrics, parse_lrc_content
 from blinkb0t.core.audio.lyrics.providers.models import LyricsQuery
 from blinkb0t.core.audio.lyrics.quality import compute_quality_metrics
+from blinkb0t.core.audio.lyrics.whisperx_models import WhisperXConfig
+from blinkb0t.core.audio.lyrics.whisperx_service import WhisperXService
 from blinkb0t.core.audio.models import StageStatus
 from blinkb0t.core.audio.models.lyrics import LyricsBundle, LyricsSource, LyricsSourceKind
 
@@ -28,6 +30,12 @@ class LyricsPipelineConfig(BaseModel):
     min_coverage_pct: float = Field(
         default=0.8, ge=0.0, le=1.0, description="Minimum coverage for quality"
     )
+    mismatch_threshold: float = Field(
+        default=0.25, ge=0.0, le=1.0, description="Mismatch ratio threshold for warnings"
+    )
+    whisperx_config: WhisperXConfig = Field(
+        default_factory=WhisperXConfig, description="WhisperX configuration"
+    )
 
 
 class LyricsPipeline:
@@ -37,6 +45,8 @@ class LyricsPipeline:
     1. Embedded extraction (LRC sidecar, SYLT, USLT)
     2. Synced lookup (LRCLib)
     3. Plain lookup (Genius)
+    4. WhisperX align-only (if require_timed_words and lyrics_text exists)
+    5. WhisperX transcribe (if no lyrics or align fails)
     """
 
     # Base confidence by source (from spec)
@@ -44,17 +54,27 @@ class LyricsPipeline:
         LyricsSourceKind.EMBEDDED: 0.70,
         LyricsSourceKind.LOOKUP_SYNCED: 0.80,
         LyricsSourceKind.LOOKUP_PLAIN: 0.75,
+        LyricsSourceKind.WHISPERX_ALIGN: 0.85,
+        LyricsSourceKind.WHISPERX_TRANSCRIBE: 0.80,
     }
 
-    def __init__(self, *, config: LyricsPipelineConfig, providers: dict[str, Any]):
+    def __init__(
+        self,
+        *,
+        config: LyricsPipelineConfig,
+        providers: dict[str, Any],
+        whisperx_service: WhisperXService | None = None,
+    ):
         """Initialize pipeline.
 
         Args:
             config: Pipeline configuration
             providers: Dict of provider name -> client instance
+            whisperx_service: Optional WhisperX service for align/transcribe
         """
         self.config = config
         self.providers = providers
+        self.whisperx_service = whisperx_service
 
     def resolve(
         self,
@@ -112,7 +132,30 @@ class LyricsPipeline:
                 warnings=warnings,
             )
             if plain_bundle:
+                # Check if we need word timing but don't have it
+                if self.config.require_timed_words and not plain_bundle.words:
+                    # Stage 4: Try WhisperX align to add timing to plain text
+                    if self.whisperx_service:
+                        align_bundle = self._try_whisperx_align(
+                            audio_path=audio_path,
+                            lyrics_text=plain_bundle.text,
+                            duration_ms=duration_ms,
+                            warnings=warnings,
+                        )
+                        if align_bundle:
+                            return align_bundle
+                # Plain text is sufficient (or align failed)
                 return plain_bundle
+
+        # Stage 5: Try WhisperX transcribe (no lyrics from any source)
+        if self.whisperx_service:
+            transcribe_bundle = self._try_whisperx_transcribe(
+                audio_path=audio_path,
+                duration_ms=duration_ms,
+                warnings=warnings,
+            )
+            if transcribe_bundle:
+                return transcribe_bundle
 
         # No lyrics found
         return LyricsBundle(
@@ -321,3 +364,180 @@ class LyricsPipeline:
             quality=quality,
             warnings=warnings,
         )
+
+    def _try_whisperx_align(
+        self,
+        *,
+        audio_path: str,
+        lyrics_text: str,
+        duration_ms: int,
+        warnings: list[str],
+    ) -> LyricsBundle | None:
+        """Try WhisperX align-only (add timing to existing lyrics).
+
+        Args:
+            audio_path: Path to audio file
+            lyrics_text: Reference lyrics text
+            duration_ms: Song duration
+            warnings: List to append warnings to
+
+        Returns:
+            LyricsBundle if successful, None otherwise
+        """
+        if not self.whisperx_service:
+            return None
+
+        try:
+            logger.info(f"WhisperX align: {audio_path}")
+            result = self.whisperx_service.align(
+                audio_path=audio_path,
+                lyrics_text=lyrics_text,
+                config=self.config.whisperx_config,
+            )
+
+            # Check mismatch ratio
+            if result.mismatch_ratio > self.config.mismatch_threshold:
+                warnings.append(
+                    f"WhisperX align mismatch ratio {result.mismatch_ratio:.3f} "
+                    f"exceeds threshold {self.config.mismatch_threshold}"
+                )
+
+            # Compute quality metrics
+            quality = compute_quality_metrics(words=result.words, duration_ms=duration_ms)
+
+            # Compute confidence with penalties
+            base_conf = self.BASE_CONFIDENCE[LyricsSourceKind.WHISPERX_ALIGN]
+            confidence = base_conf
+
+            # Mismatch penalty
+            if result.mismatch_ratio > self.config.mismatch_threshold:
+                confidence -= 0.10
+
+            # Quality penalties
+            if quality.coverage_pct < self.config.min_coverage_pct:
+                confidence -= 0.10
+            overlap_penalty = min(quality.overlap_violations * 0.05, 0.20)
+            confidence -= overlap_penalty
+            oob_penalty = min(quality.out_of_bounds_violations * 0.05, 0.20)
+            confidence -= oob_penalty
+            if quality.large_gaps_count > 8:
+                confidence -= 0.05
+
+            # Clamp [0, 1]
+            confidence = max(0.0, min(1.0, confidence))
+
+            source = LyricsSource(
+                kind=LyricsSourceKind.WHISPERX_ALIGN,
+                provider="whisperx",
+                confidence=confidence,
+            )
+
+            # Determine sufficiency
+            is_sufficient = True
+            if self.config.require_timed_words:
+                if not result.words:
+                    is_sufficient = False
+                elif quality.coverage_pct < self.config.min_coverage_pct:
+                    is_sufficient = False
+
+            if not is_sufficient:
+                warnings.append("WhisperX align result does not meet sufficiency requirements")
+
+            return LyricsBundle(
+                schema_version="1.0.0",
+                stage_status=StageStatus.OK,
+                text=lyrics_text,  # Original text
+                phrases=[],
+                words=result.words,
+                source=source,
+                quality=quality,
+                warnings=warnings,
+            )
+
+        except Exception as e:
+            logger.warning(f"WhisperX align failed: {e}")
+            warnings.append(f"WhisperX align error: {e}")
+            return None
+
+    def _try_whisperx_transcribe(
+        self,
+        *,
+        audio_path: str,
+        duration_ms: int,
+        warnings: list[str],
+    ) -> LyricsBundle | None:
+        """Try WhisperX transcribe (generate lyrics from audio).
+
+        Args:
+            audio_path: Path to audio file
+            duration_ms: Song duration
+            warnings: List to append warnings to
+
+        Returns:
+            LyricsBundle if successful, None otherwise
+        """
+        if not self.whisperx_service:
+            return None
+
+        try:
+            logger.info(f"WhisperX transcribe: {audio_path}")
+            result = self.whisperx_service.transcribe(
+                audio_path=audio_path,
+                config=self.config.whisperx_config,
+            )
+
+            # Compute quality metrics
+            quality = None
+            if result.words:
+                quality = compute_quality_metrics(words=result.words, duration_ms=duration_ms)
+
+            # Compute confidence with penalties
+            base_conf = self.BASE_CONFIDENCE[LyricsSourceKind.WHISPERX_TRANSCRIBE]
+            confidence = base_conf
+
+            # Quality penalties (if available)
+            if quality:
+                if quality.coverage_pct < self.config.min_coverage_pct:
+                    confidence -= 0.10
+                overlap_penalty = min(quality.overlap_violations * 0.05, 0.20)
+                confidence -= overlap_penalty
+                oob_penalty = min(quality.out_of_bounds_violations * 0.05, 0.20)
+                confidence -= oob_penalty
+                if quality.large_gaps_count > 8:
+                    confidence -= 0.05
+
+            # Clamp [0, 1]
+            confidence = max(0.0, min(1.0, confidence))
+
+            source = LyricsSource(
+                kind=LyricsSourceKind.WHISPERX_TRANSCRIBE,
+                provider="whisperx",
+                confidence=confidence,
+            )
+
+            # Determine sufficiency
+            is_sufficient = True
+            if self.config.require_timed_words:
+                if not result.words:
+                    is_sufficient = False
+                elif quality and quality.coverage_pct < self.config.min_coverage_pct:
+                    is_sufficient = False
+
+            if not is_sufficient:
+                warnings.append("WhisperX transcribe result does not meet sufficiency requirements")
+
+            return LyricsBundle(
+                schema_version="1.0.0",
+                stage_status=StageStatus.OK,
+                text=result.text,
+                phrases=[],
+                words=result.words,
+                source=source,
+                quality=quality,
+                warnings=warnings,
+            )
+
+        except Exception as e:
+            logger.warning(f"WhisperX transcribe failed: {e}")
+            warnings.append(f"WhisperX transcribe error: {e}")
+            return None

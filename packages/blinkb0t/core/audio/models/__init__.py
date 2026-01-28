@@ -27,15 +27,20 @@ from blinkb0t.core.audio.models.metadata import (
     ResolvedMBIDs,
     ResolvedMetadata,
 )
+from blinkb0t.core.audio.models.phonemes import (
+    Phoneme,
+    PhonemeBundle,
+    PhonemeSource,
+    VisemeEvent,
+)
 from blinkb0t.core.audio.models.song_bundle import SongBundle, SongTiming
-
-# Note: PhonemeBundle will be added in Phase 6
 
 __all__ = [
     # Enums
     "StageStatus",
     "LyricsSourcePath",
     "G2PSource",
+    "PhonemeSource",
     # Song bundle
     "SongBundle",
     "SongTiming",
@@ -54,4 +59,8 @@ __all__ = [
     "LyricsSource",
     "LyricsSourceKind",
     "LyricsQuality",
+    # Phonemes (Phase 6)
+    "Phoneme",
+    "VisemeEvent",
+    "PhonemeBundle",
 ]
