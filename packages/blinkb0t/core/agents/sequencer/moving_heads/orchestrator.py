@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from blinkb0t.core.agents.feedback import FeedbackManager
+from blinkb0t.core.agents.logging import LLMCallLogger, NullLLMCallLogger
 from blinkb0t.core.agents.providers.base import LLMProvider
 from blinkb0t.core.agents.runner import AgentRunner
 from blinkb0t.core.agents.sequencer.moving_heads.context_shaper import (
@@ -46,6 +47,7 @@ class OrchestrationConfig:
     prompt_base_path: Path | None = None
     context_shaper: MovingHeadContextShaper | None = None
     checkpoint_manager: Any | None = None  # CheckpointManager from core.utils.checkpoint
+    llm_logger: LLMCallLogger | None = None  # Phase 0: LLM call logger
 
     def __post_init__(self) -> None:
         """Initialize defaults."""
@@ -55,6 +57,9 @@ class OrchestrationConfig:
 
         if self.context_shaper is None:
             self.context_shaper = MovingHeadContextShaper()
+
+        if self.llm_logger is None:
+            self.llm_logger = NullLLMCallLogger()
 
 
 @dataclass
@@ -100,9 +105,11 @@ class Orchestrator:
         """
         self.provider = provider
         self.config = config
+        self.llm_logger = config.llm_logger or NullLLMCallLogger()
         self.runner = AgentRunner(
             provider=provider,
             prompt_base_path=config.prompt_base_path or Path(__file__).parent / "prompts",
+            llm_logger=self.llm_logger,
         )
         self.state_machine = OrchestrationStateMachine()
         self.feedback_manager = FeedbackManager()
@@ -119,6 +126,25 @@ class Orchestrator:
         """
         logger.debug("Starting orchestration")
 
+        try:
+            return self._orchestrate_impl(context)
+        finally:
+            # Phase 0: Flush LLM logs on completion (success or failure)
+            try:
+                self.llm_logger.flush()
+                logger.debug("Flushed LLM call logs")
+            except Exception as e:
+                logger.warning(f"Failed to flush LLM logs: {e}")
+
+    def _orchestrate_impl(self, context: dict[str, Any]) -> OrchestrationResult:
+        """Internal orchestration implementation.
+
+        Args:
+            context: Choreography context
+
+        Returns:
+            Orchestration result
+        """
         # Check for existing checkpoint before starting (if checkpoints enabled)
         if self.checkpoint_manager and self.checkpoint_manager.job_config.checkpoint:
             from blinkb0t.core.utils.checkpoint import CheckpointType

@@ -36,7 +36,7 @@
     "enforce_token_budget": false,
     "token_buffer_pct": 0.2,
     "success_threshold": 70,
-    
+
     "plan_agent": {
       "description": "Agent that generates initial choreography plan",
       "model": "gpt-5.2",
@@ -44,7 +44,7 @@
       "max_tokens": 50000,
       "timeout_seconds": 60
     },
-    
+
     "implementation_agent": {
       "description": "Agent that converts plan to detailed DMX instructions",
       "model": "gpt-5.2",
@@ -52,7 +52,7 @@
       "max_tokens": 50000,
       "timeout_seconds": 60
     },
-    
+
     "judge_agent": {
       "description": "Agent that evaluates plan quality and provides feedback",
       "model": "gpt-5-mini",
@@ -60,7 +60,7 @@
       "max_tokens": 50000,
       "timeout_seconds": 60
     },
-    
+
     "refinement_agent": {
       "description": "Agent that refines plan based on judge feedback",
       "model": "gpt-5.2",
@@ -68,7 +68,22 @@
       "max_tokens": 50000,
       "timeout_seconds": 60
     },
-    
+
+    "llm_logging": {
+      "description": "LLM call logging for observability and debugging (Phase 0)",
+      "enabled": true,
+      "log_level": "standard",
+      "format": "yaml",
+      "sanitize": true,
+      "_comments": {
+        "enabled": "Enable/disable LLM call logging (set false for production performance)",
+        "log_level": "Detail level: 'minimal' (metrics only), 'standard' (prompts + responses), 'full' (+ context)",
+        "format": "Output format: 'yaml' (human-readable) or 'json' (machine-readable)",
+        "sanitize": "Sanitize sensitive data (API keys, emails, etc.) from logs",
+        "_env_overrides": "BLINKBOT_DISABLE_LLM_LOGGING=1, BLINKBOT_LLM_LOG_LEVEL=full, BLINKBOT_LLM_LOG_FORMAT=json"
+      }
+    },
+
     "_comments": {
       "max_iterations": "Maximum judge/iterate loops (0=skip judge, just generate once)",
       "token_budget": "Total token budget for all agents across all iterations",

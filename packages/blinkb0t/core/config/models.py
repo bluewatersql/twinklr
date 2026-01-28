@@ -28,6 +28,41 @@ class AgentConfig(BaseModel):
     timeout_seconds: int = Field(default=60, gt=0, description="Timeout for LLM API call")
 
 
+class LLMLoggingConfig(BaseModel):
+    """LLM call logging configuration (Phase 0).
+
+    Controls comprehensive logging of LLM interactions including
+    prompts, responses, metrics, and errors.
+    """
+
+    enabled: bool = Field(
+        default=True,
+        description="Enable LLM call logging (set to False for production performance)",
+    )
+
+    log_level: str = Field(
+        default="standard",
+        pattern="^(minimal|standard|full)$",
+        description=(
+            "Log detail level: "
+            "'minimal' (metrics only), "
+            "'standard' (prompts + responses), "
+            "'full' (+ full context)"
+        ),
+    )
+
+    format: str = Field(
+        default="yaml",
+        pattern="^(yaml|json)$",
+        description="Output format: 'yaml' (human-readable) or 'json' (machine-readable)",
+    )
+
+    sanitize: bool = Field(
+        default=True,
+        description="Sanitize sensitive data (API keys, emails, etc.) from logs",
+    )
+
+
 class AgentOrchestrationConfig(BaseModel):
     """Multi-agent orchestration configuration."""
 
@@ -64,6 +99,12 @@ class AgentOrchestrationConfig(BaseModel):
     )
 
     refinement_agent: AgentConfig = Field(default_factory=lambda: AgentConfig(temperature=0.7))
+
+    # Phase 0: LLM Logging Configuration
+    llm_logging: LLMLoggingConfig = Field(
+        default_factory=LLMLoggingConfig,
+        description="LLM call logging configuration for observability and debugging",
+    )
 
 
 class ChannelDefaults(BaseModel):
@@ -253,6 +294,9 @@ class AudioEnhancementConfig(BaseModel):
     # Provider configuration
     acoustid_api_key: str | None = Field(
         default=None, description="AcoustID API key (load from env: ACOUSTID_API_KEY)"
+    )
+    genius_access_token: str | None = Field(
+        default=None, description="Genius API access token (load from env: GENIUS_ACCESS_TOKEN)"
     )
     musicbrainz_rate_limit_rps: float = Field(
         default=1.0,

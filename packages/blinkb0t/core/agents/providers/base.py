@@ -50,6 +50,10 @@ class LLMProvider(Protocol):
     - Conversation state management
     - Token usage tracking
     - JSON response parsing
+
+    Phase 0 Note: This protocol now includes async methods.
+    Sync methods are provided for backward compatibility and
+    should be thin wrappers around async implementations.
     """
 
     @property
@@ -154,4 +158,74 @@ class LLMProvider(Protocol):
 
     def reset_token_tracking(self) -> None:
         """Reset token usage tracking."""
+        ...
+
+    # =========================================================================
+    # Async Methods (Phase 0)
+    # =========================================================================
+
+    async def generate_json_async(
+        self,
+        messages: list[dict[str, str]],
+        model: str,
+        temperature: float | None = None,
+        **kwargs: Any,
+    ) -> LLMResponse:
+        """Generate JSON response from messages asynchronously.
+
+        This is the primary implementation method. The sync version
+        `generate_json` should be a thin wrapper using asyncio.run().
+
+        Provider handles retries for:
+        - Network errors (ConnectionError, TimeoutError)
+        - Rate limits (429)
+        - Server errors (500, 502, 503, 529)
+
+        Higher-level failures (validation errors) are NOT retried.
+
+        Args:
+            messages: List of message dicts with 'role' and 'content'
+            model: Model identifier
+            temperature: Sampling temperature
+            **kwargs: Provider-specific parameters
+
+        Returns:
+            LLMResponse with parsed JSON content and metadata
+
+        Raises:
+            LLMProviderError: On unrecoverable errors after retries
+        """
+        ...
+
+    async def generate_json_with_conversation_async(
+        self,
+        user_message: str,
+        conversation_id: str,
+        model: str,
+        system_prompt: str | None = None,
+        temperature: float | None = None,
+        **kwargs: Any,
+    ) -> LLMResponse:
+        """Generate JSON response in conversation context asynchronously.
+
+        This is the primary implementation method. The sync version
+        should be a thin wrapper using asyncio.run().
+
+        Provider manages conversation state internally.
+
+        Args:
+            user_message: User's message
+            conversation_id: Conversation ID (created if doesn't exist)
+            model: Model identifier
+            system_prompt: System prompt (only used for new conversations)
+            temperature: Sampling temperature
+            **kwargs: Provider-specific parameters
+
+        Returns:
+            LLMResponse with parsed JSON content and metadata
+            (metadata.conversation_id will contain the conversation ID)
+
+        Raises:
+            LLMProviderError: On unrecoverable errors
+        """
         ...

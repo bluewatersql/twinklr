@@ -1,6 +1,8 @@
 """Agent orchestration system."""
 
 # Phase 1: Foundation (Complete)
+# Phase 2: Agent Runner (Complete)
+from blinkb0t.core.agents.async_runner import AsyncAgentRunner
 from blinkb0t.core.agents.context import (
     BaseContextShaper,
     ContextShaper,
@@ -9,6 +11,16 @@ from blinkb0t.core.agents.context import (
     TokenEstimator,
 )
 from blinkb0t.core.agents.feedback import FeedbackEntry, FeedbackManager, FeedbackType
+
+# Phase 0: Async Infrastructure + LLM Logging
+from blinkb0t.core.agents.logging import (
+    AsyncFileLogger,
+    CallSummary,
+    LLMCallLog,
+    LLMCallLogger,
+    NullLLMCallLogger,
+    create_llm_logger,
+)
 from blinkb0t.core.agents.prompts import PromptPackLoader, PromptRenderer
 from blinkb0t.core.agents.providers import (
     LLMProvider,
@@ -19,8 +31,6 @@ from blinkb0t.core.agents.providers import (
     ResponseMetadata,
     TokenUsage,
 )
-
-# Phase 2: Agent Runner (Complete)
 from blinkb0t.core.agents.result import AgentResult
 from blinkb0t.core.agents.runner import AgentRunner, RunError
 from blinkb0t.core.agents.spec import AgentMode, AgentSpec
@@ -67,5 +77,13 @@ __all__ = [
     "AgentState",
     "AgentResult",
     "AgentRunner",
+    "AsyncAgentRunner",
     "RunError",
+    # LLM Logging (Phase 0)
+    "LLMCallLogger",
+    "AsyncFileLogger",
+    "NullLLMCallLogger",
+    "create_llm_logger",
+    "LLMCallLog",
+    "CallSummary",
 ]

@@ -1,7 +1,7 @@
 """Tests for agent runner."""
 
 from pathlib import Path
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 from pydantic import BaseModel
 import pytest
@@ -34,7 +34,7 @@ def test_spec():
 
 @pytest.fixture
 def mock_provider():
-    """Mock LLM provider."""
+    """Mock LLM provider with both sync and async methods."""
     provider = MagicMock()
 
     # Track tokens (simulate accumulation)
@@ -50,12 +50,24 @@ def mock_provider():
             ),
         )
 
+    # Async version for AsyncAgentRunner
+    async def generate_json_async_side_effect(*args, **kwargs):
+        token_counter["total"] += 150
+        return LLMResponse(
+            content={"result": "success", "count": 5},
+            metadata=ResponseMetadata(
+                token_usage=TokenUsage(prompt_tokens=100, completion_tokens=50, total_tokens=150),
+                model="gpt-5.2-mini",
+            ),
+        )
+
     provider.generate_json.side_effect = generate_json_side_effect
+    provider.generate_json_async = AsyncMock(side_effect=generate_json_async_side_effect)
 
     # Mock get_token_usage to return cumulative tokens
     provider.get_token_usage.side_effect = lambda: TokenUsage(
-        prompt_tokens=0,
-        completion_tokens=0,
+        prompt_tokens=100,
+        completion_tokens=50,
         total_tokens=token_counter["total"],
     )
 
@@ -116,13 +128,18 @@ def test_run_conversational_mode(mock_provider):
         mode=AgentMode.CONVERSATIONAL,
     )
 
-    # Mock conversational response
-    mock_provider.generate_json_with_conversation.return_value = LLMResponse(
-        content={"result": "conv_success", "count": 3},
-        metadata=ResponseMetadata(
-            token_usage=TokenUsage(prompt_tokens=100, completion_tokens=50, total_tokens=150),
-            conversation_id="test_conv_123",
-        ),
+    # Mock async conversational response
+    async def conv_async_side_effect(*args, **kwargs):
+        return LLMResponse(
+            content={"result": "conv_success", "count": 3},
+            metadata=ResponseMetadata(
+                token_usage=TokenUsage(prompt_tokens=100, completion_tokens=50, total_tokens=150),
+                conversation_id="test_conv_123",
+            ),
+        )
+
+    mock_provider.generate_json_with_conversation_async = AsyncMock(
+        side_effect=conv_async_side_effect
     )
 
     runner = AgentRunner(provider=mock_provider, prompt_base_path=FIXTURES_PATH)
@@ -150,7 +167,7 @@ def test_run_schema_validation_failure_and_repair(test_spec, mock_provider):
 
     # First response: invalid (missing 'count')
     # Second response: valid
-    mock_provider.generate_json.side_effect = [
+    responses = [
         LLMResponse(
             content={"result": "invalid"},  # Missing 'count'
             metadata=ResponseMetadata(
@@ -164,6 +181,12 @@ def test_run_schema_validation_failure_and_repair(test_spec, mock_provider):
             ),
         ),
     ]
+    response_iter = iter(responses)
+
+    async def async_side_effect(*args, **kwargs):
+        return next(response_iter)
+
+    mock_provider.generate_json_async = AsyncMock(side_effect=async_side_effect)
 
     variables = {"agent_name": "test", "iteration": 1, "context": {}, "feedback": None}
 
@@ -187,7 +210,7 @@ def test_run_schema_validation_exhausted(test_spec):
     # Track tokens
     token_counter = {"total": 0}
 
-    def always_invalid(*args, **kwargs):
+    async def always_invalid_async(*args, **kwargs):
         token_counter["total"] += 150
         return LLMResponse(
             content={"result": "invalid"},  # Always missing 'count'
@@ -196,9 +219,9 @@ def test_run_schema_validation_exhausted(test_spec):
             ),
         )
 
-    provider.generate_json.side_effect = always_invalid
+    provider.generate_json_async = AsyncMock(side_effect=always_invalid_async)
     provider.get_token_usage.side_effect = lambda: TokenUsage(
-        prompt_tokens=0, completion_tokens=0, total_tokens=token_counter["total"]
+        prompt_tokens=100, completion_tokens=50, total_tokens=token_counter["total"]
     )
 
     runner = AgentRunner(provider=provider, prompt_base_path=FIXTURES_PATH)
@@ -220,8 +243,8 @@ def test_run_provider_error(test_spec, mock_provider):
 
     runner = AgentRunner(provider=mock_provider, prompt_base_path=FIXTURES_PATH)
 
-    # Make provider raise error
-    mock_provider.generate_json.side_effect = LLMProviderError("API Error")
+    # Make async provider raise error
+    mock_provider.generate_json_async = AsyncMock(side_effect=LLMProviderError("API Error"))
 
     variables = {"agent_name": "test", "iteration": 1, "context": {}, "feedback": None}
 
@@ -240,11 +263,11 @@ def test_run_with_examples(test_spec, mock_provider):
 
     _result = runner.run(spec=test_spec, variables=variables)
 
-    # Check that generate_json was called
-    assert mock_provider.generate_json.called
+    # Check that generate_json_async was called
+    assert mock_provider.generate_json_async.called
 
     # Get the messages passed to provider
-    call_args = mock_provider.generate_json.call_args
+    call_args = mock_provider.generate_json_async.call_args
     messages = call_args.kwargs["messages"]
 
     # Should include examples (from examples.jsonl)
@@ -285,7 +308,7 @@ def test_run_dict_response_model():
     provider = MagicMock()
     token_counter = {"total": 0}
 
-    def return_any_dict(*args, **kwargs):
+    async def return_any_dict_async(*args, **kwargs):
         token_counter["total"] += 150
         return LLMResponse(
             content={"any": "structure", "works": True},
@@ -294,9 +317,9 @@ def test_run_dict_response_model():
             ),
         )
 
-    provider.generate_json.side_effect = return_any_dict
+    provider.generate_json_async = AsyncMock(side_effect=return_any_dict_async)
     provider.get_token_usage.side_effect = lambda: TokenUsage(
-        prompt_tokens=0, completion_tokens=0, total_tokens=token_counter["total"]
+        prompt_tokens=100, completion_tokens=50, total_tokens=token_counter["total"]
     )
 
     runner = AgentRunner(provider=provider, prompt_base_path=FIXTURES_PATH)
@@ -338,7 +361,7 @@ def test_run_with_temperature(mock_provider):
     runner.run(spec=spec, variables=variables)
 
     # Verify temperature was passed
-    call_args = mock_provider.generate_json.call_args
+    call_args = mock_provider.generate_json_async.call_args
     assert call_args.kwargs["temperature"] == 0.9
 
 
@@ -358,5 +381,5 @@ def test_run_with_model_override(mock_provider):
     runner.run(spec=spec, variables=variables)
 
     # Verify model was passed
-    call_args = mock_provider.generate_json.call_args
+    call_args = mock_provider.generate_json_async.call_args
     assert call_args.kwargs["model"] == "gpt-5.2"
