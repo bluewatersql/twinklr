@@ -86,10 +86,13 @@ class LLMCallLogger(Protocol):
     ) -> None:
         """Log the completion of an LLM call (async).
 
+        Implementations should log validated_response when validation succeeds,
+        and fallback to raw_response when validation fails to avoid redundancy.
+
         Args:
             call_id: Unique call ID from start_call_async
-            raw_response: Raw response from LLM (before validation)
-            validated_response: Validated response (or None if validation failed)
+            raw_response: Raw response from LLM (logged only if validation fails)
+            validated_response: Validated response (logged only if validation succeeds, None if failed)
             validation_errors: List of validation error messages
             tokens_used: Total tokens used
             prompt_tokens: Tokens used for prompt
@@ -155,10 +158,13 @@ class LLMCallLogger(Protocol):
 
         DEPRECATED: Use complete_call_async() for new code.
 
+        Implementations should log validated_response when validation succeeds,
+        and fallback to raw_response when validation fails to avoid redundancy.
+
         Args:
             call_id: Unique call ID from start_call
-            raw_response: Raw response from LLM
-            validated_response: Validated response
+            raw_response: Raw response from LLM (logged only if validation fails)
+            validated_response: Validated response (logged only if validation succeeds)
             validation_errors: List of validation errors
             tokens_used: Total tokens used
             prompt_tokens: Prompt tokens

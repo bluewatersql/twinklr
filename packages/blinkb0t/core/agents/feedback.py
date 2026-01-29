@@ -9,6 +9,8 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from blinkb0t.core.agents.issues import Issue
+
 logger = logging.getLogger(__name__)
 
 
@@ -31,9 +33,15 @@ class FeedbackEntry(BaseModel):
     iteration: int = Field(ge=0, description="Iteration number when feedback generated")
     timestamp: float = Field(description="Unix timestamp when feedback generated")
 
+    # Structured issues (V2 enhancement)
+    issues: list[Issue] = Field(
+        default_factory=list, description="Structured issues identified (V2)"
+    )
+
     # Optional metadata
     metadata: dict[str, Any] = Field(
-        default_factory=dict, description="Additional metadata (scores, issues, etc.)"
+        default_factory=dict,
+        description="Additional metadata (scores, breakdown, confidence, etc.)",
     )
 
     model_config = ConfigDict(frozen=True)
@@ -86,6 +94,7 @@ class FeedbackManager:
         message: str,
         iteration: int,
         score: float | None = None,
+        issues: list[Issue] | None = None,
         metadata: dict[str, Any] | None = None,
     ) -> None:
         """Add judge soft failure feedback (refinement needed).
@@ -94,7 +103,8 @@ class FeedbackManager:
             message: Feedback message
             iteration: Current iteration number
             score: Optional evaluation score
-            metadata: Optional metadata
+            issues: Optional structured issues (V2)
+            metadata: Optional metadata (score_breakdown, confidence, etc.)
         """
         meta = metadata or {}
         if score is not None:
@@ -105,17 +115,24 @@ class FeedbackManager:
             message=message,
             iteration=iteration,
             timestamp=time.time(),
+            issues=issues or [],
             metadata=meta,
         )
 
         self._add_entry(entry)
-        logger.debug(f"Added judge soft failure feedback (iteration {iteration}, score={score})")
+
+        issue_count = len(issues) if issues else 0
+        logger.debug(
+            f"Added judge soft failure feedback "
+            f"(iteration {iteration}, score={score}, issues={issue_count})"
+        )
 
     def add_judge_hard_failure(
         self,
         message: str,
         iteration: int,
         score: float | None = None,
+        issues: list[Issue] | None = None,
         metadata: dict[str, Any] | None = None,
     ) -> None:
         """Add judge hard failure feedback (replan needed).
@@ -124,7 +141,8 @@ class FeedbackManager:
             message: Feedback message
             iteration: Current iteration number
             score: Optional evaluation score
-            metadata: Optional metadata
+            issues: Optional structured issues (V2)
+            metadata: Optional metadata (score_breakdown, confidence, etc.)
         """
         meta = metadata or {}
         if score is not None:
@@ -135,11 +153,17 @@ class FeedbackManager:
             message=message,
             iteration=iteration,
             timestamp=time.time(),
+            issues=issues or [],
             metadata=meta,
         )
 
         self._add_entry(entry)
-        logger.debug(f"Added judge hard failure feedback (iteration {iteration}, score={score})")
+
+        issue_count = len(issues) if issues else 0
+        logger.debug(
+            f"Added judge hard failure feedback "
+            f"(iteration {iteration}, score={score}, issues={issue_count})"
+        )
 
     def _add_entry(self, entry: FeedbackEntry) -> None:
         """Add entry and trim to max_entries (FIFO).
@@ -235,3 +259,68 @@ class FeedbackManager:
             True if no feedback entries
         """
         return len(self.entries) == 0
+
+    def get_all_issues(self) -> list[Issue]:
+        """Get all structured issues from all feedback entries.
+
+        Returns:
+            List of all issues across all feedback entries
+        """
+        issues = []
+        for entry in self.entries:
+            issues.extend(entry.issues)
+        return issues
+
+    def get_unresolved_issues(self, current_issues: list[Issue]) -> list[Issue]:
+        """Get issues from previous iterations that are still present.
+
+        Matches issues by issue_id to track resolution.
+
+        Args:
+            current_issues: Issues from current iteration
+
+        Returns:
+            List of issues from previous iterations still in current iteration
+        """
+        current_issue_ids = {issue.issue_id for issue in current_issues}
+        previous_issues = self.get_all_issues()
+
+        unresolved = []
+        for prev_issue in previous_issues:
+            if prev_issue.issue_id in current_issue_ids:
+                unresolved.append(prev_issue)
+
+        return unresolved
+
+    def get_resolved_issues(self, current_issues: list[Issue]) -> list[Issue]:
+        """Get issues from previous iterations that were resolved.
+
+        Matches issues by issue_id to track resolution.
+
+        Args:
+            current_issues: Issues from current iteration
+
+        Returns:
+            List of issues from previous iterations not in current iteration
+        """
+        current_issue_ids = {issue.issue_id for issue in current_issues}
+        previous_issues = self.get_all_issues()
+
+        resolved = []
+        for prev_issue in previous_issues:
+            if prev_issue.issue_id not in current_issue_ids:
+                resolved.append(prev_issue)
+
+        return resolved
+
+    def get_issues_by_severity(self, severity: str) -> list[Issue]:
+        """Get all issues matching severity level.
+
+        Args:
+            severity: Severity level (ERROR, WARN, NIT)
+
+        Returns:
+            List of issues matching severity
+        """
+        all_issues = self.get_all_issues()
+        return [issue for issue in all_issues if issue.severity.value == severity]

@@ -70,7 +70,9 @@ class GeniusClient:
 
             logger.debug(f"Genius API search URL: {search_url}")
             response = await self.http_client.get(search_url, headers=headers)
-            logger.debug(f"Response status: {response.status_code}, content-type: {response.headers.get('content-type')}")
+            logger.debug(
+                f"Response status: {response.status_code}, content-type: {response.headers.get('content-type')}"
+            )
             logger.debug(f"Response body (first 200 chars): {response.text[:200]}")
             result = response.json()
 
@@ -86,20 +88,21 @@ class GeniusClient:
                 result_data = hit.get("result", {})
                 song_title = result_data.get("title", "Unknown")
                 artist_name = result_data.get("primary_artist", {}).get("name", "Unknown")
-                logger.debug(f"Genius hit {i+1}: '{song_title}' by {artist_name}")
-                
+                logger.debug(f"Genius hit {i + 1}: '{song_title}' by {artist_name}")
+
                 candidate = await self._fetch_lyrics(result_data, query, headers)
                 if candidate:
-                    logger.debug(f"Successfully fetched lyrics for hit {i+1}")
+                    logger.debug(f"Successfully fetched lyrics for hit {i + 1}")
                     candidates.append(candidate)
                 else:
-                    logger.debug(f"Failed to fetch lyrics for hit {i+1}")
+                    logger.debug(f"Failed to fetch lyrics for hit {i + 1}")
 
             logger.debug(f"Returning {len(candidates)} candidates")
             return candidates
 
         except Exception as e:
             import traceback
+
             logger.error(f"Genius search failed: {e}")
             logger.error(f"Traceback: {traceback.format_exc()}")
             return []

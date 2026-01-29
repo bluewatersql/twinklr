@@ -278,6 +278,7 @@ class LyricsPipeline:
 
         except Exception as e:
             import traceback
+
             logger.error(f"Plain lookup failed: {e}")
             logger.error(f"Traceback: {traceback.format_exc()}")
             warnings.append(f"Plain lookup error: {e}")

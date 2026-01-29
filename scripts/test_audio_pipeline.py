@@ -28,15 +28,13 @@ import argparse
 import asyncio
 import json
 import logging
-import sys
 from pathlib import Path
+import sys
 from typing import Any
 
 from blinkb0t.core.audio.analyzer import AudioAnalyzer
 from blinkb0t.core.audio.models import StageStatus
-from blinkb0t.core.caching import FSCache
 from blinkb0t.core.config.loader import load_app_config, load_job_config
-from blinkb0t.core.io import RealFileSystem, absolute_path
 
 # Set up logging
 logging.basicConfig(
@@ -90,15 +88,11 @@ def parse_args() -> argparse.Namespace:
     features_group.add_argument(
         "--skip-metadata", action="store_true", help="Skip metadata extraction"
     )
-    features_group.add_argument(
-        "--skip-lyrics", action="store_true", help="Skip lyrics resolution"
-    )
+    features_group.add_argument("--skip-lyrics", action="store_true", help="Skip lyrics resolution")
     features_group.add_argument(
         "--skip-phonemes", action="store_true", help="Skip phoneme generation"
     )
-    features_group.add_argument(
-        "--enable-all", action="store_true", help="Enable all enhancements"
-    )
+    features_group.add_argument("--enable-all", action="store_true", help="Enable all enhancements")
 
     # WhisperX configuration
     whisperx_group = parser.add_argument_group("WhisperX configuration")
@@ -173,7 +167,7 @@ def print_bundle_summary(bundle: Any, stage_name: str) -> None:
     print(f"\n{stage_name}:")
     print(f"  Status: {print_status(bundle.stage_status)}")
 
-    if hasattr(bundle, 'warnings') and bundle.warnings:
+    if hasattr(bundle, "warnings") and bundle.warnings:
         print(f"  Warnings: {len(bundle.warnings)}")
         for i, warning in enumerate(bundle.warnings[:3], 1):
             print(f"    {i}. {warning}")
@@ -186,13 +180,14 @@ async def run_analysis(args: argparse.Namespace) -> dict[str, Any]:
     # Load config
     print_header("Configuration")
     app_config = load_app_config()
-    
+
     # Load or create minimal job config
     try:
         job_config = load_job_config()
     except Exception:
         # Create minimal job config if not found
         from blinkb0t.core.config.models import JobConfig
+
         job_config = JobConfig(project_name="test_audio")
 
     # Apply overrides from args
@@ -253,7 +248,7 @@ async def run_analysis(args: argparse.Namespace) -> dict[str, Any]:
     print_section("Active Configuration")
     print(f"Audio Path: {args.audio_path}")
     print(f"Cache Enabled: {not args.no_cache}")
-    print(f"\nEnhancements:")
+    print("\nEnhancements:")
     print(f"  Metadata:  {app_config.audio_processing.enhancements.enable_metadata}")
     print(f"  Lyrics:    {app_config.audio_processing.enhancements.enable_lyrics}")
     print(f"  Phonemes:  {app_config.audio_processing.enhancements.enable_phonemes}")
@@ -282,6 +277,7 @@ async def run_analysis(args: argparse.Namespace) -> dict[str, Any]:
     except Exception as e:
         print(f"\n✗ ERROR: {e}")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)
 
@@ -292,7 +288,7 @@ async def run_analysis(args: argparse.Namespace) -> dict[str, Any]:
 
     # Audio features (timing from direct fields, rest from features dict)
     print(f"Duration: {bundle.timing.duration_s:.2f}s")
-    
+
     # Access features from the features dict (backward compatible v2.3 format)
     features = bundle.features
     if "tempo" in features:
@@ -309,19 +305,19 @@ async def run_analysis(args: argparse.Namespace) -> dict[str, Any]:
         print_bundle_summary(bundle.metadata, "Metadata")
         if bundle.metadata.stage_status == StageStatus.OK:
             if bundle.metadata.resolved:
-                artist = getattr(bundle.metadata.resolved, 'artist', None)
-                title = getattr(bundle.metadata.resolved, 'title', None)
+                artist = getattr(bundle.metadata.resolved, "artist", None)
+                title = getattr(bundle.metadata.resolved, "title", None)
                 print(f"  Resolved: {artist} - {title}")
-                if hasattr(bundle.metadata.resolved, 'tags') and bundle.metadata.resolved.tags:
-                    genre = bundle.metadata.resolved.tags.get('genre')
-                    year = bundle.metadata.resolved.tags.get('date')
+                if hasattr(bundle.metadata.resolved, "tags") and bundle.metadata.resolved.tags:
+                    genre = bundle.metadata.resolved.tags.get("genre")
+                    year = bundle.metadata.resolved.tags.get("date")
                     if genre:
                         print(f"    Genre: {genre}")
                     if year:
                         print(f"    Year: {year}")
             if bundle.metadata.embedded:
-                artist = getattr(bundle.metadata.embedded, 'artist', None)
-                title = getattr(bundle.metadata.embedded, 'title', None)
+                artist = getattr(bundle.metadata.embedded, "artist", None)
+                title = getattr(bundle.metadata.embedded, "title", None)
                 print(f"  Embedded: {artist} - {title}")
 
     # Lyrics
@@ -334,20 +330,20 @@ async def run_analysis(args: argparse.Namespace) -> dict[str, Any]:
             print(f"  Words: {len(bundle.lyrics.words)} timed words")
             print(f"  Phrases: {len(bundle.lyrics.phrases)} phrases")
             if bundle.lyrics.quality:
-                print(f"  Quality:")
+                print("  Quality:")
                 print(f"    Coverage: {bundle.lyrics.quality.coverage:.2%}")
                 print(f"    Gap Ratio: {bundle.lyrics.quality.gap_ratio:.2%}")
                 print(f"    Avg Word Duration: {bundle.lyrics.quality.avg_word_duration_ms:.0f}ms")
 
             # Show first few words
             if bundle.lyrics.words:
-                print(f"\n  First 5 words:")
+                print("\n  First 5 words:")
                 for word in bundle.lyrics.words[:5]:
                     print(f"    {word.start_ms:6.0f}ms - {word.end_ms:6.0f}ms: {word.text}")
 
             # Show first phrase
             if bundle.lyrics.phrases:
-                print(f"\n  First phrase:")
+                print("\n  First phrase:")
                 phrase = bundle.lyrics.phrases[0]
                 print(f"    {phrase.start_ms:6.0f}ms - {phrase.end_ms:6.0f}ms")
                 print(f"    {phrase.text}")

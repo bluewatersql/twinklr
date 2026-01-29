@@ -210,7 +210,10 @@ class MovingHeadManager(DomainManager):
                         metadata_context["artist"] = song_bundle.metadata.resolved.artist
                     if song_bundle.metadata.resolved.title:
                         metadata_context["title"] = song_bundle.metadata.resolved.title
-                    if song_bundle.metadata.resolved.mbids and song_bundle.metadata.resolved.mbids.artist_mbids:
+                    if (
+                        song_bundle.metadata.resolved.mbids
+                        and song_bundle.metadata.resolved.mbids.artist_mbids
+                    ):
                         metadata_context["genre_hints"] = "Available via MusicBrainz"
                 elif song_bundle.metadata.embedded:
                     if song_bundle.metadata.embedded.artist:

@@ -291,7 +291,13 @@ class Orchestrator:
 
             # Handle judge decision
             if judge_response.decision == JudgeDecision.APPROVE:
-                logger.debug(f"Judge approved plan with score {judge_response.score}")
+                logger.debug(
+                    f"Judge approved plan with score {judge_response.score} "
+                    f"(confidence: {judge_response.confidence})"
+                )
+                logger.debug(f"Score breakdown: {judge_response.score_breakdown}")
+                if judge_response.strengths:
+                    logger.debug(f"Strengths: {judge_response.strengths}")
 
                 self.state_machine.transition(
                     OrchestrationState.SUCCEEDED,
@@ -305,13 +311,36 @@ class Orchestrator:
                     total_tokens=total_tokens,
                     duration_seconds=total_duration,
                     final_state=OrchestrationState.SUCCEEDED,
-                    metadata={"final_score": judge_response.score},
+                    metadata={
+                        "final_score": judge_response.score,
+                        "score_breakdown": judge_response.score_breakdown,
+                        "confidence": judge_response.confidence,
+                        "strengths": judge_response.strengths,
+                        "overall_assessment": judge_response.overall_assessment,
+                    },
                 )
 
             elif judge_response.decision == JudgeDecision.SOFT_FAIL:
-                logger.debug(f"Judge soft fail (score {judge_response.score}), iterating")
+                logger.debug(
+                    f"Judge soft fail (score {judge_response.score}, "
+                    f"confidence: {judge_response.confidence}), iterating"
+                )
+                logger.debug(f"Score breakdown: {judge_response.score_breakdown}")
+                if judge_response.issues:
+                    logger.debug(
+                        f"Issues identified: {len(judge_response.issues)} "
+                        f"({sum(1 for i in judge_response.issues if i.severity.value == 'ERROR')} errors, "
+                        f"{sum(1 for i in judge_response.issues if i.severity.value == 'WARN')} warnings)"
+                    )
                 self.feedback_manager.add_judge_soft_failure(
-                    judge_response.feedback_for_planner, iteration=iterations
+                    message=judge_response.feedback_for_planner,
+                    iteration=iterations,
+                    score=judge_response.score,
+                    issues=judge_response.issues,
+                    metadata={
+                        "score_breakdown": judge_response.score_breakdown,
+                        "confidence": judge_response.confidence,
+                    },
                 )
 
                 # Transition back to planning
@@ -322,9 +351,33 @@ class Orchestrator:
                 )
 
             elif judge_response.decision == JudgeDecision.HARD_FAIL:
-                logger.warning(f"Judge hard fail (score {judge_response.score})")
+                logger.warning(
+                    f"Judge hard fail (score {judge_response.score}, "
+                    f"confidence: {judge_response.confidence})"
+                )
+                logger.warning(f"Score breakdown: {judge_response.score_breakdown}")
+                if judge_response.issues:
+                    logger.warning(
+                        f"Issues identified: {len(judge_response.issues)} "
+                        f"({sum(1 for i in judge_response.issues if i.severity.value == 'ERROR')} errors, "
+                        f"{sum(1 for i in judge_response.issues if i.severity.value == 'WARN')} warnings)"
+                    )
+                    # Log ERROR issues for immediate attention
+                    for issue in judge_response.issues:
+                        if issue.severity.value == "ERROR":
+                            logger.warning(
+                                f"  ERROR [{issue.issue_id}] {issue.category.value}: "
+                                f"{issue.message} (Location: {issue.location})"
+                            )
                 self.feedback_manager.add_judge_hard_failure(
-                    judge_response.feedback_for_planner, iteration=iterations
+                    message=judge_response.feedback_for_planner,
+                    iteration=iterations,
+                    score=judge_response.score,
+                    issues=judge_response.issues,
+                    metadata={
+                        "score_breakdown": judge_response.score_breakdown,
+                        "confidence": judge_response.confidence,
+                    },
                 )
                 # Transition back to planning
                 self.state_machine.transition(

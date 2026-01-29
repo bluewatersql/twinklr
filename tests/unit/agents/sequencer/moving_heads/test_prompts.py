@@ -35,6 +35,7 @@ def test_planner_prompts_exist():
     planner_dir = PROMPTS_BASE / "planner"
     assert planner_dir.exists()
     assert (planner_dir / "system.j2").exists()
+    assert (planner_dir / "developer.j2").exists()
     assert (planner_dir / "user.j2").exists()
 
 
@@ -43,6 +44,7 @@ def test_judge_prompts_exist():
     judge_dir = PROMPTS_BASE / "judge"
     assert judge_dir.exists()
     assert (judge_dir / "system.j2").exists()
+    assert (judge_dir / "developer.j2").exists()
     assert (judge_dir / "user.j2").exists()
 
 
@@ -51,8 +53,10 @@ def test_load_planner_prompts(prompt_loader):
     prompts = prompt_loader.load("planner")
 
     assert "system" in prompts
+    assert "developer" in prompts
     assert "user" in prompts
     assert len(prompts["system"]) > 0
+    assert len(prompts["developer"]) > 0
     assert len(prompts["user"]) > 0
 
 
@@ -61,8 +65,10 @@ def test_load_judge_prompts(prompt_loader):
     prompts = prompt_loader.load("judge")
 
     assert "system" in prompts
+    assert "developer" in prompts
     assert "user" in prompts
     assert len(prompts["system"]) > 0
+    assert len(prompts["developer"]) > 0
     assert len(prompts["user"]) > 0
 
 
@@ -158,12 +164,14 @@ def test_all_prompts_have_required_keys(prompt_loader):
     for pack_name in ["planner", "judge"]:
         prompts = prompt_loader.load(pack_name)
 
-        # All should have system and user
+        # All should have system, developer, and user
         assert "system" in prompts, f"{pack_name} missing system prompt"
+        assert "developer" in prompts, f"{pack_name} missing developer prompt"
         assert "user" in prompts, f"{pack_name} missing user prompt"
 
         # Should be non-empty
         assert len(prompts["system"]) > 100, f"{pack_name} system prompt too short"
+        assert len(prompts["developer"]) > 100, f"{pack_name} developer prompt too short"
         assert len(prompts["user"]) > 100, f"{pack_name} user prompt too short"
 
 
@@ -173,11 +181,17 @@ def test_prompts_contain_key_concepts():
 
     # Planner should mention templates, choreography
     planner = loader.load("planner")
-    assert "template" in planner["system"].lower()
+    assert "template" in planner["system"].lower() or "template" in planner["developer"].lower()
     assert "choreography" in planner["system"].lower()
 
-    # Judge should mention technical validation, evaluation, quality
+    # Judge should mention evaluation, quality
     judge = loader.load("judge")
     judge_system = judge["system"].lower()
     assert "evaluat" in judge_system or "judge" in judge_system
-    assert "technical" in judge_system  # Now includes technical validation
+
+    # Developer prompts should mention technical details
+    planner_dev = planner["developer"].lower()
+    assert "schema" in planner_dev or "json" in planner_dev
+
+    judge_dev = judge["developer"].lower()
+    assert "schema" in judge_dev or "json" in judge_dev

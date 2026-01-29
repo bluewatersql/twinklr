@@ -1,0 +1,120 @@
+## Technical Contract: Choreography Plan Structure
+
+### Plan Schema
+
+You must return a `ChoreographyPlan` that matches this JSON schema:
+
+```json
+{{ response_schema }}
+```
+
+### Plan Structure Rules
+
+A choreography plan contains a list of **sections**. Each `PlanSection` may be expressed in one of two valid forms:
+
+1. **Single-template section** (default, preferred)
+   - The section directly specifies `template_id` (and optional `preset_id`) for the full bar range
+   - The `segments` field must be omitted or set to `null`
+   - Use this form by default unless there's a clear musical reason to segment
+
+2. **Segmented section** (1-3 parts, use sparingly)
+   - The section contains `segments` (1 to 3 items, not null or empty)
+   - Each segment specifies its own `template_id` (and optional `preset_id`) and a bar range
+   - Segments must be **contiguous**, **non-overlapping**, and must **fully cover** the section's bar range
+   - The section-level `template_id` must be omitted or set to `null`
+
+### Segmentation Guidelines
+
+**Default to 1 template per section.** Only split a section into 2-3 segments if there's a **clear musical change** within the section:
+- **Pickup before drop**: Short buildup (1-2 bars) followed by main hit
+- **Build into hit**: Gradual intensification into climactic moment  
+- **Verse A-B structure**: Distinct musical phrases within one section
+- **Drop with aftermath**: Initial impact followed by sustained energy
+
+**Do NOT segment for**:
+- Arbitrary bar divisions without musical justification
+- Template variety alone (choose one appropriate template instead)
+- Sections shorter than 4 bars (too short to benefit from segmentation)
+- Every section (overuse defeats the purpose)
+
+### Segmentation Requirements (when using segments)
+
+- **Max 3 segments per section**
+- **Contiguous coverage**: First segment starts at section `start_bar`, last segment ends at section `end_bar`
+- **No overlaps**: Each bar belongs to exactly one segment
+- **No gaps**: Segments must be adjacent (segment N `end_bar` + 1 = segment N+1 `start_bar`)
+- **Minimum length**: Avoid segments shorter than 1 bar
+- **Segment IDs**: Use descriptive identifiers (e.g., 'A', 'B', 'C' or 'pickup', 'drop', 'tail')
+
+### Bar Numbering
+
+- **Bar numbers are 1-indexed and inclusive**: First bar is 1, not 0. Last valid bar is `total_bars`.
+- All `start_bar` values must be >= 1
+- All `end_bar` values must be >= `start_bar`
+- **Your plan should end at `total_bars`**: The last section's `end_bar` should typically equal `total_bars` to cover the full song
+
+### Template Composition
+
+- **Templates are complete choreography units**: Each template already defines movement patterns, geometry, and dimmer effects
+- **Your job**: Select which template (+ optional preset) to use for each section or segment
+- **Template IDs**: Use ONLY template IDs from the provided Template Library (exactly as written)
+- **Presets**: Optional variations (e.g., CHILL, MODERATE, ENERGETIC) - use when appropriate
+- **Modifiers**: Optional dict for additional parameters - use sparingly
+
+### Coverage Requirements
+
+- **Complete coverage**: Plan must cover the entire song from bar 1 to bar `total_bars` (no large gaps)
+- **End at total_bars**: Your last section should end at `end_bar = total_bars` (bars are inclusive, so this is correct)
+- **Section alignment**: Section bar ranges should align with the song structure provided
+- **Intentional gaps**: If you deliberately leave gaps (e.g., blackout), explain in `reasoning`
+
+### Field Requirements
+
+**PlanSection (single-template)**:
+- `section_name`: Required (e.g., 'intro', 'verse_1', 'chorus_1')
+- `start_bar`: Required, >= 1
+- `end_bar`: Required, >= start_bar
+- `template_id`: Required
+- `preset_id`: Optional
+- `modifiers`: Optional dict
+- `reasoning`: Optional but recommended (why this template/preset choice)
+- `section_role`: Optional (verse, chorus, bridge, build, drop, etc.)
+- `energy_level`: Optional (0-100)
+- `segments`: Must be omitted or null
+
+**PlanSection (segmented)**:
+- `section_name`: Required
+- `start_bar`: Required, >= 1
+- `end_bar`: Required, >= start_bar
+- `segments`: Required (1-3 items)
+- `section_role`: Optional
+- `energy_level`: Optional
+- `template_id`: Must be omitted or null
+- `preset_id`: Must be omitted or null (set on segments instead)
+- `modifiers`: Must be omitted or empty (set on segments instead)
+- `reasoning`: Optional (why this segmentation strategy)
+
+**PlanSegment** (within segmented section):
+- `segment_id`: Required (e.g., 'A', 'B', 'pickup', 'drop')
+- `start_bar`: Required, >= section start_bar
+- `end_bar`: Required, <= section end_bar
+- `template_id`: Required
+- `preset_id`: Optional
+- `modifiers`: Optional dict
+- `reasoning`: Optional (why this segment choice)
+
+**ChoreographyPlan**:
+- `sections`: Required (min 1 section)
+- `overall_strategy`: Optional but recommended (high-level choreography strategy, 1-3 sentences)
+
+### Common Errors to Avoid
+
+- ❌ Using template IDs not in the provided library
+- ❌ Setting both `segments` and `template_id` on a section (pick one approach)
+- ❌ Neither `segments` nor `template_id` set (must provide one)
+- ❌ Segments that don't cover the full section range
+- ❌ Overlapping or non-contiguous segments
+- ❌ Bar numbers starting at 0 (use 1-indexed)
+- ❌ More than 3 segments per section
+- ❌ Segmenting every section without musical justification
+- ❌ Segments shorter than 1 bar (unless absolutely necessary)

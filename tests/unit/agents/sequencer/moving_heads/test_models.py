@@ -3,6 +3,15 @@
 from pydantic import ValidationError
 import pytest
 
+from blinkb0t.core.agents.issues import (
+    Issue,
+    IssueCategory,
+    IssueEffort,
+    IssueLocation,
+    IssueScope,
+    IssueSeverity,
+    SuggestedAction,
+)
 from blinkb0t.core.agents.sequencer.moving_heads.models import (
     ChoreographyPlan,
     JudgeDecision,
@@ -132,16 +141,27 @@ def test_choreography_plan_validation():
 
 
 def test_judge_issue_model():
-    """Test judge issue model."""
+    """Test judge issue model (alias for Issue)."""
     issue = JudgeIssue(
-        severity="minor",
-        location="verse_1",
-        issue="Repetitive movement",
-        suggestion="Add variety",
+        issue_id="VARIETY_LOW_VERSE1",
+        category=IssueCategory.VARIETY,
+        severity=IssueSeverity.WARN,
+        estimated_effort=IssueEffort.LOW,
+        scope=IssueScope.SECTION,
+        location=IssueLocation(section_id="verse_1", bar_start=8, bar_end=24),
+        message="Repetitive movement pattern throughout verse",
+        fix_hint="Add variety by using different geometry types",
+        acceptance_test="Verse_1 should use at least 2 different templates or presets",
+        suggested_action=SuggestedAction.PATCH,
     )
 
-    assert issue.severity == "minor"
-    assert issue.location == "verse_1"
+    assert issue.issue_id == "VARIETY_LOW_VERSE1"
+    assert issue.category == IssueCategory.VARIETY
+    assert issue.severity == IssueSeverity.WARN
+    assert issue.location.section_id == "verse_1"
+
+    # Verify JudgeIssue is an alias for Issue
+    assert type(issue).__name__ == "Issue"
 
 
 def test_judge_response_approve():
@@ -149,15 +169,19 @@ def test_judge_response_approve():
     response = JudgeResponse(
         decision=JudgeDecision.APPROVE,
         score=8.5,
+        score_breakdown={"musicality": 9.0, "variety": 8.0, "flow": 8.5},
+        confidence=0.9,
+        feedback_for_planner="Excellent work, plan is ready to render",
+        overall_assessment="Strong choreography with good energy arc and musical synchronization",
         strengths=["Good energy match", "Creative variety"],
         issues=[],
-        feedback_for_planner="Excellent work",
-        overall_assessment="Ready to render",
     )
 
     assert response.decision == JudgeDecision.APPROVE
     assert response.score == 8.5
+    assert response.confidence == 0.9
     assert len(response.strengths) == 2
+    assert len(response.score_breakdown) == 3
 
 
 def test_judge_response_soft_fail():
@@ -165,22 +189,32 @@ def test_judge_response_soft_fail():
     response = JudgeResponse(
         decision=JudgeDecision.SOFT_FAIL,
         score=6.5,
+        score_breakdown={"musicality": 7.0, "variety": 6.0, "flow": 6.5},
+        confidence=0.8,
+        feedback_for_planner="Address chorus energy mismatch to improve overall score",
+        overall_assessment="Good foundation but needs minor improvements in energy matching",
         strengths=["Good foundation"],
         issues=[
-            JudgeIssue(
-                severity="moderate",
-                location="chorus",
-                issue="Energy mismatch",
-                suggestion="Increase intensity",
+            Issue(
+                issue_id="ENERGY_MISMATCH_CHORUS",
+                category=IssueCategory.MUSICALITY,
+                severity=IssueSeverity.WARN,
+                estimated_effort=IssueEffort.MEDIUM,
+                scope=IssueScope.SECTION,
+                location=IssueLocation(section_id="chorus"),
+                message="Energy mismatch in chorus section",
+                fix_hint="Increase intensity by using ENERGETIC preset",
+                acceptance_test="Chorus energy level >= 70/100",
+                suggested_action=SuggestedAction.PATCH,
             )
         ],
-        feedback_for_planner="Address chorus energy",
-        overall_assessment="Needs minor improvements",
     )
 
     assert response.decision == JudgeDecision.SOFT_FAIL
     assert response.score == 6.5
+    assert response.confidence == 0.8
     assert len(response.issues) == 1
+    assert response.issues[0].category == IssueCategory.MUSICALITY
 
 
 def test_judge_response_hard_fail():
@@ -188,21 +222,31 @@ def test_judge_response_hard_fail():
     response = JudgeResponse(
         decision=JudgeDecision.HARD_FAIL,
         score=3.0,
+        score_breakdown={"musicality": 2.0, "variety": 4.0, "flow": 3.0},
+        confidence=0.95,
+        feedback_for_planner="Major revision needed: rethink approach to match music structure",
+        overall_assessment="Plan fundamentally flawed with no musical synchronization",
         strengths=[],
         issues=[
-            JudgeIssue(
-                severity="critical",
-                location="overall",
-                issue="No musical synchronization",
-                suggestion="Rethink entire approach",
+            Issue(
+                issue_id="NO_MUSIC_SYNC_GLOBAL",
+                category=IssueCategory.MUSICALITY,
+                severity=IssueSeverity.ERROR,
+                estimated_effort=IssueEffort.HIGH,
+                scope=IssueScope.GLOBAL,
+                location=IssueLocation(),
+                message="No musical synchronization throughout the plan",
+                fix_hint="Rethink entire approach to align with song structure and energy",
+                acceptance_test="Musical synchronization score >= 6.0/10",
+                suggested_action=SuggestedAction.REPLAN_GLOBAL,
             )
         ],
-        feedback_for_planner="Major revision needed",
-        overall_assessment="Plan fundamentally flawed",
     )
 
     assert response.decision == JudgeDecision.HARD_FAIL
     assert response.score == 3.0
+    assert response.confidence == 0.95
+    assert response.issues[0].severity == IssueSeverity.ERROR
 
 
 def test_judge_decision_enum():
@@ -216,26 +260,112 @@ def test_judge_decision_enum():
     assert len(decisions) == 3
 
 
+def test_issue_enums():
+    """Test issue-related enum values."""
+    # Test IssueCategory
+    assert IssueCategory.SCHEMA == "SCHEMA"
+    assert IssueCategory.TIMING == "TIMING"
+    assert IssueCategory.MUSICALITY == "MUSICALITY"
+
+    # Test IssueSeverity
+    assert IssueSeverity.ERROR == "ERROR"
+    assert IssueSeverity.WARN == "WARN"
+    assert IssueSeverity.NIT == "NIT"
+
+    # Test IssueEffort
+    assert IssueEffort.LOW == "LOW"
+    assert IssueEffort.MEDIUM == "MEDIUM"
+    assert IssueEffort.HIGH == "HIGH"
+
+    # Test IssueScope
+    assert IssueScope.GLOBAL == "GLOBAL"
+    assert IssueScope.SECTION == "SECTION"
+
+    # Test SuggestedAction
+    assert SuggestedAction.PATCH == "PATCH"
+    assert SuggestedAction.REPLAN_SECTION == "REPLAN_SECTION"
+    assert SuggestedAction.REPLAN_GLOBAL == "REPLAN_GLOBAL"
+
+
+def test_issue_location_model():
+    """Test issue location model."""
+    # Full location
+    location = IssueLocation(
+        section_id="verse_1",
+        group_id="front",
+        effect_id="sweep",
+        bar_start=8,
+        bar_end=16,
+    )
+    assert location.section_id == "verse_1"
+    assert location.bar_start == 8
+
+    # Minimal location (all fields optional)
+    location_minimal = IssueLocation()
+    assert location_minimal.section_id is None
+    assert location_minimal.bar_start is None
+
+
+def test_judge_response_confidence_validation():
+    """Test judge confidence validation."""
+    # Valid confidence
+    response = JudgeResponse(
+        decision=JudgeDecision.APPROVE,
+        score=8.0,
+        score_breakdown={},
+        confidence=0.85,
+        feedback_for_planner="Good",
+        overall_assessment="Approved",
+    )
+    assert response.confidence == 0.85
+
+    # Invalid confidence (< 0)
+    with pytest.raises(ValidationError):
+        JudgeResponse(
+            decision=JudgeDecision.APPROVE,
+            score=8.0,
+            score_breakdown={},
+            confidence=-0.1,
+            feedback_for_planner="",
+            overall_assessment="",
+        )
+
+    # Invalid confidence (> 1)
+    with pytest.raises(ValidationError):
+        JudgeResponse(
+            decision=JudgeDecision.APPROVE,
+            score=8.0,
+            score_breakdown={},
+            confidence=1.5,
+            feedback_for_planner="",
+            overall_assessment="",
+        )
+
+
 def test_judge_response_score_validation():
     """Test judge score validation."""
     # Valid scores
     response1 = JudgeResponse(
         decision=JudgeDecision.APPROVE,
         score=10.0,
+        score_breakdown={},
+        confidence=1.0,
+        feedback_for_planner="Perfect",
+        overall_assessment="Excellent",
         strengths=[],
         issues=[],
-        feedback_for_planner="",
-        overall_assessment="",
     )
     assert response1.score == 10.0
 
     response2 = JudgeResponse(
         decision=JudgeDecision.HARD_FAIL,
         score=0.0,
+        score_breakdown={},
+        confidence=1.0,
+        feedback_for_planner="Failed",
+        overall_assessment="Poor",
         strengths=[],
         issues=[],
-        feedback_for_planner="",
-        overall_assessment="",
     )
     assert response2.score == 0.0
 
@@ -244,20 +374,24 @@ def test_judge_response_score_validation():
         JudgeResponse(
             decision=JudgeDecision.APPROVE,
             score=-1.0,  # Too low
-            strengths=[],
-            issues=[],
+            score_breakdown={},
+            confidence=1.0,
             feedback_for_planner="",
             overall_assessment="",
+            strengths=[],
+            issues=[],
         )
 
     with pytest.raises(ValidationError):
         JudgeResponse(
             decision=JudgeDecision.APPROVE,
             score=11.0,  # Too high
-            strengths=[],
-            issues=[],
+            score_breakdown={},
+            confidence=1.0,
             feedback_for_planner="",
             overall_assessment="",
+            strengths=[],
+            issues=[],
         )
 
 
@@ -277,10 +411,12 @@ def test_models_are_serializable():
     judge = JudgeResponse(
         decision=JudgeDecision.APPROVE,
         score=8.0,
-        strengths=[],
-        issues=[],
+        score_breakdown={"musicality": 8.0},
+        confidence=0.9,
         feedback_for_planner="Good",
         overall_assessment="Approved",
+        strengths=[],
+        issues=[],
     )
 
     # All should serialize

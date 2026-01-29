@@ -559,7 +559,9 @@ def _detect_novelty_boundaries(
 
     except (TypeError, AttributeError) as e:
         # librosa compatibility issue - timelag_filter can fail with certain versions/inputs
-        logger.debug(f"Novelty boundary detection failed (librosa compatibility): {type(e).__name__}")
+        logger.debug(
+            f"Novelty boundary detection failed (librosa compatibility): {type(e).__name__}"
+        )
         return []
     except Exception as e:
         logger.debug(f"Novelty boundary detection failed: {type(e).__name__}: {str(e)[:100]}")

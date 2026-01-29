@@ -171,10 +171,13 @@ class AsyncFileLogger:
     ) -> None:
         """Log the completion of an LLM call (async).
 
+        Logs only validated_response if validation succeeded, otherwise logs
+        raw_response to avoid redundancy (they're identical 99% of the time).
+
         Args:
             call_id: Unique call ID from start_call_async
-            raw_response: Raw response from LLM
-            validated_response: Validated response
+            raw_response: Raw response from LLM (logged only if validation fails)
+            validated_response: Validated response (logged only if validation succeeds)
             validation_errors: List of validation errors
             tokens_used: Total tokens used
             prompt_tokens: Prompt tokens
@@ -191,8 +194,14 @@ class AsyncFileLogger:
         log_entry: LLMCallLog = pending["log_entry"]
 
         # Update with response data
-        log_entry.raw_response = raw_response
-        log_entry.validated_response = validated_response
+        # Only log validated_response if validation succeeded, otherwise log raw_response
+        # This avoids redundancy since they're identical 99% of the time
+        if validated_response is not None:
+            log_entry.validated_response = validated_response
+            log_entry.raw_response = None
+        else:
+            log_entry.raw_response = raw_response
+            log_entry.validated_response = None
         log_entry.validation_errors = validation_errors
         log_entry.tokens_used = tokens_used
         log_entry.prompt_tokens = prompt_tokens
@@ -271,6 +280,9 @@ class AsyncFileLogger:
         """Log call completion (sync wrapper).
 
         DEPRECATED: Use complete_call_async() for new code.
+
+        Logs validated_response when validation succeeds, otherwise logs
+        raw_response to avoid redundancy.
         """
         asyncio.run(
             self.complete_call_async(

@@ -123,7 +123,7 @@ def test_shape_summarizes_audio_features():
 
 
 def test_shape_truncates_template_list():
-    """Test that long template lists are truncated."""
+    """Test that available_templates is preserved (not truncated) since it's a critical key."""
     shaper = MovingHeadContextShaper(max_tokens=300)
 
     context = {
@@ -133,9 +133,9 @@ def test_shape_truncates_template_list():
 
     shaped = shaper.shape(context=context)
 
-    # Template list should be truncated
-    if "available_templates" in shaped.data:
-        assert len(shaped.data["available_templates"]) < len(context["available_templates"])
+    # available_templates should be preserved in full (it's a critical key for judge validation)
+    assert "available_templates" in shaped.data
+    assert len(shaped.data["available_templates"]) == len(context["available_templates"])
 
 
 def test_shape_with_iteration_feedback():

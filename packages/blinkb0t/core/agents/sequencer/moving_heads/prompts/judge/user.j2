@@ -13,6 +13,14 @@ Evaluate the following choreography plan:
 **Key Moments**: {{ context.audio_features.get('key_moments', []) | tojson }}
 {% endif %}
 
+## Available Templates
+
+{% if context.get('available_templates') %}
+{{ context.available_templates | tojson }}
+{% else %}
+No template library provided. Cannot validate template IDs.
+{% endif %}
+
 {% if iteration > 1 %}
 ## Iteration Context
 

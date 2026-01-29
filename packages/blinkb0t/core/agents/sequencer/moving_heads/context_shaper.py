@@ -38,7 +38,13 @@ class MovingHeadContextShaper(BaseContextShaper):
         self.max_tokens = max_tokens
 
         # Default critical keys for moving head domain
-        default_preserve = ["song_structure", "fixtures", "beat_grid", "feedback"]
+        default_preserve = [
+            "song_structure",
+            "fixtures",
+            "beat_grid",
+            "feedback",
+            "available_templates",
+        ]
 
         if preserve_keys:
             # Merge with defaults
@@ -102,8 +108,6 @@ class MovingHeadContextShaper(BaseContextShaper):
             # Apply domain-specific reductions
             if key == "audio_features":
                 filtered[key] = self._summarize_audio_features(value)
-            elif key == "available_templates":
-                filtered[key] = self._truncate_template_list(value)
             elif key == "template_library":
                 filtered[key] = self._truncate_template_library(value)
             elif key in ["metadata", "debug_info", "raw_audio"]:

@@ -6,6 +6,9 @@ from enum import Enum
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from blinkb0t.core.agents.issues import (
+    Issue,
+)
 from blinkb0t.core.sequencer.models.transition import TransitionHint
 
 # ============================================================================
@@ -142,25 +145,29 @@ class JudgeDecision(str, Enum):
     HARD_FAIL = "HARD_FAIL"  # Needs major revision (< 5.0)
 
 
-class JudgeIssue(BaseModel):
-    """Quality issue identified by judge."""
-
-    severity: str = Field(description="Severity: 'minor', 'moderate', 'critical'")
-    location: str = Field(description="Location of issue")
-    issue: str = Field(description="Issue description")
-    suggestion: str = Field(description="Suggested improvement")
-
-    model_config = ConfigDict(frozen=True)
+# Alias for domain-specific naming (shared Issue model)
+JudgeIssue = Issue
 
 
 class JudgeResponse(BaseModel):
-    """Judge evaluation result."""
+    """Detailed judge evaluation result."""
 
     decision: JudgeDecision = Field(description="Approve, soft fail, or hard fail")
-    score: float = Field(ge=0.0, le=10.0, description="Quality score (0-10)")
+    score: float = Field(ge=0.0, le=10.0, description="Overall quality score (0-10)")
+    score_breakdown: dict[str, float] = Field(
+        description="Named dimension scores (e.g., musicality: 8.5, variety: 7.0)",
+        default_factory=dict,
+    )
+    confidence: float = Field(
+        ge=0.0, le=1.0, description="Judge confidence in this evaluation (0-1)"
+    )
+    feedback_for_planner: str = Field(
+        description="Concise summary feedback for next iteration (2-4 sentences)"
+    )
+    overall_assessment: str = Field(
+        description="Overall assessment summary (2-4 sentences)", max_length=500
+    )
     strengths: list[str] = Field(description="What the plan does well", default_factory=list)
-    issues: list[JudgeIssue] = Field(description="Issues to address", default_factory=list)
-    feedback_for_planner: str = Field(description="Concise feedback for next iteration")
-    overall_assessment: str = Field(description="Overall assessment summary")
+    issues: list[Issue] = Field(description="Detailed issues to address", default_factory=list)
 
     model_config = ConfigDict(frozen=True)

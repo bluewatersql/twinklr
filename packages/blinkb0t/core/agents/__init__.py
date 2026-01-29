@@ -11,6 +11,15 @@ from blinkb0t.core.agents.context import (
     TokenEstimator,
 )
 from blinkb0t.core.agents.feedback import FeedbackEntry, FeedbackManager, FeedbackType
+from blinkb0t.core.agents.issues import (
+    Issue,
+    IssueCategory,
+    IssueEffort,
+    IssueLocation,
+    IssueScope,
+    IssueSeverity,
+    SuggestedAction,
+)
 
 # Phase 0: Async Infrastructure + LLM Logging
 from blinkb0t.core.agents.logging import (
@@ -62,6 +71,14 @@ __all__ = [
     "FeedbackManager",
     "FeedbackEntry",
     "FeedbackType",
+    # Issues
+    "Issue",
+    "IssueCategory",
+    "IssueSeverity",
+    "IssueEffort",
+    "IssueScope",
+    "IssueLocation",
+    "SuggestedAction",
     # Context
     "ContextShaper",
     "BaseContextShaper",

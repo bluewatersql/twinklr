@@ -101,7 +101,9 @@ class TestSanitizeString:
             result = sanitize_string(f"CC: {cc}")
             assert "<REDACTED:CREDIT_CARD>" in result
             # Check that original number is not in result
-            assert cc.replace(" ", "").replace("-", "") not in result.replace(" ", "").replace("-", "")
+            assert cc.replace(" ", "").replace("-", "") not in result.replace(" ", "").replace(
+                "-", ""
+            )
 
     def test_credit_card_no_false_positives(self):
         """Test that long decimals are NOT redacted as credit cards."""
