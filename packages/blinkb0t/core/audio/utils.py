@@ -132,9 +132,8 @@ def cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
 def to_simple_dict(bundle: Any) -> dict[str, Any]:
     """Extract v2.3 features dict from SongBundle (backward compatibility).
 
-    This utility enables gradual migration by providing backward compatibility
-    with code expecting the old v2.3 dict format. The v2.3 dict is preserved
-    in SongBundle.features field.
+    DEPRECATED: This utility exists only for backward compatibility.
+    Use SongBundle directly to access metadata and other v3.0 features.
 
     Args:
         bundle: SongBundle instance
@@ -146,12 +145,9 @@ def to_simple_dict(bundle: Any) -> dict[str, Any]:
         bundle = analyzer.analyze("song.mp3")  # Returns SongBundle
         features_dict = to_simple_dict(bundle)  # Extract v2.3 dict
         tempo = features_dict["tempo_bpm"]
-
-    TODO: Technical debt - Remove after agent pipeline migrated to use SongBundle directly.
     """
-    # Simply return the features dict from the bundle
-    # The features field contains the complete v2.3 dict
-    return bundle.features
+    features: dict[str, Any] = bundle.features
+    return features
 
 
 __all__ = [

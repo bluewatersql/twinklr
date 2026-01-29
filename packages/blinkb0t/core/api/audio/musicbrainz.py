@@ -1,7 +1,7 @@
-"""MusicBrainz API client (Phase 3).
+"""MusicBrainz API client (Phase 3, async in Phase 8).
 
 Client for MusicBrainz music metadata database.
-Uses framework HTTP client for requests.
+Uses framework async HTTP client for requests.
 
 MusicBrainz Rate Limiting:
 - Limit: 1 request per second
@@ -25,22 +25,22 @@ class MusicBrainzError(RuntimeError):
 
 
 class MusicBrainzClient:
-    """MusicBrainz API client.
+    """MusicBrainz API client (async).
 
     Client for looking up music metadata from MusicBrainz database.
-    Uses framework HTTP client for retry/error handling.
+    Uses framework async HTTP client for retry/error handling.
 
     Rate Limiting:
         MusicBrainz enforces 1 request/second rate limit for anonymous requests.
         Client relies on framework HTTP client for retry/backoff.
 
     Args:
-        http_client: Framework HTTP client instance
+        http_client: Framework AsyncApiClient instance
         user_agent: User agent string (required by MusicBrainz)
 
     Example:
         >>> client = MusicBrainzClient(http_client=http, user_agent="app/1.0")
-        >>> recording = client.lookup_recording(mbid="...")
+        >>> recording = await client.lookup_recording(mbid="...")
         >>> print(recording.title, recording.artists)
     """
 
@@ -62,8 +62,8 @@ class MusicBrainzClient:
         self.http_client = http_client
         self.user_agent = user_agent
 
-    def lookup_recording(self, *, mbid: str) -> MusicBrainzRecording:
-        """Look up recording by MusicBrainz ID.
+    async def lookup_recording(self, *, mbid: str) -> MusicBrainzRecording:
+        """Look up recording by MusicBrainz ID (async).
 
         Args:
             mbid: MusicBrainz recording ID (MBID)
@@ -85,9 +85,9 @@ class MusicBrainzClient:
         }
 
         try:
-            # Make API request
+            # Make async API request (Phase 8)
             logger.debug(f"MusicBrainz lookup: mbid={mbid} (note: 1 req/sec rate limit applies)")
-            response_data = self.http_client.get(
+            response_data = await self.http_client.get(
                 url,
                 params=params,
                 headers=headers,

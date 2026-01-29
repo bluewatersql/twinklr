@@ -21,7 +21,8 @@ help: ## Show this help message
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(BLUE)%-20s$(NC) %s\n", $$1, $$2}'
 	@echo ""
 	@echo "$(YELLOW)Quick start:$(NC)"
-	@echo "  make install        # First time setup"
+	@echo "  make install        # First time setup (standard dependencies)"
+	@echo "  make install-dev    # Install everything including ML (WhisperX, ~2GB+)"
 	@echo "  make check-all      # Run all quality checks"
 	@echo "  make run-demo       # Run demo pipeline"
 
@@ -37,6 +38,19 @@ install: ## Install project for development (first time setup)
 	@echo "$(BLUE)→ Verifying installation...$(NC)"
 	@$(MAKE) verify-install
 	@echo "$(GREEN)✓ Installation complete!$(NC)"
+
+install-dev: ## Install everything including ML dependencies (WhisperX, PyTorch, ~2GB+)
+	@echo "$(GREEN)Installing BlinkB0t with ALL dependencies (including ML)...$(NC)"
+	@command -v uv >/dev/null 2>&1 || { echo "$(RED)Error: uv is not installed. Install from https://github.com/astral-sh/uv$(NC)"; exit 1; }
+	@echo "$(YELLOW)⚠ This will download ~2GB+ of ML dependencies (WhisperX, PyTorch)$(NC)"
+	@echo "$(BLUE)→ Syncing workspace with dev + ML dependencies...$(NC)"
+	uv sync --extra dev --extra ml --all-packages
+	@echo "$(BLUE)→ Verifying installation...$(NC)"
+	@$(MAKE) verify-install
+	@echo "$(BLUE)→ Checking ML packages...$(NC)"
+	@uv pip list | grep -E "(whisperx|torch)" || { echo "$(YELLOW)⚠ ML packages not found (installation may have failed)$(NC)"; }
+	@echo "$(GREEN)✓ Full installation complete!$(NC)"
+	@echo "$(YELLOW)→ WhisperX models will download automatically on first use (~150MB for 'base' model)$(NC)"
 
 sync: ## Sync dependencies (update after pyproject.toml changes)
 	@echo "$(BLUE)→ Syncing all dependencies (including dev)...$(NC)"
@@ -239,6 +253,33 @@ verify-install: ## Verify installation is working correctly
 #############################################################################
 # Development Utilities
 #############################################################################
+
+test-audio: ## Test audio pipeline on a file (usage: make test-audio FILE=path/to/song.mp3)
+	@if [ -z "$(FILE)" ]; then \
+		echo "$(RED)ERROR: FILE not specified$(NC)"; \
+		echo "Usage: make test-audio FILE=path/to/song.mp3"; \
+		exit 1; \
+	fi
+	@echo "$(BLUE)→ Testing audio pipeline: $(FILE)$(NC)"
+	uv run python scripts/test_audio_pipeline.py "$(FILE)"
+
+test-audio-whisperx: ## Test WhisperX transcribe (usage: make test-audio-whisperx FILE=path/to/song.mp3)
+	@if [ -z "$(FILE)" ]; then \
+		echo "$(RED)ERROR: FILE not specified$(NC)"; \
+		echo "Usage: make test-audio-whisperx FILE=path/to/song.mp3"; \
+		exit 1; \
+	fi
+	@echo "$(BLUE)→ Testing WhisperX transcribe: $(FILE)$(NC)"
+	uv run python scripts/test_audio_pipeline.py "$(FILE)" --force-whisperx-transcribe --no-cache
+
+test-audio-all: ## Test full audio pipeline with all enhancements (usage: make test-audio-all FILE=path/to/song.mp3)
+	@if [ -z "$(FILE)" ]; then \
+		echo "$(RED)ERROR: FILE not specified$(NC)"; \
+		echo "Usage: make test-audio-all FILE=path/to/song.mp3"; \
+		exit 1; \
+	fi
+	@echo "$(BLUE)→ Testing full audio pipeline: $(FILE)$(NC)"
+	uv run python scripts/test_audio_pipeline.py "$(FILE)" --enable-all
 
 shell: ## Open Python shell with project imports
 	@echo "$(BLUE)→ Opening Python shell...$(NC)"

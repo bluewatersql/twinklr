@@ -82,7 +82,7 @@ class TransitionDetector:
                 f"{target_section.section_name} at bar {boundary_bar} ({boundary_ms}ms)"
             )
 
-        logger.info(f"Detected {len(boundaries)} section boundaries")
+        logger.debug(f"Detected {len(boundaries)} section boundaries")
         return boundaries
 
     def detect_step_boundaries(
@@ -140,7 +140,7 @@ class TransitionDetector:
                 f"{target_instance.step_id} at bar {boundary_bar:.2f} ({boundary_ms}ms)"
             )
 
-        logger.info(
+        logger.debug(
             f"Detected {len(boundaries)} step boundaries in template {template.template_id}"
         )
         return boundaries

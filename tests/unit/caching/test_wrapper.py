@@ -10,8 +10,8 @@ from blinkb0t.core.caching import CacheOptions, FSCache, cached_step
 from blinkb0t.core.io import FakeFileSystem, absolute_path
 
 
-class TestArtifact(BaseModel):
-    """Test artifact model."""
+class SampleArtifact(BaseModel):
+    """Sample artifact model for testing."""
 
     value: str
     compute_count: int = 0
@@ -38,10 +38,10 @@ class TestCacheHit:
         """Test cache hit returns cached artifact without recomputing."""
         compute_count = 0
 
-        async def compute() -> TestArtifact:
+        async def compute() -> SampleArtifact:
             nonlocal compute_count
             compute_count += 1
-            return TestArtifact(value="computed", compute_count=compute_count)
+            return SampleArtifact(value="computed", compute_count=compute_count)
 
         # First call: cache miss, computes
         result1 = await cached_step(
@@ -49,7 +49,7 @@ class TestCacheHit:
             step_id="test.step",
             step_version="1",
             inputs={"param": "value"},
-            model_cls=TestArtifact,
+            model_cls=SampleArtifact,
             compute=compute,
         )
 
@@ -63,7 +63,7 @@ class TestCacheHit:
             step_id="test.step",
             step_version="1",
             inputs={"param": "value"},
-            model_cls=TestArtifact,
+            model_cls=SampleArtifact,
             compute=compute,
         )
 
@@ -74,8 +74,8 @@ class TestCacheHit:
     async def test_different_inputs_cause_cache_miss(self, cache: FSCache):
         """Test different inputs produce different cache entries."""
 
-        async def compute() -> TestArtifact:
-            return TestArtifact(value="computed")
+        async def compute() -> SampleArtifact:
+            return SampleArtifact(value="computed")
 
         # Call with input1
         _result1 = await cached_step(
@@ -83,24 +83,24 @@ class TestCacheHit:
             step_id="test.step",
             step_version="1",
             inputs={"param": "value1"},
-            model_cls=TestArtifact,
+            model_cls=SampleArtifact,
             compute=compute,
         )
 
         # Call with input2 (different) - should be cache miss
         compute_count = 0
 
-        async def compute_counting() -> TestArtifact:
+        async def compute_counting() -> SampleArtifact:
             nonlocal compute_count
             compute_count += 1
-            return TestArtifact(value="computed2")
+            return SampleArtifact(value="computed2")
 
         _result2 = await cached_step(
             cache=cache,
             step_id="test.step",
             step_version="1",
             inputs={"param": "value2"},  # Different input
-            model_cls=TestArtifact,
+            model_cls=SampleArtifact,
             compute=compute_counting,
         )
 
@@ -113,15 +113,15 @@ class TestCacheMiss:
     async def test_cache_miss_computes_and_stores(self, cache: FSCache):
         """Test cache miss triggers computation and stores result."""
 
-        async def compute() -> TestArtifact:
-            return TestArtifact(value="freshly computed")
+        async def compute() -> SampleArtifact:
+            return SampleArtifact(value="freshly computed")
 
         result = await cached_step(
             cache=cache,
             step_id="test.step",
             step_version="1",
             inputs={"param": "value"},
-            model_cls=TestArtifact,
+            model_cls=SampleArtifact,
             compute=compute,
         )
 
@@ -148,10 +148,10 @@ class TestCacheOptions:
         """Test force=True bypasses cache but still stores result."""
         compute_count = 0
 
-        async def compute() -> TestArtifact:
+        async def compute() -> SampleArtifact:
             nonlocal compute_count
             compute_count += 1
-            return TestArtifact(value="computed", compute_count=compute_count)
+            return SampleArtifact(value="computed", compute_count=compute_count)
 
         # First call: populate cache
         _result1 = await cached_step(
@@ -159,7 +159,7 @@ class TestCacheOptions:
             step_id="test.step",
             step_version="1",
             inputs={"param": "value"},
-            model_cls=TestArtifact,
+            model_cls=SampleArtifact,
             compute=compute,
         )
         assert compute_count == 1
@@ -170,7 +170,7 @@ class TestCacheOptions:
             step_id="test.step",
             step_version="1",
             inputs={"param": "value"},
-            model_cls=TestArtifact,
+            model_cls=SampleArtifact,
             compute=compute,
             options=CacheOptions(force=True),
         )
@@ -182,10 +182,10 @@ class TestCacheOptions:
         """Test enabled=False skips cache load and store."""
         compute_count = 0
 
-        async def compute() -> TestArtifact:
+        async def compute() -> SampleArtifact:
             nonlocal compute_count
             compute_count += 1
-            return TestArtifact(value="computed", compute_count=compute_count)
+            return SampleArtifact(value="computed", compute_count=compute_count)
 
         # First call with cache disabled
         _result1 = await cached_step(
@@ -193,7 +193,7 @@ class TestCacheOptions:
             step_id="test.step",
             step_version="1",
             inputs={"param": "value"},
-            model_cls=TestArtifact,
+            model_cls=SampleArtifact,
             compute=compute,
             options=CacheOptions(enabled=False),
         )
@@ -205,7 +205,7 @@ class TestCacheOptions:
             step_id="test.step",
             step_version="1",
             inputs={"param": "value"},
-            model_cls=TestArtifact,
+            model_cls=SampleArtifact,
             compute=compute,
             options=CacheOptions(enabled=False),
         )
@@ -217,7 +217,7 @@ class TestCacheOptions:
             step_id="test.step",
             step_version="1",
             inputs={"param": "value"},
-            model_cls=TestArtifact,
+            model_cls=SampleArtifact,
             compute=compute,
             options=CacheOptions(enabled=True),
         )
@@ -230,11 +230,11 @@ class TestVersioning:
     async def test_different_step_versions_cause_cache_miss(self, cache: FSCache):
         """Test different step versions produce separate cache entries."""
 
-        async def compute_v1() -> TestArtifact:
-            return TestArtifact(value="v1")
+        async def compute_v1() -> SampleArtifact:
+            return SampleArtifact(value="v1")
 
-        async def compute_v2() -> TestArtifact:
-            return TestArtifact(value="v2")
+        async def compute_v2() -> SampleArtifact:
+            return SampleArtifact(value="v2")
 
         # Store with version 1
         result1 = await cached_step(
@@ -242,7 +242,7 @@ class TestVersioning:
             step_id="test.step",
             step_version="1",
             inputs={"param": "value"},
-            model_cls=TestArtifact,
+            model_cls=SampleArtifact,
             compute=compute_v1,
         )
         assert result1.value == "v1"
@@ -250,17 +250,17 @@ class TestVersioning:
         # Call with version 2 (different) - should be cache miss
         compute_count = 0
 
-        async def compute_counting() -> TestArtifact:
+        async def compute_counting() -> SampleArtifact:
             nonlocal compute_count
             compute_count += 1
-            return TestArtifact(value="v2")
+            return SampleArtifact(value="v2")
 
         result2 = await cached_step(
             cache=cache,
             step_id="test.step",
             step_version="2",  # Different version
             inputs={"param": "value"},
-            model_cls=TestArtifact,
+            model_cls=SampleArtifact,
             compute=compute_counting,
         )
 
@@ -275,10 +275,10 @@ class TestFingerprintStability:
         """Test identical inputs produce stable fingerprints."""
         compute_count = 0
 
-        async def compute() -> TestArtifact:
+        async def compute() -> SampleArtifact:
             nonlocal compute_count
             compute_count += 1
-            return TestArtifact(value="computed")
+            return SampleArtifact(value="computed")
 
         # Call twice with identical inputs
         await cached_step(
@@ -286,7 +286,7 @@ class TestFingerprintStability:
             step_id="test.step",
             step_version="1",
             inputs={"a": 1, "b": 2, "c": 3},
-            model_cls=TestArtifact,
+            model_cls=SampleArtifact,
             compute=compute,
         )
 
@@ -295,7 +295,7 @@ class TestFingerprintStability:
             step_id="test.step",
             step_version="1",
             inputs={"a": 1, "b": 2, "c": 3},
-            model_cls=TestArtifact,
+            model_cls=SampleArtifact,
             compute=compute,
         )
 
@@ -305,10 +305,10 @@ class TestFingerprintStability:
         """Test input dict key order doesn't affect fingerprint."""
         compute_count = 0
 
-        async def compute() -> TestArtifact:
+        async def compute() -> SampleArtifact:
             nonlocal compute_count
             compute_count += 1
-            return TestArtifact(value="computed")
+            return SampleArtifact(value="computed")
 
         # Call with keys in one order
         await cached_step(
@@ -316,7 +316,7 @@ class TestFingerprintStability:
             step_id="test.step",
             step_version="1",
             inputs={"z": 1, "a": 2, "m": 3},
-            model_cls=TestArtifact,
+            model_cls=SampleArtifact,
             compute=compute,
         )
 
@@ -326,7 +326,7 @@ class TestFingerprintStability:
             step_id="test.step",
             step_version="1",
             inputs={"a": 2, "m": 3, "z": 1},  # Different order
-            model_cls=TestArtifact,
+            model_cls=SampleArtifact,
             compute=compute,
         )
 

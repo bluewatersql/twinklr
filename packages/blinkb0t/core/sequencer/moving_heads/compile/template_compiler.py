@@ -88,14 +88,14 @@ def compile_template(
         >>> result = compile_template(template, context)
     """
     # Initialize provenance
-    renderer_log.info(f"Template: {template.template_id}")
+    renderer_log.debug(f"Template: {template.template_id}")
     provenance: list[str] = [f"template:{template.template_id}"]
 
     # Apply preset if provided
     working_template = template
 
     if preset:
-        renderer_log.info(f"Applying preset: {preset.preset_id}")
+        renderer_log.debug(f"Applying preset: {preset.preset_id}")
         working_template = apply_preset(template, preset)
         provenance.append(f"preset:{preset.preset_id}")
 
@@ -117,7 +117,7 @@ def compile_template(
     all_segments: list[FixtureSegment] = []
 
     for instance in schedule_result.instances:
-        renderer_log.info(f"Step: {instance.step_id}")
+        renderer_log.debug(f"Step: {instance.step_id}")
         step = step_map[instance.step_id]
 
         # Filter fixtures based on step's target semantic group
@@ -130,8 +130,8 @@ def compile_template(
             # Filter fixtures by role membership in target group
             target_fixtures = [f for f in context.fixtures if f.role in target_roles]
 
-        renderer_log.info(f"Target group: {step.target}")
-        renderer_log.info(f"# of Target fixtures: {len(target_fixtures)}")
+        renderer_log.debug(f"Target group: {step.target}")
+        renderer_log.debug(f"# of Target fixtures: {len(target_fixtures)}")
 
         if not target_fixtures:
             # No fixtures for this group, skip
@@ -144,7 +144,7 @@ def compile_template(
         )
         fixture_ids = [f.fixture_id for f in ordered_fixtures]
 
-        renderer_log.info(f"Fixture IDs (Ordered for phase offsets): {fixture_ids}")
+        renderer_log.debug(f"Fixture IDs (Ordered for phase offsets): {fixture_ids}")
 
         if phase_config:
             phase_offsets = calculate_fixture_offsets(phase_config, fixture_ids)
@@ -154,12 +154,12 @@ def compile_template(
         # Calculate timing in milliseconds
         start_ms = context.start_ms + int(instance.start_bars * context.ms_per_bar)
         duration_ms = int(instance.duration_bars * context.ms_per_bar)
-        renderer_log.info(f"Section Timing (ms): {start_ms} - {duration_ms}")
+        renderer_log.debug(f"Section Timing (ms): {start_ms} - {duration_ms}")
 
         # Check if this step uses phase offsets
         # If yes, mark all segments as non-groupable (even those with offset=0)
         uses_phase_offsets = phase_config is not None and phase_config.spread_bars > 0
-        renderer_log.info(f"Uses phase offsets: {uses_phase_offsets}")
+        renderer_log.debug(f"Uses phase offsets: {uses_phase_offsets}")
 
         # Compile for each target fixture (use original list, not ordered)
         for fixture in target_fixtures:
@@ -170,7 +170,7 @@ def compile_template(
             if phase_offsets.wrap:
                 phase_offset_norm = phase_offset_norm % 1.0
 
-            renderer_log.info(
+            renderer_log.debug(
                 f"Fixture {fixture.fixture_id} Offset: {offset_bars} - Phase offset norm: {phase_offset_norm} - Wrap: {phase_offsets.wrap}"
             )
 

@@ -3,8 +3,6 @@
 Testing stage gating, confidence scoring, and sufficiency decisions.
 """
 
-from unittest.mock import MagicMock
-
 import pytest
 
 from blinkb0t.core.audio.lyrics.pipeline import LyricsPipeline, LyricsPipelineConfig
@@ -17,10 +15,12 @@ class TestLyricsPipeline:
 
     @pytest.fixture
     def mock_providers(self):
-        """Mock provider clients."""
+        """Mock async provider clients."""
+        from unittest.mock import AsyncMock
+
         return {
-            "lrclib": MagicMock(),
-            "genius": MagicMock(),
+            "lrclib": AsyncMock(),
+            "genius": AsyncMock(),
         }
 
     @pytest.fixture
@@ -31,7 +31,7 @@ class TestLyricsPipeline:
             min_coverage_pct=0.8,
         )
 
-    def test_embedded_success(self, mock_providers, config, tmp_path):
+    async def test_embedded_success(self, mock_providers, config, tmp_path):
         """Pipeline returns embedded lyrics if found."""
         # Create audio file with embedded lyrics
         audio_file = tmp_path / "song.mp3"
@@ -40,7 +40,7 @@ class TestLyricsPipeline:
         lrc_file.write_text("[00:10.00]First line\n[00:15.00]Second line")
 
         pipeline = LyricsPipeline(config=config, providers=mock_providers)
-        bundle = pipeline.resolve(audio_path=str(audio_file), duration_ms=30000)
+        bundle = await pipeline.resolve(audio_path=str(audio_file), duration_ms=30000)
 
         assert bundle.stage_status == StageStatus.OK
         assert bundle.text == "First line\nSecond line"
@@ -51,7 +51,7 @@ class TestLyricsPipeline:
         mock_providers["lrclib"].search.assert_not_called()
         mock_providers["genius"].search.assert_not_called()
 
-    def test_synced_lookup_fallback(self, mock_providers, config, tmp_path):
+    async def test_synced_lookup_fallback(self, mock_providers, config, tmp_path):
         """Pipeline falls back to synced lookup if no embedded lyrics."""
         audio_file = tmp_path / "song.mp3"
         audio_file.touch()
@@ -70,7 +70,7 @@ class TestLyricsPipeline:
         ]
 
         pipeline = LyricsPipeline(config=config, providers=mock_providers)
-        bundle = pipeline.resolve(
+        bundle = await pipeline.resolve(
             audio_path=str(audio_file),
             duration_ms=30000,
             artist="Artist",
@@ -86,7 +86,7 @@ class TestLyricsPipeline:
         mock_providers["lrclib"].search.assert_called_once()
         mock_providers["genius"].search.assert_not_called()
 
-    def test_plain_lookup_fallback(self, mock_providers, config, tmp_path):
+    async def test_plain_lookup_fallback(self, mock_providers, config, tmp_path):
         """Pipeline falls back to plain lookup if no synced."""
         audio_file = tmp_path / "song.mp3"
         audio_file.touch()
@@ -107,7 +107,7 @@ class TestLyricsPipeline:
         ]
 
         pipeline = LyricsPipeline(config=config, providers=mock_providers)
-        bundle = pipeline.resolve(
+        bundle = await pipeline.resolve(
             audio_path=str(audio_file),
             duration_ms=30000,
             artist="Artist",
@@ -123,7 +123,7 @@ class TestLyricsPipeline:
         mock_providers["lrclib"].search.assert_called_once()
         mock_providers["genius"].search.assert_called_once()
 
-    def test_no_lyrics_found(self, mock_providers, config, tmp_path):
+    async def test_no_lyrics_found(self, mock_providers, config, tmp_path):
         """Pipeline returns NOT_AVAILABLE if no lyrics found."""
         audio_file = tmp_path / "song.mp3"
         audio_file.touch()
@@ -133,7 +133,7 @@ class TestLyricsPipeline:
         mock_providers["genius"].search.return_value = []
 
         pipeline = LyricsPipeline(config=config, providers=mock_providers)
-        bundle = pipeline.resolve(
+        bundle = await pipeline.resolve(
             audio_path=str(audio_file),
             duration_ms=30000,
             artist="Artist",
@@ -144,7 +144,7 @@ class TestLyricsPipeline:
         assert bundle.text is None
         assert len(bundle.phrases) == 0
 
-    def test_require_timed_words_insufficient(self, mock_providers, config, tmp_path):
+    async def test_require_timed_words_insufficient(self, mock_providers, config, tmp_path):
         """Pipeline marks INSUFFICIENT if require_timed_words but only plain available."""
         audio_file = tmp_path / "song.mp3"
         audio_file.touch()
@@ -164,7 +164,7 @@ class TestLyricsPipeline:
 
         config.require_timed_words = True
         pipeline = LyricsPipeline(config=config, providers=mock_providers)
-        bundle = pipeline.resolve(
+        bundle = await pipeline.resolve(
             audio_path=str(audio_file),
             duration_ms=30000,
             artist="Artist",
@@ -177,7 +177,7 @@ class TestLyricsPipeline:
         assert len(bundle.phrases) == 0
         assert any("sufficiency" in w.lower() for w in bundle.warnings)
 
-    def test_confidence_adjustment(self, mock_providers, config, tmp_path):
+    async def test_confidence_adjustment(self, mock_providers, config, tmp_path):
         """Pipeline sets base confidence for embedded lyrics."""
         audio_file = tmp_path / "song.mp3"
         audio_file.touch()
@@ -188,7 +188,7 @@ class TestLyricsPipeline:
         lrc_file.write_text(lrc_content)
 
         pipeline = LyricsPipeline(config=config, providers=mock_providers)
-        bundle = pipeline.resolve(audio_path=str(audio_file), duration_ms=100000)
+        bundle = await pipeline.resolve(audio_path=str(audio_file), duration_ms=100000)
 
         assert bundle.stage_status == StageStatus.OK
         assert bundle.source is not None
@@ -200,7 +200,7 @@ class TestLyricsPipeline:
         # Base confidence for EMBEDDED should be 0.70
         assert bundle.source.confidence == 0.70
 
-    def test_best_candidate_selection(self, mock_providers, config, tmp_path):
+    async def test_best_candidate_selection(self, mock_providers, config, tmp_path):
         """Pipeline selects candidate with highest confidence."""
         audio_file = tmp_path / "song.mp3"
         audio_file.touch()
@@ -226,7 +226,7 @@ class TestLyricsPipeline:
         ]
 
         pipeline = LyricsPipeline(config=config, providers=mock_providers)
-        bundle = pipeline.resolve(
+        bundle = await pipeline.resolve(
             audio_path=str(audio_file),
             duration_ms=30000,
             artist="Artist",
@@ -236,13 +236,13 @@ class TestLyricsPipeline:
         # Should select high confidence candidate
         assert "High confidence" in bundle.text
 
-    def test_missing_metadata_skips_providers(self, mock_providers, config, tmp_path):
+    async def test_missing_metadata_skips_providers(self, mock_providers, config, tmp_path):
         """Pipeline skips providers if artist/title missing."""
         audio_file = tmp_path / "song.mp3"
         audio_file.touch()
 
         pipeline = LyricsPipeline(config=config, providers=mock_providers)
-        bundle = pipeline.resolve(
+        bundle = await pipeline.resolve(
             audio_path=str(audio_file),
             duration_ms=30000,
             # No artist or title
@@ -254,7 +254,7 @@ class TestLyricsPipeline:
         mock_providers["lrclib"].search.assert_not_called()
         mock_providers["genius"].search.assert_not_called()
 
-    def test_provider_errors_graceful(self, mock_providers, config, tmp_path):
+    async def test_provider_errors_graceful(self, mock_providers, config, tmp_path):
         """Pipeline handles provider errors gracefully."""
         audio_file = tmp_path / "song.mp3"
         audio_file.touch()
@@ -273,7 +273,7 @@ class TestLyricsPipeline:
         ]
 
         pipeline = LyricsPipeline(config=config, providers=mock_providers)
-        bundle = pipeline.resolve(
+        bundle = await pipeline.resolve(
             audio_path=str(audio_file),
             duration_ms=30000,
             artist="Artist",
@@ -285,7 +285,7 @@ class TestLyricsPipeline:
         assert bundle.text == "Fallback lyrics"
         assert len(bundle.warnings) > 0  # Should have warning about LRCLib
 
-    def test_empty_providers_dict(self, config, tmp_path):
+    async def test_empty_providers_dict(self, config, tmp_path):
         """Pipeline works with no external providers."""
         audio_file = tmp_path / "song.mp3"
         audio_file.touch()
@@ -293,7 +293,7 @@ class TestLyricsPipeline:
         lrc_file.write_text("[00:10.00]Embedded line")
 
         pipeline = LyricsPipeline(config=config, providers={})
-        bundle = pipeline.resolve(audio_path=str(audio_file), duration_ms=30000)
+        bundle = await pipeline.resolve(audio_path=str(audio_file), duration_ms=30000)
 
         # Should still get embedded lyrics
         assert bundle.stage_status == StageStatus.OK

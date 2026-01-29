@@ -4,6 +4,7 @@
 Tests the full pipeline with real checkpoint data from need_a_favor.
 """
 
+import asyncio
 import logging
 from pathlib import Path
 import sys
@@ -20,8 +21,8 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def main():
-    """Run evaluation report generation demo."""
+async def main_async():
+    """Run evaluation report generation demo (async)."""
     logger.info("=== Evaluation Report Phase 1 Demo ===\n")
 
     # Paths
@@ -71,11 +72,11 @@ def main():
     logger.info(f"  Clamp error: {config.clamp_error_threshold * 100}%")
     logger.info(f"  Output formats: {config.output_format}\n")
 
-    # Generate report
+    # Generate report (async)
     logger.info("Generating evaluation report...")
 
     try:
-        report = generate_evaluation_report(
+        report = await generate_evaluation_report(
             checkpoint_path=checkpoint_path,
             audio_path=audio_path,
             fixture_config_path=fixture_config_path,
@@ -125,6 +126,11 @@ def main():
     except Exception as e:
         logger.exception(f"Report generation failed: {e}")
         return 1
+
+
+def main():
+    """Sync wrapper for async main."""
+    return asyncio.run(main_async())
 
 
 if __name__ == "__main__":

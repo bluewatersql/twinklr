@@ -6,7 +6,7 @@ from collections.abc import Mapping
 
 from pydantic import BaseModel
 
-logger = logging.getLogger("http_client")
+logger = logging.getLogger("blinkb0t.core.api.http")
 
 
 def _lower_set(values: tuple[str, ...]) -> set[str]:
@@ -65,7 +65,7 @@ def log_request(
     """
     start = time.perf_counter()
     safe_headers = redact_headers(headers, redact)
-    logger.info(
+    logger.debug(
         "HTTP request",
         extra={
             "method": ctx.method,
@@ -86,7 +86,7 @@ def log_response(ctx: RequestLogContext, status_code: int, elapsed_s: float) -> 
         status_code: HTTP response status code
         elapsed_s: Elapsed time in seconds
     """
-    logger.info(
+    logger.debug(
         "HTTP response",
         extra={
             "method": ctx.method,

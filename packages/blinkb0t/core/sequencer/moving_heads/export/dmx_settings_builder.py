@@ -27,12 +27,6 @@ class DmxSettingsBuilder:
     - Separation of concerns - only builds strings
     - Proper type hints and documentation
     - No business logic or side effects
-
-    Example:
-        >>> builder = DmxSettingsBuilder(fixture)
-        >>> settings = builder.build_settings_string(segment)
-        >>> print(settings)
-        "B_CHOICE_BufferStyle=Per Model Default,E_CHECKBOX_INVDMX1=0,..."
     """
 
     def __init__(self, fixture: FixtureInstance):
@@ -53,12 +47,6 @@ class DmxSettingsBuilder:
 
         Returns:
             Settings string like "B_CHOICE_BufferStyle=...,E_CHECKBOX_INVDMX1=0,..."
-
-        Example:
-            >>> builder = DmxSettingsBuilder(fixture)
-            >>> settings = builder.build_settings_string(segment)
-            >>> print(settings)
-            "B_CHOICE_BufferStyle=Per Model Default,E_CHECKBOX_INVDMX1=0,..."
         """
         # Collect channel values and curves
         channel_values: dict[int, int] = {}

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from pathlib import Path
@@ -96,20 +97,23 @@ def eval_report_cli(  # type: ignore[misc]
             click.echo(f"Warning: Failed to load config: {e}", err=True)
             click.echo("Using default configuration")
 
-    # Generate report
+    # Generate report (async)
     try:
         click.echo("Generating evaluation report...")
         click.echo(f"  Checkpoint: {checkpoint}")
         click.echo(f"  Audio: {audio}")
         click.echo(f"  Output: {out}")
 
-        report_path = generate_evaluation_report(
-            checkpoint_path=checkpoint,
-            audio_path=audio,
-            fixture_config_path=fixture,
-            xsq_path=xsq,
-            output_dir=out,
-            config=eval_config,
+        # Run async function with asyncio.run()
+        report_path = asyncio.run(
+            generate_evaluation_report(
+                checkpoint_path=checkpoint,
+                audio_path=audio,
+                fixture_config_path=fixture,
+                xsq_path=xsq,
+                output_dir=out,
+                config=eval_config,
+            )
         )
 
         click.echo("")

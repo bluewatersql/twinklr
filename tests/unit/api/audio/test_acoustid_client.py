@@ -3,7 +3,7 @@
 Testing AcoustID fingerprint lookup with mocked HTTP responses.
 """
 
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -16,8 +16,9 @@ class TestAcoustIDClient:
 
     @pytest.fixture
     def mock_http_client(self):
-        """Mock HTTP client."""
-        return MagicMock()
+        """Mock async HTTP client."""
+        mock = AsyncMock()
+        return mock
 
     @pytest.fixture
     def client(self, mock_http_client):
@@ -35,7 +36,7 @@ class TestAcoustIDClient:
         with pytest.raises(ValueError, match="API key is required"):
             AcoustIDClient(api_key=None, http_client=mock_http_client)
 
-    def test_lookup_successful(self, client, mock_http_client):
+    async def test_lookup_successful(self, client, mock_http_client):
         """Successful fingerprint lookup."""
         # Mock HTTP response
         mock_response = {
@@ -58,7 +59,7 @@ class TestAcoustIDClient:
         mock_http_client.get.return_value = mock_response
 
         # Call lookup
-        response = client.lookup(
+        response = await client.lookup(
             fingerprint="AQADtEmRJkqRJEqSJEqRJEqS",
             duration_s=180.5,
         )
@@ -80,7 +81,7 @@ class TestAcoustIDClient:
         assert response.results[0].id == "acoustid-1"
         assert response.results[0].score == 0.95
 
-    def test_lookup_with_metadata(self, client, mock_http_client):
+    async def test_lookup_with_metadata(self, client, mock_http_client):
         """Lookup with full metadata extraction."""
         # Mock HTTP response with rich metadata
         mock_response = {
@@ -103,7 +104,7 @@ class TestAcoustIDClient:
         }
         mock_http_client.get.return_value = mock_response
 
-        response = client.lookup(
+        response = await client.lookup(
             fingerprint="AQADtEmRJkqRJEqSJEqRJEqS",
             duration_s=180.0,
         )
@@ -117,12 +118,12 @@ class TestAcoustIDClient:
         assert result.recording_mbid == "rec-mbid-123"
         assert result.release_mbid == "rel-mbid-456"
 
-    def test_lookup_no_results(self, client, mock_http_client):
+    async def test_lookup_no_results(self, client, mock_http_client):
         """Lookup with no matching fingerprints."""
         mock_response = {"status": "ok", "results": []}
         mock_http_client.get.return_value = mock_response
 
-        response = client.lookup(
+        response = await client.lookup(
             fingerprint="AQADtEmRJkqRJEqSJEqRJEqS",
             duration_s=180.0,
         )
@@ -130,7 +131,7 @@ class TestAcoustIDClient:
         assert response.status == "ok"
         assert response.results == []
 
-    def test_lookup_multiple_results(self, client, mock_http_client):
+    async def test_lookup_multiple_results(self, client, mock_http_client):
         """Lookup returns multiple candidates."""
         mock_response = {
             "status": "ok",
@@ -142,7 +143,7 @@ class TestAcoustIDClient:
         }
         mock_http_client.get.return_value = mock_response
 
-        response = client.lookup(
+        response = await client.lookup(
             fingerprint="AQADtEmRJkqRJEqSJEqRJEqS",
             duration_s=180.0,
         )
@@ -152,7 +153,7 @@ class TestAcoustIDClient:
         assert response.results[1].score == 0.85
         assert response.results[2].score == 0.72
 
-    def test_lookup_api_error(self, client, mock_http_client):
+    async def test_lookup_api_error(self, client, mock_http_client):
         """AcoustID API returns error response."""
         mock_response = {
             "status": "error",
@@ -161,12 +162,12 @@ class TestAcoustIDClient:
         mock_http_client.get.return_value = mock_response
 
         with pytest.raises(AcoustIDError, match="AcoustID API error: Invalid API key"):
-            client.lookup(
+            await client.lookup(
                 fingerprint="AQADtEmRJkqRJEqSJEqRJEqS",
                 duration_s=180.0,
             )
 
-    def test_lookup_http_error(self, client, mock_http_client):
+    async def test_lookup_http_error(self, client, mock_http_client):
         """HTTP request fails."""
         from blinkb0t.core.api.http.errors import ApiError
 
@@ -178,23 +179,23 @@ class TestAcoustIDClient:
         )
 
         with pytest.raises(AcoustIDError, match="AcoustID HTTP error"):
-            client.lookup(
+            await client.lookup(
                 fingerprint="AQADtEmRJkqRJEqSJEqRJEqS",
                 duration_s=180.0,
             )
 
-    def test_lookup_invalid_response(self, client, mock_http_client):
+    async def test_lookup_invalid_response(self, client, mock_http_client):
         """API returns invalid/malformed response."""
         # Missing required fields
         mock_http_client.get.return_value = {"invalid": "response"}
 
         with pytest.raises(AcoustIDError, match="Invalid response from AcoustID"):
-            client.lookup(
+            await client.lookup(
                 fingerprint="AQADtEmRJkqRJEqSJEqRJEqS",
                 duration_s=180.0,
             )
 
-    def test_lookup_timeout(self, client, mock_http_client):
+    async def test_lookup_timeout(self, client, mock_http_client):
         """Request times out."""
         from blinkb0t.core.api.http.errors import TimeoutError as HTTPTimeoutError
 
@@ -205,24 +206,24 @@ class TestAcoustIDClient:
         )
 
         with pytest.raises(AcoustIDError, match="AcoustID request timed out"):
-            client.lookup(
+            await client.lookup(
                 fingerprint="AQADtEmRJkqRJEqSJEqRJEqS",
                 duration_s=180.0,
             )
 
-    def test_lookup_duration_bucketing(self, client, mock_http_client):
+    async def test_lookup_duration_bucketing(self, client, mock_http_client):
         """Duration is rounded to integer seconds."""
         mock_response = {"status": "ok", "results": []}
         mock_http_client.get.return_value = mock_response
 
         # Test various durations
-        client.lookup(fingerprint="test", duration_s=180.4)
+        await client.lookup(fingerprint="test", duration_s=180.4)
         assert mock_http_client.get.call_args[1]["params"]["duration"] == 180
 
-        client.lookup(fingerprint="test", duration_s=180.5)
+        await client.lookup(fingerprint="test", duration_s=180.5)
         assert mock_http_client.get.call_args[1]["params"]["duration"] == 180
 
-        client.lookup(fingerprint="test", duration_s=180.9)
+        await client.lookup(fingerprint="test", duration_s=180.9)
         assert mock_http_client.get.call_args[1]["params"]["duration"] == 180
 
     def test_parse_recording_minimal(self, client):

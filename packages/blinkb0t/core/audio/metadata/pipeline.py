@@ -1,13 +1,14 @@
-"""Metadata pipeline orchestration (Phase 3).
+"""Metadata pipeline orchestration (Phase 3, async in Phase 8).
 
 Orchestrates the full metadata extraction pipeline:
 1. Embedded metadata extraction
 2. Fingerprinting (chromaprint)
-3. AcoustID lookup
-4. MusicBrainz lookup
+3. AcoustID lookup (async)
+4. MusicBrainz lookup (async)
 5. Metadata merging
 """
 
+import asyncio
 import datetime
 import hashlib
 import logging
@@ -50,13 +51,13 @@ class PipelineConfig(BaseModel):
 
 
 class MetadataPipeline:
-    """Metadata extraction pipeline.
+    """Metadata extraction pipeline (async).
 
     Orchestrates multi-stage metadata extraction:
     1. Extract embedded metadata from audio file
     2. Compute audio fingerprint (hash + chromaprint)
-    3. Query AcoustID (if fingerprint available)
-    4. Query MusicBrainz (if MBID available)
+    3. Query AcoustID (if fingerprint available) - async
+    4. Query MusicBrainz (if MBID available) - async with parallelization
     5. Merge all candidates with embedded
 
     Error Handling:
@@ -67,12 +68,12 @@ class MetadataPipeline:
 
     Args:
         config: Pipeline configuration
-        acoustid_client: AcoustID API client
-        musicbrainz_client: MusicBrainz API client
+        acoustid_client: Async AcoustID API client
+        musicbrainz_client: Async MusicBrainz API client
 
     Example:
         >>> pipeline = MetadataPipeline(config, acoustid, musicbrainz)
-        >>> bundle = pipeline.extract("/path/to/audio.mp3")
+        >>> bundle = await pipeline.extract("/path/to/audio.mp3")
         >>> print(bundle.resolved.title, bundle.resolved.confidence)
     """
 
@@ -94,13 +95,13 @@ class MetadataPipeline:
         self.acoustid_client = acoustid_client
         self.musicbrainz_client = musicbrainz_client
 
-    def extract(self, audio_path: str) -> MetadataBundle:
-        """Extract metadata from audio file.
+    async def extract(self, audio_path: str) -> MetadataBundle:
+        """Extract metadata from audio file (async).
 
         Orchestrates full pipeline:
         1. Embedded metadata
         2. Fingerprinting
-        3. Provider lookups
+        3. Provider lookups (async, parallel MusicBrainz)
         4. Merge
 
         Args:
@@ -111,7 +112,7 @@ class MetadataPipeline:
         """
         warnings: list[str] = []
         provenance: dict[str, Any] = {
-            "pipeline_version": "3.0.0",
+            "pipeline_version": "4.0.0",  # Phase 8: async
             "extracted_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
         }
 
@@ -129,7 +130,7 @@ class MetadataPipeline:
         # Stage 2: Compute fingerprint
         fingerprint = self._compute_fingerprint(audio_path, warnings)
 
-        # Stage 3: Query providers
+        # Stage 3: Query providers (async - Phase 8)
         candidates: list[MetadataCandidate] = []
 
         # Query AcoustID (if fingerprint available)
@@ -138,15 +139,24 @@ class MetadataPipeline:
             and fingerprint is not None
             and fingerprint.chromaprint_fingerprint is not None
         ):
-            acoustid_candidates = self._query_acoustid(fingerprint, warnings)
+            acoustid_candidates = await self._query_acoustid(fingerprint, warnings)
             candidates.extend(acoustid_candidates)
 
-        # Query MusicBrainz (if MBID available from AcoustID)
+        # Query MusicBrainz (if MBID available from AcoustID) - parallel (Phase 8)
         if self.config.enable_musicbrainz:
-            # Try AcoustID MBIDs
+            # Collect MBIDs to query
+            mbids_to_query = []
             for candidate in candidates:
                 if candidate.provider == "acoustid" and candidate.mbids.recording_mbid:
-                    mb_candidate = self._query_musicbrainz(candidate.mbids.recording_mbid, warnings)
+                    mbids_to_query.append(candidate.mbids.recording_mbid)
+
+            # Query MusicBrainz in parallel for all MBIDs
+            if mbids_to_query:
+                mb_tasks = [self._query_musicbrainz(mbid, warnings) for mbid in mbids_to_query]
+                mb_results = await asyncio.gather(*mb_tasks)
+
+                # Add successful results
+                for mb_candidate in mb_results:
                     if mb_candidate:
                         # Avoid duplicate MusicBrainz entries (but allow MB + AcoustID with same MBID)
                         if not any(
@@ -155,7 +165,6 @@ class MetadataPipeline:
                             for c in candidates
                         ):
                             candidates.append(mb_candidate)
-                        break  # Only query first MBID
 
         # Stage 4: Merge metadata
         resolved = self._merge_metadata(embedded, candidates, warnings)
@@ -194,24 +203,25 @@ class MetadataPipeline:
             warnings.append(f"Fingerprint computation failed: {str(e)}")
             return None
 
-        # Compute chromaprint (may fail)
+        # Compute chromaprint (only if AcoustID is enabled)
         chromaprint_fingerprint = None
         chromaprint_duration_s = None
         chromaprint_duration_bucket = None
 
-        try:
-            fingerprint, duration = compute_chromaprint_fingerprint(
-                audio_path, timeout_s=self.config.chromaprint_timeout_s
-            )
-            chromaprint_fingerprint = fingerprint
-            chromaprint_duration_s = duration
-            chromaprint_duration_bucket = round(duration, 1)  # Bucket to 0.1s
-        except ChromaprintError as e:
-            logger.warning(f"Chromaprint fingerprint failed: {e}")
-            warnings.append(f"Chromaprint fingerprint failed: {str(e)}")
-        except Exception as e:
-            logger.warning(f"Chromaprint fingerprint failed: {e}")
-            warnings.append(f"Chromaprint fingerprint failed: {str(e)}")
+        if self.config.enable_acoustid:
+            try:
+                fingerprint, duration = compute_chromaprint_fingerprint(
+                    audio_path, timeout_s=self.config.chromaprint_timeout_s
+                )
+                chromaprint_fingerprint = fingerprint
+                chromaprint_duration_s = duration
+                chromaprint_duration_bucket = round(duration, 1)  # Bucket to 0.1s
+            except ChromaprintError as e:
+                logger.warning(f"Chromaprint fingerprint failed: {e}")
+                warnings.append(f"Chromaprint fingerprint failed: {str(e)}")
+            except Exception as e:
+                logger.warning(f"Chromaprint fingerprint failed: {e}")
+                warnings.append(f"Chromaprint fingerprint failed: {str(e)}")
 
         return FingerprintInfo(
             audio_fingerprint=audio_fingerprint,
@@ -220,10 +230,10 @@ class MetadataPipeline:
             chromaprint_duration_bucket=chromaprint_duration_bucket,
         )
 
-    def _query_acoustid(
+    async def _query_acoustid(
         self, fingerprint: FingerprintInfo, warnings: list[str]
     ) -> list[MetadataCandidate]:
-        """Query AcoustID with fingerprint.
+        """Query AcoustID with fingerprint (async).
 
         Args:
             fingerprint: Fingerprint info
@@ -233,8 +243,8 @@ class MetadataPipeline:
             List of candidates from AcoustID
         """
         try:
-            logger.debug("Querying AcoustID")
-            response = self.acoustid_client.lookup(
+            logger.debug("Querying AcoustID (async)")
+            response = await self.acoustid_client.lookup(
                 fingerprint=fingerprint.chromaprint_fingerprint,
                 duration_s=fingerprint.chromaprint_duration_s or 0.0,
             )
@@ -264,8 +274,8 @@ class MetadataPipeline:
             warnings.append(f"AcoustID lookup failed: {str(e)}")
             return []
 
-    def _query_musicbrainz(self, mbid: str, warnings: list[str]) -> MetadataCandidate | None:
-        """Query MusicBrainz by MBID.
+    async def _query_musicbrainz(self, mbid: str, warnings: list[str]) -> MetadataCandidate | None:
+        """Query MusicBrainz by MBID (async).
 
         Args:
             mbid: MusicBrainz recording ID
@@ -275,8 +285,8 @@ class MetadataPipeline:
             MetadataCandidate or None if failed
         """
         try:
-            logger.debug(f"Querying MusicBrainz for {mbid}")
-            recording = self.musicbrainz_client.lookup_recording(mbid=mbid)
+            logger.debug(f"Querying MusicBrainz for {mbid} (async)")
+            recording = await self.musicbrainz_client.lookup_recording(mbid=mbid)
 
             # Use first release if available
             album = None

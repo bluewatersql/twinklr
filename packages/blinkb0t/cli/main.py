@@ -1,4 +1,10 @@
-"""Command-line interface for BlinkB0t."""
+"""Command-line interface for BlinkB0t.
+
+Note:
+    This CLI uses synchronous wrappers around the async core.
+    For async usage, see the async examples in the documentation.
+    The underlying pipeline (v4.0) is fully async for better performance.
+"""
 
 from __future__ import annotations
 
@@ -15,7 +21,13 @@ console = Console()
 
 
 def run_pipeline(args: argparse.Namespace) -> None:
-    """Run the full BlinkB0t pipeline."""
+    """Run the full BlinkB0t pipeline.
+
+    Note:
+        This function uses synchronous wrappers. The underlying pipeline
+        (audio analysis, metadata, lyrics) runs async internally (v4.0).
+        Manager uses analyze_dict() which wraps async analyze() with asyncio.run().
+    """
     audio_path = Path(args.audio).resolve()
     sequence_path = Path(args.xsq).resolve()
 

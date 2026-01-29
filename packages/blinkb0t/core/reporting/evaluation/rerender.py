@@ -48,7 +48,7 @@ class RerenderResult:
         self.fixture_contexts = fixture_contexts
 
 
-def rerender_plan(
+async def rerender_plan(
     *,
     plan: ChoreographyPlan,
     audio_path: Path,
@@ -75,7 +75,7 @@ def rerender_plan(
         ValueError: If plan cannot be rendered
 
     Example:
-        >>> result = rerender_plan(
+        >>> result = await rerender_plan(
         ...     plan=plan,
         ...     audio_path=Path("song.mp3"),
         ...     fixture_config_path=Path("fixtures.json"),
@@ -92,13 +92,13 @@ def rerender_plan(
     if not xsq_path.exists():
         raise FileNotFoundError(f"XSQ file not found: {xsq_path}")
 
-    logger.info(f"Re-rendering plan with {len(plan.sections)} sections")
+    logger.debug(f"Re-rendering plan with {len(plan.sections)} sections")
 
     # Load fixtures
     logger.debug(f"Loading fixtures from {fixture_config_path.name}")
     fixture_group = load_fixture_group(fixture_config_path)
 
-    # Analyze audio
+    # Analyze audio (async)
     logger.debug(f"Analyzing audio: {audio_path.name}")
     from blinkb0t.core.audio.analyzer import AudioAnalyzer
     from blinkb0t.core.config.models import AppConfig, JobConfig
@@ -113,11 +113,11 @@ def rerender_plan(
     app_config = AppConfig.load_or_default()
 
     analyzer = AudioAnalyzer(app_config=app_config, job_config=job_config)
-    song_features = analyzer.analyze(str(audio_path))
+    song_bundle = await analyzer.analyze(str(audio_path))
 
-    # Build beat grid
+    # Build beat grid from features dict
     logger.debug("Building beat grid")
-    beat_grid = BeatGrid.from_song_features(song_features)
+    beat_grid = BeatGrid.from_song_features(song_bundle.features)
 
     # Create rendering pipeline
     logger.debug("Creating rendering pipeline")
@@ -138,12 +138,12 @@ def rerender_plan(
     # Build fixture contexts (same logic as pipeline)
     fixture_contexts = pipeline._build_fixture_contexts()
 
-    logger.info(f"Re-rendered {len(segments)} segments")
+    logger.debug(f"Re-rendered {len(segments)} segments")
 
-    # Return wrapped result
+    # Return wrapped result (pass features dict for backward compatibility)
     return RerenderResult(
         segments=segments,
-        song_features=song_features,
+        song_features=song_bundle.features,
         fixture_group=fixture_group,
         beat_grid=beat_grid,
         fixture_contexts=fixture_contexts,

@@ -8,7 +8,6 @@ Tests cover:
 - Speaker assignment logic
 """
 
-
 from blinkb0t.core.audio.lyrics.diarization import (
     assign_speakers,
     suggest_diarization,
@@ -105,9 +104,7 @@ class TestSuggestDiarization:
         words = None
         config = DiarizationConfig(suggest_threshold=0.95)
 
-        suggested, confidence, reasons = suggest_diarization(
-            lyrics_text, words, config=config
-        )
+        suggested, confidence, reasons = suggest_diarization(lyrics_text, words, config=config)
 
         # Confidence is 0.85-0.90, below 0.95 threshold
         assert not suggested  # Not suggested (below threshold)
@@ -140,9 +137,7 @@ class TestAssignSpeakers:
             LyricWord(text="world", start_ms=500, end_ms=1000),
         ]
 
-        segments = [
-            SpeakerSegment(speaker="SPEAKER_01", start_ms=0, end_ms=1000, confidence=0.95)
-        ]
+        segments = [SpeakerSegment(speaker="SPEAKER_01", start_ms=0, end_ms=1000, confidence=0.95)]
 
         assigned_words = assign_speakers(words, segments)
 
@@ -173,9 +168,7 @@ class TestAssignSpeakers:
             LyricWord(text="hello", start_ms=0, end_ms=100),  # Too short overlap
         ]
 
-        segments = [
-            SpeakerSegment(speaker="SPEAKER_01", start_ms=90, end_ms=2000, confidence=0.95)
-        ]
+        segments = [SpeakerSegment(speaker="SPEAKER_01", start_ms=90, end_ms=2000, confidence=0.95)]
 
         # Word duration = 100ms, overlap with segment = 10ms (10%)
         # Below 30% threshold, so no speaker assigned
@@ -242,9 +235,7 @@ class TestAssignSpeakers:
 
     def test_empty_words(self):
         """Empty words list should return empty list."""
-        segments = [
-            SpeakerSegment(speaker="SPEAKER_01", start_ms=0, end_ms=1000, confidence=0.95)
-        ]
+        segments = [SpeakerSegment(speaker="SPEAKER_01", start_ms=0, end_ms=1000, confidence=0.95)]
 
         assigned_words = assign_speakers([], segments)
         assert len(assigned_words) == 0
@@ -264,9 +255,7 @@ class TestAssignSpeakers:
             LyricWord(text="hello", start_ms=0, end_ms=500, speaker="OLD_SPEAKER"),
         ]
 
-        segments = [
-            SpeakerSegment(speaker="NEW_SPEAKER", start_ms=0, end_ms=1000, confidence=0.95)
-        ]
+        segments = [SpeakerSegment(speaker="NEW_SPEAKER", start_ms=0, end_ms=1000, confidence=0.95)]
 
         assigned_words = assign_speakers(words, segments)
 

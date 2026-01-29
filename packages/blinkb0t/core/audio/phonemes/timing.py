@@ -32,11 +32,21 @@ class PhonemeType(str, Enum):
 
 # ARPAbet vowels
 _VOWELS = {
-    "AA", "AE", "AH", "AO", "AW", "AY",
-    "EH", "ER", "EY",
-    "IH", "IY",
-    "OW", "OY",
-    "UH", "UW",
+    "AA",
+    "AE",
+    "AH",
+    "AO",
+    "AW",
+    "AY",
+    "EH",
+    "ER",
+    "EY",
+    "IH",
+    "IY",
+    "OW",
+    "OY",
+    "UH",
+    "UW",
 }
 
 

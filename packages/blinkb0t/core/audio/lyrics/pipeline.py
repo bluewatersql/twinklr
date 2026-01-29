@@ -1,4 +1,4 @@
-"""Lyrics resolution pipeline (Phase 4 + Phase 5).
+"""Lyrics resolution pipeline (Phase 4 + Phase 5, async in Phase 8).
 
 Orchestrates stage gating: embedded → synced → plain → whisperx_align → whisperx_transcribe.
 """
@@ -39,12 +39,12 @@ class LyricsPipelineConfig(BaseModel):
 
 
 class LyricsPipeline:
-    """Lyrics resolution pipeline.
+    """Lyrics resolution pipeline (async).
 
     Stage gating order:
     1. Embedded extraction (LRC sidecar, SYLT, USLT)
-    2. Synced lookup (LRCLib)
-    3. Plain lookup (Genius)
+    2. Synced lookup (LRCLib) - async (Phase 8)
+    3. Plain lookup (Genius) - async (Phase 8)
     4. WhisperX align-only (if require_timed_words and lyrics_text exists)
     5. WhisperX transcribe (if no lyrics or align fails)
     """
@@ -69,14 +69,14 @@ class LyricsPipeline:
 
         Args:
             config: Pipeline configuration
-            providers: Dict of provider name -> client instance
+            providers: Dict of provider name -> async client instances
             whisperx_service: Optional WhisperX service for align/transcribe
         """
         self.config = config
         self.providers = providers
         self.whisperx_service = whisperx_service
 
-    def resolve(
+    async def resolve(
         self,
         *,
         audio_path: str,
@@ -84,7 +84,7 @@ class LyricsPipeline:
         artist: str | None = None,
         title: str | None = None,
     ) -> LyricsBundle:
-        """Resolve lyrics through stage gating.
+        """Resolve lyrics through stage gating (async).
 
         Args:
             audio_path: Path to audio file
@@ -115,30 +115,34 @@ class LyricsPipeline:
 
         # Stage 2: Try synced lookup (if metadata available)
         if artist or title:
-            synced_bundle = self._try_synced_lookup(
+            logger.debug(f"Trying synced lookup for artist='{artist}', title='{title}'")
+            synced_bundle = await self._try_synced_lookup(
                 artist=artist,
                 title=title,
                 duration_ms=duration_ms,
                 warnings=warnings,
             )
             if synced_bundle:
+                logger.debug(f"Found synced lyrics from {synced_bundle.source}")
                 return synced_bundle
 
             # Stage 3: Try plain lookup
-            plain_bundle = self._try_plain_lookup(
+            logger.debug(f"Trying plain lookup for artist='{artist}', title='{title}'")
+            plain_bundle = await self._try_plain_lookup(
                 artist=artist,
                 title=title,
                 duration_ms=duration_ms,
                 warnings=warnings,
             )
             if plain_bundle:
+                logger.debug(f"Found plain lyrics from {plain_bundle.source}")
                 # Check if we need word timing but don't have it
                 if self.config.require_timed_words and not plain_bundle.words:
                     # Stage 4: Try WhisperX align to add timing to plain text
                     if self.whisperx_service:
                         align_bundle = self._try_whisperx_align(
                             audio_path=audio_path,
-                            lyrics_text=plain_bundle.text,
+                            lyrics_text=plain_bundle.text or "",
                             duration_ms=duration_ms,
                             warnings=warnings,
                         )
@@ -158,13 +162,17 @@ class LyricsPipeline:
                 return transcribe_bundle
 
         # No lyrics found
+        logger.debug(
+            f"No lyrics found from any source (embedded/synced/plain/whisperx). "
+            f"Warnings: {len(warnings)}"
+        )
         return LyricsBundle(
             schema_version="1.0.0",
             stage_status=StageStatus.SKIPPED,
             warnings=warnings,
         )
 
-    def _try_synced_lookup(
+    async def _try_synced_lookup(
         self,
         *,
         artist: str | None,
@@ -172,7 +180,7 @@ class LyricsPipeline:
         duration_ms: int,
         warnings: list[str],
     ) -> LyricsBundle | None:
-        """Try to get synced lyrics from providers.
+        """Try to get synced lyrics from providers (async).
 
         Args:
             artist: Artist name
@@ -189,7 +197,7 @@ class LyricsPipeline:
 
         try:
             query = LyricsQuery(artist=artist, title=title, duration_ms=duration_ms)
-            candidates = lrclib_client.search(query)
+            candidates = await lrclib_client.search(query)
 
             # Filter to synced candidates and select best
             synced = [c for c in candidates if c.kind == "SYNCED" and c.lrc]
@@ -219,7 +227,7 @@ class LyricsPipeline:
             warnings.append(f"Synced lookup error: {e}")
             return None
 
-    def _try_plain_lookup(
+    async def _try_plain_lookup(
         self,
         *,
         artist: str | None,
@@ -227,7 +235,7 @@ class LyricsPipeline:
         duration_ms: int,
         warnings: list[str],
     ) -> LyricsBundle | None:
-        """Try to get plain lyrics from providers.
+        """Try to get plain lyrics from providers (async).
 
         Args:
             artist: Artist name
@@ -244,13 +252,17 @@ class LyricsPipeline:
 
         try:
             query = LyricsQuery(artist=artist, title=title)
-            candidates = genius_client.search(query)
+            logger.debug(f"Calling Genius API with query: {query}")
+            candidates = await genius_client.search(query)
+            logger.debug(f"Genius returned {len(candidates)} candidates")
 
             if not candidates:
+                logger.debug("Genius search returned no candidates")
                 return None
 
             # Select best confidence
             best = max(candidates, key=lambda c: c.confidence)
+            logger.debug(f"Selected best candidate with confidence {best.confidence}")
 
             return self._finalize_bundle(
                 text=best.text,
@@ -265,7 +277,9 @@ class LyricsPipeline:
             )
 
         except Exception as e:
-            logger.warning(f"Plain lookup failed: {e}")
+            import traceback
+            logger.error(f"Plain lookup failed: {e}")
+            logger.error(f"Traceback: {traceback.format_exc()}")
             warnings.append(f"Plain lookup error: {e}")
             return None
 
@@ -388,7 +402,7 @@ class LyricsPipeline:
             return None
 
         try:
-            logger.info(f"WhisperX align: {audio_path}")
+            logger.debug(f"WhisperX align: {audio_path}")
             result = self.whisperx_service.align(
                 audio_path=audio_path,
                 lyrics_text=lyrics_text,
@@ -480,7 +494,7 @@ class LyricsPipeline:
             return None
 
         try:
-            logger.info(f"WhisperX transcribe: {audio_path}")
+            logger.debug(f"WhisperX transcribe: {audio_path}")
             result = self.whisperx_service.transcribe(
                 audio_path=audio_path,
                 config=self.config.whisperx_config,

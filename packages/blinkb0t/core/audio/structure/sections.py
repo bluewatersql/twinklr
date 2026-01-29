@@ -33,7 +33,7 @@ def detect_song_sections(
     sr: int,
     *,
     hop_length: int,
-    min_section_s: float = 6.0,
+    min_section_s: float = 3.0,
     rms_for_energy: np.ndarray | None = None,
     chroma_cqt: np.ndarray | None = None,
     beats_s: list[float] | None = None,
@@ -354,9 +354,9 @@ def _hybrid_segmentation(features: np.ndarray, n_frames: int, duration_s: float)
         R_enhanced = librosa.segment.path_enhance(R, n=3)
 
         # Use spectral clustering with intelligent k estimation
-        # Scale with duration but allow more sections for variety
-        min_sections = max(8, int(duration_s / 25))  # At least 1 per 25s
-        max_sections = min(24, int(duration_s / 8))  # Up to 1 per 8s
+        # Scale with duration - target 12-16 sections for typical songs
+        min_sections = max(12, int(duration_s / 15))  # At least 1 per 15s
+        max_sections = min(36, int(duration_s / 5))  # Up to 1 per 5s
 
         # Try different k values and pick the best based on boundary strength
         best_boundaries = None
@@ -525,6 +525,7 @@ def _detect_novelty_boundaries(
         )
 
         # Compute novelty curve (checkerboard kernel)
+        # Note: timelag_filter may fail in some librosa versions with certain input shapes
         novelty_curve: np.ndarray = librosa.segment.timelag_filter(  # type: ignore[type-var]  # pyright: ignore[reportArgumentType]
             similarity  # pyright: ignore[reportArgumentType]
         )
@@ -556,8 +557,12 @@ def _detect_novelty_boundaries(
 
         return additional
 
+    except (TypeError, AttributeError) as e:
+        # librosa compatibility issue - timelag_filter can fail with certain versions/inputs
+        logger.debug(f"Novelty boundary detection failed (librosa compatibility): {type(e).__name__}")
+        return []
     except Exception as e:
-        logger.debug(f"Novelty boundary detection failed: {e}")
+        logger.debug(f"Novelty boundary detection failed: {type(e).__name__}: {str(e)[:100]}")
         return []
 
 

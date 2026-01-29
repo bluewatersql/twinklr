@@ -13,10 +13,6 @@ class NullLogger:
     - Testing (avoid cluttering test output)
     - Disabled logging configuration
     - Dependency injection default
-
-    Example:
-        logger = NullLogger()
-        logger.info("This goes nowhere")  # No output
     """
 
     def log(

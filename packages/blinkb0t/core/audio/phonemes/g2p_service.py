@@ -21,18 +21,10 @@ Example:
 import logging
 from typing import Protocol
 
+from g2p_en import G2p as _G2p
 from pydantic import BaseModel, ConfigDict, Field
 
 logger = logging.getLogger(__name__)
-
-# Lazy import g2p_en (optional dependency)
-try:
-    from g2p_en import G2p as _G2p
-
-    _G2P_AVAILABLE = True
-except ImportError:
-    _G2p = None  # type: ignore[assignment, misc]
-    _G2P_AVAILABLE = False
 
 
 class G2PConfig(BaseModel):
@@ -50,9 +42,7 @@ class G2PConfig(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    strip_stress: bool = Field(
-        default=True, description="Strip stress markers from phonemes"
-    )
+    strip_stress: bool = Field(default=True, description="Strip stress markers from phonemes")
     filter_punctuation: bool = Field(
         default=True, description="Filter out punctuation from results"
     )
@@ -101,12 +91,6 @@ def word_to_phonemes(word: str, *, config: G2PConfig | None = None) -> list[str]
         >>> word_to_phonemes("HELLO")
         ['HH', 'EH', 'L', 'OW']
     """
-    if not _G2P_AVAILABLE:
-        raise ImportError(
-            "g2p_en library not installed. "
-            "Install with: pip install g2p-en"
-        )
-
     if config is None:
         config = G2PConfig()
 
@@ -117,7 +101,8 @@ def word_to_phonemes(word: str, *, config: G2PConfig | None = None) -> list[str]
 
     # Convert to phonemes
     g2p = _G2p()
-    phonemes = g2p(word)
+    raw_phonemes: list[str] = g2p(word)  # Type cast from Any
+    phonemes = raw_phonemes
 
     # Filter out non-phoneme tokens (spaces, punctuation)
     if config.filter_punctuation:

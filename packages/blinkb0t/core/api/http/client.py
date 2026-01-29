@@ -511,10 +511,13 @@ class AsyncApiClient:
             start = log_request(ctx, merged_headers, self.config.redact_headers)
 
             try:
+                # Only pass params if there are any, otherwise httpx strips query strings from URLs
+                request_params = merged_params if merged_params else None
+
                 resp = await self._client.request(
                     method_u,
                     url,
-                    params=merged_params,
+                    params=request_params,
                     headers=merged_headers,
                     json=json_body,
                     data=data,

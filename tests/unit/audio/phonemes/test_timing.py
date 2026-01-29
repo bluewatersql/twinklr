@@ -6,7 +6,6 @@ Tests cover:
 - Phoneme classification (vowel vs consonant)
 """
 
-
 from blinkb0t.core.audio.phonemes.timing import (
     PhonemeType,
     classify_phoneme,
@@ -35,17 +34,60 @@ class TestClassifyPhoneme:
 
     def test_vowels(self):
         """Vowels should be classified as VOWEL."""
-        vowels = ["AA", "AE", "AH", "AO", "AW", "AY", "EH", "ER", "EY", "IH", "IY", "OW", "OY", "UH", "UW"]
+        vowels = [
+            "AA",
+            "AE",
+            "AH",
+            "AO",
+            "AW",
+            "AY",
+            "EH",
+            "ER",
+            "EY",
+            "IH",
+            "IY",
+            "OW",
+            "OY",
+            "UH",
+            "UW",
+        ]
 
         for vowel in vowels:
             assert classify_phoneme(vowel) == PhonemeType.VOWEL, f"{vowel} should be VOWEL"
 
     def test_consonants(self):
         """Consonants should be classified as CONSONANT."""
-        consonants = ["B", "CH", "D", "DH", "F", "G", "HH", "JH", "K", "L", "M", "N", "NG", "P", "R", "S", "SH", "T", "TH", "V", "W", "Y", "Z", "ZH"]
+        consonants = [
+            "B",
+            "CH",
+            "D",
+            "DH",
+            "F",
+            "G",
+            "HH",
+            "JH",
+            "K",
+            "L",
+            "M",
+            "N",
+            "NG",
+            "P",
+            "R",
+            "S",
+            "SH",
+            "T",
+            "TH",
+            "V",
+            "W",
+            "Y",
+            "Z",
+            "ZH",
+        ]
 
         for consonant in consonants:
-            assert classify_phoneme(consonant) == PhonemeType.CONSONANT, f"{consonant} should be CONSONANT"
+            assert classify_phoneme(consonant) == PhonemeType.CONSONANT, (
+                f"{consonant} should be CONSONANT"
+            )
 
     def test_unknown_phoneme(self):
         """Unknown phoneme should default to CONSONANT."""

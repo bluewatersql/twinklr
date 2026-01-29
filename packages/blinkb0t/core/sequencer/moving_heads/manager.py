@@ -11,6 +11,7 @@ import os
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from blinkb0t.core.agents.logging import create_llm_logger
 from blinkb0t.core.agents.providers import OpenAIProvider
 from blinkb0t.core.agents.sequencer.moving_heads import (
     ChoreographyPlan,
@@ -99,16 +100,27 @@ class MovingHeadManager(DomainManager):
 
             provider = OpenAIProvider(api_key=api_key)
 
-            # Create checkpoint manager
-            from blinkb0t.core.utils.checkpoint import CheckpointManager
+            # Create LLM logger from job config settings
+            llm_logging_config = self.session.job_config.agent.llm_logging
+            llm_logger = create_llm_logger(
+                enabled=llm_logging_config.enabled,
+                output_dir=self.session.artifact_dir / "llm_calls"
+                if self.session.artifact_dir
+                else None,
+                run_id=self.session.job_config.project_name or "run",
+                log_level=llm_logging_config.log_level,
+                format=llm_logging_config.format,
+                sanitize=llm_logging_config.sanitize,
+            )
+            logger.debug(
+                f"LLM logger initialized: enabled={llm_logging_config.enabled}, "
+                f"level={llm_logging_config.log_level}, format={llm_logging_config.format}"
+            )
 
-            checkpoint_manager = CheckpointManager(job_config=self.session.job_config)
-
-            # Configure orchestrator
             config = OrchestrationConfig(
                 max_iterations=self.session.job_config.agent.max_iterations,
                 token_budget=self.session.job_config.agent.token_budget,
-                checkpoint_manager=checkpoint_manager,
+                llm_logger=llm_logger,
             )
 
             self._planner = Orchestrator(
@@ -127,9 +139,9 @@ class MovingHeadManager(DomainManager):
         """Run complete moving head pipeline.
 
         Executes all steps:
-        1. Audio analysis (song features)
+        1. Audio analysis (song features) - uses async caching internally
         2. Sequence fingerprinting
-        3. Plan generation
+        3. Plan generation - with LLM logging from job_config
         4. Sequence application
 
         Args:
@@ -144,13 +156,13 @@ class MovingHeadManager(DomainManager):
         """
         logger.debug(f"Running moving head pipeline: {audio_path} -> {xsq_out}")
 
-        # Step 1: Analyze audio (universal service)
+        # Step 1: Analyze audio (universal service with async caching)
         logger.debug("Step 1/4: Analyzing audio...")
-        song_features: dict[str, Any] = self.session.audio.analyze(str(audio_path))
+        song_bundle = self.session.audio.analyze_sync(str(audio_path))
 
         # Step 2: Build beat grid
         logger.debug("Step 2/4: Building beat grid...")
-        beat_grid = BeatGrid.from_song_features(song_features)
+        beat_grid = BeatGrid.from_song_features(song_bundle.features)
         logger.debug(
             f"Created beat grid: tempo={beat_grid.tempo_bpm} BPM, "
             f"total_bars={beat_grid.total_bars}, ms_per_bar={beat_grid.ms_per_bar:.2f}ms, "
@@ -161,17 +173,52 @@ class MovingHeadManager(DomainManager):
         logger.debug("Step 3/4: Running agent orchestration...")
 
         # Load builtin templates (registers them in global REGISTRY)
-
         load_builtin_templates()
 
         # Build context for orchestrator
         available_templates = [t.template_id for t in list_templates()]
 
-        # Extract song structure from features dict
-        structure_sections = song_features.get("structure", {}).get("sections", {})
-        total_bars = song_features.get("structure", {}).get(
+        # Extract song structure from features
+        structure_sections = song_bundle.features.get("structure", {}).get("sections", {})
+        total_bars = song_bundle.features.get("structure", {}).get(
             "total_bars", len(beat_grid.bar_boundaries)
         )
+
+        # Extract metadata for LLM context
+        # Handle both dict (from cache) and object forms
+        metadata_context: dict[str, Any] = {}
+        if song_bundle.metadata:
+            if isinstance(song_bundle.metadata, dict):
+                # Dict form (from cache)
+                resolved = song_bundle.metadata.get("resolved", {})
+                embedded = song_bundle.metadata.get("embedded", {})
+                if resolved and resolved.get("artist"):
+                    metadata_context["artist"] = resolved["artist"]
+                if resolved and resolved.get("title"):
+                    metadata_context["title"] = resolved["title"]
+                elif embedded:
+                    if embedded.get("artist"):
+                        metadata_context["artist"] = embedded["artist"]
+                    if embedded.get("title"):
+                        metadata_context["title"] = embedded["title"]
+                    if embedded.get("genre"):
+                        metadata_context["genre"] = embedded["genre"]
+            else:
+                # Object form (MetadataBundle)
+                if song_bundle.metadata.resolved:
+                    if song_bundle.metadata.resolved.artist:
+                        metadata_context["artist"] = song_bundle.metadata.resolved.artist
+                    if song_bundle.metadata.resolved.title:
+                        metadata_context["title"] = song_bundle.metadata.resolved.title
+                    if song_bundle.metadata.resolved.mbids and song_bundle.metadata.resolved.mbids.artist_mbids:
+                        metadata_context["genre_hints"] = "Available via MusicBrainz"
+                elif song_bundle.metadata.embedded:
+                    if song_bundle.metadata.embedded.artist:
+                        metadata_context["artist"] = song_bundle.metadata.embedded.artist
+                    if song_bundle.metadata.embedded.title:
+                        metadata_context["title"] = song_bundle.metadata.embedded.title
+                    if song_bundle.metadata.embedded.genre:
+                        metadata_context["genre"] = song_bundle.metadata.embedded.genre
 
         context: dict[str, Any] = {
             "song_structure": {
@@ -189,6 +236,11 @@ class MovingHeadManager(DomainManager):
                 "total_bars": len(beat_grid.bar_boundaries),
             },
         }
+
+        # Add metadata if available
+        if metadata_context:
+            context["metadata"] = metadata_context
+            logger.debug(f"Added metadata to context: {metadata_context}")
 
         # Run orchestration
         orchestration_result = self.planner.orchestrate(context)

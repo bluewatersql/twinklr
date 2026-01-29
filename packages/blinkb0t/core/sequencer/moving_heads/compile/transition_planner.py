@@ -102,7 +102,7 @@ class TransitionPlanner:
             },
         )
 
-        logger.info(
+        logger.debug(
             f"Planned transition {transition_id}: {boundary.source_id} → {boundary.target_id}, "
             f"duration={overlap_duration_ms}ms, mode={effective_hint.mode.value}"
         )
@@ -251,13 +251,6 @@ class TransitionPlanner:
 
         Returns:
             Tuple of (is_valid, list_of_warnings).
-
-        Example:
-            >>> is_valid, warnings = planner.validate_transition_feasibility(
-            ...     plan, source_duration_ms=10000, target_duration_ms=10000
-            ... )
-            >>> if not is_valid:
-            ...     print(f"Transition infeasible: {warnings}")
         """
         warnings: list[str] = []
 

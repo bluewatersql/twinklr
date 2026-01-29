@@ -1,4 +1,4 @@
-"""Genius API client (Phase 4).
+"""Genius API client (Phase 4, async in Phase 8).
 
 Genius provides plain text lyrics (no timing) and requires an access token.
 
@@ -15,12 +15,12 @@ logger = logging.getLogger(__name__)
 
 
 class GeniusClient:
-    """Genius API client for plain lyrics.
+    """Genius API client for plain lyrics (async).
 
     Genius provides plain text lyrics without timing. Requires free API token.
 
     Args:
-        http_client: Framework HTTP client instance
+        http_client: Framework AsyncApiClient instance
         access_token: Genius API access token (from https://genius.com/api-clients)
     """
 
@@ -30,14 +30,14 @@ class GeniusClient:
         """Initialize Genius client.
 
         Args:
-            http_client: Framework HTTP client (ApiClient)
+            http_client: Framework AsyncApiClient
             access_token: Genius API access token (optional)
         """
         self.http_client = http_client
         self.access_token = access_token
 
-    def search(self, query: LyricsQuery) -> list[LyricsCandidate]:
-        """Search for lyrics by metadata.
+    async def search(self, query: LyricsQuery) -> list[LyricsCandidate]:
+        """Search for lyrics by metadata (async).
 
         Args:
             query: Search query with artist, title, etc.
@@ -64,38 +64,53 @@ class GeniusClient:
                 search_terms.append(query.title)
             search_query = " ".join(search_terms)
 
-            # Search for songs
+            # Search for songs (async - Phase 8)
             headers = {"Authorization": f"Bearer {self.access_token}"}
             search_url = f"{self.BASE_URL}/search?q={quote(search_query)}"
 
-            response = self.http_client.get(search_url, headers=headers)
+            logger.debug(f"Genius API search URL: {search_url}")
+            response = await self.http_client.get(search_url, headers=headers)
+            logger.debug(f"Response status: {response.status_code}, content-type: {response.headers.get('content-type')}")
+            logger.debug(f"Response body (first 200 chars): {response.text[:200]}")
             result = response.json()
 
             hits = result.get("response", {}).get("hits", [])
+            logger.debug(f"Genius API returned {len(hits)} hits")
             if not hits:
+                logger.debug(f"Genius API response: {result}")
                 return []
 
             # Fetch lyrics for each hit (limit to top 3)
             candidates: list[LyricsCandidate] = []
-            for hit in hits[:3]:
+            for i, hit in enumerate(hits[:3]):
                 result_data = hit.get("result", {})
-                candidate = self._fetch_lyrics(result_data, query, headers)
+                song_title = result_data.get("title", "Unknown")
+                artist_name = result_data.get("primary_artist", {}).get("name", "Unknown")
+                logger.debug(f"Genius hit {i+1}: '{song_title}' by {artist_name}")
+                
+                candidate = await self._fetch_lyrics(result_data, query, headers)
                 if candidate:
+                    logger.debug(f"Successfully fetched lyrics for hit {i+1}")
                     candidates.append(candidate)
+                else:
+                    logger.debug(f"Failed to fetch lyrics for hit {i+1}")
 
+            logger.debug(f"Returning {len(candidates)} candidates")
             return candidates
 
         except Exception as e:
-            logger.warning(f"Genius search failed: {e}")
+            import traceback
+            logger.error(f"Genius search failed: {e}")
+            logger.error(f"Traceback: {traceback.format_exc()}")
             return []
 
-    def _fetch_lyrics(
+    async def _fetch_lyrics(
         self,
         result: dict[str, Any],
         query: LyricsQuery,
         headers: dict[str, str],
     ) -> LyricsCandidate | None:
-        """Fetch lyrics for a specific song.
+        """Fetch lyrics for a specific song (async).
 
         Args:
             result: Genius search result
@@ -116,7 +131,7 @@ class GeniusClient:
             lyrics_url = f"{self.BASE_URL}/songs/{song_id}/lyrics"
 
             try:
-                response = self.http_client.get(lyrics_url, headers=headers)
+                response = await self.http_client.get(lyrics_url, headers=headers)
                 lyrics_data = response.json()
                 lyrics_text = lyrics_data.get("lyrics", {}).get("body", {}).get("plain", "")
             except Exception:

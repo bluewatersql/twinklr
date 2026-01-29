@@ -1,25 +1,25 @@
+"""Demo script for BlinkB0t pipeline.
+
+Note:
+    This demo uses synchronous wrappers around the async core (v4.0).
+    The underlying audio analysis, metadata extraction, and lyrics resolution
+    all run async internally for better performance.
+"""
+
 from __future__ import annotations
 
 import logging
 from pathlib import Path
+import shutil
 
 from rich.console import Console
 
 from blinkb0t.core.sequencer.moving_heads.manager import MovingHeadManager
 from blinkb0t.core.session import BlinkB0tSession
+from blinkb0t.core.utils.logging import configure_logging
 
-logging.basicConfig(
-    level=logging.DEBUG,
-    format="%(asctime)s - %(levelname)s - %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
-)
+configure_logging(level="DEBUG")
 logger = logging.getLogger(__name__)
-
-logging.getLogger("httpx").setLevel(logging.WARNING)
-logging.getLogger("httpcore").setLevel(logging.WARNING)
-logging.getLogger("requests").setLevel(logging.WARNING)
-logging.getLogger("urllib3").setLevel(logging.WARNING)
-logging.getLogger("openai").setLevel(logging.WARNING)
 
 console = Console()
 
@@ -32,9 +32,21 @@ def _default_repo_root() -> Path:
     return Path(__file__).resolve().parents[1]
 
 
+def _cleanup_artifacts(repo_root: Path) -> None:
+    """Cleanup artifacts directory."""
+    artifact_dir = repo_root / "artifacts"
+    if artifact_dir.exists():
+        shutil.rmtree(str(artifact_dir))
+
+    audio_cache_dir = repo_root / "data/audio_cache"
+    if audio_cache_dir.exists():
+        shutil.rmtree(str(audio_cache_dir))
+
+
 def run_pipeline() -> None:
     repo_root = _default_repo_root()
 
+    _cleanup_artifacts(repo_root)
     audio_path = Path(repo_root / mp3_path).resolve()
     sequence_path = Path(repo_root / xsq_path).resolve()
 

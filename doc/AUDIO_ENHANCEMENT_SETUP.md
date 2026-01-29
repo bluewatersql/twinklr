@@ -70,7 +70,7 @@ OPENAI_API_KEY=sk-proj-your_key_here
 
 # Optional (for audio enhancements)
 ACOUSTID_API_KEY=your_acoustid_key_here
-GENIUS_CLIENT_TOKEN=your_genius_token_here
+GENIUS_ACCESS_TOKEN=your_genius_token_here
 HF_TOKEN=your_huggingface_token_here
 ```
 
@@ -128,7 +128,7 @@ Edit `config.json`:
 
 **`enable_lyrics_lookup`** (default: `false`)
 - Queries online lyrics providers (LRCLib, Genius)
-- **Requires**: Provider API keys (e.g., `GENIUS_CLIENT_TOKEN`)
+- **Requires**: Provider API keys (e.g., `GENIUS_ACCESS_TOKEN`)
 - Provides synced lyrics with word-level timing
 
 **`enable_whisperx`** (default: `false`)

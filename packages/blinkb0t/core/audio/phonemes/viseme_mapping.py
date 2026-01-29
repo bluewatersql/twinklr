@@ -73,17 +73,17 @@ PHONEME_TO_VISEME: dict[str, str] = {
     "D": "TD",  # dip
     "S": "TD",  # sip
     "Z": "TD",  # zip
-    "N": "N",   # nip
+    "N": "N",  # nip
     # Consonants - Velar
     "K": "KG",  # kite
     "G": "KG",  # gate
-    "NG": "KG", # sing
+    "NG": "KG",  # sing
     # Consonants - Palatal
     "CH": "CHJ",  # church
     "JH": "CHJ",  # judge
     "SH": "CHJ",  # ship
     "ZH": "CHJ",  # measure
-    "Y": "Y",     # yes
+    "Y": "Y",  # yes
     # Consonants - Liquid
     "L": "L",  # lip
     "R": "R",  # rip

@@ -47,11 +47,11 @@
   
   "planning": {
     "description": "LLM context building configuration - controls token budget for audio features",
-    "max_beats": 600,
-    "max_energy_points": 768,
-    "max_spectral_points": 256,
-    "max_transients": 20,
-    "max_sections": 12,
+    "max_beats": 1000,
+    "max_energy_points": 1000,
+    "max_spectral_points": 50,
+    "max_transients": 50,
+    "max_sections": 25,
     "_comments": {
       "max_beats": "Maximum beat timestamps to include in LLM context (100-2000)",
       "max_energy_points": "Maximum energy envelope points (100-2000)",
@@ -69,26 +69,6 @@
     "_comments": {
       "level": "Log level: DEBUG (verbose), INFO (normal), WARNING, ERROR, CRITICAL",
       "format": "Python logging format string"
-    }
-  },
-  
-  "sequencing": {
-    "description": "Version configuration for sequencing components - controls which library versions to use",
-    "prompt": "1.0.0",
-    "response_schema": "1.0.0",
-    "templates": "1.0.0",
-    "curves": "1.0.0",
-    "dimmer": "1.0.0",
-    "geometry": "1.0.0",
-    "movements": "2.0.0",
-    "_comments": {
-      "prompt": "LLM prompt template version",
-      "response_schema": "JSON schema version for LLM responses",
-      "templates": "Effect template library version",
-      "curves": "Value curve preset library version",
-      "dimmer": "Dimmer pattern library version",
-      "geometry": "Geometry pattern library version",
-      "movements": "Movement pattern library version (2.0.0 is current)"
     }
   },
   

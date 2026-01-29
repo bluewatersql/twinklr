@@ -6,6 +6,9 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from blinkb0t.core.audio.models.lyrics import LyricsBundle
+from blinkb0t.core.audio.models.metadata import MetadataBundle
+
 
 class SongTiming(BaseModel):
     """Basic timing information for audio file."""
@@ -48,8 +51,12 @@ class SongBundle(BaseModel):
     timing: SongTiming = Field(description="Basic timing information")
 
     # Enhancement bundles (optional, require feature flags)
-    metadata: Any | None = Field(default=None, description="Metadata enrichment (MetadataBundle)")
-    lyrics: Any | None = Field(default=None, description="Lyrics resolution (LyricsBundle)")
+    metadata: MetadataBundle | None = Field(
+        default=None, description="Metadata enrichment (MetadataBundle)"
+    )
+    lyrics: LyricsBundle | None = Field(
+        default=None, description="Lyrics resolution (LyricsBundle)"
+    )
     phonemes: Any | None = Field(
         default=None, description="Phoneme/viseme generation (PhonemeBundle)"
     )

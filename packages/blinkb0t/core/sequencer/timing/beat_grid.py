@@ -30,12 +30,6 @@ class BeatGrid(BaseModel):
         tempo_bpm: Average tempo in beats per minute
         beats_per_bar: Number of beats per bar (time signature)
         duration_ms: Total song duration in milliseconds
-
-    Example:
-        >>> resolver = TimeResolver(song_features)
-        >>> beat_grid = BeatGrid.from_resolver(resolver, duration_ms=180000.0)
-        >>> print(f"Song has {len(beat_grid.bar_boundaries)} bars")
-        >>> first_chorus_start = beat_grid.bar_boundaries[8]  # Bar 8
     """
 
     model_config = ConfigDict(frozen=True)
@@ -104,10 +98,6 @@ class BeatGrid(BaseModel):
 
         Returns:
             BeatGrid with tempo-based boundaries
-
-        Example:
-            >>> beat_grid = BeatGrid.from_tempo(tempo_bpm=120, total_bars=64)
-            >>> print(f"Bar 1 starts at {beat_grid.bar_boundaries[0]}ms")
         """
         ms_per_beat = 60000.0 / tempo_bpm
         ms_per_bar = ms_per_beat * beats_per_bar
@@ -165,9 +155,6 @@ class BeatGrid(BaseModel):
 
         Returns:
             Number of complete bars
-
-        Example:
-            >>> print(f"Song has {beat_grid.total_bars} bars")
         """
         return len(self.bar_boundaries)
 
@@ -177,9 +164,6 @@ class BeatGrid(BaseModel):
 
         Returns:
             Number of beats
-
-        Example:
-            >>> print(f"Song has {beat_grid.total_beats} beats")
         """
         return len(self.beat_boundaries)
 
@@ -189,9 +173,6 @@ class BeatGrid(BaseModel):
 
         Returns:
             Number of eighth note boundaries
-
-        Example:
-            >>> print(f"Song has {beat_grid.total_eighths} eighth notes")
         """
         return len(self.eighth_boundaries)
 
@@ -201,9 +182,6 @@ class BeatGrid(BaseModel):
 
         Returns:
             Number of sixteenth note boundaries
-
-        Example:
-            >>> print(f"Song has {beat_grid.total_sixteenths} sixteenth notes")
         """
         return len(self.sixteenth_boundaries)
 
@@ -213,10 +191,6 @@ class BeatGrid(BaseModel):
 
         Returns:
             Average milliseconds per bar
-
-        Example:
-            >>> bar_duration = beat_grid.ms_per_bar
-            >>> print(f"Each bar is ~{bar_duration:.0f}ms")
         """
         if len(self.bar_boundaries) < 2:
             # Fallback to mathematical calculation
@@ -232,10 +206,6 @@ class BeatGrid(BaseModel):
 
         Returns:
             Average milliseconds per beat
-
-        Example:
-            >>> beat_duration = beat_grid.ms_per_beat
-            >>> print(f"Each beat is ~{beat_duration:.0f}ms")
         """
         if len(self.beat_boundaries) < 2:
             # Fallback to mathematical calculation

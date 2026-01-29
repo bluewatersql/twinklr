@@ -9,7 +9,6 @@ Tests cover:
 - Mock-based testing (no real WhisperX calls)
 """
 
-
 import pytest
 
 from blinkb0t.core.audio.lyrics.whisperx_models import (
@@ -83,21 +82,15 @@ class MockWhisperXService(WhisperXService):
             LyricWord(text="hello", start_ms=0, end_ms=500),
             LyricWord(text="world", start_ms=500, end_ms=1000),
         ]
-        return WhisperXAlignResult(
-            words=words, mismatch_ratio=0.0, metadata={"mock": True}
-        )
+        return WhisperXAlignResult(words=words, mismatch_ratio=0.0, metadata={"mock": True})
 
-    def transcribe(
-        self, audio_path: str, config: WhisperXConfig
-    ) -> WhisperXTranscribeResult:
+    def transcribe(self, audio_path: str, config: WhisperXConfig) -> WhisperXTranscribeResult:
         """Mock transcribe implementation."""
         words = [
             LyricWord(text="hello", start_ms=0, end_ms=500),
             LyricWord(text="world", start_ms=500, end_ms=1000),
         ]
-        return WhisperXTranscribeResult(
-            text="hello world", words=words, metadata={"mock": True}
-        )
+        return WhisperXTranscribeResult(text="hello world", words=words, metadata={"mock": True})
 
 
 class TestWhisperXServiceProtocol:

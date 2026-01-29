@@ -189,7 +189,7 @@ class RenderingPipeline:
                             defaults={},
                             step_patches=step_patches,
                         )
-                        logger.info(
+                        logger.debug(
                             f"Auto-generated preset '{section.preset_id}' "
                             f"with intensity {intensity.value} for template '{section.template_id}'"
                         )
@@ -289,6 +289,9 @@ class RenderingPipeline:
                         reasoning=seg.reasoning or section.reasoning,
                         # IMPORTANT: do not carry segments forward once flattened
                         segments=None,
+                        # Inherit parent section's transition hints (if any)
+                        transition_in=section.transition_in,
+                        transition_out=section.transition_out,
                     )
             else:
                 yield section

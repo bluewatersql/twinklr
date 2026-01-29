@@ -21,7 +21,7 @@ class PlanSegment(BaseModel):
     end_bar: int = Field(ge=1, description="End bar (1-indexed, inclusive)")
 
     template_id: str = Field(description="Template ID to use for this segment")
-    preset_id: str | None = Field(None, description="Optional preset ID")
+    preset_id: str | None = Field(default=None, description="Optional preset ID")
     modifiers: dict[str, str] = Field(default_factory=dict, description="Optional modifiers")
     reasoning: str = Field(default="", description="Why this segment choice was made")
 
@@ -48,21 +48,21 @@ class PlanSection(BaseModel):
 
     # Optional context
     section_role: str | None = Field(
-        None, description="Section role (verse, chorus, bridge, build, drop, etc.)"
+        default=None, description="Section role (verse, chorus, bridge, build, drop, etc.)"
     )
-    energy_level: int | None = Field(None, ge=0, le=100, description="Energy level 0-100")
+    energy_level: int | None = Field(default=None, ge=0, le=100, description="Energy level 0-100")
 
     # Template selection (the LLM's choice)
     template_id: str | None = Field(
-        None,
+        default=None,
         description="Template ID to use when not providing segments",
     )
-    preset_id: str | None = Field(None, description="Optional preset ID")
+    preset_id: str | None = Field(default=None, description="Optional preset ID")
     modifiers: dict[str, str] = Field(default_factory=dict, description="Optional modifiers")
     reasoning: str = Field(default="", description="Why this template/preset was chosen")
 
     segments: list[PlanSegment] | None = Field(
-        None,
+        default=None,
         description="Optional 1–3 contiguous segments that partition this section",
         min_length=1,
         max_length=3,
@@ -70,11 +70,11 @@ class PlanSection(BaseModel):
 
     # Transition fields
     transition_in: TransitionHint | None = Field(
-        None, description="How to transition INTO this section (from previous section)"
+        default=None, description="How to transition INTO this section (from previous section)"
     )
 
     transition_out: TransitionHint | None = Field(
-        None, description="How to transition OUT OF this section (to next section)"
+        default=None, description="How to transition OUT OF this section (to next section)"
     )
 
     model_config = ConfigDict(frozen=True)

@@ -8,7 +8,7 @@ Testing the full metadata extraction pipeline that orchestrates:
 5. Metadata merging
 """
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -49,13 +49,17 @@ class TestMetadataPipeline:
 
     @pytest.fixture
     def mock_acoustid_client(self):
-        """Mock AcoustID client."""
-        return MagicMock()
+        """Mock async AcoustID client."""
+        from unittest.mock import AsyncMock
+
+        return AsyncMock()
 
     @pytest.fixture
     def mock_musicbrainz_client(self):
-        """Mock MusicBrainz client."""
-        return MagicMock()
+        """Mock async MusicBrainz client."""
+        from unittest.mock import AsyncMock
+
+        return AsyncMock()
 
     @pytest.fixture
     def pipeline(self, mock_acoustid_client, mock_musicbrainz_client):
@@ -67,7 +71,7 @@ class TestMetadataPipeline:
             musicbrainz_client=mock_musicbrainz_client,
         )
 
-    def test_pipeline_embedded_only(self, pipeline):
+    async def test_pipeline_embedded_only(self, pipeline):
         """Pipeline with only embedded metadata (no providers)."""
         # Configure to skip providers
         pipeline.config.enable_acoustid = False
@@ -83,7 +87,7 @@ class TestMetadataPipeline:
             )
 
             # Run pipeline
-            bundle = pipeline.extract("/test/audio.mp3")
+            bundle = await pipeline.extract("/test/audio.mp3")
 
             # Verify bundle
             assert isinstance(bundle, MetadataBundle)
@@ -94,11 +98,13 @@ class TestMetadataPipeline:
             assert bundle.resolved is not None
             assert bundle.resolved.title == "Test Song"
 
-    def test_pipeline_with_fingerprint(self, pipeline):
-        """Pipeline computes fingerprint when enabled."""
-        # Configure to skip providers but enable fingerprint
-        pipeline.config.enable_acoustid = False
+    async def test_pipeline_with_fingerprint(self, pipeline):
+        """Pipeline computes fingerprint when AcoustID enabled."""
+        # Enable AcoustID for chromaprint (but skip actual lookup)
+        pipeline.config.enable_acoustid = True
         pipeline.config.enable_musicbrainz = False
+        # Set acoustid_client to None to skip the actual lookup
+        pipeline.acoustid_client = None
 
         # Mock embedded and fingerprint
         with (
@@ -115,7 +121,7 @@ class TestMetadataPipeline:
             mock_hash.return_value = "abc123hash"
 
             # Run pipeline
-            bundle = pipeline.extract("/test/audio.mp3")
+            bundle = await pipeline.extract("/test/audio.mp3")
 
             # Verify fingerprint computed
             assert bundle.fingerprint is not None
@@ -123,7 +129,7 @@ class TestMetadataPipeline:
             assert bundle.fingerprint.chromaprint_fingerprint == "FINGERPRINT123"
             assert bundle.fingerprint.chromaprint_duration_s == 180.5
 
-    def test_pipeline_with_acoustid(self, pipeline, mock_acoustid_client):
+    async def test_pipeline_with_acoustid(self, pipeline, mock_acoustid_client):
         """Pipeline queries AcoustID when enabled."""
         # Configure to enable AcoustID only
         pipeline.config.enable_musicbrainz = False
@@ -158,7 +164,7 @@ class TestMetadataPipeline:
             mock_hash.return_value = "hash123"
 
             # Run pipeline
-            bundle = pipeline.extract("/test/audio.mp3")
+            bundle = await pipeline.extract("/test/audio.mp3")
 
             # Verify AcoustID called
             mock_acoustid_client.lookup.assert_called_once_with(
@@ -171,7 +177,7 @@ class TestMetadataPipeline:
             assert bundle.candidates[0].provider == "acoustid"
             assert bundle.candidates[0].title == "Provider Song"
 
-    def test_pipeline_with_musicbrainz(
+    async def test_pipeline_with_musicbrainz(
         self, pipeline, mock_acoustid_client, mock_musicbrainz_client
     ):
         """Pipeline queries MusicBrainz when MBID available from AcoustID."""
@@ -215,7 +221,7 @@ class TestMetadataPipeline:
             mock_hash.return_value = "hash123"
 
             # Run pipeline
-            bundle = pipeline.extract("/test/audio.mp3")
+            bundle = await pipeline.extract("/test/audio.mp3")
 
             # Verify MusicBrainz called
             mock_musicbrainz_client.lookup_recording.assert_called_once_with(mbid="rec-123")
@@ -226,7 +232,9 @@ class TestMetadataPipeline:
             assert bundle.candidates[1].provider == "musicbrainz"
             assert bundle.candidates[1].title == "MB Song"
 
-    def test_pipeline_full_flow(self, pipeline, mock_acoustid_client, mock_musicbrainz_client):
+    async def test_pipeline_full_flow(
+        self, pipeline, mock_acoustid_client, mock_musicbrainz_client
+    ):
         """Pipeline with full flow: embedded + fingerprint + both providers."""
         # Mock responses
         from blinkb0t.core.api.audio.models import (
@@ -267,7 +275,7 @@ class TestMetadataPipeline:
             mock_hash.return_value = "hash123"
 
             # Run pipeline
-            bundle = pipeline.extract("/test/audio.mp3")
+            bundle = await pipeline.extract("/test/audio.mp3")
 
             # Verify both providers called
             mock_acoustid_client.lookup.assert_called_once()
@@ -282,10 +290,12 @@ class TestMetadataPipeline:
             assert bundle.resolved is not None
             assert bundle.stage_status == StageStatus.OK
 
-    def test_pipeline_fingerprint_error_handled(self, pipeline):
-        """Pipeline handles fingerprint errors gracefully."""
-        pipeline.config.enable_acoustid = False
+    async def test_pipeline_fingerprint_error_handled(self, pipeline):
+        """Pipeline handles chromaprint errors gracefully."""
+        # Enable AcoustID to trigger chromaprint (but set client to None to skip lookup)
+        pipeline.config.enable_acoustid = True
         pipeline.config.enable_musicbrainz = False
+        pipeline.acoustid_client = None
 
         with (
             patch(
@@ -301,16 +311,17 @@ class TestMetadataPipeline:
             mock_hash.return_value = "hash123"
 
             # Run pipeline
-            bundle = pipeline.extract("/test/audio.mp3")
+            bundle = await pipeline.extract("/test/audio.mp3")
 
-            # Pipeline succeeds, but fingerprint is partial
+            # Pipeline succeeds, but chromaprint is None with warning
             assert bundle.stage_status == StageStatus.OK
             assert bundle.fingerprint is not None
             assert bundle.fingerprint.audio_fingerprint == "hash123"
             assert bundle.fingerprint.chromaprint_fingerprint is None
-            assert "fingerprint" in bundle.warnings[0].lower()
+            assert len(bundle.warnings) > 0
+            assert "chromaprint" in bundle.warnings[0].lower()
 
-    def test_pipeline_acoustid_error_handled(self, pipeline, mock_acoustid_client):
+    async def test_pipeline_acoustid_error_handled(self, pipeline, mock_acoustid_client):
         """Pipeline handles AcoustID errors gracefully."""
         pipeline.config.enable_musicbrainz = False
 
@@ -333,14 +344,14 @@ class TestMetadataPipeline:
             mock_hash.return_value = "hash123"
 
             # Run pipeline
-            bundle = pipeline.extract("/test/audio.mp3")
+            bundle = await pipeline.extract("/test/audio.mp3")
 
             # Pipeline succeeds, AcoustID skipped
             assert bundle.stage_status == StageStatus.OK
             assert bundle.candidates == []
             assert "acoustid" in bundle.warnings[0].lower()
 
-    def test_pipeline_musicbrainz_error_handled(
+    async def test_pipeline_musicbrainz_error_handled(
         self, pipeline, mock_acoustid_client, mock_musicbrainz_client
     ):
         """Pipeline handles MusicBrainz errors gracefully."""
@@ -369,7 +380,7 @@ class TestMetadataPipeline:
             mock_hash.return_value = "hash123"
 
             # Run pipeline
-            bundle = pipeline.extract("/test/audio.mp3")
+            bundle = await pipeline.extract("/test/audio.mp3")
 
             # Pipeline succeeds, MusicBrainz skipped
             assert bundle.stage_status == StageStatus.OK
@@ -377,7 +388,7 @@ class TestMetadataPipeline:
             assert bundle.candidates[0].provider == "acoustid"
             assert "musicbrainz" in bundle.warnings[0].lower()
 
-    def test_pipeline_embedded_extraction_fails(self, pipeline):
+    async def test_pipeline_embedded_extraction_fails(self, pipeline):
         """Pipeline fails if embedded extraction fails."""
         with (
             patch(
@@ -389,7 +400,7 @@ class TestMetadataPipeline:
             mock_hash.return_value = "hash123"
 
             # Run pipeline
-            bundle = pipeline.extract("/test/audio.mp3")
+            bundle = await pipeline.extract("/test/audio.mp3")
 
             # Pipeline marks as failed
             assert bundle.stage_status == StageStatus.FAILED
@@ -397,7 +408,7 @@ class TestMetadataPipeline:
             assert bundle.embedded.title is None  # Empty fallback
             assert bundle.embedded.artist is None
 
-    def test_pipeline_skips_providers_without_fingerprint(
+    async def test_pipeline_skips_providers_without_fingerprint(
         self, pipeline, mock_acoustid_client, mock_musicbrainz_client
     ):
         """Pipeline skips AcoustID if chromaprint fails."""
@@ -415,7 +426,7 @@ class TestMetadataPipeline:
             mock_hash.return_value = "hash123"
 
             # Run pipeline
-            bundle = pipeline.extract("/test/audio.mp3")
+            bundle = await pipeline.extract("/test/audio.mp3")
 
             # AcoustID not called (no chromaprint fingerprint)
             mock_acoustid_client.lookup.assert_not_called()

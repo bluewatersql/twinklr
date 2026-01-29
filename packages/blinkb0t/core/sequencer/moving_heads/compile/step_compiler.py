@@ -62,12 +62,12 @@ def compile_step(
     # Calculate timing
     t0_ms = context.start_ms
     t1_ms = context.start_ms + context.duration_ms
-    renderer_log.info(f"Timing: {t0_ms} - {t1_ms}")
+    renderer_log.debug(f"Timing: {t0_ms} - {t1_ms}")
 
     # Get handlers
     geometry_handler = context.geometry_registry.get(step.geometry.geometry_type.value)
 
-    renderer_log.info(
+    renderer_log.debug(
         f"Geometry Handler for {step.geometry.geometry_type.value}: {geometry_handler.handler_id}"
     )
 
@@ -90,7 +90,7 @@ def compile_step(
 
     base_pan_norm = geometry_result.pan_norm
     base_tilt_norm = geometry_result.tilt_norm
-    renderer_log.info(f"Base Pose (normalized): {base_pan_norm}, {base_tilt_norm}")
+    renderer_log.debug(f"Base Pose (normalized): {base_pan_norm}, {base_tilt_norm}")
 
     movement_params = dict(step.movement.params)
     movement_params["base_pan_norm"] = base_pan_norm
@@ -101,7 +101,7 @@ def compile_step(
     movement_handler = context.movement_registry.get_with_params(
         step.movement.movement_type.value, movement_params
     )
-    renderer_log.info(
+    renderer_log.debug(
         f"Movement Handler for {step.movement.movement_type.value}: {movement_handler.handler_id}"
     )
 
@@ -205,7 +205,7 @@ def compile_step(
 
     # Build tilt segment - scale [0,1] curve to DMX boundaries
     if movement_result.tilt_static_dmx is not None:
-        renderer_log.info(f"Tilt Static DMX: {movement_result.tilt_static_dmx}")
+        renderer_log.debug(f"Tilt Static DMX: {movement_result.tilt_static_dmx}")
 
     segment.add_channel(
         channel=ChannelName.TILT,
@@ -216,7 +216,7 @@ def compile_step(
     )
 
     if dimmer_result.dimmer_static_dmx is not None:
-        renderer_log.info(f"Dimmer Static DMX: {dimmer_result.dimmer_static_dmx}")
+        renderer_log.debug(f"Dimmer Static DMX: {dimmer_result.dimmer_static_dmx}")
 
     segment.add_channel(
         channel=ChannelName.DIMMER,

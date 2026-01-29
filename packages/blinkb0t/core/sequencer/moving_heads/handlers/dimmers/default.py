@@ -87,16 +87,16 @@ class DefaultDimmerHandler:
             if intensity in categorical_params_set
             else DEFAULT_DIMMER_PARAMS[Intensity.SMOOTH]
         )
-        renderer_log.info(f"Categorical Params: {categorical_params}")
-        renderer_log.info(f"Intensity: {intensity}")
+        renderer_log.debug(f"Categorical Params: {categorical_params}")
+        renderer_log.debug(f"Intensity: {intensity}")
 
         calibration = params.get("calibration", {})
         dimmer_min = calibration.get("dimmer_floor_dmx", 0) if calibration else 0
         dimmer_max = calibration.get("dimmer_ceiling_dmx", 255) if calibration else 255
         dimmer_amplitude_dmx = int((dimmer_max - dimmer_min) / 2)
 
-        renderer_log.info(f"Dimmer Min: {dimmer_min}, Dimmer Max: {dimmer_max}")
-        renderer_log.info(f"Dimmer Amplitude DMX: {dimmer_amplitude_dmx}")
+        renderer_log.debug(f"Dimmer Min: {dimmer_min}, Dimmer Max: {dimmer_max}")
+        renderer_log.debug(f"Dimmer Amplitude DMX: {dimmer_amplitude_dmx}")
 
         # Generate dimmer curve
         if pattern.curve == CurveLibrary.HOLD:
@@ -124,7 +124,7 @@ class DefaultDimmerHandler:
                 period_ms = period_bars * beat_grid.ms_per_bar
                 # Calculate cycles: how many periods fit in the template duration
                 computed_cycles = template_duration_ms / period_ms
-                renderer_log.info(
+                renderer_log.debug(
                     f"Period conversion: {period_bars} bars = {period_ms:.0f}ms → {computed_cycles:.2f} cycles (template: {template_duration_ms}ms)"
                 )
             else:
@@ -165,7 +165,7 @@ class DefaultDimmerHandler:
         Returns:
             Static DMX value [0, 255].
         """
-        renderer_log.info(
+        renderer_log.debug(
             f"Resolving static DMX value: {normalized_value}, {clamp_min}, {clamp_max}"
         )
         floor = max(clamp_min, 0)

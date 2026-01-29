@@ -11,7 +11,10 @@ Example:
 
 from __future__ import annotations
 
+import asyncio
 import logging
+import time
+from pathlib import Path
 from typing import Any
 
 import librosa
@@ -19,13 +22,13 @@ import numpy as np
 
 from blinkb0t.core.api.audio.acoustid import AcoustIDClient
 from blinkb0t.core.api.audio.musicbrainz import MusicBrainzClient
-from blinkb0t.core.api.http import ApiClient, HttpClientConfig
+from blinkb0t.core.api.http import AsyncApiClient, HttpClientConfig
 
 # Import all the analysis modules
 from blinkb0t.core.audio.advanced.tension import compute_tension_curve
-from blinkb0t.core.audio.cache import (
-    load_cached_features,
-    save_cached_features,
+from blinkb0t.core.audio.cache_adapter import (
+    load_audio_features_async,
+    save_audio_features_async,
 )
 from blinkb0t.core.audio.energy.builds_drops import detect_builds_and_drops
 from blinkb0t.core.audio.energy.multiscale import extract_smoothed_energy
@@ -53,8 +56,9 @@ from blinkb0t.core.audio.structure.sections import detect_song_sections
 from blinkb0t.core.audio.timeline.builder import build_timeline_export
 from blinkb0t.core.audio.utils import to_simple_dict
 from blinkb0t.core.audio.validation.validator import validate_features
+from blinkb0t.core.caching import FSCache
 from blinkb0t.core.config.models import AppConfig, JobConfig
-from blinkb0t.core.utils.checkpoint import CheckpointManager, CheckpointType
+from blinkb0t.core.io import RealFileSystem, absolute_path
 
 logger = logging.getLogger(__name__)
 
@@ -83,23 +87,36 @@ class AudioAnalyzer:
         """
         self.app_config = app_config
         self.job_config = job_config
-        self.checkpoint_manager = CheckpointManager(job_config=job_config)
 
-    def analyze(
+        # Initialize async cache
+        fs = RealFileSystem()
+        cache_root = absolute_path(str(Path(app_config.cache_dir or "data/cache")))
+        self.cache = FSCache(fs, cache_root)
+
+        # Initialize cache if not in an async context
+        try:
+            asyncio.get_running_loop()
+            # Already in async context - cache will be initialized on first use
+            self._cache_initialized = False
+        except RuntimeError:
+            # No running loop - safe to use asyncio.run()
+            asyncio.run(self.cache.initialize())
+            self._cache_initialized = True
+
+    async def analyze(
         self,
         audio_path: str,
         *,
         force_reprocess: bool = False,
     ) -> SongBundle:
-        """Analyze audio file to extract musical features and enhancements.
+        """Analyze audio file to extract musical features and enhancements (async).
 
         Returns a SongBundle (v3.0) containing:
         - features: Complete v2.3 features dict (backward compatible)
         - timing: Basic timing information
         - metadata/lyrics/phonemes: Optional enhancements (when enabled)
 
-        Checks checkpoint and cache before reprocessing. Results are saved
-        to both checkpoint (per-job) and cache (global).
+        Checks cache before reprocessing. Results are saved to cache (global).
 
         Args:
             audio_path: Path to audio file (mp3, wav, etc.)
@@ -110,36 +127,69 @@ class AudioAnalyzer:
 
         Example:
             analyzer = AudioAnalyzer(app_config, job_config)
-            bundle = analyzer.analyze("song.mp3")
+            bundle = await analyzer.analyze("song.mp3")
             tempo = bundle.features["tempo_bpm"]
             beats = bundle.features["beats_s"]
 
         Note:
             For backward compatibility, use analyze_dict() to get v2.3 dict.
         """
-        # Check checkpoint first (v2.3 dict format for now)
-        checkpoint = self.checkpoint_manager.read_checkpoint(CheckpointType.AUDIO)
-        if checkpoint:
-            logger.debug("Using checkpointed features")
-            return self._build_song_bundle(audio_path, checkpoint)
+        # Initialize cache if not already initialized (async context)
+        if not self._cache_initialized:
+            await self.cache.initialize()
+            self._cache_initialized = True
 
         # Check cache (unless forcing reprocess)
         if not force_reprocess:
-            cached = load_cached_features(audio_path, "features", app_config=self.app_config)
-            if cached:
-                logger.debug("Using cached features")
-                self.checkpoint_manager.write_checkpoint(CheckpointType.AUDIO, cached)
-                return self._build_song_bundle(audio_path, cached)
+            cached_bundle = await load_audio_features_async(audio_path, self.cache, SongBundle)
+            if cached_bundle:
+                logger.debug("Using cached SongBundle")
+                return cached_bundle
 
-        # Process audio
+        start_time_ms = time.perf_counter() * 1000
+
+        # Process audio (CPU-bound, run in thread pool)
         logger.debug(f"Analyzing audio: {audio_path}")
-        features = self._process_audio(audio_path)
+        features = await asyncio.to_thread(self._process_audio, audio_path)
 
-        # Save to cache and checkpoint (v2.3 dict format for now)
-        save_cached_features(audio_path, "features", features, app_config=self.app_config)
-        self.checkpoint_manager.write_checkpoint(CheckpointType.AUDIO, features)
+        # Build bundle (includes async metadata/lyrics extraction)
+        bundle = await self._build_song_bundle(audio_path, features)
 
-        return self._build_song_bundle(audio_path, features)
+        # Calculate total compute time
+        compute_ms = time.perf_counter() * 1000 - start_time_ms
+
+        # Save to cache (SongBundle format, v3.0) with compute time
+        await save_audio_features_async(audio_path, self.cache, bundle, compute_ms=compute_ms)
+
+        logger.info(f"Audio analysis complete: {compute_ms:.0f}ms")
+
+        return bundle
+
+    def analyze_sync(
+        self,
+        audio_path: str,
+        *,
+        force_reprocess: bool = False,
+    ) -> SongBundle:
+        """Analyze audio synchronously and return SongBundle.
+
+        This is a sync wrapper around async analyze(). Prefer using async analyze() directly
+        when in async context.
+
+        Args:
+            audio_path: Path to audio file (mp3, wav, etc.)
+            force_reprocess: If True, skip cache and reprocess
+
+        Returns:
+            SongBundle with v3.0 schema including metadata
+
+        Example:
+            analyzer = AudioAnalyzer(app_config, job_config)
+            bundle = analyzer.analyze_sync("song.mp3")
+            tempo = bundle.features["tempo_bpm"]
+            artist = bundle.metadata.embedded.artist if bundle.metadata else None
+        """
+        return asyncio.run(self.analyze(audio_path, force_reprocess=force_reprocess))
 
     def analyze_dict(
         self,
@@ -148,6 +198,8 @@ class AudioAnalyzer:
         force_reprocess: bool = False,
     ) -> dict[str, Any]:
         """Analyze audio and return v2.3 dict format (backward compatibility).
+
+        DEPRECATED: Use analyze_sync() to get full SongBundle with metadata.
 
         This method provides backward compatibility for code expecting the
         old v2.3 dict format. It calls analyze() and extracts the features dict.
@@ -164,13 +216,14 @@ class AudioAnalyzer:
             features = analyzer.analyze_dict("song.mp3")  # Returns dict
             tempo = features["tempo_bpm"]
 
-        TODO: Technical debt - Remove after agent pipeline migrated to SongBundle.
+        Note:
+            This is a sync wrapper around async analyze(). Use async analyze() directly when possible.
         """
-        bundle = self.analyze(audio_path, force_reprocess=force_reprocess)
+        bundle = self.analyze_sync(audio_path, force_reprocess=force_reprocess)
         return to_simple_dict(bundle)
 
-    def _build_song_bundle(self, audio_path: str, features: dict[str, Any]) -> SongBundle:
-        """Build SongBundle from v2.3 features dict.
+    async def _build_song_bundle(self, audio_path: str, features: dict[str, Any]) -> SongBundle:
+        """Build SongBundle from v2.3 features dict (async).
 
         Args:
             audio_path: Path to audio file
@@ -193,11 +246,20 @@ class AudioAnalyzer:
         fingerprint = f"{audio_path}:{sr}:{hop_length}"
         recording_id = hashlib.sha256(fingerprint.encode()).hexdigest()[:16]
 
-        # Extract metadata if enabled (Phase 2)
-        metadata_bundle = self._extract_metadata_if_enabled(audio_path)
+        # Extract metadata and lyrics in parallel (async)
+        metadata_bundle, lyrics_bundle = await asyncio.gather(
+            self._extract_metadata_if_enabled(audio_path),
+            self._extract_lyrics_if_enabled(audio_path, duration_ms, None),
+        )
 
-        # Extract lyrics if enabled (Phase 4)
-        lyrics_bundle = self._extract_lyrics_if_enabled(audio_path, duration_ms, metadata_bundle)
+        # If lyrics needs metadata, re-extract with metadata context
+        if (
+            lyrics_bundle.stage_status == StageStatus.SKIPPED
+            and metadata_bundle.stage_status != StageStatus.SKIPPED
+        ):
+            lyrics_bundle = await self._extract_lyrics_if_enabled(
+                audio_path, duration_ms, metadata_bundle
+            )
 
         # Build bundle
         return SongBundle(
@@ -211,13 +273,13 @@ class AudioAnalyzer:
                 duration_s=duration_s,
                 duration_ms=duration_ms,
             ),
-            metadata=metadata_bundle,  # Phase 2
-            lyrics=lyrics_bundle,  # Phase 4
+            metadata=metadata_bundle,
+            lyrics=lyrics_bundle,
             phonemes=None,  # Phase 6+
         )
 
-    def _extract_metadata_if_enabled(self, audio_path: str) -> MetadataBundle:
-        """Extract metadata if feature is enabled (Phase 3).
+    async def _extract_metadata_if_enabled(self, audio_path: str) -> MetadataBundle:
+        """Extract metadata if feature is enabled (async).
 
         Uses the metadata pipeline to orchestrate:
         1. Embedded metadata extraction
@@ -254,10 +316,9 @@ class AudioAnalyzer:
                 self.app_config.audio_processing.enhancements.enable_acoustid
                 or self.app_config.audio_processing.enhancements.enable_musicbrainz
             ):
-                # Create HTTP client for API calls
-                # Note: base_url is required but unused since clients specify full URLs
+                # Create async HTTP client for API calls
                 http_config = HttpClientConfig(base_url="http://localhost")
-                http_client = ApiClient(config=http_config)
+                http_client = AsyncApiClient(config=http_config)
 
                 # Initialize AcoustID client if enabled
                 if self.app_config.audio_processing.enhancements.enable_acoustid:
@@ -276,8 +337,7 @@ class AudioAnalyzer:
 
                 # Initialize MusicBrainz client if enabled
                 if self.app_config.audio_processing.enhancements.enable_musicbrainz:
-                    # MusicBrainz requires user agent for rate limiting
-                    user_agent = "BlinkB0t/3.0 (https://github.com/blinkb0t)"
+                    user_agent = "BlinkB0t/4.0 (https://github.com/blinkb0t)"
                     musicbrainz_client = MusicBrainzClient(
                         http_client=http_client,
                         user_agent=user_agent,
@@ -289,14 +349,14 @@ class AudioAnalyzer:
                 enable_musicbrainz=self.app_config.audio_processing.enhancements.enable_musicbrainz,
             )
 
-            # Create and run pipeline
+            # Create and run async pipeline
             pipeline = MetadataPipeline(
                 config=pipeline_config,
                 acoustid_client=acoustid_client,
                 musicbrainz_client=musicbrainz_client,
             )
 
-            bundle = pipeline.extract(audio_path)
+            bundle = await pipeline.extract(audio_path)
             return bundle
 
         except Exception as e:
@@ -308,13 +368,13 @@ class AudioAnalyzer:
                 warnings=[f"Metadata pipeline failed: {str(e)}"],
             )
 
-    def _extract_lyrics_if_enabled(
+    async def _extract_lyrics_if_enabled(
         self,
         audio_path: str,
         duration_ms: int,
-        metadata_bundle: MetadataBundle,
+        metadata_bundle: MetadataBundle | None,
     ) -> LyricsBundle:
-        """Extract lyrics if feature is enabled (Phase 4).
+        """Extract lyrics if feature is enabled (async).
 
         Uses the lyrics pipeline to orchestrate:
         1. Embedded lyrics extraction (LRC sidecar, SYLT, USLT)
@@ -347,10 +407,10 @@ class AudioAnalyzer:
             providers: dict[str, Any] = {}
 
             if self.app_config.audio_processing.enhancements.enable_lyrics_lookup:
-                # Create HTTP client for API calls
-                # Note: base_url is required but unused since clients specify full URLs
-                http_config = HttpClientConfig(base_url="http://localhost")
-                http_client = ApiClient(config=http_config)
+                # Create async HTTP client for API calls
+                # Providers use absolute URLs, so base_url is just a placeholder
+                http_config = HttpClientConfig(base_url="https://api.placeholder.local")
+                http_client = AsyncApiClient(config=http_config)
 
                 # LRCLib (always available, no API key needed)
                 providers["lrclib"] = LRCLibClient(http_client=http_client)
@@ -371,20 +431,35 @@ class AudioAnalyzer:
                 min_coverage_pct=self.app_config.audio_processing.enhancements.lyrics_min_coverage,
             )
 
-            # Create and run pipeline
+            # Create and run async pipeline
+            logger.debug(
+                f"Creating lyrics pipeline with {len(providers)} providers: {list(providers.keys())}"
+            )
             pipeline = LyricsPipeline(config=pipeline_config, providers=providers)
 
             # Extract artist/title from metadata
             artist = None
             title = None
-            if metadata_bundle.resolved:
-                artist = metadata_bundle.resolved.artist
-                title = metadata_bundle.resolved.title
-            elif metadata_bundle.embedded.artist or metadata_bundle.embedded.title:
-                artist = metadata_bundle.embedded.artist
-                title = metadata_bundle.embedded.title
+            if metadata_bundle:
+                # Try resolved metadata first (best quality)
+                if metadata_bundle.resolved and (
+                    metadata_bundle.resolved.artist or metadata_bundle.resolved.title
+                ):
+                    artist = metadata_bundle.resolved.artist
+                    title = metadata_bundle.resolved.title
+                # Fall back to embedded metadata
+                elif metadata_bundle.embedded and (
+                    metadata_bundle.embedded.artist or metadata_bundle.embedded.title
+                ):
+                    artist = metadata_bundle.embedded.artist
+                    title = metadata_bundle.embedded.title
 
-            bundle = pipeline.resolve(
+            logger.debug(
+                f"Lyrics lookup with artist='{artist}', title='{title}' "
+                f"(from {'resolved' if metadata_bundle and metadata_bundle.resolved and artist else 'embedded' if artist else 'none'})"
+            )
+
+            bundle = await pipeline.resolve(
                 audio_path=audio_path,
                 duration_ms=duration_ms,
                 artist=artist,

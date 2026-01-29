@@ -14,10 +14,6 @@ class YAMLLogger:
 
     Writes logs as YAML documents separated by --- for easy reading.
     Best for debugging and development, not high-volume production.
-
-    Example:
-        with YAMLLogger(Path("debug.yaml")) as logger:
-            logger.info("Started", run_id="abc123")
     """
 
     def __init__(

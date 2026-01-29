@@ -1,7 +1,7 @@
-"""AcoustID API client (Phase 3).
+"""AcoustID API client (Phase 3, async in Phase 8).
 
 Client for AcoustID audio fingerprinting service.
-Uses framework HTTP client for requests.
+Uses framework async HTTP client for requests.
 """
 
 import logging
@@ -20,18 +20,18 @@ class AcoustIDError(RuntimeError):
 
 
 class AcoustIDClient:
-    """AcoustID API client.
+    """AcoustID API client (async).
 
     Client for looking up audio fingerprints via AcoustID API.
-    Uses framework HTTP client for retry/error handling.
+    Uses framework async HTTP client for retry/error handling.
 
     Args:
         api_key: AcoustID API key (from https://acoustid.org/api-key)
-        http_client: Framework HTTP client instance
+        http_client: Framework AsyncApiClient instance
 
     Example:
         >>> client = AcoustIDClient(api_key="...", http_client=http)
-        >>> response = client.lookup(fingerprint="...", duration_s=180.5)
+        >>> response = await client.lookup(fingerprint="...", duration_s=180.5)
         >>> for result in response.results:
         ...     print(result.title, result.score)
     """
@@ -54,8 +54,8 @@ class AcoustIDClient:
         self.api_key = api_key
         self.http_client = http_client
 
-    def lookup(self, *, fingerprint: str, duration_s: float) -> AcoustIDResponse:
-        """Look up audio fingerprint.
+    async def lookup(self, *, fingerprint: str, duration_s: float) -> AcoustIDResponse:
+        """Look up audio fingerprint (async).
 
         Args:
             fingerprint: Chromaprint fingerprint string
@@ -79,9 +79,9 @@ class AcoustIDClient:
         }
 
         try:
-            # Make API request
+            # Make async API request (Phase 8)
             logger.debug(f"AcoustID lookup: duration={duration_int}s")
-            response_data = self.http_client.get(
+            response_data = await self.http_client.get(
                 f"{self.API_BASE_URL}/lookup",
                 params=params,
             )

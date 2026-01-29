@@ -109,9 +109,7 @@ class WhisperXService(Protocol):
         """
         ...
 
-    def transcribe(
-        self, audio_path: str, config: WhisperXConfig
-    ) -> WhisperXTranscribeResult:
+    def transcribe(self, audio_path: str, config: WhisperXConfig) -> WhisperXTranscribeResult:
         """Transcribe lyrics from audio (no reference needed).
 
         Use when no lyrics text exists. Generates lyrics from audio.
@@ -168,13 +166,9 @@ class WhisperXImpl(WhisperXService):
         try:
             import whisperx  # type: ignore
         except ImportError as e:
-            raise ImportError(
-                "whisperx not installed. Install with: uv sync --extra ml"
-            ) from e
+            raise ImportError("whisperx not installed. Install with: uv sync --extra ml") from e
 
-        logger.info(
-            f"WhisperX align: {audio_path} (model={config.model}, device={config.device})"
-        )
+        logger.debug(f"WhisperX align: {audio_path} (model={config.model}, device={config.device})")
 
         # Load audio
         audio = whisperx.load_audio(audio_path)
@@ -218,10 +212,7 @@ class WhisperXImpl(WhisperXService):
         aligned_text = " ".join(aligned_text_parts)
         mismatch_ratio = compute_mismatch_ratio(lyrics_text, aligned_text)
 
-        logger.info(
-            f"WhisperX align complete: {len(words)} words, "
-            f"mismatch={mismatch_ratio:.3f}"
-        )
+        logger.debug(f"WhisperX align complete: {len(words)} words, mismatch={mismatch_ratio:.3f}")
 
         return WhisperXAlignResult(
             words=words,
@@ -234,9 +225,7 @@ class WhisperXImpl(WhisperXService):
             },
         )
 
-    def transcribe(
-        self, audio_path: str, config: WhisperXConfig
-    ) -> WhisperXTranscribeResult:
+    def transcribe(self, audio_path: str, config: WhisperXConfig) -> WhisperXTranscribeResult:
         """Transcribe lyrics from audio using WhisperX.
 
         Downloads model on first use. Supports GPU (cuda/mps) and CPU.
@@ -256,25 +245,19 @@ class WhisperXImpl(WhisperXService):
         try:
             import whisperx  # type: ignore
         except ImportError as e:
-            raise ImportError(
-                "whisperx not installed. Install with: uv sync --extra ml"
-            ) from e
+            raise ImportError("whisperx not installed. Install with: uv sync --extra ml") from e
 
-        logger.info(
+        logger.debug(
             f"WhisperX transcribe: {audio_path} (model={config.model}, device={config.device})"
         )
 
         # Load model and audio
         compute_type = "float32" if config.device == "cpu" else "float16"
-        model = whisperx.load_model(
-            config.model, device=config.device, compute_type=compute_type
-        )
+        model = whisperx.load_model(config.model, device=config.device, compute_type=compute_type)
         audio = whisperx.load_audio(audio_path)
 
         # Transcribe
-        result = model.transcribe(
-            audio, batch_size=config.batch_size, language=config.language
-        )
+        result = model.transcribe(audio, batch_size=config.batch_size, language=config.language)
 
         # Extract text and words
         text_parts: list[str] = []
@@ -299,9 +282,8 @@ class WhisperXImpl(WhisperXService):
         text = " ".join(text_parts)
         detected_language = result.get("language", config.language or "unknown")
 
-        logger.info(
-            f"WhisperX transcribe complete: {len(words)} words, "
-            f"language={detected_language}"
+        logger.debug(
+            f"WhisperX transcribe complete: {len(words)} words, language={detected_language}"
         )
 
         return WhisperXTranscribeResult(

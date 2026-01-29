@@ -72,6 +72,9 @@ def _expand_plan_sections(plan):
                         modifiers=seg.modifiers,
                         reasoning=seg.reasoning or section.reasoning,
                         segments=None,  # Don't carry segments forward
+                        # Inherit parent section's transition hints (if any)
+                        transition_in=section.transition_in,
+                        transition_out=section.transition_out,
                     )
                 )
         else:
@@ -81,7 +84,7 @@ def _expand_plan_sections(plan):
     return expanded
 
 
-def generate_evaluation_report(
+async def generate_evaluation_report(
     *,
     checkpoint_path: Path,
     audio_path: Path,
@@ -90,11 +93,11 @@ def generate_evaluation_report(
     output_dir: Path,
     config: EvalConfig | None = None,
 ) -> EvaluationReport:
-    """Generate complete evaluation report from checkpoint.
+    """Generate complete evaluation report from checkpoint (async).
 
     This is the main entry point for report generation. It:
     1. Loads checkpoint and extracts plan
-    2. Re-renders plan through sequencer
+    2. Re-renders plan through sequencer (async)
     3. Extracts and analyzes curves
     4. Generates plots
     5. Writes JSON and Markdown reports
@@ -109,15 +112,6 @@ def generate_evaluation_report(
 
     Returns:
         EvaluationReport object
-
-    Example:
-        >>> report = generate_evaluation_report(
-        ...     checkpoint_path=Path("checkpoint.json"),
-        ...     audio_path=Path("song.mp3"),
-        ...     fixture_config_path=Path("fixtures.json"),
-        ...     xsq_path=Path("sequence.xsq"),
-        ...     output_dir=Path("output"),
-        ... )
     """
     if config is None:
         config = EvalConfig()
@@ -125,12 +119,12 @@ def generate_evaluation_report(
     logger.info(f"Generating evaluation report from {checkpoint_path.name}")
 
     # Load checkpoint
-    logger.info("Loading checkpoint...")
+    logger.debug("Loading checkpoint...")
     checkpoint_data = load_checkpoint(checkpoint_path)
     plan = extract_plan(checkpoint_data)
     run_metadata = build_run_metadata(checkpoint_path, checkpoint_data)
 
-    logger.info(f"Loaded plan with {len(plan.sections)} sections")
+    logger.debug(f"Loaded plan with {len(plan.sections)} sections")
 
     # Phase 2: Validate plan structure (if enabled)
     plan_validation: ValidationResult | None = None
@@ -165,9 +159,9 @@ def generate_evaluation_report(
         else:
             logger.info("Plan validation passed (%d warnings)", len(plan_validation.warnings))
 
-    # Re-render plan
+    # Re-render plan (async)
     logger.info("Re-rendering plan through sequencer...")
-    render_data = rerender_plan(
+    render_data = await rerender_plan(
         plan=plan,
         audio_path=audio_path,
         fixture_config_path=fixture_config_path,

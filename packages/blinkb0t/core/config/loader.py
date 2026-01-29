@@ -101,7 +101,8 @@ def load_config(path: str | Path) -> dict[str, Any]:
 def load_app_config(path: str | Path | None = None) -> AppConfig:
     """Load and validate application configuration.
 
-    Supports both JSON and YAML formats.
+    Supports both JSON and YAML formats. Environment variables are loaded
+    automatically for API keys when config values are None.
 
     Args:
         path: Path to app config file (.json, .yaml, or .yml)
@@ -129,6 +130,9 @@ def load_app_config(path: str | Path | None = None) -> AppConfig:
     else:
         # Use all defaults
         config = AppConfig()
+
+    # Load environment variables for API keys if not set in config
+    _load_env_vars_into_config(config)
 
     # Cache if using default path
     if path == _DEFAULT_APP_CONFIG_PATH:
@@ -235,3 +239,42 @@ def get_openai_api_key() -> str | None:
         API key or None if not set
     """
     return os.getenv("OPENAI_API_KEY")
+
+
+def _load_env_vars_into_config(config: AppConfig) -> None:
+    """Load environment variables into config for API keys.
+
+    This mutates the config object to fill in None values from environment.
+
+    Args:
+        config: AppConfig instance to populate
+    """
+    updates = {}
+
+    # Load AcoustID API key from environment if not in config
+    if config.audio_processing.enhancements.acoustid_api_key is None:
+        acoustid_key = os.getenv("ACOUSTID_API_KEY")
+        if acoustid_key:
+            logger.debug("Loaded ACOUSTID_API_KEY from environment")
+            updates["acoustid_api_key"] = acoustid_key
+
+    # Load Genius access token from environment if not in config
+    # Support both GENIUS_ACCESS_TOKEN (preferred) and GENIUS_CLIENT_TOKEN (legacy)
+    if config.audio_processing.enhancements.genius_access_token is None:
+        genius_token = os.getenv("GENIUS_ACCESS_TOKEN") or os.getenv("GENIUS_CLIENT_TOKEN")
+        if genius_token:
+            env_var_used = (
+                "GENIUS_ACCESS_TOKEN" if os.getenv("GENIUS_ACCESS_TOKEN") else "GENIUS_CLIENT_TOKEN"
+            )
+            logger.debug(f"Loaded Genius token from {env_var_used}")
+            if env_var_used == "GENIUS_CLIENT_TOKEN":
+                logger.warning(
+                    "Using deprecated GENIUS_CLIENT_TOKEN. Please rename to GENIUS_ACCESS_TOKEN in your .env file"
+                )
+            updates["genius_access_token"] = genius_token
+
+    # Apply updates if any
+    if updates:
+        config.audio_processing.enhancements = config.audio_processing.enhancements.model_copy(
+            update=updates
+        )

@@ -10,8 +10,8 @@ from blinkb0t.core.caching import CacheKey, FSCache
 from blinkb0t.core.io import FakeFileSystem, absolute_path
 
 
-class TestArtifact(BaseModel):
-    """Test artifact model."""
+class SampleArtifact(BaseModel):
+    """Sample artifact model for testing."""
 
     value: str
     schema_version: int = 1
@@ -61,7 +61,7 @@ class TestExists:
 
     async def test_exists_returns_true_for_complete_entry(self, cache: FSCache, test_key: CacheKey):
         """Test exists returns True when both artifact and meta exist."""
-        artifact = TestArtifact(value="test")
+        artifact = SampleArtifact(value="test")
         await cache.store(test_key, artifact)
 
         assert await cache.exists(test_key)
@@ -83,15 +83,15 @@ class TestLoad:
 
     async def test_load_returns_none_for_missing_entry(self, cache: FSCache, test_key: CacheKey):
         """Test load returns None when entry doesn't exist."""
-        result = await cache.load(test_key, TestArtifact)
+        result = await cache.load(test_key, SampleArtifact)
         assert result is None
 
     async def test_load_returns_artifact_on_hit(self, cache: FSCache, test_key: CacheKey):
         """Test load returns cached artifact on cache hit."""
-        artifact = TestArtifact(value="cached")
+        artifact = SampleArtifact(value="cached")
         await cache.store(test_key, artifact)
 
-        loaded = await cache.load(test_key, TestArtifact)
+        loaded = await cache.load(test_key, SampleArtifact)
         assert loaded is not None
         assert loaded.value == "cached"
         assert loaded.schema_version == 1
@@ -101,14 +101,14 @@ class TestLoad:
     ):
         """Test load returns None when artifact fails validation."""
         # Store valid entry first
-        artifact = TestArtifact(value="test")
+        artifact = SampleArtifact(value="test")
         await cache.store(test_key, artifact)
 
         # Corrupt artifact (invalid JSON)
         artifact_path = cache._artifact_path(test_key)
         await fs.write_text(artifact_path, "invalid json")
 
-        loaded = await cache.load(test_key, TestArtifact)
+        loaded = await cache.load(test_key, SampleArtifact)
         assert loaded is None
 
     async def test_load_returns_none_for_meta_mismatch(self, cache: FSCache, fs: FakeFileSystem):
@@ -119,7 +119,7 @@ class TestLoad:
             step_version="1",
             input_fingerprint="a" * 64,
         )
-        await cache.store(key1, TestArtifact(value="test"))
+        await cache.store(key1, SampleArtifact(value="test"))
 
         # Try to load with different key
         key2 = CacheKey(
@@ -141,7 +141,7 @@ class TestLoad:
         await fs.write_text(fs.join(entry_dir2, "meta.json"), meta_content)
 
         # Should return None due to meta mismatch
-        loaded = await cache.load(key2, TestArtifact)
+        loaded = await cache.load(key2, SampleArtifact)
         assert loaded is None
 
 
@@ -152,7 +152,7 @@ class TestStore:
         self, cache: FSCache, test_key: CacheKey, fs: FakeFileSystem
     ):
         """Test store creates entry directory."""
-        artifact = TestArtifact(value="test")
+        artifact = SampleArtifact(value="test")
         await cache.store(test_key, artifact)
 
         entry_dir = cache._entry_dir(test_key)
@@ -162,7 +162,7 @@ class TestStore:
         self, cache: FSCache, test_key: CacheKey, fs: FakeFileSystem
     ):
         """Test store writes both artifact.json and meta.json."""
-        artifact = TestArtifact(value="test")
+        artifact = SampleArtifact(value="test")
         await cache.store(test_key, artifact, compute_ms=100.5)
 
         artifact_path = cache._artifact_path(test_key)
@@ -182,10 +182,10 @@ class TestStore:
 
     async def test_store_overwrites_existing_entry(self, cache: FSCache, test_key: CacheKey):
         """Test store overwrites existing cache entries."""
-        await cache.store(test_key, TestArtifact(value="first"))
-        await cache.store(test_key, TestArtifact(value="second"))
+        await cache.store(test_key, SampleArtifact(value="first"))
+        await cache.store(test_key, SampleArtifact(value="second"))
 
-        loaded = await cache.load(test_key, TestArtifact)
+        loaded = await cache.load(test_key, SampleArtifact)
         assert loaded is not None
         assert loaded.value == "second"
 
@@ -195,7 +195,7 @@ class TestInvalidate:
 
     async def test_invalidate_removes_entry(self, cache: FSCache, test_key: CacheKey):
         """Test invalidate removes cache entry."""
-        artifact = TestArtifact(value="test")
+        artifact = SampleArtifact(value="test")
         await cache.store(test_key, artifact)
 
         assert await cache.exists(test_key)
@@ -214,10 +214,10 @@ class TestRoundtrip:
 
     async def test_store_load_roundtrip(self, cache: FSCache, test_key: CacheKey):
         """Test complete store → load roundtrip."""
-        original = TestArtifact(value="roundtrip test", schema_version=2)
+        original = SampleArtifact(value="roundtrip test", schema_version=2)
         await cache.store(test_key, original, compute_ms=42.0)
 
-        loaded = await cache.load(test_key, TestArtifact)
+        loaded = await cache.load(test_key, SampleArtifact)
         assert loaded is not None
         assert loaded.value == original.value
         assert loaded.schema_version == original.schema_version
@@ -235,11 +235,11 @@ class TestRoundtrip:
             input_fingerprint="b" * 64,
         )
 
-        await cache.store(key1, TestArtifact(value="first"))
-        await cache.store(key2, TestArtifact(value="second"))
+        await cache.store(key1, SampleArtifact(value="first"))
+        await cache.store(key2, SampleArtifact(value="second"))
 
-        loaded1 = await cache.load(key1, TestArtifact)
-        loaded2 = await cache.load(key2, TestArtifact)
+        loaded1 = await cache.load(key1, SampleArtifact)
+        loaded2 = await cache.load(key2, SampleArtifact)
 
         assert loaded1 is not None
         assert loaded2 is not None

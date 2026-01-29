@@ -34,7 +34,7 @@ def write_report_json(report: EvaluationReport, output_path: Path) -> None:
         encoding="utf-8",
     )
 
-    logger.info(f"Wrote report JSON: {output_path}")
+    logger.debug(f"Wrote report JSON: {output_path}")
 
 
 def write_report_markdown(report: EvaluationReport, output_path: Path) -> None:
@@ -116,7 +116,7 @@ def write_report_markdown(report: EvaluationReport, output_path: Path) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text("\n".join(lines), encoding="utf-8")
 
-    logger.info(f"Wrote report Markdown: {output_path}")
+    logger.debug(f"Wrote report Markdown: {output_path}")
 
 
 def _render_section_markdown(section: SectionReport) -> list[str]:

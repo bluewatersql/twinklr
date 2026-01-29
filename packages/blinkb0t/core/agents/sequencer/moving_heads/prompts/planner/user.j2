@@ -1,5 +1,20 @@
 Design a choreography plan for the following song:
 
+{% if context.get('metadata') %}
+## Song Information
+
+{% if context.metadata.get('artist') and context.metadata.get('title') %}
+**Song**: "{{ context.metadata.title }}" by {{ context.metadata.artist }}
+{% elif context.metadata.get('title') %}
+**Song**: "{{ context.metadata.title }}"
+{% elif context.metadata.get('artist') %}
+**Artist**: {{ context.metadata.artist }}
+{% endif %}
+{% if context.metadata.get('genre') %}
+**Genre**: {{ context.metadata.genre | join(', ') if context.metadata.genre is iterable and context.metadata.genre is not string else context.metadata.genre }}
+{% endif %}
+
+{% endif %}
 ## Song Context
 
 {{ context.song_structure | tojson(indent=2) }}

@@ -175,11 +175,17 @@ class ConfigBase(BaseModel):
             FileNotFoundError: If config file doesn't exist
             ValidationError: If config is invalid
         """
+        # AppConfig needs environment variable loading for API keys
+        if cls.__name__ == "AppConfig":
+            from blinkb0t.core.config.loader import load_app_config
+
+            return load_app_config(path)  # type: ignore[return-value]
+
+        # Other config types use simple loader
         from blinkb0t.core.config.loader import load_config
 
         if path is None:
             path = cls.default_path()
-
         raw = load_config(path)
         return cls.model_validate(raw)
 
@@ -188,18 +194,6 @@ class AssumptionsConfig(BaseModel):
     """Music theory assumptions for beat-aligned planning."""
 
     beats_per_bar: int = Field(default=4, ge=1, le=12)
-
-
-class SequencingVersionConfig(BaseModel):
-    """Version configuration for sequencing data, schemas, and prompts."""
-
-    prompt: str = Field(default="1.0.0", description="LLM prompt version")
-    response_schema: str = Field(default="1.0.0", description="Response schema version")
-    templates: str = Field(default="1.0.0", description="Effect templates version")
-    curves: str = Field(default="1.0.0", description="Curve presets version")
-    dimmer: str = Field(default="1.0.0", description="Dimmer library version")
-    geometry: str = Field(default="1.0.0", description="Geometry library version")
-    movements: str = Field(default="2.0.0", description="Movement library version")
 
 
 class AudioEnhancementConfig(BaseModel):
@@ -296,7 +290,8 @@ class AudioEnhancementConfig(BaseModel):
         default=None, description="AcoustID API key (load from env: ACOUSTID_API_KEY)"
     )
     genius_access_token: str | None = Field(
-        default=None, description="Genius API access token (load from env: GENIUS_ACCESS_TOKEN)"
+        default=None,
+        description="Genius API access token (load from env: GENIUS_ACCESS_TOKEN or GENIUS_CLIENT_TOKEN)",
     )
     musicbrainz_rate_limit_rps: float = Field(
         default=1.0,
@@ -412,10 +407,6 @@ class AppConfig(ConfigBase):
     audio_processing: AudioProcessingConfig = AudioProcessingConfig()
     planning: PlanningContextConfig = PlanningContextConfig()
     logging: LoggingConfig = LoggingConfig()
-    sequencing: SequencingVersionConfig = Field(
-        default_factory=SequencingVersionConfig,
-        description="Version configuration for sequencing components",
-    )
 
     @classmethod
     def default_path(cls) -> Path:
@@ -502,7 +493,6 @@ class JobConfig(ConfigBase):
     project_name: str | None = None
     checkpoint: bool = True
 
-    # Phase 0 Component 5: Configuration Enhancements
     pose_config: PoseConfig = Field(
         default_factory=PoseConfig,
         description=(
@@ -519,7 +509,6 @@ class JobConfig(ConfigBase):
         ),
     )
 
-    # Component 5: Channel Defaults
     channel_defaults: ChannelDefaults = Field(
         default_factory=ChannelDefaults,
         description=(
@@ -528,7 +517,6 @@ class JobConfig(ConfigBase):
         ),
     )
 
-    # Transitions Configuration
     transitions: TransitionConfig = Field(
         default_factory=TransitionConfig,
         description="Transition behavior configuration for smooth blending between sections and steps",

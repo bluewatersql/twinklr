@@ -82,8 +82,8 @@ class DefaultMovementHandler:
         categorical_params_set = pattern.categorical_params or DEFAULT_MOVEMENT_PARAMS
         categorical_params = categorical_params_set[intensity]
 
-        renderer_log.info(f"Categorical Params: {categorical_params}")
-        renderer_log.info(f"Intensity: {intensity}")
+        renderer_log.debug(f"Categorical Params: {categorical_params}")
+        renderer_log.debug(f"Intensity: {intensity}")
 
         geometry = params.get("geometry")
         if not geometry:
@@ -96,8 +96,8 @@ class DefaultMovementHandler:
         pan_max = calibration.get("pan_max_dmx", 255) if calibration else 255
         tilt_min = calibration.get("tilt_min_dmx", 0) if calibration else 0
         tilt_max = calibration.get("tilt_max_dmx", 255) if calibration else 255
-        renderer_log.info(f"Pan Min: {pan_min}, Pan Max: {pan_max}")
-        renderer_log.info(f"Tilt Min: {tilt_min}, Tilt Max: {tilt_max}")
+        renderer_log.debug(f"Pan Min: {pan_min}, Pan Max: {pan_max}")
+        renderer_log.debug(f"Tilt Min: {tilt_min}, Tilt Max: {tilt_max}")
 
         base_pan_norm = params.get("base_pan_norm", 0.5)
         base_tilt_norm = params.get("base_tilt_norm", 0.5)
@@ -121,16 +121,16 @@ class DefaultMovementHandler:
         tilt_dist_to_max = tilt_max_norm - base_tilt_norm
         tilt_max_amplitude_norm = min(tilt_dist_to_min, tilt_dist_to_max)
 
-        renderer_log.info(
+        renderer_log.debug(
             f"Max safe amplitude (norm): pan={pan_max_amplitude_norm:.3f}, tilt={tilt_max_amplitude_norm:.3f}"
         )
 
         # Resolve amplitude (allow param override)
         amplitude = self._resolve_amplitude(params, categorical_params.amplitude)
-        renderer_log.info(f"Resolved Amplitude: {amplitude}")
+        renderer_log.debug(f"Resolved Amplitude: {amplitude}")
 
         # Generate pan curve scaled to fit within pan_min/pan_max
-        renderer_log.info(
+        renderer_log.debug(
             f"Generating Pan Curve - type: {pattern.pan_curve.value}, amplitude: {amplitude}, frequency: {categorical_params.frequency}, center: {categorical_params.center_offset}"
         )
         pan_curve = self._generate_curve(

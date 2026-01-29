@@ -1,4 +1,4 @@
-"""LRCLib API client (Phase 4).
+"""LRCLib API client (Phase 4, async in Phase 8).
 
 LRCLib is a free, open-source lyrics provider with synced lyrics support.
 No API key required.
@@ -16,12 +16,12 @@ logger = logging.getLogger(__name__)
 
 
 class LRCLibClient:
-    """LRCLib API client for synced lyrics.
+    """LRCLib API client for synced lyrics (async).
 
     LRCLib provides free synced lyrics (LRC format) without requiring an API key.
 
     Args:
-        http_client: Framework HTTP client instance
+        http_client: Framework AsyncApiClient instance
     """
 
     BASE_URL = "https://lrclib.net/api"
@@ -30,12 +30,12 @@ class LRCLibClient:
         """Initialize LRCLib client.
 
         Args:
-            http_client: Framework HTTP client (ApiClient)
+            http_client: Framework AsyncApiClient
         """
         self.http_client = http_client
 
-    def search(self, query: LyricsQuery) -> list[LyricsCandidate]:
-        """Search for lyrics by metadata.
+    async def search(self, query: LyricsQuery) -> list[LyricsCandidate]:
+        """Search for lyrics by metadata (async).
 
         Args:
             query: Search query with artist, title, etc.
@@ -60,8 +60,8 @@ class LRCLibClient:
 
             url = f"{self.BASE_URL}/search?{urlencode(params)}"
 
-            # Make API request
-            response = self.http_client.get(url)
+            # Make async API request (Phase 8)
+            response = await self.http_client.get(url)
             results = response.json()
 
             if not isinstance(results, list):

@@ -1,70 +1,51 @@
-"""Caching system for BlinkB0t pipeline steps.
+"""Unified caching system for BlinkB0t.
 
-Provides deterministic, filesystem-backed caching for expensive computations.
+This module provides async-first caching using core.io abstractions:
+- Audio analysis features (replaces audio/cache.py)
+- Agent orchestration checkpoints (replaces utils/checkpoint.py)
+- Sequence analysis data
 
-Example (async):
+Key features:
+- Async file I/O using core.io FileSystem
+- Type-safe cache keys (step_id + version + input fingerprint)
+- Pydantic model validation
+- Atomic commit pattern (artifact + meta)
+- Graceful error handling
+
+Example:
+    >>> from blinkb0t.core.caching import FSCache, CacheKey
     >>> from blinkb0t.core.io import RealFileSystem, absolute_path
-    >>> from blinkb0t.core.caching import FSCache, cached_step, CacheKey
     >>>
     >>> fs = RealFileSystem()
-    >>> cache = FSCache(fs, absolute_path("/.cache"))
+    >>> cache = FSCache(fs, absolute_path("data/cache"))
     >>> await cache.initialize()
     >>>
-    >>> async def compute():
-    ...     return MyArtifact(value="computed")
-    >>>
-    >>> result = await cached_step(
-    ...     cache=cache,
-    ...     step_id="my.step",
+    >>> key = CacheKey(
+    ...     step_id="audio.features",
     ...     step_version="1",
-    ...     inputs={"param": "value"},
-    ...     model_cls=MyArtifact,
-    ...     compute=compute,
+    ...     input_fingerprint="abc123..."
     ... )
-
-Example (sync):
-    >>> from blinkb0t.core.io import RealFileSystem, absolute_path
-    >>> from blinkb0t.core.caching import FSCacheSync, cached_step_sync
-    >>>
-    >>> fs = RealFileSystem()
-    >>> cache = FSCacheSync(fs, absolute_path("/.cache"))
-    >>>
-    >>> def compute():
-    ...     return MyArtifact(value="computed")
-    >>>
-    >>> result = cached_step_sync(
-    ...     cache=cache,
-    ...     step_id="my.step",
-    ...     step_version="1",
-    ...     inputs={"param": "value"},
-    ...     model_cls=MyArtifact,
-    ...     compute=compute,
-    ... )
+    >>> await cache.store(key, my_pydantic_model)
+    >>> result = await cache.load(key, MyModel)
 """
 
-from .backends import FSCache, FSCacheSync, NullCache, NullCacheSync
-from .fingerprint import compute_fingerprint
-from .models import CacheKey, CacheMeta, CacheOptions
-from .protocols import Cache, CacheSync
-from .wrapper import cached_step, cached_step_sync
+from blinkb0t.core.caching.backends.fs import FSCache
+from blinkb0t.core.caching.fingerprint import compute_fingerprint
+from blinkb0t.core.caching.models import CacheKey, CacheMeta, CacheOptions
+from blinkb0t.core.caching.protocols import Cache, CacheSync
+from blinkb0t.core.caching.wrapper import cached_step, cached_step_sync
 
 __all__ = [
-    # Models
+    # Core
+    "Cache",
+    "CacheSync",
     "CacheKey",
     "CacheMeta",
     "CacheOptions",
-    # Protocols
-    "Cache",
-    "CacheSync",
-    # Async backends
+    # Backends
     "FSCache",
-    "NullCache",
-    # Sync wrappers
-    "FSCacheSync",
-    "NullCacheSync",
-    # Wrapper functions
+    # Utils
+    "compute_fingerprint",
     "cached_step",
     "cached_step_sync",
-    # Utilities
-    "compute_fingerprint",
 ]

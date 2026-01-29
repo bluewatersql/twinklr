@@ -3,7 +3,7 @@
 Testing MusicBrainz recording lookup with mocked HTTP responses.
 """
 
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -16,8 +16,9 @@ class TestMusicBrainzClient:
 
     @pytest.fixture
     def mock_http_client(self):
-        """Mock HTTP client."""
-        return MagicMock()
+        """Mock async HTTP client."""
+        mock = AsyncMock()
+        return mock
 
     @pytest.fixture
     def client(self, mock_http_client):
@@ -35,7 +36,7 @@ class TestMusicBrainzClient:
         with pytest.raises(ValueError, match="user agent is required"):
             MusicBrainzClient(http_client=mock_http_client, user_agent=None)
 
-    def test_lookup_recording_successful(self, client, mock_http_client):
+    async def test_lookup_recording_successful(self, client, mock_http_client):
         """Successful recording lookup by MBID."""
         # Mock HTTP response
         mock_response = {
@@ -59,7 +60,7 @@ class TestMusicBrainzClient:
         mock_http_client.get.return_value = mock_response
 
         # Call lookup
-        recording = client.lookup_recording(mbid="rec-mbid-123")
+        recording = await client.lookup_recording(mbid="rec-mbid-123")
 
         # Verify HTTP call
         mock_http_client.get.assert_called_once()
@@ -82,7 +83,7 @@ class TestMusicBrainzClient:
         assert len(recording.releases) == 1
         assert recording.releases[0].title == "Test Album"
 
-    def test_lookup_recording_minimal(self, client, mock_http_client):
+    async def test_lookup_recording_minimal(self, client, mock_http_client):
         """Lookup recording with minimal fields."""
         mock_response = {
             "id": "rec-123",
@@ -90,7 +91,7 @@ class TestMusicBrainzClient:
         }
         mock_http_client.get.return_value = mock_response
 
-        recording = client.lookup_recording(mbid="rec-123")
+        recording = await client.lookup_recording(mbid="rec-123")
 
         assert recording.id == "rec-123"
         assert recording.title == "Minimal Song"
@@ -99,7 +100,7 @@ class TestMusicBrainzClient:
         assert recording.isrc is None
         assert recording.releases == []
 
-    def test_lookup_recording_multiple_artists(self, client, mock_http_client):
+    async def test_lookup_recording_multiple_artists(self, client, mock_http_client):
         """Recording with multiple artists."""
         mock_response = {
             "id": "rec-123",
@@ -112,11 +113,11 @@ class TestMusicBrainzClient:
         }
         mock_http_client.get.return_value = mock_response
 
-        recording = client.lookup_recording(mbid="rec-123")
+        recording = await client.lookup_recording(mbid="rec-123")
 
         assert recording.artists == ["A1", "A2", "A3"]
 
-    def test_lookup_recording_multiple_releases(self, client, mock_http_client):
+    async def test_lookup_recording_multiple_releases(self, client, mock_http_client):
         """Recording appears on multiple releases."""
         mock_response = {
             "id": "rec-123",
@@ -129,14 +130,14 @@ class TestMusicBrainzClient:
         }
         mock_http_client.get.return_value = mock_response
 
-        recording = client.lookup_recording(mbid="rec-123")
+        recording = await client.lookup_recording(mbid="rec-123")
 
         assert len(recording.releases) == 3
         assert recording.releases[0].title == "Album 1"
         assert recording.releases[1].date == "2024-06-01"
         assert recording.releases[2].date is None
 
-    def test_lookup_recording_multiple_isrcs(self, client, mock_http_client):
+    async def test_lookup_recording_multiple_isrcs(self, client, mock_http_client):
         """Recording has multiple ISRCs (use first)."""
         mock_response = {
             "id": "rec-123",
@@ -145,12 +146,12 @@ class TestMusicBrainzClient:
         }
         mock_http_client.get.return_value = mock_response
 
-        recording = client.lookup_recording(mbid="rec-123")
+        recording = await client.lookup_recording(mbid="rec-123")
 
         # Use first ISRC
         assert recording.isrc == "ISRC1"
 
-    def test_lookup_recording_no_isrcs(self, client, mock_http_client):
+    async def test_lookup_recording_no_isrcs(self, client, mock_http_client):
         """Recording has no ISRCs."""
         mock_response = {
             "id": "rec-123",
@@ -159,11 +160,11 @@ class TestMusicBrainzClient:
         }
         mock_http_client.get.return_value = mock_response
 
-        recording = client.lookup_recording(mbid="rec-123")
+        recording = await client.lookup_recording(mbid="rec-123")
 
         assert recording.isrc is None
 
-    def test_lookup_recording_api_error(self, client, mock_http_client):
+    async def test_lookup_recording_api_error(self, client, mock_http_client):
         """MusicBrainz API returns error response."""
         from blinkb0t.core.api.http.errors import ClientError
 
@@ -175,9 +176,9 @@ class TestMusicBrainzClient:
         )
 
         with pytest.raises(MusicBrainzError, match="MusicBrainz HTTP error"):
-            client.lookup_recording(mbid="invalid-mbid")
+            await client.lookup_recording(mbid="invalid-mbid")
 
-    def test_lookup_recording_http_error(self, client, mock_http_client):
+    async def test_lookup_recording_http_error(self, client, mock_http_client):
         """HTTP request fails."""
         from blinkb0t.core.api.http.errors import ServerError
 
@@ -189,9 +190,9 @@ class TestMusicBrainzClient:
         )
 
         with pytest.raises(MusicBrainzError, match="MusicBrainz HTTP error"):
-            client.lookup_recording(mbid="rec-123")
+            await client.lookup_recording(mbid="rec-123")
 
-    def test_lookup_recording_timeout(self, client, mock_http_client):
+    async def test_lookup_recording_timeout(self, client, mock_http_client):
         """Request times out."""
         from blinkb0t.core.api.http.errors import TimeoutError as HTTPTimeoutError
 
@@ -202,17 +203,17 @@ class TestMusicBrainzClient:
         )
 
         with pytest.raises(MusicBrainzError, match="MusicBrainz request timed out"):
-            client.lookup_recording(mbid="rec-123")
+            await client.lookup_recording(mbid="rec-123")
 
-    def test_lookup_recording_invalid_response(self, client, mock_http_client):
+    async def test_lookup_recording_invalid_response(self, client, mock_http_client):
         """API returns invalid/malformed response."""
         # Missing required fields
         mock_http_client.get.return_value = {"invalid": "response"}
 
         with pytest.raises(MusicBrainzError, match="Invalid response from MusicBrainz"):
-            client.lookup_recording(mbid="rec-123")
+            await client.lookup_recording(mbid="rec-123")
 
-    def test_lookup_recording_rate_limit_warning(self, client, mock_http_client, caplog):
+    async def test_lookup_recording_rate_limit_warning(self, client, mock_http_client, caplog):
         """Rate limiting is mentioned in documentation."""
         import logging
 
@@ -221,7 +222,7 @@ class TestMusicBrainzClient:
         mock_response = {"id": "rec-123", "title": "Song"}
         mock_http_client.get.return_value = mock_response
 
-        client.lookup_recording(mbid="rec-123")
+        await client.lookup_recording(mbid="rec-123")
 
         # Check that rate limiting is mentioned in debug logs
         assert any("rate limit" in record.message.lower() for record in caplog.records)

@@ -47,54 +47,51 @@ def mock_process_audio():
 class TestAudioAnalyzerReturnsSongBundle:
     """Test that AudioAnalyzer.analyze() returns SongBundle."""
 
-    def test_analyze_returns_song_bundle(self, app_config, job_config, mock_process_audio):
+    @pytest.mark.asyncio
+    async def test_analyze_returns_song_bundle(self, app_config, job_config, mock_process_audio):
         """analyze() should return SongBundle instance."""
         analyzer = AudioAnalyzer(app_config, job_config)
 
         with (
             patch.object(analyzer, "_process_audio", return_value=mock_process_audio),
-            patch("blinkb0t.core.audio.analyzer.load_cached_features", return_value=None),
-            patch("blinkb0t.core.audio.analyzer.save_cached_features"),
-            patch.object(analyzer.checkpoint_manager, "read_checkpoint", return_value=None),
-            patch.object(analyzer.checkpoint_manager, "write_checkpoint"),
+            patch("blinkb0t.core.audio.cache_adapter.load_audio_features_async", return_value=None),
+            patch("blinkb0t.core.audio.cache_adapter.save_audio_features_async"),
         ):
-            result = analyzer.analyze("test.mp3")
+            result = await analyzer.analyze("test.mp3")
 
         # Should return SongBundle
         assert isinstance(result, SongBundle)
         assert result.schema_version == "3.0"
         assert result.audio_path == "test.mp3"
 
-    def test_bundle_contains_v23_features(self, app_config, job_config, mock_process_audio):
+    @pytest.mark.asyncio
+    async def test_bundle_contains_v23_features(self, app_config, job_config, mock_process_audio):
         """SongBundle.features should contain v2.3 features dict."""
         analyzer = AudioAnalyzer(app_config, job_config)
 
         with (
             patch.object(analyzer, "_process_audio", return_value=mock_process_audio),
-            patch("blinkb0t.core.audio.analyzer.load_cached_features", return_value=None),
-            patch("blinkb0t.core.audio.analyzer.save_cached_features"),
-            patch.object(analyzer.checkpoint_manager, "read_checkpoint", return_value=None),
-            patch.object(analyzer.checkpoint_manager, "write_checkpoint"),
+            patch("blinkb0t.core.audio.cache_adapter.load_audio_features_async", return_value=None),
+            patch("blinkb0t.core.audio.cache_adapter.save_audio_features_async"),
         ):
-            result = analyzer.analyze("test.mp3")
+            result = await analyzer.analyze("test.mp3")
 
         # Should preserve v2.3 features in bundle
         assert result.features["schema_version"] == "2.3"
         assert result.features["tempo_bpm"] == 120.0
         assert result.features["beats_s"] == [0.5, 1.0, 1.5]
 
-    def test_bundle_timing_populated(self, app_config, job_config, mock_process_audio):
+    @pytest.mark.asyncio
+    async def test_bundle_timing_populated(self, app_config, job_config, mock_process_audio):
         """SongBundle.timing should be populated from features."""
         analyzer = AudioAnalyzer(app_config, job_config)
 
         with (
             patch.object(analyzer, "_process_audio", return_value=mock_process_audio),
-            patch("blinkb0t.core.audio.analyzer.load_cached_features", return_value=None),
-            patch("blinkb0t.core.audio.analyzer.save_cached_features"),
-            patch.object(analyzer.checkpoint_manager, "read_checkpoint", return_value=None),
-            patch.object(analyzer.checkpoint_manager, "write_checkpoint"),
+            patch("blinkb0t.core.audio.cache_adapter.load_audio_features_async", return_value=None),
+            patch("blinkb0t.core.audio.cache_adapter.save_audio_features_async"),
         ):
-            result = analyzer.analyze("test.mp3")
+            result = await analyzer.analyze("test.mp3")
 
         # Timing extracted from features
         assert result.timing.sr == 22050
@@ -102,7 +99,10 @@ class TestAudioAnalyzerReturnsSongBundle:
         assert result.timing.duration_s == 3.0
         assert result.timing.duration_ms == 3000
 
-    def test_enhancements_none_when_disabled(self, app_config, job_config, mock_process_audio):
+    @pytest.mark.asyncio
+    async def test_enhancements_none_when_disabled(
+        self, app_config, job_config, mock_process_audio
+    ):
         """Enhancement bundles populated but with SKIPPED status when disabled."""
         # Disable metadata for this test
         app_config.audio_processing.enhancements.enable_metadata = False
@@ -110,20 +110,20 @@ class TestAudioAnalyzerReturnsSongBundle:
 
         with (
             patch.object(analyzer, "_process_audio", return_value=mock_process_audio),
-            patch("blinkb0t.core.audio.analyzer.load_cached_features", return_value=None),
-            patch("blinkb0t.core.audio.analyzer.save_cached_features"),
-            patch.object(analyzer.checkpoint_manager, "read_checkpoint", return_value=None),
-            patch.object(analyzer.checkpoint_manager, "write_checkpoint"),
+            patch("blinkb0t.core.audio.cache_adapter.load_audio_features_async", return_value=None),
+            patch("blinkb0t.core.audio.cache_adapter.save_audio_features_async"),
         ):
-            result = analyzer.analyze("test.mp3")
+            result = await analyzer.analyze("test.mp3")
 
         # Phase 2: Metadata always populated (SKIPPED when disabled)
         from blinkb0t.core.audio.models.enums import StageStatus
 
         assert result.metadata is not None
         assert result.metadata.stage_status == StageStatus.SKIPPED
-        # Lyrics and phonemes not yet implemented
-        assert result.lyrics is None
+        # Lyrics populated with SKIPPED status
+        assert result.lyrics is not None
+        assert result.lyrics.stage_status == StageStatus.SKIPPED
+        # Phonemes not yet implemented
         assert result.phonemes is None
 
 
@@ -136,10 +136,8 @@ class TestAudioAnalyzerBackwardCompat:
 
         with (
             patch.object(analyzer, "_process_audio", return_value=mock_process_audio),
-            patch("blinkb0t.core.audio.analyzer.load_cached_features", return_value=None),
-            patch("blinkb0t.core.audio.analyzer.save_cached_features"),
-            patch.object(analyzer.checkpoint_manager, "read_checkpoint", return_value=None),
-            patch.object(analyzer.checkpoint_manager, "write_checkpoint"),
+            patch("blinkb0t.core.audio.cache_adapter.load_audio_features_async", return_value=None),
+            patch("blinkb0t.core.audio.cache_adapter.save_audio_features_async"),
         ):
             result = analyzer.analyze_dict("test.mp3")
 
@@ -157,10 +155,8 @@ class TestAudioAnalyzerBackwardCompat:
 
         with (
             patch.object(analyzer, "_process_audio", return_value=mock_process_audio),
-            patch("blinkb0t.core.audio.analyzer.load_cached_features", return_value=None),
-            patch("blinkb0t.core.audio.analyzer.save_cached_features"),
-            patch.object(analyzer.checkpoint_manager, "read_checkpoint", return_value=None),
-            patch.object(analyzer.checkpoint_manager, "write_checkpoint"),
+            patch("blinkb0t.core.audio.cache_adapter.load_audio_features_async", return_value=None),
+            patch("blinkb0t.core.audio.cache_adapter.save_audio_features_async"),
         ):
             dict_result = analyzer.analyze_dict("test.mp3")
 

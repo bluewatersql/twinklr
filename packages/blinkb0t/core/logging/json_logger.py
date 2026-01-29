@@ -12,10 +12,6 @@ class JSONLogger:
     """JSON-formatted structured logger.
 
     Writes logs as JSONL (one JSON object per line) for easy parsing.
-
-    Example:
-        with JSONLogger(Path("app.jsonl")) as logger:
-            logger.info("Started", run_id="abc123")
     """
 
     def __init__(

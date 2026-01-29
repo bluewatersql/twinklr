@@ -8,9 +8,18 @@ SENSITIVE_PATTERNS: dict[str, re.Pattern[str]] = {
     "api_key": re.compile(r"(sk|pk)-[A-Za-z0-9]{32,}"),
     "bearer_token": re.compile(r"Bearer\s+[A-Za-z0-9\-._~+/]+=*", re.IGNORECASE),
     "email": re.compile(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}"),
-    "phone": re.compile(r"\+?\d{1,3}[-.\s]?\(?\d{1,4}\)?[-.\s]?\d{1,4}[-.\s]?\d{1,9}"),
-    "ssn": re.compile(r"\d{3}-\d{2}-\d{4}"),
-    "credit_card": re.compile(r"\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}"),
+    # Phone: Require at least 10 digits total, use word boundaries to avoid matching decimals/floats
+    # Matches: +1-555-123-4567, (555) 123-4567, 555-123-4567, 5551234567
+    # Does NOT match: 0.0, 5.0, 3, short numbers
+    "phone": re.compile(
+        r"\b(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b"  # US/Canada: 10 digits
+        r"|\b\+\d{1,3}[-.\s]?\d{2,4}[-.\s]?\d{2,4}[-.\s]?\d{2,4}\b"  # International: 10+ digits
+    ),
+    "ssn": re.compile(r"\b\d{3}-\d{2}-\d{4}\b"),
+    # Credit card: Require separators (space/dash) or context, avoid matching long decimals
+    # Matches: 4532-1234-5678-9010, 4532 1234 5678 9010
+    # Does NOT match: 0.1234567890123456 (decimal with 16 digits after point)
+    "credit_card": re.compile(r"\b\d{4}[-\s]\d{4}[-\s]\d{4}[-\s]\d{4}\b"),
 }
 
 # Sensitive keys (exact match, case-insensitive)

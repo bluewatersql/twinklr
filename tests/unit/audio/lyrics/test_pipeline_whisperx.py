@@ -24,7 +24,12 @@ from blinkb0t.core.audio.models.lyrics import LyricsSourceKind, LyricWord
 class MockWhisperXService(WhisperXService):
     """Mock WhisperX service for testing."""
 
-    def __init__(self, *, align_result: WhisperXAlignResult | None = None, transcribe_result: WhisperXTranscribeResult | None = None):
+    def __init__(
+        self,
+        *,
+        align_result: WhisperXAlignResult | None = None,
+        transcribe_result: WhisperXTranscribeResult | None = None,
+    ):
         self.align_result = align_result
         self.transcribe_result = transcribe_result
         self.align_called = False
@@ -41,13 +46,9 @@ class MockWhisperXService(WhisperXService):
             LyricWord(text="hello", start_ms=0, end_ms=500),
             LyricWord(text="world", start_ms=500, end_ms=1000),
         ]
-        return WhisperXAlignResult(
-            words=words, mismatch_ratio=0.1, metadata={"mock": True}
-        )
+        return WhisperXAlignResult(words=words, mismatch_ratio=0.1, metadata={"mock": True})
 
-    def transcribe(
-        self, audio_path: str, config: WhisperXConfig
-    ) -> WhisperXTranscribeResult:
+    def transcribe(self, audio_path: str, config: WhisperXConfig) -> WhisperXTranscribeResult:
         self.transcribe_called = True
         if self.transcribe_result:
             return self.transcribe_result
@@ -210,7 +211,7 @@ class TestWhisperXTranscribeStage:
 class TestWhisperXGatingLogic:
     """Test gating logic for WhisperX stages."""
 
-    def test_stage_order_full_pipeline(self, tmp_path):
+    async def test_stage_order_full_pipeline(self, tmp_path):
         """Test that stages execute in correct order with WhisperX."""
         audio_path = str(tmp_path / "song.mp3")
         (tmp_path / "song.mp3").write_text("mock")
@@ -220,7 +221,7 @@ class TestWhisperXGatingLogic:
         config = LyricsPipelineConfig()
         pipeline = LyricsPipeline(config=config, providers={}, whisperx_service=whisperx)
 
-        bundle = pipeline.resolve(
+        bundle = await pipeline.resolve(
             audio_path=audio_path,
             duration_ms=1000,
         )
@@ -230,7 +231,7 @@ class TestWhisperXGatingLogic:
         assert not whisperx.align_called  # No text to align
         assert bundle.source.kind == LyricsSourceKind.WHISPERX_TRANSCRIBE
 
-    def test_whisperx_disabled_when_service_not_provided(self, tmp_path):
+    async def test_whisperx_disabled_when_service_not_provided(self, tmp_path):
         """Pipeline should skip WhisperX stages if service not provided."""
         audio_path = str(tmp_path / "song.mp3")
         (tmp_path / "song.mp3").write_text("mock")
@@ -239,7 +240,7 @@ class TestWhisperXGatingLogic:
         config = LyricsPipelineConfig()
         pipeline = LyricsPipeline(config=config, providers={})
 
-        bundle = pipeline.resolve(
+        bundle = await pipeline.resolve(
             audio_path=audio_path,
             duration_ms=1000,
         )

@@ -58,17 +58,6 @@ class ChannelBlender:
 
         Returns:
             Blended DMX value (0-255).
-
-        Example:
-            >>> blender = ChannelBlender(curve_generator)
-            >>> blended = blender.blend_channel(
-            ...     ChannelName.DIMMER,
-            ...     source_value=255,
-            ...     target_value=0,
-            ...     transition_plan=plan,
-            ...     time_in_transition=0.5  # Halfway through
-            ... )
-            >>> print(blended)  # e.g., 128 for linear blend
         """
         # Get strategy for this channel
         strategy = transition_plan.channel_strategies.get(

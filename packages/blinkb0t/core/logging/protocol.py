@@ -9,14 +9,6 @@ class StructuredLogger(Protocol):
     Structured loggers write logs with rich metadata beyond
     just the message string. This enables programmatic analysis,
     querying, and aggregation.
-
-    Example:
-        logger.info(
-            "Agent execution started",
-            run_id="abc123",
-            agent_name="planner",
-            iteration=1,
-        )
     """
 
     def log(

@@ -7,7 +7,6 @@ from typing import Any
 
 from blinkb0t.core.config.models import AppConfig, JobConfig
 from blinkb0t.core.formats.xlights.sequence.parser import XSQParser
-from blinkb0t.core.utils.checkpoint import CheckpointManager, CheckpointType
 
 
 class SequenceAnalyzer:
@@ -19,8 +18,6 @@ class SequenceAnalyzer:
     - Activity proxy (effects per time bin)
     - Timing track events (structural markers)
     - xLights version metadata
-
-    Results are checkpointed to avoid reprocessing the same sequence.
     """
 
     def __init__(self, app_config: AppConfig, job_config: JobConfig):
@@ -28,11 +25,10 @@ class SequenceAnalyzer:
 
         Args:
             app_config: Application configuration
-            job_config: Job configuration (checkpoint settings)
+            job_config: Job configuration
         """
         self.app_config = app_config
         self.job_config = job_config
-        self.checkpoint_manager = CheckpointManager(job_config=job_config)
 
     def fingerprint(
         self,
@@ -58,12 +54,6 @@ class SequenceAnalyzer:
             duration = fp["duration_s"]
             timing_tracks = fp["timing_tracks"]
         """
-        # Check checkpoint first
-        checkpoint = self.checkpoint_manager.read_checkpoint(CheckpointType.SEQUENCE)
-
-        if checkpoint:
-            return checkpoint
-
         # Load and analyze sequence
         parser = XSQParser()
         sequence = parser.parse(xsq_path)
@@ -117,8 +107,5 @@ class SequenceAnalyzer:
                 "timing_track_events: structural information from sequence timing tracks (v1.1+).",
             ],
         }
-
-        # Save checkpoint
-        self.checkpoint_manager.write_checkpoint(CheckpointType.SEQUENCE, results)
 
         return results

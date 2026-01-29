@@ -46,7 +46,6 @@ class OrchestrationConfig:
     token_budget: int | None = None
     prompt_base_path: Path | None = None
     context_shaper: MovingHeadContextShaper | None = None
-    checkpoint_manager: Any | None = None  # CheckpointManager from core.utils.checkpoint
     llm_logger: LLMCallLogger | None = None  # Phase 0: LLM call logger
 
     def __post_init__(self) -> None:
@@ -113,7 +112,6 @@ class Orchestrator:
         )
         self.state_machine = OrchestrationStateMachine()
         self.feedback_manager = FeedbackManager()
-        self.checkpoint_manager = config.checkpoint_manager
 
     def orchestrate(self, context: dict[str, Any]) -> OrchestrationResult:
         """Execute orchestration pipeline.
@@ -145,45 +143,6 @@ class Orchestrator:
         Returns:
             Orchestration result
         """
-        # Check for existing checkpoint before starting (if checkpoints enabled)
-        if self.checkpoint_manager and self.checkpoint_manager.job_config.checkpoint:
-            from blinkb0t.core.utils.checkpoint import CheckpointType
-
-            checkpoint = self.checkpoint_manager.read_checkpoint(CheckpointType.FINAL)
-            if checkpoint:
-                logger.debug("Found FINAL checkpoint, restoring previous orchestration result")
-
-                # Restore plan from checkpoint
-                plan_data = checkpoint.get("plan")
-                if plan_data:
-                    try:
-                        restored_plan = ChoreographyPlan.model_validate(plan_data)
-                        logger.debug(
-                            f"Restored plan with {len(restored_plan.sections)} sections from checkpoint"
-                        )
-
-                        # Return restored result
-                        return OrchestrationResult(
-                            success=checkpoint.get("status") == "SUCCESS",
-                            plan=restored_plan,
-                            iterations=checkpoint.get("iterations", 0),
-                            total_tokens=checkpoint.get("total_tokens", 0),
-                            duration_seconds=checkpoint.get("duration_seconds", 0.0),
-                            final_state=OrchestrationState.SUCCEEDED,
-                            error_message=checkpoint.get("reason"),
-                        )
-                    except Exception as e:
-                        logger.warning(
-                            f"Failed to restore checkpoint: {e}, rerunning orchestration"
-                        )
-            else:
-                logger.debug("No FINAL checkpoint found, running orchestration from scratch")
-
-        # Start new run and generate unique run ID
-        if self.checkpoint_manager:
-            run_id = self.checkpoint_manager.start_run()
-            logger.info(f"Starting new orchestration run: {run_id}")
-
         # Initialize state machine
         self.state_machine.transition(OrchestrationState.PLANNING)
 
@@ -264,19 +223,6 @@ class Orchestrator:
             plan = planner_result.data
             assert isinstance(plan, ChoreographyPlan), "Planner must return ChoreographyPlan"
 
-            # Save raw plan checkpoint (both current and iteration-specific)
-            if self.checkpoint_manager and self.checkpoint_manager.job_config.checkpoint:
-                from blinkb0t.core.utils.checkpoint import CheckpointType
-
-                # Save current raw plan (gets overwritten each iteration)
-                self.checkpoint_manager.write_checkpoint(CheckpointType.RAW, plan.model_dump())
-
-                # Save iteration-specific raw plan (preserved)
-                self.checkpoint_manager.write_iteration_checkpoint(
-                    CheckpointType.RAW, {"plan": plan.model_dump()}, iterations
-                )
-                logger.debug(f"Saved RAW checkpoints for iteration {iterations}")
-
             # 2. Heuristic validation
             logger.debug("Running heuristic validator")
             heuristic_result = heuristic_validator.validate(plan)
@@ -343,46 +289,9 @@ class Orchestrator:
                 best_score = judge_response.score
                 best_plan = plan
 
-            # Save evaluation checkpoint (both current and iteration-specific)
-            if self.checkpoint_manager and self.checkpoint_manager.job_config.checkpoint:
-                from blinkb0t.core.utils.checkpoint import CheckpointType
-
-                # Save current evaluation (gets overwritten each iteration)
-                self.checkpoint_manager.write_checkpoint(
-                    CheckpointType.EVALUATION, judge_response.model_dump()
-                )
-
-                # Save iteration-specific evaluation (preserved)
-                self.checkpoint_manager.write_iteration_checkpoint(
-                    CheckpointType.EVALUATION,
-                    {
-                        "evaluation": judge_response.model_dump(),
-                        "plan_sections": len(plan.sections),
-                        "score": judge_response.score,
-                        "decision": judge_response.decision.value,
-                    },
-                    iterations,
-                )
-                logger.debug(f"Saved EVALUATION checkpoints for iteration {iterations}")
-
             # Handle judge decision
             if judge_response.decision == JudgeDecision.APPROVE:
                 logger.debug(f"Judge approved plan with score {judge_response.score}")
-
-                # Save final approved plan checkpoint
-                if self.checkpoint_manager and self.checkpoint_manager.job_config.checkpoint:
-                    self.checkpoint_manager.write_checkpoint(
-                        CheckpointType.FINAL,
-                        {
-                            "status": "SUCCESS",
-                            "plan": plan.model_dump(),
-                            "evaluation": judge_response.model_dump(),
-                            "iterations": iterations,
-                            "total_tokens": total_tokens,
-                            "duration_seconds": total_duration,
-                        },
-                    )
-                    logger.debug("Saved FINAL checkpoint")
 
                 self.state_machine.transition(
                     OrchestrationState.SUCCEEDED,
@@ -426,24 +335,6 @@ class Orchestrator:
 
         # Max iterations reached without approval
         logger.warning(f"Max iterations ({self.config.max_iterations}) reached without approval")
-
-        # Save best attempt as final checkpoint
-        if self.checkpoint_manager and self.checkpoint_manager.job_config.checkpoint and best_plan:
-            from blinkb0t.core.utils.checkpoint import CheckpointType
-
-            self.checkpoint_manager.write_checkpoint(
-                CheckpointType.FINAL,
-                {
-                    "status": "INCOMPLETE",
-                    "plan": best_plan.model_dump(),
-                    "iterations": iterations,
-                    "total_tokens": total_tokens,
-                    "duration_seconds": total_duration,
-                    "best_score": best_score,
-                    "reason": "Max iterations reached without approval",
-                },
-            )
-            logger.debug("Saved FINAL checkpoint (best attempt)")
 
         final_state = self.state_machine.current_state
         if final_state != OrchestrationState.BUDGET_EXHAUSTED:

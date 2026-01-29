@@ -37,9 +37,10 @@ def test_openai_provider_type():
 
 def test_openai_provider_init(mock_openai_client):
     """Test provider initialization."""
-    with patch(
-        "blinkb0t.core.api.llm.openai.client.OpenAIClient", return_value=mock_openai_client
-    ) and patch("blinkb0t.core.agents.providers.openai.AsyncOpenAI"):
+    with (
+        patch("blinkb0t.core.api.llm.openai.client.OpenAIClient", return_value=mock_openai_client),
+        patch("blinkb0t.core.agents.providers.openai.AsyncOpenAI"),
+    ):
         provider = OpenAIProvider(api_key="test-key", timeout=60.0)
 
         assert provider._sync_client == mock_openai_client
@@ -219,9 +220,10 @@ def test_get_conversation_history_nonexistent(mock_openai_client):
 
 def test_get_token_usage(mock_openai_client):
     """Test getting token usage after making calls."""
-    with patch(
-        "blinkb0t.core.api.llm.openai.client.OpenAIClient", return_value=mock_openai_client
-    ) and patch("blinkb0t.core.agents.providers.openai.AsyncOpenAI"):
+    with (
+        patch("blinkb0t.core.api.llm.openai.client.OpenAIClient", return_value=mock_openai_client),
+        patch("blinkb0t.core.agents.providers.openai.AsyncOpenAI"),
+    ):
         provider = OpenAIProvider(api_key="test-key")
 
         # Token usage starts at 0 before any calls
