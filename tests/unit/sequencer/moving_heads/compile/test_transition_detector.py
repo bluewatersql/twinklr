@@ -2,17 +2,17 @@
 
 import pytest
 
-from blinkb0t.core.agents.sequencer.moving_heads.models import ChoreographyPlan, PlanSection
-from blinkb0t.core.curves.registry import CurveRegistry
-from blinkb0t.core.sequencer.models.compiler import ScheduledInstance
-from blinkb0t.core.sequencer.models.context import TemplateCompileContext
-from blinkb0t.core.sequencer.models.enum import (
+from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan, PlanSection
+from twinklr.core.curves.registry import CurveRegistry
+from twinklr.core.sequencer.models.compiler import ScheduledInstance
+from twinklr.core.sequencer.models.context import TemplateCompileContext
+from twinklr.core.sequencer.models.enum import (
     QuantizeMode,
     SemanticGroupType,
     TemplateCategory,
     TimingMode,
 )
-from blinkb0t.core.sequencer.models.template import (
+from twinklr.core.sequencer.models.template import (
     BaseTiming,
     Dimmer,
     Geometry,
@@ -24,20 +24,20 @@ from blinkb0t.core.sequencer.models.template import (
     Template,
     TemplateStep,
 )
-from blinkb0t.core.sequencer.models.transition import BoundaryType
-from blinkb0t.core.sequencer.moving_heads.compile.scheduler import ScheduleResult
-from blinkb0t.core.sequencer.moving_heads.compile.transition_detector import (
+from twinklr.core.sequencer.models.transition import BoundaryType
+from twinklr.core.sequencer.moving_heads.compile.scheduler import ScheduleResult
+from twinklr.core.sequencer.moving_heads.compile.transition_detector import (
     TransitionDetector,
 )
-from blinkb0t.core.sequencer.moving_heads.handlers.registry import (
+from twinklr.core.sequencer.moving_heads.handlers.registry import (
     DimmerRegistry,
     GeometryRegistry,
     MovementRegistry,
 )
-from blinkb0t.core.sequencer.moving_heads.libraries.dimmer import DimmerType
-from blinkb0t.core.sequencer.moving_heads.libraries.geometry import GeometryType
-from blinkb0t.core.sequencer.moving_heads.libraries.movement import MovementType
-from blinkb0t.core.sequencer.timing.beat_grid import BeatGrid
+from twinklr.core.sequencer.moving_heads.libraries.dimmer import DimmerType
+from twinklr.core.sequencer.moving_heads.libraries.geometry import GeometryType
+from twinklr.core.sequencer.moving_heads.libraries.movement import MovementType
+from twinklr.core.sequencer.timing.beat_grid import BeatGrid
 
 
 @pytest.fixture

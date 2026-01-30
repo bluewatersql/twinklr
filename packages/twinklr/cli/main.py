@@ -1,4 +1,4 @@
-"""Command-line interface for BlinkB0t.
+"""Command-line interface for Twinklr.
 
 Note:
     This CLI uses synchronous wrappers around the async core.
@@ -13,15 +13,15 @@ from pathlib import Path
 
 from rich.console import Console
 
-from blinkb0t.core.config import configure_logging
-from blinkb0t.core.sequencer.moving_heads.manager import MovingHeadManager
-from blinkb0t.core.session import BlinkB0tSession
+from twinklr.core.config import configure_logging
+from twinklr.core.sequencer.moving_heads.manager import MovingHeadManager
+from twinklr.core.session import TwinklrSession
 
 console = Console()
 
 
 def run_pipeline(args: argparse.Namespace) -> None:
-    """Run the full BlinkB0t pipeline.
+    """Run the full Twinklr pipeline.
 
     Note:
         This function uses synchronous wrappers. The underlying pipeline
@@ -32,8 +32,8 @@ def run_pipeline(args: argparse.Namespace) -> None:
     sequence_path = Path(args.xsq).resolve()
 
     # Create session from configs
-    console.print("[bold]Initializing BlinkB0t session...[/bold]")
-    session = BlinkB0tSession(
+    console.print("[bold]Initializing Twinklr session...[/bold]")
+    session = TwinklrSession(
         app_config=Path(args.app_config),
         job_config=Path(args.config),
     )
@@ -41,7 +41,7 @@ def run_pipeline(args: argparse.Namespace) -> None:
     # Set project name if not configured
     if not session.job_config.project_name:
         session.job_config.project_name = (
-            (sequence_path.stem or audio_path.stem or "BlinkB0tAI_Sequence")
+            (sequence_path.stem or audio_path.stem or "TwinklrAI_Sequence")
             .lower()
             .replace(" ", "_")
         )
@@ -56,13 +56,13 @@ def run_pipeline(args: argparse.Namespace) -> None:
     session.artifact_dir = artifact_dir
 
     # Determine output path
-    xsq_out = artifact_dir / f"{session.job_config.project_name}_blinkb0t_mh.xsq"
+    xsq_out = artifact_dir / f"{session.job_config.project_name}_twinklr_mh.xsq"
 
     # Create domain manager and run pipeline
     console.print("[bold]Creating moving head manager...[/bold]")
     mh = MovingHeadManager(session)
 
-    console.print("\n[bold cyan]Running BlinkB0t Pipeline[/bold cyan]")
+    console.print("\n[bold cyan]Running Twinklr Pipeline[/bold cyan]")
     mh.run_pipeline(
         audio_path=str(audio_path),
         xsq_in=str(sequence_path),
@@ -75,7 +75,7 @@ def run_pipeline(args: argparse.Namespace) -> None:
 def build_arg_parser() -> argparse.ArgumentParser:
     """Build argument parser for CLI."""
     p = argparse.ArgumentParser(
-        prog="blinkb0t", description="BlinkB0t - AI-powered lighting sequencer for xLights"
+        prog="twinklr", description="Twinklr - AI-powered lighting sequencer for xLights"
     )
     sub = p.add_subparsers(dest="cmd", required=True)
 

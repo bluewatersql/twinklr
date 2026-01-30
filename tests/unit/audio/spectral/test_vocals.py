@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from blinkb0t.core.audio.spectral.vocals import detect_vocals
+from twinklr.core.audio.spectral.vocals import detect_vocals
 
 
 class TestDetectVocals:

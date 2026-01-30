@@ -9,7 +9,7 @@ from unittest.mock import MagicMock, patch
 import numpy as np
 import pytest
 
-from blinkb0t.core.audio.analyzer import AudioAnalyzer
+from twinklr.core.audio.analyzer import AudioAnalyzer
 
 
 class TestAudioAnalyzer:
@@ -54,14 +54,14 @@ class TestAudioAnalyzer:
         result = analyzer.analyze("/fake/path.mp3")
 
         # analyze() now returns SongBundle
-        from blinkb0t.core.audio.models import SongBundle
+        from twinklr.core.audio.models import SongBundle
 
         assert isinstance(result, SongBundle)
         assert result.features["tempo_bpm"] == 120.0
         mock_checkpoint.read_checkpoint.assert_called_once()
 
     @pytest.mark.skip(reason="Rewriting for async cache in Day 3")
-    @patch("blinkb0t.core.audio.cache_adapter.load_audio_features_async")
+    @patch("twinklr.core.audio.cache_adapter.load_audio_features_async")
     def test_cache_miss_and_save(
         self,
         mock_load_cache: MagicMock,
@@ -80,14 +80,14 @@ class TestAudioAnalyzer:
         result = analyzer.analyze("/fake/path.mp3")
 
         # analyze() now returns SongBundle
-        from blinkb0t.core.audio.models import SongBundle
+        from twinklr.core.audio.models import SongBundle
 
         assert isinstance(result, SongBundle)
         assert result.features["tempo_bpm"] == 100.0
         mock_load_cache.assert_called_once()
 
     @pytest.mark.skip(reason="Phase 8: Migrating to async cache, will update in Day 3")
-    @patch("blinkb0t.core.audio.cache_adapter.load_audio_features_async")
+    @patch("twinklr.core.audio.cache_adapter.load_audio_features_async")
     def test_force_reprocess_skips_cache(
         self,
         mock_load_cache: MagicMock,
@@ -127,18 +127,18 @@ class TestAudioAnalyzer:
 
         try:
             # Mock checkpoint to return None
-            with patch("blinkb0t.core.audio.analyzer.CheckpointManager") as mock_cp:
+            with patch("twinklr.core.audio.analyzer.CheckpointManager") as mock_cp:
                 mock_cp.return_value.read_checkpoint.return_value = None
 
                 with (
-                    patch("blinkb0t.core.audio.analyzer.load_cached_features", return_value=None),
-                    patch("blinkb0t.core.audio.analyzer.save_cached_features"),
+                    patch("twinklr.core.audio.analyzer.load_cached_features", return_value=None),
+                    patch("twinklr.core.audio.analyzer.save_cached_features"),
                 ):
                     analyzer = AudioAnalyzer(app_config, job_config)
                     result = analyzer.analyze(audio_path)
 
                     # analyze() now returns SongBundle
-                    from blinkb0t.core.audio.models import SongBundle
+                    from twinklr.core.audio.models import SongBundle
 
                     assert isinstance(result, SongBundle)
                     assert result.features["schema_version"] == "2.3"
@@ -213,18 +213,18 @@ class TestAudioAnalyzerIntegration:
         with tempfile.TemporaryDirectory() as tmpdir:
             mock_app_config.cache_dir = tmpdir
 
-            with patch("blinkb0t.core.audio.analyzer.CheckpointManager") as mock_cp:
+            with patch("twinklr.core.audio.analyzer.CheckpointManager") as mock_cp:
                 mock_cp.return_value.read_checkpoint.return_value = None
 
                 with (
-                    patch("blinkb0t.core.audio.analyzer.load_cached_features", return_value=None),
-                    patch("blinkb0t.core.audio.analyzer.save_cached_features"),
+                    patch("twinklr.core.audio.analyzer.load_cached_features", return_value=None),
+                    patch("twinklr.core.audio.analyzer.save_cached_features"),
                 ):
                     analyzer = AudioAnalyzer(mock_app_config, mock_job_config)
                     result = analyzer.analyze(test_audio_file)
 
                     # analyze() now returns SongBundle
-                    from blinkb0t.core.audio.models import SongBundle
+                    from twinklr.core.audio.models import SongBundle
 
                     assert isinstance(result, SongBundle)
                     # Verify structure

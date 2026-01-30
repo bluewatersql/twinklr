@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from blinkb0t.core.curves.composition import apply_envelope, multiply_curves
-from blinkb0t.core.curves.models import CurvePoint
+from twinklr.core.curves.composition import apply_envelope, multiply_curves
+from twinklr.core.curves.models import CurvePoint
 
 
 class TestMultiplyCurves:

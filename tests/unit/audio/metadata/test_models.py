@@ -6,8 +6,8 @@ Following TDD for Phase 2 - Embedded Metadata.
 from pydantic import ValidationError
 import pytest
 
-from blinkb0t.core.audio.models.enums import StageStatus
-from blinkb0t.core.audio.models.metadata import EmbeddedMetadata, MetadataBundle
+from twinklr.core.audio.models.enums import StageStatus
+from twinklr.core.audio.models.metadata import EmbeddedMetadata, MetadataBundle
 
 
 class TestEmbeddedMetadata:

@@ -37,7 +37,7 @@ Example:
     'BMP'
 """
 
-from blinkb0t.core.audio.models.phonemes import VisemeEvent
+from twinklr.core.audio.models.phonemes import VisemeEvent
 
 # ARPAbet phoneme to viseme mapping
 # Based on standard lip-sync viseme codes

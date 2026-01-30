@@ -1,15 +1,15 @@
 """Movement curve wrappers for offset-centered, loop-ready output."""
 
-from blinkb0t.core.curves.defaults import DEFAULT_CURVE_INTENSITY_PARAMS
-from blinkb0t.core.curves.functions.basic import (
+from twinklr.core.curves.defaults import DEFAULT_CURVE_INTENSITY_PARAMS
+from twinklr.core.curves.functions.basic import (
     generate_hold,
     generate_linear,
     generate_pulse,
     generate_sine,
     generate_triangle,
 )
-from blinkb0t.core.curves.models import CurvePoint
-from blinkb0t.core.curves.semantics import center_curve, ensure_loop_ready
+from twinklr.core.curves.models import CurvePoint
+from twinklr.core.curves.semantics import center_curve, ensure_loop_ready
 
 
 def _movement_post_process(

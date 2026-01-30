@@ -10,12 +10,12 @@ Tests cover:
 from pydantic import ValidationError
 import pytest
 
-from blinkb0t.core.audio.lyrics.whisperx_models import (
+from twinklr.core.audio.lyrics.whisperx_models import (
     WhisperXAlignResult,
     WhisperXConfig,
     WhisperXTranscribeResult,
 )
-from blinkb0t.core.audio.models.lyrics import LyricWord
+from twinklr.core.audio.models.lyrics import LyricWord
 
 
 class TestWhisperXConfig:

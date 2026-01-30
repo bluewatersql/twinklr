@@ -11,7 +11,7 @@ import logging
 from dataclasses import dataclass
 from typing import Any, NamedTuple
 
-from blinkb0t.core.agents.sequencer.moving_heads.models import ChoreographyPlan, PlanSection
+from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan, PlanSection
 
 logger = logging.getLogger(__name__)
 

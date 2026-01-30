@@ -18,7 +18,7 @@ try:
 except ImportError:
     HAS_SCIPY = False
 
-from blinkb0t.core.audio.energy.profiling import classify_song_energy_profile
+from twinklr.core.audio.energy.profiling import classify_song_energy_profile
 
 logger = logging.getLogger(__name__)
 

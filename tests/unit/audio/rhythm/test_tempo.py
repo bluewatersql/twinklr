@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from blinkb0t.core.audio.rhythm.tempo import detect_tempo_changes
+from twinklr.core.audio.rhythm.tempo import detect_tempo_changes
 
 
 class TestDetectTempoChanges:

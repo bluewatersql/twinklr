@@ -1,25 +1,25 @@
 """Moving heads choreography agent integration."""
 
-from blinkb0t.core.agents.sequencer.moving_heads.context_shaper import (
+from twinklr.core.agents.sequencer.moving_heads.context_shaper import (
     MovingHeadContextShaper,
 )
-from blinkb0t.core.agents.sequencer.moving_heads.heuristic_validator import (
+from twinklr.core.agents.sequencer.moving_heads.heuristic_validator import (
     HeuristicValidationResult,
     HeuristicValidator,
 )
-from blinkb0t.core.agents.sequencer.moving_heads.models import (
+from twinklr.core.agents.sequencer.moving_heads.models import (
     ChoreographyPlan,
     JudgeDecision,
     JudgeIssue,
     JudgeResponse,
     PlanSection,
 )
-from blinkb0t.core.agents.sequencer.moving_heads.orchestrator import (
+from twinklr.core.agents.sequencer.moving_heads.orchestrator import (
     OrchestrationConfig,
     OrchestrationResult,
     Orchestrator,
 )
-from blinkb0t.core.agents.sequencer.moving_heads.specs import (
+from twinklr.core.agents.sequencer.moving_heads.specs import (
     get_judge_spec,
     get_planner_spec,
 )

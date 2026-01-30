@@ -1,7 +1,7 @@
-# blinkb0t/core/domains/sequencer/moving_heads/templates/__init__.py
+# twinklr/core/domains/sequencer/moving_heads/templates/__init__.py
 from __future__ import annotations
 
-from blinkb0t.core.sequencer.moving_heads.templates.library import (
+from twinklr.core.sequencer.moving_heads.templates.library import (
     REGISTRY,
     get_template,
     list_templates,
@@ -18,6 +18,6 @@ def load_builtin_templates() -> None:
         return
 
     # Importing registers builtins
-    from blinkb0t.core.sequencer.moving_heads.templates import builtins as _builtins  # noqa: F401
+    from twinklr.core.sequencer.moving_heads.templates import builtins as _builtins  # noqa: F401
 
     _loaded = True

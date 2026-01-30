@@ -34,7 +34,7 @@ class RunMetadata(BaseModel):
     run_id: str = Field(description="Unique run identifier from checkpoint")
     timestamp: str = Field(description="ISO 8601 timestamp")
     git_sha: str | None = Field(default=None, description="Git commit SHA")
-    engine_version: str = Field(description="BlinkB0t version")
+    engine_version: str = Field(description="Twinklr version")
     checkpoint_path: Path = Field(description="Source checkpoint path")
 
     model_config = ConfigDict(frozen=True)

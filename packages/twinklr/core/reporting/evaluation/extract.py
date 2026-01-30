@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from blinkb0t.core.sequencer.models.enum import ChannelName
+from twinklr.core.sequencer.models.enum import ChannelName
 
 logger = logging.getLogger(__name__)
 

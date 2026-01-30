@@ -8,13 +8,13 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from blinkb0t.core.audio.cache_adapter import (
+from twinklr.core.audio.cache_adapter import (
     compute_audio_file_hash,
     load_audio_features_async,
     save_audio_features_async,
 )
-from blinkb0t.core.audio.models import SongBundle, SongTiming
-from blinkb0t.core.caching import CacheKey, FSCache
+from twinklr.core.audio.models import SongBundle, SongTiming
+from twinklr.core.caching import CacheKey, FSCache
 
 
 class TestComputeAudioHash:
@@ -68,7 +68,7 @@ class TestLoadAudioFeatures:
     async def test_returns_none_on_cache_miss(self) -> None:
         """Returns None when cache has no entry."""
         with tempfile.TemporaryDirectory() as cache_dir:
-            from blinkb0t.core.io import RealFileSystem
+            from twinklr.core.io import RealFileSystem
 
             fs = RealFileSystem()
             cache = FSCache(fs, cache_dir)
@@ -76,7 +76,7 @@ class TestLoadAudioFeatures:
 
             # Mock hash computation (using AsyncMock for async function)
             with patch(
-                "blinkb0t.core.audio.cache_adapter.compute_audio_file_hash",
+                "twinklr.core.audio.cache_adapter.compute_audio_file_hash",
                 new=AsyncMock(return_value="abc123"),
             ):
                 result = await load_audio_features_async("/fake/audio.mp3", cache, SongBundle)
@@ -87,7 +87,7 @@ class TestLoadAudioFeatures:
     async def test_loads_cached_bundle(self) -> None:
         """Loads and validates cached SongBundle."""
         with tempfile.TemporaryDirectory() as cache_dir:
-            from blinkb0t.core.io import RealFileSystem
+            from twinklr.core.io import RealFileSystem
 
             fs = RealFileSystem()
             cache = FSCache(fs, cache_dir)
@@ -105,7 +105,7 @@ class TestLoadAudioFeatures:
             # Mock hash and save bundle
             audio_hash = "test_hash"
             with patch(
-                "blinkb0t.core.audio.cache_adapter.compute_audio_file_hash",
+                "twinklr.core.audio.cache_adapter.compute_audio_file_hash",
                 return_value=audio_hash,
             ):
                 key = CacheKey(
@@ -130,7 +130,7 @@ class TestSaveAudioFeatures:
     async def test_saves_bundle_to_cache(self) -> None:
         """Saves SongBundle to cache with correct key."""
         with tempfile.TemporaryDirectory() as cache_dir:
-            from blinkb0t.core.io import RealFileSystem
+            from twinklr.core.io import RealFileSystem
 
             fs = RealFileSystem()
             cache = FSCache(fs, cache_dir)
@@ -146,7 +146,7 @@ class TestSaveAudioFeatures:
 
             audio_hash = "save_test_hash"
             with patch(
-                "blinkb0t.core.audio.cache_adapter.compute_audio_file_hash",
+                "twinklr.core.audio.cache_adapter.compute_audio_file_hash",
                 new=AsyncMock(return_value=audio_hash),
             ):
                 await save_audio_features_async("/test.mp3", cache, bundle)
@@ -161,7 +161,7 @@ class TestSaveAudioFeatures:
     async def test_compute_ms_optional(self) -> None:
         """compute_ms parameter is optional."""
         with tempfile.TemporaryDirectory() as cache_dir:
-            from blinkb0t.core.io import RealFileSystem
+            from twinklr.core.io import RealFileSystem
 
             fs = RealFileSystem()
             cache = FSCache(fs, cache_dir)
@@ -176,7 +176,7 @@ class TestSaveAudioFeatures:
             )
 
             with patch(
-                "blinkb0t.core.audio.cache_adapter.compute_audio_file_hash",
+                "twinklr.core.audio.cache_adapter.compute_audio_file_hash",
                 return_value="hash",
             ):
                 # Should not raise

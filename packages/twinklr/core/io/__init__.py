@@ -1,16 +1,16 @@
-"""Filesystem abstraction layer for BlinkB0t.
+"""Filesystem abstraction layer for Twinklr.
 
 Provides safe, testable, async-first filesystem operations with sync convenience wrappers.
 
 Example (async):
-    >>> from blinkb0t.core.io import RealFileSystem, absolute_path
+    >>> from twinklr.core.io import RealFileSystem, absolute_path
     >>> fs = RealFileSystem()
     >>> path = fs.join(absolute_path("/tmp"), "cache", "test.txt")
     >>> await fs.write_text(path, "Hello, world!")
     >>> content = await fs.read_text(path)
 
 Example (sync):
-    >>> from blinkb0t.core.io import RealFileSystemSync, absolute_path
+    >>> from twinklr.core.io import RealFileSystemSync, absolute_path
     >>> fs = RealFileSystemSync()
     >>> path = fs.join(absolute_path("/tmp"), "cache", "test.txt")
     >>> fs.write_text(path, "Hello, world!")

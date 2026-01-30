@@ -92,12 +92,12 @@ def categorize_file(file_path: str) -> str:
     # Normalize path separators
     path = file_path.replace("\\", "/")
 
-    # Check if it's a blinkb0t core package file
-    if "blinkb0t/core/" not in path:
+    # Check if it's a twinklr core package file
+    if "twinklr/core/" not in path:
         return "other"
 
-    # Extract the part after blinkb0t/core/
-    after_core = path.split("blinkb0t/core/")[1]
+    # Extract the part after twinklr/core/
+    after_core = path.split("twinklr/core/")[1]
     parts = after_core.split("/")
 
     if not parts:

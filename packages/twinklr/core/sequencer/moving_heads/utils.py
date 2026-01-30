@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Sequence
 
-from blinkb0t.core.sequencer.models.enum import SemanticGroupType, TemplateRole
+from twinklr.core.sequencer.models.enum import SemanticGroupType, TemplateRole
 
 # Canonical left→right ordering (covers your current TemplateRole set)
 _ROLE_ORDER: list[TemplateRole] = [

@@ -6,9 +6,9 @@ registry default_params, fixing mismatches that caused TypeErrors.
 
 from __future__ import annotations
 
-from blinkb0t.core.curves.functions.basic import generate_triangle
-from blinkb0t.core.curves.functions.movement import generate_movement_pulse
-from blinkb0t.core.curves.library import CurveLibrary, build_default_registry
+from twinklr.core.curves.functions.basic import generate_triangle
+from twinklr.core.curves.functions.movement import generate_movement_pulse
+from twinklr.core.curves.library import CurveLibrary, build_default_registry
 
 
 class TestTrianglePhaseParameter:

@@ -2,12 +2,12 @@
 
 import pytest
 
-from blinkb0t.core.config.fixtures import FixtureConfig, FixtureGroup, FixtureInstance
-from blinkb0t.core.config.models import JobConfig, TransitionConfig
-from blinkb0t.core.sequencer.models.enum import ChannelName, TransitionMode
-from blinkb0t.core.sequencer.moving_heads.channels.state import ChannelValue, FixtureSegment
-from blinkb0t.core.sequencer.moving_heads.export.xsq_adapter import XsqAdapter
-from blinkb0t.core.sequencer.timing.beat_grid import BeatGrid
+from twinklr.core.config.fixtures import FixtureConfig, FixtureGroup, FixtureInstance
+from twinklr.core.config.models import JobConfig, TransitionConfig
+from twinklr.core.sequencer.models.enum import ChannelName, TransitionMode
+from twinklr.core.sequencer.moving_heads.channels.state import ChannelValue, FixtureSegment
+from twinklr.core.sequencer.moving_heads.export.xsq_adapter import XsqAdapter
+from twinklr.core.sequencer.timing.beat_grid import BeatGrid
 
 
 @pytest.fixture
@@ -19,7 +19,7 @@ def beat_grid():
 @pytest.fixture
 def fixture_group():
     """Create a test fixture group."""
-    from blinkb0t.core.config.fixtures.dmx import DmxMapping
+    from twinklr.core.config.fixtures.dmx import DmxMapping
 
     dmx_map = DmxMapping(
         pan_channel=1,

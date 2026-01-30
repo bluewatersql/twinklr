@@ -6,7 +6,7 @@ Tests cover:
 - Phoneme classification (vowel vs consonant)
 """
 
-from blinkb0t.core.audio.phonemes.timing import (
+from twinklr.core.audio.phonemes.timing import (
     PhonemeType,
     classify_phoneme,
     distribute_phonemes_uniform,

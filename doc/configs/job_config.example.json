@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "description": "BlinkB0t Job Configuration - Task-specific settings for a single sequence generation job",
+  "description": "Twinklr Job Configuration - Task-specific settings for a single sequence generation job",
   
   "schema_version": "3.0",
   
@@ -80,7 +80,7 @@
         "log_level": "Detail level: 'minimal' (metrics only), 'standard' (prompts + responses), 'full' (+ context)",
         "format": "Output format: 'yaml' (human-readable) or 'json' (machine-readable)",
         "sanitize": "Sanitize sensitive data (API keys, emails, etc.) from logs",
-        "_env_overrides": "BLINKBOT_DISABLE_LLM_LOGGING=1, BLINKBOT_LLM_LOG_LEVEL=full, BLINKBOT_LLM_LOG_FORMAT=json"
+        "_env_overrides": "TWINKLR_DISABLE_LLM_LOGGING=1, TWINKLR_LLM_LOG_LEVEL=full, TWINKLR_LLM_LOG_FORMAT=json"
       }
     },
 
@@ -171,7 +171,7 @@
   "_usage": {
     "description": "How to use this configuration file",
     "location": "Save as 'job_config.json' in project root (or specify path with --job-config)",
-    "validation": "Validated by JobConfig Pydantic model (packages/blinkb0t/core/config/models.py)",
+    "validation": "Validated by JobConfig Pydantic model (packages/twinklr/core/config/models.py)",
     "schema_version": "Current schema version is 3.0 (adds pose_config, planner_features, channel_defaults)",
     "fixture_config": "Must reference a valid fixture configuration file (see fixture_config.example.json)",
     "forward_compatibility": "Unknown fields are ignored for forward compatibility"

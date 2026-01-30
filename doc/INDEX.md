@@ -1,4 +1,4 @@
-# BlinkB0t Documentation Index
+# Twinklr Documentation Index
 
 ## Getting Started
 
@@ -80,25 +80,25 @@ make type-check  # MyPy type checking
 
 ### Core Modules
 
-- **Audio Analysis**: `blinkb0t.core.audio.*`
+- **Audio Analysis**: `twinklr.core.audio.*`
   - Rhythm analysis (beats, tempo)
   - Energy profiling (multi-scale)
   - Structure detection (sections)
   - Harmonic analysis (chords, key)
 
-- **Sequencing**: `blinkb0t.core.sequencer.*`
+- **Sequencing**: `twinklr.core.sequencer.*`
   - Template system
   - Movement library
   - Geometry handlers
   - Dimmer patterns
 
-- **Agents**: `blinkb0t.core.agents.*`
+- **Agents**: `twinklr.core.agents.*`
   - Multi-agent orchestration
   - Plan generation
   - Quality evaluation
   - Iterative refinement
 
-- **Curves**: `blinkb0t.core.curves.*`
+- **Curves**: `twinklr.core.curves.*`
   - Curve generators
   - Parameter adapters
   - Categorical parameters
@@ -106,8 +106,8 @@ make type-check  # MyPy type checking
 ## Project Structure
 
 ```
-blinkb0t/
-├── packages/blinkb0t/core/          # Core engine
+twinklr/
+├── packages/twinklr/core/          # Core engine
 │   ├── agents/                      # Multi-agent system
 │   ├── audio/                       # Audio analysis
 │   ├── curves/                      # Curve generation
@@ -173,7 +173,7 @@ blinkb0t/
 - **Issues**: Report bugs and request features via GitHub Issues
 - **Discussions**: Ask questions and share templates in GitHub Discussions
 - **Documentation**: This directory (`doc/`)
-- **Examples**: See `tests/fixtures/` and `packages/blinkb0t/core/sequencer/moving_heads/templates/builtins/`
+- **Examples**: See `tests/fixtures/` and `packages/twinklr/core/sequencer/moving_heads/templates/builtins/`
 
 ## Quick Links
 
@@ -189,7 +189,7 @@ blinkb0t/
 1. Start: [Quick Reference Card](CATEGORICAL_PARAMS_QUICK_REFERENCE.md)
 2. Learn: [Template Authoring Guide](TEMPLATE_AUTHORING_CATEGORICAL_PARAMS.md)
 3. Reference: [Template Audit Report](../changes/vnext/optimization/TEMPLATE_AUDIT.md)
-4. Examples: [Built-in Templates](../packages/blinkb0t/core/sequencer/moving_heads/templates/builtins/)
+4. Examples: [Built-in Templates](../packages/twinklr/core/sequencer/moving_heads/templates/builtins/)
 
 ### For Developers
 

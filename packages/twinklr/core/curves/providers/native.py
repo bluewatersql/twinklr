@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from blinkb0t.core.curves.native import NativeCurveType, xLightsNativeCurve
-from blinkb0t.core.curves.registry import NativeCurveDefinition
+from twinklr.core.curves.native import NativeCurveType, xLightsNativeCurve
+from twinklr.core.curves.registry import NativeCurveDefinition
 
 
 class NativeCurveProvider:

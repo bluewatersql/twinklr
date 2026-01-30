@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from blinkb0t.core.agents.context import BaseContextShaper, ShapedContext
+from twinklr.core.agents.context import BaseContextShaper, ShapedContext
 
 logger = logging.getLogger(__name__)
 

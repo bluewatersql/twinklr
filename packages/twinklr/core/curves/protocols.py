@@ -9,7 +9,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
-    from blinkb0t.core.curves.models import CurvePoint
+    from twinklr.core.curves.models import CurvePoint
 
 
 @runtime_checkable

@@ -7,10 +7,10 @@ from __future__ import annotations
 
 import pytest
 
-from blinkb0t.core.curves.adapters import build_default_adapter_registry
-from blinkb0t.core.curves.library import CurveLibrary, build_default_registry
-from blinkb0t.core.sequencer.models.enum import Intensity
-from blinkb0t.core.sequencer.moving_heads.libraries.movement import (
+from twinklr.core.curves.adapters import build_default_adapter_registry
+from twinklr.core.curves.library import CurveLibrary, build_default_registry
+from twinklr.core.sequencer.models.enum import Intensity
+from twinklr.core.sequencer.moving_heads.libraries.movement import (
     DEFAULT_MOVEMENT_PARAMS,
     MovementCategoricalParams,
 )

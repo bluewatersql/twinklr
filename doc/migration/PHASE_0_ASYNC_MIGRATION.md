@@ -26,7 +26,7 @@ Phase 0 transforms the agent framework to be **async-first** while maintaining *
 For async contexts (FastAPI, asyncio applications), use `AsyncAgentRunner` directly:
 
 ```python
-from blinkb0t.core.agents import AsyncAgentRunner
+from twinklr.core.agents import AsyncAgentRunner
 
 # Async execution
 runner = AsyncAgentRunner(
@@ -43,7 +43,7 @@ result = await runner.run(spec=spec, variables=variables, state=state)
 All LLM interactions can now be logged for debugging and observability:
 
 ```python
-from blinkb0t.core.agents.logging import create_llm_logger
+from twinklr.core.agents.logging import create_llm_logger
 
 # Create logger with factory
 logger = create_llm_logger(
@@ -85,9 +85,9 @@ Override logging settings via environment:
 
 | Variable | Values | Description |
 |----------|--------|-------------|
-| `BLINKBOT_DISABLE_LLM_LOGGING` | `1`, `true` | Disable logging entirely |
-| `BLINKBOT_LLM_LOG_LEVEL` | `minimal`, `standard`, `full` | Override log detail level |
-| `BLINKBOT_LLM_LOG_FORMAT` | `yaml`, `json` | Override output format |
+| `TWINKLR_DISABLE_LLM_LOGGING` | `1`, `true` | Disable logging entirely |
+| `TWINKLR_LLM_LOG_LEVEL` | `minimal`, `standard`, `full` | Override log detail level |
+| `TWINKLR_LLM_LOG_FORMAT` | `yaml`, `json` | Override output format |
 
 ## Migration Steps
 
@@ -97,7 +97,7 @@ Existing synchronous code continues to work:
 
 ```python
 # This still works exactly as before
-from blinkb0t.core.agents import AgentRunner
+from twinklr.core.agents import AgentRunner
 
 runner = AgentRunner(provider=provider, prompt_base_path=path)
 result = runner.run(spec=spec, variables=variables)
@@ -107,7 +107,7 @@ result = runner.run(spec=spec, variables=variables)
 
 1. Create a logger:
 ```python
-from blinkb0t.core.agents.logging import create_llm_logger
+from twinklr.core.agents.logging import create_llm_logger
 
 logger = create_llm_logger(
     output_dir=Path("artifacts"),
@@ -132,7 +132,7 @@ For async applications:
 
 ```python
 import asyncio
-from blinkb0t.core.agents import AsyncAgentRunner
+from twinklr.core.agents import AsyncAgentRunner
 
 async def run_agents():
     runner = AsyncAgentRunner(provider=provider, prompt_base_path=path)
@@ -220,7 +220,7 @@ result = await runner.run(spec=spec, variables=variables)
 ### Logs not appearing
 
 1. Check `llm_logging.enabled` is `true` in config
-2. Check environment variable `BLINKBOT_DISABLE_LLM_LOGGING` is not set
+2. Check environment variable `TWINKLR_DISABLE_LLM_LOGGING` is not set
 3. Verify output directory is writable
 4. Call `logger.flush()` or `await logger.flush_async()` to force write
 

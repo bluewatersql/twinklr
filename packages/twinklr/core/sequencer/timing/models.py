@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from blinkb0t.core.sequencer.models.enum import QuantizeMode, TimingMode
+from twinklr.core.sequencer.models.enum import QuantizeMode, TimingMode
 
 
 class MusicalTiming(BaseModel):

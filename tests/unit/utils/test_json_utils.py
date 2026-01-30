@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from blinkb0t.core.utils.json import read_json, write_json
+from twinklr.core.utils.json import read_json, write_json
 
 
 @pytest.fixture

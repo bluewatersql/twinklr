@@ -3,7 +3,7 @@
 from pydantic import ValidationError
 import pytest
 
-from blinkb0t.core.agents.issues import (
+from twinklr.core.agents.issues import (
     Issue,
     IssueCategory,
     IssueEffort,
@@ -12,7 +12,7 @@ from blinkb0t.core.agents.issues import (
     IssueSeverity,
     SuggestedAction,
 )
-from blinkb0t.core.agents.sequencer.moving_heads.models import (
+from twinklr.core.agents.sequencer.moving_heads.models import (
     ChoreographyPlan,
     JudgeDecision,
     JudgeIssue,

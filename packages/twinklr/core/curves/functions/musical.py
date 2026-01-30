@@ -1,7 +1,7 @@
 import math
 
-from blinkb0t.core.curves.models import CurvePoint
-from blinkb0t.core.curves.sampling import sample_uniform_grid
+from twinklr.core.curves.models import CurvePoint
+from twinklr.core.curves.sampling import sample_uniform_grid
 
 
 def generate_musical_accent(

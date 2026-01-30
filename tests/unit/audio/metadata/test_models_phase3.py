@@ -6,8 +6,8 @@ Testing FingerprintInfo, ResolvedMBIDs, ResolvedMetadata, MetadataCandidate.
 from pydantic import ValidationError
 import pytest
 
-from blinkb0t.core.audio.models.enums import StageStatus
-from blinkb0t.core.audio.models.metadata import (
+from twinklr.core.audio.models.enums import StageStatus
+from twinklr.core.audio.models.metadata import (
     FingerprintInfo,
     MetadataCandidate,
     ResolvedMBIDs,
@@ -266,7 +266,7 @@ class TestMetadataBundlePhase3:
 
     def test_metadata_bundle_with_fingerprint(self):
         """MetadataBundle includes fingerprint."""
-        from blinkb0t.core.audio.models.metadata import EmbeddedMetadata, MetadataBundle
+        from twinklr.core.audio.models.metadata import EmbeddedMetadata, MetadataBundle
 
         bundle = MetadataBundle(
             schema_version="3.0.0",
@@ -285,7 +285,7 @@ class TestMetadataBundlePhase3:
 
     def test_metadata_bundle_with_resolved(self):
         """MetadataBundle includes resolved metadata."""
-        from blinkb0t.core.audio.models.metadata import EmbeddedMetadata, MetadataBundle
+        from twinklr.core.audio.models.metadata import EmbeddedMetadata, MetadataBundle
 
         resolved = ResolvedMetadata(
             confidence=0.92,
@@ -310,7 +310,7 @@ class TestMetadataBundlePhase3:
 
     def test_metadata_bundle_with_candidates(self):
         """MetadataBundle includes candidate list."""
-        from blinkb0t.core.audio.models.metadata import EmbeddedMetadata, MetadataBundle
+        from twinklr.core.audio.models.metadata import EmbeddedMetadata, MetadataBundle
 
         candidates = [
             MetadataCandidate(

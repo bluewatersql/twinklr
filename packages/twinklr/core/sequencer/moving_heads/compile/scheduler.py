@@ -7,8 +7,8 @@ and remainder policies.
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from blinkb0t.core.sequencer.models.compiler import ScheduledInstance
-from blinkb0t.core.sequencer.models.template import (
+from twinklr.core.sequencer.models.compiler import ScheduledInstance
+from twinklr.core.sequencer.models.template import (
     RemainderPolicy,
     RepeatContract,
     RepeatMode,

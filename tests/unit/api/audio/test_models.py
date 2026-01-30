@@ -6,7 +6,7 @@ Testing AcoustID and MusicBrainz request/response models.
 from pydantic import ValidationError
 import pytest
 
-from blinkb0t.core.api.audio.models import (
+from twinklr.core.api.audio.models import (
     AcoustIDRecording,
     AcoustIDResponse,
     MusicBrainzRecording,

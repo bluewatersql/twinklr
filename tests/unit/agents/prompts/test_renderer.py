@@ -2,7 +2,7 @@
 
 import pytest
 
-from blinkb0t.core.agents.prompts.renderer import PromptRenderer, RenderError
+from twinklr.core.agents.prompts.renderer import PromptRenderer, RenderError
 
 
 def test_render_simple_template():

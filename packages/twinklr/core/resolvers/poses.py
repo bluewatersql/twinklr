@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import logging
 
-from blinkb0t.core.config.poses import STANDARD_POSES, Pose, PoseConfig, PoseLibrary
+from twinklr.core.config.poses import STANDARD_POSES, Pose, PoseConfig, PoseLibrary
 
 logger = logging.getLogger(__name__)
 

@@ -7,11 +7,11 @@ from unittest.mock import patch
 
 import pytest
 
-from blinkb0t.core.audio.analyzer import AudioAnalyzer
-from blinkb0t.core.audio.models import MetadataBundle
-from blinkb0t.core.audio.models.enums import StageStatus
-from blinkb0t.core.audio.models.metadata import EmbeddedMetadata, ResolvedMetadata
-from blinkb0t.core.config.models import AppConfig, AudioEnhancementConfig, JobConfig
+from twinklr.core.audio.analyzer import AudioAnalyzer
+from twinklr.core.audio.models import MetadataBundle
+from twinklr.core.audio.models.enums import StageStatus
+from twinklr.core.audio.models.metadata import EmbeddedMetadata, ResolvedMetadata
+from twinklr.core.config.models import AppConfig, AudioEnhancementConfig, JobConfig
 
 
 class TestAudioAnalyzerMetadataIntegration:
@@ -54,7 +54,7 @@ class TestAudioAnalyzerMetadataIntegration:
         """Metadata extraction with only embedded tags."""
         from unittest.mock import AsyncMock
 
-        with patch("blinkb0t.core.audio.analyzer.MetadataPipeline") as MockPipeline:
+        with patch("twinklr.core.audio.analyzer.MetadataPipeline") as MockPipeline:
             mock_pipeline = AsyncMock()
             mock_pipeline.extract.return_value = MetadataBundle(
                 schema_version="3.0.0",
@@ -83,7 +83,7 @@ class TestAudioAnalyzerMetadataIntegration:
         app_config.audio_processing.enhancements.acoustid_api_key = "test-key"
         analyzer = AudioAnalyzer(app_config, job_config)
 
-        with patch("blinkb0t.core.audio.analyzer.MetadataPipeline") as MockPipeline:
+        with patch("twinklr.core.audio.analyzer.MetadataPipeline") as MockPipeline:
             mock_pipeline = AsyncMock()
             mock_pipeline.extract.return_value = MetadataBundle(
                 schema_version="3.0.0",
@@ -118,7 +118,7 @@ class TestAudioAnalyzerMetadataIntegration:
         app_config.audio_processing.enhancements.acoustid_api_key = "test-key"
         analyzer = AudioAnalyzer(app_config, job_config)
 
-        with patch("blinkb0t.core.audio.analyzer.MetadataPipeline") as MockPipeline:
+        with patch("twinklr.core.audio.analyzer.MetadataPipeline") as MockPipeline:
             mock_pipeline = AsyncMock()
             mock_pipeline.extract.return_value = MetadataBundle(
                 schema_version="3.0.0",
@@ -148,7 +148,7 @@ class TestAudioAnalyzerMetadataIntegration:
         """Metadata extraction failures are handled gracefully."""
         from unittest.mock import AsyncMock
 
-        with patch("blinkb0t.core.audio.analyzer.MetadataPipeline") as MockPipeline:
+        with patch("twinklr.core.audio.analyzer.MetadataPipeline") as MockPipeline:
             mock_pipeline = AsyncMock()
             mock_pipeline.extract.side_effect = Exception("Pipeline error")
             MockPipeline.return_value = mock_pipeline
@@ -167,10 +167,10 @@ class TestAudioAnalyzerMetadataIntegration:
         analyzer = AudioAnalyzer(app_config, job_config)
 
         with (
-            patch("blinkb0t.core.audio.analyzer.AcoustIDClient") as MockAcoustID,
-            patch("blinkb0t.core.audio.analyzer.MusicBrainzClient") as MockMB,
-            patch("blinkb0t.core.audio.analyzer.AsyncApiClient") as MockApiClient,
-            patch("blinkb0t.core.audio.analyzer.MetadataPipeline") as MockPipeline,
+            patch("twinklr.core.audio.analyzer.AcoustIDClient") as MockAcoustID,
+            patch("twinklr.core.audio.analyzer.MusicBrainzClient") as MockMB,
+            patch("twinklr.core.audio.analyzer.AsyncApiClient") as MockApiClient,
+            patch("twinklr.core.audio.analyzer.MetadataPipeline") as MockPipeline,
         ):
             mock_pipeline = MockPipeline.return_value
             mock_pipeline.extract.return_value = MetadataBundle(
@@ -200,7 +200,7 @@ class TestAudioAnalyzerMetadataIntegration:
         app_config.audio_processing.enhancements.enable_musicbrainz = False
         analyzer = AudioAnalyzer(app_config, job_config)
 
-        with patch("blinkb0t.core.audio.analyzer.MetadataPipeline") as MockPipeline:
+        with patch("twinklr.core.audio.analyzer.MetadataPipeline") as MockPipeline:
             mock_pipeline = MockPipeline.return_value
             mock_pipeline.extract.return_value = MetadataBundle(
                 schema_version="3.0.0",

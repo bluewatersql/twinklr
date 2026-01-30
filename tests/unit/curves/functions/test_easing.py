@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from blinkb0t.core.curves.functions.easing import (
+from twinklr.core.curves.functions.easing import (
     generate_ease_in_cubic,
     generate_ease_in_out_cubic,
     generate_ease_in_out_quad,

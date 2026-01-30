@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from blinkb0t.core.audio.harmonic.chords import detect_chords
+from twinklr.core.audio.harmonic.chords import detect_chords
 
 
 class TestDetectChords:

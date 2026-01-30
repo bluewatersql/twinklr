@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from blinkb0t.core.curves.dmx_conversion import dimmer_curve_to_dmx
-from blinkb0t.core.curves.models import CurvePoint
+from twinklr.core.curves.dmx_conversion import dimmer_curve_to_dmx
+from twinklr.core.curves.models import CurvePoint
 
 
 class TestTiltVariation:

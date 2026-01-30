@@ -3,10 +3,10 @@
 from pydantic import ValidationError
 import pytest
 
-from blinkb0t.core.curves.library import CurveLibrary
-from blinkb0t.core.sequencer.models.enum import Intensity
-from blinkb0t.core.sequencer.models.template import Movement, MovementType
-from blinkb0t.core.sequencer.moving_heads.libraries.movement import (
+from twinklr.core.curves.library import CurveLibrary
+from twinklr.core.sequencer.models.enum import Intensity
+from twinklr.core.sequencer.models.template import Movement, MovementType
+from twinklr.core.sequencer.moving_heads.libraries.movement import (
     get_curve_categorical_params,
 )
 

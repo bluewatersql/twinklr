@@ -10,11 +10,11 @@ import logging
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from blinkb0t.core.config.fixtures.instances import FixtureInstance
-    from blinkb0t.core.sequencer.moving_heads.channels.state import ChannelValue, FixtureSegment
+    from twinklr.core.config.fixtures.instances import FixtureInstance
+    from twinklr.core.sequencer.moving_heads.channels.state import ChannelValue, FixtureSegment
 
-from blinkb0t.core.curves.models import CurvePoint
-from blinkb0t.core.sequencer.models.enum import ChannelName
+from twinklr.core.curves.models import CurvePoint
+from twinklr.core.sequencer.models.enum import ChannelName
 
 logger = logging.getLogger(__name__)
 
@@ -119,7 +119,7 @@ class DmxSettingsBuilder:
         # Get value curve if present
         if channel_value.value_points:
             # Convert curve to DMX and normalize for xLights export
-            from blinkb0t.core.curves.dmx_conversion import (
+            from twinklr.core.curves.dmx_conversion import (
                 dimmer_curve_to_dmx,
                 movement_curve_to_dmx,
             )

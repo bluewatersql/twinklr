@@ -2,7 +2,7 @@
 
 import re
 
-from blinkb0t.core.agents.providers.conversation import Conversation, generate_conversation_id
+from twinklr.core.agents.providers.conversation import Conversation, generate_conversation_id
 
 
 def test_generate_conversation_id_format():

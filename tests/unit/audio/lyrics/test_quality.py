@@ -5,8 +5,8 @@ Testing quality metrics computation from word-level timing.
 
 import pytest
 
-from blinkb0t.core.audio.lyrics.quality import compute_quality_metrics
-from blinkb0t.core.audio.models.lyrics import LyricWord
+from twinklr.core.audio.lyrics.quality import compute_quality_metrics
+from twinklr.core.audio.models.lyrics import LyricWord
 
 
 class TestComputeQualityMetrics:

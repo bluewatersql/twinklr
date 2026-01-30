@@ -5,10 +5,10 @@ from __future__ import annotations
 import httpx
 import pytest
 
-from blinkb0t.core.api.http.client import ApiClient
-from blinkb0t.core.api.http.config import HttpClientConfig
-from blinkb0t.core.api.http.errors import ClientError
-from blinkb0t.core.api.http.retry import RetryPolicy
+from twinklr.core.api.http.client import ApiClient
+from twinklr.core.api.http.config import HttpClientConfig
+from twinklr.core.api.http.errors import ClientError
+from twinklr.core.api.http.retry import RetryPolicy
 
 
 def test_sync_success_json() -> None:

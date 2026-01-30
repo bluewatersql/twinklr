@@ -6,8 +6,8 @@ Imports updated for new architecture: core.sequencer.timing
 
 import pytest
 
-from blinkb0t.core.sequencer.timing.beat_grid import BeatGrid
-from blinkb0t.core.sequencer.timing.resolver import TimeResolver
+from twinklr.core.sequencer.timing.beat_grid import BeatGrid
+from twinklr.core.sequencer.timing.resolver import TimeResolver
 
 # ============================================================================
 # BeatGrid Creation Tests

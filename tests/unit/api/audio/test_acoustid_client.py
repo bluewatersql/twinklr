@@ -7,8 +7,8 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from blinkb0t.core.api.audio.acoustid import AcoustIDClient, AcoustIDError
-from blinkb0t.core.api.audio.models import AcoustIDResponse
+from twinklr.core.api.audio.acoustid import AcoustIDClient, AcoustIDError
+from twinklr.core.api.audio.models import AcoustIDResponse
 
 
 class TestAcoustIDClient:
@@ -169,7 +169,7 @@ class TestAcoustIDClient:
 
     async def test_lookup_http_error(self, client, mock_http_client):
         """HTTP request fails."""
-        from blinkb0t.core.api.http.errors import ApiError
+        from twinklr.core.api.http.errors import ApiError
 
         mock_http_client.get.side_effect = ApiError(
             message="Network error",
@@ -197,7 +197,7 @@ class TestAcoustIDClient:
 
     async def test_lookup_timeout(self, client, mock_http_client):
         """Request times out."""
-        from blinkb0t.core.api.http.errors import TimeoutError as HTTPTimeoutError
+        from twinklr.core.api.http.errors import TimeoutError as HTTPTimeoutError
 
         mock_http_client.get.side_effect = HTTPTimeoutError(
             message="Request timed out",

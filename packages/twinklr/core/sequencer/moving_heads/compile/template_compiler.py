@@ -8,28 +8,28 @@ import logging
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from blinkb0t.core.curves.models import CurvePoint, PointsCurve
-from blinkb0t.core.sequencer.models.context import FixtureContext, TemplateCompileContext
-from blinkb0t.core.sequencer.models.enum import ChannelName, ChaseOrder
-from blinkb0t.core.sequencer.models.template import (
+from twinklr.core.curves.models import CurvePoint, PointsCurve
+from twinklr.core.sequencer.models.context import FixtureContext, TemplateCompileContext
+from twinklr.core.sequencer.models.enum import ChannelName, ChaseOrder
+from twinklr.core.sequencer.models.template import (
     RemainderPolicy,
     Template,
     TemplatePreset,
     TemplateStep,
 )
-from blinkb0t.core.sequencer.moving_heads.channels.state import ChannelValue, FixtureSegment
-from blinkb0t.core.sequencer.moving_heads.compile.phase_offset import (
+from twinklr.core.sequencer.moving_heads.channels.state import ChannelValue, FixtureSegment
+from twinklr.core.sequencer.moving_heads.compile.phase_offset import (
     PhaseOffsetResult,
     calculate_fixture_offsets,
 )
-from blinkb0t.core.sequencer.moving_heads.compile.preset import apply_preset
-from blinkb0t.core.sequencer.moving_heads.compile.scheduler import schedule_repeats
-from blinkb0t.core.sequencer.moving_heads.compile.step_compiler import (
+from twinklr.core.sequencer.moving_heads.compile.preset import apply_preset
+from twinklr.core.sequencer.moving_heads.compile.scheduler import schedule_repeats
+from twinklr.core.sequencer.moving_heads.compile.step_compiler import (
     StepCompileContext,
     compile_step,
 )
-from blinkb0t.core.sequencer.moving_heads.utils import resolve_semantic_group
-from blinkb0t.core.utils.logging import get_renderer_logger, log_performance
+from twinklr.core.sequencer.moving_heads.utils import resolve_semantic_group
+from twinklr.core.utils.logging import get_renderer_logger, log_performance
 
 logger = logging.getLogger(__name__)
 renderer_log = get_renderer_logger()

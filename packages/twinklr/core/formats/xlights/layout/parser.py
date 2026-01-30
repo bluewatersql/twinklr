@@ -1,15 +1,15 @@
 from pathlib import Path
 from typing import Any
 
-from blinkb0t.core.formats.xlights.layout.models.rgb_effects import (
+from twinklr.core.formats.xlights.layout.models.rgb_effects import (
     Layout,
     ModelGroups,
     Models,
     Settings,
     Viewpoints,
 )
-from blinkb0t.core.utils.logging import get_logger
-from blinkb0t.core.utils.xml import XMLParser
+from twinklr.core.utils.logging import get_logger
+from twinklr.core.utils.xml import XMLParser
 
 logger = get_logger(__name__)
 

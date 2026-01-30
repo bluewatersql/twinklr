@@ -3,10 +3,10 @@ from __future__ import annotations
 import math
 from enum import Enum
 
-from blinkb0t.core.curves.library import CurveLibrary
-from blinkb0t.core.sequencer.models.enum import Intensity
-from blinkb0t.core.sequencer.moving_heads.libraries.geometry import GeometryType
 from pydantic import BaseModel, ConfigDict, Field
+from twinklr.core.curves.library import CurveLibrary
+from twinklr.core.sequencer.models.enum import Intensity
+from twinklr.core.sequencer.moving_heads.libraries.geometry import GeometryType
 
 
 class MovementCategoricalParams(BaseModel):

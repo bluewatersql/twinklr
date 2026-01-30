@@ -6,11 +6,11 @@ Following TDD for Phase 1 - Scaffolding and Backward Compatibility.
 from pydantic import ValidationError
 import pytest
 
-from blinkb0t.core.audio.models import (
+from twinklr.core.audio.models import (
     SongBundle,
     SongTiming,
 )
-from blinkb0t.core.audio.models.enums import StageStatus
+from twinklr.core.audio.models.enums import StageStatus
 
 
 class TestSongTiming:

@@ -6,8 +6,8 @@ Testing LyricsBundle, LyricWord, LyricPhrase, and related models.
 from pydantic import ValidationError
 import pytest
 
-from blinkb0t.core.audio.models.enums import StageStatus
-from blinkb0t.core.audio.models.lyrics import (
+from twinklr.core.audio.models.enums import StageStatus
+from twinklr.core.audio.models.lyrics import (
     LyricPhrase,
     LyricsBundle,
     LyricsQuality,

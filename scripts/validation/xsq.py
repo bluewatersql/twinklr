@@ -938,7 +938,7 @@ def main() -> None:
         sequence_name = args.sequence_name
     else:
         sequence_name = args.sequence_name
-        xsq_path = repo_root / f"artifacts/{sequence_name}/{sequence_name}_blinkb0t_mh.xsq"
+        xsq_path = repo_root / f"artifacts/{sequence_name}/{sequence_name}_twinklr_mh.xsq"
 
     if args.plan_path:
         impl_plan_path = args.plan_path

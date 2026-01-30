@@ -2,7 +2,7 @@
 
 import pytest
 
-from blinkb0t.core.agents.state_machine import (
+from twinklr.core.agents.state_machine import (
     InvalidTransitionError,
     OrchestrationState,
     OrchestrationStateMachine,

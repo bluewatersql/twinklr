@@ -2,16 +2,16 @@
 
 # Phase 1: Foundation (Complete)
 # Phase 2: Agent Runner (Complete)
-from blinkb0t.core.agents.async_runner import AsyncAgentRunner
-from blinkb0t.core.agents.context import (
+from twinklr.core.agents.async_runner import AsyncAgentRunner
+from twinklr.core.agents.context import (
     BaseContextShaper,
     ContextShaper,
     IdentityContextShaper,
     ShapedContext,
     TokenEstimator,
 )
-from blinkb0t.core.agents.feedback import FeedbackEntry, FeedbackManager, FeedbackType
-from blinkb0t.core.agents.issues import (
+from twinklr.core.agents.feedback import FeedbackEntry, FeedbackManager, FeedbackType
+from twinklr.core.agents.issues import (
     Issue,
     IssueCategory,
     IssueEffort,
@@ -22,7 +22,7 @@ from blinkb0t.core.agents.issues import (
 )
 
 # Phase 0: Async Infrastructure + LLM Logging
-from blinkb0t.core.agents.logging import (
+from twinklr.core.agents.logging import (
     AsyncFileLogger,
     CallSummary,
     LLMCallLog,
@@ -30,8 +30,8 @@ from blinkb0t.core.agents.logging import (
     NullLLMCallLogger,
     create_llm_logger,
 )
-from blinkb0t.core.agents.prompts import PromptPackLoader, PromptRenderer
-from blinkb0t.core.agents.providers import (
+from twinklr.core.agents.prompts import PromptPackLoader, PromptRenderer
+from twinklr.core.agents.providers import (
     LLMProvider,
     LLMProviderError,
     LLMResponse,
@@ -40,11 +40,11 @@ from blinkb0t.core.agents.providers import (
     ResponseMetadata,
     TokenUsage,
 )
-from blinkb0t.core.agents.result import AgentResult
-from blinkb0t.core.agents.runner import AgentRunner, RunError
-from blinkb0t.core.agents.spec import AgentMode, AgentSpec
-from blinkb0t.core.agents.state import AgentState
-from blinkb0t.core.agents.state_machine import (
+from twinklr.core.agents.result import AgentResult
+from twinklr.core.agents.runner import AgentRunner, RunError
+from twinklr.core.agents.spec import AgentMode, AgentSpec
+from twinklr.core.agents.state import AgentState
+from twinklr.core.agents.state_machine import (
     InvalidTransitionError,
     OrchestrationState,
     OrchestrationStateMachine,

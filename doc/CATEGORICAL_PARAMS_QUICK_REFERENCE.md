@@ -3,7 +3,7 @@
 ## Intensity Levels (Choose One)
 
 ```python
-from blinkb0t.core.sequencer.models.enum import Intensity
+from twinklr.core.sequencer.models.enum import Intensity
 
 Intensity.SLOW       # 0.5x energy - Intro, ambient, chill
 Intensity.SMOOTH     # 1.0x energy - Verse, baseline (DEFAULT)
@@ -81,10 +81,10 @@ SMOOTH → FAST → DRAMATIC → SMOOTH
 ### Get Parameters Programmatically
 
 ```python
-from blinkb0t.core.sequencer.moving_heads.libraries.movement import (
+from twinklr.core.sequencer.moving_heads.libraries.movement import (
     get_curve_categorical_params,
 )
-from blinkb0t.core.curves.library import CurveLibrary
+from twinklr.core.curves.library import CurveLibrary
 
 params = get_curve_categorical_params(
     CurveLibrary.MOVEMENT_SINE,

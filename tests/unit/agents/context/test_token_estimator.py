@@ -1,6 +1,6 @@
 """Tests for token estimator."""
 
-from blinkb0t.core.agents.context.token_estimator import TokenEstimator
+from twinklr.core.agents.context.token_estimator import TokenEstimator
 
 
 def test_estimate_empty_dict():

@@ -3,8 +3,8 @@
 import hashlib
 from typing import Any
 
-from blinkb0t.core.config.poses import STANDARD_POSES, PoseLibrary
-from blinkb0t.core.sequencer.moving_heads.handlers.protocols import GeometryResult
+from twinklr.core.config.poses import STANDARD_POSES, PoseLibrary
+from twinklr.core.sequencer.moving_heads.handlers.protocols import GeometryResult
 
 
 class ScatteredChaosHandler:

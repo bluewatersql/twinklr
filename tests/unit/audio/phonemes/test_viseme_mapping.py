@@ -7,8 +7,8 @@ Tests cover:
 - apply_min_hold() function
 """
 
-from blinkb0t.core.audio.models.phonemes import VisemeEvent
-from blinkb0t.core.audio.phonemes.viseme_mapping import (
+from twinklr.core.audio.models.phonemes import VisemeEvent
+from twinklr.core.audio.phonemes.viseme_mapping import (
     PHONEME_TO_VISEME,
     apply_min_hold,
     merge_adjacent_visemes,

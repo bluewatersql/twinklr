@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import pytest
 
-from blinkb0t.core.curves.generator import CurveGenerator
-from blinkb0t.core.curves.library import CurveLibrary
-from blinkb0t.core.curves.native import NativeCurveType, xLightsNativeCurve
+from twinklr.core.curves.generator import CurveGenerator
+from twinklr.core.curves.library import CurveLibrary
+from twinklr.core.curves.native import NativeCurveType, xLightsNativeCurve
 
 
 class TestCurveGenerator:

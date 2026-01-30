@@ -7,8 +7,8 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from blinkb0t.core.audio.lyrics.providers.lrclib import LRCLibClient
-from blinkb0t.core.audio.lyrics.providers.models import LyricsQuery
+from twinklr.core.audio.lyrics.providers.lrclib import LRCLibClient
+from twinklr.core.audio.lyrics.providers.models import LyricsQuery
 
 
 class TestLRCLibClient:

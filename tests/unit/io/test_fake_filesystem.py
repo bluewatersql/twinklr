@@ -5,7 +5,7 @@ Tests the in-memory fake filesystem implementation.
 
 import pytest
 
-from blinkb0t.core.io import AbsolutePath, FakeFileSystem, absolute_path
+from twinklr.core.io import AbsolutePath, FakeFileSystem, absolute_path
 
 
 @pytest.fixture

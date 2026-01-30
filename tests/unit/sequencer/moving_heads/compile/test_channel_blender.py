@@ -2,16 +2,16 @@
 
 import pytest
 
-from blinkb0t.core.curves.generator import CurveGenerator
-from blinkb0t.core.sequencer.models.enum import ChannelName, TransitionMode
-from blinkb0t.core.sequencer.models.transition import (
+from twinklr.core.curves.generator import CurveGenerator
+from twinklr.core.sequencer.models.enum import ChannelName, TransitionMode
+from twinklr.core.sequencer.models.transition import (
     Boundary,
     BoundaryType,
     TransitionHint,
     TransitionPlan,
     TransitionStrategy,
 )
-from blinkb0t.core.sequencer.moving_heads.compile.channel_blender import ChannelBlender
+from twinklr.core.sequencer.moving_heads.compile.channel_blender import ChannelBlender
 
 
 @pytest.fixture

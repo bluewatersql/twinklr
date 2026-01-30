@@ -12,7 +12,7 @@ from unittest.mock import MagicMock, patch
 from openai import APIConnectionError, RateLimitError
 import pytest
 
-from blinkb0t.core.api.llm.openai.client import (
+from twinklr.core.api.llm.openai.client import (
     OpenAIClient,
     OpenAIRetryExhausted,
     ReasoningEffort,
@@ -40,7 +40,7 @@ class TestRetryIntegration:
 
     def test_retry_recovers_from_transient_errors(self, fast_retry_config: RetryConfig) -> None:
         """Test that retries can recover from transient errors."""
-        with patch("blinkb0t.core.api.llm.openai.client.OpenAI") as mock_openai:
+        with patch("twinklr.core.api.llm.openai.client.OpenAI") as mock_openai:
             mock_client = MagicMock()
 
             # First call fails with connection error, second succeeds
@@ -72,7 +72,7 @@ class TestRetryIntegration:
 
     def test_retry_exhaustion_preserves_error(self, fast_retry_config: RetryConfig) -> None:
         """Test that original error is preserved when retries exhausted."""
-        with patch("blinkb0t.core.api.llm.openai.client.OpenAI") as mock_openai:
+        with patch("twinklr.core.api.llm.openai.client.OpenAI") as mock_openai:
             mock_client = MagicMock()
 
             # Always fail with connection error
@@ -93,7 +93,7 @@ class TestRetryIntegration:
 
     def test_rate_limit_has_higher_retry_count(self, fast_retry_config: RetryConfig) -> None:
         """Test that rate limit errors get more retry attempts."""
-        with patch("blinkb0t.core.api.llm.openai.client.OpenAI") as mock_openai:
+        with patch("twinklr.core.api.llm.openai.client.OpenAI") as mock_openai:
             mock_client = MagicMock()
 
             # Create rate limit error
@@ -131,7 +131,7 @@ class TestTokenTrackingIntegration:
 
     def test_token_accumulation_across_calls(self) -> None:
         """Test that tokens accumulate across multiple API calls."""
-        with patch("blinkb0t.core.api.llm.openai.client.OpenAI") as mock_openai:
+        with patch("twinklr.core.api.llm.openai.client.OpenAI") as mock_openai:
             mock_client = MagicMock()
 
             def create_response(tokens: int) -> MagicMock:
@@ -168,7 +168,7 @@ class TestTokenTrackingIntegration:
 
     def test_metadata_history_tracked(self) -> None:
         """Test that metadata history is tracked for all calls."""
-        with patch("blinkb0t.core.api.llm.openai.client.OpenAI") as mock_openai:
+        with patch("twinklr.core.api.llm.openai.client.OpenAI") as mock_openai:
             mock_client = MagicMock()
 
             def create_response(idx: int) -> MagicMock:
@@ -206,7 +206,7 @@ class TestTokenTrackingIntegration:
 
     def test_reset_clears_all_tracking(self) -> None:
         """Test that reset clears all tracking data."""
-        with patch("blinkb0t.core.api.llm.openai.client.OpenAI") as mock_openai:
+        with patch("twinklr.core.api.llm.openai.client.OpenAI") as mock_openai:
             mock_client = MagicMock()
 
             mock_response = MagicMock()
@@ -247,7 +247,7 @@ class TestConversationFlowIntegration:
 
     def test_multi_turn_conversation(self) -> None:
         """Test multi-turn conversation maintains context."""
-        with patch("blinkb0t.core.api.llm.openai.client.OpenAI") as mock_openai:
+        with patch("twinklr.core.api.llm.openai.client.OpenAI") as mock_openai:
             mock_client = MagicMock()
             call_count = {"n": 0}
 
@@ -298,7 +298,7 @@ class TestConversationFlowIntegration:
 
     def test_conversation_response_id_tracking(self) -> None:
         """Test that response IDs are tracked in conversation."""
-        with patch("blinkb0t.core.api.llm.openai.client.OpenAI") as mock_openai:
+        with patch("twinklr.core.api.llm.openai.client.OpenAI") as mock_openai:
             mock_client = MagicMock()
 
             response = MagicMock()
@@ -327,7 +327,7 @@ class TestMixedOperationsIntegration:
 
     def test_mixed_json_and_text_generation(self) -> None:
         """Test mixing JSON and text generation."""
-        with patch("blinkb0t.core.api.llm.openai.client.OpenAI") as mock_openai:
+        with patch("twinklr.core.api.llm.openai.client.OpenAI") as mock_openai:
             mock_client = MagicMock()
 
             json_response = MagicMock()
@@ -372,7 +372,7 @@ class TestMixedOperationsIntegration:
 
     def test_operations_with_different_parameters(self) -> None:
         """Test operations with different parameter combinations."""
-        with patch("blinkb0t.core.api.llm.openai.client.OpenAI") as mock_openai:
+        with patch("twinklr.core.api.llm.openai.client.OpenAI") as mock_openai:
             mock_client = MagicMock()
 
             response = MagicMock()
@@ -414,7 +414,7 @@ class TestValidationIntegration:
 
     def test_validation_with_retry(self) -> None:
         """Test validation failure triggers retry behavior."""
-        with patch("blinkb0t.core.api.llm.openai.client.OpenAI") as mock_openai:
+        with patch("twinklr.core.api.llm.openai.client.OpenAI") as mock_openai:
             mock_client = MagicMock()
 
             # First response fails validation, second passes
@@ -465,7 +465,7 @@ class TestEdgeCasesIntegration:
 
     def test_empty_conversation_history_on_first_call(self) -> None:
         """Test first conversational call with empty history."""
-        with patch("blinkb0t.core.api.llm.openai.client.OpenAI") as mock_openai:
+        with patch("twinklr.core.api.llm.openai.client.OpenAI") as mock_openai:
             mock_client = MagicMock()
 
             response = MagicMock()
@@ -492,7 +492,7 @@ class TestEdgeCasesIntegration:
 
     def test_multiple_resets(self) -> None:
         """Test multiple reset calls are safe."""
-        with patch("blinkb0t.core.api.llm.openai.client.OpenAI"):
+        with patch("twinklr.core.api.llm.openai.client.OpenAI"):
             client = OpenAIClient(api_key="test-key")
 
             # Reset multiple times
@@ -506,7 +506,7 @@ class TestEdgeCasesIntegration:
 
     def test_large_message_handling(self) -> None:
         """Test handling of large messages."""
-        with patch("blinkb0t.core.api.llm.openai.client.OpenAI") as mock_openai:
+        with patch("twinklr.core.api.llm.openai.client.OpenAI") as mock_openai:
             mock_client = MagicMock()
 
             response = MagicMock()

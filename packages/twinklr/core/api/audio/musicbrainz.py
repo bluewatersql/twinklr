@@ -12,8 +12,8 @@ MusicBrainz Rate Limiting:
 import logging
 from typing import Any
 
-from blinkb0t.core.api.audio.models import MusicBrainzRecording, MusicBrainzRelease
-from blinkb0t.core.api.http.errors import ApiError, TimeoutError
+from twinklr.core.api.audio.models import MusicBrainzRecording, MusicBrainzRelease
+from twinklr.core.api.http.errors import ApiError, TimeoutError
 
 logger = logging.getLogger(__name__)
 

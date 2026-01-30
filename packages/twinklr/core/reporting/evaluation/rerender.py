@@ -10,10 +10,10 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from blinkb0t.core.agents.sequencer.moving_heads.models import ChoreographyPlan
-from blinkb0t.core.config.loader import load_fixture_group
-from blinkb0t.core.sequencer.moving_heads.pipeline import RenderingPipeline
-from blinkb0t.core.sequencer.timing.beat_grid import BeatGrid
+from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan
+from twinklr.core.config.loader import load_fixture_group
+from twinklr.core.sequencer.moving_heads.pipeline import RenderingPipeline
+from twinklr.core.sequencer.timing.beat_grid import BeatGrid
 
 logger = logging.getLogger(__name__)
 
@@ -100,8 +100,8 @@ async def rerender_plan(
 
     # Analyze audio (async)
     logger.debug(f"Analyzing audio: {audio_path.name}")
-    from blinkb0t.core.audio.analyzer import AudioAnalyzer
-    from blinkb0t.core.config.models import AppConfig, JobConfig
+    from twinklr.core.audio.analyzer import AudioAnalyzer
+    from twinklr.core.config.models import AppConfig, JobConfig
 
     # Create job_config first
     job_config = JobConfig(

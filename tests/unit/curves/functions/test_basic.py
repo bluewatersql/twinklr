@@ -6,7 +6,7 @@ import math
 
 import pytest
 
-from blinkb0t.core.curves.functions.basic import (
+from twinklr.core.curves.functions.basic import (
     generate_cosine,
     generate_hold,
     generate_linear,

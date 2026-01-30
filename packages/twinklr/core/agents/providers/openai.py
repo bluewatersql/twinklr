@@ -9,14 +9,14 @@ from typing import Any
 
 from openai import AsyncOpenAI
 
-from blinkb0t.core.agents.providers.base import (
+from twinklr.core.agents.providers.base import (
     LLMResponse,
     ProviderType,
     ResponseMetadata,
     TokenUsage,
 )
-from blinkb0t.core.agents.providers.conversation import Conversation
-from blinkb0t.core.agents.providers.errors import LLMProviderError
+from twinklr.core.agents.providers.conversation import Conversation
+from twinklr.core.agents.providers.errors import LLMProviderError
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +52,7 @@ class OpenAIProvider:
         self._async_client = AsyncOpenAI(api_key=api_key, timeout=timeout)
 
         # Keep sync client for backward compatibility during transition
-        from blinkb0t.core.api.llm.openai.client import OpenAIClient
+        from twinklr.core.api.llm.openai.client import OpenAIClient
 
         self._sync_client = OpenAIClient(api_key=api_key, timeout=timeout)
 

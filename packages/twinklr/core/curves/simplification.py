@@ -6,7 +6,7 @@ points that don't contribute significantly to the overall shape.
 
 import math
 
-from blinkb0t.core.curves.models import CurvePoint
+from twinklr.core.curves.models import CurvePoint
 
 
 def perpendicular_distance(

@@ -9,9 +9,9 @@ from typing import Any
 
 import yaml
 
-from blinkb0t.core.config.fixtures import FixtureGroup
-from blinkb0t.core.config.models import AppConfig, JobConfig
-from blinkb0t.core.utils.json import read_json
+from twinklr.core.config.fixtures import FixtureGroup
+from twinklr.core.config.models import AppConfig, JobConfig
+from twinklr.core.utils.json import read_json
 
 logger = logging.getLogger(__name__)
 

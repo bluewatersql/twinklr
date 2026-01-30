@@ -10,7 +10,7 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any
 
-from blinkb0t.core.formats.xlights.sequence.models.xsq import (
+from twinklr.core.formats.xlights.sequence.models.xsq import (
     ColorPalette,
     Effect,
     EffectDB,
@@ -21,8 +21,8 @@ from blinkb0t.core.formats.xlights.sequence.models.xsq import (
     TimingTrack,
     XSequence,
 )
-from blinkb0t.core.parsers.xml import XMLParser
-from blinkb0t.core.utils.logging import get_logger
+from twinklr.core.parsers.xml import XMLParser
+from twinklr.core.utils.logging import get_logger
 
 logger = get_logger(__name__)
 

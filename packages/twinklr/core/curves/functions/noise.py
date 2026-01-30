@@ -2,8 +2,8 @@
 
 from noise import pnoise1
 
-from blinkb0t.core.curves.models import CurvePoint
-from blinkb0t.core.curves.sampling import sample_uniform_grid
+from twinklr.core.curves.models import CurvePoint
+from twinklr.core.curves.sampling import sample_uniform_grid
 
 
 def _normalize_noise(value: float) -> float:

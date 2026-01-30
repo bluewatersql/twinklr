@@ -20,45 +20,45 @@ from typing import Any
 import librosa
 import numpy as np
 
-from blinkb0t.core.api.audio.acoustid import AcoustIDClient
-from blinkb0t.core.api.audio.musicbrainz import MusicBrainzClient
-from blinkb0t.core.api.http import AsyncApiClient, HttpClientConfig
+from twinklr.core.api.audio.acoustid import AcoustIDClient
+from twinklr.core.api.audio.musicbrainz import MusicBrainzClient
+from twinklr.core.api.http import AsyncApiClient, HttpClientConfig
 
 # Import all the analysis modules
-from blinkb0t.core.audio.advanced.tension import compute_tension_curve
-from blinkb0t.core.audio.cache_adapter import (
+from twinklr.core.audio.advanced.tension import compute_tension_curve
+from twinklr.core.audio.cache_adapter import (
     load_audio_features_async,
     save_audio_features_async,
 )
-from blinkb0t.core.audio.energy.builds_drops import detect_builds_and_drops
-from blinkb0t.core.audio.energy.multiscale import extract_smoothed_energy
-from blinkb0t.core.audio.harmonic.chords import detect_chords
-from blinkb0t.core.audio.harmonic.hpss import compute_hpss, compute_onset_env
-from blinkb0t.core.audio.harmonic.key import detect_musical_key, extract_chroma
-from blinkb0t.core.audio.harmonic.pitch import extract_pitch_tracking
-from blinkb0t.core.audio.lyrics.pipeline import LyricsPipeline, LyricsPipelineConfig
-from blinkb0t.core.audio.lyrics.providers.genius import GeniusClient
-from blinkb0t.core.audio.lyrics.providers.lrclib import LRCLibClient
-from blinkb0t.core.audio.metadata.pipeline import MetadataPipeline, PipelineConfig
-from blinkb0t.core.audio.models import LyricsBundle, MetadataBundle, SongBundle, SongTiming
-from blinkb0t.core.audio.models.enums import StageStatus
-from blinkb0t.core.audio.models.metadata import EmbeddedMetadata
-from blinkb0t.core.audio.rhythm.beats import (
+from twinklr.core.audio.energy.builds_drops import detect_builds_and_drops
+from twinklr.core.audio.energy.multiscale import extract_smoothed_energy
+from twinklr.core.audio.harmonic.chords import detect_chords
+from twinklr.core.audio.harmonic.hpss import compute_hpss, compute_onset_env
+from twinklr.core.audio.harmonic.key import detect_musical_key, extract_chroma
+from twinklr.core.audio.harmonic.pitch import extract_pitch_tracking
+from twinklr.core.audio.lyrics.pipeline import LyricsPipeline, LyricsPipelineConfig
+from twinklr.core.audio.lyrics.providers.genius import GeniusClient
+from twinklr.core.audio.lyrics.providers.lrclib import LRCLibClient
+from twinklr.core.audio.metadata.pipeline import MetadataPipeline, PipelineConfig
+from twinklr.core.audio.models import LyricsBundle, MetadataBundle, SongBundle, SongTiming
+from twinklr.core.audio.models.enums import StageStatus
+from twinklr.core.audio.models.metadata import EmbeddedMetadata
+from twinklr.core.audio.rhythm.beats import (
     compute_beats,
     detect_downbeats_phase_aligned,
     detect_time_signature,
 )
-from blinkb0t.core.audio.rhythm.tempo import detect_tempo_changes
-from blinkb0t.core.audio.spectral.bands import extract_dynamic_features
-from blinkb0t.core.audio.spectral.basic import extract_spectral_features
-from blinkb0t.core.audio.spectral.vocals import detect_vocals
-from blinkb0t.core.audio.structure.sections import detect_song_sections
-from blinkb0t.core.audio.timeline.builder import build_timeline_export
-from blinkb0t.core.audio.utils import to_simple_dict
-from blinkb0t.core.audio.validation.validator import validate_features
-from blinkb0t.core.caching import FSCache
-from blinkb0t.core.config.models import AppConfig, JobConfig
-from blinkb0t.core.io import RealFileSystem, absolute_path
+from twinklr.core.audio.rhythm.tempo import detect_tempo_changes
+from twinklr.core.audio.spectral.bands import extract_dynamic_features
+from twinklr.core.audio.spectral.basic import extract_spectral_features
+from twinklr.core.audio.spectral.vocals import detect_vocals
+from twinklr.core.audio.structure.sections import detect_song_sections
+from twinklr.core.audio.timeline.builder import build_timeline_export
+from twinklr.core.audio.utils import to_simple_dict
+from twinklr.core.audio.validation.validator import validate_features
+from twinklr.core.caching import FSCache
+from twinklr.core.config.models import AppConfig, JobConfig
+from twinklr.core.io import RealFileSystem, absolute_path
 
 logger = logging.getLogger(__name__)
 
@@ -337,7 +337,7 @@ class AudioAnalyzer:
 
                 # Initialize MusicBrainz client if enabled
                 if self.app_config.audio_processing.enhancements.enable_musicbrainz:
-                    user_agent = "BlinkB0t/4.0 (https://github.com/blinkb0t)"
+                    user_agent = "Twinklr/4.0 (https://github.com/twinklr)"
                     musicbrainz_client = MusicBrainzClient(
                         http_client=http_client,
                         user_agent=user_agent,
@@ -365,7 +365,7 @@ class AudioAnalyzer:
                 schema_version="3.0.0",
                 stage_status=StageStatus.FAILED,
                 embedded=EmbeddedMetadata(),
-                warnings=[f"Metadata pipeline failed: {str(e)}"],
+                warnings=[f"Metadata pipeline failed: {e!s}"],
             )
 
     async def _extract_lyrics_if_enabled(
@@ -472,7 +472,7 @@ class AudioAnalyzer:
             return LyricsBundle(
                 schema_version="1.0.0",
                 stage_status=StageStatus.FAILED,
-                warnings=[f"Lyrics pipeline failed: {str(e)}"],
+                warnings=[f"Lyrics pipeline failed: {e!s}"],
             )
 
     def _process_audio(self, audio_path: str) -> dict[str, Any]:

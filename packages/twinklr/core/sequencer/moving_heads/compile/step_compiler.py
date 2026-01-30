@@ -9,13 +9,13 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
-from blinkb0t.core.curves.models import PointsCurve
-from blinkb0t.core.curves.phase import apply_phase_shift_samples
-from blinkb0t.core.sequencer.models.context import StepCompileContext
-from blinkb0t.core.sequencer.models.enum import ChannelName
-from blinkb0t.core.sequencer.models.template import TemplateStep
-from blinkb0t.core.sequencer.moving_heads.channels.state import FixtureSegment
-from blinkb0t.core.utils.logging import get_renderer_logger, log_performance
+from twinklr.core.curves.models import PointsCurve
+from twinklr.core.curves.phase import apply_phase_shift_samples
+from twinklr.core.sequencer.models.context import StepCompileContext
+from twinklr.core.sequencer.models.enum import ChannelName
+from twinklr.core.sequencer.models.template import TemplateStep
+from twinklr.core.sequencer.moving_heads.channels.state import FixtureSegment
+from twinklr.core.utils.logging import get_renderer_logger, log_performance
 
 logger = logging.getLogger(__name__)
 renderer_log = get_renderer_logger()

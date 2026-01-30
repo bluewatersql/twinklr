@@ -6,7 +6,7 @@ Following TDD for Phase 0 - Dependencies and Configuration.
 from pydantic import ValidationError
 import pytest
 
-from blinkb0t.core.config.models import AudioEnhancementConfig, AudioProcessingConfig
+from twinklr.core.config.models import AudioEnhancementConfig, AudioProcessingConfig
 
 
 class TestAudioEnhancementConfigDefaults:

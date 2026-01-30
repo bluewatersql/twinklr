@@ -5,9 +5,9 @@ Testing stage gating, confidence scoring, and sufficiency decisions.
 
 import pytest
 
-from blinkb0t.core.audio.lyrics.pipeline import LyricsPipeline, LyricsPipelineConfig
-from blinkb0t.core.audio.models import StageStatus
-from blinkb0t.core.audio.models.lyrics import LyricsSourceKind
+from twinklr.core.audio.lyrics.pipeline import LyricsPipeline, LyricsPipelineConfig
+from twinklr.core.audio.models import StageStatus
+from twinklr.core.audio.models.lyrics import LyricsSourceKind
 
 
 class TestLyricsPipeline:
@@ -57,7 +57,7 @@ class TestLyricsPipeline:
         audio_file.touch()
 
         # Mock synced candidate from LRCLib
-        from blinkb0t.core.audio.lyrics.providers.models import LyricsCandidate
+        from twinklr.core.audio.lyrics.providers.models import LyricsCandidate
 
         mock_providers["lrclib"].search.return_value = [
             LyricsCandidate(
@@ -91,7 +91,7 @@ class TestLyricsPipeline:
         audio_file = tmp_path / "song.mp3"
         audio_file.touch()
 
-        from blinkb0t.core.audio.lyrics.providers.models import LyricsCandidate
+        from twinklr.core.audio.lyrics.providers.models import LyricsCandidate
 
         # No synced results
         mock_providers["lrclib"].search.return_value = []
@@ -149,7 +149,7 @@ class TestLyricsPipeline:
         audio_file = tmp_path / "song.mp3"
         audio_file.touch()
 
-        from blinkb0t.core.audio.lyrics.providers.models import LyricsCandidate
+        from twinklr.core.audio.lyrics.providers.models import LyricsCandidate
 
         # Only plain lyrics available
         mock_providers["lrclib"].search.return_value = []
@@ -205,7 +205,7 @@ class TestLyricsPipeline:
         audio_file = tmp_path / "song.mp3"
         audio_file.touch()
 
-        from blinkb0t.core.audio.lyrics.providers.models import LyricsCandidate
+        from twinklr.core.audio.lyrics.providers.models import LyricsCandidate
 
         # Multiple synced candidates with different confidences
         mock_providers["lrclib"].search.return_value = [
@@ -260,7 +260,7 @@ class TestLyricsPipeline:
         audio_file.touch()
 
         # LRCLib raises error, Genius returns result
-        from blinkb0t.core.audio.lyrics.providers.models import LyricsCandidate
+        from twinklr.core.audio.lyrics.providers.models import LyricsCandidate
 
         mock_providers["lrclib"].search.side_effect = Exception("API error")
         mock_providers["genius"].search.return_value = [

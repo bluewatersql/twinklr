@@ -13,7 +13,7 @@ from typing import Any
 
 from mutagen import File
 
-from blinkb0t.core.audio.models.metadata import EmbeddedMetadata
+from twinklr.core.audio.models.metadata import EmbeddedMetadata
 
 logger = logging.getLogger(__name__)
 

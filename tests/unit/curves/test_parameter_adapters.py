@@ -8,12 +8,12 @@ from __future__ import annotations
 
 import pytest
 
-from blinkb0t.core.sequencer.moving_heads.libraries.movement import MovementCategoricalParams
+from twinklr.core.sequencer.moving_heads.libraries.movement import MovementCategoricalParams
 
 # Import adapters (will be created)
 # These imports will fail until we create the adapters module
 try:
-    from blinkb0t.core.curves.adapters import (
+    from twinklr.core.curves.adapters import (
         ParameterAdapterRegistry,
         adapt_bezier_params,
         adapt_fixed_behavior,

@@ -1,6 +1,6 @@
-"""Configuration management for BlinkB0t."""
+"""Configuration management for Twinklr."""
 
-from blinkb0t.core.config.fixtures import (
+from twinklr.core.config.fixtures import (
     ChannelInversions,
     DmxMapping,
     FixtureCapabilities,
@@ -17,7 +17,7 @@ from blinkb0t.core.config.fixtures import (
     RestingPosition,
     ShutterMap,
 )
-from blinkb0t.core.config.loader import (
+from twinklr.core.config.loader import (
     configure_logging,
     load_app_config,
     load_config,
@@ -25,7 +25,7 @@ from blinkb0t.core.config.loader import (
     load_full_config,
     load_job_config,
 )
-from blinkb0t.core.config.models import (
+from twinklr.core.config.models import (
     AppConfig,
     AudioEnhancementConfig,
     AudioProcessingConfig,

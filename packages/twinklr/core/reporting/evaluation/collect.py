@@ -8,8 +8,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from blinkb0t.core.agents.sequencer.moving_heads.models import ChoreographyPlan
-from blinkb0t.core.reporting.evaluation.models import RunMetadata
+from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan
+from twinklr.core.reporting.evaluation.models import RunMetadata
 
 
 def load_checkpoint(checkpoint_path: Path) -> dict[str, Any]:
@@ -116,7 +116,7 @@ def build_run_metadata(checkpoint_path: Path, checkpoint_data: dict) -> RunMetad
     try:
         import importlib.metadata
 
-        engine_version = importlib.metadata.version("blinkb0t")
+        engine_version = importlib.metadata.version("twinklr")
     except Exception:
         # Package not installed or version not available
         pass

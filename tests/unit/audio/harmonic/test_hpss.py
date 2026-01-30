@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from blinkb0t.core.audio.harmonic.hpss import compute_hpss, compute_onset_env
+from twinklr.core.audio.harmonic.hpss import compute_hpss, compute_onset_env
 
 
 class TestComputeHPSS:

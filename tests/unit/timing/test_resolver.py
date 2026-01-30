@@ -2,8 +2,8 @@
 
 import pytest
 
-from blinkb0t.core.sequencer.timing.models import MusicalTiming, QuantizeMode, TimingMode
-from blinkb0t.core.sequencer.timing.resolver import TimeResolver
+from twinklr.core.sequencer.timing.models import MusicalTiming, QuantizeMode, TimingMode
+from twinklr.core.sequencer.timing.resolver import TimeResolver
 
 
 class TestTimeResolver:

@@ -5,40 +5,40 @@ from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
-from blinkb0t.core.agents.sequencer.moving_heads import ChoreographyPlan
-from blinkb0t.core.agents.sequencer.moving_heads.models import PlanSection
-from blinkb0t.core.config.fixtures import FixtureGroup
-from blinkb0t.core.config.models import JobConfig
-from blinkb0t.core.curves.generator import CurveGenerator
-from blinkb0t.core.curves.registry import CurveRegistry
-from blinkb0t.core.formats.xlights.sequence.exporter import XSQExporter
-from blinkb0t.core.formats.xlights.sequence.models.xsq import (
+from twinklr.core.agents.sequencer.moving_heads import ChoreographyPlan
+from twinklr.core.agents.sequencer.moving_heads.models import PlanSection
+from twinklr.core.config.fixtures import FixtureGroup
+from twinklr.core.config.models import JobConfig
+from twinklr.core.curves.generator import CurveGenerator
+from twinklr.core.curves.registry import CurveRegistry
+from twinklr.core.formats.xlights.sequence.exporter import XSQExporter
+from twinklr.core.formats.xlights.sequence.models.xsq import (
     Effect,
     SequenceHead,
     TimeMarker,
     XSequence,
 )
-from blinkb0t.core.formats.xlights.sequence.parser import XSQParser
-from blinkb0t.core.sequencer.models.context import FixtureContext, TemplateCompileContext
-from blinkb0t.core.sequencer.models.moving_heads.rig import rig_profile_from_fixture_group
-from blinkb0t.core.sequencer.models.transition import TransitionRegistry
-from blinkb0t.core.sequencer.moving_heads.channels.state import FixtureSegment
-from blinkb0t.core.sequencer.moving_heads.compile.channel_blender import ChannelBlender
-from blinkb0t.core.sequencer.moving_heads.compile.template_compiler import (
+from twinklr.core.formats.xlights.sequence.parser import XSQParser
+from twinklr.core.sequencer.models.context import FixtureContext, TemplateCompileContext
+from twinklr.core.sequencer.models.moving_heads.rig import rig_profile_from_fixture_group
+from twinklr.core.sequencer.models.transition import TransitionRegistry
+from twinklr.core.sequencer.moving_heads.channels.state import FixtureSegment
+from twinklr.core.sequencer.moving_heads.compile.channel_blender import ChannelBlender
+from twinklr.core.sequencer.moving_heads.compile.template_compiler import (
     compile_template,
 )
-from blinkb0t.core.sequencer.moving_heads.compile.transition_detector import TransitionDetector
-from blinkb0t.core.sequencer.moving_heads.compile.transition_planner import TransitionPlanner
-from blinkb0t.core.sequencer.moving_heads.compile.transition_segment_compiler import (
+from twinklr.core.sequencer.moving_heads.compile.transition_detector import TransitionDetector
+from twinklr.core.sequencer.moving_heads.compile.transition_planner import TransitionPlanner
+from twinklr.core.sequencer.moving_heads.compile.transition_segment_compiler import (
     TransitionSegmentCompiler,
 )
-from blinkb0t.core.sequencer.moving_heads.export.xsq_adapter import XsqAdapter
-from blinkb0t.core.sequencer.moving_heads.handlers.defaults import create_default_registries
-from blinkb0t.core.sequencer.moving_heads.templates import (
+from twinklr.core.sequencer.moving_heads.export.xsq_adapter import XsqAdapter
+from twinklr.core.sequencer.moving_heads.handlers.defaults import create_default_registries
+from twinklr.core.sequencer.moving_heads.templates import (
     get_template,
     load_builtin_templates,
 )
-from blinkb0t.core.sequencer.timing.beat_grid import BeatGrid
+from twinklr.core.sequencer.timing.beat_grid import BeatGrid
 
 logger = logging.getLogger(__name__)
 
@@ -162,8 +162,8 @@ class RenderingPipeline:
                     logger.debug(f"Applying preset: {preset.name}")
                 except StopIteration:
                     # Preset not found - try to infer intensity from preset_id
-                    from blinkb0t.core.sequencer.models.enum import Intensity
-                    from blinkb0t.core.sequencer.models.template import StepPatch, TemplatePreset
+                    from twinklr.core.sequencer.models.enum import Intensity
+                    from twinklr.core.sequencer.models.template import StepPatch, TemplatePreset
 
                     intensity_map = {
                         "CHILL": Intensity.SLOW,
@@ -433,10 +433,9 @@ class RenderingPipeline:
                 # Allow some tolerance (e.g., within 100ms)
                 if abs(segment.t1_ms - boundary_time_ms) <= 100:
                     boundary_segments.append(segment)
-            else:
-                # Target: segment should start at or near boundary
-                if abs(segment.t0_ms - boundary_time_ms) <= 100:
-                    boundary_segments.append(segment)
+            # Target: segment should start at or near boundary
+            elif abs(segment.t0_ms - boundary_time_ms) <= 100:
+                boundary_segments.append(segment)
 
         # If no exact matches, get the closest segments
         if not boundary_segments and segments:
@@ -540,13 +539,13 @@ class RenderingPipeline:
                     media_file="",
                     sequence_duration_ms=duration_ms,
                     song="Generated Sequence",
-                    artist="BlinkB0t",
+                    artist="Twinklr",
                     sequence_timing="50 ms",
                 )
             )
 
         # Add timing markers to XSQ
-        xsq.add_timing_layer(timing_name="BlinkB0t AudioSections", markers=time_markers)
+        xsq.add_timing_layer(timing_name="Twinklr AudioSections", markers=time_markers)
 
         adapter = XsqAdapter()
         placements = adapter.convert(segments, self.fixture_group, xsq)

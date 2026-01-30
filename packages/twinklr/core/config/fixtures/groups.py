@@ -9,10 +9,10 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from blinkb0t.core.config.fixtures.capabilities import FixtureCapabilities, MovementSpeed
-from blinkb0t.core.config.fixtures.dmx import ChannelInversions, DmxMapping
-from blinkb0t.core.config.fixtures.instances import FixtureConfig, FixtureInstance, FixturePosition
-from blinkb0t.core.config.fixtures.physical import MovementLimits, Orientation, PanTiltRange
+from twinklr.core.config.fixtures.capabilities import FixtureCapabilities, MovementSpeed
+from twinklr.core.config.fixtures.dmx import ChannelInversions, DmxMapping
+from twinklr.core.config.fixtures.instances import FixtureConfig, FixtureInstance, FixturePosition
+from twinklr.core.config.fixtures.physical import MovementLimits, Orientation, PanTiltRange
 
 
 class BaseFixtureConfig(BaseModel):

@@ -1,6 +1,6 @@
 from typing import Literal, overload
 
-from blinkb0t.core.sequencer.models.template import (
+from twinklr.core.sequencer.models.template import (
     BaseTiming,
     Dimmer,
     Geometry,
@@ -12,7 +12,7 @@ from blinkb0t.core.sequencer.models.template import (
     TemplatePreset,
     TemplateStep,
 )
-from blinkb0t.core.sequencer.moving_heads.compile.patch import deep_merge
+from twinklr.core.sequencer.moving_heads.compile.patch import deep_merge
 
 
 def apply_step_patch(step: TemplateStep, patch: StepPatch) -> TemplateStep:

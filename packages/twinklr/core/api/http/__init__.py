@@ -7,10 +7,10 @@ Exposes a small, ergonomic surface:
 - Auth helpers: ApiKeyAuth, BearerTokenAuth, TokenProvider
 """
 
-from blinkb0t.core.api.http.auth import ApiKeyAuth, BearerTokenAuth, TokenProvider
-from blinkb0t.core.api.http.client import ApiClient, AsyncApiClient
-from blinkb0t.core.api.http.config import HttpClientConfig
-from blinkb0t.core.api.http.errors import (
+from twinklr.core.api.http.auth import ApiKeyAuth, BearerTokenAuth, TokenProvider
+from twinklr.core.api.http.client import ApiClient, AsyncApiClient
+from twinklr.core.api.http.config import HttpClientConfig
+from twinklr.core.api.http.errors import (
     ApiError,
     AuthError,
     ClientError,

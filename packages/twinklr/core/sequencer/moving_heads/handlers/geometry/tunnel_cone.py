@@ -3,7 +3,7 @@
 import math
 from typing import Any
 
-from blinkb0t.core.sequencer.moving_heads.handlers.protocols import GeometryResult
+from twinklr.core.sequencer.moving_heads.handlers.protocols import GeometryResult
 
 
 class TunnelConeHandler:

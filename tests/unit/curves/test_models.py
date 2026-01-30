@@ -5,7 +5,7 @@ from __future__ import annotations
 from pydantic import ValidationError
 import pytest
 
-from blinkb0t.core.curves.models import CurvePoint, NativeCurve, PointsCurve
+from twinklr.core.curves.models import CurvePoint, NativeCurve, PointsCurve
 
 
 class TestCurvePoint:

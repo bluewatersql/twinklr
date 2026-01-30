@@ -6,8 +6,8 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from blinkb0t.core.audio.models.lyrics import LyricsBundle
-from blinkb0t.core.audio.models.metadata import MetadataBundle
+from twinklr.core.audio.models.lyrics import LyricsBundle
+from twinklr.core.audio.models.metadata import MetadataBundle
 
 
 class SongTiming(BaseModel):

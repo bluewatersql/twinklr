@@ -20,8 +20,8 @@ from pydantic import (
     model_validator,
 )
 
-from blinkb0t.core.config.fixtures import FixtureGroup
-from blinkb0t.core.sequencer.models.enum import ChaseOrder, SemanticGroupType
+from twinklr.core.config.fixtures import FixtureGroup
+from twinklr.core.sequencer.models.enum import ChaseOrder, SemanticGroupType
 
 
 class FixtureCalibration(BaseModel):

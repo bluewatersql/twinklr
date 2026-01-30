@@ -8,8 +8,8 @@ Functions:
     save_audio_features_async: Save audio features to cache
 
 Example:
-    >>> from blinkb0t.core.caching import FSCache
-    >>> from blinkb0t.core.io import RealFileSystem, absolute_path
+    >>> from twinklr.core.caching import FSCache
+    >>> from twinklr.core.io import RealFileSystem, absolute_path
     >>>
     >>> fs = RealFileSystem()
     >>> cache = FSCache(fs, absolute_path("data/cache"))
@@ -25,7 +25,7 @@ from typing import TypeVar
 
 from pydantic import BaseModel
 
-from blinkb0t.core.caching import CacheKey, FSCache
+from twinklr.core.caching import CacheKey, FSCache
 
 logger = logging.getLogger(__name__)
 

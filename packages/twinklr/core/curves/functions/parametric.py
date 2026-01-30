@@ -5,9 +5,9 @@ import math
 import bezier
 import numpy as np
 
-from blinkb0t.core.curves.defaults import DEFAULT_CURVE_INTENSITY_PARAMS
-from blinkb0t.core.curves.models import CurvePoint
-from blinkb0t.core.curves.sampling import sample_uniform_grid
+from twinklr.core.curves.defaults import DEFAULT_CURVE_INTENSITY_PARAMS
+from twinklr.core.curves.models import CurvePoint
+from twinklr.core.curves.sampling import sample_uniform_grid
 
 
 def generate_bezier(

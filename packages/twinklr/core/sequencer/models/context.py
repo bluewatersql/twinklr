@@ -2,13 +2,13 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from blinkb0t.core.curves.registry import CurveRegistry
-from blinkb0t.core.sequencer.moving_heads.handlers.registry import (
+from twinklr.core.curves.registry import CurveRegistry
+from twinklr.core.sequencer.moving_heads.handlers.registry import (
     DimmerRegistry,
     GeometryRegistry,
     MovementRegistry,
 )
-from blinkb0t.core.sequencer.timing.beat_grid import BeatGrid
+from twinklr.core.sequencer.timing.beat_grid import BeatGrid
 
 
 class FixtureContext(BaseModel):

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from blinkb0t.core.curves.models import CurvePoint
+from twinklr.core.curves.models import CurvePoint
 
 
 def movement_curve_to_dmx(

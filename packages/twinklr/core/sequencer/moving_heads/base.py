@@ -1,4 +1,4 @@
-"""Domain manager base class for BlinkB0t.
+"""Domain manager base class for Twinklr.
 
 This module provides the abstract base class that all domain-specific
 managers must implement. Each domain (moving heads, RGB, lasers, etc.)
@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from blinkb0t.core.session import BlinkB0tSession
+    from twinklr.core.session import TwinklrSession
 
 
 class DomainManager(ABC):
@@ -32,11 +32,11 @@ class DomainManager(ABC):
     - run_pipeline() - Execute the complete domain-specific pipeline
     """
 
-    def __init__(self, session: BlinkB0tSession):
+    def __init__(self, session: TwinklrSession):
         """Initialize domain manager with session.
 
         Args:
-            session: BlinkB0t session providing universal services
+            session: Twinklr session providing universal services
         """
         self.session = session
 
@@ -66,4 +66,3 @@ class DomainManager(ABC):
         Raises:
             NotImplementedError: If subclass doesn't implement this
         """
-        pass

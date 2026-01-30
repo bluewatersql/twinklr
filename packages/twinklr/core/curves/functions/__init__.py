@@ -1,6 +1,6 @@
 """Standard curve generators."""
 
-from blinkb0t.core.curves.functions.basic import (
+from twinklr.core.curves.functions.basic import (
     generate_cosine,
     generate_hold,
     generate_linear,
@@ -12,7 +12,7 @@ from blinkb0t.core.curves.functions.basic import (
     generate_square,
     generate_triangle,
 )
-from blinkb0t.core.curves.functions.easing import (
+from twinklr.core.curves.functions.easing import (
     generate_bounce_in,
     generate_bounce_out,
     generate_ease_in_back,
@@ -31,23 +31,23 @@ from blinkb0t.core.curves.functions.easing import (
     generate_elastic_in_out,
     generate_elastic_out,
 )
-from blinkb0t.core.curves.functions.motion import generate_anticipate, generate_overshoot
-from blinkb0t.core.curves.functions.movement import (
+from twinklr.core.curves.functions.motion import generate_anticipate, generate_overshoot
+from twinklr.core.curves.functions.movement import (
     generate_movement_hold,
     generate_movement_linear,
     generate_movement_pulse,
     generate_movement_sine,
     generate_movement_triangle,
 )
-from blinkb0t.core.curves.functions.musical import (
+from twinklr.core.curves.functions.musical import (
     generate_beat_pulse,
     generate_musical_accent,
     generate_musical_swell,
 )
-from blinkb0t.core.curves.functions.noise import (
+from twinklr.core.curves.functions.noise import (
     generate_perlin_noise,
 )
-from blinkb0t.core.curves.functions.parametric import generate_bezier, generate_lissajous
+from twinklr.core.curves.functions.parametric import generate_bezier, generate_lissajous
 
 __all__ = [
     "generate_linear",

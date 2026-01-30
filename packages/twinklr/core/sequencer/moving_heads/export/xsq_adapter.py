@@ -10,17 +10,17 @@ import logging
 from collections import defaultdict
 from typing import TYPE_CHECKING
 
-from blinkb0t.core.formats.xlights.sequence.models.effect_placement import EffectPlacement
-from blinkb0t.core.sequencer.moving_heads.export.dmx_settings_builder import (
+from twinklr.core.formats.xlights.sequence.models.effect_placement import EffectPlacement
+from twinklr.core.sequencer.moving_heads.export.dmx_settings_builder import (
     DmxSettingsBuilder,
 )
-from blinkb0t.core.utils.fixtures import build_semantic_groups
+from twinklr.core.utils.fixtures import build_semantic_groups
 
 if TYPE_CHECKING:
-    from blinkb0t.core.config.fixtures.groups import FixtureGroup
-    from blinkb0t.core.config.fixtures.instances import FixtureInstance
-    from blinkb0t.core.formats.xlights.sequence.models.xsq import XSequence
-    from blinkb0t.core.sequencer.moving_heads.channels.state import FixtureSegment
+    from twinklr.core.config.fixtures.groups import FixtureGroup
+    from twinklr.core.config.fixtures.instances import FixtureInstance
+    from twinklr.core.formats.xlights.sequence.models.xsq import XSequence
+    from twinklr.core.sequencer.moving_heads.channels.state import FixtureSegment
 
 logger = logging.getLogger(__name__)
 

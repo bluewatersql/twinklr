@@ -17,8 +17,8 @@ from typing import Any, TypeVar
 
 import httpx
 
-from blinkb0t.core.api.http.config import HttpClientConfig
-from blinkb0t.core.api.http.errors import (
+from twinklr.core.api.http.config import HttpClientConfig
+from twinklr.core.api.http.errors import (
     ApiError,
     AuthError,
     ClientError,
@@ -29,9 +29,9 @@ from blinkb0t.core.api.http.errors import (
     TimeoutError,
     UnexpectedStatusError,
 )
-from blinkb0t.core.api.http.logging_utils import RequestLogContext, log_request, log_response
-from blinkb0t.core.api.http.retry import RetryPolicy, parse_retry_after_seconds
-from blinkb0t.core.api.http.utils import get_request_id, join_url, safe_snippet
+from twinklr.core.api.http.logging_utils import RequestLogContext, log_request, log_response
+from twinklr.core.api.http.retry import RetryPolicy, parse_retry_after_seconds
+from twinklr.core.api.http.utils import get_request_id, join_url, safe_snippet
 
 T = TypeVar("T")
 
@@ -135,7 +135,7 @@ class ApiClient:
         transport: Optional custom transport (useful for testing)
 
     Example:
-        >>> from blinkb0t.core.api.http import ApiClient, HttpClientConfig, ApiKeyAuth
+        >>> from twinklr.core.api.http import ApiClient, HttpClientConfig, ApiKeyAuth
         >>> config = HttpClientConfig(base_url="https://api.example.com")
         >>> auth = ApiKeyAuth(header_name="X-API-Key", api_key="secret")
         >>> with ApiClient(config, auth=auth) as client:
@@ -433,7 +433,7 @@ class AsyncApiClient:
         transport: Optional custom transport (useful for testing)
 
     Example:
-        >>> from blinkb0t.core.api.http import AsyncApiClient, HttpClientConfig
+        >>> from twinklr.core.api.http import AsyncApiClient, HttpClientConfig
         >>> config = HttpClientConfig(base_url="https://api.example.com")
         >>> async with AsyncApiClient(config) as client:
         ...     resp = await client.get("/v1/users")

@@ -12,15 +12,15 @@ from typing import Any
 
 from pydantic import ValidationError
 
-from blinkb0t.core.agents.logging import LLMCallLogger, NullLLMCallLogger
-from blinkb0t.core.agents.prompts import PromptPackLoader
-from blinkb0t.core.agents.providers.base import LLMProvider
-from blinkb0t.core.agents.providers.conversation import generate_conversation_id
-from blinkb0t.core.agents.providers.errors import LLMProviderError
-from blinkb0t.core.agents.result import AgentResult
-from blinkb0t.core.agents.schema_utils import get_json_schema_example
-from blinkb0t.core.agents.spec import AgentMode, AgentSpec
-from blinkb0t.core.agents.state import AgentState
+from twinklr.core.agents.logging import LLMCallLogger, NullLLMCallLogger
+from twinklr.core.agents.prompts import PromptPackLoader
+from twinklr.core.agents.providers.base import LLMProvider
+from twinklr.core.agents.providers.conversation import generate_conversation_id
+from twinklr.core.agents.providers.errors import LLMProviderError
+from twinklr.core.agents.result import AgentResult
+from twinklr.core.agents.schema_utils import get_json_schema_example
+from twinklr.core.agents.spec import AgentMode, AgentSpec
+from twinklr.core.agents.state import AgentState
 
 logger = logging.getLogger(__name__)
 

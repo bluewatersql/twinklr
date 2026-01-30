@@ -9,7 +9,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from blinkb0t.core.agents.issues import Issue
+from twinklr.core.agents.issues import Issue
 
 logger = logging.getLogger(__name__)
 

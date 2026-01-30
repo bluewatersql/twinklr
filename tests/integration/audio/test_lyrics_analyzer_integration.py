@@ -7,10 +7,10 @@ from unittest.mock import patch
 
 import pytest
 
-from blinkb0t.core.audio.analyzer import AudioAnalyzer
-from blinkb0t.core.audio.models import StageStatus
-from blinkb0t.core.audio.models.lyrics import LyricsSourceKind
-from blinkb0t.core.config.models import AppConfig, JobConfig
+from twinklr.core.audio.analyzer import AudioAnalyzer
+from twinklr.core.audio.models import StageStatus
+from twinklr.core.audio.models.lyrics import LyricsSourceKind
+from twinklr.core.config.models import AppConfig, JobConfig
 
 
 class TestLyricsAnalyzerIntegration:
@@ -115,7 +115,7 @@ class TestLyricsAnalyzerIntegration:
 
     async def test_lyrics_pipeline_error_handled_gracefully(self, app_config, job_config, tmp_path):
         """Pipeline errors are caught by _extract_lyrics_if_enabled and return FAILED status."""
-        from blinkb0t.core.audio.models import LyricsBundle
+        from twinklr.core.audio.models import LyricsBundle
 
         audio_file = tmp_path / "song.mp3"
         audio_file.touch()

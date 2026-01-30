@@ -10,11 +10,11 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-from blinkb0t.core.curves.generator import CurveGenerator
-from blinkb0t.core.curves.library import CurveLibrary
-from blinkb0t.core.sequencer.models.enum import ChannelName
-from blinkb0t.core.sequencer.models.transition import TransitionPlan, TransitionStrategy
-from blinkb0t.core.sequencer.moving_heads.channels.state import ChannelValue
+from twinklr.core.curves.generator import CurveGenerator
+from twinklr.core.curves.library import CurveLibrary
+from twinklr.core.sequencer.models.enum import ChannelName
+from twinklr.core.sequencer.models.transition import TransitionPlan, TransitionStrategy
+from twinklr.core.sequencer.moving_heads.channels.state import ChannelValue
 
 if TYPE_CHECKING:
     pass
@@ -300,7 +300,7 @@ class ChannelBlender:
             ...     blended_curve
             ... )
         """
-        from blinkb0t.core.curves.models import CurvePoint, PointsCurve
+        from twinklr.core.curves.models import CurvePoint, PointsCurve
 
         # PointsCurve requires at least 2 points
         # If single value, create 2 points with same value

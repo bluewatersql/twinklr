@@ -8,14 +8,14 @@ catch-all for dimmers that don't need specialized logic.
 import logging
 from typing import Any
 
-from blinkb0t.core.curves.generator import CurveGenerator
-from blinkb0t.core.curves.library import CurveLibrary
-from blinkb0t.core.curves.models import CurvePoint
-from blinkb0t.core.curves.semantics import CurveKind
-from blinkb0t.core.sequencer.models.enum import Intensity
-from blinkb0t.core.sequencer.moving_heads.handlers.protocols import DimmerResult
-from blinkb0t.core.sequencer.moving_heads.libraries.dimmer import DEFAULT_DIMMER_PARAMS
-from blinkb0t.core.utils.logging import get_renderer_logger, log_performance
+from twinklr.core.curves.generator import CurveGenerator
+from twinklr.core.curves.library import CurveLibrary
+from twinklr.core.curves.models import CurvePoint
+from twinklr.core.curves.semantics import CurveKind
+from twinklr.core.sequencer.models.enum import Intensity
+from twinklr.core.sequencer.moving_heads.handlers.protocols import DimmerResult
+from twinklr.core.sequencer.moving_heads.libraries.dimmer import DEFAULT_DIMMER_PARAMS
+from twinklr.core.utils.logging import get_renderer_logger, log_performance
 
 logger = logging.getLogger(__name__)
 renderer_log = get_renderer_logger()

@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from blinkb0t.core.audio.harmonic.pitch import extract_pitch_tracking
+from twinklr.core.audio.harmonic.pitch import extract_pitch_tracking
 
 
 class TestExtractPitchTracking:

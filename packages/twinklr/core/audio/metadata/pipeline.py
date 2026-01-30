@@ -16,15 +16,15 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
-from blinkb0t.core.audio.metadata.embedded_tags import extract_embedded_metadata
-from blinkb0t.core.audio.metadata.fingerprint import (
+from twinklr.core.audio.metadata.embedded_tags import extract_embedded_metadata
+from twinklr.core.audio.metadata.fingerprint import (
     ChromaprintError,
     compute_chromaprint_fingerprint,
 )
-from blinkb0t.core.audio.metadata.merge import merge_metadata
-from blinkb0t.core.audio.models import MetadataBundle
-from blinkb0t.core.audio.models.enums import StageStatus
-from blinkb0t.core.audio.models.metadata import (
+from twinklr.core.audio.metadata.merge import merge_metadata
+from twinklr.core.audio.models import MetadataBundle
+from twinklr.core.audio.models.enums import StageStatus
+from twinklr.core.audio.models.metadata import (
     EmbeddedMetadata,
     FingerprintInfo,
     MetadataCandidate,
@@ -336,7 +336,7 @@ class MetadataPipeline:
         """
         try:
             logger.debug(f"Merging embedded with {len(candidates)} candidates")
-            from blinkb0t.core.audio.metadata.merge import MergeConfig
+            from twinklr.core.audio.metadata.merge import MergeConfig
 
             config = MergeConfig()
             resolved = merge_metadata(embedded, candidates, config=config, ref_duration_ms=None)
@@ -352,7 +352,7 @@ class MetadataPipeline:
             warnings.append(f"Metadata merge failed: {str(e)}")
 
             # Fallback to embedded as resolved
-            from blinkb0t.core.audio.metadata.merge import MergeConfig
+            from twinklr.core.audio.metadata.merge import MergeConfig
 
             config = MergeConfig()
             return merge_metadata(embedded, [], config=config, ref_duration_ms=None)

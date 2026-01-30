@@ -1,7 +1,7 @@
 from typing import Any
 
-from blinkb0t.core.utils.logging import get_logger
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from twinklr.core.utils.logging import get_logger
 
 logger = get_logger(__name__)
 

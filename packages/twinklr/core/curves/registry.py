@@ -6,8 +6,8 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
-from blinkb0t.core.curves.models import CurvePoint
-from blinkb0t.core.curves.modifiers import (
+from twinklr.core.curves.models import CurvePoint
+from twinklr.core.curves.modifiers import (
     CurveModifier,
     bounce_curve,
     mirror_curve,
@@ -15,7 +15,7 @@ from blinkb0t.core.curves.modifiers import (
     repeat_curve,
     reverse_curve,
 )
-from blinkb0t.core.curves.semantics import CurveKind
+from twinklr.core.curves.semantics import CurveKind
 
 
 @dataclass(frozen=True)

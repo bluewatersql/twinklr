@@ -7,7 +7,7 @@ Tests the comprehensive snap_to_grid() method with support for:
 
 import pytest
 
-from blinkb0t.core.sequencer.timing.beat_grid import BeatGrid
+from twinklr.core.sequencer.timing.beat_grid import BeatGrid
 
 # ============================================================================
 # Fixture Setup

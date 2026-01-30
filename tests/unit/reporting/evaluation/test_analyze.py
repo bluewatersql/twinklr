@@ -3,9 +3,9 @@
 Tests the analyze module's statistical metrics and flag generation.
 """
 
-from blinkb0t.core.reporting.evaluation.analyze import analyze_curve, check_loop_continuity
-from blinkb0t.core.reporting.evaluation.config import EvalConfig
-from blinkb0t.core.reporting.evaluation.models import ReportFlagLevel
+from twinklr.core.reporting.evaluation.analyze import analyze_curve, check_loop_continuity
+from twinklr.core.reporting.evaluation.config import EvalConfig
+from twinklr.core.reporting.evaluation.models import ReportFlagLevel
 
 
 def test_analyze_curve_all_zeros():

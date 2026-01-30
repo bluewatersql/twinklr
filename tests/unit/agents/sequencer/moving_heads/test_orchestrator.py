@@ -4,19 +4,19 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from blinkb0t.core.agents.result import AgentResult
-from blinkb0t.core.agents.sequencer.moving_heads.models import (
+from twinklr.core.agents.result import AgentResult
+from twinklr.core.agents.sequencer.moving_heads.models import (
     ChoreographyPlan,
     JudgeDecision,
     JudgeResponse,
     PlanSection,
 )
-from blinkb0t.core.agents.sequencer.moving_heads.orchestrator import (
+from twinklr.core.agents.sequencer.moving_heads.orchestrator import (
     OrchestrationConfig,
     OrchestrationResult,
     Orchestrator,
 )
-from blinkb0t.core.agents.state_machine import OrchestrationState
+from twinklr.core.agents.state_machine import OrchestrationState
 
 
 @pytest.fixture

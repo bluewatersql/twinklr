@@ -14,7 +14,7 @@ from typing import Any
 
 import numpy as np
 
-from blinkb0t.core.sequencer.timing.models import MusicalTiming, QuantizeMode, TimingMode
+from twinklr.core.sequencer.timing.models import MusicalTiming, QuantizeMode, TimingMode
 
 logger = logging.getLogger(__name__)
 

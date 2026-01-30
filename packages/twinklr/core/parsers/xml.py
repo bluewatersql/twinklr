@@ -9,7 +9,7 @@ from __future__ import annotations
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
-from blinkb0t.core.utils.logging import get_logger
+from twinklr.core.utils.logging import get_logger
 
 logger = get_logger(__name__)
 

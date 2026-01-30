@@ -12,7 +12,7 @@ Tests cover:
 from pydantic import ValidationError
 import pytest
 
-from blinkb0t.core.audio.phonemes.g2p_service import (
+from twinklr.core.audio.phonemes.g2p_service import (
     G2PConfig,
     G2PImpl,
     normalize_phoneme,

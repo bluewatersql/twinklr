@@ -24,8 +24,8 @@ from easing_functions import (
     SineEaseOut,
 )
 
-from blinkb0t.core.curves.models import CurvePoint
-from blinkb0t.core.curves.sampling import sample_uniform_grid
+from twinklr.core.curves.models import CurvePoint
+from twinklr.core.curves.sampling import sample_uniform_grid
 
 
 class _CallableEasing(Protocol):

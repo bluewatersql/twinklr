@@ -6,7 +6,7 @@ from collections.abc import Mapping
 
 from pydantic import BaseModel
 
-logger = logging.getLogger("blinkb0t.core.api.http")
+logger = logging.getLogger("twinklr.core.api.http")
 
 
 def _lower_set(values: tuple[str, ...]) -> set[str]:

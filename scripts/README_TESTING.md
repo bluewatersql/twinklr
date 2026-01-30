@@ -344,4 +344,4 @@ def test_whisperx_transcribe():
 
 - [Audio Enhancement Setup](../doc/AUDIO_ENHANCEMENT_SETUP.md)
 - [Configuration Reference](../doc/configs/)
-- Main codebase: `packages/blinkb0t/core/audio/`
+- Main codebase: `packages/twinklr/core/audio/`

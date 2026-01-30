@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from blinkb0t.core.curves.functions.motion import generate_anticipate, generate_overshoot
+from twinklr.core.curves.functions.motion import generate_anticipate, generate_overshoot
 
 
 class TestGenerateAnticipate:

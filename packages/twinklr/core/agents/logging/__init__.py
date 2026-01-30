@@ -4,7 +4,7 @@ This module provides comprehensive logging of LLM interactions including
 prompts, responses, metrics, and errors.
 
 Example:
-    from blinkb0t.core.agents.logging import AsyncFileLogger, NullLLMCallLogger
+    from twinklr.core.agents.logging import AsyncFileLogger, NullLLMCallLogger
 
     # For production: use file logger
     logger = AsyncFileLogger(
@@ -17,7 +17,7 @@ Example:
     logger = NullLLMCallLogger()
 
     # Using factory (recommended):
-    from blinkb0t.core.agents.logging import create_llm_logger
+    from twinklr.core.agents.logging import create_llm_logger
     logger = create_llm_logger(
         enabled=True,
         output_dir=Path("artifacts"),
@@ -50,9 +50,9 @@ def create_llm_logger(
     Respects environment variable overrides.
 
     Environment Variables:
-        BLINKBOT_DISABLE_LLM_LOGGING: Set to "1" or "true" to disable logging
-        BLINKBOT_LLM_LOG_LEVEL: Override log level ("minimal", "standard", "full")
-        BLINKBOT_LLM_LOG_FORMAT: Override format ("yaml", "json")
+        TWINKLR_DISABLE_LLM_LOGGING: Set to "1" or "true" to disable logging
+        TWINKLR_LLM_LOG_LEVEL: Override log level ("minimal", "standard", "full")
+        TWINKLR_LLM_LOG_FORMAT: Override format ("yaml", "json")
 
     Args:
         enabled: Enable LLM call logging (False returns NullLLMCallLogger)
@@ -84,15 +84,15 @@ def create_llm_logger(
         )
     """
     # Check environment variable overrides
-    env_disable = os.environ.get("BLINKBOT_DISABLE_LLM_LOGGING", "").lower()
+    env_disable = os.environ.get("TWINKLR_DISABLE_LLM_LOGGING", "").lower()
     if env_disable in ("1", "true", "yes"):
         enabled = False
 
-    env_level = os.environ.get("BLINKBOT_LLM_LOG_LEVEL")
+    env_level = os.environ.get("TWINKLR_LLM_LOG_LEVEL")
     if env_level and env_level in ("minimal", "standard", "full"):
         log_level = env_level
 
-    env_format = os.environ.get("BLINKBOT_LLM_LOG_FORMAT")
+    env_format = os.environ.get("TWINKLR_LLM_LOG_FORMAT")
     if env_format and env_format in ("yaml", "json"):
         format = env_format
 

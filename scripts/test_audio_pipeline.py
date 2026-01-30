@@ -32,9 +32,9 @@ from pathlib import Path
 import sys
 from typing import Any
 
-from blinkb0t.core.audio.analyzer import AudioAnalyzer
-from blinkb0t.core.audio.models import StageStatus
-from blinkb0t.core.config.loader import load_app_config, load_job_config
+from twinklr.core.audio.analyzer import AudioAnalyzer
+from twinklr.core.audio.models import StageStatus
+from twinklr.core.config.loader import load_app_config, load_job_config
 
 # Set up logging
 logging.basicConfig(
@@ -186,7 +186,7 @@ async def run_analysis(args: argparse.Namespace) -> dict[str, Any]:
         job_config = load_job_config()
     except Exception:
         # Create minimal job config if not found
-        from blinkb0t.core.config.models import JobConfig
+        from twinklr.core.config.models import JobConfig
 
         job_config = JobConfig(project_name="test_audio")
 

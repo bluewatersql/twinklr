@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 
 if TYPE_CHECKING:
-    from blinkb0t.core.config.models import JobConfig
+    from twinklr.core.config.models import JobConfig
 
 logger = logging.getLogger(__name__)
 

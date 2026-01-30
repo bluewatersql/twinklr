@@ -3,8 +3,8 @@
 Testing to_simple_dict() which extracts v2.3 dict from SongBundle.
 """
 
-from blinkb0t.core.audio.models import SongBundle, SongTiming
-from blinkb0t.core.audio.utils import to_simple_dict
+from twinklr.core.audio.models import SongBundle, SongTiming
+from twinklr.core.audio.utils import to_simple_dict
 
 
 class TestToSimpleDict:

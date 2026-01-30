@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from blinkb0t.core.audio.energy.profiling import classify_song_energy_profile
+from twinklr.core.audio.energy.profiling import classify_song_energy_profile
 
 
 class TestClassifySongEnergyProfile:

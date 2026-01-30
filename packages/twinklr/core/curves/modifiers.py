@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from enum import Enum
 
-from blinkb0t.core.curves.models import CurvePoint
+from twinklr.core.curves.models import CurvePoint
 
 
 class CurveModifier(str, Enum):

@@ -11,7 +11,7 @@ import pytest
 import yaml
 
 # Import config module directly
-import blinkb0t.core.config.loader as config_loader
+import twinklr.core.config.loader as config_loader
 
 
 @pytest.fixture

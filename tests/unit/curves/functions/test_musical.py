@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from blinkb0t.core.curves.functions.musical import (
+from twinklr.core.curves.functions.musical import (
     generate_beat_pulse,
     generate_musical_accent,
     generate_musical_swell,

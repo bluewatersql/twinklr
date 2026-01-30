@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from blinkb0t.core.curves.functions.noise import (
+from twinklr.core.curves.functions.noise import (
     _normalize_noise,
     generate_perlin_noise,
 )

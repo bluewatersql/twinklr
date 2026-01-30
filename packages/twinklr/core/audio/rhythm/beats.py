@@ -7,7 +7,7 @@ from typing import Any
 import librosa
 import numpy as np
 
-from blinkb0t.core.audio.utils import frames_to_time, normalize_to_0_1
+from twinklr.core.audio.utils import frames_to_time, normalize_to_0_1
 
 
 def compute_beats(

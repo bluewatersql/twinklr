@@ -6,7 +6,7 @@ import math
 
 import pytest
 
-from blinkb0t.core.curves.functions.parametric import generate_bezier, generate_lissajous
+from twinklr.core.curves.functions.parametric import generate_bezier, generate_lissajous
 
 
 class TestGenerateBezier:

@@ -5,7 +5,7 @@ from __future__ import annotations
 from pydantic import ValidationError
 import pytest
 
-from blinkb0t.core.config.fixtures import (
+from twinklr.core.config.fixtures import (
     ChannelInversions,
     DmxMapping,
     FixtureConfig,
@@ -18,7 +18,7 @@ from blinkb0t.core.config.fixtures import (
     Pose,
     ShutterMap,
 )
-from blinkb0t.core.config.poses import STANDARD_POSES, PoseLibrary
+from twinklr.core.config.poses import STANDARD_POSES, PoseLibrary
 
 
 class TestPose:

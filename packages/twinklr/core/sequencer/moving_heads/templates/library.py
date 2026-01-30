@@ -5,7 +5,7 @@ from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from typing import Any
 
-from blinkb0t.core.sequencer.models.template import TemplateDoc
+from twinklr.core.sequencer.models.template import TemplateDoc
 
 logger = logging.getLogger(__name__)
 

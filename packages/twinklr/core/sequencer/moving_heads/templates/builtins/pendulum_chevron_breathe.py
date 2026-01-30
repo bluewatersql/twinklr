@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from blinkb0t.core.config.poses import PanPose, TiltPose
-from blinkb0t.core.sequencer.models.enum import (
+from twinklr.core.config.poses import PanPose, TiltPose
+from twinklr.core.sequencer.models.enum import (
     Intensity,
     QuantizeMode,
     TemplateCategory,
     TimingMode,
 )
-from blinkb0t.core.sequencer.models.template import (
+from twinklr.core.sequencer.models.template import (
     BaseTiming,
     ChaseOrder,
     Dimmer,
@@ -25,11 +25,11 @@ from blinkb0t.core.sequencer.models.template import (
     TemplateMetadata,
     TemplateStep,
 )
-from blinkb0t.core.sequencer.moving_heads.libraries.dimmer import DimmerType
-from blinkb0t.core.sequencer.moving_heads.libraries.geometry import GeometryType
-from blinkb0t.core.sequencer.moving_heads.libraries.movement import MovementType
-from blinkb0t.core.sequencer.moving_heads.templates.library import register_template
-from blinkb0t.core.sequencer.moving_heads.templates.utils import (
+from twinklr.core.sequencer.moving_heads.libraries.dimmer import DimmerType
+from twinklr.core.sequencer.moving_heads.libraries.geometry import GeometryType
+from twinklr.core.sequencer.moving_heads.libraries.movement import MovementType
+from twinklr.core.sequencer.moving_heads.templates.library import register_template
+from twinklr.core.sequencer.moving_heads.templates.utils import (
     TemplateRoleHelper,
 )
 

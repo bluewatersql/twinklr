@@ -1,14 +1,14 @@
 """LLM provider abstraction for agents."""
 
-from blinkb0t.core.agents.providers.base import (
+from twinklr.core.agents.providers.base import (
     LLMProvider,
     LLMResponse,
     ProviderType,
     ResponseMetadata,
     TokenUsage,
 )
-from blinkb0t.core.agents.providers.errors import LLMProviderError
-from blinkb0t.core.agents.providers.openai import OpenAIProvider
+from twinklr.core.agents.providers.errors import LLMProviderError
+from twinklr.core.agents.providers.openai import OpenAIProvider
 
 __all__ = [
     "LLMProvider",

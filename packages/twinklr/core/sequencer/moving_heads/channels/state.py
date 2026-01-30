@@ -5,13 +5,13 @@ import logging
 from enum import Enum
 from typing import TYPE_CHECKING, Any
 
-from blinkb0t.core.curves.models import BaseCurve, CurvePoint
-from blinkb0t.core.sequencer.models.enum import BlendMode, ChannelName
-from blinkb0t.core.utils.math import clamp
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+from twinklr.core.curves.models import BaseCurve, CurvePoint
+from twinklr.core.sequencer.models.enum import BlendMode, ChannelName
+from twinklr.core.utils.math import clamp
 
 if TYPE_CHECKING:
-    from blinkb0t.core.config.fixtures import FixtureInstance
+    from twinklr.core.config.fixtures import FixtureInstance
 
 logger = logging.getLogger(__name__)
 

@@ -9,8 +9,8 @@ from pathlib import Path
 from pydantic import BaseModel
 import pytest
 
-from blinkb0t.core.caching import FSCache, cached_step
-from blinkb0t.core.io import RealFileSystem, absolute_path
+from twinklr.core.caching import FSCache, cached_step
+from twinklr.core.io import RealFileSystem, absolute_path
 
 
 class SampleArtifact(BaseModel):
@@ -123,8 +123,8 @@ class TestRealFilesystemCaching:
 
     async def test_cache_invalidation_removes_files(self, cache: FSCache, tmp_path: Path):
         """Test that invalidation removes cache entry."""
-        from blinkb0t.core.caching import CacheKey
-        from blinkb0t.core.caching.fingerprint import compute_fingerprint
+        from twinklr.core.caching import CacheKey
+        from twinklr.core.caching.fingerprint import compute_fingerprint
 
         # Store artifact
         artifact = SampleArtifact(value="test", checksum="xyz")
@@ -152,8 +152,8 @@ class TestRealFilesystemCaching:
 
         # Populate cache
         artifact = SampleArtifact(value="concurrent", checksum="123")
-        from blinkb0t.core.caching import CacheKey
-        from blinkb0t.core.caching.fingerprint import compute_fingerprint
+        from twinklr.core.caching import CacheKey
+        from twinklr.core.caching.fingerprint import compute_fingerprint
 
         fingerprint = compute_fingerprint("concurrent.test", "1", {"p": 1})
         key = CacheKey(

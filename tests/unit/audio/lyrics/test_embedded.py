@@ -5,7 +5,7 @@ Testing LRC file parsing, SYLT/USLT tag extraction, and timestamp normalization.
 
 from unittest.mock import MagicMock, patch
 
-from blinkb0t.core.audio.lyrics.embedded import (
+from twinklr.core.audio.lyrics.embedded import (
     extract_embedded_lyrics,
     parse_lrc_content,
     parse_lrc_timestamp,

@@ -9,15 +9,15 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-from blinkb0t.core.config.models import TransitionConfig
-from blinkb0t.core.sequencer.models.enum import ChannelName, TransitionMode
-from blinkb0t.core.sequencer.models.transition import (
+from twinklr.core.config.models import TransitionConfig
+from twinklr.core.sequencer.models.enum import ChannelName, TransitionMode
+from twinklr.core.sequencer.models.transition import (
     Boundary,
     TransitionHint,
     TransitionPlan,
     TransitionStrategy,
 )
-from blinkb0t.core.sequencer.timing.beat_grid import BeatGrid
+from twinklr.core.sequencer.timing.beat_grid import BeatGrid
 
 if TYPE_CHECKING:
     pass

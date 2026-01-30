@@ -5,10 +5,10 @@ Tests the extract module's ability to sample curves from FixtureSegment IR.
 
 from unittest.mock import Mock
 
-from blinkb0t.core.reporting.evaluation.extract import (
+from twinklr.core.reporting.evaluation.extract import (
     extract_curves_from_segments,
 )
-from blinkb0t.core.sequencer.models.enum import ChannelName
+from twinklr.core.sequencer.models.enum import ChannelName
 
 
 def test_extract_curves_empty_segments():

@@ -8,17 +8,17 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from blinkb0t.core.reporting.evaluation.analyze import analyze_curve, check_loop_continuity
-from blinkb0t.core.reporting.evaluation.collect import (
+from twinklr.core.reporting.evaluation.analyze import analyze_curve, check_loop_continuity
+from twinklr.core.reporting.evaluation.collect import (
     build_run_metadata,
     extract_plan,
     load_checkpoint,
 )
-from blinkb0t.core.reporting.evaluation.compliance import verify_template_compliance
-from blinkb0t.core.reporting.evaluation.config import EvalConfig
-from blinkb0t.core.reporting.evaluation.continuity import analyze_section_transition
-from blinkb0t.core.reporting.evaluation.extract import extract_curves_from_segments
-from blinkb0t.core.reporting.evaluation.models import (
+from twinklr.core.reporting.evaluation.compliance import verify_template_compliance
+from twinklr.core.reporting.evaluation.config import EvalConfig
+from twinklr.core.reporting.evaluation.continuity import analyze_section_transition
+from twinklr.core.reporting.evaluation.extract import extract_curves_from_segments
+from twinklr.core.reporting.evaluation.models import (
     CurveAnalysis,
     EvaluationReport,
     ReportFlagLevel,
@@ -29,11 +29,11 @@ from blinkb0t.core.reporting.evaluation.models import (
     TemplateSelection,
     ValidationResult,
 )
-from blinkb0t.core.reporting.evaluation.physics import check_physics_constraints
-from blinkb0t.core.reporting.evaluation.plot import plot_curve
-from blinkb0t.core.reporting.evaluation.render import write_report_json, write_report_markdown
-from blinkb0t.core.reporting.evaluation.rerender import rerender_plan
-from blinkb0t.core.reporting.evaluation.validate import (
+from twinklr.core.reporting.evaluation.physics import check_physics_constraints
+from twinklr.core.reporting.evaluation.plot import plot_curve
+from twinklr.core.reporting.evaluation.render import write_report_json, write_report_markdown
+from twinklr.core.reporting.evaluation.rerender import rerender_plan
+from twinklr.core.reporting.evaluation.validate import (
     load_available_templates,
     validate_plan_structure,
     validation_to_flags,
@@ -53,7 +53,7 @@ def _expand_plan_sections(plan):
     Returns:
         List of PlanSection objects (one per segment)
     """
-    from blinkb0t.core.agents.sequencer.moving_heads.models import PlanSection
+    from twinklr.core.agents.sequencer.moving_heads.models import PlanSection
 
     expanded = []
     for section in plan.sections:

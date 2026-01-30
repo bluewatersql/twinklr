@@ -2,11 +2,11 @@
 
 import pytest
 
-from blinkb0t.core.agents.sequencer.moving_heads.heuristic_validator import (
+from twinklr.core.agents.sequencer.moving_heads.heuristic_validator import (
     HeuristicValidationResult,
     HeuristicValidator,
 )
-from blinkb0t.core.agents.sequencer.moving_heads.models import (
+from twinklr.core.agents.sequencer.moving_heads.models import (
     ChoreographyPlan,
     PlanSection,
 )

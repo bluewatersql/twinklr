@@ -6,7 +6,7 @@ import logging
 from pathlib import Path
 import tempfile
 
-from packages.blinkb0t.core.utils.logging import (
+from packages.twinklr.core.utils.logging import (
     StructuredJSONFormatter,
     configure_logging,
     get_logger,

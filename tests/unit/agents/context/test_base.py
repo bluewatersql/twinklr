@@ -2,7 +2,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from blinkb0t.core.agents.context.base import BaseContextShaper, ShapedContext
+from twinklr.core.agents.context.base import BaseContextShaper, ShapedContext
 
 
 def test_shaped_context_model():

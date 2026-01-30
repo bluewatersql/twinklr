@@ -6,7 +6,7 @@ from typing import Any
 
 import pytest
 
-from blinkb0t.core.audio.context.unified_map import (
+from twinklr.core.audio.context.unified_map import (
     _extract_peaks,
     _filter_meaningful_timing_events,
     _find_section_for_time,

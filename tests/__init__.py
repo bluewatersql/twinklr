@@ -1,4 +1,4 @@
-"""Test suite for blinkb0t.
+"""Test suite for twinklr.
 
 This test suite follows a hybrid approach:
 - Quick harvest of stable, architecture-independent tests (utils, timing)

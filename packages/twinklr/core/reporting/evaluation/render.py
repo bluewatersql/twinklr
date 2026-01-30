@@ -9,7 +9,7 @@ import json
 import logging
 from pathlib import Path
 
-from blinkb0t.core.reporting.evaluation.models import EvaluationReport, SectionReport
+from twinklr.core.reporting.evaluation.models import EvaluationReport, SectionReport
 
 logger = logging.getLogger(__name__)
 

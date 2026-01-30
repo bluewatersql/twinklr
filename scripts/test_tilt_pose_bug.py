@@ -3,8 +3,8 @@
 import logging
 import sys
 
-from blinkb0t.core.config.poses import TiltPose
-from blinkb0t.core.sequencer.moving_heads.handlers.geometry.role_pose import RolePoseHandler
+from twinklr.core.config.poses import TiltPose
+from twinklr.core.sequencer.moving_heads.handlers.geometry.role_pose import RolePoseHandler
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s | %(message)s")
 logger = logging.getLogger(__name__)

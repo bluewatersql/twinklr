@@ -6,10 +6,10 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from blinkb0t.core.curves.phase import apply_phase_shift_samples
+from twinklr.core.curves.phase import apply_phase_shift_samples
 
 if TYPE_CHECKING:
-    from blinkb0t.core.curves.models import CurvePoint
+    from twinklr.core.curves.models import CurvePoint
 
 
 class TestApplyPhaseShiftSamples:

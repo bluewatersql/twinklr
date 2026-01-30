@@ -8,15 +8,15 @@ Tests cover:
 - Speaker assignment logic
 """
 
-from blinkb0t.core.audio.lyrics.diarization import (
+from twinklr.core.audio.lyrics.diarization import (
     assign_speakers,
     suggest_diarization,
 )
-from blinkb0t.core.audio.lyrics.diarization_models import (
+from twinklr.core.audio.lyrics.diarization_models import (
     DiarizationConfig,
     SpeakerSegment,
 )
-from blinkb0t.core.audio.models.lyrics import LyricWord
+from twinklr.core.audio.models.lyrics import LyricWord
 
 
 class TestSuggestDiarization:

@@ -10,15 +10,15 @@ Tests cover:
 
 import pytest
 
-from blinkb0t.core.audio.lyrics.pipeline import LyricsPipeline, LyricsPipelineConfig
-from blinkb0t.core.audio.lyrics.whisperx_models import (
+from twinklr.core.audio.lyrics.pipeline import LyricsPipeline, LyricsPipelineConfig
+from twinklr.core.audio.lyrics.whisperx_models import (
     WhisperXAlignResult,
     WhisperXConfig,
     WhisperXTranscribeResult,
 )
-from blinkb0t.core.audio.lyrics.whisperx_service import WhisperXService
-from blinkb0t.core.audio.models import StageStatus
-from blinkb0t.core.audio.models.lyrics import LyricsSourceKind, LyricWord
+from twinklr.core.audio.lyrics.whisperx_service import WhisperXService
+from twinklr.core.audio.models import StageStatus
+from twinklr.core.audio.models.lyrics import LyricsSourceKind, LyricWord
 
 
 class MockWhisperXService(WhisperXService):

@@ -11,7 +11,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from blinkb0t.core.reporting.evaluation.models import (
+from twinklr.core.reporting.evaluation.models import (
     CurveAnalysis,
     ModifierCompliance,
     TemplateCompliance,

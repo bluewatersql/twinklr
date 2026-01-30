@@ -11,10 +11,10 @@ Usage:
 
 import logging
 
-from blinkb0t.core.curves.dmx_conversion import movement_curve_to_dmx
-from blinkb0t.core.curves.generator import CurveGenerator
-from blinkb0t.core.curves.library import CurveLibrary
-from blinkb0t.core.curves.models import CurvePoint
+from twinklr.core.curves.dmx_conversion import movement_curve_to_dmx
+from twinklr.core.curves.generator import CurveGenerator
+from twinklr.core.curves.library import CurveLibrary
+from twinklr.core.curves.models import CurvePoint
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s | %(name)s | %(message)s")
 logger = logging.getLogger(__name__)

@@ -12,7 +12,7 @@ Classes:
     G2PImpl: Implementation using g2p_en
 
 Example:
-    >>> from blinkb0t.core.audio.phonemes.g2p_service import word_to_phonemes
+    >>> from twinklr.core.audio.phonemes.g2p_service import word_to_phonemes
     >>> phonemes = word_to_phonemes("hello")
     >>> phonemes
     ['HH', 'EH', 'L', 'OW']

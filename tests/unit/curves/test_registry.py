@@ -4,15 +4,15 @@ from __future__ import annotations
 
 import pytest
 
-from blinkb0t.core.curves.models import CurvePoint
-from blinkb0t.core.curves.modifiers import CurveModifier
-from blinkb0t.core.curves.registry import (
+from twinklr.core.curves.models import CurvePoint
+from twinklr.core.curves.modifiers import CurveModifier
+from twinklr.core.curves.registry import (
     CurveDefinition,
     CurveRegistry,
     NativeCurveDefinition,
     _apply_modifiers,
 )
-from blinkb0t.core.curves.semantics import CurveKind
+from twinklr.core.curves.semantics import CurveKind
 
 
 def mock_generator(n_samples: int, **kwargs) -> list[CurvePoint]:

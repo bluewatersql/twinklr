@@ -11,17 +11,17 @@ Tests cover:
 
 import pytest
 
-from blinkb0t.core.audio.lyrics.whisperx_models import (
+from twinklr.core.audio.lyrics.whisperx_models import (
     WhisperXAlignResult,
     WhisperXConfig,
     WhisperXTranscribeResult,
 )
-from blinkb0t.core.audio.lyrics.whisperx_service import (
+from twinklr.core.audio.lyrics.whisperx_service import (
     WhisperXImpl,
     WhisperXService,
     compute_mismatch_ratio,
 )
-from blinkb0t.core.audio.models.lyrics import LyricWord
+from twinklr.core.audio.models.lyrics import LyricWord
 
 
 class TestComputeMismatchRatio:

@@ -9,8 +9,8 @@ import logging
 from pathlib import Path
 import sys
 
-from blinkb0t.core.reporting.evaluation import generate_evaluation_report
-from blinkb0t.core.reporting.evaluation.config import EvalConfig
+from twinklr.core.reporting.evaluation import generate_evaluation_report
+from twinklr.core.reporting.evaluation.config import EvalConfig
 
 # Setup logging
 logging.basicConfig(
@@ -29,7 +29,7 @@ async def main_async():
     checkpoint_path = Path("artifacts/need_a_favor/checkpoints/plans/need_a_favor_final.json")
     audio_path = Path("data/music/Need A Favor.mp3")  # User must provide
     fixture_config_path = Path("fixture_config.json")
-    xsq_path = Path("artifacts/need_a_favor/need_a_favor_blinkb0t_mh.xsq")  # Use actual XSQ
+    xsq_path = Path("artifacts/need_a_favor/need_a_favor_twinklr_mh.xsq")  # Use actual XSQ
     output_dir = Path("artifacts/need_a_favor/eval_report")
 
     # Verify inputs exist

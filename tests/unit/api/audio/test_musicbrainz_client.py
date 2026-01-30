@@ -7,8 +7,8 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from blinkb0t.core.api.audio.models import MusicBrainzRecording
-from blinkb0t.core.api.audio.musicbrainz import MusicBrainzClient, MusicBrainzError
+from twinklr.core.api.audio.models import MusicBrainzRecording
+from twinklr.core.api.audio.musicbrainz import MusicBrainzClient, MusicBrainzError
 
 
 class TestMusicBrainzClient:
@@ -25,7 +25,7 @@ class TestMusicBrainzClient:
         """Create MusicBrainz client with mock HTTP client."""
         return MusicBrainzClient(
             http_client=mock_http_client,
-            user_agent="blinkb0t-test/1.0",
+            user_agent="twinklr-test/1.0",
         )
 
     def test_init_requires_user_agent(self, mock_http_client):
@@ -71,7 +71,7 @@ class TestMusicBrainzClient:
         assert params["inc"] == "artists+releases+isrcs"
 
         headers = call_args[1]["headers"]
-        assert headers["User-Agent"] == "blinkb0t-test/1.0"
+        assert headers["User-Agent"] == "twinklr-test/1.0"
 
         # Verify response
         assert isinstance(recording, MusicBrainzRecording)
@@ -166,7 +166,7 @@ class TestMusicBrainzClient:
 
     async def test_lookup_recording_api_error(self, client, mock_http_client):
         """MusicBrainz API returns error response."""
-        from blinkb0t.core.api.http.errors import ClientError
+        from twinklr.core.api.http.errors import ClientError
 
         mock_http_client.get.side_effect = ClientError(
             message="Recording not found",
@@ -180,7 +180,7 @@ class TestMusicBrainzClient:
 
     async def test_lookup_recording_http_error(self, client, mock_http_client):
         """HTTP request fails."""
-        from blinkb0t.core.api.http.errors import ServerError
+        from twinklr.core.api.http.errors import ServerError
 
         mock_http_client.get.side_effect = ServerError(
             message="Server error",
@@ -194,7 +194,7 @@ class TestMusicBrainzClient:
 
     async def test_lookup_recording_timeout(self, client, mock_http_client):
         """Request times out."""
-        from blinkb0t.core.api.http.errors import TimeoutError as HTTPTimeoutError
+        from twinklr.core.api.http.errors import TimeoutError as HTTPTimeoutError
 
         mock_http_client.get.side_effect = HTTPTimeoutError(
             message="Request timed out",

@@ -10,7 +10,7 @@ Tests cover:
 from pydantic import ValidationError
 import pytest
 
-from blinkb0t.core.audio.lyrics.diarization_models import (
+from twinklr.core.audio.lyrics.diarization_models import (
     DiarizationConfig,
     DiarizationResult,
     SpeakerSegment,

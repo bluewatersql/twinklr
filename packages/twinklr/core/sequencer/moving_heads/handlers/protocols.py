@@ -14,9 +14,9 @@ from typing import Any, Protocol
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from blinkb0t.core.curves.library import CurveLibrary
-from blinkb0t.core.curves.models import CurvePoint
-from blinkb0t.core.sequencer.models.enum import Intensity
+from twinklr.core.curves.library import CurveLibrary
+from twinklr.core.curves.models import CurvePoint
+from twinklr.core.sequencer.models.enum import Intensity
 
 # =============================================================================
 # Result Models (immutable data containers)

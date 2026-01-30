@@ -6,7 +6,7 @@ Testing LyricsQuery and LyricsCandidate models.
 from pydantic import ValidationError
 import pytest
 
-from blinkb0t.core.audio.lyrics.providers.models import LyricsCandidate, LyricsQuery
+from twinklr.core.audio.lyrics.providers.models import LyricsCandidate, LyricsQuery
 
 
 class TestLyricsQuery:

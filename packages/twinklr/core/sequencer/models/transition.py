@@ -15,8 +15,8 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from blinkb0t.core.curves.library import CurveLibrary
-from blinkb0t.core.sequencer.models.enum import ChannelName, TransitionMode
+from twinklr.core.curves.library import CurveLibrary
+from twinklr.core.sequencer.models.enum import ChannelName, TransitionMode
 
 
 class TransitionStrategy(str, Enum):

@@ -4,12 +4,12 @@ from pathlib import Path
 
 import pytest
 
-from blinkb0t.core.agents.prompts import PromptPackLoader, PromptRenderer
+from twinklr.core.agents.prompts import PromptPackLoader, PromptRenderer
 
 PROMPTS_BASE = (
     Path(__file__).parent.parent.parent.parent.parent.parent
     / "packages"
-    / "blinkb0t"
+    / "twinklr"
     / "core"
     / "agents"
     / "sequencer"

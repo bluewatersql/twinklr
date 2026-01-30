@@ -86,7 +86,7 @@ class TestAudioPipelineIntegration:
         """Test HPSS and onset detection pipeline."""
         import librosa
 
-        from blinkb0t.core.audio.harmonic.hpss import compute_hpss, compute_onset_env
+        from twinklr.core.audio.harmonic.hpss import compute_hpss, compute_onset_env
 
         y, sr = librosa.load(test_audio_path, sr=sample_rate, mono=True)
 
@@ -112,9 +112,9 @@ class TestAudioPipelineIntegration:
         """Test beat and tempo detection pipeline."""
         import librosa
 
-        from blinkb0t.core.audio.harmonic.hpss import compute_hpss, compute_onset_env
-        from blinkb0t.core.audio.harmonic.key import extract_chroma
-        from blinkb0t.core.audio.rhythm.beats import (
+        from twinklr.core.audio.harmonic.hpss import compute_hpss, compute_onset_env
+        from twinklr.core.audio.harmonic.key import extract_chroma
+        from twinklr.core.audio.rhythm.beats import (
             compute_beats,
             detect_downbeats_phase_aligned,
             detect_time_signature,
@@ -169,10 +169,10 @@ class TestAudioPipelineIntegration:
         """Test energy analysis pipeline including builds/drops."""
         import librosa
 
-        from blinkb0t.core.audio.energy.builds_drops import detect_builds_and_drops
-        from blinkb0t.core.audio.energy.multiscale import extract_smoothed_energy
-        from blinkb0t.core.audio.harmonic.hpss import compute_hpss, compute_onset_env
-        from blinkb0t.core.audio.rhythm.beats import compute_beats
+        from twinklr.core.audio.energy.builds_drops import detect_builds_and_drops
+        from twinklr.core.audio.energy.multiscale import extract_smoothed_energy
+        from twinklr.core.audio.harmonic.hpss import compute_hpss, compute_onset_env
+        from twinklr.core.audio.rhythm.beats import compute_beats
 
         y, sr = librosa.load(test_audio_path, sr=sample_rate, mono=True)
 
@@ -217,8 +217,8 @@ class TestAudioPipelineIntegration:
         """Test spectral feature extraction pipeline."""
         import librosa
 
-        from blinkb0t.core.audio.spectral.bands import extract_dynamic_features
-        from blinkb0t.core.audio.spectral.basic import extract_spectral_features
+        from twinklr.core.audio.spectral.bands import extract_dynamic_features
+        from twinklr.core.audio.spectral.basic import extract_spectral_features
 
         y, sr = librosa.load(test_audio_path, sr=sample_rate, mono=True)
 
@@ -250,10 +250,10 @@ class TestAudioPipelineIntegration:
         """Test harmonic analysis pipeline (key, chords)."""
         import librosa
 
-        from blinkb0t.core.audio.harmonic.chords import detect_chords
-        from blinkb0t.core.audio.harmonic.hpss import compute_hpss, compute_onset_env
-        from blinkb0t.core.audio.harmonic.key import detect_musical_key, extract_chroma
-        from blinkb0t.core.audio.rhythm.beats import compute_beats
+        from twinklr.core.audio.harmonic.chords import detect_chords
+        from twinklr.core.audio.harmonic.hpss import compute_hpss, compute_onset_env
+        from twinklr.core.audio.harmonic.key import detect_musical_key, extract_chroma
+        from twinklr.core.audio.rhythm.beats import compute_beats
 
         y, sr = librosa.load(test_audio_path, sr=sample_rate, mono=True)
 
@@ -293,7 +293,7 @@ class TestAudioPipelineIntegration:
         """Test structure analysis pipeline (sections)."""
         import librosa
 
-        from blinkb0t.core.audio.structure.sections import detect_song_sections
+        from twinklr.core.audio.structure.sections import detect_song_sections
 
         y, sr = librosa.load(test_audio_path, sr=sample_rate, mono=True)
 
@@ -325,13 +325,13 @@ class TestAudioPipelineIntegration:
         """Test timeline builder with real features."""
         import librosa
 
-        from blinkb0t.core.audio.energy.multiscale import extract_smoothed_energy
-        from blinkb0t.core.audio.harmonic.hpss import compute_hpss, compute_onset_env
-        from blinkb0t.core.audio.harmonic.key import extract_chroma
-        from blinkb0t.core.audio.rhythm.beats import compute_beats
-        from blinkb0t.core.audio.spectral.bands import extract_dynamic_features
-        from blinkb0t.core.audio.spectral.basic import extract_spectral_features
-        from blinkb0t.core.audio.timeline.builder import build_timeline_export
+        from twinklr.core.audio.energy.multiscale import extract_smoothed_energy
+        from twinklr.core.audio.harmonic.hpss import compute_hpss, compute_onset_env
+        from twinklr.core.audio.harmonic.key import extract_chroma
+        from twinklr.core.audio.rhythm.beats import compute_beats
+        from twinklr.core.audio.spectral.bands import extract_dynamic_features
+        from twinklr.core.audio.spectral.basic import extract_spectral_features
+        from twinklr.core.audio.timeline.builder import build_timeline_export
 
         y, sr = librosa.load(test_audio_path, sr=sample_rate, mono=True)
 
@@ -386,20 +386,20 @@ class TestAudioPipelineIntegration:
         """Test complete feature extraction flow (simulating AudioAnalyzer)."""
         import librosa
 
-        from blinkb0t.core.audio.energy.builds_drops import detect_builds_and_drops
-        from blinkb0t.core.audio.energy.multiscale import extract_smoothed_energy
-        from blinkb0t.core.audio.harmonic.chords import detect_chords
-        from blinkb0t.core.audio.harmonic.hpss import compute_hpss, compute_onset_env
-        from blinkb0t.core.audio.harmonic.key import detect_musical_key, extract_chroma
-        from blinkb0t.core.audio.rhythm.beats import (
+        from twinklr.core.audio.energy.builds_drops import detect_builds_and_drops
+        from twinklr.core.audio.energy.multiscale import extract_smoothed_energy
+        from twinklr.core.audio.harmonic.chords import detect_chords
+        from twinklr.core.audio.harmonic.hpss import compute_hpss, compute_onset_env
+        from twinklr.core.audio.harmonic.key import detect_musical_key, extract_chroma
+        from twinklr.core.audio.rhythm.beats import (
             compute_beats,
             detect_downbeats_phase_aligned,
             detect_time_signature,
         )
-        from blinkb0t.core.audio.spectral.bands import extract_dynamic_features
-        from blinkb0t.core.audio.spectral.basic import extract_spectral_features
-        from blinkb0t.core.audio.structure.sections import detect_song_sections
-        from blinkb0t.core.audio.validation.validator import validate_features
+        from twinklr.core.audio.spectral.bands import extract_dynamic_features
+        from twinklr.core.audio.spectral.basic import extract_spectral_features
+        from twinklr.core.audio.structure.sections import detect_song_sections
+        from twinklr.core.audio.validation.validator import validate_features
 
         y, sr = librosa.load(test_audio_path, sr=sample_rate, mono=True)
         duration = librosa.get_duration(y=y, sr=sr)

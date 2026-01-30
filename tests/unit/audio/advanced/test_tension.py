@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from blinkb0t.core.audio.advanced.tension import compute_tension_curve
+from twinklr.core.audio.advanced.tension import compute_tension_curve
 
 
 class TestComputeTensionCurve:

@@ -9,7 +9,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from blinkb0t.core.config.fixtures import ChannelWithConfig, FixtureGroup
+    from twinklr.core.config.fixtures import ChannelWithConfig, FixtureGroup
 
 
 def _to_int(channel: int | ChannelWithConfig | None) -> int | None:

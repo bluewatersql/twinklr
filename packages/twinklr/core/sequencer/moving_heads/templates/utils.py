@@ -1,5 +1,5 @@
-from blinkb0t.core.config.poses import PanPose
-from blinkb0t.core.sequencer.models.enum import TemplateRole
+from twinklr.core.config.poses import PanPose
+from twinklr.core.sequencer.models.enum import TemplateRole
 
 
 class TemplateRoleHelper:

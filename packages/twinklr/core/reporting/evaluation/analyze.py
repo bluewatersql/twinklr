@@ -10,8 +10,8 @@ import logging
 
 import numpy as np
 
-from blinkb0t.core.reporting.evaluation.config import EvalConfig
-from blinkb0t.core.reporting.evaluation.models import (
+from twinklr.core.reporting.evaluation.config import EvalConfig
+from twinklr.core.reporting.evaluation.models import (
     ContinuityCheck,
     CurveStats,
     ReportFlag,
@@ -224,7 +224,7 @@ def _calculate_clamp_percentage(arr: np.ndarray, epsilon: float = 0.001) -> floa
     at_max = np.sum(arr >= 1.0 - epsilon)
     clamped = at_min + at_max
 
-    return (clamped / len(arr)) * 100 if len(arr) > 0 else 0.0
+    return float((clamped / len(arr)) * 100 if len(arr) > 0 else 0.0)
 
 
 def _calculate_energy(arr: np.ndarray) -> float:

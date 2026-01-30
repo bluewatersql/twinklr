@@ -7,12 +7,12 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from blinkb0t.core.agents.sequencer.moving_heads.heuristic_validator import (
+from twinklr.core.agents.sequencer.moving_heads.heuristic_validator import (
     HeuristicValidationResult,
     HeuristicValidator,
 )
-from blinkb0t.core.agents.sequencer.moving_heads.models import ChoreographyPlan
-from blinkb0t.core.reporting.evaluation.models import ReportFlag, ReportFlagLevel, ValidationResult
+from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan
+from twinklr.core.reporting.evaluation.models import ReportFlag, ReportFlagLevel, ValidationResult
 
 logger = logging.getLogger(__name__)
 
@@ -133,8 +133,8 @@ def load_available_templates(template_dir: Path | None = None) -> list[str]:
         True
     """
     # Import here to avoid circular dependencies
-    from blinkb0t.core.sequencer.moving_heads.templates import load_builtin_templates
-    from blinkb0t.core.sequencer.moving_heads.templates.library import REGISTRY
+    from twinklr.core.sequencer.moving_heads.templates import load_builtin_templates
+    from twinklr.core.sequencer.moving_heads.templates.library import REGISTRY
 
     # Ensure built-in templates are loaded
     load_builtin_templates()

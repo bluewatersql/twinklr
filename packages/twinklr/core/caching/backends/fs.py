@@ -9,8 +9,8 @@ from typing import TypeVar
 
 from pydantic import BaseModel, ValidationError
 
-from blinkb0t.core.io import AbsolutePath, FileSystem
-from blinkb0t.core.io.utils import sanitize_path_component
+from twinklr.core.io import AbsolutePath, FileSystem
+from twinklr.core.io.utils import sanitize_path_component
 
 from ..models import CacheKey, CacheMeta
 

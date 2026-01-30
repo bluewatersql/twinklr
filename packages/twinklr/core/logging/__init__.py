@@ -1,4 +1,4 @@
-"""Core logging abstraction for BlinkB0t.
+"""Core logging abstraction for Twinklr.
 
 This module provides structured logging with protocol-based
 implementations for JSON, YAML, and null outputs.

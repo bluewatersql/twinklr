@@ -5,7 +5,7 @@ from pathlib import Path
 from pydantic import ValidationError
 import pytest
 
-from blinkb0t.core.reporting.evaluation.models import (
+from twinklr.core.reporting.evaluation.models import (
     ContinuityCheck,
     CurveAnalysis,
     CurveStats,

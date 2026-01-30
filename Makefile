@@ -15,7 +15,7 @@ NC := \033[0m # No Color
 #############################################################################
 
 help: ## Show this help message
-	@echo "$(BLUE)BlinkB0t - AI-powered lighting sequencer$(NC)"
+	@echo "$(BLUE)Twinklr - AI-powered lighting sequencer$(NC)"
 	@echo ""
 	@echo "$(GREEN)Available targets:$(NC)"
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(BLUE)%-20s$(NC) %s\n", $$1, $$2}'
@@ -31,7 +31,7 @@ help: ## Show this help message
 #############################################################################
 
 install: ## Install project for development (first time setup)
-	@echo "$(GREEN)Installing BlinkB0t for development...$(NC)"
+	@echo "$(GREEN)Installing Twinklr for development...$(NC)"
 	@command -v uv >/dev/null 2>&1 || { echo "$(RED)Error: uv is not installed. Install from https://github.com/astral-sh/uv$(NC)"; exit 1; }
 	@echo "$(BLUE)→ Syncing workspace and installing all packages with dependencies...$(NC)"
 	uv sync --extra dev --all-packages
@@ -40,7 +40,7 @@ install: ## Install project for development (first time setup)
 	@echo "$(GREEN)✓ Installation complete!$(NC)"
 
 install-dev: ## Install everything including ML dependencies (WhisperX, PyTorch, ~2GB+)
-	@echo "$(GREEN)Installing BlinkB0t with ALL dependencies (including ML)...$(NC)"
+	@echo "$(GREEN)Installing Twinklr with ALL dependencies (including ML)...$(NC)"
 	@command -v uv >/dev/null 2>&1 || { echo "$(RED)Error: uv is not installed. Install from https://github.com/astral-sh/uv$(NC)"; exit 1; }
 	@echo "$(YELLOW)⚠ This will download ~2GB+ of ML dependencies (WhisperX, PyTorch)$(NC)"
 	@echo "$(BLUE)→ Syncing workspace with dev + ML dependencies...$(NC)"
@@ -108,7 +108,7 @@ test: ## Run all tests
 
 test-cov: ## Run tests with coverage report
 	@echo "$(BLUE)→ Running tests with coverage...$(NC)"
-	uv run pytest tests/ --cov=blinkb0t.core --cov-report=term-missing --cov-report=html --cov-report=json
+	uv run pytest tests/ --cov=twinklr.core --cov-report=term-missing --cov-report=html --cov-report=json
 	@echo "$(GREEN)✓ Tests complete$(NC)"
 	@echo "$(YELLOW)→ Coverage report: htmlcov/index.html$(NC)"
 
@@ -240,13 +240,13 @@ clean-install: clean-venv install ## Complete clean reinstall (removes .venv and
 #############################################################################
 
 verify-install: ## Verify installation is working correctly
-	@echo "$(BLUE)→ Verifying blinkb0t installation...$(NC)"
+	@echo "$(BLUE)→ Verifying twinklr installation...$(NC)"
 	@echo "$(YELLOW)  Checking packages installed...$(NC)"
-	@uv pip list | grep blinkb0t || { echo "$(RED)✗ BlinkB0t packages not found$(NC)"; exit 1; }
+	@uv pip list | grep twinklr || { echo "$(RED)✗ Twinklr packages not found$(NC)"; exit 1; }
 	@echo "$(YELLOW)  Testing core import...$(NC)"
-	@uv run python -c "import blinkb0t.core" || { echo "$(RED)✗ Cannot import blinkb0t.core$(NC)"; exit 1; }
+	@uv run python -c "import twinklr.core" || { echo "$(RED)✗ Cannot import twinklr.core$(NC)"; exit 1; }
 	@echo "$(YELLOW)  Testing CLI...$(NC)"
-	@uv run blinkb0t --help >/dev/null || { echo "$(RED)✗ CLI not working$(NC)"; exit 1; }
+	@uv run twinklr --help >/dev/null || { echo "$(RED)✗ CLI not working$(NC)"; exit 1; }
 	@echo "$(GREEN)✓ Installation verified$(NC)"
 
 
@@ -288,17 +288,17 @@ shell: ## Open Python shell with project imports
 repl: shell ## Alias for shell
 
 info: ## Show project information
-	@echo "$(BLUE)BlinkB0t Project Information$(NC)"
+	@echo "$(BLUE)Twinklr Project Information$(NC)"
 	@echo ""
 	@echo "$(YELLOW)Packages:$(NC)"
-	@echo "  Core:    blinkb0t-core (packages/core/)"
-	@echo "  CLI:     blinkb0t-cli (packages/cli/)"
+	@echo "  Core:    twinklr-core (packages/core/)"
+	@echo "  CLI:     twinklr-cli (packages/cli/)"
 	@echo ""
 	@echo "$(YELLOW)Python Version:$(NC)"
 	@uv run python --version
 	@echo ""
 	@echo "$(YELLOW)Installed Packages:$(NC)"
-	@uv pip list | grep blinkb0t || echo "  (not installed yet - run 'make install')"
+	@uv pip list | grep twinklr || echo "  (not installed yet - run 'make install')"
 	@echo ""
 	@echo "$(YELLOW)Test Coverage Target:$(NC) 80%"
 	@echo "$(YELLOW)Line Length:$(NC) 100 characters"

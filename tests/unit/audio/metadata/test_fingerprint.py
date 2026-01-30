@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from blinkb0t.core.audio.metadata.fingerprint import (
+from twinklr.core.audio.metadata.fingerprint import (
     ChromaprintError,
     compute_chromaprint_fingerprint,
 )

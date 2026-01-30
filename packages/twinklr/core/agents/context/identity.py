@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from blinkb0t.core.agents.context.base import BaseContextShaper, ShapedContext
+from twinklr.core.agents.context.base import BaseContextShaper, ShapedContext
 
 
 class IdentityContextShaper(BaseContextShaper):

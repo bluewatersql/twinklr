@@ -10,7 +10,7 @@ Tests cover:
 from pydantic import ValidationError
 import pytest
 
-from blinkb0t.core.audio.models.phonemes import (
+from twinklr.core.audio.models.phonemes import (
     Phoneme,
     PhonemeBundle,
     PhonemeSource,

@@ -17,14 +17,14 @@ project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
 # ruff: noqa: E402 - Module imports after sys.path modification for standalone script
-from blinkb0t.core.curves.library import CurveLibrary
-from blinkb0t.core.sequencer.moving_heads.libraries.movement import (
+from twinklr.core.curves.library import CurveLibrary
+from twinklr.core.sequencer.moving_heads.libraries.movement import (
     MovementLibrary,
     MovementType,
 )
 
 if TYPE_CHECKING:
-    from blinkb0t.core.sequencer.models.template import Movement, TemplateDoc
+    from twinklr.core.sequencer.models.template import Movement, TemplateDoc
 
 
 def get_curve_for_movement(movement_type: MovementType) -> CurveLibrary:
@@ -275,10 +275,10 @@ def main():
     print()
 
     # Import all built-in templates to trigger registration
-    from blinkb0t.core.sequencer.moving_heads.templates import builtins  # noqa: F401
+    from twinklr.core.sequencer.moving_heads.templates import builtins  # noqa: F401
 
     # Get all registered templates
-    from blinkb0t.core.sequencer.moving_heads.templates.library import (
+    from twinklr.core.sequencer.moving_heads.templates.library import (
         get_template,
         list_templates,
     )

@@ -4,7 +4,7 @@ Tests that BeatGrid correctly calculates eighth and sixteenth note boundaries
 from beat positions for precise musical quantization.
 """
 
-from blinkb0t.core.sequencer.timing.beat_grid import BeatGrid
+from twinklr.core.sequencer.timing.beat_grid import BeatGrid
 
 # ============================================================================
 # Eighth Note Boundary Tests

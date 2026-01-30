@@ -3,7 +3,7 @@
 from pydantic import ValidationError
 import pytest
 
-from blinkb0t.core.agents.spec import AgentMode, AgentSpec
+from twinklr.core.agents.spec import AgentMode, AgentSpec
 
 
 def test_agent_spec_minimal():

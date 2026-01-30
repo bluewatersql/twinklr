@@ -8,13 +8,13 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from blinkb0t.core.audio.lyrics.embedded import extract_embedded_lyrics, parse_lrc_content
-from blinkb0t.core.audio.lyrics.providers.models import LyricsQuery
-from blinkb0t.core.audio.lyrics.quality import compute_quality_metrics
-from blinkb0t.core.audio.lyrics.whisperx_models import WhisperXConfig
-from blinkb0t.core.audio.lyrics.whisperx_service import WhisperXService
-from blinkb0t.core.audio.models import StageStatus
-from blinkb0t.core.audio.models.lyrics import LyricsBundle, LyricsSource, LyricsSourceKind
+from twinklr.core.audio.lyrics.embedded import extract_embedded_lyrics, parse_lrc_content
+from twinklr.core.audio.lyrics.providers.models import LyricsQuery
+from twinklr.core.audio.lyrics.quality import compute_quality_metrics
+from twinklr.core.audio.lyrics.whisperx_models import WhisperXConfig
+from twinklr.core.audio.lyrics.whisperx_service import WhisperXService
+from twinklr.core.audio.models import StageStatus
+from twinklr.core.audio.models.lyrics import LyricsBundle, LyricsSource, LyricsSourceKind
 
 logger = logging.getLogger(__name__)
 

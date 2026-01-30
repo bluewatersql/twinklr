@@ -12,10 +12,10 @@ from unittest.mock import patch
 
 import pytest
 
-from blinkb0t.core.audio.metadata.pipeline import MetadataPipeline, PipelineConfig
-from blinkb0t.core.audio.models import MetadataBundle
-from blinkb0t.core.audio.models.enums import StageStatus
-from blinkb0t.core.audio.models.metadata import (
+from twinklr.core.audio.metadata.pipeline import MetadataPipeline, PipelineConfig
+from twinklr.core.audio.models import MetadataBundle
+from twinklr.core.audio.models.enums import StageStatus
+from twinklr.core.audio.models.metadata import (
     EmbeddedMetadata,
 )
 
@@ -79,7 +79,7 @@ class TestMetadataPipeline:
 
         # Mock embedded metadata
         with patch(
-            "blinkb0t.core.audio.metadata.pipeline.extract_embedded_metadata"
+            "twinklr.core.audio.metadata.pipeline.extract_embedded_metadata"
         ) as mock_extract:
             mock_extract.return_value = EmbeddedMetadata(
                 title="Test Song",
@@ -108,13 +108,11 @@ class TestMetadataPipeline:
 
         # Mock embedded and fingerprint
         with (
+            patch("twinklr.core.audio.metadata.pipeline.extract_embedded_metadata") as mock_extract,
             patch(
-                "blinkb0t.core.audio.metadata.pipeline.extract_embedded_metadata"
-            ) as mock_extract,
-            patch(
-                "blinkb0t.core.audio.metadata.pipeline.compute_chromaprint_fingerprint"
+                "twinklr.core.audio.metadata.pipeline.compute_chromaprint_fingerprint"
             ) as mock_fingerprint,
-            patch("blinkb0t.core.audio.metadata.pipeline.compute_file_hash") as mock_hash,
+            patch("twinklr.core.audio.metadata.pipeline.compute_file_hash") as mock_hash,
         ):
             mock_extract.return_value = EmbeddedMetadata(title="Test")
             mock_fingerprint.return_value = ("FINGERPRINT123", 180.5)
@@ -135,7 +133,7 @@ class TestMetadataPipeline:
         pipeline.config.enable_musicbrainz = False
 
         # Mock responses
-        from blinkb0t.core.api.audio.models import AcoustIDRecording, AcoustIDResponse
+        from twinklr.core.api.audio.models import AcoustIDRecording, AcoustIDResponse
 
         mock_acoustid_client.lookup.return_value = AcoustIDResponse(
             status="ok",
@@ -151,13 +149,11 @@ class TestMetadataPipeline:
         )
 
         with (
+            patch("twinklr.core.audio.metadata.pipeline.extract_embedded_metadata") as mock_extract,
             patch(
-                "blinkb0t.core.audio.metadata.pipeline.extract_embedded_metadata"
-            ) as mock_extract,
-            patch(
-                "blinkb0t.core.audio.metadata.pipeline.compute_chromaprint_fingerprint"
+                "twinklr.core.audio.metadata.pipeline.compute_chromaprint_fingerprint"
             ) as mock_fingerprint,
-            patch("blinkb0t.core.audio.metadata.pipeline.compute_file_hash") as mock_hash,
+            patch("twinklr.core.audio.metadata.pipeline.compute_file_hash") as mock_hash,
         ):
             mock_extract.return_value = EmbeddedMetadata(title="Embedded")
             mock_fingerprint.return_value = ("FP123", 180.0)
@@ -182,7 +178,7 @@ class TestMetadataPipeline:
     ):
         """Pipeline queries MusicBrainz when MBID available from AcoustID."""
         # Mock AcoustID returning MBID
-        from blinkb0t.core.api.audio.models import (
+        from twinklr.core.api.audio.models import (
             AcoustIDRecording,
             AcoustIDResponse,
             MusicBrainzRecording,
@@ -208,13 +204,11 @@ class TestMetadataPipeline:
         )
 
         with (
+            patch("twinklr.core.audio.metadata.pipeline.extract_embedded_metadata") as mock_extract,
             patch(
-                "blinkb0t.core.audio.metadata.pipeline.extract_embedded_metadata"
-            ) as mock_extract,
-            patch(
-                "blinkb0t.core.audio.metadata.pipeline.compute_chromaprint_fingerprint"
+                "twinklr.core.audio.metadata.pipeline.compute_chromaprint_fingerprint"
             ) as mock_fingerprint,
-            patch("blinkb0t.core.audio.metadata.pipeline.compute_file_hash") as mock_hash,
+            patch("twinklr.core.audio.metadata.pipeline.compute_file_hash") as mock_hash,
         ):
             mock_extract.return_value = EmbeddedMetadata(title="Embedded")
             mock_fingerprint.return_value = ("FP123", 180.0)
@@ -237,7 +231,7 @@ class TestMetadataPipeline:
     ):
         """Pipeline with full flow: embedded + fingerprint + both providers."""
         # Mock responses
-        from blinkb0t.core.api.audio.models import (
+        from twinklr.core.api.audio.models import (
             AcoustIDRecording,
             AcoustIDResponse,
             MusicBrainzRecording,
@@ -262,13 +256,11 @@ class TestMetadataPipeline:
         )
 
         with (
+            patch("twinklr.core.audio.metadata.pipeline.extract_embedded_metadata") as mock_extract,
             patch(
-                "blinkb0t.core.audio.metadata.pipeline.extract_embedded_metadata"
-            ) as mock_extract,
-            patch(
-                "blinkb0t.core.audio.metadata.pipeline.compute_chromaprint_fingerprint"
+                "twinklr.core.audio.metadata.pipeline.compute_chromaprint_fingerprint"
             ) as mock_fingerprint,
-            patch("blinkb0t.core.audio.metadata.pipeline.compute_file_hash") as mock_hash,
+            patch("twinklr.core.audio.metadata.pipeline.compute_file_hash") as mock_hash,
         ):
             mock_extract.return_value = EmbeddedMetadata(title="Embedded")
             mock_fingerprint.return_value = ("FP123", 180.0)
@@ -298,13 +290,11 @@ class TestMetadataPipeline:
         pipeline.acoustid_client = None
 
         with (
+            patch("twinklr.core.audio.metadata.pipeline.extract_embedded_metadata") as mock_extract,
             patch(
-                "blinkb0t.core.audio.metadata.pipeline.extract_embedded_metadata"
-            ) as mock_extract,
-            patch(
-                "blinkb0t.core.audio.metadata.pipeline.compute_chromaprint_fingerprint"
+                "twinklr.core.audio.metadata.pipeline.compute_chromaprint_fingerprint"
             ) as mock_fingerprint,
-            patch("blinkb0t.core.audio.metadata.pipeline.compute_file_hash") as mock_hash,
+            patch("twinklr.core.audio.metadata.pipeline.compute_file_hash") as mock_hash,
         ):
             mock_extract.return_value = EmbeddedMetadata(title="Test")
             mock_fingerprint.side_effect = Exception("fpcalc error")
@@ -326,18 +316,16 @@ class TestMetadataPipeline:
         pipeline.config.enable_musicbrainz = False
 
         # AcoustID fails
-        from blinkb0t.core.api.audio.acoustid import AcoustIDError
+        from twinklr.core.api.audio.acoustid import AcoustIDError
 
         mock_acoustid_client.lookup.side_effect = AcoustIDError("API error")
 
         with (
+            patch("twinklr.core.audio.metadata.pipeline.extract_embedded_metadata") as mock_extract,
             patch(
-                "blinkb0t.core.audio.metadata.pipeline.extract_embedded_metadata"
-            ) as mock_extract,
-            patch(
-                "blinkb0t.core.audio.metadata.pipeline.compute_chromaprint_fingerprint"
+                "twinklr.core.audio.metadata.pipeline.compute_chromaprint_fingerprint"
             ) as mock_fingerprint,
-            patch("blinkb0t.core.audio.metadata.pipeline.compute_file_hash") as mock_hash,
+            patch("twinklr.core.audio.metadata.pipeline.compute_file_hash") as mock_hash,
         ):
             mock_extract.return_value = EmbeddedMetadata(title="Test")
             mock_fingerprint.return_value = ("FP123", 180.0)
@@ -356,8 +344,8 @@ class TestMetadataPipeline:
     ):
         """Pipeline handles MusicBrainz errors gracefully."""
         # AcoustID returns MBID but MusicBrainz fails
-        from blinkb0t.core.api.audio.models import AcoustIDRecording, AcoustIDResponse
-        from blinkb0t.core.api.audio.musicbrainz import MusicBrainzError
+        from twinklr.core.api.audio.models import AcoustIDRecording, AcoustIDResponse
+        from twinklr.core.api.audio.musicbrainz import MusicBrainzError
 
         mock_acoustid_client.lookup.return_value = AcoustIDResponse(
             status="ok",
@@ -367,13 +355,11 @@ class TestMetadataPipeline:
         mock_musicbrainz_client.lookup_recording.side_effect = MusicBrainzError("API error")
 
         with (
+            patch("twinklr.core.audio.metadata.pipeline.extract_embedded_metadata") as mock_extract,
             patch(
-                "blinkb0t.core.audio.metadata.pipeline.extract_embedded_metadata"
-            ) as mock_extract,
-            patch(
-                "blinkb0t.core.audio.metadata.pipeline.compute_chromaprint_fingerprint"
+                "twinklr.core.audio.metadata.pipeline.compute_chromaprint_fingerprint"
             ) as mock_fingerprint,
-            patch("blinkb0t.core.audio.metadata.pipeline.compute_file_hash") as mock_hash,
+            patch("twinklr.core.audio.metadata.pipeline.compute_file_hash") as mock_hash,
         ):
             mock_extract.return_value = EmbeddedMetadata(title="Test")
             mock_fingerprint.return_value = ("FP123", 180.0)
@@ -391,10 +377,8 @@ class TestMetadataPipeline:
     async def test_pipeline_embedded_extraction_fails(self, pipeline):
         """Pipeline fails if embedded extraction fails."""
         with (
-            patch(
-                "blinkb0t.core.audio.metadata.pipeline.extract_embedded_metadata"
-            ) as mock_extract,
-            patch("blinkb0t.core.audio.metadata.pipeline.compute_file_hash") as mock_hash,
+            patch("twinklr.core.audio.metadata.pipeline.extract_embedded_metadata") as mock_extract,
+            patch("twinklr.core.audio.metadata.pipeline.compute_file_hash") as mock_hash,
         ):
             mock_extract.side_effect = Exception("File read error")
             mock_hash.return_value = "hash123"
@@ -413,13 +397,11 @@ class TestMetadataPipeline:
     ):
         """Pipeline skips AcoustID if chromaprint fails."""
         with (
+            patch("twinklr.core.audio.metadata.pipeline.extract_embedded_metadata") as mock_extract,
             patch(
-                "blinkb0t.core.audio.metadata.pipeline.extract_embedded_metadata"
-            ) as mock_extract,
-            patch(
-                "blinkb0t.core.audio.metadata.pipeline.compute_chromaprint_fingerprint"
+                "twinklr.core.audio.metadata.pipeline.compute_chromaprint_fingerprint"
             ) as mock_fingerprint,
-            patch("blinkb0t.core.audio.metadata.pipeline.compute_file_hash") as mock_hash,
+            patch("twinklr.core.audio.metadata.pipeline.compute_file_hash") as mock_hash,
         ):
             mock_extract.return_value = EmbeddedMetadata(title="Test")
             mock_fingerprint.side_effect = Exception("fpcalc not found")

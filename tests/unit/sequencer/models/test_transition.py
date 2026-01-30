@@ -3,9 +3,9 @@
 from pydantic import ValidationError
 import pytest
 
-from blinkb0t.core.curves.library import CurveLibrary
-from blinkb0t.core.sequencer.models.enum import ChannelName, TransitionMode
-from blinkb0t.core.sequencer.models.transition import (
+from twinklr.core.curves.library import CurveLibrary
+from twinklr.core.sequencer.models.enum import ChannelName, TransitionMode
+from twinklr.core.sequencer.models.transition import (
     Boundary,
     BoundaryType,
     TransitionHint,

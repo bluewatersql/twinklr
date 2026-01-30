@@ -20,12 +20,12 @@ from typing import Protocol
 
 from Levenshtein import distance as levenshtein_distance
 
-from blinkb0t.core.audio.lyrics.whisperx_models import (
+from twinklr.core.audio.lyrics.whisperx_models import (
     WhisperXAlignResult,
     WhisperXConfig,
     WhisperXTranscribeResult,
 )
-from blinkb0t.core.audio.models.lyrics import LyricWord
+from twinklr.core.audio.models.lyrics import LyricWord
 
 logger = logging.getLogger(__name__)
 

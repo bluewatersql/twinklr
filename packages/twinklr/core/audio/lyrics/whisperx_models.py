@@ -11,7 +11,7 @@ Models:
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from blinkb0t.core.audio.models.lyrics import LyricWord
+from twinklr.core.audio.models.lyrics import LyricWord
 
 
 class WhisperXConfig(BaseModel):

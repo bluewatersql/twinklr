@@ -8,12 +8,12 @@ from __future__ import annotations
 
 import pytest
 
-from blinkb0t.core.sequencer.models.enum import Intensity
-from blinkb0t.core.sequencer.moving_heads.handlers.movement.default import (
+from twinklr.core.sequencer.models.enum import Intensity
+from twinklr.core.sequencer.moving_heads.handlers.movement.default import (
     DefaultMovementHandler,
 )
-from blinkb0t.core.sequencer.moving_heads.libraries.geometry import GeometryType
-from blinkb0t.core.sequencer.moving_heads.libraries.movement import (
+from twinklr.core.sequencer.moving_heads.libraries.geometry import GeometryType
+from twinklr.core.sequencer.moving_heads.libraries.movement import (
     MovementLibrary,
     MovementType,
 )

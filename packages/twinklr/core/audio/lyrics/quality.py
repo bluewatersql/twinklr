@@ -3,7 +3,7 @@
 Compute quality metrics from word-level timing to assess lyrics quality.
 """
 
-from blinkb0t.core.audio.models.lyrics import LyricsQuality, LyricWord
+from twinklr.core.audio.models.lyrics import LyricsQuality, LyricWord
 
 
 def compute_quality_metrics(

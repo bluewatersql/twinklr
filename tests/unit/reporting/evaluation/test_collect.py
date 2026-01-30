@@ -4,8 +4,8 @@ import json
 
 import pytest
 
-from blinkb0t.core.agents.sequencer.moving_heads.models import ChoreographyPlan
-from blinkb0t.core.reporting.evaluation.collect import (
+from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan
+from twinklr.core.reporting.evaluation.collect import (
     build_run_metadata,
     extract_plan,
     load_checkpoint,

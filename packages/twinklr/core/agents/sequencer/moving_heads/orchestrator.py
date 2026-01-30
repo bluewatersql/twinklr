@@ -10,27 +10,27 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from blinkb0t.core.agents.feedback import FeedbackManager
-from blinkb0t.core.agents.logging import LLMCallLogger, NullLLMCallLogger
-from blinkb0t.core.agents.providers.base import LLMProvider
-from blinkb0t.core.agents.runner import AgentRunner
-from blinkb0t.core.agents.sequencer.moving_heads.context_shaper import (
+from twinklr.core.agents.feedback import FeedbackManager
+from twinklr.core.agents.logging import LLMCallLogger, NullLLMCallLogger
+from twinklr.core.agents.providers.base import LLMProvider
+from twinklr.core.agents.runner import AgentRunner
+from twinklr.core.agents.sequencer.moving_heads.context_shaper import (
     MovingHeadContextShaper,
 )
-from blinkb0t.core.agents.sequencer.moving_heads.heuristic_validator import (
+from twinklr.core.agents.sequencer.moving_heads.heuristic_validator import (
     HeuristicValidator,
 )
-from blinkb0t.core.agents.sequencer.moving_heads.models import (
+from twinklr.core.agents.sequencer.moving_heads.models import (
     ChoreographyPlan,
     JudgeDecision,
     JudgeResponse,
 )
-from blinkb0t.core.agents.sequencer.moving_heads.specs import (
+from twinklr.core.agents.sequencer.moving_heads.specs import (
     get_judge_spec,
     get_planner_spec,
 )
-from blinkb0t.core.agents.state import AgentState
-from blinkb0t.core.agents.state_machine import (
+from twinklr.core.agents.state import AgentState
+from twinklr.core.agents.state_machine import (
     OrchestrationState,
     OrchestrationStateMachine,
 )

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from blinkb0t.core.audio.rhythm.beats import (
+from twinklr.core.audio.rhythm.beats import (
     compute_beats,
     detect_downbeats_phase_aligned,
     detect_time_signature,
@@ -408,7 +408,7 @@ class TestDetectTempoChanges:
         hop_length: int,
     ) -> None:
         """Function returns expected dictionary structure."""
-        from blinkb0t.core.audio.rhythm.beats import detect_tempo_changes
+        from twinklr.core.audio.rhythm.beats import detect_tempo_changes
 
         result = detect_tempo_changes(
             sine_wave_440hz,
@@ -428,7 +428,7 @@ class TestDetectTempoChanges:
         hop_length: int,
     ) -> None:
         """Short audio (< 10s window) returns single tempo point."""
-        from blinkb0t.core.audio.rhythm.beats import detect_tempo_changes
+        from twinklr.core.audio.rhythm.beats import detect_tempo_changes
 
         # Create 5 second audio (shorter than 10s window)
         duration = 5.0
@@ -452,7 +452,7 @@ class TestDetectTempoChanges:
         hop_length: int,
     ) -> None:
         """Very short or silent audio uses fallback values."""
-        from blinkb0t.core.audio.rhythm.beats import detect_tempo_changes
+        from twinklr.core.audio.rhythm.beats import detect_tempo_changes
 
         # Create very short audio with some content (not silent)
         very_short = np.random.rand(int(sample_rate * 0.5)).astype(np.float32) * 0.5
@@ -475,7 +475,7 @@ class TestDetectTempoChanges:
         hop_length: int,
     ) -> None:
         """Stable tempo is correctly detected."""
-        from blinkb0t.core.audio.rhythm.beats import detect_tempo_changes
+        from twinklr.core.audio.rhythm.beats import detect_tempo_changes
 
         # Create click track with consistent tempo (120 BPM)
         duration = 15.0
@@ -504,7 +504,7 @@ class TestDetectTempoChanges:
         hop_length: int,
     ) -> None:
         """Tempo curve entries have correct structure."""
-        from blinkb0t.core.audio.rhythm.beats import detect_tempo_changes
+        from twinklr.core.audio.rhythm.beats import detect_tempo_changes
 
         result = detect_tempo_changes(
             long_audio,
@@ -525,7 +525,7 @@ class TestDetectTempoChanges:
         hop_length: int,
     ) -> None:
         """Tempo changes have correct structure when detected."""
-        from blinkb0t.core.audio.rhythm.beats import detect_tempo_changes
+        from twinklr.core.audio.rhythm.beats import detect_tempo_changes
 
         # Create audio with tempo change
         duration = 20.0

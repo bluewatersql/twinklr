@@ -1,6 +1,6 @@
 """Tests for moving head context shaper."""
 
-from blinkb0t.core.agents.sequencer.moving_heads.context_shaper import (
+from twinklr.core.agents.sequencer.moving_heads.context_shaper import (
     MovingHeadContextShaper,
 )
 

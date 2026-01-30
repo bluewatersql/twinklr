@@ -4,10 +4,10 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from blinkb0t.core.agents.providers.base import ProviderType, TokenUsage
-from blinkb0t.core.agents.providers.conversation import generate_conversation_id
-from blinkb0t.core.agents.providers.errors import LLMProviderError
-from blinkb0t.core.agents.providers.openai import OpenAIProvider
+from twinklr.core.agents.providers.base import ProviderType, TokenUsage
+from twinklr.core.agents.providers.conversation import generate_conversation_id
+from twinklr.core.agents.providers.errors import LLMProviderError
+from twinklr.core.agents.providers.openai import OpenAIProvider
 
 
 @pytest.fixture
@@ -30,7 +30,7 @@ def mock_openai_client():
 
 def test_openai_provider_type():
     """Test provider type is OPENAI."""
-    with patch("blinkb0t.core.api.llm.openai.client.OpenAIClient"):
+    with patch("twinklr.core.api.llm.openai.client.OpenAIClient"):
         provider = OpenAIProvider(api_key="test-key")
         assert provider.provider_type == ProviderType.OPENAI
 
@@ -38,8 +38,8 @@ def test_openai_provider_type():
 def test_openai_provider_init(mock_openai_client):
     """Test provider initialization."""
     with (
-        patch("blinkb0t.core.api.llm.openai.client.OpenAIClient", return_value=mock_openai_client),
-        patch("blinkb0t.core.agents.providers.openai.AsyncOpenAI"),
+        patch("twinklr.core.api.llm.openai.client.OpenAIClient", return_value=mock_openai_client),
+        patch("twinklr.core.agents.providers.openai.AsyncOpenAI"),
     ):
         provider = OpenAIProvider(api_key="test-key", timeout=60.0)
 
@@ -49,7 +49,7 @@ def test_openai_provider_init(mock_openai_client):
 
 def test_generate_json_success(mock_openai_client):
     """Test successful JSON generation."""
-    with patch("blinkb0t.core.api.llm.openai.client.OpenAIClient", return_value=mock_openai_client):
+    with patch("twinklr.core.api.llm.openai.client.OpenAIClient", return_value=mock_openai_client):
         provider = OpenAIProvider(api_key="test-key")
 
         messages = [
@@ -74,7 +74,7 @@ def test_generate_json_success(mock_openai_client):
 
 def test_generate_json_error(mock_openai_client):
     """Test error handling in generate_json."""
-    with patch("blinkb0t.core.api.llm.openai.client.OpenAIClient", return_value=mock_openai_client):
+    with patch("twinklr.core.api.llm.openai.client.OpenAIClient", return_value=mock_openai_client):
         provider = OpenAIProvider(api_key="test-key")
 
         # Make client raise error
@@ -90,7 +90,7 @@ def test_generate_json_error(mock_openai_client):
 
 def test_generate_json_with_conversation_new(mock_openai_client):
     """Test creating new conversation."""
-    with patch("blinkb0t.core.api.llm.openai.client.OpenAIClient", return_value=mock_openai_client):
+    with patch("twinklr.core.api.llm.openai.client.OpenAIClient", return_value=mock_openai_client):
         provider = OpenAIProvider(api_key="test-key")
 
         conv_id = generate_conversation_id("planner", 1)
@@ -121,7 +121,7 @@ def test_generate_json_with_conversation_new(mock_openai_client):
 
 def test_generate_json_with_conversation_existing(mock_openai_client):
     """Test continuing existing conversation."""
-    with patch("blinkb0t.core.api.llm.openai.client.OpenAIClient", return_value=mock_openai_client):
+    with patch("twinklr.core.api.llm.openai.client.OpenAIClient", return_value=mock_openai_client):
         provider = OpenAIProvider(api_key="test-key")
 
         conv_id = generate_conversation_id("planner", 1)
@@ -150,7 +150,7 @@ def test_generate_json_with_conversation_existing(mock_openai_client):
 
 def test_add_message_to_conversation(mock_openai_client):
     """Test adding message to conversation."""
-    with patch("blinkb0t.core.api.llm.openai.client.OpenAIClient", return_value=mock_openai_client):
+    with patch("twinklr.core.api.llm.openai.client.OpenAIClient", return_value=mock_openai_client):
         provider = OpenAIProvider(api_key="test-key")
 
         conv_id = generate_conversation_id("test", 1)
@@ -172,7 +172,7 @@ def test_add_message_to_conversation(mock_openai_client):
 
 def test_add_message_to_nonexistent_conversation(mock_openai_client):
     """Test adding message to nonexistent conversation."""
-    with patch("blinkb0t.core.api.llm.openai.client.OpenAIClient", return_value=mock_openai_client):
+    with patch("twinklr.core.api.llm.openai.client.OpenAIClient", return_value=mock_openai_client):
         provider = OpenAIProvider(api_key="test-key")
 
         with pytest.raises(ValueError) as exc_info:
@@ -185,7 +185,7 @@ def test_add_message_to_nonexistent_conversation(mock_openai_client):
 
 def test_get_conversation_history(mock_openai_client):
     """Test getting conversation history."""
-    with patch("blinkb0t.core.api.llm.openai.client.OpenAIClient", return_value=mock_openai_client):
+    with patch("twinklr.core.api.llm.openai.client.OpenAIClient", return_value=mock_openai_client):
         provider = OpenAIProvider(api_key="test-key")
 
         conv_id = generate_conversation_id("test", 1)
@@ -209,7 +209,7 @@ def test_get_conversation_history(mock_openai_client):
 
 def test_get_conversation_history_nonexistent(mock_openai_client):
     """Test getting history for nonexistent conversation."""
-    with patch("blinkb0t.core.api.llm.openai.client.OpenAIClient", return_value=mock_openai_client):
+    with patch("twinklr.core.api.llm.openai.client.OpenAIClient", return_value=mock_openai_client):
         provider = OpenAIProvider(api_key="test-key")
 
         with pytest.raises(ValueError) as exc_info:
@@ -221,8 +221,8 @@ def test_get_conversation_history_nonexistent(mock_openai_client):
 def test_get_token_usage(mock_openai_client):
     """Test getting token usage after making calls."""
     with (
-        patch("blinkb0t.core.api.llm.openai.client.OpenAIClient", return_value=mock_openai_client),
-        patch("blinkb0t.core.agents.providers.openai.AsyncOpenAI"),
+        patch("twinklr.core.api.llm.openai.client.OpenAIClient", return_value=mock_openai_client),
+        patch("twinklr.core.agents.providers.openai.AsyncOpenAI"),
     ):
         provider = OpenAIProvider(api_key="test-key")
 
@@ -247,7 +247,7 @@ def test_get_token_usage(mock_openai_client):
 
 def test_reset_token_tracking(mock_openai_client):
     """Test resetting token tracking."""
-    with patch("blinkb0t.core.api.llm.openai.client.OpenAIClient", return_value=mock_openai_client):
+    with patch("twinklr.core.api.llm.openai.client.OpenAIClient", return_value=mock_openai_client):
         provider = OpenAIProvider(api_key="test-key")
 
         provider.reset_token_tracking()
@@ -257,7 +257,7 @@ def test_reset_token_tracking(mock_openai_client):
 
 def test_conversation_without_system_prompt(mock_openai_client):
     """Test conversation without system prompt."""
-    with patch("blinkb0t.core.api.llm.openai.client.OpenAIClient", return_value=mock_openai_client):
+    with patch("twinklr.core.api.llm.openai.client.OpenAIClient", return_value=mock_openai_client):
         provider = OpenAIProvider(api_key="test-key")
 
         conv_id = generate_conversation_id("test", 1)

@@ -7,7 +7,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from blinkb0t.core.agents.prompts.renderer import PromptRenderer
+from twinklr.core.agents.prompts.renderer import PromptRenderer
 
 logger = logging.getLogger(__name__)
 

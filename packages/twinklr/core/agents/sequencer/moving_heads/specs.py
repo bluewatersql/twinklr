@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from blinkb0t.core.agents.sequencer.moving_heads.models import (
+from twinklr.core.agents.sequencer.moving_heads.models import (
     ChoreographyPlan,
     JudgeResponse,
 )
-from blinkb0t.core.agents.spec import AgentMode, AgentSpec
+from twinklr.core.agents.spec import AgentMode, AgentSpec
 
 
 def get_planner_spec(

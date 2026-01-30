@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from blinkb0t.core.audio.structure.sections import (
+from twinklr.core.audio.structure.sections import (
     detect_song_sections,
     label_section_contextual,
 )

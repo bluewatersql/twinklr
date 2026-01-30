@@ -2,14 +2,14 @@ from __future__ import annotations
 
 from typing import Any
 
-from blinkb0t.core.curves.library import build_default_registry
-from blinkb0t.core.curves.models import (
+from twinklr.core.curves.library import build_default_registry
+from twinklr.core.curves.models import (
     CurvePoint,
 )
-from blinkb0t.core.curves.native import NativeCurveType, xLightsNativeCurve
-from blinkb0t.core.curves.providers.custom import CustomCurveProvider
-from blinkb0t.core.curves.providers.native import NativeCurveProvider
-from blinkb0t.core.curves.registry import NativeCurveDefinition
+from twinklr.core.curves.native import NativeCurveType, xLightsNativeCurve
+from twinklr.core.curves.providers.custom import CustomCurveProvider
+from twinklr.core.curves.providers.native import NativeCurveProvider
+from twinklr.core.curves.registry import NativeCurveDefinition
 
 
 class CurveGenerator:

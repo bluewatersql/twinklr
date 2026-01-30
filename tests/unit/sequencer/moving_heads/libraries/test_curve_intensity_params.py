@@ -2,9 +2,9 @@
 
 import pytest
 
-from blinkb0t.core.curves.library import CurveLibrary
-from blinkb0t.core.sequencer.models.enum import Intensity
-from blinkb0t.core.sequencer.moving_heads.libraries.movement import (
+from twinklr.core.curves.library import CurveLibrary
+from twinklr.core.sequencer.models.enum import Intensity
+from twinklr.core.sequencer.moving_heads.libraries.movement import (
     DEFAULT_MOVEMENT_PARAMS,
     MovementCategoricalParams,
     get_curve_categorical_params,
@@ -113,7 +113,7 @@ class TestCurveIntensityParamsStructure:
 
     def test_curve_intensity_params_exists(self):
         """Test that CURVE_INTENSITY_PARAMS is defined."""
-        from blinkb0t.core.sequencer.moving_heads.libraries.movement import (
+        from twinklr.core.sequencer.moving_heads.libraries.movement import (
             CURVE_INTENSITY_PARAMS,
         )
 
@@ -122,7 +122,7 @@ class TestCurveIntensityParamsStructure:
 
     def test_all_entries_have_all_intensities(self):
         """Test that each curve has all intensity levels defined."""
-        from blinkb0t.core.sequencer.moving_heads.libraries.movement import (
+        from twinklr.core.sequencer.moving_heads.libraries.movement import (
             CURVE_INTENSITY_PARAMS,
         )
 
@@ -134,7 +134,7 @@ class TestCurveIntensityParamsStructure:
 
     def test_all_params_in_valid_range(self):
         """Test that all params are in valid ranges."""
-        from blinkb0t.core.sequencer.moving_heads.libraries.movement import (
+        from twinklr.core.sequencer.moving_heads.libraries.movement import (
             CURVE_INTENSITY_PARAMS,
         )
 
@@ -154,7 +154,7 @@ class TestCurveIntensityParamsStructure:
         """Test that all params in CURVE_INTENSITY_PARAMS are immutable."""
         from pydantic import ValidationError
 
-        from blinkb0t.core.sequencer.moving_heads.libraries.movement import (
+        from twinklr.core.sequencer.moving_heads.libraries.movement import (
             CURVE_INTENSITY_PARAMS,
         )
 

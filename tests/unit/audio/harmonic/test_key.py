@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from blinkb0t.core.audio.harmonic.key import detect_musical_key, extract_chroma
+from twinklr.core.audio.harmonic.key import detect_musical_key, extract_chroma
 
 
 class TestDetectMusicalKey:

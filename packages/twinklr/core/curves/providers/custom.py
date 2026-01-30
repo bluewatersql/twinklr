@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from typing import Any
 
-from blinkb0t.core.curves.models import (
+from twinklr.core.curves.models import (
     CurvePoint,
 )
-from blinkb0t.core.curves.registry import CurveDefinition, CurveRegistry
+from twinklr.core.curves.registry import CurveDefinition, CurveRegistry
 
 
 class CustomCurveProvider:

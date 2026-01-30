@@ -1,4 +1,4 @@
-"""BlinkB0t session coordinator - universal services for all domains.
+"""Twinklr session coordinator - universal services for all domains.
 
 The session provides shared infrastructure that all domains need:
 - Configuration management (app-level and job-level)
@@ -17,18 +17,18 @@ import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, TypeVar
 
-from blinkb0t.core.config.models import AppConfig, ConfigBase, JobConfig
+from twinklr.core.config.models import AppConfig, ConfigBase, JobConfig
 
 T = TypeVar("T", bound=ConfigBase)
 
 if TYPE_CHECKING:
-    from blinkb0t.core.audio.analyzer import AudioAnalyzer
+    from twinklr.core.audio.analyzer import AudioAnalyzer
 
 logger = logging.getLogger(__name__)
 
 
-class BlinkB0tSession:
-    """Universal session coordinator for BlinkB0t pipelines.
+class TwinklrSession:
+    """Universal session coordinator for Twinklr pipelines.
 
     Manages configuration and provides shared services (audio analysis,
     sequence fingerprinting) that all domains need. Domain-specific logic
@@ -56,7 +56,7 @@ class BlinkB0tSession:
         self.job_config: JobConfig = self._resolve_config(job_config, JobConfig)
 
         # Set up project/artifact management
-        self.project_name = self.job_config.project_name or "blinkb0t_project"
+        self.project_name = self.job_config.project_name or "twinklr_project"
         self.artifact_dir = (
             Path(self.job_config.output_dir or self.app_config.output_dir) / self.project_name
         )
@@ -93,7 +93,7 @@ class BlinkB0tSession:
             )
 
     @classmethod
-    def from_directory(cls, config_dir: Path | str = ".") -> BlinkB0tSession:
+    def from_directory(cls, config_dir: Path | str = ".") -> TwinklrSession:
         """Create session from a directory containing config files.
 
         Looks for config.json and job_config.json in the specified directory.
@@ -102,11 +102,11 @@ class BlinkB0tSession:
             config_dir: Directory containing config files (default: current directory)
 
         Returns:
-            Initialized BlinkB0tSession
+            Initialized TwinklrSession
 
         Example:
-            session = BlinkB0tSession.from_directory(".")
-            session = BlinkB0tSession.from_directory("/path/to/project")
+            session = TwinklrSession.from_directory(".")
+            session = TwinklrSession.from_directory("/path/to/project")
         """
         config_dir = Path(config_dir)
         return cls(
@@ -128,7 +128,7 @@ class BlinkB0tSession:
             AudioAnalyzer instance configured with session configs
         """
         if not hasattr(self, "_audio"):
-            from blinkb0t.core.audio.analyzer import AudioAnalyzer
+            from twinklr.core.audio.analyzer import AudioAnalyzer
 
             self._audio = AudioAnalyzer(self.app_config, self.job_config)
         return self._audio

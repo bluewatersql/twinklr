@@ -5,8 +5,8 @@ from __future__ import annotations
 import math
 from typing import Any
 
-from blinkb0t.core.config.models import AppConfig, JobConfig
-from blinkb0t.core.formats.xlights.sequence.parser import XSQParser
+from twinklr.core.config.models import AppConfig, JobConfig
+from twinklr.core.formats.xlights.sequence.parser import XSQParser
 
 
 class SequenceAnalyzer:

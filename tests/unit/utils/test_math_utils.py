@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from blinkb0t.core.utils.math import clamp, lerp
+from twinklr.core.utils.math import clamp, lerp
 
 
 def test_clamp_within_range():

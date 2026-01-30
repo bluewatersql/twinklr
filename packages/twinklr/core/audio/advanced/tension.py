@@ -7,7 +7,7 @@ from typing import Any
 
 import numpy as np
 
-from blinkb0t.core.audio.utils import as_float_list, normalize_to_0_1
+from twinklr.core.audio.utils import as_float_list, normalize_to_0_1
 
 try:
     from scipy.ndimage import gaussian_filter1d

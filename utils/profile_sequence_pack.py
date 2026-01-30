@@ -14,10 +14,10 @@ import zlib
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
-from blinkb0t.core.formats.xlights.sequence.parser import XSQParser
+from twinklr.core.formats.xlights.sequence.parser import XSQParser
 
 if TYPE_CHECKING:
-    from blinkb0t.core.formats.xlights.sequence.models.xsq import XSequence
+    from twinklr.core.formats.xlights.sequence.models.xsq import XSequence
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)

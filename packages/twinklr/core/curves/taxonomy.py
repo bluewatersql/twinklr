@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from enum import Enum
 
-from blinkb0t.core.curves.library import CurveLibrary
+from twinklr.core.curves.library import CurveLibrary
 
 
 class CurveFamily(Enum):

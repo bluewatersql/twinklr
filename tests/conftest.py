@@ -1,4 +1,4 @@
-"""Shared pytest fixtures for blinkb0t tests.
+"""Shared pytest fixtures for twinklr tests.
 
 Modern conftest adapted from .dev/tests/conftest.py with updates for new architecture.
 """
@@ -9,10 +9,10 @@ from pathlib import Path
 
 import pytest
 
-from blinkb0t.core.config.fixtures.instances import FixtureInstance
-from blinkb0t.core.config.poses import PanPose, TiltPose
-from blinkb0t.core.sequencer.models.enum import TemplateRole
-from blinkb0t.core.sequencer.timing.beat_grid import BeatGrid
+from twinklr.core.config.fixtures.instances import FixtureInstance
+from twinklr.core.config.poses import PanPose, TiltPose
+from twinklr.core.sequencer.models.enum import TemplateRole
+from twinklr.core.sequencer.timing.beat_grid import BeatGrid
 
 # ============================================================================
 # Path Fixtures
@@ -62,8 +62,8 @@ def beat_grid(simple_song_features: dict) -> BeatGrid:
 @pytest.fixture
 def mock_fixture_instance() -> FixtureInstance:
     """Create a mock FixtureInstance for testing."""
-    from blinkb0t.core.config.fixtures.base import FixtureConfig
-    from blinkb0t.core.config.fixtures.enums import ChannelName, FixtureType
+    from twinklr.core.config.fixtures.base import FixtureConfig
+    from twinklr.core.config.fixtures.enums import ChannelName, FixtureType
 
     config = FixtureConfig(
         fixture_type=FixtureType.MOVING_HEAD,
@@ -129,7 +129,7 @@ def mock_template_doc():
 
     Note: Imports moved inside fixture to avoid circular dependencies.
     """
-    from blinkb0t.core.sequencer.moving_heads.templates import (
+    from twinklr.core.sequencer.moving_heads.templates import (
         get_template,
         load_builtin_templates,
     )

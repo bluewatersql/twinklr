@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from blinkb0t.core.audio.validation.validator import validate_features
+from twinklr.core.audio.validation.validator import validate_features
 
 
 class TestValidateFeatures:

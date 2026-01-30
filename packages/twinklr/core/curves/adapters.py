@@ -10,7 +10,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
-from blinkb0t.core.sequencer.moving_heads.libraries.movement import MovementCategoricalParams
+from twinklr.core.sequencer.moving_heads.libraries.movement import MovementCategoricalParams
 
 # Adapter signature: categorical params → curve-specific params
 ParameterAdapter = Callable[[MovementCategoricalParams, dict[str, Any]], dict[str, Any]]
@@ -84,7 +84,7 @@ def adapt_pulse_params(
         Adapted parameters with high/low
 
     Example:
-        >>> from blinkb0t.core.sequencer.moving_heads.libraries.movement import (
+        >>> from twinklr.core.sequencer.moving_heads.libraries.movement import (
         ...     MovementCategoricalParams,
         ... )
         >>> categorical = MovementCategoricalParams(
@@ -125,7 +125,7 @@ def adapt_movement_pulse_params(
         Adapted parameters with high/low
 
     Example:
-        >>> from blinkb0t.core.sequencer.moving_heads.libraries.movement import (
+        >>> from twinklr.core.sequencer.moving_heads.libraries.movement import (
         ...     MovementCategoricalParams,
         ... )
         >>> categorical = MovementCategoricalParams(
@@ -167,7 +167,7 @@ def adapt_bezier_params(
         Adapted parameters with scaled control points
 
     Example:
-        >>> from blinkb0t.core.sequencer.moving_heads.libraries.movement import (
+        >>> from twinklr.core.sequencer.moving_heads.libraries.movement import (
         ...     MovementCategoricalParams,
         ... )
         >>> categorical = MovementCategoricalParams(
@@ -208,7 +208,7 @@ def adapt_lissajous_params(
         Adapted parameters with scaled b
 
     Example:
-        >>> from blinkb0t.core.sequencer.moving_heads.libraries.movement import (
+        >>> from twinklr.core.sequencer.moving_heads.libraries.movement import (
         ...     MovementCategoricalParams,
         ... )
         >>> categorical = MovementCategoricalParams(
@@ -252,7 +252,7 @@ def adapt_fixed_behavior(
         Base parameters unchanged
 
     Example:
-        >>> from blinkb0t.core.sequencer.moving_heads.libraries.movement import (
+        >>> from twinklr.core.sequencer.moving_heads.libraries.movement import (
         ...     MovementCategoricalParams,
         ... )
         >>> categorical = MovementCategoricalParams(
@@ -273,7 +273,7 @@ def build_default_adapter_registry() -> ParameterAdapterRegistry:
 
     Example:
         >>> registry = build_default_adapter_registry()
-        >>> from blinkb0t.core.sequencer.moving_heads.libraries.movement import (
+        >>> from twinklr.core.sequencer.moving_heads.libraries.movement import (
         ...     MovementCategoricalParams,
         ... )
         >>> categorical = MovementCategoricalParams(

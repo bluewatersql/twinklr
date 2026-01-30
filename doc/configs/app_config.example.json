@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "description": "BlinkB0t Application Configuration - Shared settings for all jobs/tasks",
+  "description": "Twinklr Application Configuration - Shared settings for all jobs/tasks",
   
   "output_dir": "artifacts",
   "cache_dir": "data/audio_cache",
@@ -75,7 +75,7 @@
   "_usage": {
     "description": "How to use this configuration file",
     "location": "Save as 'config.json' in project root",
-    "validation": "Validated by AppConfig Pydantic model (packages/blinkb0t/core/config/models.py)",
+    "validation": "Validated by AppConfig Pydantic model (packages/twinklr/core/config/models.py)",
     "defaults": "All fields shown here are defaults - you can omit fields to use defaults",
     "forward_compatibility": "Unknown fields are ignored for forward compatibility"
   }

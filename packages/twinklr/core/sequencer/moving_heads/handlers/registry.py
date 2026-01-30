@@ -9,14 +9,14 @@ with type-specific error messages.
 
 from typing import Any, Generic, Protocol, TypeVar
 
-from blinkb0t.core.sequencer.models.enum import Intensity
-from blinkb0t.core.sequencer.moving_heads.handlers.protocols import (
+from twinklr.core.sequencer.models.enum import Intensity
+from twinklr.core.sequencer.moving_heads.handlers.protocols import (
     DimmerResult,
     GeometryResult,
     MovementResult,
 )
-from blinkb0t.core.sequencer.moving_heads.libraries.dimmer import DimmerLibrary, DimmerType
-from blinkb0t.core.sequencer.moving_heads.libraries.movement import MovementLibrary, MovementType
+from twinklr.core.sequencer.moving_heads.libraries.dimmer import DimmerLibrary, DimmerType
+from twinklr.core.sequencer.moving_heads.libraries.movement import MovementLibrary, MovementType
 
 
 class HasHandlerId(Protocol):

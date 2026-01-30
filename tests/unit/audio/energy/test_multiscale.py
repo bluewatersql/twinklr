@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from blinkb0t.core.audio.energy.multiscale import extract_smoothed_energy
+from twinklr.core.audio.energy.multiscale import extract_smoothed_energy
 
 
 class TestExtractSmoothedEnergy:
@@ -224,11 +224,11 @@ class TestFallbackSmoothing:
         from unittest.mock import patch
 
         # Patch HAS_SCIPY to False to test fallback path
-        with patch("blinkb0t.core.audio.energy.multiscale.HAS_SCIPY", False):
+        with patch("twinklr.core.audio.energy.multiscale.HAS_SCIPY", False):
             # Need to reimport the module to get the patched version
             import importlib
 
-            import blinkb0t.core.audio.energy.multiscale as multiscale_module
+            import twinklr.core.audio.energy.multiscale as multiscale_module
 
             importlib.reload(multiscale_module)
 
@@ -265,10 +265,10 @@ class TestFallbackSmoothing:
         # Very short audio
         short_audio = np.random.rand(sample_rate).astype(np.float32)
 
-        with patch("blinkb0t.core.audio.energy.multiscale.HAS_SCIPY", False):
+        with patch("twinklr.core.audio.energy.multiscale.HAS_SCIPY", False):
             import importlib
 
-            import blinkb0t.core.audio.energy.multiscale as multiscale_module
+            import twinklr.core.audio.energy.multiscale as multiscale_module
 
             importlib.reload(multiscale_module)
 

@@ -2,16 +2,16 @@
 
 import pytest
 
-from blinkb0t.core.config.models import TransitionConfig
-from blinkb0t.core.sequencer.models.enum import ChannelName, TransitionMode
-from blinkb0t.core.sequencer.models.transition import (
+from twinklr.core.config.models import TransitionConfig
+from twinklr.core.sequencer.models.enum import ChannelName, TransitionMode
+from twinklr.core.sequencer.models.transition import (
     Boundary,
     BoundaryType,
     TransitionHint,
     TransitionStrategy,
 )
-from blinkb0t.core.sequencer.moving_heads.compile.transition_planner import TransitionPlanner
-from blinkb0t.core.sequencer.timing.beat_grid import BeatGrid
+from twinklr.core.sequencer.moving_heads.compile.transition_planner import TransitionPlanner
+from twinklr.core.sequencer.timing.beat_grid import BeatGrid
 
 
 @pytest.fixture

@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from blinkb0t.core.agents.prompts.loader import LoadError, PromptPackLoader
+from twinklr.core.agents.prompts.loader import LoadError, PromptPackLoader
 
 FIXTURES_PATH = Path(__file__).parent.parent.parent.parent / "fixtures" / "prompts"
 

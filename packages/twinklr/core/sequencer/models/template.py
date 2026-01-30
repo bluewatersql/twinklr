@@ -13,9 +13,9 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from blinkb0t.core.config.poses import PanPose, TiltPose
-from blinkb0t.core.curves.library import CurveLibrary
-from blinkb0t.core.sequencer.models.enum import (
+from twinklr.core.config.poses import PanPose, TiltPose
+from twinklr.core.curves.library import CurveLibrary
+from twinklr.core.sequencer.models.enum import (
     AimZone,
     BlendMode,
     ChaseOrder,
@@ -27,9 +27,9 @@ from blinkb0t.core.sequencer.models.enum import (
     TimingMode,
     TransitionMode,
 )
-from blinkb0t.core.sequencer.moving_heads.libraries.dimmer import DimmerType
-from blinkb0t.core.sequencer.moving_heads.libraries.geometry import GeometryType
-from blinkb0t.core.sequencer.moving_heads.libraries.movement import MovementType
+from twinklr.core.sequencer.moving_heads.libraries.dimmer import DimmerType
+from twinklr.core.sequencer.moving_heads.libraries.geometry import GeometryType
+from twinklr.core.sequencer.moving_heads.libraries.movement import MovementType
 
 
 class RepeatMode(str, Enum):
@@ -200,7 +200,7 @@ class Movement(BaseModel):
             Categorical parameters with overrides applied
 
         Example:
-            >>> from blinkb0t.core.curves.library import CurveLibrary
+            >>> from twinklr.core.curves.library import CurveLibrary
             >>> movement = Movement(
             ...     movement_type=MovementType.SWEEP_LR,
             ...     intensity=Intensity.SMOOTH,
@@ -211,7 +211,7 @@ class Movement(BaseModel):
             0.8
         """
         # Import here to avoid circular dependency
-        from blinkb0t.core.sequencer.moving_heads.libraries.movement import (
+        from twinklr.core.sequencer.moving_heads.libraries.movement import (
             MovementCategoricalParams,
             get_curve_categorical_params,
         )

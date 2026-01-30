@@ -3,7 +3,7 @@
 Testing the deterministic scoring and merging algorithms.
 """
 
-from blinkb0t.core.audio.models.metadata import (
+from twinklr.core.audio.models.metadata import (
     EmbeddedMetadata,
     MetadataCandidate,
     ResolvedMBIDs,
@@ -15,28 +15,28 @@ class TestTextNormalization:
 
     def test_normalize_text_lowercase(self):
         """normalize_text converts to lowercase."""
-        from blinkb0t.core.audio.metadata.merge import normalize_text
+        from twinklr.core.audio.metadata.merge import normalize_text
 
         assert normalize_text("Hello WORLD") == "hello world"
         assert normalize_text("Test Song") == "test song"
 
     def test_normalize_text_strip(self):
         """normalize_text strips whitespace."""
-        from blinkb0t.core.audio.metadata.merge import normalize_text
+        from twinklr.core.audio.metadata.merge import normalize_text
 
         assert normalize_text("  hello  ") == "hello"
         assert normalize_text("\t test \n") == "test"
 
     def test_normalize_text_collapse_whitespace(self):
         """normalize_text collapses multiple spaces."""
-        from blinkb0t.core.audio.metadata.merge import normalize_text
+        from twinklr.core.audio.metadata.merge import normalize_text
 
         assert normalize_text("hello    world") == "hello world"
         assert normalize_text("a  b   c") == "a b c"
 
     def test_normalize_text_remove_punctuation(self):
         """normalize_text removes punctuation."""
-        from blinkb0t.core.audio.metadata.merge import normalize_text
+        from twinklr.core.audio.metadata.merge import normalize_text
 
         assert normalize_text("hello, world!") == "hello world"
         assert normalize_text("test-song (remix)") == "testsong remix"
@@ -44,13 +44,13 @@ class TestTextNormalization:
 
     def test_normalize_text_none(self):
         """normalize_text handles None."""
-        from blinkb0t.core.audio.metadata.merge import normalize_text
+        from twinklr.core.audio.metadata.merge import normalize_text
 
         assert normalize_text(None) == ""
 
     def test_normalize_text_empty(self):
         """normalize_text handles empty string."""
-        from blinkb0t.core.audio.metadata.merge import normalize_text
+        from twinklr.core.audio.metadata.merge import normalize_text
 
         assert normalize_text("") == ""
 
@@ -60,21 +60,21 @@ class TestTokenJaccard:
 
     def test_token_jaccard_identical(self):
         """Identical strings have similarity 1.0."""
-        from blinkb0t.core.audio.metadata.merge import token_jaccard
+        from twinklr.core.audio.metadata.merge import token_jaccard
 
         assert token_jaccard("hello world", "hello world") == 1.0
         assert token_jaccard("test", "test") == 1.0
 
     def test_token_jaccard_no_overlap(self):
         """No overlap has similarity 0.0."""
-        from blinkb0t.core.audio.metadata.merge import token_jaccard
+        from twinklr.core.audio.metadata.merge import token_jaccard
 
         assert token_jaccard("hello", "world") == 0.0
         assert token_jaccard("foo bar", "baz qux") == 0.0
 
     def test_token_jaccard_partial_overlap(self):
         """Partial overlap."""
-        from blinkb0t.core.audio.metadata.merge import token_jaccard
+        from twinklr.core.audio.metadata.merge import token_jaccard
 
         # "hello world" and "hello there" share 1 token (hello)
         # Union: {hello, world, there} = 3 tokens
@@ -88,13 +88,13 @@ class TestTokenJaccard:
 
     def test_token_jaccard_case_insensitive(self):
         """token_jaccard is case-insensitive (normalized)."""
-        from blinkb0t.core.audio.metadata.merge import token_jaccard
+        from twinklr.core.audio.metadata.merge import token_jaccard
 
         assert token_jaccard("Hello World", "hello world") == 1.0
 
     def test_token_jaccard_none_handling(self):
         """token_jaccard handles None values."""
-        from blinkb0t.core.audio.metadata.merge import token_jaccard
+        from twinklr.core.audio.metadata.merge import token_jaccard
 
         assert token_jaccard(None, None) == 0.0  # Both missing (no information)
         assert token_jaccard("hello", None) == 0.0
@@ -102,7 +102,7 @@ class TestTokenJaccard:
 
     def test_token_jaccard_empty_strings(self):
         """token_jaccard handles empty strings."""
-        from blinkb0t.core.audio.metadata.merge import token_jaccard
+        from twinklr.core.audio.metadata.merge import token_jaccard
 
         assert token_jaccard("", "") == 0.0  # Both empty (no information)
         assert token_jaccard("hello", "") == 0.0
@@ -113,14 +113,14 @@ class TestDurationSimilarity:
 
     def test_duration_similarity_exact_match(self):
         """Exact duration match has similarity 1.0."""
-        from blinkb0t.core.audio.metadata.merge import duration_similarity
+        from twinklr.core.audio.metadata.merge import duration_similarity
 
         assert duration_similarity(180000, 180000) == 1.0
         assert duration_similarity(120500, 120500) == 1.0
 
     def test_duration_similarity_small_delta(self):
         """Small duration difference has high similarity."""
-        from blinkb0t.core.audio.metadata.merge import duration_similarity
+        from twinklr.core.audio.metadata.merge import duration_similarity
 
         # 1 second difference (1000ms) on 180s song
         # delta_s = 1
@@ -130,7 +130,7 @@ class TestDurationSimilarity:
 
     def test_duration_similarity_large_delta(self):
         """Large duration difference has low similarity."""
-        from blinkb0t.core.audio.metadata.merge import duration_similarity
+        from twinklr.core.audio.metadata.merge import duration_similarity
 
         # 10 second difference (10000ms)
         # delta_s = 10
@@ -139,14 +139,14 @@ class TestDurationSimilarity:
 
     def test_duration_similarity_missing_ref(self):
         """Missing reference duration returns 0.5."""
-        from blinkb0t.core.audio.metadata.merge import duration_similarity
+        from twinklr.core.audio.metadata.merge import duration_similarity
 
         assert duration_similarity(180000, None) == 0.5
         assert duration_similarity(None, 180000) == 0.5
 
     def test_duration_similarity_both_missing(self):
         """Both missing returns 0.5 (can't compare)."""
-        from blinkb0t.core.audio.metadata.merge import duration_similarity
+        from twinklr.core.audio.metadata.merge import duration_similarity
 
         assert duration_similarity(None, None) == 0.5
 
@@ -156,7 +156,7 @@ class TestGenericDetection:
 
     def test_is_generic_title(self):
         """is_generic_title detects generic titles."""
-        from blinkb0t.core.audio.metadata.merge import is_generic_title
+        from twinklr.core.audio.metadata.merge import is_generic_title
 
         assert is_generic_title("track 1")
         assert is_generic_title("Track 12")
@@ -165,7 +165,7 @@ class TestGenericDetection:
 
     def test_is_generic_title_not_generic(self):
         """is_generic_title returns False for non-generic titles."""
-        from blinkb0t.core.audio.metadata.merge import is_generic_title
+        from twinklr.core.audio.metadata.merge import is_generic_title
 
         assert not is_generic_title("Real Song Title")
         assert not is_generic_title("Track of the Century")  # Contains "track" but not pattern
@@ -173,13 +173,13 @@ class TestGenericDetection:
 
     def test_is_generic_title_none(self):
         """is_generic_title handles None."""
-        from blinkb0t.core.audio.metadata.merge import is_generic_title
+        from twinklr.core.audio.metadata.merge import is_generic_title
 
         assert is_generic_title(None)
 
     def test_is_generic_artist(self):
         """is_generic_artist detects generic artists."""
-        from blinkb0t.core.audio.metadata.merge import is_generic_artist
+        from twinklr.core.audio.metadata.merge import is_generic_artist
 
         assert is_generic_artist("unknown")
         assert is_generic_artist("Unknown")
@@ -189,14 +189,14 @@ class TestGenericDetection:
 
     def test_is_generic_artist_not_generic(self):
         """is_generic_artist returns False for non-generic artists."""
-        from blinkb0t.core.audio.metadata.merge import is_generic_artist
+        from twinklr.core.audio.metadata.merge import is_generic_artist
 
         assert not is_generic_artist("Real Artist Name")
         assert not is_generic_artist("The Unknown Legends")  # Contains "unknown" but not exact
 
     def test_is_generic_artist_none(self):
         """is_generic_artist handles None."""
-        from blinkb0t.core.audio.metadata.merge import is_generic_artist
+        from twinklr.core.audio.metadata.merge import is_generic_artist
 
         assert is_generic_artist(None)
 
@@ -206,7 +206,7 @@ class TestCandidateScoring:
 
     def test_score_candidate_perfect_match(self):
         """Perfect candidate match with MusicBrainz."""
-        from blinkb0t.core.audio.metadata.merge import MergeConfig, score_candidate
+        from twinklr.core.audio.metadata.merge import MergeConfig, score_candidate
 
         embedded = EmbeddedMetadata(
             title="Test Song",
@@ -238,7 +238,7 @@ class TestCandidateScoring:
 
     def test_score_candidate_acoustid_provider(self):
         """AcoustID provider has lower weight."""
-        from blinkb0t.core.audio.metadata.merge import MergeConfig, score_candidate
+        from twinklr.core.audio.metadata.merge import MergeConfig, score_candidate
 
         embedded = EmbeddedMetadata(title="Test", artist="Artist")
         candidate = MetadataCandidate(
@@ -264,7 +264,7 @@ class TestCandidateScoring:
 
     def test_score_candidate_with_isrc(self):
         """ISRC adds bonus to score."""
-        from blinkb0t.core.audio.metadata.merge import MergeConfig, score_candidate
+        from twinklr.core.audio.metadata.merge import MergeConfig, score_candidate
 
         embedded = EmbeddedMetadata()
         candidate = MetadataCandidate(
@@ -289,7 +289,7 @@ class TestCandidateScoring:
 
     def test_score_candidate_deterministic(self):
         """Same inputs produce same score (deterministic)."""
-        from blinkb0t.core.audio.metadata.merge import MergeConfig, score_candidate
+        from twinklr.core.audio.metadata.merge import MergeConfig, score_candidate
 
         embedded = EmbeddedMetadata(title="Test", artist="Artist")
         candidate = MetadataCandidate(
@@ -321,7 +321,7 @@ class TestMergeMetadata:
 
     def test_merge_metadata_no_candidates(self):
         """Merge with no candidates returns None if embedded is empty."""
-        from blinkb0t.core.audio.metadata.merge import MergeConfig, merge_metadata
+        from twinklr.core.audio.metadata.merge import MergeConfig, merge_metadata
 
         embedded = EmbeddedMetadata()  # Empty
         candidates = []
@@ -333,7 +333,7 @@ class TestMergeMetadata:
 
     def test_merge_metadata_single_candidate(self):
         """Merge with single candidate."""
-        from blinkb0t.core.audio.metadata.merge import MergeConfig, merge_metadata
+        from twinklr.core.audio.metadata.merge import MergeConfig, merge_metadata
 
         embedded = EmbeddedMetadata(title="Embedded Title", artist="Embedded Artist")
         candidate = MetadataCandidate(
@@ -354,7 +354,7 @@ class TestMergeMetadata:
 
     def test_merge_metadata_prefers_embedded_non_generic(self):
         """Merge prefers embedded strings if non-generic."""
-        from blinkb0t.core.audio.metadata.merge import MergeConfig, merge_metadata
+        from twinklr.core.audio.metadata.merge import MergeConfig, merge_metadata
 
         embedded = EmbeddedMetadata(title="Real Song Title", artist="Real Artist")
         candidate = MetadataCandidate(
@@ -375,7 +375,7 @@ class TestMergeMetadata:
 
     def test_merge_metadata_prefers_provider_for_generic_embedded(self):
         """Merge prefers provider strings if embedded is generic."""
-        from blinkb0t.core.audio.metadata.merge import MergeConfig, merge_metadata
+        from twinklr.core.audio.metadata.merge import MergeConfig, merge_metadata
 
         embedded = EmbeddedMetadata(title="track 1", artist="unknown")  # Generic
         candidate = MetadataCandidate(
@@ -396,7 +396,7 @@ class TestMergeMetadata:
 
     def test_merge_metadata_multiple_candidates(self):
         """Merge with multiple candidates selects best."""
-        from blinkb0t.core.audio.metadata.merge import MergeConfig, merge_metadata
+        from twinklr.core.audio.metadata.merge import MergeConfig, merge_metadata
 
         embedded = EmbeddedMetadata(title="Test", artist="Artist")
         candidates = [
@@ -430,7 +430,7 @@ class TestMergeMetadata:
 
     def test_merge_metadata_deterministic(self):
         """Merge policy is deterministic."""
-        from blinkb0t.core.audio.metadata.merge import MergeConfig, merge_metadata
+        from twinklr.core.audio.metadata.merge import MergeConfig, merge_metadata
 
         embedded = EmbeddedMetadata(title="Test", artist="Artist")
         candidates = [
@@ -450,7 +450,7 @@ class TestMergeMetadata:
 
     def test_merge_metadata_confidence_tracking(self):
         """Merge tracks per-field confidence."""
-        from blinkb0t.core.audio.metadata.merge import MergeConfig, merge_metadata
+        from twinklr.core.audio.metadata.merge import MergeConfig, merge_metadata
 
         embedded = EmbeddedMetadata(title="Real Song", artist="Real Artist")
         candidate = MetadataCandidate(

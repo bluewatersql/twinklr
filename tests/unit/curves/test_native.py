@@ -5,7 +5,7 @@ from __future__ import annotations
 from pydantic import ValidationError
 import pytest
 
-from blinkb0t.core.curves.native import (
+from twinklr.core.curves.native import (
     NativeCurveType,
     generate_native_spec,
     tune_native_spec,

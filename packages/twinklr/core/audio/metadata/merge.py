@@ -8,7 +8,7 @@ import re
 
 from pydantic import BaseModel, Field
 
-from blinkb0t.core.audio.models.metadata import (
+from twinklr.core.audio.models.metadata import (
     EmbeddedMetadata,
     MetadataCandidate,
     ResolvedMBIDs,

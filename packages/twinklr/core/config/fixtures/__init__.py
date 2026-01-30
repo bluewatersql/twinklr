@@ -21,11 +21,11 @@ This package is organized into focused modules:
 from __future__ import annotations
 
 # Capabilities module exports
-from blinkb0t.core.config.fixtures.capabilities import (
+from twinklr.core.config.fixtures.capabilities import (
     FixtureCapabilities,
     MovementSpeed,
 )
-from blinkb0t.core.config.fixtures.dmx import (
+from twinklr.core.config.fixtures.dmx import (
     ChannelInversions,
     ChannelWithConfig,
     DmxChannelConfig,
@@ -34,7 +34,7 @@ from blinkb0t.core.config.fixtures.dmx import (
 )
 
 # Groups module exports
-from blinkb0t.core.config.fixtures.groups import (
+from twinklr.core.config.fixtures.groups import (
     BaseFixtureConfig,
     FixtureGroup,
     FixtureGroupBuilder,
@@ -42,7 +42,7 @@ from blinkb0t.core.config.fixtures.groups import (
 )
 
 # Instances module exports
-from blinkb0t.core.config.fixtures.instances import (
+from twinklr.core.config.fixtures.instances import (
     FixtureConfig,
     FixtureInstance,
     FixturePosition,
@@ -50,7 +50,7 @@ from blinkb0t.core.config.fixtures.instances import (
 )
 
 # Physical module exports
-from blinkb0t.core.config.fixtures.physical import (
+from twinklr.core.config.fixtures.physical import (
     MovementLimits,
     Orientation,
     PanTiltRange,

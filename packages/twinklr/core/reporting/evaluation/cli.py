@@ -9,8 +9,8 @@ from pathlib import Path
 
 import click
 
-from blinkb0t.core.reporting.evaluation.config import EvalConfig
-from blinkb0t.core.reporting.evaluation.generator import generate_evaluation_report
+from twinklr.core.reporting.evaluation.config import EvalConfig
+from twinklr.core.reporting.evaluation.generator import generate_evaluation_report
 
 logger = logging.getLogger(__name__)
 
@@ -73,7 +73,7 @@ def eval_report_cli(  # type: ignore[misc]
     with plots.
 
     Example:
-        blinkb0t eval-report \\
+        twinklr eval-report \\
             --checkpoint artifacts/my_song/checkpoints/plans/final.json \\
             --audio data/music/my_song.mp3 \\
             --fixture fixture_config.json \\

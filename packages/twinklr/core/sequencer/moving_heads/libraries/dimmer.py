@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from enum import Enum
 
-from blinkb0t.core.curves.library import CurveLibrary
-from blinkb0t.core.sequencer.models.enum import Intensity
 from pydantic import BaseModel, ConfigDict, Field
+from twinklr.core.curves.library import CurveLibrary
+from twinklr.core.sequencer.models.enum import Intensity
 
 
 class DimmerCategoricalParams(BaseModel):

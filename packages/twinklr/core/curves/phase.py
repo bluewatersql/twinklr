@@ -5,8 +5,8 @@ All phase shifts resample the curve at a uniform grid, sampling from
 shifted positions in the original curve.
 """
 
-from blinkb0t.core.curves.models import CurvePoint
-from blinkb0t.core.curves.sampling import interpolate_linear, sample_uniform_grid
+from twinklr.core.curves.models import CurvePoint
+from twinklr.core.curves.sampling import interpolate_linear, sample_uniform_grid
 
 
 def apply_phase_shift_samples(

@@ -16,8 +16,8 @@
       "root": ".",
       "pythonVersion": "3.12",
       "extraPaths": [
-        "./packages/blinkb0t/core",
-        "./packages/blinkb0t/cli"
+        "./packages/twinklr/core",
+        "./packages/twinklr/cli"
       ]
     }
   ],

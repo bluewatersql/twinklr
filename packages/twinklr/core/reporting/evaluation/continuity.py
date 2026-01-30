@@ -12,8 +12,8 @@ import logging
 
 import numpy as np
 
-from blinkb0t.core.reporting.evaluation.config import EvalConfig
-from blinkb0t.core.reporting.evaluation.models import TransitionAnalysis
+from twinklr.core.reporting.evaluation.config import EvalConfig
+from twinklr.core.reporting.evaluation.models import TransitionAnalysis
 
 logger = logging.getLogger(__name__)
 

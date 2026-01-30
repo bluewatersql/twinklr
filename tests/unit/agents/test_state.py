@@ -1,6 +1,6 @@
 """Tests for agent state."""
 
-from blinkb0t.core.agents.state import AgentState
+from twinklr.core.agents.state import AgentState
 
 
 def test_agent_state_init():

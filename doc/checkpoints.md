@@ -133,7 +133,7 @@ cat artifacts/my_song/checkpoints/plans/my_song_a3f9b2c1_iter02_evaluation.json
 ### Programmatic Access
 
 ```python
-from blinkb0t.core.utils.checkpoint import CheckpointManager, CheckpointType
+from twinklr.core.utils.checkpoint import CheckpointManager, CheckpointType
 
 # Create manager
 manager = CheckpointManager(job_config=job_config)

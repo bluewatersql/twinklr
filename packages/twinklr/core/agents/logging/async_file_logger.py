@@ -13,7 +13,7 @@ from typing import Any
 import aiofiles  # type: ignore[import-untyped]
 import yaml
 
-from blinkb0t.core.logging.sanitize import sanitize_dict
+from twinklr.core.logging.sanitize import sanitize_dict
 
 from .models import AgentCallSummary, CallSummary, LLMCallLog
 

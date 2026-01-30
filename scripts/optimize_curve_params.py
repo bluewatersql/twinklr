@@ -20,14 +20,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from blinkb0t.core.curves.adapters import build_default_adapter_registry
-from blinkb0t.core.curves.library import CurveLibrary, build_default_registry
-from blinkb0t.core.sequencer.models.enum import Intensity
-from blinkb0t.core.sequencer.moving_heads.libraries.movement import MovementCategoricalParams
+from twinklr.core.curves.adapters import build_default_adapter_registry
+from twinklr.core.curves.library import CurveLibrary, build_default_registry
+from twinklr.core.sequencer.models.enum import Intensity
+from twinklr.core.sequencer.moving_heads.libraries.movement import MovementCategoricalParams
 
 if TYPE_CHECKING:
-    from blinkb0t.core.curves.models import CurvePoint
-    from blinkb0t.core.curves.semantics import CurveKind
+    from twinklr.core.curves.models import CurvePoint
+    from twinklr.core.curves.semantics import CurveKind
 
 
 @dataclass

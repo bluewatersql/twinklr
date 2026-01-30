@@ -7,8 +7,8 @@ from typing import Any
 import librosa
 import numpy as np
 
-from blinkb0t.core.audio.harmonic.hpss import compute_hpss
-from blinkb0t.core.audio.utils import (
+from twinklr.core.audio.harmonic.hpss import compute_hpss
+from twinklr.core.audio.utils import (
     align_to_length,
     as_float_list,
     frames_to_time,

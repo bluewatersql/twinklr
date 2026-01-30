@@ -6,8 +6,8 @@ Tests the main cached_step() function that orchestrates cache operations.
 from pydantic import BaseModel
 import pytest
 
-from blinkb0t.core.caching import CacheOptions, FSCache, cached_step
-from blinkb0t.core.io import FakeFileSystem, absolute_path
+from twinklr.core.caching import CacheOptions, FSCache, cached_step
+from twinklr.core.io import FakeFileSystem, absolute_path
 
 
 class SampleArtifact(BaseModel):
@@ -128,8 +128,8 @@ class TestCacheMiss:
         assert result.value == "freshly computed"
 
         # Verify stored in cache
-        from blinkb0t.core.caching import CacheKey
-        from blinkb0t.core.caching.fingerprint import compute_fingerprint
+        from twinklr.core.caching import CacheKey
+        from twinklr.core.caching.fingerprint import compute_fingerprint
 
         fingerprint = compute_fingerprint("test.step", "1", {"param": "value"})
         key = CacheKey(

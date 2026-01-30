@@ -10,8 +10,8 @@ All models use semantic versioning:
 - Sub-bundle schema_version: "3.0.0" (Major.Minor.Patch)
 """
 
-from blinkb0t.core.audio.models.enums import G2PSource, LyricsSourcePath, StageStatus
-from blinkb0t.core.audio.models.lyrics import (
+from twinklr.core.audio.models.enums import G2PSource, LyricsSourcePath, StageStatus
+from twinklr.core.audio.models.lyrics import (
     LyricPhrase,
     LyricsBundle,
     LyricsQuality,
@@ -19,7 +19,7 @@ from blinkb0t.core.audio.models.lyrics import (
     LyricsSourceKind,
     LyricWord,
 )
-from blinkb0t.core.audio.models.metadata import (
+from twinklr.core.audio.models.metadata import (
     EmbeddedMetadata,
     FingerprintInfo,
     MetadataBundle,
@@ -27,13 +27,13 @@ from blinkb0t.core.audio.models.metadata import (
     ResolvedMBIDs,
     ResolvedMetadata,
 )
-from blinkb0t.core.audio.models.phonemes import (
+from twinklr.core.audio.models.phonemes import (
     Phoneme,
     PhonemeBundle,
     PhonemeSource,
     VisemeEvent,
 )
-from blinkb0t.core.audio.models.song_bundle import SongBundle, SongTiming
+from twinklr.core.audio.models.song_bundle import SongBundle, SongTiming
 
 __all__ = [
     # Enums

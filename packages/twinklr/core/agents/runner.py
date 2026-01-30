@@ -10,12 +10,12 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from blinkb0t.core.agents.async_runner import AsyncAgentRunner, RunError
-from blinkb0t.core.agents.logging import LLMCallLogger
-from blinkb0t.core.agents.providers.base import LLMProvider
-from blinkb0t.core.agents.result import AgentResult
-from blinkb0t.core.agents.spec import AgentSpec
-from blinkb0t.core.agents.state import AgentState
+from twinklr.core.agents.async_runner import AsyncAgentRunner, RunError
+from twinklr.core.agents.logging import LLMCallLogger
+from twinklr.core.agents.providers.base import LLMProvider
+from twinklr.core.agents.result import AgentResult
+from twinklr.core.agents.spec import AgentSpec
+from twinklr.core.agents.state import AgentState
 
 logger = logging.getLogger(__name__)
 

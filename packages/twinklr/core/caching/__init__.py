@@ -1,4 +1,4 @@
-"""Unified caching system for BlinkB0t.
+"""Unified caching system for Twinklr.
 
 This module provides async-first caching using core.io abstractions:
 - Audio analysis features (replaces audio/cache.py)
@@ -13,8 +13,8 @@ Key features:
 - Graceful error handling
 
 Example:
-    >>> from blinkb0t.core.caching import FSCache, CacheKey
-    >>> from blinkb0t.core.io import RealFileSystem, absolute_path
+    >>> from twinklr.core.caching import FSCache, CacheKey
+    >>> from twinklr.core.io import RealFileSystem, absolute_path
     >>>
     >>> fs = RealFileSystem()
     >>> cache = FSCache(fs, absolute_path("data/cache"))
@@ -29,11 +29,11 @@ Example:
     >>> result = await cache.load(key, MyModel)
 """
 
-from blinkb0t.core.caching.backends.fs import FSCache
-from blinkb0t.core.caching.fingerprint import compute_fingerprint
-from blinkb0t.core.caching.models import CacheKey, CacheMeta, CacheOptions
-from blinkb0t.core.caching.protocols import Cache, CacheSync
-from blinkb0t.core.caching.wrapper import cached_step, cached_step_sync
+from twinklr.core.caching.backends.fs import FSCache
+from twinklr.core.caching.fingerprint import compute_fingerprint
+from twinklr.core.caching.models import CacheKey, CacheMeta, CacheOptions
+from twinklr.core.caching.protocols import Cache, CacheSync
+from twinklr.core.caching.wrapper import cached_step, cached_step_sync
 
 __all__ = [
     # Core

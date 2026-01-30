@@ -3,7 +3,7 @@
 from pydantic import ValidationError
 import pytest
 
-from blinkb0t.core.agents.result import AgentResult
+from twinklr.core.agents.result import AgentResult
 
 
 def test_agent_result_success():

@@ -1,4 +1,4 @@
-"""Logging configuration utilities for BlinkB0t.
+"""Logging configuration utilities for Twinklr.
 
 Provides centralized logging configuration with:
 - Flexible output (stdout or file)
@@ -15,7 +15,7 @@ import json
 import logging
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -105,7 +105,7 @@ class StructuredJSONFormatter(logging.Formatter):
         log_entry = {
             "level": record.levelname,
             "message": record.getMessage(),
-            "timestamp": datetime.fromtimestamp(record.created, tz=timezone.utc).isoformat(),
+            "timestamp": datetime.fromtimestamp(record.created, tz=UTC).isoformat(),
             "context": context,
         }
 

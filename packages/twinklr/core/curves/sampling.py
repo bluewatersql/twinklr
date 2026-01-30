@@ -4,7 +4,7 @@ This module provides functions for sampling curves at uniform intervals
 and for linear interpolation between curve points.
 """
 
-from blinkb0t.core.curves.models import CurvePoint
+from twinklr.core.curves.models import CurvePoint
 
 
 def sample_uniform_grid(n: int) -> list[float]:

@@ -5,12 +5,12 @@ from __future__ import annotations
 from enum import Enum
 from typing import Any
 
-from blinkb0t.core.curves.defaults import (
+from twinklr.core.curves.defaults import (
     DEFAULT_MOVEMENT_PARAMS,
     DEFAULT_PARAMETRIC_PARAMS,
     DEFAULT_WAVE_PARAMS,
 )
-from blinkb0t.core.curves.functions import (
+from twinklr.core.curves.functions import (
     generate_anticipate,
     generate_beat_pulse,
     generate_bezier,
@@ -51,8 +51,8 @@ from blinkb0t.core.curves.functions import (
     generate_square,
     generate_triangle,
 )
-from blinkb0t.core.curves.registry import CurveDefinition, CurveRegistry
-from blinkb0t.core.curves.semantics import CurveKind
+from twinklr.core.curves.registry import CurveDefinition, CurveRegistry
+from twinklr.core.curves.semantics import CurveKind
 
 
 class CurveLibrary(str, Enum):

@@ -1,6 +1,6 @@
 """Tests for logging sanitization utilities."""
 
-from blinkb0t.core.logging.sanitize import sanitize_dict, sanitize_string
+from twinklr.core.logging.sanitize import sanitize_dict, sanitize_string
 
 
 class TestSanitizeString:

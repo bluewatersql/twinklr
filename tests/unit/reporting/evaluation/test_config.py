@@ -3,7 +3,7 @@
 from pydantic import ValidationError
 import pytest
 
-from blinkb0t.core.reporting.evaluation.config import EvalConfig
+from twinklr.core.reporting.evaluation.config import EvalConfig
 
 
 class TestEvalConfig:

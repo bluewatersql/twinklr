@@ -1,8 +1,8 @@
 """Evaluation report generation for choreography plans."""
 
-from blinkb0t.core.reporting.evaluation.config import EvalConfig
-from blinkb0t.core.reporting.evaluation.generator import generate_evaluation_report
-from blinkb0t.core.reporting.evaluation.models import (
+from twinklr.core.reporting.evaluation.config import EvalConfig
+from twinklr.core.reporting.evaluation.generator import generate_evaluation_report
+from twinklr.core.reporting.evaluation.models import (
     ComparisonMetrics,
     ComparisonReport,
     ContinuityCheck,

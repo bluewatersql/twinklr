@@ -1,6 +1,6 @@
 """Structure analysis module."""
 
-from blinkb0t.core.audio.structure.sections import (
+from twinklr.core.audio.structure.sections import (
     detect_song_sections,
     label_section,
     merge_short_sections,

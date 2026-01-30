@@ -18,12 +18,12 @@ import logging
 import re
 from typing import Protocol
 
-from blinkb0t.core.audio.lyrics.diarization_models import (
+from twinklr.core.audio.lyrics.diarization_models import (
     DiarizationConfig,
     DiarizationResult,
     SpeakerSegment,
 )
-from blinkb0t.core.audio.models.lyrics import LyricWord
+from twinklr.core.audio.models.lyrics import LyricWord
 
 logger = logging.getLogger(__name__)
 

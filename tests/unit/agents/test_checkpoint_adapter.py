@@ -7,11 +7,11 @@ import tempfile
 from pydantic import BaseModel
 import pytest
 
-from blinkb0t.core.agents.checkpoint_adapter import (
+from twinklr.core.agents.checkpoint_adapter import (
     load_checkpoint_async,
     save_checkpoint_async,
 )
-from blinkb0t.core.caching import CacheKey, FSCache
+from twinklr.core.caching import CacheKey, FSCache
 
 
 class _TestCheckpointData(BaseModel):
@@ -28,7 +28,7 @@ class TestSaveCheckpoint:
     async def test_saves_checkpoint_with_type(self) -> None:
         """Saves checkpoint with correct step_id."""
         with tempfile.TemporaryDirectory() as cache_dir:
-            from blinkb0t.core.io import RealFileSystem
+            from twinklr.core.io import RealFileSystem
 
             fs = RealFileSystem()
             cache = FSCache(fs, cache_dir)
@@ -59,7 +59,7 @@ class TestSaveCheckpoint:
     async def test_iteration_appended_to_identifier(self) -> None:
         """Iteration number is appended to identifier when provided."""
         with tempfile.TemporaryDirectory() as cache_dir:
-            from blinkb0t.core.io import RealFileSystem
+            from twinklr.core.io import RealFileSystem
 
             fs = RealFileSystem()
             cache = FSCache(fs, cache_dir)
@@ -90,7 +90,7 @@ class TestSaveCheckpoint:
     async def test_run_id_appended_to_identifier(self) -> None:
         """run_id is appended to identifier when provided."""
         with tempfile.TemporaryDirectory() as cache_dir:
-            from blinkb0t.core.io import RealFileSystem
+            from twinklr.core.io import RealFileSystem
 
             fs = RealFileSystem()
             cache = FSCache(fs, cache_dir)
@@ -125,7 +125,7 @@ class TestLoadCheckpoint:
     async def test_returns_none_on_miss(self) -> None:
         """Returns None when checkpoint doesn't exist."""
         with tempfile.TemporaryDirectory() as cache_dir:
-            from blinkb0t.core.io import RealFileSystem
+            from twinklr.core.io import RealFileSystem
 
             fs = RealFileSystem()
             cache = FSCache(fs, cache_dir)
@@ -144,7 +144,7 @@ class TestLoadCheckpoint:
     async def test_loads_saved_checkpoint(self) -> None:
         """Loads previously saved checkpoint."""
         with tempfile.TemporaryDirectory() as cache_dir:
-            from blinkb0t.core.io import RealFileSystem
+            from twinklr.core.io import RealFileSystem
 
             fs = RealFileSystem()
             cache = FSCache(fs, cache_dir)
@@ -175,7 +175,7 @@ class TestLoadCheckpoint:
     async def test_loads_with_iteration(self) -> None:
         """Loads iteration-specific checkpoint."""
         with tempfile.TemporaryDirectory() as cache_dir:
-            from blinkb0t.core.io import RealFileSystem
+            from twinklr.core.io import RealFileSystem
 
             fs = RealFileSystem()
             cache = FSCache(fs, cache_dir)

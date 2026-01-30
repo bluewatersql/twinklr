@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from blinkb0t.core.curves.models import CurvePoint
-from blinkb0t.core.curves.sampling import interpolate_linear, sample_uniform_grid
+from twinklr.core.curves.models import CurvePoint
+from twinklr.core.curves.sampling import interpolate_linear, sample_uniform_grid
 
 
 class TestSampleUniformGrid:

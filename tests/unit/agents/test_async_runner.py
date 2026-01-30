@@ -6,11 +6,11 @@ from unittest.mock import AsyncMock, MagicMock
 from pydantic import BaseModel
 import pytest
 
-from blinkb0t.core.agents.async_runner import AsyncAgentRunner
-from blinkb0t.core.agents.logging import NullLLMCallLogger
-from blinkb0t.core.agents.providers.base import LLMResponse, ResponseMetadata, TokenUsage
-from blinkb0t.core.agents.spec import AgentMode, AgentSpec
-from blinkb0t.core.agents.state import AgentState
+from twinklr.core.agents.async_runner import AsyncAgentRunner
+from twinklr.core.agents.logging import NullLLMCallLogger
+from twinklr.core.agents.providers.base import LLMResponse, ResponseMetadata, TokenUsage
+from twinklr.core.agents.spec import AgentMode, AgentSpec
+from twinklr.core.agents.state import AgentState
 
 FIXTURES_PATH = Path(__file__).parent.parent.parent / "fixtures" / "prompts"
 
@@ -227,7 +227,7 @@ async def test_async_run_schema_validation_failure_and_repair(test_spec, mock_as
 @pytest.mark.asyncio
 async def test_async_run_provider_error(test_spec, mock_async_provider):
     """Test async provider error handling."""
-    from blinkb0t.core.agents.providers.errors import LLMProviderError
+    from twinklr.core.agents.providers.errors import LLMProviderError
 
     runner = AsyncAgentRunner(
         provider=mock_async_provider,

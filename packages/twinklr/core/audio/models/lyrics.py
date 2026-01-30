@@ -12,7 +12,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from blinkb0t.core.audio.models.enums import StageStatus
+from twinklr.core.audio.models.enums import StageStatus
 
 
 # Source kind constants

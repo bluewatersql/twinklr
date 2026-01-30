@@ -3,9 +3,9 @@
 import logging
 import sys
 
-from blinkb0t.core.sequencer.models.enum import Intensity
-from blinkb0t.core.sequencer.moving_heads.handlers.movement.default import DefaultMovementHandler
-from blinkb0t.core.sequencer.moving_heads.libraries.movement import (
+from twinklr.core.sequencer.models.enum import Intensity
+from twinklr.core.sequencer.moving_heads.handlers.movement.default import DefaultMovementHandler
+from twinklr.core.sequencer.moving_heads.libraries.movement import (
     MovementLibrary,
     MovementType,
 )
@@ -108,7 +108,7 @@ def test_preset_inference():
     logger.info("TESTING PRESET INFERENCE")
     logger.info("=" * 80)
 
-    from blinkb0t.core.sequencer.models.enum import Intensity
+    from twinklr.core.sequencer.models.enum import Intensity
 
     intensity_map = {
         "CHILL": Intensity.SLOW,

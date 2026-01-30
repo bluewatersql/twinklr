@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from blinkb0t.core.curves.dmx_conversion import scale_curve_to_dmx_range
-from blinkb0t.core.curves.models import CurvePoint
+from twinklr.core.curves.dmx_conversion import scale_curve_to_dmx_range
+from twinklr.core.curves.models import CurvePoint
 
 
 class TestScaleCurveToDmxRange:

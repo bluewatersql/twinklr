@@ -16,8 +16,8 @@ Works with zero configuration. No API keys, no network calls, no ML models.
 # Install core dependencies
 uv sync
 
-# Run BlinkB0t (uses embedded metadata and .lrc files only)
-uv run blinkb0t run --audio song.mp3 --xsq sequence.xsq --config job_config.json
+# Run Twinklr (uses embedded metadata and .lrc files only)
+uv run twinklr run --audio song.mp3 --xsq sequence.xsq --config job_config.json
 ```
 
 **Features available**:
@@ -210,7 +210,7 @@ ffmpeg -version
 
 ```bash
 # Verify config loads without errors
-uv run python -c "from blinkb0t.core.config import AppConfig; c = AppConfig.load_or_default(); print('Config loaded successfully'); print(f'Metadata enabled: {c.audio_processing.enhancements.enable_metadata}')"
+uv run python -c "from twinklr.core.config import AppConfig; c = AppConfig.load_or_default(); print('Config loaded successfully'); print(f'Metadata enabled: {c.audio_processing.enhancements.enable_metadata}')"
 ```
 
 Expected output:
@@ -223,7 +223,7 @@ Metadata enabled: True
 
 ```bash
 # Run with minimal features (embedded only)
-uv run blinkb0t run --audio test.mp3 --xsq test.xsq --config job_config.json
+uv run twinklr run --audio test.mp3 --xsq test.xsq --config job_config.json
 ```
 
 ---
@@ -253,7 +253,7 @@ fpcalc -version
 **Solution**:
 1. Get API key from https://acoustid.org/api-key
 2. Add to `.env`: `ACOUSTID_API_KEY=your_key_here`
-3. Restart BlinkB0t
+3. Restart Twinklr
 
 ### Model Download Errors
 
@@ -263,7 +263,7 @@ fpcalc -version
 1. Get token from https://huggingface.co/settings/tokens
 2. Add to `.env`: `HF_TOKEN=your_token_here`
 3. Accept model license agreement on HuggingFace website
-4. Restart BlinkB0t (will download on first use)
+4. Restart Twinklr (will download on first use)
 
 ### Rate Limit Errors
 

@@ -1,4 +1,4 @@
-"""Configuration models for BlinkB0t."""
+"""Configuration models for Twinklr."""
 
 from __future__ import annotations
 
@@ -8,10 +8,10 @@ from typing import Self
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from blinkb0t.core.config.poses import PoseConfig
-from blinkb0t.core.curves.library import CurveLibrary
-from blinkb0t.core.sequencer.models.enum import TransitionMode
-from blinkb0t.core.sequencer.models.transition import TransitionStrategy
+from twinklr.core.config.poses import PoseConfig
+from twinklr.core.curves.library import CurveLibrary
+from twinklr.core.sequencer.models.enum import TransitionMode
+from twinklr.core.sequencer.models.transition import TransitionStrategy
 
 
 class AgentConfig(BaseModel):
@@ -142,7 +142,7 @@ def _get_agent_config_default() -> AgentOrchestrationConfig:
 
 
 class ConfigBase(BaseModel):
-    """Base class for all BlinkB0t configurations.
+    """Base class for all Twinklr configurations.
 
     Provides common functionality for loading from files with defaults.
     Subclasses must implement default_path() to specify their default location.
@@ -177,12 +177,12 @@ class ConfigBase(BaseModel):
         """
         # AppConfig needs environment variable loading for API keys
         if cls.__name__ == "AppConfig":
-            from blinkb0t.core.config.loader import load_app_config
+            from twinklr.core.config.loader import load_app_config
 
             return load_app_config(path)  # type: ignore[return-value]
 
         # Other config types use simple loader
-        from blinkb0t.core.config.loader import load_config
+        from twinklr.core.config.loader import load_config
 
         if path is None:
             path = cls.default_path()

@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from blinkb0t.core.audio.utils import (
+from twinklr.core.audio.utils import (
     align_to_length,
     as_float_list,
     cosine_similarity,

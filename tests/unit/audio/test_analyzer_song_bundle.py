@@ -8,9 +8,9 @@ from unittest.mock import patch
 
 import pytest
 
-from blinkb0t.core.audio.analyzer import AudioAnalyzer
-from blinkb0t.core.audio.models import SongBundle
-from blinkb0t.core.config.models import AppConfig, JobConfig
+from twinklr.core.audio.analyzer import AudioAnalyzer
+from twinklr.core.audio.models import SongBundle
+from twinklr.core.config.models import AppConfig, JobConfig
 
 
 @pytest.fixture
@@ -54,8 +54,8 @@ class TestAudioAnalyzerReturnsSongBundle:
 
         with (
             patch.object(analyzer, "_process_audio", return_value=mock_process_audio),
-            patch("blinkb0t.core.audio.cache_adapter.load_audio_features_async", return_value=None),
-            patch("blinkb0t.core.audio.cache_adapter.save_audio_features_async"),
+            patch("twinklr.core.audio.cache_adapter.load_audio_features_async", return_value=None),
+            patch("twinklr.core.audio.cache_adapter.save_audio_features_async"),
         ):
             result = await analyzer.analyze("test.mp3")
 
@@ -71,8 +71,8 @@ class TestAudioAnalyzerReturnsSongBundle:
 
         with (
             patch.object(analyzer, "_process_audio", return_value=mock_process_audio),
-            patch("blinkb0t.core.audio.cache_adapter.load_audio_features_async", return_value=None),
-            patch("blinkb0t.core.audio.cache_adapter.save_audio_features_async"),
+            patch("twinklr.core.audio.cache_adapter.load_audio_features_async", return_value=None),
+            patch("twinklr.core.audio.cache_adapter.save_audio_features_async"),
         ):
             result = await analyzer.analyze("test.mp3")
 
@@ -88,8 +88,8 @@ class TestAudioAnalyzerReturnsSongBundle:
 
         with (
             patch.object(analyzer, "_process_audio", return_value=mock_process_audio),
-            patch("blinkb0t.core.audio.cache_adapter.load_audio_features_async", return_value=None),
-            patch("blinkb0t.core.audio.cache_adapter.save_audio_features_async"),
+            patch("twinklr.core.audio.cache_adapter.load_audio_features_async", return_value=None),
+            patch("twinklr.core.audio.cache_adapter.save_audio_features_async"),
         ):
             result = await analyzer.analyze("test.mp3")
 
@@ -110,13 +110,13 @@ class TestAudioAnalyzerReturnsSongBundle:
 
         with (
             patch.object(analyzer, "_process_audio", return_value=mock_process_audio),
-            patch("blinkb0t.core.audio.cache_adapter.load_audio_features_async", return_value=None),
-            patch("blinkb0t.core.audio.cache_adapter.save_audio_features_async"),
+            patch("twinklr.core.audio.cache_adapter.load_audio_features_async", return_value=None),
+            patch("twinklr.core.audio.cache_adapter.save_audio_features_async"),
         ):
             result = await analyzer.analyze("test.mp3")
 
         # Phase 2: Metadata always populated (SKIPPED when disabled)
-        from blinkb0t.core.audio.models.enums import StageStatus
+        from twinklr.core.audio.models.enums import StageStatus
 
         assert result.metadata is not None
         assert result.metadata.stage_status == StageStatus.SKIPPED
@@ -136,8 +136,8 @@ class TestAudioAnalyzerBackwardCompat:
 
         with (
             patch.object(analyzer, "_process_audio", return_value=mock_process_audio),
-            patch("blinkb0t.core.audio.cache_adapter.load_audio_features_async", return_value=None),
-            patch("blinkb0t.core.audio.cache_adapter.save_audio_features_async"),
+            patch("twinklr.core.audio.cache_adapter.load_audio_features_async", return_value=None),
+            patch("twinklr.core.audio.cache_adapter.save_audio_features_async"),
         ):
             result = analyzer.analyze_dict("test.mp3")
 
@@ -155,8 +155,8 @@ class TestAudioAnalyzerBackwardCompat:
 
         with (
             patch.object(analyzer, "_process_audio", return_value=mock_process_audio),
-            patch("blinkb0t.core.audio.cache_adapter.load_audio_features_async", return_value=None),
-            patch("blinkb0t.core.audio.cache_adapter.save_audio_features_async"),
+            patch("twinklr.core.audio.cache_adapter.load_audio_features_async", return_value=None),
+            patch("twinklr.core.audio.cache_adapter.save_audio_features_async"),
         ):
             dict_result = analyzer.analyze_dict("test.mp3")
 

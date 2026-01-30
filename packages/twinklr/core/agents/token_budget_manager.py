@@ -9,8 +9,8 @@ import logging
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from blinkb0t.core.agents.enum import Stage
-from blinkb0t.core.config.models import JobConfig
+from twinklr.core.agents.enum import Stage
+from twinklr.core.config.models import JobConfig
 
 logger = logging.getLogger(__name__)
 

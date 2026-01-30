@@ -2,7 +2,7 @@
 
 from unittest.mock import MagicMock
 
-from blinkb0t.core.agents.context.identity import IdentityContextShaper
+from twinklr.core.agents.context.identity import IdentityContextShaper
 
 
 def test_identity_shaper_returns_unchanged():

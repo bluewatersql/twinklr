@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from blinkb0t.core.audio.spectral.bands import extract_dynamic_features
+from twinklr.core.audio.spectral.bands import extract_dynamic_features
 
 
 class TestExtractDynamicFeatures:

@@ -6,8 +6,8 @@ Tests the filesystem-backed cache implementation.
 from pydantic import BaseModel
 import pytest
 
-from blinkb0t.core.caching import CacheKey, FSCache
-from blinkb0t.core.io import FakeFileSystem, absolute_path
+from twinklr.core.caching import CacheKey, FSCache
+from twinklr.core.io import FakeFileSystem, absolute_path
 
 
 class SampleArtifact(BaseModel):

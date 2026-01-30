@@ -11,23 +11,23 @@ import os
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from blinkb0t.core.agents.logging import create_llm_logger
-from blinkb0t.core.agents.providers import OpenAIProvider
-from blinkb0t.core.agents.sequencer.moving_heads import (
+from twinklr.core.agents.logging import create_llm_logger
+from twinklr.core.agents.providers import OpenAIProvider
+from twinklr.core.agents.sequencer.moving_heads import (
     ChoreographyPlan,
     OrchestrationConfig,
     Orchestrator,
 )
-from blinkb0t.core.config.fixtures import FixtureGroup
-from blinkb0t.core.config.loader import load_fixture_group
-from blinkb0t.core.sequencer.moving_heads.base import DomainManager
-from blinkb0t.core.sequencer.moving_heads.pipeline import RenderingPipeline
-from blinkb0t.core.sequencer.moving_heads.templates import load_builtin_templates
-from blinkb0t.core.sequencer.moving_heads.templates.library import list_templates
-from blinkb0t.core.sequencer.timing.beat_grid import BeatGrid
+from twinklr.core.config.fixtures import FixtureGroup
+from twinklr.core.config.loader import load_fixture_group
+from twinklr.core.sequencer.moving_heads.base import DomainManager
+from twinklr.core.sequencer.moving_heads.pipeline import RenderingPipeline
+from twinklr.core.sequencer.moving_heads.templates import load_builtin_templates
+from twinklr.core.sequencer.moving_heads.templates.library import list_templates
+from twinklr.core.sequencer.timing.beat_grid import BeatGrid
 
 if TYPE_CHECKING:
-    from blinkb0t.core.session import BlinkB0tSession
+    from twinklr.core.session import TwinklrSession
 
 logger = logging.getLogger(__name__)
 
@@ -47,13 +47,13 @@ class MovingHeadManager(DomainManager):
 
     def __init__(
         self,
-        session: BlinkB0tSession,
+        session: TwinklrSession,
         fixtures: FixtureGroup | Path | str | None = None,
     ):
         """Initialize moving head manager.
 
         Args:
-            session: BlinkB0t session providing universal services
+            session: Twinklr session providing universal services
             fixtures: Fixture configuration (loaded from job_config if None)
 
         Example:
@@ -150,7 +150,7 @@ class MovingHeadManager(DomainManager):
             xsq_out: Output xLights sequence path
 
         Example:
-            session = BlinkB0tSession.from_directory(".")
+            session = TwinklrSession.from_directory(".")
             mh = MovingHeadManager(session)
             mh.run_pipeline("song.mp3", "input.xsq", "output.xsq")
         """
@@ -203,25 +203,24 @@ class MovingHeadManager(DomainManager):
                         metadata_context["title"] = embedded["title"]
                     if embedded.get("genre"):
                         metadata_context["genre"] = embedded["genre"]
-            else:
-                # Object form (MetadataBundle)
-                if song_bundle.metadata.resolved:
-                    if song_bundle.metadata.resolved.artist:
-                        metadata_context["artist"] = song_bundle.metadata.resolved.artist
-                    if song_bundle.metadata.resolved.title:
-                        metadata_context["title"] = song_bundle.metadata.resolved.title
-                    if (
-                        song_bundle.metadata.resolved.mbids
-                        and song_bundle.metadata.resolved.mbids.artist_mbids
-                    ):
-                        metadata_context["genre_hints"] = "Available via MusicBrainz"
-                elif song_bundle.metadata.embedded:
-                    if song_bundle.metadata.embedded.artist:
-                        metadata_context["artist"] = song_bundle.metadata.embedded.artist
-                    if song_bundle.metadata.embedded.title:
-                        metadata_context["title"] = song_bundle.metadata.embedded.title
-                    if song_bundle.metadata.embedded.genre:
-                        metadata_context["genre"] = song_bundle.metadata.embedded.genre
+            # Object form (MetadataBundle)
+            elif song_bundle.metadata.resolved:
+                if song_bundle.metadata.resolved.artist:
+                    metadata_context["artist"] = song_bundle.metadata.resolved.artist
+                if song_bundle.metadata.resolved.title:
+                    metadata_context["title"] = song_bundle.metadata.resolved.title
+                if (
+                    song_bundle.metadata.resolved.mbids
+                    and song_bundle.metadata.resolved.mbids.artist_mbids
+                ):
+                    metadata_context["genre_hints"] = "Available via MusicBrainz"
+            elif song_bundle.metadata.embedded:
+                if song_bundle.metadata.embedded.artist:
+                    metadata_context["artist"] = song_bundle.metadata.embedded.artist
+                if song_bundle.metadata.embedded.title:
+                    metadata_context["title"] = song_bundle.metadata.embedded.title
+                if song_bundle.metadata.embedded.genre:
+                    metadata_context["genre"] = song_bundle.metadata.embedded.genre
 
         context: dict[str, Any] = {
             "song_structure": {

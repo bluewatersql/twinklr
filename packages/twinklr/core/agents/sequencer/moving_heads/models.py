@@ -6,10 +6,10 @@ from enum import Enum
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from blinkb0t.core.agents.issues import (
+from twinklr.core.agents.issues import (
     Issue,
 )
-from blinkb0t.core.sequencer.models.transition import TransitionHint
+from twinklr.core.sequencer.models.transition import TransitionHint
 
 # ============================================================================
 # Planner Models

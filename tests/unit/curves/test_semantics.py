@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from blinkb0t.core.curves.models import CurvePoint
-from blinkb0t.core.curves.semantics import CurveKind, center_curve, ensure_loop_ready
+from twinklr.core.curves.models import CurvePoint
+from twinklr.core.curves.semantics import CurveKind, center_curve, ensure_loop_ready
 
 
 class TestCurveKindEnum:

@@ -16,7 +16,7 @@ import logging
 import re
 from pathlib import Path
 
-from blinkb0t.core.audio.models.lyrics import LyricPhrase, LyricWord
+from twinklr.core.audio.models.lyrics import LyricPhrase, LyricWord
 
 logger = logging.getLogger(__name__)
 

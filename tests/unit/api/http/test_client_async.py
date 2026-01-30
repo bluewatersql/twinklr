@@ -8,9 +8,9 @@ from __future__ import annotations
 import httpx
 import pytest
 
-from blinkb0t.core.api.http.client import AsyncApiClient
-from blinkb0t.core.api.http.config import HttpClientConfig
-from blinkb0t.core.api.http.retry import RetryPolicy
+from twinklr.core.api.http.client import AsyncApiClient
+from twinklr.core.api.http.config import HttpClientConfig
+from twinklr.core.api.http.retry import RetryPolicy
 
 
 @pytest.mark.anyio

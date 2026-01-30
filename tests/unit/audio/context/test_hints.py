@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from blinkb0t.core.audio.context.hints import build_lighting_hints
+from twinklr.core.audio.context.hints import build_lighting_hints
 
 
 class TestBuildLightingHints:

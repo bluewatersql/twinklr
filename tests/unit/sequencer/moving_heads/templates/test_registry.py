@@ -6,13 +6,13 @@ Written fresh for new architecture after template migration (Task 7).
 
 import pytest
 
-from blinkb0t.core.sequencer.models.enum import (
+from twinklr.core.sequencer.models.enum import (
     SemanticGroupType,
     TemplateCategory,
     TemplateRole,
 )
-from blinkb0t.core.sequencer.models.template import TemplateDoc
-from blinkb0t.core.sequencer.moving_heads.templates import (
+from twinklr.core.sequencer.models.template import TemplateDoc
+from twinklr.core.sequencer.moving_heads.templates import (
     get_template,
     list_templates,
     load_builtin_templates,

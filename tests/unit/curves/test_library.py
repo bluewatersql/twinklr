@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from blinkb0t.core.curves.library import CurveLibrary, build_default_registry
-from blinkb0t.core.curves.semantics import CurveKind
+from twinklr.core.curves.library import CurveLibrary, build_default_registry
+from twinklr.core.curves.semantics import CurveKind
 
 
 class TestCurveLibrary:
@@ -100,7 +100,7 @@ class TestBuildDefaultRegistry:
 
     def test_returns_registry(self) -> None:
         """Returns a CurveRegistry instance."""
-        from blinkb0t.core.curves.registry import CurveRegistry
+        from twinklr.core.curves.registry import CurveRegistry
 
         registry = build_default_registry()
         assert isinstance(registry, CurveRegistry)

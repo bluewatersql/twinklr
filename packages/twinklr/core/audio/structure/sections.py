@@ -23,7 +23,7 @@ from typing import Any, cast
 import librosa
 import numpy as np
 
-from blinkb0t.core.audio.utils import cosine_similarity, frames_to_time, normalize_to_0_1
+from twinklr.core.audio.utils import cosine_similarity, frames_to_time, normalize_to_0_1
 
 logger = logging.getLogger(__name__)
 

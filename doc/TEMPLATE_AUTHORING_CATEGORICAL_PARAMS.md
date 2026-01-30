@@ -2,7 +2,7 @@
 
 ## Overview
 
-BlinkB0t's categorical parameter system provides automatic, curve-specific optimization for movement intensity while maintaining flexibility for fine-tuning. This guide explains how to use intensity levels and parameter overrides when authoring templates.
+Twinklr's categorical parameter system provides automatic, curve-specific optimization for movement intensity while maintaining flexibility for fine-tuning. This guide explains how to use intensity levels and parameter overrides when authoring templates.
 
 ## Quick Start
 
@@ -223,9 +223,9 @@ TemplateStep(
 ### Example 1: Simple Template (No Overrides)
 
 ```python
-from blinkb0t.core.sequencer.models.template import Movement, TemplateStep
-from blinkb0t.core.sequencer.models.enum import Intensity
-from blinkb0t.core.sequencer.moving_heads.libraries.movement import MovementType
+from twinklr.core.sequencer.models.template import Movement, TemplateStep
+from twinklr.core.sequencer.models.enum import Intensity
+from twinklr.core.sequencer.moving_heads.libraries.movement import MovementType
 
 TemplateStep(
     step_id="verse",
@@ -609,7 +609,7 @@ Movement(
 
 - [Curve Optimization Report](../vnext/optimization/curve_optimization_phase5_fixed.md) - Detailed parameter values
 - [Template Audit Report](../vnext/optimization/TEMPLATE_AUDIT.md) - Real-world template analysis
-- [Movement Library Reference](../../packages/blinkb0t/core/sequencer/moving_heads/libraries/movement.py) - Available movement types
+- [Movement Library Reference](../../packages/twinklr/core/sequencer/moving_heads/libraries/movement.py) - Available movement types
 - [Phase 6 Documentation](../vnext/optimization/curve_movement_params/PHASE6_PROGRESS.md) - System design and implementation
 
 ---

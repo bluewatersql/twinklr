@@ -5,7 +5,7 @@ Tests the plot module's ability to render curve PNG plots.
 
 from pathlib import Path
 
-from blinkb0t.core.reporting.evaluation.plot import plot_curve
+from twinklr.core.reporting.evaluation.plot import plot_curve
 
 
 def test_plot_curve_normalized_space(tmp_path: Path):

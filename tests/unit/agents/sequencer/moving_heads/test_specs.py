@@ -1,14 +1,14 @@
 """Tests for moving heads agent specs."""
 
-from blinkb0t.core.agents.sequencer.moving_heads.models import (
+from twinklr.core.agents.sequencer.moving_heads.models import (
     ChoreographyPlan,
     JudgeResponse,
 )
-from blinkb0t.core.agents.sequencer.moving_heads.specs import (
+from twinklr.core.agents.sequencer.moving_heads.specs import (
     get_judge_spec,
     get_planner_spec,
 )
-from blinkb0t.core.agents.spec import AgentMode
+from twinklr.core.agents.spec import AgentMode
 
 
 def test_get_planner_spec():

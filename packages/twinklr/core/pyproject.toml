@@ -1,7 +1,7 @@
 [project]
-name = "blinkb0t-core"
+name = "twinklr-core"
 version = "0.1.0"
-description = "BlinkB0t Core - AI-powered lighting sequencer for xLights"
+description = "Twinklr Core - AI-powered lighting sequencer for xLights"
 requires-python = ">=3.10,<3.13"
 dependencies = [
     "numpy>=2.0,<3.0",
@@ -82,6 +82,6 @@ ignore_missing_imports = true
 [tool.pytest.ini_options]
 testpaths = ["../../../tests"]
 python_files = "test_*.py"
-addopts = "--cov=blinkb0t.core --cov-report=term-missing --cov-report=html"
+addopts = "--cov=twinklr.core --cov-report=term-missing --cov-report=html"
 asyncio_mode = "auto"
 

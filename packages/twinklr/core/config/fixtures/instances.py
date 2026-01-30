@@ -7,10 +7,10 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from blinkb0t.core.config.fixtures.capabilities import FixtureCapabilities, MovementSpeed
-from blinkb0t.core.config.fixtures.dmx import ChannelInversions, DmxMapping
-from blinkb0t.core.config.fixtures.physical import MovementLimits, Orientation, PanTiltRange
-from blinkb0t.core.config.poses import STANDARD_POSES, PoseLibrary
+from twinklr.core.config.fixtures.capabilities import FixtureCapabilities, MovementSpeed
+from twinklr.core.config.fixtures.dmx import ChannelInversions, DmxMapping
+from twinklr.core.config.fixtures.physical import MovementLimits, Orientation, PanTiltRange
+from twinklr.core.config.poses import STANDARD_POSES, PoseLibrary
 
 
 class Pose(BaseModel):

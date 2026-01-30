@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 from openai import APIConnectionError, APIStatusError, APITimeoutError, RateLimitError
 import pytest
 
-from blinkb0t.core.api.llm.openai.client import (
+from twinklr.core.api.llm.openai.client import (
     OpenAIClient,
     OpenAIClientError,
     OpenAIResponseParseError,
@@ -238,7 +238,7 @@ class TestOpenAIClientInit:
 
     def test_init_with_defaults(self) -> None:
         """Test initialization with default values."""
-        with patch("blinkb0t.core.api.llm.openai.client.OpenAI") as mock_openai:
+        with patch("twinklr.core.api.llm.openai.client.OpenAI") as mock_openai:
             client = OpenAIClient(api_key="test-key")
 
             mock_openai.assert_called_once_with(api_key="test-key", timeout=120.0)
@@ -247,7 +247,7 @@ class TestOpenAIClientInit:
 
     def test_init_with_custom_retry_config(self) -> None:
         """Test initialization with custom retry config."""
-        with patch("blinkb0t.core.api.llm.openai.client.OpenAI"):
+        with patch("twinklr.core.api.llm.openai.client.OpenAI"):
             config = RetryConfig(max_retries=5)
             client = OpenAIClient(api_key="test-key", retry_config=config)
 
@@ -255,21 +255,21 @@ class TestOpenAIClientInit:
 
     def test_init_with_custom_timeout(self) -> None:
         """Test initialization with custom timeout."""
-        with patch("blinkb0t.core.api.llm.openai.client.OpenAI") as mock_openai:
+        with patch("twinklr.core.api.llm.openai.client.OpenAI") as mock_openai:
             OpenAIClient(api_key="test-key", timeout=60.0)
 
             mock_openai.assert_called_once_with(api_key="test-key", timeout=60.0)
 
     def test_init_with_max_tokens(self) -> None:
         """Test initialization with max_tokens."""
-        with patch("blinkb0t.core.api.llm.openai.client.OpenAI"):
+        with patch("twinklr.core.api.llm.openai.client.OpenAI"):
             client = OpenAIClient(api_key="test-key", max_tokens=4096)
 
             assert client.max_tokens == 4096
 
     def test_init_conversation_state(self) -> None:
         """Test conversation state is initialized."""
-        with patch("blinkb0t.core.api.llm.openai.client.OpenAI"):
+        with patch("twinklr.core.api.llm.openai.client.OpenAI"):
             client = OpenAIClient(api_key="test-key")
 
             assert client._conversation_history == []
@@ -284,7 +284,7 @@ class TestGetRetryDelay:
     @pytest.fixture
     def client(self) -> OpenAIClient:
         """Create client for testing."""
-        with patch("blinkb0t.core.api.llm.openai.client.OpenAI"):
+        with patch("twinklr.core.api.llm.openai.client.OpenAI"):
             return OpenAIClient(
                 api_key="test-key",
                 retry_config=RetryConfig(
@@ -322,7 +322,7 @@ class TestGetRetryDelay:
 
     def test_jitter_applied(self) -> None:
         """Test that jitter is applied when enabled."""
-        with patch("blinkb0t.core.api.llm.openai.client.OpenAI"):
+        with patch("twinklr.core.api.llm.openai.client.OpenAI"):
             client = OpenAIClient(
                 api_key="test-key",
                 retry_config=RetryConfig(
@@ -345,7 +345,7 @@ class TestShouldRetry:
     @pytest.fixture
     def client(self) -> OpenAIClient:
         """Create client for testing."""
-        with patch("blinkb0t.core.api.llm.openai.client.OpenAI"):
+        with patch("twinklr.core.api.llm.openai.client.OpenAI"):
             return OpenAIClient(
                 api_key="test-key",
                 retry_config=RetryConfig(
@@ -445,7 +445,7 @@ class TestRetryWithBackoff:
     @pytest.fixture
     def client(self) -> OpenAIClient:
         """Create client with fast retry config for testing."""
-        with patch("blinkb0t.core.api.llm.openai.client.OpenAI"):
+        with patch("twinklr.core.api.llm.openai.client.OpenAI"):
             return OpenAIClient(
                 api_key="test-key",
                 retry_config=RetryConfig(
@@ -515,7 +515,7 @@ class TestGenerateJson:
     @pytest.fixture
     def client_with_mock(self, mock_response: MagicMock) -> OpenAIClient:
         """Create client with mocked responses.create."""
-        with patch("blinkb0t.core.api.llm.openai.client.OpenAI") as mock_openai:
+        with patch("twinklr.core.api.llm.openai.client.OpenAI") as mock_openai:
             mock_client = MagicMock()
             mock_client.responses.create.return_value = mock_response
             mock_openai.return_value = mock_client
@@ -627,7 +627,7 @@ class TestGenerateJson:
 
     def test_generate_json_empty_response(self) -> None:
         """Test empty response raises error."""
-        with patch("blinkb0t.core.api.llm.openai.client.OpenAI") as mock_openai:
+        with patch("twinklr.core.api.llm.openai.client.OpenAI") as mock_openai:
             mock_response = MagicMock()
             mock_response.output_text = None
             mock_response.id = "resp_123"
@@ -645,7 +645,7 @@ class TestGenerateJson:
 
     def test_generate_json_invalid_json(self) -> None:
         """Test invalid JSON response raises error."""
-        with patch("blinkb0t.core.api.llm.openai.client.OpenAI") as mock_openai:
+        with patch("twinklr.core.api.llm.openai.client.OpenAI") as mock_openai:
             mock_response = MagicMock()
             mock_response.output_text = "not valid json {"
             mock_response.id = "resp_123"
@@ -663,7 +663,7 @@ class TestGenerateJson:
 
     def test_generate_json_mini_model_skips_temperature(self) -> None:
         """Test mini models skip temperature parameter."""
-        with patch("blinkb0t.core.api.llm.openai.client.OpenAI") as mock_openai:
+        with patch("twinklr.core.api.llm.openai.client.OpenAI") as mock_openai:
             mock_response = MagicMock()
             mock_response.output_text = '{"result": "ok"}'
             mock_response.id = "resp_123"
@@ -709,7 +709,7 @@ class TestGenerateText:
     @pytest.fixture
     def client_with_mock(self, mock_response: MagicMock) -> OpenAIClient:
         """Create client with mocked responses.create."""
-        with patch("blinkb0t.core.api.llm.openai.client.OpenAI") as mock_openai:
+        with patch("twinklr.core.api.llm.openai.client.OpenAI") as mock_openai:
             mock_client = MagicMock()
             mock_client.responses.create.return_value = mock_response
             mock_openai.return_value = mock_client
@@ -746,7 +746,7 @@ class TestGenerateText:
 
     def test_generate_text_empty_response(self) -> None:
         """Test empty response raises error."""
-        with patch("blinkb0t.core.api.llm.openai.client.OpenAI") as mock_openai:
+        with patch("twinklr.core.api.llm.openai.client.OpenAI") as mock_openai:
             mock_response = MagicMock()
             mock_response.output_text = None
             mock_response.id = "resp_123"
@@ -769,7 +769,7 @@ class TestExtractMetadata:
     @pytest.fixture
     def client(self) -> OpenAIClient:
         """Create client for testing."""
-        with patch("blinkb0t.core.api.llm.openai.client.OpenAI"):
+        with patch("twinklr.core.api.llm.openai.client.OpenAI"):
             return OpenAIClient(api_key="test-key")
 
     def test_extract_full_metadata(self, client: OpenAIClient) -> None:
@@ -820,7 +820,7 @@ class TestConversationManagement:
     @pytest.fixture
     def client(self) -> OpenAIClient:
         """Create client for testing."""
-        with patch("blinkb0t.core.api.llm.openai.client.OpenAI"):
+        with patch("twinklr.core.api.llm.openai.client.OpenAI"):
             return OpenAIClient(api_key="test-key")
 
     def test_add_to_conversation(self, client: OpenAIClient) -> None:
@@ -886,7 +886,7 @@ class TestMessageConversion:
     @pytest.fixture
     def client(self) -> OpenAIClient:
         """Create client for testing."""
-        with patch("blinkb0t.core.api.llm.openai.client.OpenAI"):
+        with patch("twinklr.core.api.llm.openai.client.OpenAI"):
             return OpenAIClient(api_key="test-key")
 
     def test_get_messages_from_simple(self, client: OpenAIClient) -> None:
@@ -958,7 +958,7 @@ class TestGenerateJsonWithConversation:
     @pytest.fixture
     def client_with_mock(self, mock_response: MagicMock) -> OpenAIClient:
         """Create client with mocked responses.create."""
-        with patch("blinkb0t.core.api.llm.openai.client.OpenAI") as mock_openai:
+        with patch("twinklr.core.api.llm.openai.client.OpenAI") as mock_openai:
             mock_client = MagicMock()
             mock_client.responses.create.return_value = mock_response
             mock_openai.return_value = mock_client
@@ -1011,7 +1011,7 @@ class TestCreateClient:
 
     def test_create_client_defaults(self) -> None:
         """Test create_client with defaults."""
-        with patch("blinkb0t.core.api.llm.openai.client.OpenAI") as mock_openai:
+        with patch("twinklr.core.api.llm.openai.client.OpenAI") as mock_openai:
             client = create_client(api_key="test-key")
 
             mock_openai.assert_called_once_with(api_key="test-key", timeout=120.0)
@@ -1019,14 +1019,14 @@ class TestCreateClient:
 
     def test_create_client_custom_retries(self) -> None:
         """Test create_client with custom max_retries."""
-        with patch("blinkb0t.core.api.llm.openai.client.OpenAI"):
+        with patch("twinklr.core.api.llm.openai.client.OpenAI"):
             client = create_client(api_key="test-key", max_retries=5)
 
             assert client.retry_config.max_retries == 5
 
     def test_create_client_custom_timeout(self) -> None:
         """Test create_client with custom timeout."""
-        with patch("blinkb0t.core.api.llm.openai.client.OpenAI") as mock_openai:
+        with patch("twinklr.core.api.llm.openai.client.OpenAI") as mock_openai:
             create_client(api_key="test-key", timeout=60.0)
 
             mock_openai.assert_called_once_with(api_key="test-key", timeout=60.0)

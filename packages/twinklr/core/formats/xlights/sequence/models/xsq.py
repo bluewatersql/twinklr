@@ -10,7 +10,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from blinkb0t.core.formats.xlights.sequence.models.effect_placement import EffectPlacement
+from twinklr.core.formats.xlights.sequence.models.effect_placement import EffectPlacement
 
 
 class TimeMarker(BaseModel):

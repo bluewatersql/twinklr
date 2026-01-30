@@ -1,4 +1,4 @@
-"""Demo script for BlinkB0t pipeline.
+"""Demo script for Twinklr pipeline.
 
 Note:
     This demo uses synchronous wrappers around the async core (v4.0).
@@ -14,9 +14,9 @@ import shutil
 
 from rich.console import Console
 
-from blinkb0t.core.sequencer.moving_heads.manager import MovingHeadManager
-from blinkb0t.core.session import BlinkB0tSession
-from blinkb0t.core.utils.logging import configure_logging
+from twinklr.core.sequencer.moving_heads.manager import MovingHeadManager
+from twinklr.core.session import TwinklrSession
+from twinklr.core.utils.logging import configure_logging
 
 configure_logging(level="DEBUG")
 logger = logging.getLogger(__name__)
@@ -51,13 +51,13 @@ def run_pipeline() -> None:
     sequence_path = Path(repo_root / xsq_path).resolve()
 
     # Initialize session from project directory
-    console.print("[bold]Initializing BlinkB0t session...[/bold]")
-    session = BlinkB0tSession.from_directory(repo_root)
+    console.print("[bold]Initializing Twinklr session...[/bold]")
+    session = TwinklrSession.from_directory(repo_root)
 
     # Set project name
     if not session.job_config.project_name:
         session.job_config.project_name = (
-            (sequence_path.stem or audio_path.stem or "BlinkB0tAI Sequence")
+            (sequence_path.stem or audio_path.stem or "TwinklrAI Sequence")
             .lower()
             .replace(" ", "_")
         )
@@ -71,13 +71,13 @@ def run_pipeline() -> None:
     session.job_config.output_dir = str(artifact_dir)
     session.artifact_dir = artifact_dir
 
-    xsq_out = artifact_dir / f"{session.job_config.project_name}_blinkb0t_mh.xsq"
+    xsq_out = artifact_dir / f"{session.job_config.project_name}_twinklr_mh.xsq"
 
     # Create moving head manager and run pipeline
     console.print("[bold]Creating moving head manager...[/bold]")
     mh = MovingHeadManager(session)
 
-    console.print("\n[bold cyan]Running BlinkB0t Pipeline[/bold cyan]")
+    console.print("\n[bold cyan]Running Twinklr Pipeline[/bold cyan]")
     mh.run_pipeline(
         audio_path=str(audio_path),
         xsq_in=str(sequence_path),

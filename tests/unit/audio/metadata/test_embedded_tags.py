@@ -6,8 +6,8 @@ Following TDD for embedded metadata extraction using mutagen.
 import hashlib
 from unittest.mock import Mock, patch
 
-from blinkb0t.core.audio.metadata.embedded_tags import extract_embedded_metadata
-from blinkb0t.core.audio.models.metadata import EmbeddedMetadata
+from twinklr.core.audio.metadata.embedded_tags import extract_embedded_metadata
+from twinklr.core.audio.models.metadata import EmbeddedMetadata
 
 
 class TestExtractEmbeddedMetadata:
@@ -16,7 +16,7 @@ class TestExtractEmbeddedMetadata:
     def test_no_tags_returns_empty_metadata(self):
         """File with no tags returns empty EmbeddedMetadata."""
         # Mock mutagen to return None (no tags)
-        with patch("blinkb0t.core.audio.metadata.embedded_tags.File", return_value=None):
+        with patch("twinklr.core.audio.metadata.embedded_tags.File", return_value=None):
             result = extract_embedded_metadata("/fake/path.mp3")
 
         assert isinstance(result, EmbeddedMetadata)
@@ -36,7 +36,7 @@ class TestExtractEmbeddedMetadata:
         }
         mock_file.pictures = []
 
-        with patch("blinkb0t.core.audio.metadata.embedded_tags.File", return_value=mock_file):
+        with patch("twinklr.core.audio.metadata.embedded_tags.File", return_value=mock_file):
             result = extract_embedded_metadata("/fake/path.mp3")
 
         assert result.title == "Test Song"
@@ -52,7 +52,7 @@ class TestExtractEmbeddedMetadata:
         }
         mock_file.pictures = []
 
-        with patch("blinkb0t.core.audio.metadata.embedded_tags.File", return_value=mock_file):
+        with patch("twinklr.core.audio.metadata.embedded_tags.File", return_value=mock_file):
             result = extract_embedded_metadata("/fake/path.mp3")
 
         assert result.track_number == 5
@@ -68,7 +68,7 @@ class TestExtractEmbeddedMetadata:
         }
         mock_file.pictures = []
 
-        with patch("blinkb0t.core.audio.metadata.embedded_tags.File", return_value=mock_file):
+        with patch("twinklr.core.audio.metadata.embedded_tags.File", return_value=mock_file):
             result = extract_embedded_metadata("/fake/path.mp3")
 
         assert result.year == 2026
@@ -82,7 +82,7 @@ class TestExtractEmbeddedMetadata:
         }
         mock_file.pictures = []
 
-        with patch("blinkb0t.core.audio.metadata.embedded_tags.File", return_value=mock_file):
+        with patch("twinklr.core.audio.metadata.embedded_tags.File", return_value=mock_file):
             result = extract_embedded_metadata("/fake/path.mp3")
 
         assert result.genre == ["Rock", "Alternative"]
@@ -101,7 +101,7 @@ class TestExtractEmbeddedMetadata:
         mock_file.tags = {}
         mock_file.pictures = [mock_picture]
 
-        with patch("blinkb0t.core.audio.metadata.embedded_tags.File", return_value=mock_file):
+        with patch("twinklr.core.audio.metadata.embedded_tags.File", return_value=mock_file):
             result = extract_embedded_metadata("/fake/path.mp3")
 
         assert result.artwork_present is True
@@ -117,7 +117,7 @@ class TestExtractEmbeddedMetadata:
         }
         mock_file.pictures = []
 
-        with patch("blinkb0t.core.audio.metadata.embedded_tags.File", return_value=mock_file):
+        with patch("twinklr.core.audio.metadata.embedded_tags.File", return_value=mock_file):
             result = extract_embedded_metadata("/fake/path.mp3")
 
         assert result.lyrics_embedded_present is True
@@ -130,7 +130,7 @@ class TestExtractEmbeddedMetadata:
         }
         mock_file.pictures = []
 
-        with patch("blinkb0t.core.audio.metadata.embedded_tags.File", return_value=mock_file):
+        with patch("twinklr.core.audio.metadata.embedded_tags.File", return_value=mock_file):
             result = extract_embedded_metadata("/fake/path.mp3")
 
         assert result.compilation is True
@@ -138,7 +138,7 @@ class TestExtractEmbeddedMetadata:
     def test_file_not_found_returns_warning(self):
         """Non-existent file returns metadata with warning."""
         with patch(
-            "blinkb0t.core.audio.metadata.embedded_tags.File", side_effect=FileNotFoundError()
+            "twinklr.core.audio.metadata.embedded_tags.File", side_effect=FileNotFoundError()
         ):
             result = extract_embedded_metadata("/nonexistent/file.mp3")
 
@@ -149,7 +149,7 @@ class TestExtractEmbeddedMetadata:
     def test_corrupted_file_returns_warning(self):
         """Corrupted file returns metadata with warning."""
         with patch(
-            "blinkb0t.core.audio.metadata.embedded_tags.File", side_effect=Exception("Corrupted")
+            "twinklr.core.audio.metadata.embedded_tags.File", side_effect=Exception("Corrupted")
         ):
             result = extract_embedded_metadata("/fake/corrupted.mp3")
 
@@ -167,7 +167,7 @@ class TestExtractEmbeddedMetadata:
         # FLAC doesn't have pictures attribute, might have different structure
         mock_file.pictures = []
 
-        with patch("blinkb0t.core.audio.metadata.embedded_tags.File", return_value=mock_file):
+        with patch("twinklr.core.audio.metadata.embedded_tags.File", return_value=mock_file):
             result = extract_embedded_metadata("/fake/file.flac")
 
         # Should normalize to canonical fields
@@ -183,7 +183,7 @@ class TestExtractEmbeddedMetadata:
         }
         mock_file.pictures = []
 
-        with patch("blinkb0t.core.audio.metadata.embedded_tags.File", return_value=mock_file):
+        with patch("twinklr.core.audio.metadata.embedded_tags.File", return_value=mock_file):
             result = extract_embedded_metadata("/fake/path.mp3")
 
         assert result.title is None
@@ -206,7 +206,7 @@ class TestExtractEmbeddedMetadata:
         mock_file.tags = {}
         mock_file.pictures = [mock_pic1, mock_pic2]
 
-        with patch("blinkb0t.core.audio.metadata.embedded_tags.File", return_value=mock_file):
+        with patch("twinklr.core.audio.metadata.embedded_tags.File", return_value=mock_file):
             result = extract_embedded_metadata("/fake/path.mp3")
 
         # Should use first artwork

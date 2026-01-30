@@ -7,8 +7,8 @@ Uses framework async HTTP client for requests.
 import logging
 from typing import Any
 
-from blinkb0t.core.api.audio.models import AcoustIDRecording, AcoustIDResponse
-from blinkb0t.core.api.http.errors import ApiError, TimeoutError
+from twinklr.core.api.audio.models import AcoustIDRecording, AcoustIDResponse
+from twinklr.core.api.http.errors import ApiError, TimeoutError
 
 logger = logging.getLogger(__name__)
 

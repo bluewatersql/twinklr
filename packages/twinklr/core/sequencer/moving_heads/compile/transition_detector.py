@@ -8,12 +8,12 @@ from __future__ import annotations
 
 import logging
 
-from blinkb0t.core.agents.sequencer.moving_heads.models import ChoreographyPlan
-from blinkb0t.core.sequencer.models.context import TemplateCompileContext
-from blinkb0t.core.sequencer.models.template import Template
-from blinkb0t.core.sequencer.models.transition import Boundary, BoundaryType
-from blinkb0t.core.sequencer.moving_heads.compile.scheduler import ScheduleResult
-from blinkb0t.core.sequencer.timing.beat_grid import BeatGrid
+from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan
+from twinklr.core.sequencer.models.context import TemplateCompileContext
+from twinklr.core.sequencer.models.template import Template
+from twinklr.core.sequencer.models.transition import Boundary, BoundaryType
+from twinklr.core.sequencer.moving_heads.compile.scheduler import ScheduleResult
+from twinklr.core.sequencer.timing.beat_grid import BeatGrid
 
 logger = logging.getLogger(__name__)
 

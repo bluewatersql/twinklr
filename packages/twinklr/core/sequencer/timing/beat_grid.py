@@ -10,7 +10,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from blinkb0t.core.sequencer.timing.resolver import TimeResolver
+from twinklr.core.sequencer.timing.resolver import TimeResolver
 
 
 class BeatGrid(BaseModel):

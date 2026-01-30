@@ -9,7 +9,7 @@ import logging
 from typing import Any
 from urllib.parse import quote
 
-from blinkb0t.core.audio.lyrics.providers.models import LyricsCandidate, LyricsQuery
+from twinklr.core.audio.lyrics.providers.models import LyricsCandidate, LyricsQuery
 
 logger = logging.getLogger(__name__)
 

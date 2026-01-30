@@ -7,7 +7,7 @@ from typing import Any, Protocol
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from blinkb0t.core.agents.context.token_estimator import TokenEstimator
+from twinklr.core.agents.context.token_estimator import TokenEstimator
 
 logger = logging.getLogger(__name__)
 

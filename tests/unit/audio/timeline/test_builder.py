@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from blinkb0t.core.audio.timeline.builder import build_timeline_export
+from twinklr.core.audio.timeline.builder import build_timeline_export
 
 
 class TestBuildTimelineExport:
