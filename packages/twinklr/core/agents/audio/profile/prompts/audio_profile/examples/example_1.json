@@ -1,0 +1,213 @@
+{
+  "description": "Example 1: High-energy dance track with clear verse-chorus structure",
+  "input": {
+    "audio_path": "/data/music/example_dance.mp3",
+    "duration_ms": 180000,
+    "tempo": {
+      "bpm": 128.0,
+      "confidence": 0.95,
+      "time_signature": "4/4"
+    },
+    "key": {
+      "key": "A",
+      "mode": "minor",
+      "confidence": 0.88
+    },
+    "sections": [
+      {"type": "intro", "start_ms": 0, "end_ms": 8000, "confidence": 0.92},
+      {"type": "verse", "start_ms": 8000, "end_ms": 38000, "confidence": 0.89},
+      {"type": "chorus", "start_ms": 38000, "end_ms": 68000, "confidence": 0.94},
+      {"type": "verse", "start_ms": 68000, "end_ms": 98000, "confidence": 0.89},
+      {"type": "chorus", "start_ms": 98000, "end_ms": 128000, "confidence": 0.94},
+      {"type": "bridge", "start_ms": 128000, "end_ms": 148000, "confidence": 0.85},
+      {"type": "chorus", "start_ms": 148000, "end_ms": 180000, "confidence": 0.94}
+    ],
+    "energy": {
+      "overall": 0.82,
+      "section_profiles": [
+        {
+          "section_id": "intro_0",
+          "energy_curve": [
+            {"t_ms": 0, "energy": 0.3},
+            {"t_ms": 2000, "energy": 0.4},
+            {"t_ms": 4000, "energy": 0.5},
+            {"t_ms": 6000, "energy": 0.6},
+            {"t_ms": 8000, "energy": 0.7}
+          ],
+          "mean_energy": 0.5,
+          "peak_energy": 0.7,
+          "characteristics": ["building"]
+        },
+        {
+          "section_id": "verse_1",
+          "energy_curve": [
+            {"t_ms": 8000, "energy": 0.65},
+            {"t_ms": 15000, "energy": 0.68},
+            {"t_ms": 23000, "energy": 0.72},
+            {"t_ms": 30000, "energy": 0.75},
+            {"t_ms": 38000, "energy": 0.80}
+          ],
+          "mean_energy": 0.72,
+          "peak_energy": 0.80,
+          "characteristics": ["building", "sustained"]
+        },
+        {
+          "section_id": "chorus_2",
+          "energy_curve": [
+            {"t_ms": 38000, "energy": 0.90},
+            {"t_ms": 45000, "energy": 0.93},
+            {"t_ms": 53000, "energy": 0.95},
+            {"t_ms": 60000, "energy": 0.93},
+            {"t_ms": 68000, "energy": 0.90}
+          ],
+          "mean_energy": 0.92,
+          "peak_energy": 0.95,
+          "characteristics": ["peak", "sustained"]
+        }
+      ],
+      "peaks": [
+        {"start_ms": 48000, "end_ms": 58000, "energy": 0.95},
+        {"start_ms": 158000, "end_ms": 168000, "energy": 0.96}
+      ]
+    },
+    "lyrics": {
+      "has_plain_lyrics": true,
+      "has_timed_words": true,
+      "has_phonemes": false,
+      "lyric_confidence": 0.90,
+      "phoneme_confidence": 0.0
+    },
+    "phonemes": {
+      "available": false,
+      "confidence": 0.0
+    }
+  },
+  "expected_output": {
+    "schema_version": "2.0",
+    "agent_id": "audio_profile.v2",
+    "run_id": "example_1",
+    "provenance": {
+      "provider_id": "openai",
+      "model_id": "gpt-5.2",
+      "prompt_pack": "audio_profile.v2",
+      "prompt_pack_version": "1.0",
+      "framework_version": "2.0.0",
+      "temperature": 0.7,
+      "created_at": "2026-01-29T10:00:00Z"
+    },
+    "warnings": [],
+    "song_identity": {
+      "title": null,
+      "artist": null,
+      "duration_ms": 180000,
+      "bpm": 128.0,
+      "key": "A minor",
+      "time_signature": "4/4"
+    },
+    "structure": {
+      "sections": [
+        {"section_id": "intro", "name": "intro", "start_ms": 0, "end_ms": 8000},
+        {"section_id": "verse_1", "name": "verse", "start_ms": 8000, "end_ms": 38000},
+        {"section_id": "chorus_1", "name": "chorus", "start_ms": 38000, "end_ms": 68000},
+        {"section_id": "verse_2", "name": "verse", "start_ms": 68000, "end_ms": 98000},
+        {"section_id": "chorus_2", "name": "chorus", "start_ms": 98000, "end_ms": 128000},
+        {"section_id": "bridge", "name": "bridge", "start_ms": 128000, "end_ms": 148000},
+        {"section_id": "chorus_3", "name": "chorus", "start_ms": 148000, "end_ms": 180000}
+      ],
+      "structure_confidence": 0.91,
+      "notes": ["Clear verse-chorus structure", "Strong section boundaries", "Classic dance track arrangement"]
+    },
+    "energy_profile": {
+      "macro_energy": "HIGH",
+      "section_profiles": [
+        {
+          "section_id": "intro",
+          "start_ms": 0,
+          "end_ms": 8000,
+          "energy_curve": [
+            {"t_ms": 0, "energy_0_1": 0.3},
+            {"t_ms": 2000, "energy_0_1": 0.4},
+            {"t_ms": 4000, "energy_0_1": 0.5},
+            {"t_ms": 6000, "energy_0_1": 0.6},
+            {"t_ms": 8000, "energy_0_1": 0.7}
+          ],
+          "mean_energy": 0.5,
+          "peak_energy": 0.7,
+          "characteristics": ["building"]
+        },
+        {
+          "section_id": "verse_1",
+          "start_ms": 8000,
+          "end_ms": 38000,
+          "energy_curve": [
+            {"t_ms": 8000, "energy_0_1": 0.65},
+            {"t_ms": 15000, "energy_0_1": 0.68},
+            {"t_ms": 23000, "energy_0_1": 0.72},
+            {"t_ms": 30000, "energy_0_1": 0.75},
+            {"t_ms": 38000, "energy_0_1": 0.80}
+          ],
+          "mean_energy": 0.72,
+          "peak_energy": 0.80,
+          "characteristics": ["building", "sustained"]
+        },
+        {
+          "section_id": "chorus_1",
+          "start_ms": 38000,
+          "end_ms": 68000,
+          "energy_curve": [
+            {"t_ms": 38000, "energy_0_1": 0.90},
+            {"t_ms": 45000, "energy_0_1": 0.93},
+            {"t_ms": 53000, "energy_0_1": 0.95},
+            {"t_ms": 60000, "energy_0_1": 0.93},
+            {"t_ms": 68000, "energy_0_1": 0.90}
+          ],
+          "mean_energy": 0.92,
+          "peak_energy": 0.95,
+          "characteristics": ["peak", "sustained"]
+        }
+      ],
+      "peaks": [
+        {"start_ms": 48000, "end_ms": 58000, "energy": 0.95},
+        {"start_ms": 158000, "end_ms": 168000, "energy": 0.96}
+      ],
+      "overall_mean": 0.82,
+      "energy_confidence": 0.93
+    },
+    "lyric_profile": {
+      "has_plain_lyrics": true,
+      "has_timed_words": true,
+      "has_phonemes": false,
+      "lyric_confidence": 0.90,
+      "phoneme_confidence": 0.0
+    },
+    "creative_guidance": {
+      "recommended_layer_count": 3,
+      "recommended_contrast": "HIGH",
+      "recommended_motion_density": "BUSY",
+      "recommended_asset_usage": "HEAVY",
+      "recommended_color_story": ["vibrant", "energetic", "pulsing", "electric"],
+      "cautions": [
+        "Maintain high energy throughout - avoid drops in chorus sections",
+        "Sync movement tightly to 128 BPM beat",
+        "Use strobing/fast effects sparingly to avoid fatigue"
+      ]
+    },
+    "planner_hints": {
+      "section_objectives": {
+        "intro": "Build anticipation with gradual intensity increase, establish rhythm",
+        "verse_1": "Support vocals with complementary movement, maintain energy buildup",
+        "chorus_1": "Maximum intensity with dynamic sweeps, fast color cycling, wide coverage",
+        "verse_2": "Slight pullback in intensity while maintaining energy, vary patterns from verse 1",
+        "chorus_2": "Peak energy with full fixture engagement, complex multi-layer patterns",
+        "bridge": "Create contrast with different movement patterns, maintain interest",
+        "chorus_3": "Final climax with all available effects, maximum impact"
+      },
+      "avoid_patterns": [
+        "Static positioning during high-energy chorus",
+        "Repetitive patterns between chorus sections",
+        "Slow movements that don't match 128 BPM energy"
+      ],
+      "emphasize_groups": []
+    }
+  }
+}

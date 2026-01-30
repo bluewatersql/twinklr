@@ -143,8 +143,6 @@ class TestAudioAnalyzer:
                     assert isinstance(result, SongBundle)
                     assert result.features["schema_version"] == "2.3"
                     assert result.features["tempo_bpm"] == 0.0
-                    # Warnings in features dict for v2.3 compatibility
-                    assert "warnings" in result.features
         finally:
             Path(audio_path).unlink()
 
@@ -236,8 +234,6 @@ class TestAudioAnalyzerIntegration:
                     assert "energy" in result.features
                     assert "spectral" in result.features
                     assert "structure" in result.features
-                    # timeline is an optional field in v2.3, may not always be present
-                    # (check in features dict, not in SongBundle)
 
         # Clean up test file
         Path(test_audio_file).unlink()

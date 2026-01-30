@@ -1,0 +1,129 @@
+# Song Analysis Request
+
+Analyze the following song and produce a complete AudioProfileModel.
+
+## Song Metadata
+
+- **Audio Path:** {{ shaped_context.audio_path }}
+- **Duration:** {{ shaped_context.duration_ms }}ms ({{ (shaped_context.duration_ms / 1000) | round(1) }}s)
+
+{% if shaped_context.tempo %}
+## Tempo & Rhythm
+
+- **BPM:** {{ shaped_context.tempo.bpm or "Unknown" }}
+- **Time Signature:** {{ shaped_context.tempo.time_signature or "4/4" }}
+- **Tempo Confidence:** {{ shaped_context.tempo.confidence | round(2) }}
+{% endif %}
+
+{% if shaped_context.key %}
+## Musical Key
+
+- **Key:** {{ shaped_context.key.key or "Unknown" }} {{ shaped_context.key.mode or "" }}
+- **Key Confidence:** {{ shaped_context.key.confidence | round(2) }}
+{% endif %}
+
+## Song Structure
+
+{% if shaped_context.sections %}
+The song has {{ shaped_context.sections | length }} sections:
+
+{% for section in shaped_context.sections %}
+{{ loop.index }}. **{{ section.type }}** — {{ section.start_ms }}ms to {{ section.end_ms }}ms ({{ ((section.end_ms - section.start_ms) / 1000) | round(1) }}s)
+   - Confidence: {{ section.confidence | round(2) }}
+{% endfor %}
+{% else %}
+No section data available.
+{% endif %}
+
+## Energy Profile
+
+{% if shaped_context.energy %}
+**Overall Mean Energy:** {{ shaped_context.energy.overall | round(2) }}
+
+### Per-Section Energy Profiles
+
+{% for section in shaped_context.energy.section_profiles %}
+**{{ section.section_id }}**:
+- **Mean energy:** {{ section.mean_energy | round(2) }}
+- **Peak energy:** {{ section.peak_energy | round(2) }}
+- **Energy curve:** {{ section.energy_curve | length }} points preserving intra-section shape
+  - Range: {{ section.energy_curve[0].energy | round(2) }} → {{ section.energy_curve[-1].energy | round(2) }}
+{% if section.characteristics %}
+- **Characteristics:** {{ section.characteristics | join(', ') }}
+{% endif %}
+
+{% endfor %}
+
+{% if shaped_context.energy.peaks %}
+### Major Peaks
+
+{{ shaped_context.energy.peaks | length }} significant energy peaks identified:
+{% for peak in shaped_context.energy.peaks %}
+- **Peak {{ loop.index }}:** {{ peak.start_ms }}ms - {{ peak.end_ms }}ms, energy {{ peak.energy | round(2) }}
+{% endfor %}
+{% endif %}
+{% endif %}
+
+## Lyrics & Phonemes
+
+{% if shaped_context.lyrics %}
+- **Plain Lyrics Available:** {{ "Yes" if shaped_context.lyrics.has_plain_lyrics else "No" }}
+- **Timed Words Available:** {{ "Yes" if shaped_context.lyrics.has_timed_words else "No" }}
+- **Lyrics Confidence:** {{ shaped_context.lyrics.lyric_confidence | round(2) }}
+{% endif %}
+
+{% if shaped_context.phonemes %}
+- **Phoneme Timing Available:** {{ "Yes" if shaped_context.phonemes.available else "No" }}
+{% if shaped_context.phonemes.available and shaped_context.phonemes.confidence %}
+- **Phoneme Confidence:** {{ shaped_context.phonemes.confidence | round(2) }}
+{% endif %}
+{% endif %}
+
+---
+
+## Task
+
+Based on this audio analysis data, produce a complete **AudioProfileModel** with:
+
+### 1. Song Identity
+Confirm or infer song identity fields from the metadata above.
+
+### 2. Structure Analysis
+- Convert sections into standardized `SongSectionRef` list
+- Assign clear `section_id` values (e.g., "verse_1", "chorus_1", "bridge")
+- Provide `structure_confidence` based on section clarity
+- Add any relevant notes about the structure
+
+### 3. Energy Profiling
+- Classify overall `macro_energy` (LOW, MED, HIGH, or DYNAMIC)
+- For each section, use the per-section energy data provided
+- Identify section characteristics from curve shape: "building", "drop", "sustained", "peak"
+- Calculate and report mean_energy and peak_energy per section
+- Identify major peaks across all sections (use provided peaks or identify new ones)
+- Provide `energy_confidence` and `overall_mean`
+
+### 4. Lyric Assessment
+- Report lyrics availability accurately
+- Assess quality via confidence scores
+- Report phoneme data availability
+
+### 5. Creative Guidance
+Recommend for downstream choreography planners:
+- **Layer count** (1-3): How many choreography layers should be used?
+  - 1 = Simple, unified choreography
+  - 2 = Medium complexity, complementary layers
+  - 3 = High complexity, multiple independent layers
+- **Contrast** (LOW/MED/HIGH): Visual contrast level
+- **Motion density** (SPARSE/MED/BUSY): How busy/active should movement be?
+- **Asset usage** (NONE/SPARSE/HEAVY): Should generated images/shaders be used?
+- **Color story** (up to 5 themes): Thematic color palette suggestions (e.g., "warm", "cool", "vibrant", "monochrome")
+- **Cautions**: Specific warnings for planners (e.g., "Avoid strobing in quiet intro", "Respect vocal phrasing")
+
+### 6. Planner Hints
+- **Section objectives**: Specific objectives for each section (what should choreography achieve?)
+  - Be concrete (not "make it energetic" but "build intensity gradually with increasing pan speed")
+- **Avoid patterns**: Specific patterns to avoid (e.g., "Repetitive pan/tilt in verse", "Static positioning in chorus")
+
+## Deliverable
+
+Return a complete AudioProfileModel JSON object with all fields populated according to the schema and constraints specified in the developer prompt.

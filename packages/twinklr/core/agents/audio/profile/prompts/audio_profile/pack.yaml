@@ -1,0 +1,31 @@
+pack_id: audio_profile.v2
+pack_version: "1.0"
+agent_id: audio_profile.v2
+
+description: >
+  Prompt pack for AudioProfile agent that analyzes song characteristics
+  and generates canonical intent profiles for downstream planning agents.
+
+templates:
+  system: system.j2
+  developer: developer.j2
+  user: user.j2
+
+variables:
+  response_schema:
+    source: runtime
+    description: Auto-injected from AudioProfileModel.model_json_schema()
+  
+  shaped_context:
+    source: runtime
+    description: Shaped context from SongBundle via context shaper
+
+examples:
+  - examples/example_1.json
+  - examples/example_2.json
+
+metadata:
+  created_at: "2026-01-29"
+  author: "Twinklr V2 Team"
+  tags: ["audio", "analysis", "profile", "no-judge"]
+  prompt_structure: "three-part"

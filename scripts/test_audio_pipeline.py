@@ -257,11 +257,9 @@ async def run_analysis(args: argparse.Namespace) -> dict[str, Any]:
         print(f"    Model:   {app_config.audio_processing.enhancements.whisperx_model}")
         print(f"    Device:  {app_config.audio_processing.enhancements.whisperx_device}")
 
-    # Set up cache (AudioAnalyzer creates its own cache from config)
+    # Set up cache info
     if args.no_cache:
-        # Temporarily disable cache in config
-        app_config.audio_processing.cache_enabled = False
-        print("\nCache: DISABLED")
+        print("\nCache: DISABLED (will force reprocess)")
     else:
         cache_dir = Path(app_config.cache_dir) / "audio_cache"
         print(f"\nCache: {cache_dir}")
@@ -273,7 +271,7 @@ async def run_analysis(args: argparse.Namespace) -> dict[str, Any]:
     # Run analysis
     print(f"Analyzing: {args.audio_path}")
     try:
-        bundle = await analyzer.analyze(str(args.audio_path))
+        bundle = await analyzer.analyze(str(args.audio_path), force_reprocess=args.no_cache)
     except Exception as e:
         print(f"\n✗ ERROR: {e}")
         import traceback
@@ -359,7 +357,8 @@ async def run_analysis(args: argparse.Namespace) -> dict[str, Any]:
         args.output_json.write_text(json.dumps(output_data, indent=2, default=str))
         print(f"✓ Saved to {args.output_json}")
 
-    return bundle.model_dump(mode="json")
+    result: dict[str, Any] = bundle.model_dump(mode="json")
+    return result
 
 
 async def main() -> None:

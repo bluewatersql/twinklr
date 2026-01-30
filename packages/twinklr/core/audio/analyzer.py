@@ -54,7 +54,6 @@ from twinklr.core.audio.spectral.basic import extract_spectral_features
 from twinklr.core.audio.spectral.vocals import detect_vocals
 from twinklr.core.audio.structure.sections import detect_song_sections
 from twinklr.core.audio.timeline.builder import build_timeline_export
-from twinklr.core.audio.utils import to_simple_dict
 from twinklr.core.audio.validation.validator import validate_features
 from twinklr.core.caching import FSCache
 from twinklr.core.config.models import AppConfig, JobConfig
@@ -112,7 +111,7 @@ class AudioAnalyzer:
         """Analyze audio file to extract musical features and enhancements (async).
 
         Returns a SongBundle (v3.0) containing:
-        - features: Complete v2.3 features dict (backward compatible)
+        - features: Complete features dict
         - timing: Basic timing information
         - metadata/lyrics/phonemes: Optional enhancements (when enabled)
 
@@ -130,9 +129,6 @@ class AudioAnalyzer:
             bundle = await analyzer.analyze("song.mp3")
             tempo = bundle.features["tempo_bpm"]
             beats = bundle.features["beats_s"]
-
-        Note:
-            For backward compatibility, use analyze_dict() to get v2.3 dict.
         """
         # Initialize cache if not already initialized (async context)
         if not self._cache_initialized:
@@ -190,37 +186,6 @@ class AudioAnalyzer:
             artist = bundle.metadata.embedded.artist if bundle.metadata else None
         """
         return asyncio.run(self.analyze(audio_path, force_reprocess=force_reprocess))
-
-    def analyze_dict(
-        self,
-        audio_path: str,
-        *,
-        force_reprocess: bool = False,
-    ) -> dict[str, Any]:
-        """Analyze audio and return v2.3 dict format (backward compatibility).
-
-        DEPRECATED: Use analyze_sync() to get full SongBundle with metadata.
-
-        This method provides backward compatibility for code expecting the
-        old v2.3 dict format. It calls analyze() and extracts the features dict.
-
-        Args:
-            audio_path: Path to audio file (mp3, wav, etc.)
-            force_reprocess: If True, skip cache and reprocess
-
-        Returns:
-            v2.3 features dict (same format as old analyze() method)
-
-        Example:
-            analyzer = AudioAnalyzer(app_config, job_config)
-            features = analyzer.analyze_dict("song.mp3")  # Returns dict
-            tempo = features["tempo_bpm"]
-
-        Note:
-            This is a sync wrapper around async analyze(). Use async analyze() directly when possible.
-        """
-        bundle = self.analyze_sync(audio_path, force_reprocess=force_reprocess)
-        return to_simple_dict(bundle)
 
     async def _build_song_bundle(self, audio_path: str, features: dict[str, Any]) -> SongBundle:
         """Build SongBundle from v2.3 features dict (async).

@@ -1,0 +1,135 @@
+## Output Schema
+
+You must respond with valid JSON matching this exact schema:
+
+{{ response_schema }}
+
+## Field-Level Constraints
+
+### Global Story (Required)
+- **theme**: Overarching theme of the light show (e.g., "Winter Wonderland", "Rockin' Christmas")
+- **motifs**: List of recurring visual motifs (e.g., ["falling snow", "twinkling stars", "candy cane stripes"])
+  - At least 1 motif required
+- **pacing_notes**: Overall pacing and dynamic notes (e.g., "starts slow, builds to grand finale")
+- **color_story**: Overall color palette and evolution (e.g., "cool blues/whites, warm red accents in choruses")
+
+### Section Plans (Required)
+- **section_plans**: List of section-level plans (one per song section from AudioProfile)
+- Sections must be **monotonic** (start_ms increasing)
+- Sections must be **non-overlapping**
+- Sections should **cover the entire song** (gaps trigger warnings)
+- At least **one section required**
+
+### Per-Section Fields
+
+**Timing**:
+- **section_id**: Must match section IDs from AudioProfile (e.g., "verse_1", "chorus", "bridge")
+- **section_name**: Human-readable name matching AudioProfile
+- **start_ms**, **end_ms**: Must match AudioProfile section timing exactly
+
+**Display Group Selection** (Required):
+- **primary_focus_groups**: List of primary display groups for this section (at least 1 required)
+  - Examples: ["mega_tree", "roofline", "arches", "windows", "yard_stakes"]
+  - These are the main groups carrying the choreography
+- **secondary_groups**: List of supporting display groups (optional)
+  - These provide complementary or ambient effects
+
+**Choreography Style** (Required):
+- **choreography_style**: Must be one of:
+  - "imagery" - Visual metaphors, storytelling (e.g., "snowflakes falling", "reindeer flying")
+  - "abstract" - Patterns, shapes, colors, less literal (e.g., "geometric pulses", "color washes")
+  - "hybrid" - Mix of imagery and abstract elements
+
+**Motion Density** (Required):
+- **motion_density**: Must be one of:
+  - "SPARSE" - Minimal movement, static looks (good for intros, slow verses)
+  - "MED" - Moderate movement, some dynamic elements (good for verses, bridges)
+  - "BUSY" - High movement, dynamic and active (good for choruses, peaks)
+
+**Layering Plan** (Required):
+- **layering_plan**: Defines the purpose and intent of each choreography layer (1-3 layers)
+  - Each layer has:
+    - **layer_index**: 1-indexed layer number (1, 2, or 3)
+    - **intent**: Purpose of this layer (e.g., "rhythmic accents", "ambient wash", "highlight effects")
+    - **preferred_templates** (optional): Suggested template types (e.g., ["sweep", "chase"])
+    - **preferred_assets** (optional): Suggested asset types (e.g., ["moving_heads", "LED_strips"])
+    - **blend_mode** (optional): How this layer blends (default: "normal")
+    - **intensity** (optional): Relative intensity 0.0-1.0 (default: 0.7)
+
+**Energy Target** (Required):
+- **energy_target**: Must be one of: "LOW", "MED", "HIGH", "BUILD", "RELEASE", "PEAK"
+  - Match to AudioProfile section energy characteristics
+
+**Transitions** (Optional):
+- **transition_in**: Suggested transition into this section (e.g., "fade_in", "cut", "build")
+- **transition_out**: Suggested transition out of this section (e.g., "fade_out", "cut", "drop")
+
+**Strategy** (Optional):
+- **objectives**: List of concrete objectives for this section (e.g., ["Establish mood", "Build intensity"])
+- **avoid**: List of patterns to avoid (e.g., ["fast_movements", "high_intensity"])
+
+### Global Constraints (Required)
+- **max_layers**: Maximum number of active layers allowed (1-3, default: 3)
+- **default_blend_mode**: Default blend mode for layers (default: "normal")
+- **intensity_policy**: Overall intensity policy (default: "dynamic")
+
+## Logical Dependencies
+
+**Critical:** These dependencies MUST be respected:
+
+**Display Group Selection**:
+- High energy sections should use prominent groups (mega_tree, roofline)
+- Low energy sections can use subtler groups (windows, yard_stakes)
+- Vary primary focus across sections for visual interest
+
+**Choreography Style**:
+- Match style to song mood and lyrics
+- "imagery" for narrative songs with visual lyrics
+- "abstract" for instrumental or mood-focused sections
+- "hybrid" for complex sections with both elements
+
+**Motion Density**:
+- High energy sections (energy_target = "HIGH", "PEAK") should use "BUSY"
+- Low energy sections (energy_target = "LOW") should use "SPARSE"
+- Build sections (energy_target = "BUILD") should transition from "SPARSE" to "MED" or "BUSY"
+
+**Layering Intent**:
+- Layer intents should be distinct and complementary
+- Suggestions (preferred_templates, preferred_assets) are guidance, not requirements
+- Downstream agents will make final template/asset selections
+
+**Energy Consistency**:
+- Section energy_target should align with AudioProfile section energy characteristics
+- Overall energy arc should match AudioProfile macro_energy
+
+## Output Format Requirements
+
+**Critical - Read Carefully:**
+
+1. Respond with **valid JSON only**
+2. **No additional text** before or after JSON
+3. **All required fields** must be present
+4. Use **null** for optional fields when not applicable
+5. **Double-check field types** match schema exactly
+6. Ensure **all lists** have correct item types
+7. Verify **all timestamps** are in milliseconds
+8. Confirm **section timing** matches AudioProfile exactly
+
+## Edge Cases
+
+**Single section song**:
+- Still valid (min 1 section required)
+- Provide single section plan with appropriate strategy
+
+**Very short section (<2s)**:
+- Still provide all required fields
+- May use simpler choreography_style and motion_density
+
+**Conflicting AudioProfile guidance**:
+- Prioritize musical structure over generic recommendations
+- Use your creative judgment while respecting constraints
+- Explain reasoning in global_story.pacing_notes if deviating
+
+**Display Group Availability**:
+- You don't know which groups are available - suggest appropriate group types
+- Downstream agents will validate against actual rig configuration

@@ -1,0 +1,96 @@
+## Output Schema
+
+You must respond with valid JSON matching this exact schema:
+
+{{ response_schema }}
+
+## Field-Level Constraints
+
+### Section Handling
+- Sections must be **monotonic** (start_ms increasing)
+- Sections must be **non-overlapping**
+- Section timing must be **within song duration**
+- At least **one section required**
+- Section IDs should be descriptive (verse_1, chorus_1, bridge, etc.)
+
+### Confidence Scores
+- All confidence values must be in range **[0.0, 1.0]**
+- Use 0.0 only for complete absence of data
+- Use 1.0 only for absolute certainty (rare)
+- Be realistic: most confidence scores fall in 0.6-0.9 range
+
+### Energy Profile
+- **Macro energy** must match overall song dynamics
+- **Section profiles**: Each section gets its own energy curve (3-10 points)
+- **Energy curves** preserve intra-section shape (builds, drops, peaks)
+- **Peaks**: Identify major peaks/climaxes only (not every fluctuation)
+- **Characteristics**: Use standardized terms: "building", "drop", "sustained", "peak"
+
+### Creative Guidance
+- **Layer count** must be 1, 2, or 3:
+  - 1 = Simple, unified choreography
+  - 2 = Medium complexity, complementary layers
+  - 3 = High complexity, multiple independent layers
+- **Contrast** must be LOW, MED, or HIGH
+- **Motion density** must be SPARSE, MED, or BUSY
+- **Asset usage** must be NONE, SPARSE, or HEAVY
+- **Color story**: Up to 5 thematic terms (e.g., "warm", "vibrant", "monochrome")
+- **Cautions**: Specific, actionable warnings (not generic)
+
+### Planner Hints
+- **Section objectives**: Concrete objectives per section
+  - Good: "Build intensity gradually with increasing pan speed"
+  - Bad: "Make it energetic"
+- **Avoid patterns**: Specific patterns to avoid with reasoning
+- **Emphasize groups**: Reference fixture groups by group_id or name
+
+## Logical Dependencies
+
+**Critical:** These dependencies MUST be respected:
+
+**If has_timed_words = true:**
+- Then has_plain_lyrics **MUST be true**
+- (Can't have timed words without plain text)
+
+**If has_phonemes = true:**
+- Then has_timed_words **MUST be true**
+- (Phonemes require word timing)
+
+**If recommended_layer_count = 1:**
+- Then recommended_contrast should be LOW or MED
+- (Single layer limits contrast potential)
+
+**If macro_energy = "LOW":**
+- Then recommended_motion_density should NOT be BUSY
+- (Low energy doesn't support busy movement)
+
+## Output Format Requirements
+
+**Critical - Read Carefully:**
+
+1. Respond with **valid JSON only**
+2. **No additional text** before or after JSON
+3. **All required fields** must be present
+4. Use **null** for optional fields when data unavailable
+5. **Double-check field types** match schema exactly
+6. Ensure **all lists** have correct item types
+7. Verify **all confidence scores** are in [0, 1]
+8. Confirm **all timestamps** are in milliseconds
+
+## Edge Cases
+
+**Missing tempo:**
+- Set bpm to null
+- Still produce valid profile
+
+**Very short section (<2s):**
+- Minimum 3 energy curve points
+- May have "sustained" characteristic by default
+
+**No lyrics:**
+- Set all lyric fields to false/null
+- lyric_confidence = 0.0
+
+**Single section:**
+- Still valid (min 1 section required)
+- Provide single section profile

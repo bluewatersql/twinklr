@@ -1,0 +1,142 @@
+# Choreography Planning Request
+
+Create a high-level choreography plan (MacroPlan) for the following song.
+
+## Song Overview
+
+- **Duration:** {{ audio_profile.song_identity.duration_ms }}ms ({{ (audio_profile.song_identity.duration_ms / 1000) | round(1) }}s)
+{% if audio_profile.song_identity.bpm %}
+- **BPM:** {{ audio_profile.song_identity.bpm | round(1) }}
+{% endif %}
+{% if audio_profile.song_identity.key %}
+- **Key:** {{ audio_profile.song_identity.key }}
+{% endif %}
+{% if audio_profile.song_identity.time_signature %}
+- **Time Signature:** {{ audio_profile.song_identity.time_signature }}
+{% endif %}
+
+## Song Structure
+
+The song has {{ audio_profile.structure.sections | length }} sections:
+
+{% for section in audio_profile.structure.sections %}
+{{ loop.index }}. **{{ section.name }}** ({{ section.section_id }})
+   - Timing: {{ section.start_ms }}ms - {{ section.end_ms }}ms ({{ ((section.end_ms - section.start_ms) / 1000) | round(1) }}s)
+{% endfor %}
+
+**Structure Notes:** {{ audio_profile.structure.notes or "None" }}
+
+## Energy Profile
+
+**Overall Energy:** {{ audio_profile.energy_profile.macro_energy }}
+
+### Per-Section Energy
+
+{% for section_energy in audio_profile.energy_profile.section_profiles %}
+**{{ section_energy.section_id }}**:
+- Mean energy: {{ section_energy.mean_energy | round(2) }}
+- Peak energy: {{ section_energy.peak_energy | round(2) }}
+{% if section_energy.characteristics %}
+- Characteristics: {{ section_energy.characteristics | join(', ') }}
+{% endif %}
+
+{% endfor %}
+
+{% if audio_profile.energy_profile.peaks %}
+### Major Peaks
+
+{{ audio_profile.energy_profile.peaks | length }} significant energy peaks:
+{% for peak in audio_profile.energy_profile.peaks %}
+- Peak at {{ peak.start_ms }}ms - {{ peak.end_ms }}ms: energy {{ peak.energy | round(2) }}
+{% endfor %}
+{% endif %}
+
+## Creative Guidance
+
+{% if audio_profile.creative_guidance %}
+- **Recommended Layers:** {{ audio_profile.creative_guidance.recommended_layer_count }}
+- **Contrast Level:** {{ audio_profile.creative_guidance.recommended_contrast.value }}
+- **Motion Density:** {{ audio_profile.creative_guidance.recommended_motion_density.value }}
+- **Asset Usage:** {{ audio_profile.creative_guidance.recommended_asset_usage.value }}
+- **Color Story:** {{ audio_profile.creative_guidance.recommended_color_story | join(', ') if audio_profile.creative_guidance.recommended_color_story else 'None' }}
+{% endif %}
+
+## Planner Hints
+
+{% if audio_profile.planner_hints %}
+{% if audio_profile.planner_hints.emphasize_groups %}
+**Emphasize Groups:**
+{% for group in audio_profile.planner_hints.emphasize_groups %}
+- {{ group }}
+{% endfor %}
+{% endif %}
+
+{% if audio_profile.planner_hints.avoid_patterns %}
+**Avoid Patterns:**
+{% for pattern in audio_profile.planner_hints.avoid_patterns %}
+- {{ pattern }}
+{% endfor %}
+{% endif %}
+
+{% if audio_profile.planner_hints.section_objectives %}
+**Section-Specific Objectives:**
+{% for section_id, objectives in audio_profile.planner_hints.section_objectives.items() %}
+- **{{ section_id }}:** {{ objectives | join('; ') }}
+{% endfor %}
+{% endif %}
+{% endif %}
+
+## Lyrics Context
+
+{% if audio_profile.lyric_profile %}
+- **Plain Lyrics:** {{ 'Available' if audio_profile.lyric_profile.has_plain_lyrics else 'Not available' }}
+- **Timed Words:** {{ 'Available' if audio_profile.lyric_profile.has_timed_words else 'Not available' }}
+- **Phonemes:** {{ 'Available' if audio_profile.lyric_profile.has_phonemes else 'Not available' }}
+- **Lyric Confidence:** {{ (audio_profile.lyric_profile.lyric_confidence * 100) | round(0) }}%
+{% if audio_profile.lyric_profile.notes %}
+- **Notes:** {{ audio_profile.lyric_profile.notes | join('; ') }}
+{% endif %}
+{% endif %}
+
+---
+
+{% if iteration is defined and iteration > 1 %}
+## Iteration Context
+
+**This is iteration {{ iteration }} of {{ max_iterations }}.**
+
+{% if feedback %}
+### Feedback from Previous Iteration
+
+{{ feedback }}
+{% endif %}
+
+{% if revision_request %}
+### Structured Revision Request
+
+{{ revision_request | tojson(indent=2) }}
+{% endif %}
+{% endif %}
+
+---
+
+## Your Task
+
+Generate a complete MacroPlan with:
+
+1. **Global Story**: Define the overarching theme, motifs, pacing notes, and color story for the entire show
+2. **Section Plans**: For each song section, specify:
+   - Primary and secondary display group focus
+   - Choreography style (imagery/abstract/hybrid)
+   - Motion density (SPARSE/MED/BUSY)
+   - Layering plan with layer intents (1-3 layers)
+   - Energy target matching the section's characteristics
+   - Optional: objectives, transitions, avoid patterns
+3. **Global Constraints**: Define max layers, blend modes, and intensity policy
+
+Remember:
+- You are designing **high-level strategy**, not detailed implementation
+- Focus on **display group coordination**, **choreography style**, and **motion density**
+- Provide **layer intents** (purpose and suggestions), not template selections
+- Match **energy targets** to AudioProfile section characteristics
+- Ensure sections are **monotonic, non-overlapping, and complete**

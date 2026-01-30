@@ -25,8 +25,7 @@ def run_pipeline(args: argparse.Namespace) -> None:
 
     Note:
         This function uses synchronous wrappers. The underlying pipeline
-        (audio analysis, metadata, lyrics) runs async internally (v4.0).
-        Manager uses analyze_dict() which wraps async analyze() with asyncio.run().
+        (audio analysis, metadata, lyrics) runs async internally.
     """
     audio_path = Path(args.audio).resolve()
     sequence_path = Path(args.xsq).resolve()

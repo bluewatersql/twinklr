@@ -586,6 +586,10 @@ def label_section_contextual(
 
     IMPROVEMENT 5: Context-Aware Labeling
 
+    Uses a two-pass algorithm:
+    1. Identify repetition structure (chorus vs verse from similarity data)
+    2. Apply position-based overrides (intro/outro based on position + energy)
+
     Args:
         idx: Section index
         sections: All sections
@@ -606,6 +610,31 @@ def label_section_contextual(
     start_s, end_s = section["start_s"], section["end_s"]
     section_duration = end_s - start_s
     total_sections = len(sections)
+
+    # PASS 1: Position-based overrides (most confident labels)
+
+    # Intro: First section with distinctly low energy
+    if idx == 0 and total_sections > 3:
+        if energy_rank < 0.15:  # Significantly lower than median
+            return "intro"
+        # Or first section with low repetition AND low energy
+        if repeat_count <= 1 and energy_rank < 0.30:
+            return "intro"
+
+    # Outro: Last section(s) - multiple signals
+    if idx == total_sections - 1 and total_sections > 3:
+        # Very short last section is almost always outro
+        if section_duration < 10:
+            return "outro"
+        # Last section with low energy
+        if energy_rank < 0.40:
+            return "outro"
+    # Penultimate section if very short and low energy
+    if idx == total_sections - 2 and total_sections > 4:
+        if section_duration < 8 and energy_rank < 0.50:
+            return "outro"
+
+    # PASS 2: Compute context features for remaining labels
 
     # 1. Check if this section contains a drop (often marks chorus start)
     has_drop = any(start_s <= d["time_s"] <= end_s for d in drops)
@@ -633,18 +662,14 @@ def label_section_contextual(
     unique_chords = len({c["chord"] for c in section_chords if c["chord"] != "N"})
     chord_changes = len([c for c in section_chords if c["chord"] != "N"])
 
-    # Intro: first section, typically lower energy, short
-    if idx == 0 and total_sections > 3:
-        if section_duration < 20 and energy_rank < 0.6:
-            return "intro"
-
-    # Outro: last section, often fading
-    if idx == total_sections - 1 and total_sections > 3:
-        if section_duration < 30 and energy_rank < 0.5:
-            return "outro"
-
     # Pre-chorus detection (build + high energy + before likely chorus)
-    if preceded_by_build and energy_rank > 0.6 and idx < total_sections - 1:
+    # Add minimum duration to avoid fragments
+    if (
+        preceded_by_build
+        and energy_rank > 0.6
+        and idx < total_sections - 1
+        and section_duration >= 5.0
+    ):
         next_section = sections[idx + 1]
         next_repeat_count = next_section.get("repeat_count", 0)
         next_energy = next_section.get("energy_rank", 0)
@@ -656,16 +681,17 @@ def label_section_contextual(
     if has_drop and vocal_coverage < 0.3 and energy_rank < 0.4:
         return "breakdown"
 
-    # Chorus detection (improved with drops and vocal presence)
-    if repeat_count >= 3 and energy_rank > 0.5:
+    # Chorus detection: High repetition + (high energy OR high similarity)
+    # Chorus is typically the most energetic AND most repeated section
+    if repeat_count >= 3 and (energy_rank > 0.70 or max_similarity > 0.85):
         return "chorus"
     if repeat_count >= 2 and energy_rank > 0.85:
         return "chorus"
     if repeat_count >= 2 and has_drop:
         return "chorus"
-    if repeat_count >= 2 and max_similarity > 0.90 and energy_rank > 0.75:
+    if repeat_count >= 2 and max_similarity > 0.90 and energy_rank > 0.60:
         return "chorus"
-    if repeat_count >= 2 and vocal_coverage > 0.7 and energy_rank > 0.65:
+    if repeat_count >= 2 and vocal_coverage > 0.7 and energy_rank > 0.70:
         return "chorus"  # Vocal chorus
 
     # Bridge: late in song, low repetition, often different harmony

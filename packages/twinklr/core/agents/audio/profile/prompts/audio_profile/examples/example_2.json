@@ -1,0 +1,231 @@
+{
+  "description": "Example 2: Low-energy ballad with simple structure, no lyrics",
+  "input": {
+    "audio_path": "/data/music/example_ballad.mp3",
+    "duration_ms": 120000,
+    "tempo": {
+      "bpm": 72.0,
+      "confidence": 0.91,
+      "time_signature": "4/4"
+    },
+    "key": {
+      "key": "D",
+      "mode": "major",
+      "confidence": 0.93
+    },
+    "sections": [
+      {"type": "intro", "start_ms": 0, "end_ms": 12000, "confidence": 0.88},
+      {"type": "verse", "start_ms": 12000, "end_ms": 48000, "confidence": 0.85},
+      {"type": "chorus", "start_ms": 48000, "end_ms": 78000, "confidence": 0.82},
+      {"type": "outro", "start_ms": 78000, "end_ms": 120000, "confidence": 0.90}
+    ],
+    "energy": {
+      "overall": 0.35,
+      "section_profiles": [
+        {
+          "section_id": "intro_0",
+          "energy_curve": [
+            {"t_ms": 0, "energy": 0.15},
+            {"t_ms": 3000, "energy": 0.18},
+            {"t_ms": 6000, "energy": 0.20},
+            {"t_ms": 9000, "energy": 0.22},
+            {"t_ms": 12000, "energy": 0.25}
+          ],
+          "mean_energy": 0.20,
+          "peak_energy": 0.25,
+          "characteristics": ["building", "valley"]
+        },
+        {
+          "section_id": "verse_1",
+          "energy_curve": [
+            {"t_ms": 12000, "energy": 0.30},
+            {"t_ms": 21000, "energy": 0.32},
+            {"t_ms": 30000, "energy": 0.35},
+            {"t_ms": 39000, "energy": 0.38},
+            {"t_ms": 48000, "energy": 0.42}
+          ],
+          "mean_energy": 0.35,
+          "peak_energy": 0.42,
+          "characteristics": ["building", "sustained"]
+        },
+        {
+          "section_id": "chorus_2",
+          "energy_curve": [
+            {"t_ms": 48000, "energy": 0.55},
+            {"t_ms": 56000, "energy": 0.58},
+            {"t_ms": 63000, "energy": 0.60},
+            {"t_ms": 70000, "energy": 0.57},
+            {"t_ms": 78000, "energy": 0.52}
+          ],
+          "mean_energy": 0.56,
+          "peak_energy": 0.60,
+          "characteristics": ["peak"]
+        },
+        {
+          "section_id": "outro_3",
+          "energy_curve": [
+            {"t_ms": 78000, "energy": 0.45},
+            {"t_ms": 87000, "energy": 0.38},
+            {"t_ms": 96000, "energy": 0.30},
+            {"t_ms": 105000, "energy": 0.22},
+            {"t_ms": 120000, "energy": 0.15}
+          ],
+          "mean_energy": 0.30,
+          "peak_energy": 0.45,
+          "characteristics": ["drop", "valley"]
+        }
+      ],
+      "peaks": [
+        {"start_ms": 60000, "end_ms": 66000, "energy": 0.60}
+      ]
+    },
+    "lyrics": {
+      "has_plain_lyrics": false,
+      "has_timed_words": false,
+      "has_phonemes": false,
+      "lyric_confidence": 0.0,
+      "phoneme_confidence": 0.0
+    },
+    "phonemes": {
+      "available": false,
+      "confidence": 0.0
+    }
+  },
+  "expected_output": {
+    "schema_version": "2.0",
+    "agent_id": "audio_profile.v2",
+    "run_id": "example_2",
+    "provenance": {
+      "provider_id": "openai",
+      "model_id": "gpt-5.2",
+      "prompt_pack": "audio_profile.v2",
+      "prompt_pack_version": "1.0",
+      "framework_version": "2.0.0",
+      "temperature": 0.7,
+      "created_at": "2026-01-29T11:00:00Z"
+    },
+    "warnings": [],
+    "song_identity": {
+      "title": null,
+      "artist": null,
+      "duration_ms": 120000,
+      "bpm": 72.0,
+      "key": "D major",
+      "time_signature": "4/4"
+    },
+    "structure": {
+      "sections": [
+        {"section_id": "intro", "name": "intro", "start_ms": 0, "end_ms": 12000},
+        {"section_id": "verse_1", "name": "verse", "start_ms": 12000, "end_ms": 48000},
+        {"section_id": "chorus_1", "name": "chorus", "start_ms": 48000, "end_ms": 78000},
+        {"section_id": "outro", "name": "outro", "start_ms": 78000, "end_ms": 120000}
+      ],
+      "structure_confidence": 0.86,
+      "notes": ["Simple 4-section structure", "Instrumental piece", "Gradual build and fade"]
+    },
+    "energy_profile": {
+      "macro_energy": "LOW",
+      "section_profiles": [
+        {
+          "section_id": "intro",
+          "start_ms": 0,
+          "end_ms": 12000,
+          "energy_curve": [
+            {"t_ms": 0, "energy_0_1": 0.15},
+            {"t_ms": 3000, "energy_0_1": 0.18},
+            {"t_ms": 6000, "energy_0_1": 0.20},
+            {"t_ms": 9000, "energy_0_1": 0.22},
+            {"t_ms": 12000, "energy_0_1": 0.25}
+          ],
+          "mean_energy": 0.20,
+          "peak_energy": 0.25,
+          "characteristics": ["building", "valley"]
+        },
+        {
+          "section_id": "verse_1",
+          "start_ms": 12000,
+          "end_ms": 48000,
+          "energy_curve": [
+            {"t_ms": 12000, "energy_0_1": 0.30},
+            {"t_ms": 21000, "energy_0_1": 0.32},
+            {"t_ms": 30000, "energy_0_1": 0.35},
+            {"t_ms": 39000, "energy_0_1": 0.38},
+            {"t_ms": 48000, "energy_0_1": 0.42}
+          ],
+          "mean_energy": 0.35,
+          "peak_energy": 0.42,
+          "characteristics": ["building", "sustained"]
+        },
+        {
+          "section_id": "chorus_1",
+          "start_ms": 48000,
+          "end_ms": 78000,
+          "energy_curve": [
+            {"t_ms": 48000, "energy_0_1": 0.55},
+            {"t_ms": 56000, "energy_0_1": 0.58},
+            {"t_ms": 63000, "energy_0_1": 0.60},
+            {"t_ms": 70000, "energy_0_1": 0.57},
+            {"t_ms": 78000, "energy_0_1": 0.52}
+          ],
+          "mean_energy": 0.56,
+          "peak_energy": 0.60,
+          "characteristics": ["peak"]
+        },
+        {
+          "section_id": "outro",
+          "start_ms": 78000,
+          "end_ms": 120000,
+          "energy_curve": [
+            {"t_ms": 78000, "energy_0_1": 0.45},
+            {"t_ms": 87000, "energy_0_1": 0.38},
+            {"t_ms": 96000, "energy_0_1": 0.30},
+            {"t_ms": 105000, "energy_0_1": 0.22},
+            {"t_ms": 120000, "energy_0_1": 0.15}
+          ],
+          "mean_energy": 0.30,
+          "peak_energy": 0.45,
+          "characteristics": ["drop", "valley"]
+        }
+      ],
+      "peaks": [
+        {"start_ms": 60000, "end_ms": 66000, "energy": 0.60}
+      ],
+      "overall_mean": 0.35,
+      "energy_confidence": 0.88
+    },
+    "lyric_profile": {
+      "has_plain_lyrics": false,
+      "has_timed_words": false,
+      "has_phonemes": false,
+      "lyric_confidence": 0.0,
+      "phoneme_confidence": 0.0
+    },
+    "creative_guidance": {
+      "recommended_layer_count": 1,
+      "recommended_contrast": "LOW",
+      "recommended_motion_density": "SPARSE",
+      "recommended_asset_usage": "SPARSE",
+      "recommended_color_story": ["warm", "soft", "flowing"],
+      "cautions": [
+        "Respect the calm, meditative nature of the piece",
+        "Avoid jarring transitions or sudden movements",
+        "Keep movements smooth and gradual throughout",
+        "No strobing or rapid effects"
+      ]
+    },
+    "planner_hints": {
+      "section_objectives": {
+        "intro": "Establish gentle, contemplative mood with slow, smooth movements",
+        "verse_1": "Maintain calm atmosphere with subtle progressive movement",
+        "chorus_1": "Gentle elevation in intensity without breaking the peaceful mood",
+        "outro": "Gradually reduce movement intensity, fade to stillness"
+      },
+      "avoid_patterns": [
+        "Fast pan/tilt movements that disrupt tranquility",
+        "Strobing or rapid color changes",
+        "Complex multi-fixture patterns that create visual noise"
+      ],
+      "emphasize_groups": []
+    }
+  }
+}

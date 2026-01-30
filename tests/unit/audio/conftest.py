@@ -217,7 +217,7 @@ def mock_job_config() -> MagicMock:
 
 @pytest.fixture
 def sample_song_features() -> dict[str, Any]:
-    """Sample song features dict matching schema v2.3."""
+    """Sample song features dict matching schema"""
     return {
         "schema_version": "2.3",
         "audio_path": "/test/audio.mp3",

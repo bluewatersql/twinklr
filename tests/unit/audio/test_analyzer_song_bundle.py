@@ -1,7 +1,6 @@
 """Tests for AudioAnalyzer returning SongBundle (Phase 1).
 
 Tests that AudioAnalyzer.analyze() returns SongBundle and that
-analyze_dict() provides backward compatibility.
 """
 
 from unittest.mock import patch
@@ -32,7 +31,7 @@ def job_config():
 
 @pytest.fixture
 def mock_process_audio():
-    """Mock the _process_audio method to return v2.3 features."""
+    """Mock the _process_audio method to return features."""
     return {
         "schema_version": "2.3",
         "tempo_bpm": 120.0,
@@ -63,23 +62,6 @@ class TestAudioAnalyzerReturnsSongBundle:
         assert isinstance(result, SongBundle)
         assert result.schema_version == "3.0"
         assert result.audio_path == "test.mp3"
-
-    @pytest.mark.asyncio
-    async def test_bundle_contains_v23_features(self, app_config, job_config, mock_process_audio):
-        """SongBundle.features should contain v2.3 features dict."""
-        analyzer = AudioAnalyzer(app_config, job_config)
-
-        with (
-            patch.object(analyzer, "_process_audio", return_value=mock_process_audio),
-            patch("twinklr.core.audio.cache_adapter.load_audio_features_async", return_value=None),
-            patch("twinklr.core.audio.cache_adapter.save_audio_features_async"),
-        ):
-            result = await analyzer.analyze("test.mp3")
-
-        # Should preserve v2.3 features in bundle
-        assert result.features["schema_version"] == "2.3"
-        assert result.features["tempo_bpm"] == 120.0
-        assert result.features["beats_s"] == [0.5, 1.0, 1.5]
 
     @pytest.mark.asyncio
     async def test_bundle_timing_populated(self, app_config, job_config, mock_process_audio):
@@ -125,40 +107,3 @@ class TestAudioAnalyzerReturnsSongBundle:
         assert result.lyrics.stage_status == StageStatus.SKIPPED
         # Phonemes not yet implemented
         assert result.phonemes is None
-
-
-class TestAudioAnalyzerBackwardCompat:
-    """Test AudioAnalyzer.analyze_dict() backward compatibility."""
-
-    def test_analyze_dict_returns_v23_dict(self, app_config, job_config, mock_process_audio):
-        """analyze_dict() should return v2.3 dict for backward compatibility."""
-        analyzer = AudioAnalyzer(app_config, job_config)
-
-        with (
-            patch.object(analyzer, "_process_audio", return_value=mock_process_audio),
-            patch("twinklr.core.audio.cache_adapter.load_audio_features_async", return_value=None),
-            patch("twinklr.core.audio.cache_adapter.save_audio_features_async"),
-        ):
-            result = analyzer.analyze_dict("test.mp3")
-
-        # Should return v2.3 dict
-        assert isinstance(result, dict)
-        assert result["schema_version"] == "2.3"
-        assert result["tempo_bpm"] == 120.0
-        assert result["beats_s"] == [0.5, 1.0, 1.5]
-
-    def test_analyze_dict_equivalent_to_old_analyze(
-        self, app_config, job_config, mock_process_audio
-    ):
-        """analyze_dict() should return same format as old analyze() method."""
-        analyzer = AudioAnalyzer(app_config, job_config)
-
-        with (
-            patch.object(analyzer, "_process_audio", return_value=mock_process_audio),
-            patch("twinklr.core.audio.cache_adapter.load_audio_features_async", return_value=None),
-            patch("twinklr.core.audio.cache_adapter.save_audio_features_async"),
-        ):
-            dict_result = analyzer.analyze_dict("test.mp3")
-
-        # Should match the old dict format exactly
-        assert dict_result == mock_process_audio

@@ -1,0 +1,52 @@
+pack_id: macro_planner_judge.v2
+pack_version: "1.0"
+agent_id: macro_planner_judge.v2
+
+description: >
+  Prompt pack for MacroPlanner Judge agent that evaluates MacroPlan quality
+  across four dimensions: musical alignment (30%), creative quality (25%),
+  technical feasibility (25%), and strategic coherence (20%).
+
+templates:
+  system: system.j2
+  developer: developer.j2
+  user: user.j2
+
+variables:
+  response_schema:
+    source: runtime
+    description: Auto-injected from JudgeVerdict.model_json_schema()
+  
+  audio_profile:
+    source: runtime
+    description: AudioProfileModel from Phase 1 agent (for context)
+  
+  plan:
+    source: runtime
+    description: MacroPlan to evaluate
+  
+  iteration:
+    source: runtime
+    description: Current iteration number (1-based)
+    default: 1
+  
+  max_iterations:
+    source: runtime
+    description: Maximum iterations allowed
+    default: 5
+  
+  previous_issues:
+    source: runtime
+    description: Issues from previous iteration (if any)
+    default: null
+
+metadata:
+  created_at: "2026-01-30"
+  author: "Twinklr V2 Team"
+  tags: ["macro", "judge", "evaluation", "rubric"]
+  prompt_structure: "three-part"
+  rubric_weights:
+    musical_alignment: 0.30
+    creative_quality: 0.25
+    technical_feasibility: 0.25
+    strategic_coherence: 0.20

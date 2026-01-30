@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Any
-
 import numpy as np
 
 
@@ -129,27 +127,6 @@ def cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
     return float(np.dot(a, b) / (na * nb))
 
 
-def to_simple_dict(bundle: Any) -> dict[str, Any]:
-    """Extract v2.3 features dict from SongBundle (backward compatibility).
-
-    DEPRECATED: This utility exists only for backward compatibility.
-    Use SongBundle directly to access metadata and other v3.0 features.
-
-    Args:
-        bundle: SongBundle instance
-
-    Returns:
-        v2.3 features dict (from bundle.features)
-
-    Example:
-        bundle = analyzer.analyze("song.mp3")  # Returns SongBundle
-        features_dict = to_simple_dict(bundle)  # Extract v2.3 dict
-        tempo = features_dict["tempo_bpm"]
-    """
-    features: dict[str, Any] = bundle.features
-    return features
-
-
 __all__ = [
     "normalize_to_0_1",
     "frames_to_time",
@@ -158,5 +135,4 @@ __all__ = [
     "safe_divide",
     "align_to_length",
     "cosine_similarity",
-    "to_simple_dict",
 ]

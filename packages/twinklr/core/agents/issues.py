@@ -1,6 +1,6 @@
 """Shared issue tracking models for agent feedback and validation.
 
-These models provide structured issue reporting across all V2 agents,
+These models provide structured issue reporting across all agents,
 enabling consistent feedback tracking, resolution verification, and
 iterative improvement.
 """

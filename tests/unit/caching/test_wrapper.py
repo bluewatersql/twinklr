@@ -233,9 +233,6 @@ class TestVersioning:
         async def compute_v1() -> SampleArtifact:
             return SampleArtifact(value="v1")
 
-        async def compute_v2() -> SampleArtifact:
-            return SampleArtifact(value="v2")
-
         # Store with version 1
         result1 = await cached_step(
             cache=cache,
