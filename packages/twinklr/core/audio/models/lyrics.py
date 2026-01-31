@@ -85,8 +85,13 @@ class LyricsQuality(BaseModel):
 
     Computed from word-level timing to assess lyrics quality.
 
+    Coverage is calculated as the percentage of song duration with vocals,
+    computed by merging word intervals with small gaps (250ms tolerance).
+    This represents "time with vocal phrases" rather than just summing
+    individual word durations.
+
     Args:
-        coverage_pct: Percentage of song duration covered by lyrics (0-1)
+        coverage_pct: Percentage of song duration with vocals (0-1, merged intervals)
         monotonicity_violations: Count of timestamps going backward
         overlap_violations: Count of overlapping words
         out_of_bounds_violations: Count of timestamps outside song bounds

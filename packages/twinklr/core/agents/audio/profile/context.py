@@ -202,6 +202,7 @@ def _shape_energy(energy_data: dict[str, Any], sections: list[dict[str, Any]]) -
     section_profiles = []
     for i, section in enumerate(sections):
         section_id = f"{section.get('type', 'unknown')}_{i}"
+        # Sections already have start_ms/end_ms from context shaping
         start_ms = section.get("start_ms", 0)
         end_ms = section.get("end_ms", 0)
 
@@ -309,59 +310,46 @@ def _shape_phonemes(phonemes: Any) -> dict[str, Any]:
 def compress_section_curve(
     section_curve: list[dict[str, Any]], points_per_section: int = 8
 ) -> list[dict[str, Any]]:
-    """Compress energy curve for a single section while preserving shape.
+    """Compress energy curve for a single section using uniform sampling.
 
     Strategy:
-    1. Always include first and last points
-    2. Find local extrema (peaks and valleys)
-    3. Fill remaining points with even sampling
-    4. Sort by timestamp and deduplicate
+    - Sample points evenly distributed across the section duration
+    - Always include first and last points
+    - Use linear interpolation to get uniform timestamps
 
     Args:
         section_curve: Section curve [{"t_ms": int, "energy": float}, ...].
-        points_per_section: Target number of points (8 recommended).
+        points_per_section: Target number of points (default: 8).
 
     Returns:
-        Compressed curve with ~points_per_section points.
+        Compressed curve with exactly points_per_section points.
     """
+    if len(section_curve) == 0:
+        return []
+
     if len(section_curve) <= points_per_section:
         return section_curve
 
+    # Get time range
+    start_ms = section_curve[0]["t_ms"]
+    end_ms = section_curve[-1]["t_ms"]
+    duration_ms = end_ms - start_ms
+
+    if duration_ms <= 0:
+        return [section_curve[0]]
+
+    # Generate uniform timestamps
     result = []
+    for i in range(points_per_section):
+        # Sample at evenly spaced fractions: 0%, 1/(n-1), 2/(n-1), ..., 100%
+        fraction = i / (points_per_section - 1) if points_per_section > 1 else 0.0
+        target_ms = start_ms + int(fraction * duration_ms)
 
-    # Always include first and last
-    result.append(section_curve[0])
+        # Find closest point in original curve
+        closest_point = min(section_curve, key=lambda p: abs(p["t_ms"] - target_ms))
+        result.append(closest_point)
 
-    # Find local extrema (peaks and valleys)
-    extrema = _find_local_extrema(section_curve)
-    result.extend(extrema)
-
-    # Fill remaining points with even sampling
-    remaining = points_per_section - len(result) - 1  # -1 for last point
-    if remaining > 0:
-        step = max(1, (len(section_curve) - 1) // (remaining + 1))
-        for i in range(1, remaining + 1):
-            idx = min(i * step, len(section_curve) - 2)
-            if section_curve[idx] not in result:
-                result.append(section_curve[idx])
-
-    # Always include last
-    if section_curve[-1] not in result:
-        result.append(section_curve[-1])
-
-    # Sort by timestamp
-    result = sorted(result, key=lambda p: p["t_ms"])
-
-    # Deduplicate
-    seen = set()
-    deduped = []
-    for point in result:
-        t_ms = point["t_ms"]
-        if t_ms not in seen:
-            seen.add(t_ms)
-            deduped.append(point)
-
-    return deduped[:points_per_section]
+    return result
 
 
 def _find_local_extrema(curve: list[dict[str, Any]]) -> list[dict[str, Any]]:

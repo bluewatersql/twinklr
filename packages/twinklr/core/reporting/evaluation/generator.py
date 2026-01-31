@@ -116,7 +116,7 @@ async def generate_evaluation_report(
     if config is None:
         config = EvalConfig()
 
-    logger.info(f"Generating evaluation report from {checkpoint_path.name}")
+    logger.debug(f"Generating evaluation report from {checkpoint_path.name}")
 
     # Load checkpoint
     logger.debug("Loading checkpoint...")
@@ -131,7 +131,7 @@ async def generate_evaluation_report(
     validation_errors_count = 0
 
     if config.enable_heuristic_validation:
-        logger.info("Validating plan structure...")
+        logger.debug("Validating plan structure...")
         available_templates = load_available_templates()
         song_structure = {
             "sections": checkpoint_data.get("context", {})
@@ -157,10 +157,10 @@ async def generate_evaluation_report(
                 len(plan_validation.warnings),
             )
         else:
-            logger.info("Plan validation passed (%d warnings)", len(plan_validation.warnings))
+            logger.debug("Plan validation passed (%d warnings)", len(plan_validation.warnings))
 
     # Re-render plan (async)
-    logger.info("Re-rendering plan through sequencer...")
+    logger.debug("Re-rendering plan through sequencer...")
     render_data = await rerender_plan(
         plan=plan,
         audio_path=audio_path,
@@ -168,7 +168,7 @@ async def generate_evaluation_report(
         xsq_path=xsq_path,
     )
 
-    logger.info(f"Re-rendered {len(render_data.segments)} segments")
+    logger.debug(f"Re-rendered {len(render_data.segments)} segments")
 
     # Build song metadata
     tempo_info = render_data.song_features.get("tempo", {})
@@ -187,7 +187,7 @@ async def generate_evaluation_report(
     expanded_sections = _expand_plan_sections(plan)
 
     # Process sections
-    logger.info(
+    logger.debug(
         f"Processing {len(expanded_sections)} sections (expanded from {len(plan.sections)} plan sections)..."
     )
     section_reports = []
@@ -232,7 +232,7 @@ async def generate_evaluation_report(
     # Phase 2: Analyze transitions between sections (if enabled)
     harsh_transitions_count = 0
     if config.enable_continuity_checks and len(section_reports) > 1:
-        logger.info("Analyzing section transitions...")
+        logger.debug("Analyzing section transitions...")
 
         updated_sections = []
         for i in range(len(section_reports)):
@@ -356,11 +356,11 @@ async def generate_evaluation_report(
     )
 
     # Write outputs
-    logger.info("Writing report outputs...")
+    logger.debug("Writing report outputs...")
     write_report_json(report, output_dir / "report.json")
     write_report_markdown(report, output_dir / "report.md")
 
-    logger.info(f"✓ Report generated: {output_dir / 'report.md'}")
+    logger.debug(f"✓ Report generated: {output_dir / 'report.md'}")
     return report
 
 

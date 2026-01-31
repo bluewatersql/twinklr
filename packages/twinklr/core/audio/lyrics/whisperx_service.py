@@ -268,27 +268,27 @@ class WhisperXImpl(WhisperXService):
         # Extract text and language
         detected_language = result.get("language", config.language or "en")
         segments = result.get("segments", [])
-        
+
         logger.debug(f"WhisperX transcribe: {len(segments)} segments returned")
-        
+
         # Collect all text
         text_parts: list[str] = []
         for segment in segments:
             text_parts.append(segment.get("text", ""))
-        
+
         full_text = " ".join(text_parts).strip()
-        
+
         # If we got text, align it to get word-level timing
         words: list[LyricWord] = []
         if full_text:
             try:
                 logger.debug(f"WhisperX: aligning {len(full_text)} chars for word-level timing")
-                
+
                 # Load align model for detected language
                 align_model, metadata = whisperx.load_align_model(
                     language_code=detected_language, device=config.device
                 )
-                
+
                 # Align to get word-level timing
                 align_result = whisperx.align(
                     result["segments"],
@@ -298,7 +298,7 @@ class WhisperXImpl(WhisperXService):
                     config.device,
                     return_char_alignments=False,
                 )
-                
+
                 # Extract words from aligned segments
                 for segment in align_result.get("segments", []):
                     for word_dict in segment.get("words", []):
@@ -314,7 +314,7 @@ class WhisperXImpl(WhisperXService):
                                     end_ms=int(end_s * 1000),
                                 )
                             )
-                
+
                 logger.debug(f"WhisperX align: extracted {len(words)} words")
             except Exception as e:
                 logger.warning(f"WhisperX align failed: {e}, returning text without word timing")

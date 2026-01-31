@@ -39,9 +39,9 @@ def test_audio_profile_spec_uses_oneshot_mode():
 
 
 def test_audio_profile_spec_uses_low_temperature():
-    """Test that spec uses low temperature for factual analysis."""
+    """Test that spec uses moderate temperature for balanced output."""
     spec = get_audio_profile_spec()
-    assert spec.temperature == 0.2
+    assert spec.temperature == 0.4
 
 
 def test_audio_profile_spec_uses_gpt5_2():

@@ -156,9 +156,9 @@ class TestDetectSongSections:
             hop_length=hop_length,
         )
 
-        # Now using Foote novelty method
+        # Now using hybrid Foote novelty method
         assert "method" in result["meta"]
-        assert result["meta"]["method"] == "foote_novelty"
+        assert result["meta"]["method"] == "hybrid_foote_v3"
 
     def test_custom_min_section_duration(
         self,
@@ -228,7 +228,7 @@ class TestLabelSection:
             total_sections=6,
             repeat_count=0,
             max_similarity=0.3,
-            energy_rank=0.3,
+            energy_rank=0.25,  # Below 0.30 threshold for intro
             start_s=0.0,
             end_s=15.0,
             duration=180.0,
@@ -243,7 +243,7 @@ class TestLabelSection:
             total_sections=6,
             repeat_count=0,
             max_similarity=0.3,
-            energy_rank=0.3,
+            energy_rank=0.5,  # Below 0.60 threshold with low confidence
             start_s=160.0,
             end_s=180.0,
             duration=180.0,

@@ -1,0 +1,250 @@
+"""MacroPlanner data models."""
+
+from pydantic import BaseModel, Field, field_validator
+
+from twinklr.core.agents.audio.profile.models import SongSectionRef
+from twinklr.core.agents.taxonomy import (
+    BlendMode,
+    ChoreographyStyle,
+    EnergyTarget,
+    LayerRole,
+    MotionDensity,
+    TargetRole,
+    TimingDriver,
+)
+
+
+class GlobalStory(BaseModel):
+    """Global story arc for entire sequence.
+
+    Defines the overarching theme, recurring motifs, pacing strategy,
+    and color palette for the complete Christmas light show.
+    """
+
+    model_config = {"extra": "forbid"}
+
+    theme: str = Field(
+        ..., description="Overarching theme/narrative for the show", min_length=10
+    )
+    motifs: list[str] = Field(
+        ...,
+        description="3-5 recurring visual/musical motifs throughout the show",
+        min_length=3,
+        max_length=10,
+    )
+    pacing_notes: str = Field(
+        ..., description="How energy builds/releases across the song", min_length=20)
+    color_story: str = Field(
+        ...,
+        description="Color palette and transitions throughout the show",
+        min_length=10)
+
+
+class MacroSectionPlan(BaseModel):
+    """Strategic plan for one song section.
+
+    Defines energy target, choreography style, motion density, and target
+    selection for a single section of the song.
+    """
+
+    model_config = {"extra": "forbid"}
+
+    section: SongSectionRef = Field(..., description="Reference to audio section")
+    energy_target: EnergyTarget = Field(..., description="Target energy level for section")
+    primary_focus_targets: list[str] = Field(
+        ..., description="Main display roles (e.g. OUTLINE, MEGA_TREE)", min_length=1, max_length=5
+    )
+    secondary_targets: list[str] = Field(
+        default_factory=list, description="Supporting roles", max_length=10
+    )
+    choreography_style: ChoreographyStyle = Field(
+        ..., description="Visual approach (IMAGERY, ABSTRACT, HYBRID)"
+    )
+    motion_density: MotionDensity = Field(..., description="Activity level (SPARSE, MED, BUSY)")
+    notes: str = Field(
+        ..., description="Strategic notes for this section", min_length=20
+    )
+
+    @field_validator("primary_focus_targets", "secondary_targets")
+    @classmethod
+    def validate_target_roles(cls, v: list[str]) -> list[str]:
+        """Validate target roles are valid TargetRole names."""
+        valid_roles = {r.name for r in TargetRole}
+        for role in v:
+            if role not in valid_roles:
+                raise ValueError(f"Invalid target role: {role}")
+        return v
+
+
+class TargetSelector(BaseModel):
+    """Defines which targets a layer should affect.
+
+    Supports multiple targets for coordinated impact (not 1:1).
+    """
+
+    model_config = {"extra": "forbid"}
+
+    roles: list[str] = Field(
+        ..., description="Target roles (e.g. OUTLINE, MEGA_TREE)", min_length=1, max_length=10
+    )
+    coordination: str = Field(
+        default="unified",
+        description="How targets work together (unified, complementary, independent)",
+    )
+
+    @field_validator("roles")
+    @classmethod
+    def validate_roles(cls, v: list[str]) -> list[str]:
+        """Validate roles are valid TargetRole names."""
+        valid_roles = {r.name for r in TargetRole}
+        for role in v:
+            if role not in valid_roles:
+                raise ValueError(f"Invalid role: {role}")
+        return v
+
+
+class LayerSpec(BaseModel):
+    """Specification for a single layer in composition.
+
+    Defines the role, targets, blend mode, timing, and intensity for one
+    layer in the choreography architecture.
+    """
+
+    model_config = {"extra": "forbid"}
+
+    layer_index: int = Field(..., ge=0, le=4, description="Layer index (0-4, lower = back)")
+    layer_role: LayerRole = Field(
+        ..., description="Layer role (BASE, RHYTHM, ACCENT, FILL, TEXTURE)"
+    )
+    target_selector: TargetSelector = Field(
+        ..., description="Which display groups this layer affects"
+    )
+    blend_mode: BlendMode = Field(..., description="How layer combines with others (NORMAL, ADD)")
+    timing_driver: TimingDriver = Field(..., description="Musical timing this layer follows")
+    intensity_bias: float = Field(
+        default=1.0, ge=0.0, le=1.5, description="Global intensity multiplier for this layer"
+    )
+    usage_notes: str = Field(
+        ..., description="Strategic guidance for GroupPlanner", min_length=10
+    )
+
+
+class LayeringPlan(BaseModel):
+    """Complete layering architecture for the sequence.
+
+    Validates the collection of layers with composition rules:
+    - Exactly one BASE layer required
+    - No duplicate layer indices
+    - BASE layer must use NORMAL blend
+    - 1-5 layers total
+    """
+
+    model_config = {"extra": "forbid"}
+
+    layers: list[LayerSpec] = Field(
+        ..., description="Layer specifications", min_length=1, max_length=5
+    )
+    strategy_notes: str = Field(
+        ..., description="High-level layering strategy", min_length=20
+    )
+
+    @field_validator("layers")
+    @classmethod
+    def validate_layer_composition(cls, v: list[LayerSpec]) -> list[LayerSpec]:
+        """Validate layer composition rules."""
+        # Check for exactly one BASE layer
+        base_layers = [layer for layer in v if layer.layer_role == LayerRole.BASE]
+        if len(base_layers) != 1:
+            raise ValueError("Must have exactly one BASE layer")
+
+        # Check for duplicate indices
+        indices = [layer.layer_index for layer in v]
+        if len(indices) != len(set(indices)):
+            raise ValueError("Duplicate layer index found")
+
+        # Validate BASE layer uses NORMAL blend
+        base_layer = base_layers[0]
+        if base_layer.blend_mode != BlendMode.NORMAL:
+            raise ValueError("BASE layer must use NORMAL blend mode")
+
+        return v
+
+
+class MacroPlan(BaseModel):
+    """Complete strategic plan for entire sequence.
+
+    Root schema that ties together global story, layering architecture,
+    per-section plans, and asset requirements.
+
+    Validates:
+    - No gaps or overlaps between sections
+    - Sections sorted by start_ms
+    - No duplicate section IDs
+    """
+
+    model_config = {"extra": "forbid"}
+
+    global_story: GlobalStory = Field(..., description="Overarching theme and narrative")
+    layering_plan: LayeringPlan = Field(..., description="Complete layering architecture")
+    section_plans: list[MacroSectionPlan] = Field(
+        ..., description="Per-section strategic plans", min_length=1
+    )
+    asset_requirements: list[str] = Field(
+        default_factory=list, description="Required assets (e.g. 'snowflake_burst.png')"
+    )
+
+    @field_validator("asset_requirements")
+    @classmethod
+    def validate_asset_requirements(cls, v: list[str]) -> list[str]:
+        """Validate asset requirement strings."""
+        for asset in v:
+            if not asset or len(asset.strip()) == 0:
+                raise ValueError("Asset requirement must be at least 1 character")
+        return v
+
+    @field_validator("section_plans")
+    @classmethod
+    def validate_section_coverage(cls, v: list[MacroSectionPlan]) -> list[MacroSectionPlan]:
+        """Validate section timing coverage.
+
+        Ensures:
+        - No duplicate section IDs
+        - Sections sorted by start_ms
+        - No gaps between sections
+        - No overlaps between sections
+        """
+        if len(v) == 0:
+            return v
+
+        # Check for duplicate section IDs
+        section_ids = [plan.section.section_id for plan in v]
+        if len(section_ids) != len(set(section_ids)):
+            raise ValueError("Duplicate section_id found")
+
+        # Check sections are sorted by start_ms
+        start_times = [plan.section.start_ms for plan in v]
+        if start_times != sorted(start_times):
+            raise ValueError("Sections not sorted by start_ms")
+
+        # Check for gaps and overlaps
+        for i in range(len(v) - 1):
+            current = v[i]
+            next_section = v[i + 1]
+
+            current_end = current.section.end_ms
+            next_start = next_section.section.start_ms
+
+            if current_end < next_start:
+                raise ValueError(
+                    f"Gap detected between sections '{current.section.section_id}' "
+                    f"and '{next_section.section.section_id}': "
+                    f"{current_end}ms to {next_start}ms"
+                )
+            elif current_end > next_start:
+                raise ValueError(
+                    f"Overlap detected between sections '{current.section.section_id}' "
+                    f"and '{next_section.section.section_id}': "
+                    f"current ends at {current_end}ms, next starts at {next_start}ms"
+                )
+
+        return v

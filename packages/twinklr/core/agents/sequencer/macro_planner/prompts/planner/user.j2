@@ -1,0 +1,78 @@
+{#
+MacroPlanner User Prompt
+Provides song details, display layout, and task instructions
+#}
+# Song Information
+
+**Title:** {{ audio_profile.song_identity.title or "Untitled" }}
+**Artist:** {{ audio_profile.song_identity.artist or "Unknown" }}
+**Duration:** {{ (audio_profile.song_identity.duration_ms / 1000) | round(1) }}s
+**BPM:** {{ audio_profile.song_identity.bpm | round(1) }}
+**Key:** {{ audio_profile.song_identity.key }}
+**Time Signature:** {{ audio_profile.song_identity.time_signature }}
+
+## Song Structure
+
+{% for section in audio_profile.structure.sections %}
+- **{{ section.name }}** ({{ section.section_id }}) - {{ (section.start_ms / 1000) | round(1) }}s to {{ (section.end_ms / 1000) | round(1) }}s
+{% endfor %}
+
+## Energy Profile
+
+**Overall Energy:** {{ audio_profile.energy_profile.macro_energy }}
+
+**Energy Peaks:** {{ audio_profile.energy_profile.peaks | length }} major peaks detected
+{% if audio_profile.energy_profile.peaks %}
+Peak timings:
+{% for peak in audio_profile.energy_profile.peaks[:5] %}
+- {{ (peak.start_ms / 1000) | round(1) }}s to {{ (peak.end_ms / 1000) | round(1) }}s (energy: {{ peak.energy | round(2) }})
+{% endfor %}
+{% if audio_profile.energy_profile.peaks | length > 5 %}
+... and {{ audio_profile.energy_profile.peaks | length - 5 }} more peaks
+{% endif %}
+{% endif %}
+
+## Creative Guidance
+
+**Recommended Layer Count:** {{ audio_profile.creative_guidance.recommended_layer_count }}
+
+**Recommended Contrast:** {{ audio_profile.creative_guidance.recommended_contrast.value }}
+
+**Recommended Motion Density:** {{ audio_profile.creative_guidance.recommended_motion_density.value }}
+
+**Recommended Color Story:** {{ audio_profile.creative_guidance.recommended_color_story | join(", ") or "Not specified" }}
+
+{% if audio_profile.creative_guidance.cautions %}
+**Cautions:** 
+{% for caution in audio_profile.creative_guidance.cautions %}
+- {{ caution }}
+{% endfor %}
+{% endif %}
+
+## Display Layout
+
+Available target roles in this display:
+{% for group in display_groups %}
+- **{{ group.role_key }}** ({{ group.group_type }}) - {{ group.model_count }} models
+{% endfor %}
+
+{% if iteration is defined and iteration > 1 %}
+---
+
+# Iteration {{ iteration }} - Refinement Feedback
+
+{{ feedback }}
+
+**Instructions:** Address the feedback above while maintaining the global story coherence.
+
+{% endif %}
+# Your Task
+
+Create a strategic MacroPlan for this Christmas light show that:
+
+1. **Tells a story** - Define global theme, motifs, and pacing
+2. **Plans each section** - Energy targets, choreography style, focus targets
+3. **Designs layer architecture** - BASE, RHYTHM, ACCENT layers with proper blend modes
+4. **Specifies assets** - List any required imagery assets (snowflakes, stars, etc.)
+
+Remember: Bold impact, main character energy, coordinated wow moments!

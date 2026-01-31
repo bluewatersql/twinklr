@@ -268,6 +268,30 @@ class AsyncAgentRunner:
             except ValidationError as e:
                 repair_attempts += 1
 
+                # Format validation error
+                error_details = self._format_validation_error(e)
+
+                # Log the failed response for debugging (first attempt only)
+                if attempt == 0:
+                    import json
+                    try:
+                        raw_json = json.dumps(response.content, indent=2)
+                    except Exception:
+                        raw_json = str(response.content)
+                    
+                    logger.warning(
+                        f"Agent {spec.name} FIRST schema validation failure:\n"
+                        f"===== VALIDATION ERROR =====\n"
+                        f"{error_details}\n"
+                        f"===== RAW RESPONSE =====\n"
+                        f"{raw_json}"
+                    )
+                else:
+                    logger.warning(
+                        f"Agent {spec.name} schema validation failed "
+                        f"(attempt {attempt + 1}/{spec.max_schema_repair_attempts + 1})"
+                    )
+
                 if attempt >= spec.max_schema_repair_attempts:
                     logger.error(
                         f"Agent {spec.name} exhausted schema repair attempts "
@@ -278,7 +302,6 @@ class AsyncAgentRunner:
                     ) from e
 
                 # Add repair feedback to messages
-                error_details = self._format_validation_error(e)
                 repair_message = (
                     f"Schema validation failed. Error:\n{error_details}\n\n"
                     f"Expected schema:\n{get_json_schema_example(spec.response_model)}\n\n"
@@ -286,10 +309,6 @@ class AsyncAgentRunner:
                 )
 
                 messages.append({"role": "user", "content": repair_message})
-                logger.warning(
-                    f"Agent {spec.name} schema validation failed "
-                    f"(attempt {attempt + 1}/{spec.max_schema_repair_attempts + 1})"
-                )
 
         raise RunError("Schema repair loop exited unexpectedly")
 

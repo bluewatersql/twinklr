@@ -69,7 +69,7 @@ def validate_plan_structure(
     )
 
     if result.valid:
-        logger.info("Plan validation passed (%d warnings)", len(result.warnings))
+        logger.debug("Plan validation passed (%d warnings)", len(result.warnings))
     else:
         logger.warning("Plan validation failed (%d errors)", len(result.errors))
 

@@ -4,10 +4,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from twinklr.core.audio.structure.sections import (
-    detect_song_sections,
-    label_section_contextual,
-)
+from twinklr.core.audio.structure.labeling import label_section_contextual
+from twinklr.core.audio.structure.sections import detect_song_sections
 
 if TYPE_CHECKING:
     import numpy as np
@@ -62,7 +60,7 @@ class TestContextAwareLabling:
             duration=100.0,
         )
 
-        assert label == "breakdown"
+        assert label == "break"  # Updated from refactor (renamed from breakdown)
 
     def test_instrumental_detection(self) -> None:
         """Section with low vocals and moderate energy labeled as instrumental."""
@@ -88,21 +86,52 @@ class TestContextAwareLabling:
 
     def test_chorus_with_drop(self) -> None:
         """Repeated section with drop labeled as chorus."""
+        # Need repeat_rank > 0.70 and has_drop
+        # With 4 sections, 3 < 0.85 means repeat_rank = 3/4 = 0.75 > 0.70
         label = label_section_contextual(
-            idx=2,
+            idx=3,
             sections=[
-                {"start_s": 0.0, "end_s": 20.0, "energy_rank": 0.5, "repeat_count": 0},
-                {"start_s": 20.0, "end_s": 40.0, "energy_rank": 0.8, "repeat_count": 0},
-                {"start_s": 40.0, "end_s": 60.0, "energy_rank": 0.7, "repeat_count": 2},
+                {
+                    "start_s": 0.0,
+                    "end_s": 20.0,
+                    "energy_rank": 0.5,
+                    "repeat_count": 0,
+                    "repetition": 0.2,
+                    "vocal_density": 0.5,
+                },
+                {
+                    "start_s": 20.0,
+                    "end_s": 40.0,
+                    "energy_rank": 0.8,
+                    "repeat_count": 1,
+                    "repetition": 0.4,
+                    "vocal_density": 0.6,
+                },
+                {
+                    "start_s": 40.0,
+                    "end_s": 60.0,
+                    "energy_rank": 0.6,
+                    "repeat_count": 2,
+                    "repetition": 0.6,
+                    "vocal_density": 0.5,
+                },
+                {
+                    "start_s": 60.0,
+                    "end_s": 80.0,
+                    "energy_rank": 0.7,
+                    "repeat_count": 3,
+                    "repetition": 0.85,
+                    "vocal_density": 0.7,
+                },
             ],
             chords=[],
             builds=[],
-            drops=[{"time_s": 41.0}],
-            vocal_segments=[],
+            drops=[{"time_s": 61.0}],
+            vocal_segments=[{"start_s": 60.0, "end_s": 80.0}],  # Vocals present
             energy_rank=0.7,
-            repeat_count=2,
+            repeat_count=3,
             max_similarity=0.9,
-            relative_pos=0.5,
+            relative_pos=0.6,
             duration=100.0,
         )
 

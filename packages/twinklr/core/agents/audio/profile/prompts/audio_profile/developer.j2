@@ -37,12 +37,31 @@ You must respond with valid JSON matching this exact schema:
 - **Color story**: Up to 5 thematic terms (e.g., "warm", "vibrant", "monochrome")
 - **Cautions**: Specific, actionable warnings (not generic)
 
-### Planner Hints
-- **Section objectives**: Concrete objectives per section
-  - Good: "Build intensity gradually with increasing pan speed"
-  - Bad: "Make it energetic"
-- **Avoid patterns**: Specific patterns to avoid with reasoning
-- **Emphasize groups**: Reference fixture groups by group_id or name
+### Planner Hints ⚠️ CRITICAL: SONG-SPECIFIC ONLY ⚠️
+- **Section objectives**: Must cite SPECIFIC timing and energy data from this song's curves
+  - ✅ GOOD: "At 13.8s (mid-verse_1), energy spikes to 0.425 (2.7x section mean of 0.15) - create surprise accent here, then drop back to 0.17 by 17.2s for contrast"
+  - ❌ BAD: "Build intensity gradually with increasing pan speed" (too generic, applies to any song)
+  - ❌ BAD: "Keep motion minimal in intro" (obvious for any low-energy section)
+  - ❌ BAD: "Add sparkle layer during build" (no specific timing or reasoning)
+  
+- **Section objective requirements:**
+  - MUST cite specific millisecond timestamps from energy curve
+  - MUST reference actual energy values and how they compare (peaks vs means)
+  - MUST identify what makes THIS section unique (unusual drops, extended duration, atypical energy for section type)
+  - SHOULD suggest specific fixture behaviors tied to energy dynamics
+  
+- **Avoid patterns**: Patterns to avoid WITH song-specific reasoning
+  - ✅ GOOD: "Avoid 4-step or 8-step chases (this is 3/4 waltz time, not 4/4) - use 3-beat or 6-beat patterns instead"
+  - ✅ GOOD: "Avoid repeating identical choreography across instrumental_1 through instrumental_5 - these 5 consecutive sections need varied routing to prevent monotony"
+  - ❌ BAD: "Avoid repetitive sweeps" (what song wouldn't this apply to?)
+  
+- **Cautions**: Must be derived from actual data anomalies
+  - ✅ GOOD: "Intro is only 580ms with energy near zero - don't attempt fade-in, use instant-on at first beat (592ms)"
+  - ✅ GOOD: "Bridge drops to mean 0.0 after sustained 0.67 energy in verse_4 - handle this as hard cut, not gradual transition"
+  - ❌ BAD: "Avoid strobing in quiet intro" (applies to every song with quiet intro)
+  - ❌ BAD: "Respect vocal phrasing" (generic advice for any song with lyrics)
+
+- **Emphasize groups**: Reference fixture groups by group_id or name (generic fixture types are acceptable)
 
 ## Logical Dependencies
 
@@ -76,6 +95,43 @@ You must respond with valid JSON matching this exact schema:
 6. Ensure **all lists** have correct item types
 7. Verify **all confidence scores** are in [0, 1]
 8. Confirm **all timestamps** are in milliseconds
+9. **DO NOT generate `provenance` field** - this is injected by the framework with actual runtime values
+
+## Warnings Guidance
+
+Use the `warnings` field sparingly for **actionable concerns** only:
+
+**DO warn about:**
+- Critical data quality issues (e.g., completely missing sections, corrupted data)
+- Logical inconsistencies in provided data that prevent confident analysis
+- Safety concerns (e.g., dangerously high strobing risk)
+- **Structure confidence: ONLY if average section confidence < 0.15** (extremely low)
+
+**DO NOT warn about:**
+- Structure confidence ≥ 0.15 (this is acceptable for real-world audio, even if labeled "low")
+- Individual sections with confidence 0.2-0.5 (normal for verses/transitions in many songs)
+- Very short sections (< 1s) unless they're shorter than 100ms and clearly artifacts
+- Moderate data quality issues that don't prevent analysis
+- Expected characteristics (e.g., ballads naturally have lower confidence due to subtle structure)
+
+**Confidence Threshold Reference:**
+- **< 0.15**: Critical - warn about this
+- **0.15 - 0.50**: Acceptable - do NOT warn
+- **0.50 - 0.80**: Normal - do NOT warn
+- **> 0.80**: High confidence - do NOT warn
+
+**Example of appropriate warning:**
+```json
+{"severity": "WARN", "code": "CRITICAL_STRUCTURE_UNCERTAINTY", "message": "Average section confidence is 0.08; structure detection may have failed", ...}
+```
+
+**Examples of unnecessary warnings:**
+```json
+// ❌ Don't warn about these:
+{"severity": "WARN", "code": "STRUCTURE_LOW_CONFIDENCE", "message": "Section confidence averages 0.35", ...}
+{"severity": "WARN", "code": "STRUCTURE_LOW_SECTION_CONF", "message": "Many section confidences ~0.2-0.36", ...}
+// ✅ These confidences are acceptable - no warning needed
+```
 
 ## Edge Cases
 

@@ -94,11 +94,14 @@ Confirm or infer song identity fields from the metadata above.
 - Convert sections into standardized `SongSectionRef` list
 - Assign clear `section_id` values (e.g., "verse_1", "chorus_1", "bridge")
 - Provide `structure_confidence` based on section clarity
-- Add any relevant notes about the structure
+- Add any relevant notes about the structure **that capture unique structural traits**
+  - Good: "Extended instrumental passages (5 sections, 80s total) dominate runtime unlike typical verse-chorus pop"
+  - Bad: "Song has verse and chorus sections"
 
 ### 3. Energy Profiling
 - Classify overall `macro_energy` (LOW, MED, HIGH, or DYNAMIC)
-- For each section, use the per-section energy data provided
+- For each section, **preserve the exact timestamps (`t_ms`) from the energy curve** provided above
+- Update energy values (`energy_0_1`) to reflect normalized 0-1 scale if needed, but **do not change timestamps**
 - Identify section characteristics from curve shape: "building", "drop", "sustained", "peak"
 - Calculate and report mean_energy and peak_energy per section
 - Identify major peaks across all sections (use provided peaks or identify new ones)
@@ -110,21 +113,50 @@ Confirm or infer song identity fields from the metadata above.
 - Report phoneme data availability
 
 ### 5. Creative Guidance
-Recommend for downstream choreography planners:
-- **Layer count** (1-3): How many choreography layers should be used?
+Recommend for downstream choreography planners **based on THIS song's specific characteristics**:
+- **Layer count** (1-3): How many choreography layers should be used **for this song specifically**?
   - 1 = Simple, unified choreography
   - 2 = Medium complexity, complementary layers
   - 3 = High complexity, multiple independent layers
-- **Contrast** (LOW/MED/HIGH): Visual contrast level
-- **Motion density** (SPARSE/MED/BUSY): How busy/active should movement be?
-- **Asset usage** (NONE/SPARSE/HEAVY): Should generated images/shaders be used?
-- **Color story** (up to 5 themes): Thematic color palette suggestions (e.g., "warm", "cool", "vibrant", "monochrome")
-- **Cautions**: Specific warnings for planners (e.g., "Avoid strobing in quiet intro", "Respect vocal phrasing")
+  - **Justify your choice** based on song complexity, energy profile, and structure
+- **Contrast** (LOW/MED/HIGH): Visual contrast level **appropriate for this song's dynamics**
+- **Motion density** (SPARSE/MED/BUSY): How busy/active should movement be **for this song's tempo and energy**?
+- **Asset usage** (NONE/SPARSE/HEAVY): Should generated images/shaders be used **for this song**?
+- **Color story** (up to 5 themes): Thematic color palette suggestions **that fit this song's mood and genre**
+  - For Christmas songs: Consider traditional vs modern arrangements, vocal style, instrumentation
+  - For non-Christmas songs: Reflect actual song mood (don't force Christmas themes)
+- **Cautions**: Specific warnings derived from **THIS song's actual data**
+  - ❌ FORBIDDEN: Generic cautions like "Avoid strobing in quiet intro" (unless intro has specific strobing risk)
+  - ✅ REQUIRED: Data-driven cautions like "Intro is only 0.58s with near-zero energy - don't attempt fade-in, use instant-on at first beat"
 
-### 6. Planner Hints
-- **Section objectives**: Specific objectives for each section (what should choreography achieve?)
-  - Be concrete (not "make it energetic" but "build intensity gradually with increasing pan speed")
-- **Avoid patterns**: Specific patterns to avoid (e.g., "Repetitive pan/tilt in verse", "Static positioning in chorus")
+### 6. Planner Hints ⚠️ MOST IMPORTANT SECTION ⚠️
+**This is where you differentiate songs - make every hint song-specific:**
+
+- **Section objectives**: Concrete objectives per section **tied to actual timing and energy data**
+  - ❌ FORBIDDEN: "Build intensity gradually" / "Keep motion minimal" / "Add sparkle layer"
+  - ✅ REQUIRED: "At 13.8s (mid-verse), data shows 0.425 peak (2.7x section mean) - create surprise accent here, then drop back to 0.17 by 17.2s"
+  - ✅ REQUIRED: "instrumental_2 has highest peak (1.0 at 70s) despite only mean 0.34 - design for contrast: sustained groove punctuated by sharp hits"
+  - **Cite specific millisecond timestamps and energy values from the curves above**
+  - **Identify unusual patterns** (e.g., "verse_2 stays higher than verse_1", "bridge is quieter than verses")
+  
+- **Avoid patterns**: Patterns to avoid **specific to this song's structure/timing**
+  - ❌ FORBIDDEN: "Avoid repetitive sweeps" (too generic)
+  - ✅ REQUIRED: "Avoid 4-step chases (this is 3/4 time at fast tempo)" OR "With 5 consecutive instrumental sections, avoid copy-paste choreography - vary routing each time"
+
+**Uniqueness Test:** Before finalizing section objectives:
+1. Read your objective for verse_1
+2. Ask: "Would I write this same objective for a different Christmas song with similar structure?"
+3. If YES → you've failed. REWRITE to cite specific energy data and timing that makes THIS verse unique
+
+## Critical Reminder: SONG-SPECIFIC ANALYSIS REQUIRED
+
+**Every profile must be distinguishable from others.** If your creative guidance or planner hints could be copy-pasted to another song in the same genre without changing effectiveness, you have FAILED the task.
+
+Ground every recommendation in:
+- Specific millisecond timestamps from the energy curves
+- Actual energy values and how they differ from section means
+- Unusual structural traits (section count, duration ratios, timing irregularities)
+- Unique characteristics (tempo relative to genre norms, energy dynamics, instrumentation cues from structure)
 
 ## Deliverable
 

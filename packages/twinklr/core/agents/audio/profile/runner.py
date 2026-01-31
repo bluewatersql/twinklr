@@ -40,6 +40,7 @@ async def run_audio_profile(
     2. Agent execution (AsyncAgentRunner)
     3. Heuristic validation (fail-fast)
     4. Model instantiation
+    5. Provenance injection (with correct runtime values)
 
     Args:
         song_bundle: Full SongBundle from AudioAnalyzer
@@ -51,7 +52,7 @@ async def run_audio_profile(
         token_budget: Optional token budget
 
     Returns:
-        AudioProfileModel instance
+        AudioProfileModel instance with injected provenance
 
     Raises:
         AudioProfileRunError: If agent execution or validation fails
@@ -81,7 +82,7 @@ async def run_audio_profile(
         )
 
         # Run agent
-        logger.info(f"Running AudioProfile agent (model={model}, temp={temperature})")
+        logger.debug(f"Running AudioProfile agent (model={model}, temp={temperature})")
         result = await runner.run(
             spec=spec,
             variables={"shaped_context": shaped_context},
@@ -103,6 +104,22 @@ async def run_audio_profile(
             # Fallback if it's a dict (shouldn't happen with current implementation)
             profile = AudioProfileModel(**result.data)
 
+        # Inject provenance with ACTUAL runtime values
+        from datetime import datetime
+
+        from twinklr.core.agents.audio.profile.models import Provenance
+
+        profile.provenance = Provenance(
+            provider_id=provider.provider_type.value,
+            model_id=model,  # Use ACTUAL model from parameters
+            prompt_pack="audio_profile",
+            prompt_pack_version="2.0",
+            framework_version="twinklr-agents-2.0",
+            seed=None,
+            temperature=temperature,  # Use ACTUAL temperature from parameters
+            created_at=datetime.utcnow().isoformat() + "Z",
+        )
+
         # Heuristic validation
         logger.debug("Running heuristic validation")
         validation_errors = validate_audio_profile(profile)
@@ -111,7 +128,7 @@ async def run_audio_profile(
             logger.error(error_msg)
             raise AudioProfileRunError(error_msg)
 
-        logger.info("AudioProfile agent completed successfully")
+        logger.debug("AudioProfile agent completed successfully")
         return profile
 
     except Exception as e:

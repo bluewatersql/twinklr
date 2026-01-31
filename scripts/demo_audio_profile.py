@@ -7,8 +7,12 @@ Runs the AudioProfile agent on real audio files with live audio analysis.
 import argparse
 import asyncio
 import json
+import logging
+import os
 from pathlib import Path
 import sys
+
+from twinklr.core.utils.formatting import clean_audio_filename
 
 # Add parent to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -23,13 +27,17 @@ from twinklr.core.agents.logging import NullLLMCallLogger, create_llm_logger
 from twinklr.core.agents.providers.openai import OpenAIProvider
 from twinklr.core.audio.analyzer import AudioAnalyzer
 from twinklr.core.config.loader import load_app_config, load_job_config
+from twinklr.core.utils.logging import configure_logging
+
+configure_logging(level="DEBUG")
+logger = logging.getLogger(__name__)
 
 
 def print_section(title: str, char: str = "=") -> None:
     """Print a section header."""
-    print(f"\n{char * 80}")
+    print(f"\n{char * len(title)}")
     print(f"{title}")
-    print(f"{char * 80}\n")
+    print(f"{char * len(title)}\n")
 
 
 def print_subsection(title: str) -> None:
@@ -57,9 +65,6 @@ async def main() -> None:
 
     print_section("AudioProfile Agent Demo", "=")
 
-    # Check for API key
-    import os
-
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
         print("❌ ERROR: OPENAI_API_KEY environment variable not set")
@@ -79,7 +84,7 @@ async def main() -> None:
 
         # Get model settings from config (fallback to plan_agent settings)
         model = job_config.agent.plan_agent.model
-        temperature = 0.2  # Lower temp for factual analysis
+        temperature = 0.3  # Lower temp for factual analysis
 
         print("✅ Configuration loaded")
         print(f"   Model from config: {model}")
@@ -92,10 +97,11 @@ async def main() -> None:
         print(f"⚠️  Could not load config, using defaults: {e}")
         app_config = None
         job_config = None
-        model = "gpt-4o"
-        temperature = 0.2
+        model = "gpt-5.2"
+        temperature = 0.3
         config_loaded = False
 
+    clean_file_name = clean_audio_filename(Path(args.audio_file).stem)
     # Analyze audio
     print_subsection("1. Analyzing Audio")
     audio_path = str(Path(args.audio_file).resolve())
@@ -179,6 +185,8 @@ async def main() -> None:
     # Run agent
     print_subsection("4. Running AudioProfile Agent")
     print("⏳ Calling LLM (this may take 10-30 seconds)...\n")
+    print(f"   Model: {model}")
+    print(f"   Temperature: {temperature}")
 
     try:
         profile = await run_audio_profile(
@@ -278,7 +286,7 @@ async def main() -> None:
 
     # Save to file
     print_section("Saving Output", "=")
-    output_path = Path("artifacts/audio_profile_demo_output.json")
+    output_path = Path(f"artifacts/audio_profile/{clean_file_name}.json")
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     try:

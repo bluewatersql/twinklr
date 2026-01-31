@@ -1,0 +1,92 @@
+{#
+MacroPlanner Judge User Prompt
+Provides the MacroPlan to evaluate along with song context
+#}
+# Song Information
+
+**Title:** {{ audio_profile.song_identity.title or "Untitled" }}
+**Artist:** {{ audio_profile.song_identity.artist or "Unknown" }}
+**Duration:** {{ (audio_profile.song_identity.duration_ms / 1000) | round(1) }}s
+**BPM:** {{ audio_profile.song_identity.bpm | round(1) }}
+**Energy:** {{ audio_profile.energy_profile.macro_energy.value }}
+
+## Song Structure
+
+{% for section in audio_profile.structure.sections %}
+- **{{ section.name }}** ({{ section.section_id }}) - {{ (section.start_ms / 1000) | round(1) }}s to {{ (section.end_ms / 1000) | round(1) }}s
+{% endfor %}
+
+## Display Layout
+
+Available target roles:
+{% for group in display_groups %}
+- **{{ group.role_key }}** ({{ group.model_count }} models)
+{% endfor %}
+
+---
+
+# MacroPlan to Evaluate
+
+{% if iteration > 1 %}
+**Iteration {{ iteration }}** - Evaluating refined plan
+{% else %}
+**Iteration 1** - Initial plan evaluation
+{% endif %}
+
+## Global Story
+
+**Theme:** {{ macro_plan.global_story.theme }}
+
+**Motifs:** {{ macro_plan.global_story.motifs | join(', ') }}
+**Pacing Notes:** {{ macro_plan.global_story.pacing_notes }}
+**Color Story:** {{ macro_plan.global_story.color_story }}
+
+## Layering Plan
+
+**Layer Count:** {{ macro_plan.layering_plan.layers | length }}
+
+{% for layer in macro_plan.layering_plan.layers %}
+- **Layer {{ layer.layer_index }}** ({{ layer.layer_role }}, {{ layer.blend_mode }} blend)
+  - **Usage Notes:** {{ layer.usage_notes }}
+  - **Timing:** {{ layer.timing_driver }}
+  - **Targets:** {{ layer.target_selector.roles | join(', ') }}
+  - **Intensity Bias:** {{ layer.intensity_bias }}
+{% endfor %}
+
+## Section Plans
+
+{% for section in macro_plan.section_plans %}
+### {{ section.section.name }} ({{ (section.section.start_ms / 1000) | round(1) }}s - {{ (section.section.end_ms / 1000) | round(1) }}s)
+
+- **Energy Target:** {{ section.energy_target }}
+- **Motion Density:** {{ section.motion_density }}
+- **Choreography Style:** {{ section.choreography_style }}
+- **Primary Focus:** {{ section.primary_focus_targets | join(', ') if section.primary_focus_targets else 'None' }}
+- **Secondary Targets:** {{ section.secondary_targets | join(', ') if section.secondary_targets else 'None' }}
+- **Notes:** {{ section.notes }}
+
+{% endfor %}
+
+## Asset Requirements
+
+{% if macro_plan.asset_requirements %}
+**Required Assets:**
+{% for asset in macro_plan.asset_requirements %}
+- {{ asset }}
+{% endfor %}
+{% else %}
+No custom assets required.
+{% endif %}
+
+---
+
+# Your Task
+
+Evaluate this MacroPlan for a Christmas light show. Assess:
+1. **Technical Validity**: Section coverage, layer architecture, target validity
+2. **Strategic Quality**: Story coherence, section appropriateness, bold impact, contrast
+3. **Actionability**: Are section notes clear enough for group planners?
+
+Provide a score (0-10), verdict status (APPROVE/SOFT_FAIL/HARD_FAIL), structured issues, and constructive feedback.
+
+**Remember**: This is a **Christmas light show** for residential displays. Bold, impactful designs win. Subtle concepts get lost.

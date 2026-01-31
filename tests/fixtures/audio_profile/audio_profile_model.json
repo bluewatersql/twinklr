@@ -1,0 +1,810 @@
+{
+  "schema_version": "2.0",
+  "agent_id": "audio_profile.v2",
+  "run_id": "apm_need_a_favor_197400ms_v1",
+  "provenance": {
+    "provider_id": "openai",
+    "model_id": "gpt-5",
+    "prompt_pack": "audio_profile",
+    "prompt_pack_version": "2.0",
+    "framework_version": "1.0",
+    "seed": null,
+    "temperature": 0.2,
+    "created_at": "2026-01-31T00:00:00Z"
+  },
+  "warnings": [
+    {
+      "severity": "WARN",
+      "code": "STRUCTURE_LOW_SECTION_CONF",
+      "message": "Section labels appear weakly supported (many section confidences ~0.2–0.36); treat verse/break/instrumental boundaries as approximate for choreography transitions.",
+      "path": "$.structure.structure_confidence",
+      "hint": "Prefer beat-aligned transitions and use short transition looks at section boundaries to mask minor timing drift."
+    }
+  ],
+  "song_identity": {
+    "title": "Need A Favor",
+    "artist": null,
+    "duration_ms": 197400,
+    "bpm": 156.60511363636363,
+    "key": "E minor",
+    "time_signature": "3/4"
+  },
+  "structure": {
+    "sections": [
+      {
+        "section_id": "intro",
+        "name": "intro",
+        "start_ms": 0,
+        "end_ms": 16068
+      },
+      {
+        "section_id": "verse_1",
+        "name": "verse",
+        "start_ms": 16068,
+        "end_ms": 32031
+      },
+      {
+        "section_id": "verse_2",
+        "name": "verse",
+        "start_ms": 32031,
+        "end_ms": 47972
+      },
+      {
+        "section_id": "instrumental_1",
+        "name": "instrumental",
+        "start_ms": 47972,
+        "end_ms": 63924
+      },
+      {
+        "section_id": "verse_3",
+        "name": "verse",
+        "start_ms": 63924,
+        "end_ms": 79865
+      },
+      {
+        "section_id": "break_1",
+        "name": "break",
+        "start_ms": 79865,
+        "end_ms": 95817
+      },
+      {
+        "section_id": "instrumental_2",
+        "name": "instrumental",
+        "start_ms": 95817,
+        "end_ms": 111780
+      },
+      {
+        "section_id": "verse_4",
+        "name": "verse",
+        "start_ms": 111780,
+        "end_ms": 127732
+      },
+      {
+        "section_id": "verse_5",
+        "name": "verse",
+        "start_ms": 127732,
+        "end_ms": 143673
+      },
+      {
+        "section_id": "break_2",
+        "name": "break",
+        "start_ms": 143673,
+        "end_ms": 159613
+      },
+      {
+        "section_id": "chorus_1",
+        "name": "chorus",
+        "start_ms": 159613,
+        "end_ms": 175566
+      },
+      {
+        "section_id": "chorus_2",
+        "name": "chorus",
+        "start_ms": 175566,
+        "end_ms": 192133
+      },
+      {
+        "section_id": "outro",
+        "name": "outro",
+        "start_ms": 192133,
+        "end_ms": 197400
+      }
+    ],
+    "structure_confidence": 0.52,
+    "notes": [
+      "Consistent ~16s block segmentation suggests beat/phrase-based slicing; boundaries may not align perfectly to lyrical phrases.",
+      "Two consecutive chorus sections at the end indicate a late-arriving hook; plan a clear visual 'arrival' at 159.6s."
+    ]
+  },
+  "energy_profile": {
+    "macro_energy": "DYNAMIC",
+    "section_profiles": [
+      {
+        "section_id": "intro",
+        "start_ms": 0,
+        "end_ms": 16068,
+        "energy_curve": [
+          {
+            "t_ms": 0,
+            "energy_0_1": 0.0
+          },
+          {
+            "t_ms": 2299,
+            "energy_0_1": 0.277
+          },
+          {
+            "t_ms": 4585,
+            "energy_0_1": 0.175
+          },
+          {
+            "t_ms": 6885,
+            "energy_0_1": 0.349
+          },
+          {
+            "t_ms": 9171,
+            "energy_0_1": 0.388
+          },
+          {
+            "t_ms": 11470,
+            "energy_0_1": 0.212
+          },
+          {
+            "t_ms": 13758,
+            "energy_0_1": 0.336
+          },
+          {
+            "t_ms": 16056,
+            "energy_0_1": 0.394
+          }
+        ],
+        "mean_energy": 0.29,
+        "peak_energy": 0.52,
+        "characteristics": [
+          "building"
+        ]
+      },
+      {
+        "section_id": "verse_1",
+        "start_ms": 16068,
+        "end_ms": 32031,
+        "energy_curve": [
+          {
+            "t_ms": 16068,
+            "energy_0_1": 0.383
+          },
+          {
+            "t_ms": 18343,
+            "energy_0_1": 0.347
+          },
+          {
+            "t_ms": 20631,
+            "energy_0_1": 0.387
+          },
+          {
+            "t_ms": 22906,
+            "energy_0_1": 0.189
+          },
+          {
+            "t_ms": 25181,
+            "energy_0_1": 0.734
+          },
+          {
+            "t_ms": 27458,
+            "energy_0_1": 0.49
+          },
+          {
+            "t_ms": 29745,
+            "energy_0_1": 0.726
+          },
+          {
+            "t_ms": 32020,
+            "energy_0_1": 0.426
+          }
+        ],
+        "mean_energy": 0.37,
+        "peak_energy": 0.9,
+        "characteristics": [
+          "drop"
+        ]
+      },
+      {
+        "section_id": "verse_2",
+        "start_ms": 32031,
+        "end_ms": 47972,
+        "energy_curve": [
+          {
+            "t_ms": 32032,
+            "energy_0_1": 0.452
+          },
+          {
+            "t_ms": 34306,
+            "energy_0_1": 0.79
+          },
+          {
+            "t_ms": 36583,
+            "energy_0_1": 0.69
+          },
+          {
+            "t_ms": 38859,
+            "energy_0_1": 0.728
+          },
+          {
+            "t_ms": 41133,
+            "energy_0_1": 0.456
+          },
+          {
+            "t_ms": 43409,
+            "energy_0_1": 0.761
+          },
+          {
+            "t_ms": 45685,
+            "energy_0_1": 0.559
+          },
+          {
+            "t_ms": 47960,
+            "energy_0_1": 0.662
+          }
+        ],
+        "mean_energy": 0.46,
+        "peak_energy": 0.89,
+        "characteristics": [
+          "building",
+          "drop"
+        ]
+      },
+      {
+        "section_id": "instrumental_1",
+        "start_ms": 47972,
+        "end_ms": 63924,
+        "energy_curve": [
+          {
+            "t_ms": 47972,
+            "energy_0_1": 0.704
+          },
+          {
+            "t_ms": 50248,
+            "energy_0_1": 0.533
+          },
+          {
+            "t_ms": 52523,
+            "energy_0_1": 0.844
+          },
+          {
+            "t_ms": 54798,
+            "energy_0_1": 0.683
+          },
+          {
+            "t_ms": 57075,
+            "energy_0_1": 0.748
+          },
+          {
+            "t_ms": 59361,
+            "energy_0_1": 0.507
+          },
+          {
+            "t_ms": 61637,
+            "energy_0_1": 0.815
+          },
+          {
+            "t_ms": 63912,
+            "energy_0_1": 0.61
+          }
+        ],
+        "mean_energy": 0.6,
+        "peak_energy": 0.98,
+        "characteristics": [
+          "drop"
+        ]
+      },
+      {
+        "section_id": "verse_3",
+        "start_ms": 63924,
+        "end_ms": 79865,
+        "energy_curve": [
+          {
+            "t_ms": 63924,
+            "energy_0_1": 0.633
+          },
+          {
+            "t_ms": 66199,
+            "energy_0_1": 0.848
+          },
+          {
+            "t_ms": 68475,
+            "energy_0_1": 0.519
+          },
+          {
+            "t_ms": 70750,
+            "energy_0_1": 0.852
+          },
+          {
+            "t_ms": 73027,
+            "energy_0_1": 0.814
+          },
+          {
+            "t_ms": 75314,
+            "energy_0_1": 0.78
+          },
+          {
+            "t_ms": 77588,
+            "energy_0_1": 0.513
+          },
+          {
+            "t_ms": 79864,
+            "energy_0_1": 0.373
+          }
+        ],
+        "mean_energy": 0.61,
+        "peak_energy": 0.94,
+        "characteristics": [
+          "drop"
+        ]
+      },
+      {
+        "section_id": "break_1",
+        "start_ms": 79865,
+        "end_ms": 95817,
+        "energy_curve": [
+          {
+            "t_ms": 79876,
+            "energy_0_1": 0.37
+          },
+          {
+            "t_ms": 82152,
+            "energy_0_1": 0.331
+          },
+          {
+            "t_ms": 84428,
+            "energy_0_1": 0.617
+          },
+          {
+            "t_ms": 86703,
+            "energy_0_1": 0.556
+          },
+          {
+            "t_ms": 88978,
+            "energy_0_1": 0.305
+          },
+          {
+            "t_ms": 91253,
+            "energy_0_1": 0.614
+          },
+          {
+            "t_ms": 93529,
+            "energy_0_1": 0.74
+          },
+          {
+            "t_ms": 95805,
+            "energy_0_1": 0.412
+          }
+        ],
+        "mean_energy": 0.47,
+        "peak_energy": 0.96,
+        "characteristics": [
+          "drop"
+        ]
+      },
+      {
+        "section_id": "instrumental_2",
+        "start_ms": 95817,
+        "end_ms": 111780,
+        "energy_curve": [
+          {
+            "t_ms": 95817,
+            "energy_0_1": 0.445
+          },
+          {
+            "t_ms": 98093,
+            "energy_0_1": 0.812
+          },
+          {
+            "t_ms": 100379,
+            "energy_0_1": 0.554
+          },
+          {
+            "t_ms": 102654,
+            "energy_0_1": 0.768
+          },
+          {
+            "t_ms": 104930,
+            "energy_0_1": 0.585
+          },
+          {
+            "t_ms": 107207,
+            "energy_0_1": 0.851
+          },
+          {
+            "t_ms": 109494,
+            "energy_0_1": 0.637
+          },
+          {
+            "t_ms": 111768,
+            "energy_0_1": 0.788
+          }
+        ],
+        "mean_energy": 0.59,
+        "peak_energy": 0.97,
+        "characteristics": [
+          "building",
+          "drop"
+        ]
+      },
+      {
+        "section_id": "verse_4",
+        "start_ms": 111780,
+        "end_ms": 127732,
+        "energy_curve": [
+          {
+            "t_ms": 111780,
+            "energy_0_1": 0.832
+          },
+          {
+            "t_ms": 114055,
+            "energy_0_1": 0.486
+          },
+          {
+            "t_ms": 116332,
+            "energy_0_1": 0.87
+          },
+          {
+            "t_ms": 118608,
+            "energy_0_1": 0.617
+          },
+          {
+            "t_ms": 120894,
+            "energy_0_1": 0.908
+          },
+          {
+            "t_ms": 123169,
+            "energy_0_1": 0.585
+          },
+          {
+            "t_ms": 125445,
+            "energy_0_1": 0.872
+          },
+          {
+            "t_ms": 127721,
+            "energy_0_1": 0.656
+          }
+        ],
+        "mean_energy": 0.61,
+        "peak_energy": 0.97,
+        "characteristics": [
+          "drop"
+        ]
+      },
+      {
+        "section_id": "verse_5",
+        "start_ms": 127732,
+        "end_ms": 143673,
+        "energy_curve": [
+          {
+            "t_ms": 127733,
+            "energy_0_1": 0.651
+          },
+          {
+            "t_ms": 130009,
+            "energy_0_1": 0.416
+          },
+          {
+            "t_ms": 132283,
+            "energy_0_1": 0.321
+          },
+          {
+            "t_ms": 134559,
+            "energy_0_1": 0.462
+          },
+          {
+            "t_ms": 136835,
+            "energy_0_1": 0.422
+          },
+          {
+            "t_ms": 139110,
+            "energy_0_1": 0.249
+          },
+          {
+            "t_ms": 141386,
+            "energy_0_1": 0.415
+          },
+          {
+            "t_ms": 143662,
+            "energy_0_1": 0.695
+          }
+        ],
+        "mean_energy": 0.38,
+        "peak_energy": 1.0,
+        "characteristics": [
+          "drop"
+        ]
+      },
+      {
+        "section_id": "break_2",
+        "start_ms": 143673,
+        "end_ms": 159613,
+        "energy_curve": [
+          {
+            "t_ms": 143673,
+            "energy_0_1": 0.759
+          },
+          {
+            "t_ms": 145949,
+            "energy_0_1": 0.433
+          },
+          {
+            "t_ms": 148225,
+            "energy_0_1": 0.83
+          },
+          {
+            "t_ms": 150500,
+            "energy_0_1": 0.804
+          },
+          {
+            "t_ms": 152776,
+            "energy_0_1": 0.742
+          },
+          {
+            "t_ms": 155050,
+            "energy_0_1": 0.624
+          },
+          {
+            "t_ms": 157326,
+            "energy_0_1": 0.764
+          },
+          {
+            "t_ms": 159602,
+            "energy_0_1": 0.633
+          }
+        ],
+        "mean_energy": 0.56,
+        "peak_energy": 0.99,
+        "characteristics": [
+          "drop"
+        ]
+      },
+      {
+        "section_id": "chorus_1",
+        "start_ms": 159613,
+        "end_ms": 175566,
+        "energy_curve": [
+          {
+            "t_ms": 159613,
+            "energy_0_1": 0.612
+          },
+          {
+            "t_ms": 161889,
+            "energy_0_1": 0.807
+          },
+          {
+            "t_ms": 164164,
+            "energy_0_1": 0.689
+          },
+          {
+            "t_ms": 166451,
+            "energy_0_1": 0.808
+          },
+          {
+            "t_ms": 168727,
+            "energy_0_1": 0.617
+          },
+          {
+            "t_ms": 171003,
+            "energy_0_1": 0.747
+          },
+          {
+            "t_ms": 173291,
+            "energy_0_1": 0.569
+          },
+          {
+            "t_ms": 175565,
+            "energy_0_1": 0.798
+          }
+        ],
+        "mean_energy": 0.62,
+        "peak_energy": 0.96,
+        "characteristics": [
+          "building"
+        ]
+      },
+      {
+        "section_id": "chorus_2",
+        "start_ms": 175566,
+        "end_ms": 192133,
+        "energy_curve": [
+          {
+            "t_ms": 175578,
+            "energy_0_1": 0.927
+          },
+          {
+            "t_ms": 177945,
+            "energy_0_1": 0.591
+          },
+          {
+            "t_ms": 180302,
+            "energy_0_1": 0.533
+          },
+          {
+            "t_ms": 182671,
+            "energy_0_1": 0.654
+          },
+          {
+            "t_ms": 185027,
+            "energy_0_1": 0.471
+          },
+          {
+            "t_ms": 187397,
+            "energy_0_1": 0.523
+          },
+          {
+            "t_ms": 189753,
+            "energy_0_1": 0.164
+          },
+          {
+            "t_ms": 192121,
+            "energy_0_1": 0.018
+          }
+        ],
+        "mean_energy": 0.52,
+        "peak_energy": 0.99,
+        "characteristics": [
+          "drop"
+        ]
+      },
+      {
+        "section_id": "outro",
+        "start_ms": 192133,
+        "end_ms": 197400,
+        "energy_curve": [
+          {
+            "t_ms": 192134,
+            "energy_0_1": 0.017
+          },
+          {
+            "t_ms": 192888,
+            "energy_0_1": 0.005
+          },
+          {
+            "t_ms": 193630,
+            "energy_0_1": 0.002
+          },
+          {
+            "t_ms": 194386,
+            "energy_0_1": 0.001
+          },
+          {
+            "t_ms": 195139,
+            "energy_0_1": 0.0
+          },
+          {
+            "t_ms": 195895,
+            "energy_0_1": 0.0
+          },
+          {
+            "t_ms": 196638,
+            "energy_0_1": 0.0
+          },
+          {
+            "t_ms": 197393,
+            "energy_0_1": 0.0
+          }
+        ],
+        "mean_energy": 0.0,
+        "peak_energy": 0.02,
+        "characteristics": [
+          "sustained"
+        ]
+      }
+    ],
+    "peaks": [
+      {
+        "start_ms": 89652,
+        "end_ms": 94250,
+        "energy": 0.8
+      },
+      {
+        "start_ms": 147121,
+        "end_ms": 151718,
+        "energy": 0.8
+      }
+    ],
+    "overall_mean": 0.49,
+    "energy_confidence": 0.82
+  },
+  "lyric_profile": {
+    "has_plain_lyrics": true,
+    "has_timed_words": true,
+    "has_phonemes": false,
+    "lyric_confidence": 0.7,
+    "phoneme_confidence": 0.0,
+    "notes": [
+      "Word-level timing available; use for lyric-accents and phrase-end hits.",
+      "No phoneme timing; avoid ultra-tight mouth/phoneme-synced effects."
+    ]
+  },
+  "creative_guidance": {
+    "recommended_layer_count": 3,
+    "recommended_contrast": "HIGH",
+    "recommended_motion_density": "BUSY",
+    "recommended_asset_usage": "SPARSE",
+    "recommended_color_story": [
+      "cool",
+      "high-contrast",
+      "red-green accents",
+      "white sparkle",
+      "moody"
+    ],
+    "cautions": [
+      "Avoid strobing during the intro and outro (0–16s, 192–197s) where energy is low; use slow fades and gentle twinkle instead.",
+      "Time signature is 3/4; avoid strictly 4/4 chase patterns that will drift against the musical pulse—prefer 3-beat sweeps and waltz-like accents.",
+      "Energy is highly jagged with frequent drops; reserve full-white blasts for the two major peak windows (≈89.7–94.3s and ≈147.1–151.7s) to keep impact.",
+      "Chorus_2 contains a pronounced energy fall to near-silence at the end; plan a clear visual decrescendo and blackout/hold to avoid an abrupt mismatch."
+    ]
+  },
+  "planner_hints": {
+    "section_objectives": {
+      "intro": [
+        "Establish tempo in 3/4 with gentle, slow-moving sweeps (one sweep per bar) and low-intensity warm-white twinkle.",
+        "Introduce a subtle build by increasing sparkle density toward 14–16s without hard hits."
+      ],
+      "verse_1": [
+        "Keep vocals readable: mid-level brightness with restrained movement; accent the larger energy surges around ~25.2s and ~29.7s with brief color pops.",
+        "Use a drop-aware look: pull back intensity at ~22.9s then rebound with a short chase burst."
+      ],
+      "verse_2": [
+        "Increase motion complexity vs verse_1: add alternating left/right sweeps on beat 1 of each bar.",
+        "Highlight the building moments (~34.3s) with rising intensity ramps, then release on subsequent dips."
+      ],
+      "instrumental_1": [
+        "Switch to instrument-led patterns: faster chases and wider pan/tilt arcs; keep hits punchy but short to match frequent drops.",
+        "Use a repeating 3-step motif (beat1/beat2/beat3) that can vary color each bar."
+      ],
+      "verse_3": [
+        "Start strong then taper: maintain high brightness early (64–75s) and intentionally reduce by 77–79.8s to set up the break.",
+        "Add occasional audience-facing 'sparkle bursts' on the highest points (~66.2s, ~70.8s)."
+      ],
+      "break_1": [
+        "Create tension-release: alternate tight, focused elements (mini-trees/arches) with wider house outline hits on the rebounds (~84.4s, ~91.3s, ~93.5s).",
+        "Aim for the first major peak window by increasing intensity and motion speed from ~88.9s onward."
+      ],
+      "instrumental_2": [
+        "Drive momentum with layered movement: base layer = 3/4 chase; secondary layer = slow color rotation across props.",
+        "Emphasize the repeated rises (~98.1s, ~102.7s, ~107.2s) with synchronized full-yard accents on beat 1."
+      ],
+      "verse_4": [
+        "Keep high energy but articulate drops: use quick dim-outs on the dips (~114.1s, ~118.6s, ~123.2s) then snap back with bright accents.",
+        "Introduce higher contrast (cool vs warm) to signal late-song escalation."
+      ],
+      "verse_5": [
+        "Exploit the low-mid valley (≈132–141s): reduce motion density briefly, then rebuild into the end of the section (~143.7s).",
+        "Use tighter, more rhythmic elements (arches/candy canes) rather than full-yard washes to keep dynamics clear."
+      ],
+      "break_2": [
+        "Set up Peak 2: ramp intensity and widen coverage starting ~145.9s; use strong beat-1 hits through ~151.7s.",
+        "After the peak, keep motion active but slightly reduce brightness to make the chorus arrival feel earned."
+      ],
+      "chorus_1": [
+        "Deliver the hook: full-yard participation with high contrast (white + saturated accents) and consistent 3/4 pulse chases.",
+        "Use call-and-response between roofline and yard props every bar to maintain the 'building' feel."
+      ],
+      "chorus_2": [
+        "Start with maximum impact (first ~2–3s) then plan a controlled step-down in brightness and motion as energy falls.",
+        "From ~189.8s onward, transition to sparse twinkle and end on a clean hold/blackout aligned to the near-zero energy."
+      ],
+      "outro": [
+        "Fade to near-dark with minimal motion; keep only soft warm-white glimmer on a few focal props.",
+        "End with a definitive blackout at the final beat to match sustained silence."
+      ]
+    },
+    "avoid_patterns": [
+      "Avoid continuous high-speed strobing or rapid full-white flashing; the song’s frequent drops will make it feel harsh and can be unsafe for viewers.",
+      "Avoid long, unchanging full-yard washes during verses; the energy curve is jagged and benefits from visible push-pull dynamics.",
+      "Avoid 4-beat chase loops; enforce 3-beat phrasing so visual accents land on the waltz pulse."
+    ],
+    "emphasize_groups": [
+      "roofline",
+      "mega_tree",
+      "arches",
+      "mini_trees",
+      "yard_outline"
+    ]
+  }
+}

@@ -26,6 +26,7 @@ from twinklr.core.agents.shared.judge.models import (
     VerdictStatus,
 )
 from twinklr.core.agents.spec import AgentSpec
+from twinklr.core.agents.state import AgentState
 
 # Generic plan type (ChoreographyPlan, MacroPlan, etc.)
 TPlan = TypeVar("TPlan")
@@ -244,19 +245,27 @@ class StandardIterationController(Generic[TPlan]):
             llm_logger=llm_logger,
         )
 
+        # Create agent state for conversational planner (if needed)
+        planner_state: AgentState | None = None
+        if planner_spec.mode.value == "conversational":
+            planner_state = AgentState(name=planner_spec.name)
+
         context.update_state(IterationState.PLANNING)
 
+        plan: TPlan | None = None
         for iteration in range(self.config.max_iterations):
             context.increment_iteration()
 
             # === PLANNING STAGE ===
-            self.logger.info(f"Iteration {iteration + 1}/{self.config.max_iterations}: Planning")
+            self.logger.debug(f"Iteration {iteration + 1}/{self.config.max_iterations}: Planning")
 
             # Prepare planner variables (include feedback if enabled)
             planner_vars = self._prepare_planner_variables(initial_variables, context, iteration)
 
             # Run planner
-            plan_result = await runner.run(spec=planner_spec, variables=planner_vars)
+            plan_result = await runner.run(
+                spec=planner_spec, variables=planner_vars, state=planner_state
+            )
             context.add_tokens(plan_result.tokens_used or 0)
 
             if not plan_result.success:
@@ -271,7 +280,7 @@ class StandardIterationController(Generic[TPlan]):
 
             # === VALIDATION STAGE ===
             context.update_state(IterationState.VALIDATING)
-            self.logger.info("Validating plan (heuristics)")
+            self.logger.debug("Validating plan (heuristics)")
 
             validation_errors = validator(plan)
 
@@ -299,7 +308,7 @@ class StandardIterationController(Generic[TPlan]):
 
             # === JUDGING STAGE ===
             context.update_state(IterationState.JUDGING)
-            self.logger.info("Judging plan")
+            self.logger.debug("Judging plan")
 
             # Prepare judge variables
             judge_vars = self._prepare_judge_variables(plan, initial_variables, iteration)
@@ -323,7 +332,7 @@ class StandardIterationController(Generic[TPlan]):
             if verdict.status == VerdictStatus.APPROVE:
                 context.update_state(IterationState.JUDGE_APPROVED)
                 context.update_state(IterationState.COMPLETE)
-                self.logger.info(f"✅ Plan approved (score: {verdict.score:.1f})")
+                self.logger.debug(f"✅ Plan approved (score: {verdict.score:.1f})")
 
                 # Save FINAL checkpoint
                 if self.checkpoints and self.config.enable_checkpoints:
@@ -352,11 +361,13 @@ class StandardIterationController(Generic[TPlan]):
             revision = RevisionRequest.from_verdict(verdict)
             context.add_revision_request(revision)
 
-            self.logger.info(
+            self.logger.debug(
                 f"Refinement needed (score: {verdict.score:.1f}, status: {verdict.status.value})"
             )
 
         # Should never reach here (loop should exit via termination)
+        # Assert plan exists (loop runs at least once due to max_iterations >= 1)
+        assert plan is not None, "Plan should exist after at least one iteration"
         return self._handle_max_iterations(context, plan)
 
     def _prepare_planner_variables(

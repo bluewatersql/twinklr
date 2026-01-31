@@ -1,0 +1,30 @@
+pack_id: macro_judge.v2
+version: 2.0.0
+agent_type: judge
+supports_iteration: true
+max_iterations: 3
+
+templates:
+  system: system.j2
+  user: user.j2
+  developer: developer.j2
+
+variables:
+  - name: audio_profile
+    description: Full AudioProfileModel for the song
+    required: true
+  - name: display_groups
+    description: List of available display groups with role keys
+    required: true
+  - name: macro_plan
+    description: MacroPlan to evaluate
+    required: true
+  - name: iteration
+    description: Current iteration number (starts at 1)
+    required: true
+  - name: taxonomy
+    description: Dict of enum names to value lists (auto-injected)
+    required: true
+  - name: response_schema
+    description: JSON schema for JudgeVerdict (auto-injected)
+    required: true

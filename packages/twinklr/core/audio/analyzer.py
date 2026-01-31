@@ -20,10 +20,6 @@ from typing import Any
 import librosa
 import numpy as np
 
-from twinklr.core.api.audio.acoustid import AcoustIDClient
-from twinklr.core.api.audio.musicbrainz import MusicBrainzClient
-from twinklr.core.api.http import AsyncApiClient, HttpClientConfig
-
 # Import all the analysis modules
 from twinklr.core.audio.advanced.tension import compute_tension_curve
 from twinklr.core.audio.cache_adapter import (
@@ -32,14 +28,11 @@ from twinklr.core.audio.cache_adapter import (
 )
 from twinklr.core.audio.energy.builds_drops import detect_builds_and_drops
 from twinklr.core.audio.energy.multiscale import extract_smoothed_energy
+from twinklr.core.audio.enhancement_factory import EnhancementServiceFactory
 from twinklr.core.audio.harmonic.chords import detect_chords
 from twinklr.core.audio.harmonic.hpss import compute_hpss, compute_onset_env
 from twinklr.core.audio.harmonic.key import detect_musical_key, extract_chroma
 from twinklr.core.audio.harmonic.pitch import extract_pitch_tracking
-from twinklr.core.audio.lyrics.pipeline import LyricsPipeline, LyricsPipelineConfig
-from twinklr.core.audio.lyrics.providers.genius import GeniusClient
-from twinklr.core.audio.lyrics.providers.lrclib import LRCLibClient
-from twinklr.core.audio.metadata.pipeline import MetadataPipeline, PipelineConfig
 from twinklr.core.audio.models import LyricsBundle, MetadataBundle, SongBundle, SongTiming
 from twinklr.core.audio.models.enums import StageStatus
 from twinklr.core.audio.models.metadata import EmbeddedMetadata
@@ -77,12 +70,18 @@ class AudioAnalyzer:
     Results are cached to avoid reprocessing the same audio file.
     """
 
-    def __init__(self, app_config: AppConfig, job_config: JobConfig):
+    def __init__(
+        self,
+        app_config: AppConfig,
+        job_config: JobConfig,
+        service_factory: EnhancementServiceFactory | None = None,
+    ):
         """Initialize audio analyzer with configuration.
 
         Args:
             app_config: Application configuration (audio processing settings)
             job_config: Job configuration (checkpoint settings)
+            service_factory: Optional factory for creating enhancement services (DI)
         """
         self.app_config = app_config
         self.job_config = job_config
@@ -101,6 +100,11 @@ class AudioAnalyzer:
             # No running loop - safe to use asyncio.run()
             asyncio.run(self.cache.initialize())
             self._cache_initialized = True
+
+        # Initialize enhancement services via factory (DI pattern)
+        self.service_factory = service_factory or EnhancementServiceFactory()
+        self.metadata_pipeline = self.service_factory.create_metadata_pipeline(app_config)
+        self.lyrics_pipeline = self.service_factory.create_lyrics_pipeline(app_config)
 
     async def analyze(
         self,
@@ -144,12 +148,17 @@ class AudioAnalyzer:
 
         start_time_ms = time.perf_counter() * 1000
 
-        # Process audio (CPU-bound, run in thread pool)
-        logger.debug(f"Analyzing audio: {audio_path}")
-        features = await asyncio.to_thread(self._process_audio, audio_path)
+        # Extract embedded metadata first (fast, needed for genre-aware section detection)
+        logger.debug("Extracting embedded metadata for genre detection")
+        embedded_metadata = await self._extract_embedded_metadata_fast(audio_path)
+        genre = embedded_metadata.genre[0] if embedded_metadata.genre else None
+
+        # Process audio (CPU-bound, run in thread pool) with genre hint
+        logger.debug(f"Analyzing audio: {audio_path} (genre={genre})")
+        features = await asyncio.to_thread(self._process_audio, audio_path, genre=genre)
 
         # Build bundle (includes async metadata/lyrics extraction)
-        bundle = await self._build_song_bundle(audio_path, features)
+        bundle = await self._build_song_bundle(audio_path, features, embedded_metadata)
 
         # Calculate total compute time
         compute_ms = time.perf_counter() * 1000 - start_time_ms
@@ -157,7 +166,7 @@ class AudioAnalyzer:
         # Save to cache (SongBundle format, v3.0) with compute time
         await save_audio_features_async(audio_path, self.cache, bundle, compute_ms=compute_ms)
 
-        logger.info(f"Audio analysis complete: {compute_ms:.0f}ms")
+        logger.debug(f"Audio analysis complete: {compute_ms:.0f}ms")
 
         return bundle
 
@@ -187,12 +196,34 @@ class AudioAnalyzer:
         """
         return asyncio.run(self.analyze(audio_path, force_reprocess=force_reprocess))
 
-    async def _build_song_bundle(self, audio_path: str, features: dict[str, Any]) -> SongBundle:
+    async def _extract_embedded_metadata_fast(self, audio_path: str) -> EmbeddedMetadata:
+        """Extract embedded metadata quickly (genre, artist, title).
+
+        This is a fast pre-pass before audio analysis to enable genre-aware processing.
+
+        Args:
+            audio_path: Path to audio file
+
+        Returns:
+            EmbeddedMetadata with genre/artist/title
+        """
+        try:
+            from twinklr.core.audio.metadata.embedded_tags import extract_embedded_metadata
+
+            return await asyncio.to_thread(extract_embedded_metadata, audio_path)
+        except Exception as e:
+            logger.warning(f"Failed to extract embedded metadata: {e}")
+            return EmbeddedMetadata()
+
+    async def _build_song_bundle(
+        self, audio_path: str, features: dict[str, Any], embedded_metadata: EmbeddedMetadata
+    ) -> SongBundle:
         """Build SongBundle from v2.3 features dict (async).
 
         Args:
             audio_path: Path to audio file
             features: v2.3 features dict
+            embedded_metadata: Pre-extracted embedded metadata (for efficiency)
 
         Returns:
             SongBundle with v3.0 schema
@@ -212,8 +243,9 @@ class AudioAnalyzer:
         recording_id = hashlib.sha256(fingerprint.encode()).hexdigest()[:16]
 
         # Extract metadata and lyrics in parallel (async)
+        # Pass embedded_metadata to avoid re-extracting
         metadata_bundle, lyrics_bundle = await asyncio.gather(
-            self._extract_metadata_if_enabled(audio_path),
+            self._extract_metadata_if_enabled(audio_path, embedded_metadata),
             self._extract_lyrics_if_enabled(audio_path, duration_ms, None),
         )
 
@@ -243,85 +275,34 @@ class AudioAnalyzer:
             phonemes=None,  # Phase 6+
         )
 
-    async def _extract_metadata_if_enabled(self, audio_path: str) -> MetadataBundle:
+    async def _extract_metadata_if_enabled(
+        self, audio_path: str, embedded_metadata: EmbeddedMetadata | None = None
+    ) -> MetadataBundle:
         """Extract metadata if feature is enabled (async).
 
-        Uses the metadata pipeline to orchestrate:
-        1. Embedded metadata extraction
-        2. Fingerprinting (if enabled)
-        3. Provider lookups (AcoustID, MusicBrainz)
-        4. Metadata merging
+        Uses pre-initialized metadata pipeline for extraction.
 
         Args:
             audio_path: Path to audio file
+            embedded_metadata: Pre-extracted embedded metadata (optional, for efficiency)
 
         Returns:
             MetadataBundle (with SKIPPED status if disabled)
         """
-        # Check feature flag
-        enable_metadata = self.app_config.audio_processing.enhancements.enable_metadata
-
-        if not enable_metadata:
-            # Return bundle with SKIPPED status
+        # Check if pipeline was initialized (feature enabled)
+        if self.metadata_pipeline is None:
             return MetadataBundle(
                 schema_version="3.0.0",
                 stage_status=StageStatus.SKIPPED,
                 embedded=EmbeddedMetadata(),
             )
 
-        # Phase 3: Use metadata pipeline
+        # Use pre-initialized pipeline
         try:
             logger.debug(f"Extracting metadata (Phase 3 pipeline) from {audio_path}")
-
-            # Initialize API clients if needed
-            acoustid_client = None
-            musicbrainz_client = None
-
-            if (
-                self.app_config.audio_processing.enhancements.enable_acoustid
-                or self.app_config.audio_processing.enhancements.enable_musicbrainz
-            ):
-                # Create async HTTP client for API calls
-                http_config = HttpClientConfig(base_url="http://localhost")
-                http_client = AsyncApiClient(config=http_config)
-
-                # Initialize AcoustID client if enabled
-                if self.app_config.audio_processing.enhancements.enable_acoustid:
-                    acoustid_api_key = (
-                        self.app_config.audio_processing.enhancements.acoustid_api_key
-                    )
-                    if acoustid_api_key:
-                        acoustid_client = AcoustIDClient(
-                            api_key=acoustid_api_key,
-                            http_client=http_client,
-                        )
-                    else:
-                        logger.warning(
-                            "AcoustID enabled but no API key provided (ACOUSTID_API_KEY)"
-                        )
-
-                # Initialize MusicBrainz client if enabled
-                if self.app_config.audio_processing.enhancements.enable_musicbrainz:
-                    user_agent = "Twinklr/4.0 (https://github.com/twinklr)"
-                    musicbrainz_client = MusicBrainzClient(
-                        http_client=http_client,
-                        user_agent=user_agent,
-                    )
-
-            # Create pipeline config
-            pipeline_config = PipelineConfig(
-                enable_acoustid=self.app_config.audio_processing.enhancements.enable_acoustid,
-                enable_musicbrainz=self.app_config.audio_processing.enhancements.enable_musicbrainz,
+            bundle = await self.metadata_pipeline.extract(
+                audio_path, embedded_metadata=embedded_metadata
             )
-
-            # Create and run async pipeline
-            pipeline = MetadataPipeline(
-                config=pipeline_config,
-                acoustid_client=acoustid_client,
-                musicbrainz_client=musicbrainz_client,
-            )
-
-            bundle = await pipeline.extract(audio_path)
             return bundle
 
         except Exception as e:
@@ -341,10 +322,7 @@ class AudioAnalyzer:
     ) -> LyricsBundle:
         """Extract lyrics if feature is enabled (async).
 
-        Uses the lyrics pipeline to orchestrate:
-        1. Embedded lyrics extraction (LRC sidecar, SYLT, USLT)
-        2. Synced lyrics lookup (LRCLib) if enabled
-        3. Plain lyrics lookup (Genius) if enabled
+        Uses pre-initialized lyrics pipeline for extraction.
 
         Args:
             audio_path: Path to audio file
@@ -354,69 +332,16 @@ class AudioAnalyzer:
         Returns:
             LyricsBundle (with SKIPPED status if disabled)
         """
-        # Check feature flag
-        enable_lyrics = self.app_config.audio_processing.enhancements.enable_lyrics
-
-        if not enable_lyrics:
-            # Return bundle with SKIPPED status
+        # Check if pipeline was initialized (feature enabled)
+        if self.lyrics_pipeline is None:
             return LyricsBundle(
                 schema_version="1.0.0",
                 stage_status=StageStatus.SKIPPED,
             )
 
-        # Phase 4: Use lyrics pipeline
+        # Use pre-initialized pipeline
         try:
             logger.debug(f"Extracting lyrics (Phase 4 pipeline) from {audio_path}")
-
-            # Initialize provider clients if enabled
-            providers: dict[str, Any] = {}
-
-            if self.app_config.audio_processing.enhancements.enable_lyrics_lookup:
-                # Create async HTTP client for API calls
-                # Providers use absolute URLs, so base_url is just a placeholder
-                http_config = HttpClientConfig(base_url="https://api.placeholder.local")
-                http_client = AsyncApiClient(config=http_config)
-
-                # LRCLib (always available, no API key needed)
-                providers["lrclib"] = LRCLibClient(http_client=http_client)
-
-                # Genius (requires API key)
-                genius_token = self.app_config.audio_processing.enhancements.genius_access_token
-                if genius_token:
-                    providers["genius"] = GeniusClient(
-                        http_client=http_client,
-                        access_token=genius_token,
-                    )
-                else:
-                    logger.debug("Genius provider skipped (no GENIUS_ACCESS_TOKEN provided)")
-
-            # Create pipeline config
-            pipeline_config = LyricsPipelineConfig(
-                require_timed_words=self.app_config.audio_processing.enhancements.lyrics_require_timed,
-                min_coverage_pct=self.app_config.audio_processing.enhancements.lyrics_min_coverage,
-            )
-
-            # Initialize WhisperX service if enabled
-            whisperx_service = None
-            if self.app_config.audio_processing.enhancements.enable_whisperx:
-                try:
-                    from twinklr.core.audio.lyrics.whisperx_service import WhisperXImpl
-
-                    whisperx_service = WhisperXImpl()
-                    logger.debug("WhisperX service initialized")
-                except ImportError as e:
-                    logger.warning(
-                        f"WhisperX enabled but not installed: {e}. "
-                        "Install with: uv sync --extra ml"
-                    )
-
-            # Create and run async pipeline
-            logger.debug(
-                f"Creating lyrics pipeline with {len(providers)} providers: {list(providers.keys())}"
-            )
-            pipeline = LyricsPipeline(
-                config=pipeline_config, providers=providers, whisperx_service=whisperx_service
-            )
 
             # Extract artist/title from metadata
             artist = None
@@ -440,7 +365,7 @@ class AudioAnalyzer:
                 f"(from {'resolved' if metadata_bundle and metadata_bundle.resolved and artist else 'embedded' if artist else 'none'})"
             )
 
-            bundle = await pipeline.resolve(
+            bundle = await self.lyrics_pipeline.resolve(
                 audio_path=audio_path,
                 duration_ms=duration_ms,
                 artist=artist,
@@ -456,11 +381,12 @@ class AudioAnalyzer:
                 warnings=[f"Lyrics pipeline failed: {e!s}"],
             )
 
-    def _process_audio(self, audio_path: str) -> dict[str, Any]:
+    def _process_audio(self, audio_path: str, genre: str | None = None) -> dict[str, Any]:
         """Process audio file (internal implementation).
 
         Args:
             audio_path: Path to audio file
+            genre: Optional genre hint for section detection
 
         Returns:
             Feature dictionary
@@ -562,6 +488,7 @@ class AudioAnalyzer:
             y,
             sr,
             hop_length=hop_length,
+            genre=genre,
             rms_for_energy=rms_norm,
             chroma_cqt=chroma,
             beats_s=beats_s,

@@ -1,0 +1,121 @@
+## Technical Constraints
+
+- **Schema Version:** macro-plan.v2
+- **Score Range:** 0.0 - 10.0 (float)
+- **Confidence Range:** 0.0 - 1.0 (float)
+- **Max Layers:** 5
+- **Min Layers:** 1
+- **Valid Asset Extensions:** .png, .gif
+- **Max Recommended Assets:** 10
+
+## Validation Rules
+
+**Section Coverage:**
+- All audio profile sections must be present in section_plans
+- No gaps or overlaps in section timing
+- Sections must be sorted by start_ms
+
+**Layer Architecture:**
+- Exactly one BASE layer (must use NORMAL blend mode)
+- All layer indices (0-4) must be unique
+- Valid blend modes: NORMAL, ADD
+
+**Target Roles:**
+- All target roles (primary_focus_targets, secondary_targets, layer target_selector.roles) must be valid TargetRole enum names
+- Target roles must exist in the provided display layout
+
+**Asset Requirements:**
+- Asset file extensions must be .png or .gif
+- Warn if more than 10 assets are requested
+
+## Enum Values for Reference
+
+{% if taxonomy %}
+- **EnergyTarget:** {{ taxonomy.EnergyTarget | join(', ') }}
+- **ChoreographyStyle:** {{ taxonomy.ChoreographyStyle | join(', ') }}
+- **MotionDensity:** {{ taxonomy.MotionDensity | join(', ') }}
+- **TargetRole:** {{ taxonomy.TargetRole | join(', ') }}
+- **LayerRole:** {{ taxonomy.LayerRole | join(', ') }}
+- **BlendMode:** {{ taxonomy.BlendMode | join(', ') }}
+- **TimingDriver:** {{ taxonomy.TimingDriver | join(', ') }}
+{% else %}
+{# Fallback if taxonomy not provided #}
+- **EnergyTarget:** LOW, MED, HIGH, BUILD, RELEASE, PEAK
+- **ChoreographyStyle:** IMAGERY, ABSTRACT, HYBRID
+- **MotionDensity:** SPARSE, MED, BUSY
+- **TargetRole:** OUTLINE, MEGA_TREE, HERO, ARCHES, TREES, PROPS, FLOODS, ACCENTS, MATRIX, MOVING_HEADS
+- **LayerRole:** BASE, RHYTHM, ACCENT, HIGHLIGHT, FILL, TEXTURE, CUSTOM
+- **BlendMode:** NORMAL, ADD, MASK
+- **TimingDriver:** BEATS, DOWNBEATS, BARS, PHRASES, PEAKS, LYRICS
+{% endif %}
+
+## Score Breakdown Dimensions
+
+Use these standardized dimensions for score_breakdown:
+- **story_coherence**: Global story clarity and thematic consistency (0-10)
+- **section_appropriateness**: Section energy/style matching music (0-10)
+- **layer_architecture**: Layer design and target selection quality (0-10)
+- **bold_impact**: Design boldness and wow-factor (0-10)
+- **contrast_dynamics**: Variety and contrast across sections (0-10)
+
+## Issue Categories
+
+{% if taxonomy and taxonomy.IssueCategory %}
+**CRITICAL: Use ONLY these exact category strings:**
+{% for category in taxonomy.IssueCategory -%}
+- **{{ category }}**
+{% endfor -%}
+{% else %}
+**CRITICAL: Use ONLY these exact category strings** (from IssueCategory enum):
+- **SCHEMA**: Schema validation or structure issues
+- **TIMING**: Timing, bar range, or alignment issues  
+- **COVERAGE**: Missing sections or gaps in coverage
+- **TEMPLATES**: Template selection or availability issues
+- **LAYERING**: Layer composition or coordination issues
+- **SPATIAL**: Target role selection or coordination issues
+- **VARIETY**: Lack of variety or repetition issues
+- **MUSICALITY**: Music synchronization or energy matching issues
+- **COMPLEXITY**: Over/under-complexity issues
+- **STYLE**: Style consistency or coherence issues
+- **DATA_QUALITY**: Input data quality or completeness issues
+- **LOGIC**: Logical consistency or contradiction issues
+- **CONSTRAINT**: Constraint violation issues
+{% endif %}
+
+**Mapping guidance:**
+- "Unclear notes" → STYLE (not ACTIONABILITY)
+- "Too subtle design" → STYLE or COMPLEXITY (not BOLDNESS)
+- "Energy mismatch" → MUSICALITY
+- "Missing sections" → COVERAGE
+- "Layer problems" → LAYERING
+- "Target issues" → SPATIAL
+
+## Issue Severities
+
+{% if taxonomy and taxonomy.IssueSeverity %}
+Use these exact severity strings:
+{% for severity in taxonomy.IssueSeverity -%}
+- **{{ severity }}**
+{% endfor -%}
+{% else %}
+Use these exact severity strings (from IssueSeverity enum):
+- **ERROR**: Blocking technical issues (invalid structure, coverage gaps)
+- **WARN**: Quality concerns that should be addressed (low contrast, unclear notes)
+- **NIT**: Minor suggestions for improvement (polish, enhancements)
+{% endif %}
+
+## Feedback Guidelines
+
+1. **Be specific about locations**: Use section names, layer indices, target roles
+2. **Reference musical context**: Tie feedback to song characteristics
+3. **Suggest concrete actions**: "Increase chorus_2 energy to HIGH" not "Add more energy"
+4. **Acknowledge Christmas light show context**: Bold, impactful, street-visible design
+5. **Track iteration progress**: Note improvements if this is iteration 2+
+
+## Iteration Context
+
+{% if iteration > 1 %}
+This is **iteration {{ iteration }}**. Check if previous feedback was addressed. Give credit for improvements and focus on remaining issues.
+{% else %}
+This is the **first iteration**. Provide comprehensive feedback to guide refinement.
+{% endif %}

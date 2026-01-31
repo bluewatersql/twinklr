@@ -115,13 +115,16 @@ class StructuredJSONFormatter(logging.Formatter):
 
 def _supress_noisy_loggers() -> None:
     """Supress noisy loggers."""
-    logging.getLogger("httpx").setLevel(logging.ERROR)
-    logging.getLogger("httpcore").setLevel(logging.ERROR)
-    logging.getLogger("requests").setLevel(logging.ERROR)
-    logging.getLogger("urllib3").setLevel(logging.ERROR)
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
+    logging.getLogger("requests").setLevel(logging.WARNING)
+    logging.getLogger("urllib3").setLevel(logging.WARNING)
     logging.getLogger("openai").setLevel(logging.WARNING)
-    logging.getLogger("numba").setLevel(logging.ERROR)
-    logging.getLogger("asyncio").setLevel(logging.ERROR)
+    logging.getLogger("numba").setLevel(logging.WARNING)
+    logging.getLogger("asyncio").setLevel(logging.WARNING)
+    logging.getLogger("matplotlib").setLevel(logging.WARNING)
+    logging.getLogger("speechbrain").setLevel(logging.WARNING)
+    logging.getLogger("fsspec.local").setLevel(logging.WARNING)
 
 
 def configure_logging(

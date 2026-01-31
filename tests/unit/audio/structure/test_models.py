@@ -1,7 +1,8 @@
 """Unit tests for section detection Pydantic models."""
 
-import pytest
+
 from pydantic import ValidationError
+import pytest
 
 from twinklr.core.audio.structure.models import Section, SectionDiagnostics, SectioningPreset
 
@@ -61,7 +62,7 @@ class TestSection:
 
     def test_section_end_before_start_fails(self):
         """Test that end_s must be > start_s."""
-        with pytest.raises(ValidationError, match="end_s.*must be greater than start_s"):
+        with pytest.raises(ValidationError, match=r"end_s.*must be greater than start_s"):
             Section(
                 section_id=0,
                 start_s=10.0,
@@ -73,7 +74,7 @@ class TestSection:
 
     def test_section_end_equals_start_fails(self):
         """Test that end_s must be strictly greater than start_s."""
-        with pytest.raises(ValidationError, match="end_s.*must be greater than start_s"):
+        with pytest.raises(ValidationError, match=r"end_s.*must be greater than start_s"):
             Section(
                 section_id=0,
                 start_s=10.0,
@@ -187,7 +188,7 @@ class TestSectionDiagnostics:
 
     def test_diagnostics_curve_length_mismatch_fails(self):
         """Test that curves must match beat grid length."""
-        with pytest.raises(ValidationError, match="Curve length.*must match beat grid"):
+        with pytest.raises(ValidationError, match=r"Curve length.*must match beat grid"):
             SectionDiagnostics(
                 tempo_bpm=120.0,
                 beat_times_s=[0.0, 0.5, 1.0, 1.5],  # 4 beats
@@ -260,7 +261,7 @@ class TestSectioningPreset:
 
     def test_preset_max_less_than_min_fails(self):
         """Test that max_sections must be >= min_sections."""
-        with pytest.raises(ValidationError, match="max_sections.*must be >= min_sections"):
+        with pytest.raises(ValidationError, match=r"max_sections.*must be >= min_sections"):
             SectioningPreset(
                 genre="test",
                 min_sections=20,
@@ -274,7 +275,7 @@ class TestSectioningPreset:
 
     def test_preset_invalid_context_weight(self):
         """Test that context weights must be in [0, 1]."""
-        with pytest.raises(ValidationError, match="Weight.*must be in"):
+        with pytest.raises(ValidationError, match=r"Weight.*must be in"):
             SectioningPreset(
                 genre="test",
                 min_sections=10,

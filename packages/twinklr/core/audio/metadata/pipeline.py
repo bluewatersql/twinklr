@@ -95,17 +95,20 @@ class MetadataPipeline:
         self.acoustid_client = acoustid_client
         self.musicbrainz_client = musicbrainz_client
 
-    async def extract(self, audio_path: str) -> MetadataBundle:
+    async def extract(
+        self, audio_path: str, embedded_metadata: EmbeddedMetadata | None = None
+    ) -> MetadataBundle:
         """Extract metadata from audio file (async).
 
         Orchestrates full pipeline:
-        1. Embedded metadata
+        1. Embedded metadata (or use provided)
         2. Fingerprinting
         3. Provider lookups (async, parallel MusicBrainz)
         4. Merge
 
         Args:
             audio_path: Path to audio file
+            embedded_metadata: Pre-extracted embedded metadata (optional, for efficiency)
 
         Returns:
             MetadataBundle with merged metadata
@@ -116,16 +119,21 @@ class MetadataPipeline:
             "extracted_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
         }
 
-        # Stage 1: Extract embedded metadata
-        try:
-            logger.debug(f"Extracting embedded metadata from {audio_path}")
-            embedded = extract_embedded_metadata(audio_path)
+        # Stage 1: Extract embedded metadata (or reuse if provided)
+        if embedded_metadata:
+            logger.debug("Reusing pre-extracted embedded metadata")
+            embedded = embedded_metadata
             stage_status = StageStatus.OK
-        except Exception as e:
-            logger.warning(f"Embedded metadata extraction failed: {e}")
-            embedded = EmbeddedMetadata()
-            stage_status = StageStatus.FAILED
-            warnings.append(f"Embedded metadata extraction failed: {str(e)}")
+        else:
+            try:
+                logger.debug(f"Extracting embedded metadata from {audio_path}")
+                embedded = extract_embedded_metadata(audio_path)
+                stage_status = StageStatus.OK
+            except Exception as e:
+                logger.warning(f"Embedded metadata extraction failed: {e}")
+                embedded = EmbeddedMetadata()
+                stage_status = StageStatus.FAILED
+                warnings.append(f"Embedded metadata extraction failed: {str(e)}")
 
         # Stage 2: Compute fingerprint
         fingerprint = self._compute_fingerprint(audio_path, warnings)

@@ -1,0 +1,25 @@
+pack_id: macro_planner.v2
+version: 2.0.0
+description: Strategic planning prompts for MacroPlanner agent
+
+templates:
+  system: system.j2
+  user: user.j2
+  developer: developer.j2
+
+variables:
+  required:
+    - audio_profile  # AudioProfileModel with song analysis
+    - display_groups  # List of DisplayGroup objects with target roles
+    - response_schema  # JSON schema for MacroPlan (auto-injected)
+    - taxonomy  # Dict of enum names to value lists (auto-injected)
+  
+  optional:
+    - iteration  # Current iteration number (int, default: 0)
+    - feedback  # Judge feedback from previous iteration (str)
+
+metadata:
+  agent_type: strategic_planner
+  output_schema: MacroPlan
+  supports_iteration: true
+  max_iterations: 3

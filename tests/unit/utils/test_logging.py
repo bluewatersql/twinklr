@@ -237,6 +237,7 @@ class TestConfigureLogging:
         handler = logging.StreamHandler(stream)
         handler.setFormatter(StructuredJSONFormatter())
         logger.addHandler(handler)
+        logger.setLevel(logging.INFO)
 
         logger.info("Test message")
         output = stream.getvalue()

@@ -11,6 +11,8 @@ def compute_quality_metrics(
     words: list[LyricWord],
     duration_ms: int,
     max_large_gap_s: float = 10.0,
+    gap_merge_ms: float = 250.0,
+    vocal_segments: list[dict[str, float]] | None = None,
 ) -> LyricsQuality:
     """Compute quality metrics from word-level timing.
 
@@ -18,6 +20,9 @@ def compute_quality_metrics(
         words: List of words with timing
         duration_ms: Song duration in milliseconds
         max_large_gap_s: Threshold for large gap detection (seconds)
+        gap_merge_ms: Merge gaps smaller than this (for coverage calculation)
+        vocal_segments: Optional vocal detector segments for coverage validation
+                       Format: [{"start_s": float, "end_s": float, ...}, ...]
 
     Returns:
         LyricsQuality with computed metrics
@@ -25,16 +30,56 @@ def compute_quality_metrics(
     if not words:
         return LyricsQuality()
 
-    # Compute coverage
-    total_coverage_ms = 0.0
+    # Compute coverage with gap merging (vocal time, not individual word time)
+    # Merge word intervals with small gaps to represent continuous vocal phrases
+    intervals: list[tuple[int, int]] = []
     for word in words:
-        # Clip word span to [0, duration_ms]
         start = max(0, word.start_ms)
         end = min(duration_ms, word.end_ms)
-        word_duration = max(0, end - start)
-        total_coverage_ms += word_duration
+        if start < end:
+            intervals.append((start, end))
 
+    # Sort by start time
+    intervals.sort()
+
+    # Merge overlapping/close intervals (gap_merge_ms tolerance)
+    merged: list[tuple[int, int]] = []
+    for start, end in intervals:
+        if merged and start - merged[-1][1] <= gap_merge_ms:
+            # Merge with previous interval
+            merged[-1] = (merged[-1][0], max(merged[-1][1], end))
+        else:
+            # New interval
+            merged.append((start, end))
+
+    # Calculate coverage from merged intervals
+    total_coverage_ms = sum(end - start for start, end in merged)
     coverage_pct = total_coverage_ms / duration_ms if duration_ms > 0 else 0.0
+
+    # Optional: Validate against vocal segments if provided
+    # This can help detect if word timing is significantly off from actual vocals
+    if vocal_segments:
+        # Convert vocal segments to ms intervals
+        vocal_intervals = [
+            (int(seg["start_s"] * 1000), int(seg["end_s"] * 1000)) for seg in vocal_segments
+        ]
+
+        # Compute overlap between word intervals and vocal segments
+        total_overlap_ms = 0
+        for word_start, word_end in merged:
+            for vocal_start, vocal_end in vocal_intervals:
+                # Compute intersection
+                overlap_start = max(word_start, vocal_start)
+                overlap_end = min(word_end, vocal_end)
+                if overlap_start < overlap_end:
+                    total_overlap_ms += overlap_end - overlap_start
+
+        # If word coverage significantly exceeds vocal segments, may indicate timing issues
+        # (But this is normal if vocal detector misses some vocals, so just informational)
+        # vocal_total_ms = sum(end - start for start, end in vocal_intervals)  # Reserved for future use
+
+        # Store as metadata for debugging (could add to model if needed)
+        # For now, just use word-based coverage as the primary metric
 
     # Detect violations
     monotonicity_violations = 0

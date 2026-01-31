@@ -8,18 +8,18 @@ from twinklr.core.agents.spec import AgentMode, AgentSpec
 
 def get_audio_profile_spec(
     model: str = "gpt-5.2",
-    temperature: float = 0.2,
+    temperature: float = 0.4,
     token_budget: int | None = None,
 ) -> AgentSpec:
     """Get AudioProfile agent specification.
 
     The AudioProfile agent is a oneshot, fact-based analyzer that transforms
-    raw audio analysis into a canonical song intent profile. It uses low
-    temperature for objective, deterministic output.
+    raw audio analysis into a canonical song intent profile. It uses moderate
+    temperature (0.4) to balance factual accuracy with creative interpretation.
 
     Args:
         model: LLM model to use (default: gpt-5.2 for high-quality analysis)
-        temperature: Sampling temperature (default: 0.2 for factual output)
+        temperature: Sampling temperature (default: 0.4 for balanced output)
         token_budget: Optional token budget for this agent
 
     Returns:

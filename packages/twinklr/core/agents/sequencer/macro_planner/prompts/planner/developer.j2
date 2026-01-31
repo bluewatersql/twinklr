@@ -1,0 +1,47 @@
+{#
+MacroPlanner Developer Prompt
+Technical constraints and enum guidance
+#}
+## Technical Constraints
+
+**Schema Version:** macro-plan.v2  
+**Max Layers:** 5 (min 1, must include exactly one BASE layer)  
+**Max Sections:** Match audio profile sections exactly
+
+## Enum Values (Use These Exactly)
+
+{% if taxonomy %}
+**LayerRole:** {{ taxonomy.LayerRole | join(', ') }}  
+**BlendMode:** {{ taxonomy.BlendMode | join(', ') }}  
+**TimingDriver:** {{ taxonomy.TimingDriver | join(', ') }}  
+
+**TargetRole:** {{ taxonomy.TargetRole | join(', ') }}  
+**EnergyTarget:** {{ taxonomy.EnergyTarget | join(', ') }}  
+**ChoreographyStyle:** {{ taxonomy.ChoreographyStyle | join(', ') }}  
+**MotionDensity:** {{ taxonomy.MotionDensity | join(', ') }}
+{% else %}
+{# Fallback if taxonomy not provided #}
+**LayerRole:** BASE, RHYTHM, ACCENT, HIGHLIGHT, FILL, TEXTURE, CUSTOM  
+**BlendMode:** NORMAL, ADD, MASK  
+**TimingDriver:** BEATS, DOWNBEATS, BARS, PHRASES, PEAKS, LYRICS  
+
+**TargetRole:** OUTLINE, MEGA_TREE, HERO, ARCHES, TREES, PROPS, FLOODS, ACCENTS, MATRIX, MOVING_HEADS  
+**EnergyTarget:** LOW, MED, HIGH, BUILD, RELEASE, PEAK  
+**ChoreographyStyle:** IMAGERY, ABSTRACT, HYBRID  
+**MotionDensity:** SPARSE, MED, BUSY
+{% endif %}
+
+## Critical Rules
+
+1. **Exactly one BASE layer** with NORMAL blend mode
+2. **All other layers** use ADD blend mode
+3. **Section coverage** must be complete (no gaps, no overlaps)
+4. **Target roles** must be from available display groups
+
+**Note on MASK blend mode:** While MASK exists in the schema, it is reserved for advanced use cases and should NOT be used in standard macro plans. Stick to NORMAL (for BASE layer only) and ADD (for all other layers).
+
+## Asset Requirements
+
+- File types: .png or .gif only
+- Keep count reasonable (<10 recommended)
+- Descriptive names (e.g., "snowflake_burst.png", "star_twinkle.gif")

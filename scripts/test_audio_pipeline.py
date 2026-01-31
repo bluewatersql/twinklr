@@ -26,7 +26,6 @@ Usage:
 
 import argparse
 import asyncio
-import json
 import logging
 from pathlib import Path
 import sys
@@ -35,12 +34,11 @@ from typing import Any
 from twinklr.core.audio.analyzer import AudioAnalyzer
 from twinklr.core.audio.models import StageStatus
 from twinklr.core.config.loader import load_app_config, load_job_config
+from twinklr.core.config.models import JobConfig
+from twinklr.core.utils.formatting import clean_audio_filename
+from twinklr.core.utils.logging import configure_logging
 
-# Set up logging
-logging.basicConfig(
-    level=logging.DEBUG,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-)
+configure_logging(level="DEBUG")
 logger = logging.getLogger(__name__)
 
 
@@ -185,9 +183,6 @@ async def run_analysis(args: argparse.Namespace) -> dict[str, Any]:
     try:
         job_config = load_job_config()
     except Exception:
-        # Create minimal job config if not found
-        from twinklr.core.config.models import JobConfig
-
         job_config = JobConfig(project_name="test_audio")
 
     # Apply overrides from args
@@ -257,6 +252,8 @@ async def run_analysis(args: argparse.Namespace) -> dict[str, Any]:
         print(f"    Model:   {app_config.audio_processing.enhancements.whisperx_model}")
         print(f"    Device:  {app_config.audio_processing.enhancements.whisperx_device}")
 
+    clean_file_name = clean_audio_filename(Path(str(args.audio_path)).stem)
+
     # Set up cache info
     if args.no_cache:
         print("\nCache: DISABLED (will force reprocess)")
@@ -287,7 +284,7 @@ async def run_analysis(args: argparse.Namespace) -> dict[str, Any]:
     # Audio features (timing from direct fields, rest from features dict)
     print(f"Duration: {bundle.timing.duration_s:.2f}s")
 
-    # Access features from the features dict (backward compatible v2.3 format)
+    # Access features from the features dict
     features = bundle.features
     if "tempo" in features:
         print(f"Tempo: {features['tempo']:.1f} BPM")
@@ -330,10 +327,14 @@ async def run_analysis(args: argparse.Namespace) -> dict[str, Any]:
             if bundle.lyrics.quality:
                 print("  Quality:")
                 print(f"    Coverage: {bundle.lyrics.quality.coverage_pct:.2%}")
-                print(f"    Monotonicity Violations: {bundle.lyrics.quality.monotonicity_violations}")
+                print(
+                    f"    Monotonicity Violations: {bundle.lyrics.quality.monotonicity_violations}"
+                )
                 print(f"    Overlap Violations: {bundle.lyrics.quality.overlap_violations}")
                 if bundle.lyrics.quality.avg_word_duration_ms:
-                    print(f"    Avg Word Duration: {bundle.lyrics.quality.avg_word_duration_ms:.0f}ms")
+                    print(
+                        f"    Avg Word Duration: {bundle.lyrics.quality.avg_word_duration_ms:.0f}ms"
+                    )
 
             # Show first few words
             if bundle.lyrics.words:
@@ -352,12 +353,17 @@ async def run_analysis(args: argparse.Namespace) -> dict[str, Any]:
     if bundle.phonemes:
         print_bundle_summary(bundle.phonemes, "Phonemes")
 
-    # Save to JSON if requested
-    if args.output_json:
-        print_section(f"Saving to {args.output_json}")
-        output_data = bundle.model_dump(mode="json")
-        args.output_json.write_text(json.dumps(output_data, indent=2, default=str))
-        print(f"✓ Saved to {args.output_json}")
+    ## Save to file
+    print_section("Saving Output")
+    output_path = Path(f"artifacts/audio_pipeline/{clean_file_name}.json")
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    try:
+        output_path.write_text(bundle.model_dump_json(indent=2))
+        print(f"✅ Output saved to: {output_path}")
+        print(f"   Size: {output_path.stat().st_size:,} bytes")
+    except Exception as e:
+        print(f"⚠️  Failed to save output: {e}")
 
     result: dict[str, Any] = bundle.model_dump(mode="json")
     return result
