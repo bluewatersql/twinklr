@@ -119,6 +119,7 @@ def test_layering_plan_strategy_notes_too_short():
     with pytest.raises(ValidationError, match="at least 20 characters"):
         LayeringPlan(layers=[base], strategy_notes="Short")
 
+
 def test_layering_plan_serialization():
     """LayeringPlan serializes to/from JSON."""
     base = _create_layer(

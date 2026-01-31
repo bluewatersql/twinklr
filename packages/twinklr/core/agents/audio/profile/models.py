@@ -1,6 +1,6 @@
 """Pydantic models for AudioProfile agent."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
 
@@ -45,7 +45,7 @@ class Provenance(BaseModel):
     temperature: float = Field(description="LLM temperature used")
 
     created_at: str = Field(
-        default_factory=lambda: datetime.utcnow().isoformat(),
+        default_factory=lambda: datetime.now(UTC).isoformat(),
         description="ISO timestamp of creation",
     )
 

@@ -210,10 +210,12 @@ def detect_tempo_changes(y: np.ndarray, sr: int, *, hop_length: int) -> dict[str
     if len(y) < window_samples:
         try:
             tempo, _ = librosa.beat.beat_track(y=y, sr=sr, hop_length=hop_length)
+            # Convert numpy array/scalar to Python float using .item()
+            tempo_float = float(tempo.item()) if hasattr(tempo, "item") else float(tempo)
             return {
-                "tempo_curve": [{"time_s": 0.0, "tempo_bpm": float(tempo)}],
+                "tempo_curve": [{"time_s": 0.0, "tempo_bpm": tempo_float}],
                 "tempo_changes": [],
-                "average_tempo_bpm": float(tempo),
+                "average_tempo_bpm": tempo_float,
                 "tempo_std": 0.0,
                 "is_stable": True,
             }
@@ -233,7 +235,9 @@ def detect_tempo_changes(y: np.ndarray, sr: int, *, hop_length: int) -> dict[str
         y_win = y[i : i + window_samples]
         try:
             tempo, _ = librosa.beat.beat_track(y=y_win, sr=sr, hop_length=hop_length)
-            tempos.append(float(tempo))
+            # Convert numpy array/scalar to Python float using .item()
+            tempo_float = float(tempo.item()) if hasattr(tempo, "item") else float(tempo)
+            tempos.append(tempo_float)
             times.append(float(i / sr))
         except Exception:
             pass

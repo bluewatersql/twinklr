@@ -49,6 +49,60 @@ Peak timings:
 {% endfor %}
 {% endif %}
 
+{% if lyric_context is defined and lyric_context %}
+## Lyric Context
+
+**Has Lyrics:** Yes
+
+**Themes:** {{ lyric_context.themes | join(", ") }}
+
+**Mood Arc:** {{ lyric_context.mood_arc }}
+
+**Genre Markers:** {{ lyric_context.genre_markers | join(", ") }}
+
+{% if lyric_context.has_narrative %}
+**Narrative:** Yes - {{ lyric_context.characters | length if lyric_context.characters else 0 }} character(s), {{ lyric_context.story_beats | length if lyric_context.story_beats else 0 }} story beat(s)
+
+{% if lyric_context.story_beats %}
+**Story Beats:**
+{% for beat in lyric_context.story_beats[:3] %}
+- **[{{ beat.beat_type }}]** {{ beat.section_id }} ({{ (beat.timestamp_range[0] / 1000) | round(1) }}s-{{ (beat.timestamp_range[1] / 1000) | round(1) }}s)
+  {{ beat.description }}
+  💡 {{ beat.visual_opportunity }}
+{% endfor %}
+{% if lyric_context.story_beats | length > 3 %}
+... and {{ lyric_context.story_beats | length - 3 }} more story beats
+{% endif %}
+{% endif %}
+{% endif %}
+
+**Key Phrases:** {{ lyric_context.key_phrases | length }} memorable moments identified
+{% if lyric_context.key_phrases %}
+Notable examples:
+{% for phrase in lyric_context.key_phrases[:5] %}
+- "{{ phrase.text }}" @ {{ (phrase.timestamp_ms / 1000) | round(1) }}s [{{ phrase.emphasis }}]
+  💡 {{ phrase.visual_hint }}
+{% endfor %}
+{% if lyric_context.key_phrases | length > 5 %}
+... and {{ lyric_context.key_phrases | length - 5 }} more key phrases
+{% endif %}
+{% endif %}
+
+**Recommended Visual Themes:** {{ lyric_context.recommended_visual_themes | join(", ") }}
+
+**Lyric Density:** {{ lyric_context.lyric_density }}
+**Vocal Coverage:** {{ (lyric_context.vocal_coverage_pct * 100) | round(0) }}%
+
+{% if lyric_context.silent_sections %}
+**Silent/Instrumental Sections:** {{ lyric_context.silent_sections | length }}
+{% for section in lyric_context.silent_sections %}
+- {{ (section.start_ms / 1000) | round(1) }}s to {{ (section.end_ms / 1000) | round(1) }}s ({{ (section.duration_ms / 1000) | round(1) }}s){% if section.section_id %} - {{ section.section_id }}{% endif %}
+{% endfor %}
+{% endif %}
+
+**IMPORTANT:** Use the key phrases' visual hints as inspiration for choreography moments. Align story beats with section planning.
+
+{% endif %}
 ## Display Layout
 
 Available target roles in this display:

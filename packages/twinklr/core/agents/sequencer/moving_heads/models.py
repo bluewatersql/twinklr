@@ -68,7 +68,7 @@ class PlanSection(BaseModel):
         default=None,
         description="Optional 1–3 contiguous segments that partition this section",
         min_length=1,
-        max_length=3,
+        max_length=5,
     )
 
     # Transition fields
@@ -165,7 +165,7 @@ class JudgeResponse(BaseModel):
         description="Concise summary feedback for next iteration (2-4 sentences)"
     )
     overall_assessment: str = Field(
-        description="Overall assessment summary (2-4 sentences)", max_length=500
+        description="Overall assessment summary (2-4 sentences)"
     )
     strengths: list[str] = Field(description="What the plan does well", default_factory=list)
     issues: list[Issue] = Field(description="Detailed issues to address", default_factory=list)

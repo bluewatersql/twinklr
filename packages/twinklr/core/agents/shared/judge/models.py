@@ -80,8 +80,7 @@ class JudgeVerdict(BaseModel):
 
     # Narrative feedback
     overall_assessment: str = Field(
-        description="Overall assessment summary (2-4 sentences)",
-        max_length=500,
+        description="Overall assessment summary (2-4 sentences)"
     )
     feedback_for_planner: str = Field(
         description="Concise feedback for next iteration (2-4 sentences)"
@@ -173,7 +172,6 @@ class RevisionRequest(BaseModel):
     )
     context_for_planner: str = Field(
         description="Additional context to guide revision (1-3 sentences)",
-        max_length=500,
     )
 
     model_config = ConfigDict(frozen=True, extra="forbid", validate_assignment=True)

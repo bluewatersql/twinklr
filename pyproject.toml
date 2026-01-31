@@ -138,4 +138,8 @@ filterwarnings = [
     "ignore::FutureWarning:librosa.*",
     "ignore::UserWarning:librosa.*",
     "ignore:PySoundFile failed:UserWarning",
+    # Ignore SWIG-related deprecation warnings (low priority, external C library issue)
+    "ignore:builtin type SwigPyPacked has no __module__ attribute:DeprecationWarning",
+    "ignore:builtin type SwigPyObject has no __module__ attribute:DeprecationWarning",
+    "ignore:builtin type swigvarlink has no __module__ attribute:DeprecationWarning",
 ]

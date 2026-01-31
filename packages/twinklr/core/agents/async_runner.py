@@ -274,11 +274,12 @@ class AsyncAgentRunner:
                 # Log the failed response for debugging (first attempt only)
                 if attempt == 0:
                     import json
+
                     try:
                         raw_json = json.dumps(response.content, indent=2)
                     except Exception:
                         raw_json = str(response.content)
-                    
+
                     logger.warning(
                         f"Agent {spec.name} FIRST schema validation failure:\n"
                         f"===== VALIDATION ERROR =====\n"

@@ -23,9 +23,7 @@ class GlobalStory(BaseModel):
 
     model_config = {"extra": "forbid"}
 
-    theme: str = Field(
-        ..., description="Overarching theme/narrative for the show", min_length=10
-    )
+    theme: str = Field(..., description="Overarching theme/narrative for the show", min_length=10)
     motifs: list[str] = Field(
         ...,
         description="3-5 recurring visual/musical motifs throughout the show",
@@ -33,11 +31,11 @@ class GlobalStory(BaseModel):
         max_length=10,
     )
     pacing_notes: str = Field(
-        ..., description="How energy builds/releases across the song", min_length=20)
+        ..., description="How energy builds/releases across the song", min_length=20
+    )
     color_story: str = Field(
-        ...,
-        description="Color palette and transitions throughout the show",
-        min_length=10)
+        ..., description="Color palette and transitions throughout the show", min_length=10
+    )
 
 
 class MacroSectionPlan(BaseModel):
@@ -61,9 +59,7 @@ class MacroSectionPlan(BaseModel):
         ..., description="Visual approach (IMAGERY, ABSTRACT, HYBRID)"
     )
     motion_density: MotionDensity = Field(..., description="Activity level (SPARSE, MED, BUSY)")
-    notes: str = Field(
-        ..., description="Strategic notes for this section", min_length=20
-    )
+    notes: str = Field(..., description="Strategic notes for this section", min_length=20)
 
     @field_validator("primary_focus_targets", "secondary_targets")
     @classmethod
@@ -124,9 +120,7 @@ class LayerSpec(BaseModel):
     intensity_bias: float = Field(
         default=1.0, ge=0.0, le=1.5, description="Global intensity multiplier for this layer"
     )
-    usage_notes: str = Field(
-        ..., description="Strategic guidance for GroupPlanner", min_length=10
-    )
+    usage_notes: str = Field(..., description="Strategic guidance for GroupPlanner", min_length=10)
 
 
 class LayeringPlan(BaseModel):
@@ -144,9 +138,7 @@ class LayeringPlan(BaseModel):
     layers: list[LayerSpec] = Field(
         ..., description="Layer specifications", min_length=1, max_length=5
     )
-    strategy_notes: str = Field(
-        ..., description="High-level layering strategy", min_length=20
-    )
+    strategy_notes: str = Field(..., description="High-level layering strategy", min_length=20)
 
     @field_validator("layers")
     @classmethod

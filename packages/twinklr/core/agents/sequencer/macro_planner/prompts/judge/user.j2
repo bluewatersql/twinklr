@@ -10,6 +10,15 @@ Provides the MacroPlan to evaluate along with song context
 **BPM:** {{ audio_profile.song_identity.bpm | round(1) }}
 **Energy:** {{ audio_profile.energy_profile.macro_energy.value }}
 
+{% if lyric_context is defined and lyric_context %}
+**Lyric Context Available:** Yes
+- **Themes:** {{ lyric_context.themes | join(", ") }}
+- **Mood Arc:** {{ lyric_context.mood_arc }}
+- **Has Narrative:** {{ "Yes" if lyric_context.has_narrative else "No" }}
+- **Key Phrases:** {{ lyric_context.key_phrases | length }} identified
+- **Vocal Coverage:** {{ (lyric_context.vocal_coverage_pct * 100) | round(0) }}%
+{% endif %}
+
 ## Song Structure
 
 {% for section in audio_profile.structure.sections %}

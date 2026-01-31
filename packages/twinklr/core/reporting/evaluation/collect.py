@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import datetime as dt
 import json
 import subprocess
 from datetime import datetime
@@ -123,7 +124,7 @@ def build_run_metadata(checkpoint_path: Path, checkpoint_data: dict) -> RunMetad
 
     return RunMetadata(
         run_id=run_id,
-        timestamp=datetime.now().isoformat(),
+        timestamp=datetime.now(dt.UTC).isoformat(),
         git_sha=git_sha,
         engine_version=engine_version,
         checkpoint_path=checkpoint_path,

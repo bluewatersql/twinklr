@@ -81,7 +81,9 @@ class TestGeniusClient:
         """Search with no results."""
         query = LyricsQuery(artist="Test Artist", title="Unknown Song")
 
-        http_client.get.return_value.json.return_value = {"response": {"hits": []}}
+        response = MagicMock()
+        response.json.return_value = {"response": {"hits": []}}
+        http_client.get.return_value = response
 
         candidates = await genius_client_with_token.search(query)
 
@@ -115,7 +117,9 @@ class TestGeniusClient:
         """Search includes Authorization header."""
         query = LyricsQuery(artist="Test Artist", title="Test Song")
 
-        http_client.get.return_value.json.return_value = {"response": {"hits": []}}
+        response = MagicMock()
+        response.json.return_value = {"response": {"hits": []}}
+        http_client.get.return_value = response
 
         await genius_client_with_token.search(query)
 

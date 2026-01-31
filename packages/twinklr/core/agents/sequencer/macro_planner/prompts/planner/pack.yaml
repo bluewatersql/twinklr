@@ -15,6 +15,7 @@ variables:
     - taxonomy  # Dict of enum names to value lists (auto-injected)
   
   optional:
+    - lyric_context  # LyricContextModel with narrative/thematic analysis (None if no lyrics)
     - iteration  # Current iteration number (int, default: 0)
     - feedback  # Judge feedback from previous iteration (str)
 

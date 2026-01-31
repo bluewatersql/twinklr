@@ -31,6 +31,7 @@ def test_target_selector_empty_roles():
     with pytest.raises(ValidationError):
         TargetSelector(roles=[])
 
+
 def test_layer_spec_valid():
     """Valid LayerSpec passes."""
     spec = LayerSpec(
@@ -139,6 +140,7 @@ def test_usage_notes_too_short():
             timing_driver=TimingDriver.BARS,
             usage_notes="Short",
         )
+
 
 def test_layer_spec_serialization():
     """LayerSpec serializes to/from JSON."""

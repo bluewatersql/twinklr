@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import datetime as dt
 import logging
 from pathlib import Path
 
@@ -117,7 +118,7 @@ async def run_audio_profile(
             framework_version="twinklr-agents-2.0",
             seed=None,
             temperature=temperature,  # Use ACTUAL temperature from parameters
-            created_at=datetime.utcnow().isoformat() + "Z",
+            created_at=datetime.now(dt.UTC).isoformat() + "Z",
         )
 
         # Heuristic validation

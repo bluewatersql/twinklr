@@ -1,6 +1,5 @@
 """Tests for taxonomy utilities."""
 
-
 from twinklr.core.agents.taxonomy import (
     BlendMode,
     ChoreographyStyle,
@@ -131,7 +130,13 @@ def test_taxonomy_includes_issue_enums():
     taxonomy = get_taxonomy_dict()
 
     # Check issue-related enum classes are present
-    expected_issue_enums = ["IssueCategory", "IssueSeverity", "IssueEffort", "IssueScope", "SuggestedAction"]
+    expected_issue_enums = [
+        "IssueCategory",
+        "IssueSeverity",
+        "IssueEffort",
+        "IssueScope",
+        "SuggestedAction",
+    ]
 
     for enum_name in expected_issue_enums:
         assert enum_name in taxonomy, f"Missing {enum_name} in taxonomy dict"

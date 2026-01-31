@@ -70,11 +70,12 @@ class GeniusClient:
 
             logger.debug(f"Genius API search URL: {search_url}")
             response = await self.http_client.get(search_url, headers=headers)
+            result = response.json()
+
             logger.debug(
                 f"Response status: {response.status_code}, content-type: {response.headers.get('content-type')}"
             )
             logger.debug(f"Response body (first 200 chars): {response.text[:200]}")
-            result = response.json()
 
             hits = result.get("response", {}).get("hits", [])
             logger.debug(f"Genius API returned {len(hits)} hits")

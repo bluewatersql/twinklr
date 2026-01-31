@@ -1,0 +1,178 @@
+# Lyric Analysis Request
+
+Analyze the following song lyrics and produce a complete LyricContextModel.
+
+## Song Information
+
+- **Duration:** {{ duration_ms }}ms ({{ (duration_ms / 1000) | round(1) }}s)
+- **Lyrics Available:** {{ "Yes" if has_lyrics else "No" }}
+
+{% if not has_lyrics %}
+**No lyrics available for this song.** Return a minimal LyricContextModel with `has_lyrics=False`.
+{% else %}
+
+## Quality Metrics
+
+{% if quality %}
+- **Coverage:** {{ (quality.coverage_pct * 100) | round(1) }}% of song has vocals
+- **Source Confidence:** {{ (quality.source_confidence * 100) | round(0) }}%
+{% endif %}
+
+## Song Structure
+
+{% if sections %}
+The song has {{ sections | length }} structural sections:
+
+{% for section in sections %}
+{{ loop.index }}. **{{ section.name }}** ({{ section.section_id }}) — {{ section.start_ms }}ms to {{ section.end_ms }}ms ({{ ((section.end_ms - section.start_ms) / 1000) | round(1) }}s)
+{% endfor %}
+{% else %}
+No structure sections provided.
+{% endif %}
+
+## Full Lyrics
+
+```
+{{ text }}
+```
+
+## Word-Level Timing
+
+{% if words %}
+{{ words | length }} words with precise timing:
+
+{% for word in words[:20] %}
+- {{ word.start_ms }}ms: "{{ word.text }}"
+{% endfor %}
+{% if words | length > 20 %}
+... ({{ words | length - 20 }} more words)
+{% endif %}
+{% else %}
+No word-level timing available.
+{% endif %}
+
+## Phrase-Level Timing
+
+{% if phrases %}
+{{ phrases | length }} phrases identified:
+
+{% for phrase in phrases %}
+{{ loop.index }}. **{{ phrase.start_ms }}-{{ phrase.end_ms }}ms:** "{{ phrase.text }}"
+{% endfor %}
+{% endif %}
+
+---
+
+## Task
+
+Based on these lyrics, produce a complete **LyricContextModel** with:
+
+### 1. Thematic Analysis
+Extract core thematic elements **specific to THIS song**:
+
+- **Themes** (2-5 items): Major thematic elements present in these lyrics
+  - ❌ FORBIDDEN: Generic themes like "joy", "celebration" (unless song explicitly explores these)
+  - ✅ REQUIRED: Specific themes derived from actual lyric content
+  - Examples: "nostalgia for childhood Christmases", "Santa's perspective on modern world", "religious reverence mixed with secular joy"
+
+- **Mood Arc**: Emotional trajectory across the song
+  - ❌ FORBIDDEN: "Happy throughout" / "Sad to happy" (too generic)
+  - ✅ REQUIRED: Specific mood progression tied to structure
+  - Examples: "wistful longing (verses) → triumphant celebration (chorus)", "reverent solemnity building to joyful exuberance"
+
+- **Genre Markers** (2-5 items): Context clues from lyric style
+  - Traditional vs modern language, religious vs secular, narrative vs abstract
+  - Examples: ["Christmas", "traditional carol", "religious"], ["modern pop", "secular", "romance"]
+
+### 2. Narrative Analysis (if applicable)
+
+Only populate if song has clear storytelling:
+
+- **has_narrative**: Does this song tell a story with characters and progression?
+- **characters**: Named personas or character types (e.g., ["Santa", "Narrator", "Children"])
+- **story_beats**: 2-5 key narrative moments aligned to song sections
+  - Each beat must have:
+    - `section_id`: Matching a section from structure above
+    - `timestamp_range`: Precise (start_ms, end_ms) from word timing
+    - `beat_type`: "setup" | "conflict" | "climax" | "resolution" | "coda"
+    - `description`: What happens in this moment (song-specific, 10+ chars)
+    - `visual_opportunity`: Specific choreography hint for this beat (10+ chars)
+  
+  **Examples:**
+  - ❌ FORBIDDEN: "Setup the scene" / "Build tension"
+  - ✅ REQUIRED: "Santa loads sleigh with unusual modern gifts (tablets, smartphones)" → "Visual: Mega tree 'loading bar' animation with chase patterns"
+  - ✅ REQUIRED: "Child realizes Santa is actually dad in costume (climax)" → "Visual: Warm amber spotlight transition from cool whites"
+
+### 3. Visual Hooks ⚠️ MOST CRITICAL SECTION ⚠️
+
+**This is where you create memorable choreography moments - make every key phrase song-specific:**
+
+- **key_phrases** (5-10 items): Memorable lyric moments with visual potential
+  - Each phrase must have:
+    - `text`: Exact lyric phrase (verbatim from lyrics above)
+    - `timestamp_ms`: Start time from word/phrase timing
+    - `section_id`: Matching section from structure
+    - `visual_hint`: **Specific choreography suggestion tied to the actual words** (5+ chars)
+    - `emphasis`: "LOW" | "MED" | "HIGH" (based on lyric impact)
+  
+  **Quality Bar for visual_hint:**
+  - ❌ FORBIDDEN: "Bright lights" / "Flash effect" / "Follow the beat" (too generic)
+  - ❌ FORBIDDEN: "Celebrate the lyrics" / "Match the energy" (not actionable)
+  - ✅ REQUIRED: Specific, actionable hints tied to the actual words:
+    - "Sharp white flash on hard 'K' sound in 'jingle bell ROCK' + immediate mega tree starburst"
+    - "Word 'SNOW' - white cascade from roofline to ground, sweeping left-to-right"
+    - "'Silent night' whispered - dim to 20% amber with slow fade, hold for reverence"
+    - "'HO HO HO' - three rapid red pulses on outline, staccato timing"
+    - "'Sleigh bells ring' - use actual bell sounds as timing cue for sparkle layer across props"
+  
+  **Test your visual_hint:** Would this hint only make sense for THESE specific words? If it could apply to any lyric, REWRITE.
+
+- **recommended_visual_themes** (3-5 items): Visual design recommendations
+  - Tie themes to actual lyric content
+  - Examples:
+    - "Warm nostalgic ambers and golds (matches 'memories of years gone by' in verse_2)"
+    - "Sharp red/white contrasts (Santa's classic colors mentioned in chorus)"
+    - "Soft blue night sky palette (lyrics emphasize starlight and moonlight)"
+    - "Cascading white sweeps (lyrics repeat 'falling snow' motif)"
+
+### 4. Density & Coverage
+
+Analyze vocal patterns:
+
+- **lyric_density**: "SPARSE" | "MED" | "DENSE"
+  - Based on word count relative to duration
+  - SPARSE: < 100 words/minute (lots of instrumental space)
+  - MED: 100-150 words/minute (typical pop song)
+  - DENSE: > 150 words/minute (rapid-fire lyrics, minimal gaps)
+
+- **vocal_coverage_pct**: 0.0-1.0 (from quality metrics above)
+  - This represents how much of the song has vocals
+
+- **silent_sections**: Identify instrumental breaks
+  - Only include sections > 5 seconds without vocals
+  - Use structure sections as guidance
+  - Each section: `start_ms`, `end_ms`, `duration_ms`, optional `section_id`
+
+## Critical Reminder: SONG-SPECIFIC ANALYSIS REQUIRED
+
+**Every lyric context profile must be distinguishable from others.** Generic advice fails the family looking for a memorable holiday display.
+
+Ground every recommendation in:
+- Actual words and phrases from THIS song's lyrics
+- Precise timing from word/phrase data
+- Unique narrative or thematic elements that differentiate this song
+- Visual opportunities that only make sense for THESE specific lyrics
+
+**Uniqueness Test for Key Phrases:**
+For each key phrase, ask:
+1. "Does my visual_hint cite the specific words in this phrase?"
+2. "Would this same visual_hint work for a different Christmas song?"
+3. "Have I identified what makes THIS lyric moment special?"
+
+If you answer "no specific words", "yes generic hint", or "no distinctive element" - REWRITE to be song-specific.
+
+## Deliverable
+
+Return a complete LyricContextModel JSON object with all fields populated according to the schema and constraints specified in the developer prompt.
+
+{% endif %}

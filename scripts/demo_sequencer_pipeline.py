@@ -3,8 +3,8 @@
 
 Demonstrates the complete flow:
 1. Audio Analysis (with caching)
-2. Audio Profile Agent
-3. MacroPlanner Agent
+2. Audio Profile Agent + Lyrics Agent (parallel)
+3. MacroPlanner Agent (with both contexts)
 
 Saves intermediates to artifacts/ for review.
 """
@@ -21,10 +21,14 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import logging
 
+from twinklr.core.agents.audio.lyrics import run_lyrics_async
 from twinklr.core.agents.audio.profile import run_audio_profile
 from twinklr.core.agents.logging import create_llm_logger
 from twinklr.core.agents.providers.openai import OpenAIProvider
-from twinklr.core.agents.sequencer.macro_planner import MacroPlannerOrchestrator
+from twinklr.core.agents.sequencer.macro_planner import (
+    MacroPlannerOrchestrator,
+    PlanningContext,
+)
 from twinklr.core.audio.analyzer import AudioAnalyzer
 from twinklr.core.config.loader import load_app_config, load_job_config
 from twinklr.core.utils.formatting import clean_audio_filename
@@ -168,9 +172,9 @@ async def main() -> None:
         sys.exit(1)
 
     # ========================================================================
-    # STAGE 2: Audio Profile Agent
+    # STAGE 2: Phase 1 Agents (Audio Profile + Lyrics)
     # ========================================================================
-    print_section("STAGE 2: Audio Profile Agent", "=")
+    print_section("STAGE 2: Phase 1 Agents", "=")
 
     try:
         provider = OpenAIProvider(api_key=api_key)
@@ -183,31 +187,95 @@ async def main() -> None:
             format=job_config.agent.llm_logging.format if job_config else "yaml",
         )
 
-        print("🤖 Running AudioProfile agent...")
-        audio_profile = await run_audio_profile(
-            song_bundle=bundle,
-            provider=provider,
-            llm_logger=llm_logger,
-            model=model,
-            temperature=0.3,
-        )
+        # Check if lyrics are available
+        has_lyrics = bundle.lyrics is not None and bundle.lyrics.text is not None
 
-        # Save audio profile
-        audio_profile_path = save_artifact(
-            audio_profile.model_dump(),
-            song_name,
-            "audio_profile.json",
-            output_dir,
-        )
+        if has_lyrics:
+            print("🤖 Running AudioProfile and Lyrics agents in parallel...")
+            print("   This provides complete song understanding (musical + narrative)")
 
-        print("✅ Audio profile complete")
-        print(f"   Macro energy: {audio_profile.energy_profile.macro_energy}")
-        print(f"   Recommended layers: {audio_profile.creative_guidance.recommended_layer_count}")
-        print(f"   Recommended contrast: {audio_profile.creative_guidance.recommended_contrast}")
-        print(f"   📄 Saved: {audio_profile_path}")
+            # Run both agents concurrently
+            audio_task = run_audio_profile(
+                song_bundle=bundle,
+                provider=provider,
+                llm_logger=llm_logger,
+                model=model,
+                temperature=0.3,
+            )
+
+            lyrics_task = run_lyrics_async(
+                song_bundle=bundle,
+                provider=provider,
+                llm_logger=llm_logger,
+                model=model,
+                temperature=0.5,
+            )
+
+            audio_profile, lyric_context = await asyncio.gather(audio_task, lyrics_task)
+
+            # Save both outputs
+            audio_profile_path = save_artifact(
+                audio_profile.model_dump(),
+                song_name,
+                "audio_profile.json",
+                output_dir,
+            )
+
+            lyric_context_path = save_artifact(
+                lyric_context.model_dump(),
+                song_name,
+                "lyric_context.json",
+                output_dir,
+            )
+
+            print("\n✅ Both agents complete")
+            print("   AudioProfile:")
+            print(f"     - Macro energy: {audio_profile.energy_profile.macro_energy}")
+            print(
+                f"     - Recommended layers: {audio_profile.creative_guidance.recommended_layer_count}"
+            )
+            print(
+                f"     - Recommended contrast: {audio_profile.creative_guidance.recommended_contrast}"
+            )
+            print(f"     - 📄 Saved: {audio_profile_path}")
+            print("   Lyrics Context:")
+            print(f"     - Has narrative: {lyric_context.has_narrative}")
+            print(f"     - Themes: {', '.join(lyric_context.themes[:3])}")
+            print(f"     - Key phrases: {len(lyric_context.key_phrases)}")
+            print(f"     - 📄 Saved: {lyric_context_path}")
+        else:
+            print("🤖 Running AudioProfile agent only (no lyrics available)...")
+
+            audio_profile = await run_audio_profile(
+                song_bundle=bundle,
+                provider=provider,
+                llm_logger=llm_logger,
+                model=model,
+                temperature=0.3,
+            )
+
+            lyric_context = None
+
+            # Save audio profile
+            audio_profile_path = save_artifact(
+                audio_profile.model_dump(),
+                song_name,
+                "audio_profile.json",
+                output_dir,
+            )
+
+            print("\n✅ Audio profile complete")
+            print(f"   Macro energy: {audio_profile.energy_profile.macro_energy}")
+            print(
+                f"   Recommended layers: {audio_profile.creative_guidance.recommended_layer_count}"
+            )
+            print(
+                f"   Recommended contrast: {audio_profile.creative_guidance.recommended_contrast}"
+            )
+            print(f"   📄 Saved: {audio_profile_path}")
 
     except Exception as e:
-        print(f"❌ Audio profile failed: {e}")
+        print(f"❌ Phase 1 agents failed: {e}")
         import traceback
 
         traceback.print_exc()
@@ -232,6 +300,20 @@ async def main() -> None:
         for group in display_groups:
             print(f"   - {group['role_key']}: {group['model_count']} models")
 
+        # Create planning context
+        planning_context = PlanningContext(
+            audio_profile=audio_profile,
+            lyric_context=lyric_context,
+            display_groups=display_groups,
+        )
+
+        print("\n📋 Planning context created:")
+        print("   - Audio profile: ✅")
+        print(
+            f"   - Lyric context: {'✅' if planning_context.has_lyrics else '⏭️  (not available)'}"
+        )
+        print(f"   - Display groups: {len(planning_context.display_groups)}")
+
         # Create orchestrator
         orchestrator = MacroPlannerOrchestrator(
             provider=provider,
@@ -243,10 +325,12 @@ async def main() -> None:
         print(
             f"\n🤖 Running MacroPlanner (max {orchestrator.controller.config.max_iterations} iterations)..."
         )
-        result = await orchestrator.run(
-            audio_profile=audio_profile,
-            display_groups=display_groups,
-        )
+        if planning_context.has_lyrics:
+            print("   Context: Musical analysis + Narrative/thematic analysis")
+        else:
+            print("   Context: Musical analysis only")
+
+        result = await orchestrator.run(planning_context=planning_context)
 
         # Save macro plan (handle None case)
         if result.plan:

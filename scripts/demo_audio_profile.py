@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Demo script for AudioProfile agent.
+"""Demo script for AudioProfile and Lyrics agents.
 
-Runs the AudioProfile agent on real audio files with live audio analysis.
+Runs both AudioProfile and Lyrics agents in parallel on real audio files with live audio analysis.
 """
 
 import argparse
@@ -17,6 +17,11 @@ from twinklr.core.utils.formatting import clean_audio_filename
 # Add parent to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+from twinklr.core.agents.audio.lyrics import (
+    get_lyrics_spec,
+    run_lyrics_async,
+    validate_lyrics,
+)
 from twinklr.core.agents.audio.profile import (
     get_audio_profile_spec,
     run_audio_profile,
@@ -47,9 +52,9 @@ def print_subsection(title: str) -> None:
 
 
 async def main() -> None:
-    """Run AudioProfile agent demo."""
+    """Run AudioProfile and Lyrics agents demo."""
     # Parse arguments
-    parser = argparse.ArgumentParser(description="AudioProfile Agent Demo")
+    parser = argparse.ArgumentParser(description="AudioProfile & Lyrics Agents Demo")
     parser.add_argument(
         "audio_file",
         nargs="?",
@@ -61,9 +66,14 @@ async def main() -> None:
         action="store_true",
         help="Force reanalysis (skip cache)",
     )
+    parser.add_argument(
+        "--skip-lyrics",
+        action="store_true",
+        help="Skip lyrics agent (run audio profile only)",
+    )
     args = parser.parse_args()
 
-    print_section("AudioProfile Agent Demo", "=")
+    print_section("AudioProfile & Lyrics Agents Demo", "=")
 
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
@@ -147,17 +157,37 @@ async def main() -> None:
         sys.exit(1)
 
     # Setup agent
-    print_subsection("3. Setting Up Agent")
+    print_subsection("3. Setting Up Agents")
     try:
-        spec = get_audio_profile_spec(
+        audio_spec = get_audio_profile_spec(
             model=model,
             temperature=temperature,
         )
-        print("✅ Agent spec created")
-        print(f"   Agent: {spec.name}")
-        print(f"   Model: {spec.model}")
-        print(f"   Temperature: {spec.temperature}")
-        print(f"   Mode: {spec.mode.value}")
+        print("✅ AudioProfile spec created")
+        print(f"   Agent: {audio_spec.name}")
+        print(f"   Model: {audio_spec.model}")
+        print(f"   Temperature: {audio_spec.temperature}")
+        print(f"   Mode: {audio_spec.mode.value}")
+
+        # Check if lyrics are available
+        has_lyrics = bundle.lyrics is not None and bundle.lyrics.text is not None
+
+        if has_lyrics and not args.skip_lyrics:
+            lyrics_spec = get_lyrics_spec(
+                model=model,
+                temperature=0.5,  # Higher temp for creative interpretation
+            )
+            print("\n✅ Lyrics spec created")
+            print(f"   Agent: {lyrics_spec.name}")
+            print(f"   Model: {lyrics_spec.model}")
+            print(f"   Temperature: {lyrics_spec.temperature}")
+            print(f"   Mode: {lyrics_spec.mode.value}")
+        else:
+            lyrics_spec = None
+            if args.skip_lyrics:
+                print("\n⏭️  Lyrics agent skipped (--skip-lyrics flag)")
+            else:
+                print("\n⏭️  Lyrics agent skipped (no lyrics in audio)")
 
         provider = OpenAIProvider(api_key=api_key)
 
@@ -171,51 +201,104 @@ async def main() -> None:
                     log_level=job_config.agent.llm_logging.log_level,
                     format=job_config.agent.llm_logging.format,
                 )
-                print("✅ Provider and logger ready (logging enabled)")
+                print("\n✅ Provider and logger ready (logging enabled)")
             else:
                 llm_logger = NullLLMCallLogger()
-                print("✅ Provider and logger ready (logging disabled)")
+                print("\n✅ Provider and logger ready (logging disabled)")
         else:
             llm_logger = NullLLMCallLogger()
-            print("✅ Provider and logger ready (logging disabled)")
+            print("\n✅ Provider and logger ready (logging disabled)")
     except Exception as e:
         print(f"❌ Agent setup failed: {e}")
         sys.exit(1)
 
-    # Run agent
-    print_subsection("4. Running AudioProfile Agent")
-    print("⏳ Calling LLM (this may take 10-30 seconds)...\n")
-    print(f"   Model: {model}")
-    print(f"   Temperature: {temperature}")
+    # Run agents
+    print_subsection("4. Running Agents")
 
-    try:
-        profile = await run_audio_profile(
-            song_bundle=bundle,
-            provider=provider,
-            llm_logger=llm_logger,
-            model=model,
-            temperature=temperature,
-        )
-        print("✅ Agent completed successfully!")
-    except Exception as e:
-        print(f"❌ Agent execution failed: {e}")
-        import traceback
+    if lyrics_spec is not None:
+        # Run both agents in parallel
+        print("⏳ Running AudioProfile and Lyrics agents in parallel...")
+        print("   (this may take 15-45 seconds for both agents)\n")
+        print(f"   AudioProfile Model: {model} (temp={temperature})")
+        print(f"   Lyrics Model: {model} (temp=0.5)")
 
-        traceback.print_exc()
-        sys.exit(1)
+        try:
+            # Run both agents concurrently
+            audio_task = run_audio_profile(
+                song_bundle=bundle,
+                provider=provider,
+                llm_logger=llm_logger,
+                model=model,
+                temperature=temperature,
+            )
+
+            lyrics_task = run_lyrics_async(
+                song_bundle=bundle,
+                provider=provider,
+                llm_logger=llm_logger,
+                model=model,
+                temperature=0.5,
+            )
+
+            profile, lyric_context = await asyncio.gather(audio_task, lyrics_task)
+
+            print("\n✅ Both agents completed successfully!")
+        except Exception as e:
+            print(f"\n❌ Agent execution failed: {e}")
+            import traceback
+
+            traceback.print_exc()
+            sys.exit(1)
+    else:
+        # Run audio profile only
+        print("⏳ Running AudioProfile agent only...")
+        print("   (this may take 10-30 seconds)\n")
+        print(f"   Model: {model} (temp={temperature})")
+
+        try:
+            profile = await run_audio_profile(
+                song_bundle=bundle,
+                provider=provider,
+                llm_logger=llm_logger,
+                model=model,
+                temperature=temperature,
+            )
+            lyric_context = None
+            print("\n✅ AudioProfile agent completed successfully!")
+        except Exception as e:
+            print(f"\n❌ Agent execution failed: {e}")
+            import traceback
+
+            traceback.print_exc()
+            sys.exit(1)
 
     # Validate output
-    print_subsection("5. Validating Output")
+    print_subsection("5. Validating Outputs")
+
+    # Validate AudioProfile
     try:
         errors = validate_audio_profile(profile)
         if errors:
-            print(f"⚠️  Validation found {len(errors)} issue(s):")
+            print(f"⚠️  AudioProfile validation found {len(errors)} issue(s):")
             for i, error in enumerate(errors, 1):
                 print(f"   {i}. {error}")
         else:
-            print("✅ All heuristic validation checks passed")
+            print("✅ AudioProfile: All heuristic validation checks passed")
     except Exception as e:
-        print(f"❌ Validation failed: {e}")
+        print(f"❌ AudioProfile validation failed: {e}")
+
+    # Validate Lyrics
+    if lyric_context is not None:
+        try:
+            issues = validate_lyrics(lyric_context, bundle)
+            if issues:
+                print(f"\n⚠️  Lyrics validation found {len(issues)} issue(s):")
+                for i, issue in enumerate(issues, 1):
+                    print(f"   {i}. [{issue.severity.value}] {issue.message}")
+            else:
+                print("\n✅ Lyrics: All heuristic validation checks passed")
+        except Exception as e:
+            print(f"\n❌ Lyrics validation failed: {e}")
 
     # Display results
     print_section("AudioProfile Results", "=")
@@ -284,20 +367,90 @@ async def main() -> None:
     if profile.planner_hints.emphasize_groups:
         print(f"\n  Emphasize Groups: {', '.join(profile.planner_hints.emphasize_groups)}")
 
+    # Display Lyrics Results (if available)
+    if lyric_context is not None:
+        print_section("Lyrics Context Results", "=")
+
+        print_subsection("Thematic Analysis")
+        print(f"  Has Lyrics: {'Yes' if lyric_context.has_lyrics else 'No'}")
+        if lyric_context.themes:
+            print(f"  Themes: {', '.join(lyric_context.themes)}")
+        print(f"  Mood Arc: {lyric_context.mood_arc}")
+        if lyric_context.genre_markers:
+            print(f"  Genre Markers: {', '.join(lyric_context.genre_markers)}")
+
+        print_subsection("Narrative Analysis")
+        print(f"  Has Narrative: {'Yes' if lyric_context.has_narrative else 'No'}")
+        if lyric_context.characters:
+            print(f"  Characters: {', '.join(lyric_context.characters)}")
+        if lyric_context.story_beats:
+            print(f"  Story Beats: {len(lyric_context.story_beats)}")
+            print("\n  Story Beat Breakdown:")
+            for i, beat in enumerate(lyric_context.story_beats, 1):
+                start_s = beat.timestamp_range[0] / 1000
+                end_s = beat.timestamp_range[1] / 1000
+                print(
+                    f"    {i}. [{beat.beat_type}] {beat.section_id} ({start_s:.1f}s - {end_s:.1f}s)"
+                )
+                print(f"       {beat.description}")
+                print(f"       💡 {beat.visual_opportunity}")
+
+        print_subsection("Visual Hooks")
+        print(f"  Key Phrases: {len(lyric_context.key_phrases)}")
+        if lyric_context.key_phrases:
+            print("\n  Key Phrases Breakdown:")
+            for i, phrase in enumerate(lyric_context.key_phrases[:10], 1):  # Show first 10
+                time_s = phrase.timestamp_ms / 1000
+                print(f'    {i}. "{phrase.text}" @ {time_s:.1f}s [{phrase.emphasis}]')
+                print(f"       {phrase.section_id}")
+                print(f"       💡 {phrase.visual_hint}")
+
+        if lyric_context.recommended_visual_themes:
+            print("\n  Recommended Visual Themes:")
+            for i, theme in enumerate(lyric_context.recommended_visual_themes, 1):
+                print(f"    {i}. {theme}")
+
+        print_subsection("Density & Coverage")
+        print(f"  Lyric Density: {lyric_context.lyric_density}")
+        print(f"  Vocal Coverage: {lyric_context.vocal_coverage_pct * 100:.1f}%")
+        if lyric_context.silent_sections:
+            print(f"  Silent Sections: {len(lyric_context.silent_sections)}")
+            print("\n  Silent Section Breakdown:")
+            for i, section in enumerate(lyric_context.silent_sections, 1):
+                start_s = section.start_ms / 1000
+                end_s = section.end_ms / 1000
+                duration_s = section.duration_ms / 1000
+                section_label = f" ({section.section_id})" if section.section_id else ""
+                print(f"    {i}. {start_s:.1f}s - {end_s:.1f}s ({duration_s:.1f}s){section_label}")
+
     # Save to file
-    print_section("Saving Output", "=")
-    output_path = Path(f"artifacts/audio_profile/{clean_file_name}.json")
-    output_path.parent.mkdir(parents=True, exist_ok=True)
+    print_section("Saving Outputs", "=")
+
+    # Save AudioProfile
+    audio_output_path = Path(f"artifacts/audio_profile/{clean_file_name}.json")
+    audio_output_path.parent.mkdir(parents=True, exist_ok=True)
 
     try:
-        output_path.write_text(profile.model_dump_json(indent=2))
-        print(f"✅ Output saved to: {output_path}")
-        print(f"   Size: {output_path.stat().st_size:,} bytes")
+        audio_output_path.write_text(profile.model_dump_json(indent=2))
+        print(f"✅ AudioProfile saved to: {audio_output_path}")
+        print(f"   Size: {audio_output_path.stat().st_size:,} bytes")
     except Exception as e:
-        print(f"⚠️  Failed to save output: {e}")
+        print(f"⚠️  Failed to save AudioProfile: {e}")
+
+    # Save Lyrics
+    if lyric_context is not None:
+        lyrics_output_path = Path(f"artifacts/lyrics/{clean_file_name}.json")
+        lyrics_output_path.parent.mkdir(parents=True, exist_ok=True)
+
+        try:
+            lyrics_output_path.write_text(lyric_context.model_dump_json(indent=2))
+            print(f"\n✅ Lyrics context saved to: {lyrics_output_path}")
+            print(f"   Size: {lyrics_output_path.stat().st_size:,} bytes")
+        except Exception as e:
+            print(f"\n⚠️  Failed to save Lyrics context: {e}")
 
     print_section("Demo Complete", "=")
-    print("✅ AudioProfile agent demo completed successfully!\n")
+    print("✅ Agent demo completed successfully!\n")
 
 
 if __name__ == "__main__":

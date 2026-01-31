@@ -1,6 +1,5 @@
 """Unit tests for section detection Pydantic models."""
 
-
 from pydantic import ValidationError
 import pytest
 

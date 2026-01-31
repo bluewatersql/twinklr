@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import datetime as dt
 import logging
 from datetime import datetime
 from pathlib import Path
@@ -65,7 +66,7 @@ def validate_plan_structure(
         valid=heuristic_result.valid,
         errors=heuristic_result.errors,
         warnings=heuristic_result.warnings,
-        timestamp=datetime.now().isoformat(),
+        timestamp=datetime.now(dt.UTC).isoformat(),
     )
 
     if result.valid:

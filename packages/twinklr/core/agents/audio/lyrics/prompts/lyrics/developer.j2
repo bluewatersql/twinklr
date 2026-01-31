@@ -1,0 +1,170 @@
+## Output Schema
+
+You must respond with valid JSON matching this exact schema:
+
+{{ response_schema }}
+
+## Field-Level Constraints
+
+### Core Analysis
+- **has_lyrics**: boolean - whether lyrics were available
+- **themes**: 2-5 items when has_lyrics=true
+- **mood_arc**: descriptive string (10+ chars)
+- **genre_markers**: 0-5 items indicating genre/context
+
+### Narrative Analysis (Optional)
+- **has_narrative**: Set to true only if song has clear storytelling
+- **characters**: null OR list of 1+ character names/types
+- **story_beats**: null OR list of 2-5 narrative moments
+  - Each beat MUST have all fields populated
+  - `timestamp_range`: (start_ms, end_ms) within song duration
+  - `beat_type`: Must be one of: "setup", "conflict", "climax", "resolution", "coda"
+  - `description`: 10+ characters, song-specific
+  - `visual_opportunity`: 10+ characters, actionable choreography hint
+
+### Visual Hooks ⚠️ CRITICAL: SONG-SPECIFIC ONLY ⚠️
+- **key_phrases**: 5-10 items (REQUIRED when has_lyrics=true)
+  - Each phrase MUST have:
+    - `text`: Exact verbatim lyric from song (1+ chars)
+    - `timestamp_ms`: Within song duration
+    - `section_id`: Matching a provided section
+    - `visual_hint`: **Specific actionable choreography tied to these words** (5+ chars)
+    - `emphasis`: Must be "LOW", "MED", or "HIGH"
+  
+  **Visual hint quality bar:**
+  - ✅ GOOD: "Sharp white flash on hard 'K' in 'ROCK' + mega tree starburst"
+  - ✅ GOOD: "Cascade white from roof to ground on word 'SNOW', left-to-right"
+  - ✅ GOOD: "'Silent night' whisper - dim to 20% amber, slow fade, hold 2s"
+  - ❌ BAD: "Bright lights" (too generic, no connection to words)
+  - ❌ BAD: "Flash effect" (not specific, could apply to any lyric)
+  - ❌ BAD: "Follow the beat" (ignores the actual words)
+  
+  **Test:** Would this hint ONLY make sense for these specific words? If not, REWRITE.
+
+- **recommended_visual_themes**: 3-5 items (REQUIRED when has_lyrics=true)
+  - Each theme should tie to actual lyric content
+  - Examples:
+    - ✅ "Warm amber nostalgia (verse_2 'memories of years gone by')"
+    - ✅ "Sharp red/white Santa palette (chorus mentions 'red suit')"
+    - ❌ "Bright festive colors" (too generic)
+    - ❌ "Follow the mood" (not actionable)
+
+### Density & Coverage
+- **lyric_density**: Must be "SPARSE", "MED", or "DENSE"
+  - Guidelines:
+    - SPARSE: Long instrumental passages, minimal vocals
+    - MED: Typical balance of vocals and music
+    - DENSE: Rapid-fire lyrics, minimal gaps
+- **vocal_coverage_pct**: 0.0-1.0 (from quality metrics)
+- **silent_sections**: List of instrumental breaks > 5 seconds
+  - Each section: `start_ms`, `end_ms`, `duration_ms` (must match: duration_ms = end_ms - start_ms)
+  - `section_id`: optional, should match provided structure
+
+## Logical Dependencies
+
+**Critical:** These dependencies MUST be respected:
+
+**If has_lyrics = false:**
+- Then themes SHOULD be empty or minimal
+- Then key_phrases MUST be empty
+- Then recommended_visual_themes SHOULD be empty or minimal
+- Then has_narrative MUST be false
+
+**If has_narrative = true:**
+- Then story_beats MUST NOT be null or empty (2-5 beats required)
+- Then characters SHOULD NOT be null or empty (populate with personas/types if no explicit names)
+
+**If has_lyrics = true:**
+- Then themes SHOULD have 2-5 items (not empty)
+- Then key_phrases MUST have 5-10 items
+- Then recommended_visual_themes SHOULD have 3-5 items
+
+## Timestamp Validation
+
+**All timestamps must be within song duration:**
+- `key_phrases[].timestamp_ms` ≤ duration_ms
+- `story_beats[].timestamp_range[1]` ≤ duration_ms
+- `silent_sections[].end_ms` ≤ duration_ms
+
+**Story beats must not overlap:**
+- Sort beats by start time
+- Ensure beat[i].end_ms ≤ beat[i+1].start_ms
+
+**Silent sections should not overlap:**
+- If multiple silent sections, ensure they're sequential
+
+## Output Format Requirements
+
+**Critical - Read Carefully:**
+
+1. Respond with **valid JSON only**
+2. **No additional text** before or after JSON
+3. **All required fields** must be present
+4. Use **null** for optional fields when not applicable
+5. **Double-check field types** match schema exactly
+6. Ensure **all lists** have correct item types and lengths
+7. Verify **all timestamps** are in milliseconds
+8. Verify **all enum values** match allowed strings exactly
+9. **DO NOT generate `provenance` field** - this is injected by the framework with actual runtime values
+10. **DO NOT generate `run_id` field** - this is provided externally
+
+## Warnings Guidance
+
+Use the `warnings` field sparingly for **actionable concerns** only:
+
+**DO warn about:**
+- Critical lyric quality issues (coverage < 30%, low confidence)
+- Timestamp misalignment or corruption
+- Missing key data that prevents thorough analysis
+- Ambiguous lyrics that require interpretation
+
+**DO NOT warn about:**
+- Normal lyric density variations
+- Typical instrumental sections
+- Standard song structures
+- Minor formatting inconsistencies
+
+**Example of appropriate warning:**
+```json
+{"severity": "WARN", "code": "LOW_COVERAGE", "message": "Lyric coverage only 25% - many visual opportunities may be missed", ...}
+```
+
+## Edge Cases
+
+**No lyrics available:**
+- Set has_lyrics = false
+- Set vocal_coverage_pct = 0.0
+- Return minimal model with all optional fields null/empty
+
+**Instrumental-heavy song:**
+- Set lyric_density = "SPARSE"
+- Populate silent_sections with all instrumental breaks > 5s
+- Focus key_phrases on the few vocal moments that exist
+
+**No clear narrative:**
+- Set has_narrative = false
+- Set story_beats = null
+- Set characters = null
+- Still extract themes and key phrases for thematic content
+
+**Very short song (<60s):**
+- May have fewer key phrases (minimum 5 still required if lyrics present)
+- May have only 1-2 story beats if narrative present
+- Adjust expectations for density analysis
+
+## UNIQUENESS REQUIREMENT
+
+**Every field must be song-specific.** Generic advice fails the user.
+
+**Before finalizing, ask for EACH key phrase:**
+1. "Does my visual_hint cite these specific words?"
+2. "Would this hint work for different lyrics?"
+3. "What makes THIS phrase special?"
+
+**If any answer is "no specific words", "yes generic", or "nothing special" - REWRITE.**
+
+Ground every recommendation in:
+- Actual words from THIS song's lyrics
+- Precise word/phrase timestamps
+- Unique narrative or thematic elements
+- Visual opportunities tied to specific lyric content

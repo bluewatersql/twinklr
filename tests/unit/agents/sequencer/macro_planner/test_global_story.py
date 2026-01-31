@@ -61,6 +61,7 @@ def test_theme_too_short():
 
     assert "theme" in str(exc_info.value).lower()
 
+
 def test_pacing_notes_too_short():
     """Pacing notes < 20 characters rejected."""
     with pytest.raises(ValidationError) as exc_info:

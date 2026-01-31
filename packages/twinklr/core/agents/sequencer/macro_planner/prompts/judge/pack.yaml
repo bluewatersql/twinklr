@@ -28,3 +28,6 @@ variables:
   - name: response_schema
     description: JSON schema for JudgeVerdict (auto-injected)
     required: true
+  - name: lyric_context
+    description: Optional LyricContextModel with narrative/thematic analysis
+    required: false

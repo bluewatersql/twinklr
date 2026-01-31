@@ -1,5 +1,6 @@
 """MacroPlanner agent for strategic choreography planning."""
 
+from twinklr.core.agents.sequencer.macro_planner.context import PlanningContext
 from twinklr.core.agents.sequencer.macro_planner.heuristics import (
     MacroPlanHeuristicValidator,
 )
@@ -22,6 +23,8 @@ from twinklr.core.agents.sequencer.macro_planner.specs import (
 )
 
 __all__ = [
+    # Context
+    "PlanningContext",
     # Models
     "GlobalStory",
     "LayerSpec",

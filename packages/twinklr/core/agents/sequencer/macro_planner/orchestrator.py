@@ -10,9 +10,9 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from twinklr.core.agents.audio.profile.models import AudioProfileModel
 from twinklr.core.agents.logging import LLMCallLogger, NullLLMCallLogger
 from twinklr.core.agents.providers.base import LLMProvider
+from twinklr.core.agents.sequencer.macro_planner.context import PlanningContext
 from twinklr.core.agents.sequencer.macro_planner.heuristics import (
     MacroPlanHeuristicValidator,
 )
@@ -108,8 +108,7 @@ class MacroPlannerOrchestrator:
 
     async def run(
         self,
-        audio_profile: AudioProfileModel,
-        display_groups: list[dict[str, Any]],
+        planning_context: PlanningContext,
     ) -> IterationResult[MacroPlan]:
         """Run MacroPlanner with iterative refinement.
 
@@ -121,8 +120,10 @@ class MacroPlannerOrchestrator:
         5. Return final plan or best attempt
 
         Args:
-            audio_profile: Complete audio analysis and creative guidance
-            display_groups: Available display groups with role keys
+            planning_context: Complete planning context containing:
+                - audio_profile: Musical analysis and creative guidance
+                - lyric_context: Narrative and thematic analysis (optional)
+                - display_groups: Available display groups with role keys
 
         Returns:
             IterationResult containing the final MacroPlan and metadata
@@ -130,22 +131,32 @@ class MacroPlannerOrchestrator:
         Raises:
             ValueError: If inputs are invalid
         """
+        audio_profile = planning_context.audio_profile
+
         if not audio_profile.structure.sections:
             raise ValueError("AudioProfile must have at least one section")
 
-        if not display_groups:
+        if not planning_context.display_groups:
             raise ValueError("At least one display group must be provided")
 
         logger.info(
             f"Starting MacroPlanner orchestration: "
             f"{audio_profile.song_identity.title} by {audio_profile.song_identity.artist}"
         )
+        if planning_context.has_lyrics:
+            logger.info("  ✅ Lyric context available (narrative + thematic analysis)")
+        else:
+            logger.info("  ⏭️  No lyric context (musical analysis only)")
 
         # Prepare initial variables for planner
         initial_variables = {
             "audio_profile": audio_profile,
-            "display_groups": display_groups,
+            "display_groups": planning_context.display_groups,
         }
+
+        # Add lyric context if available
+        if planning_context.lyric_context:
+            initial_variables["lyric_context"] = planning_context.lyric_context
 
         # Define validator function (converts heuristic validator to callable)
         def validator(plan: MacroPlan) -> list[str]:
