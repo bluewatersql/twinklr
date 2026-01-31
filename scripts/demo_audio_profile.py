@@ -28,7 +28,7 @@ from twinklr.core.config.loader import load_app_config, load_job_config
 def print_section(title: str, char: str = "=") -> None:
     """Print a section header."""
     print(f"\n{char * 80}")
-    print(f"{title:^80}")
+    print(f"{title}")
     print(f"{char * 80}\n")
 
 

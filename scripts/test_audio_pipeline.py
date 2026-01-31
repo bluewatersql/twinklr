@@ -329,9 +329,11 @@ async def run_analysis(args: argparse.Namespace) -> dict[str, Any]:
             print(f"  Phrases: {len(bundle.lyrics.phrases)} phrases")
             if bundle.lyrics.quality:
                 print("  Quality:")
-                print(f"    Coverage: {bundle.lyrics.quality.coverage:.2%}")
-                print(f"    Gap Ratio: {bundle.lyrics.quality.gap_ratio:.2%}")
-                print(f"    Avg Word Duration: {bundle.lyrics.quality.avg_word_duration_ms:.0f}ms")
+                print(f"    Coverage: {bundle.lyrics.quality.coverage_pct:.2%}")
+                print(f"    Monotonicity Violations: {bundle.lyrics.quality.monotonicity_violations}")
+                print(f"    Overlap Violations: {bundle.lyrics.quality.overlap_violations}")
+                if bundle.lyrics.quality.avg_word_duration_ms:
+                    print(f"    Avg Word Duration: {bundle.lyrics.quality.avg_word_duration_ms:.0f}ms")
 
             # Show first few words
             if bundle.lyrics.words:

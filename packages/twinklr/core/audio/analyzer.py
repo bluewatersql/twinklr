@@ -396,11 +396,27 @@ class AudioAnalyzer:
                 min_coverage_pct=self.app_config.audio_processing.enhancements.lyrics_min_coverage,
             )
 
+            # Initialize WhisperX service if enabled
+            whisperx_service = None
+            if self.app_config.audio_processing.enhancements.enable_whisperx:
+                try:
+                    from twinklr.core.audio.lyrics.whisperx_service import WhisperXImpl
+
+                    whisperx_service = WhisperXImpl()
+                    logger.debug("WhisperX service initialized")
+                except ImportError as e:
+                    logger.warning(
+                        f"WhisperX enabled but not installed: {e}. "
+                        "Install with: uv sync --extra ml"
+                    )
+
             # Create and run async pipeline
             logger.debug(
                 f"Creating lyrics pipeline with {len(providers)} providers: {list(providers.keys())}"
             )
-            pipeline = LyricsPipeline(config=pipeline_config, providers=providers)
+            pipeline = LyricsPipeline(
+                config=pipeline_config, providers=providers, whisperx_service=whisperx_service
+            )
 
             # Extract artist/title from metadata
             artist = None

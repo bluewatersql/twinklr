@@ -46,8 +46,10 @@ No section data available.
 **{{ section.section_id }}**:
 - **Mean energy:** {{ section.mean_energy | round(2) }}
 - **Peak energy:** {{ section.peak_energy | round(2) }}
-- **Energy curve:** {{ section.energy_curve | length }} points preserving intra-section shape
-  - Range: {{ section.energy_curve[0].energy | round(2) }} → {{ section.energy_curve[-1].energy | round(2) }}
+- **Energy curve (t_ms → energy):**
+{%- for point in section.energy_curve %}
+  - {{ point.t_ms }}ms: {{ point.energy | round(3) }}
+{%- endfor %}
 {% if section.characteristics %}
 - **Characteristics:** {{ section.characteristics | join(', ') }}
 {% endif %}

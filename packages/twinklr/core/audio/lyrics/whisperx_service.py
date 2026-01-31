@@ -242,6 +242,12 @@ class WhisperXImpl(WhisperXService):
             FileNotFoundError: If audio file not found
             RuntimeError: If transcription fails
         """
+        # Suppress torchaudio FFmpeg warnings BEFORE importing whisperx
+        # (WhisperX uses librosa/soundfile for audio, not FFmpeg)
+        import logging as stdlib_logging
+
+        stdlib_logging.getLogger("torio._extension.utils").setLevel(stdlib_logging.ERROR)
+
         try:
             import whisperx  # type: ignore
         except ImportError as e:
@@ -259,35 +265,78 @@ class WhisperXImpl(WhisperXService):
         # Transcribe
         result = model.transcribe(audio, batch_size=config.batch_size, language=config.language)
 
-        # Extract text and words
+        # Extract text and language
+        detected_language = result.get("language", config.language or "en")
+        segments = result.get("segments", [])
+        
+        logger.debug(f"WhisperX transcribe: {len(segments)} segments returned")
+        
+        # Collect all text
         text_parts: list[str] = []
-        words: list[LyricWord] = []
-
-        for segment in result.get("segments", []):
+        for segment in segments:
             text_parts.append(segment.get("text", ""))
-            for word_dict in segment.get("words", []):
-                word_text = word_dict.get("word", "").strip()
-                start_s = word_dict.get("start", 0.0)
-                end_s = word_dict.get("end", 0.0)
+        
+        full_text = " ".join(text_parts).strip()
+        
+        # If we got text, align it to get word-level timing
+        words: list[LyricWord] = []
+        if full_text:
+            try:
+                logger.debug(f"WhisperX: aligning {len(full_text)} chars for word-level timing")
+                
+                # Load align model for detected language
+                align_model, metadata = whisperx.load_align_model(
+                    language_code=detected_language, device=config.device
+                )
+                
+                # Align to get word-level timing
+                align_result = whisperx.align(
+                    result["segments"],
+                    align_model,
+                    metadata,
+                    audio,
+                    config.device,
+                    return_char_alignments=False,
+                )
+                
+                # Extract words from aligned segments
+                for segment in align_result.get("segments", []):
+                    for word_dict in segment.get("words", []):
+                        word_text = word_dict.get("word", "").strip()
+                        start_s = word_dict.get("start", 0.0)
+                        end_s = word_dict.get("end", 0.0)
 
-                if word_text:
-                    words.append(
-                        LyricWord(
-                            text=word_text,
-                            start_ms=int(start_s * 1000),
-                            end_ms=int(end_s * 1000),
+                        if word_text:
+                            words.append(
+                                LyricWord(
+                                    text=word_text,
+                                    start_ms=int(start_s * 1000),
+                                    end_ms=int(end_s * 1000),
+                                )
+                            )
+                
+                logger.debug(f"WhisperX align: extracted {len(words)} words")
+            except Exception as e:
+                logger.warning(f"WhisperX align failed: {e}, returning text without word timing")
+                # Fall back to segment-level timing if align fails
+                for segment in segments:
+                    # Create a single "word" for the whole segment
+                    segment_text = segment.get("text", "").strip()
+                    if segment_text:
+                        words.append(
+                            LyricWord(
+                                text=segment_text,
+                                start_ms=int(segment.get("start", 0.0) * 1000),
+                                end_ms=int(segment.get("end", 0.0) * 1000),
+                            )
                         )
-                    )
-
-        text = " ".join(text_parts)
-        detected_language = result.get("language", config.language or "unknown")
 
         logger.debug(
             f"WhisperX transcribe complete: {len(words)} words, language={detected_language}"
         )
 
         return WhisperXTranscribeResult(
-            text=text,
+            text=full_text,
             words=words,
             metadata={
                 "model": config.model,

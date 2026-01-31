@@ -179,7 +179,7 @@ class TestMultiFeatureDetection:
 
         assert "sections" in result
         assert "meta" in result
-        assert "improvements" in result["meta"]
+        assert "method" in result["meta"]  # Changed from "improvements"
 
     def test_backward_compatible_without_context(
         self,

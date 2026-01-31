@@ -92,39 +92,82 @@ def detect_song_sections(
             "meta": {"k": 1, "hop_struct": hop_length, "min_section_s": min_section_s},
         }
 
-    hop_struct = hop_length * 4
-
-    # IMPROVEMENT 1: Multi-Feature Fusion
-    features = _extract_multi_features(y, sr, hop_struct, chroma_cqt)
-
-    # IMPROVEMENT 2: Hybrid Segmentation (Baseline + Novelty Detection)
-    # This is more robust than pure Laplacian while still being data-driven
+    # NEW: Foote novelty-based segmentation (replaces clustering)
     try:
-        # Step 1: Create intelligent baseline using recurrence-based detection
-        boundary_frames = _hybrid_segmentation(
-            features, n_frames=features.shape[1], duration_s=duration
+        # Step 1: Extract beat grid
+        tempo_val, beat_frames = librosa.beat.beat_track(y=y, sr=sr, units='frames')
+        beat_times_np = librosa.frames_to_time(beat_frames, sr=sr, hop_length=512)
+        num_beats = len(beat_times_np)
+        
+        # Handle too few beats
+        if num_beats < 8:
+            num_beats = max(8, int(duration * 2.0))  # 120 BPM fallback
+            beat_times_np = np.linspace(0, duration, num_beats)
+            tempo_val = 120.0
+        
+        tempo_bpm = float(tempo_val) if isinstance(tempo_val, (np.ndarray, np.number)) else tempo_val
+        
+        # Step 2: Extract beat-sync MFCC + chroma
+        S = np.abs(librosa.stft(y, n_fft=2048, hop_length=512))
+        mfcc = librosa.feature.mfcc(S=librosa.power_to_db(S**2), sr=sr, n_mfcc=13)
+        
+        if chroma_cqt is not None and chroma_cqt.shape[1] > 0:
+            chroma = chroma_cqt
+        else:
+            chroma = librosa.feature.chroma_stft(S=S, sr=sr)
+        
+        # Beat-sync features
+        beat_frames_list = beat_frames.tolist()  # Convert to list for type checker
+        mfcc_sync = librosa.util.sync(mfcc, beat_frames_list, aggregate=np.mean)[:, :num_beats]
+        chroma_sync = librosa.util.sync(chroma, beat_frames_list, aggregate=np.mean)[:, :num_beats]
+        
+        # Step 3: Compute SSM
+        X = np.vstack([mfcc_sync, chroma_sync])
+        norms = np.linalg.norm(X, axis=0, keepdims=True)
+        norms = np.where(norms < 1e-10, 1.0, norms)
+        X_norm = X / norms
+        
+        with np.errstate(invalid='ignore', divide='ignore', over='ignore'):
+            ssm = X_norm.T @ X_norm
+        ssm = np.nan_to_num(ssm, nan=0.0, posinf=1.0, neginf=-1.0)
+        ssm = np.clip(ssm, -1.0, 1.0)
+        
+        # Step 4: Compute Foote novelty
+        L = 12  # Kernel half-size
+        novelty = np.zeros(num_beats)
+        kernel = np.zeros((2*L, 2*L))
+        kernel[:L, :L] = 1
+        kernel[L:, L:] = 1
+        kernel[:L, L:] = -1
+        kernel[L:, :L] = -1
+        
+        for t in range(L, num_beats - L):
+            patch = ssm[t-L:t+L, t-L:t+L]
+            novelty[t] = np.sum(patch * kernel)
+        
+        if novelty.max() > novelty.min():
+            novelty = (novelty - novelty.min()) / (novelty.max() - novelty.min())
+        
+        # Step 5: Peak-pick boundaries
+        min_len_beats = max(8, int(min_section_s * tempo_bpm / 60.0))
+        boundaries = librosa.util.peak_pick(
+            novelty,
+            pre_max=10, post_max=10,
+            pre_avg=10, post_avg=10,
+            delta=0.05,
+            wait=min_len_beats
         )
-        boundary_times = frames_to_time(boundary_frames, sr=sr, hop_length=hop_struct)
-
-        # Ensure start/end
-        times: list[float] = [0.0]
-        for t in boundary_times.tolist():
-            tf = float(t)
-            if tf > times[-1] + 1e-3 and tf < duration - 1e-3:
-                times.append(tf)
-        times.append(duration)
-
-        # Step 2: AGGRESSIVE novelty-based refinement
-        # This finds data-driven boundaries that the baseline might have missed
-        frame_times = frames_to_time(np.arange(features.shape[1]), sr=sr, hop_length=hop_struct)
-        additional_boundaries = _detect_novelty_boundaries(
-            features,
-            frame_times,
-            np.array(times),
-            threshold_percentile=75,  # More aggressive (was 85)
-        )
-        times = sorted(set(list(times) + list(additional_boundaries)))
-
+        
+        # Convert to times
+        boundary_beats = sorted(set([0] + boundaries.tolist() + [num_beats - 1]))
+        times = [float(beat_times_np[b]) for b in boundary_beats]
+        
+        # Ensure start and end
+        if times[0] > 0.1:
+            times = [0.0] + times
+        if times[-1] < duration - 0.1:
+            times.append(duration)
+        
         # Merge short sections
         cleaned = merge_short_sections(times, min_section_s, duration)
 
@@ -132,30 +175,33 @@ def detect_song_sections(
         if bars_s:
             cleaned = _align_boundaries_to_bars(cleaned, bars_s, tolerance_s=2.0)
 
-        # Compute section features
+        # Compute section features using beat-sync MFCC
         centroids: list[np.ndarray] = []
         section_energies: list[float] = []
 
         # Compute RMS for energy ranking if not provided
-        rms_energy: np.ndarray
         if rms_for_energy is None:
-            rms_energy = librosa.feature.rms(y=y, hop_length=hop_struct)[0].astype(np.float32)
+            rms_energy = librosa.feature.rms(y=y, hop_length=512)[0].astype(np.float32)
         else:
             rms_energy = rms_for_energy
-        rms_times = frames_to_time(np.arange(len(rms_energy)), sr=sr, hop_length=hop_struct)
+        rms_times = librosa.frames_to_time(np.arange(len(rms_energy)), sr=sr, hop_length=512)
 
-        # Use MFCC for centroids (first 13 features)
-        mfcc = features[:13, :]
-
+        # Build centroids from beat-sync MFCC
         for i in range(len(cleaned) - 1):
             s, e = cleaned[i], cleaned[i + 1]
 
-            # MFCC centroid
-            s_idx = int(np.searchsorted(frame_times, s))
-            e_idx = int(np.searchsorted(frame_times, e))
-            e_idx = max(e_idx, s_idx + 1)
-            sec = mfcc[:, s_idx:e_idx]
-            centroids.append(np.mean(sec, axis=1))
+            # Find beat range for this section
+            start_beat = int(np.searchsorted(beat_times_np, s))
+            end_beat = int(np.searchsorted(beat_times_np, e))
+            end_beat = max(end_beat, start_beat + 1)
+            end_beat = min(end_beat, num_beats)
+            
+            # MFCC centroid from beat-sync features
+            if end_beat > start_beat:
+                sec = mfcc_sync[:, start_beat:end_beat]
+                centroids.append(np.mean(sec, axis=1))
+            else:
+                centroids.append(mfcc_sync[:, start_beat])
 
             # Section energy
             rs_idx = int(np.searchsorted(rms_times, s))
@@ -172,7 +218,9 @@ def detect_song_sections(
                     sim_mat[i, j] = cosine_similarity(centroids[i], centroids[j])
 
         # Repetition analysis
-        repeat_thresh = 0.88
+        # FIXED: Use higher threshold to avoid marking everything as repeated
+        # when all sections are acoustically similar (e.g., repetitive songs)
+        repeat_thresh = 0.95  # Increased from 0.88
         repeat_counts = (sim_mat >= repeat_thresh).sum(axis=1).astype(int)
         max_sim = sim_mat.max(axis=1) if n > 0 else np.array([])
 
@@ -222,36 +270,32 @@ def detect_song_sections(
             )
             section["label"] = label
 
-        # IMPROVEMENT 6: Subsection Detection
-        sections = _detect_subsections(sections, mfcc, frame_times, similarity_threshold=0.75)
+        # Skip subsection detection for now (was using frame-level features)
+        # sections = _detect_subsections(sections, mfcc_sync, beat_times_np, similarity_threshold=0.75)
 
         return {
             "sections": sections,
             "boundary_times_s": [float(x) for x in cleaned],
             "meta": {
-                "method": "hybrid_segmentation",
-                "hop_struct": hop_struct,
+                "method": "foote_novelty",
+                "tempo_bpm": tempo_bpm,
+                "num_beats": num_beats,
                 "min_section_s": float(min_section_s),
                 "repeat_thresh": repeat_thresh,
-                "improvements": [
-                    "multi_feature_fusion",
-                    "hybrid_segmentation",
-                    "beat_alignment",
-                    "aggressive_novelty_detection",
-                    "context_aware_labeling",
-                    "subsection_detection",
-                ],
             },
         }
 
     except Exception as e:
-        logger.warning(f"Section detection failed: {e}")
+        logger.warning(f"Section detection failed: {e}", exc_info=True)
         return {
             "sections": [],
             "boundary_times_s": [0.0, duration],
-            "meta": {"method": "hybrid_segmentation", "hop_struct": hop_struct, "error": str(e)},
+            "meta": {"method": "foote_novelty", "error": str(e)},
         }
 
+
+# OBSOLETE: The following functions are no longer used after migration to Foote novelty
+# Kept temporarily in case of unexpected issues, will be removed in cleanup
 
 def _extract_multi_features(
     y: np.ndarray, sr: int, hop_length: int, chroma_cqt: np.ndarray | None = None
@@ -611,6 +655,12 @@ def label_section_contextual(
     section_duration = end_s - start_s
     total_sections = len(sections)
 
+    # Calculate relative repeat count (percentile among all sections)
+    all_repeat_counts = [s["repeat_count"] for s in sections]
+    repeat_rank = sum(1 for r in all_repeat_counts if r < repeat_count) / max(
+        len(all_repeat_counts), 1
+    )
+
     # PASS 1: Position-based overrides (most confident labels)
 
     # Intro: First section with distinctly low energy
@@ -681,34 +731,37 @@ def label_section_contextual(
     if has_drop and vocal_coverage < 0.3 and energy_rank < 0.4:
         return "breakdown"
 
-    # Chorus detection: High repetition + (high energy OR high similarity)
-    # Chorus is typically the most energetic AND most repeated section
-    if repeat_count >= 3 and (energy_rank > 0.70 or max_similarity > 0.85):
+    # Chorus detection: High RELATIVE repetition + high energy
+    # Use repeat_rank (percentile) instead of absolute repeat_count
+    # to handle songs where all sections are similar
+    if repeat_rank > 0.70 and energy_rank > 0.65:
         return "chorus"
-    if repeat_count >= 2 and energy_rank > 0.85:
+    if repeat_rank > 0.65 and energy_rank > 0.75:
         return "chorus"
-    if repeat_count >= 2 and has_drop:
+    if repeat_rank > 0.35 and energy_rank > 0.88:
+        return "chorus"  # Very high energy sections (top 12%)
+    if repeat_rank > 0.70 and has_drop:
         return "chorus"
-    if repeat_count >= 2 and max_similarity > 0.90 and energy_rank > 0.60:
+    if repeat_rank > 0.65 and max_similarity > 0.95 and energy_rank > 0.50:
         return "chorus"
-    if repeat_count >= 2 and vocal_coverage > 0.7 and energy_rank > 0.70:
+    if repeat_rank > 0.60 and vocal_coverage > 0.7 and energy_rank > 0.65:
         return "chorus"  # Vocal chorus
 
     # Bridge: late in song, low repetition, often different harmony
-    if relative_pos > 0.55 and repeat_count <= 1 and max_similarity < 0.75:
+    if relative_pos > 0.55 and repeat_rank < 0.30 and max_similarity < 0.75:
         return "bridge"
     if (
-        repeat_count == 0
+        repeat_rank < 0.20
         and relative_pos > 0.45
         and chord_changes > 0
         and unique_chords > chord_changes * 0.6
     ):
         return "bridge"  # More diverse harmony
 
-    # Verse: Moderate repetition with lower-to-mid energy
-    if repeat_count >= 2 and energy_rank <= 0.65 and vocal_coverage > 0.6:
+    # Verse: Lower relative repetition with lower-to-mid energy
+    if repeat_rank >= 0.35 and repeat_rank < 0.65 and energy_rank <= 0.60:
         return "verse"
-    if repeat_count >= 2 and energy_rank <= 0.65:
+    if repeat_rank >= 0.30 and repeat_rank < 0.60 and energy_rank <= 0.50:
         return "verse"
 
     # Instrumental/solo (low vocal, moderate-high energy)

@@ -156,9 +156,9 @@ class TestDetectSongSections:
             hop_length=hop_length,
         )
 
-        # Hybrid segmentation uses method field
+        # Now using Foote novelty method
         assert "method" in result["meta"]
-        assert result["meta"]["method"] == "hybrid_segmentation"
+        assert result["meta"]["method"] == "foote_novelty"
 
     def test_custom_min_section_duration(
         self,

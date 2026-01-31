@@ -279,7 +279,7 @@ test-audio-all: ## Test full audio pipeline with all enhancements (usage: make t
 		exit 1; \
 	fi
 	@echo "$(BLUE)→ Testing full audio pipeline: $(FILE)$(NC)"
-	uv run python scripts/test_audio_pipeline.py "$(FILE)" --enable-all
+	uv run python scripts/test_audio_pipeline.py "$(FILE)" --enable-all --no-cache
 
 shell: ## Open Python shell with project imports
 	@echo "$(BLUE)→ Opening Python shell...$(NC)"
