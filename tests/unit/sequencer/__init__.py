@@ -1,1 +1,1 @@
-"""Sequencer tests."""
+"""Tests for template system."""

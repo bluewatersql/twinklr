@@ -1,0 +1,198 @@
+## Technical Constraints
+
+- **Schema Version:** group-plan.v2
+- **Score Range:** 0.0 - 10.0 (float)
+- **Confidence Range:** 0.0 - 1.0 (float)
+- **Max Layers:** Varies by context (typically 3-6)
+- **Time Reference:** Must use bar numbers (MARKER type), not milliseconds
+
+## Validation Rules
+
+**Section Coverage:**
+- All audio profile sections must be present in plan.section_plans
+- Each section must have at least one SectionGroupPlan
+- Bar ranges must not have gaps or overlaps
+- Sections must be sorted by bar range start
+
+**Layer Structure:**
+- Layer indices in GroupPlan must match MacroPlan's layering_plan.layers
+- Each layer can have 0-N placements (templates)
+- Layer indices must be unique within a section
+
+**Template Validity:**
+- All template_ids must exist in available_templates list
+- Template types should match layer roles:
+  - BASE → SECTION_BACKGROUND
+  - RHYTHM → PATTERN_LOOP
+  - ACCENT/HIGHLIGHT → ACCENT or SECTION_FEATURE
+  - FILL/TEXTURE → PATTERN_LOOP or abstract templates
+
+**Time References:**
+- placement.start and placement.end must use TimeRef with ref_type=MARKER
+- marker_type should be "bar"
+- Bar numbers must be within song structure bar range
+- Snap rules should support musical alignment (DOWNBEAT, BEAT, BAR)
+
+**Asset Requests:**
+- request_id must be unique
+- kind must be valid (image_png, image_gif, texture)
+- use_case should be descriptive (matrix_texture, sprite, gobo)
+- style_tags and content_tags should be clear for Asset Creation Agent
+
+## Enum Values for Reference
+
+{% if taxonomy %}
+- **TimeRefType:** {{ taxonomy.TimeRefType | join(', ') }}
+- **SnapMode:** {{ taxonomy.SnapMode | join(', ') }}
+- **QuantizeMode:** {{ taxonomy.QuantizeMode | join(', ') }}
+- **BlendMode:** {{ taxonomy.BlendMode | join(', ') }}
+- **LayerRole:** {{ taxonomy.LayerRole | join(', ') }}
+- **GroupTemplateType:** {{ taxonomy.GroupTemplateType | join(', ') }}
+- **GroupVisualIntent:** {{ taxonomy.GroupVisualIntent | join(', ') }}
+{% else %}
+{# Fallback if taxonomy not provided #}
+- **TimeRefType:** MARKER, ABSOLUTE
+- **SnapMode:** NONE, NEAREST, FLOOR, CEIL
+- **QuantizeMode:** NONE, BEATS, DOWNBEATS, BARS, PHRASES
+- **BlendMode:** NORMAL, ADD, MASK
+- **LayerRole:** BASE, RHYTHM, ACCENT, HIGHLIGHT, FILL, TEXTURE, CUSTOM
+- **GroupTemplateType:** SECTION_BACKGROUND, SECTION_FEATURE, PATTERN_LOOP, ACCENT, TRANSITION
+- **GroupVisualIntent:** ABSTRACT, PATTERN, ICON, SCENE
+{% endif %}
+
+## Score Breakdown Dimensions
+
+Use these standardized dimensions for score_breakdown:
+- **strategic_alignment**: MacroPlan guidance implementation (0-10)
+- **template_selection**: Appropriateness of template choices (0-10)
+- **layer_coordination**: Layer composition and balance (0-10)
+- **musical_sync**: Timing and song structure alignment (0-10)
+- **variety_coherence**: Template variety while maintaining story (0-10)
+- **asset_validity**: Asset request quality (0-10, N/A if no assets)
+
+## Issue Categories
+
+{% if taxonomy and taxonomy.IssueCategory %}
+**CRITICAL: Use ONLY these exact category strings:**
+{% for category in taxonomy.IssueCategory -%}
+- **{{ category }}**
+{% endfor -%}
+{% else %}
+**CRITICAL: Use ONLY these exact category strings** (from IssueCategory enum):
+- **SCHEMA**: Schema validation or structure issues
+- **TIMING**: Timing, bar range, or alignment issues  
+- **COVERAGE**: Missing sections or gaps in coverage
+- **TEMPLATES**: Template selection or availability issues
+- **LAYERING**: Layer composition or coordination issues
+- **SPATIAL**: Spatial coordination or pattern issues
+- **VARIETY**: Lack of variety or repetition issues
+- **MUSICALITY**: Music synchronization or energy matching issues
+- **COMPLEXITY**: Over/under-complexity issues
+- **STYLE**: Style consistency or coherence issues
+- **DATA_QUALITY**: Input data quality or completeness issues
+- **LOGIC**: Logical consistency or contradiction issues
+- **CONSTRAINT**: Constraint violation issues
+{% endif %}
+
+**Mapping guidance:**
+- "Wrong template for layer" → TEMPLATES
+- "Template not in catalog" → TEMPLATES
+- "Timing uses milliseconds" → TIMING
+- "Missing section" → COVERAGE
+- "Layer index mismatch" → LAYERING
+- "Energy doesn't match MacroPlan" → MUSICALITY
+- "No variety in templates" → VARIETY
+- "Template type mismatch" → STYLE
+
+## Issue Severities
+
+{% if taxonomy and taxonomy.IssueSeverity %}
+Use these exact severity strings:
+{% for severity in taxonomy.IssueSeverity -%}
+- **{{ severity }}**
+{% endfor -%}
+{% else %}
+Use these exact severity strings (from IssueSeverity enum):
+- **ERROR**: Blocking technical issues (invalid template ID, missing sections, wrong time ref type)
+- **WARN**: Implementation concerns that should be addressed (wrong template type, energy mismatch)
+- **NIT**: Minor suggestions for improvement (could add more variety, consider different preset)
+{% endif %}
+
+## Feedback Guidelines
+
+1. **Be specific about locations**: Use placement_id, section names, layer indices
+2. **Reference MacroPlan guidance**: Tie feedback to strategic alignment
+3. **Suggest concrete actions**: "Replace pl_intro_base_1 template with gtpl_scene_cozy_village_bg" not "Use better templates"
+4. **Acknowledge Christmas light show context**: Bold, impactful, residential display design
+5. **Track iteration progress**: Note improvements if this is iteration 2+
+
+## Common Issues to Check
+
+**Technical (HARD_FAIL if present):**
+- Template IDs not in available_templates catalog
+- Time references using milliseconds instead of bar numbers
+- Missing sections from audio profile
+- Layer indices not matching MacroPlan
+- Invalid enum values
+
+**Implementation (SOFT_FAIL if significant):**
+- BASE layer using ACCENT templates (should use SECTION_BACKGROUND)
+- RHYTHM layer using SECTION_FEATURE templates (should use PATTERN_LOOP)
+- Section energy mismatch (MacroPlan says HIGH, plan uses LOW energy templates)
+- Choreography style mismatch (MacroPlan says IMAGERY, plan uses only ABSTRACT)
+- Motion density mismatch (MacroPlan says BUSY, plan has sparse placements)
+- All sections using same template (lacks variety)
+- No layer coordination (single layer doing everything)
+
+**Polish (NIT if present):**
+- Could use more template variety
+- Asset requests could be more specific
+- Spatial intent could enhance coordination
+- Intensity could be adjusted for emphasis
+
+## Iteration Context
+
+{% if iteration > 1 %}
+This is **iteration {{ iteration }}**. Check if previous feedback was addressed. Give credit for improvements and focus on remaining issues.
+{% else %}
+This is the **first iteration**. Provide comprehensive feedback to guide refinement.
+{% endif %}
+
+## Strategic Alignment Checklist
+
+For each section, verify:
+- [ ] Energy target matches (LOW/MED/HIGH/BUILD/RELEASE/PEAK)
+- [ ] Motion density aligns (SPARSE/MED/BUSY)
+- [ ] Choreography style honored (IMAGERY/ABSTRACT/HYBRID)
+- [ ] Primary focus targets considered (if specified in MacroPlan)
+- [ ] Section notes guidance followed
+
+For overall plan, verify:
+- [ ] Global story theme reflected in template selection
+- [ ] Color story considered (if specified)
+- [ ] Layer architecture followed (correct layer roles)
+- [ ] Timing drivers respected (BEATS, DOWNBEATS, etc.)
+
+## Template-Layer Matching Guide
+
+**Correct Matches:**
+- BASE + SECTION_BACKGROUND → ✅ (scenes, washes)
+- RHYTHM + PATTERN_LOOP → ✅ (twinkle, ornaments)
+- ACCENT + ACCENT → ✅ (star bursts, quick highlights)
+- HIGHLIGHT + SECTION_FEATURE → ✅ (Santa, snowman, hero moments)
+
+**Incorrect Matches (flag as WARN):**
+- BASE + ACCENT → ❌ (accent templates too brief for foundation)
+- BASE + SECTION_FEATURE → ❌ (feature templates too specific for foundation)
+- RHYTHM + SECTION_BACKGROUND → ❌ (backgrounds too static for rhythm)
+- ACCENT + SECTION_BACKGROUND → ❌ (backgrounds too long for accents)
+
+## Response Format Notes
+
+- **overall_score**: Float 0-10 (use 1 decimal place)
+- **confidence**: Float 0-1 (use 2 decimal places)
+- **verdict_status**: Exactly one of "APPROVE", "SOFT_FAIL", "HARD_FAIL"
+- **score_breakdown**: Dict with dimension names (strings) to scores (floats 0-10)
+- **issues**: List of Issue objects (id, category, severity, location, message, fix_hint, acceptance_test)
+- **strengths**: List of strings (2-5 specific strengths)
+- **feedback_to_planner**: String (constructive, specific, actionable)

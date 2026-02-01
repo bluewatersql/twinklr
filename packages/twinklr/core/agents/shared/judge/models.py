@@ -79,9 +79,7 @@ class JudgeVerdict(BaseModel):
     )
 
     # Narrative feedback
-    overall_assessment: str = Field(
-        description="Overall assessment summary (2-4 sentences)"
-    )
+    overall_assessment: str = Field(description="Overall assessment summary (2-4 sentences)")
     feedback_for_planner: str = Field(
         description="Concise feedback for next iteration (2-4 sentences)"
     )

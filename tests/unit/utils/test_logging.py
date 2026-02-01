@@ -285,8 +285,8 @@ class TestGetLogger:
         logger = get_logger("test.context", request_id="req-123", user="user-456")
         assert isinstance(logger, logging.LoggerAdapter)
         assert logger.logger.name == "test.context"
-        assert logger.extra["request_id"] == "req-123"
-        assert logger.extra["user"] == "user-456"
+        assert logger.extra["request_id"] == "req-123"  # pyright: ignore[reportOptionalSubscript]
+        assert logger.extra["user"] == "user-456"  # pyright: ignore[reportOptionalSubscript]
 
     def test_logger_adapter_includes_context_in_structured_logs(self):
         """Test that LoggerAdapter context appears in structured logs."""

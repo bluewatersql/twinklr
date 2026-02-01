@@ -42,8 +42,6 @@ class IterationConfig(BaseModel):
         token_budget: Optional token budget (cumulative)
         max_feedback_entries: Max feedback entries to keep (1-50)
         include_feedback_in_prompt: Include feedback in planner prompt
-        enable_checkpoints: Save iteration checkpoints
-        checkpoint_dir: Directory for checkpoints
         approval_score_threshold: Min score for APPROVE (0-10)
         soft_fail_score_threshold: Min score for SOFT_FAIL (0-10)
     """
@@ -58,10 +56,6 @@ class IterationConfig(BaseModel):
     include_feedback_in_prompt: bool = Field(
         default=True, description="Include feedback in planner prompt"
     )
-
-    # Checkpoint management
-    enable_checkpoints: bool = Field(default=True, description="Save iteration checkpoints")
-    checkpoint_dir: Path | None = Field(default=None, description="Directory for checkpoints")
 
     # Quality thresholds
     approval_score_threshold: float = Field(
@@ -86,7 +80,6 @@ class IterationContext(BaseModel):
         verdicts: List of judge verdicts from all iterations
         revision_requests: List of revision requests from all iterations
         total_tokens_used: Cumulative token usage
-        checkpoints_saved: List of checkpoint paths saved
         termination_reason: Reason for termination (if terminated)
         final_verdict: Final judge verdict (if any)
     """
@@ -101,7 +94,6 @@ class IterationContext(BaseModel):
 
     # Tracking
     total_tokens_used: int = Field(ge=0, default=0)
-    checkpoints_saved: list[str] = Field(default_factory=list)
 
     # Termination
     termination_reason: str | None = Field(default=None)
@@ -188,13 +180,11 @@ class IterationResult(BaseModel, Generic[TPlan]):
 class StandardIterationController(Generic[TPlan]):
     """Standard implementation of iteration controller.
 
-    Manages judge-based refinement loop with feedback, validation,
-    and checkpoint support.
+    Manages judge-based refinement loop with feedback and validation.
 
     Attributes:
         config: Iteration configuration
         feedback: Feedback manager instance
-        checkpoints: Optional checkpoint manager
         logger: Logger instance
     """
 
@@ -202,18 +192,15 @@ class StandardIterationController(Generic[TPlan]):
         self,
         config: IterationConfig,
         feedback_manager: FeedbackManager,
-        checkpoint_manager: Any | None = None,
     ):
         """Initialize iteration controller.
 
         Args:
             config: Iteration configuration
             feedback_manager: Feedback manager instance
-            checkpoint_manager: Optional checkpoint manager
         """
         self.config = config
         self.feedback = feedback_manager
-        self.checkpoints = checkpoint_manager
         self.logger = logging.getLogger(__name__)
 
     async def run(
@@ -224,6 +211,7 @@ class StandardIterationController(Generic[TPlan]):
         validator: Callable[[TPlan], list[str]],
         provider: LLMProvider,
         llm_logger: LLMCallLogger,
+        prompt_base_path: Path | str = Path("packages/twinklr/core/agents"),
     ) -> IterationResult[TPlan]:
         """Run iteration loop until approval or termination.
 
@@ -234,6 +222,7 @@ class StandardIterationController(Generic[TPlan]):
             validator: Heuristic validator function (returns list of errors)
             provider: LLM provider
             llm_logger: LLM call logger
+            prompt_base_path: Base path for prompt packs (default: packages/twinklr/core/agents)
 
         Returns:
             IterationResult with final plan and metadata
@@ -241,7 +230,7 @@ class StandardIterationController(Generic[TPlan]):
         context = IterationContext()
         runner = AsyncAgentRunner(
             provider=provider,
-            prompt_base_path=Path("packages/twinklr/core/agents"),
+            prompt_base_path=Path(prompt_base_path),
             llm_logger=llm_logger,
         )
 
@@ -273,10 +262,6 @@ class StandardIterationController(Generic[TPlan]):
 
             plan = cast(TPlan, plan_result.data)
             assert plan is not None, "Planner succeeded but returned None data"
-
-            # Save RAW checkpoint
-            if self.checkpoints and self.config.enable_checkpoints:
-                await self._save_checkpoint(context, plan, "raw")
 
             # === VALIDATION STAGE ===
             context.update_state(IterationState.VALIDATING)
@@ -324,19 +309,11 @@ class StandardIterationController(Generic[TPlan]):
             assert isinstance(verdict, JudgeVerdict), "Judge succeeded but returned invalid data"
             context.add_verdict(verdict)
 
-            # Save EVALUATION checkpoint
-            if self.checkpoints and self.config.enable_checkpoints:
-                await self._save_checkpoint(context, verdict, "evaluation")
-
             # === DECISION STAGE ===
             if verdict.status == VerdictStatus.APPROVE:
                 context.update_state(IterationState.JUDGE_APPROVED)
                 context.update_state(IterationState.COMPLETE)
                 self.logger.debug(f"✅ Plan approved (score: {verdict.score:.1f})")
-
-                # Save FINAL checkpoint
-                if self.checkpoints and self.config.enable_checkpoints:
-                    await self._save_checkpoint(context, plan, "final")
 
                 return IterationResult(
                     success=True,
@@ -414,33 +391,16 @@ class StandardIterationController(Generic[TPlan]):
         variables.update(
             {
                 "plan": plan,
-                "macro_plan": plan,  # Alias for MacroPlanner judge template
                 "iteration": iteration,
             }
         )
+        
+        # Only alias macro_plan = plan for MacroPlanner judge
+        # For other judges, macro_plan should come from initial_vars if present
+        if "macro_plan" not in variables:
+            variables["macro_plan"] = plan  # Fallback for MacroPlanner judge
 
         return variables
-
-    async def _save_checkpoint(
-        self, context: IterationContext, data: Any, checkpoint_type: str
-    ) -> None:
-        """Save checkpoint if enabled.
-
-        Args:
-            context: Iteration context
-            data: Data to save
-            checkpoint_type: Type of checkpoint (raw, evaluation, final)
-        """
-        if not self.checkpoints or not self.config.enable_checkpoints:
-            return
-
-        checkpoint_path = await self.checkpoints.save(
-            data=data,
-            checkpoint_type=checkpoint_type,
-            iteration=context.current_iteration,
-        )
-        context.checkpoints_saved.append(str(checkpoint_path))
-        self.logger.debug(f"Checkpoint saved: {checkpoint_path}")
 
     def _handle_planner_failure(
         self, context: IterationContext, result: AgentResult

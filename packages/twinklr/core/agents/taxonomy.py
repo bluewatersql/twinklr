@@ -94,3 +94,109 @@ class TargetRole(str, Enum):
 
     # Moving lights
     MOVING_HEADS = "MOVING_HEADS"  # Moving head fixtures
+
+
+# GroupPlanner Template Enums
+
+
+class GroupTemplateType(str, Enum):
+    """Group plan template type."""
+
+    SECTION_BACKGROUND = "section_background"
+    SECTION_FEATURE = "section_feature"
+    TRANSITION = "transition"
+    ACCENT = "accent"
+    PATTERN_LOOP = "pattern_loop"
+
+
+class GroupVisualIntent(str, Enum):
+    """Visual intent for group templates."""
+
+    SCENE = "scene"
+    ICON = "icon"
+    PATTERN = "pattern"
+    TEXT = "text"
+    ABSTRACT = "abstract"
+
+
+class ProjectionIntent(str, Enum):
+    """Projection mapping intent (for trees/matrices)."""
+
+    FLAT = "proj_flat"
+    TREE_POLAR = "proj_tree_polar"
+    TREE_RADIAL_FOCUS = "proj_tree_radial_focus"
+    TREE_SPIRAL_BIAS = "proj_tree_spiral_bias"
+    TREE_BAND_SAFE = "proj_tree_band_safe"
+
+
+class WarpHint(str, Enum):
+    """Warp transformation hints."""
+
+    SKEW_LR = "warp_skew_lr"
+    SKEW_UD = "warp_skew_ud"
+    RADIAL_WARP_OK = "warp_radial_warp_ok"
+    CENTER_ANCHOR = "warp_center_anchor"
+
+
+class MotionVerb(str, Enum):
+    """Motion/animation verbs for templates."""
+
+    NONE = "none"
+    DRIFT = "drift"
+    FALL = "fall"
+    TWINKLE = "twinkle"
+    PULSE = "pulse"
+    WIPE = "wipe"
+    SWEEP = "sweep"
+    ROTATE = "rotate"
+    SPIRAL = "spiral"
+
+
+class ColorMode(str, Enum):
+    """Color palette mode."""
+
+    TRADITIONAL = "traditional"  # red/green/gold/white
+    WARM = "warm"
+    COOL = "cool"
+    LIMITED = "limited"
+    MONO = "mono"
+
+
+class AssetSlotType(str, Enum):
+    """Asset slot type in templates."""
+
+    BACKGROUND_PLATE = "background_plate"
+    ICON_CUTOUT = "icon_cutout"
+    PATTERN_TILE = "pattern_tile"
+    MASK = "mask"
+    TEXT_PLATE = "text_plate"
+
+
+# GroupPlanner Time & Placement Enums
+
+
+class TimeRefType(str, Enum):
+    """Type of time reference for placements."""
+
+    MARKER = "marker"  # Marker-based (bars, beats, phrases)
+    MILLISECONDS = "milliseconds"  # Absolute milliseconds
+
+
+class SnapMode(str, Enum):
+    """Snap behavior for time alignment."""
+
+    NONE = "none"  # No snapping
+    START = "start"  # Snap start to boundary
+    END = "end"  # Snap end to boundary
+    BOTH = "both"  # Snap both ends
+    STRETCH = "stretch"  # Stretch to fill boundaries
+
+
+class QuantizeMode(str, Enum):
+    """Quantization modes for time alignment."""
+
+    NONE = "none"
+    BARS = "bars"
+    BEATS = "beats"
+    EIGHTHS = "eighths"
+    SIXTEENTHS = "sixteenths"

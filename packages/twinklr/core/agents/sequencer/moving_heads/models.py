@@ -164,9 +164,7 @@ class JudgeResponse(BaseModel):
     feedback_for_planner: str = Field(
         description="Concise summary feedback for next iteration (2-4 sentences)"
     )
-    overall_assessment: str = Field(
-        description="Overall assessment summary (2-4 sentences)"
-    )
+    overall_assessment: str = Field(description="Overall assessment summary (2-4 sentences)")
     strengths: list[str] = Field(description="What the plan does well", default_factory=list)
     issues: list[Issue] = Field(description="Detailed issues to address", default_factory=list)
 

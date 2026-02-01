@@ -1,7 +1,5 @@
 """Unit tests for iteration controller models."""
 
-from pathlib import Path
-
 from pydantic import ValidationError
 import pytest
 
@@ -26,8 +24,6 @@ class TestIterationConfig:
         assert config.token_budget is None
         assert config.max_feedback_entries == 25
         assert config.include_feedback_in_prompt is True
-        assert config.enable_checkpoints is True
-        assert config.checkpoint_dir is None
         assert config.approval_score_threshold == 7.0
         assert config.soft_fail_score_threshold == 5.0
 
@@ -40,8 +36,6 @@ class TestIterationConfig:
             token_budget=100000,
             max_feedback_entries=10,
             include_feedback_in_prompt=False,
-            enable_checkpoints=False,
-            checkpoint_dir=Path("/tmp/checkpoints"),
             approval_score_threshold=8.0,
             soft_fail_score_threshold=6.0,
         )
@@ -50,8 +44,6 @@ class TestIterationConfig:
         assert config.token_budget == 100000
         assert config.max_feedback_entries == 10
         assert config.include_feedback_in_prompt is False
-        assert config.enable_checkpoints is False
-        assert config.checkpoint_dir == Path("/tmp/checkpoints")
         assert config.approval_score_threshold == 8.0
         assert config.soft_fail_score_threshold == 6.0
 
@@ -103,7 +95,6 @@ class TestIterationContext:
         assert context.verdicts == []
         assert context.revision_requests == []
         assert context.total_tokens_used == 0
-        assert context.checkpoints_saved == []
         assert context.termination_reason is None
         assert context.final_verdict is None
 

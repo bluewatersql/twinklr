@@ -91,7 +91,7 @@ async def run_lyrics_async(
         )
 
         # Run agent
-        logger.info(f"Running Lyrics agent with model={model}, temperature={temperature}")
+        logger.debug(f"Running Lyrics agent with model={model}, temperature={temperature}")
         result: AgentResult = await runner.run(
             spec=spec,
             variables=shaped_context,
@@ -123,7 +123,7 @@ async def run_lyrics_async(
             created_at=dt.datetime.now(dt.UTC).isoformat(),
         )
 
-        logger.info("Lyrics agent completed successfully")
+        logger.debug("Lyrics agent completed successfully")
         return lyric_context
 
     except ValueError as e:

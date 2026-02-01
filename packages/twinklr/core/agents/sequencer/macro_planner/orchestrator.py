@@ -8,7 +8,6 @@ StandardIterationController.
 from __future__ import annotations
 
 import logging
-from typing import Any
 
 from twinklr.core.agents.logging import LLMCallLogger, NullLLMCallLogger
 from twinklr.core.agents.providers.base import LLMProvider
@@ -39,7 +38,6 @@ class MacroPlannerOrchestrator:
     - Heuristic validation (fast, deterministic quality checks)
     - Judge-based evaluation (LLM-driven quality assessment)
     - Iterative refinement with feedback
-    - Optional checkpoint support
 
     Attributes:
         planner_spec: Planner agent specification
@@ -57,7 +55,6 @@ class MacroPlannerOrchestrator:
         planner_spec: AgentSpec | None = None,
         judge_spec: AgentSpec | None = None,
         heuristic_validator: MacroPlanHeuristicValidator | None = None,
-        checkpoint_manager: Any | None = None,
         max_iterations: int = 3,
         min_pass_score: float = 7.0,
         token_budget: int | None = None,
@@ -70,7 +67,6 @@ class MacroPlannerOrchestrator:
             planner_spec: Optional planner spec (uses default if None)
             judge_spec: Optional judge spec (uses default if None)
             heuristic_validator: Optional validator (creates default if None)
-            checkpoint_manager: Optional checkpoint manager for saving plans
             max_iterations: Maximum refinement iterations (default: 3)
             min_pass_score: Minimum score for approval (default: 7.0)
             token_budget: Optional token budget limit
@@ -86,8 +82,6 @@ class MacroPlannerOrchestrator:
         config = IterationConfig(
             max_iterations=max_iterations,
             approval_score_threshold=min_pass_score,
-            enable_checkpoints=(checkpoint_manager is not None),
-            checkpoint_dir=None,  # Checkpoint manager handles path
             token_budget=token_budget,
         )
 
@@ -98,10 +92,9 @@ class MacroPlannerOrchestrator:
         self.controller = StandardIterationController[MacroPlan](
             config=config,
             feedback_manager=feedback_manager,
-            checkpoint_manager=checkpoint_manager,
         )
 
-        logger.info(
+        logger.debug(
             f"MacroPlannerOrchestrator initialized "
             f"(max_iterations={max_iterations}, min_pass_score={min_pass_score})"
         )
@@ -139,14 +132,14 @@ class MacroPlannerOrchestrator:
         if not planning_context.display_groups:
             raise ValueError("At least one display group must be provided")
 
-        logger.info(
+        logger.debug(
             f"Starting MacroPlanner orchestration: "
             f"{audio_profile.song_identity.title} by {audio_profile.song_identity.artist}"
         )
         if planning_context.has_lyrics:
-            logger.info("  ✅ Lyric context available (narrative + thematic analysis)")
+            logger.debug("  ✅ Lyric context available (narrative + thematic analysis)")
         else:
-            logger.info("  ⏭️  No lyric context (musical analysis only)")
+            logger.debug("  ⏭️  No lyric context (musical analysis only)")
 
         # Prepare initial variables for planner
         initial_variables = {
@@ -182,7 +175,7 @@ class MacroPlannerOrchestrator:
         )
 
         if result.success:
-            logger.info(
+            logger.debug(
                 f"✅ MacroPlanner succeeded: {result.context.current_iteration} iterations, "
                 f"score {result.context.final_verdict.score:.1f}"
                 if result.context.final_verdict

@@ -1,0 +1,166 @@
+{#
+GroupJudge User Prompt
+Provides the GroupPlan to evaluate along with context
+#}
+# Song Information
+
+**Title:** {{ audio_profile.song_identity.title or "Untitled" }}
+**Artist:** {{ audio_profile.song_identity.artist or "Unknown" }}
+**Duration:** {{ (audio_profile.song_identity.duration_ms / 1000) | round(1) }}s
+**BPM:** {{ audio_profile.song_identity.bpm | round(1) }}
+**Energy:** {{ audio_profile.energy_profile.macro_energy.value }}
+
+{% if lyric_context is defined and lyric_context %}
+**Lyric Context Available:** Yes
+- **Themes:** {{ lyric_context.themes | join(", ") }}
+- **Mood Arc:** {{ lyric_context.mood_arc }}
+- **Has Narrative:** {{ "Yes" if lyric_context.has_narrative else "No" }}
+{% endif %}
+
+## Song Structure
+
+{% for section in audio_profile.structure.sections %}
+- **{{ section.name }}** ({{ section.section_id }}) - {{ (section.start_ms / 1000) | round(1) }}s to {{ (section.end_ms / 1000) | round(1) }}s
+{% endfor %}
+
+---
+
+# MacroPlan Strategic Guidance
+
+## Global Story
+
+**Theme:** {{ macro_plan.global_story.theme }}
+**Motifs:** {{ macro_plan.global_story.motifs | join(', ') }}
+**Color Story:** {{ macro_plan.global_story.color_story }}
+
+## Layering Plan ({{ macro_plan.layering_plan.layers | length }} layers)
+
+{% for layer in macro_plan.layering_plan.layers %}
+- **Layer {{ layer.layer_index }}** ({{ layer.layer_role }}, {{ layer.blend_mode }} blend)
+  - Usage: {{ layer.usage_notes }}
+  - Timing: {{ layer.timing_driver }}
+  - Intensity: {{ layer.intensity_bias }}
+{% endfor %}
+
+## Section Plans
+
+{% for section_plan in macro_plan.section_plans %}
+### {{ section_plan.section.name }} ({{ (section_plan.section.start_ms / 1000) | round(1) }}s - {{ (section_plan.section.end_ms / 1000) | round(1) }}s)
+
+- **Energy:** {{ section_plan.energy_target }}
+- **Motion:** {{ section_plan.motion_density }}
+- **Style:** {{ section_plan.choreography_style }}
+- **Notes:** {{ section_plan.notes }}
+
+{% endfor %}
+
+---
+
+# Display Group
+
+**Group ID:** {{ display_group.group_id }}
+**Name:** {{ display_group.name }}
+**Type:** {{ display_group.group_type }}
+
+---
+
+# Available Templates
+
+{% for template in available_templates %}
+## {{ template.name }}
+- **ID:** `{{ template.template_id }}`
+- **Type:** {{ template.template_type }}
+{% if template.tags %}- **Tags:** {{ template.tags | join(', ') }}{% endif %}
+
+{% endfor %}
+
+---
+
+# GroupPlan to Evaluate
+
+{% if iteration > 1 %}
+**Iteration {{ iteration }}** - Evaluating refined plan
+{% else %}
+**Iteration 1** - Initial plan evaluation
+{% endif %}
+
+**Plan ID:** {{ plan.plan_id }}
+**Group ID:** {{ plan.group_id }}
+**Schema Version:** {{ plan.schema_version }}
+
+## Section Plans ({{ plan.section_plans | length }} sections)
+
+{% for section_plan in plan.section_plans %}
+### {{ section_plan.section.name }} ({{ (section_plan.section.start_ms / 1000) | round(1) }}s - {{ (section_plan.section.end_ms / 1000) | round(1) }}s)
+
+**Layers:** {{ section_plan.layers | length }}
+
+{% for layer in section_plan.layers %}
+#### Layer {{ layer.layer_index }} ({{ layer.placements | length }} placement(s))
+
+{% for placement in layer.placements %}
+- **{{ placement.placement_id }}**
+  - Template: `{{ placement.template_id }}`
+  - Preset: `{{ placement.preset_id }}`
+  - Timing: Bar {{ placement.start.value }} to {{ placement.end.value }}
+  - Snap: {{ placement.snap.snap_mode }}, Quantize: {{ placement.snap.quantize }}
+  - Intensity: {{ placement.intensity }}
+  - Blend: {{ placement.blend_mode }}
+  {% if placement.spatial %}
+  - Spatial: {{ placement.spatial.pattern if placement.spatial.pattern else "None" }}{% if placement.spatial.direction %} ({{ placement.spatial.direction }}){% endif %}
+  {% endif %}
+  {% if placement.media %}
+  - Media: {{ placement.media.purpose }}{% if placement.media.asset_request_id %} (request: {{ placement.media.asset_request_id }}){% endif %}
+  {% endif %}
+{% endfor %}
+
+{% endfor %}
+
+{% endfor %}
+
+## Asset Requests ({{ plan.asset_requests | length }})
+
+{% if plan.asset_requests %}
+{% for request in plan.asset_requests %}
+- **{{ request.request_id }}** ({{ request.kind }})
+  - Use Case: {{ request.use_case }}
+  - Style Tags: {{ request.style_tags | join(', ') if request.style_tags else 'None' }}
+  - Content Tags: {{ request.content_tags | join(', ') if request.content_tags else 'None' }}
+  - Tiling: {{ "Yes" if request.tiling else "No" }}
+  - Fallback: {{ request.fallback_strategy }}
+{% endfor %}
+{% else %}
+No asset requests.
+{% endif %}
+
+## Compilation Hints
+
+- **Quantize Policy:** {{ plan.compilation_hints.quantize_policy }}
+- **Transition Policy:** {{ plan.compilation_hints.transition_policy }}
+- **Layering Policy:** {{ plan.compilation_hints.layering_policy }}
+- **Overlap Resolution:** {{ plan.compilation_hints.overlap_resolution }}
+
+{% if plan.warnings %}
+## Warnings from Planner
+
+{% for warning in plan.warnings %}
+- **[{{ warning.severity }}]** {{ warning.message }}
+{% endfor %}
+{% endif %}
+
+---
+
+# Your Task
+
+Evaluate this GroupPlan for the **{{ display_group.name }}** display group. Assess:
+
+1. **Technical Validity**: Section coverage, layer structure, template IDs, time references
+2. **Strategic Alignment**: Does it implement the MacroPlan guidance correctly?
+3. **Template Selection**: Are templates appropriate for layer roles and section energy?
+4. **Layer Coordination**: Do layers work together effectively?
+5. **Musical Synchronization**: Do placements align with song structure?
+6. **Asset Requests**: Are they necessary and well-specified?
+
+Provide a score (0-10), verdict status (APPROVE/SOFT_FAIL/HARD_FAIL), structured issues, and constructive feedback.
+
+**Remember**: This is a **Christmas light show** for residential displays. Bold, impactful designs win. The GroupPlan must correctly implement the MacroPlan's strategic vision.

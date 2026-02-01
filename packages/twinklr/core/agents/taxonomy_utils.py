@@ -28,12 +28,18 @@ def get_taxonomy_dict() -> dict[str, list[str]]:
         SuggestedAction,
     )
     from twinklr.core.agents.taxonomy import (
+        AssetSlotType,
         BlendMode,
         ChoreographyStyle,
         EnergyTarget,
+        GroupTemplateType,
+        GroupVisualIntent,
         LayerRole,
         MotionDensity,
+        QuantizeMode,
+        SnapMode,
         TargetRole,
+        TimeRefType,
         TimingDriver,
     )
 
@@ -48,6 +54,12 @@ def get_taxonomy_dict() -> dict[str, list[str]]:
         EnergyTarget,
         ChoreographyStyle,
         MotionDensity,
+        TimeRefType,
+        SnapMode,
+        QuantizeMode,
+        GroupTemplateType,
+        GroupVisualIntent,
+        AssetSlotType,
     ]
 
     # Extract issue taxonomy enums (for judge agents)

@@ -1,0 +1,139 @@
+{#
+GroupPlanner Developer Prompt
+Technical constraints, enum values, and validation rules
+#}
+## Technical Constraints
+
+**Schema Version:** group-plan.v2  
+**Max Layers:** {{ max_layers if max_layers is defined else 3 }} (configurable per context)  
+**Max Effects Per Section:** {{ max_effects_per_section if max_effects_per_section is defined else 8 }}  
+**Time Reference:** Use bar numbers (1-indexed), not milliseconds  
+**Quantize Policy:** BARS (default), DOWNBEATS, BEATS, or NONE
+
+## Enum Values (Use These Exactly)
+
+{% if taxonomy %}
+**TimeRefType:** {{ taxonomy.TimeRefType | join(', ') }}  
+**SnapMode:** {{ taxonomy.SnapMode | join(', ') }}  
+**QuantizeMode:** {{ taxonomy.QuantizeMode | join(', ') }}  
+**BlendMode:** {{ taxonomy.BlendMode | join(', ') }}  
+
+**LayerRole:** {{ taxonomy.LayerRole | join(', ') }}  
+**GroupTemplateType:** {{ taxonomy.GroupTemplateType | join(', ') }}  
+**GroupVisualIntent:** {{ taxonomy.GroupVisualIntent | join(', ') }}  
+**AssetSlotType:** {{ taxonomy.AssetSlotType | join(', ') }}
+{% else %}
+{# Fallback if taxonomy not provided #}
+**TimeRefType:** MARKER, ABSOLUTE  
+**SnapMode:** NONE, NEAREST, FLOOR, CEIL  
+**QuantizeMode:** NONE, BEATS, DOWNBEATS, BARS, PHRASES  
+**BlendMode:** NORMAL, ADD, MASK  
+
+**LayerRole:** BASE, RHYTHM, ACCENT, HIGHLIGHT, FILL, TEXTURE, CUSTOM  
+**GroupTemplateType:** SECTION_BACKGROUND, SECTION_FEATURE, PATTERN_LOOP, ACCENT, TRANSITION  
+**GroupVisualIntent:** ABSTRACT, PATTERN, ICON, SCENE  
+**AssetSlotType:** BACKGROUND_PLATE, ICON_CUTOUT, PATTERN_TILE, TEXTURE_MAP
+{% endif %}
+
+## Critical Validation Rules
+
+**Section Coverage:**
+- All song sections from audio profile must be covered
+- Section timing must use bar ranges (from section.bar_range)
+- No gaps or overlaps in section timing
+
+**Layer Structure:**
+- Layer indices must match MacroPlan's layering_plan
+- Each layer can have multiple placements (templates)
+- Placements within a layer can overlap (renderer resolves)
+
+**Template Placement:**
+- Each placement needs unique placement_id (e.g., "pl_intro_base_1")
+- Start/end times use TimeRef with bar numbers
+- Template_id MUST be from available_templates list
+- Preset_id should match template type (use "default" if unsure)
+- Intensity range: 0.0 - 1.5 (1.0 is normal, >1.0 emphasizes)
+
+**Time References:**
+- Use MARKER type with bar numbers (1-indexed)
+- marker_type should be "bar" for bar-based placement
+- Snap rules align to musical grid (DOWNBEAT, BEAT, BAR)
+
+**Asset Requests (Optional):**
+- Only request assets if templates truly need custom imagery
+- Keep count reasonable (<5 per group recommended)
+- Use clear style_tags and content_tags for Asset Creation Agent
+- request_id format: "req_<descriptor>" (e.g., "req_santa_cutout")
+
+## Template Selection Guidelines
+
+**Match template type to layer role:**
+- **BASE layer** → SECTION_BACKGROUND templates (scenes, washes)
+- **RHYTHM layer** → PATTERN_LOOP templates (twinkle, ornaments)
+- **ACCENT layer** → ACCENT or SECTION_FEATURE templates (bursts, icons)
+- **HIGHLIGHT layer** → SECTION_FEATURE templates (hero moments)
+- **FILL/TEXTURE** → PATTERN_LOOP templates (subtle overlays)
+
+**Match visual intent to choreography style:**
+- **IMAGERY style** → ICON or SCENE templates (Santa, snowman, village)
+- **ABSTRACT style** → ABSTRACT templates (washes, twinkle, sparkle)
+- **HYBRID style** → Mix of PATTERN and ICON templates
+
+**Match template timing to section:**
+- **Low energy** → Slow PATTERN_LOOP, gentle ABSTRACT
+- **High energy** → Fast PATTERN_LOOP, bold ACCENT
+- **Build/Release** → TRANSITION templates between sections
+- **Peak moments** → SECTION_FEATURE or ACCENT templates
+
+## Placement ID Naming Convention
+
+Use descriptive placement IDs for debugging:
+- Format: `pl_{section}_{layer}_{index}`
+- Examples: `pl_intro_base_1`, `pl_chorus_rhythm_2`, `pl_bridge_accent_1`
+
+## Spatial Intent (Advanced, Optional)
+
+SpatialIntent can specify choreography patterns:
+- **pattern:** "MIRROR", "SWEEP", "RIPPLE", "CENTER_OUT", etc.
+- **direction:** "L2R" (left to right), "R2L", "C2O" (center out), etc.
+- **roles:** Zone roles for spatial coordination (v1: leave empty)
+- **phase_offset:** Timing offset for pattern phase (0.0-1.0)
+
+## Compilation Hints
+
+CompilationHints guide the SequenceAssembler:
+- **quantize_policy:** BARS (align to bar boundaries), DOWNBEATS, BEATS, NONE
+- **transition_policy:** "crossfade" (smooth blend), "cut" (hard switch), "beat_snap"
+- **layering_policy:** "blend" (mix layers), "priority" (top layer wins)
+- **overlap_resolution:** "trim" (cut overlaps), "allow" (keep overlaps), "priority"
+
+Default settings are usually fine. Override only if MacroPlan specifies unique behavior.
+
+## Common Mistakes to Avoid
+
+1. **Inventing template IDs** - Only use IDs from available_templates list
+2. **Using milliseconds** - Always use bar numbers for time references
+3. **Missing section coverage** - Every audio section needs a SectionGroupPlan
+4. **Layer index mismatch** - Use the exact layer indices from MacroPlan
+5. **Over-requesting assets** - Only request custom imagery if truly needed (many templates work without assets)
+6. **Ignoring MacroPlan guidance** - Section energy, motion density, style must align
+7. **Concert language** - Use Christmas light show terminology (no "spot", "wash", "beam")
+
+## Response Checklist
+
+Before submitting your GroupPlan, verify:
+- [ ] All sections covered with SectionGroupPlan
+- [ ] All layer indices match MacroPlan
+- [ ] All template_ids are from available_templates
+- [ ] All time references use bar numbers (not milliseconds)
+- [ ] Asset requests (if any) have clear tags and purpose
+- [ ] Section energy/style aligns with MacroPlan
+- [ ] JSON is valid and matches schema
+
+## Iteration Context
+
+{% if iteration is defined and iteration > 1 %}
+This is **iteration {{ iteration }}**. Focus on addressing the judge's feedback while maintaining strategic alignment.
+{% else %}
+This is the **first iteration**. Create a complete, coherent GroupPlan that implements the MacroPlan strategy.
+{% endif %}

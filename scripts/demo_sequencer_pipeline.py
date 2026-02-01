@@ -25,12 +25,20 @@ from twinklr.core.agents.audio.lyrics import run_lyrics_async
 from twinklr.core.agents.audio.profile import run_audio_profile
 from twinklr.core.agents.logging import create_llm_logger
 from twinklr.core.agents.providers.openai import OpenAIProvider
+from twinklr.core.agents.sequencer.group_planner.orchestrator import (
+    GroupPlannerOrchestrator,
+)
 from twinklr.core.agents.sequencer.macro_planner import (
     MacroPlannerOrchestrator,
     PlanningContext,
 )
 from twinklr.core.audio.analyzer import AudioAnalyzer
 from twinklr.core.config.loader import load_app_config, load_job_config
+from twinklr.core.sequencer.templates.group_templates import (
+    bootstrap_traditional,  # noqa: F401 - Import to register templates
+)
+from twinklr.core.sequencer.templates.group_templates.library import list_templates
+from twinklr.core.sequencer.templates.models import template_ref_from_info
 from twinklr.core.utils.formatting import clean_audio_filename
 from twinklr.core.utils.logging import configure_logging
 
@@ -334,7 +342,7 @@ async def main() -> None:
 
         # Save macro plan (handle None case)
         if result.plan:
-            macro_plan_path = save_artifact(
+            _ = save_artifact(
                 result.plan.model_dump(),
                 song_name,
                 "macro_plan.json",
@@ -379,51 +387,96 @@ async def main() -> None:
             print(f"   Success: {result.success}")
             print(f"   Iterations: {result.context.current_iteration}")
             if result.context.final_verdict:
-                print(f"   Final score: {result.context.final_verdict.score:.1f}/10.0")
-                print(f"   Status: {result.context.final_verdict.status.value}")
-            print(f"   Total tokens: {result.context.total_tokens_used:,}")
-            print(f"   📄 Saved: {macro_plan_path}")
+                print(f"   Final score: {result.context.final_verdict.score:.1f}/10")
 
-            # Print plan summary
-            print_subsection("MacroPlan Summary")
-            plan = result.plan
-            print(f"Theme: {plan.global_story.theme}")
-            print(f"Motifs: {', '.join(plan.global_story.motifs)}")
-            print(f"Layers: {len(plan.layering_plan.layers)}")
-            for layer in plan.layering_plan.layers:
-                print(
-                    f"  - Layer {layer.layer_index} ({layer.layer_role.value}): {layer.usage_notes[:50]}..."
-                )
-            print(f"Sections: {len(plan.section_plans)}")
-            for section in plan.section_plans:
-                print(
-                    f"  - {section.section.name}: {section.energy_target.value} energy, {section.choreography_style.value}"
-                )
-            if len(plan.section_plans) > 3:
-                print(f"  ... and {len(plan.section_plans) - 3} more")
+            macro_plan = result.plan
+
         else:
-            print("\n❌ MacroPlanner failed to produce a plan")
-            print(f"   Termination: {result.context.termination_reason}")
-            sys.exit(1)
+            print("\n⚠️  MacroPlanner did not produce a plan")
+            macro_plan = None
 
     except Exception as e:
-        print(f"❌ MacroPlanner failed: {e}")
+        print(f"\n❌ Error running MacroPlanner: {e}")
         import traceback
 
         traceback.print_exc()
-        sys.exit(1)
+        macro_plan = None
+
+    # ========================================================================
+    # STAGE 4: GroupPlanner Agent
+    # ========================================================================
+    print_section("STAGE 4: GroupPlanner Agent", "=")
+
+    if macro_plan is None:
+        print("⏭️  Skipping GroupPlanner (no macro plan available)")
+        group_plan_set = None
+    else:
+        try:
+            # Get available templates from registry (Phase 2 integration)
+            template_infos = list_templates()
+            template_refs = [template_ref_from_info(info) for info in template_infos]
+            print(f"📚 Available templates: {len(template_refs)}")
+            for ref in template_refs[:5]:
+                print(f"   - {ref.template_id}: {ref.name} ({ref.template_type})")
+            if len(template_refs) > 5:
+                print(f"   ... and {len(template_refs) - 5} more")
+
+            # Create GroupPlanner orchestrator
+            group_orchestrator = GroupPlannerOrchestrator(
+                provider=provider,
+                max_iterations=job_config.agent.max_iterations if job_config else 3,
+                min_pass_score=7.0,
+                llm_logger=llm_logger,
+            )
+
+            print(f"\n🤖 Running GroupPlanner for {len(display_groups)} groups (sequential)...")
+
+            # Run for all groups (now using TemplateRef from Phase 2)
+            group_plan_set = await group_orchestrator.run_all_groups(
+                audio_profile=audio_profile,
+                lyric_context=lyric_context,
+                macro_plan=macro_plan,
+                display_groups=display_groups,
+                available_templates=None,  # Let orchestrator load from registry
+                max_layers=3,
+            )
+
+            # Save group plan set
+            _ = save_artifact(
+                group_plan_set.model_dump(),
+                song_name,
+                "group_plan_set.json",
+                output_dir,
+            )
+
+            print("\n✅ GroupPlanner complete")
+            print(f"   Groups planned: {len(group_plan_set.group_plans)}")
+            for plan in group_plan_set.group_plans:
+                print(f"   - {plan.group_id}: {len(plan.section_plans)} sections")
+
+        except Exception as e:
+            print(f"\n❌ Error running GroupPlanner: {e}")
+            import traceback
+
+            traceback.print_exc()
+            group_plan_set = None
 
     # ========================================================================
     # Summary
     # ========================================================================
     print_section("Pipeline Complete! 🎉", "=")
-    print("✅ Audio Analysis → Audio Profile → MacroPlanner")
+    print("✅ Audio Analysis → Audio Profile → Lyrics → MacroPlanner → GroupPlanner")
     print(f"\n📁 All artifacts saved to: {output_dir}")
+    print("\nCompleted stages:")
+    print("  1. Audio Analysis")
+    print("  2. Audio Profile Agent (musical analysis)")
+    print("  3. Lyrics Agent (narrative analysis)")
+    print("  4. MacroPlanner (strategic choreography)")
+    print("  5. GroupPlanner (per-group effect selection)")
     print("\nPending stages:")
-    print("  4. GroupPlanner (per display group)")
-    print("  5. Asset Generation (imagery/shaders)")
-    print("  6. Sequence Assembly (IR composition)")
-    print("  7. Rendering & Export (xLights .xsq)")
+    print("  6. Asset Generation (imagery/shaders)")
+    print("  7. Sequence Assembly (IR composition)")
+    print("  8. Rendering & Export (xLights .xsq)")
 
 
 if __name__ == "__main__":

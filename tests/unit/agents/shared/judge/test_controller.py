@@ -1,7 +1,6 @@
 """Unit tests for StandardIterationController."""
 
 import logging
-from pathlib import Path
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
@@ -29,8 +28,6 @@ def iteration_config():
         token_budget=None,
         max_feedback_entries=25,
         include_feedback_in_prompt=True,
-        enable_checkpoints=True,
-        checkpoint_dir=Path("/tmp/checkpoints"),
         approval_score_threshold=7.0,
         soft_fail_score_threshold=5.0,
     )
@@ -40,14 +37,6 @@ def iteration_config():
 def feedback_manager():
     """Create feedback manager."""
     return FeedbackManager(max_entries=25)
-
-
-@pytest.fixture
-def mock_checkpoint_manager():
-    """Create mock checkpoint manager."""
-    manager = Mock()
-    manager.save = AsyncMock(return_value=Path("/tmp/checkpoints/test.json"))
-    return manager
 
 
 @pytest.fixture
@@ -93,32 +82,16 @@ def mock_llm_logger():
 class TestStandardIterationControllerInit:
     """Tests for StandardIterationController initialization."""
 
-    def test_init_with_all_dependencies(
-        self, iteration_config, feedback_manager, mock_checkpoint_manager
-    ):
+    def test_init_with_all_dependencies(self, iteration_config, feedback_manager):
         """Test initialization with all dependencies."""
         controller: StandardIterationController[dict] = StandardIterationController(
             config=iteration_config,
             feedback_manager=feedback_manager,
-            checkpoint_manager=mock_checkpoint_manager,
         )
 
         assert controller.config == iteration_config
         assert controller.feedback == feedback_manager
-        assert controller.checkpoints == mock_checkpoint_manager
         assert isinstance(controller.logger, logging.Logger)
-
-    def test_init_without_checkpoint_manager(self, iteration_config, feedback_manager):
-        """Test initialization without checkpoint manager."""
-        controller: StandardIterationController[dict] = StandardIterationController(
-            config=iteration_config,
-            feedback_manager=feedback_manager,
-            checkpoint_manager=None,
-        )
-
-        assert controller.config == iteration_config
-        assert controller.feedback == feedback_manager
-        assert controller.checkpoints is None
 
     def test_init_stores_dependencies(self, iteration_config, feedback_manager):
         """Test that dependencies are stored correctly."""
@@ -207,60 +180,6 @@ class TestStandardIterationControllerSingleIterationSuccess:
         assert result.context.total_tokens_used == 800  # 500 + 300
         assert len(result.context.verdicts) == 1
         assert result.context.final_verdict == judge_verdict
-
-    @pytest.mark.asyncio
-    async def test_single_iteration_with_checkpoints(
-        self,
-        iteration_config,
-        feedback_manager,
-        mock_checkpoint_manager,
-        planner_spec,
-        judge_spec,
-        mock_provider,
-        mock_llm_logger,
-    ):
-        """Test that checkpoints are saved on success."""
-        controller: StandardIterationController[dict] = StandardIterationController(
-            config=iteration_config,
-            feedback_manager=feedback_manager,
-            checkpoint_manager=mock_checkpoint_manager,
-        )
-
-        test_plan = {"test": "plan"}
-        planner_result = AgentResult(
-            duration_seconds=0.1, success=True, data=test_plan, tokens_used=500
-        )
-
-        judge_verdict = JudgeVerdict(
-            status=VerdictStatus.APPROVE,
-            score=8.0,
-            confidence=0.9,
-            overall_assessment="Good",
-            feedback_for_planner="Good work",
-            iteration=0,
-        )
-        judge_result = AgentResult(
-            duration_seconds=0.1, success=True, data=judge_verdict, tokens_used=300
-        )
-
-        validator = Mock(return_value=[])
-
-        with patch("twinklr.core.agents.shared.judge.controller.AsyncAgentRunner") as MockRunner:
-            mock_runner = MockRunner.return_value
-            mock_runner.run = AsyncMock(side_effect=[planner_result, judge_result])
-
-            result = await controller.run(
-                planner_spec=planner_spec,
-                judge_spec=judge_spec,
-                initial_variables={},
-                validator=validator,
-                provider=mock_provider,
-                llm_logger=mock_llm_logger,
-            )
-
-        # Verify checkpoints were saved (RAW, EVALUATION, FINAL)
-        assert mock_checkpoint_manager.save.call_count == 3
-        assert len(result.context.checkpoints_saved) == 3
 
 
 class TestStandardIterationControllerMultiIterationRefinement:

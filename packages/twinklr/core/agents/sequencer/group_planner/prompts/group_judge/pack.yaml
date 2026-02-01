@@ -1,0 +1,39 @@
+pack_id: group_judge.v2
+version: 2.0.0
+agent_type: judge
+supports_iteration: true
+max_iterations: 3
+
+templates:
+  system: system.j2
+  user: user.j2
+  developer: developer.j2
+
+variables:
+  - name: audio_profile
+    description: Full AudioProfileModel for the song
+    required: true
+  - name: macro_plan
+    description: MacroPlan with strategic guidance
+    required: true
+  - name: display_group
+    description: DisplayGroupRef for this group
+    required: true
+  - name: available_templates
+    description: List of available template IDs from catalog
+    required: true
+  - name: plan
+    description: GroupPlan to evaluate
+    required: true
+  - name: iteration
+    description: Current iteration number (starts at 1)
+    required: true
+  - name: taxonomy
+    description: Dict of enum names to value lists (auto-injected)
+    required: true
+  - name: response_schema
+    description: JSON schema for JudgeVerdict (auto-injected)
+    required: true
+  - name: lyric_context
+    description: Optional LyricContextModel with narrative/thematic analysis
+    required: false
