@@ -1,6 +1,13 @@
-"""Agent specifications for GroupPlanner and Judge."""
+"""Agent specifications for GroupPlanner section-level coordination.
 
-from twinklr.core.agents.sequencer.group_planner.models import GroupPlan
+Defines specs for:
+- GroupPlanner: Generates SectionCoordinationPlan for each section
+- SectionJudge: Evaluates section plans for quality and coherence
+"""
+
+from __future__ import annotations
+
+from twinklr.core.agents.sequencer.group_planner.models import SectionCoordinationPlan
 from twinklr.core.agents.shared.judge.models import JudgeVerdict
 from twinklr.core.agents.spec import AgentMode, AgentSpec
 from twinklr.core.agents.taxonomy_utils import get_taxonomy_dict
@@ -11,57 +18,69 @@ def get_planner_spec(
     temperature: float = 0.7,
     token_budget: int | None = None,
 ) -> AgentSpec:
-    """Get agent spec for GroupPlanner agent.
+    """Get GroupPlanner agent specification.
+
+    The GroupPlanner is conversational and creative, generating section-level
+    coordination plans that define how display groups work together
+    for Christmas light shows.
 
     Args:
-        model: LLM model to use
-        temperature: Sampling temperature
-        token_budget: Optional token limit
+        model: LLM model to use (default: gpt-5.2 for creative coordination)
+        temperature: Sampling temperature (default: 0.7 for balanced creativity)
+        token_budget: Optional token budget
 
     Returns:
-        AgentSpec configured for GroupPlanner
+        GroupPlanner agent spec
     """
     return AgentSpec(
         name="group_planner",
-        prompt_pack="group_planner",
-        response_model=GroupPlan,
-        mode=AgentMode.CONVERSATIONAL,
+        prompt_pack="sequencer/group_planner/prompts/planner",
+        response_model=SectionCoordinationPlan,
+        mode=AgentMode.CONVERSATIONAL,  # Maintains context for refinement
         model=model,
         temperature=temperature,
-        max_schema_repair_attempts=2,
+        max_schema_repair_attempts=3,
         token_budget=token_budget,
         default_variables={"taxonomy": get_taxonomy_dict()},
     )
 
 
-def get_judge_spec(
-    model: str = "gpt-5.2",
+def get_section_judge_spec(
+    model: str = "gpt-5-mini",
     temperature: float = 0.3,
     token_budget: int | None = None,
 ) -> AgentSpec:
-    """Get agent spec for GroupPlanner judge.
+    """Get SectionJudge agent specification.
+
+    The SectionJudge is stateless and analytical, evaluating section plans for:
+    - Template appropriateness for section intent
+    - Coordination mode coherence
+    - Timing validity within section bounds
+    - Group coverage completeness
+
+    Uses lighter model (gpt-5-mini) since section-level evaluation is focused.
 
     Args:
-        model: LLM model to use
-        temperature: Sampling temperature
-        token_budget: Optional token limit
+        model: LLM model to use (default: gpt-5-mini for fast evaluation)
+        temperature: Sampling temperature (default: 0.3 for consistent judgment)
+        token_budget: Optional token budget
 
     Returns:
-        AgentSpec configured for judge
+        SectionJudge agent spec
     """
     return AgentSpec(
-        name="group_judge",
-        prompt_pack="group_judge",
+        name="section_judge",
+        prompt_pack="sequencer/group_planner/prompts/section_judge",
         response_model=JudgeVerdict,
-        mode=AgentMode.ONESHOT,
+        mode=AgentMode.ONESHOT,  # Stateless per-section evaluation
         model=model,
         temperature=temperature,
-        max_schema_repair_attempts=2,
+        max_schema_repair_attempts=5,  # Increased for enum validation
         token_budget=token_budget,
         default_variables={"taxonomy": get_taxonomy_dict()},
     )
 
 
-# Module-level spec constants for convenience
-GROUPPLANNER_SPEC = get_planner_spec()
-GROUP_JUDGE_SPEC = get_judge_spec()
+# Convenience constants for default specs
+GROUP_PLANNER_SPEC = get_planner_spec()
+SECTION_JUDGE_SPEC = get_section_judge_spec()

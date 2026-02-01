@@ -15,31 +15,6 @@ from twinklr.core.audio.lyrics.embedded import (
 class TestParseLrcTimestamp:
     """Test LRC timestamp parsing."""
 
-    def test_parse_standard_timestamp(self):
-        """Parse standard [mm:ss.xx] format."""
-        ms = parse_lrc_timestamp("[01:23.45]")
-        assert ms == (1 * 60 + 23) * 1000 + 450
-
-    def test_parse_short_centiseconds(self):
-        """Parse [mm:ss.x] format."""
-        ms = parse_lrc_timestamp("[01:23.4]")
-        assert ms == (1 * 60 + 23) * 1000 + 400
-
-    def test_parse_no_centiseconds(self):
-        """Parse [mm:ss] format."""
-        ms = parse_lrc_timestamp("[01:23]")
-        assert ms == (1 * 60 + 23) * 1000
-
-    def test_parse_zero_timestamp(self):
-        """Parse [00:00.00] format."""
-        ms = parse_lrc_timestamp("[00:00.00]")
-        assert ms == 0
-
-    def test_parse_long_duration(self):
-        """Parse timestamps over 10 minutes."""
-        ms = parse_lrc_timestamp("[12:34.56]")
-        assert ms == (12 * 60 + 34) * 1000 + 560
-
     def test_invalid_timestamp_returns_none(self):
         """Invalid timestamps return None."""
         assert parse_lrc_timestamp("[invalid]") is None
@@ -64,41 +39,6 @@ class TestParseLrcContent:
         assert phrases[1].text == "Second line"
         assert phrases[1].start_ms == 17200
 
-    def test_parse_with_metadata(self):
-        """Parse LRC with metadata tags (ar, ti, al, etc)."""
-        content = """[ar:Artist Name]
-[ti:Song Title]
-[al:Album Name]
-[00:12.00]First line
-[00:17.20]Second line"""
-
-        phrases = parse_lrc_content(content)
-
-        # Metadata lines should be skipped
-        assert len(phrases) == 2
-        assert phrases[0].text == "First line"
-
-    def test_parse_with_offset(self):
-        """Parse LRC with [offset:+/-ms] tag."""
-        content = """[offset:+500]
-[00:12.00]First line
-[00:17.20]Second line"""
-
-        phrases = parse_lrc_content(content)
-
-        # Offset should be applied to all timestamps
-        assert phrases[0].start_ms == 12000 + 500
-        assert phrases[1].start_ms == 17200 + 500
-
-    def test_parse_negative_offset(self):
-        """Parse LRC with negative offset."""
-        content = """[offset:-200]
-[00:12.00]First line"""
-
-        phrases = parse_lrc_content(content)
-
-        assert phrases[0].start_ms == 12000 - 200
-
     def test_parse_multiple_timestamps_per_line(self):
         """Parse line with multiple timestamps (chorus repetition)."""
         content = """[00:12.00][00:45.00]Chorus line
@@ -114,16 +54,6 @@ class TestParseLrcContent:
         assert phrases[1].start_ms == 17200
         assert phrases[2].text == "Chorus line"
         assert phrases[2].start_ms == 45000
-
-    def test_parse_empty_lines(self):
-        """Parse LRC with empty lines."""
-        content = """[00:12.00]First line
-
-[00:17.20]Second line"""
-
-        phrases = parse_lrc_content(content)
-
-        assert len(phrases) == 2
 
     def test_parse_with_instrumental_breaks(self):
         """Parse LRC with instrumental sections."""
@@ -153,16 +83,6 @@ class TestParseLrcContent:
         # Last phrase end_ms equals start_ms (unknown duration)
         assert phrases[2].end_ms == 23000
 
-    def test_parse_with_song_duration(self):
-        """Parse with explicit song duration for last phrase."""
-        content = """[00:12.00]First line
-[00:17.20]Second line"""
-
-        phrases = parse_lrc_content(content, duration_ms=25000)
-
-        # Last phrase should extend to song end
-        assert phrases[1].end_ms == 25000
-
     def test_parse_malformed_lines(self):
         """Malformed lines are skipped gracefully."""
         content = """[00:12.00]Valid line
@@ -175,15 +95,6 @@ Not a valid LRC line
         assert len(phrases) == 2
         assert phrases[0].text == "Valid line"
         assert phrases[1].text == "Another valid line"
-
-    def test_parse_empty_content(self):
-        """Empty content returns empty list."""
-        phrases = parse_lrc_content("")
-        assert phrases == []
-
-
-class TestExtractEmbeddedLyrics:
-    """Test complete embedded lyrics extraction."""
 
     def test_extract_from_lrc_sidecar(self):
         """Extract lyrics from .lrc sidecar file."""

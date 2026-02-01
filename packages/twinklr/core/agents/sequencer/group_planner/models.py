@@ -1,122 +1,381 @@
-"""GroupPlanner agent models.
+"""GroupPlanner models for section-level cross-group coordination.
 
-GroupPlanner implements MacroPlan for each display group, selecting templates and presets
-for each section/layer.
+These models implement the v3.3 specification for GroupPlanner output.
+Key principles:
+- Iteration unit is SECTION (not per-group)
+- TimeRef is used for all authored timing (no bar-only fields)
+- SEQUENCED/CALL_RESPONSE/RIPPLE use window+config (Assembler expands)
+- Lane intent mirrors MacroPlan (timing_driver, target_roles, blend_mode)
 """
 
 from __future__ import annotations
 
+from enum import Enum
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, computed_field, model_validator
 
-from twinklr.core.agents.audio.profile.models import Provenance, SongSectionRef
-from twinklr.core.agents.issues import Issue
-from twinklr.core.agents.taxonomy import BlendMode, QuantizeMode, SnapMode, TimeRefType
+# =============================================================================
+# Enums (GroupPlanner-specific, per spec v3.3)
+# =============================================================================
 
-# Time reference models
+
+class LaneKind(str, Enum):
+    """Lane (layer) types for choreography."""
+
+    BASE = "BASE"  # Bed / background continuity
+    RHYTHM = "RHYTHM"  # Beat-driven motion / texture
+    ACCENT = "ACCENT"  # Focal punctuation, hits, callouts
+
+
+class CoordinationMode(str, Enum):
+    """Coordination mode for cross-group choreography."""
+
+    UNIFIED = "UNIFIED"  # Same behavior across groups simultaneously
+    COMPLEMENTARY = "COMPLEMENTARY"  # Different behaviors, designed to harmonize
+    SEQUENCED = "SEQUENCED"  # Ordered progression across groups
+    CALL_RESPONSE = "CALL_RESPONSE"  # Alternating sets (A responds to B)
+    RIPPLE = "RIPPLE"  # Propagation across ordered set with overlap
+
+
+class StepUnit(str, Enum):
+    """Step unit for sequenced coordination."""
+
+    BEAT = "BEAT"
+    BAR = "BAR"
+    PHRASE = "PHRASE"
+
+
+class SpillPolicy(str, Enum):
+    """Policy for handling placements that spill outside section bounds."""
+
+    TRUNCATE = "TRUNCATE"  # Clip to section end
+    DROP = "DROP"  # Omit if extends past section
+    WRAP = "WRAP"  # Wrap to next occurrence (if applicable)
+
+
+class SnapRule(str, Enum):
+    """Snap rule for time alignment."""
+
+    BAR = "BAR"
+    BEAT = "BEAT"
+    PHRASE = "PHRASE"
+    NONE = "NONE"
+
+
+class TimeRefKind(str, Enum):
+    """Kind of time reference."""
+
+    BAR_BEAT = "BAR_BEAT"  # Bar/beat/beat_frac based
+    MS = "MS"  # Absolute milliseconds
+
+
+class SpatialIntent(str, Enum):
+    """Spatial direction intent for coordination."""
+
+    NONE = "NONE"
+    L2R = "L2R"  # Left to right
+    R2L = "R2L"  # Right to left
+    C2O = "C2O"  # Center to outer
+    O2C = "O2C"  # Outer to center
+    RANDOM = "RANDOM"
+
+
+class GPBlendMode(str, Enum):
+    """Blend mode for GroupPlanner (distinct from core BlendMode)."""
+
+    ADD = "add"
+    MAX = "max"
+    ALPHA_OVER = "alpha_over"
+
+
+class GPTimingDriver(str, Enum):
+    """Timing driver for GroupPlanner lanes."""
+
+    BEATS = "BEATS"
+    BARS = "BARS"
+    PHRASES = "PHRASES"
+    LYRICS = "LYRICS"
+
+
+# =============================================================================
+# TimeRef Model
+# =============================================================================
 
 
 class TimeRef(BaseModel):
-    """Time reference for placement (marker-based or absolute ms)."""
+    """Canonical time reference for all authored timing.
+
+    Supports two modes:
+    - BAR_BEAT: (bar, beat, beat_frac) with optional offset_ms nudge
+    - MS: Absolute milliseconds (offset_ms required, bar/beat must be None)
+    """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    ref_type: TimeRefType
-    value: int = Field(ge=0)  # bar number (1-indexed) or milliseconds
-    marker_type: str | None = Field(default=None)  # "bar", "beat", "phrase", etc.
+    kind: TimeRefKind
+
+    # BAR_BEAT fields
+    bar: int | None = Field(default=None, ge=1)
+    beat: int | None = Field(default=None, ge=1)
+    beat_frac: float = Field(default=0.0, ge=0.0, le=1.0)
+
+    # Fine nudge (BAR_BEAT) or required absolute offset (MS)
+    offset_ms: int | None = None
+
+    @model_validator(mode="after")
+    def _validate_kind_fields(self) -> TimeRef:
+        """Validate fields match the kind."""
+        if self.kind == TimeRefKind.BAR_BEAT:
+            if self.bar is None:
+                raise ValueError("TimeRef(kind=BAR_BEAT): bar is required")
+            if self.beat is None:
+                raise ValueError("TimeRef(kind=BAR_BEAT): beat is required")
+        elif self.kind == TimeRefKind.MS:
+            if self.offset_ms is None:
+                raise ValueError("TimeRef(kind=MS): offset_ms is required")
+            if self.bar is not None:
+                raise ValueError("TimeRef(kind=MS): bar must be None")
+            if self.beat is not None:
+                raise ValueError("TimeRef(kind=MS): beat must be None")
+        return self
 
 
-class SnapRule(BaseModel):
-    """Snap behavior for time alignment."""
+# =============================================================================
+# DisplayGraph Models
+# =============================================================================
+
+
+class GroupPosition(BaseModel):
+    """Normalized spatial position for a display group."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    snap_mode: SnapMode = SnapMode.NONE
-    quantize: QuantizeMode = QuantizeMode.NONE
+    x: float = Field(ge=0.0, le=1.0)
+    y: float = Field(ge=0.0, le=1.0)
+    z: float = Field(default=0.0, ge=0.0, le=1.0)
+    zone: str | None = None
 
 
-# Spatial intent
-
-
-class SpatialIntent(BaseModel):
-    """Spatial choreography intent for placement."""
-
-    model_config = ConfigDict(extra="forbid", frozen=True)
-
-    pattern: str | None = None  # "MIRROR", "SWEEP", "RIPPLE", etc.
-    direction: str | None = None  # "L2R", "R2L", "C2O", etc.
-    roles: list[str] = Field(default_factory=list)  # Zone roles
-    phase_offset: float | None = Field(default=None, ge=0.0, le=1.0)
-
-
-# Asset references
-
-
-class AssetSlot(BaseModel):
-    """Asset slot reference in placement."""
+class DisplayGroup(BaseModel):
+    """Single display group definition."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    purpose: str  # "texture", "mask", "sprite", "gobo"
-    asset_request_id: str | None = None
-    asset_ref_id: str | None = None
+    group_id: str = Field(pattern=r"^[A-Z][A-Z0-9_]*$")
+    role: str
+    display_name: str
+
+    position: GroupPosition | None = None
+    capabilities: list[str] = Field(default_factory=list)
+    fixture_count: int = Field(default=1, ge=1)
 
 
-# Template placement
+class DisplayGraph(BaseModel):
+    """Complete display configuration with group-to-role mapping.
+
+    Provides groups_by_role computed property for role expansion.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: str = "display-graph.v1"
+    display_id: str
+    display_name: str
+    groups: list[DisplayGroup] = Field(min_length=1)
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def groups_by_role(self) -> dict[str, list[str]]:
+        """Map role -> list of group_ids."""
+        result: dict[str, list[str]] = {}
+        for g in self.groups:
+            result.setdefault(g.role, []).append(g.group_id)
+        return result
+
+    def get_group(self, group_id: str) -> DisplayGroup | None:
+        """Get group by ID, or None if not found."""
+        return next((g for g in self.groups if g.group_id == group_id), None)
 
 
-class TemplatePlacement(BaseModel):
-    """Single template placement within a layer."""
+# =============================================================================
+# Template Catalog (Lightweight)
+# =============================================================================
+
+
+class TemplateCatalogEntry(BaseModel):
+    """Lightweight template catalog entry for GroupPlanner.
+
+    Full template definitions are handled by the template workstream.
+    This provides just enough info for GroupPlanner to select templates.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    template_id: str
+    name: str
+    compatible_lanes: list[LaneKind] = Field(min_length=1)
+    tags: list[str] = Field(default_factory=list)
+    description: str = ""
+
+
+class TemplateCatalog(BaseModel):
+    """Lightweight template catalog for GroupPlanner validation.
+
+    Provides template_id existence checks and lane compatibility filtering.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: str = "template-catalog.v1"
+    entries: list[TemplateCatalogEntry] = Field(default_factory=list)
+
+    def has_template(self, template_id: str) -> bool:
+        """Check if template_id exists in catalog."""
+        return any(e.template_id == template_id for e in self.entries)
+
+    def get_entry(self, template_id: str) -> TemplateCatalogEntry | None:
+        """Get catalog entry by template_id, or None if not found."""
+        return next((e for e in self.entries if e.template_id == template_id), None)
+
+    def list_by_lane(self, lane: LaneKind) -> list[TemplateCatalogEntry]:
+        """List all templates compatible with given lane."""
+        return [e for e in self.entries if lane in e.compatible_lanes]
+
+
+# =============================================================================
+# GroupPlacement and Coordination Models
+# =============================================================================
+
+
+class GroupPlacement(BaseModel):
+    """Individual placement of a template on a group.
+
+    Uses TimeRef for start/end timing (no bar-only fields).
+    """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     placement_id: str
+    group_id: str
+    template_id: str
     start: TimeRef
     end: TimeRef
-    snap: SnapRule
-    template_id: str
-    preset_id: str
-    params: dict[str, Any] = Field(default_factory=dict)
+
+    # Optional overrides
+    param_overrides: dict[str, Any] = Field(default_factory=dict)
     intensity: float = Field(default=1.0, ge=0.0, le=1.5)
-    blend_mode: BlendMode = BlendMode.NORMAL
-    spatial: SpatialIntent | None = None
-    media: AssetSlot | None = None
+    snap_rule: SnapRule = SnapRule.BEAT
 
 
-# Layer plan
+class PlacementWindow(BaseModel):
+    """Window for sequenced/ripple/call-response expansion.
 
-
-class LayerPlan(BaseModel):
-    """Plan for a single layer in a section."""
+    Defines the overall time window and template for Assembler expansion.
+    """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    layer_index: int = Field(ge=0)
-    placements: list[TemplatePlacement]
+    start: TimeRef
+    end: TimeRef
+    template_id: str
+    param_overrides: dict[str, Any] = Field(default_factory=dict)
+    snap_rule: SnapRule = SnapRule.BEAT
 
 
-# Section plan
+class CoordinationConfig(BaseModel):
+    """Configuration for SEQUENCED/CALL_RESPONSE/RIPPLE modes.
 
-
-class SectionGroupPlan(BaseModel):
-    """Plan for a single section in a specific group."""
+    Assembler uses this to expand to per-group placements deterministically.
+    """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    section: SongSectionRef
-    layers: list[LayerPlan]
-
-    @model_validator(mode="after")
-    def _validate_unique_layer_indices(self) -> SectionGroupPlan:
-        """Validate layer indices are unique."""
-        indices = [layer.layer_index for layer in self.layers]
-        if len(indices) != len(set(indices)):
-            raise ValueError("Layer indices must be unique within a section")
-        return self
+    group_order: list[str] = Field(min_length=1)
+    step_unit: StepUnit = StepUnit.BEAT
+    step_duration: int = Field(default=1, ge=1)
+    phase_offset: float = Field(default=0.0, ge=0.0, le=1.0)
+    spill_policy: SpillPolicy = SpillPolicy.TRUNCATE
+    spatial_intent: SpatialIntent = SpatialIntent.NONE
 
 
-# Asset request
+class CoordinationPlan(BaseModel):
+    """Coordination plan for a set of groups within a lane.
+
+    For UNIFIED/COMPLEMENTARY: placements are provided directly.
+    For SEQUENCED/CALL_RESPONSE/RIPPLE: window + config provided, Assembler expands.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    coordination_mode: CoordinationMode
+    group_ids: list[str] = Field(min_length=1)
+
+    # For UNIFIED/COMPLEMENTARY modes
+    placements: list[GroupPlacement] = Field(default_factory=list)
+
+    # For SEQUENCED/CALL_RESPONSE/RIPPLE modes
+    window: PlacementWindow | None = None
+    config: CoordinationConfig | None = None
+
+
+# =============================================================================
+# Lane and Section Plans
+# =============================================================================
+
+
+class LanePlan(BaseModel):
+    """Plan for a single lane (BASE/RHYTHM/ACCENT) in a section.
+
+    Mirrors MacroPlan lane intent (timing_driver, target_roles, blend_mode).
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    lane: LaneKind
+    target_roles: list[str] = Field(min_length=1)
+    timing_driver: GPTimingDriver = GPTimingDriver.BEATS
+    blend_mode: GPBlendMode = GPBlendMode.ADD
+
+    coordination_plans: list[CoordinationPlan] = Field(default_factory=list)
+
+
+class Deviation(BaseModel):
+    """Explicit deviation from MacroPlan intent.
+
+    If GroupPlanner cannot satisfy a MacroPlan intent, it must
+    document the deviation explicitly.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    deviation_id: str
+    intent_field: str  # Which MacroPlan field was not honored
+    reason: str
+    mitigation: str | None = None
+
+
+class SectionCoordinationPlan(BaseModel):
+    """Complete coordination plan for a single section.
+
+    This is the output of one GroupPlanner invocation.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: str = "section-coordination-plan.v1"
+    section_id: str
+
+    lane_plans: list[LanePlan] = Field(min_length=1)
+    deviations: list[Deviation] = Field(default_factory=list)
+
+    # Optional notes for debugging/tracing
+    planning_notes: str | None = None
+
+
+# =============================================================================
+# Aggregated Output
+# =============================================================================
 
 
 class AssetRequest(BaseModel):
@@ -129,62 +388,22 @@ class AssetRequest(BaseModel):
     use_case: str  # "matrix_texture", "sprite", "gobo", etc.
     style_tags: list[str] = Field(default_factory=list)
     content_tags: list[str] = Field(default_factory=list)
-    palette_hint: str | None = None
-    tiling: bool = False
-    constraints: dict[str, Any] = Field(default_factory=dict)
     fallback_strategy: str = "use_builtin_if_missing"
 
 
-# Compilation hints
-
-
-class CompilationHints(BaseModel):
-    """Hints for SequenceAssembler compilation."""
-
-    model_config = ConfigDict(extra="forbid", frozen=True)
-
-    quantize_policy: QuantizeMode = QuantizeMode.BARS
-    transition_policy: str = "crossfade"  # "crossfade", "cut", "beat_snap"
-    layering_policy: str = "blend"  # "blend", "priority", "allow_overlap"
-    overlap_resolution: str = "trim"  # "trim", "allow", "priority"
-
-
-# Complete group plan
-
-
-class GroupPlan(BaseModel):
-    """Complete plan for a single display group."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    schema_version: str = "group-plan.v2"
-    plan_id: str
-    group_id: str
-    section_plans: list[SectionGroupPlan] = Field(min_length=1)
-    asset_requests: list[AssetRequest] = Field(default_factory=list)
-    compilation_hints: CompilationHints = Field(default_factory=CompilationHints)
-    provenance: Provenance | None = None
-    warnings: list[Issue] = Field(default_factory=list)
-
-
-# Group plan set (aggregated output)
-
-
 class GroupPlanSet(BaseModel):
-    """Aggregated plans for all display groups."""
+    """Aggregated coordination plans for all sections.
+
+    This is the final output of the GroupPlanner orchestration.
+    """
 
     model_config = ConfigDict(extra="forbid")
 
-    schema_version: str = "group-plan-set.v2"
-    set_id: str
-    group_plans: list[GroupPlan] = Field(min_length=1)
-    provenance: Provenance | None = None
-    warnings: list[Issue] = Field(default_factory=list)
+    schema_version: str = "group-plan-set.v1"
+    plan_set_id: str
 
-    @model_validator(mode="after")
-    def _validate_unique_group_ids(self) -> GroupPlanSet:
-        """Validate group IDs are unique."""
-        group_ids = [plan.group_id for plan in self.group_plans]
-        if len(group_ids) != len(set(group_ids)):
-            raise ValueError("Group IDs must be unique within GroupPlanSet")
-        return self
+    section_plans: list[SectionCoordinationPlan] = Field(min_length=1)
+    asset_requests: list[AssetRequest] = Field(default_factory=list)
+
+    # Holistic evaluation result (populated after holistic judge)
+    # holistic_evaluation: HolisticEvaluation | None = None  # Added in Phase 3

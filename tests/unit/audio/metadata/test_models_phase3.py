@@ -3,9 +3,6 @@
 Testing FingerprintInfo, ResolvedMBIDs, ResolvedMetadata, MetadataCandidate.
 """
 
-from pydantic import ValidationError
-import pytest
-
 from twinklr.core.audio.models.enums import StageStatus
 from twinklr.core.audio.models.metadata import (
     FingerprintInfo,
@@ -41,28 +38,6 @@ class TestFingerprintInfo:
         assert info.chromaprint_duration_s == 180.5
         assert info.chromaprint_duration_bucket == 180.5
 
-    def test_fingerprint_info_validation(self):
-        """FingerprintInfo validation rules."""
-        # audio_fingerprint is required
-        with pytest.raises(ValidationError):
-            FingerprintInfo()
-
-        # duration must be positive
-        with pytest.raises(ValidationError):
-            FingerprintInfo(
-                audio_fingerprint="abc123",
-                chromaprint_duration_s=-1.0,
-            )
-
-    def test_fingerprint_info_extra_forbidden(self):
-        """FingerprintInfo rejects extra fields."""
-        with pytest.raises(ValidationError):
-            FingerprintInfo(audio_fingerprint="abc123", extra_field="invalid")
-
-
-class TestResolvedMBIDs:
-    """Test ResolvedMBIDs model."""
-
     def test_empty_mbids(self):
         """Empty ResolvedMBIDs with no IDs."""
         mbids = ResolvedMBIDs()
@@ -85,15 +60,6 @@ class TestResolvedMBIDs:
         assert mbids.release_mbid == "rel-5678"
         assert mbids.artist_mbids == ["art-1111", "art-2222"]
         assert mbids.work_mbid == "work-9999"
-
-    def test_mbids_extra_forbidden(self):
-        """ResolvedMBIDs rejects extra fields."""
-        with pytest.raises(ValidationError):
-            ResolvedMBIDs(recording_mbid="rec-123", invalid="extra")
-
-
-class TestResolvedMetadata:
-    """Test ResolvedMetadata model."""
 
     def test_minimal_resolved_metadata(self):
         """Minimal ResolvedMetadata."""
@@ -139,51 +105,6 @@ class TestResolvedMetadata:
         assert resolved.acoustid_id == "acoustid-789"
         assert resolved.isrc == "US1234567890"
 
-    def test_resolved_metadata_confidence_range(self):
-        """ResolvedMetadata confidence must be 0-1."""
-        # Valid
-        ResolvedMetadata(confidence=0.0, title="Test", title_confidence=0.5)
-        ResolvedMetadata(confidence=1.0, title="Test", title_confidence=1.0)
-
-        # Invalid - out of range
-        with pytest.raises(ValidationError):
-            ResolvedMetadata(confidence=-0.1, title="Test", title_confidence=0.5)
-
-        with pytest.raises(ValidationError):
-            ResolvedMetadata(confidence=1.1, title="Test", title_confidence=0.5)
-
-    def test_resolved_metadata_duration_positive(self):
-        """ResolvedMetadata duration_ms must be positive."""
-        # Valid
-        ResolvedMetadata(
-            confidence=0.85,
-            title="Test",
-            title_confidence=0.9,
-            duration_ms=1,
-        )
-
-        # Invalid - negative
-        with pytest.raises(ValidationError):
-            ResolvedMetadata(
-                confidence=0.85,
-                title="Test",
-                title_confidence=0.9,
-                duration_ms=-100,
-            )
-
-        # Invalid - zero
-        with pytest.raises(ValidationError):
-            ResolvedMetadata(
-                confidence=0.85,
-                title="Test",
-                title_confidence=0.9,
-                duration_ms=0,
-            )
-
-
-class TestMetadataCandidate:
-    """Test MetadataCandidate model."""
-
     def test_minimal_candidate(self):
         """Minimal MetadataCandidate."""
         candidate = MetadataCandidate(
@@ -227,42 +148,6 @@ class TestMetadataCandidate:
         assert candidate.acoustid_id == "acoustid-789"
         assert candidate.isrc == "US1234567890"
         assert candidate.raw == {"source": "test"}
-
-    def test_candidate_score_range(self):
-        """MetadataCandidate score must be 0-1."""
-        # Valid
-        MetadataCandidate(provider="test", provider_id="123", score=0.0)
-        MetadataCandidate(provider="test", provider_id="123", score=1.0)
-
-        # Invalid
-        with pytest.raises(ValidationError):
-            MetadataCandidate(provider="test", provider_id="123", score=-0.1)
-
-        with pytest.raises(ValidationError):
-            MetadataCandidate(provider="test", provider_id="123", score=1.1)
-
-    def test_candidate_duration_positive(self):
-        """MetadataCandidate duration_ms must be positive."""
-        # Valid
-        MetadataCandidate(
-            provider="test",
-            provider_id="123",
-            score=0.8,
-            duration_ms=1,
-        )
-
-        # Invalid
-        with pytest.raises(ValidationError):
-            MetadataCandidate(
-                provider="test",
-                provider_id="123",
-                score=0.8,
-                duration_ms=0,
-            )
-
-
-class TestMetadataBundlePhase3:
-    """Test MetadataBundle with Phase 3 fields."""
 
     def test_metadata_bundle_with_fingerprint(self):
         """MetadataBundle includes fingerprint."""

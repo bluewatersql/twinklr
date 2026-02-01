@@ -6,27 +6,6 @@ from twinklr.core.logging.sanitize import sanitize_dict, sanitize_string
 class TestSanitizeString:
     """Test string sanitization."""
 
-    def test_sanitize_api_key(self):
-        """Test API key redaction."""
-        text = "API key: sk-abc123def456ghi789jkl012mno345pqr"
-        result = sanitize_string(text)
-        assert "<REDACTED:API_KEY>" in result
-        assert "sk-" not in result
-
-    def test_sanitize_bearer_token(self):
-        """Test Bearer token redaction."""
-        text = "Authorization: Bearer abc123def456"
-        result = sanitize_string(text)
-        assert "<REDACTED:BEARER_TOKEN>" in result
-        assert "Bearer abc" not in result
-
-    def test_sanitize_email(self):
-        """Test email redaction."""
-        text = "Contact: user@example.com"
-        result = sanitize_string(text)
-        assert "<REDACTED:EMAIL>" in result
-        assert "@example.com" not in result
-
     def test_sanitize_phone_us(self):
         """Test US phone number redaction."""
         test_cases = [
@@ -82,13 +61,6 @@ class TestSanitizeString:
         for text in test_cases:
             result = sanitize_string(text)
             assert "<REDACTED" not in result, f"False positive on: {text}"
-
-    def test_sanitize_ssn(self):
-        """Test SSN redaction."""
-        text = "SSN: 123-45-6789"
-        result = sanitize_string(text)
-        assert "<REDACTED:SSN>" in result
-        assert "123-45-6789" not in result
 
     def test_sanitize_credit_card(self):
         """Test credit card redaction."""

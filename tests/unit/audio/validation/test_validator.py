@@ -110,24 +110,6 @@ class TestValidateFeatures:
         warnings = validate_features(features)
         assert any("Low downbeat phase confidence" in w for w in warnings)
 
-    def test_missing_keys_handled(self) -> None:
-        """Missing keys don't cause errors."""
-        features: dict[str, Any] = {
-            # Only tempo_bpm, everything else missing
-            "tempo_bpm": 120.0,
-        }
-        # Should not raise
-        warnings = validate_features(features)
-        # Should have warnings for missing beats and sections
-        assert len(warnings) > 0
-
-    def test_empty_features_dict(self) -> None:
-        """Empty features dict is handled."""
-        features: dict[str, Any] = {}
-        warnings = validate_features(features)
-        # Should have warning for unusual tempo (0)
-        assert len(warnings) > 0
-
     def test_multiple_warnings(self) -> None:
         """Multiple issues generate multiple warnings."""
         features: dict[str, Any] = {

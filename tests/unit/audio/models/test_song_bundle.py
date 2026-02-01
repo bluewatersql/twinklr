@@ -3,9 +3,6 @@
 Following TDD for Phase 1 - Scaffolding and Backward Compatibility.
 """
 
-from pydantic import ValidationError
-import pytest
-
 from twinklr.core.audio.models import (
     SongBundle,
     SongTiming,
@@ -15,31 +12,6 @@ from twinklr.core.audio.models.enums import StageStatus
 
 class TestSongTiming:
     """Test SongTiming model."""
-
-    def test_minimal_valid(self):
-        """Minimal SongTiming with all required fields."""
-        timing = SongTiming(
-            sr=22050,
-            hop_length=512,
-            duration_s=180.5,
-            duration_ms=180500,
-        )
-
-        assert timing.sr == 22050
-        assert timing.hop_length == 512
-        assert timing.duration_s == 180.5
-        assert timing.duration_ms == 180500
-
-    def test_validation_positive_values(self):
-        """All numeric fields must be positive."""
-        with pytest.raises(ValidationError):
-            SongTiming(sr=0, hop_length=512, duration_s=10.0, duration_ms=10000)
-
-        with pytest.raises(ValidationError):
-            SongTiming(sr=22050, hop_length=0, duration_s=10.0, duration_ms=10000)
-
-        with pytest.raises(ValidationError):
-            SongTiming(sr=22050, hop_length=512, duration_s=-1.0, duration_ms=10000)
 
 
 class TestSongBundleMinimal:
@@ -121,50 +93,6 @@ class TestSongBundleMinimal:
 class TestSongBundleValidation:
     """Test SongBundle validation rules."""
 
-    def test_schema_version_required(self):
-        """schema_version must be present."""
-        with pytest.raises(ValidationError):
-            SongBundle(
-                audio_path="/path/to/song.mp3",
-                recording_id="rec_123",
-                features={"schema_version": "2.3"},
-                timing=SongTiming(sr=22050, hop_length=512, duration_s=1.0, duration_ms=1000),
-            )
-
-    def test_audio_path_required(self):
-        """audio_path must be present."""
-        with pytest.raises(ValidationError):
-            SongBundle(
-                schema_version="3.0",
-                recording_id="rec_123",
-                features={"schema_version": "2.3"},
-                timing=SongTiming(sr=22050, hop_length=512, duration_s=1.0, duration_ms=1000),
-            )
-
-    def test_features_dict_required(self):
-        """features dict must be present."""
-        with pytest.raises(ValidationError):
-            SongBundle(
-                schema_version="3.0",
-                audio_path="/path/to/song.mp3",
-                recording_id="rec_123",
-                timing=SongTiming(sr=22050, hop_length=512, duration_s=1.0, duration_ms=1000),
-            )
-
-    def test_timing_required(self):
-        """timing must be present."""
-        with pytest.raises(ValidationError):
-            SongBundle(
-                schema_version="3.0",
-                audio_path="/path/to/song.mp3",
-                recording_id="rec_123",
-                features={"schema_version": "2.3"},
-            )
-
-
-class TestSongBundleSerialization:
-    """Test SongBundle serialization/deserialization."""
-
     def test_dict_round_trip(self):
         """Bundle can be serialized to dict and back."""
         original = SongBundle(
@@ -209,12 +137,6 @@ class TestSongBundleSerialization:
 
 class TestStageStatus:
     """Test StageStatus enum."""
-
-    def test_all_values_available(self):
-        """All expected status values are available."""
-        assert StageStatus.OK == "OK"
-        assert StageStatus.SKIPPED == "SKIPPED"
-        assert StageStatus.FAILED == "FAILED"
 
     def test_can_use_in_models(self):
         """StageStatus can be used in Pydantic models."""

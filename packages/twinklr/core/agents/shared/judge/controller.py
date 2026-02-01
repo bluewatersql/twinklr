@@ -394,7 +394,7 @@ class StandardIterationController(Generic[TPlan]):
                 "iteration": iteration,
             }
         )
-        
+
         # Only alias macro_plan = plan for MacroPlanner judge
         # For other judges, macro_plan should come from initial_vars if present
         if "macro_plan" not in variables:

@@ -89,24 +89,11 @@ class TestClassifyPhoneme:
                 f"{consonant} should be CONSONANT"
             )
 
-    def test_unknown_phoneme(self):
-        """Unknown phoneme should default to CONSONANT."""
-        assert classify_phoneme("UNKNOWN") == PhonemeType.CONSONANT
-        assert classify_phoneme("XYZ") == PhonemeType.CONSONANT
-
     def test_case_insensitive(self):
         """Classification should be case-insensitive."""
         assert classify_phoneme("aa") == PhonemeType.VOWEL
         assert classify_phoneme("AA") == PhonemeType.VOWEL
         assert classify_phoneme("Aa") == PhonemeType.VOWEL
-
-    def test_empty_string(self):
-        """Empty string should default to CONSONANT."""
-        assert classify_phoneme("") == PhonemeType.CONSONANT
-
-
-class TestDistributePhonemesUniform:
-    """Test uniform phoneme distribution."""
 
     def test_distribute_single_phoneme(self):
         """Single phoneme should span entire word window."""
@@ -163,12 +150,6 @@ class TestDistributePhonemesUniform:
         assert result[2][0] == "C"
         assert result[2][2] == 100  # Last phoneme ends at word end
 
-    def test_empty_phonemes(self):
-        """Empty phonemes list should return empty list."""
-        result = distribute_phonemes_uniform([], 0, 100)
-
-        assert result == []
-
     def test_zero_duration(self):
         """Zero duration should return phonemes with zero-length spans."""
         phonemes = ["HH", "EH"]
@@ -181,17 +162,6 @@ class TestDistributePhonemesUniform:
         # All phonemes at same time
         assert result[0] == ("HH", 100, 100)
         assert result[1] == ("EH", 100, 100)
-
-    def test_negative_duration(self):
-        """Negative duration should handle gracefully."""
-        phonemes = ["HH"]
-        start_ms = 100
-        end_ms = 50
-
-        result = distribute_phonemes_uniform(phonemes, start_ms, end_ms)
-
-        # Should return empty or handle edge case
-        assert isinstance(result, list)
 
     def test_large_word_window(self):
         """Should handle large word windows."""

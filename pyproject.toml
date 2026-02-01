@@ -119,6 +119,8 @@ exclude = [
     ".dev/",
     ".dev/.*",
     "scripts/*",
+    "changes/archive/",
+    "utils/",
 ]
 
 [tool.pydantic-mypy]

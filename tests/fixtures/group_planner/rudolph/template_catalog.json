@@ -1,0 +1,89 @@
+{
+  "schema_version": "template-catalog.v1",
+  "entries": [
+    {
+      "template_id": "gtpl_bg_warm_white",
+      "name": "Warm White Background",
+      "compatible_lanes": ["BASE"],
+      "tags": ["background", "warm", "continuous"],
+      "description": "Solid warm white foundation layer"
+    },
+    {
+      "template_id": "gtpl_bg_red_green",
+      "name": "Classic Red/Green Background",
+      "compatible_lanes": ["BASE"],
+      "tags": ["background", "traditional", "christmas"],
+      "description": "Traditional red/green color scheme background"
+    },
+    {
+      "template_id": "gtpl_bg_cool_blue",
+      "name": "Cool Blue Wash",
+      "compatible_lanes": ["BASE"],
+      "tags": ["background", "cool", "winter"],
+      "description": "Cool blue/white winter atmosphere"
+    },
+    {
+      "template_id": "gtpl_rhythm_bounce",
+      "name": "Rhythm Bounce",
+      "compatible_lanes": ["RHYTHM"],
+      "tags": ["rhythm", "bounce", "beat"],
+      "description": "Beat-driven bounce effect"
+    },
+    {
+      "template_id": "gtpl_rhythm_chase_lr",
+      "name": "Chase Left-to-Right",
+      "compatible_lanes": ["RHYTHM"],
+      "tags": ["rhythm", "chase", "motion"],
+      "description": "Left-to-right chase pattern"
+    },
+    {
+      "template_id": "gtpl_rhythm_candy_stripe",
+      "name": "Candy Cane Stripe",
+      "compatible_lanes": ["RHYTHM"],
+      "tags": ["rhythm", "candy", "stripe"],
+      "description": "Red/white candy cane stripe motion"
+    },
+    {
+      "template_id": "gtpl_accent_flash",
+      "name": "Accent Flash",
+      "compatible_lanes": ["ACCENT"],
+      "tags": ["accent", "flash", "hit"],
+      "description": "Quick bright flash for accents"
+    },
+    {
+      "template_id": "gtpl_accent_pulse",
+      "name": "Accent Pulse",
+      "compatible_lanes": ["ACCENT"],
+      "tags": ["accent", "pulse", "glow"],
+      "description": "Pulsing glow accent effect"
+    },
+    {
+      "template_id": "gtpl_accent_pop",
+      "name": "Accent Pop",
+      "compatible_lanes": ["ACCENT"],
+      "tags": ["accent", "pop", "hit"],
+      "description": "Sharp pop accent for emphasis"
+    },
+    {
+      "template_id": "gtpl_accent_rudolph_red",
+      "name": "Rudolph Red Glow",
+      "compatible_lanes": ["ACCENT"],
+      "tags": ["accent", "rudolph", "red", "hero"],
+      "description": "Distinctive red glow for Rudolph's nose moments"
+    },
+    {
+      "template_id": "gtpl_feature_fog_wash",
+      "name": "Foggy Night Wash",
+      "compatible_lanes": ["BASE", "ACCENT"],
+      "tags": ["feature", "fog", "atmosphere"],
+      "description": "Atmospheric foggy night effect"
+    },
+    {
+      "template_id": "gtpl_feature_victory_crown",
+      "name": "Victory Crown",
+      "compatible_lanes": ["ACCENT"],
+      "tags": ["feature", "victory", "celebration"],
+      "description": "Celebratory crown effect for finale"
+    }
+  ]
+}

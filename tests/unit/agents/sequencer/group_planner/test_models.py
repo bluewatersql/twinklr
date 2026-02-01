@@ -1,279 +1,290 @@
-"""Tests for GroupPlanner models."""
+"""Tests for GroupPlanner models.
 
-from pydantic import ValidationError
+Tests focus on model contracts and validation rules, not basic Pydantic behavior.
+"""
+
+from __future__ import annotations
+
 import pytest
 
-from twinklr.core.agents.audio.profile.models import SongSectionRef
 from twinklr.core.agents.sequencer.group_planner.models import (
-    AssetRequest,
-    CompilationHints,
-    GroupPlan,
-    GroupPlanSet,
-    LayerPlan,
-    SectionGroupPlan,
-    SnapRule,
-    TemplatePlacement,
+    CoordinationConfig,
+    CoordinationMode,
+    CoordinationPlan,
+    DisplayGraph,
+    DisplayGroup,
+    GroupPlacement,
+    LaneKind,
+    LanePlan,
+    PlacementWindow,
+    SectionCoordinationPlan,
+    SpillPolicy,
+    StepUnit,
+    TemplateCatalog,
+    TemplateCatalogEntry,
     TimeRef,
-)
-from twinklr.core.agents.taxonomy import (
-    BlendMode,
-    QuantizeMode,
-    SnapMode,
-    TimeRefType,
+    TimeRefKind,
 )
 
 
 class TestTimeRef:
-    """Test TimeRef model."""
+    """Tests for TimeRef model validation contracts."""
 
-    def test_marker_based_time_ref(self):
-        """Test marker-based time reference."""
-        ref = TimeRef(ref_type=TimeRefType.MARKER, value=4, marker_type="bar")
-        assert ref.ref_type == TimeRefType.MARKER
-        assert ref.value == 4
-        assert ref.marker_type == "bar"
+    def test_bar_beat_requires_bar_and_beat(self) -> None:
+        """BAR_BEAT kind requires bar and beat fields."""
+        ref = TimeRef(kind=TimeRefKind.BAR_BEAT, bar=1, beat=1)
+        assert ref.bar == 1
+        assert ref.beat == 1
+        assert ref.offset_ms is None
 
-    def test_milliseconds_time_ref(self):
-        """Test milliseconds-based time reference."""
-        ref = TimeRef(ref_type=TimeRefType.MILLISECONDS, value=5000)
-        assert ref.ref_type == TimeRefType.MILLISECONDS
-        assert ref.value == 5000
+    def test_bar_beat_with_optional_offset(self) -> None:
+        """BAR_BEAT can have optional offset_ms for fine nudge."""
+        ref = TimeRef(kind=TimeRefKind.BAR_BEAT, bar=4, beat=2, offset_ms=50)
+        assert ref.bar == 4
+        assert ref.beat == 2
+        assert ref.offset_ms == 50
+
+    def test_bar_beat_with_beat_frac(self) -> None:
+        """BAR_BEAT supports beat_frac for sub-beat timing."""
+        ref = TimeRef(kind=TimeRefKind.BAR_BEAT, bar=1, beat=1, beat_frac=0.5)
+        assert ref.beat_frac == 0.5
+
+    def test_ms_requires_offset_ms(self) -> None:
+        """MS kind requires offset_ms field."""
+        ref = TimeRef(kind=TimeRefKind.MS, offset_ms=5000)
+        assert ref.offset_ms == 5000
+        assert ref.bar is None
+        assert ref.beat is None
+
+    def test_bar_beat_missing_bar_raises(self) -> None:
+        """BAR_BEAT without bar should raise validation error."""
+        with pytest.raises(ValueError, match=r"bar.*required"):
+            TimeRef(kind=TimeRefKind.BAR_BEAT, beat=1)
+
+    def test_bar_beat_missing_beat_raises(self) -> None:
+        """BAR_BEAT without beat should raise validation error."""
+        with pytest.raises(ValueError, match=r"beat.*required"):
+            TimeRef(kind=TimeRefKind.BAR_BEAT, bar=1)
+
+    def test_ms_missing_offset_raises(self) -> None:
+        """MS without offset_ms should raise validation error."""
+        with pytest.raises(ValueError, match=r"offset_ms.*required"):
+            TimeRef(kind=TimeRefKind.MS)
+
+    def test_ms_with_bar_raises(self) -> None:
+        """MS kind with bar field should raise validation error."""
+        with pytest.raises(ValueError, match=r"bar.*None"):
+            TimeRef(kind=TimeRefKind.MS, offset_ms=5000, bar=1)
 
 
-class TestSnapRule:
-    """Test SnapRule model."""
+class TestDisplayGraph:
+    """Tests for DisplayGraph model."""
 
-    def test_snap_rule_defaults(self):
-        """Test snap rule defaults."""
-        rule = SnapRule()
-        assert rule.snap_mode == SnapMode.NONE
-        assert rule.quantize == QuantizeMode.NONE
+    def test_groups_by_role_computed(self) -> None:
+        """groups_by_role returns mapping of role -> group_ids."""
+        graph = DisplayGraph(
+            display_id="test_display",
+            display_name="Test Display",
+            groups=[
+                DisplayGroup(group_id="HERO_1", role="HERO", display_name="Hero 1"),
+                DisplayGroup(group_id="HERO_2", role="HERO", display_name="Hero 2"),
+                DisplayGroup(group_id="ARCHES_1", role="ARCHES", display_name="Arches"),
+            ],
+        )
+        by_role = graph.groups_by_role
+        assert by_role["HERO"] == ["HERO_1", "HERO_2"]
+        assert by_role["ARCHES"] == ["ARCHES_1"]
 
-    def test_snap_rule_custom(self):
-        """Test custom snap rule."""
-        rule = SnapRule(snap_mode=SnapMode.BOTH, quantize=QuantizeMode.BARS)
-        assert rule.snap_mode == SnapMode.BOTH
-        assert rule.quantize == QuantizeMode.BARS
+    def test_get_group_by_id(self) -> None:
+        """get_group returns group by ID or None."""
+        graph = DisplayGraph(
+            display_id="test_display",
+            display_name="Test Display",
+            groups=[
+                DisplayGroup(group_id="HERO_1", role="HERO", display_name="Hero 1"),
+            ],
+        )
+        assert graph.get_group("HERO_1") is not None
+        assert graph.get_group("HERO_1").display_name == "Hero 1"
+        assert graph.get_group("NONEXISTENT") is None
+
+    def test_requires_at_least_one_group(self) -> None:
+        """DisplayGraph must have at least one group."""
+        with pytest.raises(ValueError):
+            DisplayGraph(
+                display_id="empty",
+                display_name="Empty",
+                groups=[],
+            )
 
 
-class TestTemplatePlacement:
-    """Test TemplatePlacement model."""
+class TestTemplateCatalog:
+    """Tests for lightweight TemplateCatalog."""
 
-    def test_valid_template_placement(self):
-        """Test valid template placement."""
-        start = TimeRef(ref_type=TimeRefType.MARKER, value=1, marker_type="bar")
-        end = TimeRef(ref_type=TimeRefType.MARKER, value=4, marker_type="bar")
-        snap = SnapRule()
+    def test_has_template(self) -> None:
+        """has_template checks if template_id exists."""
+        catalog = TemplateCatalog(
+            entries=[
+                TemplateCatalogEntry(
+                    template_id="gtpl_bg_starfield",
+                    name="Starfield Background",
+                    compatible_lanes=[LaneKind.BASE],
+                ),
+            ]
+        )
+        assert catalog.has_template("gtpl_bg_starfield") is True
+        assert catalog.has_template("nonexistent") is False
 
-        placement = TemplatePlacement(
+    def test_get_entry(self) -> None:
+        """get_entry returns entry or None."""
+        catalog = TemplateCatalog(
+            entries=[
+                TemplateCatalogEntry(
+                    template_id="gtpl_accent_bell",
+                    name="Bell Accent",
+                    compatible_lanes=[LaneKind.ACCENT],
+                ),
+            ]
+        )
+        entry = catalog.get_entry("gtpl_accent_bell")
+        assert entry is not None
+        assert entry.name == "Bell Accent"
+        assert catalog.get_entry("nonexistent") is None
+
+    def test_list_by_lane(self) -> None:
+        """list_by_lane filters entries by lane compatibility."""
+        catalog = TemplateCatalog(
+            entries=[
+                TemplateCatalogEntry(
+                    template_id="gtpl_bg_1",
+                    name="BG 1",
+                    compatible_lanes=[LaneKind.BASE],
+                ),
+                TemplateCatalogEntry(
+                    template_id="gtpl_rhythm_1",
+                    name="Rhythm 1",
+                    compatible_lanes=[LaneKind.RHYTHM],
+                ),
+                TemplateCatalogEntry(
+                    template_id="gtpl_multi",
+                    name="Multi",
+                    compatible_lanes=[LaneKind.BASE, LaneKind.RHYTHM],
+                ),
+            ]
+        )
+        base_templates = catalog.list_by_lane(LaneKind.BASE)
+        assert len(base_templates) == 2
+        template_ids = [e.template_id for e in base_templates]
+        assert "gtpl_bg_1" in template_ids
+        assert "gtpl_multi" in template_ids
+
+
+class TestGroupPlacement:
+    """Tests for GroupPlacement model."""
+
+    def test_valid_placement(self) -> None:
+        """Valid placement with TimeRef start/end."""
+        placement = GroupPlacement(
             placement_id="p1",
-            start=start,
-            end=end,
-            snap=snap,
-            template_id="gtpl_test",
-            preset_id="default",
+            group_id="HERO_1",
+            template_id="gtpl_accent_bell",
+            start=TimeRef(kind=TimeRefKind.BAR_BEAT, bar=1, beat=1),
+            end=TimeRef(kind=TimeRefKind.BAR_BEAT, bar=2, beat=1),
         )
-        assert placement.placement_id == "p1"
-        assert placement.template_id == "gtpl_test"
-        assert placement.intensity == 1.0
-        assert placement.blend_mode == BlendMode.NORMAL
+        assert placement.group_id == "HERO_1"
+        assert placement.template_id == "gtpl_accent_bell"
 
 
-class TestLayerPlan:
-    """Test LayerPlan model."""
+class TestCoordinationPlan:
+    """Tests for CoordinationPlan model."""
 
-    def test_valid_layer_plan(self):
-        """Test valid layer plan."""
-        start = TimeRef(ref_type=TimeRefType.MARKER, value=1, marker_type="bar")
-        end = TimeRef(ref_type=TimeRefType.MARKER, value=4, marker_type="bar")
-        snap = SnapRule()
-
-        placement = TemplatePlacement(
-            placement_id="p1",
-            start=start,
-            end=end,
-            snap=snap,
-            template_id="gtpl_test",
-            preset_id="default",
+    def test_unified_mode_requires_placements(self) -> None:
+        """UNIFIED mode should have placements, no config."""
+        plan = CoordinationPlan(
+            coordination_mode=CoordinationMode.UNIFIED,
+            group_ids=["HERO_1", "HERO_2"],
+            placements=[
+                GroupPlacement(
+                    placement_id="p1",
+                    group_id="HERO_1",
+                    template_id="gtpl_accent",
+                    start=TimeRef(kind=TimeRefKind.BAR_BEAT, bar=1, beat=1),
+                    end=TimeRef(kind=TimeRefKind.BAR_BEAT, bar=2, beat=1),
+                ),
+            ],
         )
+        assert plan.coordination_mode == CoordinationMode.UNIFIED
+        assert plan.config is None
 
-        layer = LayerPlan(layer_index=0, placements=[placement])
-        assert layer.layer_index == 0
-        assert len(layer.placements) == 1
-
-
-class TestSectionGroupPlan:
-    """Test SectionGroupPlan model."""
-
-    def test_valid_section_group_plan(self):
-        """Test valid section group plan."""
-        section = SongSectionRef(section_id="verse_1", name="verse", start_ms=0, end_ms=10000)
-
-        start = TimeRef(ref_type=TimeRefType.MARKER, value=1, marker_type="bar")
-        end = TimeRef(ref_type=TimeRefType.MARKER, value=4, marker_type="bar")
-        snap = SnapRule()
-
-        placement = TemplatePlacement(
-            placement_id="p1",
-            start=start,
-            end=end,
-            snap=snap,
-            template_id="gtpl_test",
-            preset_id="default",
+    def test_sequenced_mode_requires_config(self) -> None:
+        """SEQUENCED mode should have window + config, no pre-expanded placements."""
+        plan = CoordinationPlan(
+            coordination_mode=CoordinationMode.SEQUENCED,
+            group_ids=["HERO_1", "HERO_2", "HERO_3"],
+            window=PlacementWindow(
+                start=TimeRef(kind=TimeRefKind.BAR_BEAT, bar=1, beat=1),
+                end=TimeRef(kind=TimeRefKind.BAR_BEAT, bar=4, beat=1),
+                template_id="gtpl_accent",
+            ),
+            config=CoordinationConfig(
+                group_order=["HERO_1", "HERO_2", "HERO_3"],
+                step_unit=StepUnit.BEAT,
+                step_duration=1,
+                spill_policy=SpillPolicy.TRUNCATE,
+            ),
         )
+        assert plan.coordination_mode == CoordinationMode.SEQUENCED
+        assert plan.config is not None
+        assert plan.config.group_order == ["HERO_1", "HERO_2", "HERO_3"]
 
-        layer = LayerPlan(layer_index=0, placements=[placement])
-        section_plan = SectionGroupPlan(section=section, layers=[layer])
 
-        assert section_plan.section.section_id == "verse_1"
-        assert len(section_plan.layers) == 1
+class TestLanePlan:
+    """Tests for LanePlan model."""
 
-    def test_section_group_plan_duplicate_layers(self):
-        """Test that duplicate layer indices are rejected."""
-        section = SongSectionRef(section_id="verse_1", name="verse", start_ms=0, end_ms=10000)
-
-        start = TimeRef(ref_type=TimeRefType.MARKER, value=1, marker_type="bar")
-        end = TimeRef(ref_type=TimeRefType.MARKER, value=4, marker_type="bar")
-        snap = SnapRule()
-
-        placement = TemplatePlacement(
-            placement_id="p1",
-            start=start,
-            end=end,
-            snap=snap,
-            template_id="gtpl_test",
-            preset_id="default",
+    def test_lane_plan_with_coordination(self) -> None:
+        """LanePlan contains coordination plans for a lane."""
+        lane_plan = LanePlan(
+            lane=LaneKind.ACCENT,
+            target_roles=["HERO"],
+            coordination_plans=[
+                CoordinationPlan(
+                    coordination_mode=CoordinationMode.UNIFIED,
+                    group_ids=["HERO_1"],
+                    placements=[
+                        GroupPlacement(
+                            placement_id="p1",
+                            group_id="HERO_1",
+                            template_id="gtpl_accent",
+                            start=TimeRef(kind=TimeRefKind.BAR_BEAT, bar=1, beat=1),
+                            end=TimeRef(kind=TimeRefKind.BAR_BEAT, bar=2, beat=1),
+                        ),
+                    ],
+                ),
+            ],
         )
-
-        layer1 = LayerPlan(layer_index=0, placements=[placement])
-        layer2 = LayerPlan(layer_index=0, placements=[placement])  # Duplicate index
-
-        with pytest.raises(ValidationError, match="Layer indices must be unique"):
-            SectionGroupPlan(section=section, layers=[layer1, layer2])
+        assert lane_plan.lane == LaneKind.ACCENT
+        assert len(lane_plan.coordination_plans) == 1
 
 
-class TestAssetRequest:
-    """Test AssetRequest model."""
+class TestSectionCoordinationPlan:
+    """Tests for SectionCoordinationPlan model."""
 
-    def test_valid_asset_request(self):
-        """Test valid asset request."""
-        request = AssetRequest(
-            request_id="req_001",
-            kind="image_png",
-            use_case="matrix_texture",
-            style_tags=["holiday", "winter"],
-            content_tags=["snowflakes"],
+    def test_section_plan_structure(self) -> None:
+        """SectionCoordinationPlan contains lane plans for a section."""
+        section_plan = SectionCoordinationPlan(
+            section_id="verse_1",
+            lane_plans=[
+                LanePlan(
+                    lane=LaneKind.BASE,
+                    target_roles=["OUTLINE"],
+                    coordination_plans=[],
+                ),
+                LanePlan(
+                    lane=LaneKind.ACCENT,
+                    target_roles=["HERO"],
+                    coordination_plans=[],
+                ),
+            ],
         )
-        assert request.request_id == "req_001"
-        assert request.kind == "image_png"
-        assert request.use_case == "matrix_texture"
-
-
-class TestCompilationHints:
-    """Test CompilationHints model."""
-
-    def test_compilation_hints_defaults(self):
-        """Test compilation hints defaults."""
-        hints = CompilationHints()
-        assert hints.quantize_policy == QuantizeMode.BARS
-        assert hints.transition_policy == "crossfade"
-        assert hints.layering_policy == "blend"
-
-
-class TestGroupPlan:
-    """Test GroupPlan model."""
-
-    def test_valid_group_plan(self):
-        """Test valid group plan."""
-        section = SongSectionRef(section_id="verse_1", name="verse", start_ms=0, end_ms=10000)
-
-        start = TimeRef(ref_type=TimeRefType.MARKER, value=1, marker_type="bar")
-        end = TimeRef(ref_type=TimeRefType.MARKER, value=4, marker_type="bar")
-        snap = SnapRule()
-
-        placement = TemplatePlacement(
-            placement_id="p1",
-            start=start,
-            end=end,
-            snap=snap,
-            template_id="gtpl_test",
-            preset_id="default",
-        )
-
-        layer = LayerPlan(layer_index=0, placements=[placement])
-        section_plan = SectionGroupPlan(section=section, layers=[layer])
-
-        group_plan = GroupPlan(
-            plan_id="plan_001",
-            group_id="roofline",
-            section_plans=[section_plan],
-        )
-
-        assert group_plan.plan_id == "plan_001"
-        assert group_plan.group_id == "roofline"
-        assert len(group_plan.section_plans) == 1
-        assert group_plan.schema_version == "group-plan.v2"
-
-
-class TestGroupPlanSet:
-    """Test GroupPlanSet model."""
-
-    def test_valid_group_plan_set(self):
-        """Test valid group plan set."""
-        section = SongSectionRef(section_id="verse_1", name="verse", start_ms=0, end_ms=10000)
-
-        start = TimeRef(ref_type=TimeRefType.MARKER, value=1, marker_type="bar")
-        end = TimeRef(ref_type=TimeRefType.MARKER, value=4, marker_type="bar")
-        snap = SnapRule()
-
-        placement = TemplatePlacement(
-            placement_id="p1",
-            start=start,
-            end=end,
-            snap=snap,
-            template_id="gtpl_test",
-            preset_id="default",
-        )
-
-        layer = LayerPlan(layer_index=0, placements=[placement])
-        section_plan = SectionGroupPlan(section=section, layers=[layer])
-
-        plan1 = GroupPlan(plan_id="plan_001", group_id="roofline", section_plans=[section_plan])
-        plan2 = GroupPlan(plan_id="plan_002", group_id="mega_tree", section_plans=[section_plan])
-
-        plan_set = GroupPlanSet(
-            set_id="set_001",
-            group_plans=[plan1, plan2],
-        )
-
-        assert plan_set.set_id == "set_001"
-        assert len(plan_set.group_plans) == 2
-        assert plan_set.schema_version == "group-plan-set.v2"
-
-    def test_group_plan_set_duplicate_groups(self):
-        """Test that duplicate group IDs are rejected."""
-        section = SongSectionRef(section_id="verse_1", name="verse", start_ms=0, end_ms=10000)
-
-        start = TimeRef(ref_type=TimeRefType.MARKER, value=1, marker_type="bar")
-        end = TimeRef(ref_type=TimeRefType.MARKER, value=4, marker_type="bar")
-        snap = SnapRule()
-
-        placement = TemplatePlacement(
-            placement_id="p1",
-            start=start,
-            end=end,
-            snap=snap,
-            template_id="gtpl_test",
-            preset_id="default",
-        )
-
-        layer = LayerPlan(layer_index=0, placements=[placement])
-        section_plan = SectionGroupPlan(section=section, layers=[layer])
-
-        plan1 = GroupPlan(plan_id="plan_001", group_id="roofline", section_plans=[section_plan])
-        plan2 = GroupPlan(
-            plan_id="plan_002", group_id="roofline", section_plans=[section_plan]
-        )  # Duplicate
-
-        with pytest.raises(ValidationError, match="Group IDs must be unique"):
-            GroupPlanSet(set_id="set_001", group_plans=[plan1, plan2])
+        assert section_plan.section_id == "verse_1"
+        assert len(section_plan.lane_plans) == 2

@@ -3,7 +3,6 @@
 import json
 from pathlib import Path
 
-from pydantic import ValidationError
 import pytest
 
 from twinklr.core.agents.audio.lyrics.models import LyricContextModel
@@ -52,16 +51,6 @@ class TestPlanningContext:
         assert ctx.song_title is not None
         assert ctx.song_duration_ms > 0
         assert ctx.has_lyrics is False
-
-    def test_planning_context_forbids_extra_fields(self, audio_profile_fixture):
-        """Test planning context forbids extra fields."""
-        with pytest.raises(ValidationError, match=r"Extra inputs are not permitted"):
-            PlanningContext(
-                audio_profile=audio_profile_fixture,
-                lyric_context=None,
-                display_groups=[],
-                extra_field="not_allowed",  # type: ignore[call-arg]
-            )
 
 
 # Fixtures

@@ -29,13 +29,6 @@ class TestAudioAnalyzer:
         return app_config, job_config
 
     @pytest.mark.skip(reason="Rewriting for async cache in Day 3")
-    def test_cache_integration(
-        self,
-        mock_configs: tuple[MagicMock, MagicMock],
-    ) -> None:
-        """Test async cache integration."""
-
-    @pytest.mark.skip(reason="Rewriting for async cache in Day 3")
     def test_cache_hit(
         self,
         mock_configs: tuple[MagicMock, MagicMock],

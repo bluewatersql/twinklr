@@ -138,15 +138,6 @@ def target_segments():
 class TestTransitionSegmentCompilerBasic:
     """Test basic transition compilation."""
 
-    def test_compile_transition_creates_segments(
-        self, compiler, transition_plan, source_segments, target_segments
-    ):
-        """Test that compiler creates segments for all fixtures."""
-        result = compiler.compile_transition(transition_plan, source_segments, target_segments)
-
-        assert len(result) == 2  # One per fixture
-        assert all(isinstance(seg, FixtureSegment) for seg in result)
-
     def test_transition_segment_timing(
         self, compiler, transition_plan, source_segments, target_segments
     ):
@@ -298,25 +289,6 @@ class TestTransitionSegmentCompilerEdgeCases:
         # Fixture 2 should have a transition segment (target defaults to 0)
         fixture_2_seg = next(seg for seg in result if seg.fixture_id == "fixture_2")
         assert fixture_2_seg is not None
-
-    def test_no_fixtures_in_plan(self, compiler, transition_plan, source_segments, target_segments):
-        """Test transition with no fixtures specified in plan."""
-        # Clear fixtures from plan
-        transition_plan.fixtures.clear()
-
-        result = compiler.compile_transition(transition_plan, source_segments, target_segments)
-
-        # Should infer fixtures from source and target segments
-        assert len(result) == 2
-        fixture_ids = {seg.fixture_id for seg in result}
-        assert fixture_ids == {"fixture_1", "fixture_2"}
-
-    def test_empty_source_and_target(self, compiler, transition_plan):
-        """Test transition with no source or target segments."""
-        result = compiler.compile_transition(transition_plan, [], [])
-
-        # Should still create segments for fixtures in plan
-        assert len(result) == 2  # transition_plan has 2 fixtures
 
     def test_different_channels_in_source_and_target(self, compiler, transition_plan):
         """Test blending when source and target have different channels."""

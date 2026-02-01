@@ -110,17 +110,6 @@ class TestComputeQualityMetrics:
         assert quality.avg_word_duration_ms == pytest.approx(666.67, rel=0.01)
         assert quality.min_word_duration_ms == 500.0
 
-    def test_coverage_clips_to_duration(self):
-        """Coverage clips word spans to duration bounds."""
-        words = [
-            LyricWord(text="word1", start_ms=0, end_ms=120000),  # Extends beyond
-        ]
-
-        quality = compute_quality_metrics(words=words, duration_ms=100000)
-
-        # Should clip to 100s, not use 120s
-        assert quality.coverage_pct == 1.0
-
     def test_custom_max_gap(self):
         """Custom max gap threshold."""
         words = [

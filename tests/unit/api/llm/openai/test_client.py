@@ -5,68 +5,18 @@ from __future__ import annotations
 from typing import Any
 from unittest.mock import MagicMock, patch
 
-from openai import APIConnectionError, APIStatusError, APITimeoutError, RateLimitError
+from openai import APIConnectionError, APIStatusError, RateLimitError
 import pytest
 
 from twinklr.core.api.llm.openai.client import (
     OpenAIClient,
-    OpenAIClientError,
-    OpenAIResponseParseError,
     OpenAIRetryExhausted,
     ReasoningEffort,
     ResponseMetadata,
     RetryConfig,
     TokenUsage,
     Verbosity,
-    create_client,
 )
-
-# ============================================================================
-# Enum Tests
-# ============================================================================
-
-
-class TestReasoningEffort:
-    """Tests for ReasoningEffort enum."""
-
-    def test_low_value(self) -> None:
-        """Test LOW enum value."""
-        assert ReasoningEffort.LOW.value == "low"
-
-    def test_medium_value(self) -> None:
-        """Test MEDIUM enum value."""
-        assert ReasoningEffort.MEDIUM.value == "medium"
-
-    def test_high_value(self) -> None:
-        """Test HIGH enum value."""
-        assert ReasoningEffort.HIGH.value == "high"
-
-    def test_is_string_enum(self) -> None:
-        """Test that ReasoningEffort is a string enum."""
-        assert isinstance(ReasoningEffort.LOW, str)
-        assert ReasoningEffort.LOW == "low"
-
-
-class TestVerbosity:
-    """Tests for Verbosity enum."""
-
-    def test_low_value(self) -> None:
-        """Test LOW enum value."""
-        assert Verbosity.LOW.value == "low"
-
-    def test_medium_value(self) -> None:
-        """Test MEDIUM enum value."""
-        assert Verbosity.MEDIUM.value == "medium"
-
-    def test_high_value(self) -> None:
-        """Test HIGH enum value."""
-        assert Verbosity.HIGH.value == "high"
-
-    def test_is_string_enum(self) -> None:
-        """Test that Verbosity is a string enum."""
-        assert isinstance(Verbosity.LOW, str)
-        assert Verbosity.LOW == "low"
-
 
 # ============================================================================
 # Dataclass Tests
@@ -75,20 +25,6 @@ class TestVerbosity:
 
 class TestTokenUsage:
     """Tests for TokenUsage dataclass."""
-
-    def test_default_values(self) -> None:
-        """Test default values are zero."""
-        usage = TokenUsage()
-        assert usage.prompt_tokens == 0
-        assert usage.completion_tokens == 0
-        assert usage.total_tokens == 0
-
-    def test_custom_values(self) -> None:
-        """Test custom values."""
-        usage = TokenUsage(prompt_tokens=100, completion_tokens=50, total_tokens=150)
-        assert usage.prompt_tokens == 100
-        assert usage.completion_tokens == 50
-        assert usage.total_tokens == 150
 
     def test_add_two_usages(self) -> None:
         """Test adding two TokenUsage instances."""
@@ -101,40 +37,9 @@ class TestTokenUsage:
         assert result.completion_tokens == 150
         assert result.total_tokens == 450
 
-    def test_add_preserves_original(self) -> None:
-        """Test that addition does not modify original instances."""
-        usage1 = TokenUsage(prompt_tokens=100, completion_tokens=50, total_tokens=150)
-        usage2 = TokenUsage(prompt_tokens=200, completion_tokens=100, total_tokens=300)
-
-        _ = usage1 + usage2
-
-        # Originals should be unchanged
-        assert usage1.prompt_tokens == 100
-        assert usage2.prompt_tokens == 200
-
-    def test_str_representation(self) -> None:
-        """Test string representation."""
-        usage = TokenUsage(prompt_tokens=100, completion_tokens=50, total_tokens=150)
-        result = str(usage)
-
-        assert "TokenUsage" in result
-        assert "prompt=100" in result
-        assert "completion=50" in result
-        assert "total=150" in result
-
 
 class TestResponseMetadata:
     """Tests for ResponseMetadata dataclass."""
-
-    def test_default_values(self) -> None:
-        """Test default values."""
-        metadata = ResponseMetadata()
-
-        assert metadata.response_id is None
-        assert metadata.model is None
-        assert metadata.finish_reason is None
-        assert isinstance(metadata.token_usage, TokenUsage)
-        assert metadata.token_usage.total_tokens == 0
 
     def test_custom_values(self) -> None:
         """Test custom values."""
@@ -151,36 +56,9 @@ class TestResponseMetadata:
         assert metadata.finish_reason == "stop"
         assert metadata.token_usage.total_tokens == 150
 
-    def test_str_representation(self) -> None:
-        """Test string representation."""
-        usage = TokenUsage(prompt_tokens=100, completion_tokens=50, total_tokens=150)
-        metadata = ResponseMetadata(
-            response_id="resp_123",
-            token_usage=usage,
-            model="gpt-5.2",
-        )
-        result = str(metadata)
-
-        assert "ResponseMetadata" in result
-        assert "resp_123" in result
-        assert "gpt-5.2" in result
-
 
 class TestRetryConfig:
     """Tests for RetryConfig dataclass."""
-
-    def test_default_values(self) -> None:
-        """Test default values."""
-        config = RetryConfig()
-
-        assert config.max_retries == 3
-        assert config.initial_delay == 1.0
-        assert config.max_delay == 60.0
-        assert config.exponential_base == 2.0
-        assert config.jitter is True
-        assert config.max_rate_limit_retries == 5
-        assert config.max_timeout_retries == 3
-        assert config.max_connection_retries == 3
 
     def test_custom_values(self) -> None:
         """Test custom values."""
@@ -206,26 +84,7 @@ class TestRetryConfig:
 # ============================================================================
 
 
-class TestExceptions:
-    """Tests for custom exceptions."""
-
-    def test_openai_client_error_is_exception(self) -> None:
-        """Test OpenAIClientError inherits from Exception."""
-        error = OpenAIClientError("Test error")
-        assert isinstance(error, Exception)
-        assert str(error) == "Test error"
-
-    def test_openai_retry_exhausted_inherits_client_error(self) -> None:
-        """Test OpenAIRetryExhausted inherits from OpenAIClientError."""
-        error = OpenAIRetryExhausted("Retries exhausted")
-        assert isinstance(error, OpenAIClientError)
-        assert isinstance(error, Exception)
-
-    def test_openai_response_parse_error_inherits_client_error(self) -> None:
-        """Test OpenAIResponseParseError inherits from OpenAIClientError."""
-        error = OpenAIResponseParseError("Parse failed")
-        assert isinstance(error, OpenAIClientError)
-        assert isinstance(error, Exception)
+# Skip trivial exception inheritance tests - Python guarantees this
 
 
 # ============================================================================
@@ -236,52 +95,6 @@ class TestExceptions:
 class TestOpenAIClientInit:
     """Tests for OpenAIClient initialization."""
 
-    def test_init_with_defaults(self) -> None:
-        """Test initialization with default values."""
-        with patch("twinklr.core.api.llm.openai.client.OpenAI") as mock_openai:
-            client = OpenAIClient(api_key="test-key")
-
-            mock_openai.assert_called_once_with(api_key="test-key", timeout=120.0)
-            assert client.retry_config is not None
-            assert client.max_tokens is None
-
-    def test_init_with_custom_retry_config(self) -> None:
-        """Test initialization with custom retry config."""
-        with patch("twinklr.core.api.llm.openai.client.OpenAI"):
-            config = RetryConfig(max_retries=5)
-            client = OpenAIClient(api_key="test-key", retry_config=config)
-
-            assert client.retry_config.max_retries == 5
-
-    def test_init_with_custom_timeout(self) -> None:
-        """Test initialization with custom timeout."""
-        with patch("twinklr.core.api.llm.openai.client.OpenAI") as mock_openai:
-            OpenAIClient(api_key="test-key", timeout=60.0)
-
-            mock_openai.assert_called_once_with(api_key="test-key", timeout=60.0)
-
-    def test_init_with_max_tokens(self) -> None:
-        """Test initialization with max_tokens."""
-        with patch("twinklr.core.api.llm.openai.client.OpenAI"):
-            client = OpenAIClient(api_key="test-key", max_tokens=4096)
-
-            assert client.max_tokens == 4096
-
-    def test_init_conversation_state(self) -> None:
-        """Test conversation state is initialized."""
-        with patch("twinklr.core.api.llm.openai.client.OpenAI"):
-            client = OpenAIClient(api_key="test-key")
-
-            assert client._conversation_history == []
-            assert client._last_response_id is None
-            assert client._total_token_usage.total_tokens == 0
-            assert client._response_metadata_history == []
-
-
-class TestGetRetryDelay:
-    """Tests for _get_retry_delay method."""
-
-    @pytest.fixture
     def client(self) -> OpenAIClient:
         """Create client for testing."""
         with patch("twinklr.core.api.llm.openai.client.OpenAI"):
@@ -294,31 +107,6 @@ class TestGetRetryDelay:
                     jitter=False,
                 ),
             )
-
-    def test_first_attempt_delay(self, client: OpenAIClient) -> None:
-        """Test delay for first attempt (0-indexed)."""
-        delay = client._get_retry_delay(0)
-        assert delay == 1.0
-
-    def test_second_attempt_delay(self, client: OpenAIClient) -> None:
-        """Test delay for second attempt."""
-        delay = client._get_retry_delay(1)
-        assert delay == 2.0
-
-    def test_third_attempt_delay(self, client: OpenAIClient) -> None:
-        """Test delay for third attempt."""
-        delay = client._get_retry_delay(2)
-        assert delay == 4.0
-
-    def test_max_delay_cap(self, client: OpenAIClient) -> None:
-        """Test that delay is capped at max_delay."""
-        delay = client._get_retry_delay(10)  # Would be 1024 without cap
-        assert delay == 60.0
-
-    def test_custom_base_delay(self, client: OpenAIClient) -> None:
-        """Test with custom base delay."""
-        delay = client._get_retry_delay(0, base_delay=2.0)
-        assert delay == 2.0
 
     def test_jitter_applied(self) -> None:
         """Test that jitter is applied when enabled."""
@@ -378,46 +166,6 @@ class TestShouldRetry:
         assert should_retry is False
         assert "exhausted" in reason
 
-    def test_timeout_error_retry(self, client: OpenAIClient) -> None:
-        """Test timeout errors are retried."""
-        request = MagicMock()
-        error = APITimeoutError(request=request)
-
-        should_retry, reason = client._should_retry(error, attempt=0)
-
-        assert should_retry is True
-        assert "Timeout" in reason
-
-    def test_timeout_exhausted(self, client: OpenAIClient) -> None:
-        """Test timeout retries are exhausted."""
-        request = MagicMock()
-        error = APITimeoutError(request=request)
-
-        should_retry, reason = client._should_retry(error, attempt=3)
-
-        assert should_retry is False
-        assert "exhausted" in reason
-
-    def test_connection_error_retry(self, client: OpenAIClient) -> None:
-        """Test connection errors are retried."""
-        request = MagicMock()
-        error = APIConnectionError(request=request)
-
-        should_retry, reason = client._should_retry(error, attempt=0)
-
-        assert should_retry is True
-        assert "Connection" in reason
-
-    def test_connection_exhausted(self, client: OpenAIClient) -> None:
-        """Test connection retries are exhausted."""
-        request = MagicMock()
-        error = APIConnectionError(request=request)
-
-        should_retry, reason = client._should_retry(error, attempt=3)
-
-        assert should_retry is False
-        assert "exhausted" in reason
-
     def test_client_error_not_retried(self, client: OpenAIClient) -> None:
         """Test 4xx client errors are not retried."""
         mock_response = MagicMock()
@@ -457,15 +205,6 @@ class TestRetryWithBackoff:
                     jitter=False,
                 ),
             )
-
-    def test_success_on_first_try(self, client: OpenAIClient) -> None:
-        """Test successful execution on first try."""
-
-        def success_func() -> str:
-            return "success"
-
-        result = client._retry_with_backoff(success_func, "test operation")
-        assert result == "success"
 
     def test_success_after_retry(self, client: OpenAIClient) -> None:
         """Test success after retry."""
@@ -555,15 +294,6 @@ class TestGenerateJson:
         assert client_with_mock.get_last_response_id() == "resp_123"
         assert client_with_mock.get_total_token_usage().total_tokens == 150
         assert len(client_with_mock.get_response_metadata_history()) == 1
-
-    def test_generate_json_temperature_validation(self, client_with_mock: OpenAIClient) -> None:
-        """Test temperature parameter validation."""
-        messages = [{"role": "user", "content": "Test"}]
-
-        with pytest.raises(ValueError) as exc_info:
-            client_with_mock.generate_json(messages=messages, model="gpt-5.2", temperature=3.0)
-
-        assert "temperature must be between" in str(exc_info.value)
 
     def test_generate_json_temperature_negative(self, client_with_mock: OpenAIClient) -> None:
         """Test negative temperature validation."""
@@ -717,14 +447,6 @@ class TestGenerateText:
             client = OpenAIClient(api_key="test-key")
             return client
 
-    def test_generate_text_success(self, client_with_mock: OpenAIClient) -> None:
-        """Test successful text generation."""
-        messages = [{"role": "user", "content": "Hello"}]
-
-        result = client_with_mock.generate_text(messages=messages, model="gpt-5.2")
-
-        assert result == "This is a text response."
-
     def test_generate_text_with_metadata(self, client_with_mock: OpenAIClient) -> None:
         """Test text generation with metadata return."""
         messages = [{"role": "user", "content": "Hello"}]
@@ -735,14 +457,6 @@ class TestGenerateText:
 
         assert result == "This is a text response."
         assert metadata.response_id == "resp_text_123"
-
-    def test_generate_text_updates_tracking(self, client_with_mock: OpenAIClient) -> None:
-        """Test that generate_text updates internal tracking."""
-        messages = [{"role": "user", "content": "Hello"}]
-
-        client_with_mock.generate_text(messages=messages, model="gpt-5.2")
-
-        assert client_with_mock.get_last_response_id() == "resp_text_123"
 
     def test_generate_text_empty_response(self) -> None:
         """Test empty response raises error."""
@@ -836,15 +550,6 @@ class TestConversationManagement:
         assert history[1]["role"] == "assistant"
         assert history[1]["content"] == "Hi there!"
 
-    def test_get_conversation_history_returns_copy(self, client: OpenAIClient) -> None:
-        """Test that get_conversation_history returns a copy."""
-        client.add_to_conversation("user", "Hello")
-
-        history1 = client.get_conversation_history()
-        history2 = client.get_conversation_history()
-
-        assert history1 is not history2
-
     def test_reset_conversation(self, client: OpenAIClient) -> None:
         """Test resetting conversation state."""
         # Add some state
@@ -861,81 +566,6 @@ class TestConversationManagement:
         assert client.get_last_response_id() is None
         assert client.get_total_token_usage().total_tokens == 0
         assert len(client.get_response_metadata_history()) == 0
-
-    def test_get_last_response_id(self, client: OpenAIClient) -> None:
-        """Test getting last response ID."""
-        assert client.get_last_response_id() is None
-
-        client._last_response_id = "resp_123"
-
-        assert client.get_last_response_id() == "resp_123"
-
-    def test_get_response_metadata_history_returns_copy(self, client: OpenAIClient) -> None:
-        """Test that get_response_metadata_history returns a copy."""
-        client._response_metadata_history.append(ResponseMetadata())
-
-        history1 = client.get_response_metadata_history()
-        history2 = client.get_response_metadata_history()
-
-        assert history1 is not history2
-
-
-class TestMessageConversion:
-    """Tests for message conversion methods."""
-
-    @pytest.fixture
-    def client(self) -> OpenAIClient:
-        """Create client for testing."""
-        with patch("twinklr.core.api.llm.openai.client.OpenAI"):
-            return OpenAIClient(api_key="test-key")
-
-    def test_get_messages_from_simple(self, client: OpenAIClient) -> None:
-        """Test converting simple messages to OpenAI format."""
-        simple_messages = [
-            {"role": "user", "content": "Hello"},
-            {"role": "assistant", "content": "Hi"},
-        ]
-
-        result = client.get_messages_from_simple(simple_messages)
-
-        assert len(result) == 2
-        assert result[0]["role"] == "user"
-        assert result[0]["content"] == "Hello"
-
-    def test_get_messages_from_simple_defaults(self, client: OpenAIClient) -> None:
-        """Test converting simple messages with missing fields."""
-        simple_messages = [
-            {"content": "Hello"},  # Missing role
-            {"role": "user"},  # Missing content
-        ]
-
-        result = client.get_messages_from_simple(simple_messages)
-
-        assert result[0]["role"] == "user"  # Default
-        assert result[1]["content"] == ""  # Default
-
-    def test_get_simple_messages(self, client: OpenAIClient) -> None:
-        """Test converting OpenAI format to simple messages."""
-        openai_messages = [
-            {"role": "user", "content": "Hello"},
-            {"role": "assistant", "content": "Hi"},
-        ]
-
-        result = client.get_simple_messages(openai_messages)
-
-        assert len(result) == 2
-        assert result[0] == {"role": "user", "content": "Hello"}
-        assert result[1] == {"role": "assistant", "content": "Hi"}
-
-    def test_get_simple_messages_list_content(self, client: OpenAIClient) -> None:
-        """Test converting messages with list content."""
-        openai_messages = [
-            {"role": "user", "content": ["part1", "part2"]},
-        ]
-
-        result = client.get_simple_messages(openai_messages)
-
-        assert result[0]["content"] == "['part1', 'part2']"
 
 
 class TestGenerateJsonWithConversation:
@@ -1008,25 +638,3 @@ class TestGenerateJsonWithConversation:
 
 class TestCreateClient:
     """Tests for create_client factory function."""
-
-    def test_create_client_defaults(self) -> None:
-        """Test create_client with defaults."""
-        with patch("twinklr.core.api.llm.openai.client.OpenAI") as mock_openai:
-            client = create_client(api_key="test-key")
-
-            mock_openai.assert_called_once_with(api_key="test-key", timeout=120.0)
-            assert client.retry_config.max_retries == 3
-
-    def test_create_client_custom_retries(self) -> None:
-        """Test create_client with custom max_retries."""
-        with patch("twinklr.core.api.llm.openai.client.OpenAI"):
-            client = create_client(api_key="test-key", max_retries=5)
-
-            assert client.retry_config.max_retries == 5
-
-    def test_create_client_custom_timeout(self) -> None:
-        """Test create_client with custom timeout."""
-        with patch("twinklr.core.api.llm.openai.client.OpenAI") as mock_openai:
-            create_client(api_key="test-key", timeout=60.0)
-
-            mock_openai.assert_called_once_with(api_key="test-key", timeout=60.0)

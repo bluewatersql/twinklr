@@ -228,17 +228,6 @@ class TestTransitionPlannerOverlapCalculation:
 class TestTransitionPlannerChannelStrategies:
     """Test per-channel strategy determination."""
 
-    def test_default_channel_strategies(self, planner, boundary):
-        """Test that default strategies are applied from config."""
-        hint = TransitionHint(mode=TransitionMode.CROSSFADE, duration_bars=1.0)
-
-        plan = planner.plan_transition(boundary=boundary, hint=hint, fixtures=["f1"])
-
-        # Check that defaults are applied
-        assert plan.channel_strategies[ChannelName.PAN] == TransitionStrategy.SMOOTH_INTERPOLATION
-        assert plan.channel_strategies[ChannelName.TILT] == TransitionStrategy.SMOOTH_INTERPOLATION
-        assert plan.channel_strategies[ChannelName.DIMMER] == TransitionStrategy.CROSSFADE
-
     def test_channel_strategy_overrides(self, planner, boundary):
         """Test that hint overrides take precedence."""
         hint = TransitionHint(

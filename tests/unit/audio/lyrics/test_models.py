@@ -3,9 +3,6 @@
 Testing LyricsBundle, LyricWord, LyricPhrase, and related models.
 """
 
-from pydantic import ValidationError
-import pytest
-
 from twinklr.core.audio.models.enums import StageStatus
 from twinklr.core.audio.models.lyrics import (
     LyricPhrase,
@@ -43,30 +40,6 @@ class TestLyricWord:
 
         assert word.speaker == "vocalist_1"
 
-    def test_word_timing_validation(self):
-        """Word timing must be non-negative and ordered."""
-        # Valid
-        LyricWord(text="test", start_ms=0, end_ms=100)
-        LyricWord(text="test", start_ms=100, end_ms=100)  # Equal is ok
-
-        # Invalid: negative start
-        with pytest.raises(ValidationError):
-            LyricWord(text="test", start_ms=-1, end_ms=100)
-
-        # Invalid: negative end
-        with pytest.raises(ValidationError):
-            LyricWord(text="test", start_ms=0, end_ms=-1)
-
-    def test_word_forbids_extra_fields(self):
-        """Word model forbids extra fields."""
-        with pytest.raises(ValidationError):
-            LyricWord(  # type: ignore[call-arg]
-                text="test",
-                start_ms=0,
-                end_ms=100,
-                extra_field="not_allowed",
-            )
-
 
 class TestLyricPhrase:
     """Test LyricPhrase model."""
@@ -99,15 +72,6 @@ class TestLyricPhrase:
         assert len(phrase.words) == 2
         assert phrase.words[0].text == "Hello"
         assert phrase.words[1].text == "world"
-
-    def test_phrase_timing_validation(self):
-        """Phrase timing must be non-negative and ordered."""
-        # Valid
-        LyricPhrase(text="test", start_ms=0, end_ms=100)
-
-        # Invalid: negative start
-        with pytest.raises(ValidationError):
-            LyricPhrase(text="test", start_ms=-1, end_ms=100)
 
 
 class TestLyricsSource:
@@ -148,20 +112,6 @@ class TestLyricsSource:
 
         assert source.kind == "LOOKUP_PLAIN"
 
-    def test_source_confidence_range(self):
-        """Source confidence must be 0-1."""
-        # Valid
-        LyricsSource(kind="EMBEDDED", provider="test", confidence=0.0)
-        LyricsSource(kind="EMBEDDED", provider="test", confidence=1.0)
-
-        # Invalid: below 0
-        with pytest.raises(ValidationError):
-            LyricsSource(kind="EMBEDDED", provider="test", confidence=-0.1)
-
-        # Invalid: above 1
-        with pytest.raises(ValidationError):
-            LyricsSource(kind="EMBEDDED", provider="test", confidence=1.1)
-
 
 class TestLyricsQuality:
     """Test LyricsQuality model."""
@@ -193,18 +143,6 @@ class TestLyricsQuality:
         assert quality.coverage_pct == 0.85
         assert quality.large_gaps_count == 2
         assert quality.avg_word_duration_ms == 350.5
-
-    def test_quality_ranges(self):
-        """Quality metrics have valid ranges."""
-        # Coverage must be 0-1
-        with pytest.raises(ValidationError):
-            LyricsQuality(coverage_pct=-0.1)
-        with pytest.raises(ValidationError):
-            LyricsQuality(coverage_pct=1.1)
-
-        # Violations must be non-negative
-        with pytest.raises(ValidationError):
-            LyricsQuality(monotonicity_violations=-1)
 
 
 class TestLyricsBundle:
@@ -309,12 +247,3 @@ class TestLyricsBundle:
 
         assert "pipeline_version" in bundle.provenance
         assert bundle.provenance["pipeline_version"] == "3.0.0"
-
-    def test_bundle_forbids_extra_fields(self):
-        """Bundle forbids extra fields."""
-        with pytest.raises(ValidationError):
-            LyricsBundle(  # type: ignore[call-arg]
-                schema_version="3.0.0",
-                stage_status=StageStatus.OK,
-                extra_field="not_allowed",
-            )

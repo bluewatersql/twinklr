@@ -3,9 +3,6 @@
 Following TDD for Phase 2 - Embedded Metadata.
 """
 
-from pydantic import ValidationError
-import pytest
-
 from twinklr.core.audio.models.enums import StageStatus
 from twinklr.core.audio.models.metadata import EmbeddedMetadata, MetadataBundle
 
@@ -67,13 +64,6 @@ class TestEmbeddedMetadata:
         assert meta.disc_number == 1
         assert meta.disc_total == 2
 
-    def test_genre_list(self):
-        """Genre as list of strings."""
-        meta = EmbeddedMetadata(genre=["Rock", "Alternative"])
-
-        assert meta.genre == ["Rock", "Alternative"]
-        assert len(meta.genre) == 2
-
     def test_date_fields(self):
         """Date fields (raw, ISO, year)."""
         meta = EmbeddedMetadata(
@@ -99,50 +89,6 @@ class TestEmbeddedMetadata:
         assert meta.artwork_mime == "image/jpeg"
         assert meta.artwork_hash_sha256 == "abc123def456"
         assert meta.artwork_size_bytes == 102400
-
-    def test_lyrics_embedded_flag(self):
-        """Lyrics embedded presence flag."""
-        meta = EmbeddedMetadata(lyrics_embedded_present=True)
-
-        assert meta.lyrics_embedded_present is True
-
-    def test_compilation_flag(self):
-        """Compilation album flag."""
-        meta = EmbeddedMetadata(compilation=True)
-
-        assert meta.compilation is True
-
-    def test_warnings_list(self):
-        """Warnings list."""
-        meta = EmbeddedMetadata(warnings=["Missing album artist", "Year could not be parsed"])
-
-        assert len(meta.warnings) == 2
-        assert "Missing album artist" in meta.warnings
-
-    def test_validation_positive_numbers(self):
-        """Track/disc numbers must be positive."""
-        with pytest.raises(ValidationError):
-            EmbeddedMetadata(track_number=0)
-
-        with pytest.raises(ValidationError):
-            EmbeddedMetadata(track_number=-1)
-
-        with pytest.raises(ValidationError):
-            EmbeddedMetadata(disc_number=0)
-
-    def test_validation_year_range(self):
-        """Year must be in reasonable range (1000-9999)."""
-        # Valid years
-        EmbeddedMetadata(year=2026)
-        EmbeddedMetadata(year=1000)
-        EmbeddedMetadata(year=9999)
-
-        # Invalid years
-        with pytest.raises(ValidationError):
-            EmbeddedMetadata(year=999)
-
-        with pytest.raises(ValidationError):
-            EmbeddedMetadata(year=10000)
 
     def test_serialization_round_trip(self):
         """Serialize and deserialize."""

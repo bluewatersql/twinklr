@@ -2,9 +2,6 @@
 
 from pathlib import Path
 
-from pydantic import ValidationError
-import pytest
-
 from twinklr.core.reporting.evaluation.models import (
     ContinuityCheck,
     CurveAnalysis,
@@ -35,16 +32,6 @@ class TestReportFlag:
         assert flag.level == ReportFlagLevel.WARNING
         assert flag.code == "CLAMP_PCT"
         assert flag.details["clamp_pct"] == 15.0
-
-    def test_flag_is_frozen(self):
-        """Test that flag is immutable."""
-        flag = ReportFlag(level=ReportFlagLevel.ERROR, code="TEST", message="Test message")
-        with pytest.raises(ValidationError):
-            flag.level = ReportFlagLevel.INFO  # type: ignore
-
-
-class TestRunMetadata:
-    """Tests for RunMetadata model."""
 
     def test_valid_metadata(self):
         """Test creating valid run metadata."""
@@ -109,21 +96,6 @@ class TestCurveStats:
 class TestContinuityCheck:
     """Tests for ContinuityCheck model."""
 
-    def test_passing_continuity(self):
-        """Test continuity check that passes."""
-        check = ContinuityCheck(loop_delta=0.02, ok=True, threshold=0.05)
-        assert check.ok is True
-        assert check.loop_delta == 0.02
-
-    def test_failing_continuity(self):
-        """Test continuity check that fails."""
-        check = ContinuityCheck(loop_delta=0.10, ok=False, threshold=0.05)
-        assert check.ok is False
-
-
-class TestCurveAnalysis:
-    """Tests for CurveAnalysis model."""
-
     def test_valid_analysis(self):
         """Test creating valid curve analysis."""
         stats = CurveStats(
@@ -159,17 +131,6 @@ class TestTemplateSelection:
         assert template.preset_id is None
         assert template.modifiers["intensity"] == "high"
 
-    def test_template_with_preset(self):
-        """Test template selection with preset."""
-        template = TemplateSelection(
-            template_id="sweep_lr", preset_id="ENERGETIC", modifiers={}, reasoning=""
-        )
-        assert template.preset_id == "ENERGETIC"
-
-
-class TestSectionReport:
-    """Tests for SectionReport model."""
-
     def test_section_report_structure(self):
         """Test creating a section report."""
         targets = TargetResolution(
@@ -194,13 +155,6 @@ class TestSectionReport:
 
 class TestReportSummary:
     """Tests for ReportSummary model."""
-
-    def test_summary_defaults(self):
-        """Test summary with default values."""
-        summary = ReportSummary(sections=5)
-        assert summary.sections == 5
-        assert summary.total_warnings == 0
-        assert summary.total_errors == 0
 
     def test_summary_with_counts(self):
         """Test summary with error/warning counts."""

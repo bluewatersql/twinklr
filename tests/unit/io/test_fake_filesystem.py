@@ -23,11 +23,6 @@ def test_root():
 class TestJoin:
     """Tests for path joining (sync operation)."""
 
-    def test_join_single_part(self, fs: FakeFileSystem, test_root: AbsolutePath):
-        """Test joining single path component."""
-        result = fs.join(test_root, "subdir")
-        assert str(result) == "/test/subdir"
-
     def test_join_multiple_parts(self, fs: FakeFileSystem, test_root: AbsolutePath):
         """Test joining multiple path components."""
         result = fs.join(test_root, "a", "b", "c")

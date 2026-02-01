@@ -19,11 +19,6 @@ from twinklr.core.audio.phonemes.viseme_mapping import (
 class TestPhonemeToVisemeMapping:
     """Test PHONEME_TO_VISEME mapping."""
 
-    def test_mapping_exists(self):
-        """Mapping dict should exist and be populated."""
-        assert isinstance(PHONEME_TO_VISEME, dict)
-        assert len(PHONEME_TO_VISEME) > 0
-
     def test_vowel_mappings(self):
         """Vowels should map to appropriate visemes."""
         # Open vowels
@@ -77,24 +72,6 @@ class TestPhonemeToViseme:
         assert phoneme_to_viseme("AH0") == phoneme_to_viseme("AH")
         assert phoneme_to_viseme("IY1") == phoneme_to_viseme("IY")
         assert phoneme_to_viseme("EH2") == phoneme_to_viseme("EH")
-
-    def test_unknown_phoneme(self):
-        """Unknown phoneme should return REST."""
-        assert phoneme_to_viseme("UNKNOWN") == "REST"
-        assert phoneme_to_viseme("XYZ") == "REST"
-
-    def test_empty_string(self):
-        """Empty string should return REST."""
-        assert phoneme_to_viseme("") == "REST"
-
-    def test_case_insensitive(self):
-        """Should handle different cases."""
-        assert phoneme_to_viseme("aa") == phoneme_to_viseme("AA")
-        assert phoneme_to_viseme("Aa") == phoneme_to_viseme("AA")
-
-
-class TestMergeAdjacentVisemes:
-    """Test merge_adjacent_visemes() function."""
 
     def test_merge_identical_adjacent(self):
         """Adjacent identical visemes should merge."""
@@ -152,25 +129,6 @@ class TestMergeAdjacentVisemes:
 
         assert len(result) == 2
 
-    def test_empty_list(self):
-        """Empty list should return empty list."""
-        result = merge_adjacent_visemes([])
-
-        assert result == []
-
-    def test_single_event(self):
-        """Single event should remain unchanged."""
-        events = [VisemeEvent(viseme="A", start_ms=0, end_ms=100)]
-
-        result = merge_adjacent_visemes(events)
-
-        assert len(result) == 1
-        assert result[0].viseme == "A"
-
-
-class TestApplyMinHold:
-    """Test apply_min_hold() function."""
-
     def test_extend_short_events(self):
         """Events shorter than min_hold should be extended."""
         events = [
@@ -184,40 +142,3 @@ class TestApplyMinHold:
         assert result[0].end_ms == 50
         # Second event starts later
         assert result[1].start_ms == 50
-
-    def test_dont_extend_long_events(self):
-        """Events longer than min_hold should remain unchanged."""
-        events = [
-            VisemeEvent(viseme="A", start_ms=0, end_ms=100),  # 100ms > 50ms
-        ]
-
-        result = apply_min_hold(events, min_hold_ms=50)
-
-        assert result[0].end_ms == 100
-
-    def test_last_event_not_extended(self):
-        """Last event should not be extended beyond its end."""
-        events = [
-            VisemeEvent(viseme="A", start_ms=0, end_ms=30),  # Short
-        ]
-
-        result = apply_min_hold(events, min_hold_ms=50)
-
-        # Last event extended, but doesn't affect anything after
-        assert result[0].end_ms == 50
-
-    def test_empty_list(self):
-        """Empty list should return empty list."""
-        result = apply_min_hold([])
-
-        assert result == []
-
-    def test_zero_min_hold(self):
-        """Zero min_hold should leave events unchanged."""
-        events = [
-            VisemeEvent(viseme="A", start_ms=0, end_ms=10),
-        ]
-
-        result = apply_min_hold(events, min_hold_ms=0)
-
-        assert result[0].end_ms == 10

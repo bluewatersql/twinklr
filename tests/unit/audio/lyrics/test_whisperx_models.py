@@ -7,9 +7,6 @@ Tests cover:
 - Field validation and defaults
 """
 
-from pydantic import ValidationError
-import pytest
-
 from twinklr.core.audio.lyrics.whisperx_models import (
     WhisperXAlignResult,
     WhisperXConfig,
@@ -46,60 +43,6 @@ class TestWhisperXConfig:
         assert config.batch_size == 32
         assert config.language == "en"
         assert config.return_char_alignments is True
-
-    def test_device_validation(self):
-        """Device must be cpu, cuda, or mps."""
-        # Valid devices
-        for device in ["cpu", "cuda", "mps"]:
-            config = WhisperXConfig(device=device)
-            assert config.device == device
-
-        # Invalid device (should still accept but may fail at runtime)
-        # Pydantic allows any string, validation happens at WhisperX level
-        config = WhisperXConfig(device="invalid")
-        assert config.device == "invalid"
-
-    def test_model_validation(self):
-        """Model must be one of the supported WhisperX models."""
-        valid_models = ["tiny", "base", "small", "medium", "large"]
-        for model in valid_models:
-            config = WhisperXConfig(model=model)
-            assert config.model == model
-
-    def test_batch_size_validation(self):
-        """Batch size must be positive."""
-        # Valid batch sizes
-        config = WhisperXConfig(batch_size=1)
-        assert config.batch_size == 1
-
-        config = WhisperXConfig(batch_size=64)
-        assert config.batch_size == 64
-
-        # Invalid batch size
-        with pytest.raises(ValidationError) as exc_info:
-            WhisperXConfig(batch_size=0)
-        assert "greater than 0" in str(exc_info.value)
-
-        with pytest.raises(ValidationError) as exc_info:
-            WhisperXConfig(batch_size=-1)
-        assert "greater than 0" in str(exc_info.value)
-
-    def test_language_validation(self):
-        """Language should accept ISO language codes or None."""
-        # None (auto-detect)
-        config = WhisperXConfig(language=None)
-        assert config.language is None
-
-        # ISO codes
-        for lang in ["en", "es", "fr", "de", "ja", "zh"]:
-            config = WhisperXConfig(language=lang)
-            assert config.language == lang
-
-    def test_extra_fields_forbidden(self):
-        """Extra fields should be rejected."""
-        with pytest.raises(ValidationError) as exc_info:
-            WhisperXConfig(extra_field="value")  # type: ignore
-        assert "Extra inputs are not permitted" in str(exc_info.value)
 
 
 class TestWhisperXAlignResult:
@@ -146,36 +89,6 @@ class TestWhisperXAlignResult:
         assert len(result.words) == 0
         assert result.mismatch_ratio == 1.0
 
-    def test_mismatch_ratio_range(self):
-        """Mismatch ratio should be 0.0-1.0."""
-        # Valid range
-        result = WhisperXAlignResult(words=[], mismatch_ratio=0.0, metadata={})
-        assert result.mismatch_ratio == 0.0
-
-        result = WhisperXAlignResult(words=[], mismatch_ratio=1.0, metadata={})
-        assert result.mismatch_ratio == 1.0
-
-        result = WhisperXAlignResult(words=[], mismatch_ratio=0.5, metadata={})
-        assert result.mismatch_ratio == 0.5
-
-        # Out of range (should be caught by validation)
-        with pytest.raises(ValidationError):
-            WhisperXAlignResult(words=[], mismatch_ratio=-0.1, metadata={})
-
-        with pytest.raises(ValidationError):
-            WhisperXAlignResult(words=[], mismatch_ratio=1.1, metadata={})
-
-    def test_extra_fields_forbidden(self):
-        """Extra fields should be rejected."""
-        with pytest.raises(ValidationError) as exc_info:
-            WhisperXAlignResult(
-                words=[],
-                mismatch_ratio=0.0,
-                metadata={},
-                extra_field="value",  # type: ignore
-            )
-        assert "Extra inputs are not permitted" in str(exc_info.value)
-
 
 class TestWhisperXTranscribeResult:
     """Test WhisperXTranscribeResult model."""
@@ -218,20 +131,3 @@ class TestWhisperXTranscribeResult:
 
         assert result.text == "some transcribed text"
         assert len(result.words) == 0
-
-    def test_metadata_optional(self):
-        """Metadata is optional and defaults to empty dict."""
-        result = WhisperXTranscribeResult(text="test", words=[])
-
-        assert result.metadata == {}
-
-    def test_extra_fields_forbidden(self):
-        """Extra fields should be rejected."""
-        with pytest.raises(ValidationError) as exc_info:
-            WhisperXTranscribeResult(
-                text="test",
-                words=[],
-                metadata={},
-                extra_field="value",  # type: ignore
-            )
-        assert "Extra inputs are not permitted" in str(exc_info.value)

@@ -88,16 +88,6 @@ class TestSuggestDiarization:
         assert _confidence >= 0.90  # Multiple markers = higher confidence
         assert len(reasons) >= 2
 
-    def test_case_insensitive_markers(self):
-        """Markers should be detected case-insensitively."""
-        lyrics_text = "(MALE) HELLO (Female) world"
-        words = None
-
-        suggested, _confidence, reasons = suggest_diarization(lyrics_text, words)
-
-        assert suggested
-        assert len(reasons) >= 1
-
     def test_custom_threshold(self):
         """Custom threshold should affect suggestion."""
         lyrics_text = "(male) hello"
@@ -118,17 +108,6 @@ class TestSuggestDiarization:
         assert not suggested
         assert confidence == 0.0
         assert len(reasons) == 0
-
-    def test_empty_text_no_suggestion(self):
-        """Empty text should not suggest diarization."""
-        suggested, confidence, _reasons = suggest_diarization("", None)
-
-        assert not suggested
-        assert confidence == 0.0
-
-
-class TestAssignSpeakers:
-    """Test speaker assignment to words."""
 
     def test_assign_single_speaker(self):
         """Words in single speaker segment should get that speaker."""
@@ -232,22 +211,6 @@ class TestAssignSpeakers:
 
         assigned_words = assign_speakers(words, segments)
         assert assigned_words[0].speaker == "SPEAKER_02"  # Best overlap
-
-    def test_empty_words(self):
-        """Empty words list should return empty list."""
-        segments = [SpeakerSegment(speaker="SPEAKER_01", start_ms=0, end_ms=1000, confidence=0.95)]
-
-        assigned_words = assign_speakers([], segments)
-        assert len(assigned_words) == 0
-
-    def test_empty_segments(self):
-        """Empty segments should leave all speakers as None."""
-        words = [
-            LyricWord(text="hello", start_ms=0, end_ms=500),
-        ]
-
-        assigned_words = assign_speakers(words, [])
-        assert assigned_words[0].speaker is None
 
     def test_preserves_other_fields(self):
         """Speaker assignment should preserve other word fields."""

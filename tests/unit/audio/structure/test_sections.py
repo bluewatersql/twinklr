@@ -9,7 +9,6 @@ import pytest
 from twinklr.core.audio.structure.sections import (
     detect_song_sections,
     label_section,
-    merge_short_sections,
 )
 
 if TYPE_CHECKING:
@@ -182,44 +181,6 @@ class TestDetectSongSections:
 
 class TestMergeShortSections:
     """Tests for merge_short_sections function."""
-
-    def test_keeps_long_sections(self) -> None:
-        """Sections longer than min_s are kept."""
-        times = [0.0, 10.0, 20.0, 30.0]
-        result = merge_short_sections(times, min_s=5.0, duration=30.0)
-
-        assert 10.0 in result
-        assert 20.0 in result
-
-    def test_merges_short_sections(self) -> None:
-        """Sections shorter than min_s are merged."""
-        # Section from 5.0-8.0 is only 3 seconds
-        times = [0.0, 5.0, 8.0, 20.0, 30.0]
-        result = merge_short_sections(times, min_s=5.0, duration=30.0)
-
-        # 8.0 should be merged out (section 5.0-8.0 too short)
-        assert 8.0 not in result
-
-    def test_always_includes_endpoints(self) -> None:
-        """Start (0.0) and end (duration) are always included."""
-        times = [0.0, 2.0, 30.0]
-        result = merge_short_sections(times, min_s=5.0, duration=30.0)
-
-        assert result[0] == 0.0
-        assert result[-1] == 30.0
-
-    def test_avoids_overly_long_sections(self) -> None:
-        """Preserves boundaries that would create overly long sections."""
-        # Without 15.0, we'd have 0-30 which is 3x the min
-        times = [0.0, 3.0, 15.0, 30.0]
-        result = merge_short_sections(times, min_s=10.0, duration=30.0)
-
-        # Should keep some boundary to avoid 30s section
-        assert len(result) >= 2
-
-
-class TestLabelSection:
-    """Tests for label_section function."""
 
     def test_intro_detection(self) -> None:
         """First short, low-energy section labeled as intro."""

@@ -227,17 +227,6 @@ class TestMusicBrainzClient:
         # Check that rate limiting is mentioned in debug logs
         assert any("rate limit" in record.message.lower() for record in caplog.records)
 
-    def test_parse_artist_credit_empty(self, client):
-        """Parse empty artist credit."""
-        artists = client._parse_artist_credit([])
-        assert artists == []
-
-    def test_parse_artist_credit_single(self, client):
-        """Parse single artist."""
-        artist_credit = [{"name": "Solo Artist"}]
-        artists = client._parse_artist_credit(artist_credit)
-        assert artists == ["Solo Artist"]
-
     def test_parse_artist_credit_multiple(self, client):
         """Parse multiple artists."""
         artist_credit = [

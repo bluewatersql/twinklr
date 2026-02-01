@@ -1,93 +1,155 @@
-"""Planning context for GroupPlanner agent."""
+"""Context models for GroupPlanner inputs.
+
+Provides structured context for section-level coordination planning.
+"""
+
+from __future__ import annotations
+
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from twinklr.core.agents.audio.lyrics.models import LyricContextModel
-from twinklr.core.agents.audio.profile.models import AudioProfileModel
-from twinklr.core.agents.sequencer.macro_planner.models import MacroPlan
-from twinklr.core.sequencer.templates.models import TemplateRef
+from twinklr.core.agents.sequencer.group_planner.models import (
+    DisplayGraph,
+    LaneKind,
+    TemplateCatalog,
+    TemplateCatalogEntry,
+)
+from twinklr.core.agents.sequencer.group_planner.timing import TimingContext
 
 
-class DisplayGroupRef(BaseModel):
-    """Reference to a display group."""
+class SectionPlanningContext(BaseModel):
+    """Context for planning a single section.
 
-    model_config = ConfigDict(extra="forbid")
+    Contains all information needed by GroupPlanner to generate
+    a SectionCoordinationPlan for one section.
 
-    group_id: str
-    name: str
-    group_type: str
-    model_count: int | None = None
-    tags: list[str] = Field(default_factory=list)
-
-
-class GroupPlanningContext(BaseModel):
-    """Complete context for GroupPlanner.
-
-    Bundles all inputs needed for GroupPlanner to generate GroupPlan for a display group.
-
-    This context object pattern:
-    - Keeps API stable as new inputs are added
-    - Groups related planning inputs together
-    - Makes dependencies explicit
-    - Simplifies testing and mocking
+    This is the input to the GroupPlanner orchestrator's run() method.
     """
 
     model_config = ConfigDict(extra="forbid")
 
-    # Phase 1 Outputs
-    audio_profile: AudioProfileModel = Field(
-        description="Musical analysis and creative guidance from AudioProfile agent"
-    )
+    # Section identity (from MacroPlan)
+    section_id: str = Field(description="Section identifier (e.g., 'verse_1')")
+    section_name: str = Field(description="Section type name (e.g., 'verse')")
 
-    lyric_context: LyricContextModel | None = Field(
-        default=None,
-        description="Narrative and thematic analysis from Lyrics agent (None if no lyrics)",
-    )
+    # Timing (from MacroPlan section)
+    start_ms: int = Field(ge=0, description="Section start in milliseconds")
+    end_ms: int = Field(ge=0, description="Section end in milliseconds")
 
-    # Phase 2 Output (MacroPlanner)
-    macro_plan: MacroPlan = Field(description="Strategic plan from MacroPlanner")
+    # Intent (from MacroPlan)
+    energy_target: str = Field(description="Energy target (LOW, MED, HIGH, BUILD, etc.)")
+    motion_density: str = Field(description="Motion density (SPARSE, MED, BUSY)")
+    choreography_style: str = Field(description="Choreography style (IMAGERY, ABSTRACT, HYBRID)")
+    primary_focus_targets: list[str] = Field(description="Primary focus role targets")
+    secondary_targets: list[str] = Field(default_factory=list, description="Secondary role targets")
+    notes: str | None = Field(default=None, description="Section-specific notes from MacroPlan")
 
-    # Display Context
-    display_group: DisplayGroupRef = Field(description="Display group being planned for")
+    # Shared context references
+    display_graph: DisplayGraph = Field(description="Display group configuration")
+    template_catalog: TemplateCatalog = Field(description="Available templates")
+    timing_context: TimingContext = Field(description="Timing resolution context")
 
-    # Template Catalog
-    available_templates: list[TemplateRef] = Field(
+    # Optional layer intent from MacroPlan (if provided)
+    layer_intents: list[dict[str, Any]] = Field(
         default_factory=list,
-        description="Available templates with metadata from catalog",
+        description="Layer intents from MacroPlan layering_plan (optional)",
     )
 
-    # Constraints
-    max_layers: int = Field(default=3, ge=1, le=6)
-    max_effects_per_section: int = Field(default=8, ge=1)
-    allow_assets: bool = True
-    allow_overlaps: bool = False
-
-    # Future extensibility (commented out, not yet implemented):
-    # template_catalog: TemplateCatalog | None = None  # Full catalog with presets
-    # display_graph: DisplayGraph | None = None         # Complete display layout
-    # user_preferences: UserPreferences | None = None   # User overrides
-
     @property
-    def has_lyrics(self) -> bool:
-        """Check if lyric context is available."""
-        return self.lyric_context is not None
+    def duration_ms(self) -> int:
+        """Section duration in milliseconds."""
+        return self.end_ms - self.start_ms
 
-    @property
-    def song_title(self) -> str | None:
-        """Get song title from audio profile."""
-        return self.audio_profile.song_identity.title
+    def get_target_groups(self, roles: list[str]) -> list[str]:
+        """Expand role names to concrete group_ids.
 
-    @property
-    def song_duration_ms(self) -> int:
-        """Get song duration from audio profile."""
-        return self.audio_profile.song_identity.duration_ms
+        Args:
+            roles: List of role names (e.g., ["HERO", "ARCHES"])
 
-    @property
-    def group_id(self) -> str:
-        """Get group ID being planned for."""
-        return self.display_group.group_id
+        Returns:
+            List of group_ids matching those roles
+        """
+        group_ids: list[str] = []
+        groups_by_role = self.display_graph.groups_by_role
+        for role in roles:
+            if role in groups_by_role:
+                group_ids.extend(groups_by_role[role])
+        return group_ids
 
-    @property
-    def group_type(self) -> str:
-        """Get group type."""
-        return self.display_group.group_type
+    def templates_for_lane(self, lane: LaneKind) -> list[TemplateCatalogEntry]:
+        """Get templates compatible with a lane.
+
+        Args:
+            lane: Lane kind (BASE, RHYTHM, ACCENT)
+
+        Returns:
+            List of compatible template catalog entries
+        """
+        return self.template_catalog.list_by_lane(lane)
+
+
+class GroupPlanningContext(BaseModel):
+    """Aggregate context for GroupPlanner orchestration.
+
+    Holds shared resources and provides factory method for
+    creating per-section SectionPlanningContext instances.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    display_graph: DisplayGraph = Field(description="Display group configuration")
+    template_catalog: TemplateCatalog = Field(description="Available templates")
+    timing_context: TimingContext = Field(description="Timing resolution context")
+
+    # Optional global strategy from MacroPlan
+    global_story: dict[str, Any] | None = Field(
+        default=None,
+        description="Global story from MacroPlan (theme, motifs, etc.)",
+    )
+    layering_plan: dict[str, Any] | None = Field(
+        default=None,
+        description="Layering plan from MacroPlan",
+    )
+
+    def build_section_contexts(
+        self,
+        section_plans: list[dict[str, Any]],
+    ) -> list[SectionPlanningContext]:
+        """Build SectionPlanningContext for each section in MacroPlan.
+
+        Args:
+            section_plans: List of section_plan dicts from MacroPlan
+
+        Returns:
+            List of SectionPlanningContext, one per section
+        """
+        contexts: list[SectionPlanningContext] = []
+
+        # Extract layer intents if layering_plan provided
+        layer_intents: list[dict[str, Any]] = []
+        if self.layering_plan and "layers" in self.layering_plan:
+            layer_intents = self.layering_plan["layers"]
+
+        for section_plan in section_plans:
+            section_info = section_plan.get("section", {})
+
+            ctx = SectionPlanningContext(
+                section_id=section_info.get("section_id", "unknown"),
+                section_name=section_info.get("name", "unknown"),
+                start_ms=section_info.get("start_ms", 0),
+                end_ms=section_info.get("end_ms", 0),
+                energy_target=section_plan.get("energy_target", "MED"),
+                motion_density=section_plan.get("motion_density", "MED"),
+                choreography_style=section_plan.get("choreography_style", "HYBRID"),
+                primary_focus_targets=section_plan.get("primary_focus_targets", []),
+                secondary_targets=section_plan.get("secondary_targets", []),
+                notes=section_plan.get("notes"),
+                display_graph=self.display_graph,
+                template_catalog=self.template_catalog,
+                timing_context=self.timing_context,
+                layer_intents=layer_intents,
+            )
+            contexts.append(ctx)
+
+        return contexts

@@ -1,0 +1,71 @@
+{
+  "schema_version": "display-graph.v1",
+  "display_id": "rudolph_test_display",
+  "display_name": "Rudolph Test Display",
+  "groups": [
+    {
+      "group_id": "HERO_1",
+      "role": "HERO",
+      "display_name": "Hero Prop 1 (Left)",
+      "position": {"x": 0.2, "y": 0.5, "z": 0.0, "zone": "LEFT"},
+      "capabilities": ["pixel", "rgb"],
+      "fixture_count": 1
+    },
+    {
+      "group_id": "HERO_2",
+      "role": "HERO",
+      "display_name": "Hero Prop 2 (Center)",
+      "position": {"x": 0.5, "y": 0.5, "z": 0.0, "zone": "CENTER"},
+      "capabilities": ["pixel", "rgb"],
+      "fixture_count": 1
+    },
+    {
+      "group_id": "HERO_3",
+      "role": "HERO",
+      "display_name": "Hero Prop 3 (Right)",
+      "position": {"x": 0.8, "y": 0.5, "z": 0.0, "zone": "RIGHT"},
+      "capabilities": ["pixel", "rgb"],
+      "fixture_count": 1
+    },
+    {
+      "group_id": "ARCHES_1",
+      "role": "ARCHES",
+      "display_name": "Driveway Arches Left",
+      "position": {"x": 0.3, "y": 0.2, "z": 0.0, "zone": "LEFT"},
+      "capabilities": ["pixel", "rgb", "chase"],
+      "fixture_count": 3
+    },
+    {
+      "group_id": "ARCHES_2",
+      "role": "ARCHES",
+      "display_name": "Driveway Arches Right",
+      "position": {"x": 0.7, "y": 0.2, "z": 0.0, "zone": "RIGHT"},
+      "capabilities": ["pixel", "rgb", "chase"],
+      "fixture_count": 3
+    },
+    {
+      "group_id": "OUTLINE_1",
+      "role": "OUTLINE",
+      "display_name": "Roofline",
+      "position": {"x": 0.5, "y": 0.9, "z": 0.0, "zone": "TOP"},
+      "capabilities": ["pixel", "rgb"],
+      "fixture_count": 1
+    },
+    {
+      "group_id": "WINDOWS_1",
+      "role": "WINDOWS",
+      "display_name": "Front Windows",
+      "position": {"x": 0.5, "y": 0.6, "z": 0.0, "zone": "CENTER"},
+      "capabilities": ["pixel", "rgb"],
+      "fixture_count": 4
+    },
+    {
+      "group_id": "MEGA_TREE_1",
+      "role": "MEGA_TREE",
+      "display_name": "Center Mega Tree",
+      "position": {"x": 0.5, "y": 0.4, "z": 0.0, "zone": "CENTER"},
+      "capabilities": ["pixel", "rgb", "matrix"],
+      "fixture_count": 1
+    }
+  ]
+}

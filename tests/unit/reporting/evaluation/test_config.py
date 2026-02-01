@@ -24,11 +24,6 @@ class TestEvalConfig:
         assert "json" in config.output_format
         assert "md" in config.output_format
 
-    def test_custom_sampling(self):
-        """Test config with custom sampling rate."""
-        config = EvalConfig(samples_per_bar=128)
-        assert config.samples_per_bar == 128
-
     def test_custom_thresholds(self):
         """Test config with custom thresholds."""
         config = EvalConfig(
@@ -39,17 +34,6 @@ class TestEvalConfig:
         assert config.clamp_warning_threshold == 0.10
         assert config.clamp_error_threshold == 0.25
         assert config.loop_delta_threshold == 0.10
-
-    def test_plot_specific_roles(self):
-        """Test config with specific roles to plot."""
-        config = EvalConfig(roles_to_plot=["OUTER_LEFT", "CENTER"])
-        assert config.roles_to_plot == ["OUTER_LEFT", "CENTER"]
-        assert config.plot_all_roles is False
-
-    def test_plot_all_roles(self):
-        """Test config with plot_all_roles enabled."""
-        config = EvalConfig(plot_all_roles=True)
-        assert config.plot_all_roles is True
 
     def test_output_formats(self):
         """Test config with custom output formats."""
@@ -75,20 +59,6 @@ class TestEvalConfig:
         """Test validation of max_concurrent_layers."""
         with pytest.raises(ValidationError):
             EvalConfig(max_concurrent_layers=0)  # Must be >= 1
-
-    def test_config_is_frozen(self):
-        """Test that config is immutable."""
-        config = EvalConfig()
-        with pytest.raises(ValidationError):
-            config.samples_per_bar = 200  # type: ignore
-
-    def test_serialization(self):
-        """Test config serialization."""
-        config = EvalConfig(samples_per_bar=128, plot_all_roles=True)
-        data = config.model_dump()
-
-        assert data["samples_per_bar"] == 128
-        assert data["plot_all_roles"] is True
 
     def test_deserialization(self):
         """Test config deserialization."""

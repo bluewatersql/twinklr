@@ -3,9 +3,9 @@ from __future__ import annotations
 
 import argparse
 import os
+from pathlib import Path
 import subprocess
 import time
-from pathlib import Path
 
 from openai import OpenAI
 
@@ -23,7 +23,9 @@ Camera: fixed shot, no cuts, no zoom, no camera motion.
 """.strip()
 
 
-def wait_for_video(client: OpenAI, video_id: str, poll_s: float = 2.0, timeout_s: float = 180.0) -> None:
+def wait_for_video(
+    client: OpenAI, video_id: str, poll_s: float = 2.0, timeout_s: float = 180.0
+) -> None:
     t0 = time.time()
     while True:
         job = client.videos.retrieve(video_id)
@@ -45,9 +47,12 @@ def mp4_to_gif_ffmpeg(mp4_path: Path, gif_path: Path, fps: int = 12, width: int 
 
     subprocess.run(
         [
-            "ffmpeg", "-y",
-            "-i", str(mp4_path),
-            "-vf", f"fps={fps},scale={width}:-1:flags=lanczos,palettegen",
+            "ffmpeg",
+            "-y",
+            "-i",
+            str(mp4_path),
+            "-vf",
+            f"fps={fps},scale={width}:-1:flags=lanczos,palettegen",
             str(palette),
         ],
         check=True,
@@ -57,10 +62,14 @@ def mp4_to_gif_ffmpeg(mp4_path: Path, gif_path: Path, fps: int = 12, width: int 
 
     subprocess.run(
         [
-            "ffmpeg", "-y",
-            "-i", str(mp4_path),
-            "-i", str(palette),
-            "-lavfi", f"fps={fps},scale={width}:-1:flags=lanczos [x]; [x][1:v] paletteuse",
+            "ffmpeg",
+            "-y",
+            "-i",
+            str(mp4_path),
+            "-i",
+            str(palette),
+            "-lavfi",
+            f"fps={fps},scale={width}:-1:flags=lanczos [x]; [x][1:v] paletteuse",
             str(gif_path),
         ],
         check=True,
@@ -74,9 +83,15 @@ def mp4_to_gif_ffmpeg(mp4_path: Path, gif_path: Path, fps: int = 12, width: int 
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default="out_video_demo")
-    ap.add_argument("--model", default="sora-2")      # allowed: sora-2, sora-2-pro :contentReference[oaicite:4]{index=4}
-    ap.add_argument("--seconds", default="4")         # allowed: 4, 8, 12 :contentReference[oaicite:5]{index=5}
-    ap.add_argument("--size", default="1280x720")     # allowed sizes listed in docs :contentReference[oaicite:6]{index=6}
+    ap.add_argument(
+        "--model", default="sora-2"
+    )  # allowed: sora-2, sora-2-pro :contentReference[oaicite:4]{index=4}
+    ap.add_argument(
+        "--seconds", default="4"
+    )  # allowed: 4, 8, 12 :contentReference[oaicite:5]{index=5}
+    ap.add_argument(
+        "--size", default="1280x720"
+    )  # allowed sizes listed in docs :contentReference[oaicite:6]{index=6}
     ap.add_argument("--fps", type=int, default=12)
     args = ap.parse_args()
 

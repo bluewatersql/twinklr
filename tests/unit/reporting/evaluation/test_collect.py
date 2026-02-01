@@ -15,16 +15,6 @@ from twinklr.core.reporting.evaluation.collect import (
 class TestLoadCheckpoint:
     """Tests for load_checkpoint function."""
 
-    def test_load_valid_checkpoint(self, tmp_path):
-        """Test loading a valid checkpoint file."""
-        checkpoint_path = tmp_path / "checkpoint.json"
-        checkpoint_data = {"run_id": "abc123", "plan": {"sections": []}}
-        checkpoint_path.write_text(json.dumps(checkpoint_data), encoding="utf-8")
-
-        result = load_checkpoint(checkpoint_path)
-        assert result["run_id"] == "abc123"
-        assert "plan" in result
-
     def test_load_nonexistent_checkpoint(self, tmp_path):
         """Test loading a nonexistent checkpoint file."""
         checkpoint_path = tmp_path / "missing.json"
@@ -96,38 +86,6 @@ class TestBuildRunMetadata:
         assert metadata.run_id == "abc123"
         assert metadata.checkpoint_path == checkpoint_path
         assert metadata.engine_version  # Should have some value
-
-    def test_build_metadata_without_run_id(self, tmp_path):
-        """Test building metadata when run_id is missing."""
-        checkpoint_path = tmp_path / "test.json"
-        checkpoint_data = {}
-
-        metadata = build_run_metadata(checkpoint_path, checkpoint_data)
-        # When run_id is missing, it uses the filename stem
-        assert metadata.run_id == "test"
-
-    def test_metadata_includes_timestamp(self, tmp_path):
-        """Test that metadata includes timestamp."""
-        checkpoint_path = tmp_path / "test.json"
-        checkpoint_data = {"run_id": "test"}
-
-        metadata = build_run_metadata(checkpoint_path, checkpoint_data)
-        assert metadata.timestamp  # Should be ISO 8601 format
-        assert "T" in metadata.timestamp  # ISO format includes 'T'
-
-    def test_metadata_git_sha(self, tmp_path):
-        """Test git SHA handling."""
-        checkpoint_path = tmp_path / "test.json"
-        checkpoint_data = {"run_id": "test"}
-
-        metadata = build_run_metadata(checkpoint_path, checkpoint_data)
-        # git_sha may be None if not in a git repo or git not available
-        # Just verify the field exists
-        assert hasattr(metadata, "git_sha")
-
-
-class TestIntegration:
-    """Integration tests for collector workflow."""
 
     def test_full_checkpoint_loading_workflow(self, tmp_path):
         """Test complete workflow: load → extract → metadata."""

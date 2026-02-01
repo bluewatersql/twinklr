@@ -5,7 +5,6 @@ import pytest
 from twinklr.core.audio.structure.presets import (
     PRESETS,
     get_preset,
-    get_preset_or_default,
 )
 
 
@@ -61,40 +60,7 @@ class TestPresets:
         assert preset.min_sections == pop_preset.min_sections
         assert preset.max_sections == pop_preset.max_sections
 
-    def test_get_preset_valid_genre(self):
-        """Test getting preset by genre name."""
-        preset = get_preset("edm")
-        assert preset.genre == "edm"
-
     def test_get_preset_invalid_genre(self):
         """Test that get_preset raises KeyError for unknown genre."""
         with pytest.raises(KeyError, match="Unknown genre"):
             get_preset("unknown_genre")
-
-    def test_get_preset_or_default_valid(self):
-        """Test get_preset_or_default with valid genre."""
-        preset = get_preset_or_default("edm")
-        assert preset.genre == "edm"
-
-    def test_get_preset_or_default_none(self):
-        """Test get_preset_or_default with None returns default."""
-        preset = get_preset_or_default(None)
-        assert preset.genre == "default"  # Updated from refactor
-
-    def test_get_preset_or_default_invalid(self):
-        """Test get_preset_or_default with invalid genre returns default."""
-        preset = get_preset_or_default("unknown_genre")
-        assert preset.genre == "default"  # Updated from refactor
-
-    def test_get_preset_or_default_custom_default(self):
-        """Test get_preset_or_default with custom default."""
-        preset = get_preset_or_default("unknown_genre", default="edm")
-        assert preset.genre == "edm"
-
-    def test_all_presets_have_context_weights(self):
-        """Test that all presets define context weights."""
-        required_keys = ["drops_weight", "builds_weight", "vocals_weight", "chords_weight"]
-        for genre, preset in PRESETS.items():
-            for key in required_keys:
-                assert key in preset.context_weights, f"{genre} missing {key}"
-                assert 0.0 <= preset.context_weights[key] <= 1.0

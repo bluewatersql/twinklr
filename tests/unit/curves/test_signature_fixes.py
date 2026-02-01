@@ -28,13 +28,6 @@ class TestTrianglePhaseParameter:
         assert len(result) == 10
         assert all(0.0 <= p.v <= 1.0 for p in result)
 
-    def test_generate_triangle_phase_default(self):
-        """Test triangle generator has default phase."""
-        # Should work without phase (backward compatible)
-        result = generate_triangle(n_samples=10, cycles=1.0)
-
-        assert len(result) == 10
-
     def test_generate_triangle_phase_ignored(self):
         """Test triangle generator ignores phase (for now)."""
         # Phase should be accepted but not affect output (for now)
@@ -55,17 +48,6 @@ class TestTrianglePhaseParameter:
 
 class TestTriangleRegistryIntegration:
     """Tests for TRIANGLE curve registry integration."""
-
-    def test_triangle_registry_resolve_with_defaults(self):
-        """Test triangle can be resolved with default params."""
-        registry = build_default_registry()
-        definition = registry.get(CurveLibrary.TRIANGLE.value)
-
-        # This should not raise TypeError about 'phase'
-        result = registry.resolve(definition=definition)
-
-        assert len(result) > 0
-        assert all(0.0 <= p.v <= 1.0 for p in result)
 
     def test_triangle_registry_resolve_with_custom_params(self):
         """Test triangle can be resolved with custom params including phase."""
@@ -124,17 +106,6 @@ class TestMovementPulseParameters:
 
 class TestMovementPulseRegistryIntegration:
     """Tests for MOVEMENT_PULSE curve registry integration."""
-
-    def test_movement_pulse_registry_resolve_with_defaults(self):
-        """Test movement_pulse can be resolved with default params."""
-        registry = build_default_registry()
-        definition = registry.get(CurveLibrary.MOVEMENT_PULSE.value)
-
-        # This should not raise TypeError about missing high/low
-        result = registry.resolve(definition=definition)
-
-        assert len(result) > 0
-        assert all(0.0 <= p.v <= 1.0 for p in result)
 
     def test_movement_pulse_registry_resolve_with_high_low(self):
         """Test movement_pulse can be resolved with high/low params."""

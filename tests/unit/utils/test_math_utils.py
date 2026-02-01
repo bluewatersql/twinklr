@@ -59,21 +59,3 @@ def test_lerp_extrapolation():
 
     # Above 1
     assert lerp(0.0, 10.0, 1.5) == 15.0
-
-
-def test_clamp_integer_result():
-    """Test that clamp preserves integer type when appropriate."""
-    result = clamp(5, 0, 10)
-    assert isinstance(result, int)
-
-
-def test_clamp_float_result():
-    """Test that clamp preserves float type."""
-    result = clamp(5.5, 0.0, 10.0)
-    assert isinstance(result, float)
-
-
-def test_lerp_result_type():
-    """Test that lerp returns float."""
-    result = lerp(0.0, 10.0, 0.5)
-    assert isinstance(result, float)

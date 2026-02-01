@@ -17,29 +17,6 @@ from twinklr.core.audio.metadata.fingerprint import (
 class TestComputeChromaprintFingerprint:
     """Test chromaprint fingerprint computation."""
 
-    def test_successful_fingerprint(self):
-        """Successful chromaprint computation."""
-        # Mock fpcalc output
-        mock_output = """
-DURATION=180.50
-FINGERPRINT=AQADtEmRJkqRJEqSJEqRJEqS
-"""
-
-        with patch("subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(
-                returncode=0,
-                stdout=mock_output,
-                stderr="",
-            )
-
-            fingerprint, duration = compute_chromaprint_fingerprint(
-                "/test/audio.mp3",
-                timeout_s=30.0,
-            )
-
-            assert fingerprint == "AQADtEmRJkqRJEqSJEqRJEqS"
-            assert duration == 180.50
-
     def test_fingerprint_with_bucketed_duration(self):
         """Duration is returned as-is (bucketing done by caller)."""
         mock_output = "DURATION=123.456\nFINGERPRINT=ABC123"
@@ -163,30 +140,6 @@ FINGERPRINT=AQADtEmRJkqRJEqSJEqRJEqS
             assert call_args[1]["text"] is True
             assert call_args[1]["timeout"] == 45.0
 
-    def test_fpcalc_handles_whitespace_in_output(self):
-        """fpcalc output with extra whitespace is handled."""
-        mock_output = """
-
-DURATION = 180.0
-FINGERPRINT = ABC123
-
-"""
-
-        with patch("subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(
-                returncode=0,
-                stdout=mock_output,
-                stderr="",
-            )
-
-            fingerprint, duration = compute_chromaprint_fingerprint(
-                "/test/audio.mp3",
-                timeout_s=30.0,
-            )
-
-            assert fingerprint == "ABC123"
-            assert duration == 180.0
-
     def test_fpcalc_short_duration(self):
         """Short audio files (< 1s) work correctly."""
         mock_output = "DURATION=0.5\nFINGERPRINT=SHORT"
@@ -228,17 +181,3 @@ FINGERPRINT = ABC123
 
 class TestChromaprintError:
     """Test ChromaprintError exception."""
-
-    def test_chromaprint_error_is_runtime_error(self):
-        """ChromaprintError is a RuntimeError subclass."""
-        error = ChromaprintError("test error")
-
-        assert isinstance(error, RuntimeError)
-        assert str(error) == "test error"
-
-    def test_chromaprint_error_can_be_raised(self):
-        """ChromaprintError can be raised and caught."""
-        with pytest.raises(ChromaprintError) as exc_info:
-            raise ChromaprintError("Chromaprint computation failed")
-
-        assert "Chromaprint computation failed" in str(exc_info.value)

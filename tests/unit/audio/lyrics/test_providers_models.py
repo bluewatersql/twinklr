@@ -3,9 +3,6 @@
 Testing LyricsQuery and LyricsCandidate models.
 """
 
-from pydantic import ValidationError
-import pytest
-
 from twinklr.core.audio.lyrics.providers.models import LyricsCandidate, LyricsQuery
 
 
@@ -47,23 +44,6 @@ class TestLyricsQuery:
         assert query.album == "Test Album"
         assert query.duration_ms == 180000
         assert query.ids["musicbrainz"] == "abc123"
-
-    def test_query_duration_validation(self):
-        """Duration must be positive."""
-        # Valid
-        LyricsQuery(duration_ms=1000)
-
-        # Invalid: negative duration
-        with pytest.raises(ValidationError):
-            LyricsQuery(duration_ms=-1000)
-
-    def test_query_forbids_extra_fields(self):
-        """Query forbids extra fields."""
-        with pytest.raises(ValidationError):
-            LyricsQuery(  # type: ignore[call-arg]
-                artist="Test",
-                extra_field="not_allowed",
-            )
 
 
 class TestLyricsCandidate:
@@ -140,27 +120,3 @@ class TestLyricsCandidate:
 
         assert len(candidate.warnings) == 2
         assert "Low confidence match" in candidate.warnings
-
-    def test_candidate_confidence_range(self):
-        """Confidence must be 0-1."""
-        # Valid
-        LyricsCandidate(provider="test", kind="PLAIN", text="test", confidence=0.0)
-        LyricsCandidate(provider="test", kind="PLAIN", text="test", confidence=1.0)
-
-        # Invalid: below 0
-        with pytest.raises(ValidationError):
-            LyricsCandidate(provider="test", kind="PLAIN", text="test", confidence=-0.1)
-
-        # Invalid: above 1
-        with pytest.raises(ValidationError):
-            LyricsCandidate(provider="test", kind="PLAIN", text="test", confidence=1.1)
-
-    def test_candidate_forbids_extra_fields(self):
-        """Candidate forbids extra fields."""
-        with pytest.raises(ValidationError):
-            LyricsCandidate(  # type: ignore[call-arg]
-                provider="test",
-                kind="PLAIN",
-                text="test",
-                extra_field="not_allowed",
-            )

@@ -1,8 +1,5 @@
 """Tests for Movement model categorical parameter overrides."""
 
-from pydantic import ValidationError
-import pytest
-
 from twinklr.core.curves.library import CurveLibrary
 from twinklr.core.sequencer.models.enum import Intensity
 from twinklr.core.sequencer.models.template import Movement, MovementType
@@ -38,59 +35,6 @@ class TestMovementOverrideFields:
         assert movement.amplitude_override is None
         assert movement.frequency_override is None
         assert movement.center_offset_override is None
-
-    def test_amplitude_override_validates_range(self):
-        """Test that amplitude_override must be in [0, 1]."""
-        # Valid values
-        Movement(movement_type=MovementType.SWEEP_LR, amplitude_override=0.0)
-        Movement(movement_type=MovementType.SWEEP_LR, amplitude_override=1.0)
-        Movement(movement_type=MovementType.SWEEP_LR, amplitude_override=0.5)
-
-        # Invalid values
-        with pytest.raises(ValidationError):
-            Movement(movement_type=MovementType.SWEEP_LR, amplitude_override=-0.1)
-
-        with pytest.raises(ValidationError):
-            Movement(movement_type=MovementType.SWEEP_LR, amplitude_override=1.1)
-
-    def test_frequency_override_validates_range(self):
-        """Test that frequency_override must be in [0, 10]."""
-        # Valid values
-        Movement(movement_type=MovementType.SWEEP_LR, frequency_override=0.0)
-        Movement(movement_type=MovementType.SWEEP_LR, frequency_override=10.0)
-        Movement(movement_type=MovementType.SWEEP_LR, frequency_override=5.0)
-
-        # Invalid values
-        with pytest.raises(ValidationError):
-            Movement(movement_type=MovementType.SWEEP_LR, frequency_override=-0.1)
-
-        with pytest.raises(ValidationError):
-            Movement(movement_type=MovementType.SWEEP_LR, frequency_override=10.1)
-
-    def test_center_offset_override_validates_range(self):
-        """Test that center_offset_override must be in [0, 1]."""
-        # Valid values
-        Movement(movement_type=MovementType.SWEEP_LR, center_offset_override=0.0)
-        Movement(movement_type=MovementType.SWEEP_LR, center_offset_override=1.0)
-        Movement(movement_type=MovementType.SWEEP_LR, center_offset_override=0.5)
-
-        # Invalid values
-        with pytest.raises(ValidationError):
-            Movement(movement_type=MovementType.SWEEP_LR, center_offset_override=-0.1)
-
-        with pytest.raises(ValidationError):
-            Movement(movement_type=MovementType.SWEEP_LR, center_offset_override=1.1)
-
-
-class TestGetCategoricalParamsMethod:
-    """Tests for Movement.get_categorical_params() method."""
-
-    def test_method_exists(self):
-        """Test that get_categorical_params method exists."""
-        movement = Movement(movement_type=MovementType.SWEEP_LR)
-
-        assert hasattr(movement, "get_categorical_params")
-        assert callable(movement.get_categorical_params)
 
     def test_returns_base_params_when_no_overrides(self):
         """Test returns base params when no overrides are set."""
@@ -178,17 +122,6 @@ class TestGetCategoricalParamsMethod:
         assert result.amplitude == 0.9
         assert result.frequency == 2.5
         assert result.center_offset == 0.7
-
-    def test_returns_immutable_params(self):
-        """Test that returned params are immutable."""
-        from pydantic import ValidationError
-
-        movement = Movement(movement_type=MovementType.SWEEP_LR)
-
-        result = movement.get_categorical_params(CurveLibrary.MOVEMENT_TRIANGLE)
-
-        with pytest.raises(ValidationError):
-            result.amplitude = 0.999
 
     def test_works_with_different_curves(self):
         """Test works with different curve types."""

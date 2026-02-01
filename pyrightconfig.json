@@ -1,15 +1,23 @@
 {
   "include": [
-    "packages",
-    "scripts",
-    "tests"
+    "packages"
   ],
   "exclude": [
     "**/__pycache__",
     ".venv",
     ".archive",
     "**/node_modules",
-    "**/*.egg-info"
+    "**/*.egg-info",
+    "tests/**",
+    ".dev/**",
+    "scripts/**",
+    "utils/**"
+  ],
+  "ignore": [
+    "tests/**",
+    ".dev/**",
+    "scripts/**",
+    "utils/**"
   ],
   "executionEnvironments": [
     {

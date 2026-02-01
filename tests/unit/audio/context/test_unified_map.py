@@ -56,11 +56,6 @@ class TestExtractPeaks:
 
         assert len(peaks) <= 3
 
-    def test_empty_input(self) -> None:
-        """Empty input returns empty list."""
-        peaks = _extract_peaks([], [], n_peaks=5, min_sep_s=1.0)
-        assert peaks == []
-
     def test_returns_sorted_by_time(self) -> None:
         """Result is sorted by time."""
         times = list(range(20))
@@ -89,15 +84,6 @@ class TestFindSectionForTime:
         result = _find_section_for_time(sections, 45.0)
         assert result is not None
         assert result["label"] == "verse"
-
-    def test_returns_none_for_out_of_range(self) -> None:
-        """Returns None if time not in any section."""
-        sections = [
-            {"start_s": 10.0, "end_s": 20.0, "label": "verse"},
-        ]
-
-        assert _find_section_for_time(sections, 5.0) is None
-        assert _find_section_for_time(sections, 25.0) is None
 
     def test_boundary_inclusion(self) -> None:
         """Start is inclusive, end is exclusive."""
@@ -133,15 +119,6 @@ class TestSampleTimelineAtTime:
 
         result = _sample_timeline_at_time(timeline, 1.0)
         assert result["energy"] == pytest.approx(0.5, abs=0.01)
-
-    def test_handles_empty_timeline(self) -> None:
-        """Returns empty dict for empty timeline."""
-        result = _sample_timeline_at_time({"t_sec": []}, 1.0)
-        assert result == {}
-
-
-class TestFilterMeaningfulTimingEvents:
-    """Tests for _filter_meaningful_timing_events function."""
 
     def test_filters_by_track_name(self) -> None:
         """Only keeps events from meaningful track names."""

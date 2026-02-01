@@ -1,30 +1,26 @@
-"""Orchestrator for GroupPlanner with judge-based iteration.
+"""Orchestrator for GroupPlanner with section-level iteration.
 
-This module provides orchestration for GroupPlanner agent, coordinating planner execution,
-heuristic validation, and judge-based refinement using StandardIterationController.
-
-For v1: Sequential execution (one group at a time).
-For v2+: Parallel fan-out pattern (documented in changes/vnext/todo/).
+Coordinates GroupPlanner agent with heuristic validation and section-level
+judge evaluation using the StandardIterationController.
 """
 
 from __future__ import annotations
 
 import logging
-from pathlib import Path
+from collections.abc import Callable
 from typing import Any
 
-from twinklr.core.agents.audio.profile.models import AudioProfileModel
-from twinklr.core.agents.issues import IssueSeverity
 from twinklr.core.agents.logging import LLMCallLogger, NullLLMCallLogger
 from twinklr.core.agents.providers.base import LLMProvider
-from twinklr.core.agents.sequencer.group_planner.context import GroupPlanningContext
-from twinklr.core.agents.sequencer.group_planner.heuristics import (
-    GroupPlanHeuristicValidator,
-)
-from twinklr.core.agents.sequencer.group_planner.models import GroupPlan, GroupPlanSet
+from twinklr.core.agents.sequencer.group_planner.context import SectionPlanningContext
+from twinklr.core.agents.sequencer.group_planner.models import SectionCoordinationPlan
 from twinklr.core.agents.sequencer.group_planner.specs import (
-    get_judge_spec,
     get_planner_spec,
+    get_section_judge_spec,
+)
+from twinklr.core.agents.sequencer.group_planner.validators import (
+    SectionPlanValidator,
+    ValidationSeverity,
 )
 from twinklr.core.agents.shared.judge.controller import (
     IterationConfig,
@@ -33,246 +29,200 @@ from twinklr.core.agents.shared.judge.controller import (
 )
 from twinklr.core.agents.shared.judge.feedback import FeedbackManager
 from twinklr.core.agents.spec import AgentSpec
-from twinklr.core.sequencer.templates.group_templates.library import (
-    list_templates as list_group_templates,
-)
-from twinklr.core.sequencer.templates.models import template_ref_from_info
 
 logger = logging.getLogger(__name__)
 
 
 class GroupPlannerOrchestrator:
-    """Orchestrator for GroupPlanner with iterative refinement.
+    """Orchestrates GroupPlanner with section-level iteration.
 
-    Coordinates GroupPlanner agent with heuristic validation and judge-based refinement.
+    Provides high-level interface for running the GroupPlanner with:
+    - Heuristic validation (fast, deterministic quality checks)
+    - Section-level judge evaluation (LLM-driven quality assessment)
+    - Iterative refinement with feedback
 
-    For v1: Sequential execution (one group at a time).
-    For v2: Parallel fan-out with holistic judge evaluation.
+    This orchestrator handles ONE SECTION at a time. For full song processing,
+    use GroupPlannerStage with FAN_OUT pattern in the pipeline.
+
+    Attributes:
+        planner_spec: Planner agent specification
+        section_judge_spec: Section judge agent specification
+        provider: LLM provider
+        llm_logger: LLM call logger
     """
 
     def __init__(
         self,
         provider: LLMProvider,
+        *,
+        planner_spec: AgentSpec | None = None,
+        section_judge_spec: AgentSpec | None = None,
         max_iterations: int = 3,
         min_pass_score: float = 7.0,
-        planner_spec: AgentSpec | None = None,
-        judge_spec: AgentSpec | None = None,
+        token_budget: int | None = None,
         llm_logger: LLMCallLogger | None = None,
     ):
         """Initialize GroupPlanner orchestrator.
 
         Args:
             provider: LLM provider for agent execution
-            max_iterations: Maximum refinement iterations
-            min_pass_score: Minimum judge score for approval (0-10)
-            planner_spec: Optional custom planner spec
-            judge_spec: Optional custom judge spec
-            llm_logger: Optional LLM call logger
+            planner_spec: Optional planner spec (uses default if None)
+            section_judge_spec: Optional section judge spec (uses default if None)
+            max_iterations: Maximum refinement iterations per section (default: 3)
+            min_pass_score: Minimum score for section approval (default: 7.0)
+            token_budget: Optional token budget limit per section
+            llm_logger: Optional LLM call logger (uses NullLLMCallLogger if None)
         """
-        self.provider = provider
         self.planner_spec = planner_spec or get_planner_spec()
-        self.judge_spec = judge_spec or get_judge_spec()
+        self.section_judge_spec = section_judge_spec or get_section_judge_spec()
+        self.provider = provider
         self.llm_logger = llm_logger or NullLLMCallLogger()
 
-        # Create iteration controller
-        config = IterationConfig(
+        # Create iteration config
+        self.config = IterationConfig(
             max_iterations=max_iterations,
             approval_score_threshold=min_pass_score,
+            token_budget=token_budget,
         )
-
-        self.controller: StandardIterationController[GroupPlan] = StandardIterationController(
-            config=config,
-            feedback_manager=FeedbackManager(),
-        )
-
-        self.heuristic_validator: GroupPlanHeuristicValidator | None = None
-
-    async def run_single_group(
-        self,
-        planning_context: GroupPlanningContext,
-    ) -> IterationResult[GroupPlan]:
-        """Run GroupPlanner for a single display group.
-
-        Args:
-            planning_context: Complete planning context for this group
-
-        Returns:
-            IterationResult containing the final GroupPlan and metadata
-
-        Raises:
-            ValueError: If inputs are invalid
-        """
-        audio_profile = planning_context.audio_profile
-
-        if not audio_profile.structure.sections:
-            raise ValueError("AudioProfile must have at least one section")
 
         logger.debug(
-            f"Starting GroupPlanner for group '{planning_context.group_id}' "
-            f"({planning_context.group_type})"
+            f"GroupPlannerOrchestrator initialized "
+            f"(max_iterations={max_iterations}, min_pass_score={min_pass_score})"
         )
 
-        # Create validator with available template IDs
-        template_ids = {t.template_id for t in planning_context.available_templates}
-        self.heuristic_validator = GroupPlanHeuristicValidator(
-            available_templates=template_ids
+    async def run(
+        self,
+        section_context: SectionPlanningContext,
+    ) -> IterationResult[SectionCoordinationPlan]:
+        """Run GroupPlanner for a single section with iterative refinement.
+
+        Executes the complete GroupPlanner workflow for one section:
+        1. Generate initial section plan (planner agent)
+        2. Validate plan (heuristic validator)
+        3. Evaluate plan (section judge agent)
+        4. Refine if needed (repeat with feedback)
+        5. Return final plan or best attempt
+
+        Args:
+            section_context: Complete section planning context
+
+        Returns:
+            IterationResult containing the final SectionCoordinationPlan
+
+        Raises:
+            ValueError: If section context is invalid
+        """
+        if not section_context.primary_focus_targets:
+            raise ValueError("Section must have at least one primary_focus_target")
+
+        logger.debug(
+            f"Starting GroupPlanner orchestration for section: {section_context.section_id}"
+        )
+
+        # Create feedback manager for this section
+        feedback_manager = FeedbackManager()
+
+        # Create controller for this section
+        controller = StandardIterationController[SectionCoordinationPlan](
+            config=self.config,
+            feedback_manager=feedback_manager,
         )
 
         # Prepare initial variables for planner
-        initial_variables: dict[str, Any] = {
-            "audio_profile": audio_profile,
-            "macro_plan": planning_context.macro_plan,
-            "display_group": planning_context.display_group,
-            "available_templates": planning_context.available_templates,
-        }
+        initial_variables = self._build_planner_variables(section_context)
 
-        # Add lyric context if available
-        if planning_context.lyric_context:
-            initial_variables["lyric_context"] = planning_context.lyric_context
-
-        # Define validator function
-        def validator(plan: GroupPlan) -> list[str]:
-            """Validate plan and return list of error messages."""
-            if self.heuristic_validator is None:
-                return []
-
-            issues = self.heuristic_validator.validate(
-                plan, audio_profile, max_layers=planning_context.max_layers
-            )
-
-            # Return only ERROR severity issues as strings
-            errors = [
-                f"{issue.issue_id}: {issue.message}"
-                for issue in issues
-                if issue.severity == IssueSeverity.ERROR
-            ]
-            return errors
+        # Create validator function
+        validator = self._build_validator(section_context)
 
         # Run iteration loop
-        result = await self.controller.run(
+        result = await controller.run(
             planner_spec=self.planner_spec,
-            judge_spec=self.judge_spec,
+            judge_spec=self.section_judge_spec,
             initial_variables=initial_variables,
             validator=validator,
             provider=self.provider,
             llm_logger=self.llm_logger,
-            prompt_base_path=Path("packages/twinklr/core/agents/sequencer/group_planner/prompts"),
         )
 
         if result.success:
             logger.debug(
-                f"✅ GroupPlanner succeeded for '{planning_context.group_id}': "
+                f"✅ Section {section_context.section_id} succeeded: "
                 f"{result.context.current_iteration} iterations, "
                 f"score {result.context.final_verdict.score:.1f}"
                 if result.context.final_verdict
-                else f"✅ GroupPlanner succeeded: {result.context.current_iteration} iterations"
+                else f"✅ Section {section_context.section_id} succeeded"
             )
         else:
             logger.warning(
-                f"⚠️ GroupPlanner completed without approval for '{planning_context.group_id}': "
+                f"⚠️ Section {section_context.section_id} completed without approval: "
                 f"{result.context.current_iteration} iterations, "
                 f"termination: {result.context.termination_reason}"
             )
 
         return result
 
-    async def run_all_groups(
+    def _build_planner_variables(
         self,
-        audio_profile: AudioProfileModel,
-        lyric_context: Any | None,
-        macro_plan: Any,
-        display_groups: list[dict[str, Any]],
-        available_templates: list[str] | None = None,
-        max_layers: int = 3,
-        max_effects_per_section: int = 8,
-        allow_assets: bool = True,
-    ) -> GroupPlanSet:
-        """Run GroupPlanner for all display groups (sequential).
+        section_context: SectionPlanningContext,
+    ) -> dict[str, Any]:
+        """Build variables for planner prompt.
 
         Args:
-            audio_profile: Audio profile from Phase 1
-            lyric_context: Optional lyric context from Phase 1
-            macro_plan: Macro plan from MacroPlanner
-            display_groups: List of display groups to plan for
-            available_templates: Available template IDs (if None, loads all from registry)
-            max_layers: Max layers per section
-            max_effects_per_section: Max effects per section
-            allow_assets: Whether to allow asset requests
+            section_context: Section planning context
 
         Returns:
-            GroupPlanSet with plans for all groups
-
-        Raises:
-            ValueError: If no display groups provided
+            Variables dict for planner
         """
-        if not display_groups:
-            raise ValueError("At least one display group required")
+        return {
+            # Section identity
+            "section_id": section_context.section_id,
+            "section_name": section_context.section_name,
+            # Timing
+            "start_ms": section_context.start_ms,
+            "end_ms": section_context.end_ms,
+            # Intent from MacroPlan
+            "energy_target": section_context.energy_target,
+            "motion_density": section_context.motion_density,
+            "choreography_style": section_context.choreography_style,
+            "primary_focus_targets": section_context.primary_focus_targets,
+            "secondary_targets": section_context.secondary_targets,
+            "notes": section_context.notes,
+            # Shared context
+            "display_graph": section_context.display_graph,
+            "template_catalog": section_context.template_catalog,
+            "timing_context": section_context.timing_context,
+            "layer_intents": section_context.layer_intents,
+        }
 
-        # Build template ref list from registry if not provided
+    def _build_validator(
+        self,
+        section_context: SectionPlanningContext,
+    ) -> Callable[[SectionCoordinationPlan], list[str]]:
+        """Build validator function for section plans.
 
-        # Import bootstrap to ensure templates are registered
-        from twinklr.core.sequencer.templates.group_templates import (
-            bootstrap_traditional,  # noqa: F401
+        Args:
+            section_context: Section planning context
+
+        Returns:
+            Validator function that returns list of error messages
+        """
+        # Create deterministic validator
+        validator = SectionPlanValidator(
+            display_graph=section_context.display_graph,
+            template_catalog=section_context.template_catalog,
+            timing_context=section_context.timing_context,
         )
 
-        if available_templates is None:
-            # Load all templates from registry
-            template_refs = [
-                template_ref_from_info(info) for info in list_group_templates()
+        def validate(plan: SectionCoordinationPlan) -> list[str]:
+            """Validate plan and return list of error messages."""
+            result = validator.validate(plan)
+
+            # Return only ERROR severity issues as strings
+            errors = [
+                f"{issue.code}: {issue.message}"
+                for issue in result.errors
+                if issue.severity == ValidationSeverity.ERROR
             ]
-        else:
-            # Filter to specified template IDs
-            all_templates = {
-                info.template_id: info for info in list_group_templates()
-            }
-            template_refs = [
-                template_ref_from_info(all_templates[tid])
-                for tid in available_templates
-                if tid in all_templates
-            ]
+            return errors
 
-        logger.debug(
-            f"Starting GroupPlanner orchestration for {len(display_groups)} groups (sequential)"
-        )
-
-        group_plans: list[GroupPlan] = []
-
-        # Sequential execution (v1)
-        for group_dict in display_groups:
-            from twinklr.core.agents.sequencer.group_planner.context import DisplayGroupRef
-
-            display_group = DisplayGroupRef(
-                group_id=group_dict.get("group_id", group_dict.get("role_key", "unknown")),
-                name=group_dict.get("name", group_dict.get("role_key", "Unknown")),
-                group_type=group_dict.get("group_type", "CUSTOM"),
-                model_count=group_dict.get("model_count"),
-                tags=group_dict.get("tags", []),
-            )
-
-            planning_context = GroupPlanningContext(
-                audio_profile=audio_profile,
-                lyric_context=lyric_context,
-                macro_plan=macro_plan,
-                display_group=display_group,
-                available_templates=template_refs,
-                max_layers=max_layers,
-                max_effects_per_section=max_effects_per_section,
-                allow_assets=allow_assets,
-            )
-
-            result = await self.run_single_group(planning_context)
-
-            if result.plan:
-                group_plans.append(result.plan)
-
-        logger.debug(
-            f"✅ GroupPlanner orchestration complete: {len(group_plans)} group plans generated"
-        )
-
-        # Aggregate into GroupPlanSet
-        plan_set = GroupPlanSet(
-            set_id=f"group_plan_set_{audio_profile.song_identity.title or 'unknown'}",
-            group_plans=group_plans,
-        )
-
-        return plan_set
+        return validate

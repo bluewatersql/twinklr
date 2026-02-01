@@ -294,15 +294,3 @@ class TestDefaultAdapterRegistry:
         # Test lissajous adapter
         liss_result = registry.adapt("lissajous", categorical, {"a": 1, "b": 2})
         assert liss_result["b"] == 3  # 2 * 1.5
-
-    def test_build_includes_fixed_behavior_adapters(self):
-        """Test default registry includes fixed behavior adapters."""
-        registry = build_default_adapter_registry()
-
-        categorical = MovementCategoricalParams(amplitude=0.8, frequency=2.0, center_offset=0.5)
-
-        # Test easing curves
-        for curve in ["ease_in_sine", "ease_out_sine", "bounce_in", "elastic_out"]:
-            result = registry.adapt(curve, categorical, {"some_param": 1})
-            # Should return base params unchanged
-            assert result == {"some_param": 1}

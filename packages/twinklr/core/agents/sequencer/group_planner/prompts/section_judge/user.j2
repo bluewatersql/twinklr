@@ -1,0 +1,72 @@
+{#
+SectionJudge User Prompt
+Provides section plan and context for evaluation
+#}
+# Section Plan to Evaluate
+
+**Section ID:** {{ plan.section_id }}
+
+## MacroPlan Intent for This Section
+
+**Energy Target:** {{ energy_target }}
+**Motion Density:** {{ motion_density }}
+**Choreography Style:** {{ choreography_style }}
+**Primary Focus Targets:** {{ primary_focus_targets | join(", ") }}
+{% if secondary_targets %}
+**Secondary Targets:** {{ secondary_targets | join(", ") }}
+{% endif %}
+
+## Section Bounds
+
+**Start:** {{ (start_ms / 1000) | round(1) }}s
+**End:** {{ (end_ms / 1000) | round(1) }}s
+**Duration:** {{ ((end_ms - start_ms) / 1000) | round(1) }}s
+
+## Available Groups
+
+{% for role, group_ids in display_graph.groups_by_role.items() %}
+- **{{ role }}**: {{ group_ids | join(", ") }}
+{% endfor %}
+
+## Available Templates
+
+{% for entry in template_catalog.entries %}
+- `{{ entry.template_id }}` ({{ entry.compatible_lanes | map(attribute="value") | join(", ") }}) - {{ entry.name }}
+{% endfor %}
+
+---
+
+## Plan to Evaluate
+
+```json
+{{ plan | tojson(indent=2) }}
+```
+
+---
+
+# Your Task
+
+Evaluate this SectionCoordinationPlan:
+
+1. **Technical Validation**:
+   - All template_ids exist in catalog
+   - All group_ids exist in display graph
+   - Timing within section bounds
+   - No within-lane overlaps on same group
+
+2. **Quality Assessment**:
+   - Templates appropriate for lanes and section intent
+   - Coordination modes coherent
+   - Primary targets ({{ primary_focus_targets | join(", ") }}) get proper ACCENT treatment
+   - Energy target ({{ energy_target }}) is reflected
+   - Motion density ({{ motion_density }}) matches complexity
+
+{% if iteration is defined and iteration > 0 %}
+---
+
+## Iteration {{ iteration + 1 }}
+
+Previous feedback was provided. Check if issues were addressed.
+{% endif %}
+
+Provide your evaluation as a JudgeVerdict.

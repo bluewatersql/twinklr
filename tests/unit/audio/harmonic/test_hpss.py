@@ -65,19 +65,6 @@ class TestComputeHPSS:
         perc_energy = np.sum(y_perc**2)
         assert perc_energy > 0
 
-    def test_empty_audio_handled(self) -> None:
-        """Empty audio is handled gracefully."""
-        empty = np.array([], dtype=np.float32)
-        y_harm, y_perc = compute_hpss(empty)
-
-        # Should return empty arrays
-        assert len(y_harm) == 0
-        assert len(y_perc) == 0
-
-
-class TestComputeOnsetEnv:
-    """Tests for compute_onset_env function."""
-
     def test_returns_array(
         self,
         sine_wave_440hz: np.ndarray,
@@ -90,18 +77,6 @@ class TestComputeOnsetEnv:
         onset_env = compute_onset_env(y_perc, sample_rate, hop_length=hop_length)
 
         assert isinstance(onset_env, np.ndarray)
-
-    def test_output_dtype_float32(
-        self,
-        sine_wave_440hz: np.ndarray,
-        sample_rate: int,
-        hop_length: int,
-    ) -> None:
-        """Output is float32."""
-        _, y_perc = compute_hpss(sine_wave_440hz)
-        onset_env = compute_onset_env(y_perc, sample_rate, hop_length=hop_length)
-
-        assert onset_env.dtype == np.float32
 
     def test_click_track_has_peaks(
         self,

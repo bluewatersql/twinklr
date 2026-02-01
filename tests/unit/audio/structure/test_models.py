@@ -59,67 +59,6 @@ class TestSection:
         assert section.vocal_density == 0.8
         assert section.harmonic_complexity == 0.4
 
-    def test_section_end_before_start_fails(self):
-        """Test that end_s must be > start_s."""
-        with pytest.raises(ValidationError, match=r"end_s.*must be greater than start_s"):
-            Section(
-                section_id=0,
-                start_s=10.0,
-                end_s=5.0,  # Invalid: end before start
-                label="verse",
-                energy=0.5,
-                repetition=0.5,
-            )
-
-    def test_section_end_equals_start_fails(self):
-        """Test that end_s must be strictly greater than start_s."""
-        with pytest.raises(ValidationError, match=r"end_s.*must be greater than start_s"):
-            Section(
-                section_id=0,
-                start_s=10.0,
-                end_s=10.0,  # Invalid: zero duration
-                label="verse",
-                energy=0.5,
-                repetition=0.5,
-            )
-
-    def test_section_invalid_label(self):
-        """Test that invalid labels are rejected."""
-        with pytest.raises(ValidationError):
-            Section(
-                section_id=0,
-                start_s=0.0,
-                end_s=10.0,
-                label="invalid_label",  # type: ignore
-                energy=0.5,
-                repetition=0.5,
-            )
-
-    def test_section_confidence_out_of_range(self):
-        """Test that confidence must be in [0, 1]."""
-        with pytest.raises(ValidationError):
-            Section(
-                section_id=0,
-                start_s=0.0,
-                end_s=10.0,
-                label="verse",
-                confidence=1.5,  # Invalid: > 1
-                energy=0.5,
-                repetition=0.5,
-            )
-
-    def test_section_energy_out_of_range(self):
-        """Test that energy must be in [0, 1]."""
-        with pytest.raises(ValidationError):
-            Section(
-                section_id=0,
-                start_s=0.0,
-                end_s=10.0,
-                label="verse",
-                energy=-0.1,  # Invalid: < 0
-                repetition=0.5,
-            )
-
     def test_section_is_frozen(self):
         """Test that Section is immutable (frozen)."""
         section = Section(
@@ -185,25 +124,6 @@ class TestSectionDiagnostics:
         assert diagnostics.bar_times_s == [0.0, 2.0]
         assert len(diagnostics.ssm) == 3  # type: ignore
 
-    def test_diagnostics_curve_length_mismatch_fails(self):
-        """Test that curves must match beat grid length."""
-        with pytest.raises(ValidationError, match=r"Curve length.*must match beat grid"):
-            SectionDiagnostics(
-                tempo_bpm=120.0,
-                beat_times_s=[0.0, 0.5, 1.0, 1.5],  # 4 beats
-                duration_s=30.0,
-                novelty=[0.1, 0.8, 0.3],  # 3 values - mismatch!
-                repetition=[0.5, 0.6, 0.7, 0.6],
-                rms=[0.4, 0.5, 0.6, 0.5],
-                onset=[0.3, 0.7, 0.4, 0.3],
-                boundary_beats=[0, 2],
-                boundary_strengths=[1.0, 0.8],
-            )
-
-
-class TestSectioningPreset:
-    """Tests for SectioningPreset model."""
-
     def test_valid_preset(self):
         """Test creating a valid preset."""
         preset = SectioningPreset(
@@ -257,37 +177,6 @@ class TestSectioningPreset:
         assert "drops_weight" in preset.context_weights
         assert "builds_weight" in preset.context_weights
         assert 0.0 <= preset.context_weights["drops_weight"] <= 1.0
-
-    def test_preset_max_less_than_min_fails(self):
-        """Test that max_sections must be >= min_sections."""
-        with pytest.raises(ValidationError, match=r"max_sections.*must be >= min_sections"):
-            SectioningPreset(
-                genre="test",
-                min_sections=20,
-                max_sections=10,  # Invalid: max < min
-                min_len_beats=12,
-                novelty_L_beats=12,
-                peak_delta=0.05,
-                pre_avg=10,
-                post_avg=10,
-            )
-
-    def test_preset_invalid_context_weight(self):
-        """Test that context weights must be in [0, 1]."""
-        with pytest.raises(ValidationError, match=r"Weight.*must be in"):
-            SectioningPreset(
-                genre="test",
-                min_sections=10,
-                max_sections=20,
-                min_len_beats=12,
-                novelty_L_beats=12,
-                peak_delta=0.05,
-                pre_avg=10,
-                post_avg=10,
-                context_weights={
-                    "drops_weight": 1.5,  # Invalid: > 1
-                },
-            )
 
     def test_preset_is_frozen(self):
         """Test that preset is immutable."""

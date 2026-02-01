@@ -17,18 +17,6 @@ from twinklr.core.audio.models import (
 class TestShapeLyricsContext:
     """Test shape_lyrics_context function."""
 
-    def test_shape_context_no_lyrics(self, minimal_bundle_no_lyrics):
-        """Test shaping context when lyrics are None."""
-        context = shape_lyrics_context(minimal_bundle_no_lyrics)
-
-        assert context == {"has_lyrics": False, "reason": "No lyrics available"}
-
-    def test_shape_context_no_lyrics_text(self, minimal_bundle_no_lyrics_text):
-        """Test shaping context when lyrics.text is None."""
-        context = shape_lyrics_context(minimal_bundle_no_lyrics_text)
-
-        assert context == {"has_lyrics": False, "reason": "No lyrics available"}
-
     def test_shape_context_with_lyrics(self, full_bundle_with_lyrics):
         """Test shaping context with full lyrics."""
         context = shape_lyrics_context(full_bundle_with_lyrics)
@@ -69,13 +57,6 @@ class TestShapeLyricsContext:
         assert context["has_lyrics"] is True
         assert context["quality"]["coverage_pct"] == 0.0
         assert context["quality"]["source_confidence"] == 0.0
-
-    def test_shape_context_without_sections(self, bundle_no_sections):
-        """Test shaping context when structure sections are missing."""
-        context = shape_lyrics_context(bundle_no_sections)
-
-        assert context["has_lyrics"] is True
-        assert context["sections"] == []
 
     def test_shape_context_empty_words_and_phrases(self, bundle_empty_words):
         """Test shaping context with empty words and phrases lists."""

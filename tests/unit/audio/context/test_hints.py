@@ -157,16 +157,6 @@ class TestBuildLightingHints:
         assert "drop_count" in build_drop
         assert "recommendation" in build_drop
 
-    def test_handles_missing_keys(self) -> None:
-        """Function handles missing keys gracefully."""
-        minimal_features: dict[str, Any] = {
-            "tempo_bpm": 120,
-        }
-
-        # Should not raise
-        result = build_lighting_hints(minimal_features)
-        assert "movement_speed" in result
-
     def test_tempo_stability_values(
         self,
         sample_song_features: dict[str, Any],

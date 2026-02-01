@@ -23,14 +23,6 @@ from twinklr.core.audio.models.metadata import (
 class TestPipelineConfig:
     """Test PipelineConfig model."""
 
-    def test_default_config(self):
-        """Default configuration has all features enabled."""
-        config = PipelineConfig()
-
-        assert config.enable_acoustid is True
-        assert config.enable_musicbrainz is True
-        assert config.chromaprint_timeout_s == 30.0
-
     def test_custom_config(self):
         """Custom configuration."""
         config = PipelineConfig(

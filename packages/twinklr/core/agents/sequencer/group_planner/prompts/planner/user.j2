@@ -1,0 +1,98 @@
+{#
+GroupPlanner User Prompt
+Provides section context, templates, and groups for coordination planning
+#}
+# Section Information
+
+**Section ID:** {{ section_id }}
+**Section Name:** {{ section_name }}
+**Timing:** {{ (start_ms / 1000) | round(1) }}s to {{ (end_ms / 1000) | round(1) }}s ({{ ((end_ms - start_ms) / 1000) | round(1) }}s duration)
+
+## MacroPlan Intent
+
+**Energy Target:** {{ energy_target }}
+**Motion Density:** {{ motion_density }}
+**Choreography Style:** {{ choreography_style }}
+
+**Primary Focus Targets:** {{ primary_focus_targets | join(", ") }}
+{% if secondary_targets %}
+**Secondary Targets:** {{ secondary_targets | join(", ") }}
+{% endif %}
+
+{% if notes %}
+**Section Notes:** {{ notes }}
+{% endif %}
+
+## Available Display Groups
+
+{% for group in display_graph.groups %}
+- **{{ group.group_id }}** (role: {{ group.role }}) - {{ group.display_name }}{% if group.position %} [x={{ group.position.x }}, y={{ group.position.y }}]{% endif %}
+{% endfor %}
+
+### Groups by Role
+{% for role, group_ids in display_graph.groups_by_role.items() %}
+- **{{ role }}**: {{ group_ids | join(", ") }}
+{% endfor %}
+
+## Available Templates
+
+### BASE Lane Templates
+{% for entry in template_catalog.entries %}
+{% if "BASE" in entry.compatible_lanes | map(attribute="value") %}
+- `{{ entry.template_id }}` - {{ entry.name }}{% if entry.description %}: {{ entry.description }}{% endif %}
+{% endif %}
+{% endfor %}
+
+### RHYTHM Lane Templates
+{% for entry in template_catalog.entries %}
+{% if "RHYTHM" in entry.compatible_lanes | map(attribute="value") %}
+- `{{ entry.template_id }}` - {{ entry.name }}{% if entry.description %}: {{ entry.description }}{% endif %}
+{% endif %}
+{% endfor %}
+
+### ACCENT Lane Templates
+{% for entry in template_catalog.entries %}
+{% if "ACCENT" in entry.compatible_lanes | map(attribute="value") %}
+- `{{ entry.template_id }}` - {{ entry.name }}{% if entry.description %}: {{ entry.description }}{% endif %}
+{% endif %}
+{% endfor %}
+
+{% if layer_intents %}
+## Layer Intent (from MacroPlan)
+
+{% for layer in layer_intents %}
+**Layer {{ layer.layer_index }}: {{ layer.layer_role }}**
+- Targets: {{ layer.target_selector.roles | join(", ") }}
+- Coordination: {{ layer.target_selector.coordination }}
+- Timing Driver: {{ layer.timing_driver }}
+- Intensity Bias: {{ layer.intensity_bias }}
+{% if layer.usage_notes %}
+- Notes: {{ layer.usage_notes }}
+{% endif %}
+
+{% endfor %}
+{% endif %}
+
+{% if iteration is defined and iteration > 0 %}
+---
+
+# Iteration {{ iteration + 1 }} - Refinement Feedback
+
+{{ feedback }}
+
+**Instructions:** Address the feedback while maintaining section coherence.
+
+{% endif %}
+# Your Task
+
+Create a SectionCoordinationPlan for **{{ section_name }} ({{ section_id }})** that:
+
+1. **Assigns lanes** - BASE (foundation), RHYTHM (motion), ACCENT (highlights)
+2. **Selects templates** - From the catalog above, matching section intent
+3. **Defines coordination** - How groups work together (UNIFIED, SEQUENCED, etc.)
+4. **Sets timing** - Using bar/beat TimeRefs within section bounds
+
+**Remember:**
+- Primary targets ({{ primary_focus_targets | join(", ") }}) should get prominent ACCENT treatment
+- Energy target is {{ energy_target }} - design accordingly
+- Motion density is {{ motion_density }} - adjust complexity

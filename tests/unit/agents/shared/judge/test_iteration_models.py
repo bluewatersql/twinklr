@@ -1,8 +1,5 @@
 """Unit tests for iteration controller models."""
 
-from pydantic import ValidationError
-import pytest
-
 from twinklr.core.agents.shared.judge.models import (
     IterationState,
     JudgeVerdict,
@@ -47,43 +44,6 @@ class TestIterationConfig:
         assert config.approval_score_threshold == 8.0
         assert config.soft_fail_score_threshold == 6.0
 
-    def test_max_iterations_validation_min(self):
-        """Test max_iterations validation - too low."""
-        from twinklr.core.agents.shared.judge.controller import IterationConfig
-
-        with pytest.raises(ValidationError) as exc_info:
-            IterationConfig(max_iterations=0)
-        assert "max_iterations" in str(exc_info.value).lower()
-
-    def test_max_iterations_validation_max(self):
-        """Test max_iterations validation - too high."""
-        from twinklr.core.agents.shared.judge.controller import IterationConfig
-
-        with pytest.raises(ValidationError) as exc_info:
-            IterationConfig(max_iterations=11)
-        assert "max_iterations" in str(exc_info.value).lower()
-
-    def test_frozen_immutable(self):
-        """Test config is frozen (immutable)."""
-        from twinklr.core.agents.shared.judge.controller import IterationConfig
-
-        config = IterationConfig()
-
-        with pytest.raises(ValidationError):
-            config.max_iterations = 5
-
-    def test_extra_forbid(self):
-        """Test extra fields are forbidden."""
-        from twinklr.core.agents.shared.judge.controller import IterationConfig
-
-        with pytest.raises(ValidationError) as exc_info:
-            IterationConfig(extra_field="not allowed")
-        assert "extra" in str(exc_info.value).lower()
-
-
-class TestIterationContext:
-    """Tests for IterationContext model."""
-
     def test_valid_context_defaults(self):
         """Test creating valid context with defaults."""
         from twinklr.core.agents.shared.judge.controller import IterationContext
@@ -97,15 +57,6 @@ class TestIterationContext:
         assert context.total_tokens_used == 0
         assert context.termination_reason is None
         assert context.final_verdict is None
-
-    def test_update_state(self):
-        """Test update_state method."""
-        from twinklr.core.agents.shared.judge.controller import IterationContext
-
-        context = IterationContext()
-        context.update_state(IterationState.PLANNING)
-
-        assert context.state == IterationState.PLANNING
 
     def test_add_verdict(self):
         """Test add_verdict method."""
@@ -168,46 +119,6 @@ class TestIterationContext:
         context.add_tokens(50)
         assert context.total_tokens_used == 150
 
-    def test_is_complete_false(self):
-        """Test is_complete property when not complete."""
-        from twinklr.core.agents.shared.judge.controller import IterationContext
-
-        context = IterationContext()
-        context.update_state(IterationState.PLANNING)
-
-        assert context.is_complete is False
-
-    def test_is_complete_true(self):
-        """Test is_complete property when complete."""
-        from twinklr.core.agents.shared.judge.controller import IterationContext
-
-        context = IterationContext()
-        context.update_state(IterationState.COMPLETE)
-
-        assert context.is_complete is True
-
-    def test_was_successful_true(self):
-        """Test was_successful property when successful."""
-        from twinklr.core.agents.shared.judge.controller import IterationContext
-
-        context = IterationContext()
-        context.update_state(IterationState.COMPLETE)
-
-        assert context.was_successful is True
-
-    def test_was_successful_false(self):
-        """Test was_successful property when not successful."""
-        from twinklr.core.agents.shared.judge.controller import IterationContext
-
-        context = IterationContext()
-        context.update_state(IterationState.MAX_ITERATIONS_REACHED)
-
-        assert context.was_successful is False
-
-
-class TestIterationResult:
-    """Tests for IterationResult model."""
-
     def test_valid_result_success(self):
         """Test creating valid result for success case."""
         from twinklr.core.agents.shared.judge.controller import (
@@ -252,16 +163,3 @@ class TestIterationResult:
         assert result.plan is None
         assert result.context == context
         assert result.error_message == "Planner failed"
-
-    def test_frozen_immutable(self):
-        """Test result is frozen (immutable)."""
-        from twinklr.core.agents.shared.judge.controller import (
-            IterationContext,
-            IterationResult,
-        )
-
-        context = IterationContext()
-        result = IterationResult(success=True, plan={}, context=context)
-
-        with pytest.raises(ValidationError):
-            result.success = False

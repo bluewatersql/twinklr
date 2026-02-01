@@ -28,18 +28,14 @@ from __future__ import annotations
 
 import argparse
 import base64
-import json
-import math
-import os
-import random
 from dataclasses import dataclass
+import json
+import os
 from pathlib import Path
-from typing import Iterable
-
-from PIL import Image, ImageChops, ImageDraw, ImageEnhance, ImageFilter, ImageFont
+import random
 
 from openai import OpenAI
-
+from PIL import Image, ImageChops, ImageDraw, ImageEnhance, ImageFilter, ImageFont
 
 # -----------------------------
 # Prompting (consistency-first)
@@ -94,7 +90,10 @@ def build_frame_prompts() -> list[FramePrompt]:
         ("base", "Base scene, no motion."),
         ("twinkle_1", "Windows glow slightly brighter in a few houses; keep layout identical."),
         ("steam_up", "Chimney steam rises a bit higher; keep everything else identical."),
-        ("twinkle_2", "Tree lights sparkle subtly (larger sparkles, not tiny dots); keep layout identical."),
+        (
+            "twinkle_2",
+            "Tree lights sparkle subtly (larger sparkles, not tiny dots); keep layout identical.",
+        ),
     ]
 
     prompts: list[FramePrompt] = []
@@ -113,6 +112,7 @@ def build_frame_prompts() -> list[FramePrompt]:
 # -----------------------------
 # OpenAI Image API helpers
 # -----------------------------
+
 
 def _write_png_from_b64(b64_data: str, out_path: Path) -> None:
     out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -236,6 +236,7 @@ def generate_placeholder_frames(out_dir: Path, count: int, size: tuple[int, int]
 # Pillow scenario 1: text overlay
 # -----------------------------
 
+
 def add_text_overlay(img: Image.Image, text: str) -> Image.Image:
     out = img.copy()
     draw = ImageDraw.Draw(out)
@@ -256,6 +257,7 @@ def add_text_overlay(img: Image.Image, text: str) -> Image.Image:
 # -----------------------------
 # Pillow scenario 2: tree warp + seam-safe
 # -----------------------------
+
 
 def warp_tree_region(img: Image.Image) -> Image.Image:
     """
@@ -331,6 +333,7 @@ def make_seam_safe_horizontal(img: Image.Image, seam_width: int = 96) -> Image.I
 # Pillow scenario 3: GIF + falling snow overlay
 # -----------------------------
 
+
 def iter_snow_particles(seed: int, count: int, w: int, h: int) -> list[tuple[int, int, int]]:
     rng = random.Random(seed)
     parts: list[tuple[int, int, int]] = []
@@ -352,7 +355,7 @@ def add_falling_snow(img: Image.Image, frame_idx: int, *, density: int = 260) ->
     particles = iter_snow_particles(seed=1337, count=density, w=w, h=h)
     dy = (frame_idx * 10) % h
 
-    for (x, y, r) in particles:
+    for x, y, r in particles:
         yy = (y + dy) % h
         a = 140 + ((x + y + frame_idx * 17) % 90)
         draw.ellipse([x - r, yy - r, x + r, yy + r], fill=(255, 255, 255, a))
@@ -384,7 +387,10 @@ def write_gif(frames: list[Image.Image], out_path: Path, duration_ms: int = 120)
 # Scenario 4: image edit/overlay/mask
 # -----------------------------
 
-def build_sky_mask_rgba(size: tuple[int, int], *, sky_ratio: float = 0.55, feather_px: int = 16) -> Image.Image:
+
+def build_sky_mask_rgba(
+    size: tuple[int, int], *, sky_ratio: float = 0.55, feather_px: int = 16
+) -> Image.Image:
     """
     Returns an RGBA mask image:
       - White/opaque = editable area
@@ -476,10 +482,13 @@ def openai_masked_edit(
 # Main
 # -----------------------------
 
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", required=True, help="Output directory")
-    ap.add_argument("--skip-openai", action="store_true", help="Skip OpenAI calls; use placeholders")
+    ap.add_argument(
+        "--skip-openai", action="store_true", help="Skip OpenAI calls; use placeholders"
+    )
     ap.add_argument("--model", default="gpt-image-1.5", help="GPT Image model (e.g. gpt-image-1.5)")
     ap.add_argument("--size", default="1536x1024", help="Image size (e.g. 1536x1024)")
     args = ap.parse_args()
@@ -490,8 +499,16 @@ def main() -> int:
     prompts = build_frame_prompts()
 
     # Persist prompts for traceability
-    prompts_json = [{"frame_index": p.frame_index, "label": p.label, "prompt": p.prompt} for p in prompts]
-    prompts_json.append({"frame_index": 999, "label": "scenario_4_masked_edit", "prompt": SCENARIO_4_MASKED_EDIT_PROMPT})
+    prompts_json = [
+        {"frame_index": p.frame_index, "label": p.label, "prompt": p.prompt} for p in prompts
+    ]
+    prompts_json.append(
+        {
+            "frame_index": 999,
+            "label": "scenario_4_masked_edit",
+            "prompt": SCENARIO_4_MASKED_EDIT_PROMPT,
+        }
+    )
     (out_dir / "prompts_used.json").write_text(json.dumps(prompts_json, indent=2), encoding="utf-8")
 
     print("\nPROMPTS USED:\n")
@@ -502,9 +519,13 @@ def main() -> int:
     # Generate frames
     if args.skip_openai:
         w_s, h_s = args.size.lower().split("x")
-        frame_paths = generate_placeholder_frames(out_dir, count=len(prompts), size=(int(w_s), int(h_s)))
+        frame_paths = generate_placeholder_frames(
+            out_dir, count=len(prompts), size=(int(w_s), int(h_s))
+        )
     else:
-        frame_paths = generate_sequence_frames_openai(out_dir, prompts, model=args.model, size=args.size)
+        frame_paths = generate_sequence_frames_openai(
+            out_dir, prompts, model=args.model, size=args.size
+        )
 
     frames = [Image.open(p).convert("RGB") for p in frame_paths]
 

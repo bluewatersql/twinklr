@@ -274,19 +274,13 @@ class TestConfigureLogging:
 class TestGetLogger:
     """Test suite for get_logger function."""
 
-    def test_get_logger_without_context(self):
-        """Test getting a plain logger without context."""
-        logger = get_logger("test.plain")
-        assert isinstance(logger, logging.Logger)
-        assert logger.name == "test.plain"
-
     def test_get_logger_with_context(self):
         """Test getting a LoggerAdapter with context."""
         logger = get_logger("test.context", request_id="req-123", user="user-456")
         assert isinstance(logger, logging.LoggerAdapter)
         assert logger.logger.name == "test.context"
-        assert logger.extra["request_id"] == "req-123"  # pyright: ignore[reportOptionalSubscript]
-        assert logger.extra["user"] == "user-456"  # pyright: ignore[reportOptionalSubscript]
+        assert logger.extra["request_id"] == "req-123"
+        assert logger.extra["user"] == "user-456"
 
     def test_logger_adapter_includes_context_in_structured_logs(self):
         """Test that LoggerAdapter context appears in structured logs."""

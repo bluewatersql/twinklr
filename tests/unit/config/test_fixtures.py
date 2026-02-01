@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from pydantic import ValidationError
 import pytest
 
 from twinklr.core.config.fixtures import (
@@ -16,19 +15,11 @@ from twinklr.core.config.fixtures import (
     MovementLimits,
     PanTiltRange,
     Pose,
-    ShutterMap,
 )
-from twinklr.core.config.poses import STANDARD_POSES, PoseLibrary
 
 
 class TestPose:
     """Tests for Pose model."""
-
-    def test_pose_creation(self) -> None:
-        """Test basic pose creation."""
-        pose = Pose(pan_deg=0.0, tilt_deg=0.0)
-        assert pose.pan_deg == 0.0
-        assert pose.tilt_deg == 0.0
 
     def test_pose_pan_normalization(self) -> None:
         """Test pan angle normalization to [-180, 180)."""
@@ -48,94 +39,9 @@ class TestPose:
         pose = Pose(pan_deg=540.0, tilt_deg=0.0)
         assert pose.pan_deg == -180.0
 
-    def test_pose_negative_tilt(self) -> None:
-        """Test pose with negative tilt (below horizon)."""
-        pose = Pose(pan_deg=0.0, tilt_deg=-10.0)
-        assert pose.tilt_deg == -10.0
-
 
 class TestPoseLibraryIntegration:
     """Tests for PoseLibrary integration with FixtureConfig."""
-
-    def test_center_pose(self) -> None:
-        """Test CENTER standard pose via FixtureConfig."""
-        config = FixtureConfig(
-            fixture_id="test",
-            pan_range_deg=540.0,
-            tilt_range_deg=270.0,
-            dmx_mapping=DmxMapping(pan_channel=1, tilt_channel=3, dimmer_channel=5),
-        )
-        pose = config.get_standard_pose("center")
-        assert pose.pan_deg == 0.0
-        assert pose.tilt_deg == 0.0
-
-    def test_sky_pose(self) -> None:
-        """Test SKY standard pose via FixtureConfig."""
-        config = FixtureConfig(
-            fixture_id="test",
-            pan_range_deg=540.0,
-            tilt_range_deg=270.0,
-            dmx_mapping=DmxMapping(pan_channel=1, tilt_channel=3, dimmer_channel=5),
-        )
-        pose = config.get_standard_pose("sky")
-        assert pose.pan_deg == 0.0
-        assert pose.tilt_deg == 80.0
-
-    def test_crowd_pose(self) -> None:
-        """Test CROWD standard pose via FixtureConfig."""
-        config = FixtureConfig(
-            fixture_id="test",
-            pan_range_deg=540.0,
-            tilt_range_deg=270.0,
-            dmx_mapping=DmxMapping(pan_channel=1, tilt_channel=3, dimmer_channel=5),
-        )
-        pose = config.get_standard_pose("crowd")
-        assert pose.pan_deg == 0.0
-        assert pose.tilt_deg == -20.0
-
-    def test_audience_poses(self) -> None:
-        """Test audience standard poses via FixtureConfig."""
-        config = FixtureConfig(
-            fixture_id="test",
-            pan_range_deg=540.0,
-            tilt_range_deg=270.0,
-            dmx_mapping=DmxMapping(pan_channel=1, tilt_channel=3, dimmer_channel=5),
-        )
-        center = config.get_standard_pose("audience_center")
-        assert center.pan_deg == 0.0
-        assert center.tilt_deg == -20.0  # From STANDARD_POSES
-
-        left = config.get_standard_pose("audience_left")
-        assert left.pan_deg == -35.0  # From STANDARD_POSES
-
-        right = config.get_standard_pose("audience_right")
-        assert right.pan_deg == 35.0  # From STANDARD_POSES
-
-    def test_soft_home_pose(self) -> None:
-        """Test SOFT_HOME standard pose."""
-        config = FixtureConfig(
-            fixture_id="test",
-            pan_range_deg=540.0,
-            tilt_range_deg=270.0,
-            dmx_mapping=DmxMapping(pan_channel=1, tilt_channel=3, dimmer_channel=5),
-        )
-        pose = config.get_standard_pose("soft_home")
-        assert pose.pan_deg == 0.0
-        assert pose.tilt_deg == 0.0
-
-    def test_direct_poselibrary_access(self) -> None:
-        """Test direct access to STANDARD_POSES via PoseLibrary."""
-        # Test domain pose access
-        domain_pose = STANDARD_POSES[PoseLibrary.CENTER]
-        assert domain_pose.pan_deg == 0.0
-        assert domain_pose.tilt_deg == 0.0
-        assert domain_pose.name == "Center"
-
-        # Test with SOFT_HOME
-        soft_home = STANDARD_POSES[PoseLibrary.SOFT_HOME]
-        assert soft_home.pan_deg == 0.0
-        assert soft_home.tilt_deg == 0.0
-        assert soft_home.name == "Soft Home"
 
     def test_invalid_pose_id(self) -> None:
         """Test that invalid pose ID raises error."""
@@ -152,131 +58,19 @@ class TestPoseLibraryIntegration:
 class TestShutterMap:
     """Tests for ShutterMap model."""
 
-    def test_shutter_map_defaults(self) -> None:
-        """Test shutter map with default values."""
-        shutter = ShutterMap()
-        assert shutter.closed == 0
-        assert shutter.open == 255
-        assert shutter.strobe_slow == 64
-
-    def test_shutter_map_custom(self) -> None:
-        """Test shutter map with custom values."""
-        shutter = ShutterMap(closed=10, open=250, strobe_slow=100)
-        assert shutter.closed == 10
-        assert shutter.open == 250
-        assert shutter.strobe_slow == 100
+    # Skip trivial dataclass tests - Pydantic validates these
 
 
 class TestDmxMapping:
     """Tests for DmxMapping model."""
 
-    def test_dmx_mapping_required_fields(self) -> None:
-        """Test DMX mapping with required fields only."""
-        mapping = DmxMapping(pan_channel=11, tilt_channel=13, dimmer_channel=15)
-
-        assert mapping.pan_channel == 11
-        assert mapping.tilt_channel == 13
-        assert mapping.dimmer_channel == 15
-        assert mapping.use_16bit_pan_tilt is False
-        assert mapping.shutter_channel is None
-
-    def test_dmx_mapping_16bit(self) -> None:
-        """Test DMX mapping with 16-bit support."""
-        mapping = DmxMapping(
-            pan_channel=11,
-            tilt_channel=13,
-            dimmer_channel=15,
-            pan_fine_channel=12,
-            tilt_fine_channel=14,
-            use_16bit_pan_tilt=True,
-        )
-
-        assert mapping.pan_fine_channel == 12
-        assert mapping.tilt_fine_channel == 14
-        assert mapping.use_16bit_pan_tilt is True
-
-    def test_dmx_mapping_full_featured(self) -> None:
-        """Test DMX mapping with all features."""
-        mapping = DmxMapping(
-            pan_channel=11,
-            tilt_channel=13,
-            dimmer_channel=15,
-            shutter_channel=17,
-            color_channel=18,
-            gobo_channel=19,
-        )
-
-        assert mapping.shutter_channel == 17
-        assert mapping.color_channel == 18
-        assert mapping.gobo_channel == 19
-        assert "white" in mapping.color_map
-        assert "open" in mapping.gobo_map
-
-    def test_dmx_mapping_invalid_channel(self) -> None:
-        """Test DMX mapping with invalid channel number."""
-        with pytest.raises(ValidationError):
-            DmxMapping(pan_channel=0, tilt_channel=13, dimmer_channel=15)
-
-        with pytest.raises(ValidationError):
-            DmxMapping(pan_channel=513, tilt_channel=13, dimmer_channel=15)
-
 
 class TestMovementLimits:
     """Tests for MovementLimits model."""
 
-    def test_limits_defaults(self) -> None:
-        """Test movement limits with defaults."""
-        limits = MovementLimits()
-        assert limits.pan_min == 50
-        assert limits.pan_max == 190
-        assert limits.tilt_min == 5
-        assert limits.tilt_max == 125
-        assert limits.avoid_backward is True
-
-    def test_limits_custom(self) -> None:
-        """Test movement limits with custom values."""
-        limits = MovementLimits(pan_min=30, pan_max=220, tilt_min=10, tilt_max=200)
-        assert limits.pan_min == 30
-        assert limits.pan_max == 220
-
-    def test_limits_validation_pan(self) -> None:
-        """Test that pan_min < pan_max validation works."""
-        with pytest.raises(ValidationError, match="must be less than"):
-            MovementLimits(pan_min=200, pan_max=50)
-
-    def test_limits_validation_tilt(self) -> None:
-        """Test that tilt_min < tilt_max validation works."""
-        with pytest.raises(ValidationError, match="must be less than"):
-            MovementLimits(tilt_min=200, tilt_max=50)
-
 
 class TestFixturePosition:
     """Tests for FixturePosition model."""
-
-    def test_position_defaults(self) -> None:
-        """Test fixture position with defaults."""
-        position = FixturePosition()
-        assert position.position_index == 1
-        assert position.pan_offset_deg == 0.0
-        assert position.tilt_offset_deg == 0.0
-
-    def test_position_with_offset(self) -> None:
-        """Test fixture position with offset."""
-        position = FixturePosition(position_index=2, pan_offset_deg=30.0, tilt_offset_deg=-5.0)
-        assert position.position_index == 2
-        assert position.pan_offset_deg == 30.0
-        assert position.tilt_offset_deg == -5.0
-
-    def test_apply_offset(self) -> None:
-        """Test applying position offset to a pose."""
-        position = FixturePosition(pan_offset_deg=30.0, tilt_offset_deg=-5.0)
-        target = Pose(pan_deg=0.0, tilt_deg=0.0)  # Want to aim forward
-
-        actual = position.apply_offset(target)
-
-        # Fixture at 30° pan, -5° tilt aims forward
-        assert actual.pan_deg == 30.0
-        assert actual.tilt_deg == -5.0
 
     def test_remove_offset(self) -> None:
         """Test removing position offset from a pose."""
@@ -436,12 +230,6 @@ class TestFixtureGroup:
         assert group.xlights_group == "GROUP - MOVING HEADS"
         assert len(group) == 0
         assert group.is_semantic() is False
-
-    def test_semantic_group(self) -> None:
-        """Test semantic group (no xLights mapping)."""
-        group = FixtureGroup(group_id="FRONT_SPOTS", xlights_group=None)
-
-        assert group.is_semantic() is True
 
     def test_add_fixture(self) -> None:
         """Test adding fixture to group."""

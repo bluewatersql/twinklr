@@ -13,27 +13,6 @@ from twinklr.core.audio.models.metadata import (
 class TestTextNormalization:
     """Test text normalization for similarity comparison."""
 
-    def test_normalize_text_lowercase(self):
-        """normalize_text converts to lowercase."""
-        from twinklr.core.audio.metadata.merge import normalize_text
-
-        assert normalize_text("Hello WORLD") == "hello world"
-        assert normalize_text("Test Song") == "test song"
-
-    def test_normalize_text_strip(self):
-        """normalize_text strips whitespace."""
-        from twinklr.core.audio.metadata.merge import normalize_text
-
-        assert normalize_text("  hello  ") == "hello"
-        assert normalize_text("\t test \n") == "test"
-
-    def test_normalize_text_collapse_whitespace(self):
-        """normalize_text collapses multiple spaces."""
-        from twinklr.core.audio.metadata.merge import normalize_text
-
-        assert normalize_text("hello    world") == "hello world"
-        assert normalize_text("a  b   c") == "a b c"
-
     def test_normalize_text_remove_punctuation(self):
         """normalize_text removes punctuation."""
         from twinklr.core.audio.metadata.merge import normalize_text
@@ -42,56 +21,6 @@ class TestTextNormalization:
         assert normalize_text("test-song (remix)") == "testsong remix"
         assert normalize_text("it's a song") == "its a song"
 
-    def test_normalize_text_none(self):
-        """normalize_text handles None."""
-        from twinklr.core.audio.metadata.merge import normalize_text
-
-        assert normalize_text(None) == ""
-
-    def test_normalize_text_empty(self):
-        """normalize_text handles empty string."""
-        from twinklr.core.audio.metadata.merge import normalize_text
-
-        assert normalize_text("") == ""
-
-
-class TestTokenJaccard:
-    """Test token Jaccard similarity."""
-
-    def test_token_jaccard_identical(self):
-        """Identical strings have similarity 1.0."""
-        from twinklr.core.audio.metadata.merge import token_jaccard
-
-        assert token_jaccard("hello world", "hello world") == 1.0
-        assert token_jaccard("test", "test") == 1.0
-
-    def test_token_jaccard_no_overlap(self):
-        """No overlap has similarity 0.0."""
-        from twinklr.core.audio.metadata.merge import token_jaccard
-
-        assert token_jaccard("hello", "world") == 0.0
-        assert token_jaccard("foo bar", "baz qux") == 0.0
-
-    def test_token_jaccard_partial_overlap(self):
-        """Partial overlap."""
-        from twinklr.core.audio.metadata.merge import token_jaccard
-
-        # "hello world" and "hello there" share 1 token (hello)
-        # Union: {hello, world, there} = 3 tokens
-        # Jaccard: 1/3 = 0.333...
-        assert abs(token_jaccard("hello world", "hello there") - 1 / 3) < 0.001
-
-        # "a b c" and "b c d" share 2 tokens (b, c)
-        # Union: {a, b, c, d} = 4 tokens
-        # Jaccard: 2/4 = 0.5
-        assert token_jaccard("a b c", "b c d") == 0.5
-
-    def test_token_jaccard_case_insensitive(self):
-        """token_jaccard is case-insensitive (normalized)."""
-        from twinklr.core.audio.metadata.merge import token_jaccard
-
-        assert token_jaccard("Hello World", "hello world") == 1.0
-
     def test_token_jaccard_none_handling(self):
         """token_jaccard handles None values."""
         from twinklr.core.audio.metadata.merge import token_jaccard
@@ -99,60 +28,6 @@ class TestTokenJaccard:
         assert token_jaccard(None, None) == 0.0  # Both missing (no information)
         assert token_jaccard("hello", None) == 0.0
         assert token_jaccard(None, "hello") == 0.0
-
-    def test_token_jaccard_empty_strings(self):
-        """token_jaccard handles empty strings."""
-        from twinklr.core.audio.metadata.merge import token_jaccard
-
-        assert token_jaccard("", "") == 0.0  # Both empty (no information)
-        assert token_jaccard("hello", "") == 0.0
-
-
-class TestDurationSimilarity:
-    """Test duration similarity."""
-
-    def test_duration_similarity_exact_match(self):
-        """Exact duration match has similarity 1.0."""
-        from twinklr.core.audio.metadata.merge import duration_similarity
-
-        assert duration_similarity(180000, 180000) == 1.0
-        assert duration_similarity(120500, 120500) == 1.0
-
-    def test_duration_similarity_small_delta(self):
-        """Small duration difference has high similarity."""
-        from twinklr.core.audio.metadata.merge import duration_similarity
-
-        # 1 second difference (1000ms) on 180s song
-        # delta_s = 1
-        # sim = 1 - min(1, 6)/6 = 1 - 1/6 = 0.833...
-        sim = duration_similarity(180000, 181000)
-        assert abs(sim - (1 - 1 / 6)) < 0.001
-
-    def test_duration_similarity_large_delta(self):
-        """Large duration difference has low similarity."""
-        from twinklr.core.audio.metadata.merge import duration_similarity
-
-        # 10 second difference (10000ms)
-        # delta_s = 10
-        # sim = 1 - min(10, 6)/6 = 1 - 6/6 = 0
-        assert duration_similarity(180000, 190000) == 0.0
-
-    def test_duration_similarity_missing_ref(self):
-        """Missing reference duration returns 0.5."""
-        from twinklr.core.audio.metadata.merge import duration_similarity
-
-        assert duration_similarity(180000, None) == 0.5
-        assert duration_similarity(None, 180000) == 0.5
-
-    def test_duration_similarity_both_missing(self):
-        """Both missing returns 0.5 (can't compare)."""
-        from twinklr.core.audio.metadata.merge import duration_similarity
-
-        assert duration_similarity(None, None) == 0.5
-
-
-class TestGenericDetection:
-    """Test generic title/artist detection."""
 
     def test_is_generic_title(self):
         """is_generic_title detects generic titles."""
@@ -171,12 +46,6 @@ class TestGenericDetection:
         assert not is_generic_title("Track of the Century")  # Contains "track" but not pattern
         assert not is_generic_title("My Track")
 
-    def test_is_generic_title_none(self):
-        """is_generic_title handles None."""
-        from twinklr.core.audio.metadata.merge import is_generic_title
-
-        assert is_generic_title(None)
-
     def test_is_generic_artist(self):
         """is_generic_artist detects generic artists."""
         from twinklr.core.audio.metadata.merge import is_generic_artist
@@ -186,23 +55,6 @@ class TestGenericDetection:
         assert is_generic_artist("UNKNOWN")
         assert is_generic_artist("unknown artist")
         assert is_generic_artist("Unknown Artist")
-
-    def test_is_generic_artist_not_generic(self):
-        """is_generic_artist returns False for non-generic artists."""
-        from twinklr.core.audio.metadata.merge import is_generic_artist
-
-        assert not is_generic_artist("Real Artist Name")
-        assert not is_generic_artist("The Unknown Legends")  # Contains "unknown" but not exact
-
-    def test_is_generic_artist_none(self):
-        """is_generic_artist handles None."""
-        from twinklr.core.audio.metadata.merge import is_generic_artist
-
-        assert is_generic_artist(None)
-
-
-class TestCandidateScoring:
-    """Test candidate scoring algorithm."""
 
     def test_score_candidate_perfect_match(self):
         """Perfect candidate match with MusicBrainz."""

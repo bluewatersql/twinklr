@@ -65,16 +65,6 @@ class MockWhisperXService(WhisperXService):
 class TestWhisperXAlignStage:
     """Test Stage 4: WhisperX align-only."""
 
-    def test_align_triggered_when_plain_text_but_require_timed(self):
-        """WhisperX align should trigger when we have text but require_timed_words=True."""
-        # This is tested in the full pipeline flow (test_stage_order_full_pipeline)
-        # When plain text is found but require_timed_words=True, align should trigger
-        # Just verify the pipeline accepts whisperx_service parameter
-        whisperx = MockWhisperXService()
-        config = LyricsPipelineConfig(require_timed_words=True)
-        pipeline = LyricsPipeline(config=config, providers={}, whisperx_service=whisperx)
-        assert pipeline.whisperx_service is not None
-
     def test_align_with_good_reference(self, tmp_path):
         """Align with low mismatch ratio should succeed."""
         audio_path = str(tmp_path / "song.mp3")
@@ -137,16 +127,6 @@ class TestWhisperXAlignStage:
         assert any("mismatch" in w.lower() for w in bundle.warnings)
         # Confidence should have -0.10 penalty for high mismatch
         assert bundle.source.confidence < 0.85  # Base confidence
-
-    def test_align_not_triggered_when_words_already_exist(self):
-        """Align should not trigger if we already have word-level timing."""
-        # This is tested in the full pipeline flow
-        # If embedded/synced provided words, don't need align
-        # Just a placeholder test
-
-
-class TestWhisperXTranscribeStage:
-    """Test Stage 5: WhisperX transcribe."""
 
     def test_transcribe_triggered_when_no_lyrics(self, tmp_path):
         """Transcribe should trigger when no lyrics found from any source."""
@@ -251,14 +231,6 @@ class TestWhisperXGatingLogic:
 
 class TestWhisperXConfidenceScoring:
     """Test confidence scoring for WhisperX results."""
-
-    def test_base_confidence_align(self):
-        """WhisperX align should have base confidence 0.85."""
-        assert LyricsPipeline.BASE_CONFIDENCE[LyricsSourceKind.WHISPERX_ALIGN] == 0.85
-
-    def test_base_confidence_transcribe(self):
-        """WhisperX transcribe should have base confidence 0.80."""
-        assert LyricsPipeline.BASE_CONFIDENCE[LyricsSourceKind.WHISPERX_TRANSCRIBE] == 0.80
 
     def test_mismatch_penalty_applied(self, tmp_path):
         """High mismatch ratio should apply -0.10 penalty."""

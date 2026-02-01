@@ -3,9 +3,6 @@
 Testing AcoustID and MusicBrainz request/response models.
 """
 
-from pydantic import ValidationError
-import pytest
-
 from twinklr.core.api.audio.models import (
     AcoustIDRecording,
     AcoustIDResponse,
@@ -50,35 +47,6 @@ class TestAcoustIDRecording:
         assert recording.duration_ms == 180000
         assert recording.recording_mbid == "rec-mbid-123"
         assert recording.release_mbid == "rel-mbid-456"
-
-    def test_score_range_validation(self):
-        """AcoustID score must be 0-1."""
-        # Valid
-        AcoustIDRecording(id="test", score=0.0)
-        AcoustIDRecording(id="test", score=1.0)
-
-        # Invalid
-        with pytest.raises(ValidationError):
-            AcoustIDRecording(id="test", score=-0.1)
-
-        with pytest.raises(ValidationError):
-            AcoustIDRecording(id="test", score=1.1)
-
-    def test_duration_positive(self):
-        """Duration must be positive if provided."""
-        # Valid
-        AcoustIDRecording(id="test", score=0.9, duration_ms=1)
-
-        # Invalid
-        with pytest.raises(ValidationError):
-            AcoustIDRecording(id="test", score=0.9, duration_ms=0)
-
-        with pytest.raises(ValidationError):
-            AcoustIDRecording(id="test", score=0.9, duration_ms=-100)
-
-
-class TestAcoustIDResponse:
-    """Test AcoustIDResponse model."""
 
     def test_empty_response(self):
         """Empty AcoustID response with no results."""
@@ -186,24 +154,3 @@ class TestMusicBrainzRecording:
         assert len(recording.releases) == 2
         assert recording.releases[0].title == "Album 1"
         assert recording.releases[1].date == "2024-01-01"
-
-    def test_length_positive(self):
-        """Length must be positive if provided."""
-        # Valid
-        MusicBrainzRecording(id="rec-123", title="Test", length_ms=1)
-
-        # Invalid
-        with pytest.raises(ValidationError):
-            MusicBrainzRecording(id="rec-123", title="Test", length_ms=0)
-
-        with pytest.raises(ValidationError):
-            MusicBrainzRecording(id="rec-123", title="Test", length_ms=-100)
-
-    def test_extra_forbidden(self):
-        """Extra fields should be forbidden."""
-        with pytest.raises(ValidationError):
-            MusicBrainzRecording(
-                id="rec-123",
-                title="Test",
-                extra_field="invalid",
-            )

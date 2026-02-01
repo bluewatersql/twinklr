@@ -1,0 +1,67 @@
+{#
+HolisticJudge User Prompt
+Provides complete GroupPlanSet for holistic evaluation
+#}
+# GroupPlanSet to Evaluate
+
+**Plan Set ID:** {{ group_plan_set.plan_set_id }}
+**Sections:** {{ section_count }} total
+
+## Section Order
+
+{% for section_id in section_ids %}
+{{ loop.index }}. {{ section_id }}
+{% endfor %}
+
+## Available Display Groups
+
+{% for role, group_ids in display_graph.groups_by_role.items() %}
+- **{{ role }}**: {{ group_ids | join(", ") }}
+{% endfor %}
+
+{% if macro_plan_summary and macro_plan_summary.global_story %}
+## MacroPlan Context
+
+{% if macro_plan_summary.global_story.theme %}
+**Theme:** {{ macro_plan_summary.global_story.theme }}
+{% endif %}
+
+{% if macro_plan_summary.global_story.motifs %}
+**Motifs:**
+{% for motif in macro_plan_summary.global_story.motifs %}
+- {{ motif }}
+{% endfor %}
+{% endif %}
+
+{% if macro_plan_summary.global_story.pacing_notes %}
+**Pacing Notes:** {{ macro_plan_summary.global_story.pacing_notes }}
+{% endif %}
+{% endif %}
+
+---
+
+## Complete GroupPlanSet
+
+```json
+{{ group_plan_set | tojson(indent=2) }}
+```
+
+---
+
+# Your Task
+
+Evaluate this complete GroupPlanSet for:
+
+1. **Energy Arc**: Does energy build and release appropriately across sections?
+
+2. **Template Variety**: Are templates varied enough to avoid monotony?
+
+3. **Group Utilization**: Are all groups getting appropriate attention?
+
+4. **Coherence**: Do sections flow naturally together?
+
+{% if macro_plan_summary %}
+5. **MacroPlan Alignment**: Does coordination honor the global story and motifs?
+{% endif %}
+
+Provide your evaluation as a HolisticEvaluation with score, status, and any cross-section issues.

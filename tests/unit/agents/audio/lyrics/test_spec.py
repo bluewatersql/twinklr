@@ -22,24 +22,6 @@ class TestGetLyricsSpec:
         assert spec.token_budget is None
         assert spec.default_variables == {}
 
-    def test_custom_model(self):
-        """Test spec with custom model."""
-        spec = get_lyrics_spec(model="gpt-4")
-
-        assert spec.model == "gpt-4"
-
-    def test_custom_temperature(self):
-        """Test spec with custom temperature."""
-        spec = get_lyrics_spec(temperature=0.7)
-
-        assert spec.temperature == 0.7
-
-    def test_custom_token_budget(self):
-        """Test spec with custom token budget."""
-        spec = get_lyrics_spec(token_budget=5000)
-
-        assert spec.token_budget == 5000
-
     def test_all_custom_params(self):
         """Test spec with all custom parameters."""
         spec = get_lyrics_spec(

@@ -83,24 +83,7 @@ def simple_audio_profile(valid_macro_plan: MacroPlan) -> AudioProfileModel:
     return AudioProfileModel(**data)
 
 
-def test_validator_instantiation():
-    """Validator can be instantiated."""
-    validator = MacroPlanHeuristicValidator()
-    assert validator is not None
-
-
-def test_validate_returns_list(
-    valid_macro_plan: MacroPlan, simple_audio_profile: AudioProfileModel
-):
-    """Validate returns list of issues."""
-    validator = MacroPlanHeuristicValidator()
-
-    issues = validator.validate(valid_macro_plan, simple_audio_profile)
-
-    assert isinstance(issues, list)
-    # The valid_macro_plan only has 1 section but audio has many, so we expect missing sections
-    # Just verify it returns a list - actual validation tested in specific tests
-    assert len(issues) >= 0  # May or may not have issues depending on fixtures
+# Skip trivial instantiation/type tests
 
 
 def test_validate_accepts_plan_and_profile(

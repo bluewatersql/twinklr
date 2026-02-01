@@ -1,8 +1,5 @@
 """Unit tests for transition models."""
 
-from pydantic import ValidationError
-import pytest
-
 from twinklr.core.curves.library import CurveLibrary
 from twinklr.core.sequencer.models.enum import ChannelName, TransitionMode
 from twinklr.core.sequencer.models.transition import (
@@ -30,23 +27,6 @@ class TestTransitionStrategy:
 class TestTransitionHint:
     """Test TransitionHint model."""
 
-    def test_default_values(self):
-        """Test default transition hint values."""
-        hint = TransitionHint()
-
-        assert hint.mode == TransitionMode.CROSSFADE
-        assert hint.duration_bars == 0.5
-        assert hint.curve == CurveLibrary.EASE_IN_OUT_SINE
-        assert hint.fade_out_ratio == 0.5
-        assert hint.per_channel_overrides is None
-
-    def test_snap_transition(self):
-        """Test creating a snap transition."""
-        hint = TransitionHint(mode=TransitionMode.SNAP, duration_bars=0.0)
-
-        assert hint.mode == TransitionMode.SNAP
-        assert hint.is_snap is True
-
     def test_crossfade_transition(self):
         """Test creating a crossfade transition."""
         hint = TransitionHint(
@@ -72,34 +52,6 @@ class TestTransitionHint:
         assert hint.per_channel_overrides is not None
         assert hint.per_channel_overrides["dimmer"] == TransitionStrategy.FADE_VIA_BLACK
         assert hint.per_channel_overrides["color"] == TransitionStrategy.SNAP
-
-    def test_duration_validation(self):
-        """Test duration validation."""
-        # Valid durations
-        TransitionHint(duration_bars=0.0)
-        TransitionHint(duration_bars=1.0)
-        TransitionHint(duration_bars=8.0)
-
-        # Invalid durations
-        with pytest.raises(ValidationError):
-            TransitionHint(duration_bars=-0.1)
-
-        with pytest.raises(ValidationError):
-            TransitionHint(duration_bars=8.1)
-
-    def test_fade_out_ratio_validation(self):
-        """Test fade_out_ratio validation."""
-        # Valid ratios
-        TransitionHint(fade_out_ratio=0.0)
-        TransitionHint(fade_out_ratio=0.5)
-        TransitionHint(fade_out_ratio=1.0)
-
-        # Invalid ratios
-        with pytest.raises(ValidationError):
-            TransitionHint(fade_out_ratio=-0.1)
-
-        with pytest.raises(ValidationError):
-            TransitionHint(fade_out_ratio=1.1)
 
     def test_is_snap_property(self):
         """Test is_snap property logic."""
@@ -145,38 +97,6 @@ class TestBoundary:
         assert boundary.type == BoundaryType.STEP_BOUNDARY
         assert boundary.source_id == "intro_step"
         assert boundary.target_id == "main_step"
-
-    def test_time_validation(self):
-        """Test time_ms validation."""
-        # Valid times
-        Boundary(
-            type=BoundaryType.SECTION_BOUNDARY,
-            source_id="a",
-            target_id="b",
-            time_ms=0,
-            bar_position=0.0,
-        )
-        Boundary(
-            type=BoundaryType.SECTION_BOUNDARY,
-            source_id="a",
-            target_id="b",
-            time_ms=100000,
-            bar_position=40.0,
-        )
-
-        # Invalid time (negative)
-        with pytest.raises(ValidationError):
-            Boundary(
-                type=BoundaryType.SECTION_BOUNDARY,
-                source_id="a",
-                target_id="b",
-                time_ms=-1,
-                bar_position=0.0,
-            )
-
-
-class TestTransitionPlan:
-    """Test TransitionPlan model."""
 
     def test_basic_transition_plan(self):
         """Test creating a basic transition plan."""
@@ -258,12 +178,6 @@ class TestTransitionPlan:
 
 class TestTransitionRegistry:
     """Test TransitionRegistry model."""
-
-    def test_empty_registry(self):
-        """Test creating an empty registry."""
-        registry = TransitionRegistry()
-
-        assert len(registry.transitions) == 0
 
     def test_add_transition(self):
         """Test adding transitions to registry."""

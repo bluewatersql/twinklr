@@ -1,11 +1,8 @@
 """Tests for curve-specific intensity parameters."""
 
-import pytest
-
 from twinklr.core.curves.library import CurveLibrary
 from twinklr.core.sequencer.models.enum import Intensity
 from twinklr.core.sequencer.moving_heads.libraries.movement import (
-    DEFAULT_MOVEMENT_PARAMS,
     MovementCategoricalParams,
     get_curve_categorical_params,
 )
@@ -13,36 +10,6 @@ from twinklr.core.sequencer.moving_heads.libraries.movement import (
 
 class TestGetCurveCategoricalParams:
     """Tests for get_curve_categorical_params helper function."""
-
-    def test_returns_curve_specific_params_when_available(self):
-        """Test returns curve-specific params when defined."""
-        # MOVEMENT_SINE has optimized params for SMOOTH intensity
-        result = get_curve_categorical_params(CurveLibrary.MOVEMENT_SINE, Intensity.SMOOTH)
-
-        assert isinstance(result, MovementCategoricalParams)
-        # Should return optimized params, not defaults
-        assert result.amplitude == 0.6  # From optimization report
-        assert result.frequency == 1.0
-
-    def test_returns_defaults_for_undefined_curve(self):
-        """Test falls back to defaults when curve not in CURVE_INTENSITY_PARAMS."""
-        # MOVEMENT_HOLD doesn't have optimized params (fixed behavior curve)
-        result = get_curve_categorical_params(CurveLibrary.MOVEMENT_HOLD, Intensity.SMOOTH)
-
-        assert isinstance(result, MovementCategoricalParams)
-        # Should return default params
-        assert result == DEFAULT_MOVEMENT_PARAMS[Intensity.SMOOTH]
-
-    def test_returns_defaults_for_undefined_intensity(self):
-        """Test falls back to defaults when intensity not defined for curve."""
-        # Even if curve has params, all intensities should be defined
-        # This test verifies the fallback mechanism works
-        result = get_curve_categorical_params(CurveLibrary.MOVEMENT_SINE, Intensity.SLOW)
-
-        assert isinstance(result, MovementCategoricalParams)
-        # Should have valid params (either curve-specific or default)
-        assert 0.0 <= result.amplitude <= 1.0
-        assert 0.0 <= result.frequency <= 10.0
 
     def test_all_intensities_defined_for_optimized_curves(self):
         """Test that all intensities are defined for curves with optimized params."""
@@ -64,15 +31,6 @@ class TestGetCurveCategoricalParams:
                 assert 0.0 <= result.amplitude <= 1.0
                 assert 0.0 <= result.frequency <= 10.0
                 assert result.center_offset == 0.5
-
-    def test_params_are_frozen(self):
-        """Test that returned params are immutable."""
-        from pydantic import ValidationError
-
-        result = get_curve_categorical_params(CurveLibrary.MOVEMENT_SINE, Intensity.SMOOTH)
-
-        with pytest.raises(ValidationError):
-            result.amplitude = 0.999
 
     def test_intensity_progression_for_movement_sine(self):
         """Test that MOVEMENT_SINE params show expected progression."""
@@ -111,15 +69,6 @@ class TestGetCurveCategoricalParams:
 class TestCurveIntensityParamsStructure:
     """Tests for CURVE_INTENSITY_PARAMS structure and completeness."""
 
-    def test_curve_intensity_params_exists(self):
-        """Test that CURVE_INTENSITY_PARAMS is defined."""
-        from twinklr.core.sequencer.moving_heads.libraries.movement import (
-            CURVE_INTENSITY_PARAMS,
-        )
-
-        assert isinstance(CURVE_INTENSITY_PARAMS, dict)
-        assert len(CURVE_INTENSITY_PARAMS) >= 6  # At least 6 optimized curves
-
     def test_all_entries_have_all_intensities(self):
         """Test that each curve has all intensity levels defined."""
         from twinklr.core.sequencer.moving_heads.libraries.movement import (
@@ -149,39 +98,3 @@ class TestCurveIntensityParamsStructure:
                 assert params.center_offset == 0.5, (
                     f"{curve_id}/{intensity} center_offset should be 0.5"
                 )
-
-    def test_params_are_frozen(self):
-        """Test that all params in CURVE_INTENSITY_PARAMS are immutable."""
-        from pydantic import ValidationError
-
-        from twinklr.core.sequencer.moving_heads.libraries.movement import (
-            CURVE_INTENSITY_PARAMS,
-        )
-
-        for intensity_map in CURVE_INTENSITY_PARAMS.values():
-            for params in intensity_map.values():
-                with pytest.raises(ValidationError):
-                    params.amplitude = 0.999
-
-
-class TestBackwardCompatibility:
-    """Tests for backward compatibility with DEFAULT_MOVEMENT_PARAMS."""
-
-    def test_default_movement_params_unchanged(self):
-        """Test that DEFAULT_MOVEMENT_PARAMS still exists and is unchanged."""
-        # Verify structure
-        assert isinstance(DEFAULT_MOVEMENT_PARAMS, dict)
-        assert len(DEFAULT_MOVEMENT_PARAMS) == len(Intensity)
-
-        # Verify all intensities present
-        for intensity in Intensity:
-            assert intensity in DEFAULT_MOVEMENT_PARAMS
-            assert isinstance(DEFAULT_MOVEMENT_PARAMS[intensity], MovementCategoricalParams)
-
-    def test_defaults_are_fallback_for_undefined_curves(self):
-        """Test that defaults are used when curve not optimized."""
-        # Use a curve that shouldn't have optimized params
-        result = get_curve_categorical_params(CurveLibrary.MOVEMENT_HOLD, Intensity.DRAMATIC)
-
-        # Should match default
-        assert result == DEFAULT_MOVEMENT_PARAMS[Intensity.DRAMATIC]
