@@ -44,7 +44,7 @@ class AudioProfileStage:
         input: SongBundle,
         context: PipelineContext,
     ) -> StageResult[AudioProfileModel]:
-        """Generate audio profile.
+        """Generate audio profile with caching.
 
         Args:
             input: SongBundle from audio analysis
@@ -54,33 +54,43 @@ class AudioProfileStage:
             StageResult containing AudioProfileModel
 
         Side Effects:
-            - Adds "audio_profile_tokens" to context.metrics
+            - Stores "audio_profile_result" in context.state (full result)
+            - Stores "audio_profile" in context.state (for backward compatibility)
+            - Adds "audio_profile_from_cache" to context.metrics
         """
-        from twinklr.core.agents.audio.profile import run_audio_profile
-        from twinklr.core.pipeline.result import failure_result, success_result
+        from twinklr.core.agents.audio.profile.models import AudioProfileModel
+        from twinklr.core.agents.audio.profile.orchestrator import AudioProfileOrchestrator
+        from twinklr.core.pipeline.execution import execute_step
+        from twinklr.core.pipeline.result import failure_result
 
         try:
-            logger.info("Generating audio profile")
+            model = context.job_config.agent.plan_agent.model
+            temperature = 0.3
 
-            # Run audio profile agent
-            profile = await run_audio_profile(
-                song_bundle=input,
+            # Create orchestrator
+            orchestrator = AudioProfileOrchestrator(
                 provider=context.provider,
+                model=model,
+                temperature=temperature,
                 llm_logger=context.llm_logger,
-                model=context.job_config.agent.plan_agent.model,
-                temperature=0.3,
             )
 
-            logger.info(
-                f"Audio profile complete: {profile.energy_profile.macro_energy}, "
-                f"recommended layers: {profile.creative_guidance.recommended_layer_count}"
+            # Use execute_step for caching and metrics
+            return await execute_step(
+                stage_name=self.name,
+                context=context,
+                compute=lambda: orchestrator.run(input),
+                result_extractor=lambda r: r,  # Result is already AudioProfileModel
+                result_type=AudioProfileModel,
+                cache_key_fn=lambda: orchestrator.get_cache_key(input),
+                cache_version="1",
+                state_handler=self._handle_state,
             )
-
-            # Store in state for downstream stages (GroupPlannerStage)
-            context.set_state("audio_profile", profile)
-
-            return success_result(profile, stage_name=self.name)
 
         except Exception as e:
             logger.exception("Audio profile generation failed", exc_info=e)
             return failure_result(str(e), stage_name=self.name)
+
+    def _handle_state(self, result: AudioProfileModel, context: PipelineContext) -> None:
+        """Store audio profile in state (backward compatibility)."""
+        context.set_state("audio_profile", result)

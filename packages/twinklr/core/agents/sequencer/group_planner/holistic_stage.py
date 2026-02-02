@@ -61,10 +61,10 @@ class HolisticEvaluatorStage:
             - Adds "holistic_issues_count" to context.metrics
         """
         from twinklr.core.agents.sequencer.group_planner.holistic import HolisticEvaluator
-        from twinklr.core.pipeline.result import failure_result, success_result
+        from twinklr.core.pipeline.result import failure_result
 
         try:
-            logger.info(f"Running holistic evaluation on {len(input.section_plans)} sections")
+            logger.debug(f"Running holistic evaluation on {len(input.section_plans)} sections")
 
             # Retrieve required context from state
             display_graph = context.get_state("display_graph")
@@ -96,26 +96,40 @@ class HolisticEvaluatorStage:
                 llm_logger=context.llm_logger,
             )
 
-            # Run evaluation
-            evaluation = await evaluator.evaluate(
-                group_plan_set=input,
-                display_graph=display_graph,
-                template_catalog=template_catalog,
-                macro_plan_summary=macro_plan_summary,
+            # Use execute_step for caching and metrics
+            from twinklr.core.agents.sequencer.group_planner.holistic import HolisticEvaluation
+            from twinklr.core.pipeline.execution import execute_step
+
+            return await execute_step(
+                stage_name=self.name,
+                context=context,
+                compute=lambda: evaluator.evaluate(
+                    group_plan_set=input,
+                    display_graph=display_graph,
+                    template_catalog=template_catalog,
+                    macro_plan_summary=macro_plan_summary,
+                ),
+                result_extractor=lambda r: r,  # Result is already HolisticEvaluation
+                result_type=HolisticEvaluation,
+                cache_key_fn=lambda: evaluator.get_cache_key(
+                    group_plan_set=input,
+                    display_graph=display_graph,
+                    template_catalog=template_catalog,
+                    macro_plan_summary=macro_plan_summary,
+                ),
+                cache_version="1",
+                metrics_handler=self._handle_metrics,
             )
-
-            logger.info(
-                f"Holistic evaluation complete: status={evaluation.status.value}, "
-                f"score={evaluation.score:.1f}, approved={evaluation.is_approved}"
-            )
-
-            # Track metrics
-            context.add_metric("holistic_score", evaluation.score)
-            context.add_metric("holistic_status", evaluation.status.value)
-            context.add_metric("holistic_issues_count", len(evaluation.cross_section_issues))
-
-            return success_result(evaluation, stage_name=self.name)
 
         except Exception as e:
             logger.exception("Holistic evaluation failed", exc_info=e)
             return failure_result(str(e), stage_name=self.name)
+
+    def _handle_metrics(self, result: Any, context: PipelineContext) -> None:
+        """Track holistic evaluation metrics (extends defaults)."""
+        from twinklr.core.agents.sequencer.group_planner.holistic import HolisticEvaluation
+
+        if isinstance(result, HolisticEvaluation):
+            context.add_metric("holistic_score", result.score)
+            context.add_metric("holistic_status", result.status.value)
+            context.add_metric("holistic_issues_count", len(result.cross_section_issues))

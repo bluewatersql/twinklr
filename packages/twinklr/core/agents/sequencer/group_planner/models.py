@@ -201,46 +201,8 @@ class DisplayGraph(BaseModel):
 # =============================================================================
 # Template Catalog (Lightweight)
 # =============================================================================
-
-
-class TemplateCatalogEntry(BaseModel):
-    """Lightweight template catalog entry for GroupPlanner.
-
-    Full template definitions are handled by the template workstream.
-    This provides just enough info for GroupPlanner to select templates.
-    """
-
-    model_config = ConfigDict(extra="forbid", frozen=True)
-
-    template_id: str
-    name: str
-    compatible_lanes: list[LaneKind] = Field(min_length=1)
-    tags: list[str] = Field(default_factory=list)
-    description: str = ""
-
-
-class TemplateCatalog(BaseModel):
-    """Lightweight template catalog for GroupPlanner validation.
-
-    Provides template_id existence checks and lane compatibility filtering.
-    """
-
-    model_config = ConfigDict(extra="forbid")
-
-    schema_version: str = "template-catalog.v1"
-    entries: list[TemplateCatalogEntry] = Field(default_factory=list)
-
-    def has_template(self, template_id: str) -> bool:
-        """Check if template_id exists in catalog."""
-        return any(e.template_id == template_id for e in self.entries)
-
-    def get_entry(self, template_id: str) -> TemplateCatalogEntry | None:
-        """Get catalog entry by template_id, or None if not found."""
-        return next((e for e in self.entries if e.template_id == template_id), None)
-
-    def list_by_lane(self, lane: LaneKind) -> list[TemplateCatalogEntry]:
-        """List all templates compatible with given lane."""
-        return [e for e in self.entries if lane in e.compatible_lanes]
+# NOTE: TemplateCatalog models are now imported from catalog at top of file
+# for backward compatibility. See import section above.
 
 
 # =============================================================================

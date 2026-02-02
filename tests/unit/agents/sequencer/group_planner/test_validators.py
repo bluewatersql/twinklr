@@ -13,8 +13,6 @@ from twinklr.core.agents.sequencer.group_planner.models import (
     LaneKind,
     LanePlan,
     SectionCoordinationPlan,
-    TemplateCatalog,
-    TemplateCatalogEntry,
     TimeRef,
     TimeRefKind,
 )
@@ -25,6 +23,10 @@ from twinklr.core.agents.sequencer.group_planner.timing import (
 )
 from twinklr.core.agents.sequencer.group_planner.validators import (
     SectionPlanValidator,
+)
+from twinklr.core.sequencer.templates.group.catalog import (
+    TemplateCatalog,
+    TemplateCatalogEntry,
 )
 
 

@@ -16,8 +16,6 @@ from twinklr.core.agents.sequencer.group_planner.models import (
     LaneKind,
     LanePlan,
     SectionCoordinationPlan,
-    TemplateCatalog,
-    TemplateCatalogEntry,
     TimeRef,
     TimeRefKind,
 )
@@ -28,6 +26,10 @@ from twinklr.core.agents.sequencer.group_planner.timing import (
     BarInfo,
     SectionBounds,
     TimingContext,
+)
+from twinklr.core.sequencer.templates.group.catalog import (
+    TemplateCatalog,
+    TemplateCatalogEntry,
 )
 
 
@@ -58,7 +60,7 @@ def sample_template_catalog() -> TemplateCatalog:
     return TemplateCatalog(
         entries=[
             TemplateCatalogEntry(
-                template_id="gtpl_bg_warm",
+                template_id="gtpl_base_glow_warm",
                 name="Warm BG",
                 compatible_lanes=[LaneKind.BASE],
             ),

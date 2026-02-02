@@ -61,7 +61,7 @@ class AudioAnalysisStage:
         from twinklr.core.pipeline.result import failure_result, success_result
 
         try:
-            logger.info(f"Analyzing audio: {input}")
+            logger.debug(f"Analyzing audio: {input}")
 
             # Create analyzer with configs from context
             analyzer = AudioAnalyzer(context.app_config, context.job_config)
@@ -80,7 +80,7 @@ class AudioAnalysisStage:
             if tempo is not None:
                 context.add_metric("tempo_bpm", tempo)
 
-            logger.info(
+            logger.debug(
                 f"Audio analysis complete: {bundle.timing.duration_ms / 1000:.1f}s, "
                 f"{tempo} BPM, lyrics={'yes' if has_lyrics else 'no'}"
             )

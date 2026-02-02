@@ -41,7 +41,7 @@ def create_llm_logger(
     output_dir: Path | str | None = None,
     run_id: str | None = None,
     log_level: str = "standard",
-    format: str = "yaml",
+    format: str = "json",
     sanitize: bool = True,
 ) -> LLMCallLogger:
     """Factory function to create an LLM call logger.

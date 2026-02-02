@@ -7,6 +7,8 @@ StandardIterationController.
 
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
 
 from twinklr.core.agents.logging import LLMCallLogger, NullLLMCallLogger
@@ -98,6 +100,48 @@ class MacroPlannerOrchestrator:
             f"MacroPlannerOrchestrator initialized "
             f"(max_iterations={max_iterations}, min_pass_score={min_pass_score})"
         )
+
+    async def get_cache_key(self, planning_context: PlanningContext) -> str:
+        """Generate cache key for deterministic caching.
+
+        Cache key includes all inputs that affect macro plan output:
+        - Audio profile (musical analysis)
+        - Lyric context (narrative/themes, if present)
+        - Display groups (available fixtures)
+        - Max iterations
+        - Min pass score
+        - Model configuration
+
+        Args:
+            planning_context: Planning context for this run
+
+        Returns:
+            SHA256 hash of canonical inputs
+        """
+        key_data = {
+            "audio_profile": planning_context.audio_profile.model_dump(),
+            "lyric_context": (
+                planning_context.lyric_context.model_dump()
+                if planning_context.lyric_context
+                else None
+            ),
+            "display_groups": planning_context.display_groups,
+            "max_iterations": self.controller.config.max_iterations,
+            "min_pass_score": self.controller.config.approval_score_threshold,
+            "planner_model": self.planner_spec.model,
+            "judge_model": self.judge_spec.model,
+        }
+
+        # Canonical JSON encoding for stable hashing
+        canonical = json.dumps(
+            key_data,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+            default=str,
+        )
+
+        return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
     async def run(
         self,

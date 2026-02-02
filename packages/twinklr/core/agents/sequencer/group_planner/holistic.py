@@ -5,6 +5,8 @@ Provides models and evaluator for cross-section quality assessment.
 
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
 from enum import Enum
 from typing import Any
@@ -16,11 +18,11 @@ from twinklr.core.agents.providers.base import LLMProvider
 from twinklr.core.agents.sequencer.group_planner.models import (
     DisplayGraph,
     GroupPlanSet,
-    TemplateCatalog,
 )
 from twinklr.core.agents.shared.judge.models import VerdictStatus
 from twinklr.core.agents.spec import AgentMode, AgentSpec
 from twinklr.core.agents.taxonomy_utils import get_taxonomy_dict
+from twinklr.core.sequencer.templates.group.catalog import TemplateCatalog
 
 logger = logging.getLogger(__name__)
 
@@ -151,6 +153,50 @@ class HolisticEvaluator:
 
         logger.debug("HolisticEvaluator initialized")
 
+    async def get_cache_key(
+        self,
+        group_plan_set: GroupPlanSet,
+        display_graph: DisplayGraph,
+        template_catalog: TemplateCatalog,
+        macro_plan_summary: dict[str, Any] | None = None,
+    ) -> str:
+        """Generate cache key for deterministic caching.
+
+        Cache key includes all inputs that affect holistic evaluation:
+        - Group plan set (all section plans)
+        - Display graph configuration
+        - Template catalog
+        - Macro plan summary
+        - Model configuration
+
+        Args:
+            group_plan_set: Complete set of section plans
+            display_graph: Display configuration
+            template_catalog: Available templates
+            macro_plan_summary: Optional MacroPlan summary
+
+        Returns:
+            SHA256 hash of canonical inputs
+        """
+        key_data = {
+            "group_plan_set": group_plan_set.model_dump(),
+            "display_graph": display_graph.model_dump(),
+            "template_catalog": template_catalog.model_dump(),
+            "macro_plan_summary": macro_plan_summary or {},
+            "model": self.holistic_judge_spec.model,
+        }
+
+        # Canonical JSON encoding for stable hashing
+        canonical = json.dumps(
+            key_data,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+            default=str,
+        )
+
+        return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
     async def evaluate(
         self,
         group_plan_set: GroupPlanSet,
@@ -179,7 +225,7 @@ class HolisticEvaluator:
         if not group_plan_set.section_plans:
             raise ValueError("GroupPlanSet must have at least one section plan")
 
-        logger.info(f"Running holistic evaluation on {len(group_plan_set.section_plans)} sections")
+        logger.debug(f"Running holistic evaluation on {len(group_plan_set.section_plans)} sections")
 
         # Build variables for judge
         variables = self._build_judge_variables(
@@ -214,7 +260,7 @@ class HolisticEvaluator:
         evaluation = result.data
         assert isinstance(evaluation, HolisticEvaluation)
 
-        logger.info(
+        logger.debug(
             f"Holistic evaluation complete: "
             f"status={evaluation.status.value}, score={evaluation.score:.1f}"
         )
@@ -239,11 +285,13 @@ class HolisticEvaluator:
         Returns:
             Variables dict for judge prompt
         """
-        return {
-            "group_plan_set": group_plan_set,
-            "display_graph": display_graph,
-            "template_catalog": template_catalog,
-            "section_count": len(group_plan_set.section_plans),
-            "section_ids": [sp.section_id for sp in group_plan_set.section_plans],
-            "macro_plan_summary": macro_plan_summary or {},
-        }
+        from twinklr.core.agents.sequencer.group_planner.context_shaping import (
+            shape_holistic_judge_context,
+        )
+
+        return shape_holistic_judge_context(
+            group_plan_set=group_plan_set,
+            display_graph=display_graph,
+            template_catalog=template_catalog,
+            macro_plan_summary=macro_plan_summary,
+        )

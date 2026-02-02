@@ -19,15 +19,15 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from twinklr.core.agents.audio.lyrics import (
     get_lyrics_spec,
-    run_lyrics_async,
     validate_lyrics,
 )
+from twinklr.core.agents.audio.lyrics.orchestrator import LyricsOrchestrator
 from twinklr.core.agents.audio.profile import (
     get_audio_profile_spec,
-    run_audio_profile,
     shape_context,
     validate_audio_profile,
 )
+from twinklr.core.agents.audio.profile.orchestrator import AudioProfileOrchestrator
 from twinklr.core.agents.logging import NullLLMCallLogger, create_llm_logger
 from twinklr.core.agents.providers.openai import OpenAIProvider
 from twinklr.core.audio.analyzer import AudioAnalyzer
@@ -224,21 +224,21 @@ async def main() -> None:
 
         try:
             # Run both agents concurrently
-            audio_task = run_audio_profile(
-                song_bundle=bundle,
+            audio_orchestrator = AudioProfileOrchestrator(
                 provider=provider,
                 llm_logger=llm_logger,
                 model=model,
                 temperature=temperature,
             )
+            audio_task = audio_orchestrator.run(bundle)
 
-            lyrics_task = run_lyrics_async(
-                song_bundle=bundle,
+            lyrics_orchestrator = LyricsOrchestrator(
                 provider=provider,
                 llm_logger=llm_logger,
                 model=model,
                 temperature=0.5,
             )
+            lyrics_task = lyrics_orchestrator.run(bundle)
 
             profile, lyric_context = await asyncio.gather(audio_task, lyrics_task)
 
@@ -256,13 +256,13 @@ async def main() -> None:
         print(f"   Model: {model} (temp={temperature})")
 
         try:
-            profile = await run_audio_profile(
-                song_bundle=bundle,
+            orchestrator = AudioProfileOrchestrator(
                 provider=provider,
                 llm_logger=llm_logger,
                 model=model,
                 temperature=temperature,
             )
+            profile = await orchestrator.run(bundle)
             lyric_context = None
             print("\n✅ AudioProfile agent completed successfully!")
         except Exception as e:

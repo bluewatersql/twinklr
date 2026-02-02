@@ -68,6 +68,7 @@ class StageDefinition:
         retry_config: Optional retry configuration
         timeout_ms: Optional timeout in milliseconds
         critical: Whether failure should fail entire pipeline (default: True)
+        max_concurrent_fan_out: Max concurrent executions for FAN_OUT (default: 4, None=unlimited)
         description: Optional human-readable description
 
     Example:
@@ -95,12 +96,13 @@ class StageDefinition:
         ...     condition=lambda ctx: ctx.get_state("has_lyrics", False),
         ... )
         >>>
-        >>> # Fan-out stage with retry
+        >>> # Fan-out stage with concurrency limit
         >>> group_stage = StageDefinition(
         ...     id="groups",
         ...     stage=GroupPlannerStage(),
         ...     pattern=ExecutionPattern.FAN_OUT,
         ...     inputs=["macro", "fixtures"],
+        ...     max_concurrent_fan_out=4,  # Max 4 sections in parallel
         ...     retry_config=RetryConfig(max_attempts=2),
         ... )
     """
@@ -113,6 +115,7 @@ class StageDefinition:
     retry_config: RetryConfig | None = None
     timeout_ms: float | None = None
     critical: bool = True
+    max_concurrent_fan_out: int | None = 4
     description: str | None = None
 
     def should_execute(self, context: PipelineContext) -> bool:

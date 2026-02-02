@@ -29,10 +29,7 @@ from twinklr.core.agents.audio.profile.models import (
     SongSectionRef,
     Structure,
 )
-from twinklr.core.agents.audio.profile.runner import (
-    AudioProfileRunError,
-    run_audio_profile,
-)
+from twinklr.core.agents.audio.profile.orchestrator import AudioProfileOrchestrator
 from twinklr.core.agents.audio.profile.spec import get_audio_profile_spec
 from twinklr.core.agents.audio.profile.validation import validate_audio_profile
 
@@ -41,7 +38,7 @@ __version__ = "1.0.0"
 __all__ = [
     "AssetUsage",
     "AudioProfileModel",
-    "AudioProfileRunError",
+    "AudioProfileOrchestrator",
     "Contrast",
     "CreativeGuidance",
     "EnergyPeak",
@@ -59,7 +56,6 @@ __all__ = [
     "SongSectionRef",
     "Structure",
     "get_audio_profile_spec",
-    "run_audio_profile",
     "shape_context",
     "validate_audio_profile",
 ]

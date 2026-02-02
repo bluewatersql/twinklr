@@ -159,9 +159,9 @@ class RevisionRequest(BaseModel):
         max_length=10,
     )
     specific_fixes: list[str] = Field(
-        description="Specific actionable fixes (3-8 items)",
+        description="Specific actionable fixes (3-8 items, max 25 for complex cases)",
         min_length=1,
-        max_length=15,
+        max_length=25,
     )
     avoid: list[str] = Field(
         description="What NOT to change (preserve strengths)",

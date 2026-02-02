@@ -73,17 +73,18 @@ class MacroPlannerStage:
             - Adds "macro_plan_iterations" to context.metrics
             - Adds "macro_plan_tokens" to context.metrics
             - Adds "macro_plan_score" to context.metrics (if available)
+            - Adds "macro_plan_from_cache" to context.metrics
             - Adds "section_count" to context.metrics
         """
         from twinklr.core.agents.sequencer.macro_planner import (
             MacroPlannerOrchestrator,
             PlanningContext,
         )
-        from twinklr.core.pipeline.result import failure_result, success_result
+        from twinklr.core.agents.shared.judge.controller import IterationResult
+        from twinklr.core.pipeline.execution import execute_step
+        from twinklr.core.pipeline.result import failure_result
 
         try:
-            logger.info("Generating macro plan")
-
             # Extract inputs
             audio_profile = input["profile"]
             lyric_context = input.get("lyrics")  # May be None
@@ -103,33 +104,24 @@ class MacroPlannerStage:
                 llm_logger=context.llm_logger,
             )
 
-            # Run orchestrator with agent context
-            result = await orchestrator.run(planning_context=planning_context)
+            def extract_sections(r: Any) -> list[MacroSectionPlan]:
+                """Extract section plans from result."""
+                if r.plan is None:
+                    raise ValueError("IterationResult.plan is None")
+                return r.plan.section_plans
 
-            if not result.success or result.plan is None:
-                error_msg = result.context.termination_reason or "No plan generated"
-                logger.error(f"Macro planning failed: {error_msg}")
-                return failure_result(error_msg, stage_name=self.name)
-
-            # Store full MacroPlan in state for downstream stages
-            context.set_state("macro_plan", result.plan)
-
-            # Log success
-            logger.info(
-                f"Macro plan complete: {len(result.plan.section_plans)} sections, "
-                f"iterations={result.context.current_iteration}, "
-                f"score={result.context.final_verdict.score if result.context.final_verdict else 'N/A'}"
+            # Execute with caching and automatic metrics/state handling
+            return await execute_step(
+                stage_name=self.name,
+                context=context,
+                compute=lambda: orchestrator.run(planning_context),
+                result_extractor=extract_sections,
+                result_type=IterationResult,
+                cache_key_fn=lambda: orchestrator.get_cache_key(planning_context),
+                cache_version="1",
+                state_handler=self._handle_state,
+                metrics_handler=self._handle_metrics,
             )
-
-            # Track metrics in pipeline context
-            context.add_metric("macro_plan_iterations", result.context.current_iteration)
-            context.add_metric("macro_plan_tokens", result.context.total_tokens_used)
-            context.add_metric("section_count", len(result.plan.section_plans))
-            if result.context.final_verdict:
-                context.add_metric("macro_plan_score", result.context.final_verdict.score)
-
-            # Return section_plans list for direct FAN_OUT to GroupPlanner
-            return success_result(result.plan.section_plans, stage_name=self.name)
 
         except KeyError as e:
             logger.error(f"Missing required input: {e}")
@@ -137,3 +129,13 @@ class MacroPlannerStage:
         except Exception as e:
             logger.exception("Macro planning failed", exc_info=e)
             return failure_result(str(e), stage_name=self.name)
+
+    def _handle_state(self, result: Any, context: PipelineContext) -> None:
+        """Store macro plan in state for downstream stages."""
+        if result.plan:
+            context.set_state("macro_plan", result.plan)
+
+    def _handle_metrics(self, result: Any, context: PipelineContext) -> None:
+        """Track section count metric (extends defaults)."""
+        if result.plan:
+            context.add_metric("section_count", len(result.plan.section_plans))

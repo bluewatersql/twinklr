@@ -7,6 +7,7 @@ structural and timing issues quickly.
 from __future__ import annotations
 
 from collections import defaultdict
+from dataclasses import dataclass
 from enum import Enum
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -15,11 +16,12 @@ from twinklr.core.agents.sequencer.group_planner.models import (
     CoordinationMode,
     DisplayGraph,
     GroupPlacement,
+    LaneKind,
     PlacementWindow,
     SectionCoordinationPlan,
-    TemplateCatalog,
 )
 from twinklr.core.agents.sequencer.group_planner.timing import TimingContext
+from twinklr.core.sequencer.templates.group.catalog import TemplateCatalog
 
 
 class ValidationSeverity(str, Enum):
@@ -104,6 +106,9 @@ class SectionPlanValidator:
 
         # Validate each lane plan
         for lane_plan in plan.lane_plans:
+            # Track group timings across ALL coordination_plans in this lane
+            group_timings: dict[str, list[tuple[int, int, str]]] = defaultdict(list)
+
             for coord_plan in lane_plan.coordination_plans:
                 # Validate group_ids exist
                 for group_id in coord_plan.group_ids:
@@ -118,51 +123,154 @@ class SectionPlanValidator:
                             )
                         )
 
+                # Validate config for sequenced modes
+                if coord_plan.config and coord_plan.config.group_order:
+                    errors.extend(
+                        self._validate_group_order(
+                            coord_plan.config.group_order, lane_plan.lane.value
+                        )
+                    )
+
                 # Validate placements
                 placements = coord_plan.placements
-                errors.extend(
-                    self._validate_placements(
-                        placements,
-                        lane_plan.lane.value,
-                        section_start_ms,
-                        section_end_ms,
-                    )
+                placement_errors, placement_timings = self._validate_placements(
+                    placements,
+                    lane_plan.lane,
+                    section_start_ms,
+                    section_end_ms,
                 )
+                errors.extend(placement_errors)
+
+                # Accumulate timings for cross-coordination overlap check
+                for group_id, timings in placement_timings.items():
+                    group_timings[group_id].extend(timings)
 
                 # Validate window (for sequenced modes)
                 if coord_plan.window:
-                    errors.extend(
-                        self._validate_window(
-                            coord_plan.window,
-                            coord_plan.coordination_mode,
-                            lane_plan.lane.value,
-                            section_start_ms,
-                            section_end_ms,
-                        )
+                    window_errors, window_timings = self._validate_window(
+                        coord_plan.window,
+                        coord_plan.coordination_mode,
+                        coord_plan.group_ids,
+                        lane_plan.lane,
+                        section_start_ms,
+                        section_end_ms,
                     )
+                    errors.extend(window_errors)
+
+                    # Accumulate window timings for cross-coordination overlap check
+                    for group_id, timings in window_timings.items():
+                        group_timings[group_id].extend(timings)
+
+            # Check for cross-coordination-plan overlaps within same lane
+            errors.extend(self._check_cross_coordination_overlaps(group_timings, lane_plan.lane))
 
         is_valid = len(errors) == 0
         return ValidationResult(is_valid=is_valid, errors=errors, warnings=warnings)
 
+    def _validate_group_order(
+        self, group_order: list[str], lane_name: str
+    ) -> list[ValidationIssue]:
+        """Validate group_order for duplicates.
+
+        Args:
+            group_order: List of group IDs in sequence
+            lane_name: Name of lane
+
+        Returns:
+            List of validation issues
+        """
+        errors: list[ValidationIssue] = []
+
+        # Check for duplicates
+        seen = set()
+        duplicates = set()
+        for group_id in group_order:
+            if group_id in seen:
+                duplicates.add(group_id)
+            seen.add(group_id)
+
+        if duplicates:
+            errors.append(
+                ValidationIssue(
+                    severity=ValidationSeverity.ERROR,
+                    code="DUPLICATE_GROUP_ORDER",
+                    message=f"Duplicate groups in group_order: {duplicates}",
+                    field_path=f"lane_plans[{lane_name}].config.group_order",
+                    fix_hint="Remove duplicate entries from group_order array",
+                )
+            )
+
+        return errors
+
+    def _check_cross_coordination_overlaps(
+        self, group_timings: dict[str, list[tuple[int, int, str]]], lane: LaneKind
+    ) -> list[ValidationIssue]:
+        """Check for overlaps across coordination_plans within same lane.
+
+        Args:
+            group_timings: Dict mapping group_id to list of (start_ms, end_ms, source) tuples
+            lane: Lane kind
+
+        Returns:
+            List of validation issues
+        """
+        errors: list[ValidationIssue] = []
+
+        for group_id, timings in group_timings.items():
+            if len(timings) < 2:
+                continue
+
+            # Sort by start time
+            sorted_timings = sorted(timings, key=lambda x: x[0])
+
+            # Check each pair for overlap
+            for i in range(len(sorted_timings)):
+                start_i, end_i, source_i = sorted_timings[i]
+                for j in range(i + 1, len(sorted_timings)):
+                    start_j, end_j, source_j = sorted_timings[j]
+
+                    # Check if they overlap (not just touch)
+                    if start_j < end_i:
+                        errors.append(
+                            ValidationIssue(
+                                severity=ValidationSeverity.ERROR,
+                                code="CROSS_COORDINATION_OVERLAP",
+                                message=(
+                                    f"Group '{group_id}' appears in multiple coordination_plans "
+                                    f"in {lane.value} lane with overlapping timing: "
+                                    f"{source_i} ({start_i}-{end_i}ms) and {source_j} ({start_j}-{end_j}ms)"
+                                ),
+                                field_path=f"lane_plans[{lane.value}]",
+                                fix_hint="Remove group from one coordination_plan or make timing sequential",
+                            )
+                        )
+
+        return errors
+
     def _validate_placements(
         self,
         placements: list[GroupPlacement],
-        lane_name: str,
+        lane: LaneKind,
         section_start_ms: int | None,
         section_end_ms: int | None,
-    ) -> list[ValidationIssue]:
+    ) -> tuple[list[ValidationIssue], dict[str, list[tuple[int, int, str]]]]:
         """Validate a list of placements.
 
         Checks:
-        - Template exists
+        - Template exists and matches lane
         - Group exists
         - Timing within section bounds
-        - No within-lane overlaps on same group
+        - Intensity in valid range
+        - No within-coordination overlaps on same group
+
+        Returns:
+            Tuple of (errors, group_timings)
         """
         errors: list[ValidationIssue] = []
 
         # Track placements by group for overlap detection
         placements_by_group: dict[str, list[tuple[int, int, str]]] = defaultdict(list)
+        group_timings: dict[str, list[tuple[int, int, str]]] = defaultdict(list)
 
         for placement in placements:
             # Check template exists
@@ -174,6 +282,34 @@ class SectionPlanValidator:
                         message=f"Template '{placement.template_id}' not found in catalog",
                         field_path=f"placement[{placement.placement_id}].template_id",
                         fix_hint="Use a valid template_id from TemplateCatalog",
+                    )
+                )
+            else:
+                # Check template-lane compatibility
+                expected_prefix = f"gtpl_{lane.value.lower()}_"
+                if not placement.template_id.startswith(expected_prefix):
+                    errors.append(
+                        ValidationIssue(
+                            severity=ValidationSeverity.ERROR,
+                            code="TEMPLATE_LANE_MISMATCH",
+                            message=(
+                                f"Template '{placement.template_id}' in {lane.value} lane "
+                                f"(expected {expected_prefix}* templates)"
+                            ),
+                            field_path=f"placement[{placement.placement_id}].template_id",
+                            fix_hint=f"Use a {lane.value} template (gtpl_{lane.value.lower()}_*)",
+                        )
+                    )
+
+            # Check intensity range
+            if placement.intensity < 0.0 or placement.intensity > 1.5:
+                errors.append(
+                    ValidationIssue(
+                        severity=ValidationSeverity.ERROR,
+                        code="INTENSITY_OUT_OF_RANGE",
+                        message=f"Intensity {placement.intensity} out of valid range [0.0, 1.5]",
+                        field_path=f"placement[{placement.placement_id}].intensity",
+                        fix_hint="Set intensity between 0.0 and 1.5",
                     )
                 )
 
@@ -221,12 +357,15 @@ class SectionPlanValidator:
                         )
                     )
 
-            # Track for overlap detection
+            # Track for overlap detection (both within-coordination and cross-coordination)
             placements_by_group[placement.group_id].append(
                 (start_ms, end_ms, placement.placement_id)
             )
+            group_timings[placement.group_id].append(
+                (start_ms, end_ms, f"placement:{placement.placement_id}")
+            )
 
-        # Check for within-lane overlaps on same group
+        # Check for within-coordination overlaps on same group (same coordination_plan)
         for group_id, group_placements in placements_by_group.items():
             # Sort by start time
             sorted_placements = sorted(group_placements, key=lambda x: x[0])
@@ -239,28 +378,34 @@ class SectionPlanValidator:
                     errors.append(
                         ValidationIssue(
                             severity=ValidationSeverity.ERROR,
-                            code="WITHIN_LANE_OVERLAP",
+                            code="WITHIN_COORDINATION_OVERLAP",
                             message=(
-                                f"Overlap detected in lane '{lane_name}' on group "
-                                f"'{group_id}': placements '{pid1}' and '{pid2}'"
+                                f"Overlap in {lane.value} lane on group '{group_id}': "
+                                f"placements '{pid1}' and '{pid2}'"
                             ),
-                            field_path=f"lane_plans[{lane_name}].placements",
+                            field_path=f"lane_plans[{lane.value}].placements",
                             fix_hint="Adjust placement timing to avoid overlaps",
                         )
                     )
 
-        return errors
+        return errors, group_timings
 
     def _validate_window(
         self,
         window: PlacementWindow,
         coordination_mode: CoordinationMode,
-        lane_name: str,
+        group_ids: list[str],
+        lane: LaneKind,
         section_start_ms: int | None,
         section_end_ms: int | None,
-    ) -> list[ValidationIssue]:
-        """Validate a placement window."""
+    ) -> tuple[list[ValidationIssue], dict[str, list[tuple[int, int, str]]]]:
+        """Validate a placement window.
+
+        Returns:
+            Tuple of (errors, group_timings)
+        """
         errors: list[ValidationIssue] = []
+        group_timings: dict[str, list[tuple[int, int, str]]] = defaultdict(list)
 
         # Check template exists
         if not self.template_catalog.has_template(window.template_id):
@@ -269,10 +414,26 @@ class SectionPlanValidator:
                     severity=ValidationSeverity.ERROR,
                     code="UNKNOWN_TEMPLATE",
                     message=f"Template '{window.template_id}' not found in catalog",
-                    field_path=f"lane_plans[{lane_name}].window.template_id",
+                    field_path=f"lane_plans[{lane.value}].window.template_id",
                     fix_hint="Use a valid template_id from TemplateCatalog",
                 )
             )
+        else:
+            # Check template-lane compatibility
+            expected_prefix = f"gtpl_{lane.value.lower()}_"
+            if not window.template_id.startswith(expected_prefix):
+                errors.append(
+                    ValidationIssue(
+                        severity=ValidationSeverity.ERROR,
+                        code="TEMPLATE_LANE_MISMATCH",
+                        message=(
+                            f"Template '{window.template_id}' in {lane.value} lane "
+                            f"(expected {expected_prefix}* templates)"
+                        ),
+                        field_path=f"lane_plans[{lane.value}].window.template_id",
+                        fix_hint=f"Use a {lane.value} template (gtpl_{lane.value.lower()}_*)",
+                    )
+                )
 
         # Resolve timing
         try:
@@ -284,10 +445,10 @@ class SectionPlanValidator:
                     severity=ValidationSeverity.ERROR,
                     code="INVALID_TIMEREF",
                     message=f"Cannot resolve window TimeRef: {e}",
-                    field_path=f"lane_plans[{lane_name}].window.start/end",
+                    field_path=f"lane_plans[{lane.value}].window.start/end",
                 )
             )
-            return errors
+            return errors, group_timings
 
         # Check timing within section bounds
         if section_start_ms is not None and section_end_ms is not None:
@@ -300,9 +461,275 @@ class SectionPlanValidator:
                             f"Window ({start_ms}ms-{end_ms}ms) outside section bounds "
                             f"({section_start_ms}ms-{section_end_ms}ms)"
                         ),
-                        field_path=f"lane_plans[{lane_name}].window.start/end",
+                        field_path=f"lane_plans[{lane.value}].window.start/end",
                         fix_hint="Adjust window timing to fit within section bounds",
                     )
                 )
 
-        return errors
+        # Track window timing for all groups in this coordination_plan
+        for group_id in group_ids:
+            group_timings[group_id].append((start_ms, end_ms, f"window:{coordination_mode.value}"))
+
+        return errors, group_timings
+
+
+# =============================================================================
+# Diversity Validation (Phase 1)
+# =============================================================================
+
+
+@dataclass(frozen=True)
+class DiversityConstraints:
+    """Diversity constraints for a lane.
+
+    Defines minimum variety requirements to prevent repetitive choreography.
+
+    Attributes:
+        min_unique_template_ids: Minimum unique templates required.
+        max_uses_per_template_id: Maximum uses of any single template.
+        max_consecutive_same_template_id: Maximum consecutive uses of same template.
+        top2_share_limit: Maximum share of top 2 templates (0.0-1.0).
+    """
+
+    min_unique_template_ids: int
+    max_uses_per_template_id: int
+    max_consecutive_same_template_id: int
+    top2_share_limit: float
+
+
+# Per-lane diversity constraints (for ~16 section songs)
+DIVERSITY_CONSTRAINTS = {
+    LaneKind.BASE: DiversityConstraints(
+        min_unique_template_ids=5,
+        max_uses_per_template_id=3,
+        max_consecutive_same_template_id=1,  # A→A ok, A→A→A forbidden
+        top2_share_limit=0.50,
+    ),
+    LaneKind.RHYTHM: DiversityConstraints(
+        min_unique_template_ids=9,
+        max_uses_per_template_id=2,
+        max_consecutive_same_template_id=0,  # A→A forbidden
+        top2_share_limit=0.35,
+    ),
+    LaneKind.ACCENT: DiversityConstraints(
+        min_unique_template_ids=8,
+        max_uses_per_template_id=2,
+        max_consecutive_same_template_id=0,  # A→A forbidden
+        top2_share_limit=0.35,
+    ),
+}
+
+
+@dataclass(frozen=True)
+class LaneDiversityStats:
+    """Diversity statistics for a lane.
+
+    Attributes:
+        lane: Lane being analyzed.
+        total_placements: Total number of placements in lane.
+        unique_template_ids: Number of unique template_ids used.
+        max_uses_single_template: Maximum uses of any single template.
+        max_consecutive_same_template: Maximum consecutive uses of same template.
+        top2_share: Share of placements covered by top 2 templates (0.0-1.0).
+        template_use_counts: Dict mapping template_id to use count.
+    """
+
+    lane: LaneKind
+    total_placements: int
+    unique_template_ids: int
+    max_uses_single_template: int
+    max_consecutive_same_template: int
+    top2_share: float
+    template_use_counts: dict[str, int]
+
+
+def compute_lane_stats(
+    placements: list[GroupPlacement],
+    lane: LaneKind,
+) -> LaneDiversityStats:
+    """Compute diversity statistics for lane placements.
+
+    Args:
+        placements: List of GroupPlacement for this lane.
+        lane: Lane being analyzed.
+
+    Returns:
+        LaneDiversityStats with computed statistics.
+    """
+    from collections import Counter
+
+    if not placements:
+        return LaneDiversityStats(
+            lane=lane,
+            total_placements=0,
+            unique_template_ids=0,
+            max_uses_single_template=0,
+            max_consecutive_same_template=0,
+            top2_share=0.0,
+            template_use_counts={},
+        )
+
+    template_ids = [p.template_id for p in placements]
+    use_counts = Counter(template_ids)
+
+    unique = len(use_counts)
+    max_uses = max(use_counts.values())
+
+    # Max consecutive same template
+    max_consecutive = 1
+    current_consecutive = 1
+    for i in range(1, len(template_ids)):
+        if template_ids[i] == template_ids[i - 1]:
+            current_consecutive += 1
+            max_consecutive = max(max_consecutive, current_consecutive)
+        else:
+            current_consecutive = 1
+
+    # Top 2 share
+    top2_count = sum(sorted(use_counts.values(), reverse=True)[:2])
+    top2_share = top2_count / len(placements)
+
+    return LaneDiversityStats(
+        lane=lane,
+        total_placements=len(placements),
+        unique_template_ids=unique,
+        max_uses_single_template=max_uses,
+        max_consecutive_same_template=max_consecutive,
+        top2_share=top2_share,
+        template_use_counts=dict(use_counts),
+    )
+
+
+def validate_lane_diversity(
+    stats: LaneDiversityStats,
+    constraints: DiversityConstraints,
+) -> list[ValidationIssue]:
+    """Validate lane diversity against constraints.
+
+    Args:
+        stats: Computed diversity statistics.
+        constraints: Diversity constraints to validate against.
+
+    Returns:
+        List of ValidationIssue (may be empty if no issues).
+    """
+    issues: list[ValidationIssue] = []
+
+    # Check min_unique_template_ids
+    if stats.unique_template_ids < constraints.min_unique_template_ids:
+        issues.append(
+            ValidationIssue(
+                severity=ValidationSeverity.ERROR,
+                code="INSUFFICIENT_UNIQUE_TEMPLATES",
+                message=(
+                    f"Insufficient unique templates: {stats.unique_template_ids} "
+                    f"(need {constraints.min_unique_template_ids})"
+                ),
+                field_path=f"lane={stats.lane.value}",
+                fix_hint=(
+                    f"Add {constraints.min_unique_template_ids - stats.unique_template_ids} "
+                    f"more distinct template_ids to {stats.lane.value} lane"
+                ),
+            )
+        )
+
+    # Check max_uses_per_template_id
+    if stats.max_uses_single_template > constraints.max_uses_per_template_id:
+        overused = [
+            tid
+            for tid, count in stats.template_use_counts.items()
+            if count > constraints.max_uses_per_template_id
+        ]
+        issues.append(
+            ValidationIssue(
+                severity=ValidationSeverity.ERROR,
+                code="TEMPLATE_OVERUSED",
+                message=(
+                    f"Template(s) overused: {overused} "
+                    f"(max {constraints.max_uses_per_template_id} uses)"
+                ),
+                field_path=f"lane={stats.lane.value}",
+                fix_hint="Replace some uses with unused templates",
+            )
+        )
+
+    # Check max_consecutive_same_template_id
+    if stats.max_consecutive_same_template > constraints.max_consecutive_same_template_id:
+        issues.append(
+            ValidationIssue(
+                severity=ValidationSeverity.ERROR,
+                code="CONSECUTIVE_REUSE_VIOLATION",
+                message=(
+                    f"Consecutive reuse violation: {stats.max_consecutive_same_template} "
+                    f"consecutive uses (max {constraints.max_consecutive_same_template_id})"
+                ),
+                field_path=f"lane={stats.lane.value}",
+                fix_hint=f"Break up consecutive sequences in {stats.lane.value} lane",
+            )
+        )
+
+    # Check top2_share (WARNING only)
+    if stats.top2_share > constraints.top2_share_limit:
+        issues.append(
+            ValidationIssue(
+                severity=ValidationSeverity.WARNING,
+                code="TOP_HEAVY_DISTRIBUTION",
+                message=(
+                    f"Top-heavy distribution: top 2 templates cover {stats.top2_share:.1%} "
+                    f"(limit {constraints.top2_share_limit:.1%})"
+                ),
+                field_path=f"lane={stats.lane.value}",
+                fix_hint="Distribute placements more evenly across available templates",
+            )
+        )
+
+    return issues
+
+
+def validate_section_diversity(plan: SectionCoordinationPlan) -> ValidationResult:
+    """Validate diversity across all lanes in section plan.
+
+    Args:
+        plan: SectionCoordinationPlan to validate.
+
+    Returns:
+        ValidationResult with diversity-specific errors and warnings.
+    """
+    all_errors: list[ValidationIssue] = []
+    all_warnings: list[ValidationIssue] = []
+
+    for lane_plan in plan.lane_plans:
+        lane = lane_plan.lane
+
+        # Collect all placements for this lane
+        placements: list[GroupPlacement] = []
+        for coord_plan in lane_plan.coordination_plans:
+            placements.extend(coord_plan.placements)
+
+        # Skip lanes with no placements
+        if not placements:
+            continue
+
+        # Compute stats
+        stats = compute_lane_stats(placements, lane)
+
+        # Get constraints (skip if no constraints for this lane)
+        constraints = DIVERSITY_CONSTRAINTS.get(lane)
+        if not constraints:
+            continue
+
+        # Validate
+        lane_issues = validate_lane_diversity(stats, constraints)
+
+        # Separate errors and warnings
+        for issue in lane_issues:
+            if issue.severity == ValidationSeverity.ERROR:
+                all_errors.append(issue)
+            else:
+                all_warnings.append(issue)
+
+    return ValidationResult(
+        is_valid=len(all_errors) == 0,
+        errors=all_errors,
+        warnings=all_warnings,
+    )

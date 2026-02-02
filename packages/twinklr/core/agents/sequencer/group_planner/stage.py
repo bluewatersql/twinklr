@@ -107,12 +107,12 @@ class GroupPlannerStage:
         from twinklr.core.agents.sequencer.group_planner.orchestrator import (
             GroupPlannerOrchestrator,
         )
-        from twinklr.core.pipeline.result import failure_result, success_result
+        from twinklr.core.pipeline.result import failure_result
 
         section_id = input.section.section_id
 
         try:
-            logger.info(f"Generating coordination plan for section: {section_id}")
+            logger.debug(f"Generating coordination plan for section: {section_id}")
 
             # Retrieve shared context from pipeline state
             audio_bundle = context.get_state("audio_bundle")
@@ -184,37 +184,26 @@ class GroupPlannerStage:
                 llm_logger=context.llm_logger,
             )
 
-            # Run orchestrator with section context
-            result = await orchestrator.run(section_context=section_context)
+            # Use execute_step for caching and metrics
+            from twinklr.core.agents.shared.judge.controller import IterationResult
+            from twinklr.core.pipeline.execution import execute_step
 
-            if not result.success or result.plan is None:
-                error_msg = result.context.termination_reason or "No plan generated"
-                logger.error(f"Section {section_id} planning failed: {error_msg}")
-                return failure_result(error_msg, stage_name=self.name)
+            def extract_plan(r: Any) -> SectionCoordinationPlan:
+                """Extract plan from result (guaranteed non-None by execute_step)."""
+                if r.plan is None:
+                    raise ValueError("IterationResult.plan is None")
+                result_plan: SectionCoordinationPlan = r.plan
+                return result_plan
 
-            # Log success
-            logger.info(
-                f"Section {section_id} plan complete: "
-                f"iterations={result.context.current_iteration}, "
-                f"score={result.context.final_verdict.score if result.context.final_verdict else 'N/A'}"
+            return await execute_step(
+                stage_name=f"{self.name}_{section_id}",
+                context=context,
+                compute=lambda: orchestrator.run(section_context),
+                result_extractor=extract_plan,
+                result_type=IterationResult,
+                cache_key_fn=lambda: orchestrator.get_cache_key(section_context),
+                cache_version="1",
             )
-
-            # Track metrics in pipeline context
-            context.add_metric(
-                f"group_planner_iterations_{section_id}",
-                result.context.current_iteration,
-            )
-            context.add_metric(
-                f"group_planner_tokens_{section_id}",
-                result.context.total_tokens_used,
-            )
-            if result.context.final_verdict:
-                context.add_metric(
-                    f"group_planner_score_{section_id}",
-                    result.context.final_verdict.score,
-                )
-
-            return success_result(result.plan, stage_name=self.name)
 
         except ValueError as e:
             logger.error(f"Invalid section context for {section_id}: {e}")
@@ -275,7 +264,7 @@ class GroupPlanAggregatorStage:
             if not input:
                 return failure_result("No section plans to aggregate", stage_name=self.name)
 
-            logger.info(f"Aggregating {len(input)} section plans")
+            logger.debug(f"Aggregating {len(input)} section plans")
 
             # Create GroupPlanSet from section plans
             group_plan_set = GroupPlanSet(
@@ -283,7 +272,7 @@ class GroupPlanAggregatorStage:
                 section_plans=input,
             )
 
-            logger.info(f"GroupPlanSet created: {len(group_plan_set.section_plans)} sections")
+            logger.debug(f"GroupPlanSet created: {len(group_plan_set.section_plans)} sections")
 
             # Track metrics
             context.add_metric("group_plan_sections", len(group_plan_set.section_plans))

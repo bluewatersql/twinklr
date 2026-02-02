@@ -9,9 +9,9 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from twinklr.core.agents.audio.lyrics import run_lyrics_async
-from twinklr.core.agents.audio.profile import run_audio_profile
+from twinklr.core.agents.audio.lyrics.orchestrator import LyricsOrchestrator
 from twinklr.core.agents.audio.profile.models import AudioProfileModel
+from twinklr.core.agents.audio.profile.orchestrator import AudioProfileOrchestrator
 from twinklr.core.agents.sequencer.macro_planner import (
     MacroPlannerOrchestrator,
     PlanningContext,
@@ -51,7 +51,7 @@ class AudioAnalysisStage:
             StageResult containing SongBundle
         """
         try:
-            logger.info(f"Analyzing audio: {input}")
+            logger.debug(f"Analyzing audio: {input}")
 
             analyzer = AudioAnalyzer(context.app_config, context.job_config)
             bundle = await analyzer.analyze(input, force_reprocess=False)
@@ -61,7 +61,7 @@ class AudioAnalysisStage:
             context.add_metric("audio_duration_ms", bundle.timing.duration_ms)
             context.add_metric("tempo_bpm", bundle.features.get("tempo_bpm"))
 
-            logger.info(
+            logger.debug(
                 f"Audio analysis complete: {bundle.timing.duration_ms / 1000:.1f}s, "
                 f"{bundle.features.get('tempo_bpm')} BPM"
             )
@@ -99,17 +99,17 @@ class AudioProfileStage:
             StageResult containing AudioProfileModel
         """
         try:
-            logger.info("Generating audio profile")
+            logger.debug("Generating audio profile")
 
-            profile = await run_audio_profile(
-                song_bundle=input,
+            orchestrator = AudioProfileOrchestrator(
                 provider=context.provider,
                 llm_logger=context.llm_logger,
                 model=context.job_config.agent.plan_agent.model,
                 temperature=0.3,
             )
+            profile = await orchestrator.run(input)
 
-            logger.info(
+            logger.debug(
                 f"Audio profile complete: {profile.energy_profile.macro_energy}, "
                 f"recommended layers: {profile.creative_guidance.recommended_layer_count}"
             )
@@ -147,17 +147,17 @@ class LyricsStage:
             StageResult containing LyricContext
         """
         try:
-            logger.info("Generating lyrics context")
+            logger.debug("Generating lyrics context")
 
-            lyric_context = await run_lyrics_async(
-                song_bundle=input,
+            orchestrator = LyricsOrchestrator(
                 provider=context.provider,
                 llm_logger=context.llm_logger,
                 model=context.job_config.agent.plan_agent.model,
                 temperature=0.5,
             )
+            lyric_context = await orchestrator.run(input)
 
-            logger.info(
+            logger.debug(
                 f"Lyrics context complete: has_narrative={lyric_context.has_narrative}, "
                 f"themes={len(lyric_context.themes)}"
             )
@@ -203,7 +203,7 @@ class MacroPlannerStage:
             StageResult containing MacroPlan
         """
         try:
-            logger.info("Generating macro plan")
+            logger.debug("Generating macro plan")
 
             audio_profile = input["profile"]
             lyric_context = input.get("lyrics")  # May be None
@@ -232,7 +232,7 @@ class MacroPlannerStage:
                     stage_name=self.name,
                 )
 
-            logger.info(
+            logger.debug(
                 f"Macro plan complete: {len(result.plan.section_plans)} sections, "
                 f"score={result.context.final_verdict.score if result.context.final_verdict else 'N/A'}"
             )

@@ -2,21 +2,21 @@
   "schema_version": "template-catalog.v1",
   "entries": [
     {
-      "template_id": "gtpl_bg_warm_white",
+      "template_id": "gtpl_base_glow_warm",
       "name": "Warm White Background",
       "compatible_lanes": ["BASE"],
       "tags": ["background", "warm", "continuous"],
       "description": "Solid warm white foundation layer"
     },
     {
-      "template_id": "gtpl_bg_red_green",
+      "template_id": "gtpl_base_glow_traditional",
       "name": "Classic Red/Green Background",
       "compatible_lanes": ["BASE"],
       "tags": ["background", "traditional", "christmas"],
       "description": "Traditional red/green color scheme background"
     },
     {
-      "template_id": "gtpl_bg_cool_blue",
+      "template_id": "gtpl_base_wash_cool",
       "name": "Cool Blue Wash",
       "compatible_lanes": ["BASE"],
       "tags": ["background", "cool", "winter"],

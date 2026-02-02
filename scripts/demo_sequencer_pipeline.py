@@ -38,7 +38,6 @@ from twinklr.core.agents.sequencer.group_planner import (
     HolisticEvaluatorStage,
     LaneKind,
     TemplateCatalog,
-    TemplateCatalogEntry,
 )
 from twinklr.core.agents.sequencer.macro_planner.stage import MacroPlannerStage
 from twinklr.core.config.loader import load_app_config, load_job_config
@@ -58,15 +57,15 @@ logger = logging.getLogger(__name__)
 
 def print_section(title: str, char: str = "=") -> None:
     """Print a section header."""
-    print(f"\n{char * len(title)}")
-    print(f"{title}")
-    print(f"{char * len(title)}\n")
+    print(f"\n{char * len(title) * 2}")
+    print(f"{title.upper()}")
+    print(f"{char * len(title) * 2}\n")
 
 
 def print_subsection(title: str) -> None:
     """Print a subsection header."""
-    print(f"\n{title}")
-    print("-" * len(title))
+    print(f"\n{title.upper()}")
+    print("-" * len(title) * 2)
 
 
 def save_artifact(data: dict, song_name: str, filename: str, output_dir: Path) -> Path:
@@ -86,7 +85,7 @@ def build_display_graph(display_groups: list[dict]) -> DisplayGraph:
     for g in display_groups:
         role_key = str(g["role_key"])
         model_count: int = g["model_count"]  # type: ignore[assignment]
-        count = min(model_count, 3)  # Limit to 3 per role
+        count = min(model_count, 3)
         for i in range(1, count + 1):
             groups_list.append(
                 DisplayGroup(
@@ -104,59 +103,23 @@ def build_display_graph(display_groups: list[dict]) -> DisplayGraph:
 
 
 def build_template_catalog() -> TemplateCatalog:
-    """Build sample TemplateCatalog for demo."""
-    return TemplateCatalog(
-        entries=[
-            # Base layer templates
-            TemplateCatalogEntry(
-                template_id="gtpl_base_warm_glow",
-                name="Warm Glow",
-                compatible_lanes=[LaneKind.BASE],
-            ),
-            TemplateCatalogEntry(
-                template_id="gtpl_base_cool_wash",
-                name="Cool Wash",
-                compatible_lanes=[LaneKind.BASE],
-            ),
-            TemplateCatalogEntry(
-                template_id="gtpl_base_pulse",
-                name="Gentle Pulse",
-                compatible_lanes=[LaneKind.BASE],
-            ),
-            # Rhythm layer templates
-            TemplateCatalogEntry(
-                template_id="gtpl_rhythm_bounce",
-                name="Beat Bounce",
-                compatible_lanes=[LaneKind.RHYTHM],
-            ),
-            TemplateCatalogEntry(
-                template_id="gtpl_rhythm_wave",
-                name="Rhythm Wave",
-                compatible_lanes=[LaneKind.RHYTHM],
-            ),
-            TemplateCatalogEntry(
-                template_id="gtpl_rhythm_chase",
-                name="Chase",
-                compatible_lanes=[LaneKind.RHYTHM],
-            ),
-            # Accent layer templates
-            TemplateCatalogEntry(
-                template_id="gtpl_accent_flash",
-                name="Flash",
-                compatible_lanes=[LaneKind.ACCENT],
-            ),
-            TemplateCatalogEntry(
-                template_id="gtpl_accent_burst",
-                name="Burst",
-                compatible_lanes=[LaneKind.ACCENT],
-            ),
-            TemplateCatalogEntry(
-                template_id="gtpl_accent_shimmer",
-                name="Shimmer",
-                compatible_lanes=[LaneKind.ACCENT],
-            ),
-        ]
+    """Build real TemplateCatalog from registered group templates.
+
+    Loads all builtin group templates and builds a catalog for GroupPlanner.
+
+    Returns:
+        TemplateCatalog with all 83 registered templates
+    """
+    from twinklr.core.sequencer.templates.group import load_builtin_group_templates
+    from twinklr.core.sequencer.templates.group.catalog import (
+        build_template_catalog as build_catalog_from_registry,
     )
+
+    # Load builtin templates (triggers auto-registration)
+    load_builtin_group_templates()
+
+    # Build catalog from registry
+    return build_catalog_from_registry()
 
 
 async def main() -> None:
@@ -339,11 +302,30 @@ async def main() -> None:
         print(f"   - {stage.id}{pattern}{deps}")
 
     # ========================================================================
-    # Create Pipeline Context
+    # Create Pipeline Context with Caching
     # ========================================================================
     print_section("3. Pipeline Execution", "=")
 
-    provider = OpenAIProvider(api_key=api_key)
+    # Setup caching infrastructure
+    from twinklr.core.caching import FSCache
+    from twinklr.core.io import RealFileSystem, absolute_path
+
+    fs = RealFileSystem()
+
+    # LLM cache: Short-lived, transparent deduplication of identical LLM calls
+    llm_cache_dir = absolute_path("data/cache/llm")
+    llm_cache = FSCache(fs, llm_cache_dir)
+    await llm_cache.initialize()
+    print(f"🔄 LLM cache initialized: {llm_cache_dir}")
+
+    # Agent cache: Long-lived, deterministic caching of agent results
+    agent_cache_dir = absolute_path("data/cache/agents")
+    agent_cache = FSCache(fs, agent_cache_dir)
+    await agent_cache.initialize()
+    print(f"💾 Agent cache initialized: {agent_cache_dir}")
+
+    # Create provider with LLM cache
+    provider = OpenAIProvider(api_key=api_key, llm_cache=llm_cache)
 
     llm_logger = create_llm_logger(
         enabled=job_config.agent.llm_logging.enabled if job_config else False,
@@ -352,10 +334,12 @@ async def main() -> None:
         format=job_config.agent.llm_logging.format if job_config else "yaml",
     )
 
+    # Create pipeline context with agent cache
     pipeline_context = PipelineContext(
         provider=provider,
         app_config=app_config,
         job_config=job_config,
+        cache=agent_cache,
         llm_logger=llm_logger,
         output_dir=output_dir,
     )
@@ -432,16 +416,17 @@ async def main() -> None:
         )
         print(f"📄 Lyric context: {lyrics_path}")
 
-    # Macro plan
+    # Macro plan (output is list[MacroSectionPlan], not MacroPlan)
     if "macro" in result.outputs:
-        macro_plan = result.outputs["macro"]
+        macro_sections = result.outputs["macro"]
+        # Save section list (this is what FAN_OUT consumes)
         macro_path = save_artifact(
-            macro_plan.model_dump(),
+            [section.model_dump() for section in macro_sections],
             song_name,
-            "macro_plan.json",
+            "macro_sections.json",
             output_dir,
         )
-        print(f"📄 Macro plan: {macro_path}")
+        print(f"📄 Macro sections: {macro_path}")
 
     # GroupPlanSet
     if "aggregate" in result.outputs:

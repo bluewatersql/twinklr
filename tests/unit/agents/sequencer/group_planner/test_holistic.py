@@ -22,12 +22,14 @@ from twinklr.core.agents.sequencer.group_planner.models import (
     LaneKind,
     LanePlan,
     SectionCoordinationPlan,
-    TemplateCatalog,
-    TemplateCatalogEntry,
     TimeRef,
     TimeRefKind,
 )
 from twinklr.core.agents.shared.judge.models import VerdictStatus
+from twinklr.core.sequencer.templates.group.catalog import (
+    TemplateCatalog,
+    TemplateCatalogEntry,
+)
 
 
 class TestHolisticEvaluation:

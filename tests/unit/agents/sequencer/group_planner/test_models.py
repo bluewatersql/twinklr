@@ -20,10 +20,12 @@ from twinklr.core.agents.sequencer.group_planner.models import (
     SectionCoordinationPlan,
     SpillPolicy,
     StepUnit,
-    TemplateCatalog,
-    TemplateCatalogEntry,
     TimeRef,
     TimeRefKind,
+)
+from twinklr.core.sequencer.templates.group.catalog import (
+    TemplateCatalog,
+    TemplateCatalogEntry,
 )
 
 

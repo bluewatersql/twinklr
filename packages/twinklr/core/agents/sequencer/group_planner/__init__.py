@@ -40,8 +40,6 @@ from twinklr.core.agents.sequencer.group_planner.models import (
     SpatialIntent,
     SpillPolicy,
     StepUnit,
-    TemplateCatalog,
-    TemplateCatalogEntry,
     TimeRef,
     TimeRefKind,
 )
@@ -68,6 +66,10 @@ from twinklr.core.agents.sequencer.group_planner.validators import (
     ValidationIssue,
     ValidationResult,
     ValidationSeverity,
+)
+from twinklr.core.sequencer.templates.group.catalog import (
+    TemplateCatalog,
+    TemplateCatalogEntry,
 )
 
 __all__ = [

@@ -50,7 +50,7 @@ def sample_template_catalog() -> TemplateCatalog:
     return TemplateCatalog(
         entries=[
             TemplateCatalogEntry(
-                template_id="gtpl_bg_warm",
+                template_id="gtpl_base_glow_warm",
                 name="Warm BG",
                 compatible_lanes=[LaneKind.BASE],
             ),
@@ -156,7 +156,7 @@ def create_mock_section_plan() -> SectionCoordinationPlan:
                             GroupPlacement(
                                 placement_id="p3",
                                 group_id="ARCHES_1",
-                                template_id="gtpl_bg_warm",
+                                template_id="gtpl_base_glow_warm",
                                 start=TimeRef(kind=TimeRefKind.BAR_BEAT, bar=1, beat=1),
                                 end=TimeRef(kind=TimeRefKind.BAR_BEAT, bar=3, beat=1),
                             ),
@@ -200,7 +200,7 @@ class TestGroupPlannerOrchestratorIntegration:
 
         variables = orchestrator._build_planner_variables(sample_section_context)
 
-        # Verify all expected variables are present
+        # Verify all expected variables are present (post-context-shaping)
         assert variables["section_id"] == "verse_1"
         assert variables["section_name"] == "verse"
         assert variables["start_ms"] == 0
@@ -209,7 +209,9 @@ class TestGroupPlannerOrchestratorIntegration:
         assert variables["primary_focus_targets"] == ["HERO"]
         assert "display_graph" in variables
         assert "template_catalog" in variables
-        assert "timing_context" in variables
+        # timing_context explicitly excluded via context shaping (not used in prompt)
+        assert "timing_context" not in variables
+        assert "layer_intents" in variables
 
     def test_orchestrator_validator_catches_invalid_template(
         self,

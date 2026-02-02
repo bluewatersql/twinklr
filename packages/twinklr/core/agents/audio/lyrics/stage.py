@@ -45,7 +45,7 @@ class LyricsStage:
         input: SongBundle,
         context: PipelineContext,
     ) -> StageResult[LyricContextModel]:
-        """Generate lyrics context.
+        """Generate lyrics context with caching.
 
         Args:
             input: SongBundle from audio analysis
@@ -55,10 +55,14 @@ class LyricsStage:
             StageResult containing LyricContextModel
 
         Side Effects:
-            - Adds "lyrics_tokens" to context.metrics
+            - Stores "lyrics_result" in context.state (full result)
+            - Stores "lyric_context" in context.state (for backward compatibility)
+            - Adds "lyrics_from_cache" to context.metrics
         """
-        from twinklr.core.agents.audio.lyrics import run_lyrics_async
-        from twinklr.core.pipeline.result import failure_result, success_result
+        from twinklr.core.agents.audio.lyrics.models import LyricContextModel
+        from twinklr.core.agents.audio.lyrics.orchestrator import LyricsOrchestrator
+        from twinklr.core.pipeline.execution import execute_step
+        from twinklr.core.pipeline.result import failure_result
 
         try:
             # Check if lyrics are available
@@ -69,28 +73,33 @@ class LyricsStage:
                     stage_name=self.name,
                 )
 
-            logger.info("Generating lyrics context")
+            model = context.job_config.agent.plan_agent.model
+            temperature = 0.5
 
-            # Run lyrics agent
-            lyric_context = await run_lyrics_async(
-                song_bundle=input,
+            # Create orchestrator
+            orchestrator = LyricsOrchestrator(
                 provider=context.provider,
+                model=model,
+                temperature=temperature,
                 llm_logger=context.llm_logger,
-                model=context.job_config.agent.plan_agent.model,
-                temperature=0.5,
             )
 
-            logger.info(
-                f"Lyrics context complete: has_narrative={lyric_context.has_narrative}, "
-                f"themes={len(lyric_context.themes)}, "
-                f"key_phrases={len(lyric_context.key_phrases)}"
+            # Use execute_step for caching and metrics
+            return await execute_step(
+                stage_name=self.name,
+                context=context,
+                compute=lambda: orchestrator.run(input),
+                result_extractor=lambda r: r,  # Result is already LyricContextModel
+                result_type=LyricContextModel,
+                cache_key_fn=lambda: orchestrator.get_cache_key(input),
+                cache_version="1",
+                state_handler=self._handle_state,
             )
-
-            # Store in state for downstream stages (GroupPlannerStage)
-            context.set_state("lyric_context", lyric_context)
-
-            return success_result(lyric_context, stage_name=self.name)
 
         except Exception as e:
             logger.exception("Lyrics context generation failed", exc_info=e)
             return failure_result(str(e), stage_name=self.name)
+
+    def _handle_state(self, result: LyricContextModel, context: PipelineContext) -> None:
+        """Store lyrics context in state (backward compatibility)."""
+        context.set_state("lyric_context", result)

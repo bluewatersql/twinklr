@@ -12,6 +12,7 @@ from typing import Any
 
 from twinklr.core.agents.logging import LLMCallLogger, NullLLMCallLogger
 from twinklr.core.agents.providers.base import LLMProvider
+from twinklr.core.caching import Cache
 from twinklr.core.config.models import AppConfig, JobConfig
 
 
@@ -26,6 +27,7 @@ class PipelineContext:
         provider: LLM provider for agent stages
         app_config: Application configuration
         job_config: Job configuration
+        cache: Optional cache backend for agent results (enables deterministic caching)
         llm_logger: LLM call logger (defaults to NullLLMCallLogger)
         checkpoint_dir: Optional checkpoint directory
         output_dir: Optional output directory for artifacts
@@ -38,6 +40,7 @@ class PipelineContext:
         ...     provider=provider,
         ...     app_config=app_config,
         ...     job_config=job_config,
+        ...     cache=fs_cache,
         ...     output_dir=Path("artifacts/demo"),
         ... )
         >>>
@@ -56,6 +59,7 @@ class PipelineContext:
     job_config: JobConfig
 
     # Optional dependencies
+    cache: Cache | None = None
     llm_logger: LLMCallLogger = field(default_factory=NullLLMCallLogger)
 
     # Paths

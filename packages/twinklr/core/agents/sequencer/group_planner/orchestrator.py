@@ -6,6 +6,8 @@ judge evaluation using the StandardIterationController.
 
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
 from collections.abc import Callable
 from typing import Any
@@ -90,6 +92,40 @@ class GroupPlannerOrchestrator:
             f"(max_iterations={max_iterations}, min_pass_score={min_pass_score})"
         )
 
+    async def get_cache_key(self, section_context: SectionPlanningContext) -> str:
+        """Generate cache key for deterministic caching.
+
+        Cache key includes all inputs that affect section plan output:
+        - Section planning context (macro section plan, display graph, templates, timing, layer intents)
+        - Max iterations
+        - Min pass score
+        - Model configuration
+
+        Args:
+            section_context: Section planning context for this run
+
+        Returns:
+            SHA256 hash of canonical inputs
+        """
+        key_data = {
+            "section_context": section_context.model_dump(),
+            "max_iterations": self.config.max_iterations,
+            "min_pass_score": self.config.approval_score_threshold,
+            "planner_model": self.planner_spec.model,
+            "judge_model": self.section_judge_spec.model,
+        }
+
+        # Canonical JSON encoding for stable hashing
+        canonical = json.dumps(
+            key_data,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+            default=str,
+        )
+
+        return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
     async def run(
         self,
         section_context: SectionPlanningContext,
@@ -173,26 +209,11 @@ class GroupPlannerOrchestrator:
         Returns:
             Variables dict for planner
         """
-        return {
-            # Section identity
-            "section_id": section_context.section_id,
-            "section_name": section_context.section_name,
-            # Timing
-            "start_ms": section_context.start_ms,
-            "end_ms": section_context.end_ms,
-            # Intent from MacroPlan
-            "energy_target": section_context.energy_target,
-            "motion_density": section_context.motion_density,
-            "choreography_style": section_context.choreography_style,
-            "primary_focus_targets": section_context.primary_focus_targets,
-            "secondary_targets": section_context.secondary_targets,
-            "notes": section_context.notes,
-            # Shared context
-            "display_graph": section_context.display_graph,
-            "template_catalog": section_context.template_catalog,
-            "timing_context": section_context.timing_context,
-            "layer_intents": section_context.layer_intents,
-        }
+        from twinklr.core.agents.sequencer.group_planner.context_shaping import (
+            shape_planner_context,
+        )
+
+        return shape_planner_context(section_context)
 
     def _build_validator(
         self,

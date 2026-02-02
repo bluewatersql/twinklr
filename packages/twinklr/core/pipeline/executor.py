@@ -80,14 +80,14 @@ class PipelineExecutor:
                 metadata={"validation_errors": errors},
             )
 
-        logger.info(f"Executing pipeline: {pipeline.name}")
-        logger.info(f"  Stages: {len(pipeline.stages)}")
-        logger.info(f"  Fail fast: {pipeline.fail_fast}")
+        logger.debug(f"Executing pipeline: {pipeline.name}")
+        logger.debug(f"  Stages: {len(pipeline.stages)}")
+        logger.debug(f"  Fail fast: {pipeline.fail_fast}")
 
         # Build execution plan (waves of stages that can run in parallel)
         execution_plan = self._build_execution_plan(pipeline, context)
 
-        logger.info(f"  Execution plan: {len(execution_plan)} waves")
+        logger.debug(f"  Execution plan: {len(execution_plan)} waves")
         for i, wave in enumerate(execution_plan):
             logger.debug(f"    Wave {i}: {[s.id for s in wave]}")
 
@@ -111,7 +111,7 @@ class PipelineExecutor:
                     metadata={"cancellation": "User cancelled", "completed_waves": wave_idx},
                 )
 
-            logger.info(
+            logger.debug(
                 f"Executing wave {wave_idx + 1}/{len(execution_plan)}: {[s.id for s in wave]}"
             )
 
@@ -129,7 +129,7 @@ class PipelineExecutor:
 
                 if result.success:
                     outputs[stage_id] = result.output
-                    logger.info(f"  ✓ {stage_id} completed")
+                    logger.debug(f"  ✓ {stage_id} completed")
                 else:
                     failed_stages.append(stage_id)
                     logger.error(f"  ✗ {stage_id} failed: {result.error}")
@@ -153,7 +153,7 @@ class PipelineExecutor:
         duration_ms = (end_time - start_time) * 1000
 
         success = len(failed_stages) == 0
-        logger.info(
+        logger.debug(
             f"Pipeline {'completed' if success else 'finished with errors'} in {duration_ms:.0f}ms"
         )
 
@@ -192,7 +192,7 @@ class PipelineExecutor:
 
         if len(active_stages) < len(pipeline.stages):
             skipped = {s.id for s in pipeline.stages} - {s.id for s in active_stages}
-            logger.info(f"Skipping conditional stages: {skipped}")
+            logger.debug(f"Skipping conditional stages: {skipped}")
 
         # Topological sort into waves
         waves: list[list[StageDefinition]] = []
@@ -324,7 +324,7 @@ class PipelineExecutor:
         for attempt in range(max_attempts):
             if attempt > 0:
                 delay_ms = self._calculate_backoff_delay(attempt, retry_config)
-                logger.info(
+                logger.debug(
                     f"Retrying {stage_name} (attempt {attempt + 1}/{max_attempts}) after {delay_ms}ms"
                 )
                 await asyncio.sleep(delay_ms / 1000.0)
@@ -375,6 +375,8 @@ class PipelineExecutor:
     ) -> StageResult[list[Any]]:
         """Execute stage multiple times in parallel (fan-out pattern).
 
+        Uses semaphore-based concurrency control if max_concurrent_fan_out is set.
+
         Args:
             stage_def: Stage definition
             inputs: List of inputs (one execution per input)
@@ -384,10 +386,29 @@ class PipelineExecutor:
             StageResult containing list of outputs (or failure)
         """
         stage_name = stage_def.stage.name
-        logger.info(f"Fan-out: executing {stage_name} {len(inputs)} times in parallel")
+        max_concurrent = stage_def.max_concurrent_fan_out
 
-        # Execute for each input
-        tasks = [stage_def.stage.execute(inp, context) for inp in inputs]
+        if max_concurrent is not None:
+            logger.debug(
+                f"Fan-out: executing {stage_name} {len(inputs)} times "
+                f"(max {max_concurrent} concurrent)"
+            )
+        else:
+            logger.debug(f"Fan-out: executing {stage_name} {len(inputs)} times in parallel")
+
+        # Execute with concurrency control if specified
+        if max_concurrent is not None and max_concurrent > 0:
+            semaphore = asyncio.Semaphore(max_concurrent)
+
+            async def execute_with_limit(inp: Any) -> StageResult[Any]:
+                async with semaphore:
+                    return await stage_def.stage.execute(inp, context)
+
+            tasks = [execute_with_limit(inp) for inp in inputs]
+        else:
+            # Unlimited concurrency
+            tasks = [stage_def.stage.execute(inp, context) for inp in inputs]
+
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
         # Separate successes from failures
@@ -417,7 +438,7 @@ class PipelineExecutor:
                     metadata={"successes": len(successes), "failures": len(failures)},
                 )
 
-        logger.info(f"Fan-out {stage_name}: {len(successes)}/{len(inputs)} succeeded")
+        logger.debug(f"Fan-out {stage_name}: {len(successes)}/{len(inputs)} succeeded")
 
         # Return list of successful outputs
         return success_result(

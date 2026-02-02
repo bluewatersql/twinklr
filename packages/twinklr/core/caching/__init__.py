@@ -33,7 +33,6 @@ from twinklr.core.caching.backends.fs import FSCache
 from twinklr.core.caching.fingerprint import compute_fingerprint
 from twinklr.core.caching.models import CacheKey, CacheMeta, CacheOptions
 from twinklr.core.caching.protocols import Cache, CacheSync
-from twinklr.core.caching.wrapper import cached_step, cached_step_sync
 
 __all__ = [
     # Core
@@ -46,6 +45,4 @@ __all__ = [
     "FSCache",
     # Utils
     "compute_fingerprint",
-    "cached_step",
-    "cached_step_sync",
 ]
