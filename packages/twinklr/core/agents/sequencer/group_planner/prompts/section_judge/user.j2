@@ -61,12 +61,16 @@ Evaluate this SectionCoordinationPlan:
    - Energy target ({{ energy_target }}) is reflected
    - Motion density ({{ motion_density }}) matches complexity
 
-{% if iteration is defined and iteration > 0 %}
 ---
 
+{% if iteration is defined and iteration > 0 %}
 ## Iteration {{ iteration + 1 }}
 
-Previous feedback was provided. Check if issues were addressed.
+This is **iteration {{ iteration + 1 }}**. Previous feedback was provided. Check if issues were addressed, give credit for improvements, and focus on remaining issues.
+{% else %}
+## First Iteration
+
+This is the **first iteration**. Provide comprehensive feedback to guide refinement.
 {% endif %}
 
 Provide your evaluation as a JudgeVerdict.

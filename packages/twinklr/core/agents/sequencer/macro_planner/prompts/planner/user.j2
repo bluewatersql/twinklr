@@ -19,7 +19,7 @@ Provides song details, display layout, and task instructions
 
 ## Energy Profile
 
-**Overall Energy:** {{ audio_profile.energy_profile.macro_energy }}
+**Overall Energy:** {{ audio_profile.energy_profile.macro_energy.value }}
 
 **Energy Peaks:** {{ audio_profile.energy_profile.peaks | length }} major peaks detected
 {% if audio_profile.energy_profile.peaks %}

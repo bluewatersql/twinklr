@@ -27,6 +27,12 @@ def get_taxonomy_dict() -> dict[str, list[str]]:
         IssueSeverity,
         SuggestedAction,
     )
+    from twinklr.core.agents.sequencer.group_planner.models import (
+        CoordinationMode,
+        LaneKind,
+        SpillPolicy,
+        StepUnit,
+    )
     from twinklr.core.agents.taxonomy import (
         AssetSlotType,
         BlendMode,
@@ -62,6 +68,14 @@ def get_taxonomy_dict() -> dict[str, list[str]]:
         AssetSlotType,
     ]
 
+    # Group planner enums
+    group_planner_enums: list[type[Enum]] = [
+        LaneKind,
+        CoordinationMode,
+        StepUnit,
+        SpillPolicy,
+    ]
+
     # Extract issue taxonomy enums (for judge agents)
     issue_enums: list[type[Enum]] = [
         IssueCategory,
@@ -71,7 +85,8 @@ def get_taxonomy_dict() -> dict[str, list[str]]:
         SuggestedAction,
     ]
 
-    for enum_class in choreography_enums + issue_enums:
+    all_enums = choreography_enums + group_planner_enums + issue_enums
+    for enum_class in all_enums:
         taxonomy[enum_class.__name__] = [e.value for e in enum_class]  # type: ignore[misc]
 
     return taxonomy

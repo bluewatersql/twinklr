@@ -105,10 +105,32 @@ class MacroPlannerStage:
             )
 
             def extract_sections(r: Any) -> list[MacroSectionPlan]:
-                """Extract section plans from result."""
-                if r.plan is None:
+                """Extract section plans from result (handles both Pydantic model and dict)."""
+                from twinklr.core.agents.sequencer.macro_planner.models import MacroSectionPlan
+
+                # Handle both IterationResult model and dict from cache
+                if isinstance(r, dict):
+                    plan = r.get("plan")
+                else:
+                    plan = getattr(r, "plan", None)
+
+                if plan is None:
                     raise ValueError("IterationResult.plan is None")
-                return r.plan.section_plans
+
+                # Handle both MacroPlan model and dict from cache
+                if isinstance(plan, dict):
+                    section_plans_data = plan.get("section_plans")
+                else:
+                    section_plans_data = getattr(plan, "section_plans", None)
+
+                if section_plans_data is None:
+                    raise ValueError("MacroPlan.section_plans is None")
+
+                # Convert dicts to MacroSectionPlan models if needed
+                if section_plans_data and isinstance(section_plans_data[0], dict):
+                    return [MacroSectionPlan.model_validate(s) for s in section_plans_data]
+
+                return section_plans_data
 
             # Execute with caching and automatic metrics/state handling
             return await execute_step(
@@ -132,10 +154,29 @@ class MacroPlannerStage:
 
     def _handle_state(self, result: Any, context: PipelineContext) -> None:
         """Store macro plan in state for downstream stages."""
-        if result.plan:
-            context.set_state("macro_plan", result.plan)
+        # Handle both IterationResult model and dict from cache
+        if isinstance(result, dict):
+            plan = result.get("plan")
+        else:
+            plan = getattr(result, "plan", None)
+
+        if plan:
+            context.set_state("macro_plan", plan)
 
     def _handle_metrics(self, result: Any, context: PipelineContext) -> None:
         """Track section count metric (extends defaults)."""
-        if result.plan:
-            context.add_metric("section_count", len(result.plan.section_plans))
+        # Handle both IterationResult model and dict from cache
+        if isinstance(result, dict):
+            plan = result.get("plan")
+        else:
+            plan = getattr(result, "plan", None)
+
+        if plan:
+            # Handle both MacroPlan model and dict from cache
+            if isinstance(plan, dict):
+                section_plans = plan.get("section_plans")
+            else:
+                section_plans = getattr(plan, "section_plans", None)
+
+            if section_plans:
+                context.add_metric("section_count", len(section_plans))

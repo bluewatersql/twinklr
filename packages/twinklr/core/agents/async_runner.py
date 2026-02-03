@@ -21,6 +21,7 @@ from twinklr.core.agents.result import AgentResult
 from twinklr.core.agents.schema_utils import get_json_schema_example
 from twinklr.core.agents.spec import AgentMode, AgentSpec
 from twinklr.core.agents.state import AgentState
+from twinklr.core.agents.taxonomy_utils import inject_taxonomy
 
 logger = logging.getLogger(__name__)
 
@@ -86,7 +87,7 @@ class AsyncAgentRunner:
             AgentResult with execution outcome
         """
         start_time = time.time()
-        start_tokens = self.provider.get_token_usage().total_tokens
+        start_usage = self.provider.get_token_usage()
 
         try:
             # Merge default variables
@@ -95,6 +96,9 @@ class AsyncAgentRunner:
             # Auto-inject response schema to avoid drift between prompts and models
             if spec.response_model and hasattr(spec.response_model, "model_json_schema"):
                 merged_vars["response_schema"] = get_json_schema_example(spec.response_model)
+
+            # Auto-inject taxonomy enum values to avoid drift between prompts and enums
+            merged_vars = inject_taxonomy(merged_vars)
 
             # Load and render prompts (sync, but fast)
             prompts = self.prompt_loader.load_and_render(spec.prompt_pack, merged_vars)
@@ -117,8 +121,8 @@ class AsyncAgentRunner:
 
             # Calculate duration and tokens
             duration = time.time() - start_time
-            token_usage = self.provider.get_token_usage()
-            tokens = token_usage.total_tokens - start_tokens
+            end_usage = self.provider.get_token_usage()
+            tokens = end_usage.total_tokens - start_usage.total_tokens
 
             # Track state if provided
             if state:
@@ -130,8 +134,8 @@ class AsyncAgentRunner:
                 raw_response=response_data,
                 validated_response=response_data,
                 validation_errors=[],
-                token_usage=token_usage,
-                start_tokens=start_tokens,
+                start_usage=start_usage,
+                end_usage=end_usage,
                 duration=duration,
                 success=True,
                 repair_attempts=repair_attempts,
@@ -153,8 +157,8 @@ class AsyncAgentRunner:
 
         except LLMProviderError as e:
             duration = time.time() - start_time
-            token_usage = self.provider.get_token_usage()
-            tokens = token_usage.total_tokens - start_tokens
+            end_usage = self.provider.get_token_usage()
+            tokens = end_usage.total_tokens - start_usage.total_tokens
 
             logger.error(f"Provider error in {spec.name}: {e}")
 
@@ -168,8 +172,8 @@ class AsyncAgentRunner:
 
         except RunError as e:
             duration = time.time() - start_time
-            token_usage = self.provider.get_token_usage()
-            tokens = token_usage.total_tokens - start_tokens
+            end_usage = self.provider.get_token_usage()
+            tokens = end_usage.total_tokens - start_usage.total_tokens
 
             logger.error(f"Run error in {spec.name}: {e}")
 
@@ -187,8 +191,8 @@ class AsyncAgentRunner:
 
         except Exception as e:
             duration = time.time() - start_time
-            token_usage = self.provider.get_token_usage()
-            tokens = token_usage.total_tokens - start_tokens
+            end_usage = self.provider.get_token_usage()
+            tokens = end_usage.total_tokens - start_usage.total_tokens
 
             logger.error(f"Unexpected error in {spec.name}: {e}")
 
@@ -432,25 +436,42 @@ class AsyncAgentRunner:
         raw_response: Any,
         validated_response: Any,
         validation_errors: list[str],
-        token_usage: Any,
-        start_tokens: int,
+        start_usage: Any,
+        end_usage: Any,
         duration: float,
         success: bool,
         repair_attempts: int,
     ) -> None:
         """Safely log call completion (async).
 
+        Calculates per-call token deltas from start and end usage.
         Never raises - logs errors silently.
+
+        Args:
+            call_id: Call identifier from start_call_async
+            raw_response: Raw LLM response
+            validated_response: Validated response (after Pydantic parsing)
+            validation_errors: List of validation error messages
+            start_usage: TokenUsage before the call (cumulative)
+            end_usage: TokenUsage after the call (cumulative)
+            duration: Call duration in seconds
+            success: Whether the call succeeded
+            repair_attempts: Number of schema repair attempts
         """
         try:
+            # Calculate per-call token deltas
+            tokens_used = end_usage.total_tokens - start_usage.total_tokens
+            prompt_tokens = end_usage.prompt_tokens - start_usage.prompt_tokens
+            completion_tokens = end_usage.completion_tokens - start_usage.completion_tokens
+
             await self.llm_logger.complete_call_async(
                 call_id=call_id,
                 raw_response=raw_response,
                 validated_response=validated_response,
                 validation_errors=validation_errors,
-                tokens_used=token_usage.total_tokens - start_tokens,
-                prompt_tokens=token_usage.prompt_tokens,
-                completion_tokens=token_usage.completion_tokens,
+                tokens_used=tokens_used,
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
                 duration_seconds=duration,
                 success=success,
                 repair_attempts=repair_attempts,

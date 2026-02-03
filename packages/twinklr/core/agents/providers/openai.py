@@ -25,6 +25,9 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# LLM cache TTL (1 hour) - short-lived, transient cache for deduplication
+LLM_CACHE_TTL_SECONDS = 3600.0
+
 
 class CachedLLMResponse(BaseModel):
     """Cacheable LLM response wrapper.
@@ -308,7 +311,9 @@ class OpenAIProvider:
                     input_fingerprint=cache_key_hash,
                 )
 
-                cached_response = await self.llm_cache.load(cache_key, CachedLLMResponse)
+                cached_response = await self.llm_cache.load(
+                    cache_key, CachedLLMResponse, ttl_seconds=LLM_CACHE_TTL_SECONDS
+                )
                 if cached_response:
                     logger.debug(f"LLM cache hit (model={model}, temp={temperature})")
                     # Update token tracking from cached response
@@ -395,8 +400,13 @@ class OpenAIProvider:
                         total_tokens=token_usage.total_tokens,
                         model=model,
                     )
-                    await self.llm_cache.store(cache_key, cached_resp)
-                    logger.debug(f"LLM response cached (model={model}, temp={temperature})")
+                    await self.llm_cache.store(
+                        cache_key, cached_resp, ttl_seconds=LLM_CACHE_TTL_SECONDS
+                    )
+                    logger.debug(
+                        f"LLM response cached with TTL={LLM_CACHE_TTL_SECONDS}s "
+                        f"(model={model}, temp={temperature})"
+                    )
                 except Exception as e:
                     logger.warning(f"LLM cache store failed: {e}")
 

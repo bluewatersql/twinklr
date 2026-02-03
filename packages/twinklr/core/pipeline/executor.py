@@ -187,12 +187,10 @@ class PipelineExecutor:
         Returns:
             List of waves (each wave is list of stages to run in parallel)
         """
-        # Filter stages based on conditions
-        active_stages = [s for s in pipeline.stages if s.should_execute(context)]
-
-        if len(active_stages) < len(pipeline.stages):
-            skipped = {s.id for s in pipeline.stages} - {s.id for s in active_stages}
-            logger.debug(f"Skipping conditional stages: {skipped}")
+        # NOTE: Conditions are now evaluated at execution time, not planning time.
+        # This allows conditional stages to depend on state set by earlier stages.
+        # We include all stages in planning and check conditions in _execute_stage().
+        active_stages = list(pipeline.stages)
 
         # Topological sort into waves
         waves: list[list[StageDefinition]] = []
@@ -287,7 +285,14 @@ class PipelineExecutor:
         Returns:
             StageResult from stage execution
         """
+        from twinklr.core.pipeline.result import skipped_result
+
         stage_name = stage_def.stage.name
+
+        # Evaluate condition at execution time (after dependencies have run)
+        if not stage_def.should_execute(context):
+            logger.debug(f"Skipping conditional stage '{stage_def.id}' (condition not met)")
+            return skipped_result(stage_name=stage_name, reason="Condition not met")
 
         # Determine stage input
         if not stage_def.inputs:

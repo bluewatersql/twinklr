@@ -37,9 +37,9 @@ Available target roles:
 # MacroPlan to Evaluate
 
 {% if iteration > 1 %}
-**Iteration {{ iteration }}** - Evaluating refined plan
+**Iteration {{ iteration }}** - Evaluating refined plan. Check if previous feedback was addressed.
 {% else %}
-**Iteration 1** - Initial plan evaluation
+**Iteration 1** - Initial plan evaluation. Provide comprehensive feedback to guide refinement.
 {% endif %}
 
 ## Global Story
@@ -55,9 +55,9 @@ Available target roles:
 **Layer Count:** {{ macro_plan.layering_plan.layers | length }}
 
 {% for layer in macro_plan.layering_plan.layers %}
-- **Layer {{ layer.layer_index }}** ({{ layer.layer_role }}, {{ layer.blend_mode }} blend)
+- **Layer {{ layer.layer_index }}** ({{ layer.layer_role.value }}, {{ layer.blend_mode.value }} blend)
   - **Usage Notes:** {{ layer.usage_notes }}
-  - **Timing:** {{ layer.timing_driver }}
+  - **Timing:** {{ layer.timing_driver.value }}
   - **Targets:** {{ layer.target_selector.roles | join(', ') }}
   - **Intensity Bias:** {{ layer.intensity_bias }}
 {% endfor %}
@@ -67,9 +67,9 @@ Available target roles:
 {% for section in macro_plan.section_plans %}
 ### {{ section.section.name }} ({{ (section.section.start_ms / 1000) | round(1) }}s - {{ (section.section.end_ms / 1000) | round(1) }}s)
 
-- **Energy Target:** {{ section.energy_target }}
-- **Motion Density:** {{ section.motion_density }}
-- **Choreography Style:** {{ section.choreography_style }}
+- **Energy Target:** {{ section.energy_target.value }}
+- **Motion Density:** {{ section.motion_density.value }}
+- **Choreography Style:** {{ section.choreography_style.value }}
 - **Primary Focus:** {{ section.primary_focus_targets | join(', ') if section.primary_focus_targets else 'None' }}
 - **Secondary Targets:** {{ section.secondary_targets | join(', ') if section.secondary_targets else 'None' }}
 - **Notes:** {{ section.notes }}

@@ -29,6 +29,9 @@ from twinklr.core.sequencer.templates.group.catalog import (
     TemplateCatalogEntry,
 )
 
+# Rebuild TemplateCatalogEntry after LaneKind is imported (forward ref resolution)
+TemplateCatalogEntry.model_rebuild()
+
 
 @pytest.fixture
 def sample_display_graph() -> DisplayGraph:
@@ -344,6 +347,134 @@ class TestSectionPlanValidator:
                                     template_id="gtpl_accent_bell",
                                     start=TimeRef(kind=TimeRefKind.BAR_BEAT, bar=1, beat=1),
                                     end=TimeRef(kind=TimeRefKind.BAR_BEAT, bar=2, beat=1),
+                                ),
+                            ],
+                        ),
+                    ],
+                ),
+            ],
+        )
+
+        validator = SectionPlanValidator(
+            display_graph=sample_display_graph,
+            template_catalog=sample_template_catalog,
+            timing_context=sample_timing_context,
+        )
+        result = validator.validate(plan)
+
+        assert result.is_valid
+
+    def test_accent_intensity_exceeds_lane_limit(
+        self,
+        sample_display_graph: DisplayGraph,
+        sample_template_catalog: TemplateCatalog,
+        sample_timing_context: TimingContext,
+    ) -> None:
+        """ACCENT lane intensity >1.30 should fail validation."""
+        plan = SectionCoordinationPlan(
+            section_id="verse_1",
+            lane_plans=[
+                LanePlan(
+                    lane=LaneKind.ACCENT,
+                    target_roles=["HERO"],
+                    coordination_plans=[
+                        CoordinationPlan(
+                            coordination_mode=CoordinationMode.UNIFIED,
+                            group_ids=["HERO_1"],
+                            placements=[
+                                GroupPlacement(
+                                    placement_id="p1",
+                                    group_id="HERO_1",
+                                    template_id="gtpl_accent_bell",
+                                    start=TimeRef(kind=TimeRefKind.BAR_BEAT, bar=1, beat=1),
+                                    end=TimeRef(kind=TimeRefKind.BAR_BEAT, bar=2, beat=1),
+                                    intensity=1.35,  # Exceeds ACCENT max of 1.30
+                                ),
+                            ],
+                        ),
+                    ],
+                ),
+            ],
+        )
+
+        validator = SectionPlanValidator(
+            display_graph=sample_display_graph,
+            template_catalog=sample_template_catalog,
+            timing_context=sample_timing_context,
+        )
+        result = validator.validate(plan)
+
+        assert not result.is_valid
+        assert any(e.code == "LANE_INTENSITY_EXCEEDED" for e in result.errors)
+
+    def test_rhythm_intensity_exceeds_lane_limit(
+        self,
+        sample_display_graph: DisplayGraph,
+        sample_template_catalog: TemplateCatalog,
+        sample_timing_context: TimingContext,
+    ) -> None:
+        """RHYTHM lane intensity >1.20 should fail validation."""
+        plan = SectionCoordinationPlan(
+            section_id="verse_1",
+            lane_plans=[
+                LanePlan(
+                    lane=LaneKind.RHYTHM,
+                    target_roles=["ARCHES"],
+                    coordination_plans=[
+                        CoordinationPlan(
+                            coordination_mode=CoordinationMode.UNIFIED,
+                            group_ids=["ARCHES_1"],
+                            placements=[
+                                GroupPlacement(
+                                    placement_id="p1",
+                                    group_id="ARCHES_1",
+                                    template_id="gtpl_rhythm_bounce",
+                                    start=TimeRef(kind=TimeRefKind.BAR_BEAT, bar=1, beat=1),
+                                    end=TimeRef(kind=TimeRefKind.BAR_BEAT, bar=2, beat=1),
+                                    intensity=1.25,  # Exceeds RHYTHM max of 1.20
+                                ),
+                            ],
+                        ),
+                    ],
+                ),
+            ],
+        )
+
+        validator = SectionPlanValidator(
+            display_graph=sample_display_graph,
+            template_catalog=sample_template_catalog,
+            timing_context=sample_timing_context,
+        )
+        result = validator.validate(plan)
+
+        assert not result.is_valid
+        assert any(e.code == "LANE_INTENSITY_EXCEEDED" for e in result.errors)
+
+    def test_intensity_at_lane_limit_passes(
+        self,
+        sample_display_graph: DisplayGraph,
+        sample_template_catalog: TemplateCatalog,
+        sample_timing_context: TimingContext,
+    ) -> None:
+        """Intensity exactly at lane limit should pass validation."""
+        plan = SectionCoordinationPlan(
+            section_id="verse_1",
+            lane_plans=[
+                LanePlan(
+                    lane=LaneKind.ACCENT,
+                    target_roles=["HERO"],
+                    coordination_plans=[
+                        CoordinationPlan(
+                            coordination_mode=CoordinationMode.UNIFIED,
+                            group_ids=["HERO_1"],
+                            placements=[
+                                GroupPlacement(
+                                    placement_id="p1",
+                                    group_id="HERO_1",
+                                    template_id="gtpl_accent_bell",
+                                    start=TimeRef(kind=TimeRefKind.BAR_BEAT, bar=1, beat=1),
+                                    end=TimeRef(kind=TimeRefKind.BAR_BEAT, bar=2, beat=1),
+                                    intensity=1.30,  # Exactly at ACCENT limit
                                 ),
                             ],
                         ),

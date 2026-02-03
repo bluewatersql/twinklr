@@ -13,9 +13,8 @@ from typing import Any
 import aiofiles  # type: ignore[import-untyped]
 import yaml
 
+from twinklr.core.agents.logging.models import AgentCallSummary, CallSummary, LLMCallLog
 from twinklr.core.logging.sanitize import sanitize_dict
-
-from .models import AgentCallSummary, CallSummary, LLMCallLog
 
 
 class AsyncFileLogger:
@@ -73,7 +72,7 @@ class AsyncFileLogger:
         self.sanitize_enabled = sanitize
 
         # Log directory
-        self.log_dir = self.output_dir / "logs" / "llm" / run_id
+        self.log_dir = self.output_dir / "llm"
         self.log_dir.mkdir(parents=True, exist_ok=True)
 
         # Counters and buffers
@@ -319,8 +318,8 @@ class AsyncFileLogger:
     ) -> None:
         """Write log entry to file (async)."""
         # Create agent directory
-        agent_dir = self.log_dir / agent_name
-        agent_dir.mkdir(exist_ok=True)
+        agent_dir = self.log_dir / agent_name / self.run_id
+        agent_dir.mkdir(parents=True, exist_ok=True)
 
         # Generate filename
         ext = self.format
@@ -435,16 +434,20 @@ class AsyncFileLogger:
         )
 
         # Write summary
-        summary_path = self.log_dir / "summary.yaml"
-        summary_dict = summary.model_dump(mode="json")
+        summary_path = self.log_dir / f"summary.{self.format}"
+        summary_dict = summary.model_dump(exclude_none=True, mode="json")
 
-        async with aiofiles.open(summary_path, "w") as f:
-            await f.write("---\n")
-            await f.write(
-                yaml.dump(
-                    summary_dict, default_flow_style=False, sort_keys=False, allow_unicode=True
+        if self.format == "yaml":
+            async with aiofiles.open(summary_path, "w") as f:
+                await f.write("---\n")
+                await f.write(
+                    yaml.dump(
+                        summary_dict, default_flow_style=False, sort_keys=False, allow_unicode=True
+                    )
                 )
-            )
+        elif self.format == "json":
+            async with aiofiles.open(summary_path, "w") as f:
+                await f.write(json.dumps(summary_dict, indent=2, default=str))
 
     async def _create_latest_symlink_async(self) -> None:
         """Create 'latest' symlink (async)."""

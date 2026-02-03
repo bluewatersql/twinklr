@@ -121,6 +121,30 @@ def cancelled_result(
     return failure_result(f"[CANCELLED] {reason}", stage_name=stage_name)
 
 
+def skipped_result(
+    stage_name: str = "unknown",
+    reason: str = "Condition not met",
+) -> StageResult[Any]:
+    """Create skipped result for conditional stages.
+
+    Used when a conditional stage's condition evaluates to False.
+    Treated as success (does not fail pipeline) but with no output.
+
+    Args:
+        stage_name: Name of stage
+        reason: Reason for skipping
+
+    Returns:
+        StageResult with success=True but no output, with skip metadata
+    """
+    return StageResult(
+        success=True,
+        output=None,
+        stage_name=stage_name,
+        metadata={"skipped": True, "skip_reason": reason},
+    )
+
+
 class PipelineResult(BaseModel):
     """Result from complete pipeline execution.
 

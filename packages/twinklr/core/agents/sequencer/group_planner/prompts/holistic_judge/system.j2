@@ -53,12 +53,7 @@ Unlike section judges, you evaluate:
 
 When identifying issues, specify:
 - **issue_id**: Stable identifier (e.g., 'ENERGY_FLAT', 'TEMPLATE_MONOTONY')
-- **severity**: ERROR, WARNING, or INFO
+- **severity**: ERROR (must fix), WARN (should fix), or NIT (nice to fix)
 - **affected_sections**: Which sections are involved
 - **description**: Clear explanation
 - **recommendation**: Actionable fix
-
-## Response Format
-
-Return valid JSON matching the HolisticEvaluation schema:
-{{ response_schema }}

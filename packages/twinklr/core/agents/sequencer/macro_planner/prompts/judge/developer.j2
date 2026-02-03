@@ -1,121 +1,73 @@
-## Technical Constraints
+## Response Schema
 
-- **Schema Version:** macro-plan.v2
-- **Score Range:** 0.0 - 10.0 (float)
-- **Confidence Range:** 0.0 - 1.0 (float)
-- **Max Layers:** 5
-- **Min Layers:** 1
-- **Valid Asset Extensions:** .png, .gif
-- **Max Recommended Assets:** 10
+Return valid JSON matching this schema:
 
-## Validation Rules
+```json
+{{ response_schema }}
+```
 
-**Section Coverage:**
-- All audio profile sections must be present in section_plans
-- No gaps or overlaps in section timing
-- Sections must be sorted by start_ms
+## Technical Contract
 
-**Layer Architecture:**
-- Exactly one BASE layer (must use NORMAL blend mode)
-- All layer indices (0-4) must be unique
-- Valid blend modes: NORMAL, ADD
+**Constraints:**
+- Score: 0.0-10.0 | Confidence: 0.0-1.0
+- Layers: 1-5 (exactly 1 BASE, unique indices)
+- Assets: .png/.gif only, ≤10 recommended
 
-**Target Roles:**
-- All target roles (primary_focus_targets, secondary_targets, layer target_selector.roles) must be valid TargetRole enum names
-- Target roles must exist in the provided display layout
+{% if learning_context %}
+## Historical Learning Context
 
-**Asset Requirements:**
-- Asset file extensions must be .png or .gif
-- Warn if more than 10 assets are requested
+{{ learning_context }}
 
-## Enum Values for Reference
+Be vigilant about these patterns, but evaluate each plan independently.
 
-{% if taxonomy %}
-- **EnergyTarget:** {{ taxonomy.EnergyTarget | join(', ') }}
-- **ChoreographyStyle:** {{ taxonomy.ChoreographyStyle | join(', ') }}
-- **MotionDensity:** {{ taxonomy.MotionDensity | join(', ') }}
-- **TargetRole:** {{ taxonomy.TargetRole | join(', ') }}
-- **LayerRole:** {{ taxonomy.LayerRole | join(', ') }}
-- **BlendMode:** {{ taxonomy.BlendMode | join(', ') }}
-- **TimingDriver:** {{ taxonomy.TimingDriver | join(', ') }}
-{% else %}
-{# Fallback if taxonomy not provided #}
-- **EnergyTarget:** LOW, MED, HIGH, BUILD, RELEASE, PEAK
-- **ChoreographyStyle:** IMAGERY, ABSTRACT, HYBRID
-- **MotionDensity:** SPARSE, MED, BUSY
-- **TargetRole:** OUTLINE, MEGA_TREE, HERO, ARCHES, TREES, PROPS, FLOODS, ACCENTS, MATRIX, MOVING_HEADS
-- **LayerRole:** BASE, RHYTHM, ACCENT, HIGHLIGHT, FILL, TEXTURE, CUSTOM
-- **BlendMode:** NORMAL, ADD, MASK
-- **TimingDriver:** BEATS, DOWNBEATS, BARS, PHRASES, PEAKS, LYRICS
+---
 {% endif %}
+
+## Validation Checklist
+
+- All audio sections present, no gaps/overlaps, sorted by start_ms
+- Exactly 1 BASE layer with NORMAL blend mode
+- All target roles valid and exist in display layout
+- Layer indices 0-4 unique, blend modes NORMAL or ADD
+- Asset extensions valid
+
+## Issue Reporting Format
+
+Each issue must have:
+- **rule**: Generic guideline (<150 chars, "DON'T..." format, no specific names)
+- **message**: Instance-specific detail for logging
+- **issue_id**: Stable identifier (e.g., 'ENERGY_MONOTONE')
+- **category**: One of the valid categories below
+- **severity**: ERROR | WARN | NIT
+- **location**: Section/layer/role details
+- **fix_hint**: Actionable suggestion for THIS instance
+- **acceptance_test**: Deterministic check to verify fix
+
+**Rule Examples:**
+- Good: "DON'T use same energy for all chorus sections"
+- Bad: "chorus_2 at bars 32-48 needs HIGH energy"
+
+**Valid Issue Categories** (use ONLY these):
+{{ taxonomy.IssueCategory | join(', ') }}
+
+**Valid Issue Severities:** {{ taxonomy.IssueSeverity | join(' | ') }}
+**Valid Issue Scopes:** {{ taxonomy.IssueScope | join(' | ') }}
+**Valid Suggested Actions:** {{ taxonomy.SuggestedAction | join(' | ') }}
 
 ## Score Breakdown Dimensions
 
-Use these standardized dimensions for score_breakdown:
-- **story_coherence**: Global story clarity and thematic consistency (0-10)
-- **section_appropriateness**: Section energy/style matching music (0-10)
-- **layer_architecture**: Layer design and target selection quality (0-10)
-- **bold_impact**: Design boldness and wow-factor (0-10)
-- **contrast_dynamics**: Variety and contrast across sections (0-10)
+- story_coherence
+- section_appropriateness  
+- layer_architecture
+- bold_impact
+- contrast_dynamics
 
-## Issue Categories
+## Enum Reference
 
-{% if taxonomy and taxonomy.IssueCategory %}
-**CRITICAL: Use ONLY these exact category strings:**
-{% for category in taxonomy.IssueCategory -%}
-- **{{ category }}**
-{% endfor -%}
-{% else %}
-**CRITICAL: Use ONLY these exact category strings** (from IssueCategory enum):
-- **SCHEMA**: Schema validation or structure issues
-- **TIMING**: Timing, bar range, or alignment issues  
-- **COVERAGE**: Missing sections or gaps in coverage
-- **TEMPLATES**: Template selection or availability issues
-- **LAYERING**: Layer composition or coordination issues
-- **SPATIAL**: Target role selection or coordination issues
-- **VARIETY**: Lack of variety or repetition issues
-- **MUSICALITY**: Music synchronization or energy matching issues
-- **COMPLEXITY**: Over/under-complexity issues
-- **STYLE**: Style consistency or coherence issues
-- **DATA_QUALITY**: Input data quality or completeness issues
-- **LOGIC**: Logical consistency or contradiction issues
-- **CONSTRAINT**: Constraint violation issues
-{% endif %}
-
-**Mapping guidance:**
-- "Unclear notes" → STYLE (not ACTIONABILITY)
-- "Too subtle design" → STYLE or COMPLEXITY (not BOLDNESS)
-- "Energy mismatch" → MUSICALITY
-- "Missing sections" → COVERAGE
-- "Layer problems" → LAYERING
-- "Target issues" → SPATIAL
-
-## Issue Severities
-
-{% if taxonomy and taxonomy.IssueSeverity %}
-Use these exact severity strings:
-{% for severity in taxonomy.IssueSeverity -%}
-- **{{ severity }}**
-{% endfor -%}
-{% else %}
-Use these exact severity strings (from IssueSeverity enum):
-- **ERROR**: Blocking technical issues (invalid structure, coverage gaps)
-- **WARN**: Quality concerns that should be addressed (low contrast, unclear notes)
-- **NIT**: Minor suggestions for improvement (polish, enhancements)
-{% endif %}
-
-## Feedback Guidelines
-
-1. **Be specific about locations**: Use section names, layer indices, target roles
-2. **Reference musical context**: Tie feedback to song characteristics
-3. **Suggest concrete actions**: "Increase chorus_2 energy to HIGH" not "Add more energy"
-4. **Acknowledge Christmas light show context**: Bold, impactful, street-visible design
-5. **Track iteration progress**: Note improvements if this is iteration 2+
-
-## Iteration Context
-
-{% if iteration > 1 %}
-This is **iteration {{ iteration }}**. Check if previous feedback was addressed. Give credit for improvements and focus on remaining issues.
-{% else %}
-This is the **first iteration**. Provide comprehensive feedback to guide refinement.
+{% if taxonomy %}
+**EnergyTarget:** {{ taxonomy.EnergyTarget | join(', ') }}
+**MotionDensity:** {{ taxonomy.MotionDensity | join(', ') }}
+**ChoreographyStyle:** {{ taxonomy.ChoreographyStyle | join(', ') }}
+**TargetRole:** {{ taxonomy.TargetRole | join(', ') }}
+**LayerRole:** {{ taxonomy.LayerRole | join(', ') }}
 {% endif %}

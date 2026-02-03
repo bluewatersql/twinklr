@@ -73,8 +73,18 @@ class FSCache:
         """Compute meta.json path - commit marker (sync)."""
         return self.fs.join(self._entry_dir(key), "meta.json")
 
-    async def exists(self, key: CacheKey) -> bool:
-        """Check if valid cache entry exists (async)."""
+    async def exists(self, key: CacheKey, ttl_seconds: float | None = None) -> bool:
+        """
+        Check if valid cache entry exists and is not expired (async).
+
+        Args:
+            key: Cache key
+            ttl_seconds: Optional TTL in seconds. If provided, entry is expired if
+                        created_at + ttl_seconds < now()
+
+        Returns:
+            True if entry exists, is valid, and not expired
+        """
         artifact_path = self._artifact_path(key)
         meta_path = self._meta_path(key)
 
@@ -84,15 +94,42 @@ class FSCache:
             self.fs.exists(meta_path),
         )
 
-        return artifact_exists and meta_exists
+        if not (artifact_exists and meta_exists):
+            return False
 
-    async def load(self, key: CacheKey, model_cls: type[T]) -> T | None:
+        # If TTL specified, check expiration
+        if ttl_seconds is not None:
+            try:
+                meta_json = await self.fs.read_text(meta_path)
+                meta = CacheMeta.model_validate_json(meta_json)
+
+                # Check if expired
+                now = time.time()
+                if now > (meta.created_at + ttl_seconds):
+                    return False  # Expired
+
+            except (FileNotFoundError, ValidationError, ValueError):
+                return False  # Corrupted meta → treat as miss
+
+        return True
+
+    async def load(
+        self, key: CacheKey, model_cls: type[T], ttl_seconds: float | None = None
+    ) -> T | None:
         """
         Load and validate cached artifact (async).
 
-        Returns None on cache miss, corruption, or validation failure.
+        Args:
+            key: Cache key
+            model_cls: Pydantic model class for validation
+            ttl_seconds: Optional TTL in seconds. If provided, entry is expired if
+                        created_at + ttl_seconds < now()
+
+        Returns:
+            Validated artifact model, or None on miss/corruption/validation failure/expiration
         """
-        if not await self.exists(key):
+        # Check existence and expiration in one call
+        if not await self.exists(key, ttl_seconds):
             return None
 
         try:
@@ -114,6 +151,12 @@ class FSCache:
                 # Meta mismatch → treat as miss
                 return None
 
+            # Double-check expiration (in case exists() check raced with expiration)
+            if ttl_seconds is not None:
+                now = time.time()
+                if now > (meta.created_at + ttl_seconds):
+                    return None  # Expired
+
             # Validate artifact
             artifact = model_cls.model_validate_json(artifact_json)
 
@@ -128,11 +171,18 @@ class FSCache:
         key: CacheKey,
         artifact: BaseModel,
         compute_ms: float | None = None,
+        ttl_seconds: float | None = None,
     ) -> None:
         """
         Store artifact with atomic commit pattern (async).
 
         Writes artifact.json first, then meta.json (commit marker).
+
+        Args:
+            key: Cache key
+            artifact: Pydantic model to cache
+            compute_ms: Optional computation duration
+            ttl_seconds: Optional TTL in seconds (stored in meta for reference)
         """
         entry_dir = self._entry_dir(key)
         await self.fs.mkdirs(entry_dir, exist_ok=True)
@@ -159,6 +209,7 @@ class FSCache:
             artifact_schema_version=artifact_schema_version,
             compute_ms=compute_ms,
             artifact_bytes=artifact_bytes,
+            ttl_seconds=ttl_seconds,
         )
 
         # Write meta last (commit marker, atomic)
@@ -197,22 +248,23 @@ class FSCacheSync:
         # Initialize synchronously
         asyncio.run(self._async_cache.initialize())
 
-    def exists(self, key: CacheKey) -> bool:
-        """Check if entry exists (blocking)."""
-        return asyncio.run(self._async_cache.exists(key))
+    def exists(self, key: CacheKey, ttl_seconds: float | None = None) -> bool:
+        """Check if entry exists and not expired (blocking)."""
+        return asyncio.run(self._async_cache.exists(key, ttl_seconds))
 
-    def load(self, key: CacheKey, model_cls: type[T]) -> T | None:
-        """Load artifact (blocking)."""
-        return asyncio.run(self._async_cache.load(key, model_cls))
+    def load(self, key: CacheKey, model_cls: type[T], ttl_seconds: float | None = None) -> T | None:
+        """Load artifact, None if missing/expired (blocking)."""
+        return asyncio.run(self._async_cache.load(key, model_cls, ttl_seconds))
 
     def store(
         self,
         key: CacheKey,
         artifact: BaseModel,
         compute_ms: float | None = None,
+        ttl_seconds: float | None = None,
     ) -> None:
         """Store artifact (blocking)."""
-        asyncio.run(self._async_cache.store(key, artifact, compute_ms))
+        asyncio.run(self._async_cache.store(key, artifact, compute_ms, ttl_seconds))
 
     def invalidate(self, key: CacheKey) -> None:
         """Invalidate entry (blocking)."""

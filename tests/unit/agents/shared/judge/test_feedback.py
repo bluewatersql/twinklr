@@ -94,6 +94,7 @@ class TestFeedbackManagerJudgeVerdictIntegration:
             issue_id="timing-001",
             category=IssueCategory.TIMING,
             severity=IssueSeverity.WARN,
+            rule="DON'T mismatch section timing with beat grid",
             message="Section timing mismatch",
             estimated_effort=IssueEffort.MEDIUM,
             scope=IssueScope.SECTION,

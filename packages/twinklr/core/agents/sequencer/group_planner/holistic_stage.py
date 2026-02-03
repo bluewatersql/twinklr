@@ -25,16 +25,27 @@ class HolisticEvaluatorStage:
     Input: GroupPlanSet (from aggregator stage)
     Output: HolisticEvaluation
 
-    Note: Retrieves display_graph, template_catalog, and macro_plan from
-    context.state (stored by SectionContextBuilderStage).
-
     Example:
-        >>> stage = HolisticEvaluatorStage()
+        >>> stage = HolisticEvaluatorStage(display_graph, template_catalog)
         >>> result = await stage.execute(group_plan_set, context)
         >>> if result.success:
         ...     evaluation = result.output
         ...     print(f"Score: {evaluation.score}, Approved: {evaluation.is_approved}")
     """
+
+    def __init__(
+        self,
+        display_graph: Any,  # DisplayGraph
+        template_catalog: Any,  # TemplateCatalog
+    ):
+        """Initialize holistic evaluator stage.
+
+        Args:
+            display_graph: Display group configuration
+            template_catalog: Available templates
+        """
+        self.display_graph = display_graph
+        self.template_catalog = template_catalog
 
     @property
     def name(self) -> str:
@@ -66,29 +77,24 @@ class HolisticEvaluatorStage:
         try:
             logger.debug(f"Running holistic evaluation on {len(input.section_plans)} sections")
 
-            # Retrieve required context from state
-            display_graph = context.get_state("display_graph")
-            template_catalog = context.get_state("template_catalog")
+            # Retrieve macro_plan from state (set by MacroPlannerStage)
             macro_plan = context.get_state("macro_plan")
-
-            if display_graph is None:
-                return failure_result(
-                    "Missing 'display_graph' in context.state",
-                    stage_name=self.name,
-                )
-
-            if template_catalog is None:
-                return failure_result(
-                    "Missing 'template_catalog' in context.state",
-                    stage_name=self.name,
-                )
 
             # Build macro_plan_summary for holistic judge
             macro_plan_summary: dict[str, Any] = {}
-            if macro_plan is not None and hasattr(macro_plan, "global_story"):
-                macro_plan_summary["global_story"] = (
-                    macro_plan.global_story.model_dump() if macro_plan.global_story else None
-                )
+            if macro_plan is not None:
+                # Handle both Pydantic model and dict from cache
+                if isinstance(macro_plan, dict):
+                    global_story = macro_plan.get("global_story")
+                else:
+                    global_story = getattr(macro_plan, "global_story", None)
+
+                if global_story:
+                    # Convert to dict if needed
+                    if isinstance(global_story, dict):
+                        macro_plan_summary["global_story"] = global_story
+                    else:
+                        macro_plan_summary["global_story"] = global_story.model_dump()
 
             # Create evaluator
             evaluator = HolisticEvaluator(
@@ -105,16 +111,16 @@ class HolisticEvaluatorStage:
                 context=context,
                 compute=lambda: evaluator.evaluate(
                     group_plan_set=input,
-                    display_graph=display_graph,
-                    template_catalog=template_catalog,
+                    display_graph=self.display_graph,
+                    template_catalog=self.template_catalog,
                     macro_plan_summary=macro_plan_summary,
                 ),
                 result_extractor=lambda r: r,  # Result is already HolisticEvaluation
                 result_type=HolisticEvaluation,
                 cache_key_fn=lambda: evaluator.get_cache_key(
                     group_plan_set=input,
-                    display_graph=display_graph,
-                    template_catalog=template_catalog,
+                    display_graph=self.display_graph,
+                    template_catalog=self.template_catalog,
                     macro_plan_summary=macro_plan_summary,
                 ),
                 cache_version="1",

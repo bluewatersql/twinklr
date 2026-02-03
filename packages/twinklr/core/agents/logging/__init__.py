@@ -30,10 +30,10 @@ Example:
 import os
 from pathlib import Path
 
-from .async_file_logger import AsyncFileLogger
-from .models import AgentCallSummary, CallSummary, LLMCallLog
-from .null_logger import NullLLMCallLogger
-from .protocol import LLMCallLogger
+from twinklr.core.agents.logging.async_file_logger import AsyncFileLogger
+from twinklr.core.agents.logging.models import AgentCallSummary, CallSummary, LLMCallLog
+from twinklr.core.agents.logging.null_logger import NullLLMCallLogger
+from twinklr.core.agents.logging.protocol import LLMCallLogger
 
 
 def create_llm_logger(

@@ -172,7 +172,9 @@ class LyricContextModel(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    run_id: str = Field(description="Unique identifier for this agent run")
+    run_id: str = Field(
+        default="", description="Unique identifier for this agent run (injected post-LLM)"
+    )
 
     # Core Analysis
     has_lyrics: bool = Field(description="Whether lyrics were available for analysis")

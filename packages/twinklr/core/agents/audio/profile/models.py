@@ -344,7 +344,9 @@ class AudioProfileModel(BaseModel):
         default="audio_profile.v2", description="Agent that produced this profile"
     )
 
-    run_id: str = Field(description="Unique identifier for this agent run")
+    run_id: str = Field(
+        default="", description="Unique identifier for this agent run (injected post-LLM)"
+    )
 
     provenance: Provenance | None = Field(
         default=None,

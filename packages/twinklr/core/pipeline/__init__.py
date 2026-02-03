@@ -45,6 +45,7 @@ from twinklr.core.pipeline.result import (
     StageResult,
     cancelled_result,
     failure_result,
+    skipped_result,
     success_result,
 )
 from twinklr.core.pipeline.stage import PipelineStage
@@ -60,5 +61,6 @@ __all__ = [
     "StageResult",
     "cancelled_result",
     "failure_result",
+    "skipped_result",
     "success_result",
 ]

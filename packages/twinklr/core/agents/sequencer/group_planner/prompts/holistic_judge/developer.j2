@@ -1,0 +1,124 @@
+## Technical Contract: Holistic Evaluation Format
+
+### Response Schema
+
+You must return a `HolisticEvaluation` that matches this JSON schema:
+
+```json
+{{ response_schema }}
+```
+
+{% if learning_context %}
+### Historical Learning Context
+
+{{ learning_context }}
+
+This context helps you be more vigilant about recurring patterns, but evaluate each plan set on its own merits.
+
+---
+{% endif %}
+
+### Evaluation Process
+
+#### Phase 1: Technical Validation (Pass/Fail)
+
+Before evaluating holistic quality, verify the plan set is **technically sound**:
+
+**Completeness**:
+- All sections from MacroPlan are present
+- Each section has a valid SectionCoordinationPlan
+- No missing or extra sections
+
+**Cross-Section Coverage**:
+- Sections cover full song timeline
+- No gaps or overlaps between sections
+- Section ordering matches MacroPlan
+
+**Resource Consistency**:
+- All group_ids used across sections exist in display graph
+- All template_ids used across sections exist in template catalog
+- No resource conflicts
+
+**If technically invalid**: Return status `REJECTED` immediately with critical issues.
+
+#### Phase 2: Holistic Quality Evaluation (Score 0-10)
+
+Once technical validation passes, evaluate **cross-section quality** across these dimensions:
+
+1. **Story Coherence** (25%): Does the overall choreography tell a cohesive story? Thematic consistency?
+2. **Energy Arc** (25%): Does energy build appropriately across sections? Effective peaks and valleys?
+3. **Visual Variety** (20%): Sufficient contrast between sections? Avoids repetition?
+4. **Transitions** (15%): Smooth visual transitions between sections? Logical flow?
+5. **Resource Utilization** (15%): Are all display groups used effectively? Balanced across sections?
+
+Return a score 0-10 and populate `score_breakdown` with dimension scores (e.g., `{"story_coherence": 8.5, "energy_arc": 9.0, "visual_variety": 7.5, "transitions": 8.0, "resource_utilization": 8.5}`).
+
+### Decision Criteria
+
+**CRITICAL: Use these exact thresholds to determine status from score:**
+
+- **APPROVE** (`score >= 7.0`): Plan set is technically valid and holistically strong, ready to render
+- **SOFT_FAIL** (`score 5.0-6.9`): Plan set is valid but needs holistic improvements, provide feedback
+- **HARD_FAIL** (`score < 5.0`): Plan set has critical issues, major revision needed
+
+**The `status` field in your response MUST match the score according to these thresholds.**
+
+### Issue Reporting Format
+
+For each identified cross-section issue, provide a structured `CrossSectionIssue`:
+
+**Required fields**:
+- `issue_id`: Stable identifier (e.g., 'ENERGY_ARC_WEAK', 'TRANSITION_ABRUPT') - use snake_case
+- `severity`: {{ taxonomy.IssueSeverity | join(' | ') }}
+- `affected_sections`: List of section_ids affected by this issue (at least 1)
+- `description`: Clear description of the cross-section issue (2-4 sentences)
+- `recommendation`: Concrete, actionable recommendation to fix (2-3 sentences)
+
+### Response Fields
+
+**HolisticEvaluation**:
+- `status`: Required (APPROVE | SOFT_FAIL | HARD_FAIL) - **MUST match score thresholds**
+- `score`: Required (0.0-10.0)
+- `score_breakdown`: Required dict with named dimension scores
+- `confidence`: Required (0.0-1.0), your confidence in this evaluation
+- `summary`: Required string (3-5 sentences), overall holistic assessment
+- `strengths`: Required list of strings, what works well across sections (2+ items)
+- `cross_section_issues`: Required list of CrossSectionIssue objects (0+ items)
+- `recommendations`: Required list of strings, high-level recommendations (0+ items)
+
+### Judgment Philosophy
+
+- **Think holistically**: Look at the big picture, not individual section details
+- **Evaluate flow**: How do sections work together? Transitions smooth?
+- **Check energy arc**: Does energy build and release appropriately across the song?
+- **Assess variety**: Is there sufficient contrast to maintain visual interest?
+- **Consider story**: Does the overall choreography have narrative coherence?
+- **Be constructive**: Provide actionable recommendations for improvement
+- **Be decisive**: Clearly indicate if plan set is ready or needs revision
+
+### Common Errors to Avoid
+
+- ❌ Missing required fields (status, score, confidence, summary)
+- ❌ **Status doesn't match score** (e.g., score 8.5 but status NEEDS_REVISION) - CHECK THRESHOLDS!
+- ❌ Empty `score_breakdown` (provide named dimension scores)
+- ❌ Vague feedback ("needs more variety" - be specific about which sections!)
+- ❌ Focusing on section-level details instead of cross-section patterns
+- ❌ No affected_sections in issues (specify which sections are involved)
+- ❌ Inconsistent issue IDs across evaluations (use stable identifiers)
+- ❌ Overly harsh judgment without constructive recommendations
+- ❌ Approving plan sets with technical errors (always REJECT critical issues)
+
+### Evaluation Scope
+
+Remember: You are evaluating the **entire plan set holistically**, not individual sections. Section-level quality was already assessed by the section judge. Focus on:
+- How sections work together
+- Overall energy arc and story
+- Cross-section patterns and variety
+- Transitions between sections
+- Resource utilization across the show
+
+### Issue Severity Guidelines
+
+- **CRITICAL**: Fundamental issues that break holistic coherence (e.g., missing sections, broken energy arc, no variety)
+- **MAJOR**: Significant issues that hurt overall quality (e.g., weak transitions, imbalanced resource use)
+- **MINOR**: Polish issues that could enhance the show (e.g., minor variety improvements, subtle energy adjustments)

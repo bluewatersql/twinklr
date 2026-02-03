@@ -189,7 +189,7 @@ class Orchestrator:
             # Prepare planner variables
             planner_vars = {
                 "context": shaped_context,
-                "feedback": self.feedback_manager.format_for_prompt(),
+                "feedback": self.feedback_manager.format_feedback_for_prompt(),
             }
 
             # 1. Run planner
@@ -255,7 +255,7 @@ class Orchestrator:
                 "plan": plan.model_dump(),
                 "context": shaped_context,
                 "iteration": iterations,
-                "previous_feedback": self.feedback_manager.format_for_prompt(),
+                "previous_feedback": self.feedback_manager.format_feedback_for_prompt(),
             }
 
             judge_result = self.runner.run(

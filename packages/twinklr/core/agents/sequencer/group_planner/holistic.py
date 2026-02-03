@@ -8,11 +8,11 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-from enum import Enum
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from twinklr.core.agents.issues import IssueSeverity
 from twinklr.core.agents.logging import LLMCallLogger, NullLLMCallLogger
 from twinklr.core.agents.providers.base import LLMProvider
 from twinklr.core.agents.sequencer.group_planner.models import (
@@ -25,14 +25,6 @@ from twinklr.core.agents.taxonomy_utils import get_taxonomy_dict
 from twinklr.core.sequencer.templates.group.catalog import TemplateCatalog
 
 logger = logging.getLogger(__name__)
-
-
-class IssueSeverity(str, Enum):
-    """Severity of cross-section issue."""
-
-    ERROR = "ERROR"
-    WARNING = "WARNING"
-    INFO = "INFO"
 
 
 class CrossSectionIssue(BaseModel):
@@ -65,6 +57,10 @@ class HolisticEvaluation(BaseModel):
 
     status: VerdictStatus = Field(description="APPROVE, SOFT_FAIL, or HARD_FAIL")
     score: float = Field(ge=0.0, le=10.0, description="Overall quality score")
+    score_breakdown: dict[str, float] = Field(
+        default_factory=dict,
+        description="Breakdown of score by dimension (e.g., story_coherence, energy_arc)",
+    )
     confidence: float = Field(ge=0.0, le=1.0, description="Confidence in evaluation")
 
     summary: str = Field(description="Brief summary of evaluation")
@@ -289,9 +285,16 @@ class HolisticEvaluator:
             shape_holistic_judge_context,
         )
 
-        return shape_holistic_judge_context(
+        variables = shape_holistic_judge_context(
             group_plan_set=group_plan_set,
             display_graph=display_graph,
             template_catalog=template_catalog,
             macro_plan_summary=macro_plan_summary,
         )
+
+        # Always set learning_context (empty if no data) to avoid template errors
+        # Note: Holistic judge doesn't use IterationController, so we set it manually
+        if "learning_context" not in variables:
+            variables["learning_context"] = ""
+
+        return variables

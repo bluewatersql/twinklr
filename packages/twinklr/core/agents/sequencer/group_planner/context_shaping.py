@@ -7,14 +7,108 @@ Each agent gets its own shaping function based on what it actually needs
 in its prompt. This allows independent tuning per agent.
 """
 
+import logging
 from typing import Any
 
 from twinklr.core.agents.sequencer.group_planner.context import SectionPlanningContext
 from twinklr.core.agents.sequencer.group_planner.models import (
     DisplayGraph,
     GroupPlanSet,
+    LaneKind,
 )
-from twinklr.core.sequencer.templates.group.catalog import TemplateCatalog
+from twinklr.core.sequencer.templates.group.catalog import TemplateCatalog, TemplateCatalogEntry
+
+logger = logging.getLogger(__name__)
+
+
+# Template name patterns for intent-based filtering
+# Maps energy/density keywords to template name patterns that match well
+ENERGY_TEMPLATE_PATTERNS: dict[str, list[str]] = {
+    "LOW": ["glow", "soft", "warm", "gentle", "shimmer", "breathe", "slow"],
+    "MODERATE": ["pulse", "sweep", "wave", "flow", "ripple"],
+    "HIGH": ["chase", "strobe", "burst", "flash", "rapid"],
+    "PEAK": ["burst", "strobe", "hit", "flash", "slam", "big"],
+    "BUILD": ["pulse", "swell", "grow", "shimmer", "wave"],
+    "SUSTAIN": ["glow", "shimmer", "pulse", "steady"],
+    "RELEASE": ["soft", "fade", "gentle", "warm"],
+}
+
+# Minimum templates per lane (safety threshold)
+MIN_TEMPLATES_PER_LANE = 3
+
+
+def filter_templates_by_intent(
+    catalog: TemplateCatalog,
+    energy_target: str,
+    motion_density: str,
+) -> list[TemplateCatalogEntry]:
+    """Filter templates based on section intent.
+
+    Reduces template count to relevant options, saving tokens and improving
+    planner focus. Falls back to full catalog if filtering is too aggressive.
+
+    Args:
+        catalog: Full template catalog
+        energy_target: Section energy target (LOW, MODERATE, HIGH, PEAK, BUILD, etc.)
+        motion_density: Motion density (SPARSE, MODERATE, BUSY)
+
+    Returns:
+        Filtered list of template entries (empty list if catalog is empty)
+    """
+    if not catalog.entries:
+        logger.debug("Template catalog is empty, returning empty list")
+        return []
+
+    # Get patterns for this energy target
+    patterns = ENERGY_TEMPLATE_PATTERNS.get(energy_target.upper(), [])
+
+    # If no patterns for this energy, use all templates
+    if not patterns:
+        logger.debug(f"No filter patterns for energy '{energy_target}', using full catalog")
+        return list(catalog.entries)
+
+    # Filter templates whose names contain any of the patterns
+    filtered = []
+    for entry in catalog.entries:
+        name_lower = entry.name.lower()
+        template_id_lower = entry.template_id.lower()
+
+        # Check if any pattern matches in name or ID
+        if any(pattern in name_lower or pattern in template_id_lower for pattern in patterns):
+            filtered.append(entry)
+
+    # Safety check: ensure minimum per lane
+    for lane in LaneKind:
+        lane_entries = [e for e in filtered if lane in e.compatible_lanes]
+        if len(lane_entries) < MIN_TEMPLATES_PER_LANE:
+            # Add more templates from full catalog for this lane
+            full_lane_entries = [e for e in catalog.entries if lane in e.compatible_lanes]
+            # Add entries we don't already have
+            existing_ids = {e.template_id for e in filtered}
+            for entry in full_lane_entries:
+                if entry.template_id not in existing_ids:
+                    filtered.append(entry)
+                    existing_ids.add(entry.template_id)
+                    if (
+                        len([e for e in filtered if lane in e.compatible_lanes])
+                        >= MIN_TEMPLATES_PER_LANE
+                    ):
+                        break
+
+    # Final safety: if still empty, return full catalog
+    if not filtered:
+        logger.warning(
+            f"Template filtering for energy={energy_target} resulted in 0 templates, "
+            "falling back to full catalog"
+        )
+        return list(catalog.entries)
+
+    logger.debug(
+        f"Template filtering: {len(catalog.entries)} → {len(filtered)} templates "
+        f"(energy={energy_target}, density={motion_density})"
+    )
+
+    return filtered
 
 
 def shape_planner_context(section_context: SectionPlanningContext) -> dict[str, Any]:
@@ -61,18 +155,39 @@ def shape_planner_context(section_context: SectionPlanningContext) -> dict[str, 
         if role in all_target_roles
     }
 
+    # Log filtering results
+    logger.debug(
+        f"Context shaping for {section_context.section_id}: "
+        f"{len(section_context.display_graph.groups)} → {len(filtered_groups)} groups, "
+        f"{len(section_context.template_catalog.entries)} templates (simplified)"
+    )
+
     # Filter layer_intents to only layers targeting these roles
-    filtered_layer_intents = []
+    # layer_intents can be either dicts or objects with target_selector
+    filtered_layer_intents: list[Any] = []
     if section_context.layer_intents:
         for layer in section_context.layer_intents:
-            # Check if this layer targets any of our target roles
-            if hasattr(layer, "target_selector") and hasattr(layer.target_selector, "roles"):
+            # Handle both dict and object access patterns
+            if isinstance(layer, dict):
+                target_selector = layer.get("target_selector", {})
+                layer_target_roles = target_selector.get("roles", [])
+            elif hasattr(layer, "target_selector") and hasattr(layer.target_selector, "roles"):
                 layer_target_roles = layer.target_selector.roles
-                if any(role in all_target_roles for role in layer_target_roles):
-                    filtered_layer_intents.append(layer)
+            else:
+                continue
 
-    # Simplify template catalog (drop descriptions to save tokens)
-    # Planner needs IDs, names, and lane compatibility - descriptions are nice-to-have
+            if any(role in all_target_roles for role in layer_target_roles):
+                filtered_layer_intents.append(layer)
+
+    # Filter and simplify template catalog
+    # 1. Filter by section intent (energy, density) to reduce options
+    # 2. Simplify entries (drop descriptions to save tokens)
+    filtered_entries = filter_templates_by_intent(
+        section_context.template_catalog,
+        section_context.energy_target,
+        section_context.motion_density,
+    )
+
     simplified_catalog = {
         "schema_version": section_context.template_catalog.schema_version,
         "entries": [
@@ -82,9 +197,15 @@ def shape_planner_context(section_context: SectionPlanningContext) -> dict[str, 
                 "compatible_lanes": entry.compatible_lanes,
                 # Drop: description, presets, category (save ~40% tokens)
             }
-            for entry in section_context.template_catalog.entries
+            for entry in filtered_entries
         ],
     }
+
+    logger.debug(
+        f"Template catalog for {section_context.section_id}: "
+        f"{len(section_context.template_catalog.entries)} → {len(filtered_entries)} "
+        f"(energy={section_context.energy_target})"
+    )
 
     # Create section-scoped display graph
     section_display_graph = {

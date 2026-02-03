@@ -8,6 +8,15 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any
 
+from twinklr.core.agents.sequencer.group_planner.context import (
+    SectionPlanningContext,
+)
+from twinklr.core.agents.sequencer.group_planner.models import GroupPlanSet
+from twinklr.core.agents.sequencer.group_planner.orchestrator import (
+    GroupPlannerOrchestrator,
+)
+from twinklr.core.pipeline.result import failure_result, success_result
+
 if TYPE_CHECKING:
     from twinklr.core.agents.sequencer.group_planner.models import SectionCoordinationPlan
     from twinklr.core.agents.sequencer.macro_planner.models import MacroSectionPlan
@@ -101,80 +110,16 @@ class GroupPlannerStage:
             - Adds "group_planner_iterations_{section_id}" to context.metrics
             - Adds "group_planner_tokens_{section_id}" to context.metrics
         """
-        from twinklr.core.agents.sequencer.group_planner.context import (
-            SectionPlanningContext,
-        )
-        from twinklr.core.agents.sequencer.group_planner.orchestrator import (
-            GroupPlannerOrchestrator,
-        )
-        from twinklr.core.pipeline.result import failure_result
+        from twinklr.core.agents.shared.judge.controller import IterationResult
+        from twinklr.core.pipeline.execution import execute_step
 
         section_id = input.section.section_id
 
         try:
             logger.debug(f"Generating coordination plan for section: {section_id}")
 
-            # Retrieve shared context from pipeline state
-            audio_bundle = context.get_state("audio_bundle")
-            macro_plan = context.get_state("macro_plan")
-
-            if audio_bundle is None:
-                return failure_result(
-                    "Missing 'audio_bundle' in context.state", stage_name=self.name
-                )
-
-            # Build timing_context from audio_bundle (per-section)
-            from twinklr.core.agents.sequencer.group_planner.timing import (
-                BarInfo,
-                TimingContext,
-            )
-
-            timing_info = audio_bundle.timing
-            tempo_bpm = audio_bundle.features.get("tempo_bpm", 120.0)
-            beat_duration_ms = 60000.0 / tempo_bpm
-            bar_duration_ms = beat_duration_ms * 4  # Assuming 4/4 time
-
-            bar_map: dict[int, BarInfo] = {}
-            current_ms = 0.0
-            bar_num = 1
-            while current_ms < timing_info.duration_ms:
-                bar_map[bar_num] = BarInfo(
-                    bar=bar_num,
-                    start_ms=int(current_ms),
-                    duration_ms=int(bar_duration_ms),
-                )
-                current_ms += bar_duration_ms
-                bar_num += 1
-
-            timing_context = TimingContext(
-                song_duration_ms=int(timing_info.duration_ms),
-                beats_per_bar=4,
-                bar_map=bar_map,
-                section_bounds={},
-            )
-
-            # Extract layer intents from macro_plan if available
-            layer_intents: list[dict[str, Any]] = []
-            if macro_plan and hasattr(macro_plan, "layering_plan") and macro_plan.layering_plan:
-                layer_intents = [layer.model_dump() for layer in macro_plan.layering_plan.layers]
-
-            # Build SectionPlanningContext from MacroSectionPlan + constructor args + timing
-            section_context = SectionPlanningContext(
-                section_id=input.section.section_id,
-                section_name=input.section.name,
-                start_ms=input.section.start_ms,
-                end_ms=input.section.end_ms,
-                energy_target=input.energy_target.value,
-                motion_density=input.motion_density.value,
-                choreography_style=input.choreography_style.value,
-                primary_focus_targets=input.primary_focus_targets,
-                secondary_targets=input.secondary_targets,
-                notes=input.notes,
-                display_graph=self.display_graph,
-                template_catalog=self.template_catalog,
-                timing_context=timing_context,
-                layer_intents=layer_intents,
-            )
+            # Build section context (validates state presence)
+            section_context = self._build_section_context(input, context)
 
             # Create orchestrator with pipeline context dependencies
             orchestrator = GroupPlannerOrchestrator(
@@ -183,10 +128,6 @@ class GroupPlannerStage:
                 min_pass_score=self.min_pass_score,
                 llm_logger=context.llm_logger,
             )
-
-            # Use execute_step for caching and metrics
-            from twinklr.core.agents.shared.judge.controller import IterationResult
-            from twinklr.core.pipeline.execution import execute_step
 
             def extract_plan(r: Any) -> SectionCoordinationPlan:
                 """Extract plan from result (guaranteed non-None by execute_step)."""
@@ -211,6 +152,104 @@ class GroupPlannerStage:
         except Exception as e:
             logger.exception(f"Section {section_id} planning failed", exc_info=e)
             return failure_result(str(e), stage_name=self.name)
+
+    def _build_section_context(
+        self, input: MacroSectionPlan, context: PipelineContext
+    ) -> SectionPlanningContext:
+        """Build section planning context from input and pipeline state.
+
+        Args:
+            input: MacroSectionPlan for this section
+            context: Pipeline context with shared state
+
+        Returns:
+            SectionPlanningContext for orchestrator
+
+        Raises:
+            ValueError: If required state is missing
+        """
+        # Retrieve shared context from pipeline state
+        audio_bundle = context.get_state("audio_bundle")
+        macro_plan = context.get_state("macro_plan")
+
+        if audio_bundle is None:
+            raise ValueError("Missing 'audio_bundle' in context.state")
+
+        # Build timing context from audio bundle
+        timing_context = self._build_timing_context(audio_bundle)
+
+        # Extract layer intents from macro plan
+        layer_intents = self._extract_layer_intents(macro_plan)
+
+        # Build SectionPlanningContext from MacroSectionPlan + constructor args
+        return SectionPlanningContext(
+            section_id=input.section.section_id,
+            section_name=input.section.name,
+            start_ms=input.section.start_ms,
+            end_ms=input.section.end_ms,
+            energy_target=input.energy_target.value,
+            motion_density=input.motion_density.value,
+            choreography_style=input.choreography_style.value,
+            primary_focus_targets=input.primary_focus_targets,
+            secondary_targets=input.secondary_targets,
+            notes=input.notes,
+            display_graph=self.display_graph,
+            template_catalog=self.template_catalog,
+            timing_context=timing_context,
+            layer_intents=layer_intents,
+        )
+
+    def _build_timing_context(self, audio_bundle: Any) -> Any:
+        """Build timing context from audio bundle.
+
+        Args:
+            audio_bundle: SongBundle from audio analysis
+
+        Returns:
+            TimingContext with bar map
+        """
+        from twinklr.core.agents.sequencer.group_planner.timing import (
+            BarInfo,
+            TimingContext,
+        )
+
+        timing_info = audio_bundle.timing
+        tempo_bpm = audio_bundle.features.get("tempo_bpm", 120.0)
+        beat_duration_ms = 60000.0 / tempo_bpm
+        bar_duration_ms = beat_duration_ms * 4  # Assuming 4/4 time
+
+        bar_map: dict[int, BarInfo] = {}
+        current_ms = 0.0
+        bar_num = 1
+        while current_ms < timing_info.duration_ms:
+            bar_map[bar_num] = BarInfo(
+                bar=bar_num,
+                start_ms=int(current_ms),
+                duration_ms=int(bar_duration_ms),
+            )
+            current_ms += bar_duration_ms
+            bar_num += 1
+
+        return TimingContext(
+            song_duration_ms=int(timing_info.duration_ms),
+            beats_per_bar=4,
+            bar_map=bar_map,
+            section_bounds={},
+        )
+
+    def _extract_layer_intents(self, macro_plan: Any) -> list[dict[str, Any]]:
+        """Extract layer intents from macro plan.
+
+        Args:
+            macro_plan: MacroPlan with optional layering_plan
+
+        Returns:
+            List of layer intent dicts (empty if no layering plan)
+        """
+        layer_intents: list[dict[str, Any]] = []
+        if macro_plan and hasattr(macro_plan, "layering_plan") and macro_plan.layering_plan:
+            layer_intents = [layer.model_dump() for layer in macro_plan.layering_plan.layers]
+        return layer_intents
 
 
 class GroupPlanAggregatorStage:
@@ -257,9 +296,6 @@ class GroupPlanAggregatorStage:
         Returns:
             StageResult containing GroupPlanSet
         """
-        from twinklr.core.agents.sequencer.group_planner.models import GroupPlanSet
-        from twinklr.core.pipeline.result import failure_result, success_result
-
         try:
             if not input:
                 return failure_result("No section plans to aggregate", stage_name=self.name)

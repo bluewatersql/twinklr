@@ -42,6 +42,9 @@ class CacheMeta(BaseModel):
         default=None, description="Computation duration in milliseconds"
     )
     artifact_bytes: int | None = Field(default=None, description="Artifact JSON size in bytes")
+    ttl_seconds: float | None = Field(
+        default=None, description="TTL in seconds (for expiration checking)"
+    )
 
 
 class CacheOptions(BaseModel):

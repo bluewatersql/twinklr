@@ -1,0 +1,160 @@
+{#
+GroupPlanner Developer Prompt
+Technical constraints and enum guidance
+#}
+## Technical Constraints
+
+**Schema Version:** section-coordination-plan.v1
+**Max Lanes:** 3 (BASE, RHYTHM, ACCENT)
+**Max Coordination Plans per Lane:** 10
+**Max Groups per Coordination Plan:** 20
+
+### Intensity Limits (STRICT - Exceeding will fail validation)
+
+| Lane   | Max Intensity | Typical Range | Purpose |
+|--------|--------------|---------------|---------|
+| BASE   | **1.10**     | 0.60-0.90     | Foundation, never dominate |
+| RHYTHM | **1.20**     | 0.80-1.05     | Motion, support layers |
+| ACCENT | **1.30**     | 0.95-1.20     | Highlights, don't overpower |
+
+**WARNING:** Values exceeding lane max will FAIL validation. Never use intensity >1.30 on ACCENT lane.
+
+## Response Schema
+
+You must return a `SectionCoordinationPlan` that matches this JSON schema:
+
+```json
+{{ response_schema }}
+```
+
+## Enum Values (Use These Exactly)
+
+{% if taxonomy %}
+**LaneKind:** {{ taxonomy.LaneKind | join(', ') }}
+**CoordinationMode:** {{ taxonomy.CoordinationMode | join(', ') }}
+**StepUnit:** {{ taxonomy.StepUnit | join(', ') }}
+**SpillPolicy:** {{ taxonomy.SpillPolicy | join(', ') }}
+{% else %}
+{# Fallback if taxonomy not provided #}
+**LaneKind:** BASE, RHYTHM, ACCENT
+**CoordinationMode:** UNISON, SEQUENCED, WAVE, CALL_RESPONSE, RIPPLE, RANDOM_BURST, CHASE
+**StepUnit:** BEATS, BARS, MS
+**SpillPolicy:** NONE, OVERLAP, BLEND
+{% endif %}
+
+## Critical Rules
+
+1. **Template-Lane Compatibility**:
+   - BASE templates → BASE lane only
+   - RHYTHM templates → RHYTHM lane only
+   - ACCENT templates → ACCENT lane only
+   - Check `compatible_lanes` field in template catalog
+
+2. **No Within-Lane Overlaps**:
+   - Same group cannot appear in multiple coordination_plans in same lane with overlapping timing
+   - Cross-lane overlaps are allowed (different lanes can use same groups simultaneously)
+
+3. **Group Order Validation** (for SEQUENCED/CALL_RESPONSE/RIPPLE modes):
+   - No duplicates in group_order array
+   - All groups in group_order must be in group_ids
+   - Order determines execution sequence
+
+4. **Timing Constraints**:
+   - All placements must be within section bounds (start_ms to end_ms)
+   - Window ranges must be within section bounds
+   - No negative durations
+
+5. **Intensity Constraints** (STRICT):
+   - BASE lane: Max 1.10 (typical 0.6-0.9, foundation only)
+   - RHYTHM lane: Max 1.20 (typical 0.8-1.05, motion support)
+   - ACCENT lane: Max 1.30 (typical 0.95-1.20, highlights)
+   - **Exceeding lane max = VALIDATION FAILURE**
+   - For "peak" moments: Use 1.20-1.28 on ACCENT, never >1.30
+
+## Template Catalog Reference
+
+Available templates are provided in `template_catalog`. Each entry shows:
+- `template_id`: Unique identifier
+- `name`: Descriptive name
+- `compatible_lanes`: Which lanes can use this template
+- `tags`: Template characteristics (e.g., "sweep", "static", "movement")
+
+**Always check compatibility before assigning templates to lanes.**
+
+## Coordination Modes
+
+- **UNISON**: All groups execute simultaneously
+- **SEQUENCED**: Groups execute in specified order (requires group_order)
+- **WAVE**: Groups execute in wave pattern
+- **CALL_RESPONSE**: Call-and-response between group sets (requires group_order)
+- **RIPPLE**: Ripple effect across groups (requires group_order)
+- **RANDOM_BURST**: Random timing per group
+- **CHASE**: Chase pattern across groups
+
+## Layer Balance Guidelines
+
+**The #1 cause of rejected plans: Layer imbalance from incorrect intensities.**
+
+### Intensity Hierarchy (CRITICAL)
+```
+BASE (0.6-0.9) < RHYTHM (0.8-1.05) < ACCENT (0.95-1.20)
+```
+- ACCENT should be ~0.2-0.3 higher than RHYTHM on same group
+- RHYTHM should be ~0.1-0.2 higher than BASE on same group
+- **PRIMARY targets** get ACCENT treatment
+- **SECONDARY targets** get RHYTHM treatment
+- **DECORATIVE targets** get BASE treatment
+
+### Timing Coherence (CRITICAL)
+- All TimeRef values must resolve to valid ms within section bounds
+- When using BAR_BEAT, ensure bar numbers are relative to section start (bar 1 = first bar of section)
+- For windows with step expansion, verify total duration fits in section
+
+### Best Practices
+
+1. **Match MacroPlan Intent**: Use energy_target, motion_density, choreography_style from MacroPlan
+2. **Honor Focus Targets**: Prioritize primary_focus_targets in coordination
+3. **Template Variety**: Vary templates across lanes for visual interest
+4. **Timing Precision**: Align placements with musical beats/downbeats when possible
+5. **Layer Balance**: BASE < RHYTHM < ACCENT intensity. Never let supporting layers overpower focus layers.
+
+## Recurring Soft-Fail Patterns (Address These Proactively)
+
+These issues cause ~80% of first-iteration failures. Avoid them:
+
+### 1. Identical Accents on All Primary Targets (VARIETY)
+**Problem:** All HEROs or all OUTLINEs get identical accent hits at same time
+**Why it fails:** Flattens focal hierarchy, reduces impact, no "main character" moment
+**Fix:** 
+- Make ONE primary target the focal point (higher intensity or different template)
+- OR stagger timing across targets by 1+ beat
+- OR vary templates/intensity across targets
+
+### 2. Layer Imbalance (LAYERING)
+**Problem:** ACCENT dominates while BASE/RHYTHM too weak, OR BASE too strong for energy level
+**Why it fails:** Accents feel disconnected, or scene loses mass
+**Fix by energy level:**
+- **LOW energy:** BASE 0.6-0.75, RHYTHM 0.7-0.85, ACCENT ≤1.15
+- **MED energy:** BASE 0.7-0.85, RHYTHM 0.8-1.0, ACCENT ≤1.20
+- **HIGH/PEAK energy:** BASE 0.75-0.90, RHYTHM 0.9-1.10, ACCENT 1.10-1.25
+- **NEVER** drop BASE below 0.5 unless intentional blackout
+
+### 3. Timing Driver Mismatch (TIMING)
+**Problem:** Lane uses `timing_driver: LYRICS` but placements use BEAT/BAR snap_rules
+**Why it fails:** Causes alignment ambiguity and scheduling confusion
+**Fix:** Match timing_driver to placement snap_rules:
+- If placements use BEAT/BAR snap → use `timing_driver: BEATS` or `BARS`
+- If placements sync to lyrics → use `timing_driver: LYRICS` with LYRICS snap
+
+## Common Errors to Avoid (WILL FAIL VALIDATION)
+
+- ❌ **ACCENT intensity >1.30** - Overpowers other layers, causes clipping
+- ❌ RHYTHM intensity >1.20 - Competes with accents
+- ❌ BASE intensity >1.10 - Foundation should never dominate
+- ❌ Using templates in incompatible lanes
+- ❌ Creating within-lane overlaps for same group
+- ❌ Duplicate groups in group_order arrays
+- ❌ Timing outside section bounds
+- ❌ Missing required fields (template_id, group_ids, coordination_mode)
+- ❌ **Identical accent on all primary targets** - Stagger or differentiate
+- ❌ **timing_driver mismatch** - Must match placement snap_rules

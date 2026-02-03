@@ -187,25 +187,25 @@
       "recommended_asset_usage": "HEAVY",
       "recommended_color_story": ["vibrant", "energetic", "pulsing", "electric"],
       "cautions": [
-        "Maintain high energy throughout - avoid drops in chorus sections",
-        "Sync movement tightly to 128 BPM beat",
-        "Use strobing/fast effects sparingly to avoid fatigue"
+        "Intro is only 8s with rapid 0.30→0.70 ramp - instant-on at beat 1, not fade-in",
+        "Three choruses with near-identical energy profiles (0.90-0.95) - must vary choreography to prevent repetition fatigue",
+        "128 BPM is fast enough that slow pan movements (>2s) will feel sluggish - keep fixture motion snappy"
       ]
     },
     "planner_hints": {
       "section_objectives": {
-        "intro": "Build anticipation with gradual intensity increase, establish rhythm",
-        "verse_1": "Support vocals with complementary movement, maintain energy buildup",
-        "chorus_1": "Maximum intensity with dynamic sweeps, fast color cycling, wide coverage",
-        "verse_2": "Slight pullback in intensity while maintaining energy, vary patterns from verse 1",
-        "chorus_2": "Peak energy with full fixture engagement, complex multi-layer patterns",
-        "bridge": "Create contrast with different movement patterns, maintain interest",
-        "chorus_3": "Final climax with all available effects, maximum impact"
+        "intro": "Energy ramps 0.30→0.70 across 8s (doubling) - use continuous intensity sweep, not stepped; peak at 7s just before verse hit",
+        "verse_1": "30s sustained build (0.65→0.80), unusually long verse for dance track - avoid repetition by varying chase patterns at 15s (0.68) and 23s (0.72) transition points",
+        "chorus_1": "Peak at 53s (0.95 energy, mean 0.92) - this is highest sustained energy in song; design for 30s of intense output with brief 0.90 entry/exit ramps",
+        "verse_2": "Identical energy profile to verse_1 - must differentiate choreography; consider routing swap or movement direction reversal",
+        "chorus_2": "Matches chorus_1 profile but leads to bridge - end at 128s should anticipate contrast, not sustain",
+        "bridge": "Only 20s section with different energy character (data shows sustained mid-high); use this for pattern reset before final chorus",
+        "chorus_3": "32s finale (longest chorus) with peak at 158-168s (0.96, highest in song); design for extended climax with definitive ending"
       },
       "avoid_patterns": [
-        "Static positioning during high-energy chorus",
-        "Repetitive patterns between chorus sections",
-        "Slow movements that don't match 128 BPM energy"
+        "Copy-paste choreography between verse_1 and verse_2 (identical energy profiles require varied routing)",
+        "4-beat or 8-beat patterns that ignore the 128 BPM 4/4 time - use 32-beat phrase structures",
+        "Fading out in chorus_3 - peak is at 158s, maintain intensity through 168s then hard stop"
       ],
       "emphasize_groups": []
     }

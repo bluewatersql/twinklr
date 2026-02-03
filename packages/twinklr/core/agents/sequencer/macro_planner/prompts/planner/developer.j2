@@ -1,7 +1,15 @@
 {#
 MacroPlanner Developer Prompt
-Technical constraints and enum guidance
+Technical constraints and response schema
 #}
+## Response Schema
+
+Return valid JSON matching this schema:
+
+```json
+{{ response_schema }}
+```
+
 ## Technical Constraints
 
 **Schema Version:** macro-plan.v2  
@@ -31,17 +39,28 @@ Technical constraints and enum guidance
 **MotionDensity:** SPARSE, MED, BUSY
 {% endif %}
 
-## Critical Rules
+## Critical Rules (Violations Cause Validation Failures)
 
 1. **Exactly one BASE layer** with NORMAL blend mode
 2. **All other layers** use ADD blend mode
-3. **Section coverage** must be complete (no gaps, no overlaps)
+3. **Section coverage** must match audio profile exactly:
+   - Every audio section must have a MacroSectionPlan
+   - No extra sections beyond what's in audio
+   - No gaps or overlaps
 4. **Target roles** must be from available display groups
 
 **Note on MASK blend mode:** While MASK exists in the schema, it is reserved for advanced use cases and should NOT be used in standard macro plans. Stick to NORMAL (for BASE layer only) and ADD (for all other layers).
 
+## Quality Rules (Violations Trigger Warnings)
+
+1. **Layer variety**: Use 2-4 layers for visual depth (1 layer = minimal, 5 = complex)
+2. **Target variety**: Don't focus on the same target in >70% of sections
+3. **Energy variety**: Vary energy targets across sections (not all the same)
+4. **Motion density variety**: Mix SPARSE/MED/BUSY across sections (especially with 4+ sections)
+5. **Choreography style**: Consider mixing IMAGERY/ABSTRACT/HYBRID for variety
+
 ## Asset Requirements
 
-- File types: .png or .gif only
-- Keep count reasonable (<10 recommended)
+- File types: .png or .gif only (other extensions fail validation)
+- Keep count ≤10 (more triggers bloat warning)
 - Descriptive names (e.g., "snowflake_burst.png", "star_twinkle.gif")

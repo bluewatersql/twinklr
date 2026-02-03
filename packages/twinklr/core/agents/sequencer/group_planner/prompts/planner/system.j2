@@ -26,13 +26,15 @@ You create **SECTION-LEVEL COORDINATION** for one section at a time:
 
 ## Coordination Modes
 
-- **UNIFIED**: All groups do the same thing at the same time (parade sync)
-- **COMPLEMENTARY**: Groups do different but harmonious things (conversation)
-- **SEQUENCED**: Groups activate in order with delay (wave/cascade)
-- **CALL_RESPONSE**: Groups alternate (dialogue pattern)
-- **RIPPLE**: Groups propagate with overlap (ripple effect)
+- **UNISON**: All groups execute the same template simultaneously (parade sync)
+- **SEQUENCED**: Groups activate in order with delay (cascade effect, requires group_order)
+- **WAVE**: Groups execute in wave pattern across space
+- **CALL_RESPONSE**: Groups alternate between sets (dialogue pattern, requires group_order)
+- **RIPPLE**: Effect propagates across groups with overlap (requires group_order)
+- **RANDOM_BURST**: Random timing per group for organic feel
+- **CHASE**: Sequential chase pattern across groups
 
-For SEQUENCED/CALL_RESPONSE/RIPPLE, you specify a window + config (order, step unit, step duration).
+For SEQUENCED/CALL_RESPONSE/RIPPLE, you must specify a window + config (group_order, step unit, step duration).
 The Assembler will expand this to per-group placements.
 
 ## Lane Architecture
@@ -49,50 +51,4 @@ The Assembler will expand this to per-group placements.
 4. **Timing Precision**: Use bar/beat timing, snap to musical boundaries
 5. **Role Coverage**: Primary targets get accent, secondary get rhythm/base
 
-## Critical Constraints (MUST FOLLOW)
-
-### Lane Overlap Rules
-**CRITICAL:** Within a single lane, the SAME group CANNOT appear in multiple coordination_plans with overlapping timing.
-
-**Valid:**
-- ARCHES_1 in RHYTHM lane bars 1-3, then ARCHES_1 in RHYTHM lane bars 3-5 (sequential, no overlap)
-- ARCHES_1 in RHYTHM lane, ARCHES_1 in ACCENT lane (different lanes, OK)
-
-**INVALID:**
-- ARCHES_1 in RHYTHM coordination_plan A (bars 1-5) AND ARCHES_1 in RHYTHM coordination_plan B (bars 1-5) ❌
-- HERO_1 in ACCENT window (bars 1-4) AND HERO_1 in ACCENT placement (bars 2-3) ❌
-
-**Rule:** Each group can only be controlled by ONE coordination_plan per lane at any given time.
-
-### Intensity Range
-**Valid intensity values:** 0.0 to 1.5
-- BASE lane: typically 0.6-0.9
-- RHYTHM lane: typically 0.8-1.1
-- ACCENT lane: typically 0.9-1.3
-
-**Values above 1.5 will be clamped.** Values above 1.0 create "hot" overdrive effects.
-
-### Template Lane Compatibility
-**Templates MUST match their lane:**
-- BASE templates (`gtpl_base_*`) → BASE lane ONLY
-- RHYTHM templates (`gtpl_rhythm_*`) → RHYTHM lane ONLY  
-- ACCENT templates (`gtpl_accent_*`) → ACCENT lane ONLY
-
-**INVALID:** Using `gtpl_rhythm_strobe_soft` in ACCENT lane ❌
-**INVALID:** Using `gtpl_base_glow_warm` in RHYTHM lane ❌
-
-### Group Order in Sequenced Modes
-**For SEQUENCED/CALL_RESPONSE/RIPPLE modes:**
-- `group_order` array must NOT contain duplicates (unless intentionally documented)
-- All `group_ids` in coordination_plan must appear in `group_order`
-
-**INVALID:** `group_order: ["HERO_1", "HERO_2", "HERO_3", "HERO_2"]` ❌ (duplicate)
-**VALID:** `group_order: ["HERO_1", "HERO_2", "HERO_3"]` ✓
-
-## Response Format
-
-Return valid JSON matching this schema:
-
-{{ response_schema }}
-
-**Critical:** Use exact template_ids from the catalog. Use exact group_ids from the display graph.
+**Critical:** Use exact template_ids from the catalog. Use exact group_ids from the display graph. Follow technical constraints in developer prompt.

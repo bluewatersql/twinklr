@@ -213,7 +213,11 @@ class GroupPlannerOrchestrator:
             shape_planner_context,
         )
 
-        return shape_planner_context(section_context)
+        # Get shaped context (filtered/simplified for tokens)
+        # Note: Taxonomy enums are injected automatically by async_runner via taxonomy_utils
+        variables = shape_planner_context(section_context)
+
+        return variables
 
     def _build_validator(
         self,

@@ -1,0 +1,129 @@
+## Technical Contract: Section Judge Evaluation Format
+
+### Response Schema
+
+You must return a `JudgeVerdict` that matches this JSON schema:
+
+```json
+{{ response_schema }}
+```
+
+{% if learning_context %}
+### Historical Learning Context
+
+{{ learning_context }}
+
+Use this context to be more vigilant about recurring patterns, but evaluate each plan on its own merits.
+
+---
+{% endif %}
+
+### Evaluation Process
+
+#### Phase 1: Technical Validation (Pass/Fail)
+
+Before evaluating coordination quality, verify the plan is **technically sound**:
+
+**Template Compatibility**:
+- All template_ids exist in template catalog
+- Templates are assigned to compatible lanes (check `compatible_lanes` field)
+- BASE templates in BASE lane, RHYTHM templates in RHYTHM lane, ACCENT templates in ACCENT lane
+
+**Group Validity**:
+- All group_ids exist in display graph
+- No within-lane overlaps (same group in multiple coordination_plans in same lane with overlapping timing)
+- Cross-lane overlaps are allowed
+
+**Timing Validity**:
+- All placements within section bounds (start_ms to end_ms)
+- All windows within section bounds
+- No negative durations
+- Timing references are valid
+
+**Coordination Mode Validity**:
+- For SEQUENCED/CALL_RESPONSE/RIPPLE: group_order array is present and valid
+- No duplicate groups in group_order
+- All groups in group_order are in group_ids
+
+**Intensity Validity**:
+- All intensity values between 0.0-1.5
+- Reasonable ranges for lane type (BASE: 0.6-0.9, RHYTHM: 0.8-1.1, ACCENT: 0.9-1.3)
+
+**If technically invalid**: Return `HARD_FAIL` immediately with detailed issues (category: SCHEMA, TIMING, TEMPLATES, SPATIAL).
+
+#### Phase 2: Coordination Quality Evaluation (Score 0-10)
+
+Once technical validation passes, evaluate **coordination quality** across these dimensions:
+
+1. **Template Appropriateness** (30%): Are templates well-suited for section energy and style? Do they match MacroPlan intent?
+2. **Coordination Coherence** (25%): Do coordination modes work well together? Clear visual patterns?
+3. **Group Coverage** (20%): Are target groups utilized effectively? Balanced coverage of primary_focus_targets?
+4. **Timing Precision** (15%): Does timing align with musical structure? Beat/bar alignment?
+5. **Layer Balance** (10%): Do BASE/RHYTHM/ACCENT layers work together harmoniously?
+
+Return a score 0-10 and populate `score_breakdown` with dimension scores (e.g., `{"template_appropriateness": 8.5, "coordination_coherence": 7.5, "group_coverage": 8.0, "timing_precision": 7.0, "layer_balance": 8.5}`).
+
+### Decision Criteria
+
+**CRITICAL: Use these exact thresholds to determine status from score:**
+
+- **APPROVE** (`score >= 7.0`): Plan is technically valid and coordination quality is strong, ready for holistic evaluation
+- **SOFT_FAIL** (`score 5.0-6.9`): Plan is valid but needs coordination improvements, provide constructive feedback
+- **HARD_FAIL** (`score < 5.0`): Plan has technical errors OR poor coordination quality, major revision needed
+
+**The `status` field in your response MUST match the score according to these thresholds.**
+
+### Issue Reporting Format
+
+For each identified issue, provide a structured `JudgeIssue`:
+
+**Required fields (STRICT - use ONLY these exact values)**:
+- `issue_id`: Stable identifier (e.g., 'TEMPLATE_INCOMPATIBLE_LANE', 'TIMING_OVERLAP_BASE') - use snake_case
+- `category`: **EXACTLY ONE OF:** {{ taxonomy.IssueCategory | join(' | ') }} (NO other values - use LAYERING for coordination issues)
+- `severity`: **EXACTLY ONE OF:** {{ taxonomy.IssueSeverity | join(' | ') }}
+- `estimated_effort`: **EXACTLY ONE OF:** {{ taxonomy.IssueEffort | join(' | ') }}
+- `scope`: **EXACTLY ONE OF:** {{ taxonomy.IssueScope | join(' | ') }}
+- `location`: Object with optional fields:
+  - `lane`: Lane identifier (BASE, RHYTHM, ACCENT)
+  - `coordination_plan_index`: Index in lane's coordination_plans array
+  - `group_id`: Group identifier (if applicable)
+  - `placement_index`: Index in placements array (if applicable)
+- `message`: Human-readable issue description (1-3 sentences)
+- `fix_hint`: One sentence, actionable suggestion (e.g., "Move template to RHYTHM lane", "Remove duplicate group from group_order")
+- `acceptance_test`: Deterministic check the next plan must satisfy to resolve this issue (e.g., "All templates in compatible lanes", "No within-lane overlaps for group 'mega_tree'")
+- `suggested_action`: PATCH (minor adjustment) | REPLAN_LANE (replan specific lane) | REPLAN_SECTION (replan entire section) | IGNORE (can be safely ignored)
+
+### Response Fields
+
+**JudgeVerdict**:
+- `status`: Required (APPROVE | SOFT_FAIL | HARD_FAIL) - **MUST match score thresholds**
+- `score`: Required (0.0-10.0)
+- `score_breakdown`: Required dict with named dimension scores
+- `confidence`: Required (0.0-1.0), your confidence in this evaluation
+- `feedback_for_planner`: Required string (2-4 sentences), concise summary feedback for next iteration
+- `overall_assessment`: Required string (2-4 sentences), overall assessment summary
+- `strengths`: Required list of strings, what the plan does well (0+ items)
+- `issues`: Required list of JudgeIssue objects, detailed issues to address (0+ items)
+
+### Judgment Philosophy
+
+- **Be constructive**: Focus on specific, actionable improvements
+- **Be realistic**: Consider technical constraints and template limitations
+- **Be musical**: Prioritize serving the music over technical perfection
+- **Be decisive**: Clearly indicate if plan needs revision or can proceed
+- **Be specific**: When reporting issues, provide exact locations (lane, coordination_plan_index)
+- **Be consistent**: Use stable issue IDs so the planner can track issue resolution across iterations
+- **Honor MacroPlan**: Coordination should match energy_target, motion_density, and focus_targets from MacroPlan
+
+### Common Errors to Avoid
+
+- ❌ Missing required fields (status, score, confidence, feedback, assessment)
+- ❌ **Status doesn't match score** (e.g., score 8.2 but status SOFT_FAIL) - CHECK THRESHOLDS!
+- ❌ Empty `score_breakdown` (provide named dimension scores)
+- ❌ Vague feedback ("needs improvement" - be specific!)
+- ❌ No acceptance tests in issues (make them deterministic and checkable)
+- ❌ Inconsistent issue IDs across iterations (use stable identifiers)
+- ❌ Overly harsh judgment without constructive feedback
+- ❌ Approving plans with technical errors (always HARD_FAIL technical issues)
+- ❌ Location fields that don't match the plan structure
+- ❌ **INVENTING enum values** - use ONLY the values listed above for category, severity, scope, etc.

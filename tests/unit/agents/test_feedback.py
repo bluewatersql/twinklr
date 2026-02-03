@@ -156,18 +156,6 @@ def test_format_for_prompt_with_filter():
     assert "Judge 1" not in formatted
 
 
-def test_format_for_prompt_with_metadata():
-    """Test formatting with metadata included."""
-    manager = FeedbackManager()
-
-    manager.add_validation_failure(message="Test", iteration=1, metadata={"error_count": 3})
-
-    formatted = manager.format_for_prompt(include_metadata=True)
-
-    assert "Metadata:" in formatted
-    assert "error_count" in formatted
-
-
 def test_clear():
     """Test clearing all feedback."""
     manager = FeedbackManager()

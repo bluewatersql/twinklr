@@ -24,28 +24,34 @@ class Cache(Protocol):
     Async methods are primary; sync wrappers available via CacheSync.
     """
 
-    async def exists(self, key: CacheKey) -> bool:
+    async def exists(self, key: CacheKey, ttl_seconds: float | None = None) -> bool:
         """
         Check if valid cache entry exists for key (async).
 
         Args:
             key: Cache key
+            ttl_seconds: Optional TTL in seconds. If provided, entry is considered
+                        expired if created_at + ttl_seconds < now()
 
         Returns:
-            True if both artifact and meta exist and are valid
+            True if both artifact and meta exist, are valid, and not expired
         """
         ...
 
-    async def load(self, key: CacheKey, model_cls: type[T]) -> T | None:
+    async def load(
+        self, key: CacheKey, model_cls: type[T], ttl_seconds: float | None = None
+    ) -> T | None:
         """
         Load and validate cached artifact (async).
 
         Args:
             key: Cache key
             model_cls: Pydantic model class for validation
+            ttl_seconds: Optional TTL in seconds. If provided, entry is considered
+                        expired if created_at + ttl_seconds < now()
 
         Returns:
-            Validated artifact model, or None on miss/error
+            Validated artifact model, or None on miss/error/expiration
         """
         ...
 
@@ -54,6 +60,7 @@ class Cache(Protocol):
         key: CacheKey,
         artifact: BaseModel,
         compute_ms: float | None = None,
+        ttl_seconds: float | None = None,
     ) -> None:
         """
         Store artifact with atomic commit (async).
@@ -64,6 +71,8 @@ class Cache(Protocol):
             key: Cache key
             artifact: Pydantic model to cache
             compute_ms: Optional computation duration
+            ttl_seconds: Optional TTL in seconds (stored in meta for reference,
+                        enforced during load/exists)
 
         Raises:
             IOError: On write failure
@@ -88,12 +97,12 @@ class CacheSync(Protocol):
     simple scripts, tests, and non-async contexts.
     """
 
-    def exists(self, key: CacheKey) -> bool:
-        """Check if entry exists (blocking)."""
+    def exists(self, key: CacheKey, ttl_seconds: float | None = None) -> bool:
+        """Check if entry exists and not expired (blocking)."""
         ...
 
-    def load(self, key: CacheKey, model_cls: type[T]) -> T | None:
-        """Load artifact (blocking)."""
+    def load(self, key: CacheKey, model_cls: type[T], ttl_seconds: float | None = None) -> T | None:
+        """Load artifact, None if missing/expired (blocking)."""
         ...
 
     def store(
@@ -101,6 +110,7 @@ class CacheSync(Protocol):
         key: CacheKey,
         artifact: BaseModel,
         compute_ms: float | None = None,
+        ttl_seconds: float | None = None,
     ) -> None:
         """Store artifact (blocking)."""
         ...

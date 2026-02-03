@@ -164,8 +164,130 @@ class SectionPlanValidator:
             # Check for cross-coordination-plan overlaps within same lane
             errors.extend(self._check_cross_coordination_overlaps(group_timings, lane_plan.lane))
 
+        # Add warning checks for common soft-fail patterns
+        warnings.extend(self._check_identical_accent_on_primaries(plan))
+        warnings.extend(self._check_timing_driver_mismatch(plan))
+
         is_valid = len(errors) == 0
         return ValidationResult(is_valid=is_valid, errors=errors, warnings=warnings)
+
+    def _check_identical_accent_on_primaries(
+        self, plan: SectionCoordinationPlan
+    ) -> list[ValidationIssue]:
+        """Check for identical accents on all primary targets simultaneously.
+
+        This is a common soft-fail pattern that flattens focal hierarchy.
+
+        Args:
+            plan: Plan to validate
+
+        Returns:
+            List of warning issues
+        """
+        warnings: list[ValidationIssue] = []
+
+        # Find ACCENT lane
+        accent_lane = None
+        for lane_plan in plan.lane_plans:
+            if lane_plan.lane == LaneKind.ACCENT:
+                accent_lane = lane_plan
+                break
+
+        if not accent_lane:
+            return warnings
+
+        # Check each coordination plan in ACCENT lane
+        for coord_plan in accent_lane.coordination_plans:
+            # Only check UNIFIED coordination modes
+            if coord_plan.coordination_mode not in (CoordinationMode.UNIFIED,):
+                continue
+
+            # Group placements by (template_id, intensity, approximate_start)
+            # If multiple groups have identical placements, warn
+            placements = coord_plan.placements
+            if len(placements) < 3:
+                continue
+
+            # Check if placements use the same template and intensity
+            template_intensity_counts: dict[tuple[str, float], list[str]] = defaultdict(list)
+            for p in placements:
+                key = (p.template_id, round(p.intensity, 2))
+                template_intensity_counts[key].append(p.group_id)
+
+            for (template_id, intensity), groups in template_intensity_counts.items():
+                if len(groups) >= 3:
+                    # Check if these are primary targets (HERO, MEGA_TREE)
+                    primary_groups = [
+                        g for g in groups if g.startswith("HERO") or g.startswith("MEGA_TREE")
+                    ]
+                    if len(primary_groups) >= 3:
+                        warnings.append(
+                            ValidationIssue(
+                                severity=ValidationSeverity.WARNING,
+                                code="IDENTICAL_ACCENT_ON_PRIMARIES",
+                                message=(
+                                    f"All {len(primary_groups)} primary targets ({', '.join(primary_groups[:3])}) "
+                                    f"receive identical accent ({template_id}, intensity={intensity:.2f}). "
+                                    f"This flattens focal hierarchy."
+                                ),
+                                field_path="lane_plans[ACCENT]",
+                                fix_hint=(
+                                    "Make ONE target the focal point with higher intensity, "
+                                    "OR stagger timing by 1+ beat, OR vary templates"
+                                ),
+                            )
+                        )
+
+        return warnings
+
+    def _check_timing_driver_mismatch(self, plan: SectionCoordinationPlan) -> list[ValidationIssue]:
+        """Check for timing_driver/snap_rule mismatches.
+
+        Common pattern: timing_driver=LYRICS but placements use BEAT snap.
+
+        Args:
+            plan: Plan to validate
+
+        Returns:
+            List of warning issues
+        """
+        warnings: list[ValidationIssue] = []
+
+        for lane_plan in plan.lane_plans:
+            timing_driver = lane_plan.timing_driver
+            if not timing_driver:
+                continue
+
+            # Check if timing_driver is LYRICS but placements use BEAT/BAR
+            if timing_driver.upper() == "LYRICS":
+                beat_snap_count = 0
+                total_placements = 0
+
+                for coord_plan in lane_plan.coordination_plans:
+                    for p in coord_plan.placements:
+                        total_placements += 1
+                        # Check if start/end use bar/beat (not lyrics)
+                        if p.start and p.start.bar is not None:
+                            beat_snap_count += 1
+
+                if total_placements > 0 and beat_snap_count > total_placements * 0.5:
+                    warnings.append(
+                        ValidationIssue(
+                            severity=ValidationSeverity.WARNING,
+                            code="TIMING_DRIVER_MISMATCH",
+                            message=(
+                                f"{lane_plan.lane.value} lane uses timing_driver='LYRICS' "
+                                f"but {beat_snap_count}/{total_placements} placements use bar/beat timing. "
+                                f"This can cause alignment issues."
+                            ),
+                            field_path=f"lane_plans[{lane_plan.lane.value}].timing_driver",
+                            fix_hint=(
+                                "Set timing_driver to 'BEATS' or 'BARS' to match placement anchors"
+                            ),
+                        )
+                    )
+
+        return warnings
 
     def _validate_group_order(
         self, group_order: list[str], lane_name: str
@@ -301,7 +423,7 @@ class SectionPlanValidator:
                         )
                     )
 
-            # Check intensity range
+            # Check intensity range (absolute)
             if placement.intensity < 0.0 or placement.intensity > 1.5:
                 errors.append(
                     ValidationIssue(
@@ -310,6 +432,29 @@ class SectionPlanValidator:
                         message=f"Intensity {placement.intensity} out of valid range [0.0, 1.5]",
                         field_path=f"placement[{placement.placement_id}].intensity",
                         fix_hint="Set intensity between 0.0 and 1.5",
+                    )
+                )
+
+            # Check lane-specific intensity limits (prevents layer imbalance)
+            # ACCENT lane: max 1.30 (exceeding this overpowers other layers)
+            # BASE/RHYTHM: max 1.0 recommended, 1.2 hard limit
+            lane_intensity_limits = {
+                LaneKind.ACCENT: 1.30,
+                LaneKind.RHYTHM: 1.20,
+                LaneKind.BASE: 1.10,
+            }
+            lane_max = lane_intensity_limits.get(lane, 1.5)
+            if placement.intensity > lane_max:
+                errors.append(
+                    ValidationIssue(
+                        severity=ValidationSeverity.ERROR,
+                        code="LANE_INTENSITY_EXCEEDED",
+                        message=(
+                            f"Intensity {placement.intensity:.2f} exceeds {lane.value} lane "
+                            f"maximum of {lane_max:.2f}. High intensity will overpower other layers."
+                        ),
+                        field_path=f"placement[{placement.placement_id}].intensity",
+                        fix_hint=f"Reduce intensity to ≤{lane_max:.2f} for {lane.value} lane",
                     )
                 )
 

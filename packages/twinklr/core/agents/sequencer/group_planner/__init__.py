@@ -13,7 +13,6 @@ from twinklr.core.agents.sequencer.group_planner.holistic import (
     CrossSectionIssue,
     HolisticEvaluation,
     HolisticEvaluator,
-    IssueSeverity,
     get_holistic_judge_spec,
 )
 from twinklr.core.agents.sequencer.group_planner.holistic_stage import (
@@ -131,6 +130,5 @@ __all__ = [
     "HolisticEvaluation",
     "HolisticEvaluator",
     "HOLISTIC_JUDGE_SPEC",
-    "IssueSeverity",
     "get_holistic_judge_spec",
 ]

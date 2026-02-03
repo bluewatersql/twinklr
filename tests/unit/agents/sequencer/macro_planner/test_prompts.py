@@ -67,11 +67,12 @@ def test_system_prompt_renders(jinja_env: Environment):
     """System prompt renders without errors."""
     template = jinja_env.get_template("planner/system.j2")
 
-    output = template.render(response_schema="{test_schema}")
+    output = template.render()
 
     assert output
     assert len(output) > 100
-    assert "{test_schema}" in output
+    # Schema should NOT be in system prompt (it's in developer.j2)
+    # Just verify the prompt renders and has substantial content
 
 
 def test_system_prompt_christmas_identity(jinja_env: Environment):

@@ -7,12 +7,14 @@ refinement loops across all agents.
 from __future__ import annotations
 
 import logging
+import uuid
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any, Generic, TypeVar, cast
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from twinklr.core.agents.analytics.repository import IssueRepository
 from twinklr.core.agents.async_runner import AsyncAgentRunner
 from twinklr.core.agents.logging import LLMCallLogger
 from twinklr.core.agents.providers.base import LLMProvider
@@ -44,6 +46,10 @@ class IterationConfig(BaseModel):
         include_feedback_in_prompt: Include feedback in planner prompt
         approval_score_threshold: Min score for APPROVE (0-10)
         soft_fail_score_threshold: Min score for SOFT_FAIL (0-10)
+        enable_issue_tracking: Enable persistent issue tracking for learning
+        issue_tracking_storage_dir: Directory for issue storage (if enabled)
+        include_historical_learning: Include historical learning context in developer prompts
+        top_n_historical_issues: Number of top historical issues to include
     """
 
     max_iterations: int = Field(ge=1, le=10, default=3, description="Maximum iterations")
@@ -63,6 +69,26 @@ class IterationConfig(BaseModel):
     )
     soft_fail_score_threshold: float = Field(
         ge=0.0, le=10.0, default=5.0, description="Min score for SOFT_FAIL"
+    )
+
+    # Issue tracking and learning (transparent by default, opt-out to disable)
+    enable_issue_tracking: bool = Field(
+        default=True,
+        description="Enable persistent issue tracking for cross-job learning",
+    )
+    issue_tracking_storage_dir: Path | str = Field(
+        default=Path("data/agent_analytics"),
+        description="Directory for issue storage (if tracking enabled)",
+    )
+    include_historical_learning: bool = Field(
+        default=True,
+        description="Include historical learning context in developer prompts",
+    )
+    top_n_historical_issues: int = Field(
+        ge=1,
+        le=20,
+        default=5,
+        description="Number of top historical issues to include in learning context",
     )
 
     model_config = ConfigDict(frozen=True, extra="forbid", validate_assignment=True)
@@ -186,22 +212,50 @@ class StandardIterationController(Generic[TPlan]):
         config: Iteration configuration
         feedback: Feedback manager instance
         logger: Logger instance
+        issue_repository: Optional persistent issue repository
     """
 
     def __init__(
         self,
         config: IterationConfig,
-        feedback_manager: FeedbackManager,
+        feedback_manager: FeedbackManager | None = None,
+        job_id: str | None = None,
     ):
         """Initialize iteration controller.
 
         Args:
             config: Iteration configuration
-            feedback_manager: Feedback manager instance
+            feedback_manager: Optional feedback manager (created if not provided)
+            job_id: Optional job ID for issue tracking (generated if not provided)
         """
         self.config = config
-        self.feedback = feedback_manager
         self.logger = logging.getLogger(__name__)
+
+        # Generate job_id if not provided
+        self.job_id = job_id or f"job_{uuid.uuid4().hex[:8]}"
+
+        # Initialize issue repository if enabled
+        self.issue_repository: IssueRepository | None = None
+        if self.config.enable_issue_tracking:
+            self.issue_repository = IssueRepository(
+                storage_dir=Path(self.config.issue_tracking_storage_dir),
+                enabled=True,
+            )
+            self.logger.debug(f"Issue tracking enabled: {self.config.issue_tracking_storage_dir}")
+        else:
+            self.logger.debug("Issue tracking disabled")
+
+        # Create feedback manager if not provided (will be recreated per agent in run())
+        if feedback_manager:
+            self.feedback = feedback_manager
+        else:
+            # Placeholder, will be recreated in run() with correct agent_name
+            self.feedback = FeedbackManager(
+                max_entries=self.config.max_feedback_entries,
+                agent_name="unknown",
+                job_id=self.job_id,
+                issue_repository=self.issue_repository,
+            )
 
     async def run(
         self,
@@ -227,6 +281,14 @@ class StandardIterationController(Generic[TPlan]):
         Returns:
             IterationResult with final plan and metadata
         """
+        # Create feedback manager with correct agent attribution
+        self.feedback = FeedbackManager(
+            max_entries=self.config.max_feedback_entries,
+            agent_name=judge_spec.name,
+            job_id=self.job_id,
+            issue_repository=self.issue_repository,
+        )
+
         context = IterationContext()
         runner = AsyncAgentRunner(
             provider=provider,
@@ -240,6 +302,21 @@ class StandardIterationController(Generic[TPlan]):
             planner_state = AgentState(name=planner_spec.name)
 
         context.update_state(IterationState.PLANNING)
+
+        # Inject learning context into developer variables (transparent to user prompt)
+        # Always set learning_context (empty string if no data) to avoid template errors
+        learning_context = ""
+        if self.config.include_historical_learning and self.issue_repository:
+            learning_context = self.issue_repository.format_learning_context(
+                agent_name=judge_spec.name,
+                top_n=self.config.top_n_historical_issues,
+                include_resolution_rate=True,
+            )
+            if learning_context:
+                self.logger.debug(f"Injected learning context for {judge_spec.name}")
+
+        # Always set the variable (templates check for non-empty content)
+        initial_variables["learning_context"] = learning_context
 
         plan: TPlan | None = None
         for iteration in range(self.config.max_iterations):
@@ -280,13 +357,22 @@ class StandardIterationController(Generic[TPlan]):
                 if iteration >= self.config.max_iterations - 1:
                     return self._handle_max_iterations(context, plan)
 
+                # Truncate validation errors to fit RevisionRequest limits
+                # RevisionRequest.specific_fixes has max_length=25
+                max_fixes = 20  # Leave headroom for safety
+                truncated_errors = validation_errors[:max_fixes]
+                if len(validation_errors) > max_fixes:
+                    truncated_errors.append(
+                        f"... and {len(validation_errors) - max_fixes} more validation errors"
+                    )
+
                 # Build revision request and continue
                 revision = RevisionRequest(
                     priority=RevisionPriority.CRITICAL,
                     focus_areas=["Schema Validation"],
-                    specific_fixes=validation_errors,
+                    specific_fixes=truncated_errors,
                     avoid=[],
-                    context_for_planner="Fix validation errors before judging",
+                    context_for_planner=f"Fix validation errors ({len(validation_errors)} total) before judging",
                 )
                 context.add_revision_request(revision)
                 continue
@@ -308,6 +394,9 @@ class StandardIterationController(Generic[TPlan]):
             verdict = cast(JudgeVerdict, judge_result.data)
             assert isinstance(verdict, JudgeVerdict), "Judge succeeded but returned invalid data"
             context.add_verdict(verdict)
+
+            # Record verdict issues to repository (for learning, regardless of approval status)
+            self.feedback.add_judge_verdict(verdict, iteration)
 
             # === DECISION STAGE ===
             if verdict.status == VerdictStatus.APPROVE:
@@ -338,6 +427,9 @@ class StandardIterationController(Generic[TPlan]):
             revision = RevisionRequest.from_verdict(verdict)
             context.add_revision_request(revision)
 
+            # Note: Verdict already recorded above (before APPROVE check)
+            # No need to record again here for SOFT_FAIL/HARD_FAIL
+
             self.logger.debug(
                 f"Refinement needed (score: {verdict.score:.1f}, status: {verdict.status.value})"
             )
@@ -363,7 +455,7 @@ class StandardIterationController(Generic[TPlan]):
         variables = initial_vars.copy()
 
         if self.config.include_feedback_in_prompt and iteration > 0:
-            variables["feedback"] = self.feedback.format_for_prompt()
+            variables["feedback"] = self.feedback.format_feedback_for_prompt()
             variables["iteration"] = iteration
             variables["revision_request"] = (
                 context.revision_requests[-1] if context.revision_requests else None
@@ -387,10 +479,17 @@ class StandardIterationController(Generic[TPlan]):
         # Start with initial vars (includes context like audio_profile, etc.)
         variables = initial_vars.copy()
 
+        # Convert plan to dict for JSON serialization in templates (tojson filter)
+        # This is required because Pydantic models with complex nested enums
+        # cannot be directly JSON-serialized by Python's json module
+        from pydantic import BaseModel
+
+        plan_dict = plan.model_dump(mode="json") if isinstance(plan, BaseModel) else plan
+
         # Add/override with judge-specific vars
         variables.update(
             {
-                "plan": plan,
+                "plan": plan_dict,
                 "iteration": iteration,
             }
         )

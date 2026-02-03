@@ -199,6 +199,272 @@ class TargetFact(_FrozenModel):
 
 
 # -------------------------------------------------
+# Color Palette Parsing
+# -------------------------------------------------
+
+
+def parse_color_palettes_from_sequence(seq_path: Path) -> dict[str, Any]:
+    """Parse color palettes directly from sequence XML file.
+
+    Returns dict with:
+    - unique_colors: list of unique color codes used across all palettes
+    - unique_indices: list of ALL 0-based palette slot indices used (1-based palette numbers converted to 0-based)
+    - single_colors: DISTINCT list - one entry per unique color, with palette ENTRY indices where it appears alone
+    - color_palettes: DISTINCT list - one entry per unique color combo (order-independent), with palette ENTRY indices
+    """
+    xml = seq_path.read_text(encoding="utf-8", errors="ignore")
+    root = ET.fromstring(xml)
+
+    palettes_node = root.find(".//ColorPalettes")
+    if palettes_node is None:
+        return {
+            "unique_colors": [],
+            "single_colors": [],
+            "color_palettes": [],
+        }
+
+    all_unique_colors = set()
+
+    # Collect palette entries with their entry index
+    single_color_map = {}  # color -> list of palette entry indices
+    multi_color_map = {}  # color_combo -> list of palette entry indices
+
+    for entry_idx, palette_node in enumerate(palettes_node.findall("ColorPalette")):
+        palette_str = palette_node.text or ""
+        if not palette_str:
+            continue
+
+        # Parse palette entry
+        parsed = _parse_palette_entry(palette_str)
+
+        # Track unique colors and palette slot indices (0-based from palette numbers 1-8)
+        for color in parsed["colors"]:
+            all_unique_colors.add(color)
+
+        # Categorize by color count and track ENTRY index
+        if len(parsed["colors"]) == 1:
+            color = parsed["colors"][0]
+            if color not in single_color_map:
+                single_color_map[color] = []
+            single_color_map[color].append(entry_idx)
+
+        elif len(parsed["colors"]) > 1:
+            # Sort colors for order-independent comparison
+            color_combo = tuple(sorted(parsed["colors"]))
+            if color_combo not in multi_color_map:
+                multi_color_map[color_combo] = []
+            multi_color_map[color_combo].append(entry_idx)
+
+    # Build single_colors output
+    single_colors = [
+        {
+            "color": color,
+            "palette_entry_indices": entry_indices,  # indices of ColorPalette elements
+        }
+        for color, entry_indices in sorted(single_color_map.items())
+    ]
+
+    # Build color_palettes output
+    color_palettes = [
+        {
+            "colors": list(color_combo),
+            "palette_entry_indices": entry_indices,  # indices of ColorPalette elements
+        }
+        for color_combo, entry_indices in sorted(multi_color_map.items())
+    ]
+
+    palettes = {
+        "unique_colors": sorted(all_unique_colors),
+        "single_colors": single_colors,
+        "color_palettes": color_palettes,
+    }
+    palettes["classifications"] = classify_palettes_by_color_properties(palettes)
+    return palettes
+
+
+def _parse_palette_entry(palette_str: str) -> dict[str, Any]:
+    """Parse a single palette entry string from sequence file.
+
+    Extracts color codes where corresponding checkbox value is 1.
+
+    Returns:
+    - colors: list of enabled color codes (de-duplicated within this entry)
+    - slot_indices: list of 0-based palette slot indices (which of the 8 slots are used)
+    """
+    parts = palette_str.split(",")
+
+    color_buttons = {}  # palette_slot (1-based, e.g., 1-8) -> color code
+    checkboxes = {}  # palette_slot -> enabled boolean
+
+    for part in parts:
+        if "=" not in part:
+            continue
+
+        key, value = part.split("=", 1)
+        key = key.strip()
+        value = value.strip()
+
+        # Parse C_BUTTON_Palette{N}=#RRGGBB
+        if key.startswith("C_BUTTON_Palette"):
+            match = re.match(r"C_BUTTON_Palette(\d+)", key)
+            if match:
+                palette_slot = int(match.group(1))
+                color_buttons[palette_slot] = value
+
+        # Parse C_CHECKBOX_Palette{N}=1
+        elif key.startswith("C_CHECKBOX_Palette"):
+            match = re.match(r"C_CHECKBOX_Palette(\d+)", key)
+            if match:
+                palette_slot = int(match.group(1))
+                checkboxes[palette_slot] = value == "1"
+
+    # Build enabled colors list (checkbox=1 only)
+    enabled_colors = []
+    enabled_slot_indices = []
+
+    for palette_slot in sorted(color_buttons.keys()):
+        if checkboxes.get(palette_slot, False):
+            color = color_buttons[palette_slot]
+            enabled_colors.append(color)
+            enabled_slot_indices.append(palette_slot - 1)  # 0-based slot index
+
+    # De-duplicate colors within this entry while preserving order
+    seen_colors = set()
+    unique_colors = []
+    unique_slot_indices = []
+
+    for color, slot_idx in zip(enabled_colors, enabled_slot_indices, strict=False):
+        if color not in seen_colors:
+            seen_colors.add(color)
+            unique_colors.append(color)
+            unique_slot_indices.append(slot_idx)
+
+    return {"colors": unique_colors, "slot_indices": unique_slot_indices}
+
+
+def classify_palettes_by_color_properties(palette_data: dict[str, Any]) -> dict[str, Any]:
+    """Classify palettes by color properties (hue, saturation, brightness).
+
+    Returns classifications like:
+    - monochrome: Only black/white/gray
+    - warm: Contains warm colors (red, orange, yellow)
+    - cool: Contains cool colors (blue, green, purple)
+    - primary: Only primary colors (red, blue, yellow)
+    - etc.
+    """
+
+    def hex_to_rgb(hex_color: str) -> tuple[int, int, int]:
+        """Convert hex color to RGB tuple."""
+        hex_color = hex_color.lstrip("#")
+        return tuple(int(hex_color[i : i + 2], 16) for i in (0, 2, 4))
+
+    def is_grayscale(hex_color: str) -> bool:
+        """Check if color is grayscale (R=G=B)."""
+        r, g, b = hex_to_rgb(hex_color)
+        return r == g == b
+
+    def is_warm(hex_color: str) -> bool:
+        """Check if color is warm (red/orange/yellow dominant)."""
+        r, g, b = hex_to_rgb(hex_color)
+        return r > b and r > g * 0.8  # Red dominant or red/yellow
+
+    def is_cool(hex_color: str) -> bool:
+        """Check if color is cool (blue/green dominant)."""
+        r, g, b = hex_to_rgb(hex_color)
+        return (b > r and b > g * 0.8) or (g > r and g > b * 0.8)
+
+    def color_category(hex_color: str) -> str:
+        """Categorize color into basic color families."""
+        if is_grayscale(hex_color):
+            r, _, _ = hex_to_rgb(hex_color)
+            if r == 0:
+                return "black"
+            elif r == 255:
+                return "white"
+            else:
+                return "gray"
+
+        r, g, b = hex_to_rgb(hex_color)
+        max_val = max(r, g, b)
+
+        # Simple color categorization
+        if r == max_val and g < 100 and b < 100:
+            return "red"
+        elif g == max_val and r < 100 and b < 100:
+            return "green"
+        elif b == max_val and r < 100 and g < 100:
+            return "blue"
+        elif r == max_val and g == max_val and b < 100:
+            return "yellow"
+        elif r == max_val and b == max_val and g < 100:
+            return "magenta"
+        elif g == max_val and b == max_val and r < 100:
+            return "cyan"
+        elif r > 200 and g > 100 and g < 200 and b < 100:
+            return "orange"
+        elif r > 100 and g < 100 and b > 100:
+            return "purple"
+        else:
+            return "mixed"
+
+    # Combine all palettes
+    all_palettes = []
+    for entry in palette_data["single_colors"]:
+        all_palettes.append(
+            {"colors": [entry["color"]], "palette_entry_indices": entry["palette_entry_indices"]}
+        )
+    for entry in palette_data["color_palettes"]:
+        all_palettes.append(
+            {"colors": entry["colors"], "palette_entry_indices": entry["palette_entry_indices"]}
+        )
+
+    # Classify
+    monochrome = []
+    warm_palettes = []
+    cool_palettes = []
+    primary_only = []
+    by_color_family = {}
+
+    for palette in all_palettes:
+        colors = palette["colors"]
+
+        # Monochrome check
+        if all(is_grayscale(c) for c in colors):
+            monochrome.append(palette)
+
+        # Warm/cool check
+        if any(is_warm(c) for c in colors):
+            warm_palettes.append(palette)
+        if any(is_cool(c) for c in colors):
+            cool_palettes.append(palette)
+
+        # Primary colors only (red, blue, yellow + black/white)
+        primary_set = {"#FF0000", "#0000FF", "#FFFF00", "#000000", "#FFFFFF"}
+        if all(c.upper() in primary_set for c in colors):
+            primary_only.append(palette)
+
+        # Group by color family
+        for color in colors:
+            category = color_category(color)
+            if category not in by_color_family:
+                by_color_family[category] = []
+            by_color_family[category].append(
+                {
+                    "colors": palette["colors"],
+                    "palette_entry_indices": palette["palette_entry_indices"],
+                }
+            )
+
+    return {
+        "monochrome": monochrome,
+        "warm": warm_palettes,
+        "cool": cool_palettes,
+        "primary_only": primary_only,
+        "by_color_family": by_color_family,
+    }
+
+
+# -------------------------------------------------
 # Stage A: Zip ingest + hashing
 # -------------------------------------------------
 
@@ -562,6 +828,10 @@ def main(zip_path: str, out_dir: str, config_mode: ConfigMode) -> None:
         "author": sequence.head.author,
     }
     write_json(out_p / "sequence_metadata.json", seq_meta)
+
+    # Color Palettes
+    color_palettes = parse_color_palettes_from_sequence(seq_path)
+    write_json(out_p / "color_palettes.json", color_palettes)
 
     inv = asset_and_shader_inventory(manifest)
     write_json(out_p / "asset_inventory.json", inv["assets"])

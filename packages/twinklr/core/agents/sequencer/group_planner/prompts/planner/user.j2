@@ -1,7 +1,53 @@
 {#
 GroupPlanner User Prompt
-Provides section context, templates, and groups for coordination planning
+Provides section context on iteration 1, minimal refinement on iteration 2+
 #}
+{% if iteration is defined and iteration > 0 %}
+{# ============== REFINEMENT MODE (Iteration 2+) ============== #}
+{# Minimal context - conversation already has full context from iteration 1 #}
+
+# Refinement Request: {{ section_name }} ({{ section_id }})
+
+## Iteration {{ iteration + 1 }} Feedback
+
+{{ feedback }}
+
+## Key Reminders
+
+- **Section:** {{ section_name }} ({{ (start_ms / 1000) | round(1) }}s to {{ (end_ms / 1000) | round(1) }}s)
+- **Energy Target:** {{ energy_target }}
+- **Primary Targets:** {{ primary_focus_targets | join(", ") }}
+
+## Intensity Limits (STRICT - exceeding = validation failure)
+
+| Lane   | Max   |
+|--------|-------|
+| BASE   | 1.10  |
+| RHYTHM | 1.20  |
+| ACCENT | 1.30  |
+
+{% if revision_request %}
+## Revision Priority: {{ revision_request.priority }}
+
+{% if revision_request.specific_fixes %}
+**Fixes Required:**
+{% for fix in revision_request.specific_fixes[:10] %}
+- {{ fix }}
+{% endfor %}
+{% endif %}
+{% endif %}
+
+## Instructions
+
+1. Address ALL ERROR severity issues first
+2. Keep structure that worked - only fix flagged issues
+3. Verify ALL intensity values are within lane limits
+4. Return the complete revised SectionCoordinationPlan
+
+{% else %}
+{# ============== INITIAL PLANNING (Iteration 1) ============== #}
+{# Full context provided #}
+
 # Section Information
 
 **Section ID:** {{ section_id }}
@@ -38,22 +84,22 @@ Provides section context, templates, and groups for coordination planning
 
 ### BASE Lane Templates
 {% for entry in template_catalog.entries %}
-{% if "BASE" in entry.compatible_lanes | map(attribute="value") %}
-- `{{ entry.template_id }}` - {{ entry.name }}{% if entry.description %}: {{ entry.description }}{% endif %}
+{% if "BASE" in entry.compatible_lanes %}
+- `{{ entry.template_id }}` - {{ entry.name }}
 {% endif %}
 {% endfor %}
 
 ### RHYTHM Lane Templates
 {% for entry in template_catalog.entries %}
-{% if "RHYTHM" in entry.compatible_lanes | map(attribute="value") %}
-- `{{ entry.template_id }}` - {{ entry.name }}{% if entry.description %}: {{ entry.description }}{% endif %}
+{% if "RHYTHM" in entry.compatible_lanes %}
+- `{{ entry.template_id }}` - {{ entry.name }}
 {% endif %}
 {% endfor %}
 
 ### ACCENT Lane Templates
 {% for entry in template_catalog.entries %}
-{% if "ACCENT" in entry.compatible_lanes | map(attribute="value") %}
-- `{{ entry.template_id }}` - {{ entry.name }}{% if entry.description %}: {{ entry.description }}{% endif %}
+{% if "ACCENT" in entry.compatible_lanes %}
+- `{{ entry.template_id }}` - {{ entry.name }}
 {% endif %}
 {% endfor %}
 
@@ -73,16 +119,6 @@ Provides section context, templates, and groups for coordination planning
 {% endfor %}
 {% endif %}
 
-{% if iteration is defined and iteration > 0 %}
----
-
-# Iteration {{ iteration + 1 }} - Refinement Feedback
-
-{{ feedback }}
-
-**Instructions:** Address the feedback while maintaining section coherence.
-
-{% endif %}
 # Your Task
 
 Create a SectionCoordinationPlan for **{{ section_name }} ({{ section_id }})** that:
@@ -96,3 +132,5 @@ Create a SectionCoordinationPlan for **{{ section_name }} ({{ section_id }})** t
 - Primary targets ({{ primary_focus_targets | join(", ") }}) should get prominent ACCENT treatment
 - Energy target is {{ energy_target }} - design accordingly
 - Motion density is {{ motion_density }} - adjust complexity
+- **Intensity limits:** BASE ≤1.10, RHYTHM ≤1.20, ACCENT ≤1.30
+{% endif %}

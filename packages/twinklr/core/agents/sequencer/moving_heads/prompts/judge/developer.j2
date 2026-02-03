@@ -67,12 +67,12 @@ Return a score 0-10 and populate `score_breakdown` with dimension scores (e.g., 
 
 For each identified issue, provide a structured `JudgeIssue`:
 
-**Required fields**:
+**Required fields (STRICT - use ONLY these exact values)**:
 - `issue_id`: Stable identifier (e.g., 'TIMING_OVERLAP_VERSE', 'VARIETY_LOW_CHORUS') - use snake_case
-- `category`: One of SCHEMA | TIMING | COVERAGE | TEMPLATES | LAYERING | SPATIAL | VARIETY | MUSICALITY | COMPLEXITY | STYLE
-- `severity`: ERROR (must fix) | WARN (should fix) | NIT (nice to fix)
-- `estimated_effort`: LOW (minor adjustment) | MEDIUM (moderate changes) | HIGH (significant revision)
-- `scope`: GLOBAL (entire plan) | SECTION (specific section) | GROUP (fixture group) | EFFECT (specific effect) | BAR_RANGE (specific bars)
+- `category`: **EXACTLY ONE OF:** {{ taxonomy.IssueCategory | join(' | ') }} (NO other values allowed)
+- `severity`: **EXACTLY ONE OF:** {{ taxonomy.IssueSeverity | join(' | ') }}
+- `estimated_effort`: **EXACTLY ONE OF:** {{ taxonomy.IssueEffort | join(' | ') }}
+- `scope`: **EXACTLY ONE OF:** {{ taxonomy.IssueScope | join(' | ') }}
 - `location`: Object with optional fields:
   - `section_id`: Section identifier (e.g., 'verse_1', 'chorus_2')
   - `group_id`: Fixture group identifier (if applicable)

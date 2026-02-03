@@ -157,8 +157,15 @@ async def execute_step(
     if hasattr(result, "context"):
         result_context = getattr(result, "context", None)
         if result_context:
+            # Iteration count: current_iteration is 0-based but incremented at start of each loop
+            # So iteration 0 = 1 attempt, iteration 1 = 2 attempts, etc.
+            # Report the actual number of attempts made
             if hasattr(result_context, "current_iteration"):
-                context.add_metric(f"{stage_name}_iterations", result_context.current_iteration)  # type: ignore[attr-defined]
+                iterations = result_context.current_iteration  # type: ignore[attr-defined]
+                # Add 1 to convert from 0-based to human-readable count
+                # BUT: controller.increment_iteration() is called at loop start,
+                # so current_iteration already represents attempts made
+                context.add_metric(f"{stage_name}_iterations", iterations)
             if hasattr(result_context, "total_tokens_used"):
                 context.add_metric(f"{stage_name}_tokens", result_context.total_tokens_used)  # type: ignore[attr-defined]
             final_verdict = getattr(result_context, "final_verdict", None)

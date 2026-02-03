@@ -1,0 +1,55 @@
+{#
+GroupPlanner User Prompt - REFINEMENT ONLY
+Used for iteration 2+ to avoid resending full context.
+References existing conversation context (section, templates, groups).
+#}
+# Refinement Request: {{ section_name }} ({{ section_id }})
+
+## Iteration {{ iteration + 1 }} Feedback
+
+{{ feedback }}
+
+## Key Reminders (from initial context)
+
+- **Section:** {{ section_name }} ({{ (start_ms / 1000) | round(1) }}s to {{ (end_ms / 1000) | round(1) }}s)
+- **Energy Target:** {{ energy_target }}
+- **Motion Density:** {{ motion_density }}
+- **Primary Targets:** {{ primary_focus_targets | join(", ") }}
+
+## Intensity Limits (STRICT)
+
+- BASE: max **1.10**
+- RHYTHM: max **1.20**
+- ACCENT: max **1.30**
+
+Exceeding these limits will fail validation.
+
+{% if revision_request %}
+## Revision Priority
+
+**Priority:** {{ revision_request.priority }}
+**Focus Areas:** {{ revision_request.focus_areas | join(", ") }}
+
+{% if revision_request.specific_fixes %}
+**Specific Fixes Required:**
+{% for fix in revision_request.specific_fixes %}
+- {{ fix }}
+{% endfor %}
+{% endif %}
+
+{% if revision_request.avoid %}
+**Avoid:**
+{% for item in revision_request.avoid %}
+- {{ item }}
+{% endfor %}
+{% endif %}
+{% endif %}
+
+## Instructions
+
+1. Address ALL issues marked as ERROR severity first
+2. Keep the overall structure that worked in previous iteration
+3. Only modify the specific placements/intensities that caused failures
+4. Verify all intensity values are within lane limits before submitting
+
+Return the complete revised SectionCoordinationPlan.

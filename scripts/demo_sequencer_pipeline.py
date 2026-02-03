@@ -168,6 +168,7 @@ async def main() -> None:
 
     song_name = clean_audio_filename(audio_path.stem)
     output_dir = args.output_dir or repo_root / "artifacts" / song_name
+    logging_dir = Path("data") / "logging"
 
     output_dir.mkdir(parents=True, exist_ok=True)
     print(f"📁 Output directory: {output_dir}")
@@ -279,7 +280,10 @@ async def main() -> None:
             # Stage 6: Holistic Evaluation
             StageDefinition(
                 id="holistic",
-                stage=HolisticEvaluatorStage(),
+                stage=HolisticEvaluatorStage(
+                    display_graph=display_graph,
+                    template_catalog=template_catalog,
+                ),
                 inputs=["aggregate"],
                 description="Evaluate complete GroupPlanSet quality",
             ),
@@ -329,7 +333,7 @@ async def main() -> None:
 
     llm_logger = create_llm_logger(
         enabled=job_config.agent.llm_logging.enabled if job_config else False,
-        output_dir=output_dir / "llm_calls",
+        output_dir=logging_dir / "llm_calls",
         log_level=job_config.agent.llm_logging.log_level if job_config else "standard",
         format=job_config.agent.llm_logging.format if job_config else "yaml",
     )

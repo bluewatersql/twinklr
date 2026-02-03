@@ -31,6 +31,9 @@ from twinklr.core.sequencer.templates.group.catalog import (
     TemplateCatalogEntry,
 )
 
+# Rebuild TemplateCatalogEntry after LaneKind is imported (forward ref resolution)
+TemplateCatalogEntry.model_rebuild()
+
 
 class TestHolisticEvaluation:
     """Tests for HolisticEvaluation model."""
@@ -62,7 +65,7 @@ class TestHolisticEvaluation:
             cross_section_issues=[
                 CrossSectionIssue(
                     issue_id="ENERGY_FLAT",
-                    severity=IssueSeverity.WARNING,
+                    severity=IssueSeverity.WARN,
                     affected_sections=["verse_1", "verse_2", "chorus_1"],
                     description="Energy stays constant across sections",
                     recommendation="Increase energy in chorus sections",
@@ -107,7 +110,7 @@ class TestCrossSectionIssue:
         """Create cross-section issue."""
         issue = CrossSectionIssue(
             issue_id="TEMPLATE_MONOTONY",
-            severity=IssueSeverity.WARNING,
+            severity=IssueSeverity.WARN,
             affected_sections=["verse_1", "verse_2"],
             description="Same template used in consecutive sections",
             recommendation="Vary templates between sections",
