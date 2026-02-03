@@ -213,7 +213,7 @@ class TestBuildTemplateCatalog:
         registry = GroupTemplateRegistry()
 
         # Test all template types
-        for template_type, expected_lane in [
+        for template_type, _ in [
             (GroupTemplateType.BASE, LaneKind.BASE),
             (GroupTemplateType.RHYTHM, LaneKind.RHYTHM),
             (GroupTemplateType.ACCENT, LaneKind.ACCENT),

@@ -1,76 +1,189 @@
-Design a choreography plan for the following song:
+{#
+MovingHead Planner User Prompt
+Provides full context on iteration 1, minimal refinement context on iteration 2+
 
-{% if context.get('metadata') %}
-## Song Information
+V2 Migration: Uses structured context from MovingHeadPlanningContext
+Token Optimization: Refinement mode reduces prompt size by ~80%
+#}
+{% if iteration is defined and iteration > 0 %}
+{# ============== REFINEMENT MODE (Iteration 2+) ============== #}
+{# Minimal context - conversation already has full context from iteration 1 #}
 
-{% if context.metadata.get('artist') and context.metadata.get('title') %}
-**Song**: "{{ context.metadata.title }}" by {{ context.metadata.artist }}
-{% elif context.metadata.get('title') %}
-**Song**: "{{ context.metadata.title }}"
-{% elif context.metadata.get('artist') %}
-**Artist**: {{ context.metadata.artist }}
-{% endif %}
-{% if context.metadata.get('genre') %}
-**Genre**: {{ context.metadata.genre | join(', ') if context.metadata.genre is iterable and context.metadata.genre is not string else context.metadata.genre }}
-{% endif %}
+# Refinement Request: Choreography Plan (Iteration {{ iteration + 1 }})
 
-{% endif %}
-## Song Context
+## Feedback to Address
 
-{{ context.song_structure | tojson(indent=2) }}
+{{ feedback }}
 
-## Available Resources
+## Key Reminders
 
-**Fixtures**: {{ context.fixtures.count }} moving heads
-**Rig Layout**: {{ context.fixtures.groups | tojson }}
+- **Song**: {{ song_title | default('Unknown', true) }}{% if song_artist is defined and song_artist %} by {{ song_artist }}{% endif %}
 
-**Template Library** ({{ context.available_templates | length }} templates):
-{% for template in context.available_templates %}
-- {{ template }}
+- **Timing**: {{ tempo | default(120, true) }} BPM ({{ time_signature | default('4/4', true) }}), {{ total_bars | default(0, true) }} bars
+- **Fixtures**: {{ fixture_count | default(0, true) }} moving heads
+
+{% if revision_focus is defined and revision_focus %}
+## Priority Issues
+
+{% for issue in revision_focus[:5] %}
+- {{ issue }}
 {% endfor %}
-
-## Beat Grid
-
-- **Tempo**: {{ context.beat_grid.tempo }} BPM
-- **Time Signature**: {{ context.beat_grid.time_signature }}
-- **Total Bars**: {{ context.beat_grid.total_bars }}
-
-{% if feedback %}
-## Feedback from Previous Iteration
-
-{% for item in feedback %}
-- {{ item }}
-{% endfor %}
-
-Please address the above feedback in your revised plan.
 {% endif %}
+
+{% if macro_plan is defined and macro_plan %}
+## Macro Strategy (Quick Reference)
+
+{% for mp in macro_plan %}
+- **{{ mp.section_id }}**: {{ mp.energy_target }} energy, {{ mp.motion_density }} motion
+{% endfor %}
+{% endif %}
+
+## Critical Rules
+
+1. Use ONLY templates from initial context
+2. Bar numbers: 1-indexed (1 to {{ total_bars }})
+3. Cover all sections (no gaps)
+4. Segment only when musically justified
 
 ## Instructions
 
-Create a complete choreography plan that:
+1. Address ALL issues marked as errors
+2. Keep structure that worked - only fix flagged problems
+3. Ensure plan covers bars 1 through {{ total_bars }}
+4. Return complete revised ChoreographyPlan
 
-1. **Maps to song structure**: Design sequences for each section (intro, verse, chorus, bridge, outro)
-2. **Matches energy levels**: Use appropriate template intensities for each section
-3. **Creates visual interest**: Vary templates and timing throughout
+{% else %}
+{# ============== INITIAL PLANNING (Iteration 1) ============== #}
+{# Full context provided #}
+
+# Choreography Planning Request
+
+## Song Information
+
+{% if song_title is defined and song_title or song_artist is defined and song_artist %}
+**Song**: {% if song_title is defined and song_title %}"{{ song_title }}"{% endif %}{% if song_artist is defined and song_artist %} by {{ song_artist }}{% endif %}
+
+{% endif %}
+{% if genre is defined and genre %}
+**Genre**: {{ genre | join(', ') if genre is iterable and genre is not string else genre }}
+{% endif %}
+
+## Song Structure
+
+| Section | Name | Start Bar | End Bar | Duration |
+|---------|------|-----------|---------|----------|
+{% for section in sections %}
+| {{ section.section_id }} | {{ section.name }} | {{ section.start_bar }} | {{ section.end_bar }} | {{ section.end_bar - section.start_bar + 1 }} bars |
+{% endfor %}
+
+**Total Duration**: {{ total_bars }} bars
+
+## Beat Grid
+
+- **Tempo**: {{ tempo }} BPM
+- **Time Signature**: {{ time_signature }}
+- **Total Bars**: {{ total_bars }}
+
+## Available Resources
+
+**Fixtures**: {{ fixture_count }} moving heads
+{% if fixture_groups %}
+**Rig Layout**: {{ fixture_groups | tojson }}
+{% endif %}
+
+**Template Library** ({{ available_templates | length }} templates):
+{% for template in available_templates %}
+- `{{ template }}`
+{% endfor %}
+
+{% if audio_profile is defined and audio_profile %}
+## Audio Profile
+
+{% if audio_profile.energy_profile is defined and audio_profile.energy_profile %}
+**Overall Energy**: {{ audio_profile.energy_profile.macro_energy }}
+{% endif %}
+
+{% if audio_profile.creative_guidance is defined and audio_profile.creative_guidance %}
+### Creative Guidance
+- **Recommended Layers**: {{ audio_profile.creative_guidance.recommended_layer_count }}
+- **Motion Density**: {{ audio_profile.creative_guidance.recommended_motion_density }}
+- **Visual Contrast**: {{ audio_profile.creative_guidance.recommended_contrast }}
+{% if audio_profile.creative_guidance.cautions is defined and audio_profile.creative_guidance.cautions %}
+
+**Cautions**:
+{% for caution in audio_profile.creative_guidance.cautions[:3] %}
+- {{ caution }}
+{% endfor %}
+{% endif %}
+{% endif %}
+{% endif %}
+
+{% if lyric_context is defined and lyric_context %}
+## Lyric Context
+
+**Has Lyrics**: Yes
+{% if lyric_context.narrative_arc is defined and lyric_context.narrative_arc %}
+**Narrative**: {{ lyric_context.narrative_arc }}
+{% endif %}
+{% if lyric_context.key_moments is defined and lyric_context.key_moments %}
+**Key Moments**:
+{% for moment in lyric_context.key_moments[:5] %}
+- {{ moment.section_id }}: {{ moment.description }}
+{% endfor %}
+{% endif %}
+{% endif %}
+
+{% if macro_plan is defined and macro_plan %}
+## Macro Strategy (Coordination Targets)
+
+The MacroPlanner has defined the following strategic guidance for each section. **Align your template selections with these targets:**
+
+| Section | Energy Target | Motion Density | Style | Notes |
+|---------|---------------|----------------|-------|-------|
+{% for mp in macro_plan %}
+| {{ mp.section_id }} | {{ mp.energy_target }} | {{ mp.motion_density }} | {{ mp.choreography_style }} | {{ mp.notes[:50] }}{% if mp.notes | length > 50 %}...{% endif %} |
+{% endfor %}
+
+**IMPORTANT:** Your template selections should support these macro-level directives:
+- **Energy targets** indicate intensity levels (HIGH = aggressive/dramatic, MEDIUM = balanced, LOW = subtle/ambient)
+- **Motion density** guides activity level (BUSY = fast/complex, MODERATE = balanced, SPARSE = slow/simple)
+- **Choreography style** indicates visual approach (IMAGERY = narrative, ABSTRACT = patterns, HYBRID = mixed)
+{% endif %}
+
+## Your Task
+
+Create a complete choreography plan for **{{ song_title | default('this song', true) }}** that:
+
+1. **Maps to song structure**: Design choreography for each section (intro, verse, chorus, bridge, outro)
+2. **Matches musical energy**: Use appropriate template intensities - builds for builds, impacts for drops
+3. **Creates visual interest**: Vary templates and timing throughout, avoid repetition
 4. **Maintains flow**: Plan smooth transitions between sections
-5. **Uses templates effectively**: Select from available templates (which already define movement, geometry, and dimmer patterns)
-6. **Default to 1 per section**: Only split a section into 2–3 segments if there’s a clear musical change within the section.
+5. **Serves the holiday display**: Remember these are accent lights supporting a festive show
 
-## Required Output Format
+### Template Selection
 
-Provide your plan as a JSON object matching the schema specified in the developer prompt.
+- **Use ONLY** template IDs from the Template Library above (exactly as listed)
+- Each template is a **complete choreography unit** (movement + geometry + dimmer patterns)
+- Your job is to **select and arrange** templates, not design movement
 
-**CRITICAL REQUIREMENTS**:
-1. **Template Selection**: Use ONLY template IDs from the Template Library list above (exactly as written)
-2. **Template Composition**: Each template is a complete choreography unit with movement, geometry, and dimmer patterns already configured
-3. **Your Job**: For each song section, choose either:
-   - **Single-template section**: provide `template_id` (+ optional `preset_id`, `modifiers`) for the entire section bar range. Leave `segments` omitted or set to `null`.
-   - **Segmented section**: provide `segments` (1 to 3 items, not null or empty). Each segment must include `segment_id`, `start_bar`, `end_bar`, `template_id` (+ optional `preset_id`, `modifiers`). Leave section-level `template_id` omitted or `null`.
-4. **Segmentation Rules** (only if using `segments`):
-   - Max **3** segments per section
-   - Segments must be **contiguous** and **non-overlapping**
-   - Segments must **fully cover** the section range (first segment starts at section `start_bar`, last segment ends at section `end_bar`)
-   - Prefer not to create segments shorter than **1 bar**
-   - Default is **1 segment**; only split when musically justified (pickup/build/drop/hit/A-B change)
-5. **Bar Numbering**: Bar numbers are 1-indexed. First bar is 1, not 0. Use `start_bar >= 1` for all sections
-6. **Presets**: Use `preset_id` for variations (CHILL, MODERATE, ENERGETIC, etc.) - optional
+### Section Approach
+
+For each song section, choose ONE approach:
+
+**Single-template section** (preferred, default):
+- Set `template_id` for the entire section
+- Optionally add `preset_id` (CHILL, MODERATE, ENERGETIC)
+- Leave `segments` omitted or null
+
+**Segmented section** (only when musically justified):
+- Use when section has distinct musical phases (pickup → drop, A → B)
+- Max 3 segments per section
+- Segments must be contiguous and cover full section range
+
+### Bar Numbering
+
+- **1-indexed**: First bar = 1, last bar = {{ total_bars }}
+- Plan should cover bar 1 through bar {{ total_bars }}
+- Section bar ranges should align with song structure above
+
+{% endif %}

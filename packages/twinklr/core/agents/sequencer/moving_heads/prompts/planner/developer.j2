@@ -1,12 +1,25 @@
+{#
+MovingHead Planner Developer Prompt
+Technical constraints, response schema, and validation rules
+
+V2 Migration: Schema auto-injected via {{ response_schema }}
+#}
 ## Technical Contract: Choreography Plan Structure
 
-### Plan Schema
+### Response Schema
 
 You must return a `ChoreographyPlan` that matches this JSON schema:
 
 ```json
 {{ response_schema }}
 ```
+
+{% if learning_context is defined and learning_context %}
+## Historical Learning Context
+
+{{ learning_context }}
+
+{% endif %}
 
 ### Plan Structure Rules
 

@@ -161,8 +161,6 @@ class TestBuildPrompt:
             png_defaults=PNGDefaults(),
         )
         prompt = build_prompt(template)
-        # Should only contain subject and policy constraints (which are enabled by default)
-        lines = prompt.split("\n\n")
         # Policy adds constraints, so check it's not too long
         assert len(prompt) < 250  # Increased threshold to account for default policy
 

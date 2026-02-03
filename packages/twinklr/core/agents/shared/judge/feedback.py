@@ -358,7 +358,7 @@ class FeedbackManager:
             return "No feedback available."
 
         lines = []
-        for entry_idx, entry in enumerate(entries, 1):
+        for _, entry in enumerate(entries, 1):
             # Format header
             lines.append(f"## Iteration {entry.iteration} Feedback ({entry.type.value})")
             lines.append("")
@@ -402,6 +402,17 @@ class FeedbackManager:
                         lines.append("")
 
         return "\n".join(lines)
+
+    def format_for_prompt(self, filter_type: FeedbackType | None = None) -> str:
+        """Alias for format_feedback_for_prompt (backward compatibility).
+
+        Args:
+            filter_type: Optional type filter (only include this type)
+
+        Returns:
+            Formatted feedback string
+        """
+        return self.format_feedback_for_prompt(filter_type)
 
     def clear(self) -> None:
         """Clear all feedback entries."""

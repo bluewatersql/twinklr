@@ -83,7 +83,7 @@ def extract_response_content(file_path: Path) -> dict[str, Any] | None:
         Parsed response dict or None if not parseable
     """
     try:
-        with open(file_path) as f:
+        with file_path.open() as f:
             content = f.read()
 
         # Try JSON first

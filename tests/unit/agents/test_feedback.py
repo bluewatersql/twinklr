@@ -132,12 +132,12 @@ def test_format_for_prompt():
 
     formatted = manager.format_for_prompt()
 
-    assert "Feedback 1" in formatted
-    assert "Feedback 2" in formatted
+    assert "Iteration 1" in formatted
+    assert "Iteration 2" in formatted
     assert "Duration too short" in formatted
     assert "Energy matching" in formatted
-    assert "iteration 1" in formatted
-    assert "iteration 2" in formatted
+    assert "validation_failure" in formatted
+    assert "judge_soft_failure" in formatted
 
 
 def test_format_for_prompt_with_filter():

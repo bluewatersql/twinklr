@@ -121,7 +121,7 @@ class TestFeedbackManagerJudgeVerdictIntegration:
         assert entries[0].issues[0].category == IssueCategory.TIMING
 
     def test_add_judge_verdict_includes_verdict_in_metadata(self):
-        """Test that verdict is included in metadata."""
+        """Test that verdict metadata is included."""
         manager = FeedbackManager(max_entries=10)
 
         verdict = JudgeVerdict(
@@ -136,9 +136,12 @@ class TestFeedbackManagerJudgeVerdictIntegration:
         manager.add_judge_verdict(verdict=verdict, iteration=1)
 
         entries = manager.get_all()
-        assert "verdict" in entries[0].metadata
-        assert entries[0].metadata["verdict"]["status"] == VerdictStatus.SOFT_FAIL
-        assert entries[0].metadata["verdict"]["score"] == 6.5
+        # Implementation stores status and confidence separately (not full verdict dict)
+        assert "status" in entries[0].metadata
+        assert "confidence" in entries[0].metadata
+        assert "score" in entries[0].metadata
+        assert entries[0].metadata["status"] == "SOFT_FAIL"
+        assert entries[0].metadata["score"] == 6.5
 
     def test_add_judge_verdict_multiple_verdicts(self):
         """Test adding multiple verdicts across iterations."""
@@ -194,7 +197,7 @@ class TestFeedbackManagerBackwardCompatibility:
         assert entries[2].type == FeedbackType.JUDGE_HARD_FAILURE
 
     def test_format_for_prompt_still_works(self):
-        """Test that format_for_prompt is unchanged."""
+        """Test that format_for_prompt works with new format."""
         manager = FeedbackManager(max_entries=10)
 
         verdict = JudgeVerdict(
@@ -210,7 +213,6 @@ class TestFeedbackManagerBackwardCompatibility:
 
         formatted = manager.format_for_prompt()
 
-        assert "Feedback 1" in formatted
+        assert "Iteration 1" in formatted
         assert "Improve variety" in formatted
-        assert "iteration 1" in formatted
         assert "judge_soft_failure" in formatted

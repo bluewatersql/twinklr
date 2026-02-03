@@ -2,18 +2,9 @@
 
 from __future__ import annotations
 
-from enum import Enum
-
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from twinklr.core.agents.issues import (
-    Issue,
-)
 from twinklr.core.sequencer.models.transition import TransitionHint
-
-# ============================================================================
-# Planner Models
-# ============================================================================
 
 
 class PlanSegment(BaseModel):
@@ -128,44 +119,5 @@ class ChoreographyPlan(BaseModel):
     overall_strategy: str = Field(
         default="", description="High-level choreography strategy description"
     )
-
-    model_config = ConfigDict(frozen=True)
-
-
-# ============================================================================
-# Judge Models
-# ============================================================================
-
-
-class JudgeDecision(str, Enum):
-    """Judge decision enum."""
-
-    APPROVE = "APPROVE"  # Ready to render (score >= 7.0)
-    SOFT_FAIL = "SOFT_FAIL"  # Needs minor improvements (5.0-6.9)
-    HARD_FAIL = "HARD_FAIL"  # Needs major revision (< 5.0)
-
-
-# Alias for domain-specific naming (shared Issue model)
-JudgeIssue = Issue
-
-
-class JudgeResponse(BaseModel):
-    """Detailed judge evaluation result."""
-
-    decision: JudgeDecision = Field(description="Approve, soft fail, or hard fail")
-    score: float = Field(ge=0.0, le=10.0, description="Overall quality score (0-10)")
-    score_breakdown: dict[str, float] = Field(
-        description="Named dimension scores (e.g., musicality: 8.5, variety: 7.0)",
-        default_factory=dict,
-    )
-    confidence: float = Field(
-        ge=0.0, le=1.0, description="Judge confidence in this evaluation (0-1)"
-    )
-    feedback_for_planner: str = Field(
-        description="Concise summary feedback for next iteration (2-4 sentences)"
-    )
-    overall_assessment: str = Field(description="Overall assessment summary (2-4 sentences)")
-    strengths: list[str] = Field(description="What the plan does well", default_factory=list)
-    issues: list[Issue] = Field(description="Detailed issues to address", default_factory=list)
 
     model_config = ConfigDict(frozen=True)

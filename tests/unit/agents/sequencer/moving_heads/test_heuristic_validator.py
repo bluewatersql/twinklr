@@ -301,3 +301,223 @@ def test_validate_segments_null_accepted(available_templates, song_structure):
     # Should be valid - segments: null is treated the same as omitting segments
     assert result.valid is True
     assert len(result.errors) == 0
+
+
+# =============================================================================
+# V2 Interface Tests
+# =============================================================================
+
+
+class TestHeuristicValidatorV2:
+    """Tests for V2 interface (from_context and create_validator_function)."""
+
+    @pytest.fixture
+    def planning_context(self):
+        """Create a MovingHeadPlanningContext for testing."""
+        from twinklr.core.agents.audio.profile.models import (
+            AssetUsage,
+            AudioProfileModel,
+            Contrast,
+            CreativeGuidance,
+            EnergyPoint,
+            EnergyProfile,
+            LyricProfile,
+            MacroEnergy,
+            MotionDensity,
+            PlannerHints,
+            SectionEnergyProfile,
+            SongIdentity,
+            SongSectionRef,
+            Structure,
+        )
+        from twinklr.core.agents.sequencer.moving_heads.context import (
+            FixtureContext,
+            MovingHeadPlanningContext,
+        )
+
+        song_identity = SongIdentity(
+            title="Test Song",
+            duration_ms=120000,
+            bpm=120.0,
+            time_signature="4/4",
+        )
+
+        sections = [
+            SongSectionRef(section_id="intro", name="intro", start_ms=0, end_ms=30000),
+            SongSectionRef(section_id="verse_1", name="verse", start_ms=30000, end_ms=60000),
+            SongSectionRef(section_id="chorus_1", name="chorus", start_ms=60000, end_ms=90000),
+            SongSectionRef(section_id="outro", name="outro", start_ms=90000, end_ms=120000),
+        ]
+
+        structure = Structure(sections=sections, structure_confidence=0.9)
+
+        # Create minimal section energy profiles
+        section_profiles = [
+            SectionEnergyProfile(
+                section_id=sec.section_id,
+                start_ms=sec.start_ms,
+                end_ms=sec.end_ms,
+                energy_curve=[
+                    EnergyPoint(t_ms=sec.start_ms, energy_0_1=0.5),
+                    EnergyPoint(t_ms=(sec.start_ms + sec.end_ms) // 2, energy_0_1=0.6),
+                    EnergyPoint(t_ms=sec.end_ms - 1, energy_0_1=0.5),
+                ],
+                mean_energy=0.55,
+                peak_energy=0.6,
+            )
+            for sec in sections
+        ]
+
+        energy_profile = EnergyProfile(
+            macro_energy=MacroEnergy.MED,
+            section_profiles=section_profiles,
+            peaks=[],
+            overall_mean=0.5,
+            energy_confidence=0.8,
+        )
+
+        lyric_profile = LyricProfile(
+            has_plain_lyrics=False,
+            has_timed_words=False,
+            has_phonemes=False,
+            lyric_confidence=0.0,
+            phoneme_confidence=0.0,
+        )
+
+        creative_guidance = CreativeGuidance(
+            recommended_layer_count=2,
+            recommended_contrast=Contrast.MED,
+            recommended_motion_density=MotionDensity.MED,
+            recommended_asset_usage=AssetUsage.SPARSE,
+        )
+
+        planner_hints = PlannerHints()
+
+        audio_profile = AudioProfileModel(
+            song_identity=song_identity,
+            structure=structure,
+            energy_profile=energy_profile,
+            lyric_profile=lyric_profile,
+            creative_guidance=creative_guidance,
+            planner_hints=planner_hints,
+        )
+
+        return MovingHeadPlanningContext(
+            audio_profile=audio_profile,
+            fixtures=FixtureContext(count=4, groups=[]),
+            available_templates=[
+                "sweep_lr_fan_pulse",
+                "circle_fan_hold",
+                "pendulum_chevron_breathe",
+            ],
+        )
+
+    def test_from_context_creates_validator(self, planning_context):
+        """Test from_context class method creates valid validator."""
+        validator = HeuristicValidator.from_context(planning_context)
+
+        assert validator is not None
+        assert "sweep_lr_fan_pulse" in validator.available_templates
+        assert "circle_fan_hold" in validator.available_templates
+
+    def test_from_context_validates_plan(self, planning_context):
+        """Test validator from_context can validate plans."""
+        validator = HeuristicValidator.from_context(planning_context)
+
+        plan = ChoreographyPlan(
+            sections=[
+                PlanSection(
+                    section_name="intro",
+                    start_bar=1,
+                    end_bar=15,
+                    template_id="sweep_lr_fan_pulse",
+                )
+            ]
+        )
+
+        result = validator.validate(plan)
+
+        assert result.valid is True
+        assert len(result.errors) == 0
+
+    def test_from_context_detects_invalid_template(self, planning_context):
+        """Test validator from_context detects invalid templates."""
+        validator = HeuristicValidator.from_context(planning_context)
+
+        plan = ChoreographyPlan(
+            sections=[
+                PlanSection(
+                    section_name="intro",
+                    start_bar=1,
+                    end_bar=15,
+                    template_id="nonexistent_template",
+                )
+            ]
+        )
+
+        result = validator.validate(plan)
+
+        assert result.valid is False
+        assert any("nonexistent_template" in err for err in result.errors)
+
+    def test_create_validator_function(self, planning_context):
+        """Test create_validator_function factory."""
+        from twinklr.core.agents.sequencer.moving_heads.heuristic_validator import (
+            create_validator_function,
+        )
+
+        validator_fn = create_validator_function(planning_context)
+
+        # Should be callable
+        assert callable(validator_fn)
+
+    def test_create_validator_function_returns_errors_only(self, planning_context):
+        """Test validator function returns only errors, not warnings."""
+        from twinklr.core.agents.sequencer.moving_heads.heuristic_validator import (
+            create_validator_function,
+        )
+
+        validator_fn = create_validator_function(planning_context)
+
+        # Valid plan
+        valid_plan = ChoreographyPlan(
+            sections=[
+                PlanSection(
+                    section_name="intro",
+                    start_bar=1,
+                    end_bar=15,
+                    template_id="sweep_lr_fan_pulse",
+                )
+            ]
+        )
+
+        errors = validator_fn(valid_plan)
+
+        assert isinstance(errors, list)
+        assert len(errors) == 0  # No errors for valid plan
+
+    def test_create_validator_function_captures_errors(self, planning_context):
+        """Test validator function captures errors correctly."""
+        from twinklr.core.agents.sequencer.moving_heads.heuristic_validator import (
+            create_validator_function,
+        )
+
+        validator_fn = create_validator_function(planning_context)
+
+        # Invalid plan with unknown template
+        invalid_plan = ChoreographyPlan(
+            sections=[
+                PlanSection(
+                    section_name="intro",
+                    start_bar=1,
+                    end_bar=15,
+                    template_id="invalid_template_xyz",
+                )
+            ]
+        )
+
+        errors = validator_fn(invalid_plan)
+
+        assert isinstance(errors, list)
+        assert len(errors) > 0
+        assert any("invalid_template_xyz" in err for err in errors)

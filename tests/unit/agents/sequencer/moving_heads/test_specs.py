@@ -1,13 +1,14 @@
-"""Tests for moving heads agent specs."""
+"""Tests for moving heads agent specs.
 
-from twinklr.core.agents.sequencer.moving_heads.models import (
-    ChoreographyPlan,
-    JudgeResponse,
-)
+V2 Migration: Uses JudgeVerdict (shared model) instead of JudgeResponse.
+"""
+
+from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan
 from twinklr.core.agents.sequencer.moving_heads.specs import (
     get_judge_spec,
     get_planner_spec,
 )
+from twinklr.core.agents.shared.judge.models import JudgeVerdict
 from twinklr.core.agents.spec import AgentMode
 
 
@@ -31,12 +32,14 @@ def test_get_planner_spec_with_overrides():
 
 
 def test_get_judge_spec_defaults():
-    """Test judge spec has sensible defaults."""
+    """Test judge spec has sensible defaults (V2: uses JudgeVerdict)."""
     spec = get_judge_spec()
 
-    assert spec.response_model == JudgeResponse
+    # V2: Uses shared JudgeVerdict instead of domain-specific JudgeResponse
+    assert spec.response_model == JudgeVerdict
     assert spec.mode == AgentMode.ONESHOT  # Judge is stateless
-    assert spec.temperature > 0.3  # Creative evaluation
+    # V2: Lower temperature for more consistent evaluation
+    assert spec.temperature <= 0.5
     assert spec.max_schema_repair_attempts >= 2
 
 

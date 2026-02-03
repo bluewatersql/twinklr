@@ -1,5 +1,7 @@
 """Tests for group template models."""
 
+import re
+
 from pydantic import ValidationError
 import pytest
 
@@ -44,7 +46,7 @@ class TestTimingHints:
 
     def test_bars_min_max_validation(self):
         """Test bars_min must be <= bars_max."""
-        with pytest.raises(ValidationError, match="bars_min.*must be.*bars_max"):
+        with pytest.raises(ValidationError, match=re.escape("bars_min.*must be.*bars_max")):
             TimingHints(bars_min=16, bars_max=4)
 
     def test_bars_range_constraints(self):
@@ -348,7 +350,9 @@ class TestGroupPlanTemplate:
 
     def test_layer_recipe_exceeds_max_layers(self):
         """Test validation fails if layer_recipe exceeds max_layers."""
-        with pytest.raises(ValidationError, match="layer_recipe count.*exceeds.*max_layers"):
+        with pytest.raises(
+            ValidationError, match=re.escape("layer_recipe count.*exceeds.*max_layers")
+        ):
             GroupPlanTemplate(
                 template_id="test",
                 name="Test",
@@ -376,7 +380,9 @@ class TestGroupPlanTemplate:
 
     def test_seam_safe_validation(self):
         """Test seam_safe_required requires seam-safe hints."""
-        with pytest.raises(ValidationError, match="seam_safe_required.*lacks seam-safe hints"):
+        with pytest.raises(
+            ValidationError, match=re.escape("seam_safe_required.*lacks seam-safe hints")
+        ):
             GroupPlanTemplate(
                 template_id="test",
                 name="Test",

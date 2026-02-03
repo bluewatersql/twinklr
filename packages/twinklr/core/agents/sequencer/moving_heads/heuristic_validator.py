@@ -3,15 +3,24 @@
 Fast, deterministic validation without LLM calls.
 Catches technical errors before expensive judge evaluation.
 Primary validation layer - judge only evaluates creative quality.
+
+V2 Migration:
+- Supports both legacy dict-based input and new MovingHeadPlanningContext
+- Use `from_context()` class method for V2 usage
+- Use `create_validator_function()` for StandardIterationController integration
 """
 
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, NamedTuple
+from typing import TYPE_CHECKING, Any, NamedTuple
 
 from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan, PlanSection
+
+if TYPE_CHECKING:
+    from twinklr.core.agents.sequencer.moving_heads.context import MovingHeadPlanningContext
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +51,33 @@ class _PlanUnit(NamedTuple):
     modifiers: dict[str, str]
 
 
+def create_validator_function(
+    context: MovingHeadPlanningContext,
+) -> Callable[[ChoreographyPlan], list[str]]:
+    """Create validator function for StandardIterationController.
+
+    Factory function that creates the callable expected by V2 iteration controller.
+
+    Args:
+        context: MovingHead planning context
+
+    Returns:
+        Validator function that takes a plan and returns list of error messages
+
+    Example:
+        >>> validator = create_validator_function(planning_context)
+        >>> errors = validator(plan)  # Returns list[str] of errors
+    """
+    heuristic_validator = HeuristicValidator.from_context(context)
+
+    def validate(plan: ChoreographyPlan) -> list[str]:
+        """Validate plan and return list of error messages."""
+        result = heuristic_validator.validate(plan)
+        return result.errors  # Only errors, not warnings
+
+    return validate
+
+
 class HeuristicValidator:
     """Code-based validator for choreography plans.
 
@@ -54,6 +90,12 @@ class HeuristicValidator:
     - Bar numbering (1-indexed)
 
     This is the main technical gate. Judge focuses on creative quality.
+
+    V2 Usage:
+        Use `from_context()` class method or `create_validator_function()` factory.
+
+    Legacy Usage:
+        Direct instantiation with available_templates and song_structure dict.
     """
 
     def __init__(
@@ -61,11 +103,40 @@ class HeuristicValidator:
         available_templates: list[str],
         song_structure: dict[str, Any],
     ):
+        """Initialize validator with template list and song structure.
+
+        Args:
+            available_templates: List of valid template IDs
+            song_structure: Song structure dict with sections and timing
+
+        Note:
+            For V2 usage, prefer `from_context()` class method.
+        """
         self.available_templates = set(available_templates)
         self.song_structure = song_structure
 
         self._song_sections = self._normalize_song_sections(song_structure.get("sections", []))
         self._total_bars = self._infer_total_bars(song_structure)
+
+    @classmethod
+    def from_context(cls, context: MovingHeadPlanningContext) -> HeuristicValidator:
+        """Create validator from MovingHeadPlanningContext (V2).
+
+        Extracts templates and song structure from the structured context model.
+
+        Args:
+            context: MovingHead planning context
+
+        Returns:
+            Configured HeuristicValidator instance
+        """
+        # Build song structure dict from context
+        song_structure = context.for_prompt()["song_structure"]
+
+        return cls(
+            available_templates=context.available_templates,
+            song_structure=song_structure,
+        )
 
     # ---------------------------------------------------------------------
     # Public API

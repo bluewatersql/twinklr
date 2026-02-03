@@ -1,0 +1,58 @@
+{#
+MovingHead Planner User Prompt - REFINEMENT ONLY
+Used for iteration 2+ to avoid resending full context.
+References existing conversation context (song structure, templates, fixtures).
+
+Token Optimization: ~80% reduction vs full context on refinement iterations.
+#}
+# Refinement Request: Choreography Plan
+
+## Iteration {{ iteration + 1 }} Feedback
+
+{{ feedback }}
+
+## Key Reminders (from initial context)
+
+- **Song**: {{ song_title }}{% if song_artist %} by {{ song_artist }}{% endif %}
+
+- **Tempo**: {{ tempo }} BPM | **Time Signature**: {{ time_signature }}
+- **Total Bars**: {{ total_bars }}
+- **Fixtures**: {{ fixture_count }} moving heads
+- **Templates Available**: {{ template_count }}
+
+{% if revision_focus %}
+## Revision Focus
+
+**Priority Issues to Address:**
+{% for issue in revision_focus[:5] %}
+- {{ issue }}
+{% endfor %}
+{% endif %}
+
+{% if preserve_elements %}
+## Keep What Works
+
+The following aspects were praised in your previous plan:
+{% for strength in preserve_elements[:3] %}
+- {{ strength }}
+{% endfor %}
+
+Preserve these elements while addressing the feedback above.
+{% endif %}
+
+## Critical Reminders
+
+1. **Template Selection**: Use ONLY templates from the library provided in iteration 1
+2. **Bar Numbering**: 1-indexed (first bar = 1, last bar = total_bars)
+3. **Section Coverage**: Cover all sections from bar 1 to bar {{ total_bars }}
+4. **Segmentation**: Default to 1 template per section; segment only when musically justified
+5. **Schema**: Return valid ChoreographyPlan JSON per developer prompt
+
+## Instructions
+
+1. **Address ALL feedback** - specifically issues marked as errors
+2. **Preserve strengths** - keep what worked in your previous plan
+3. **Maintain coverage** - ensure plan covers bars 1 through {{ total_bars }}
+4. **Justify changes** - explain significant alterations in section reasoning fields
+
+Return the complete revised ChoreographyPlan.

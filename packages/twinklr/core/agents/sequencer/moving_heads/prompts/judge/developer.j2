@@ -1,13 +1,27 @@
+{#
+MovingHead Judge Developer Prompt
+Technical constraints, response schema (JudgeVerdict), and evaluation rules
+
+V2 Migration: Uses JudgeVerdict (shared model) instead of JudgeResponse
+#}
 ## Technical Contract: Judge Evaluation Format
 
 ### Response Schema
 
-You must return a `JudgeResponse` that matches this JSON schema:
+You must return a `JudgeVerdict` that matches this JSON schema:
 
 ```json
 {{ response_schema }}
 ```
 
+{% if learning_context %}
+## Historical Learning Context
+
+{{ learning_context }}
+
+Use this context to be more vigilant about recurring patterns, but evaluate each plan on its own merits.
+
+{% endif %}
 ### Evaluation Process
 
 #### Phase 1: Technical Validation (Pass/Fail)
@@ -57,7 +71,7 @@ Once technical validation passes, evaluate **artistic merit** across these dimen
 
 Return a score 0-10 and populate `score_breakdown` with dimension scores (e.g., `{"musicality": 8.5, "variety": 7.0, "flow": 8.0, "templates": 7.5, "energy_arc": 8.0}`).
 
-### Decision Criteria
+### Decision Criteria (VerdictStatus)
 
 - **APPROVE** (`score >= 7.0`): Plan is technically valid and creatively strong, ready to render
 - **SOFT_FAIL** (`score 5.0-6.9`): Plan is valid but needs creative improvements, provide constructive feedback
@@ -65,41 +79,44 @@ Return a score 0-10 and populate `score_breakdown` with dimension scores (e.g., 
 
 ### Issue Reporting Format
 
-For each identified issue, provide a structured `JudgeIssue`:
+For each identified issue, provide a structured `Issue`:
 
 **Required fields (STRICT - use ONLY these exact values)**:
 - `issue_id`: Stable identifier (e.g., 'TIMING_OVERLAP_VERSE', 'VARIETY_LOW_CHORUS') - use snake_case
-- `category`: **EXACTLY ONE OF:** {{ taxonomy.IssueCategory | join(' | ') }} (NO other values allowed)
-- `severity`: **EXACTLY ONE OF:** {{ taxonomy.IssueSeverity | join(' | ') }}
-- `estimated_effort`: **EXACTLY ONE OF:** {{ taxonomy.IssueEffort | join(' | ') }}
-- `scope`: **EXACTLY ONE OF:** {{ taxonomy.IssueScope | join(' | ') }}
+- `category`: **EXACTLY ONE OF:** SCHEMA | TIMING | COVERAGE | TEMPLATES | LAYERING | COORDINATION | SPATIAL | VARIETY | MUSICALITY | COMPLEXITY | STYLE | DATA_QUALITY | LOGIC | CONSTRAINT
+- `severity`: **EXACTLY ONE OF:** ERROR | WARN | NIT
+- `estimated_effort`: **EXACTLY ONE OF:** LOW | MEDIUM | HIGH
+- `scope`: **EXACTLY ONE OF:** GLOBAL | SECTION | LANE | GROUP | PLACEMENT | EFFECT | BAR_RANGE | FIELD
 - `location`: Object with optional fields:
   - `section_id`: Section identifier (e.g., 'verse_1', 'chorus_2')
   - `group_id`: Fixture group identifier (if applicable)
   - `effect_id`: Effect identifier (if applicable)
   - `bar_start`: Start bar of issue location (if applicable)
   - `bar_end`: End bar of issue location (if applicable)
+  - `field_path`: Dot-notation field path (if applicable)
+- `rule`: Generic guideline (<150 chars, 'DON'T...' or 'ALWAYS...' format)
 - `message`: Human-readable issue description (1-3 sentences)
-- `fix_hint`: One sentence, actionable suggestion (e.g., "Increase variety by using different geometry types")
-- `acceptance_test`: Deterministic check the next plan must satisfy to resolve this issue (e.g., "Chorus energy >= 70/100", "No template used more than twice consecutively")
-- `suggested_action`: PATCH (minor adjustment) | REPLAN_SECTION (replan specific section) | REPLAN_GLOBAL (replan entire plan) | IGNORE (can be safely ignored)
+- `fix_hint`: One sentence, actionable suggestion
+- `acceptance_test`: Deterministic check the next plan must satisfy to resolve this issue
+- `suggested_action`: **EXACTLY ONE OF:** PATCH | REPLAN_SECTION | REPLAN_GLOBAL | IGNORE | RETRY
+- `generic_example`: Optional abstract pattern-based example for learning (not specific to this plan)
 
-**Location format examples**:
-- Single-template section: `{"section_id": "verse_1", "bar_start": 8, "bar_end": 24}`
-- Segmented section: `{"section_id": "chorus_1", "group_id": null, "bar_start": 25, "bar_end": 28}` (optionally reference segment in message)
-- Global issue: `{"section_id": null}` or all fields null
+### JudgeVerdict Fields
 
-### Response Fields
+**Required fields**:
+- `status`: APPROVE | SOFT_FAIL | HARD_FAIL (VerdictStatus)
+- `score`: 0.0-10.0 (overall quality score)
+- `confidence`: 0.0-1.0 (your confidence in this evaluation)
+- `overall_assessment`: 2-4 sentences overall assessment
+- `feedback_for_planner`: 2-4 sentences concise feedback for next iteration
+- `iteration`: Iteration number (use the value provided in context)
 
-**JudgeResponse**:
-- `decision`: Required (APPROVE | SOFT_FAIL | HARD_FAIL)
-- `score`: Required (0.0-10.0)
-- `score_breakdown`: Required dict with named dimension scores (e.g., `{"musicality": 8.5, "variety": 7.0}`)
-- `confidence`: Required (0.0-1.0), your confidence in this evaluation
-- `feedback_for_planner`: Required string (2-4 sentences), concise summary feedback for next iteration
-- `overall_assessment`: Required string (2-4 sentences, max 500 chars), overall assessment summary
-- `strengths`: Required list of strings, what the plan does well (0+ items)
-- `issues`: Required list of JudgeIssue objects, detailed issues to address (0+ items)
+**Required lists**:
+- `strengths`: 2-5 items of what the plan does well
+- `issues`: 0+ Issue objects for problems found
+
+**Optional but recommended**:
+- `score_breakdown`: Dict with named dimension scores
 
 ### Judgment Philosophy
 
@@ -118,16 +135,14 @@ When evaluating plans with segmented sections:
 - **Evaluate musical justification**: Does segmentation align with meaningful musical changes (pickup/build/hit/drop)?
 - **Penalize overuse**: Too many segments or "template thrash" hurts visual coherence
 - **Credit good use**: Segmentation that enhances musicality and impact should be praised
-- **Location references**: Use `section_name:segment_id` in messages when discussing specific segments (e.g., "chorus_1:pickup" or "chorus_1:A")
 
 ### Common Errors to Avoid
 
-- ❌ Missing required fields (decision, score, confidence, feedback, assessment)
+- ❌ Missing required fields (status, score, confidence, feedback, assessment, iteration)
 - ❌ Empty `score_breakdown` (provide named dimension scores)
 - ❌ Vague feedback ("needs improvement" - be specific!)
 - ❌ No acceptance tests in issues (make them deterministic and checkable)
 - ❌ Inconsistent issue IDs across iterations (use stable identifiers)
 - ❌ Overly harsh judgment without constructive feedback
 - ❌ Approving plans with technical errors (always HARD_FAIL technical issues)
-- ❌ Location fields that don't match the plan structure
-- ❌ **Flagging `end_bar = total_bars` as exceeding song length** (bars are 1-indexed and inclusive, so ending at `total_bars` is correct)
+- ❌ **Flagging `end_bar = total_bars` as exceeding song length** (bars are 1-indexed and inclusive)

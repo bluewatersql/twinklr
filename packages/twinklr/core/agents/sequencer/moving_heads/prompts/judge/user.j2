@@ -1,50 +1,114 @@
-Evaluate the following choreography plan:
+{#
+MovingHead Judge User Prompt
+Provides plan and context for evaluation
+
+V2 Migration: Uses iteration number from IterationContext
+#}
+# Choreography Plan Evaluation
 
 ## Plan to Judge
 
+```json
 {{ plan | tojson(indent=2) }}
+```
 
 ## Musical Context
 
-{{ context.song_structure | tojson(indent=2) }}
+### Song Structure
 
-{% if context.get('audio_features') %}
-**Energy Profile**: {{ context.audio_features.get('energy_summary', 'Not available') }}
-**Key Moments**: {{ context.audio_features.get('key_moments', []) | tojson }}
+| Section | Name | Start Bar | End Bar | Duration |
+|---------|------|-----------|---------|----------|
+{% for section in sections %}
+| {{ section.section_id }} | {{ section.name }} | {{ section.start_bar }} | {{ section.end_bar }} | {{ section.end_bar - section.start_bar + 1 }} bars |
+{% endfor %}
+
+**Total Bars**: {{ total_bars }}
+**Tempo**: {{ tempo }} BPM ({{ time_signature }})
+
+{% if audio_profile is defined and audio_profile %}
+### Audio Profile
+
+{% if audio_profile.energy_profile is defined and audio_profile.energy_profile %}
+**Overall Energy**: {{ audio_profile.energy_profile.macro_energy }}
+{% endif %}
+
+{% if audio_profile.creative_guidance is defined and audio_profile.creative_guidance %}
+- **Recommended Layers**: {{ audio_profile.creative_guidance.recommended_layer_count }}
+- **Motion Density**: {{ audio_profile.creative_guidance.recommended_motion_density }}
+- **Visual Contrast**: {{ audio_profile.creative_guidance.recommended_contrast }}
+{% endif %}
 {% endif %}
 
 ## Available Templates
 
-{% if context.get('available_templates') %}
-{{ context.available_templates | tojson }}
-{% else %}
-No template library provided. Cannot validate template IDs.
-{% endif %}
+```json
+{{ available_templates | tojson }}
+```
 
-{% if iteration > 1 %}
+{% if iteration is defined and iteration > 0 %}
 ## Iteration Context
 
-This is iteration {{ iteration }}. Previous feedback:
+This is **iteration {{ iteration + 1 }}**.
+
+{% if previous_feedback is defined and previous_feedback %}
+### Previous Feedback
+
 {% for item in previous_feedback %}
 - {{ item }}
 {% endfor %}
 
-Has the planner addressed the feedback effectively?
+**Has the planner addressed this feedback effectively?**
+{% endif %}
+
+{% if previous_issues is defined and previous_issues %}
+### Outstanding Issues from Previous Iteration
+
+{% for issue in previous_issues %}
+- **{{ issue.issue_id }}** ({{ issue.severity }}): {{ issue.message }}
+{% endfor %}
+
+**Check if these issues have been resolved.**
+{% endif %}
 {% endif %}
 
 ## Evaluation Instructions
 
-Judge this choreography plan across all criteria:
+Evaluate this choreography plan in two phases:
 
-1. **Technical Validation (Phase 1)**: First verify completeness, timing, coverage, and consistency
-2. **Musical Synchronization**: Does it serve the music?
-3. **Visual Interest**: Is it engaging and varied?
-4. **Flow and Transitions**: Does it feel cohesive?
-5. **Creative Template Use**: Are templates used effectively?
-6. **Energy Arc**: Does the overall energy make sense?
+### Phase 1: Technical Validation
 
-Remember: If technically invalid, return HARD_FAIL immediately. Otherwise, evaluate creative quality.
+First verify the plan is technically sound:
+1. **Completeness**: All required fields present, valid section structure
+2. **Timing**: Valid bar ranges, no overlaps, correct coverage
+3. **Templates**: All template IDs exist in the available templates list
+4. **Coverage**: Plan covers bars 1 through {{ total_bars }}
 
-## Required Output Format
+**If technical issues found**: Return `HARD_FAIL` immediately with detailed issues.
 
-Provide your evaluation matching the JudgeResponse schema specified in the developer prompt.
+### Phase 2: Creative Quality (if technically valid)
+
+Score the plan 0-10 across these dimensions:
+1. **Musical Synchronization** (30%): Does choreography match song energy?
+2. **Visual Interest** (25%): Appropriate variety? Avoids monotony?
+3. **Flow and Transitions** (20%): Smooth transitions between sections?
+4. **Creative Template Use** (15%): Templates used effectively?
+5. **Energy Arc** (10%): Energy builds appropriately?
+
+### Decision
+
+- **APPROVE** (score >= 7.0): Ready to render
+- **SOFT_FAIL** (score 5.0-6.9): Needs improvement, provide feedback
+- **HARD_FAIL** (score < 5.0): Needs major revision
+
+## Required Output
+
+Return a JudgeVerdict with:
+- `status`: APPROVE, SOFT_FAIL, or HARD_FAIL
+- `score`: 0.0-10.0
+- `confidence`: 0.0-1.0
+- `strengths`: List of what works well
+- `issues`: List of detailed issues
+- `overall_assessment`: 2-4 sentence summary
+- `feedback_for_planner`: Concise, actionable feedback
+- `score_breakdown`: Named dimension scores
+- `iteration`: {{ iteration }}

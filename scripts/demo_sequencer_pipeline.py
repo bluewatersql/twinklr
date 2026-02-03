@@ -40,13 +40,19 @@ from twinklr.core.agents.sequencer.group_planner import (
     TemplateCatalog,
 )
 from twinklr.core.agents.sequencer.macro_planner.stage import MacroPlannerStage
+from twinklr.core.caching import FSCache
 from twinklr.core.config.loader import load_app_config, load_job_config
+from twinklr.core.io import RealFileSystem, absolute_path
 from twinklr.core.pipeline import (
     ExecutionPattern,
     PipelineContext,
     PipelineDefinition,
     PipelineExecutor,
     StageDefinition,
+)
+from twinklr.core.sequencer.templates.group import load_builtin_group_templates
+from twinklr.core.sequencer.templates.group.catalog import (
+    build_template_catalog as build_catalog_from_registry,
 )
 from twinklr.core.utils.formatting import clean_audio_filename
 from twinklr.core.utils.logging import configure_logging
@@ -110,11 +116,6 @@ def build_template_catalog() -> TemplateCatalog:
     Returns:
         TemplateCatalog with all 83 registered templates
     """
-    from twinklr.core.sequencer.templates.group import load_builtin_group_templates
-    from twinklr.core.sequencer.templates.group.catalog import (
-        build_template_catalog as build_catalog_from_registry,
-    )
-
     # Load builtin templates (triggers auto-registration)
     load_builtin_group_templates()
 
@@ -311,9 +312,6 @@ async def main() -> None:
     print_section("3. Pipeline Execution", "=")
 
     # Setup caching infrastructure
-    from twinklr.core.caching import FSCache
-    from twinklr.core.io import RealFileSystem, absolute_path
-
     fs = RealFileSystem()
 
     # LLM cache: Short-lived, transparent deduplication of identical LLM calls
@@ -335,7 +333,7 @@ async def main() -> None:
         enabled=job_config.agent.llm_logging.enabled if job_config else False,
         output_dir=logging_dir / "llm_calls",
         log_level=job_config.agent.llm_logging.log_level if job_config else "standard",
-        format=job_config.agent.llm_logging.format if job_config else "yaml",
+        format=job_config.agent.llm_logging.format if job_config else "json",
     )
 
     # Create pipeline context with agent cache
@@ -396,7 +394,7 @@ async def main() -> None:
             "audio_bundle_summary.json",
             output_dir,
         )
-        print(f"📄 Audio bundle: {bundle_path}")
+        print(f"📄 Audio bundle: {bundle_path.stem}")
 
     # Audio profile
     if "profile" in result.outputs:
@@ -407,7 +405,7 @@ async def main() -> None:
             "audio_profile.json",
             output_dir,
         )
-        print(f"📄 Audio profile: {profile_path}")
+        print(f"📄 Audio profile: {profile_path.stem}")
 
     # Lyrics context
     if "lyrics" in result.outputs:
@@ -418,7 +416,7 @@ async def main() -> None:
             "lyric_context.json",
             output_dir,
         )
-        print(f"📄 Lyric context: {lyrics_path}")
+        print(f"📄 Lyric context: {lyrics_path.stem}")
 
     # Macro plan (output is list[MacroSectionPlan], not MacroPlan)
     if "macro" in result.outputs:
@@ -430,7 +428,7 @@ async def main() -> None:
             "macro_sections.json",
             output_dir,
         )
-        print(f"📄 Macro sections: {macro_path}")
+        print(f"📄 Macro sections: {macro_path.stem}")
 
     # GroupPlanSet
     if "aggregate" in result.outputs:
@@ -441,7 +439,7 @@ async def main() -> None:
             "group_plan_set.json",
             output_dir,
         )
-        print(f"📄 Group plan set: {group_plan_path}")
+        print(f"📄 Group plan set: {group_plan_path.stem}")
 
     # Holistic evaluation
     if "holistic" in result.outputs:
@@ -452,7 +450,7 @@ async def main() -> None:
             "holistic_evaluation.json",
             output_dir,
         )
-        print(f"📄 Holistic evaluation: {holistic_path}")
+        print(f"📄 Holistic evaluation: {holistic_path.stem}")
 
     # Metrics summary
     print_subsection("Pipeline Metrics")

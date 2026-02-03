@@ -200,7 +200,7 @@ def validate_examples_file(file_path: Path) -> tuple[bool, list[str]]:
     valid_enums = get_valid_enum_values()
 
     try:
-        with open(file_path) as f:
+        with file_path.open() as f:
             content = f.read()
     except Exception as e:
         return False, [f"Could not read file: {e}"]

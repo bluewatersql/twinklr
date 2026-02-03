@@ -313,7 +313,7 @@ class TestRegistryDecorator:
     def test_decorator_registers_template(self):
         """Test decorator registers template in global registry."""
         # Create a new registry for isolation
-        test_registry = GroupTemplateRegistry()
+        _ = GroupTemplateRegistry()
 
         @register_group_template(aliases=["Test Decorator"])
         def make_test_decorator_template() -> GroupPlanTemplate:

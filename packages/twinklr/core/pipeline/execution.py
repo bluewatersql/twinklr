@@ -127,8 +127,10 @@ async def execute_step(
             logger.error(f"{stage_name} returned None")
             return failure_result("Execution returned None", stage_name=stage_name)
 
+        status = getattr(result, "success", True)
+        context.add_metric(f"{stage_name}_success", status)
         # Check for orchestration failure
-        if hasattr(result, "success") and not getattr(result, "success", True):
+        if not status:
             error_ctx = getattr(result, "context", None)
             if error_ctx and hasattr(error_ctx, "termination_reason"):
                 error_msg = getattr(error_ctx, "termination_reason", "Execution failed")
@@ -157,20 +159,29 @@ async def execute_step(
     if hasattr(result, "context"):
         result_context = getattr(result, "context", None)
         if result_context:
-            # Iteration count: current_iteration is 0-based but incremented at start of each loop
-            # So iteration 0 = 1 attempt, iteration 1 = 2 attempts, etc.
-            # Report the actual number of attempts made
-            if hasattr(result_context, "current_iteration"):
-                iterations = result_context.current_iteration  # type: ignore[attr-defined]
-                # Add 1 to convert from 0-based to human-readable count
-                # BUT: controller.increment_iteration() is called at loop start,
-                # so current_iteration already represents attempts made
-                context.add_metric(f"{stage_name}_iterations", iterations)
-            if hasattr(result_context, "total_tokens_used"):
-                context.add_metric(f"{stage_name}_tokens", result_context.total_tokens_used)  # type: ignore[attr-defined]
-            final_verdict = getattr(result_context, "final_verdict", None)
-            if final_verdict:
-                context.add_metric(f"{stage_name}_score", final_verdict.score)  # type: ignore[attr-defined]
+            # Handle both dict and Pydantic model contexts
+            if hasattr(result_context, "model_dump"):
+                # Pydantic model - use getattr
+                context.add_metric(
+                    f"{stage_name}_iterations", getattr(result_context, "current_iteration", 0)
+                )
+                context.add_metric(
+                    f"{stage_name}_tokens", getattr(result_context, "total_tokens_used", 0)
+                )
+                final_verdict = getattr(result_context, "final_verdict", None)
+                if final_verdict and hasattr(final_verdict, "score"):
+                    context.add_metric(f"{stage_name}_score", final_verdict.score)
+            else:
+                # Dict - use .get()
+                context.add_metric(
+                    f"{stage_name}_iterations", result_context.get("current_iteration", 0)
+                )
+                context.add_metric(
+                    f"{stage_name}_tokens", result_context.get("total_tokens_used", 0)
+                )
+                context.add_metric(
+                    f"{stage_name}_score", result_context.get("final_verdict", {}).get("score", 0)
+                )
 
     # CACHE HIT METRIC
     context.add_metric(f"{stage_name}_from_cache", from_cache)

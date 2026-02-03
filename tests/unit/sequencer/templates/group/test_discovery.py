@@ -10,7 +10,7 @@ class TestAutoDiscovery:
     def test_load_builtin_templates_idempotent(self):
         """Test load_builtin_group_templates() is idempotent."""
         # Get initial count
-        initial_count = len(REGISTRY.list_all())
+        _ = len(REGISTRY.list_all())
 
         # Load templates multiple times
         load_builtin_group_templates()
