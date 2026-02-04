@@ -35,6 +35,6 @@ class ThemeScope(str, Enum):
         PLACEMENT: Theme applies to a single placement.
     """
 
-    SONG = "song"
-    SECTION = "section"
-    PLACEMENT = "placement"
+    SONG = "SONG"
+    SECTION = "SECTION"
+    PLACEMENT = "PLACEMENT"

@@ -13,15 +13,14 @@ from enum import Enum
 from pydantic import BaseModel, ConfigDict, Field
 
 from twinklr.core.agents.sequencer.group_planner.timing import TimingContext
+from twinklr.core.sequencer.planning import SectionCoordinationPlan
 from twinklr.core.sequencer.templates.group.catalog import TemplateCatalog
 from twinklr.core.sequencer.templates.group.models import (
-    CoordinationMode,
     DisplayGraph,
     GroupPlacement,
-    LaneKind,
     PlacementWindow,
-    SectionCoordinationPlan,
 )
+from twinklr.core.sequencer.vocabulary import CoordinationMode, LaneKind
 
 
 class ValidationSeverity(str, Enum):

@@ -31,6 +31,13 @@ def make_gtpl_accent_hit_white() -> GroupPlanTemplate:
         template_type=GroupTemplateType.ACCENT,
         visual_intent=GroupVisualIntent.ABSTRACT,
         tags=["hit", "flash", "white", "short", "emphasis"],
+        affinity_tags=[
+            "motif.abstract",
+            "constraint.high_contrast",
+            "style.bold_shapes",
+            "setting.hype",
+        ],
+        avoid_tags=[],
         projection=ProjectionSpec(intent=ProjectionIntent.FLAT),
         timing=TimingHints(bars_min=1, bars_max=2),
         layer_recipe=[
@@ -59,6 +66,13 @@ def make_gtpl_accent_hit_color() -> GroupPlanTemplate:
         template_type=GroupTemplateType.ACCENT,
         visual_intent=GroupVisualIntent.ABSTRACT,
         tags=["hit", "flash", "color", "red", "green"],
+        affinity_tags=[
+            "motif.abstract",
+            "constraint.high_contrast",
+            "style.bold_shapes",
+            "setting.hype",
+        ],
+        avoid_tags=[],
         projection=ProjectionSpec(intent=ProjectionIntent.FLAT),
         timing=TimingHints(bars_min=1, bars_max=2),
         layer_recipe=[
@@ -87,6 +101,13 @@ def make_gtpl_accent_hit_ring() -> GroupPlanTemplate:
         template_type=GroupTemplateType.ACCENT,
         visual_intent=GroupVisualIntent.ABSTRACT,
         tags=["hit", "ring", "expansion", "radial"],
+        affinity_tags=[
+            "motif.concentric_rings",
+            "constraint.centered_composition",
+            "constraint.high_contrast",
+            "setting.hype",
+        ],
+        avoid_tags=[],
         projection=ProjectionSpec(intent=ProjectionIntent.FLAT),
         timing=TimingHints(bars_min=1, bars_max=2),
         layer_recipe=[
@@ -116,6 +137,13 @@ def make_gtpl_accent_burst_small() -> GroupPlanTemplate:
         template_type=GroupTemplateType.ACCENT,
         visual_intent=GroupVisualIntent.ABSTRACT,
         tags=["burst", "small", "radial", "starburst"],
+        affinity_tags=[
+            "motif.radial_rays",
+            "motif.stars",
+            "constraint.centered_composition",
+            "constraint.high_contrast",
+        ],
+        avoid_tags=[],
         projection=ProjectionSpec(intent=ProjectionIntent.FLAT),
         timing=TimingHints(bars_min=1, bars_max=2),
         layer_recipe=[
@@ -144,6 +172,13 @@ def make_gtpl_accent_burst_big() -> GroupPlanTemplate:
         template_type=GroupTemplateType.ACCENT,
         visual_intent=GroupVisualIntent.ABSTRACT,
         tags=["burst", "big", "large", "tail"],
+        affinity_tags=[
+            "motif.radial_rays",
+            "motif.flares",
+            "constraint.centered_composition",
+            "constraint.high_contrast",
+        ],
+        avoid_tags=[],
         projection=ProjectionSpec(intent=ProjectionIntent.FLAT),
         timing=TimingHints(bars_min=1, bars_max=4),
         layer_recipe=[
@@ -173,6 +208,13 @@ def make_gtpl_accent_spark_shower_up() -> GroupPlanTemplate:
         template_type=GroupTemplateType.ACCENT,
         visual_intent=GroupVisualIntent.ABSTRACT,
         tags=["spark", "shower", "up", "fountain"],
+        affinity_tags=[
+            "motif.sparkles",
+            "motif.particles",
+            "constraint.sparse_elements",
+            "setting.playful",
+        ],
+        avoid_tags=["constraint.noisy_texture_avoid"],
         projection=ProjectionSpec(intent=ProjectionIntent.FLAT),
         timing=TimingHints(bars_min=1, bars_max=4),
         layer_recipe=[
@@ -201,6 +243,13 @@ def make_gtpl_accent_spark_shower_down() -> GroupPlanTemplate:
         template_type=GroupTemplateType.ACCENT,
         visual_intent=GroupVisualIntent.ABSTRACT,
         tags=["spark", "shower", "down", "rain"],
+        affinity_tags=[
+            "motif.sparkles",
+            "motif.particles",
+            "constraint.sparse_elements",
+            "setting.playful",
+        ],
+        avoid_tags=["constraint.noisy_texture_avoid"],
         projection=ProjectionSpec(intent=ProjectionIntent.FLAT),
         timing=TimingHints(bars_min=1, bars_max=4),
         layer_recipe=[

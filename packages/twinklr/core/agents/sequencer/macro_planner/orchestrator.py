@@ -28,6 +28,7 @@ from twinklr.core.agents.shared.judge.controller import (
 )
 from twinklr.core.agents.shared.judge.feedback import FeedbackManager
 from twinklr.core.agents.spec import AgentSpec
+from twinklr.core.agents.taxonomy_utils import get_theming_catalog_dict, get_theming_ids
 from twinklr.core.sequencer.planning import MacroPlan
 
 logger = logging.getLogger(__name__)
@@ -186,9 +187,25 @@ class MacroPlannerOrchestrator:
             logger.debug("  ⏭️  No lyric context (musical analysis only)")
 
         # Prepare initial variables for planner
+        # Get theming catalog for theme/palette/tag/motif selection
+        theming_catalog = get_theming_catalog_dict()
+        theming_ids = get_theming_ids()
+
         initial_variables = {
             "audio_profile": audio_profile,
             "display_groups": planning_context.display_groups,
+            # Theme catalog: theme_id + title for selection
+            "theme_catalog": [
+                {"theme_id": t["id"], "title": t["title"]} for t in theming_catalog["themes"]
+            ],
+            # Palette catalog: for palette override validation
+            "palette_catalog": theming_catalog["palettes"],
+            # Tag catalog: for valid tag selection
+            "tag_catalog": theming_catalog["tags"],
+            # Motif catalog: for motif selection and energy matching
+            "motif_catalog": theming_catalog["motifs"],
+            # ID lists for validation
+            "theming_ids": theming_ids,
         }
 
         # Add lyric context if available

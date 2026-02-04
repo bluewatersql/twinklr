@@ -16,6 +16,57 @@ from twinklr.core.sequencer.vocabulary import (
     TargetRole,
     TimingDriver,
 )
+from twinklr.core.sequencer.vocabulary.visual import PaletteRole
+
+
+class PaletteRef(BaseModel):
+    model_config = {"extra": "forbid"}
+
+    palette_id: str = Field(..., description="Palette ID")
+
+    role: PaletteRole | None = Field(
+        default=None,
+        description="Optional usage role (e.g. PRIMARY, ACCENT, WARM, COOL)",
+    )
+    intensity: float | None = Field(
+        default=None,
+        ge=0.0,
+        le=1.0,
+        description="Optional global intensity scaler for this palette usage",
+    )
+    variant: str | None = Field(
+        default=None,
+        description="Optional palette variant key (e.g. 'a', 'b', 'night', 'day')",
+    )
+
+
+class PalettePlan(BaseModel):
+    model_config = {"extra": "forbid"}
+
+    # Primary palette for the show
+    primary: PaletteRef = Field(..., description="Default palette for the song")
+
+    # Optional alternates allowed for variation (still theme-consistent)
+    alternates: list[PaletteRef] = Field(default_factory=list, max_length=6)
+
+    # Simple transition intent (kept minimal but structured)
+    transition_notes: str = Field(
+        default="",
+        description="Rules for when/how to shift palette usage across song/sections",
+        max_length=500,
+    )
+
+
+class MotifSpec(BaseModel):
+    model_config = {"extra": "forbid"}
+
+    motif_id: str = Field(..., description="Stable id e.g. 'candy_cane_swirl'")
+    tags: list[str] = Field(default_factory=list, max_length=8)  # used for template matching
+    description: str = Field(..., min_length=10, max_length=300)
+
+    # Optional: where it should appear
+    preferred_energy: list[EnergyTarget] = Field(default_factory=list)
+    usage_notes: str = Field(default="", max_length=500)
 
 
 class GlobalStory(BaseModel):
@@ -31,7 +82,7 @@ class GlobalStory(BaseModel):
     story_notes: str = Field(
         ..., description="Overarching narrative/theme notes (prose)", min_length=10
     )
-    motifs: list[str] = Field(
+    motifs: list[MotifSpec] = Field(
         ...,
         description="3-5 recurring visual/musical motifs throughout the show",
         min_length=3,
@@ -81,6 +132,18 @@ class MacroSectionPlan(BaseModel):
     choreography_style: ChoreographyStyle = Field(
         ..., description="Visual approach (IMAGERY, ABSTRACT, HYBRID)"
     )
+
+    palette: PaletteRef | None = Field(
+        default=None,
+        description="Optional palette override for this section; if None use global primary",
+    )
+
+    motif_ids: list[str] = Field(
+        default_factory=list,
+        description="Motifs to emphasize in this section (references GlobalStory.motifs[*].motif_id)",
+        max_length=5,
+    )
+
     motion_density: MotionDensity = Field(..., description="Activity level (SPARSE, MED, BUSY)")
     notes: str = Field(..., description="Strategic notes for this section", min_length=20)
 
@@ -215,6 +278,20 @@ class MacroPlan(BaseModel):
     section_plans: list[MacroSectionPlan] = Field(
         ..., description="Per-section strategic plans", min_length=1
     )
+    asset_requirements: list[str] = Field(
+        default_factory=list,
+        description="Required visual assets (PNG/GIF filenames)",
+        max_length=50,
+    )
+
+    @field_validator("asset_requirements")
+    @classmethod
+    def validate_asset_requirements(cls, v: list[str]) -> list[str]:
+        """Validate asset requirement filenames."""
+        for asset in v:
+            if len(asset) < 1:
+                raise ValueError("Asset requirement must have at least 1 character")
+        return v
 
     @field_validator("section_plans")
     @classmethod

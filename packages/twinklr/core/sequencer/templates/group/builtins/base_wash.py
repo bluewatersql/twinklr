@@ -27,6 +27,13 @@ def make_gtpl_base_wash_soft() -> GroupPlanTemplate:
         template_type=GroupTemplateType.BASE,
         visual_intent=GroupVisualIntent.ABSTRACT,
         tags=["wash", "gradient", "soft", "calm", "continuous"],
+        affinity_tags=[
+            "motif.gradient_bands",
+            "style.minimal",
+            "setting.calm",
+            "constraint.clean_edges",
+        ],
+        avoid_tags=["constraint.noisy_texture_avoid", "constraint.high_contrast"],
         projection=ProjectionSpec(intent=ProjectionIntent.FLAT),
         timing=TimingHints(bars_min=4, bars_max=64),
         layer_recipe=[
@@ -55,6 +62,13 @@ def make_gtpl_base_wash_split() -> GroupPlanTemplate:
         template_type=GroupTemplateType.BASE,
         visual_intent=GroupVisualIntent.ABSTRACT,
         tags=["wash", "gradient", "split", "dual", "continuous"],
+        affinity_tags=[
+            "motif.gradient_bands",
+            "motif.stripes",
+            "constraint.clean_edges",
+            "style.bold_shapes",
+        ],
+        avoid_tags=["constraint.noisy_texture_avoid"],
         projection=ProjectionSpec(intent=ProjectionIntent.FLAT),
         timing=TimingHints(bars_min=4, bars_max=64),
         layer_recipe=[

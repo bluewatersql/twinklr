@@ -42,34 +42,40 @@ from twinklr.core.agents.sequencer.group_planner.validators import (
     ValidationResult,
     ValidationSeverity,
 )
+from twinklr.core.sequencer.planning import (
+    Deviation,
+    GroupPlanSet,
+    LanePlan,
+    SectionCoordinationPlan,
+)
+from twinklr.core.sequencer.templates.assets.models import AssetRequest
 from twinklr.core.sequencer.templates.group.catalog import (
     TemplateCatalog,
-    TemplateCatalogEntry,
+    TemplateInfo,
 )
-from twinklr.core.sequencer.templates.group.models import (
-    AssetRequest,
+from twinklr.core.sequencer.templates.group.models.coordination import (
     CoordinationConfig,
-    CoordinationMode,
     CoordinationPlan,
-    Deviation,
+    GroupPlacement,
+    PlacementWindow,
+)
+from twinklr.core.sequencer.templates.group.models.display import (
     DisplayGraph,
     DisplayGroup,
+    GroupPosition,
+)
+from twinklr.core.sequencer.timing import TimeRef
+from twinklr.core.sequencer.vocabulary import (
+    CoordinationMode,
     GPBlendMode,
     GPTimingDriver,
-    GroupPlacement,
-    GroupPlanSet,
-    GroupPosition,
     LaneKind,
-    LanePlan,
-    PlacementWindow,
-    SectionCoordinationPlan,
     SnapRule,
     SpatialIntent,
     SpillPolicy,
     StepUnit,
-    TimeRef,
-    TimeRefKind,
 )
+from twinklr.core.sequencer.vocabulary.timing import TimeRefKind
 
 __all__ = [
     # Models - Enums
@@ -90,7 +96,7 @@ __all__ = [
     "GroupPosition",
     # Models - Templates
     "TemplateCatalog",
-    "TemplateCatalogEntry",
+    "TemplateInfo",
     # Models - Placements
     "CoordinationConfig",
     "CoordinationPlan",

@@ -210,9 +210,9 @@ def test_learning_context_formatting(temp_storage, sample_issues):
     assert "Historical Learning Context" in learning_context
     assert "VARIETY" in learning_context
     assert "MUSICALITY" in learning_context
-    assert "occurred" in learning_context
-    assert "Repeated template usage" in learning_context
-    assert "Energy mismatch" in learning_context
+    assert "recent issues" in learning_context
+    # Examples from sample issues
+    assert "Example:" in learning_context
 
 
 def test_iteration_controller_creates_repository(temp_storage):

@@ -12,12 +12,13 @@ from pydantic import BaseModel, ConfigDict, Field
 from twinklr.core.agents.sequencer.group_planner.timing import TimingContext
 from twinklr.core.sequencer.templates.group.catalog import (
     TemplateCatalog,
-    TemplateCatalogEntry,
+    TemplateInfo,
 )
 from twinklr.core.sequencer.templates.group.models import (
     DisplayGraph,
-    LaneKind,
 )
+from twinklr.core.sequencer.theming import ThemeRef
+from twinklr.core.sequencer.vocabulary import LaneKind
 
 
 class SectionPlanningContext(BaseModel):
@@ -58,6 +59,12 @@ class SectionPlanningContext(BaseModel):
         description="Layer intents from MacroPlan layering_plan (optional)",
     )
 
+    # Theme from MacroSectionPlan (required for section coordination)
+    theme: ThemeRef | None = Field(
+        default=None,
+        description="Theme reference from MacroPlan for this section",
+    )
+
     @property
     def duration_ms(self) -> int:
         """Section duration in milliseconds."""
@@ -79,7 +86,7 @@ class SectionPlanningContext(BaseModel):
                 group_ids.extend(groups_by_role[role])
         return group_ids
 
-    def templates_for_lane(self, lane: LaneKind) -> list[TemplateCatalogEntry]:
+    def templates_for_lane(self, lane: LaneKind) -> list[TemplateInfo]:
         """Get templates compatible with a lane.
 
         Args:
@@ -136,6 +143,15 @@ class GroupPlanningContext(BaseModel):
         for section_plan in section_plans:
             section_info = section_plan.get("section", {})
 
+            # Extract theme reference if provided
+            theme_data = section_plan.get("theme")
+            theme: ThemeRef | None = None
+            if theme_data:
+                if isinstance(theme_data, ThemeRef):
+                    theme = theme_data
+                elif isinstance(theme_data, dict):
+                    theme = ThemeRef.model_validate(theme_data)
+
             ctx = SectionPlanningContext(
                 section_id=section_info.get("section_id", "unknown"),
                 section_name=section_info.get("name", "unknown"),
@@ -151,6 +167,7 @@ class GroupPlanningContext(BaseModel):
                 template_catalog=self.template_catalog,
                 timing_context=self.timing_context,
                 layer_intents=layer_intents,
+                theme=theme,
             )
             contexts.append(ctx)
 

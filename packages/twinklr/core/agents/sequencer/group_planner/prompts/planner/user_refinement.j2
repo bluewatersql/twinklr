@@ -19,6 +19,13 @@ References existing conversation context (section, templates, groups).
 - **Theme:** {{ theme_ref.theme_id }}{% if theme_ref.tags %} (tags: {{ theme_ref.tags | join(", ") }}){% endif %}
 {% endif %}
 
+{% if palette_ref_json %}
+- **Palette:** {{ palette_ref_json }}
+{% endif %}
+{% if motif_ids %}
+- **Motifs:** {{ motif_ids | join(", ") }}
+{% endif %}
+
 ## Intensity Limits (STRICT - exceeding = validation failure)
 
 | Lane   | Max   |
@@ -58,4 +65,5 @@ References existing conversation context (section, templates, groups).
 2. Keep structure that worked - only fix flagged issues
 3. Verify ALL intensity values are within lane limits
 4. Do not change theme_id unless feedback explicitly requests it
-5. Return the complete revised SectionCoordinationPlan
+5. Keep palette/motif_ids consistent with MacroPlan (do not invent)
+6. Return the complete revised SectionCoordinationPlan

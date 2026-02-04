@@ -30,6 +30,13 @@ def make_gtpl_rhythm_pulse_even() -> GroupPlanTemplate:
         template_type=GroupTemplateType.RHYTHM,
         visual_intent=GroupVisualIntent.ABSTRACT,
         tags=["pulse", "beat", "downbeat", "even", "rhythm"],
+        affinity_tags=[
+            "motif.abstract",
+            "constraint.clean_edges",
+            "style.minimal",
+            "constraint.loopable",
+        ],
+        avoid_tags=[],
         projection=ProjectionSpec(intent=ProjectionIntent.FLAT),
         timing=TimingHints(bars_min=1, bars_max=32),
         layer_recipe=[
@@ -58,6 +65,13 @@ def make_gtpl_rhythm_pulse_syncopated() -> GroupPlanTemplate:
         template_type=GroupTemplateType.RHYTHM,
         visual_intent=GroupVisualIntent.ABSTRACT,
         tags=["pulse", "syncopated", "offbeat", "rhythm"],
+        affinity_tags=[
+            "motif.abstract",
+            "setting.playful",
+            "constraint.clean_edges",
+            "style.minimal",
+        ],
+        avoid_tags=[],
         projection=ProjectionSpec(intent=ProjectionIntent.FLAT),
         timing=TimingHints(bars_min=1, bars_max=32),
         layer_recipe=[
@@ -86,6 +100,8 @@ def make_gtpl_rhythm_pulse_half_time() -> GroupPlanTemplate:
         template_type=GroupTemplateType.RHYTHM,
         visual_intent=GroupVisualIntent.ABSTRACT,
         tags=["pulse", "half-time", "slow", "rhythm"],
+        affinity_tags=["motif.abstract", "setting.calm", "style.minimal", "constraint.clean_edges"],
+        avoid_tags=["constraint.high_contrast"],
         projection=ProjectionSpec(intent=ProjectionIntent.FLAT),
         timing=TimingHints(bars_min=2, bars_max=32),
         layer_recipe=[

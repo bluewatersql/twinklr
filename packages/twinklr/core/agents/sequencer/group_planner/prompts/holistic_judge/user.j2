@@ -20,14 +20,29 @@ Provides complete GroupPlanSet for holistic evaluation
 {% endfor %}
 
 {% if macro_plan_summary and macro_plan_summary.global_story %}
-## MacroPlan Context
 
-{% if macro_plan_summary.global_story.theme %}
-**Theme:** {{ macro_plan_summary.global_story.theme }}
+## Macro Plan Theme & Palette Summary
+
+{% if global_theme_id %}
+**Global Theme ID:** {{ global_theme_id }}
+{% endif %}
+{% if global_palette_id %}
+**Global Palette Override:** {{ global_palette_id }}
+{% endif %}
+{% if global_theme_tags %}
+**Global Theme Tags:** {{ global_theme_tags | join(", ") }}
+{% endif %}
+
+{% if color_story %}
+**Color Story:** {{ color_story }}
+{% endif %}
+
+{% if story_notes %}
+**Story Notes:** {{ story_notes }}
 {% endif %}
 
 {% if macro_plan_summary.global_story.motifs %}
-**Motifs:**
+**Global Motifs:**
 {% for motif in macro_plan_summary.global_story.motifs %}
 - {{ motif }}
 {% endfor %}
@@ -36,6 +51,15 @@ Provides complete GroupPlanSet for holistic evaluation
 {% if macro_plan_summary.global_story.pacing_notes %}
 **Pacing Notes:** {{ macro_plan_summary.global_story.pacing_notes }}
 {% endif %}
+
+## Section Theme Distribution
+
+| Section | Theme ID | Scope | Tags | Palette | Motifs |
+|---------|----------|-------|------|---------|--------|
+{% for s in section_theme_summary %}
+| {{ s.section_id }} | {{ s.theme_id or "—" }} | {{ s.scope or "—" }} | {{ (s.tags | join(", ")) if s.tags else "—" }} | {{ s.palette_id or "—" }} | {{ (s.motif_ids | join(", ")) if s.motif_ids else "—" }} |
+{% endfor %}
+
 {% endif %}
 
 ---
@@ -53,15 +77,15 @@ Provides complete GroupPlanSet for holistic evaluation
 Evaluate this complete GroupPlanSet for:
 
 1. **Energy Arc**: Does energy build and release appropriately across sections?
-
 2. **Template Variety**: Are templates varied enough to avoid monotony?
-
 3. **Group Utilization**: Are all groups getting appropriate attention?
-
 4. **Coherence**: Do sections flow naturally together?
 
 {% if macro_plan_summary %}
 5. **MacroPlan Alignment**: Does coordination honor the global story and motifs?
+6. **Theme Continuity**: Do most sections use the global theme? Are overrides justified?
+7. **Palette Arc**: Does palette usage make sense across sections? Are overrides aligned to musical transitions?
+8. **Asset Workload Risk**: Is theme/palette churn creating too many unique needs?
 {% endif %}
 
-Provide your evaluation as a HolisticEvaluation with score, status, and any cross-section issues.
+Return a HolisticEvaluation JSON only.

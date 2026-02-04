@@ -1,0 +1,39 @@
+pack_id: holistic_judge.v2
+version: 2.1.0
+description: Holistic judge prompts for GroupPlanSet cross-section coherence (themes + palettes + motifs)
+
+templates:
+  system: system.j2
+  user: user.j2
+  developer: developer.j2
+
+variables:
+  required:
+    - group_plan_set
+    - section_count
+    - section_ids
+    - display_graph
+    - template_catalog
+    - response_schema
+    - taxonomy
+
+  optional:
+    - macro_plan_summary
+    - global_theme_id
+    - global_palette_id
+    - global_theme_tags
+    - color_story
+    - story_notes
+    - section_theme_summary
+    - learning_context
+
+    # optional deterministic id validation
+    - motif_catalog
+    - palette_catalog
+
+metadata:
+  agent_type: judge
+  input_schema: GroupPlanSet
+  output_schema: HolisticEvaluation
+  supports_iteration: true
+  max_iterations: 2

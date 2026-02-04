@@ -15,6 +15,7 @@ from dataclasses import dataclass
 
 from twinklr.core.sequencer.theming.enums import TagCategory
 from twinklr.core.sequencer.theming.models import (
+    MotifDefinition,
     PaletteDefinition,
     TagDefinition,
     ThemeDefinition,
@@ -60,6 +61,16 @@ class ThemeInfo:
     title: str
     description: str | None
     default_palette_id: str | None
+
+
+@dataclass(frozen=True)
+class MotifInfo:
+    """Lightweight motif metadata for listing."""
+
+    motif_id: str
+    tags: tuple[str, ...]
+    description: str | None
+    preferred_energy: tuple[str, ...]  # Stored as strings for serialization
 
 
 class PaletteCatalog:
@@ -347,6 +358,114 @@ class ThemeCatalog:
         return self.has(key)
 
 
+class MotifCatalog:
+    """Registry for motif definitions.
+
+    Motifs are derived from motif.* tags and provide structured metadata
+    for visual content guidance.
+
+    Example:
+        >>> catalog = MotifCatalog()
+        >>> catalog.register(my_motif)
+        >>> motif = catalog.get("spiral")
+    """
+
+    def __init__(self) -> None:
+        """Initialize empty catalog."""
+        self._items: dict[str, MotifDefinition] = {}
+        self._aliases: dict[str, str] = {}
+        self._info: dict[str, MotifInfo] = {}
+
+    def register(
+        self,
+        item: MotifDefinition,
+        *,
+        aliases: Iterable[str] = (),
+    ) -> None:
+        """Register a motif.
+
+        Args:
+            item: Motif definition to register.
+            aliases: Additional aliases for lookup.
+
+        Raises:
+            ValueError: If motif already registered.
+        """
+        mid = item.motif_id
+
+        if mid in self._items:
+            raise ValueError(f"Motif already registered: {mid}")
+
+        self._items[mid] = item
+
+        # Register aliases
+        all_aliases = {mid, *aliases}
+        for a in all_aliases:
+            self._aliases[normalize_key(a)] = mid
+
+        # Store lightweight info (convert enums to strings for serialization)
+        self._info[mid] = MotifInfo(
+            motif_id=mid,
+            tags=tuple(item.tags),
+            description=item.description,
+            preferred_energy=tuple(
+                e.value if hasattr(e, "value") else str(e) for e in item.preferred_energy
+            ),
+        )
+
+        logger.debug(f"Registered motif: {mid}")
+
+    def get(self, key: str) -> MotifDefinition:
+        """Lookup motif by id or alias.
+
+        Args:
+            key: Motif identifier or alias.
+
+        Returns:
+            MotifDefinition (immutable, no copy needed).
+
+        Raises:
+            ItemNotFoundError: If motif not found.
+        """
+        mid = self._aliases.get(normalize_key(key), key)
+        item = self._items.get(mid)
+
+        if not item:
+            raise ItemNotFoundError(f"Unknown motif: {key}")
+
+        return item
+
+    def has(self, key: str) -> bool:
+        """Check if motif exists."""
+        mid = self._aliases.get(normalize_key(key), key)
+        return mid in self._items
+
+    def list_all(self) -> list[MotifInfo]:
+        """List all registered motifs."""
+        return sorted(self._info.values(), key=lambda x: x.motif_id)
+
+    def list_ids(self) -> list[str]:
+        """List all registered motif IDs."""
+        return sorted(self._items.keys())
+
+    def find_by_tag(self, tag: str) -> list[MotifInfo]:
+        """Find motifs that include a specific tag.
+
+        Args:
+            tag: Tag to search for.
+
+        Returns:
+            List of MotifInfo matching the tag.
+        """
+        return [info for info in self._info.values() if tag in info.tags]
+
+    def __len__(self) -> int:
+        return len(self._items)
+
+    def __contains__(self, key: str) -> bool:
+        return self.has(key)
+
+
 # =============================================================================
 # Global registries (populated by builtins on import)
 # =============================================================================
@@ -354,6 +473,7 @@ class ThemeCatalog:
 PALETTE_REGISTRY = PaletteCatalog()
 TAG_REGISTRY = TagCatalog()
 THEME_REGISTRY = ThemeCatalog()
+MOTIF_REGISTRY = MotifCatalog()
 
 
 # =============================================================================
@@ -391,28 +511,43 @@ def list_themes() -> list[ThemeInfo]:
     return THEME_REGISTRY.list_all()
 
 
+def get_motif(key: str) -> MotifDefinition:
+    """Get motif from global registry."""
+    return MOTIF_REGISTRY.get(key)
+
+
+def list_motifs() -> list[MotifInfo]:
+    """List all motifs from global registry."""
+    return MOTIF_REGISTRY.list_all()
+
+
 __all__ = [
     # Catalog classes
     "PaletteCatalog",
     "TagCatalog",
     "ThemeCatalog",
+    "MotifCatalog",
     # Info types
     "PaletteInfo",
     "TagInfo",
     "ThemeInfo",
+    "MotifInfo",
     # Errors
     "ItemNotFoundError",
     # Global registries
     "PALETTE_REGISTRY",
     "TAG_REGISTRY",
     "THEME_REGISTRY",
+    "MOTIF_REGISTRY",
     # Convenience functions
     "get_palette",
     "get_tag",
     "get_theme",
+    "get_motif",
     "list_palettes",
     "list_tags",
     "list_themes",
+    "list_motifs",
     # Utilities
     "normalize_key",
 ]

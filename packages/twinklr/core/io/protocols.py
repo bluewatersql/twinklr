@@ -5,7 +5,7 @@ Defines async-first FileSystem protocol and sync convenience wrapper protocol.
 
 from typing import Protocol
 
-from .models import AbsolutePath, WriteResult
+from twinklr.core.io.models import AbsolutePath, WriteResult
 
 
 class FileSystem(Protocol):

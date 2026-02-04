@@ -406,7 +406,7 @@ class TestGroupPlanTemplate:
 
     def test_duplicate_slot_ids(self):
         """Test validation fails with duplicate slot_ids."""
-        with pytest.raises(ValidationError, match="Duplicate slot_id"):
+        with pytest.raises(ValidationError, match=re.escape("Duplicate slot_id")):
             GroupPlanTemplate(
                 template_id="test",
                 name="Test",

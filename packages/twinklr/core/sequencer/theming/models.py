@@ -8,9 +8,10 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from twinklr.core.sequencer.theming.enums import TagCategory, ThemeScope
+from twinklr.core.sequencer.vocabulary.energy import EnergyTarget
 
 
 class ColorStop(BaseModel):
@@ -128,6 +129,14 @@ class ThemeRef(BaseModel):
     tags: list[str] = Field(default_factory=list, description="Extra tags to bias generation")
     palette_id: str | None = Field(default=None, description="Optional palette override")
 
+    @field_validator("scope", mode="before")
+    @classmethod
+    def normalize_scope(cls, v: str | ThemeScope) -> str | ThemeScope:
+        """Normalize scope to uppercase to handle LLM outputs like 'song'."""
+        if isinstance(v, str):
+            return v.upper()
+        return v
+
 
 class ThemeCatalog(BaseModel):
     """Catalog of themes, palettes, and tags.
@@ -147,6 +156,34 @@ class ThemeCatalog(BaseModel):
     tags: dict[str, TagDefinition] = Field(default_factory=dict)
 
 
+class MotifDefinition(BaseModel):
+    """Motif definition for visual content guidance.
+
+    Motifs are derived from motif.* tags and provide structured metadata
+    for planners and validators.
+
+    Attributes:
+        motif_id: Stable identifier (e.g., 'spiral', 'snowflakes').
+        tags: Tags for template matching (must include motif.* tag).
+        description: Motif description.
+        preferred_energy: Energy levels this motif works best at.
+        usage_notes: Optional usage guidance for planners.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    motif_id: str = Field(..., min_length=1, description="Stable id derived from motif.* tag")
+    tags: list[str] = Field(
+        default_factory=list,
+        min_length=1,
+        max_length=8,
+        description="Tags for template matching (must include at least one motif.* tag)",
+    )
+    description: str = Field(default="", max_length=300)
+    preferred_energy: list[EnergyTarget] = Field(default_factory=list)
+    usage_notes: str = Field(default="", max_length=500)
+
+
 __all__ = [
     "ColorStop",
     "PaletteDefinition",
@@ -154,4 +191,5 @@ __all__ = [
     "ThemeCatalog",
     "ThemeDefinition",
     "ThemeRef",
+    "MotifDefinition",
 ]

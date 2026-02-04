@@ -130,7 +130,9 @@ class MacroPlannerStage:
                 if section_plans_data and isinstance(section_plans_data[0], dict):
                     return [MacroSectionPlan.model_validate(s) for s in section_plans_data]
 
-                return section_plans_data
+                # section_plans_data is already a list of MacroSectionPlan
+                result: list[MacroSectionPlan] = section_plans_data
+                return result
 
             # Execute with caching and automatic metrics/state handling
             return await execute_step(

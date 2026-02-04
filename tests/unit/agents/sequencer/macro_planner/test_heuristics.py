@@ -13,6 +13,7 @@ from twinklr.core.sequencer.planning import (
     MacroSectionPlan,
     TargetSelector,
 )
+from twinklr.core.sequencer.theming import ThemeRef, ThemeScope
 from twinklr.core.sequencer.vocabulary import (
     BlendMode,
     ChoreographyStyle,
@@ -22,17 +23,74 @@ from twinklr.core.sequencer.vocabulary import (
     TimingDriver,
 )
 
+from .conftest import make_motif_spec
 
-@pytest.fixture
-def valid_macro_plan() -> MacroPlan:
-    """Create a valid MacroPlan for testing."""
-    global_story = GlobalStory(
-        theme="Christmas magic with cascading waves",
-        motifs=["Starbursts", "Waves", "Sparkles"],
+
+def _make_global_theme() -> ThemeRef:
+    """Create a valid global ThemeRef (SONG scope)."""
+    return ThemeRef(
+        theme_id="theme.abstract.neon",
+        scope=ThemeScope.SONG,
+        tags=["motif.geometric"],
+    )
+
+
+def _make_section_theme() -> ThemeRef:
+    """Create a valid section ThemeRef (SECTION scope)."""
+    return ThemeRef(
+        theme_id="theme.abstract.neon",
+        scope=ThemeScope.SECTION,
+        tags=["motif.geometric"],
+    )
+
+
+def _make_global_story(
+    story_notes: str = "Christmas magic with cascading light waves across the display",
+) -> GlobalStory:
+    """Create a valid GlobalStory for testing."""
+    return GlobalStory(
+        theme=_make_global_theme(),
+        story_notes=story_notes,
+        motifs=[
+            make_motif_spec("starbursts", "Starbursts"),
+            make_motif_spec("waves", "Waves"),
+            make_motif_spec("sparkles", "Sparkles"),
+        ],
         pacing_notes="Build energy through verses, peak at chorus, gentle outro",
         color_story="Cool blues to warm golds",
     )
 
+
+def _make_section_plan(
+    section_id: str,
+    name: str,
+    start_ms: int,
+    end_ms: int,
+    energy_target: EnergyTarget = EnergyTarget.MED,
+    motion_density: MotionDensity = MotionDensity.MED,
+    choreography_style: ChoreographyStyle = ChoreographyStyle.ABSTRACT,
+    notes: str = "Section plan with appropriate choreography and energy",
+) -> MacroSectionPlan:
+    """Create a valid MacroSectionPlan for testing."""
+    return MacroSectionPlan(
+        section=SongSectionRef(
+            section_id=section_id,
+            name=name,
+            start_ms=start_ms,
+            end_ms=end_ms,
+        ),
+        theme=_make_section_theme(),
+        energy_target=energy_target,
+        primary_focus_targets=["OUTLINE"],
+        choreography_style=choreography_style,
+        motion_density=motion_density,
+        notes=notes,
+    )
+
+
+@pytest.fixture
+def valid_macro_plan() -> MacroPlan:
+    """Create a valid MacroPlan for testing."""
     base_layer = LayerSpec(
         layer_index=0,
         layer_role=LayerRole.BASE,
@@ -46,19 +104,12 @@ def valid_macro_plan() -> MacroPlan:
         layers=[base_layer], strategy_notes="Single base layer for clean foundation"
     )
 
-    section_plan = MacroSectionPlan(
-        section=SongSectionRef(section_id="intro", name="Intro", start_ms=0, end_ms=10000),
-        energy_target=EnergyTarget.LOW,
-        primary_focus_targets=["OUTLINE"],
-        choreography_style=ChoreographyStyle.ABSTRACT,
-        motion_density=MotionDensity.SPARSE,
-        notes="Gentle intro establishing foundation",
-    )
-
     return MacroPlan(
-        global_story=global_story,
+        global_story=_make_global_story(),
         layering_plan=layering_plan,
-        section_plans=[section_plan],
+        section_plans=[
+            _make_section_plan("intro", "Intro", 0, 10000, EnergyTarget.LOW, MotionDensity.SPARSE)
+        ],
         asset_requirements=[],
     )
 
@@ -222,21 +273,17 @@ def test_section_coverage_complete(simple_audio_profile: AudioProfileModel):
         section_plans.append(
             MacroSectionPlan(
                 section=section,
+                theme=_make_section_theme(),
                 energy_target=EnergyTarget.MED,
                 primary_focus_targets=["OUTLINE"],
                 choreography_style=ChoreographyStyle.ABSTRACT,
                 motion_density=MotionDensity.MED,
-                notes="Section plan matching audio section",
+                notes="Section plan matching audio section properly",
             )
         )
 
     plan = MacroPlan(
-        global_story=GlobalStory(
-            theme="Test theme with complete coverage",
-            motifs=["Motif1", "Motif2", "Motif3"],
-            pacing_notes="Build energy through song with good pacing",
-            color_story="Blues to golds",
-        ),
+        global_story=_make_global_story(),
         layering_plan=LayeringPlan(
             layers=[
                 LayerSpec(
@@ -269,21 +316,17 @@ def test_section_coverage_missing_sections(simple_audio_profile: AudioProfileMod
         section_plans.append(
             MacroSectionPlan(
                 section=section,
+                theme=_make_section_theme(),
                 energy_target=EnergyTarget.MED,
                 primary_focus_targets=["OUTLINE"],
                 choreography_style=ChoreographyStyle.ABSTRACT,
                 motion_density=MotionDensity.MED,
-                notes="Partial coverage test",
+                notes="Partial coverage test matching section",
             )
         )
 
     plan = MacroPlan(
-        global_story=GlobalStory(
-            theme="Test theme",
-            motifs=["M1", "M2", "M3"],
-            pacing_notes="Test pacing notes for validation",
-            color_story="Test colors",
-        ),
+        global_story=_make_global_story(),
         layering_plan=LayeringPlan(
             layers=[
                 LayerSpec(
@@ -328,11 +371,12 @@ def test_section_coverage_extra_sections(simple_audio_profile: AudioProfileModel
         section_plans.append(
             MacroSectionPlan(
                 section=section,
+                theme=_make_section_theme(),
                 energy_target=EnergyTarget.MED,
                 primary_focus_targets=["OUTLINE"],
                 choreography_style=ChoreographyStyle.ABSTRACT,
                 motion_density=MotionDensity.MED,
-                notes="Valid section plan matching audio section",
+                notes="Valid section plan matching audio section properly",
             )
         )
 
@@ -346,21 +390,17 @@ def test_section_coverage_extra_sections(simple_audio_profile: AudioProfileModel
                 start_ms=last_section.end_ms,  # Adjacent to last section
                 end_ms=last_section.end_ms + 10000,
             ),
+            theme=_make_section_theme(),
             energy_target=EnergyTarget.HIGH,
             primary_focus_targets=["HERO"],
             choreography_style=ChoreographyStyle.IMAGERY,
             motion_density=MotionDensity.BUSY,
-            notes="Extra section not in audio profile for testing",
+            notes="Extra section not in audio profile for testing purposes",
         )
     )
 
     plan = MacroPlan(
-        global_story=GlobalStory(
-            theme="Test theme",
-            motifs=["M1", "M2", "M3"],
-            pacing_notes="Test pacing notes for validation",
-            color_story="Test colors",
-        ),
+        global_story=_make_global_story(),
         layering_plan=LayeringPlan(
             layers=[
                 LayerSpec(
@@ -441,18 +481,14 @@ def test_layer_count_optimal(simple_audio_profile: AudioProfileModel):
     ]
 
     plan = MacroPlan(
-        global_story=GlobalStory(
-            theme="Test theme",
-            motifs=["M1", "M2", "M3"],
-            pacing_notes="Test pacing notes for validation testing",
-            color_story="Test colors",
-        ),
+        global_story=_make_global_story(),
         layering_plan=LayeringPlan(
             layers=layers, strategy_notes="Three-layer composition with clear hierarchy"
         ),
         section_plans=[
             MacroSectionPlan(
                 section=simple_audio_profile.structure.sections[0],
+                theme=_make_section_theme(),
                 energy_target=EnergyTarget.MED,
                 primary_focus_targets=["OUTLINE"],
                 choreography_style=ChoreographyStyle.ABSTRACT,
@@ -475,12 +511,7 @@ def test_layer_count_minimal_warning(simple_audio_profile: AudioProfileModel):
 
     # Create plan with only 1 layer
     plan = MacroPlan(
-        global_story=GlobalStory(
-            theme="Test theme",
-            motifs=["M1", "M2", "M3"],
-            pacing_notes="Test pacing notes for validation testing",
-            color_story="Test colors",
-        ),
+        global_story=_make_global_story(),
         layering_plan=LayeringPlan(
             layers=[
                 LayerSpec(
@@ -497,6 +528,7 @@ def test_layer_count_minimal_warning(simple_audio_profile: AudioProfileModel):
         section_plans=[
             MacroSectionPlan(
                 section=simple_audio_profile.structure.sections[0],
+                theme=_make_section_theme(),
                 energy_target=EnergyTarget.LOW,
                 primary_focus_targets=["OUTLINE"],
                 choreography_style=ChoreographyStyle.ABSTRACT,
@@ -566,18 +598,14 @@ def test_layer_count_maximum_warning(simple_audio_profile: AudioProfileModel):
     ]
 
     plan = MacroPlan(
-        global_story=GlobalStory(
-            theme="Test theme",
-            motifs=["M1", "M2", "M3"],
-            pacing_notes="Test pacing notes for validation testing",
-            color_story="Test colors",
-        ),
+        global_story=_make_global_story(),
         layering_plan=LayeringPlan(
             layers=layers, strategy_notes="Five-layer composition at maximum complexity"
         ),
         section_plans=[
             MacroSectionPlan(
                 section=simple_audio_profile.structure.sections[0],
+                theme=_make_section_theme(),
                 energy_target=EnergyTarget.HIGH,
                 primary_focus_targets=["OUTLINE", "MEGA_TREE"],
                 choreography_style=ChoreographyStyle.HYBRID,
@@ -604,12 +632,7 @@ def test_target_validity_always_passes(simple_audio_profile: AudioProfileModel):
 
     # Any valid plan will pass because Pydantic already validated targets
     plan = MacroPlan(
-        global_story=GlobalStory(
-            theme="Test theme",
-            motifs=["M1", "M2", "M3"],
-            pacing_notes="Test pacing notes for validation testing",
-            color_story="Test colors",
-        ),
+        global_story=_make_global_story(),
         layering_plan=LayeringPlan(
             layers=[
                 LayerSpec(
@@ -626,6 +649,7 @@ def test_target_validity_always_passes(simple_audio_profile: AudioProfileModel):
         section_plans=[
             MacroSectionPlan(
                 section=simple_audio_profile.structure.sections[0],
+                theme=_make_section_theme(),
                 energy_target=EnergyTarget.MED,
                 primary_focus_targets=["HERO", "ARCHES"],
                 secondary_targets=["PROPS"],
@@ -655,6 +679,7 @@ def test_focus_target_variety_good(simple_audio_profile: AudioProfileModel):
         section_plans.append(
             MacroSectionPlan(
                 section=section,
+                theme=_make_section_theme(),
                 energy_target=EnergyTarget.MED,
                 primary_focus_targets=targets[i % len(targets)],
                 choreography_style=ChoreographyStyle.ABSTRACT,
@@ -664,12 +689,7 @@ def test_focus_target_variety_good(simple_audio_profile: AudioProfileModel):
         )
 
     plan = MacroPlan(
-        global_story=GlobalStory(
-            theme="Test theme",
-            motifs=["M1", "M2", "M3"],
-            pacing_notes="Test pacing notes for validation testing",
-            color_story="Test colors",
-        ),
+        global_story=_make_global_story(),
         layering_plan=LayeringPlan(
             layers=[
                 LayerSpec(
@@ -703,6 +723,7 @@ def test_focus_target_overused_warning(simple_audio_profile: AudioProfileModel):
         section_plans.append(
             MacroSectionPlan(
                 section=section,
+                theme=_make_section_theme(),
                 energy_target=EnergyTarget.MED,
                 primary_focus_targets=["OUTLINE"],  # Always same target
                 choreography_style=ChoreographyStyle.ABSTRACT,
@@ -712,12 +733,7 @@ def test_focus_target_overused_warning(simple_audio_profile: AudioProfileModel):
         )
 
     plan = MacroPlan(
-        global_story=GlobalStory(
-            theme="Test theme",
-            motifs=["M1", "M2", "M3"],
-            pacing_notes="Test pacing notes for validation testing",
-            color_story="Test colors",
-        ),
+        global_story=_make_global_story(),
         layering_plan=LayeringPlan(
             layers=[
                 LayerSpec(
@@ -756,12 +772,7 @@ def test_asset_types_valid(simple_audio_profile: AudioProfileModel):
     validator = MacroPlanHeuristicValidator()
 
     plan = MacroPlan(
-        global_story=GlobalStory(
-            theme="Test theme",
-            motifs=["M1", "M2", "M3"],
-            pacing_notes="Test pacing notes for validation testing",
-            color_story="Test colors",
-        ),
+        global_story=_make_global_story(),
         layering_plan=LayeringPlan(
             layers=[
                 LayerSpec(
@@ -778,6 +789,7 @@ def test_asset_types_valid(simple_audio_profile: AudioProfileModel):
         section_plans=[
             MacroSectionPlan(
                 section=simple_audio_profile.structure.sections[0],
+                theme=_make_section_theme(),
                 energy_target=EnergyTarget.MED,
                 primary_focus_targets=["OUTLINE"],
                 choreography_style=ChoreographyStyle.ABSTRACT,
@@ -799,12 +811,7 @@ def test_asset_types_invalid_extension(simple_audio_profile: AudioProfileModel):
     validator = MacroPlanHeuristicValidator()
 
     plan = MacroPlan(
-        global_story=GlobalStory(
-            theme="Test theme",
-            motifs=["M1", "M2", "M3"],
-            pacing_notes="Test pacing notes for validation testing",
-            color_story="Test colors",
-        ),
+        global_story=_make_global_story(),
         layering_plan=LayeringPlan(
             layers=[
                 LayerSpec(
@@ -821,6 +828,7 @@ def test_asset_types_invalid_extension(simple_audio_profile: AudioProfileModel):
         section_plans=[
             MacroSectionPlan(
                 section=simple_audio_profile.structure.sections[0],
+                theme=_make_section_theme(),
                 energy_target=EnergyTarget.MED,
                 primary_focus_targets=["OUTLINE"],
                 choreography_style=ChoreographyStyle.ABSTRACT,
@@ -851,12 +859,7 @@ def test_asset_bloat_warning(simple_audio_profile: AudioProfileModel):
     many_assets = [f"asset_{i:02d}.png" for i in range(15)]
 
     plan = MacroPlan(
-        global_story=GlobalStory(
-            theme="Test theme",
-            motifs=["M1", "M2", "M3"],
-            pacing_notes="Test pacing notes for validation testing",
-            color_story="Test colors",
-        ),
+        global_story=_make_global_story(),
         layering_plan=LayeringPlan(
             layers=[
                 LayerSpec(
@@ -873,6 +876,7 @@ def test_asset_bloat_warning(simple_audio_profile: AudioProfileModel):
         section_plans=[
             MacroSectionPlan(
                 section=simple_audio_profile.structure.sections[0],
+                theme=_make_section_theme(),
                 energy_target=EnergyTarget.MED,
                 primary_focus_targets=["OUTLINE"],
                 choreography_style=ChoreographyStyle.ABSTRACT,
@@ -898,12 +902,7 @@ def test_asset_bloat_no_warning(simple_audio_profile: AudioProfileModel):
     validator = MacroPlanHeuristicValidator()
 
     plan = MacroPlan(
-        global_story=GlobalStory(
-            theme="Test theme",
-            motifs=["M1", "M2", "M3"],
-            pacing_notes="Test pacing notes for validation testing",
-            color_story="Test colors",
-        ),
+        global_story=_make_global_story(),
         layering_plan=LayeringPlan(
             layers=[
                 LayerSpec(
@@ -920,6 +919,7 @@ def test_asset_bloat_no_warning(simple_audio_profile: AudioProfileModel):
         section_plans=[
             MacroSectionPlan(
                 section=simple_audio_profile.structure.sections[0],
+                theme=_make_section_theme(),
                 energy_target=EnergyTarget.MED,
                 primary_focus_targets=["OUTLINE"],
                 choreography_style=ChoreographyStyle.ABSTRACT,
@@ -949,6 +949,7 @@ def test_contrast_good_variety(simple_audio_profile: AudioProfileModel):
     section_plans = [
         MacroSectionPlan(
             section=simple_audio_profile.structure.sections[0],
+            theme=_make_section_theme(),
             energy_target=EnergyTarget.LOW,
             motion_density=MotionDensity.SPARSE,
             choreography_style=ChoreographyStyle.ABSTRACT,
@@ -957,6 +958,7 @@ def test_contrast_good_variety(simple_audio_profile: AudioProfileModel):
         ),
         MacroSectionPlan(
             section=simple_audio_profile.structure.sections[1],
+            theme=_make_section_theme(),
             energy_target=EnergyTarget.MED,
             motion_density=MotionDensity.MED,
             choreography_style=ChoreographyStyle.IMAGERY,
@@ -965,6 +967,7 @@ def test_contrast_good_variety(simple_audio_profile: AudioProfileModel):
         ),
         MacroSectionPlan(
             section=simple_audio_profile.structure.sections[2],
+            theme=_make_section_theme(),
             energy_target=EnergyTarget.HIGH,
             motion_density=MotionDensity.BUSY,
             choreography_style=ChoreographyStyle.HYBRID,
@@ -974,12 +977,7 @@ def test_contrast_good_variety(simple_audio_profile: AudioProfileModel):
     ]
 
     plan = MacroPlan(
-        global_story=GlobalStory(
-            theme="Test theme",
-            motifs=["M1", "M2", "M3"],
-            pacing_notes="Test pacing notes for validation testing",
-            color_story="Test colors",
-        ),
+        global_story=_make_global_story(),
         layering_plan=LayeringPlan(
             layers=[
                 LayerSpec(
@@ -1013,6 +1011,7 @@ def test_contrast_no_energy_variety(simple_audio_profile: AudioProfileModel):
         section_plans.append(
             MacroSectionPlan(
                 section=section,
+                theme=_make_section_theme(),
                 energy_target=EnergyTarget.MED,  # All same
                 motion_density=MotionDensity.MED,
                 choreography_style=ChoreographyStyle.ABSTRACT,
@@ -1022,12 +1021,7 @@ def test_contrast_no_energy_variety(simple_audio_profile: AudioProfileModel):
         )
 
     plan = MacroPlan(
-        global_story=GlobalStory(
-            theme="Test theme",
-            motifs=["M1", "M2", "M3"],
-            pacing_notes="Test pacing notes for validation testing",
-            color_story="Test colors",
-        ),
+        global_story=_make_global_story(),
         layering_plan=LayeringPlan(
             layers=[
                 LayerSpec(
@@ -1064,6 +1058,7 @@ def test_contrast_no_density_variety(simple_audio_profile: AudioProfileModel):
         section_plans.append(
             MacroSectionPlan(
                 section=section,
+                theme=_make_section_theme(),
                 energy_target=EnergyTarget.MED if i % 2 == 0 else EnergyTarget.HIGH,  # Vary energy
                 motion_density=MotionDensity.MED,  # All same density
                 choreography_style=ChoreographyStyle.ABSTRACT,
@@ -1073,12 +1068,7 @@ def test_contrast_no_density_variety(simple_audio_profile: AudioProfileModel):
         )
 
     plan = MacroPlan(
-        global_story=GlobalStory(
-            theme="Test theme",
-            motifs=["M1", "M2", "M3"],
-            pacing_notes="Test pacing notes for validation testing",
-            color_story="Test colors",
-        ),
+        global_story=_make_global_story(),
         layering_plan=LayeringPlan(
             layers=[
                 LayerSpec(
@@ -1114,6 +1104,7 @@ def test_contrast_single_style_nit(simple_audio_profile: AudioProfileModel):
         section_plans.append(
             MacroSectionPlan(
                 section=section,
+                theme=_make_section_theme(),
                 energy_target=EnergyTarget.MED if i % 2 == 0 else EnergyTarget.HIGH,  # Vary energy
                 motion_density=MotionDensity.MED
                 if i % 2 == 0
@@ -1125,12 +1116,7 @@ def test_contrast_single_style_nit(simple_audio_profile: AudioProfileModel):
         )
 
     plan = MacroPlan(
-        global_story=GlobalStory(
-            theme="Test theme",
-            motifs=["M1", "M2", "M3"],
-            pacing_notes="Test pacing notes for validation testing",
-            color_story="Test colors",
-        ),
+        global_story=_make_global_story(),
         layering_plan=LayeringPlan(
             layers=[
                 LayerSpec(

@@ -8,16 +8,14 @@ from twinklr.core.agents.sequencer.group_planner.validators import (
     validate_lane_diversity,
     validate_section_diversity,
 )
+from twinklr.core.sequencer.planning import LanePlan, SectionCoordinationPlan
 from twinklr.core.sequencer.templates.group.models import (
-    CoordinationMode,
     CoordinationPlan,
     GroupPlacement,
-    LaneKind,
-    LanePlan,
-    SectionCoordinationPlan,
-    TimeRef,
-    TimeRefKind,
 )
+from twinklr.core.sequencer.timing import TimeRef
+from twinklr.core.sequencer.vocabulary import CoordinationMode, LaneKind
+from twinklr.core.sequencer.vocabulary.timing import TimeRefKind
 
 from .conftest import DEFAULT_THEME
 

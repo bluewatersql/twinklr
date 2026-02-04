@@ -17,7 +17,7 @@ Provides section plan and context for evaluation
 **Secondary Targets:** {{ secondary_targets | join(", ") }}
 {% endif %}
 
-## Section Theme
+## Section Theme + Palette + Motifs
 
 **Theme ID:** {{ plan.theme.theme_id }}
 **Theme Scope:** {{ plan.theme.scope }}
@@ -26,8 +26,17 @@ Provides section plan and context for evaluation
 {% else %}
 **Theme Tags:** None
 {% endif %}
-{% if plan.motif_tags %}
-**Motif Tags:** {{ plan.motif_tags | join(", ") }}
+
+{% if plan.palette %}
+**Palette ID:** {{ plan.palette.palette_id }}
+{% else %}
+**Palette ID:** MISSING
+{% endif %}
+
+{% if plan.motif_ids %}
+**Motif IDs:** {{ plan.motif_ids | join(", ") }}
+{% else %}
+**Motif IDs:** MISSING
 {% endif %}
 
 ## Section Bounds
@@ -67,6 +76,8 @@ Provides section plan and context for evaluation
 - no within-lane overlaps on same group_id
 - if mode requires expansion (SEQUENCED/CALL_RESPONSE/RIPPLE): window+config must be present and valid
 - theme must be SECTION-scoped; tags <= 5
+- palette must be present with palette_id
+- motif_ids must be present and non-empty
 
 2) **Quality Assessment**
 - templates appropriate for lanes + section intent
@@ -74,6 +85,7 @@ Provides section plan and context for evaluation
 - primary targets get meaningful ACCENT treatment
 - energy target reflected in intensity/density choices
 - motion density matches complexity
+- palette/motif choices are respected (no invented ids) and support a cohesive visual
 
 {% if iteration is defined and iteration > 0 %}
 ## Iteration {{ iteration + 1 }}

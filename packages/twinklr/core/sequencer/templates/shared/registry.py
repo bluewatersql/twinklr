@@ -11,8 +11,9 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable, Iterable
-from dataclasses import dataclass
 from typing import Generic, Protocol, TypeVar, runtime_checkable
+
+from pydantic import BaseModel, ConfigDict
 
 logger = logging.getLogger(__name__)
 
@@ -57,8 +58,7 @@ T = TypeVar("T", bound=TemplateProtocol)
 TInfo = TypeVar("TInfo", bound="BaseTemplateInfo")
 
 
-@dataclass(frozen=True)
-class BaseTemplateInfo:
+class BaseTemplateInfo(BaseModel):
     """Base lightweight metadata for listing/search without materializing instances.
 
     Subclass this for domain-specific info (e.g., GroupTemplateInfo, AssetTemplateInfo).
@@ -69,6 +69,8 @@ class BaseTemplateInfo:
         name: Human-readable template name.
         tags: Tuple of tags for categorization.
     """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
 
     template_id: str
     version: str

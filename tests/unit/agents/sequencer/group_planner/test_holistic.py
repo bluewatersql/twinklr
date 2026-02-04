@@ -13,28 +13,34 @@ from twinklr.core.agents.sequencer.group_planner.holistic import (
     IssueSeverity,
 )
 from twinklr.core.agents.shared.judge.models import VerdictStatus
+from twinklr.core.sequencer.planning import (
+    GroupPlanSet,
+    LanePlan,
+    SectionCoordinationPlan,
+)
 from twinklr.core.sequencer.templates.group.catalog import (
     TemplateCatalog,
-    TemplateCatalogEntry,
+    TemplateInfo,
 )
 from twinklr.core.sequencer.templates.group.models import (
-    CoordinationMode,
     CoordinationPlan,
     DisplayGraph,
     DisplayGroup,
     GroupPlacement,
-    GroupPlanSet,
-    LaneKind,
-    LanePlan,
-    SectionCoordinationPlan,
-    TimeRef,
-    TimeRefKind,
 )
+from twinklr.core.sequencer.timing import TimeRef
+from twinklr.core.sequencer.vocabulary import (
+    CoordinationMode,
+    GroupTemplateType,
+    GroupVisualIntent,
+    LaneKind,
+)
+from twinklr.core.sequencer.vocabulary.timing import TimeRefKind
 
 from .conftest import DEFAULT_THEME
 
-# Rebuild TemplateCatalogEntry after LaneKind is imported (forward ref resolution)
-TemplateCatalogEntry.model_rebuild()
+# Rebuild TemplateInfo after LaneKind is imported (forward ref resolution)
+TemplateInfo.model_rebuild()
 
 
 class TestHolisticEvaluation:
@@ -200,10 +206,13 @@ def sample_template_catalog() -> TemplateCatalog:
     """Sample template catalog."""
     return TemplateCatalog(
         entries=[
-            TemplateCatalogEntry(
+            TemplateInfo(
                 template_id="gtpl_accent_flash",
+                version="1.0",
                 name="Flash",
-                compatible_lanes=[LaneKind.ACCENT],
+                template_type=GroupTemplateType.ACCENT,
+                visual_intent=GroupVisualIntent.TEXTURE,
+                tags=(),
             ),
         ]
     )

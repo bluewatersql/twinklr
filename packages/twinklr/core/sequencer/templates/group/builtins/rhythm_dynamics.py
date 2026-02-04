@@ -28,6 +28,13 @@ def make_gtpl_rhythm_bounce_even() -> GroupPlanTemplate:
         template_type=GroupTemplateType.RHYTHM,
         visual_intent=GroupVisualIntent.ABSTRACT,
         tags=["bounce", "even", "arch", "matrix"],
+        affinity_tags=[
+            "motif.wave_bands",
+            "style.minimal",
+            "constraint.clean_edges",
+            "setting.playful",
+        ],
+        avoid_tags=[],
         projection=ProjectionSpec(intent=ProjectionIntent.FLAT),
         timing=TimingHints(bars_min=1, bars_max=16),
         layer_recipe=[
@@ -56,6 +63,13 @@ def make_gtpl_rhythm_bounce_staggered() -> GroupPlanTemplate:
         template_type=GroupTemplateType.RHYTHM,
         visual_intent=GroupVisualIntent.ABSTRACT,
         tags=["bounce", "staggered", "delay", "cascade"],
+        affinity_tags=[
+            "motif.wave_bands",
+            "setting.playful",
+            "constraint.clean_edges",
+            "style.minimal",
+        ],
+        avoid_tags=[],
         projection=ProjectionSpec(intent=ProjectionIntent.FLAT),
         timing=TimingHints(bars_min=1, bars_max=16),
         layer_recipe=[
@@ -85,6 +99,13 @@ def make_gtpl_rhythm_strobe_soft() -> GroupPlanTemplate:
         template_type=GroupTemplateType.RHYTHM,
         visual_intent=GroupVisualIntent.ABSTRACT,
         tags=["strobe", "soft", "safe", "rapid"],
+        affinity_tags=[
+            "motif.abstract",
+            "constraint.high_contrast",
+            "setting.hype",
+            "style.bold_shapes",
+        ],
+        avoid_tags=[],
         projection=ProjectionSpec(intent=ProjectionIntent.FLAT),
         timing=TimingHints(bars_min=1, bars_max=8),
         layer_recipe=[
@@ -113,6 +134,13 @@ def make_gtpl_rhythm_strobe_burst() -> GroupPlanTemplate:
         template_type=GroupTemplateType.RHYTHM,
         visual_intent=GroupVisualIntent.ABSTRACT,
         tags=["strobe", "burst", "pattern", "pause"],
+        affinity_tags=[
+            "motif.abstract",
+            "constraint.high_contrast",
+            "setting.hype",
+            "style.bold_shapes",
+        ],
+        avoid_tags=[],
         projection=ProjectionSpec(intent=ProjectionIntent.FLAT),
         timing=TimingHints(bars_min=1, bars_max=8),
         layer_recipe=[
@@ -142,6 +170,13 @@ def make_gtpl_rhythm_sparkle_beat() -> GroupPlanTemplate:
         template_type=GroupTemplateType.RHYTHM,
         visual_intent=GroupVisualIntent.ABSTRACT,
         tags=["sparkle", "beat", "downbeat", "hit"],
+        affinity_tags=[
+            "motif.sparkles",
+            "motif.stars",
+            "constraint.sparse_elements",
+            "constraint.high_contrast",
+        ],
+        avoid_tags=["constraint.noisy_texture_avoid"],
         projection=ProjectionSpec(intent=ProjectionIntent.FLAT),
         timing=TimingHints(bars_min=1, bars_max=16),
         layer_recipe=[
@@ -170,6 +205,13 @@ def make_gtpl_rhythm_sparkle_offbeat() -> GroupPlanTemplate:
         template_type=GroupTemplateType.RHYTHM,
         visual_intent=GroupVisualIntent.ABSTRACT,
         tags=["sparkle", "offbeat", "syncopated", "hit"],
+        affinity_tags=[
+            "motif.sparkles",
+            "motif.stars",
+            "constraint.sparse_elements",
+            "setting.playful",
+        ],
+        avoid_tags=["constraint.noisy_texture_avoid"],
         projection=ProjectionSpec(intent=ProjectionIntent.FLAT),
         timing=TimingHints(bars_min=1, bars_max=16),
         layer_recipe=[

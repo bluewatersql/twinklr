@@ -29,7 +29,8 @@ Example:
     >>> result = await cache.load(key, MyModel)
 """
 
-from twinklr.core.caching.backends.fs import FSCache
+from twinklr.core.caching.backends.fs import FSCache, FSCacheSync
+from twinklr.core.caching.backends.null import NullCache, NullCacheSync
 from twinklr.core.caching.fingerprint import compute_fingerprint
 from twinklr.core.caching.models import CacheKey, CacheMeta, CacheOptions
 from twinklr.core.caching.protocols import Cache, CacheSync
@@ -43,6 +44,9 @@ __all__ = [
     "CacheOptions",
     # Backends
     "FSCache",
+    "FSCacheSync",
+    "NullCache",
+    "NullCacheSync",
     # Utils
     "compute_fingerprint",
 ]

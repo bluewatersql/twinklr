@@ -16,6 +16,7 @@ from twinklr.core.sequencer.planning import (
     MacroSectionPlan,
     TargetSelector,
 )
+from twinklr.core.sequencer.theming import ThemeRef, ThemeScope
 from twinklr.core.sequencer.vocabulary import (
     BlendMode,
     ChoreographyStyle,
@@ -25,6 +26,27 @@ from twinklr.core.sequencer.vocabulary import (
     TargetRole,
     TimingDriver,
 )
+
+from .conftest import make_motif_spec
+
+
+def _make_global_theme() -> ThemeRef:
+    """Create a valid global ThemeRef (SONG scope)."""
+    return ThemeRef(
+        theme_id="theme.abstract.neon",
+        scope=ThemeScope.SONG,
+        tags=["motif.geometric"],
+    )
+
+
+def _make_section_theme() -> ThemeRef:
+    """Create a valid section ThemeRef (SECTION scope)."""
+    return ThemeRef(
+        theme_id="theme.abstract.neon",
+        scope=ThemeScope.SECTION,
+        tags=["motif.geometric"],
+    )
+
 
 # ============================================================================
 # Fixtures
@@ -62,8 +84,13 @@ def valid_macro_plan(audio_profile: AudioProfileModel) -> MacroPlan:
 
     return MacroPlan(
         global_story=GlobalStory(
-            theme="Winter wonderland with building energy and festive celebration",
-            motifs=["Snowflakes", "Twinkling stars", "Crescendo"],
+            theme=_make_global_theme(),
+            story_notes="Winter wonderland with building energy and festive celebration",
+            motifs=[
+                make_motif_spec("snowflakes", "Snowflake patterns in the display"),
+                make_motif_spec("twinkling_stars", "Twinkling star effects"),
+                make_motif_spec("crescendo", "Crescendo buildup pattern"),
+            ],
             pacing_notes="Start calm and serene in the intro, build energy through the verses, and peak at the chorus with maximum impact.",
             color_story="Cool blue for serenity, warm white for transitions, festive red for high-energy moments",
         ),
@@ -98,6 +125,7 @@ def valid_macro_plan(audio_profile: AudioProfileModel) -> MacroPlan:
                     start_ms=sec.start_ms,
                     end_ms=sec.end_ms,
                 ),
+                theme=_make_section_theme(),
                 energy_target=EnergyTarget.LOW if i == 0 else EnergyTarget.HIGH,
                 motion_density=MotionDensity.SPARSE if i == 0 else MotionDensity.BUSY,
                 choreography_style=ChoreographyStyle.ABSTRACT,
@@ -317,7 +345,7 @@ def test_user_prompt_macro_plan_content(
     )
 
     # Check global story
-    assert valid_macro_plan.global_story.theme in result
+    assert valid_macro_plan.global_story.story_notes in result
 
     # Check layers
     for layer in valid_macro_plan.layering_plan.layers:

@@ -6,20 +6,18 @@ Re-exports all models for backward compatibility with existing imports from
 Models are organized into submodules by concern:
 - template: Template definition models (GroupPlanTemplate, LayerRecipe, etc.)
 - display: Display graph models (DisplayGraph, DisplayGroup, GroupPosition)
-- coordination: Coordination and planning models (GroupPlacement, LanePlan, etc.)
-- theming: Theme, tag, and palette models (ThemeDefinition, PaletteDefinition, etc.)
+- coordination: Coordination models (GroupPlacement, CoordinationPlan, etc.)
+
+Planning output models (SectionCoordinationPlan, GroupPlanSet, etc.) should be
+imported from `twinklr.core.sequencer.planning`.
 """
 
 from twinklr.core.sequencer.templates.assets.models import AssetRequest
 from twinklr.core.sequencer.templates.group.models.coordination import (
     CoordinationConfig,
     CoordinationPlan,
-    Deviation,
     GroupPlacement,
-    GroupPlanSet,
-    LanePlan,
     PlacementWindow,
-    SectionCoordinationPlan,
 )
 from twinklr.core.sequencer.templates.group.models.display import (
     DisplayGraph,
@@ -73,12 +71,8 @@ __all__ = [
     # Coordination models
     "CoordinationConfig",
     "CoordinationPlan",
-    "Deviation",
     "GroupPlacement",
-    "GroupPlanSet",
-    "LanePlan",
     "PlacementWindow",
-    "SectionCoordinationPlan",
     "ThemeRef",
     "TimeRef",
     "TimeRefKind",

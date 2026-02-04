@@ -7,26 +7,29 @@ from __future__ import annotations
 
 import pytest
 
+from twinklr.core.sequencer.planning import LanePlan, SectionCoordinationPlan
 from twinklr.core.sequencer.templates.group.catalog import (
     TemplateCatalog,
-    TemplateCatalogEntry,
+    TemplateInfo,
 )
 from twinklr.core.sequencer.templates.group.models import (
     CoordinationConfig,
-    CoordinationMode,
     CoordinationPlan,
     DisplayGraph,
     DisplayGroup,
     GroupPlacement,
-    LaneKind,
-    LanePlan,
     PlacementWindow,
-    SectionCoordinationPlan,
+)
+from twinklr.core.sequencer.timing import TimeRef
+from twinklr.core.sequencer.vocabulary import (
+    CoordinationMode,
+    GroupTemplateType,
+    GroupVisualIntent,
+    LaneKind,
     SpillPolicy,
     StepUnit,
-    TimeRef,
-    TimeRefKind,
 )
+from twinklr.core.sequencer.vocabulary.timing import TimeRefKind
 
 from .conftest import DEFAULT_THEME
 
@@ -129,10 +132,13 @@ class TestTemplateCatalog:
         """has_template checks if template_id exists."""
         catalog = TemplateCatalog(
             entries=[
-                TemplateCatalogEntry(
+                TemplateInfo(
                     template_id="gtpl_bg_starfield",
+                    version="1.0",
                     name="Starfield Background",
-                    compatible_lanes=[LaneKind.BASE],
+                    template_type=GroupTemplateType.BASE,
+                    visual_intent=GroupVisualIntent.ABSTRACT,
+                    tags=(),
                 ),
             ]
         )
@@ -143,10 +149,13 @@ class TestTemplateCatalog:
         """get_entry returns entry or None."""
         catalog = TemplateCatalog(
             entries=[
-                TemplateCatalogEntry(
+                TemplateInfo(
                     template_id="gtpl_accent_bell",
+                    version="1.0",
                     name="Bell Accent",
-                    compatible_lanes=[LaneKind.ACCENT],
+                    template_type=GroupTemplateType.ACCENT,
+                    visual_intent=GroupVisualIntent.TEXTURE,
+                    tags=(),
                 ),
             ]
         )
@@ -159,20 +168,29 @@ class TestTemplateCatalog:
         """list_by_lane filters entries by lane compatibility."""
         catalog = TemplateCatalog(
             entries=[
-                TemplateCatalogEntry(
+                TemplateInfo(
                     template_id="gtpl_bg_1",
+                    version="1.0",
                     name="BG 1",
-                    compatible_lanes=[LaneKind.BASE],
+                    template_type=GroupTemplateType.BASE,
+                    visual_intent=GroupVisualIntent.ABSTRACT,
+                    tags=(),
                 ),
-                TemplateCatalogEntry(
+                TemplateInfo(
                     template_id="gtpl_rhythm_1",
+                    version="1.0",
                     name="Rhythm 1",
-                    compatible_lanes=[LaneKind.RHYTHM],
+                    template_type=GroupTemplateType.RHYTHM,
+                    visual_intent=GroupVisualIntent.GEOMETRIC,
+                    tags=(),
                 ),
-                TemplateCatalogEntry(
+                TemplateInfo(
                     template_id="gtpl_multi",
+                    version="1.0",
                     name="Multi",
-                    compatible_lanes=[LaneKind.BASE, LaneKind.RHYTHM],
+                    template_type=GroupTemplateType.BASE,
+                    visual_intent=GroupVisualIntent.ABSTRACT,
+                    tags=(),
                 ),
             ]
         )

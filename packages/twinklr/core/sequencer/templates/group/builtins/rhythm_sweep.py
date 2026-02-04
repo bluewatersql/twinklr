@@ -27,6 +27,13 @@ def make_gtpl_rhythm_sweep_lr() -> GroupPlanTemplate:
         template_type=GroupTemplateType.RHYTHM,
         visual_intent=GroupVisualIntent.ABSTRACT,
         tags=["sweep", "lr", "left-right", "linear"],
+        affinity_tags=[
+            "motif.stripes",
+            "motif.wave_bands",
+            "constraint.clean_edges",
+            "style.minimal",
+        ],
+        avoid_tags=[],
         projection=ProjectionSpec(intent=ProjectionIntent.FLAT),
         timing=TimingHints(bars_min=1, bars_max=16),
         layer_recipe=[
@@ -55,6 +62,13 @@ def make_gtpl_rhythm_sweep_rl() -> GroupPlanTemplate:
         template_type=GroupTemplateType.RHYTHM,
         visual_intent=GroupVisualIntent.ABSTRACT,
         tags=["sweep", "rl", "right-left", "linear"],
+        affinity_tags=[
+            "motif.stripes",
+            "motif.wave_bands",
+            "constraint.clean_edges",
+            "style.minimal",
+        ],
+        avoid_tags=[],
         projection=ProjectionSpec(intent=ProjectionIntent.FLAT),
         timing=TimingHints(bars_min=1, bars_max=16),
         layer_recipe=[
@@ -83,6 +97,13 @@ def make_gtpl_rhythm_sweep_pingpong() -> GroupPlanTemplate:
         template_type=GroupTemplateType.RHYTHM,
         visual_intent=GroupVisualIntent.ABSTRACT,
         tags=["sweep", "pingpong", "bounce", "bidirectional"],
+        affinity_tags=[
+            "motif.stripes",
+            "motif.wave_bands",
+            "constraint.clean_edges",
+            "setting.playful",
+        ],
+        avoid_tags=[],
         projection=ProjectionSpec(intent=ProjectionIntent.FLAT),
         timing=TimingHints(bars_min=2, bars_max=16),
         layer_recipe=[

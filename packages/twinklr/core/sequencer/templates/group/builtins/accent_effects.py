@@ -28,6 +28,13 @@ def make_gtpl_accent_icon_pop_single() -> GroupPlanTemplate:
         template_type=GroupTemplateType.ACCENT,
         visual_intent=GroupVisualIntent.IMAGERY,
         tags=["pop", "icon", "single", "emphasis"],
+        affinity_tags=[
+            "motif.geometric",
+            "style.bold_shapes",
+            "constraint.high_contrast",
+            "constraint.centered_composition",
+        ],
+        avoid_tags=["constraint.noisy_texture_avoid"],
         projection=ProjectionSpec(intent=ProjectionIntent.FLAT),
         timing=TimingHints(bars_min=1, bars_max=4),
         layer_recipe=[
@@ -56,6 +63,13 @@ def make_gtpl_accent_icon_pop_triplet() -> GroupPlanTemplate:
         template_type=GroupTemplateType.ACCENT,
         visual_intent=GroupVisualIntent.IMAGERY,
         tags=["pop", "icon", "triplet", "sequence"],
+        affinity_tags=[
+            "motif.geometric",
+            "style.bold_shapes",
+            "constraint.high_contrast",
+            "setting.playful",
+        ],
+        avoid_tags=["constraint.noisy_texture_avoid"],
         projection=ProjectionSpec(intent=ProjectionIntent.FLAT),
         timing=TimingHints(bars_min=1, bars_max=4),
         layer_recipe=[
@@ -85,6 +99,13 @@ def make_gtpl_accent_lyric_underline() -> GroupPlanTemplate:
         template_type=GroupTemplateType.ACCENT,
         visual_intent=GroupVisualIntent.ABSTRACT,
         tags=["lyric", "underline", "bottom", "emphasis"],
+        affinity_tags=[
+            "motif.stripes",
+            "style.minimal",
+            "constraint.high_contrast",
+            "constraint.clean_edges",
+        ],
+        avoid_tags=[],
         projection=ProjectionSpec(intent=ProjectionIntent.FLAT),
         timing=TimingHints(bars_min=1, bars_max=2),
         layer_recipe=[
@@ -113,6 +134,13 @@ def make_gtpl_accent_lyric_spotlight() -> GroupPlanTemplate:
         template_type=GroupTemplateType.ACCENT,
         visual_intent=GroupVisualIntent.ABSTRACT,
         tags=["lyric", "spotlight", "center", "emphasis"],
+        affinity_tags=[
+            "motif.concentric_rings",
+            "style.minimal",
+            "constraint.centered_composition",
+            "constraint.high_contrast",
+        ],
+        avoid_tags=[],
         projection=ProjectionSpec(intent=ProjectionIntent.FLAT),
         timing=TimingHints(bars_min=1, bars_max=4),
         layer_recipe=[
@@ -142,6 +170,13 @@ def make_gtpl_accent_wipe_fast() -> GroupPlanTemplate:
         template_type=GroupTemplateType.ACCENT,
         visual_intent=GroupVisualIntent.ABSTRACT,
         tags=["wipe", "fast", "trail", "lr"],
+        affinity_tags=[
+            "motif.light_trails",
+            "motif.ribbons",
+            "constraint.clean_edges",
+            "setting.hype",
+        ],
+        avoid_tags=["constraint.noisy_texture_avoid"],
         projection=ProjectionSpec(intent=ProjectionIntent.FLAT),
         timing=TimingHints(bars_min=1, bars_max=2),
         layer_recipe=[
@@ -170,6 +205,13 @@ def make_gtpl_accent_wipe_slam() -> GroupPlanTemplate:
         template_type=GroupTemplateType.ACCENT,
         visual_intent=GroupVisualIntent.ABSTRACT,
         tags=["wipe", "slam", "instant", "hold"],
+        affinity_tags=[
+            "motif.stripes",
+            "style.bold_shapes",
+            "constraint.high_contrast",
+            "constraint.clean_edges",
+        ],
+        avoid_tags=[],
         projection=ProjectionSpec(intent=ProjectionIntent.FLAT),
         timing=TimingHints(bars_min=1, bars_max=4),
         layer_recipe=[
@@ -199,6 +241,8 @@ def make_gtpl_accent_cut_to_black() -> GroupPlanTemplate:
         template_type=GroupTemplateType.ACCENT,
         visual_intent=GroupVisualIntent.ABSTRACT,
         tags=["dropout", "black", "cut", "snap"],
+        affinity_tags=["motif.abstract", "style.minimal", "constraint.high_contrast"],
+        avoid_tags=[],
         projection=ProjectionSpec(intent=ProjectionIntent.FLAT),
         timing=TimingHints(bars_min=1, bars_max=4),
         layer_recipe=[
@@ -227,6 +271,13 @@ def make_gtpl_accent_cut_to_sparkle() -> GroupPlanTemplate:
         template_type=GroupTemplateType.ACCENT,
         visual_intent=GroupVisualIntent.ABSTRACT,
         tags=["dropout", "sparkle", "return", "cascade"],
+        affinity_tags=[
+            "motif.sparkles",
+            "motif.particles",
+            "constraint.sparse_elements",
+            "setting.playful",
+        ],
+        avoid_tags=["constraint.noisy_texture_avoid"],
         projection=ProjectionSpec(intent=ProjectionIntent.FLAT),
         timing=TimingHints(bars_min=2, bars_max=8),
         layer_recipe=[

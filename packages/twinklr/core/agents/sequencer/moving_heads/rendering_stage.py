@@ -145,7 +145,7 @@ class MovingHeadRenderingStage:
             # Render to segments and export to XSQ
             segments = pipeline.render()
 
-            logger.info(f"✅ Rendered {len(segments)} segments to {self.xsq_output_path}")
+            logger.debug(f"✅ Rendered {len(segments)} segments to {self.xsq_output_path}")
 
             # Store state for downstream stages
             context.set_state("xsq_output_path", self.xsq_output_path)

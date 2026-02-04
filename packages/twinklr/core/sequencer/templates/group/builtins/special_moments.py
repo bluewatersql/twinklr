@@ -31,6 +31,13 @@ def make_gtpl_special_chorus_signature_a() -> GroupPlanTemplate:
         template_type=GroupTemplateType.SPECIAL,
         visual_intent=GroupVisualIntent.ABSTRACT,
         tags=["chorus", "signature", "bright", "energetic"],
+        affinity_tags=[
+            "setting.hype",
+            "setting.triumphant",
+            "constraint.high_contrast",
+            "style.bold_shapes",
+        ],
+        avoid_tags=[],
         projection=ProjectionSpec(intent=ProjectionIntent.FLAT),
         timing=TimingHints(bars_min=4, bars_max=16),
         layer_recipe=[
@@ -59,6 +66,13 @@ def make_gtpl_special_chorus_signature_b() -> GroupPlanTemplate:
         template_type=GroupTemplateType.SPECIAL,
         visual_intent=GroupVisualIntent.ABSTRACT,
         tags=["chorus", "signature", "rhythmic", "accents"],
+        affinity_tags=[
+            "setting.hype",
+            "motif.sparkles",
+            "constraint.high_contrast",
+            "style.bold_shapes",
+        ],
+        avoid_tags=[],
         projection=ProjectionSpec(intent=ProjectionIntent.FLAT),
         timing=TimingHints(bars_min=4, bars_max=16),
         layer_recipe=[
@@ -88,6 +102,13 @@ def make_gtpl_special_drop_freeze() -> GroupPlanTemplate:
         template_type=GroupTemplateType.SPECIAL,
         visual_intent=GroupVisualIntent.ABSTRACT,
         tags=["drop", "freeze", "explode", "impact"],
+        affinity_tags=[
+            "motif.radial_rays",
+            "setting.hype",
+            "constraint.high_contrast",
+            "style.bold_shapes",
+        ],
+        avoid_tags=[],
         projection=ProjectionSpec(intent=ProjectionIntent.FLAT),
         timing=TimingHints(bars_min=1, bars_max=4),
         layer_recipe=[
@@ -116,6 +137,13 @@ def make_gtpl_special_drop_explode() -> GroupPlanTemplate:
         template_type=GroupTemplateType.SPECIAL,
         visual_intent=GroupVisualIntent.ABSTRACT,
         tags=["drop", "explode", "immediate", "impact"],
+        affinity_tags=[
+            "motif.radial_rays",
+            "motif.concentric_rings",
+            "setting.hype",
+            "constraint.high_contrast",
+        ],
+        avoid_tags=[],
         projection=ProjectionSpec(intent=ProjectionIntent.FLAT),
         timing=TimingHints(bars_min=1, bars_max=2),
         layer_recipe=[
@@ -145,6 +173,13 @@ def make_gtpl_special_bridge_sparse() -> GroupPlanTemplate:
         template_type=GroupTemplateType.SPECIAL,
         visual_intent=GroupVisualIntent.ABSTRACT,
         tags=["bridge", "sparse", "minimal", "contrast"],
+        affinity_tags=[
+            "style.minimal",
+            "constraint.sparse_elements",
+            "setting.calm",
+            "constraint.low_detail",
+        ],
+        avoid_tags=["constraint.noisy_texture_avoid"],
         projection=ProjectionSpec(intent=ProjectionIntent.FLAT),
         timing=TimingHints(bars_min=4, bars_max=16),
         layer_recipe=[
@@ -173,6 +208,13 @@ def make_gtpl_special_bridge_moody() -> GroupPlanTemplate:
         template_type=GroupTemplateType.SPECIAL,
         visual_intent=GroupVisualIntent.ABSTRACT,
         tags=["bridge", "moody", "low-intensity", "atmospheric"],
+        affinity_tags=[
+            "setting.mysterious",
+            "setting.dreamy",
+            "motif.abstract",
+            "constraint.low_detail",
+        ],
+        avoid_tags=["constraint.high_contrast"],
         projection=ProjectionSpec(intent=ProjectionIntent.FLAT),
         timing=TimingHints(bars_min=4, bars_max=16),
         layer_recipe=[
@@ -202,6 +244,13 @@ def make_gtpl_special_finale_ramp() -> GroupPlanTemplate:
         template_type=GroupTemplateType.SPECIAL,
         visual_intent=GroupVisualIntent.ABSTRACT,
         tags=["finale", "ramp", "build", "maximum"],
+        affinity_tags=[
+            "setting.triumphant",
+            "setting.hype",
+            "constraint.high_contrast",
+            "style.bold_shapes",
+        ],
+        avoid_tags=[],
         projection=ProjectionSpec(intent=ProjectionIntent.FLAT),
         timing=TimingHints(bars_min=4, bars_max=16),
         layer_recipe=[
@@ -230,6 +279,13 @@ def make_gtpl_special_finale_strobe_safe() -> GroupPlanTemplate:
         template_type=GroupTemplateType.SPECIAL,
         visual_intent=GroupVisualIntent.ABSTRACT,
         tags=["finale", "strobe", "safe", "climax"],
+        affinity_tags=[
+            "setting.hype",
+            "setting.triumphant",
+            "constraint.high_contrast",
+            "style.bold_shapes",
+        ],
+        avoid_tags=[],
         projection=ProjectionSpec(intent=ProjectionIntent.FLAT),
         timing=TimingHints(bars_min=2, bars_max=8),
         layer_recipe=[
@@ -259,6 +315,13 @@ def make_gtpl_special_polar_spiral() -> GroupPlanTemplate:
         template_type=GroupTemplateType.SPECIAL,
         visual_intent=GroupVisualIntent.GEOMETRIC,
         tags=["polar", "spiral", "mega-tree", "cone"],
+        affinity_tags=[
+            "motif.spiral",
+            "motif.helix",
+            "constraint.polar_mapped",
+            "style.bold_shapes",
+        ],
+        avoid_tags=[],
         projection=ProjectionSpec(intent=ProjectionIntent.POLAR),
         timing=TimingHints(bars_min=2, bars_max=16),
         layer_recipe=[
@@ -287,6 +350,13 @@ def make_gtpl_special_polar_starburst() -> GroupPlanTemplate:
         template_type=GroupTemplateType.SPECIAL,
         visual_intent=GroupVisualIntent.GEOMETRIC,
         tags=["polar", "starburst", "mega-tree", "radial"],
+        affinity_tags=[
+            "motif.radial_rays",
+            "motif.stars",
+            "constraint.polar_mapped",
+            "constraint.high_contrast",
+        ],
+        avoid_tags=[],
         projection=ProjectionSpec(intent=ProjectionIntent.POLAR),
         timing=TimingHints(bars_min=1, bars_max=8),
         layer_recipe=[

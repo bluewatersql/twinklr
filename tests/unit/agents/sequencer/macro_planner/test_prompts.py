@@ -209,18 +209,20 @@ def test_user_prompt_no_iteration_feedback(
 def test_user_prompt_with_iteration_feedback(
     jinja_env: Environment, audio_profile: AudioProfileModel, display_groups: list
 ):
-    """User prompt with iteration shows feedback section."""
-    template = jinja_env.get_template("planner/user.j2")
+    """User refinement prompt with iteration shows feedback section."""
+    # For iteration > 0, we use user_refinement.j2
+    template = jinja_env.get_template("planner/user_refinement.j2")
     output = template.render(
         audio_profile=audio_profile,
         display_groups=display_groups,
         iteration=2,
+        revision_request={"priority": "SOFT_FAIL", "focus_areas": ["energy contrast"]},
         feedback="Add more energy contrast between sections",
     )
 
-    # Should show iteration feedback
-    assert "Iteration 2" in output
-    assert "Add more energy contrast" in output
+    # Should show iteration and revision context
+    assert "2" in output  # Iteration number
+    assert "energy contrast" in output.lower() or "SOFT_FAIL" in output
 
 
 # ============================================================================

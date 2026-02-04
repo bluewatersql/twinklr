@@ -18,19 +18,16 @@ from twinklr.core.agents.sequencer.group_planner.context_shaping import (
     shape_section_judge_context,
 )
 from twinklr.core.agents.sequencer.group_planner.timing import TimingContext
-from twinklr.core.sequencer.templates.group.catalog import TemplateCatalog, TemplateCatalogEntry
-from twinklr.core.sequencer.templates.group.models import (
-    DisplayGraph,
-    DisplayGroup,
-    GroupPlanSet,
-    LaneKind,
-    SectionCoordinationPlan,
-)
+from twinklr.core.sequencer.planning import GroupPlanSet, SectionCoordinationPlan
+from twinklr.core.sequencer.templates.group.catalog import TemplateCatalog
+from twinklr.core.sequencer.templates.group.library import TemplateInfo
+from twinklr.core.sequencer.templates.group.models import DisplayGraph, DisplayGroup
+from twinklr.core.sequencer.vocabulary import GroupTemplateType, GroupVisualIntent, LaneKind
 
 from .conftest import DEFAULT_THEME
 
-# Rebuild TemplateCatalogEntry after LaneKind is imported
-TemplateCatalogEntry.model_rebuild()
+# Rebuild TemplateInfo after LaneKind is imported
+TemplateInfo.model_rebuild()
 
 
 # ============================================================================
@@ -52,13 +49,34 @@ def make_display_group(group_id: str, role: str) -> DisplayGroup:
 
 def make_template_entry(
     template_id: str, name: str, lanes: list[str], description: str = "Test description"
-) -> TemplateCatalogEntry:
-    """Helper to create TemplateCatalogEntry for testing."""
-    return TemplateCatalogEntry(
+) -> TemplateInfo:
+    """Helper to create TemplateInfo for testing."""
+    from twinklr.core.sequencer.vocabulary import GroupTemplateType, GroupVisualIntent
+
+    # Map lane strings to template types
+    lane_to_type = {
+        "BASE": GroupTemplateType.BASE,
+        "RHYTHM": GroupTemplateType.RHYTHM,
+        "ACCENT": GroupTemplateType.ACCENT,
+    }
+    lane_to_visual = {
+        "BASE": GroupVisualIntent.ABSTRACT,
+        "RHYTHM": GroupVisualIntent.GEOMETRIC,
+        "ACCENT": GroupVisualIntent.TEXTURE,
+    }
+
+    # Use first lane for type determination
+    first_lane = lanes[0] if lanes else "BASE"
+    template_type = lane_to_type.get(first_lane, GroupTemplateType.BASE)
+    visual_intent = lane_to_visual.get(first_lane, GroupVisualIntent.ABSTRACT)
+
+    return TemplateInfo(
         template_id=template_id,
+        version="1.0",
         name=name,
-        compatible_lanes=lanes,
-        tags=[],
+        template_type=template_type,
+        visual_intent=visual_intent,
+        tags=(),
         description=description,
     )
 
@@ -393,14 +411,14 @@ def group_plan_set() -> GroupPlanSet:
     """Create mock GroupPlanSet."""
     # Import lane plan and minimal coordination plan
     # Import models
+    from twinklr.core.sequencer.planning import LanePlan
     from twinklr.core.sequencer.templates.group.models import (
-        CoordinationMode,
         CoordinationPlan,
         GroupPlacement,
-        LanePlan,
-        TimeRef,
-        TimeRefKind,
     )
+    from twinklr.core.sequencer.timing import TimeRef
+    from twinklr.core.sequencer.vocabulary import CoordinationMode
+    from twinklr.core.sequencer.vocabulary.timing import TimeRefKind
 
     # Create minimal placements
     placements = [
@@ -668,14 +686,14 @@ def test_shape_section_judge_context_no_matching_groups(
 
 def test_shape_holistic_judge_context_single_section() -> None:
     """Test holistic handles single section plan."""
+    from twinklr.core.sequencer.planning import LanePlan
     from twinklr.core.sequencer.templates.group.models import (
-        CoordinationMode,
         CoordinationPlan,
         GroupPlacement,
-        LanePlan,
-        TimeRef,
-        TimeRefKind,
     )
+    from twinklr.core.sequencer.timing import TimeRef
+    from twinklr.core.sequencer.vocabulary import CoordinationMode
+    from twinklr.core.sequencer.vocabulary.timing import TimeRefKind
 
     # Create minimal placements
     placements = [
@@ -784,11 +802,21 @@ def test_filter_templates_by_intent_empty_catalog() -> None:
 def test_filter_templates_by_intent_unknown_energy_returns_all() -> None:
     """Unknown energy target should return full catalog."""
     entries = [
-        TemplateCatalogEntry(
-            template_id="test1", name="Test 1", compatible_lanes=["BASE"], tags=[]
+        TemplateInfo(
+            template_id="test1",
+            version="1.0",
+            name="Test 1",
+            template_type=GroupTemplateType.BASE,
+            visual_intent=GroupVisualIntent.ABSTRACT,
+            tags=(),
         ),
-        TemplateCatalogEntry(
-            template_id="test2", name="Test 2", compatible_lanes=["RHYTHM"], tags=[]
+        TemplateInfo(
+            template_id="test2",
+            version="1.0",
+            name="Test 2",
+            template_type=GroupTemplateType.BASE,
+            visual_intent=GroupVisualIntent.ABSTRACT,
+            tags=(),
         ),
     ]
     catalog = TemplateCatalog(schema_version="test", entries=entries)
@@ -800,14 +828,29 @@ def test_filter_templates_by_intent_unknown_energy_returns_all() -> None:
 def test_filter_templates_by_intent_filters_by_energy_pattern() -> None:
     """HIGH energy should prefer burst/strobe/chase patterns."""
     entries = [
-        TemplateCatalogEntry(
-            template_id="soft_glow", name="Soft Glow", compatible_lanes=["BASE"], tags=[]
+        TemplateInfo(
+            template_id="soft_glow",
+            version="1.0",
+            name="Soft Glow",
+            template_type=GroupTemplateType.BASE,
+            visual_intent=GroupVisualIntent.ABSTRACT,
+            tags=(),
         ),
-        TemplateCatalogEntry(
-            template_id="chase_fast", name="Fast Chase", compatible_lanes=["RHYTHM"], tags=[]
+        TemplateInfo(
+            template_id="chase_fast",
+            version="1.0",
+            name="Fast Chase",
+            template_type=GroupTemplateType.BASE,
+            visual_intent=GroupVisualIntent.ABSTRACT,
+            tags=(),
         ),
-        TemplateCatalogEntry(
-            template_id="burst_big", name="Big Burst", compatible_lanes=["ACCENT"], tags=[]
+        TemplateInfo(
+            template_id="burst_big",
+            version="1.0",
+            name="Big Burst",
+            template_type=GroupTemplateType.BASE,
+            visual_intent=GroupVisualIntent.ABSTRACT,
+            tags=(),
         ),
     ]
     catalog = TemplateCatalog(schema_version="test", entries=entries)
@@ -824,25 +867,55 @@ def test_filter_templates_by_intent_ensures_minimum_per_lane() -> None:
     """Should ensure minimum templates per lane even when filtering is aggressive."""
     entries = [
         # BASE templates (none match HIGH patterns)
-        TemplateCatalogEntry(
-            template_id="base1", name="Warm Glow", compatible_lanes=["BASE"], tags=[]
+        TemplateInfo(
+            template_id="base1",
+            version="1.0",
+            name="Warm Glow",
+            template_type=GroupTemplateType.BASE,
+            visual_intent=GroupVisualIntent.ABSTRACT,
+            tags=(),
         ),
-        TemplateCatalogEntry(
-            template_id="base2", name="Gentle Fade", compatible_lanes=["BASE"], tags=[]
+        TemplateInfo(
+            template_id="base2",
+            version="1.0",
+            name="Gentle Fade",
+            template_type=GroupTemplateType.BASE,
+            visual_intent=GroupVisualIntent.ABSTRACT,
+            tags=(),
         ),
-        TemplateCatalogEntry(
-            template_id="base3", name="Slow Pulse", compatible_lanes=["BASE"], tags=[]
+        TemplateInfo(
+            template_id="base3",
+            version="1.0",
+            name="Slow Pulse",
+            template_type=GroupTemplateType.BASE,
+            visual_intent=GroupVisualIntent.ABSTRACT,
+            tags=(),
         ),
         # RHYTHM templates (some match)
-        TemplateCatalogEntry(
-            template_id="rhythm1", name="Chase Pattern", compatible_lanes=["RHYTHM"], tags=[]
+        TemplateInfo(
+            template_id="rhythm1",
+            version="1.0",
+            name="Chase Pattern",
+            template_type=GroupTemplateType.RHYTHM,
+            visual_intent=GroupVisualIntent.GEOMETRIC,
+            tags=(),
         ),
         # ACCENT templates (all match HIGH)
-        TemplateCatalogEntry(
-            template_id="accent1", name="Burst Hit", compatible_lanes=["ACCENT"], tags=[]
+        TemplateInfo(
+            template_id="accent1",
+            version="1.0",
+            name="Burst Hit",
+            template_type=GroupTemplateType.ACCENT,
+            visual_intent=GroupVisualIntent.TEXTURE,
+            tags=(),
         ),
-        TemplateCatalogEntry(
-            template_id="accent2", name="Strobe Flash", compatible_lanes=["ACCENT"], tags=[]
+        TemplateInfo(
+            template_id="accent2",
+            version="1.0",
+            name="Strobe Flash",
+            template_type=GroupTemplateType.ACCENT,
+            visual_intent=GroupVisualIntent.TEXTURE,
+            tags=(),
         ),
     ]
     catalog = TemplateCatalog(schema_version="test", entries=entries)
@@ -850,7 +923,7 @@ def test_filter_templates_by_intent_ensures_minimum_per_lane() -> None:
     result = filter_templates_by_intent(catalog, "HIGH", "BUSY")
 
     # Count templates per lane
-    from twinklr.core.sequencer.templates.group.models import LaneKind
+    from twinklr.core.sequencer.vocabulary import LaneKind
 
     base_count = len([e for e in result if LaneKind.BASE in e.compatible_lanes])
     rhythm_count = len([e for e in result if LaneKind.RHYTHM in e.compatible_lanes])
@@ -864,3 +937,25 @@ def test_filter_templates_by_intent_ensures_minimum_per_lane() -> None:
     assert base_count >= 3  # All added via safety
     assert rhythm_count >= 1  # Only 1 available
     assert accent_count >= 2  # Both match HIGH
+
+
+def test_template_simplification_includes_affinity_and_avoid_tags(section_context):
+    """Verify that affinity_tags and avoid_tags are included in simplified catalog."""
+    shaped = shape_planner_context(section_context)
+
+    # Check that simplified catalog entries include affinity_tags and avoid_tags
+    assert "template_catalog" in shaped
+    assert "entries" in shaped["template_catalog"]
+
+    if shaped["template_catalog"]["entries"]:
+        # Check first entry has the new fields
+        entry = shaped["template_catalog"]["entries"][0]
+        assert "template_id" in entry
+        assert "name" in entry
+        assert "compatible_lanes" in entry
+        assert "affinity_tags" in entry  # NEW: Should be present
+        assert "avoid_tags" in entry  # NEW: Should be present
+
+        # Verify they are lists (even if empty)
+        assert isinstance(entry["affinity_tags"], list)
+        assert isinstance(entry["avoid_tags"], list)

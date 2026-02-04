@@ -30,6 +30,13 @@ def make_gtpl_base_starfield_slow() -> GroupPlanTemplate:
         template_type=GroupTemplateType.BASE,
         visual_intent=GroupVisualIntent.ABSTRACT,
         tags=["starfield", "twinkle", "slow", "low-density", "calm"],
+        affinity_tags=[
+            "motif.stars",
+            "motif.sparkles",
+            "constraint.sparse_elements",
+            "setting.calm",
+        ],
+        avoid_tags=["constraint.noisy_texture_avoid"],
         projection=ProjectionSpec(intent=ProjectionIntent.FLAT),
         timing=TimingHints(bars_min=4, bars_max=64),
         layer_recipe=[
@@ -58,6 +65,8 @@ def make_gtpl_base_starfield_dense() -> GroupPlanTemplate:
         template_type=GroupTemplateType.BASE,
         visual_intent=GroupVisualIntent.ABSTRACT,
         tags=["starfield", "twinkle", "medium-density", "calm"],
+        affinity_tags=["motif.stars", "motif.sparkles", "setting.calm", "setting.dreamy"],
+        avoid_tags=["constraint.noisy_texture_avoid"],
         projection=ProjectionSpec(intent=ProjectionIntent.FLAT),
         timing=TimingHints(bars_min=4, bars_max=64),
         layer_recipe=[

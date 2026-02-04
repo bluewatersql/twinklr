@@ -185,6 +185,8 @@ class MovingHeadStage:
                 if isinstance(plan, dict):
                     return ChoreographyPlan.model_validate(plan)
 
+                # plan is already a ChoreographyPlan
+                assert isinstance(plan, ChoreographyPlan)
                 return plan
 
             # Execute with caching and automatic metrics/state handling

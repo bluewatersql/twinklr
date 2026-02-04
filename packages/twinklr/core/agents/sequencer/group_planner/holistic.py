@@ -18,11 +18,9 @@ from twinklr.core.agents.providers.base import LLMProvider
 from twinklr.core.agents.shared.judge.models import VerdictStatus
 from twinklr.core.agents.spec import AgentMode, AgentSpec
 from twinklr.core.agents.taxonomy_utils import get_taxonomy_dict
+from twinklr.core.sequencer.planning import GroupPlanSet
 from twinklr.core.sequencer.templates.group.catalog import TemplateCatalog
-from twinklr.core.sequencer.templates.group.models import (
-    DisplayGraph,
-    GroupPlanSet,
-)
+from twinklr.core.sequencer.templates.group.models import DisplayGraph
 
 logger = logging.getLogger(__name__)
 

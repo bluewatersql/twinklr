@@ -12,27 +12,30 @@ from twinklr.core.agents.sequencer.group_planner.timing import (
 from twinklr.core.agents.sequencer.group_planner.validators import (
     SectionPlanValidator,
 )
+from twinklr.core.sequencer.planning import LanePlan, SectionCoordinationPlan
 from twinklr.core.sequencer.templates.group.catalog import (
     TemplateCatalog,
-    TemplateCatalogEntry,
+    TemplateInfo,
 )
 from twinklr.core.sequencer.templates.group.models import (
-    CoordinationMode,
     CoordinationPlan,
     DisplayGraph,
     DisplayGroup,
     GroupPlacement,
-    LaneKind,
-    LanePlan,
-    SectionCoordinationPlan,
-    TimeRef,
-    TimeRefKind,
 )
+from twinklr.core.sequencer.timing import TimeRef
+from twinklr.core.sequencer.vocabulary import (
+    CoordinationMode,
+    GroupTemplateType,
+    GroupVisualIntent,
+    LaneKind,
+)
+from twinklr.core.sequencer.vocabulary.timing import TimeRefKind
 
 from .conftest import DEFAULT_THEME
 
-# Rebuild TemplateCatalogEntry after LaneKind is imported (forward ref resolution)
-TemplateCatalogEntry.model_rebuild()
+# Rebuild TemplateInfo after LaneKind is imported (forward ref resolution)
+TemplateInfo.model_rebuild()
 
 
 @pytest.fixture
@@ -55,20 +58,29 @@ def sample_template_catalog() -> TemplateCatalog:
     """Sample template catalog with valid templates."""
     return TemplateCatalog(
         entries=[
-            TemplateCatalogEntry(
+            TemplateInfo(
                 template_id="gtpl_bg_starfield",
+                version="1.0",
                 name="Starfield Background",
-                compatible_lanes=[LaneKind.BASE],
+                template_type=GroupTemplateType.BASE,
+                visual_intent=GroupVisualIntent.ABSTRACT,
+                tags=(),
             ),
-            TemplateCatalogEntry(
+            TemplateInfo(
                 template_id="gtpl_accent_bell",
+                version="1.0",
                 name="Bell Accent",
-                compatible_lanes=[LaneKind.ACCENT],
+                template_type=GroupTemplateType.ACCENT,
+                visual_intent=GroupVisualIntent.TEXTURE,
+                tags=(),
             ),
-            TemplateCatalogEntry(
+            TemplateInfo(
                 template_id="gtpl_rhythm_bounce",
+                version="1.0",
                 name="Rhythm Bounce",
-                compatible_lanes=[LaneKind.RHYTHM],
+                template_type=GroupTemplateType.RHYTHM,
+                visual_intent=GroupVisualIntent.GEOMETRIC,
+                tags=(),
             ),
         ]
     )

@@ -28,6 +28,13 @@ def make_gtpl_accent_bell_single() -> GroupPlanTemplate:
         template_type=GroupTemplateType.ACCENT,
         visual_intent=GroupVisualIntent.ABSTRACT,
         tags=["bell", "ring", "single", "decay"],
+        affinity_tags=[
+            "motif.abstract",
+            "constraint.high_contrast",
+            "style.minimal",
+            "setting.playful",
+        ],
+        avoid_tags=[],
         projection=ProjectionSpec(intent=ProjectionIntent.FLAT),
         timing=TimingHints(bars_min=1, bars_max=2),
         layer_recipe=[
@@ -56,6 +63,13 @@ def make_gtpl_accent_bell_double() -> GroupPlanTemplate:
         template_type=GroupTemplateType.ACCENT,
         visual_intent=GroupVisualIntent.ABSTRACT,
         tags=["bell", "ring", "double", "ding"],
+        affinity_tags=[
+            "motif.abstract",
+            "constraint.high_contrast",
+            "style.minimal",
+            "setting.playful",
+        ],
+        avoid_tags=[],
         projection=ProjectionSpec(intent=ProjectionIntent.FLAT),
         timing=TimingHints(bars_min=1, bars_max=2),
         layer_recipe=[
@@ -85,6 +99,13 @@ def make_gtpl_accent_call_response_simple() -> GroupPlanTemplate:
         template_type=GroupTemplateType.ACCENT,
         visual_intent=GroupVisualIntent.ABSTRACT,
         tags=["call", "response", "simple", "dialogue"],
+        affinity_tags=[
+            "motif.abstract",
+            "constraint.high_contrast",
+            "style.minimal",
+            "setting.playful",
+        ],
+        avoid_tags=[],
         projection=ProjectionSpec(intent=ProjectionIntent.FLAT),
         timing=TimingHints(bars_min=2, bars_max=8),
         layer_recipe=[
@@ -113,6 +134,13 @@ def make_gtpl_accent_call_response_stacked() -> GroupPlanTemplate:
         template_type=GroupTemplateType.ACCENT,
         visual_intent=GroupVisualIntent.ABSTRACT,
         tags=["call", "response", "stacked", "overlap"],
+        affinity_tags=[
+            "motif.abstract",
+            "constraint.high_contrast",
+            "setting.playful",
+            "style.bold_shapes",
+        ],
+        avoid_tags=[],
         projection=ProjectionSpec(intent=ProjectionIntent.FLAT),
         timing=TimingHints(bars_min=2, bars_max=8),
         layer_recipe=[
@@ -142,6 +170,13 @@ def make_gtpl_accent_rollcall_lr() -> GroupPlanTemplate:
         template_type=GroupTemplateType.ACCENT,
         visual_intent=GroupVisualIntent.ABSTRACT,
         tags=["rollcall", "sequential", "lr", "order"],
+        affinity_tags=[
+            "motif.dots",
+            "motif.geometric",
+            "constraint.clean_edges",
+            "constraint.high_contrast",
+        ],
+        avoid_tags=[],
         projection=ProjectionSpec(intent=ProjectionIntent.FLAT),
         timing=TimingHints(bars_min=2, bars_max=8),
         layer_recipe=[
@@ -170,6 +205,13 @@ def make_gtpl_accent_rollcall_random() -> GroupPlanTemplate:
         template_type=GroupTemplateType.ACCENT,
         visual_intent=GroupVisualIntent.ABSTRACT,
         tags=["rollcall", "random", "unpredictable"],
+        affinity_tags=[
+            "motif.dots",
+            "motif.sparkles",
+            "constraint.sparse_elements",
+            "setting.playful",
+        ],
+        avoid_tags=[],
         projection=ProjectionSpec(intent=ProjectionIntent.FLAT),
         timing=TimingHints(bars_min=2, bars_max=8),
         layer_recipe=[

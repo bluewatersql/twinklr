@@ -27,6 +27,13 @@ def make_gtpl_base_vignette_center() -> GroupPlanTemplate:
         template_type=GroupTemplateType.BASE,
         visual_intent=GroupVisualIntent.ABSTRACT,
         tags=["vignette", "center", "dark-edges", "bright-center", "focus"],
+        affinity_tags=[
+            "motif.gradient_bands",
+            "constraint.centered_composition",
+            "style.minimal",
+            "constraint.clean_edges",
+        ],
+        avoid_tags=["constraint.noisy_texture_avoid"],
         projection=ProjectionSpec(intent=ProjectionIntent.FLAT),
         timing=TimingHints(bars_min=4, bars_max=64),
         layer_recipe=[
@@ -55,6 +62,13 @@ def make_gtpl_base_vignette_edge() -> GroupPlanTemplate:
         template_type=GroupTemplateType.BASE,
         visual_intent=GroupVisualIntent.ABSTRACT,
         tags=["vignette", "edge", "bright-edges", "dark-center", "rim"],
+        affinity_tags=[
+            "motif.gradient_bands",
+            "style.minimal",
+            "constraint.clean_edges",
+            "constraint.low_detail",
+        ],
+        avoid_tags=["constraint.noisy_texture_avoid", "constraint.centered_composition"],
         projection=ProjectionSpec(intent=ProjectionIntent.FLAT),
         timing=TimingHints(bars_min=4, bars_max=64),
         layer_recipe=[

@@ -31,6 +31,8 @@ def make_gtpl_transition_fade_in() -> GroupPlanTemplate:
         template_type=GroupTemplateType.TRANSITION,
         visual_intent=GroupVisualIntent.ABSTRACT,
         tags=["fade", "in", "black", "transition"],
+        affinity_tags=["motif.abstract", "style.minimal", "constraint.clean_edges"],
+        avoid_tags=[],
         projection=ProjectionSpec(intent=ProjectionIntent.FLAT),
         timing=TimingHints(bars_min=1, bars_max=4),
         layer_recipe=[
@@ -59,6 +61,8 @@ def make_gtpl_transition_fade_out() -> GroupPlanTemplate:
         template_type=GroupTemplateType.TRANSITION,
         visual_intent=GroupVisualIntent.ABSTRACT,
         tags=["fade", "out", "black", "transition"],
+        affinity_tags=["motif.abstract", "style.minimal", "constraint.clean_edges"],
+        avoid_tags=[],
         projection=ProjectionSpec(intent=ProjectionIntent.FLAT),
         timing=TimingHints(bars_min=1, bars_max=4),
         layer_recipe=[
@@ -88,6 +92,8 @@ def make_gtpl_transition_crossfade_soft() -> GroupPlanTemplate:
         template_type=GroupTemplateType.TRANSITION,
         visual_intent=GroupVisualIntent.ABSTRACT,
         tags=["crossfade", "soft", "blend", "smooth"],
+        affinity_tags=["motif.abstract", "style.minimal", "setting.calm", "constraint.clean_edges"],
+        avoid_tags=["constraint.high_contrast"],
         projection=ProjectionSpec(intent=ProjectionIntent.FLAT),
         timing=TimingHints(bars_min=2, bars_max=4),
         layer_recipe=[
@@ -116,6 +122,13 @@ def make_gtpl_transition_crossfade_hard() -> GroupPlanTemplate:
         template_type=GroupTemplateType.TRANSITION,
         visual_intent=GroupVisualIntent.ABSTRACT,
         tags=["crossfade", "hard", "fast", "quick"],
+        affinity_tags=[
+            "motif.abstract",
+            "style.bold_shapes",
+            "constraint.clean_edges",
+            "setting.hype",
+        ],
+        avoid_tags=[],
         projection=ProjectionSpec(intent=ProjectionIntent.FLAT),
         timing=TimingHints(bars_min=1, bars_max=2),
         layer_recipe=[
@@ -145,6 +158,13 @@ def make_gtpl_transition_wipe_lr() -> GroupPlanTemplate:
         template_type=GroupTemplateType.TRANSITION,
         visual_intent=GroupVisualIntent.ABSTRACT,
         tags=["wipe", "lr", "left-right", "transition"],
+        affinity_tags=[
+            "motif.stripes",
+            "constraint.clean_edges",
+            "style.minimal",
+            "constraint.high_contrast",
+        ],
+        avoid_tags=[],
         projection=ProjectionSpec(intent=ProjectionIntent.FLAT),
         timing=TimingHints(bars_min=1, bars_max=4),
         layer_recipe=[
@@ -173,6 +193,13 @@ def make_gtpl_transition_wipe_radial() -> GroupPlanTemplate:
         template_type=GroupTemplateType.TRANSITION,
         visual_intent=GroupVisualIntent.ABSTRACT,
         tags=["wipe", "radial", "center", "expand"],
+        affinity_tags=[
+            "motif.concentric_rings",
+            "constraint.centered_composition",
+            "constraint.clean_edges",
+            "constraint.high_contrast",
+        ],
+        avoid_tags=[],
         projection=ProjectionSpec(intent=ProjectionIntent.FLAT),
         timing=TimingHints(bars_min=1, bars_max=4),
         layer_recipe=[

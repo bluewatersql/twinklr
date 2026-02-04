@@ -27,6 +27,13 @@ def make_gtpl_base_snow_haze_low() -> GroupPlanTemplate:
         template_type=GroupTemplateType.BASE,
         visual_intent=GroupVisualIntent.TEXTURE,
         tags=["snow", "haze", "low-density", "falling", "ambient"],
+        affinity_tags=[
+            "motif.snowflakes",
+            "constraint.sparse_elements",
+            "setting.calm",
+            "constraint.low_detail",
+        ],
+        avoid_tags=["constraint.noisy_texture_avoid", "constraint.high_contrast"],
         projection=ProjectionSpec(intent=ProjectionIntent.FLAT),
         timing=TimingHints(bars_min=4, bars_max=64),
         layer_recipe=[
@@ -55,6 +62,13 @@ def make_gtpl_base_snow_haze_high() -> GroupPlanTemplate:
         template_type=GroupTemplateType.BASE,
         visual_intent=GroupVisualIntent.TEXTURE,
         tags=["snow", "haze", "medium-density", "drift", "ambient"],
+        affinity_tags=[
+            "motif.snowflakes",
+            "setting.calm",
+            "setting.dreamy",
+            "constraint.low_detail",
+        ],
+        avoid_tags=["constraint.noisy_texture_avoid", "constraint.high_contrast"],
         projection=ProjectionSpec(intent=ProjectionIntent.FLAT),
         timing=TimingHints(bars_min=4, bars_max=64),
         layer_recipe=[

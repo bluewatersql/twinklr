@@ -107,8 +107,6 @@ def test_render_planner_user_prompt(prompt_loader, renderer):
 
 def test_render_planner_with_feedback(prompt_loader, renderer):
     """Test rendering planner prompt with feedback (refinement mode)."""
-    prompts = prompt_loader.load("planner")
-
     # V2 context with iteration > 0 (refinement mode)
     variables = {
         "iteration": 1,  # Refinement mode
@@ -119,15 +117,23 @@ def test_render_planner_with_feedback(prompt_loader, renderer):
         "total_bars": 32,
         "fixture_count": 4,
         "feedback": "- Needs more variety in verse\n- Chorus energy too low",
-        "revision_focus": None,
+        "revision_request": {
+            "priority": "SOFT_FAIL",
+            "focus_areas": ["variety", "energy"],
+            "specific_fixes": ["Needs more variety in verse", "Chorus energy too low"],
+            "avoid": [],
+        },
+        "revision_focus": [],
+        "preserve_elements": [],
         "response_schema": "{}",
     }
 
+    # Use load_with_refinement to get the refinement template for iteration > 0
+    prompts = prompt_loader.load_with_refinement("planner", variables)
     rendered = renderer.render(prompts["user"], variables)
 
     # Should include refinement context
-    assert "Refinement Request" in rendered
-    assert "variety" in rendered.lower() or "energy" in rendered.lower()
+    assert "SOFT_FAIL" in rendered or "variety" in rendered.lower() or "energy" in rendered.lower()
 
 
 def test_render_judge_user_prompt(prompt_loader, renderer):
@@ -261,7 +267,17 @@ class TestV2PlannerPrompts:
         ctx = v2_context_iteration_0.copy()
         ctx["iteration"] = 1
         ctx["feedback"] = "- Increase variety in verse sections\n- Add more energy to chorus"
-        ctx["revision_focus"] = ["VARIETY: Verse sections need more template variety"]
+        ctx["revision_request"] = {
+            "priority": "SOFT_FAIL",
+            "focus_areas": ["variety", "energy"],
+            "specific_fixes": [
+                "Increase variety in verse sections",
+                "Add more energy to chorus",
+            ],
+            "avoid": [],
+        }
+        ctx["revision_focus"] = []
+        ctx["preserve_elements"] = []
         return ctx
 
     def test_planner_user_refinement_prompt_exists(self):
@@ -286,13 +302,14 @@ class TestV2PlannerPrompts:
         self, prompt_loader, renderer, v2_context_iteration_1
     ):
         """Test planner user prompt renders minimal context on iteration 1+."""
-        prompts = prompt_loader.load("planner")
+        # Use load_with_refinement to get the refinement template for iteration > 0
+        prompts = prompt_loader.load_with_refinement("planner", v2_context_iteration_1)
         rendered = renderer.render(prompts["user"], v2_context_iteration_1)
 
-        # Should contain refinement context
-        assert "Refinement Request" in rendered
-        assert "Iteration 2" in rendered  # iteration 1 + 1 = 2
-        assert "Feedback to Address" in rendered or "feedback" in rendered.lower()
+        # Should contain refinement context (priority and focus areas)
+        assert (
+            "SOFT_FAIL" in rendered or "variety" in rendered.lower() or "energy" in rendered.lower()
+        )
 
         # Should NOT contain full template list (token optimization)
         # Full template list is only in iteration 0

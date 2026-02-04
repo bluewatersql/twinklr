@@ -12,6 +12,7 @@ from twinklr.core.sequencer.planning import (
     MacroSectionPlan,
     TargetSelector,
 )
+from twinklr.core.sequencer.theming import ThemeRef, ThemeScope
 from twinklr.core.sequencer.vocabulary import (
     BlendMode,
     ChoreographyStyle,
@@ -20,6 +21,26 @@ from twinklr.core.sequencer.vocabulary import (
     MotionDensity,
     TimingDriver,
 )
+
+from .conftest import make_motif_spec
+
+
+def _make_global_theme() -> ThemeRef:
+    """Create a valid global ThemeRef (SONG scope)."""
+    return ThemeRef(
+        theme_id="theme.abstract.neon",
+        scope=ThemeScope.SONG,
+        tags=["motif.geometric"],
+    )
+
+
+def _make_section_theme() -> ThemeRef:
+    """Create a valid section ThemeRef (SECTION scope)."""
+    return ThemeRef(
+        theme_id="theme.abstract.neon",
+        scope=ThemeScope.SECTION,
+        tags=["motif.geometric"],
+    )
 
 
 def _create_section_ref(section_id: str, name: str, start_ms: int, end_ms: int) -> SongSectionRef:
@@ -37,19 +58,25 @@ def _create_section_plan(
     """Helper to create MacroSectionPlan."""
     return MacroSectionPlan(
         section=_create_section_ref(section_id, name, start_ms, end_ms),
+        theme=_make_section_theme(),
         energy_target=energy,
         primary_focus_targets=["OUTLINE"],
         choreography_style=ChoreographyStyle.ABSTRACT,
         motion_density=MotionDensity.MED,
-        notes="Test section plan notes for validation",
+        notes="Test section plan notes for validation testing",
     )
 
 
 def _create_global_story() -> GlobalStory:
     """Helper to create GlobalStory."""
     return GlobalStory(
-        theme="Christmas magic with cascading light waves",
-        motifs=["Starbursts", "Waves", "Sparkles"],
+        theme=_make_global_theme(),
+        story_notes="Christmas magic with cascading light waves",
+        motifs=[
+            make_motif_spec("starbursts", "Starbursts"),
+            make_motif_spec("waves", "Waves"),
+            make_motif_spec("sparkles", "Sparkles"),
+        ],
         pacing_notes="Build energy through verses, peak at chorus, gentle outro",
         color_story="Cool blues transitioning to warm golds at climax",
     )
@@ -77,7 +104,7 @@ def test_macro_plan_valid_minimal():
         asset_requirements=[],
     )
 
-    assert plan.global_story.theme == "Christmas magic with cascading light waves"
+    assert plan.global_story.story_notes == "Christmas magic with cascading light waves"
     assert len(plan.section_plans) == 1
     assert len(plan.asset_requirements) == 0
 

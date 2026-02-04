@@ -30,7 +30,7 @@ from twinklr.core.agents.shared.judge.controller import (
 )
 from twinklr.core.agents.shared.judge.feedback import FeedbackManager
 from twinklr.core.agents.spec import AgentSpec
-from twinklr.core.sequencer.templates.group.models import SectionCoordinationPlan
+from twinklr.core.sequencer.planning import SectionCoordinationPlan
 
 logger = logging.getLogger(__name__)
 

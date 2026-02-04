@@ -16,7 +16,6 @@ Uses the Pipeline Framework for declarative, parallel execution.
 import argparse
 import asyncio
 import json
-import os
 from pathlib import Path
 import sys
 
@@ -28,21 +27,16 @@ import logging
 from twinklr.core.agents.audio.lyrics.stage import LyricsStage
 from twinklr.core.agents.audio.profile.stage import AudioProfileStage
 from twinklr.core.agents.audio.stages.analysis import AudioAnalysisStage
-from twinklr.core.agents.logging import create_llm_logger
-from twinklr.core.agents.providers.openai import OpenAIProvider
 from twinklr.core.agents.sequencer.group_planner import (
     DisplayGraph,
     DisplayGroup,
+    LaneKind,
+)
+from twinklr.core.agents.sequencer.group_planner.stage import (
     GroupPlanAggregatorStage,
     GroupPlannerStage,
-    HolisticEvaluatorStage,
-    LaneKind,
-    TemplateCatalog,
 )
 from twinklr.core.agents.sequencer.macro_planner.stage import MacroPlannerStage
-from twinklr.core.caching import FSCache
-from twinklr.core.config.loader import load_app_config, load_job_config
-from twinklr.core.io import RealFileSystem, absolute_path
 from twinklr.core.pipeline import (
     ExecutionPattern,
     PipelineContext,
@@ -54,6 +48,7 @@ from twinklr.core.sequencer.templates.group import load_builtin_group_templates
 from twinklr.core.sequencer.templates.group.catalog import (
     build_template_catalog as build_catalog_from_registry,
 )
+from twinklr.core.session import TwinklrSession
 from twinklr.core.utils.formatting import clean_audio_filename
 from twinklr.core.utils.logging import configure_logging
 
@@ -108,23 +103,7 @@ def build_display_graph(display_groups: list[dict]) -> DisplayGraph:
     )
 
 
-def build_template_catalog() -> TemplateCatalog:
-    """Build real TemplateCatalog from registered group templates.
-
-    Loads all builtin group templates and builds a catalog for GroupPlanner.
-
-    Returns:
-        TemplateCatalog with all 83 registered templates
-    """
-    # Load builtin templates (triggers auto-registration)
-    load_builtin_group_templates()
-
-    # Build catalog from registry
-    return build_catalog_from_registry()
-
-
-async def main() -> None:
-    """Run Sequencer Pipeline demo using Pipeline Framework."""
+def parse_args() -> argparse.Namespace:
     # Parse arguments
     parser = argparse.ArgumentParser(description="Sequencer Pipeline Demo")
     parser.add_argument(
@@ -133,31 +112,13 @@ async def main() -> None:
         default="data/music/Need A Favor.mp3",
         help="Path to audio file (default: data/music/Need A Favor.mp3)",
     )
-    parser.add_argument(
-        "--no-cache",
-        action="store_true",
-        help="Force reanalysis of audio (skip cache)",
-    )
-    parser.add_argument(
-        "--output-dir",
-        type=Path,
-        default=None,
-        help="Output directory for artifacts",
-    )
-    args = parser.parse_args()
+    return parser.parse_args()
+
+
+async def main() -> None:
+    args = parse_args()
 
     print_section("Sequencer Pipeline Demo (Pipeline Framework)", "=")
-
-    # Check API key
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        print("❌ ERROR: OPENAI_API_KEY environment variable not set")
-        print("\nTo run this demo:")
-        print("  export OPENAI_API_KEY='your-key-here'")
-        print("  python scripts/demo_sequencer_pipeline.py [audio_file]")
-        sys.exit(1)
-
-    print("✅ OpenAI API key found")
 
     # Setup paths
     repo_root = Path(__file__).parent.parent
@@ -168,25 +129,12 @@ async def main() -> None:
         sys.exit(1)
 
     song_name = clean_audio_filename(audio_path.stem)
-    output_dir = args.output_dir or repo_root / "artifacts" / song_name
-    logging_dir = Path("data") / "logging"
+    output_dir = repo_root / "artifacts" / song_name
 
     output_dir.mkdir(parents=True, exist_ok=True)
     print(f"📁 Output directory: {output_dir}")
 
-    # Load configuration
-    print_subsection("0. Loading Configuration")
-    try:
-        app_config = load_app_config(repo_root / "config.json")
-        job_config = load_job_config(repo_root / "job_config.json")
-
-        model = job_config.agent.plan_agent.model
-        print("✅ Configuration loaded")
-        print(f"   Model: {model}")
-        print(f"   Max iterations: {job_config.agent.max_iterations}")
-    except Exception as e:
-        print(f"❌ Could not load config: {e}")
-        sys.exit(1)
+    session = TwinklrSession.from_directory(repo_root)
 
     # Build display groups (mock for demo)
     display_groups = [
@@ -199,7 +147,10 @@ async def main() -> None:
 
     # Build display graph and template catalog
     display_graph = build_display_graph(display_groups)
-    template_catalog = build_template_catalog()
+
+    # Build catalog from registry
+    load_builtin_group_templates()
+    template_catalog = build_catalog_from_registry()
 
     print_subsection("1. Display Configuration")
     print(f"🎯 Display graph: {len(display_graph.groups)} groups")
@@ -264,7 +215,7 @@ async def main() -> None:
                 stage=GroupPlannerStage(
                     display_graph=display_graph,
                     template_catalog=template_catalog,
-                    max_iterations=job_config.agent.max_iterations,
+                    max_iterations=session.job_config.agent.max_iterations,
                     min_pass_score=7.0,
                 ),
                 inputs=["macro"],
@@ -278,16 +229,16 @@ async def main() -> None:
                 inputs=["groups"],
                 description="Aggregate section plans into GroupPlanSet",
             ),
-            # Stage 6: Holistic Evaluation
-            StageDefinition(
-                id="holistic",
-                stage=HolisticEvaluatorStage(
-                    display_graph=display_graph,
-                    template_catalog=template_catalog,
-                ),
-                inputs=["aggregate"],
-                description="Evaluate complete GroupPlanSet quality",
-            ),
+            # # Stage 6: Holistic Evaluation
+            # StageDefinition(
+            #     id="holistic",
+            #     stage=HolisticEvaluatorStage(
+            #         display_graph=display_graph,
+            #         template_catalog=template_catalog,
+            #     ),
+            #     inputs=["aggregate"],
+            #     description="Evaluate complete GroupPlanSet quality",
+            # ),
         ],
     )
 
@@ -311,38 +262,9 @@ async def main() -> None:
     # ========================================================================
     print_section("3. Pipeline Execution", "=")
 
-    # Setup caching infrastructure
-    fs = RealFileSystem()
-
-    # LLM cache: Short-lived, transparent deduplication of identical LLM calls
-    llm_cache_dir = absolute_path("data/cache/llm")
-    llm_cache = FSCache(fs, llm_cache_dir)
-    await llm_cache.initialize()
-    print(f"🔄 LLM cache initialized: {llm_cache_dir}")
-
-    # Agent cache: Long-lived, deterministic caching of agent results
-    agent_cache_dir = absolute_path("data/cache/agents")
-    agent_cache = FSCache(fs, agent_cache_dir)
-    await agent_cache.initialize()
-    print(f"💾 Agent cache initialized: {agent_cache_dir}")
-
-    # Create provider with LLM cache
-    provider = OpenAIProvider(api_key=api_key, llm_cache=llm_cache)
-
-    llm_logger = create_llm_logger(
-        enabled=job_config.agent.llm_logging.enabled if job_config else False,
-        output_dir=logging_dir / "llm_calls",
-        log_level=job_config.agent.llm_logging.log_level if job_config else "standard",
-        format=job_config.agent.llm_logging.format if job_config else "json",
-    )
-
     # Create pipeline context with agent cache
     pipeline_context = PipelineContext(
-        provider=provider,
-        app_config=app_config,
-        job_config=job_config,
-        cache=agent_cache,
-        llm_logger=llm_logger,
+        session=session,
         output_dir=output_dir,
     )
 

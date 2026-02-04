@@ -23,20 +23,25 @@ Note: Importing this module auto-registers all builtins.
 from twinklr.core.sequencer.theming import builtins as _builtins  # noqa: F401
 from twinklr.core.sequencer.theming.catalog import (
     # Global registries
+    MOTIF_REGISTRY,
     PALETTE_REGISTRY,
     TAG_REGISTRY,
     THEME_REGISTRY,
     # Catalog classes
     ItemNotFoundError,
+    MotifCatalog,
+    MotifInfo,
     PaletteCatalog,
     PaletteInfo,
     TagCatalog,
     TagInfo,
     ThemeInfo,
     # Convenience functions
+    get_motif,
     get_palette,
     get_tag,
     get_theme,
+    list_motifs,
     list_palettes,
     list_tags,
     list_themes,
@@ -51,6 +56,7 @@ from twinklr.core.sequencer.theming.enums import (
 )
 from twinklr.core.sequencer.theming.models import (
     ColorStop,
+    MotifDefinition,
     PaletteDefinition,
     TagDefinition,
     ThemeCatalog,
@@ -64,28 +70,34 @@ __all__ = [
     "ThemeScope",
     # Models
     "ColorStop",
+    "MotifDefinition",
     "PaletteDefinition",
     "TagDefinition",
     "ThemeCatalog",
     "ThemeDefinition",
     "ThemeRef",
     # Catalog classes
+    "MotifCatalog",
     "PaletteCatalog",
     "TagCatalog",
     "ThemeCatalogRegistry",
     "ItemNotFoundError",
     # Info types
+    "MotifInfo",
     "PaletteInfo",
     "TagInfo",
     "ThemeInfo",
     # Global registries
+    "MOTIF_REGISTRY",
     "PALETTE_REGISTRY",
     "TAG_REGISTRY",
     "THEME_REGISTRY",
     # Convenience functions
+    "get_motif",
     "get_palette",
     "get_tag",
     "get_theme",
+    "list_motifs",
     "list_palettes",
     "list_tags",
     "list_themes",

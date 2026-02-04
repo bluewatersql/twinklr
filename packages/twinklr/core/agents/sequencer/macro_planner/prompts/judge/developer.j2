@@ -1,140 +1,35 @@
+{#
+MacroPlanner Judge Developer Prompt
+Technical constraints and issue standards for evaluating MacroPlan outputs
+#}
+
 ## Response Schema
 
-Return valid JSON matching this schema:
+Return JSON that matches this schema:
 
 ```json
 {{ response_schema }}
 ```
 
-## Technical Contract
+## Strict Requirements (Phase 1 Failures)
 
-**Constraints:**
-- Score: 0.0-10.0 | Confidence: 0.0-1.0
-- Layers: 1-5 (exactly 1 BASE, unique indices)
-- Global theme: ThemeRef present, scope=SONG, tags ≤ 5
-- Section themes: ThemeRef present for every section, scope=SECTION, tags ≤ 5
-- Theme defaulting rule: sections should default to global theme_id unless deliberate shift; shifts must be justified
+Return HARD_FAIL if any are true:
+- Missing sections or mismatched section_id coverage vs audio_profile.structure.sections
+- Gaps/overlaps or unsorted section timing
+- Layering invalid (not 1-5, missing BASE, duplicate indices)
+- Target roles referenced that do not exist in display_groups
+- Theme invalid:
+  - global_story.theme.scope != SONG
+  - any section.theme.scope != SECTION
+  - any ThemeRef.tags length > 5
+- **Palette invalid (NEW):**
+  - global_story.palette_plan.primary.palette_id missing/empty
+  - palette_id not in palette_catalog (if provided)
+- **Motifs invalid (NEW):**
+  - any section has 0 motif_ids
+  - motif_id not in motif_catalog (if provided)
 
-## Canonical Theme Issue IDs (use these exact IDs)
+## Notes
 
-When reporting theme issues, use the following stable issue_ids and mappings:
-
-1) THEME_GLOBAL_SCOPE_INVALID
-   - category: SCHEMA
-   - severity: ERROR
-   - estimated_effort: LOW
-   - scope: FIELD
-   - location.field_path: "global_story.theme.scope"
-
-2) THEME_SECTION_SCOPE_INVALID
-   - category: SCHEMA
-   - severity: ERROR
-   - estimated_effort: LOW
-   - scope: SECTION
-   - location.section_id: <section_id>
-   - location.field_path: "section_plans.<i>.theme.scope"
-
-3) THEME_TAGS_TOO_MANY
-   - category: CONSTRAINT
-   - severity: ERROR
-   - estimated_effort: LOW
-   - scope: FIELD
-   - location.field_path: "...theme.tags"
-
-4) THEME_SHIFT_UNJUSTIFIED
-   - category: STYLE
-   - severity: WARN
-   - estimated_effort: LOW
-   - scope: SECTION
-   - location.section_id: <section_id>
-   - location.field_path: "section_plans.<i>.theme.theme_id"
-
-5) THEME_SHIFT_OVERUSED
-   - category: STYLE
-   - severity: WARN
-   - estimated_effort: MEDIUM
-   - scope: GLOBAL
-   - location.field_path: "section_plans[*].theme.theme_id"
-
-## Theme Defaulting Rule (Judge)
-
-- Default expectation: section_plans[*].theme.theme_id equals global_story.theme.theme_id
-- If a section theme_id differs, it must be justified via:
-  - at least 1 tag in section_plans[*].theme.tags OR
-  - explicit explanation in section_plans[*].notes mentioning the theme shift
-- Emit THEME_SHIFT_UNJUSTIFIED when:
-  - section_plans[i].theme.theme_id != global_story.theme.theme_id AND
-  - (section_plans[i].theme.tags is empty) AND
-  - section_plans[i].notes does NOT explicitly mention a theme shift
-- Emit THEME_SHIFT_OVERUSED when:
-  - count(theme overrides) / count(sections) > 0.25
-- Theme defaulting behavior:
-  - Most sections should reuse global_story.theme.theme_id
-  - If section theme differs, require justification (tags>=1 OR notes mention shift)
-  - Excessive overrides (>25% sections) reduce coherence
-
-
-{% if learning_context %}
-## Historical Learning Context
-
-{{ learning_context }}
-
-Be vigilant about these patterns, but evaluate each plan independently.
-
----
-{% endif %}
-
-## Validation Checklist
-
-- All audio sections present, no gaps/overlaps, sorted by start_ms
-- Exactly 1 BASE layer with NORMAL blend mode
-- All target roles valid and exist in display layout
-- Layer indices 0-4 unique, blend modes NORMAL or ADD
-- Themes:
-  - global_story.theme.scope must be SONG
-  - section_plans[*].theme.scope must be SECTION
-  - ThemeRef.tags length must be 0–5
-
-
-## Issue Reporting Format
-
-Each issue must have:
-- **rule**: Generic guideline (<150 chars, "DON'T..." format, no specific names)
-- **message**: Instance-specific detail for logging
-- **issue_id**: Stable identifier (e.g., 'ENERGY_MONOTONE')
-- **category**: One of the valid categories below
-- **severity**: ERROR | WARN | NIT
-- **location**: Section/layer/role details
-- **location.field_path**: Required for SCHEMA/CONSTRAINT/FIELD issues (dot-path into plan)
-- **fix_hint**: Actionable suggestion for THIS instance
-- **acceptance_test**: Deterministic check to verify fix
-
-**Rule Examples:**
-- Good: "DON'T use same energy for all chorus sections"
-- Bad: "chorus_2 at bars 32-48 needs HIGH energy"
-
-**Valid Issue Categories** (use ONLY these):
-{{ taxonomy.IssueCategory | join(', ') }}
-
-**Valid Issue Severities:** {{ taxonomy.IssueSeverity | join(' | ') }}
-**Valid Issue Scopes:** {{ taxonomy.IssueScope | join(' | ') }}
-**Valid Suggested Actions:** {{ taxonomy.SuggestedAction | join(' | ') }}
-
-## Score Breakdown Dimensions
-
-- story_coherence
-- section_appropriateness  
-- layer_architecture
-- bold_impact
-- contrast_dynamics
-- theme_coherence
-
-## Enum Reference
-
-{% if taxonomy %}
-**EnergyTarget:** {{ taxonomy.EnergyTarget | join(', ') }}
-**MotionDensity:** {{ taxonomy.MotionDensity | join(', ') }}
-**ChoreographyStyle:** {{ taxonomy.ChoreographyStyle | join(', ') }}
-**TargetRole:** {{ taxonomy.TargetRole | join(', ') }}
-**LayerRole:** {{ taxonomy.LayerRole | join(', ') }}
-{% endif %}
+- Prefer deterministic acceptance tests.
+- Use stable issue_ids and include location.field_path for SCHEMA/CONSTRAINT/FIELD issues.

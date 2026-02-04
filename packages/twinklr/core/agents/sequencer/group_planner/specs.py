@@ -10,7 +10,7 @@ from __future__ import annotations
 from twinklr.core.agents.shared.judge.models import JudgeVerdict
 from twinklr.core.agents.spec import AgentMode, AgentSpec
 from twinklr.core.agents.taxonomy_utils import get_taxonomy_dict
-from twinklr.core.sequencer.templates.group.models import SectionCoordinationPlan
+from twinklr.core.sequencer.planning import SectionCoordinationPlan
 
 
 def get_planner_spec(

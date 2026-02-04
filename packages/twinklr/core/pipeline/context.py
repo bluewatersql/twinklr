@@ -10,10 +10,11 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from twinklr.core.agents.logging import LLMCallLogger, NullLLMCallLogger
+from twinklr.core.agents.logging import LLMCallLogger
 from twinklr.core.agents.providers.base import LLMProvider
 from twinklr.core.caching import Cache
 from twinklr.core.config.models import AppConfig, JobConfig
+from twinklr.core.session import TwinklrSession
 
 
 @dataclass
@@ -54,13 +55,7 @@ class PipelineContext:
     """
 
     # Required dependencies
-    provider: LLMProvider
-    app_config: AppConfig
-    job_config: JobConfig
-
-    # Optional dependencies
-    cache: Cache | None = None
-    llm_logger: LLMCallLogger = field(default_factory=NullLLMCallLogger)
+    session: TwinklrSession
 
     # Paths
     checkpoint_dir: Path | None = None
@@ -72,6 +67,51 @@ class PipelineContext:
 
     # Cancellation support
     cancel_token: asyncio.Event | None = None
+
+    @property
+    def app_config(self) -> AppConfig:
+        """Get application configuration for this session (universal service).
+
+        Returns:
+            AppConfig instance configured with session configs
+        """
+        return self.session.app_config
+
+    @property
+    def job_config(self) -> JobConfig:
+        """Get job configuration for this session (universal service).
+
+        Returns:
+            JobConfig instance configured with session configs
+        """
+        return self.session.job_config
+
+    @property
+    def provider(self) -> LLMProvider:
+        """Get LLM provider for this session (universal service).
+
+        Returns:
+            LLMProvider instance configured with session configs
+        """
+        return self.session.llm_provider
+
+    @property
+    def cache(self) -> Cache:
+        """Get agent cache for this session (universal service).
+
+        Returns:
+            Cache instance configured with session configs
+        """
+        return self.session.agent_cache
+
+    @property
+    def llm_logger(self) -> LLMCallLogger:
+        """Get LLM logger for this session (universal service).
+
+        Returns:
+            LLMCallLogger instance configured with session configs
+        """
+        return self.session.llm_logger
 
     def is_cancelled(self) -> bool:
         """Check if pipeline has been cancelled.

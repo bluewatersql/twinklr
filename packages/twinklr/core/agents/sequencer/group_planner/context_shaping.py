@@ -7,16 +7,18 @@ Each agent gets its own shaping function based on what it actually needs
 in its prompt. This allows independent tuning per agent.
 """
 
+import json
 import logging
 from typing import Any
 
 from twinklr.core.agents.sequencer.group_planner.context import SectionPlanningContext
-from twinklr.core.sequencer.templates.group.catalog import TemplateCatalog, TemplateCatalogEntry
-from twinklr.core.sequencer.templates.group.models import (
-    DisplayGraph,
-    GroupPlanSet,
-    LaneKind,
-)
+from twinklr.core.agents.taxonomy_utils import get_theming_catalog_dict, get_theming_ids
+from twinklr.core.sequencer.planning import GroupPlanSet
+from twinklr.core.sequencer.templates.group.catalog import TemplateCatalog
+from twinklr.core.sequencer.templates.group.library import TemplateInfo
+from twinklr.core.sequencer.templates.group.models import DisplayGraph
+from twinklr.core.sequencer.theming import get_theme
+from twinklr.core.sequencer.vocabulary import LaneKind
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +43,7 @@ def filter_templates_by_intent(
     catalog: TemplateCatalog,
     energy_target: str,
     motion_density: str,
-) -> list[TemplateCatalogEntry]:
+) -> list[TemplateInfo]:
     """Filter templates based on section intent.
 
     Reduces template count to relevant options, saving tokens and improving
@@ -195,6 +197,8 @@ def shape_planner_context(section_context: SectionPlanningContext) -> dict[str, 
                 "template_id": entry.template_id,
                 "name": entry.name,
                 "compatible_lanes": entry.compatible_lanes,
+                "affinity_tags": entry.affinity_tags,
+                "avoid_tags": entry.avoid_tags,
                 # Drop: description, presets, category (save ~40% tokens)
             }
             for entry in filtered_entries
@@ -215,6 +219,34 @@ def shape_planner_context(section_context: SectionPlanningContext) -> dict[str, 
         "groups_by_role": filtered_groups_by_role,
     }
 
+    # Prepare theme context if theme is available
+    theme_ref_json: str = "{}"
+    theme_definition_dict: dict[str, Any] = {
+        "default_tags": [],
+        "style_tags": [],
+        "avoid_tags": [],
+        "default_palette_id": None,
+    }
+    if section_context.theme:
+        # Serialize ThemeRef to JSON for prompt
+        theme_ref_json = json.dumps(section_context.theme.model_dump(), indent=2)
+
+        # Resolve theme definition from registry
+        try:
+            theme_def = get_theme(section_context.theme.theme_id)
+            theme_definition_dict = {
+                "default_tags": theme_def.default_tags,
+                "style_tags": theme_def.style_tags,
+                "avoid_tags": theme_def.avoid_tags,
+                "default_palette_id": theme_def.default_palette_id,
+            }
+        except Exception as e:
+            logger.warning(f"Failed to resolve theme '{section_context.theme.theme_id}': {e}")
+
+    # Get tag catalog for validation
+    theming_catalog = get_theming_catalog_dict()
+    tag_catalog = theming_catalog["tags"]
+
     return {
         # Section identity
         "section_id": section_context.section_id,
@@ -233,6 +265,10 @@ def shape_planner_context(section_context: SectionPlanningContext) -> dict[str, 
         "display_graph": section_display_graph,
         "template_catalog": simplified_catalog,  # Stripped to essentials
         "layer_intents": filtered_layer_intents,  # Only relevant layers
+        # Theme context from MacroPlan
+        "theme_ref_json": theme_ref_json,
+        "theme_definition": theme_definition_dict,
+        "tag_catalog": tag_catalog,  # For tag validation
         # timing_context excluded (not used in prompt)
     }
 
@@ -244,6 +280,7 @@ def shape_section_judge_context(
 
     **SECTION-FOCUSED**: Only includes groups relevant to this section.
     Templates kept minimal (IDs only for validation).
+    Theme context included for drift/tag validation.
 
     Analyzed from section_judge/user.j2:
     - Uses: start_ms, end_ms (for bounds checking)
@@ -251,6 +288,7 @@ def shape_section_judge_context(
     - Uses: primary_focus_targets, secondary_targets
     - Uses: display_graph.groups_by_role (FILTERED to section targets)
     - Uses: template_catalog (simplified to IDs only)
+    - Uses: plan.theme (for validation)
     - Does NOT use: timing_context, layer_intents
 
     Note: The plan itself is added by the controller.
@@ -279,10 +317,30 @@ def shape_section_judge_context(
                 "template_id": entry.template_id,
                 "name": entry.name,
                 "compatible_lanes": entry.compatible_lanes,
+                "affinity_tags": entry.affinity_tags,
+                "avoid_tags": entry.avoid_tags,
             }
             for entry in section_context.template_catalog.entries
         ],
     }
+
+    # Prepare theme context for validation
+    theme_definition_dict: dict[str, Any] | None = None
+    if section_context.theme:
+        try:
+            theme_def = get_theme(section_context.theme.theme_id)
+            theme_definition_dict = {
+                "theme_id": section_context.theme.theme_id,
+                "default_tags": theme_def.default_tags,
+                "style_tags": theme_def.style_tags,
+                "avoid_tags": theme_def.avoid_tags,
+                "default_palette_id": theme_def.default_palette_id,
+            }
+        except Exception:
+            pass
+
+    # Get theming IDs for validation
+    theming_ids = get_theming_ids()
 
     return {
         # Section identity
@@ -300,6 +358,9 @@ def shape_section_judge_context(
         # Section-scoped shared context
         "display_graph": {"groups_by_role": filtered_groups_by_role},
         "template_catalog": simplified_catalog,
+        # Theme context for validation
+        "theme_definition": theme_definition_dict,
+        "theming_ids": theming_ids,  # For validating theme_id, tags, palette_id
         # Excluded: timing_context, layer_intents, notes
     }
 
@@ -312,16 +373,17 @@ def shape_holistic_judge_context(
 ) -> dict[str, Any]:
     """Shape context for HolisticJudge agent (cross-section evaluation).
 
+    Provides theme/palette data for cross-section continuity evaluation:
+    - Global theme ID and palette from macro_plan_summary.global_story
+    - Per-section theme IDs and palette overrides
+    - Color story narrative (if provided)
+
     Analyzed from holistic_judge/user.j2:
     - Uses: group_plan_set (serialized to JSON)
     - Uses: section_count, section_ids (computed from plan set)
     - Uses: display_graph.groups_by_role (NOT full groups)
     - Uses: macro_plan_summary.global_story (theme, motifs, pacing_notes)
     - Does NOT use: template_catalog, timing_context
-
-    TODO: As we tune the holistic judge, we may want to:
-    - Add aggregate statistics (template variety, energy arc summary)
-    - Add cross-section transition analysis
 
     Args:
         group_plan_set: Complete set of section plans
@@ -336,6 +398,34 @@ def shape_holistic_judge_context(
     group_plan_set_dict = group_plan_set.model_dump()
     display_graph_dict = display_graph.model_dump()
 
+    # Extract global theme context for explicit display
+    # Handle both dict and string formats for global_story
+    global_story = (macro_plan_summary or {}).get("global_story", {})
+    if isinstance(global_story, str):
+        # Legacy format: global_story is a string
+        global_story = {}
+    global_theme = global_story.get("theme", {}) if isinstance(global_story, dict) else {}
+    global_theme_id = global_theme.get("theme_id") if isinstance(global_theme, dict) else None
+    global_palette_id = global_theme.get("palette_id") if isinstance(global_theme, dict) else None
+    global_theme_tags = global_theme.get("tags", []) if isinstance(global_theme, dict) else []
+    color_story = global_story.get("color_story", "") if isinstance(global_story, dict) else ""
+    story_notes = global_story.get("story_notes", "") if isinstance(global_story, dict) else ""
+
+    # Extract section theme summaries for cross-section analysis
+    section_theme_summary = []
+    for sp in group_plan_set.section_plans:
+        theme_dict = sp.theme.model_dump() if sp.theme else {}
+        section_theme_summary.append(
+            {
+                "section_id": sp.section_id,
+                "theme_id": theme_dict.get("theme_id"),
+                "scope": theme_dict.get("scope"),
+                "tags": theme_dict.get("tags", []),
+                "palette_id": theme_dict.get("palette_id"),
+                "motif_ids": sp.motif_ids,
+            }
+        )
+
     return {
         "group_plan_set": group_plan_set_dict,
         # Only groups_by_role used in prompt
@@ -343,5 +433,12 @@ def shape_holistic_judge_context(
         "section_count": len(group_plan_set.section_plans),
         "section_ids": [sp.section_id for sp in group_plan_set.section_plans],
         "macro_plan_summary": macro_plan_summary or {},
+        # Explicitly extracted theme/palette context for holistic evaluation
+        "global_theme_id": global_theme_id,
+        "global_palette_id": global_palette_id,
+        "global_theme_tags": global_theme_tags,
+        "color_story": color_story,
+        "story_notes": story_notes,
+        "section_theme_summary": section_theme_summary,
         # template_catalog excluded (not used in prompt)
     }

@@ -7,7 +7,8 @@ Uses the shared TemplateRegistry infrastructure.
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable
-from dataclasses import dataclass
+
+from pydantic import ConfigDict, Field
 
 from twinklr.core.sequencer.templates.group.models import GroupPlanTemplate
 from twinklr.core.sequencer.templates.shared.registry import (
@@ -16,7 +17,7 @@ from twinklr.core.sequencer.templates.shared.registry import (
     TemplateRegistry,
     normalize_key,
 )
-from twinklr.core.sequencer.vocabulary import GroupTemplateType
+from twinklr.core.sequencer.vocabulary import GroupTemplateType, GroupVisualIntent, LaneKind
 
 # Re-export for backward compatibility
 __all__ = [
@@ -34,21 +35,49 @@ __all__ = [
 _norm_key = normalize_key
 
 
-@dataclass(frozen=True)
 class TemplateInfo(BaseTemplateInfo):
     """Lightweight metadata for group templates.
 
     Extends BaseTemplateInfo with group-specific fields.
+    Used for both registry listings and agent catalog (unified model).
 
     Attributes:
         template_id: Unique template identifier.
         version: Template version string.
         name: Human-readable template name.
         template_type: Template type (lane classification).
+        visual_intent: Visual intent classification.
+        affinity_tags: Tags indicating this template works well with.
+        avoid_tags: Tags indicating this template conflicts with.
         tags: Tuple of tags for categorization.
+        description: Optional template description.
+        compatible_lanes: Derived property for lane compatibility.
     """
 
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
     template_type: GroupTemplateType
+    visual_intent: GroupVisualIntent
+    affinity_tags: list[str] = Field(default_factory=list)
+    avoid_tags: list[str] = Field(default_factory=list)
+    description: str = ""
+
+    @property
+    def compatible_lanes(self) -> list[LaneKind]:
+        """Derive compatible lanes from template_type.
+
+        Returns:
+            List of lane kinds this template can be used in.
+            Empty list for TRANSITION and SPECIAL types.
+        """
+        type_to_lane = {
+            GroupTemplateType.BASE: LaneKind.BASE,
+            GroupTemplateType.RHYTHM: LaneKind.RHYTHM,
+            GroupTemplateType.ACCENT: LaneKind.ACCENT,
+            # TRANSITION and SPECIAL are not assigned to lanes
+        }
+        lane = type_to_lane.get(self.template_type)
+        return [lane] if lane else []
 
 
 def _make_template_info(t: GroupPlanTemplate) -> TemplateInfo:
@@ -58,7 +87,11 @@ def _make_template_info(t: GroupPlanTemplate) -> TemplateInfo:
         version=t.template_version,
         name=t.name,
         template_type=t.template_type,
+        visual_intent=t.visual_intent,
+        affinity_tags=t.affinity_tags,
+        avoid_tags=t.avoid_tags,
         tags=tuple(t.tags),
+        description="",  # Can be populated from template if description field is added
     )
 
 

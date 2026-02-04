@@ -232,15 +232,6 @@ def load_full_config(job_config_path: str | Path) -> tuple[JobConfig, FixtureGro
     return (job_cfg, fixtures)
 
 
-def get_openai_api_key() -> str | None:
-    """Get OpenAI API key from environment.
-
-    Returns:
-        API key or None if not set
-    """
-    return os.getenv("OPENAI_API_KEY")
-
-
 def _load_env_vars_into_config(config: AppConfig) -> None:
     """Load environment variables into config for API keys.
 

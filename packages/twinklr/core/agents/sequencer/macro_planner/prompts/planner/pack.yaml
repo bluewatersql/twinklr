@@ -1,6 +1,6 @@
 pack_id: macro_planner.v2
-version: 2.0.0
-description: Strategic planning prompts for MacroPlanner agent
+version: 2.1.0
+description: Strategic planning prompts for MacroPlanner agent (theme + palette + motifs)
 
 templates:
   system: system.j2
@@ -9,16 +9,25 @@ templates:
 
 variables:
   required:
-    - audio_profile  # AudioProfileModel with song analysis
-    - display_groups  # List of DisplayGroup objects with target roles
-    - response_schema  # JSON schema for MacroPlan (auto-injected)
-    - taxonomy  # Dict of enum names to value lists (auto-injected)
-    - theme_catalog  # List of ThemeDefinition summaries (theme_id, title)
-  
+    - audio_profile           # AudioProfileModel with song analysis
+    - display_groups          # List of DisplayGroup objects with target roles
+    - response_schema         # JSON schema for MacroPlan (auto-injected)
+    - taxonomy                # Dict of enum names to value lists (auto-injected)
+    - theme_catalog           # List of ThemeDefinition summaries (theme_id, title)
+
+    # NEW (required going forward)
+    - motif_catalog           # MotifCatalog (MotifSpec list + mapping). MacroPlanner chooses motif_ids from this.
+    - palette_catalog         # List of PaletteDefinition summaries OR list of valid palette_ids (+ optional metadata)
+
   optional:
-    - lyric_context  # LyricContextModel with narrative/thematic analysis (None if no lyrics)
-    - iteration  # Current iteration number (int, default: 0)
-    - feedback  # Judge feedback from previous iteration (str)
+    - lyric_context           # LyricContextModel with narrative/thematic analysis (None if no lyrics)
+    - iteration               # Current iteration number (int, default: 0)
+    - feedback                # Judge feedback from previous iteration (str)
+
+    # Optional helpers (nice to have)
+    - default_palette_id      # If theme has a default palette; can be derived upstream
+    - allowed_palette_ids     # If you want to constrain palette choices per run (subset of palette_catalog)
+    - motif_policy            # Cohesion constraints (e.g. min motifs per section, recurrence targets)
 
 metadata:
   agent_type: strategic_planner

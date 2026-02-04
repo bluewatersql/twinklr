@@ -1,5 +1,5 @@
 pack_id: macro_judge.v2
-version: 2.0.0
+version: 2.1.0
 agent_type: judge
 supports_iteration: true
 max_iterations: 3
@@ -33,4 +33,12 @@ variables:
     required: false
   - name: theme_catalog
     description: Optional list of allowed ThemeDefinition summaries (theme_id/title)
+    required: false
+
+  # NEW: for deterministic id validation + better feedback
+  - name: motif_catalog
+    description: Motif catalog (MotifSpec list or mapping) used to validate section motif_ids
+    required: false
+  - name: palette_catalog
+    description: Palette catalog (list of palette_ids or summary objects) used to validate palette ids
     required: false

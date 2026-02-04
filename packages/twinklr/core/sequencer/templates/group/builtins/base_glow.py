@@ -27,6 +27,8 @@ def make_gtpl_base_glow_warm() -> GroupPlanTemplate:
         template_type=GroupTemplateType.BASE,
         visual_intent=GroupVisualIntent.ABSTRACT,
         tags=["glow", "warm", "amber", "gold", "static"],
+        affinity_tags=["motif.abstract", "style.minimal", "setting.calm", "constraint.low_detail"],
+        avoid_tags=["constraint.high_contrast"],
         projection=ProjectionSpec(intent=ProjectionIntent.FLAT),
         timing=TimingHints(bars_min=4, bars_max=64),
         layer_recipe=[
@@ -55,6 +57,8 @@ def make_gtpl_base_glow_cool() -> GroupPlanTemplate:
         template_type=GroupTemplateType.BASE,
         visual_intent=GroupVisualIntent.ABSTRACT,
         tags=["glow", "cool", "blue", "white", "static"],
+        affinity_tags=["motif.abstract", "motif.ice", "style.minimal", "setting.calm"],
+        avoid_tags=["constraint.high_contrast"],
         projection=ProjectionSpec(intent=ProjectionIntent.FLAT),
         timing=TimingHints(bars_min=4, bars_max=64),
         layer_recipe=[

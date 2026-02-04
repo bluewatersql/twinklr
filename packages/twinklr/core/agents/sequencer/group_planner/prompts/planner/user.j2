@@ -25,6 +25,27 @@ Refinement iterations (2+) use user_refinement.j2 instead.
 **Section Notes:** {{ notes }}
 {% endif %}
 
+## MacroPlan Palette + Motifs (NEW)
+
+{% if palette_ref_json %}
+Resolved palette for this section (inherit global primary unless override):
+{{ palette_ref_json }}
+{% else %}
+Resolved palette for this section: MISSING
+{% endif %}
+
+{% if motif_ids %}
+Motif IDs for this section:
+- {{ motif_ids | join(", ") }}
+{% else %}
+Motif IDs for this section: MISSING
+{% endif %}
+
+{% if motif_catalog_summary %}
+Motif Catalog (summary for reference):
+{{ motif_catalog_summary }}
+{% endif %}
+
 ## Available Display Groups
 
 {% for group in display_graph.groups %}
@@ -42,6 +63,9 @@ Refinement iterations (2+) use user_refinement.j2 instead.
 {% for entry in template_catalog.entries %}
 {% if "BASE" in entry.compatible_lanes %}
 - `{{ entry.template_id }}` - {{ entry.name }}
+  {% if entry.affinity_tags %}- Affinity: {{ entry.affinity_tags | join(", ") }}{% endif %}
+  {% if entry.avoid_tags %}- Avoid: {{ entry.avoid_tags | join(", ") }}{% endif %}
+  {% if entry.tags %}- Tags: {{ entry.tags | join(", ") }}{% endif %}
 {% endif %}
 {% endfor %}
 
@@ -49,6 +73,9 @@ Refinement iterations (2+) use user_refinement.j2 instead.
 {% for entry in template_catalog.entries %}
 {% if "RHYTHM" in entry.compatible_lanes %}
 - `{{ entry.template_id }}` - {{ entry.name }}
+  {% if entry.affinity_tags %}- Affinity: {{ entry.affinity_tags | join(", ") }}{% endif %}
+  {% if entry.avoid_tags %}- Avoid: {{ entry.avoid_tags | join(", ") }}{% endif %}
+  {% if entry.tags %}- Tags: {{ entry.tags | join(", ") }}{% endif %}
 {% endif %}
 {% endfor %}
 
@@ -56,6 +83,9 @@ Refinement iterations (2+) use user_refinement.j2 instead.
 {% for entry in template_catalog.entries %}
 {% if "ACCENT" in entry.compatible_lanes %}
 - `{{ entry.template_id }}` - {{ entry.name }}
+  {% if entry.affinity_tags %}- Affinity: {{ entry.affinity_tags | join(", ") }}{% endif %}
+  {% if entry.avoid_tags %}- Avoid: {{ entry.avoid_tags | join(", ") }}{% endif %}
+  {% if entry.tags %}- Tags: {{ entry.tags | join(", ") }}{% endif %}
 {% endif %}
 {% endfor %}
 
@@ -94,7 +124,10 @@ Create a SectionCoordinationPlan for **{{ section_name }} ({{ section_id }})** t
 2. **Selects templates** - From the catalog above, matching section intent
 3. **Defines coordination** - How groups work together (UNIFIED, SEQUENCED, etc.)
 4. **Sets timing** - Using bar/beat TimeRefs within section bounds
-5. Set the section **theme** and ensure template selections align with it.
+5. **Sets theme, palette, motifs**:
+   - Copy theme from MacroPlan (do not invent theme_id)
+   - Set palette (inherit unless MacroPlan override)
+   - Copy motif_ids from MacroPlan and ensure template selections provide motif.* coverage
 
 **Remember:**
 - Primary targets ({{ primary_focus_targets | join(", ") }}) should get prominent ACCENT treatment

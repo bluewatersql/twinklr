@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from pathlib import Path
 from typing import Self
 
@@ -35,10 +36,8 @@ class LLMLoggingConfig(BaseModel):
     prompts, responses, metrics, and errors.
     """
 
-    enabled: bool = Field(
-        default=True,
-        description="Enable LLM call logging (set to False for production performance)",
-    )
+    enabled: bool = Field(default=True, description="Enable logging")
+    log_path: str = Field(default="data/logging", description="Path to log LLM calls")
 
     log_level: str = Field(
         default="standard",
@@ -61,6 +60,14 @@ class LLMLoggingConfig(BaseModel):
         default=True,
         description="Sanitize sensitive data (API keys, emails, etc.) from logs",
     )
+
+
+class CacheConfig(BaseModel):
+    """Cache configuration."""
+
+    enabled: bool = Field(default=True, description="Enable cache")
+    cache_path: str = Field(default="data/cache", description="Path to cache")
+    ttl_seconds: float = Field(default=3600.0, description="Cache TTL in seconds")
 
 
 class AgentOrchestrationConfig(BaseModel):
@@ -100,11 +107,22 @@ class AgentOrchestrationConfig(BaseModel):
 
     refinement_agent: AgentConfig = Field(default_factory=lambda: AgentConfig(temperature=0.7))
 
-    # Phase 0: LLM Logging Configuration
     llm_logging: LLMLoggingConfig = Field(
         default_factory=LLMLoggingConfig,
         description="LLM call logging configuration for observability and debugging",
     )
+
+    agent_cache: CacheConfig = Field(
+        default_factory=lambda: _get_cache_default("agent"), description="Agent cache configuration"
+    )
+    llm_cache: CacheConfig = Field(
+        default_factory=lambda: _get_cache_default("llm"), description="LLM cache configuration"
+    )
+
+
+def _get_cache_default(cache_type: str) -> CacheConfig:
+    """Return default cache configuration."""
+    return CacheConfig(enabled=True, cache_path=f"data/cache/{cache_type}", ttl_seconds=3600.0)
 
 
 class ChannelDefaults(BaseModel):
@@ -408,6 +426,15 @@ class AppConfig(ConfigBase):
     planning: PlanningContextConfig = PlanningContextConfig()
     logging: LoggingConfig = LoggingConfig()
 
+    llm_api_key: str = Field(
+        default_factory=lambda: os.getenv("OPENAI_API_KEY", ""),
+        description="LLM API key to use for API calls",
+    )
+    llm_provider: str = Field(default="openai", description="LLM provider to use for API calls")
+    llm_base_url: str = Field(
+        default="https://api.openai.com/v1", description="LLM base URL to use for API calls"
+    )
+
     @classmethod
     def default_path(cls) -> Path:
         """Default path for application config."""
@@ -480,12 +507,11 @@ class JobConfig(ConfigBase):
 
     model_config = ConfigDict(extra="ignore")
 
-    schema_version: str = "3.0"  # Bumped to 3.0 for Phase 0 Component 5
+    schema_version: str = "3.0"
     include_notes_track: bool = True
     debug: bool = True
     assumptions: AssumptionsConfig = AssumptionsConfig()
 
-    # Fixture configuration (uses FixtureGroup - loaded separately)
     fixture_config_path: str = "fixture_config.json"
 
     agent: AgentOrchestrationConfig = Field(default_factory=lambda: _get_agent_config_default())

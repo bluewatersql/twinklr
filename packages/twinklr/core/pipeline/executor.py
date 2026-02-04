@@ -407,7 +407,8 @@ class PipelineExecutor:
 
             async def execute_with_limit(inp: Any) -> StageResult[Any]:
                 async with semaphore:
-                    return await stage_def.stage.execute(inp, context)
+                    result: StageResult[Any] = await stage_def.stage.execute(inp, context)
+                    return result
 
             tasks = [execute_with_limit(inp) for inp in inputs]
         else:

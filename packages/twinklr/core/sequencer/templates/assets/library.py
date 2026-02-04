@@ -7,36 +7,22 @@ Uses the shared TemplateRegistry infrastructure.
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable
-from dataclasses import dataclass
+
+from pydantic import ConfigDict
 
 from twinklr.core.sequencer.templates.assets.models import AssetTemplate
 from twinklr.core.sequencer.templates.shared.registry import (
     BaseTemplateInfo,
-    TemplateNotFoundError,
     TemplateRegistry,
 )
 from twinklr.core.sequencer.vocabulary import AssetTemplateType
 
-# Re-export for backward compatibility
-__all__ = [
-    "REGISTRY",
-    "AssetTemplateInfo",
-    "AssetTemplateNotFoundError",
-    "AssetTemplateRegistry",
-    "get_asset_template",
-    "list_asset_templates",
-    "register_asset_template",
-]
 
-# Backward compatibility alias
-AssetTemplateNotFoundError = TemplateNotFoundError
-
-
-@dataclass(frozen=True)
 class AssetTemplateInfo(BaseTemplateInfo):
     """Lightweight metadata for asset templates.
 
     Extends BaseTemplateInfo with asset-specific fields.
+    Used for both registry listings and agent catalog (unified model).
 
     Attributes:
         template_id: Unique template identifier.
@@ -44,9 +30,13 @@ class AssetTemplateInfo(BaseTemplateInfo):
         name: Human-readable template name.
         template_type: Asset template type.
         tags: Tuple of tags for categorization.
+        description: Optional template description.
     """
 
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
     template_type: AssetTemplateType
+    description: str = ""
 
 
 def _make_template_info(t: AssetTemplate) -> AssetTemplateInfo:
@@ -57,6 +47,7 @@ def _make_template_info(t: AssetTemplate) -> AssetTemplateInfo:
         name=t.name,
         template_type=t.template_type,
         tags=tuple(t.tags),
+        description="",  # Can be populated from template if description field is added
     )
 
 

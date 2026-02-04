@@ -395,6 +395,17 @@ class StandardIterationController(Generic[TPlan]):
             assert isinstance(verdict, JudgeVerdict), "Judge succeeded but returned invalid data"
             context.add_verdict(verdict)
 
+            # Log verdict details for debugging
+            self.logger.debug(
+                f"Judge verdict (iteration {iteration + 1}): "
+                f"score={verdict.score:.1f}, status={verdict.status.value}"
+            )
+            if verdict.issues:
+                for issue in verdict.issues[:3]:  # Log first 3 issues
+                    self.logger.debug(f"  - Issue [{issue.category.value}]: {issue.message}")
+            if verdict.feedback_for_planner:
+                self.logger.debug(f"  - Feedback: {verdict.feedback_for_planner[:200]}...")
+
             # Record verdict issues to repository (for learning, regardless of approval status)
             self.feedback.add_judge_verdict(verdict, iteration)
 

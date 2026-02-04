@@ -270,7 +270,7 @@ async def main() -> None:
 
     llm_logger = create_llm_logger(
         enabled=job_config.agent.llm_logging.enabled if job_config else False,
-        output_dir=logging_dir / "llm_calls",
+        output_dir=logging_dir,
         log_level=job_config.agent.llm_logging.log_level if job_config else "standard",
         format=job_config.agent.llm_logging.format if job_config else "json",
     )

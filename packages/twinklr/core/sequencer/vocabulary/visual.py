@@ -68,6 +68,26 @@ class ColorMode(str, Enum):
     FULL_SPECTRUM = "FULL_SPECTRUM"
 
 
+class PaletteRole(str, Enum):
+    """Palette role for templates.
+
+    Defines the role of a palette in the template output.
+
+    Attributes:
+        PRIMARY: Default base palette for the song/section.
+        ACCENT: Highlight/hits/sparkle.
+        WARM: Warm bias variant.
+        COOL: Cool bias variant.
+        NEUTRAL: Whites/silvers/greys or desaturated.
+    """
+
+    PRIMARY = "PRIMARY"
+    ACCENT = "ACCENT"
+    WARM = "WARM"
+    COOL = "COOL"
+    NEUTRAL = "NEUTRAL"
+
+
 class ProjectionIntent(str, Enum):
     """Projection mapping intent for templates.
 

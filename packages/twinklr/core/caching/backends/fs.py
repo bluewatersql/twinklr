@@ -9,10 +9,9 @@ from typing import TypeVar
 
 from pydantic import BaseModel, ValidationError
 
+from twinklr.core.caching.models import CacheKey, CacheMeta
 from twinklr.core.io import AbsolutePath, FileSystem
 from twinklr.core.io.utils import sanitize_path_component
-
-from ..models import CacheKey, CacheMeta
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -28,12 +27,12 @@ class FSCache:
               {input_fingerprint}/
                 artifact.json
                 meta.json (commit marker)
+
+    The cache lazily initializes on first use (thread-safe).
     """
 
     def __init__(
-        self,
-        fs: FileSystem,
-        root: AbsolutePath,
+        self, fs: FileSystem, root: AbsolutePath, ttl_seconds: float | None = None
     ) -> None:
         """
         Initialize filesystem cache.
@@ -44,14 +43,21 @@ class FSCache:
         """
         self.fs = fs
         self.root = root
+        self._initialized = False
+        self._init_lock = asyncio.Lock()
+        self._ttl_seconds = ttl_seconds
 
     async def initialize(self) -> None:
         """
         Initialize cache (ensure root exists).
 
-        Call this once after construction in async context.
+        This is called automatically on first use, but can be called explicitly.
+        Safe to call multiple times.
         """
-        await self.fs.mkdirs(self.root, exist_ok=True)
+        async with self._init_lock:
+            if not self._initialized:
+                await self.fs.mkdirs(self.root, exist_ok=True)
+                self._initialized = True
 
     def _entry_dir(self, key: CacheKey) -> AbsolutePath:
         """Compute cache entry directory path (sync)."""
@@ -85,6 +91,7 @@ class FSCache:
         Returns:
             True if entry exists, is valid, and not expired
         """
+        await self.initialize()  # Lazy initialization
         artifact_path = self._artifact_path(key)
         meta_path = self._meta_path(key)
 
@@ -98,6 +105,7 @@ class FSCache:
             return False
 
         # If TTL specified, check expiration
+        ttl_seconds = ttl_seconds or self._ttl_seconds
         if ttl_seconds is not None:
             try:
                 meta_json = await self.fs.read_text(meta_path)
@@ -128,6 +136,7 @@ class FSCache:
         Returns:
             Validated artifact model, or None on miss/corruption/validation failure/expiration
         """
+        await self.initialize()  # Lazy initialization
         # Check existence and expiration in one call
         if not await self.exists(key, ttl_seconds):
             return None
@@ -152,6 +161,7 @@ class FSCache:
                 return None
 
             # Double-check expiration (in case exists() check raced with expiration)
+            ttl_seconds = ttl_seconds or self._ttl_seconds
             if ttl_seconds is not None:
                 now = time.time()
                 if now > (meta.created_at + ttl_seconds):
@@ -184,6 +194,7 @@ class FSCache:
             compute_ms: Optional computation duration
             ttl_seconds: Optional TTL in seconds (stored in meta for reference)
         """
+        await self.initialize()  # Lazy initialization
         entry_dir = self._entry_dir(key)
         await self.fs.mkdirs(entry_dir, exist_ok=True)
 
@@ -199,6 +210,7 @@ class FSCache:
 
         # Build metadata
         artifact_schema_version = getattr(artifact, "schema_version", None)
+        ttl_seconds = ttl_seconds or self._ttl_seconds
 
         meta = CacheMeta(
             step_id=key.step_id,
@@ -220,6 +232,7 @@ class FSCache:
 
     async def invalidate(self, key: CacheKey) -> None:
         """Invalidate cache entry by removing directory (async)."""
+        await self.initialize()  # Lazy initialization
         entry_dir = self._entry_dir(key)
         if await self.fs.exists(entry_dir):
             await self.fs.rmdir(entry_dir, recursive=True)
@@ -230,12 +243,14 @@ class FSCacheSync:
     Synchronous wrapper around FSCache.
 
     Uses asyncio.run() to execute async operations in blocking mode.
+    Cache initializes lazily on first use.
     """
 
     def __init__(
         self,
         fs: FileSystem,
         root: AbsolutePath,
+        ttl_seconds: float | None = None,
     ) -> None:
         """
         Initialize sync cache wrapper.
@@ -245,8 +260,6 @@ class FSCacheSync:
             root: Absolute path to cache root directory
         """
         self._async_cache = FSCache(fs, root)
-        # Initialize synchronously
-        asyncio.run(self._async_cache.initialize())
 
     def exists(self, key: CacheKey, ttl_seconds: float | None = None) -> bool:
         """Check if entry exists and not expired (blocking)."""
@@ -269,3 +282,7 @@ class FSCacheSync:
     def invalidate(self, key: CacheKey) -> None:
         """Invalidate entry (blocking)."""
         asyncio.run(self._async_cache.invalidate(key))
+
+    def initialize(self) -> None:
+        """Initialize cache (blocking)."""
+        asyncio.run(self._async_cache.initialize())

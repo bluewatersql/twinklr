@@ -15,7 +15,7 @@ from twinklr.core.agents.sequencer.group_planner.timing import (
 )
 from twinklr.core.sequencer.templates.group.catalog import (
     TemplateCatalog,
-    TemplateCatalogEntry,
+    TemplateInfo,
 )
 from twinklr.core.sequencer.templates.group.models import (
     DisplayGraph,
@@ -24,6 +24,7 @@ from twinklr.core.sequencer.templates.group.models import (
     TimeRef,
     TimeRefKind,
 )
+from twinklr.core.sequencer.vocabulary import GroupTemplateType, GroupVisualIntent
 
 
 @pytest.fixture
@@ -44,15 +45,21 @@ def sample_template_catalog() -> TemplateCatalog:
     """Sample template catalog."""
     return TemplateCatalog(
         entries=[
-            TemplateCatalogEntry(
+            TemplateInfo(
                 template_id="gtpl_base_glow_warm",
+                version="1.0",
                 name="Warm BG",
-                compatible_lanes=[LaneKind.BASE],
+                template_type=GroupTemplateType.BASE,
+                visual_intent=GroupVisualIntent.ABSTRACT,
+                tags=(),
             ),
-            TemplateCatalogEntry(
+            TemplateInfo(
                 template_id="gtpl_accent_flash",
+                version="1.0",
                 name="Flash",
-                compatible_lanes=[LaneKind.ACCENT],
+                template_type=GroupTemplateType.ACCENT,
+                visual_intent=GroupVisualIntent.TEXTURE,
+                tags=(),
             ),
         ]
     )

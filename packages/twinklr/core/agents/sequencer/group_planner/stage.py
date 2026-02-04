@@ -15,13 +15,12 @@ from twinklr.core.agents.sequencer.group_planner.orchestrator import (
     GroupPlannerOrchestrator,
 )
 from twinklr.core.pipeline.result import failure_result, success_result
-from twinklr.core.sequencer.templates.group.models import GroupPlanSet
+from twinklr.core.sequencer.planning import GroupPlanSet
 
 if TYPE_CHECKING:
     from twinklr.core.pipeline.context import PipelineContext
     from twinklr.core.pipeline.result import StageResult
-    from twinklr.core.sequencer.planning import MacroSectionPlan
-    from twinklr.core.sequencer.templates.group.models import SectionCoordinationPlan
+    from twinklr.core.sequencer.planning import MacroSectionPlan, SectionCoordinationPlan
 
 logger = logging.getLogger(__name__)
 

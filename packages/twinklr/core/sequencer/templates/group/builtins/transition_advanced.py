@@ -28,6 +28,8 @@ def make_gtpl_transition_ramp_up() -> GroupPlanTemplate:
         template_type=GroupTemplateType.TRANSITION,
         visual_intent=GroupVisualIntent.ABSTRACT,
         tags=["ramp", "up", "build", "intensity"],
+        affinity_tags=["motif.abstract", "style.minimal", "setting.hype", "constraint.clean_edges"],
+        avoid_tags=[],
         projection=ProjectionSpec(intent=ProjectionIntent.FLAT),
         timing=TimingHints(bars_min=2, bars_max=4),
         layer_recipe=[
@@ -56,6 +58,8 @@ def make_gtpl_transition_ramp_down() -> GroupPlanTemplate:
         template_type=GroupTemplateType.TRANSITION,
         visual_intent=GroupVisualIntent.ABSTRACT,
         tags=["ramp", "down", "decay", "intensity"],
+        affinity_tags=["motif.abstract", "style.minimal", "setting.calm", "constraint.clean_edges"],
+        avoid_tags=[],
         projection=ProjectionSpec(intent=ProjectionIntent.FLAT),
         timing=TimingHints(bars_min=2, bars_max=4),
         layer_recipe=[
@@ -85,6 +89,8 @@ def make_gtpl_transition_texture_swap() -> GroupPlanTemplate:
         template_type=GroupTemplateType.TRANSITION,
         visual_intent=GroupVisualIntent.ABSTRACT,
         tags=["texture", "swap", "change", "base"],
+        affinity_tags=["motif.abstract", "style.minimal", "constraint.clean_edges"],
+        avoid_tags=[],
         projection=ProjectionSpec(intent=ProjectionIntent.FLAT),
         timing=TimingHints(bars_min=1, bars_max=2),
         layer_recipe=[
@@ -113,6 +119,13 @@ def make_gtpl_transition_texture_swap_reverse() -> GroupPlanTemplate:
         template_type=GroupTemplateType.TRANSITION,
         visual_intent=GroupVisualIntent.ABSTRACT,
         tags=["texture", "swap", "reverse", "change"],
+        affinity_tags=[
+            "motif.abstract",
+            "style.minimal",
+            "constraint.clean_edges",
+            "setting.playful",
+        ],
+        avoid_tags=[],
         projection=ProjectionSpec(intent=ProjectionIntent.FLAT),
         timing=TimingHints(bars_min=1, bars_max=2),
         layer_recipe=[
@@ -142,6 +155,13 @@ def make_gtpl_transition_build_short() -> GroupPlanTemplate:
         template_type=GroupTemplateType.TRANSITION,
         visual_intent=GroupVisualIntent.ABSTRACT,
         tags=["build", "short", "pre-chorus", "anticipation"],
+        affinity_tags=[
+            "motif.abstract",
+            "setting.hype",
+            "constraint.high_contrast",
+            "style.bold_shapes",
+        ],
+        avoid_tags=[],
         projection=ProjectionSpec(intent=ProjectionIntent.FLAT),
         timing=TimingHints(bars_min=1, bars_max=2),
         layer_recipe=[
@@ -170,6 +190,13 @@ def make_gtpl_transition_build_long() -> GroupPlanTemplate:
         template_type=GroupTemplateType.TRANSITION,
         visual_intent=GroupVisualIntent.ABSTRACT,
         tags=["build", "long", "extended", "anticipation"],
+        affinity_tags=[
+            "motif.abstract",
+            "setting.hype",
+            "setting.triumphant",
+            "constraint.high_contrast",
+        ],
+        avoid_tags=[],
         projection=ProjectionSpec(intent=ProjectionIntent.FLAT),
         timing=TimingHints(bars_min=4, bars_max=8),
         layer_recipe=[

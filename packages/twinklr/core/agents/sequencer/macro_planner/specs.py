@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from twinklr.core.agents.shared.judge.models import JudgeVerdict
 from twinklr.core.agents.spec import AgentMode, AgentSpec
-from twinklr.core.agents.taxonomy_utils import get_taxonomy_dict
+from twinklr.core.agents.taxonomy_utils import get_taxonomy_dict, get_theming_ids
 from twinklr.core.sequencer.planning import MacroPlan
 
 
@@ -68,7 +68,10 @@ def get_judge_spec(
         temperature=temperature,
         max_schema_repair_attempts=5,  # Increased for enum validation issues
         token_budget=token_budget,
-        default_variables={"taxonomy": get_taxonomy_dict()},  # Auto-inject taxonomy
+        default_variables={
+            "taxonomy": get_taxonomy_dict(),
+            "theming_ids": get_theming_ids(),  # For theme/tag/palette validation
+        },
     )
 
 

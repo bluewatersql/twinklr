@@ -18,7 +18,7 @@ from twinklr.core.agents.sequencer.group_planner import (
     SectionCoordinationPlan,
     SectionPlanningContext,
     TemplateCatalog,
-    TemplateCatalogEntry,
+    TemplateInfo,
     TimeRef,
     TimeRefKind,
 )
@@ -28,6 +28,8 @@ from twinklr.core.agents.sequencer.group_planner.timing import (
     TimingContext,
 )
 from twinklr.core.agents.shared.judge.models import JudgeVerdict, VerdictStatus
+from twinklr.core.sequencer.theming import ThemeRef, ThemeScope
+from twinklr.core.sequencer.vocabulary import GroupTemplateType, GroupVisualIntent
 
 
 @pytest.fixture
@@ -49,20 +51,29 @@ def sample_template_catalog() -> TemplateCatalog:
     """Sample template catalog."""
     return TemplateCatalog(
         entries=[
-            TemplateCatalogEntry(
+            TemplateInfo(
                 template_id="gtpl_base_glow_warm",
+                version="1.0",
                 name="Warm BG",
-                compatible_lanes=[LaneKind.BASE],
+                template_type=GroupTemplateType.BASE,
+                visual_intent=GroupVisualIntent.ABSTRACT,
+                tags=(),
             ),
-            TemplateCatalogEntry(
+            TemplateInfo(
                 template_id="gtpl_rhythm_bounce",
+                version="1.0",
                 name="Bounce",
-                compatible_lanes=[LaneKind.RHYTHM],
+                template_type=GroupTemplateType.RHYTHM,
+                visual_intent=GroupVisualIntent.GEOMETRIC,
+                tags=(),
             ),
-            TemplateCatalogEntry(
+            TemplateInfo(
                 template_id="gtpl_accent_flash",
+                version="1.0",
                 name="Flash",
-                compatible_lanes=[LaneKind.ACCENT],
+                template_type=GroupTemplateType.ACCENT,
+                visual_intent=GroupVisualIntent.TEXTURE,
+                tags=(),
             ),
         ]
     )
@@ -114,10 +125,20 @@ def sample_section_context(
     )
 
 
+def _make_section_theme() -> ThemeRef:
+    """Create a valid section ThemeRef (SECTION scope)."""
+    return ThemeRef(
+        theme_id="theme.abstract.neon",
+        scope=ThemeScope.SECTION,
+        tags=["motif.geometric"],
+    )
+
+
 def create_mock_section_plan() -> SectionCoordinationPlan:
     """Create a mock SectionCoordinationPlan that passes validation."""
     return SectionCoordinationPlan(
         section_id="verse_1",
+        theme=_make_section_theme(),
         lane_plans=[
             LanePlan(
                 lane=LaneKind.ACCENT,
@@ -228,6 +249,7 @@ class TestGroupPlannerOrchestratorIntegration:
         # Create plan with invalid template
         invalid_plan = SectionCoordinationPlan(
             section_id="verse_1",
+            theme=_make_section_theme(),
             lane_plans=[
                 LanePlan(
                     lane=LaneKind.ACCENT,

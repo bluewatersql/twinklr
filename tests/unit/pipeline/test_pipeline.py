@@ -239,7 +239,10 @@ async def test_conditional_stage_skipped(mock_context):
 
     assert result.success is True
     assert "stage1" in result.outputs
-    assert "stage2" not in result.outputs  # Skipped
+    # Skipped stages appear in outputs with None value
+    assert result.outputs.get("stage2") is None
+    # Skipped metadata is in stage_results metadata
+    assert result.stage_results["stage2"].metadata.get("skipped") is True
 
 
 @pytest.mark.asyncio

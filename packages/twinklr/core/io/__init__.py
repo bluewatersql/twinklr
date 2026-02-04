@@ -17,12 +17,18 @@ Example (sync):
     >>> content = fs.read_text(path)
 """
 
-from .impl_fake import FakeFileSystem, FakeFileSystemSync
-from .impl_null import NullFileSystem, NullFileSystemSync
-from .impl_real import RealFileSystem, RealFileSystemSync
-from .models import AbsolutePath, RelativePath, WriteResult, absolute_path, relative_path
-from .protocols import FileSystem, FileSystemSync
-from .utils import sanitize_path_component
+from twinklr.core.io.impl_fake import FakeFileSystem, FakeFileSystemSync
+from twinklr.core.io.impl_null import NullFileSystem, NullFileSystemSync
+from twinklr.core.io.impl_real import RealFileSystem, RealFileSystemSync
+from twinklr.core.io.models import (
+    AbsolutePath,
+    RelativePath,
+    WriteResult,
+    absolute_path,
+    relative_path,
+)
+from twinklr.core.io.protocols import FileSystem, FileSystemSync
+from twinklr.core.io.utils import sanitize_path_component
 
 __all__ = [
     # Path types and constructors

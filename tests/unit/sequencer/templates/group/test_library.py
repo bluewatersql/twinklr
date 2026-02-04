@@ -112,7 +112,7 @@ class TestGroupTemplateRegistry:
 
     def test_get_nonexistent_template(self, registry):
         """Test getting nonexistent template raises error."""
-        with pytest.raises(TemplateNotFoundError, match=re.escape("Unknown.*template")):
+        with pytest.raises(TemplateNotFoundError, match="Unknown group template"):
             registry.get("nonexistent")
 
     def test_get_deep_copy_default(self, registry, sample_factory):

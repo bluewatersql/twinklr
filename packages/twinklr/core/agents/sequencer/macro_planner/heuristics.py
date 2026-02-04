@@ -1,9 +1,14 @@
-"""Heuristic validator for MacroPlan.
+"""
+Heuristic validator for MacroPlan.
 
 Performs deterministic validation checks on MacroPlan outputs
 before they are sent to the LLM judge. Fast, non-LLM checks
 that catch common structural and logical issues.
 """
+
+from __future__ import annotations
+
+from collections import Counter
 
 from twinklr.core.agents.audio.profile.models import AudioProfileModel
 from twinklr.core.agents.issues import Issue, IssueSeverity
@@ -22,26 +27,31 @@ class MacroPlanHeuristicValidator:
     2. Timing validation (section coverage, gaps, overlaps)
     3. Composition validation (layer count, target validity)
     4. Asset validation (asset types, bloat)
-    5. Quality checks (contrast, focus targets)
+    5. Quality checks (contrast, focus targets, motif cohesion, palette presence)
     """
 
     def validate(
         self,
         plan: MacroPlan,
         audio_profile: AudioProfileModel,
+        *,
+        motif_by_id: dict[str, object] | None = None,
+        palette_ids: set[str] | None = None,
     ) -> list[Issue]:
         """Run all validation checks on MacroPlan.
 
         Args:
             plan: MacroPlan to validate
             audio_profile: Audio analysis for cross-validation
+            motif_by_id: Optional mapping of valid motif_id -> MotifSpec (or any object)
+            palette_ids: Optional set of valid palette_id values
 
         Returns:
             List of issues found (empty if all checks pass)
         """
         issues: list[Issue] = []
 
-        # Run all validation checks
+        # Existing checks
         issues.extend(self._validate_section_coverage(plan, audio_profile))
         issues.extend(self._validate_layer_count(plan))
         issues.extend(self._validate_target_validity(plan))
@@ -50,51 +60,28 @@ class MacroPlanHeuristicValidator:
         issues.extend(self._check_contrast(plan))
         issues.extend(self._check_asset_bloat(plan))
 
+        # NEW: palette + motifs
+        issues.extend(self._validate_palette_plan(plan, palette_ids))
+        issues.extend(self._validate_motif_ids(plan, motif_by_id))
+        issues.extend(self._check_motif_cohesion(plan))
+
         return issues
 
     def has_errors(self, issues: list[Issue]) -> bool:
-        """Check if any ERROR severity issues present.
-
-        Args:
-            issues: List of issues to check
-
-        Returns:
-            True if any issues have ERROR severity
-        """
         return any(issue.severity == IssueSeverity.ERROR for issue in issues)
 
     def has_warnings(self, issues: list[Issue]) -> bool:
-        """Check if any WARN severity issues present.
-
-        Args:
-            issues: List of issues to check
-
-        Returns:
-            True if any issues have WARN severity
-        """
         return any(issue.severity == IssueSeverity.WARN for issue in issues)
 
-    # Validation check methods (stubbed for now, implemented in subsequent tasks)
+    # -----------------------------
+    # Existing methods (unchanged)
+    # -----------------------------
 
     def _validate_section_coverage(
         self,
         plan: MacroPlan,
         audio_profile: AudioProfileModel,
     ) -> list[Issue]:
-        """Validate section coverage matches audio profile.
-
-        Checks:
-        - All audio sections have corresponding plans (ERROR if missing)
-        - No extra sections in plan (WARN if extra)
-        - Section IDs match
-
-        Args:
-            plan: MacroPlan to validate
-            audio_profile: Audio analysis with expected sections
-
-        Returns:
-            List of coverage issues (empty if valid)
-        """
         from twinklr.core.agents.issues import (
             IssueCategory,
             IssueEffort,
@@ -106,11 +93,9 @@ class MacroPlanHeuristicValidator:
 
         issues: list[Issue] = []
 
-        # Extract section IDs
         audio_section_ids = {s.section_id for s in audio_profile.structure.sections}
         plan_section_ids = {sp.section.section_id for sp in plan.section_plans}
 
-        # Check for missing sections (ERROR)
         missing_sections = audio_section_ids - plan_section_ids
         if missing_sections:
             missing_sorted = sorted(missing_sections)
@@ -130,7 +115,6 @@ class MacroPlanHeuristicValidator:
                 )
             )
 
-        # Check for extra sections (WARN)
         extra_sections = plan_section_ids - audio_section_ids
         if extra_sections:
             extra_sorted = sorted(extra_sections)
@@ -153,22 +137,6 @@ class MacroPlanHeuristicValidator:
         return issues
 
     def _validate_layer_count(self, plan: MacroPlan) -> list[Issue]:
-        """Validate layer count is appropriate (quality check).
-
-        Note: Pydantic already enforces 1-5 layers, exactly one BASE layer,
-        and no duplicates. This check warns about edge cases that pass
-        schema validation but may indicate quality issues.
-
-        Checks:
-        - Only 1 layer (minimal, could be more engaging) -> WARN
-        - 5 layers (maximum, may be too complex) -> WARN
-
-        Args:
-            plan: MacroPlan to validate
-
-        Returns:
-            List of layer count warnings (empty if appropriate)
-        """
         from twinklr.core.agents.issues import (
             IssueCategory,
             IssueEffort,
@@ -181,7 +149,6 @@ class MacroPlanHeuristicValidator:
         issues: list[Issue] = []
         layer_count = len(plan.layering_plan.layers)
 
-        # Warn if minimal layering (1 layer only)
         if layer_count == 1:
             issues.append(
                 Issue(
@@ -199,7 +166,6 @@ class MacroPlanHeuristicValidator:
                 )
             )
 
-        # Warn if at maximum complexity (5 layers)
         if layer_count == 5:
             issues.append(
                 Issue(
@@ -220,36 +186,9 @@ class MacroPlanHeuristicValidator:
         return issues
 
     def _validate_target_validity(self, plan: MacroPlan) -> list[Issue]:
-        """Validate all target roles are valid.
-
-        Note: Pydantic already validates that target roles are valid TargetRole
-        enum names. This is a defensive check that should never trigger if
-        Pydantic validation is working correctly. Included for safety.
-
-        Args:
-            plan: MacroPlan to validate
-
-        Returns:
-            List of target validity issues (empty if valid, should always be empty)
-        """
-        # Pydantic already validates target roles in MacroSectionPlan and TargetSelector
-        # via field_validator. This method exists for completeness but should always
-        # return empty list if Pydantic validation is working.
         return []
 
     def _validate_asset_types(self, plan: MacroPlan) -> list[Issue]:
-        """Validate asset requirements are valid types.
-
-        Checks:
-        - Asset names have valid extensions (.png, .gif)
-        - File extensions are lowercase
-
-        Args:
-            plan: MacroPlan to validate
-
-        Returns:
-            List of asset type issues (empty if valid)
-        """
         from twinklr.core.agents.issues import (
             IssueCategory,
             IssueEffort,
@@ -260,14 +199,10 @@ class MacroPlanHeuristicValidator:
         )
 
         issues: list[Issue] = []
-
-        # Valid asset extensions for Phase 1
-        VALID_EXTENSIONS = {".png", ".gif"}
+        valid_extensions = {".png", ".gif"}
 
         for asset in plan.asset_requirements:
-            # Check if has valid extension
-            has_valid_ext = any(asset.lower().endswith(ext) for ext in VALID_EXTENSIONS)
-
+            has_valid_ext = any(asset.lower().endswith(ext) for ext in valid_extensions)
             if not has_valid_ext:
                 issues.append(
                     Issue(
@@ -288,20 +223,6 @@ class MacroPlanHeuristicValidator:
         return issues
 
     def _validate_focus_targets(self, plan: MacroPlan) -> list[Issue]:
-        """Validate focus targets across sections (quality check).
-
-        Checks for visual impact and variety:
-        - Warn if many sections focus on same targets (lack of variety)
-        - Warn if critical targets (e.g., MEGA_TREE, HERO) never used
-
-        Args:
-            plan: MacroPlan to validate
-
-        Returns:
-            List of focus target quality warnings (empty if good distribution)
-        """
-        from collections import Counter
-
         from twinklr.core.agents.issues import (
             IssueCategory,
             IssueEffort,
@@ -312,19 +233,15 @@ class MacroPlanHeuristicValidator:
         )
 
         issues: list[Issue] = []
-
-        # Collect primary focus targets across all sections
-        primary_targets = []
+        primary_targets: list[str] = []
         for section_plan in plan.section_plans:
             primary_targets.extend(section_plan.primary_focus_targets)
 
-        # Count frequency of each target
         target_counts = Counter(primary_targets)
         total_sections = len(plan.section_plans)
 
-        # Check if any single target dominates (used in >70% of sections)
         for target, count in target_counts.items():
-            if count / total_sections > 0.7 and total_sections > 2:
+            if total_sections > 2 and (count / total_sections) > 0.7:
                 issues.append(
                     Issue(
                         issue_id=f"FOCUS_OVERUSED_{target}",
@@ -334,7 +251,10 @@ class MacroPlanHeuristicValidator:
                         scope=IssueScope.GLOBAL,
                         location=IssueLocation(),
                         rule="DON'T overuse single target - vary focus across sections",
-                        message=f"Target '{target}' is primary focus in {count}/{total_sections} sections ({count / total_sections * 100:.0f}%). Consider more target variety.",
+                        message=(
+                            f"Target '{target}' is primary focus in {count}/{total_sections} sections "
+                            f"({count / total_sections * 100:.0f}%). Consider more target variety."
+                        ),
                         fix_hint="Vary primary focus targets across sections. Use other targets like MEGA_TREE, HERO, ARCHES, etc.",
                         acceptance_test="No single target is primary focus in more than 70% of sections",
                         suggested_action=SuggestedAction.PATCH,
@@ -344,19 +264,6 @@ class MacroPlanHeuristicValidator:
         return issues
 
     def _check_contrast(self, plan: MacroPlan) -> list[Issue]:
-        """Check for sufficient contrast across sections (quality check).
-
-        Validates visual variety and dynamic range:
-        - Warns if all sections have same energy target
-        - Warns if all sections have same motion density (4+ sections)
-        - Info if all sections use same choreography style (5+ sections)
-
-        Args:
-            plan: MacroPlan to validate
-
-        Returns:
-            List of contrast warnings (empty if good variety)
-        """
         from twinklr.core.agents.issues import (
             IssueCategory,
             IssueEffort,
@@ -367,16 +274,11 @@ class MacroPlanHeuristicValidator:
         )
 
         issues: list[Issue] = []
-
-        # Need at least 2 sections to check contrast
         if len(plan.section_plans) < 2:
             return issues
 
-        # Check energy contrast
         energies = [sp.energy_target for sp in plan.section_plans]
-        unique_energies = set(energies)
-
-        if len(unique_energies) == 1:
+        if len(set(energies)) == 1:
             issues.append(
                 Issue(
                     issue_id="CONTRAST_NO_ENERGY_VARIETY",
@@ -393,11 +295,8 @@ class MacroPlanHeuristicValidator:
                 )
             )
 
-        # Check motion density contrast (only warn if 4+ sections)
         densities = [sp.motion_density for sp in plan.section_plans]
-        unique_densities = set(densities)
-
-        if len(unique_densities) == 1 and len(densities) >= 4:
+        if len(densities) >= 4 and len(set(densities)) == 1:
             issues.append(
                 Issue(
                     issue_id="CONTRAST_NO_DENSITY_VARIETY",
@@ -414,11 +313,8 @@ class MacroPlanHeuristicValidator:
                 )
             )
 
-        # Check choreography style variety (only info if 5+ sections)
         styles = [sp.choreography_style for sp in plan.section_plans]
-        unique_styles = set(styles)
-
-        if len(unique_styles) == 1 and len(styles) >= 5:
+        if len(styles) >= 5 and len(set(styles)) == 1:
             issues.append(
                 Issue(
                     issue_id="CONTRAST_SINGLE_STYLE",
@@ -438,18 +334,43 @@ class MacroPlanHeuristicValidator:
         return issues
 
     def _check_asset_bloat(self, plan: MacroPlan) -> list[Issue]:
-        """Check for excessive asset requirements (quality check).
+        from twinklr.core.agents.issues import (
+            IssueCategory,
+            IssueEffort,
+            IssueLocation,
+            IssueScope,
+            IssueSeverity,
+            SuggestedAction,
+        )
 
-        Validates asset count is reasonable:
-        - Warn if more than 10 unique assets required
-        - Assets are expensive to generate, should be used judiciously
+        issues: list[Issue] = []
+        asset_count = len(plan.asset_requirements)
+        max_recommended = 10
 
-        Args:
-            plan: MacroPlan to validate
+        if asset_count > max_recommended:
+            issues.append(
+                Issue(
+                    issue_id="ASSET_BLOAT",
+                    category=IssueCategory.COMPLEXITY,
+                    severity=IssueSeverity.WARN,
+                    estimated_effort=IssueEffort.MEDIUM,
+                    scope=IssueScope.GLOBAL,
+                    location=IssueLocation(),
+                    rule="DON'T require excessive assets - reuse and minimize for efficiency",
+                    message=f"Plan requires {asset_count} assets (>{max_recommended} recommended max). Asset generation is expensive.",
+                    fix_hint=f"Reduce to {max_recommended} or fewer assets, reuse assets across sections",
+                    acceptance_test=f"Asset requirements ≤ {max_recommended} OR high asset count is justified",
+                    suggested_action=SuggestedAction.PATCH,
+                )
+            )
 
-        Returns:
-            List of asset bloat warnings (empty if reasonable)
-        """
+        return issues
+
+    # -----------------------------
+    # NEW: palette + motif checks
+    # -----------------------------
+
+    def _validate_palette_plan(self, plan: MacroPlan, palette_ids: set[str] | None) -> list[Issue]:
         from twinklr.core.agents.issues import (
             IssueCategory,
             IssueEffort,
@@ -461,23 +382,246 @@ class MacroPlanHeuristicValidator:
 
         issues: list[Issue] = []
 
-        # Warn if too many assets (>10)
-        asset_count = len(plan.asset_requirements)
-        MAX_RECOMMENDED_ASSETS = 10
+        global_story = getattr(plan, "global_story", None)
+        palette_plan = (
+            getattr(global_story, "palette_plan", None) if global_story is not None else None
+        )
+        primary = getattr(palette_plan, "primary", None) if palette_plan is not None else None
 
-        if asset_count > MAX_RECOMMENDED_ASSETS:
+        if primary is None:
             issues.append(
                 Issue(
-                    issue_id="ASSET_BLOAT",
-                    category=IssueCategory.COMPLEXITY,
-                    severity=IssueSeverity.WARN,
-                    estimated_effort=IssueEffort.MEDIUM,
+                    issue_id="PALETTE_MISSING_PRIMARY",
+                    category=IssueCategory.DATA_QUALITY,
+                    severity=IssueSeverity.ERROR,
+                    estimated_effort=IssueEffort.LOW,
                     scope=IssueScope.GLOBAL,
                     location=IssueLocation(),
-                    rule="DON'T require excessive assets - reuse and minimize for efficiency",
-                    message=f"Plan requires {asset_count} assets (>{MAX_RECOMMENDED_ASSETS} recommended max). Asset generation is expensive.",
-                    fix_hint=f"Reduce to {MAX_RECOMMENDED_ASSETS} or fewer assets, reuse assets across sections",
-                    acceptance_test=f"Asset requirements ≤ {MAX_RECOMMENDED_ASSETS} OR high asset count is justified",
+                    rule="DON'T omit palette - MacroPlan must specify a primary palette",
+                    message="Global palette_plan.primary is missing.",
+                    fix_hint="Set global_story.palette_plan.primary (PaletteRef) using a valid palette_id",
+                    acceptance_test="MacroPlan.global_story.palette_plan.primary is present with palette_id",
+                    suggested_action=SuggestedAction.PATCH,
+                )
+            )
+            return issues
+
+        primary_id = getattr(primary, "palette_id", None)
+        if not primary_id:
+            issues.append(
+                Issue(
+                    issue_id="PALETTE_PRIMARY_EMPTY",
+                    category=IssueCategory.DATA_QUALITY,
+                    severity=IssueSeverity.ERROR,
+                    estimated_effort=IssueEffort.LOW,
+                    scope=IssueScope.GLOBAL,
+                    location=IssueLocation(),
+                    rule="DON'T use empty palette_id - must be a stable id",
+                    message="Global palette_plan.primary.palette_id is empty.",
+                    fix_hint="Set primary.palette_id to a valid palette id",
+                    acceptance_test="Primary palette_id is a non-empty string",
+                    suggested_action=SuggestedAction.PATCH,
+                )
+            )
+            return issues
+
+        if palette_ids is not None and primary_id not in palette_ids:
+            issues.append(
+                Issue(
+                    issue_id="PALETTE_PRIMARY_UNKNOWN",
+                    category=IssueCategory.DATA_QUALITY,
+                    severity=IssueSeverity.ERROR,
+                    estimated_effort=IssueEffort.LOW,
+                    scope=IssueScope.GLOBAL,
+                    location=IssueLocation(),
+                    rule="DON'T invent palette ids - must exist in palette catalog",
+                    message=f"Primary palette_id '{primary_id}' is not in provided palette catalog.",
+                    fix_hint="Pick a valid palette_id from palette_catalog/allowed palette ids",
+                    acceptance_test="Primary palette_id exists in palette catalog",
+                    suggested_action=SuggestedAction.PATCH,
+                )
+            )
+
+        alternates = getattr(palette_plan, "alternates", None) if palette_plan is not None else None
+        alternates_list = list(alternates or [])
+        if len(alternates_list) > 6:
+            issues.append(
+                Issue(
+                    issue_id="PALETTE_TOO_MANY_ALTERNATES",
+                    category=IssueCategory.COMPLEXITY,
+                    severity=IssueSeverity.WARN,
+                    estimated_effort=IssueEffort.LOW,
+                    scope=IssueScope.GLOBAL,
+                    location=IssueLocation(),
+                    rule="DON'T over-specify palette alternates - keep small set for clarity",
+                    message=f"Palette plan has {len(alternates_list)} alternates (>6). Consider reducing.",
+                    fix_hint="Limit alternates to a small, intentional set (0-6).",
+                    acceptance_test="Palette alternates count <= 6 OR justification provided",
+                    suggested_action=SuggestedAction.PATCH,
+                )
+            )
+
+        if palette_ids is not None:
+            for alt in alternates_list:
+                alt_id = getattr(alt, "palette_id", None)
+                if alt_id and alt_id not in palette_ids:
+                    issues.append(
+                        Issue(
+                            issue_id=f"PALETTE_ALT_UNKNOWN_{alt_id}",
+                            category=IssueCategory.DATA_QUALITY,
+                            severity=IssueSeverity.ERROR,
+                            estimated_effort=IssueEffort.LOW,
+                            scope=IssueScope.GLOBAL,
+                            location=IssueLocation(),
+                            rule="DON'T invent palette ids - alternates must exist in palette catalog",
+                            message=f"Alternate palette_id '{alt_id}' is not in provided palette catalog.",
+                            fix_hint="Remove invalid alternate or choose a valid palette_id",
+                            acceptance_test="All alternate palette_ids exist in palette catalog",
+                            suggested_action=SuggestedAction.PATCH,
+                        )
+                    )
+
+        # Optional: validate per-section palette overrides are known
+        if palette_ids is not None:
+            for sp in plan.section_plans:
+                sec_pal = getattr(sp, "palette", None)
+                if sec_pal is None:
+                    continue
+                sec_id = getattr(sec_pal, "palette_id", None)
+                if sec_id and sec_id not in palette_ids:
+                    issues.append(
+                        Issue(
+                            issue_id=f"PALETTE_SECTION_UNKNOWN_{sp.section.section_id}",
+                            category=IssueCategory.DATA_QUALITY,
+                            severity=IssueSeverity.ERROR,
+                            estimated_effort=IssueEffort.LOW,
+                            scope=IssueScope.SECTION,
+                            location=IssueLocation(section_id=sp.section.section_id),
+                            rule="DON'T invent palette ids - section overrides must exist in palette catalog",
+                            message=f"Section '{sp.section.section_id}' palette_id '{sec_id}' is not in provided palette catalog.",
+                            fix_hint="Remove invalid section palette override or choose a valid palette_id",
+                            acceptance_test="All section palette overrides use valid palette_ids",
+                            suggested_action=SuggestedAction.PATCH,
+                        )
+                    )
+
+        return issues
+
+    def _validate_motif_ids(
+        self, plan: MacroPlan, motif_by_id: dict[str, object] | None
+    ) -> list[Issue]:
+        from twinklr.core.agents.issues import (
+            IssueCategory,
+            IssueEffort,
+            IssueLocation,
+            IssueScope,
+            IssueSeverity,
+            SuggestedAction,
+        )
+
+        issues: list[Issue] = []
+
+        for sp in plan.section_plans:
+            section_id = sp.section.section_id
+            motif_ids = list(getattr(sp, "motif_ids", []) or [])
+
+            if not motif_ids:
+                issues.append(
+                    Issue(
+                        issue_id=f"MOTIF_MISSING_{section_id}",
+                        category=IssueCategory.COVERAGE,
+                        severity=IssueSeverity.ERROR,
+                        estimated_effort=IssueEffort.LOW,
+                        scope=IssueScope.SECTION,
+                        location=IssueLocation(section_id=section_id),
+                        rule="DON'T omit motifs - each section must include motif_ids for cohesion",
+                        message=f"Section '{section_id}' has no motif_ids.",
+                        fix_hint="Add 1-3 motif_ids from the Motif Catalog to this section plan",
+                        acceptance_test="Each MacroSectionPlan has at least 1 motif_id",
+                        suggested_action=SuggestedAction.PATCH,
+                    )
+                )
+                continue
+
+            if motif_by_id is not None:
+                unknown = [m for m in motif_ids if m not in motif_by_id]
+                if unknown:
+                    issues.append(
+                        Issue(
+                            issue_id=f"MOTIF_UNKNOWN_{section_id}",
+                            category=IssueCategory.DATA_QUALITY,
+                            severity=IssueSeverity.ERROR,
+                            estimated_effort=IssueEffort.LOW,
+                            scope=IssueScope.SECTION,
+                            location=IssueLocation(section_id=section_id),
+                            rule="DON'T invent motif_ids - must exist in Motif Catalog",
+                            message=f"Section '{section_id}' references unknown motif_ids: {', '.join(sorted(set(unknown)))}",
+                            fix_hint="Replace unknown motif_ids with valid ids from Motif Catalog",
+                            acceptance_test="All motif_ids referenced by MacroSectionPlans exist in Motif Catalog",
+                            suggested_action=SuggestedAction.PATCH,
+                        )
+                    )
+
+        return issues
+
+    def _check_motif_cohesion(self, plan: MacroPlan) -> list[Issue]:
+        from twinklr.core.agents.issues import (
+            IssueCategory,
+            IssueEffort,
+            IssueLocation,
+            IssueScope,
+            IssueSeverity,
+            SuggestedAction,
+        )
+
+        issues: list[Issue] = []
+
+        all_ids: list[str] = []
+        for sp in plan.section_plans:
+            all_ids.extend(list(getattr(sp, "motif_ids", []) or []))
+
+        if not all_ids:
+            return issues
+
+        counts = Counter(all_ids)
+        total_sections = len(plan.section_plans)
+
+        # Recurrence heuristic: motifs used in >=3 sections
+        recurring = {m: c for m, c in counts.items() if c >= 3}
+
+        # Warn if not enough recurring anchors
+        if total_sections >= 6 and len(recurring) < 2:
+            issues.append(
+                Issue(
+                    issue_id="MOTIF_LOW_RECURRENCE",
+                    category=IssueCategory.VARIETY,
+                    severity=IssueSeverity.WARN,
+                    estimated_effort=IssueEffort.LOW,
+                    scope=IssueScope.GLOBAL,
+                    location=IssueLocation(),
+                    rule="DON'T use all-unique motifs - ensure 2-4 recurring anchors for cohesion",
+                    message=f"Motif recurrence is weak. Only {len(recurring)} motif(s) appear in 3+ sections.",
+                    fix_hint="Choose 2–4 motif_ids to recur across multiple sections (repeat anchors).",
+                    acceptance_test="At least 2 motif_ids recur across 3+ sections (for 6+ sections total)",
+                    suggested_action=SuggestedAction.PATCH,
+                )
+            )
+
+        # Warn if motif sprawl is high
+        unique_count = len(counts)
+        if total_sections >= 8 and unique_count > 8:
+            issues.append(
+                Issue(
+                    issue_id="MOTIF_SPRAWL",
+                    category=IssueCategory.COMPLEXITY,
+                    severity=IssueSeverity.WARN,
+                    estimated_effort=IssueEffort.LOW,
+                    scope=IssueScope.GLOBAL,
+                    location=IssueLocation(),
+                    rule="DON'T introduce too many motifs - keep a small vocabulary for clarity",
+                    message=f"Plan uses {unique_count} unique motifs across {total_sections} sections. This may feel incoherent.",
+                    fix_hint="Reduce unique motif_ids; reuse a smaller set of anchors across sections.",
+                    acceptance_test="Unique motif_ids remain within a small set (<=8 for 8+ sections) OR justified",
                     suggested_action=SuggestedAction.PATCH,
                 )
             )

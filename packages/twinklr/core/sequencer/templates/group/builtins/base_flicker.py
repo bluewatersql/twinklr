@@ -27,6 +27,8 @@ def make_gtpl_base_flicker_subtle() -> GroupPlanTemplate:
         template_type=GroupTemplateType.BASE,
         visual_intent=GroupVisualIntent.ABSTRACT,
         tags=["flicker", "subtle", "random", "candle", "slow"],
+        affinity_tags=["motif.abstract", "style.minimal", "setting.calm", "constraint.low_detail"],
+        avoid_tags=["constraint.high_contrast", "constraint.noisy_texture_avoid"],
         projection=ProjectionSpec(intent=ProjectionIntent.FLAT),
         timing=TimingHints(bars_min=4, bars_max=64),
         layer_recipe=[
@@ -55,6 +57,8 @@ def make_gtpl_base_flicker_pulsed() -> GroupPlanTemplate:
         template_type=GroupTemplateType.BASE,
         visual_intent=GroupVisualIntent.ABSTRACT,
         tags=["flicker", "pulse", "candle", "gentle", "combined"],
+        affinity_tags=["motif.abstract", "style.minimal", "setting.calm", "constraint.low_detail"],
+        avoid_tags=["constraint.high_contrast", "constraint.noisy_texture_avoid"],
         projection=ProjectionSpec(intent=ProjectionIntent.FLAT),
         timing=TimingHints(bars_min=4, bars_max=64),
         layer_recipe=[

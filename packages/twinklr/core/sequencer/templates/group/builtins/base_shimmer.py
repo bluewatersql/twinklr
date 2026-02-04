@@ -27,6 +27,13 @@ def make_gtpl_base_shimmer_horizontal() -> GroupPlanTemplate:
         template_type=GroupTemplateType.BASE,
         visual_intent=GroupVisualIntent.ABSTRACT,
         tags=["shimmer", "horizontal", "sweep", "slow", "subtle"],
+        affinity_tags=[
+            "motif.gradient_bands",
+            "style.minimal",
+            "setting.calm",
+            "constraint.clean_edges",
+        ],
+        avoid_tags=["constraint.high_contrast", "constraint.noisy_texture_avoid"],
         projection=ProjectionSpec(intent=ProjectionIntent.FLAT),
         timing=TimingHints(bars_min=8, bars_max=64),
         layer_recipe=[
@@ -55,6 +62,13 @@ def make_gtpl_base_shimmer_radial() -> GroupPlanTemplate:
         template_type=GroupTemplateType.BASE,
         visual_intent=GroupVisualIntent.ABSTRACT,
         tags=["shimmer", "radial", "pulse", "subtle", "outward"],
+        affinity_tags=[
+            "motif.concentric_rings",
+            "style.minimal",
+            "setting.calm",
+            "constraint.centered_composition",
+        ],
+        avoid_tags=["constraint.high_contrast", "constraint.noisy_texture_avoid"],
         projection=ProjectionSpec(intent=ProjectionIntent.FLAT),
         timing=TimingHints(bars_min=8, bars_max=64),
         layer_recipe=[

@@ -47,13 +47,21 @@ Available target roles:
 **Theme ID:** {{ macro_plan.global_story.theme.theme_id }}
 **Theme Scope:** {{ macro_plan.global_story.theme.scope.value if macro_plan.global_story.theme.scope is defined else macro_plan.global_story.theme.scope }}
 **Theme Tags:** {{ macro_plan.global_story.theme.tags | join(', ') if macro_plan.global_story.theme.tags else "None" }}
-**Theme Palette Override:** {{ macro_plan.global_story.theme.palette_id or "None" }}
+
+{% if macro_plan.global_story.palette_plan is defined and macro_plan.global_story.palette_plan %}
+**Palette Primary:** {{ macro_plan.global_story.palette_plan.primary.palette_id }}
+{% if macro_plan.global_story.palette_plan.alternates %}
+**Palette Alternates:** {{ macro_plan.global_story.palette_plan.alternates | map(attribute='palette_id') | join(', ') }}
+{% else %}
+**Palette Alternates:** None
+{% endif %}
+{% else %}
+**Palette Plan:** MISSING
+{% endif %}
 
 **Story Notes:** {{ macro_plan.global_story.story_notes }}
-**Motifs:** {{ macro_plan.global_story.motifs | join(', ') }}
 **Pacing Notes:** {{ macro_plan.global_story.pacing_notes }}
 **Color Story:** {{ macro_plan.global_story.color_story }}
-
 
 ## Layering Plan
 
@@ -73,8 +81,21 @@ Available target roles:
 ### {{ section.section.name }} ({{ (section.section.start_ms / 1000) | round(1) }}s - {{ (section.section.end_ms / 1000) | round(1) }}s)
 
 - **Theme ID:** {{ section.theme.theme_id }}
+- **Theme Scope:** {{ section.theme.scope.value if section.theme.scope else 'MISSING' }}
 - **Theme Tags:** {{ section.theme.tags | join(', ') if section.theme.tags else 'None' }}
-- **Theme Palette Override:** {{ section.theme.palette_id or 'None' }}
+
+{% if section.palette is defined and section.palette %}
+- **Palette Override:** {{ section.palette.palette_id }}
+{% else %}
+- **Palette Override:** None (inherit global)
+{% endif %}
+
+{% if section.motif_ids is defined and section.motif_ids %}
+- **Motif IDs:** {{ section.motif_ids | join(', ') }}
+{% else %}
+- **Motif IDs:** MISSING
+{% endif %}
+
 - **Energy Target:** {{ section.energy_target.value }}
 - **Motion Density:** {{ section.motion_density.value }}
 - **Choreography Style:** {{ section.choreography_style.value }}
@@ -89,8 +110,8 @@ Available target roles:
 # Your Task
 
 Evaluate this MacroPlan for a Christmas light show. Assess:
-1. **Technical Validity**: Section coverage, layer architecture, target validity
-2. **Strategic Quality**: Story coherence, section appropriateness, bold impact, contrast
+1. **Technical Validity**: Section coverage, layer architecture, target validity, palette plan, motif_ids
+2. **Strategic Quality**: Story coherence, section appropriateness, bold impact, contrast, motif/palette cohesion
 3. **Actionability**: Are section notes clear enough for group planners?
 
 Provide a score (0-10), verdict status (APPROVE/SOFT_FAIL/HARD_FAIL), structured issues, and constructive feedback.

@@ -1,132 +1,129 @@
 {#
-MacroPlanner User Prompt - INITIAL PLANNING
-Provides song details, display layout, and task instructions.
+GroupPlanner User Prompt - INITIAL PLANNING
+Provides full section context for iteration 1.
 Refinement iterations (2+) use user_refinement.j2 instead.
 #}
-# Song Information
 
-**Title:** {{ audio_profile.song_identity.title or "Untitled" }}
-**Artist:** {{ audio_profile.song_identity.artist or "Unknown" }}
-**Duration:** {{ (audio_profile.song_identity.duration_ms / 1000) | round(1) }}s
-**BPM:** {{ audio_profile.song_identity.bpm | round(1) }}
-**Key:** {{ audio_profile.song_identity.key }}
-**Time Signature:** {{ audio_profile.song_identity.time_signature }}
+# Section Information
 
-## Song Structure
+**Section ID:** {{ section_id }}
+**Section Name:** {{ section_name }}
+**Timing:** {{ (start_ms / 1000) | round(1) }}s to {{ (end_ms / 1000) | round(1) }}s ({{ ((end_ms - start_ms) / 1000) | round(1) }}s duration)
 
-{% for section in audio_profile.structure.sections %}
-- **{{ section.name }}** ({{ section.section_id }}) - {{ (section.start_ms / 1000) | round(1) }}s to {{ (section.end_ms / 1000) | round(1) }}s
+## MacroPlan Intent
+
+**Energy Target:** {{ energy_target }}
+**Motion Density:** {{ motion_density }}
+**Choreography Style:** {{ choreography_style }}
+
+**Primary Focus Targets:** {{ primary_focus_targets | join(", ") }}
+{% if secondary_targets %}
+**Secondary Targets:** {{ secondary_targets | join(", ") }}
+{% endif %}
+
+{% if notes %}
+**Section Notes:** {{ notes }}
+{% endif %}
+
+### Palette + Motifs (from MacroPlan)
+
+{% if palette_ref_json %}
+**PaletteRef (resolved for this section):**
+{{ palette_ref_json }}
+{% endif %}
+
+{% if motif_ids %}
+**Motif IDs (canonical):** {{ motif_ids | join(", ") }}
+{% endif %}
+
+{% if motif_catalog_json %}
+**Motif Catalog (for expansion to motif.* tags):**
+{{ motif_catalog_json }}
+{% endif %}
+
+## Available Display Groups
+
+{% for group in display_graph.groups %}
+- **{{ group.group_id }}** (role: {{ group.role }}) - {{ group.display_name }}{% if group.position %} [x={{ group.position.x }}, y={{ group.position.y }}]{% endif %}
 {% endfor %}
 
-## Energy Profile
-
-**Overall Energy:** {{ audio_profile.energy_profile.macro_energy.value }}
-
-**Energy Peaks:** {{ audio_profile.energy_profile.peaks | length }} major peaks detected
-{% if audio_profile.energy_profile.peaks %}
-Peak timings:
-{% for peak in audio_profile.energy_profile.peaks[:5] %}
-- {{ (peak.start_ms / 1000) | round(1) }}s to {{ (peak.end_ms / 1000) | round(1) }}s (energy: {{ peak.energy | round(2) }})
-{% endfor %}
-{% if audio_profile.energy_profile.peaks | length > 5 %}
-... and {{ audio_profile.energy_profile.peaks | length - 5 }} more peaks
-{% endif %}
-{% endif %}
-
-## Theme Catalog (Allowed IDs)
-
-Use only these theme_ids (do not invent). Prefer using the global theme for most sections.
-
-{% for t in theme_catalog %}
-- {{ t.theme_id }} — {{ t.title }}
+### Groups by Role
+{% for role, group_ids in display_graph.groups_by_role.items() %}
+- **{{ role }}**: {{ group_ids | join(", ") }}
 {% endfor %}
 
+## Available Templates
 
-## Creative Guidance
-
-**Recommended Layer Count:** {{ audio_profile.creative_guidance.recommended_layer_count }}
-
-**Recommended Contrast:** {{ audio_profile.creative_guidance.recommended_contrast.value }}
-
-**Recommended Motion Density:** {{ audio_profile.creative_guidance.recommended_motion_density.value }}
-
-**Recommended Color Story:** {{ audio_profile.creative_guidance.recommended_color_story | join(", ") or "Not specified" }}
-
-{% if audio_profile.creative_guidance.cautions %}
-**Cautions:** 
-{% for caution in audio_profile.creative_guidance.cautions %}
-- {{ caution }}
+### BASE Lane Templates
+{% for entry in template_catalog.entries %}
+{% if "BASE" in entry.compatible_lanes %}
+- `{{ entry.template_id }}` - {{ entry.name }}
+  {% if entry.affinity_tags %}- Affinity: {{ entry.affinity_tags | join(", ") }}{% endif %}
+  {% if entry.avoid_tags %}- Avoid: {{ entry.avoid_tags | join(", ") }}{% endif %}
+  {% if entry.tags %}- Tags: {{ entry.tags | join(", ") }}{% endif %}
+{% endif %}
 {% endfor %}
+
+### RHYTHM Lane Templates
+{% for entry in template_catalog.entries %}
+{% if "RHYTHM" in entry.compatible_lanes %}
+- `{{ entry.template_id }}` - {{ entry.name }}
+  {% if entry.affinity_tags %}- Affinity: {{ entry.affinity_tags | join(", ") }}{% endif %}
+  {% if entry.avoid_tags %}- Avoid: {{ entry.avoid_tags | join(", ") }}{% endif %}
+  {% if entry.tags %}- Tags: {{ entry.tags | join(", ") }}{% endif %}
 {% endif %}
-
-{% if lyric_context is defined and lyric_context %}
-## Lyric Context
-
-**Has Lyrics:** Yes
-
-**Themes:** {{ lyric_context.themes | join(", ") }}
-
-**Mood Arc:** {{ lyric_context.mood_arc }}
-
-**Genre Markers:** {{ lyric_context.genre_markers | join(", ") }}
-
-{% if lyric_context.has_narrative %}
-**Narrative:** Yes - {{ lyric_context.characters | length if lyric_context.characters else 0 }} character(s), {{ lyric_context.story_beats | length if lyric_context.story_beats else 0 }} story beat(s)
-
-{% if lyric_context.story_beats %}
-**Story Beats:**
-{% for beat in lyric_context.story_beats[:3] %}
-- **[{{ beat.beat_type }}]** {{ beat.section_id }} ({{ (beat.timestamp_range[0] / 1000) | round(1) }}s-{{ (beat.timestamp_range[1] / 1000) | round(1) }}s)
-  {{ beat.description }}
-  💡 {{ beat.visual_opportunity }}
 {% endfor %}
-{% if lyric_context.story_beats | length > 3 %}
-... and {{ lyric_context.story_beats | length - 3 }} more story beats
-{% endif %}
-{% endif %}
-{% endif %}
 
-**Key Phrases:** {{ lyric_context.key_phrases | length }} memorable moments identified
-{% if lyric_context.key_phrases %}
-Notable examples:
-{% for phrase in lyric_context.key_phrases[:5] %}
-- "{{ phrase.text }}" @ {{ (phrase.timestamp_ms / 1000) | round(1) }}s [{{ phrase.emphasis }}]
-  💡 {{ phrase.visual_hint }}
+### ACCENT Lane Templates
+{% for entry in template_catalog.entries %}
+{% if "ACCENT" in entry.compatible_lanes %}
+- `{{ entry.template_id }}` - {{ entry.name }}
+  {% if entry.affinity_tags %}- Affinity: {{ entry.affinity_tags | join(", ") }}{% endif %}
+  {% if entry.avoid_tags %}- Avoid: {{ entry.avoid_tags | join(", ") }}{% endif %}
+  {% if entry.tags %}- Tags: {{ entry.tags | join(", ") }}{% endif %}
+{% endif %}
 {% endfor %}
-{% if lyric_context.key_phrases | length > 5 %}
-... and {{ lyric_context.key_phrases | length - 5 }} more key phrases
+
+{% if layer_intents %}
+## Layer Intent (from MacroPlan)
+
+{% for layer in layer_intents %}
+**Layer {{ layer.layer_index }}: {{ layer.layer_role }}**
+- Targets: {{ layer.target_selector.roles | join(", ") }}
+- Coordination: {{ layer.target_selector.coordination }}
+- Timing Driver: {{ layer.timing_driver }}
+- Intensity Bias: {{ layer.intensity_bias }}
+{% if layer.usage_notes %}
+- Notes: {{ layer.usage_notes }}
 {% endif %}
-{% endif %}
 
-**Recommended Visual Themes:** {{ lyric_context.recommended_visual_themes | join(", ") }}
-
-**Lyric Density:** {{ lyric_context.lyric_density }}
-**Vocal Coverage:** {{ (lyric_context.vocal_coverage_pct * 100) | round(0) }}%
-
-{% if lyric_context.silent_sections %}
-**Silent/Instrumental Sections:** {{ lyric_context.silent_sections | length }}
-{% for section in lyric_context.silent_sections %}
-- {{ (section.start_ms / 1000) | round(1) }}s to {{ (section.end_ms / 1000) | round(1) }}s ({{ (section.duration_ms / 1000) | round(1) }}s){% if section.section_id %} - {{ section.section_id }}{% endif %}
 {% endfor %}
 {% endif %}
 
-**IMPORTANT:** Use the key phrases' visual hints as inspiration for choreography moments. Align story beats with section planning.
+## Theme Context (from MacroPlan)
 
-{% endif %}
-## Display Layout
+ThemeRef for this section:
+{{ theme_ref_json }}
 
-Available target roles in this display:
-{% for group in display_groups %}
-- **{{ group.role_key }}** ({{ group.group_type }}) - {{ group.model_count }} models
-{% endfor %}
+Theme defaults:
+- default_tags: {{ theme_definition.default_tags | join(", ") }}
+- style_tags: {{ theme_definition.style_tags | join(", ") }}
+- avoid_tags: {{ theme_definition.avoid_tags | join(", ") }}
+- default_palette_id: {{ theme_definition.default_palette_id }}
 
 # Your Task
 
-Create a strategic MacroPlan for this Christmas light show that:
+Create a SectionCoordinationPlan for **{{ section_name }} ({{ section_id }})** that:
 
-1. **Tells a story** - Define global theme, motifs, and pacing
-2. **Plans each section** - Energy targets, choreography style, focus targets
-3. **Designs layer architecture** - BASE, RHYTHM, ACCENT layers with proper blend modes
-4. **Sets themes** - Provide global_story.theme (SONG) and section_plans[*].theme (SECTION) for downstream asset generation
+1. **Assigns lanes** - BASE (foundation), RHYTHM (motion), ACCENT (highlights)
+2. **Selects templates** - From the catalog above, matching section intent
+3. **Defines coordination** - How groups work together (UNIFIED, SEQUENCED, etc.)
+4. **Sets timing** - Using bar/beat TimeRefs within section bounds
+5. Set the section **theme**, **palette**, and **motif_ids** and ensure template selections align with them.
 
-Remember: Bold impact, main character energy, coordinated wow moments!
+**Remember:**
+- Primary targets ({{ primary_focus_targets | join(", ") }}) should get prominent ACCENT treatment
+- Energy target is {{ energy_target }} - design accordingly
+- Motion density is {{ motion_density }} - adjust complexity
+- **Intensity limits:** BASE ≤1.10, RHYTHM ≤1.20, ACCENT ≤1.30
+- **Motif coverage:** selected templates must satisfy motif.* tag coverage for this section’s motif_ids

@@ -47,13 +47,18 @@ Before evaluating coordination quality, verify the plan is **technically sound**
   - `config` is present
   - `config.group_order` has no duplicates
   - every group in `config.group_order` is contained in `group_ids`
-- For modes that do NOT require expansion (e.g., UNISON / direct placements):
+- For modes that do NOT require expansion (e.g., UNIFIED / direct placements):
   - placements are provided directly (non-empty unless explicitly justified)
 
 #### Theme Validity
 - `plan.theme.scope` must be SECTION (when present)
 - `len(plan.theme.tags) <= 5`
-- Theme/motif tags should not violate constraints (avoid text/logo/watermark patterns)
+
+#### Palette + Motifs Validity (NEW)
+- `plan.palette` must be present and include `palette_id`
+- If `palette_catalog` is provided, `plan.palette.palette_id` must exist in it
+- `plan.motif_ids` must be present and non-empty (>= 1)
+- If `motif_catalog` is provided, every motif_id must exist in it
 
 #### Intensity Validity
 - All intensity values must be in [0.0, 1.5]

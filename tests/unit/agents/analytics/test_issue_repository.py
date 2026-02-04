@@ -286,9 +286,10 @@ def test_format_learning_context(repository, sample_issue):
 
     assert "Historical Learning Context" in context
     assert "VARIETY" in context
-    assert "occurred 3 times" in context
-    assert "Repeated template usage without variation" in context
-    assert "resolution rate" in context.lower()
+    assert "3 recent issues" in context
+    assert "Example:" in context
+    # Resolution rate no longer shown in basic context
+    assert "patterns" in context.lower() or "recurring" in context.lower()
 
 
 def test_format_learning_context_empty(repository):

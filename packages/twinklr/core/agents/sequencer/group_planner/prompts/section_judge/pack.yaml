@@ -1,0 +1,44 @@
+pack_id: section_judge.v2
+version: 2.1.0
+description: Section-level judge prompts for SectionCoordinationPlan (theme + palette + motifs)
+
+templates:
+  system: system.j2
+  user: user.j2
+  developer: developer.j2
+
+variables:
+  required:
+    - plan                   # SectionCoordinationPlan
+    - start_ms
+    - end_ms
+
+    # macro intent for calibration
+    - energy_target
+    - motion_density
+    - choreography_style
+    - primary_focus_targets
+    - secondary_targets
+
+    # validation context
+    - display_graph
+    - template_catalog
+
+    # injected
+    - response_schema
+    - taxonomy
+
+  optional:
+    - iteration
+    - learning_context
+
+    # NEW: optional deterministic id validation
+    - motif_catalog          # MotifSpec list/mapping or simple set of ids
+    - palette_catalog        # palette list/mapping or simple set of ids
+
+metadata:
+  agent_type: judge
+  input_schema: SectionCoordinationPlan
+  output_schema: JudgeVerdict
+  supports_iteration: true
+  max_iterations: 3

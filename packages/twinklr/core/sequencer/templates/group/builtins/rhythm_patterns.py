@@ -28,6 +28,13 @@ def make_gtpl_rhythm_chase_single() -> GroupPlanTemplate:
         template_type=GroupTemplateType.RHYTHM,
         visual_intent=GroupVisualIntent.ABSTRACT,
         tags=["chase", "single", "marquee", "sequential"],
+        affinity_tags=[
+            "motif.dots",
+            "style.minimal",
+            "constraint.clean_edges",
+            "constraint.sparse_elements",
+        ],
+        avoid_tags=[],
         projection=ProjectionSpec(intent=ProjectionIntent.FLAT),
         timing=TimingHints(bars_min=1, bars_max=16),
         layer_recipe=[
@@ -56,6 +63,13 @@ def make_gtpl_rhythm_chase_dual() -> GroupPlanTemplate:
         template_type=GroupTemplateType.RHYTHM,
         visual_intent=GroupVisualIntent.ABSTRACT,
         tags=["chase", "dual", "mirrored", "sequential"],
+        affinity_tags=[
+            "motif.dots",
+            "motif.geometric",
+            "constraint.clean_edges",
+            "setting.playful",
+        ],
+        avoid_tags=[],
         projection=ProjectionSpec(intent=ProjectionIntent.FLAT),
         timing=TimingHints(bars_min=1, bars_max=16),
         layer_recipe=[
@@ -85,6 +99,13 @@ def make_gtpl_rhythm_ripple_tight() -> GroupPlanTemplate:
         template_type=GroupTemplateType.RHYTHM,
         visual_intent=GroupVisualIntent.ABSTRACT,
         tags=["ripple", "tight", "fast", "propagation"],
+        affinity_tags=[
+            "motif.concentric_rings",
+            "constraint.high_contrast",
+            "constraint.clean_edges",
+            "setting.hype",
+        ],
+        avoid_tags=[],
         projection=ProjectionSpec(intent=ProjectionIntent.FLAT),
         timing=TimingHints(bars_min=1, bars_max=8),
         layer_recipe=[
@@ -113,6 +134,13 @@ def make_gtpl_rhythm_ripple_wide() -> GroupPlanTemplate:
         template_type=GroupTemplateType.RHYTHM,
         visual_intent=GroupVisualIntent.ABSTRACT,
         tags=["ripple", "wide", "slow", "propagation"],
+        affinity_tags=[
+            "motif.concentric_rings",
+            "constraint.clean_edges",
+            "setting.calm",
+            "style.minimal",
+        ],
+        avoid_tags=[],
         projection=ProjectionSpec(intent=ProjectionIntent.FLAT),
         timing=TimingHints(bars_min=2, bars_max=16),
         layer_recipe=[
@@ -142,6 +170,13 @@ def make_gtpl_rhythm_alternate_ab() -> GroupPlanTemplate:
         template_type=GroupTemplateType.RHYTHM,
         visual_intent=GroupVisualIntent.ABSTRACT,
         tags=["alternate", "ab", "toggle", "groups"],
+        affinity_tags=[
+            "motif.stripes",
+            "motif.checker",
+            "constraint.high_contrast",
+            "style.bold_shapes",
+        ],
+        avoid_tags=[],
         projection=ProjectionSpec(intent=ProjectionIntent.FLAT),
         timing=TimingHints(bars_min=1, bars_max=16),
         layer_recipe=[
@@ -170,6 +205,13 @@ def make_gtpl_rhythm_alternate_triplet() -> GroupPlanTemplate:
         template_type=GroupTemplateType.RHYTHM,
         visual_intent=GroupVisualIntent.ABSTRACT,
         tags=["alternate", "triplet", "abc", "groups"],
+        affinity_tags=[
+            "motif.stripes",
+            "motif.geometric",
+            "constraint.high_contrast",
+            "setting.playful",
+        ],
+        avoid_tags=[],
         projection=ProjectionSpec(intent=ProjectionIntent.FLAT),
         timing=TimingHints(bars_min=1, bars_max=16),
         layer_recipe=[

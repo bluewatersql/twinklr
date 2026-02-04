@@ -5,7 +5,17 @@ import pytest
 
 from twinklr.core.agents.audio.profile.models import SongSectionRef
 from twinklr.core.sequencer.planning import MacroSectionPlan
+from twinklr.core.sequencer.theming import ThemeRef, ThemeScope
 from twinklr.core.sequencer.vocabulary import ChoreographyStyle, EnergyTarget, MotionDensity
+
+
+def _make_section_theme() -> ThemeRef:
+    """Create a valid section ThemeRef (SECTION scope)."""
+    return ThemeRef(
+        theme_id="theme.abstract.neon",
+        scope=ThemeScope.SECTION,
+        tags=["motif.geometric"],
+    )
 
 
 def test_macro_section_plan_valid():
@@ -14,6 +24,7 @@ def test_macro_section_plan_valid():
         section=SongSectionRef(
             section_id="chorus_1", name="Chorus 1", start_ms=30000, end_ms=45000
         ),
+        theme=_make_section_theme(),
         energy_target=EnergyTarget.HIGH,
         primary_focus_targets=["OUTLINE", "MEGA_TREE"],
         choreography_style=ChoreographyStyle.IMAGERY,
@@ -90,6 +101,7 @@ def test_secondary_targets_optional():
     """Secondary targets are optional."""
     plan = MacroSectionPlan(
         section=SongSectionRef(section_id="intro", name="Intro", start_ms=0, end_ms=10000),
+        theme=_make_section_theme(),
         energy_target=EnergyTarget.LOW,
         primary_focus_targets=["OUTLINE"],
         choreography_style=ChoreographyStyle.ABSTRACT,
@@ -105,6 +117,7 @@ def test_macro_section_plan_with_secondary():
         section=SongSectionRef(
             section_id="chorus_2", name="Chorus 2", start_ms=60000, end_ms=75000
         ),
+        theme=_make_section_theme(),
         energy_target=EnergyTarget.PEAK,
         primary_focus_targets=["MEGA_TREE", "OUTLINE"],
         secondary_targets=["PROPS", "FLOODS"],
@@ -120,6 +133,7 @@ def test_macro_section_plan_serialization():
     """MacroSectionPlan serializes to/from JSON."""
     plan = MacroSectionPlan(
         section=SongSectionRef(section_id="bridge", name="Bridge", start_ms=90000, end_ms=105000),
+        theme=_make_section_theme(),
         energy_target=EnergyTarget.BUILD,
         primary_focus_targets=["HERO"],
         secondary_targets=["ARCHES"],

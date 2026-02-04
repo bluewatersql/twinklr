@@ -4,7 +4,7 @@ import pytest
 
 from twinklr.core.sequencer.templates.group.catalog import (
     TemplateCatalog,
-    TemplateCatalogEntry,
+    TemplateInfo,
     build_template_catalog,
 )
 from twinklr.core.sequencer.templates.group.library import GroupTemplateRegistry
@@ -17,41 +17,83 @@ from twinklr.core.sequencer.vocabulary import (
 )
 
 
-class TestTemplateCatalogEntry:
-    """Test TemplateCatalogEntry model."""
+class TestTemplateInfo:
+    """Test TemplateInfo model."""
 
     def test_create_minimal(self):
         """Test creating entry with minimal fields."""
-        entry = TemplateCatalogEntry(
-            template_id="test", name="Test", compatible_lanes=[LaneKind.BASE]
+        entry = TemplateInfo(
+            template_id="test",
+            version="1.0",
+            name="Test",
+            template_type=GroupTemplateType.BASE,
+            visual_intent=GroupVisualIntent.ABSTRACT,
+            tags=(),
         )
         assert entry.template_id == "test"
         assert entry.name == "Test"
         assert entry.compatible_lanes == [LaneKind.BASE]
-        assert entry.tags == []
+        assert entry.tags == ()
 
     def test_create_with_all_fields(self):
         """Test creating entry with all fields."""
-        entry = TemplateCatalogEntry(
+        entry = TemplateInfo(
             template_id="test",
+            version="1.0",
             name="Test Template",
-            compatible_lanes=[LaneKind.BASE, LaneKind.RHYTHM],
-            tags=["starfield", "calm"],
+            template_type=GroupTemplateType.BASE,
+            visual_intent=GroupVisualIntent.ABSTRACT,
+            tags=("starfield", "calm"),
+            affinity_tags=["gentle"],
+            avoid_tags=["intense"],
             description="Test description",
         )
-        assert len(entry.compatible_lanes) == 2
+        assert entry.compatible_lanes == [LaneKind.BASE]
         assert len(entry.tags) == 2
         assert entry.description == "Test description"
 
-    def test_compatible_lanes_required(self):
-        """Test compatible_lanes must have at least 1 lane."""
-        with pytest.raises(ValueError):
-            TemplateCatalogEntry(template_id="test", name="Test", compatible_lanes=[])
+    def test_compatible_lanes_derived(self):
+        """Test compatible_lanes is derived from template_type."""
+        base_entry = TemplateInfo(
+            template_id="test_base",
+            version="1.0",
+            name="Test Base",
+            template_type=GroupTemplateType.BASE,
+            visual_intent=GroupVisualIntent.ABSTRACT,
+            tags=(),
+        )
+        assert base_entry.compatible_lanes == [LaneKind.BASE]
+
+        rhythm_entry = TemplateInfo(
+            template_id="test_rhythm",
+            version="1.0",
+            name="Test Rhythm",
+            template_type=GroupTemplateType.RHYTHM,
+            visual_intent=GroupVisualIntent.GEOMETRIC,
+            tags=(),
+        )
+        assert rhythm_entry.compatible_lanes == [LaneKind.RHYTHM]
+
+        # TRANSITION has no lane
+        transition_entry = TemplateInfo(
+            template_id="test_transition",
+            version="1.0",
+            name="Test Transition",
+            template_type=GroupTemplateType.TRANSITION,
+            visual_intent=GroupVisualIntent.HYBRID,
+            tags=(),
+        )
+        assert transition_entry.compatible_lanes == []
 
     def test_frozen(self):
         """Test entry is frozen."""
-        entry = TemplateCatalogEntry(
-            template_id="test", name="Test", compatible_lanes=[LaneKind.BASE]
+        entry = TemplateInfo(
+            template_id="test",
+            version="1.0",
+            name="Test",
+            template_type=GroupTemplateType.BASE,
+            visual_intent=GroupVisualIntent.ABSTRACT,
+            tags=(),
         )
         with pytest.raises(ValueError):
             entry.name = "Modified"
@@ -68,19 +110,34 @@ class TestTemplateCatalog:
 
     def test_create_with_entries(self):
         """Test creating catalog with entries."""
-        entry1 = TemplateCatalogEntry(
-            template_id="test1", name="Test 1", compatible_lanes=[LaneKind.BASE]
+        entry1 = TemplateInfo(
+            template_id="test1",
+            version="1.0",
+            name="Test 1",
+            template_type=GroupTemplateType.BASE,
+            visual_intent=GroupVisualIntent.ABSTRACT,
+            tags=(),
         )
-        entry2 = TemplateCatalogEntry(
-            template_id="test2", name="Test 2", compatible_lanes=[LaneKind.RHYTHM]
+        entry2 = TemplateInfo(
+            template_id="test2",
+            version="1.0",
+            name="Test 2",
+            template_type=GroupTemplateType.RHYTHM,
+            visual_intent=GroupVisualIntent.GEOMETRIC,
+            tags=(),
         )
         catalog = TemplateCatalog(entries=[entry1, entry2])
         assert len(catalog.entries) == 2
 
     def test_has_template(self):
         """Test has_template() method."""
-        entry = TemplateCatalogEntry(
-            template_id="test", name="Test", compatible_lanes=[LaneKind.BASE]
+        entry = TemplateInfo(
+            template_id="test",
+            version="1.0",
+            name="Test",
+            template_type=GroupTemplateType.BASE,
+            visual_intent=GroupVisualIntent.ABSTRACT,
+            tags=(),
         )
         catalog = TemplateCatalog(entries=[entry])
 
@@ -89,8 +146,13 @@ class TestTemplateCatalog:
 
     def test_get_entry(self):
         """Test get_entry() method."""
-        entry = TemplateCatalogEntry(
-            template_id="test", name="Test", compatible_lanes=[LaneKind.BASE]
+        entry = TemplateInfo(
+            template_id="test",
+            version="1.0",
+            name="Test",
+            template_type=GroupTemplateType.BASE,
+            visual_intent=GroupVisualIntent.ABSTRACT,
+            tags=(),
         )
         catalog = TemplateCatalog(entries=[entry])
 
@@ -103,16 +165,29 @@ class TestTemplateCatalog:
 
     def test_list_by_lane(self):
         """Test list_by_lane() method."""
-        entry1 = TemplateCatalogEntry(
-            template_id="base1", name="Base 1", compatible_lanes=[LaneKind.BASE]
+        entry1 = TemplateInfo(
+            template_id="base1",
+            version="1.0",
+            name="Base 1",
+            template_type=GroupTemplateType.BASE,
+            visual_intent=GroupVisualIntent.ABSTRACT,
+            tags=(),
         )
-        entry2 = TemplateCatalogEntry(
+        entry2 = TemplateInfo(
             template_id="rhythm1",
+            version="1.0",
             name="Rhythm 1",
-            compatible_lanes=[LaneKind.RHYTHM, LaneKind.ACCENT],
+            template_type=GroupTemplateType.RHYTHM,
+            visual_intent=GroupVisualIntent.GEOMETRIC,
+            tags=(),
         )
-        entry3 = TemplateCatalogEntry(
-            template_id="base2", name="Base 2", compatible_lanes=[LaneKind.BASE]
+        entry3 = TemplateInfo(
+            template_id="base2",
+            version="1.0",
+            name="Base 2",
+            template_type=GroupTemplateType.BASE,
+            visual_intent=GroupVisualIntent.ABSTRACT,
+            tags=(),
         )
         catalog = TemplateCatalog(entries=[entry1, entry2, entry3])
 

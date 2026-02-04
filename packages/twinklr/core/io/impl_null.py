@@ -7,7 +7,7 @@ All reads fail.
 import asyncio
 from pathlib import Path
 
-from .models import AbsolutePath, WriteResult
+from twinklr.core.io.models import AbsolutePath, WriteResult
 
 
 class NullFileSystem:

@@ -28,6 +28,13 @@ def make_gtpl_rhythm_wave_lr() -> GroupPlanTemplate:
         template_type=GroupTemplateType.RHYTHM,
         visual_intent=GroupVisualIntent.ABSTRACT,
         tags=["wave", "lr", "sine", "smooth"],
+        affinity_tags=[
+            "motif.wave_bands",
+            "motif.water",
+            "constraint.clean_edges",
+            "style.minimal",
+        ],
+        avoid_tags=[],
         projection=ProjectionSpec(intent=ProjectionIntent.FLAT),
         timing=TimingHints(bars_min=2, bars_max=16),
         layer_recipe=[
@@ -56,6 +63,13 @@ def make_gtpl_rhythm_wave_inout() -> GroupPlanTemplate:
         template_type=GroupTemplateType.RHYTHM,
         visual_intent=GroupVisualIntent.ABSTRACT,
         tags=["wave", "center", "radial", "expand"],
+        affinity_tags=[
+            "motif.concentric_rings",
+            "motif.water",
+            "constraint.centered_composition",
+            "constraint.clean_edges",
+        ],
+        avoid_tags=[],
         projection=ProjectionSpec(intent=ProjectionIntent.FLAT),
         timing=TimingHints(bars_min=2, bars_max=16),
         layer_recipe=[
@@ -85,6 +99,13 @@ def make_gtpl_rhythm_candy_stripe_scroll() -> GroupPlanTemplate:
         template_type=GroupTemplateType.RHYTHM,
         visual_intent=GroupVisualIntent.GEOMETRIC,
         tags=["candy", "stripe", "scroll", "diagonal"],
+        affinity_tags=[
+            "motif.candy_stripes",
+            "motif.stripes",
+            "constraint.high_contrast",
+            "style.bold_shapes",
+        ],
+        avoid_tags=[],
         projection=ProjectionSpec(intent=ProjectionIntent.FLAT),
         timing=TimingHints(bars_min=2, bars_max=32),
         layer_recipe=[
@@ -113,6 +134,13 @@ def make_gtpl_rhythm_candy_stripe_rotate() -> GroupPlanTemplate:
         template_type=GroupTemplateType.RHYTHM,
         visual_intent=GroupVisualIntent.GEOMETRIC,
         tags=["candy", "stripe", "rotate", "spiral"],
+        affinity_tags=[
+            "motif.candy_stripes",
+            "motif.spiral",
+            "constraint.high_contrast",
+            "style.bold_shapes",
+        ],
+        avoid_tags=[],
         projection=ProjectionSpec(intent=ProjectionIntent.FLAT),
         timing=TimingHints(bars_min=2, bars_max=32),
         layer_recipe=[
@@ -142,6 +170,8 @@ def make_gtpl_rhythm_icicle_drip_slow() -> GroupPlanTemplate:
         template_type=GroupTemplateType.RHYTHM,
         visual_intent=GroupVisualIntent.IMAGERY,
         tags=["icicle", "drip", "slow", "vertical"],
+        affinity_tags=["motif.ice", "motif.water", "constraint.clean_edges", "setting.calm"],
+        avoid_tags=["constraint.noisy_texture_avoid"],
         projection=ProjectionSpec(intent=ProjectionIntent.FLAT),
         timing=TimingHints(bars_min=2, bars_max=16),
         layer_recipe=[
@@ -170,6 +200,8 @@ def make_gtpl_rhythm_icicle_drip_fast() -> GroupPlanTemplate:
         template_type=GroupTemplateType.RHYTHM,
         visual_intent=GroupVisualIntent.IMAGERY,
         tags=["icicle", "drip", "fast", "vertical"],
+        affinity_tags=["motif.ice", "motif.water", "constraint.clean_edges", "setting.hype"],
+        avoid_tags=["constraint.noisy_texture_avoid"],
         projection=ProjectionSpec(intent=ProjectionIntent.FLAT),
         timing=TimingHints(bars_min=1, bars_max=8),
         layer_recipe=[
@@ -199,6 +231,8 @@ def make_gtpl_rhythm_half_time_hold() -> GroupPlanTemplate:
         template_type=GroupTemplateType.RHYTHM,
         visual_intent=GroupVisualIntent.ABSTRACT,
         tags=["meter", "half-time", "hold", "sustained"],
+        affinity_tags=["motif.abstract", "setting.calm", "style.minimal", "constraint.low_detail"],
+        avoid_tags=["constraint.high_contrast"],
         projection=ProjectionSpec(intent=ProjectionIntent.FLAT),
         timing=TimingHints(bars_min=2, bars_max=16),
         layer_recipe=[
@@ -227,6 +261,13 @@ def make_gtpl_rhythm_double_time_push() -> GroupPlanTemplate:
         template_type=GroupTemplateType.RHYTHM,
         visual_intent=GroupVisualIntent.ABSTRACT,
         tags=["meter", "double-time", "push", "energy"],
+        affinity_tags=[
+            "motif.abstract",
+            "setting.hype",
+            "constraint.high_contrast",
+            "style.bold_shapes",
+        ],
+        avoid_tags=[],
         projection=ProjectionSpec(intent=ProjectionIntent.FLAT),
         timing=TimingHints(bars_min=1, bars_max=8),
         layer_recipe=[
