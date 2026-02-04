@@ -1,19 +1,19 @@
 """BASE lane group templates - Static Holiday Glow family."""
 
-from twinklr.core.sequencer.templates.group.enums import (
-    ColorMode,
-    GroupTemplateType,
-    GroupVisualIntent,
-    LayerRole,
-    MotionVerb,
-    ProjectionIntent,
-)
 from twinklr.core.sequencer.templates.group.library import register_group_template
 from twinklr.core.sequencer.templates.group.models import (
     GroupPlanTemplate,
     LayerRecipe,
     ProjectionSpec,
     TimingHints,
+)
+from twinklr.core.sequencer.vocabulary import (
+    ColorMode,
+    GroupTemplateType,
+    GroupVisualIntent,
+    MotionVerb,
+    ProjectionIntent,
+    VisualDepth,
 )
 
 
@@ -31,7 +31,7 @@ def make_gtpl_base_glow_warm() -> GroupPlanTemplate:
         timing=TimingHints(bars_min=4, bars_max=64),
         layer_recipe=[
             LayerRecipe(
-                layer=LayerRole.BACKGROUND,
+                layer=VisualDepth.BACKGROUND,
                 motifs=["glow", "static", "warm"],
                 visual_intent=GroupVisualIntent.ABSTRACT,
                 motion=[MotionVerb.NONE],
@@ -59,7 +59,7 @@ def make_gtpl_base_glow_cool() -> GroupPlanTemplate:
         timing=TimingHints(bars_min=4, bars_max=64),
         layer_recipe=[
             LayerRecipe(
-                layer=LayerRole.BACKGROUND,
+                layer=VisualDepth.BACKGROUND,
                 motifs=["glow", "static", "cool"],
                 visual_intent=GroupVisualIntent.ABSTRACT,
                 motion=[MotionVerb.NONE],

@@ -11,12 +11,12 @@ import logging
 from typing import Any
 
 from twinklr.core.agents.sequencer.group_planner.context import SectionPlanningContext
-from twinklr.core.agents.sequencer.group_planner.models import (
+from twinklr.core.sequencer.templates.group.catalog import TemplateCatalog, TemplateCatalogEntry
+from twinklr.core.sequencer.templates.group.models import (
     DisplayGraph,
     GroupPlanSet,
     LaneKind,
 )
-from twinklr.core.sequencer.templates.group.catalog import TemplateCatalog, TemplateCatalogEntry
 
 logger = logging.getLogger(__name__)
 

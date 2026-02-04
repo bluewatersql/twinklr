@@ -1,9 +1,13 @@
-"""MacroPlanner data models."""
+"""Planning models - macro-level choreography planning.
+
+Models for strategic planning at the macro (song/section) level.
+"""
 
 from pydantic import BaseModel, Field, field_validator
 
 from twinklr.core.agents.audio.profile.models import SongSectionRef
-from twinklr.core.agents.taxonomy import (
+from twinklr.core.sequencer.theming import ThemeRef, ThemeScope
+from twinklr.core.sequencer.vocabulary import (
     BlendMode,
     ChoreographyStyle,
     EnergyTarget,
@@ -23,7 +27,10 @@ class GlobalStory(BaseModel):
 
     model_config = {"extra": "forbid"}
 
-    theme: str = Field(..., description="Overarching theme/narrative for the show", min_length=10)
+    theme: ThemeRef = Field(..., description="Global default theme reference for the song")
+    story_notes: str = Field(
+        ..., description="Overarching narrative/theme notes (prose)", min_length=10
+    )
     motifs: list[str] = Field(
         ...,
         description="3-5 recurring visual/musical motifs throughout the show",
@@ -37,6 +44,21 @@ class GlobalStory(BaseModel):
         ..., description="Color palette and transitions throughout the show", min_length=10
     )
 
+    @field_validator("theme")
+    @classmethod
+    def validate_theme_scope(cls, v: ThemeRef) -> ThemeRef:
+        # GlobalStory theme must always be SONG scoped
+        if v.scope != ThemeScope.SONG:
+            raise ValueError("GlobalStory.theme.scope must be ThemeScope.SONG")
+        # keep global tags tight
+        if len(v.tags) > 5:
+            raise ValueError("GlobalStory.theme.tags must have at most 5 items")
+
+        if len(set(v.tags)) != len(v.tags):
+            raise ValueError("GlobalStory.theme.tags must not contain duplicates")
+
+        return v
+
 
 class MacroSectionPlan(BaseModel):
     """Strategic plan for one song section.
@@ -48,6 +70,7 @@ class MacroSectionPlan(BaseModel):
     model_config = {"extra": "forbid"}
 
     section: SongSectionRef = Field(..., description="Reference to audio section")
+    theme: ThemeRef = Field(..., description="Section theme reference")
     energy_target: EnergyTarget = Field(..., description="Target energy level for section")
     primary_focus_targets: list[str] = Field(
         ..., description="Main display roles (e.g. OUTLINE, MEGA_TREE)", min_length=1, max_length=5
@@ -69,6 +92,17 @@ class MacroSectionPlan(BaseModel):
         for role in v:
             if role not in valid_roles:
                 raise ValueError(f"Invalid target role: {role}")
+        return v
+
+    @field_validator("theme")
+    @classmethod
+    def validate_section_theme_scope(cls, v: ThemeRef) -> ThemeRef:
+        if v.scope != ThemeScope.SECTION:
+            raise ValueError("MacroSectionPlan.theme.scope must be ThemeScope.SECTION")
+        if len(v.tags) > 5:
+            raise ValueError("MacroSectionPlan.theme.tags must have at most 5 items")
+        if len(set(v.tags)) != len(v.tags):
+            raise ValueError("MacroSectionPlan.theme.tags must not contain duplicates")
         return v
 
 
@@ -181,18 +215,6 @@ class MacroPlan(BaseModel):
     section_plans: list[MacroSectionPlan] = Field(
         ..., description="Per-section strategic plans", min_length=1
     )
-    asset_requirements: list[str] = Field(
-        default_factory=list, description="Required assets (e.g. 'snowflake_burst.png')"
-    )
-
-    @field_validator("asset_requirements")
-    @classmethod
-    def validate_asset_requirements(cls, v: list[str]) -> list[str]:
-        """Validate asset requirement strings."""
-        for asset in v:
-            if not asset or len(asset.strip()) == 0:
-                raise ValueError("Asset requirement must be at least 1 character")
-        return v
 
     @field_validator("section_plans")
     @classmethod
@@ -240,3 +262,13 @@ class MacroPlan(BaseModel):
                 )
 
         return v
+
+
+__all__ = [
+    "GlobalStory",
+    "LayeringPlan",
+    "LayerSpec",
+    "MacroPlan",
+    "MacroSectionPlan",
+    "TargetSelector",
+]

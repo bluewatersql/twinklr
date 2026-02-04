@@ -4,7 +4,7 @@ from pydantic import ValidationError
 import pytest
 
 from twinklr.core.agents.audio.profile.models import SongSectionRef
-from twinklr.core.agents.sequencer.macro_planner.models import (
+from twinklr.core.sequencer.planning import (
     GlobalStory,
     LayeringPlan,
     LayerSpec,
@@ -12,7 +12,7 @@ from twinklr.core.agents.sequencer.macro_planner.models import (
     MacroSectionPlan,
     TargetSelector,
 )
-from twinklr.core.agents.taxonomy import (
+from twinklr.core.sequencer.vocabulary import (
     BlendMode,
     ChoreographyStyle,
     EnergyTarget,

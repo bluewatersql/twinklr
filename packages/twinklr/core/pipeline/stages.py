@@ -16,11 +16,11 @@ from twinklr.core.agents.sequencer.macro_planner import (
     MacroPlannerOrchestrator,
     PlanningContext,
 )
-from twinklr.core.agents.sequencer.macro_planner.models import MacroPlan
 from twinklr.core.audio.analyzer import AudioAnalyzer
 from twinklr.core.audio.models import SongBundle
 from twinklr.core.pipeline.context import PipelineContext
 from twinklr.core.pipeline.result import StageResult, failure_result, success_result
+from twinklr.core.sequencer.planning import MacroPlan
 
 logger = logging.getLogger(__name__)
 

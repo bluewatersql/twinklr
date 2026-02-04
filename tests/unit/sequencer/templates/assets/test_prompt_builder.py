@@ -1,6 +1,5 @@
 """Tests for asset template prompt builder."""
 
-from twinklr.core.sequencer.templates.assets.enums import AssetTemplateType, BackgroundMode
 from twinklr.core.sequencer.templates.assets.models import (
     AssetTemplate,
     PNGDefaults,
@@ -12,6 +11,7 @@ from twinklr.core.sequencer.templates.assets.prompt_builder import (
     build_prompt,
     policy_to_constraint_text,
 )
+from twinklr.core.sequencer.vocabulary import AssetTemplateType, BackgroundMode
 
 
 class TestPolicyToConstraintText:

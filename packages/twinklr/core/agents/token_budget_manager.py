@@ -6,13 +6,23 @@ Tracks token usage across agent stages and enforces limits.
 from __future__ import annotations
 
 import logging
+from enum import Enum
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from twinklr.core.agents.enum import Stage
 from twinklr.core.config.models import JobConfig
 
 logger = logging.getLogger(__name__)
+
+
+class Stage(str, Enum):
+    """Agent stages for context shaping and token tracking."""
+
+    PLAN = "plan"
+    VALIDATE = "validate"
+    IMPLEMENTATION = "implementation"
+    JUDGE = "judge"
+    REFINEMENT = "refinement"
 
 
 class StageTokenUsage(BaseModel):

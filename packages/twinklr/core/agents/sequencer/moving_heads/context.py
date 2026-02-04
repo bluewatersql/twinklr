@@ -15,7 +15,7 @@ from twinklr.core.agents.audio.profile.models import (
     AudioProfileModel,
     SongSectionRef,
 )
-from twinklr.core.agents.sequencer.macro_planner.models import MacroSectionPlan
+from twinklr.core.sequencer.planning import MacroSectionPlan
 
 
 class FixtureContext(BaseModel):

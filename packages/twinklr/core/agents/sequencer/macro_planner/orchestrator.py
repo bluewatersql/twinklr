@@ -17,7 +17,6 @@ from twinklr.core.agents.sequencer.macro_planner.context import PlanningContext
 from twinklr.core.agents.sequencer.macro_planner.heuristics import (
     MacroPlanHeuristicValidator,
 )
-from twinklr.core.agents.sequencer.macro_planner.models import MacroPlan
 from twinklr.core.agents.sequencer.macro_planner.specs import (
     get_judge_spec,
     get_planner_spec,
@@ -29,6 +28,7 @@ from twinklr.core.agents.shared.judge.controller import (
 )
 from twinklr.core.agents.shared.judge.feedback import FeedbackManager
 from twinklr.core.agents.spec import AgentSpec
+from twinklr.core.sequencer.planning import MacroPlan
 
 logger = logging.getLogger(__name__)
 

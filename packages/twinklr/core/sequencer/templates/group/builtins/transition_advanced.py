@@ -1,19 +1,19 @@
 """TRANSITION lane group templates - Ramp, Texture Swap, Build families."""
 
-from twinklr.core.sequencer.templates.group.enums import (
-    ColorMode,
-    GroupTemplateType,
-    GroupVisualIntent,
-    LayerRole,
-    MotionVerb,
-    ProjectionIntent,
-)
 from twinklr.core.sequencer.templates.group.library import register_group_template
 from twinklr.core.sequencer.templates.group.models import (
     GroupPlanTemplate,
     LayerRecipe,
     ProjectionSpec,
     TimingHints,
+)
+from twinklr.core.sequencer.vocabulary import (
+    ColorMode,
+    GroupTemplateType,
+    GroupVisualIntent,
+    MotionVerb,
+    ProjectionIntent,
+    VisualDepth,
 )
 
 
@@ -32,7 +32,7 @@ def make_gtpl_transition_ramp_up() -> GroupPlanTemplate:
         timing=TimingHints(bars_min=2, bars_max=4),
         layer_recipe=[
             LayerRecipe(
-                layer=LayerRole.BACKGROUND,
+                layer=VisualDepth.BACKGROUND,
                 motifs=["ramp", "build", "crescendo"],
                 visual_intent=GroupVisualIntent.ABSTRACT,
                 motion=[MotionVerb.FADE],
@@ -60,7 +60,7 @@ def make_gtpl_transition_ramp_down() -> GroupPlanTemplate:
         timing=TimingHints(bars_min=2, bars_max=4),
         layer_recipe=[
             LayerRecipe(
-                layer=LayerRole.BACKGROUND,
+                layer=VisualDepth.BACKGROUND,
                 motifs=["ramp", "decay", "diminuendo"],
                 visual_intent=GroupVisualIntent.ABSTRACT,
                 motion=[MotionVerb.FADE],
@@ -89,7 +89,7 @@ def make_gtpl_transition_texture_swap() -> GroupPlanTemplate:
         timing=TimingHints(bars_min=1, bars_max=2),
         layer_recipe=[
             LayerRecipe(
-                layer=LayerRole.BACKGROUND,
+                layer=VisualDepth.BACKGROUND,
                 motifs=["swap", "texture", "change"],
                 visual_intent=GroupVisualIntent.ABSTRACT,
                 motion=[MotionVerb.FADE],
@@ -117,7 +117,7 @@ def make_gtpl_transition_texture_swap_reverse() -> GroupPlanTemplate:
         timing=TimingHints(bars_min=1, bars_max=2),
         layer_recipe=[
             LayerRecipe(
-                layer=LayerRole.BACKGROUND,
+                layer=VisualDepth.BACKGROUND,
                 motifs=["swap", "reverse", "texture"],
                 visual_intent=GroupVisualIntent.ABSTRACT,
                 motion=[MotionVerb.FADE, MotionVerb.FLIP],
@@ -146,7 +146,7 @@ def make_gtpl_transition_build_short() -> GroupPlanTemplate:
         timing=TimingHints(bars_min=1, bars_max=2),
         layer_recipe=[
             LayerRecipe(
-                layer=LayerRole.MIDGROUND,
+                layer=VisualDepth.MIDGROUND,
                 motifs=["build", "crescendo", "anticipation"],
                 visual_intent=GroupVisualIntent.ABSTRACT,
                 motion=[MotionVerb.PULSE, MotionVerb.FADE],
@@ -174,7 +174,7 @@ def make_gtpl_transition_build_long() -> GroupPlanTemplate:
         timing=TimingHints(bars_min=4, bars_max=8),
         layer_recipe=[
             LayerRecipe(
-                layer=LayerRole.MIDGROUND,
+                layer=VisualDepth.MIDGROUND,
                 motifs=["build", "crescendo", "extended"],
                 visual_intent=GroupVisualIntent.ABSTRACT,
                 motion=[MotionVerb.PULSE, MotionVerb.RIPPLE],

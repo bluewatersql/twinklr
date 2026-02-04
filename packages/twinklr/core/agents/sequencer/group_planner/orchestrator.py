@@ -15,7 +15,6 @@ from typing import Any
 from twinklr.core.agents.logging import LLMCallLogger, NullLLMCallLogger
 from twinklr.core.agents.providers.base import LLMProvider
 from twinklr.core.agents.sequencer.group_planner.context import SectionPlanningContext
-from twinklr.core.agents.sequencer.group_planner.models import SectionCoordinationPlan
 from twinklr.core.agents.sequencer.group_planner.specs import (
     get_planner_spec,
     get_section_judge_spec,
@@ -31,6 +30,7 @@ from twinklr.core.agents.shared.judge.controller import (
 )
 from twinklr.core.agents.shared.judge.feedback import FeedbackManager
 from twinklr.core.agents.spec import AgentSpec
+from twinklr.core.sequencer.templates.group.models import SectionCoordinationPlan
 
 logger = logging.getLogger(__name__)
 

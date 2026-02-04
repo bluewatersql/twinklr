@@ -4,14 +4,6 @@ from twinklr.core.agents.sequencer.macro_planner.context import PlanningContext
 from twinklr.core.agents.sequencer.macro_planner.heuristics import (
     MacroPlanHeuristicValidator,
 )
-from twinklr.core.agents.sequencer.macro_planner.models import (
-    GlobalStory,
-    LayeringPlan,
-    LayerSpec,
-    MacroPlan,
-    MacroSectionPlan,
-    TargetSelector,
-)
 from twinklr.core.agents.sequencer.macro_planner.orchestrator import (
     MacroPlannerOrchestrator,
 )
@@ -20,6 +12,14 @@ from twinklr.core.agents.sequencer.macro_planner.specs import (
     MACRO_PLANNER_SPEC,
     get_judge_spec,
     get_planner_spec,
+)
+from twinklr.core.sequencer.planning import (
+    GlobalStory,
+    LayeringPlan,
+    LayerSpec,
+    MacroPlan,
+    MacroSectionPlan,
+    TargetSelector,
 )
 
 __all__ = [

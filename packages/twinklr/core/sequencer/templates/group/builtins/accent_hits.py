@@ -3,20 +3,20 @@
 Focal punctuation with high intensity for emphasis moments.
 """
 
-from twinklr.core.sequencer.templates.group.enums import (
-    ColorMode,
-    GroupTemplateType,
-    GroupVisualIntent,
-    LayerRole,
-    MotionVerb,
-    ProjectionIntent,
-)
 from twinklr.core.sequencer.templates.group.library import register_group_template
 from twinklr.core.sequencer.templates.group.models import (
     GroupPlanTemplate,
     LayerRecipe,
     ProjectionSpec,
     TimingHints,
+)
+from twinklr.core.sequencer.vocabulary import (
+    ColorMode,
+    GroupTemplateType,
+    GroupVisualIntent,
+    MotionVerb,
+    ProjectionIntent,
+    VisualDepth,
 )
 
 
@@ -35,7 +35,7 @@ def make_gtpl_accent_hit_white() -> GroupPlanTemplate:
         timing=TimingHints(bars_min=1, bars_max=2),
         layer_recipe=[
             LayerRecipe(
-                layer=LayerRole.FOREGROUND,
+                layer=VisualDepth.FOREGROUND,
                 motifs=["flash", "hit", "emphasis"],
                 visual_intent=GroupVisualIntent.ABSTRACT,
                 motion=[MotionVerb.PULSE],
@@ -63,7 +63,7 @@ def make_gtpl_accent_hit_color() -> GroupPlanTemplate:
         timing=TimingHints(bars_min=1, bars_max=2),
         layer_recipe=[
             LayerRecipe(
-                layer=LayerRole.FOREGROUND,
+                layer=VisualDepth.FOREGROUND,
                 motifs=["flash", "hit", "color"],
                 visual_intent=GroupVisualIntent.ABSTRACT,
                 motion=[MotionVerb.PULSE],
@@ -91,7 +91,7 @@ def make_gtpl_accent_hit_ring() -> GroupPlanTemplate:
         timing=TimingHints(bars_min=1, bars_max=2),
         layer_recipe=[
             LayerRecipe(
-                layer=LayerRole.FOREGROUND,
+                layer=VisualDepth.FOREGROUND,
                 motifs=["ring", "expansion", "radial"],
                 visual_intent=GroupVisualIntent.ABSTRACT,
                 motion=[MotionVerb.RIPPLE],
@@ -120,7 +120,7 @@ def make_gtpl_accent_burst_small() -> GroupPlanTemplate:
         timing=TimingHints(bars_min=1, bars_max=2),
         layer_recipe=[
             LayerRecipe(
-                layer=LayerRole.FOREGROUND,
+                layer=VisualDepth.FOREGROUND,
                 motifs=["burst", "radial", "starburst"],
                 visual_intent=GroupVisualIntent.ABSTRACT,
                 motion=[MotionVerb.RIPPLE],
@@ -148,7 +148,7 @@ def make_gtpl_accent_burst_big() -> GroupPlanTemplate:
         timing=TimingHints(bars_min=1, bars_max=4),
         layer_recipe=[
             LayerRecipe(
-                layer=LayerRole.FOREGROUND,
+                layer=VisualDepth.FOREGROUND,
                 motifs=["burst", "large", "tail"],
                 visual_intent=GroupVisualIntent.ABSTRACT,
                 motion=[MotionVerb.RIPPLE, MotionVerb.FADE],
@@ -177,7 +177,7 @@ def make_gtpl_accent_spark_shower_up() -> GroupPlanTemplate:
         timing=TimingHints(bars_min=1, bars_max=4),
         layer_recipe=[
             LayerRecipe(
-                layer=LayerRole.FOREGROUND,
+                layer=VisualDepth.FOREGROUND,
                 motifs=["spark", "fountain", "upward"],
                 visual_intent=GroupVisualIntent.ABSTRACT,
                 motion=[MotionVerb.SPARKLE],
@@ -205,7 +205,7 @@ def make_gtpl_accent_spark_shower_down() -> GroupPlanTemplate:
         timing=TimingHints(bars_min=1, bars_max=4),
         layer_recipe=[
             LayerRecipe(
-                layer=LayerRole.FOREGROUND,
+                layer=VisualDepth.FOREGROUND,
                 motifs=["spark", "rain", "downward"],
                 visual_intent=GroupVisualIntent.ABSTRACT,
                 motion=[MotionVerb.SPARKLE],

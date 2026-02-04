@@ -12,7 +12,9 @@ from enum import Enum
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from twinklr.core.agents.sequencer.group_planner.models import (
+from twinklr.core.agents.sequencer.group_planner.timing import TimingContext
+from twinklr.core.sequencer.templates.group.catalog import TemplateCatalog
+from twinklr.core.sequencer.templates.group.models import (
     CoordinationMode,
     DisplayGraph,
     GroupPlacement,
@@ -20,8 +22,6 @@ from twinklr.core.agents.sequencer.group_planner.models import (
     PlacementWindow,
     SectionCoordinationPlan,
 )
-from twinklr.core.agents.sequencer.group_planner.timing import TimingContext
-from twinklr.core.sequencer.templates.group.catalog import TemplateCatalog
 
 
 class ValidationSeverity(str, Enum):

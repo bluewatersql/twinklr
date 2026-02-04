@@ -1,7 +1,6 @@
-"""Group template models.
+"""Group template definition models.
 
-Group templates define high-level cross-group coordination patterns
-for Christmas light displays.
+Core models for defining group choreography templates.
 """
 
 from __future__ import annotations
@@ -10,16 +9,20 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from twinklr.core.sequencer.templates.group.enums import (
+from twinklr.core.sequencer.templates.assets.models import AssetRequest
+from twinklr.core.sequencer.vocabulary import (
     AssetSlotType,
     ColorMode,
     GroupTemplateType,
     GroupVisualIntent,
-    LayerRole,
     MotionVerb,
     ProjectionIntent,
+    VisualDepth,
     WarpHint,
 )
+
+# Alias for backward compatibility in templates
+LayerRole = VisualDepth
 
 
 class TimingHints(BaseModel):
@@ -231,6 +234,9 @@ class GroupPlanTemplate(BaseModel):
     author: str | None = None
     extras: dict[str, Any] = Field(default_factory=dict)
 
+    affinity_tags: list[str] = []
+    avoid_tags: list[str] = []
+
     @model_validator(mode="after")
     def _validate_constraints(self) -> GroupPlanTemplate:
         """Validate cross-field constraints."""
@@ -260,3 +266,17 @@ class GroupPlanTemplate(BaseModel):
         self.tags = sorted({tag.strip().lower() for tag in self.tags if tag.strip()})
 
         return self
+
+
+# Re-export AssetRequest for backward compatibility (imported from assets.models)
+__all__ = [
+    "AssetRequest",
+    "AssetSlot",
+    "AssetSlotDefaults",
+    "GroupConstraints",
+    "GroupPlanTemplate",
+    "LayerRecipe",
+    "ProjectionParams",
+    "ProjectionSpec",
+    "TimingHints",
+]

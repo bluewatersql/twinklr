@@ -1,6 +1,7 @@
 """Tests for taxonomy utilities."""
 
-from twinklr.core.agents.taxonomy import (
+from twinklr.core.agents.taxonomy_utils import get_taxonomy_dict, inject_taxonomy
+from twinklr.core.sequencer.vocabulary import (
     BlendMode,
     ChoreographyStyle,
     EnergyTarget,
@@ -9,7 +10,6 @@ from twinklr.core.agents.taxonomy import (
     TargetRole,
     TimingDriver,
 )
-from twinklr.core.agents.taxonomy_utils import get_taxonomy_dict, inject_taxonomy
 
 
 def test_get_taxonomy_dict_includes_all_enums():

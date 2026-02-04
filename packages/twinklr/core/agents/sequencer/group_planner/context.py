@@ -9,14 +9,14 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from twinklr.core.agents.sequencer.group_planner.models import (
-    DisplayGraph,
-    LaneKind,
-)
 from twinklr.core.agents.sequencer.group_planner.timing import TimingContext
 from twinklr.core.sequencer.templates.group.catalog import (
     TemplateCatalog,
     TemplateCatalogEntry,
+)
+from twinklr.core.sequencer.templates.group.models import (
+    DisplayGraph,
+    LaneKind,
 )
 
 

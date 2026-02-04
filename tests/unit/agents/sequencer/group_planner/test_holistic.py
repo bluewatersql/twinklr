@@ -12,7 +12,12 @@ from twinklr.core.agents.sequencer.group_planner.holistic import (
     HolisticEvaluator,
     IssueSeverity,
 )
-from twinklr.core.agents.sequencer.group_planner.models import (
+from twinklr.core.agents.shared.judge.models import VerdictStatus
+from twinklr.core.sequencer.templates.group.catalog import (
+    TemplateCatalog,
+    TemplateCatalogEntry,
+)
+from twinklr.core.sequencer.templates.group.models import (
     CoordinationMode,
     CoordinationPlan,
     DisplayGraph,
@@ -25,11 +30,8 @@ from twinklr.core.agents.sequencer.group_planner.models import (
     TimeRef,
     TimeRefKind,
 )
-from twinklr.core.agents.shared.judge.models import VerdictStatus
-from twinklr.core.sequencer.templates.group.catalog import (
-    TemplateCatalog,
-    TemplateCatalogEntry,
-)
+
+from .conftest import DEFAULT_THEME
 
 # Rebuild TemplateCatalogEntry after LaneKind is imported (forward ref resolution)
 TemplateCatalogEntry.model_rebuild()
@@ -125,6 +127,7 @@ def sample_group_plan_set() -> GroupPlanSet:
     """Sample GroupPlanSet with multiple sections."""
     section_1 = SectionCoordinationPlan(
         section_id="verse_1",
+        theme=DEFAULT_THEME,
         lane_plans=[
             LanePlan(
                 lane=LaneKind.ACCENT,
@@ -150,6 +153,7 @@ def sample_group_plan_set() -> GroupPlanSet:
 
     section_2 = SectionCoordinationPlan(
         section_id="chorus_1",
+        theme=DEFAULT_THEME,
         lane_plans=[
             LanePlan(
                 lane=LaneKind.ACCENT,

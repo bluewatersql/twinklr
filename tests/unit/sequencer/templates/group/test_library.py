@@ -1,12 +1,9 @@
 """Tests for group template registry."""
 
+import re
+
 import pytest
 
-from twinklr.core.sequencer.templates.group.enums import (
-    GroupTemplateType,
-    GroupVisualIntent,
-    ProjectionIntent,
-)
 from twinklr.core.sequencer.templates.group.library import (
     REGISTRY,
     GroupTemplateRegistry,
@@ -17,6 +14,11 @@ from twinklr.core.sequencer.templates.group.library import (
     register_group_template,
 )
 from twinklr.core.sequencer.templates.group.models import GroupPlanTemplate, ProjectionSpec
+from twinklr.core.sequencer.vocabulary import (
+    GroupTemplateType,
+    GroupVisualIntent,
+    ProjectionIntent,
+)
 
 
 class TestNormKey:
@@ -105,12 +107,12 @@ class TestGroupTemplateRegistry:
         """Test registering duplicate template_id fails."""
         registry.register(sample_factory)
 
-        with pytest.raises(ValueError, match="already registered"):
+        with pytest.raises(ValueError, match=re.escape("already registered")):
             registry.register(sample_factory)
 
     def test_get_nonexistent_template(self, registry):
         """Test getting nonexistent template raises error."""
-        with pytest.raises(TemplateNotFoundError, match="Unknown template"):
+        with pytest.raises(TemplateNotFoundError, match=re.escape("Unknown.*template")):
             registry.get("nonexistent")
 
     def test_get_deep_copy_default(self, registry, sample_factory):

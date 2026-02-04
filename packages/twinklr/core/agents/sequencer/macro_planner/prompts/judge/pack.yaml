@@ -31,3 +31,6 @@ variables:
   - name: lyric_context
     description: Optional LyricContextModel with narrative/thematic analysis
     required: false
+  - name: theme_catalog
+    description: Optional list of allowed ThemeDefinition summaries (theme_id/title)
+    required: false

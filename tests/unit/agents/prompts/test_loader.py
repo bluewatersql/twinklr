@@ -143,3 +143,56 @@ def test_render_with_missing_variable():
 
     with pytest.raises(Exception):  # Could be RenderError or similar  # noqa: B017
         loader.load_and_render("test_pack", variables)
+
+
+def test_load_with_refinement_iteration_zero():
+    """Test load_with_refinement uses user.j2 for iteration 0."""
+    loader = PromptPackLoader(base_path=FIXTURES_PATH)
+
+    prompts = loader.load_with_refinement("test_pack", {"iteration": 0})
+
+    # Should have user template
+    assert "user" in prompts
+    assert isinstance(prompts["user"], str)
+
+
+def test_load_with_refinement_uses_refinement_template():
+    """Test load_with_refinement uses user_refinement.j2 for iteration > 0."""
+    # Create a test pack with user_refinement.j2
+    test_dir = FIXTURES_PATH / "refinement_pack"
+    test_dir.mkdir(exist_ok=True)
+    (test_dir / "system.j2").write_text("System prompt")
+    (test_dir / "user.j2").write_text("Initial user prompt")
+    (test_dir / "user_refinement.j2").write_text("Refinement user prompt")
+
+    try:
+        loader = PromptPackLoader(base_path=FIXTURES_PATH)
+
+        # Iteration 0 should use user.j2
+        prompts_0 = loader.load_with_refinement("refinement_pack", {"iteration": 0})
+        assert prompts_0["user"] == "Initial user prompt"
+
+        # Iteration 1+ should use user_refinement.j2
+        prompts_1 = loader.load_with_refinement("refinement_pack", {"iteration": 1})
+        assert prompts_1["user"] == "Refinement user prompt"
+
+        prompts_2 = loader.load_with_refinement("refinement_pack", {"iteration": 2})
+        assert prompts_2["user"] == "Refinement user prompt"
+
+    finally:
+        # Cleanup
+        (test_dir / "system.j2").unlink()
+        (test_dir / "user.j2").unlink()
+        (test_dir / "user_refinement.j2").unlink()
+        test_dir.rmdir()
+
+
+def test_load_with_refinement_fallback_to_user():
+    """Test load_with_refinement falls back to user.j2 if no refinement template."""
+    loader = PromptPackLoader(base_path=FIXTURES_PATH)
+
+    # test_pack has user.j2 but no user_refinement.j2
+    prompts = loader.load_with_refinement("test_pack", {"iteration": 1})
+
+    # Should fall back to user.j2
+    assert "user" in prompts

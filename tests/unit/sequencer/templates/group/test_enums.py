@@ -1,13 +1,13 @@
 """Tests for group template enums."""
 
-from twinklr.core.sequencer.templates.group.enums import (
+from twinklr.core.sequencer.vocabulary import (
     AssetSlotType,
     ColorMode,
     GroupTemplateType,
     GroupVisualIntent,
-    LayerRole,
     MotionVerb,
     ProjectionIntent,
+    VisualDepth,
     WarpHint,
 )
 
@@ -82,18 +82,18 @@ class TestMotionVerb:
         assert MotionVerb.NONE.value == "NONE"
 
 
-class TestLayerRole:
-    """Test LayerRole enum."""
+class TestVisualDepth:
+    """Test VisualDepth enum."""
 
     def test_all_values_present(self):
         """Test all expected layer roles are defined."""
         expected = {"BACKGROUND", "MIDGROUND", "FOREGROUND", "ACCENT", "TEXTURE"}
-        actual = {r.value for r in LayerRole}
+        actual = {r.value for r in VisualDepth}
         assert actual == expected
 
     def test_values_are_strings(self):
         """Test enum values are strings."""
-        for role in LayerRole:
+        for role in VisualDepth:
             assert isinstance(role.value, str)
 
 

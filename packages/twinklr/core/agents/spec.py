@@ -19,7 +19,7 @@ class AgentSpec(BaseModel):
     """Agent specification (configuration).
 
     Data-only configuration for agent execution.
-    AgentRunner uses this spec to execute agents without separate classes.
+    Agent Runner uses this spec to execute agents without separate classes.
     """
 
     # Identity

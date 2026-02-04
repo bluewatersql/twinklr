@@ -2,23 +2,19 @@
 
 import pytest
 
-from twinklr.core.agents.sequencer.group_planner.models import LaneKind
 from twinklr.core.sequencer.templates.group.catalog import (
     TemplateCatalog,
     TemplateCatalogEntry,
     build_template_catalog,
 )
-from twinklr.core.sequencer.templates.group.enums import (
-    GroupTemplateType,
-    GroupVisualIntent,
-    ProjectionIntent,
-)
 from twinklr.core.sequencer.templates.group.library import GroupTemplateRegistry
 from twinklr.core.sequencer.templates.group.models import GroupPlanTemplate, ProjectionSpec
-
-# Rebuild models with LaneKind now defined
-TemplateCatalogEntry.model_rebuild()
-TemplateCatalog.model_rebuild()
+from twinklr.core.sequencer.vocabulary import (
+    GroupTemplateType,
+    GroupVisualIntent,
+    LaneKind,
+    ProjectionIntent,
+)
 
 
 class TestTemplateCatalogEntry:

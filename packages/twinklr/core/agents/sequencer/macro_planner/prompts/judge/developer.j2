@@ -11,7 +11,68 @@ Return valid JSON matching this schema:
 **Constraints:**
 - Score: 0.0-10.0 | Confidence: 0.0-1.0
 - Layers: 1-5 (exactly 1 BASE, unique indices)
-- Assets: .png/.gif only, ≤10 recommended
+- Global theme: ThemeRef present, scope=SONG, tags ≤ 5
+- Section themes: ThemeRef present for every section, scope=SECTION, tags ≤ 5
+- Theme defaulting rule: sections should default to global theme_id unless deliberate shift; shifts must be justified
+
+## Canonical Theme Issue IDs (use these exact IDs)
+
+When reporting theme issues, use the following stable issue_ids and mappings:
+
+1) THEME_GLOBAL_SCOPE_INVALID
+   - category: SCHEMA
+   - severity: ERROR
+   - estimated_effort: LOW
+   - scope: FIELD
+   - location.field_path: "global_story.theme.scope"
+
+2) THEME_SECTION_SCOPE_INVALID
+   - category: SCHEMA
+   - severity: ERROR
+   - estimated_effort: LOW
+   - scope: SECTION
+   - location.section_id: <section_id>
+   - location.field_path: "section_plans.<i>.theme.scope"
+
+3) THEME_TAGS_TOO_MANY
+   - category: CONSTRAINT
+   - severity: ERROR
+   - estimated_effort: LOW
+   - scope: FIELD
+   - location.field_path: "...theme.tags"
+
+4) THEME_SHIFT_UNJUSTIFIED
+   - category: STYLE
+   - severity: WARN
+   - estimated_effort: LOW
+   - scope: SECTION
+   - location.section_id: <section_id>
+   - location.field_path: "section_plans.<i>.theme.theme_id"
+
+5) THEME_SHIFT_OVERUSED
+   - category: STYLE
+   - severity: WARN
+   - estimated_effort: MEDIUM
+   - scope: GLOBAL
+   - location.field_path: "section_plans[*].theme.theme_id"
+
+## Theme Defaulting Rule (Judge)
+
+- Default expectation: section_plans[*].theme.theme_id equals global_story.theme.theme_id
+- If a section theme_id differs, it must be justified via:
+  - at least 1 tag in section_plans[*].theme.tags OR
+  - explicit explanation in section_plans[*].notes mentioning the theme shift
+- Emit THEME_SHIFT_UNJUSTIFIED when:
+  - section_plans[i].theme.theme_id != global_story.theme.theme_id AND
+  - (section_plans[i].theme.tags is empty) AND
+  - section_plans[i].notes does NOT explicitly mention a theme shift
+- Emit THEME_SHIFT_OVERUSED when:
+  - count(theme overrides) / count(sections) > 0.25
+- Theme defaulting behavior:
+  - Most sections should reuse global_story.theme.theme_id
+  - If section theme differs, require justification (tags>=1 OR notes mention shift)
+  - Excessive overrides (>25% sections) reduce coherence
+
 
 {% if learning_context %}
 ## Historical Learning Context
@@ -29,7 +90,11 @@ Be vigilant about these patterns, but evaluate each plan independently.
 - Exactly 1 BASE layer with NORMAL blend mode
 - All target roles valid and exist in display layout
 - Layer indices 0-4 unique, blend modes NORMAL or ADD
-- Asset extensions valid
+- Themes:
+  - global_story.theme.scope must be SONG
+  - section_plans[*].theme.scope must be SECTION
+  - ThemeRef.tags length must be 0–5
+
 
 ## Issue Reporting Format
 
@@ -40,6 +105,7 @@ Each issue must have:
 - **category**: One of the valid categories below
 - **severity**: ERROR | WARN | NIT
 - **location**: Section/layer/role details
+- **location.field_path**: Required for SCHEMA/CONSTRAINT/FIELD issues (dot-path into plan)
 - **fix_hint**: Actionable suggestion for THIS instance
 - **acceptance_test**: Deterministic check to verify fix
 
@@ -61,6 +127,7 @@ Each issue must have:
 - layer_architecture
 - bold_impact
 - contrast_dynamics
+- theme_coherence
 
 ## Enum Reference
 

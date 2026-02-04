@@ -1,7 +1,4 @@
-"""Async agent runner - async-native execution engine for agents.
-
-This is the primary implementation. For sync usage, use AgentRunner wrapper.
-"""
+"""Async agent runner - async-native execution engine for agents."""
 
 from __future__ import annotations
 
@@ -36,7 +33,6 @@ class AsyncAgentRunner:
     """Async-native agent execution engine.
 
     This is the primary implementation. All operations are async.
-    For sync usage, use the AgentRunner wrapper.
 
     Responsibilities:
     - Load and render prompts

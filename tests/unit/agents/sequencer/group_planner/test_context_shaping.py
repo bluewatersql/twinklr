@@ -17,15 +17,17 @@ from twinklr.core.agents.sequencer.group_planner.context_shaping import (
     shape_planner_context,
     shape_section_judge_context,
 )
-from twinklr.core.agents.sequencer.group_planner.models import (
+from twinklr.core.agents.sequencer.group_planner.timing import TimingContext
+from twinklr.core.sequencer.templates.group.catalog import TemplateCatalog, TemplateCatalogEntry
+from twinklr.core.sequencer.templates.group.models import (
     DisplayGraph,
     DisplayGroup,
     GroupPlanSet,
     LaneKind,
     SectionCoordinationPlan,
 )
-from twinklr.core.agents.sequencer.group_planner.timing import TimingContext
-from twinklr.core.sequencer.templates.group.catalog import TemplateCatalog, TemplateCatalogEntry
+
+from .conftest import DEFAULT_THEME
 
 # Rebuild TemplateCatalogEntry after LaneKind is imported
 TemplateCatalogEntry.model_rebuild()
@@ -391,7 +393,7 @@ def group_plan_set() -> GroupPlanSet:
     """Create mock GroupPlanSet."""
     # Import lane plan and minimal coordination plan
     # Import models
-    from twinklr.core.agents.sequencer.group_planner.models import (
+    from twinklr.core.sequencer.templates.group.models import (
         CoordinationMode,
         CoordinationPlan,
         GroupPlacement,
@@ -427,9 +429,9 @@ def group_plan_set() -> GroupPlanSet:
     ]
 
     section_plans = [
-        SectionCoordinationPlan(section_id="intro", lane_plans=lane_plans),
-        SectionCoordinationPlan(section_id="verse_1", lane_plans=lane_plans),
-        SectionCoordinationPlan(section_id="chorus_1", lane_plans=lane_plans),
+        SectionCoordinationPlan(section_id="intro", theme=DEFAULT_THEME, lane_plans=lane_plans),
+        SectionCoordinationPlan(section_id="verse_1", theme=DEFAULT_THEME, lane_plans=lane_plans),
+        SectionCoordinationPlan(section_id="chorus_1", theme=DEFAULT_THEME, lane_plans=lane_plans),
     ]
 
     return GroupPlanSet(
@@ -666,7 +668,7 @@ def test_shape_section_judge_context_no_matching_groups(
 
 def test_shape_holistic_judge_context_single_section() -> None:
     """Test holistic handles single section plan."""
-    from twinklr.core.agents.sequencer.group_planner.models import (
+    from twinklr.core.sequencer.templates.group.models import (
         CoordinationMode,
         CoordinationPlan,
         GroupPlacement,
@@ -703,7 +705,9 @@ def test_shape_holistic_judge_context_single_section() -> None:
 
     single_plan_set = GroupPlanSet(
         plan_set_id="test_single",
-        section_plans=[SectionCoordinationPlan(section_id="solo", lane_plans=lane_plans)],
+        section_plans=[
+            SectionCoordinationPlan(section_id="solo", theme=DEFAULT_THEME, lane_plans=lane_plans)
+        ],
     )
 
     display_graph = DisplayGraph(
@@ -846,7 +850,7 @@ def test_filter_templates_by_intent_ensures_minimum_per_lane() -> None:
     result = filter_templates_by_intent(catalog, "HIGH", "BUSY")
 
     # Count templates per lane
-    from twinklr.core.agents.sequencer.group_planner.models import LaneKind
+    from twinklr.core.sequencer.templates.group.models import LaneKind
 
     base_count = len([e for e in result if LaneKind.BASE in e.compatible_lanes])
     rhythm_count = len([e for e in result if LaneKind.RHYTHM in e.compatible_lanes])

@@ -13,6 +13,7 @@ variables:
     - display_groups  # List of DisplayGroup objects with target roles
     - response_schema  # JSON schema for MacroPlan (auto-injected)
     - taxonomy  # Dict of enum names to value lists (auto-injected)
+    - theme_catalog  # List of ThemeDefinition summaries (theme_id, title)
   
   optional:
     - lyric_context  # LyricContextModel with narrative/thematic analysis (None if no lyrics)

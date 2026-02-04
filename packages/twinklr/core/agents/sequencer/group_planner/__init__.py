@@ -18,30 +18,6 @@ from twinklr.core.agents.sequencer.group_planner.holistic import (
 from twinklr.core.agents.sequencer.group_planner.holistic_stage import (
     HolisticEvaluatorStage,
 )
-from twinklr.core.agents.sequencer.group_planner.models import (
-    AssetRequest,
-    CoordinationConfig,
-    CoordinationMode,
-    CoordinationPlan,
-    Deviation,
-    DisplayGraph,
-    DisplayGroup,
-    GPBlendMode,
-    GPTimingDriver,
-    GroupPlacement,
-    GroupPlanSet,
-    GroupPosition,
-    LaneKind,
-    LanePlan,
-    PlacementWindow,
-    SectionCoordinationPlan,
-    SnapRule,
-    SpatialIntent,
-    SpillPolicy,
-    StepUnit,
-    TimeRef,
-    TimeRefKind,
-)
 from twinklr.core.agents.sequencer.group_planner.orchestrator import (
     GroupPlannerOrchestrator,
 )
@@ -69,6 +45,30 @@ from twinklr.core.agents.sequencer.group_planner.validators import (
 from twinklr.core.sequencer.templates.group.catalog import (
     TemplateCatalog,
     TemplateCatalogEntry,
+)
+from twinklr.core.sequencer.templates.group.models import (
+    AssetRequest,
+    CoordinationConfig,
+    CoordinationMode,
+    CoordinationPlan,
+    Deviation,
+    DisplayGraph,
+    DisplayGroup,
+    GPBlendMode,
+    GPTimingDriver,
+    GroupPlacement,
+    GroupPlanSet,
+    GroupPosition,
+    LaneKind,
+    LanePlan,
+    PlacementWindow,
+    SectionCoordinationPlan,
+    SnapRule,
+    SpatialIntent,
+    SpillPolicy,
+    StepUnit,
+    TimeRef,
+    TimeRefKind,
 )
 
 __all__ = [

@@ -1,19 +1,19 @@
 """RHYTHM lane group templates - Sweep family."""
 
-from twinklr.core.sequencer.templates.group.enums import (
-    ColorMode,
-    GroupTemplateType,
-    GroupVisualIntent,
-    LayerRole,
-    MotionVerb,
-    ProjectionIntent,
-)
 from twinklr.core.sequencer.templates.group.library import register_group_template
 from twinklr.core.sequencer.templates.group.models import (
     GroupPlanTemplate,
     LayerRecipe,
     ProjectionSpec,
     TimingHints,
+)
+from twinklr.core.sequencer.vocabulary import (
+    ColorMode,
+    GroupTemplateType,
+    GroupVisualIntent,
+    MotionVerb,
+    ProjectionIntent,
+    VisualDepth,
 )
 
 
@@ -31,7 +31,7 @@ def make_gtpl_rhythm_sweep_lr() -> GroupPlanTemplate:
         timing=TimingHints(bars_min=1, bars_max=16),
         layer_recipe=[
             LayerRecipe(
-                layer=LayerRole.MIDGROUND,
+                layer=VisualDepth.MIDGROUND,
                 motifs=["sweep", "linear", "lr"],
                 visual_intent=GroupVisualIntent.ABSTRACT,
                 motion=[MotionVerb.SWEEP],
@@ -59,7 +59,7 @@ def make_gtpl_rhythm_sweep_rl() -> GroupPlanTemplate:
         timing=TimingHints(bars_min=1, bars_max=16),
         layer_recipe=[
             LayerRecipe(
-                layer=LayerRole.MIDGROUND,
+                layer=VisualDepth.MIDGROUND,
                 motifs=["sweep", "linear", "rl"],
                 visual_intent=GroupVisualIntent.ABSTRACT,
                 motion=[MotionVerb.SWEEP],
@@ -87,7 +87,7 @@ def make_gtpl_rhythm_sweep_pingpong() -> GroupPlanTemplate:
         timing=TimingHints(bars_min=2, bars_max=16),
         layer_recipe=[
             LayerRecipe(
-                layer=LayerRole.MIDGROUND,
+                layer=VisualDepth.MIDGROUND,
                 motifs=["sweep", "pingpong", "bounce"],
                 visual_intent=GroupVisualIntent.ABSTRACT,
                 motion=[MotionVerb.SWEEP, MotionVerb.BOUNCE],

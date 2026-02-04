@@ -1,19 +1,19 @@
 """RHYTHM lane group templates - Chase, Ripple, Alternator families."""
 
-from twinklr.core.sequencer.templates.group.enums import (
-    ColorMode,
-    GroupTemplateType,
-    GroupVisualIntent,
-    LayerRole,
-    MotionVerb,
-    ProjectionIntent,
-)
 from twinklr.core.sequencer.templates.group.library import register_group_template
 from twinklr.core.sequencer.templates.group.models import (
     GroupPlanTemplate,
     LayerRecipe,
     ProjectionSpec,
     TimingHints,
+)
+from twinklr.core.sequencer.vocabulary import (
+    ColorMode,
+    GroupTemplateType,
+    GroupVisualIntent,
+    MotionVerb,
+    ProjectionIntent,
+    VisualDepth,
 )
 
 
@@ -32,7 +32,7 @@ def make_gtpl_rhythm_chase_single() -> GroupPlanTemplate:
         timing=TimingHints(bars_min=1, bars_max=16),
         layer_recipe=[
             LayerRecipe(
-                layer=LayerRole.MIDGROUND,
+                layer=VisualDepth.MIDGROUND,
                 motifs=["chase", "marquee", "sequential"],
                 visual_intent=GroupVisualIntent.ABSTRACT,
                 motion=[MotionVerb.CHASE],
@@ -60,7 +60,7 @@ def make_gtpl_rhythm_chase_dual() -> GroupPlanTemplate:
         timing=TimingHints(bars_min=1, bars_max=16),
         layer_recipe=[
             LayerRecipe(
-                layer=LayerRole.MIDGROUND,
+                layer=VisualDepth.MIDGROUND,
                 motifs=["chase", "dual", "mirrored"],
                 visual_intent=GroupVisualIntent.ABSTRACT,
                 motion=[MotionVerb.CHASE],
@@ -89,7 +89,7 @@ def make_gtpl_rhythm_ripple_tight() -> GroupPlanTemplate:
         timing=TimingHints(bars_min=1, bars_max=8),
         layer_recipe=[
             LayerRecipe(
-                layer=LayerRole.MIDGROUND,
+                layer=VisualDepth.MIDGROUND,
                 motifs=["ripple", "tight", "fast"],
                 visual_intent=GroupVisualIntent.ABSTRACT,
                 motion=[MotionVerb.RIPPLE],
@@ -117,7 +117,7 @@ def make_gtpl_rhythm_ripple_wide() -> GroupPlanTemplate:
         timing=TimingHints(bars_min=2, bars_max=16),
         layer_recipe=[
             LayerRecipe(
-                layer=LayerRole.MIDGROUND,
+                layer=VisualDepth.MIDGROUND,
                 motifs=["ripple", "wide", "slow"],
                 visual_intent=GroupVisualIntent.ABSTRACT,
                 motion=[MotionVerb.RIPPLE],
@@ -146,7 +146,7 @@ def make_gtpl_rhythm_alternate_ab() -> GroupPlanTemplate:
         timing=TimingHints(bars_min=1, bars_max=16),
         layer_recipe=[
             LayerRecipe(
-                layer=LayerRole.MIDGROUND,
+                layer=VisualDepth.MIDGROUND,
                 motifs=["alternate", "toggle", "ab"],
                 visual_intent=GroupVisualIntent.ABSTRACT,
                 motion=[MotionVerb.PULSE],
@@ -174,7 +174,7 @@ def make_gtpl_rhythm_alternate_triplet() -> GroupPlanTemplate:
         timing=TimingHints(bars_min=1, bars_max=16),
         layer_recipe=[
             LayerRecipe(
-                layer=LayerRole.MIDGROUND,
+                layer=VisualDepth.MIDGROUND,
                 motifs=["alternate", "triplet", "abc"],
                 visual_intent=GroupVisualIntent.ABSTRACT,
                 motion=[MotionVerb.PULSE],

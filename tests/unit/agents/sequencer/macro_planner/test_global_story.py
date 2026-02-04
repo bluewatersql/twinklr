@@ -3,7 +3,7 @@
 from pydantic import ValidationError
 import pytest
 
-from twinklr.core.agents.sequencer.macro_planner.models import GlobalStory
+from twinklr.core.sequencer.planning import GlobalStory
 
 
 def test_global_story_valid():

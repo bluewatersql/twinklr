@@ -3,8 +3,8 @@
 from pydantic import ValidationError
 import pytest
 
-from twinklr.core.agents.sequencer.macro_planner.models import LayerSpec, TargetSelector
-from twinklr.core.agents.taxonomy import BlendMode, LayerRole, TimingDriver
+from twinklr.core.sequencer.planning import LayerSpec, TargetSelector
+from twinklr.core.sequencer.vocabulary import BlendMode, LayerRole, TimingDriver
 
 
 def test_target_selector_single_role():

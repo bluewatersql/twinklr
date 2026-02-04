@@ -7,18 +7,6 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from twinklr.core.agents.sequencer.group_planner.context import SectionPlanningContext
-from twinklr.core.agents.sequencer.group_planner.models import (
-    CoordinationMode,
-    CoordinationPlan,
-    DisplayGraph,
-    DisplayGroup,
-    GroupPlacement,
-    LaneKind,
-    LanePlan,
-    SectionCoordinationPlan,
-    TimeRef,
-    TimeRefKind,
-)
 from twinklr.core.agents.sequencer.group_planner.orchestrator import (
     GroupPlannerOrchestrator,
 )
@@ -31,6 +19,20 @@ from twinklr.core.sequencer.templates.group.catalog import (
     TemplateCatalog,
     TemplateCatalogEntry,
 )
+from twinklr.core.sequencer.templates.group.models import (
+    CoordinationMode,
+    CoordinationPlan,
+    DisplayGraph,
+    DisplayGroup,
+    GroupPlacement,
+    LaneKind,
+    LanePlan,
+    SectionCoordinationPlan,
+)
+from twinklr.core.sequencer.timing import TimeRef
+from twinklr.core.sequencer.vocabulary.timing import TimeRefKind
+
+from .conftest import DEFAULT_THEME
 
 
 @pytest.fixture
@@ -122,6 +124,7 @@ def sample_section_plan() -> SectionCoordinationPlan:
     """Sample valid section coordination plan."""
     return SectionCoordinationPlan(
         section_id="verse_1",
+        theme=DEFAULT_THEME,
         lane_plans=[
             LanePlan(
                 lane=LaneKind.ACCENT,
@@ -188,6 +191,7 @@ class TestGroupPlannerOrchestrator:
         # Validator should catch unknown templates
         invalid_plan = SectionCoordinationPlan(
             section_id="verse_1",
+            theme=DEFAULT_THEME,
             lane_plans=[
                 LanePlan(
                     lane=LaneKind.ACCENT,

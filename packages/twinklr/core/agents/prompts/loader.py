@@ -103,6 +103,9 @@ class PromptPackLoader:
     def load_and_render(self, pack_name: str, variables: dict[str, Any]) -> dict[str, Any]:
         """Load and render prompt pack with variables.
 
+        Supports refinement prompts: if `iteration > 0` in variables and
+        `user_refinement.j2` exists, it will be used instead of `user.j2`.
+
         Args:
             pack_name: Name of the prompt pack directory
             variables: Variables for template rendering
@@ -114,8 +117,8 @@ class PromptPackLoader:
             LoadError: If loading fails
             RenderError: If rendering fails
         """
-        # Load templates
-        prompts = self.load(pack_name)
+        # Load templates (with refinement support)
+        prompts = self.load_with_refinement(pack_name, variables)
 
         # Render templates
         rendered: dict[str, Any] = {}
@@ -134,3 +137,80 @@ class PromptPackLoader:
             rendered["examples"] = prompts["examples"]
 
         return rendered
+
+    def load_with_refinement(self, pack_name: str, variables: dict[str, Any]) -> dict[str, Any]:
+        """Load prompt pack with refinement template support.
+
+        If `iteration > 0` is in variables and `user_refinement.j2` exists,
+        it will be loaded instead of `user.j2`. This allows agents to use
+        a more concise refinement prompt on subsequent iterations.
+
+        Supported refinement templates:
+        - user_refinement.j2: Used instead of user.j2 on iteration 2+
+
+        Args:
+            pack_name: Name of the prompt pack directory
+            variables: Variables (checked for iteration > 0)
+
+        Returns:
+            Dict with prompt components
+
+        Raises:
+            LoadError: If pack doesn't exist or required files missing
+        """
+        pack_dir = self.base_path / pack_name
+
+        if not pack_dir.exists() or not pack_dir.is_dir():
+            raise LoadError(f"Prompt pack '{pack_name}' does not exist at {pack_dir}")
+
+        prompts: dict[str, Any] = {}
+
+        # Load system prompt (required)
+        system_path = pack_dir / "system.j2"
+        if not system_path.exists():
+            raise LoadError(
+                f"Prompt pack '{pack_name}' missing required system.j2 at {system_path}"
+            )
+
+        prompts["system"] = system_path.read_text()
+
+        # Load developer prompt (optional)
+        developer_path = pack_dir / "developer.j2"
+        if developer_path.exists():
+            prompts["developer"] = developer_path.read_text()
+
+        # Load user prompt with refinement support
+        # Check if we're in a refinement iteration (iteration > 0)
+        iteration = variables.get("iteration", 0)
+        is_refinement = iteration > 0
+
+        user_refinement_path = pack_dir / "user_refinement.j2"
+        user_path = pack_dir / "user.j2"
+
+        if is_refinement and user_refinement_path.exists():
+            # Use refinement template for iteration 2+
+            prompts["user"] = user_refinement_path.read_text()
+            logger.debug(
+                f"Using user_refinement.j2 for pack '{pack_name}' (iteration {iteration + 1})"
+            )
+        elif user_path.exists():
+            # Use standard user template
+            prompts["user"] = user_path.read_text()
+
+        # Load examples (optional)
+        examples_path = pack_dir / "examples.jsonl"
+        if examples_path.exists():
+            try:
+                examples = []
+                for line in examples_path.read_text().strip().split("\n"):
+                    if line.strip():
+                        examples.append(json.loads(line))
+                prompts["examples"] = examples
+            except json.JSONDecodeError as e:
+                raise LoadError(
+                    f"Invalid JSON in examples.jsonl for pack '{pack_name}': {e}"
+                ) from e
+
+        logger.debug(f"Loaded prompt pack '{pack_name}': {list(prompts.keys())}")
+
+        return prompts

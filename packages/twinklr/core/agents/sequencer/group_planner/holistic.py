@@ -15,14 +15,14 @@ from pydantic import BaseModel, ConfigDict, Field
 from twinklr.core.agents.issues import IssueSeverity
 from twinklr.core.agents.logging import LLMCallLogger, NullLLMCallLogger
 from twinklr.core.agents.providers.base import LLMProvider
-from twinklr.core.agents.sequencer.group_planner.models import (
-    DisplayGraph,
-    GroupPlanSet,
-)
 from twinklr.core.agents.shared.judge.models import VerdictStatus
 from twinklr.core.agents.spec import AgentMode, AgentSpec
 from twinklr.core.agents.taxonomy_utils import get_taxonomy_dict
 from twinklr.core.sequencer.templates.group.catalog import TemplateCatalog
+from twinklr.core.sequencer.templates.group.models import (
+    DisplayGraph,
+    GroupPlanSet,
+)
 
 logger = logging.getLogger(__name__)
 

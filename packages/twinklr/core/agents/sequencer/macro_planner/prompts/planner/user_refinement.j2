@@ -1,0 +1,76 @@
+{#
+MacroPlanner User Prompt - REFINEMENT ONLY
+Used for iteration 2+ to avoid resending full context.
+References existing conversation context (song, display, structure).
+
+Token Optimization: Reduced context on refinement iterations.
+#}
+# Refinement Request: MacroPlan
+
+## Iteration {{ iteration + 1 }} Feedback
+
+{{ feedback }}
+
+## Key Reminders (from initial context)
+
+- **Song**: {{ audio_profile.song_identity.title or "Untitled" }} by {{ audio_profile.song_identity.artist or "Unknown" }}
+- **Duration**: {{ (audio_profile.song_identity.duration_ms / 1000) | round(1) }}s
+- **BPM**: {{ audio_profile.song_identity.bpm | round(1) }}
+- **Sections**: {{ audio_profile.structure.sections | length }}
+- **Overall Energy**: {{ audio_profile.energy_profile.macro_energy.value }}
+
+{% if revision_request %}
+## Revision Priority: {{ revision_request.priority }}
+
+{% if revision_request.focus_areas %}
+**Focus Areas:** {{ revision_request.focus_areas | join(", ") }}
+{% endif %}
+
+{% if revision_request.specific_fixes %}
+**Fixes Required:**
+{% for fix in revision_request.specific_fixes[:10] %}
+- {{ fix }}
+{% endfor %}
+{% if revision_request.specific_fixes | length > 10 %}
+- ... and {{ revision_request.specific_fixes | length - 10 }} more issues
+{% endif %}
+{% endif %}
+
+{% if revision_request.avoid %}
+**Avoid:**
+{% for item in revision_request.avoid %}
+- {{ item }}
+{% endfor %}
+{% endif %}
+{% endif %}
+
+## Section Structure (Quick Reference)
+
+{% for section in audio_profile.structure.sections %}
+- **{{ section.name }}** ({{ section.section_id }}) - {{ (section.start_ms / 1000) | round(1) }}s to {{ (section.end_ms / 1000) | round(1) }}s
+{% endfor %}
+
+## Theme Catalog (Allowed IDs)
+
+Use only these theme_ids (do not invent):
+{% for t in theme_catalog %}
+- {{ t.theme_id }}
+{% endfor %}
+
+## Critical Reminders
+
+1. **Theme Selection**: Use ONLY theme_ids from the catalog above
+2. **Section Coverage**: Plan all {{ audio_profile.structure.sections | length }} sections
+3. **Layer Architecture**: Maintain proper BASE/RHYTHM/ACCENT structure
+4. **Story Coherence**: Keep global theme consistent across sections
+5. **Schema**: Return valid MacroPlan JSON per developer prompt
+
+## Instructions
+
+1. Address ALL ERROR severity issues first
+2. Keep structure that worked - only fix flagged issues
+3. Maintain global story coherence while addressing feedback
+4. Do not change global_story.theme unless feedback explicitly requests it
+5. Return complete revised MacroPlan
+
+Remember: Bold impact, main character energy, coordinated wow moments!

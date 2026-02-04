@@ -3,11 +3,6 @@
 from pydantic import ValidationError
 import pytest
 
-from twinklr.core.sequencer.templates.assets.enums import (
-    AssetTemplateType,
-    BackgroundMode,
-    MatrixAspect,
-)
 from twinklr.core.sequencer.templates.assets.models import (
     AssetTemplate,
     GIFDefaults,
@@ -15,6 +10,11 @@ from twinklr.core.sequencer.templates.assets.models import (
     PNGDefaults,
     PromptParts,
     PromptPolicy,
+)
+from twinklr.core.sequencer.vocabulary import (
+    AssetTemplateType,
+    BackgroundMode,
+    MatrixAspect,
 )
 
 

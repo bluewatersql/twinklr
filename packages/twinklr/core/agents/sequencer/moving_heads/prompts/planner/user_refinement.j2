@@ -13,14 +13,38 @@ Token Optimization: ~80% reduction vs full context on refinement iterations.
 
 ## Key Reminders (from initial context)
 
-- **Song**: {{ song_title }}{% if song_artist %} by {{ song_artist }}{% endif %}
+- **Song**: {{ song_title | default('Unknown', true) }}{% if song_artist %} by {{ song_artist }}{% endif %}
+- **Tempo**: {{ tempo | default(120, true) }} BPM | **Time Signature**: {{ time_signature | default('4/4', true) }}
+- **Total Bars**: {{ total_bars | default(0, true) }}
+- **Fixtures**: {{ fixture_count | default(0, true) }} moving heads
+{% if available_templates is defined %}
+- **Templates Available**: {{ available_templates | length }}
+{% endif %}
 
-- **Tempo**: {{ tempo }} BPM | **Time Signature**: {{ time_signature }}
-- **Total Bars**: {{ total_bars }}
-- **Fixtures**: {{ fixture_count }} moving heads
-- **Templates Available**: {{ template_count }}
+{% if revision_request %}
+## Revision Priority: {{ revision_request.priority }}
 
-{% if revision_focus %}
+{% if revision_request.focus_areas %}
+**Focus Areas:** {{ revision_request.focus_areas | join(", ") }}
+{% endif %}
+
+{% if revision_request.specific_fixes %}
+**Fixes Required:**
+{% for fix in revision_request.specific_fixes[:10] %}
+- {{ fix }}
+{% endfor %}
+{% if revision_request.specific_fixes | length > 10 %}
+- ... and {{ revision_request.specific_fixes | length - 10 }} more issues
+{% endif %}
+{% endif %}
+
+{% if revision_request.avoid %}
+**Avoid:**
+{% for item in revision_request.avoid %}
+- {{ item }}
+{% endfor %}
+{% endif %}
+{% elif revision_focus %}
 ## Revision Focus
 
 **Priority Issues to Address:**
@@ -40,19 +64,25 @@ The following aspects were praised in your previous plan:
 Preserve these elements while addressing the feedback above.
 {% endif %}
 
+{% if macro_plan is defined and macro_plan %}
+## Macro Strategy (Quick Reference)
+
+{% for mp in macro_plan %}
+- **{{ mp.section_id }}**: {{ mp.energy_target }} energy, {{ mp.motion_density }} motion
+{% endfor %}
+{% endif %}
+
 ## Critical Reminders
 
 1. **Template Selection**: Use ONLY templates from the library provided in iteration 1
-2. **Bar Numbering**: 1-indexed (first bar = 1, last bar = total_bars)
+2. **Bar Numbering**: 1-indexed (first bar = 1, last bar = {{ total_bars }})
 3. **Section Coverage**: Cover all sections from bar 1 to bar {{ total_bars }}
 4. **Segmentation**: Default to 1 template per section; segment only when musically justified
 5. **Schema**: Return valid ChoreographyPlan JSON per developer prompt
 
 ## Instructions
 
-1. **Address ALL feedback** - specifically issues marked as errors
-2. **Preserve strengths** - keep what worked in your previous plan
-3. **Maintain coverage** - ensure plan covers bars 1 through {{ total_bars }}
-4. **Justify changes** - explain significant alterations in section reasoning fields
-
-Return the complete revised ChoreographyPlan.
+1. Address ALL ERROR severity issues first
+2. Keep structure that worked - only fix flagged issues
+3. Ensure plan covers bars 1 through {{ total_bars }}
+4. Return complete revised ChoreographyPlan

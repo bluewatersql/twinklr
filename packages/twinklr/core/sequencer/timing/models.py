@@ -9,6 +9,7 @@ from __future__ import annotations
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from twinklr.core.sequencer.models.enum import QuantizeMode, TimingMode
+from twinklr.core.sequencer.vocabulary.timing import TimeRefKind
 
 
 class MusicalTiming(BaseModel):
@@ -62,4 +63,49 @@ class MusicalTiming(BaseModel):
             if self.duration_ms is None:
                 raise ValueError("duration_ms required in ABSOLUTE_MS mode")
 
+        return self
+
+
+class TimeRef(BaseModel):
+    """Canonical time reference for all authored timing.
+
+    Supports two modes:
+    - BAR_BEAT: (bar, beat, beat_frac) with optional offset_ms nudge
+    - MS: Absolute milliseconds (offset_ms required, bar/beat must be None)
+
+    Attributes:
+        kind: Type of time reference (BAR_BEAT or MS).
+        bar: Bar number (1-indexed, required for BAR_BEAT).
+        beat: Beat number within bar (1-indexed, required for BAR_BEAT).
+        beat_frac: Fractional beat position (0.0-1.0).
+        offset_ms: Millisecond offset (fine nudge for BAR_BEAT, required for MS).
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    kind: TimeRefKind
+
+    # BAR_BEAT fields
+    bar: int | None = Field(default=None, ge=1)
+    beat: int | None = Field(default=None, ge=1)
+    beat_frac: float = Field(default=0.0, ge=0.0, le=1.0)
+
+    # Fine nudge (BAR_BEAT) or required absolute offset (MS)
+    offset_ms: int | None = None
+
+    @model_validator(mode="after")
+    def _validate_kind_fields(self) -> TimeRef:
+        """Validate fields match the kind."""
+        if self.kind == TimeRefKind.BAR_BEAT:
+            if self.bar is None:
+                raise ValueError("TimeRef(kind=BAR_BEAT): bar is required")
+            if self.beat is None:
+                raise ValueError("TimeRef(kind=BAR_BEAT): beat is required")
+        elif self.kind == TimeRefKind.MS:
+            if self.offset_ms is None:
+                raise ValueError("TimeRef(kind=MS): offset_ms is required")
+            if self.bar is not None:
+                raise ValueError("TimeRef(kind=MS): bar must be None")
+            if self.beat is not None:
+                raise ValueError("TimeRef(kind=MS): beat must be None")
         return self

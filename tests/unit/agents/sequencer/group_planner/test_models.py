@@ -7,7 +7,11 @@ from __future__ import annotations
 
 import pytest
 
-from twinklr.core.agents.sequencer.group_planner.models import (
+from twinklr.core.sequencer.templates.group.catalog import (
+    TemplateCatalog,
+    TemplateCatalogEntry,
+)
+from twinklr.core.sequencer.templates.group.models import (
     CoordinationConfig,
     CoordinationMode,
     CoordinationPlan,
@@ -23,10 +27,8 @@ from twinklr.core.agents.sequencer.group_planner.models import (
     TimeRef,
     TimeRefKind,
 )
-from twinklr.core.sequencer.templates.group.catalog import (
-    TemplateCatalog,
-    TemplateCatalogEntry,
-)
+
+from .conftest import DEFAULT_THEME
 
 
 class TestTimeRef:
@@ -275,6 +277,7 @@ class TestSectionCoordinationPlan:
         """SectionCoordinationPlan contains lane plans for a section."""
         section_plan = SectionCoordinationPlan(
             section_id="verse_1",
+            theme=DEFAULT_THEME,
             lane_plans=[
                 LanePlan(
                     lane=LaneKind.BASE,

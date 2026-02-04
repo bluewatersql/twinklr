@@ -3,20 +3,20 @@
 Signature moment templates for high-impact sections.
 """
 
-from twinklr.core.sequencer.templates.group.enums import (
-    ColorMode,
-    GroupTemplateType,
-    GroupVisualIntent,
-    LayerRole,
-    MotionVerb,
-    ProjectionIntent,
-)
 from twinklr.core.sequencer.templates.group.library import register_group_template
 from twinklr.core.sequencer.templates.group.models import (
     GroupPlanTemplate,
     LayerRecipe,
     ProjectionSpec,
     TimingHints,
+)
+from twinklr.core.sequencer.vocabulary import (
+    ColorMode,
+    GroupTemplateType,
+    GroupVisualIntent,
+    MotionVerb,
+    ProjectionIntent,
+    VisualDepth,
 )
 
 
@@ -35,7 +35,7 @@ def make_gtpl_special_chorus_signature_a() -> GroupPlanTemplate:
         timing=TimingHints(bars_min=4, bars_max=16),
         layer_recipe=[
             LayerRecipe(
-                layer=LayerRole.FOREGROUND,
+                layer=VisualDepth.FOREGROUND,
                 motifs=["all-on", "bright", "energetic"],
                 visual_intent=GroupVisualIntent.ABSTRACT,
                 motion=[MotionVerb.PULSE],
@@ -63,7 +63,7 @@ def make_gtpl_special_chorus_signature_b() -> GroupPlanTemplate:
         timing=TimingHints(bars_min=4, bars_max=16),
         layer_recipe=[
             LayerRecipe(
-                layer=LayerRole.FOREGROUND,
+                layer=VisualDepth.FOREGROUND,
                 motifs=["rhythmic", "pulse", "accents"],
                 visual_intent=GroupVisualIntent.ABSTRACT,
                 motion=[MotionVerb.PULSE, MotionVerb.SPARKLE],
@@ -92,7 +92,7 @@ def make_gtpl_special_drop_freeze() -> GroupPlanTemplate:
         timing=TimingHints(bars_min=1, bars_max=4),
         layer_recipe=[
             LayerRecipe(
-                layer=LayerRole.FOREGROUND,
+                layer=VisualDepth.FOREGROUND,
                 motifs=["freeze", "drop", "explosion"],
                 visual_intent=GroupVisualIntent.ABSTRACT,
                 motion=[MotionVerb.PULSE, MotionVerb.RIPPLE],
@@ -120,7 +120,7 @@ def make_gtpl_special_drop_explode() -> GroupPlanTemplate:
         timing=TimingHints(bars_min=1, bars_max=2),
         layer_recipe=[
             LayerRecipe(
-                layer=LayerRole.FOREGROUND,
+                layer=VisualDepth.FOREGROUND,
                 motifs=["explosion", "drop", "impact"],
                 visual_intent=GroupVisualIntent.ABSTRACT,
                 motion=[MotionVerb.RIPPLE, MotionVerb.PULSE],
@@ -149,7 +149,7 @@ def make_gtpl_special_bridge_sparse() -> GroupPlanTemplate:
         timing=TimingHints(bars_min=4, bars_max=16),
         layer_recipe=[
             LayerRecipe(
-                layer=LayerRole.BACKGROUND,
+                layer=VisualDepth.BACKGROUND,
                 motifs=["sparse", "minimal", "subtle"],
                 visual_intent=GroupVisualIntent.ABSTRACT,
                 motion=[MotionVerb.FADE],
@@ -177,7 +177,7 @@ def make_gtpl_special_bridge_moody() -> GroupPlanTemplate:
         timing=TimingHints(bars_min=4, bars_max=16),
         layer_recipe=[
             LayerRecipe(
-                layer=LayerRole.BACKGROUND,
+                layer=VisualDepth.BACKGROUND,
                 motifs=["moody", "atmospheric", "subtle"],
                 visual_intent=GroupVisualIntent.ABSTRACT,
                 motion=[MotionVerb.SHIMMER, MotionVerb.FADE],
@@ -206,7 +206,7 @@ def make_gtpl_special_finale_ramp() -> GroupPlanTemplate:
         timing=TimingHints(bars_min=4, bars_max=16),
         layer_recipe=[
             LayerRecipe(
-                layer=LayerRole.FOREGROUND,
+                layer=VisualDepth.FOREGROUND,
                 motifs=["ramp", "crescendo", "maximum"],
                 visual_intent=GroupVisualIntent.ABSTRACT,
                 motion=[MotionVerb.PULSE, MotionVerb.RIPPLE],
@@ -234,7 +234,7 @@ def make_gtpl_special_finale_strobe_safe() -> GroupPlanTemplate:
         timing=TimingHints(bars_min=2, bars_max=8),
         layer_recipe=[
             LayerRecipe(
-                layer=LayerRole.FOREGROUND,
+                layer=VisualDepth.FOREGROUND,
                 motifs=["strobe", "build", "climax"],
                 visual_intent=GroupVisualIntent.ABSTRACT,
                 motion=[MotionVerb.STROBE, MotionVerb.PULSE],
@@ -263,7 +263,7 @@ def make_gtpl_special_polar_spiral() -> GroupPlanTemplate:
         timing=TimingHints(bars_min=2, bars_max=16),
         layer_recipe=[
             LayerRecipe(
-                layer=LayerRole.FOREGROUND,
+                layer=VisualDepth.FOREGROUND,
                 motifs=["spiral", "polar", "rotation"],
                 visual_intent=GroupVisualIntent.GEOMETRIC,
                 motion=[MotionVerb.ROLL],
@@ -291,7 +291,7 @@ def make_gtpl_special_polar_starburst() -> GroupPlanTemplate:
         timing=TimingHints(bars_min=1, bars_max=8),
         layer_recipe=[
             LayerRecipe(
-                layer=LayerRole.FOREGROUND,
+                layer=VisualDepth.FOREGROUND,
                 motifs=["starburst", "radial", "explosion"],
                 visual_intent=GroupVisualIntent.GEOMETRIC,
                 motion=[MotionVerb.RIPPLE, MotionVerb.PULSE],

@@ -5,11 +5,11 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 
-from twinklr.core.agents.feedback import FeedbackManager
 from twinklr.core.agents.shared.judge.controller import (
     IterationConfig,
     StandardIterationController,
 )
+from twinklr.core.agents.shared.judge.feedback import FeedbackManager
 from twinklr.core.agents.shared.judge.models import (
     JudgeVerdict,
 )

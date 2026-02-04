@@ -13,6 +13,9 @@ if TYPE_CHECKING:
     from twinklr.core.pipeline.context import PipelineContext
     from twinklr.core.pipeline.result import StageResult
 
+from twinklr.core.agents.sequencer.group_planner.holistic import HolisticEvaluator
+from twinklr.core.pipeline.result import failure_result
+
 logger = logging.getLogger(__name__)
 
 
@@ -71,8 +74,6 @@ class HolisticEvaluatorStage:
             - Adds "holistic_status" to context.metrics
             - Adds "holistic_issues_count" to context.metrics
         """
-        from twinklr.core.agents.sequencer.group_planner.holistic import HolisticEvaluator
-        from twinklr.core.pipeline.result import failure_result
 
         try:
             logger.debug(f"Running holistic evaluation on {len(input.section_plans)} sections")

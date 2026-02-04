@@ -44,11 +44,16 @@ Available target roles:
 
 ## Global Story
 
-**Theme:** {{ macro_plan.global_story.theme }}
+**Theme ID:** {{ macro_plan.global_story.theme.theme_id }}
+**Theme Scope:** {{ macro_plan.global_story.theme.scope.value if macro_plan.global_story.theme.scope is defined else macro_plan.global_story.theme.scope }}
+**Theme Tags:** {{ macro_plan.global_story.theme.tags | join(', ') if macro_plan.global_story.theme.tags else "None" }}
+**Theme Palette Override:** {{ macro_plan.global_story.theme.palette_id or "None" }}
 
+**Story Notes:** {{ macro_plan.global_story.story_notes }}
 **Motifs:** {{ macro_plan.global_story.motifs | join(', ') }}
 **Pacing Notes:** {{ macro_plan.global_story.pacing_notes }}
 **Color Story:** {{ macro_plan.global_story.color_story }}
+
 
 ## Layering Plan
 
@@ -67,6 +72,9 @@ Available target roles:
 {% for section in macro_plan.section_plans %}
 ### {{ section.section.name }} ({{ (section.section.start_ms / 1000) | round(1) }}s - {{ (section.section.end_ms / 1000) | round(1) }}s)
 
+- **Theme ID:** {{ section.theme.theme_id }}
+- **Theme Tags:** {{ section.theme.tags | join(', ') if section.theme.tags else 'None' }}
+- **Theme Palette Override:** {{ section.theme.palette_id or 'None' }}
 - **Energy Target:** {{ section.energy_target.value }}
 - **Motion Density:** {{ section.motion_density.value }}
 - **Choreography Style:** {{ section.choreography_style.value }}
@@ -75,17 +83,6 @@ Available target roles:
 - **Notes:** {{ section.notes }}
 
 {% endfor %}
-
-## Asset Requirements
-
-{% if macro_plan.asset_requirements %}
-**Required Assets:**
-{% for asset in macro_plan.asset_requirements %}
-- {{ asset }}
-{% endfor %}
-{% else %}
-No custom assets required.
-{% endif %}
 
 ---
 

@@ -1,6 +1,6 @@
 """Tests for asset template enums."""
 
-from twinklr.core.sequencer.templates.assets.enums import (
+from twinklr.core.sequencer.vocabulary import (
     AssetTemplateType,
     BackgroundMode,
     MatrixAspect,

@@ -1,10 +1,47 @@
-"""Enums for asset template system.
+"""Template enums - template type vocabulary.
 
-Asset templates define prompt-driven PNG/GIF generation specifications
-for visual content used in group choreography.
+Defines template types for group and asset templates.
 """
 
 from enum import Enum
+
+
+class GroupTemplateType(str, Enum):
+    """Template type by lane.
+
+    Defines which lane a template belongs to in the choreography system.
+
+    Attributes:
+        BASE: Foundation layer (calm, continuous background).
+        RHYTHM: Beat-driven motion layer.
+        ACCENT: Focal punctuation layer (hits, accents).
+        TRANSITION: Section transition templates.
+        SPECIAL: Signature moments (chorus, drop, bridge).
+    """
+
+    BASE = "BASE"
+    RHYTHM = "RHYTHM"
+    ACCENT = "ACCENT"
+    TRANSITION = "TRANSITION"
+    SPECIAL = "SPECIAL"
+
+
+class AssetSlotType(str, Enum):
+    """Asset slot types for template requirements.
+
+    Defines the type of visual asset required by a template.
+
+    Attributes:
+        PNG_OPAQUE: Opaque PNG image (backgrounds).
+        PNG_TRANSPARENT: Transparent PNG (cutouts, icons).
+        PNG_TILE: Seamless tileable PNG texture.
+        GIF_OVERLAY: Animated GIF overlay.
+    """
+
+    PNG_OPAQUE = "PNG_OPAQUE"
+    PNG_TRANSPARENT = "PNG_TRANSPARENT"
+    PNG_TILE = "PNG_TILE"
+    GIF_OVERLAY = "GIF_OVERLAY"
 
 
 class AssetTemplateType(str, Enum):

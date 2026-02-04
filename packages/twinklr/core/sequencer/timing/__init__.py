@@ -1,6 +1,18 @@
-"""Timing and quantization infrastructure."""
+"""Timing domain - time reference models.
 
-from twinklr.core.sequencer.timing.beat_grid import BeatGrid
-from twinklr.core.sequencer.timing.resolver import TimeResolver
+Models for time references and timing specifications.
+"""
 
-__all__ = ["BeatGrid", "TimeResolver"]
+from twinklr.core.sequencer.timing.models import (
+    MusicalTiming,
+    TimeRef,
+)
+from twinklr.core.sequencer.vocabulary.timing import (
+    TimeRefKind,
+)
+
+__all__ = [
+    "MusicalTiming",
+    "TimeRef",
+    "TimeRefKind",
+]

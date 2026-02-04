@@ -1,6 +1,6 @@
 """Tests for feedback manager."""
 
-from twinklr.core.agents.feedback import (
+from twinklr.core.agents.shared.judge.feedback import (
     FeedbackEntry,
     FeedbackManager,
     FeedbackType,

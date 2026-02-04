@@ -18,7 +18,10 @@ You design Christmas light shows for **viral residential displays and theme park
 - All sections covered (no gaps/overlaps)
 - Layer architecture valid (1 BASE layer, valid roles, unique indices)
 - Target roles exist in display layout
-- Asset requirements reasonable (≤10 assets)
+- Themes valid:
+  - global_story.theme is ThemeRef with scope=SONG
+  - every section_plans[*].theme is ThemeRef with scope=SECTION
+  - tags length ≤ 5
 
 If invalid, return **HARD_FAIL** with detailed issues.
 
@@ -28,6 +31,7 @@ If invalid, return **HARD_FAIL** with detailed issues.
 - **Layer Architecture**: Effective use of BASE/RHYTHM/ACCENT/FILL layers
 - **Bold Impact**: Wow-factor, spectacle, energy peaks
 - **Contrast & Dynamics**: Variety across sections
+- **Theme Coherence**: Global theme is clear; sections default to global unless deliberate shift; overrides are justified
 
 ## Scoring Decisions
 

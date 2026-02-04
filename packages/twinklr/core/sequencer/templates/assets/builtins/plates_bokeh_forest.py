@@ -1,6 +1,5 @@
 """Background plate asset templates - Bokeh and Forest families."""
 
-from twinklr.core.sequencer.templates.assets.enums import AssetTemplateType, MatrixAspect
 from twinklr.core.sequencer.templates.assets.library import register_asset_template
 from twinklr.core.sequencer.templates.assets.models import (
     AssetTemplate,
@@ -9,6 +8,7 @@ from twinklr.core.sequencer.templates.assets.models import (
     PromptParts,
     PromptPolicy,
 )
+from twinklr.core.sequencer.vocabulary import AssetTemplateType, MatrixAspect
 
 
 @register_asset_template()

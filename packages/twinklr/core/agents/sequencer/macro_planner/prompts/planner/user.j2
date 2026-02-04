@@ -1,6 +1,7 @@
 {#
-MacroPlanner User Prompt
-Provides song details, display layout, and task instructions
+MacroPlanner User Prompt - INITIAL PLANNING
+Provides song details, display layout, and task instructions.
+Refinement iterations (2+) use user_refinement.j2 instead.
 #}
 # Song Information
 
@@ -31,6 +32,15 @@ Peak timings:
 ... and {{ audio_profile.energy_profile.peaks | length - 5 }} more peaks
 {% endif %}
 {% endif %}
+
+## Theme Catalog (Allowed IDs)
+
+Use only these theme_ids (do not invent). Prefer using the global theme for most sections.
+
+{% for t in theme_catalog %}
+- {{ t.theme_id }} — {{ t.title }}
+{% endfor %}
+
 
 ## Creative Guidance
 
@@ -110,16 +120,6 @@ Available target roles in this display:
 - **{{ group.role_key }}** ({{ group.group_type }}) - {{ group.model_count }} models
 {% endfor %}
 
-{% if iteration is defined and iteration > 1 %}
----
-
-# Iteration {{ iteration }} - Refinement Feedback
-
-{{ feedback }}
-
-**Instructions:** Address the feedback above while maintaining the global story coherence.
-
-{% endif %}
 # Your Task
 
 Create a strategic MacroPlan for this Christmas light show that:
@@ -127,6 +127,6 @@ Create a strategic MacroPlan for this Christmas light show that:
 1. **Tells a story** - Define global theme, motifs, and pacing
 2. **Plans each section** - Energy targets, choreography style, focus targets
 3. **Designs layer architecture** - BASE, RHYTHM, ACCENT layers with proper blend modes
-4. **Specifies assets** - List any required imagery assets (snowflakes, stars, etc.)
+4. **Sets themes** - Provide global_story.theme (SONG) and section_plans[*].theme (SECTION) for downstream asset generation
 
 Remember: Bold impact, main character energy, coordinated wow moments!

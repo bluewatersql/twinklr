@@ -4,12 +4,12 @@ from __future__ import annotations
 
 import pytest
 
-from twinklr.core.agents.sequencer.group_planner.models import TimeRef, TimeRefKind
 from twinklr.core.agents.sequencer.group_planner.timing import (
     BarInfo,
     SectionBounds,
     TimingContext,
 )
+from twinklr.core.sequencer.templates.group.models import TimeRef, TimeRefKind
 
 
 class TestTimingContext:

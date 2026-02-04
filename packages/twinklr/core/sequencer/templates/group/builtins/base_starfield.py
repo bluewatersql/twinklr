@@ -3,20 +3,20 @@
 Calm, continuous foundation layers for ambient background.
 """
 
-from twinklr.core.sequencer.templates.group.enums import (
-    ColorMode,
-    GroupTemplateType,
-    GroupVisualIntent,
-    LayerRole,
-    MotionVerb,
-    ProjectionIntent,
-)
 from twinklr.core.sequencer.templates.group.library import register_group_template
 from twinklr.core.sequencer.templates.group.models import (
     GroupPlanTemplate,
     LayerRecipe,
     ProjectionSpec,
     TimingHints,
+)
+from twinklr.core.sequencer.vocabulary import (
+    ColorMode,
+    GroupTemplateType,
+    GroupVisualIntent,
+    MotionVerb,
+    ProjectionIntent,
+    VisualDepth,
 )
 
 
@@ -34,7 +34,7 @@ def make_gtpl_base_starfield_slow() -> GroupPlanTemplate:
         timing=TimingHints(bars_min=4, bars_max=64),
         layer_recipe=[
             LayerRecipe(
-                layer=LayerRole.BACKGROUND,
+                layer=VisualDepth.BACKGROUND,
                 motifs=["twinkle", "starfield", "async"],
                 visual_intent=GroupVisualIntent.ABSTRACT,
                 motion=[MotionVerb.TWINKLE],
@@ -62,7 +62,7 @@ def make_gtpl_base_starfield_dense() -> GroupPlanTemplate:
         timing=TimingHints(bars_min=4, bars_max=64),
         layer_recipe=[
             LayerRecipe(
-                layer=LayerRole.BACKGROUND,
+                layer=VisualDepth.BACKGROUND,
                 motifs=["twinkle", "starfield", "async"],
                 visual_intent=GroupVisualIntent.ABSTRACT,
                 motion=[MotionVerb.TWINKLE],

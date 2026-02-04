@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from twinklr.core.agents.sequencer.group_planner.models import TimeRef, TimeRefKind
+from twinklr.core.sequencer.templates.group.models import TimeRef, TimeRefKind
 
 
 class BarInfo(BaseModel):

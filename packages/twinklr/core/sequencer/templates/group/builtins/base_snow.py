@@ -1,19 +1,19 @@
 """BASE lane group templates - Snow Haze family."""
 
-from twinklr.core.sequencer.templates.group.enums import (
-    ColorMode,
-    GroupTemplateType,
-    GroupVisualIntent,
-    LayerRole,
-    MotionVerb,
-    ProjectionIntent,
-)
 from twinklr.core.sequencer.templates.group.library import register_group_template
 from twinklr.core.sequencer.templates.group.models import (
     GroupPlanTemplate,
     LayerRecipe,
     ProjectionSpec,
     TimingHints,
+)
+from twinklr.core.sequencer.vocabulary import (
+    ColorMode,
+    GroupTemplateType,
+    GroupVisualIntent,
+    MotionVerb,
+    ProjectionIntent,
+    VisualDepth,
 )
 
 
@@ -31,7 +31,7 @@ def make_gtpl_base_snow_haze_low() -> GroupPlanTemplate:
         timing=TimingHints(bars_min=4, bars_max=64),
         layer_recipe=[
             LayerRecipe(
-                layer=LayerRole.BACKGROUND,
+                layer=VisualDepth.BACKGROUND,
                 motifs=["snow", "falling", "haze"],
                 visual_intent=GroupVisualIntent.TEXTURE,
                 motion=[MotionVerb.FADE],
@@ -59,7 +59,7 @@ def make_gtpl_base_snow_haze_high() -> GroupPlanTemplate:
         timing=TimingHints(bars_min=4, bars_max=64),
         layer_recipe=[
             LayerRecipe(
-                layer=LayerRole.BACKGROUND,
+                layer=VisualDepth.BACKGROUND,
                 motifs=["snow", "falling", "drift"],
                 visual_intent=GroupVisualIntent.TEXTURE,
                 motion=[MotionVerb.FADE],

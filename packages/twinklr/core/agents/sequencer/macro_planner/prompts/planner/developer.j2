@@ -39,6 +39,24 @@ Return valid JSON matching this schema:
 **MotionDensity:** SPARSE, MED, BUSY
 {% endif %}
 
+## Theme Rules (Critical)
+
+1. **Global theme is required**:
+   - `global_story.theme` must be a ThemeRef with `scope=SONG`.
+
+2. **Every section must include a ThemeRef**:
+   - `section_plans[*].theme.scope` must be `SECTION`.
+   - Keep `section_plans[*].theme.tags` to **0–5**.
+
+3. **Defaulting rule (behavioral)**:
+   - By default, set each section theme to match the global theme:
+     - `section_plans[*].theme.theme_id == global_story.theme.theme_id`
+   - Only change a section’s `theme_id` when there is a deliberate shift (breakdown/bridge/drop/genre/mood pivot).
+   - When you override `theme_id`, add **1–2** tags in `section_plans[*].theme.tags` to justify the shift (e.g., `setting.calm`, `style.minimal`).
+
+4. **No asset filenames**:
+   - Do NOT output asset filenames in MacroPlan. Downstream AssetPlanner derives assets from templates/slots.
+
 ## Critical Rules (Violations Cause Validation Failures)
 
 1. **Exactly one BASE layer** with NORMAL blend mode
@@ -58,9 +76,3 @@ Return valid JSON matching this schema:
 3. **Energy variety**: Vary energy targets across sections (not all the same)
 4. **Motion density variety**: Mix SPARSE/MED/BUSY across sections (especially with 4+ sections)
 5. **Choreography style**: Consider mixing IMAGERY/ABSTRACT/HYBRID for variety
-
-## Asset Requirements
-
-- File types: .png or .gif only (other extensions fail validation)
-- Keep count ≤10 (more triggers bloat warning)
-- Descriptive names (e.g., "snowflake_burst.png", "star_twinkle.gif")

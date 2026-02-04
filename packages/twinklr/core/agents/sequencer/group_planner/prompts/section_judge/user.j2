@@ -2,6 +2,7 @@
 SectionJudge User Prompt
 Provides section plan and context for evaluation
 #}
+
 # Section Plan to Evaluate
 
 **Section ID:** {{ plan.section_id }}
@@ -16,13 +17,26 @@ Provides section plan and context for evaluation
 **Secondary Targets:** {{ secondary_targets | join(", ") }}
 {% endif %}
 
+## Section Theme
+
+**Theme ID:** {{ plan.theme.theme_id }}
+**Theme Scope:** {{ plan.theme.scope }}
+{% if plan.theme.tags %}
+**Theme Tags:** {{ plan.theme.tags | join(", ") }}
+{% else %}
+**Theme Tags:** None
+{% endif %}
+{% if plan.motif_tags %}
+**Motif Tags:** {{ plan.motif_tags | join(", ") }}
+{% endif %}
+
 ## Section Bounds
 
 **Start:** {{ (start_ms / 1000) | round(1) }}s
 **End:** {{ (end_ms / 1000) | round(1) }}s
 **Duration:** {{ ((end_ms - start_ms) / 1000) | round(1) }}s
 
-## Available Groups
+## Available Groups (by role)
 
 {% for role, group_ids in display_graph.groups_by_role.items() %}
 - **{{ role }}**: {{ group_ids | join(", ") }}
@@ -36,7 +50,7 @@ Provides section plan and context for evaluation
 
 ---
 
-## Plan to Evaluate
+## Plan JSON
 
 ```json
 {{ plan | tojson(indent=2) }}
@@ -44,33 +58,31 @@ Provides section plan and context for evaluation
 
 ---
 
-# Your Task
+# Judge Instructions
 
-Evaluate this SectionCoordinationPlan:
+1) **Technical Validation**
+- template_ids exist and are lane-compatible
+- group_ids exist in display graph
+- timing within section bounds; no invalid durations
+- no within-lane overlaps on same group_id
+- if mode requires expansion (SEQUENCED/CALL_RESPONSE/RIPPLE): window+config must be present and valid
+- theme must be SECTION-scoped; tags <= 5
 
-1. **Technical Validation**:
-   - All template_ids exist in catalog
-   - All group_ids exist in display graph
-   - Timing within section bounds
-   - No within-lane overlaps on same group
-
-2. **Quality Assessment**:
-   - Templates appropriate for lanes and section intent
-   - Coordination modes coherent
-   - Primary targets ({{ primary_focus_targets | join(", ") }}) get proper ACCENT treatment
-   - Energy target ({{ energy_target }}) is reflected
-   - Motion density ({{ motion_density }}) matches complexity
-
----
+2) **Quality Assessment**
+- templates appropriate for lanes + section intent
+- coordination readable + coherent
+- primary targets get meaningful ACCENT treatment
+- energy target reflected in intensity/density choices
+- motion density matches complexity
 
 {% if iteration is defined and iteration > 0 %}
 ## Iteration {{ iteration + 1 }}
 
-This is **iteration {{ iteration + 1 }}**. Previous feedback was provided. Check if issues were addressed, give credit for improvements, and focus on remaining issues.
+Check whether prior issues were addressed. Give credit for improvements and focus on remaining issues.
 {% else %}
 ## First Iteration
 
-This is the **first iteration**. Provide comprehensive feedback to guide refinement.
+Provide comprehensive feedback to guide refinement.
 {% endif %}
 
-Provide your evaluation as a JudgeVerdict.
+Return a JudgeVerdict JSON only.

@@ -10,7 +10,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from twinklr.core.sequencer.templates.assets.enums import (
+from twinklr.core.sequencer.vocabulary import (
     AssetTemplateType,
     BackgroundMode,
     MatrixAspect,
@@ -196,3 +196,16 @@ class AssetTemplate(BaseModel):
         self.negative_hints = sorted({h.strip() for h in self.negative_hints if h.strip()})
 
         return self
+
+
+class AssetRequest(BaseModel):
+    """Asset request from GroupPlanner to Asset Creation Agent."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    request_id: str
+    kind: str  # "image_png", "image_gif", "texture"
+    use_case: str  # "matrix_texture", "sprite", "gobo", etc.
+    style_tags: list[str] = Field(default_factory=list)
+    content_tags: list[str] = Field(default_factory=list)
+    fallback_strategy: str = "use_builtin_if_missing"

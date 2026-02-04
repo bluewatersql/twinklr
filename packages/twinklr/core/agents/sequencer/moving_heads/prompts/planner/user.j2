@@ -1,60 +1,10 @@
 {#
-MovingHead Planner User Prompt
-Provides full context on iteration 1, minimal refinement context on iteration 2+
+MovingHead Planner User Prompt - INITIAL PLANNING
+Provides full context for iteration 1.
+Refinement iterations (2+) use user_refinement.j2 instead.
 
 V2 Migration: Uses structured context from MovingHeadPlanningContext
-Token Optimization: Refinement mode reduces prompt size by ~80%
 #}
-{% if iteration is defined and iteration > 0 %}
-{# ============== REFINEMENT MODE (Iteration 2+) ============== #}
-{# Minimal context - conversation already has full context from iteration 1 #}
-
-# Refinement Request: Choreography Plan (Iteration {{ iteration + 1 }})
-
-## Feedback to Address
-
-{{ feedback }}
-
-## Key Reminders
-
-- **Song**: {{ song_title | default('Unknown', true) }}{% if song_artist is defined and song_artist %} by {{ song_artist }}{% endif %}
-
-- **Timing**: {{ tempo | default(120, true) }} BPM ({{ time_signature | default('4/4', true) }}), {{ total_bars | default(0, true) }} bars
-- **Fixtures**: {{ fixture_count | default(0, true) }} moving heads
-
-{% if revision_focus is defined and revision_focus %}
-## Priority Issues
-
-{% for issue in revision_focus[:5] %}
-- {{ issue }}
-{% endfor %}
-{% endif %}
-
-{% if macro_plan is defined and macro_plan %}
-## Macro Strategy (Quick Reference)
-
-{% for mp in macro_plan %}
-- **{{ mp.section_id }}**: {{ mp.energy_target }} energy, {{ mp.motion_density }} motion
-{% endfor %}
-{% endif %}
-
-## Critical Rules
-
-1. Use ONLY templates from initial context
-2. Bar numbers: 1-indexed (1 to {{ total_bars }})
-3. Cover all sections (no gaps)
-4. Segment only when musically justified
-
-## Instructions
-
-1. Address ALL issues marked as errors
-2. Keep structure that worked - only fix flagged problems
-3. Ensure plan covers bars 1 through {{ total_bars }}
-4. Return complete revised ChoreographyPlan
-
-{% else %}
-{# ============== INITIAL PLANNING (Iteration 1) ============== #}
-{# Full context provided #}
 
 # Choreography Planning Request
 
@@ -185,5 +135,3 @@ For each song section, choose ONE approach:
 - **1-indexed**: First bar = 1, last bar = {{ total_bars }}
 - Plan should cover bar 1 through bar {{ total_bars }}
 - Section bar ranges should align with song structure above
-
-{% endif %}

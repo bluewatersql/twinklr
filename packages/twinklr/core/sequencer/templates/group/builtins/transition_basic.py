@@ -3,20 +3,20 @@
 Section transition templates for smooth scene changes.
 """
 
-from twinklr.core.sequencer.templates.group.enums import (
-    ColorMode,
-    GroupTemplateType,
-    GroupVisualIntent,
-    LayerRole,
-    MotionVerb,
-    ProjectionIntent,
-)
 from twinklr.core.sequencer.templates.group.library import register_group_template
 from twinklr.core.sequencer.templates.group.models import (
     GroupPlanTemplate,
     LayerRecipe,
     ProjectionSpec,
     TimingHints,
+)
+from twinklr.core.sequencer.vocabulary import (
+    ColorMode,
+    GroupTemplateType,
+    GroupVisualIntent,
+    MotionVerb,
+    ProjectionIntent,
+    VisualDepth,
 )
 
 
@@ -35,7 +35,7 @@ def make_gtpl_transition_fade_in() -> GroupPlanTemplate:
         timing=TimingHints(bars_min=1, bars_max=4),
         layer_recipe=[
             LayerRecipe(
-                layer=LayerRole.BACKGROUND,
+                layer=VisualDepth.BACKGROUND,
                 motifs=["fade", "in", "transition"],
                 visual_intent=GroupVisualIntent.ABSTRACT,
                 motion=[MotionVerb.FADE],
@@ -63,7 +63,7 @@ def make_gtpl_transition_fade_out() -> GroupPlanTemplate:
         timing=TimingHints(bars_min=1, bars_max=4),
         layer_recipe=[
             LayerRecipe(
-                layer=LayerRole.BACKGROUND,
+                layer=VisualDepth.BACKGROUND,
                 motifs=["fade", "out", "transition"],
                 visual_intent=GroupVisualIntent.ABSTRACT,
                 motion=[MotionVerb.FADE],
@@ -92,7 +92,7 @@ def make_gtpl_transition_crossfade_soft() -> GroupPlanTemplate:
         timing=TimingHints(bars_min=2, bars_max=4),
         layer_recipe=[
             LayerRecipe(
-                layer=LayerRole.BACKGROUND,
+                layer=VisualDepth.BACKGROUND,
                 motifs=["crossfade", "blend", "soft"],
                 visual_intent=GroupVisualIntent.ABSTRACT,
                 motion=[MotionVerb.FADE],
@@ -120,7 +120,7 @@ def make_gtpl_transition_crossfade_hard() -> GroupPlanTemplate:
         timing=TimingHints(bars_min=1, bars_max=2),
         layer_recipe=[
             LayerRecipe(
-                layer=LayerRole.BACKGROUND,
+                layer=VisualDepth.BACKGROUND,
                 motifs=["crossfade", "fast", "hard"],
                 visual_intent=GroupVisualIntent.ABSTRACT,
                 motion=[MotionVerb.FADE],
@@ -149,7 +149,7 @@ def make_gtpl_transition_wipe_lr() -> GroupPlanTemplate:
         timing=TimingHints(bars_min=1, bars_max=4),
         layer_recipe=[
             LayerRecipe(
-                layer=LayerRole.BACKGROUND,
+                layer=VisualDepth.BACKGROUND,
                 motifs=["wipe", "linear", "lr"],
                 visual_intent=GroupVisualIntent.ABSTRACT,
                 motion=[MotionVerb.WIPE],
@@ -177,7 +177,7 @@ def make_gtpl_transition_wipe_radial() -> GroupPlanTemplate:
         timing=TimingHints(bars_min=1, bars_max=4),
         layer_recipe=[
             LayerRecipe(
-                layer=LayerRole.BACKGROUND,
+                layer=VisualDepth.BACKGROUND,
                 motifs=["wipe", "radial", "expand"],
                 visual_intent=GroupVisualIntent.ABSTRACT,
                 motion=[MotionVerb.WIPE, MotionVerb.RIPPLE],

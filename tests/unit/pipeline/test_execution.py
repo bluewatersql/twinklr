@@ -11,15 +11,18 @@ Tests for execute_step() which handles:
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock, MagicMock
 
 from pydantic import BaseModel
 import pytest
 
-from twinklr.core.caching import CacheKey
 from twinklr.core.pipeline.execution import execute_step
 from twinklr.core.pipeline.result import StageResult
+
+if TYPE_CHECKING:
+    from twinklr.core.caching import CacheKey
+    from twinklr.core.pipeline.result import StageResult
 
 # ============================================================================
 # Test Models

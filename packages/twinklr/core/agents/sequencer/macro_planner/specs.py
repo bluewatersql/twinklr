@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from twinklr.core.agents.sequencer.macro_planner.models import MacroPlan
 from twinklr.core.agents.shared.judge.models import JudgeVerdict
 from twinklr.core.agents.spec import AgentMode, AgentSpec
 from twinklr.core.agents.taxonomy_utils import get_taxonomy_dict
+from twinklr.core.sequencer.planning import MacroPlan
 
 
 def get_planner_spec(

@@ -8,13 +8,6 @@ from twinklr.core.agents.sequencer.group_planner.context import (
     GroupPlanningContext,
     SectionPlanningContext,
 )
-from twinklr.core.agents.sequencer.group_planner.models import (
-    DisplayGraph,
-    DisplayGroup,
-    LaneKind,
-    TimeRef,
-    TimeRefKind,
-)
 from twinklr.core.agents.sequencer.group_planner.timing import (
     BarInfo,
     SectionBounds,
@@ -23,6 +16,13 @@ from twinklr.core.agents.sequencer.group_planner.timing import (
 from twinklr.core.sequencer.templates.group.catalog import (
     TemplateCatalog,
     TemplateCatalogEntry,
+)
+from twinklr.core.sequencer.templates.group.models import (
+    DisplayGraph,
+    DisplayGroup,
+    LaneKind,
+    TimeRef,
+    TimeRefKind,
 )
 
 

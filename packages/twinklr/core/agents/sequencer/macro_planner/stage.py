@@ -9,9 +9,9 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from twinklr.core.agents.sequencer.macro_planner.models import MacroSectionPlan
     from twinklr.core.pipeline.context import PipelineContext
     from twinklr.core.pipeline.result import StageResult
+    from twinklr.core.sequencer.planning import MacroSectionPlan
 
 logger = logging.getLogger(__name__)
 
@@ -106,7 +106,7 @@ class MacroPlannerStage:
 
             def extract_sections(r: Any) -> list[MacroSectionPlan]:
                 """Extract section plans from result (handles both Pydantic model and dict)."""
-                from twinklr.core.agents.sequencer.macro_planner.models import MacroSectionPlan
+                from twinklr.core.sequencer.planning import MacroSectionPlan
 
                 # Handle both IterationResult model and dict from cache
                 if isinstance(r, dict):

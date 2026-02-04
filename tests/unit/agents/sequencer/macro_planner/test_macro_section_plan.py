@@ -4,8 +4,8 @@ from pydantic import ValidationError
 import pytest
 
 from twinklr.core.agents.audio.profile.models import SongSectionRef
-from twinklr.core.agents.sequencer.macro_planner.models import MacroSectionPlan
-from twinklr.core.agents.taxonomy import ChoreographyStyle, EnergyTarget, MotionDensity
+from twinklr.core.sequencer.planning import MacroSectionPlan
+from twinklr.core.sequencer.vocabulary import ChoreographyStyle, EnergyTarget, MotionDensity
 
 
 def test_macro_section_plan_valid():

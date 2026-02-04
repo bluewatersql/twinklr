@@ -7,7 +7,7 @@ that catch common structural and logical issues.
 
 from twinklr.core.agents.audio.profile.models import AudioProfileModel
 from twinklr.core.agents.issues import Issue, IssueSeverity
-from twinklr.core.agents.sequencer.macro_planner.models import MacroPlan
+from twinklr.core.sequencer.planning import MacroPlan
 
 
 class MacroPlanHeuristicValidator:

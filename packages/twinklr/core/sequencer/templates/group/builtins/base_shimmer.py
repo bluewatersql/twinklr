@@ -1,19 +1,19 @@
 """BASE lane group templates - Subtle Shimmer family."""
 
-from twinklr.core.sequencer.templates.group.enums import (
-    ColorMode,
-    GroupTemplateType,
-    GroupVisualIntent,
-    LayerRole,
-    MotionVerb,
-    ProjectionIntent,
-)
 from twinklr.core.sequencer.templates.group.library import register_group_template
 from twinklr.core.sequencer.templates.group.models import (
     GroupPlanTemplate,
     LayerRecipe,
     ProjectionSpec,
     TimingHints,
+)
+from twinklr.core.sequencer.vocabulary import (
+    ColorMode,
+    GroupTemplateType,
+    GroupVisualIntent,
+    MotionVerb,
+    ProjectionIntent,
+    VisualDepth,
 )
 
 
@@ -31,7 +31,7 @@ def make_gtpl_base_shimmer_horizontal() -> GroupPlanTemplate:
         timing=TimingHints(bars_min=8, bars_max=64),
         layer_recipe=[
             LayerRecipe(
-                layer=LayerRole.BACKGROUND,
+                layer=VisualDepth.BACKGROUND,
                 motifs=["shimmer", "sweep", "horizontal"],
                 visual_intent=GroupVisualIntent.ABSTRACT,
                 motion=[MotionVerb.SWEEP],
@@ -59,7 +59,7 @@ def make_gtpl_base_shimmer_radial() -> GroupPlanTemplate:
         timing=TimingHints(bars_min=8, bars_max=64),
         layer_recipe=[
             LayerRecipe(
-                layer=LayerRole.BACKGROUND,
+                layer=VisualDepth.BACKGROUND,
                 motifs=["shimmer", "radial", "pulse"],
                 visual_intent=GroupVisualIntent.ABSTRACT,
                 motion=[MotionVerb.RIPPLE],

@@ -1,19 +1,19 @@
 """RHYTHM lane group templates - Wave, Candy-Cane, Icicle, Meter families."""
 
-from twinklr.core.sequencer.templates.group.enums import (
-    ColorMode,
-    GroupTemplateType,
-    GroupVisualIntent,
-    LayerRole,
-    MotionVerb,
-    ProjectionIntent,
-)
 from twinklr.core.sequencer.templates.group.library import register_group_template
 from twinklr.core.sequencer.templates.group.models import (
     GroupPlanTemplate,
     LayerRecipe,
     ProjectionSpec,
     TimingHints,
+)
+from twinklr.core.sequencer.vocabulary import (
+    ColorMode,
+    GroupTemplateType,
+    GroupVisualIntent,
+    MotionVerb,
+    ProjectionIntent,
+    VisualDepth,
 )
 
 
@@ -32,7 +32,7 @@ def make_gtpl_rhythm_wave_lr() -> GroupPlanTemplate:
         timing=TimingHints(bars_min=2, bars_max=16),
         layer_recipe=[
             LayerRecipe(
-                layer=LayerRole.MIDGROUND,
+                layer=VisualDepth.MIDGROUND,
                 motifs=["wave", "sine", "smooth"],
                 visual_intent=GroupVisualIntent.ABSTRACT,
                 motion=[MotionVerb.WAVE],
@@ -60,7 +60,7 @@ def make_gtpl_rhythm_wave_inout() -> GroupPlanTemplate:
         timing=TimingHints(bars_min=2, bars_max=16),
         layer_recipe=[
             LayerRecipe(
-                layer=LayerRole.MIDGROUND,
+                layer=VisualDepth.MIDGROUND,
                 motifs=["wave", "radial", "expand"],
                 visual_intent=GroupVisualIntent.ABSTRACT,
                 motion=[MotionVerb.WAVE, MotionVerb.RIPPLE],
@@ -89,7 +89,7 @@ def make_gtpl_rhythm_candy_stripe_scroll() -> GroupPlanTemplate:
         timing=TimingHints(bars_min=2, bars_max=32),
         layer_recipe=[
             LayerRecipe(
-                layer=LayerRole.MIDGROUND,
+                layer=VisualDepth.MIDGROUND,
                 motifs=["stripe", "diagonal", "scroll"],
                 visual_intent=GroupVisualIntent.GEOMETRIC,
                 motion=[MotionVerb.ROLL],
@@ -117,7 +117,7 @@ def make_gtpl_rhythm_candy_stripe_rotate() -> GroupPlanTemplate:
         timing=TimingHints(bars_min=2, bars_max=32),
         layer_recipe=[
             LayerRecipe(
-                layer=LayerRole.MIDGROUND,
+                layer=VisualDepth.MIDGROUND,
                 motifs=["stripe", "spiral", "rotate"],
                 visual_intent=GroupVisualIntent.GEOMETRIC,
                 motion=[MotionVerb.ROLL],
@@ -146,7 +146,7 @@ def make_gtpl_rhythm_icicle_drip_slow() -> GroupPlanTemplate:
         timing=TimingHints(bars_min=2, bars_max=16),
         layer_recipe=[
             LayerRecipe(
-                layer=LayerRole.MIDGROUND,
+                layer=VisualDepth.MIDGROUND,
                 motifs=["drip", "vertical", "cascade"],
                 visual_intent=GroupVisualIntent.IMAGERY,
                 motion=[MotionVerb.SWEEP],
@@ -174,7 +174,7 @@ def make_gtpl_rhythm_icicle_drip_fast() -> GroupPlanTemplate:
         timing=TimingHints(bars_min=1, bars_max=8),
         layer_recipe=[
             LayerRecipe(
-                layer=LayerRole.MIDGROUND,
+                layer=VisualDepth.MIDGROUND,
                 motifs=["drip", "vertical", "rapid"],
                 visual_intent=GroupVisualIntent.IMAGERY,
                 motion=[MotionVerb.SWEEP],
@@ -203,7 +203,7 @@ def make_gtpl_rhythm_half_time_hold() -> GroupPlanTemplate:
         timing=TimingHints(bars_min=2, bars_max=16),
         layer_recipe=[
             LayerRecipe(
-                layer=LayerRole.MIDGROUND,
+                layer=VisualDepth.MIDGROUND,
                 motifs=["hold", "sustained", "half-time"],
                 visual_intent=GroupVisualIntent.ABSTRACT,
                 motion=[MotionVerb.FADE],
@@ -231,7 +231,7 @@ def make_gtpl_rhythm_double_time_push() -> GroupPlanTemplate:
         timing=TimingHints(bars_min=1, bars_max=8),
         layer_recipe=[
             LayerRecipe(
-                layer=LayerRole.MIDGROUND,
+                layer=VisualDepth.MIDGROUND,
                 motifs=["push", "rapid", "double-time"],
                 visual_intent=GroupVisualIntent.ABSTRACT,
                 motion=[MotionVerb.PULSE],

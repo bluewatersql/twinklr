@@ -5,16 +5,6 @@ import re
 from pydantic import ValidationError
 import pytest
 
-from twinklr.core.sequencer.templates.group.enums import (
-    AssetSlotType,
-    ColorMode,
-    GroupTemplateType,
-    GroupVisualIntent,
-    LayerRole,
-    MotionVerb,
-    ProjectionIntent,
-    WarpHint,
-)
 from twinklr.core.sequencer.templates.group.models import (
     AssetSlot,
     AssetSlotDefaults,
@@ -24,6 +14,16 @@ from twinklr.core.sequencer.templates.group.models import (
     ProjectionParams,
     ProjectionSpec,
     TimingHints,
+)
+from twinklr.core.sequencer.vocabulary import (
+    AssetSlotType,
+    ColorMode,
+    GroupTemplateType,
+    GroupVisualIntent,
+    MotionVerb,
+    ProjectionIntent,
+    VisualDepth,
+    WarpHint,
 )
 
 
@@ -163,20 +163,20 @@ class TestLayerRecipe:
     def test_create_minimal(self):
         """Test creating LayerRecipe with minimal required fields."""
         recipe = LayerRecipe(
-            layer=LayerRole.BACKGROUND,
+            layer=VisualDepth.BACKGROUND,
             visual_intent=GroupVisualIntent.ABSTRACT,
             density=0.5,
             contrast=0.7,
             color_mode=ColorMode.MONOCHROME,
         )
-        assert recipe.layer == LayerRole.BACKGROUND
+        assert recipe.layer == VisualDepth.BACKGROUND
         assert recipe.motion == [MotionVerb.NONE]
         assert recipe.motifs == []
 
     def test_create_with_motion(self):
         """Test creating LayerRecipe with motion verbs."""
         recipe = LayerRecipe(
-            layer=LayerRole.FOREGROUND,
+            layer=VisualDepth.FOREGROUND,
             visual_intent=GroupVisualIntent.GEOMETRIC,
             motion=[MotionVerb.PULSE, MotionVerb.FADE],
             density=0.8,
@@ -190,7 +190,7 @@ class TestLayerRecipe:
         """Test density must be between 0.0 and 1.0."""
         with pytest.raises(ValidationError):
             LayerRecipe(
-                layer=LayerRole.BACKGROUND,
+                layer=VisualDepth.BACKGROUND,
                 visual_intent=GroupVisualIntent.ABSTRACT,
                 density=-0.1,
                 contrast=0.5,
@@ -200,7 +200,7 @@ class TestLayerRecipe:
     def test_frozen(self):
         """Test LayerRecipe is frozen."""
         recipe = LayerRecipe(
-            layer=LayerRole.BACKGROUND,
+            layer=VisualDepth.BACKGROUND,
             visual_intent=GroupVisualIntent.ABSTRACT,
             density=0.5,
             contrast=0.5,
@@ -311,7 +311,7 @@ class TestGroupPlanTemplate:
             constraints=GroupConstraints(max_layers=2),
             layer_recipe=[
                 LayerRecipe(
-                    layer=LayerRole.BACKGROUND,
+                    layer=VisualDepth.BACKGROUND,
                     motifs=["stars", "dots"],
                     visual_intent=GroupVisualIntent.ABSTRACT,
                     motion=[MotionVerb.TWINKLE],
@@ -362,14 +362,14 @@ class TestGroupPlanTemplate:
                 constraints=GroupConstraints(max_layers=1),
                 layer_recipe=[
                     LayerRecipe(
-                        layer=LayerRole.BACKGROUND,
+                        layer=VisualDepth.BACKGROUND,
                         visual_intent=GroupVisualIntent.ABSTRACT,
                         density=0.5,
                         contrast=0.5,
                         color_mode=ColorMode.MONOCHROME,
                     ),
                     LayerRecipe(
-                        layer=LayerRole.FOREGROUND,
+                        layer=VisualDepth.FOREGROUND,
                         visual_intent=GroupVisualIntent.ABSTRACT,
                         density=0.5,
                         contrast=0.5,

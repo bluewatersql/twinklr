@@ -4,18 +4,6 @@ from __future__ import annotations
 
 import pytest
 
-from twinklr.core.agents.sequencer.group_planner.models import (
-    CoordinationMode,
-    CoordinationPlan,
-    DisplayGraph,
-    DisplayGroup,
-    GroupPlacement,
-    LaneKind,
-    LanePlan,
-    SectionCoordinationPlan,
-    TimeRef,
-    TimeRefKind,
-)
 from twinklr.core.agents.sequencer.group_planner.timing import (
     BarInfo,
     SectionBounds,
@@ -28,6 +16,20 @@ from twinklr.core.sequencer.templates.group.catalog import (
     TemplateCatalog,
     TemplateCatalogEntry,
 )
+from twinklr.core.sequencer.templates.group.models import (
+    CoordinationMode,
+    CoordinationPlan,
+    DisplayGraph,
+    DisplayGroup,
+    GroupPlacement,
+    LaneKind,
+    LanePlan,
+    SectionCoordinationPlan,
+    TimeRef,
+    TimeRefKind,
+)
+
+from .conftest import DEFAULT_THEME
 
 # Rebuild TemplateCatalogEntry after LaneKind is imported (forward ref resolution)
 TemplateCatalogEntry.model_rebuild()
@@ -106,6 +108,7 @@ class TestSectionPlanValidator:
         """Valid plan passes validation."""
         plan = SectionCoordinationPlan(
             section_id="verse_1",
+            theme=DEFAULT_THEME,
             lane_plans=[
                 LanePlan(
                     lane=LaneKind.ACCENT,
@@ -148,6 +151,7 @@ class TestSectionPlanValidator:
         """Unknown template_id causes validation error."""
         plan = SectionCoordinationPlan(
             section_id="verse_1",
+            theme=DEFAULT_THEME,
             lane_plans=[
                 LanePlan(
                     lane=LaneKind.ACCENT,
@@ -191,6 +195,7 @@ class TestSectionPlanValidator:
         """Unknown group_id causes validation error."""
         plan = SectionCoordinationPlan(
             section_id="verse_1",
+            theme=DEFAULT_THEME,
             lane_plans=[
                 LanePlan(
                     lane=LaneKind.ACCENT,
@@ -234,6 +239,7 @@ class TestSectionPlanValidator:
         # Section verse_1 is bar 1-3, placement starts at bar 4
         plan = SectionCoordinationPlan(
             section_id="verse_1",
+            theme=DEFAULT_THEME,
             lane_plans=[
                 LanePlan(
                     lane=LaneKind.ACCENT,
@@ -276,6 +282,7 @@ class TestSectionPlanValidator:
         """Overlapping placements on same group within same lane fails."""
         plan = SectionCoordinationPlan(
             section_id="verse_1",
+            theme=DEFAULT_THEME,
             lane_plans=[
                 LanePlan(
                     lane=LaneKind.ACCENT,
@@ -325,6 +332,7 @@ class TestSectionPlanValidator:
         """Different groups CAN have overlapping placements."""
         plan = SectionCoordinationPlan(
             section_id="verse_1",
+            theme=DEFAULT_THEME,
             lane_plans=[
                 LanePlan(
                     lane=LaneKind.ACCENT,
@@ -373,6 +381,7 @@ class TestSectionPlanValidator:
         """ACCENT lane intensity >1.30 should fail validation."""
         plan = SectionCoordinationPlan(
             section_id="verse_1",
+            theme=DEFAULT_THEME,
             lane_plans=[
                 LanePlan(
                     lane=LaneKind.ACCENT,
@@ -416,6 +425,7 @@ class TestSectionPlanValidator:
         """RHYTHM lane intensity >1.20 should fail validation."""
         plan = SectionCoordinationPlan(
             section_id="verse_1",
+            theme=DEFAULT_THEME,
             lane_plans=[
                 LanePlan(
                     lane=LaneKind.RHYTHM,
@@ -459,6 +469,7 @@ class TestSectionPlanValidator:
         """Intensity exactly at lane limit should pass validation."""
         plan = SectionCoordinationPlan(
             section_id="verse_1",
+            theme=DEFAULT_THEME,
             lane_plans=[
                 LanePlan(
                     lane=LaneKind.ACCENT,

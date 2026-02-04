@@ -1,52 +1,8 @@
 {#
-GroupPlanner User Prompt
-Provides section context on iteration 1, minimal refinement on iteration 2+
+GroupPlanner User Prompt - INITIAL PLANNING
+Provides full section context for iteration 1.
+Refinement iterations (2+) use user_refinement.j2 instead.
 #}
-{% if iteration is defined and iteration > 0 %}
-{# ============== REFINEMENT MODE (Iteration 2+) ============== #}
-{# Minimal context - conversation already has full context from iteration 1 #}
-
-# Refinement Request: {{ section_name }} ({{ section_id }})
-
-## Iteration {{ iteration + 1 }} Feedback
-
-{{ feedback }}
-
-## Key Reminders
-
-- **Section:** {{ section_name }} ({{ (start_ms / 1000) | round(1) }}s to {{ (end_ms / 1000) | round(1) }}s)
-- **Energy Target:** {{ energy_target }}
-- **Primary Targets:** {{ primary_focus_targets | join(", ") }}
-
-## Intensity Limits (STRICT - exceeding = validation failure)
-
-| Lane   | Max   |
-|--------|-------|
-| BASE   | 1.10  |
-| RHYTHM | 1.20  |
-| ACCENT | 1.30  |
-
-{% if revision_request %}
-## Revision Priority: {{ revision_request.priority }}
-
-{% if revision_request.specific_fixes %}
-**Fixes Required:**
-{% for fix in revision_request.specific_fixes[:10] %}
-- {{ fix }}
-{% endfor %}
-{% endif %}
-{% endif %}
-
-## Instructions
-
-1. Address ALL ERROR severity issues first
-2. Keep structure that worked - only fix flagged issues
-3. Verify ALL intensity values are within lane limits
-4. Return the complete revised SectionCoordinationPlan
-
-{% else %}
-{# ============== INITIAL PLANNING (Iteration 1) ============== #}
-{# Full context provided #}
 
 # Section Information
 
@@ -119,6 +75,17 @@ Provides section context on iteration 1, minimal refinement on iteration 2+
 {% endfor %}
 {% endif %}
 
+## Theme Context (from MacroPlan)
+
+ThemeRef for this section:
+{{ theme_ref_json }}
+
+Theme defaults:
+- default_tags: {{ theme_definition.default_tags | join(", ") }}
+- style_tags: {{ theme_definition.style_tags | join(", ") }}
+- avoid_tags: {{ theme_definition.avoid_tags | join(", ") }}
+- default_palette_id: {{ theme_definition.default_palette_id }}
+
 # Your Task
 
 Create a SectionCoordinationPlan for **{{ section_name }} ({{ section_id }})** that:
@@ -127,10 +94,10 @@ Create a SectionCoordinationPlan for **{{ section_name }} ({{ section_id }})** t
 2. **Selects templates** - From the catalog above, matching section intent
 3. **Defines coordination** - How groups work together (UNIFIED, SEQUENCED, etc.)
 4. **Sets timing** - Using bar/beat TimeRefs within section bounds
+5. Set the section **theme** and ensure template selections align with it.
 
 **Remember:**
 - Primary targets ({{ primary_focus_targets | join(", ") }}) should get prominent ACCENT treatment
 - Energy target is {{ energy_target }} - design accordingly
 - Motion density is {{ motion_density }} - adjust complexity
 - **Intensity limits:** BASE ≤1.10, RHYTHM ≤1.20, ACCENT ≤1.30
-{% endif %}

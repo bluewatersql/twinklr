@@ -1,7 +1,7 @@
 """Utilities for extracting taxonomy enum values for prompt injection.
 
-Ensures prompts always use the source-of-truth enum values from taxonomy.py
-and issues.py.
+Ensures prompts always use the source-of-truth enum values from vocabulary,
+theming catalogs, and issues modules.
 """
 
 from typing import Any
@@ -10,7 +10,7 @@ from typing import Any
 def get_taxonomy_dict() -> dict[str, list[str]]:
     """Get dictionary of taxonomy enum names to value lists.
 
-    Extracts all enum values from the taxonomy and issues modules for dynamic
+    Extracts all enum values from the vocabulary and issues modules for dynamic
     injection into prompts, preventing hardcoded enum drift.
 
     Returns:
@@ -27,27 +27,25 @@ def get_taxonomy_dict() -> dict[str, list[str]]:
         IssueSeverity,
         SuggestedAction,
     )
-    from twinklr.core.agents.sequencer.group_planner.models import (
-        CoordinationMode,
-        LaneKind,
-        SpillPolicy,
-        StepUnit,
-    )
-    from twinklr.core.agents.taxonomy import (
+    from twinklr.core.sequencer.vocabulary import (
         AssetSlotType,
         BlendMode,
         ChoreographyStyle,
+        CoordinationMode,
         EnergyTarget,
         GroupTemplateType,
         GroupVisualIntent,
+        LaneKind,
         LayerRole,
         MotionDensity,
         QuantizeMode,
         SnapMode,
+        SpillPolicy,
+        StepUnit,
         TargetRole,
-        TimeRefType,
         TimingDriver,
     )
+    from twinklr.core.sequencer.vocabulary.timing import TimeRefKind
 
     taxonomy: dict[str, list[str]] = {}
 
@@ -60,7 +58,7 @@ def get_taxonomy_dict() -> dict[str, list[str]]:
         EnergyTarget,
         ChoreographyStyle,
         MotionDensity,
-        TimeRefType,
+        TimeRefKind,
         SnapMode,
         QuantizeMode,
         GroupTemplateType,
@@ -92,6 +90,83 @@ def get_taxonomy_dict() -> dict[str, list[str]]:
     return taxonomy
 
 
+def get_theming_catalog_dict() -> dict[str, list[dict[str, str]]]:
+    """Get dictionary of theming catalog items for prompt injection.
+
+    Extracts palette, tag, and theme IDs with descriptions from the
+    theming catalogs for dynamic injection into prompts.
+
+    Returns:
+        Dict with keys 'palettes', 'tags', 'themes', each containing
+        a list of dicts with id and description.
+        Example: {
+            "palettes": [{"id": "core.uv_party", "title": "UV Party", "hint": "..."}],
+            "tags": [{"id": "motif.spiral", "description": "...", "category": "MOTIF"}],
+            "themes": [{"id": "theme.abstract.neon", "title": "...", "palette": "..."}]
+        }
+    """
+    from twinklr.core.sequencer.theming import (
+        list_palettes,
+        list_tags,
+        list_themes,
+    )
+
+    catalog: dict[str, list[dict[str, str]]] = {}
+
+    # Extract palettes
+    catalog["palettes"] = [
+        {
+            "id": info.palette_id,
+            "title": info.title,
+            "description": info.description or "",
+        }
+        for info in list_palettes()
+    ]
+
+    # Extract tags with category
+    catalog["tags"] = [
+        {
+            "id": info.tag,
+            "description": info.description or "",
+            "category": info.category.value if info.category else "",
+        }
+        for info in list_tags()
+    ]
+
+    # Extract themes
+    catalog["themes"] = [
+        {
+            "id": info.theme_id,
+            "title": info.title,
+            "description": info.description or "",
+            "palette": info.default_palette_id or "",
+        }
+        for info in list_themes()
+    ]
+
+    return catalog
+
+
+def get_theming_ids() -> dict[str, list[str]]:
+    """Get simple lists of theming catalog IDs for prompt injection.
+
+    Returns:
+        Dict with keys 'palette_ids', 'tag_ids', 'theme_ids',
+        each containing a sorted list of valid IDs.
+    """
+    from twinklr.core.sequencer.theming import (
+        PALETTE_REGISTRY,
+        TAG_REGISTRY,
+        THEME_REGISTRY,
+    )
+
+    return {
+        "palette_ids": PALETTE_REGISTRY.list_ids(),
+        "tag_ids": TAG_REGISTRY.list_ids(),
+        "theme_ids": THEME_REGISTRY.list_ids(),
+    }
+
+
 def inject_taxonomy(variables: dict[str, Any]) -> dict[str, Any]:
     """Inject taxonomy enum values into prompt variables.
 
@@ -103,4 +178,36 @@ def inject_taxonomy(variables: dict[str, Any]) -> dict[str, Any]:
     """
     if "taxonomy" not in variables:
         variables = {**variables, "taxonomy": get_taxonomy_dict()}
+    return variables
+
+
+def inject_theming(variables: dict[str, Any]) -> dict[str, Any]:
+    """Inject theming catalog data into prompt variables.
+
+    Args:
+        variables: Existing prompt variables
+
+    Returns:
+        Variables dict with 'theming' key added containing catalog data
+    """
+    if "theming" not in variables:
+        variables = {**variables, "theming": get_theming_catalog_dict()}
+    if "theming_ids" not in variables:
+        variables = {**variables, "theming_ids": get_theming_ids()}
+    return variables
+
+
+def inject_all(variables: dict[str, Any]) -> dict[str, Any]:
+    """Inject all taxonomy and theming data into prompt variables.
+
+    Convenience function that injects both taxonomy enums and theming catalogs.
+
+    Args:
+        variables: Existing prompt variables
+
+    Returns:
+        Variables dict with 'taxonomy', 'theming', and 'theming_ids' keys added
+    """
+    variables = inject_taxonomy(variables)
+    variables = inject_theming(variables)
     return variables

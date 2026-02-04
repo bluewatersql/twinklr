@@ -3,20 +3,20 @@
 Beat-driven motion, medium intensity rhythmic patterns.
 """
 
-from twinklr.core.sequencer.templates.group.enums import (
-    ColorMode,
-    GroupTemplateType,
-    GroupVisualIntent,
-    LayerRole,
-    MotionVerb,
-    ProjectionIntent,
-)
 from twinklr.core.sequencer.templates.group.library import register_group_template
 from twinklr.core.sequencer.templates.group.models import (
     GroupPlanTemplate,
     LayerRecipe,
     ProjectionSpec,
     TimingHints,
+)
+from twinklr.core.sequencer.vocabulary import (
+    ColorMode,
+    GroupTemplateType,
+    GroupVisualIntent,
+    MotionVerb,
+    ProjectionIntent,
+    VisualDepth,
 )
 
 
@@ -34,7 +34,7 @@ def make_gtpl_rhythm_pulse_even() -> GroupPlanTemplate:
         timing=TimingHints(bars_min=1, bars_max=32),
         layer_recipe=[
             LayerRecipe(
-                layer=LayerRole.MIDGROUND,
+                layer=VisualDepth.MIDGROUND,
                 motifs=["pulse", "beat", "rhythm"],
                 visual_intent=GroupVisualIntent.ABSTRACT,
                 motion=[MotionVerb.PULSE],
@@ -62,7 +62,7 @@ def make_gtpl_rhythm_pulse_syncopated() -> GroupPlanTemplate:
         timing=TimingHints(bars_min=1, bars_max=32),
         layer_recipe=[
             LayerRecipe(
-                layer=LayerRole.MIDGROUND,
+                layer=VisualDepth.MIDGROUND,
                 motifs=["pulse", "syncopated", "offbeat"],
                 visual_intent=GroupVisualIntent.ABSTRACT,
                 motion=[MotionVerb.PULSE],
@@ -90,7 +90,7 @@ def make_gtpl_rhythm_pulse_half_time() -> GroupPlanTemplate:
         timing=TimingHints(bars_min=2, bars_max=32),
         layer_recipe=[
             LayerRecipe(
-                layer=LayerRole.MIDGROUND,
+                layer=VisualDepth.MIDGROUND,
                 motifs=["pulse", "half-time"],
                 visual_intent=GroupVisualIntent.ABSTRACT,
                 motion=[MotionVerb.PULSE],

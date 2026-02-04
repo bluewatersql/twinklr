@@ -15,26 +15,33 @@ References existing conversation context (section, templates, groups).
 - **Energy Target:** {{ energy_target }}
 - **Motion Density:** {{ motion_density }}
 - **Primary Targets:** {{ primary_focus_targets | join(", ") }}
+{% if theme_ref %}
+- **Theme:** {{ theme_ref.theme_id }}{% if theme_ref.tags %} (tags: {{ theme_ref.tags | join(", ") }}){% endif %}
+{% endif %}
 
-## Intensity Limits (STRICT)
+## Intensity Limits (STRICT - exceeding = validation failure)
 
-- BASE: max **1.10**
-- RHYTHM: max **1.20**
-- ACCENT: max **1.30**
-
-Exceeding these limits will fail validation.
+| Lane   | Max   |
+|--------|-------|
+| BASE   | 1.10  |
+| RHYTHM | 1.20  |
+| ACCENT | 1.30  |
 
 {% if revision_request %}
-## Revision Priority
+## Revision Priority: {{ revision_request.priority }}
 
-**Priority:** {{ revision_request.priority }}
+{% if revision_request.focus_areas %}
 **Focus Areas:** {{ revision_request.focus_areas | join(", ") }}
+{% endif %}
 
 {% if revision_request.specific_fixes %}
-**Specific Fixes Required:**
-{% for fix in revision_request.specific_fixes %}
+**Fixes Required:**
+{% for fix in revision_request.specific_fixes[:10] %}
 - {{ fix }}
 {% endfor %}
+{% if revision_request.specific_fixes | length > 10 %}
+- ... and {{ revision_request.specific_fixes | length - 10 }} more issues
+{% endif %}
 {% endif %}
 
 {% if revision_request.avoid %}
@@ -47,9 +54,8 @@ Exceeding these limits will fail validation.
 
 ## Instructions
 
-1. Address ALL issues marked as ERROR severity first
-2. Keep the overall structure that worked in previous iteration
-3. Only modify the specific placements/intensities that caused failures
-4. Verify all intensity values are within lane limits before submitting
-
-Return the complete revised SectionCoordinationPlan.
+1. Address ALL ERROR severity issues first
+2. Keep structure that worked - only fix flagged issues
+3. Verify ALL intensity values are within lane limits
+4. Do not change theme_id unless feedback explicitly requests it
+5. Return the complete revised SectionCoordinationPlan

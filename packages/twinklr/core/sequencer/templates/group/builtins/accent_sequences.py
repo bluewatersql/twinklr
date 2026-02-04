@@ -1,19 +1,19 @@
 """ACCENT lane group templates - Bell, Callout, Roll-Call families."""
 
-from twinklr.core.sequencer.templates.group.enums import (
-    ColorMode,
-    GroupTemplateType,
-    GroupVisualIntent,
-    LayerRole,
-    MotionVerb,
-    ProjectionIntent,
-)
 from twinklr.core.sequencer.templates.group.library import register_group_template
 from twinklr.core.sequencer.templates.group.models import (
     GroupPlanTemplate,
     LayerRecipe,
     ProjectionSpec,
     TimingHints,
+)
+from twinklr.core.sequencer.vocabulary import (
+    ColorMode,
+    GroupTemplateType,
+    GroupVisualIntent,
+    MotionVerb,
+    ProjectionIntent,
+    VisualDepth,
 )
 
 
@@ -32,7 +32,7 @@ def make_gtpl_accent_bell_single() -> GroupPlanTemplate:
         timing=TimingHints(bars_min=1, bars_max=2),
         layer_recipe=[
             LayerRecipe(
-                layer=LayerRole.FOREGROUND,
+                layer=VisualDepth.FOREGROUND,
                 motifs=["bell", "ring", "decay"],
                 visual_intent=GroupVisualIntent.ABSTRACT,
                 motion=[MotionVerb.PULSE, MotionVerb.FADE],
@@ -60,7 +60,7 @@ def make_gtpl_accent_bell_double() -> GroupPlanTemplate:
         timing=TimingHints(bars_min=1, bars_max=2),
         layer_recipe=[
             LayerRecipe(
-                layer=LayerRole.FOREGROUND,
+                layer=VisualDepth.FOREGROUND,
                 motifs=["bell", "double", "ding"],
                 visual_intent=GroupVisualIntent.ABSTRACT,
                 motion=[MotionVerb.PULSE],
@@ -89,7 +89,7 @@ def make_gtpl_accent_call_response_simple() -> GroupPlanTemplate:
         timing=TimingHints(bars_min=2, bars_max=8),
         layer_recipe=[
             LayerRecipe(
-                layer=LayerRole.FOREGROUND,
+                layer=VisualDepth.FOREGROUND,
                 motifs=["call", "response", "dialogue"],
                 visual_intent=GroupVisualIntent.ABSTRACT,
                 motion=[MotionVerb.PULSE],
@@ -117,7 +117,7 @@ def make_gtpl_accent_call_response_stacked() -> GroupPlanTemplate:
         timing=TimingHints(bars_min=2, bars_max=8),
         layer_recipe=[
             LayerRecipe(
-                layer=LayerRole.FOREGROUND,
+                layer=VisualDepth.FOREGROUND,
                 motifs=["call", "response", "overlap"],
                 visual_intent=GroupVisualIntent.ABSTRACT,
                 motion=[MotionVerb.PULSE, MotionVerb.FADE],
@@ -146,7 +146,7 @@ def make_gtpl_accent_rollcall_lr() -> GroupPlanTemplate:
         timing=TimingHints(bars_min=2, bars_max=8),
         layer_recipe=[
             LayerRecipe(
-                layer=LayerRole.FOREGROUND,
+                layer=VisualDepth.FOREGROUND,
                 motifs=["rollcall", "sequential", "order"],
                 visual_intent=GroupVisualIntent.ABSTRACT,
                 motion=[MotionVerb.CHASE],
@@ -174,7 +174,7 @@ def make_gtpl_accent_rollcall_random() -> GroupPlanTemplate:
         timing=TimingHints(bars_min=2, bars_max=8),
         layer_recipe=[
             LayerRecipe(
-                layer=LayerRole.FOREGROUND,
+                layer=VisualDepth.FOREGROUND,
                 motifs=["rollcall", "random", "unpredictable"],
                 visual_intent=GroupVisualIntent.ABSTRACT,
                 motion=[MotionVerb.SPARKLE],

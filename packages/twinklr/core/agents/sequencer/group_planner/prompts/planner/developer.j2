@@ -37,7 +37,7 @@ You must return a `SectionCoordinationPlan` that matches this JSON schema:
 {% else %}
 {# Fallback if taxonomy not provided #}
 **LaneKind:** BASE, RHYTHM, ACCENT
-**CoordinationMode:** UNISON, SEQUENCED, WAVE, CALL_RESPONSE, RIPPLE, RANDOM_BURST, CHASE
+**CoordinationMode:** UNIFIED, COMPLEMENTARY, SEQUENCED, CALL_RESPONSE, RIPPLE
 **StepUnit:** BEATS, BARS, MS
 **SpillPolicy:** NONE, OVERLAP, BLEND
 {% endif %}
@@ -118,6 +118,21 @@ BASE (0.6-0.9) < RHYTHM (0.8-1.05) < ACCENT (0.95-1.20)
 4. **Timing Precision**: Align placements with musical beats/downbeats when possible
 5. **Layer Balance**: BASE < RHYTHM < ACCENT intensity. Never let supporting layers overpower focus layers.
 
+## Theme Rules (NEW)
+
+1. **You must set `theme` at the top level of the SectionCoordinationPlan**:
+   - `theme.theme_id` must be a stable id (no prose).
+   - `theme.scope` must be `SECTION`.
+
+2. **Theme tags are limited**:
+   - `theme.tags`: 0-5 items max.
+   - Prefer 0–2 tags; use 3–5 only when necessary.
+   - Use tags only to refine the theme (e.g., "setting.snowy_night", "motif.candy_trim").
+
+3. **Template-theme coherence**:
+   - Avoid templates with `avoid_tags` that conflict with theme constraints.
+
+
 ## Recurring Soft-Fail Patterns (Address These Proactively)
 
 These issues cause ~80% of first-iteration failures. Avoid them:
@@ -158,3 +173,4 @@ These issues cause ~80% of first-iteration failures. Avoid them:
 - ❌ Missing required fields (template_id, group_ids, coordination_mode)
 - ❌ **Identical accent on all primary targets** - Stagger or differentiate
 - ❌ **timing_driver mismatch** - Must match placement snap_rules
+- ❌ **Missing theme** = validation failure

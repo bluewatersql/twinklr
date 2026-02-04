@@ -1,19 +1,19 @@
 """ACCENT lane group templates - Pop-In, Lyric, Wipe, Dropout families."""
 
-from twinklr.core.sequencer.templates.group.enums import (
-    ColorMode,
-    GroupTemplateType,
-    GroupVisualIntent,
-    LayerRole,
-    MotionVerb,
-    ProjectionIntent,
-)
 from twinklr.core.sequencer.templates.group.library import register_group_template
 from twinklr.core.sequencer.templates.group.models import (
     GroupPlanTemplate,
     LayerRecipe,
     ProjectionSpec,
     TimingHints,
+)
+from twinklr.core.sequencer.vocabulary import (
+    ColorMode,
+    GroupTemplateType,
+    GroupVisualIntent,
+    MotionVerb,
+    ProjectionIntent,
+    VisualDepth,
 )
 
 
@@ -32,7 +32,7 @@ def make_gtpl_accent_icon_pop_single() -> GroupPlanTemplate:
         timing=TimingHints(bars_min=1, bars_max=4),
         layer_recipe=[
             LayerRecipe(
-                layer=LayerRole.FOREGROUND,
+                layer=VisualDepth.FOREGROUND,
                 motifs=["pop", "icon", "emphasis"],
                 visual_intent=GroupVisualIntent.IMAGERY,
                 motion=[MotionVerb.PULSE],
@@ -60,7 +60,7 @@ def make_gtpl_accent_icon_pop_triplet() -> GroupPlanTemplate:
         timing=TimingHints(bars_min=1, bars_max=4),
         layer_recipe=[
             LayerRecipe(
-                layer=LayerRole.FOREGROUND,
+                layer=VisualDepth.FOREGROUND,
                 motifs=["pop", "triplet", "sequence"],
                 visual_intent=GroupVisualIntent.IMAGERY,
                 motion=[MotionVerb.PULSE],
@@ -89,7 +89,7 @@ def make_gtpl_accent_lyric_underline() -> GroupPlanTemplate:
         timing=TimingHints(bars_min=1, bars_max=2),
         layer_recipe=[
             LayerRecipe(
-                layer=LayerRole.FOREGROUND,
+                layer=VisualDepth.FOREGROUND,
                 motifs=["underline", "flash", "emphasis"],
                 visual_intent=GroupVisualIntent.ABSTRACT,
                 motion=[MotionVerb.SWEEP],
@@ -117,7 +117,7 @@ def make_gtpl_accent_lyric_spotlight() -> GroupPlanTemplate:
         timing=TimingHints(bars_min=1, bars_max=4),
         layer_recipe=[
             LayerRecipe(
-                layer=LayerRole.FOREGROUND,
+                layer=VisualDepth.FOREGROUND,
                 motifs=["spotlight", "center", "focus"],
                 visual_intent=GroupVisualIntent.ABSTRACT,
                 motion=[MotionVerb.PULSE],
@@ -146,7 +146,7 @@ def make_gtpl_accent_wipe_fast() -> GroupPlanTemplate:
         timing=TimingHints(bars_min=1, bars_max=2),
         layer_recipe=[
             LayerRecipe(
-                layer=LayerRole.FOREGROUND,
+                layer=VisualDepth.FOREGROUND,
                 motifs=["wipe", "fast", "trail"],
                 visual_intent=GroupVisualIntent.ABSTRACT,
                 motion=[MotionVerb.WIPE],
@@ -174,7 +174,7 @@ def make_gtpl_accent_wipe_slam() -> GroupPlanTemplate:
         timing=TimingHints(bars_min=1, bars_max=4),
         layer_recipe=[
             LayerRecipe(
-                layer=LayerRole.FOREGROUND,
+                layer=VisualDepth.FOREGROUND,
                 motifs=["wipe", "slam", "hold"],
                 visual_intent=GroupVisualIntent.ABSTRACT,
                 motion=[MotionVerb.WIPE],
@@ -203,7 +203,7 @@ def make_gtpl_accent_cut_to_black() -> GroupPlanTemplate:
         timing=TimingHints(bars_min=1, bars_max=4),
         layer_recipe=[
             LayerRecipe(
-                layer=LayerRole.FOREGROUND,
+                layer=VisualDepth.FOREGROUND,
                 motifs=["dropout", "cut", "blackout"],
                 visual_intent=GroupVisualIntent.ABSTRACT,
                 motion=[MotionVerb.PULSE],
@@ -231,7 +231,7 @@ def make_gtpl_accent_cut_to_sparkle() -> GroupPlanTemplate:
         timing=TimingHints(bars_min=2, bars_max=8),
         layer_recipe=[
             LayerRecipe(
-                layer=LayerRole.FOREGROUND,
+                layer=VisualDepth.FOREGROUND,
                 motifs=["dropout", "sparkle", "return"],
                 visual_intent=GroupVisualIntent.ABSTRACT,
                 motion=[MotionVerb.SPARKLE],

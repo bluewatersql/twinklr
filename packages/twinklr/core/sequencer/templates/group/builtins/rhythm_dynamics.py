@@ -1,19 +1,19 @@
 """RHYTHM lane group templates - Bounce, Strobe, Sparkle families."""
 
-from twinklr.core.sequencer.templates.group.enums import (
-    ColorMode,
-    GroupTemplateType,
-    GroupVisualIntent,
-    LayerRole,
-    MotionVerb,
-    ProjectionIntent,
-)
 from twinklr.core.sequencer.templates.group.library import register_group_template
 from twinklr.core.sequencer.templates.group.models import (
     GroupPlanTemplate,
     LayerRecipe,
     ProjectionSpec,
     TimingHints,
+)
+from twinklr.core.sequencer.vocabulary import (
+    ColorMode,
+    GroupTemplateType,
+    GroupVisualIntent,
+    MotionVerb,
+    ProjectionIntent,
+    VisualDepth,
 )
 
 
@@ -32,7 +32,7 @@ def make_gtpl_rhythm_bounce_even() -> GroupPlanTemplate:
         timing=TimingHints(bars_min=1, bars_max=16),
         layer_recipe=[
             LayerRecipe(
-                layer=LayerRole.MIDGROUND,
+                layer=VisualDepth.MIDGROUND,
                 motifs=["bounce", "even", "arch"],
                 visual_intent=GroupVisualIntent.ABSTRACT,
                 motion=[MotionVerb.BOUNCE],
@@ -60,7 +60,7 @@ def make_gtpl_rhythm_bounce_staggered() -> GroupPlanTemplate:
         timing=TimingHints(bars_min=1, bars_max=16),
         layer_recipe=[
             LayerRecipe(
-                layer=LayerRole.MIDGROUND,
+                layer=VisualDepth.MIDGROUND,
                 motifs=["bounce", "stagger", "cascade"],
                 visual_intent=GroupVisualIntent.ABSTRACT,
                 motion=[MotionVerb.BOUNCE],
@@ -89,7 +89,7 @@ def make_gtpl_rhythm_strobe_soft() -> GroupPlanTemplate:
         timing=TimingHints(bars_min=1, bars_max=8),
         layer_recipe=[
             LayerRecipe(
-                layer=LayerRole.MIDGROUND,
+                layer=VisualDepth.MIDGROUND,
                 motifs=["strobe", "soft", "rapid"],
                 visual_intent=GroupVisualIntent.ABSTRACT,
                 motion=[MotionVerb.STROBE],
@@ -117,7 +117,7 @@ def make_gtpl_rhythm_strobe_burst() -> GroupPlanTemplate:
         timing=TimingHints(bars_min=1, bars_max=8),
         layer_recipe=[
             LayerRecipe(
-                layer=LayerRole.MIDGROUND,
+                layer=VisualDepth.MIDGROUND,
                 motifs=["strobe", "burst", "pattern"],
                 visual_intent=GroupVisualIntent.ABSTRACT,
                 motion=[MotionVerb.STROBE],
@@ -146,7 +146,7 @@ def make_gtpl_rhythm_sparkle_beat() -> GroupPlanTemplate:
         timing=TimingHints(bars_min=1, bars_max=16),
         layer_recipe=[
             LayerRecipe(
-                layer=LayerRole.MIDGROUND,
+                layer=VisualDepth.MIDGROUND,
                 motifs=["sparkle", "beat", "hit"],
                 visual_intent=GroupVisualIntent.ABSTRACT,
                 motion=[MotionVerb.SPARKLE],
@@ -174,7 +174,7 @@ def make_gtpl_rhythm_sparkle_offbeat() -> GroupPlanTemplate:
         timing=TimingHints(bars_min=1, bars_max=16),
         layer_recipe=[
             LayerRecipe(
-                layer=LayerRole.MIDGROUND,
+                layer=VisualDepth.MIDGROUND,
                 motifs=["sparkle", "offbeat", "hit"],
                 visual_intent=GroupVisualIntent.ABSTRACT,
                 motion=[MotionVerb.SPARKLE],

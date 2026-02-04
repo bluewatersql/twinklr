@@ -31,11 +31,11 @@ from twinklr.core.agents.issues import Issue  # noqa: E402
 from twinklr.core.agents.sequencer.group_planner.holistic import (  # noqa: E402
     HolisticEvaluation,
 )
-from twinklr.core.agents.sequencer.group_planner.models import (  # noqa: E402
+from twinklr.core.agents.shared.judge.models import JudgeVerdict  # noqa: E402
+from twinklr.core.sequencer.planning import MacroPlan  # noqa: E402
+from twinklr.core.sequencer.templates.group.models import (  # noqa: E402
     SectionCoordinationPlan,
 )
-from twinklr.core.agents.sequencer.macro_planner.models import MacroPlan  # noqa: E402
-from twinklr.core.agents.shared.judge.models import JudgeVerdict  # noqa: E402
 
 # Map agent names to their response models
 AGENT_MODELS: dict[str, type] = {

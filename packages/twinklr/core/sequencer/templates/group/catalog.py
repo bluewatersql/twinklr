@@ -6,14 +6,10 @@ Converts GroupTemplateRegistry → TemplateCatalog.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 from pydantic import BaseModel, ConfigDict, Field
 
-if TYPE_CHECKING:
-    from twinklr.core.agents.sequencer.group_planner.models import LaneKind
-
 from twinklr.core.sequencer.templates.group.library import REGISTRY
+from twinklr.core.sequencer.vocabulary import GroupTemplateType, LaneKind
 
 
 class TemplateCatalogEntry(BaseModel):
@@ -113,10 +109,6 @@ def build_template_catalog() -> TemplateCatalog:
         >>> len(catalog.entries)
         61  # BASE (14) + RHYTHM (26) + ACCENT (21)
     """
-    # Import here to avoid circular dependency
-    from twinklr.core.agents.sequencer.group_planner.models import LaneKind
-    from twinklr.core.sequencer.templates.group.enums import GroupTemplateType
-
     infos = REGISTRY.list_all()
 
     # Map template types to lanes (only BASE, RHYTHM, ACCENT have corresponding lanes)

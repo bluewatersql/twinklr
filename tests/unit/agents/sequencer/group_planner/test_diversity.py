@@ -1,6 +1,14 @@
 """Tests for diversity validators."""
 
-from twinklr.core.agents.sequencer.group_planner.models import (
+from twinklr.core.agents.sequencer.group_planner.validators import (
+    DIVERSITY_CONSTRAINTS,
+    LaneDiversityStats,
+    ValidationSeverity,
+    compute_lane_stats,
+    validate_lane_diversity,
+    validate_section_diversity,
+)
+from twinklr.core.sequencer.templates.group.models import (
     CoordinationMode,
     CoordinationPlan,
     GroupPlacement,
@@ -10,14 +18,8 @@ from twinklr.core.agents.sequencer.group_planner.models import (
     TimeRef,
     TimeRefKind,
 )
-from twinklr.core.agents.sequencer.group_planner.validators import (
-    DIVERSITY_CONSTRAINTS,
-    LaneDiversityStats,
-    ValidationSeverity,
-    compute_lane_stats,
-    validate_lane_diversity,
-    validate_section_diversity,
-)
+
+from .conftest import DEFAULT_THEME
 
 
 class TestDiversityConstraints:
@@ -254,6 +256,7 @@ class TestValidateSectionDiversity:
         """Test validating minimal plan."""
         plan = SectionCoordinationPlan(
             section_id="section1",
+            theme=DEFAULT_THEME,
             lane_plans=[
                 LanePlan(
                     lane=LaneKind.BASE,
@@ -282,6 +285,7 @@ class TestValidateSectionDiversity:
 
         plan = SectionCoordinationPlan(
             section_id="section1",
+            theme=DEFAULT_THEME,
             lane_plans=[
                 LanePlan(
                     lane=LaneKind.BASE,
@@ -317,6 +321,7 @@ class TestValidateSectionDiversity:
 
         plan = SectionCoordinationPlan(
             section_id="section1",
+            theme=DEFAULT_THEME,
             lane_plans=[
                 LanePlan(
                     lane=LaneKind.BASE,
@@ -364,6 +369,7 @@ class TestValidateSectionDiversity:
 
         plan = SectionCoordinationPlan(
             section_id="section1",
+            theme=DEFAULT_THEME,
             lane_plans=[
                 LanePlan(
                     lane=LaneKind.BASE,
