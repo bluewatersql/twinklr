@@ -725,7 +725,7 @@
     "recommended_contrast": "HIGH",
     "recommended_motion_density": "BUSY",
     "recommended_asset_usage": "SPARSE",
-    "recommended_color_story": [
+    "palette_color_guidance": [
       "cool",
       "high-contrast",
       "red-green accents",

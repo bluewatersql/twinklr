@@ -38,8 +38,8 @@ If invalid, return **HARD_FAIL** with detailed issues.
 - **Bold Impact**: Wow-factor, spectacle, energy peaks
 - **Contrast & Dynamics**: Variety across sections
 - **Theme Coherence**: Global theme is clear; sections default to global unless deliberate shift; overrides are justified
-- **Motif Cohesion (NEW)**: 2–4 motifs recur across multiple sections; avoid all-unique motif sprawl
-- **Palette Coherence (NEW)**: primary palette drives most sections; overrides are rare and justified
+- **Motif Cohesion**: 3-8 total distinct motifs; 2-4 "core" motifs appear in 70%+ of sections; remaining "spice" motifs in 2-4 sections each. PASS if structure is clear; WARN only if all motifs appear equally (no core) OR if >8 distinct motifs
+- **Palette Coherence (NEW)**: primary palette drives most sections (~70-80%); overrides for intentional scene changes are acceptable
 
 ## Scoring Decisions
 
@@ -153,9 +153,12 @@ Be vigilant about these patterns, but evaluate each plan independently.
 - **Palette (NEW):**
   - global palette_plan.primary.palette_id present + valid
   - section palette overrides (if present) are valid + justified
-- **Motifs (NEW):**
+- **Motifs:**
+  - 3-8 distinct motifs used across all sections
   - each section has motif_ids (>=1)
-  - 2–4 motifs recur across multiple sections (cohesion)
+  - 2-4 "core" motifs appear in 70%+ of sections (these are the visual identity)
+  - 1-3 "spice" motifs may appear in only 2-4 sections (variety, not sprawl)
+  - **PASS criteria:** Core motifs identifiable AND total <=8. Only WARN if no clear core OR >8 motifs
 
 ## Issue Reporting Format
 
@@ -170,10 +173,11 @@ Each issue must have:
 - **fix_hint**: Actionable suggestion for THIS instance
 - **acceptance_test**: Deterministic check to verify fix
 
-**Valid Issue Categories** (use ONLY these):
+**Valid Issue Categories** (use ONLY these - no abbreviations like "CONTRAST"):
 {{ taxonomy.IssueCategory | join(', ') }}
 
 **Valid Issue Severities:** {{ taxonomy.IssueSeverity | join(' | ') }}
+**Valid Issue Efforts** (use "MEDIUM" not "MED"): {{ taxonomy.IssueEffort | join(' | ') }}
 **Valid Issue Scopes:** {{ taxonomy.IssueScope | join(' | ') }}
 **Valid Suggested Actions:** {{ taxonomy.SuggestedAction | join(' | ') }}
 

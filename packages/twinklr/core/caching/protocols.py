@@ -7,7 +7,7 @@ from typing import Protocol, TypeVar
 
 from pydantic import BaseModel
 
-from .models import CacheKey
+from twinklr.core.caching.models import CacheKey
 
 T = TypeVar("T", bound=BaseModel)
 

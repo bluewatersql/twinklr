@@ -205,7 +205,7 @@
       "recommended_contrast": "LOW",
       "recommended_motion_density": "SPARSE",
       "recommended_asset_usage": "SPARSE",
-      "recommended_color_story": ["warm", "soft", "flowing"],
+      "palette_color_guidance": ["warm", "soft", "flowing"],
       "cautions": [
         "Respect the calm, meditative nature of the piece",
         "Avoid jarring transitions or sudden movements",

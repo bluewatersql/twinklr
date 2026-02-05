@@ -55,6 +55,7 @@ Provides section plan and context for evaluation
 
 {% for entry in template_catalog.entries %}
 - `{{ entry.template_id }}` ({{ entry.compatible_lanes | map(attribute="value") | join(", ") }}) - {{ entry.name }}
+  {% if entry.affinity_tags %}affinity: {{ entry.affinity_tags | join(", ") }}{% endif %}
 {% endfor %}
 
 ---

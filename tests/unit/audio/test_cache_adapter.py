@@ -109,6 +109,7 @@ class TestLoadAudioFeatures:
                 return_value=audio_hash,
             ):
                 key = CacheKey(
+                    domain="audio",
                     step_id="audio.features",
                     step_version="3",
                     input_fingerprint=audio_hash,

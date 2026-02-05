@@ -90,6 +90,29 @@ def get_taxonomy_dict() -> dict[str, list[str]]:
     return taxonomy
 
 
+def get_supported_motif_ids() -> set[str]:
+    """Get set of motif IDs that have at least one template with corresponding affinity_tag.
+
+    Returns:
+        Set of motif IDs (without 'motif.' prefix) that are supported by templates.
+        Example: {"sparkles", "dots", "wave_bands", "radial_rays"}
+    """
+    # Import templates (ensures builtins are loaded)
+    import twinklr.core.sequencer.templates.group.builtins  # noqa: F401
+    from twinklr.core.sequencer.templates.group.library import list_group_templates
+
+    # Get all unique motif.* tags from template affinity_tags
+    motif_tags = set()
+    for template in list_group_templates():
+        for tag in template.affinity_tags:
+            if isinstance(tag, str) and tag.startswith("motif."):
+                # Extract motif ID (e.g., "motif.sparkles" -> "sparkles")
+                motif_id = tag[6:]  # Remove "motif." prefix
+                motif_tags.add(motif_id)
+
+    return motif_tags
+
+
 def get_theming_catalog_dict() -> dict[str, list[dict[str, str]]]:
     """Get dictionary of theming catalog items for prompt injection.
 
@@ -146,7 +169,8 @@ def get_theming_catalog_dict() -> dict[str, list[dict[str, str]]]:
         for info in list_themes()
     ]
 
-    # Extract motifs
+    # Extract motifs (filtered to only those with template support)
+    supported_motifs = get_supported_motif_ids()
     catalog["motifs"] = [
         {
             "id": info.motif_id,
@@ -154,6 +178,7 @@ def get_theming_catalog_dict() -> dict[str, list[dict[str, str]]]:
             "energy": ",".join(info.preferred_energy),
         }
         for info in list_motifs()
+        if info.motif_id in supported_motifs
     ]
 
     return catalog
@@ -161,6 +186,8 @@ def get_theming_catalog_dict() -> dict[str, list[dict[str, str]]]:
 
 def get_theming_ids() -> dict[str, list[str]]:
     """Get simple lists of theming catalog IDs for prompt injection.
+
+    Motif IDs are filtered to only those with template support.
 
     Returns:
         Dict with keys 'palette_ids', 'tag_ids', 'theme_ids', 'motif_ids',
@@ -173,11 +200,16 @@ def get_theming_ids() -> dict[str, list[str]]:
         THEME_REGISTRY,
     )
 
+    # Filter motifs to only those with template support
+    supported_motifs = get_supported_motif_ids()
+    all_motif_ids = set(MOTIF_REGISTRY.list_ids())
+    filtered_motif_ids = sorted(all_motif_ids & supported_motifs)
+
     return {
         "palette_ids": PALETTE_REGISTRY.list_ids(),
         "tag_ids": TAG_REGISTRY.list_ids(),
         "theme_ids": THEME_REGISTRY.list_ids(),
-        "motif_ids": MOTIF_REGISTRY.list_ids(),
+        "motif_ids": filtered_motif_ids,
     }
 
 

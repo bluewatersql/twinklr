@@ -601,6 +601,8 @@ async def test_execute_step_cache_key_structure(
     # Extract CacheKey from call args (first positional argument)
     cache_key: CacheKey = load_call_args.args[0]
 
+    assert cache_key.domain == "pipeline"
+    assert cache_key.session_id == mock_context.session.session_id
     assert cache_key.step_id == "my_stage"
     assert cache_key.step_version == "v2"
     assert cache_key.input_fingerprint == cache_key_hash

@@ -25,20 +25,29 @@ Refinement iterations (2+) use user_refinement.j2 instead.
 **Section Notes:** {{ notes }}
 {% endif %}
 
-## MacroPlan Palette + Motifs (NEW)
+## MacroPlan Palette + Motifs (REQUIRED - Copy to Your Response)
 
 {% if palette_ref_json %}
-Resolved palette for this section (inherit global primary unless override):
+**Resolved Palette for This Section** (COPY THIS EXACTLY to your response):
 {{ palette_ref_json }}
 {% else %}
-Resolved palette for this section: MISSING
+**ERROR:** Palette information missing from MacroPlan
 {% endif %}
 
 {% if motif_ids %}
-Motif IDs for this section:
-- {{ motif_ids | join(", ") }}
+**Motif IDs for This Section** (COPY THIS EXACTLY to your response):
+{{ motif_ids | join(", ") }}
+
+**Template Selection with Motif Alignment:**
+These motifs represent visual themes for this section. Prefer templates with matching affinity tags to enhance variety and thematic coherence:
+{% for motif_id in motif_ids %}
+- Templates with `motif.{{ motif_id }}` for "{{ motif_id }}"
+{% endfor %}
+
+You don't need to match ALL motifs, but aim for good alignment between templates and motifs where it fits the section's energy and intent.
+
 {% else %}
-Motif IDs for this section: MISSING
+**ERROR:** Motif IDs missing from MacroPlan
 {% endif %}
 
 {% if motif_catalog_summary %}
@@ -107,10 +116,12 @@ Motif Catalog (summary for reference):
 
 ## Theme Context (from MacroPlan)
 
-ThemeRef for this section:
+**ThemeRef for This Section** (COPY THIS EXACTLY to your response):
 {{ theme_ref_json }}
 
-Theme defaults:
+**CRITICAL:** You MUST include this exact theme, palette, and motif_ids in your SectionCoordinationPlan response. Do not use placeholders like "MISSING" or leave these fields empty.
+
+Theme defaults (for reference only):
 - default_tags: {{ theme_definition.default_tags | join(", ") }}
 - style_tags: {{ theme_definition.style_tags | join(", ") }}
 - avoid_tags: {{ theme_definition.avoid_tags | join(", ") }}
@@ -122,15 +133,23 @@ Create a SectionCoordinationPlan for **{{ section_name }} ({{ section_id }})** t
 
 1. **Assigns lanes** - BASE (foundation), RHYTHM (motion), ACCENT (highlights)
 2. **Selects templates** - From the catalog above, matching section intent
+   - Align with motifs: {{ motif_ids | join(", ") }}
+   - Prefer templates with matching `motif.*` affinity tags to enhance variety and coherence
 3. **Defines coordination** - How groups work together (UNIFIED, SEQUENCED, etc.)
 4. **Sets timing** - Using bar/beat TimeRefs within section bounds
 5. **Sets theme, palette, motifs**:
    - Copy theme from MacroPlan (do not invent theme_id)
    - Set palette (inherit unless MacroPlan override)
-   - Copy motif_ids from MacroPlan and ensure template selections provide motif.* coverage
+   - Copy motif_ids from MacroPlan exactly (these influence template selection for visual variety)
 
 **Remember:**
 - Primary targets ({{ primary_focus_targets | join(", ") }}) should get prominent ACCENT treatment
 - Energy target is {{ energy_target }} - design accordingly
 - Motion density is {{ motion_density }} - adjust complexity
 - **Intensity limits:** BASE ≤1.10, RHYTHM ≤1.20, ACCENT ≤1.30
+- **Timing:** Use BAR_BEAT with `offset_ms: null` (never use `offset_ms: 0`); ensure start < end (no zero-duration placements)
+
+**Common Mistakes to Avoid:**
+1. **Zero-duration placements:** Start and end must be different (e.g., bar 1:1→1:1 is INVALID)
+2. **Identical accents:** Stagger timing by 1+ beat OR vary template/intensity on at least one primary target
+3. **Intensity exceeding limits:** Check every placement against lane max (BASE≤1.10, RHYTHM≤1.20, ACCENT≤1.30)

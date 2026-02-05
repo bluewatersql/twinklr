@@ -36,6 +36,8 @@ from twinklr.core.agents.sequencer.group_planner.stage import (
     GroupPlanAggregatorStage,
     GroupPlannerStage,
 )
+
+# from twinklr.core.agents.sequencer.holistic_evaluator.stage import HolisticEvaluatorStage  # Not yet implemented
 from twinklr.core.agents.sequencer.macro_planner.stage import MacroPlannerStage
 from twinklr.core.pipeline import (
     ExecutionPattern,
@@ -216,7 +218,7 @@ async def main() -> None:
                     display_graph=display_graph,
                     template_catalog=template_catalog,
                     max_iterations=session.job_config.agent.max_iterations,
-                    min_pass_score=7.0,
+                    min_pass_score=session.job_config.agent.success_threshold / 10.0,
                 ),
                 inputs=["macro"],
                 pattern=ExecutionPattern.FAN_OUT,
@@ -229,7 +231,7 @@ async def main() -> None:
                 inputs=["groups"],
                 description="Aggregate section plans into GroupPlanSet",
             ),
-            # # Stage 6: Holistic Evaluation
+            # # Stage 6: Holistic Evaluation (Not yet implemented)
             # StageDefinition(
             #     id="holistic",
             #     stage=HolisticEvaluatorStage(
@@ -364,15 +366,16 @@ async def main() -> None:
         print(f"📄 Group plan set: {group_plan_path.stem}")
 
     # Holistic evaluation
-    if "holistic" in result.outputs:
-        holistic_eval = result.outputs["holistic"]
-        holistic_path = save_artifact(
-            holistic_eval.model_dump(),
-            song_name,
-            "holistic_evaluation.json",
-            output_dir,
-        )
-        print(f"📄 Holistic evaluation: {holistic_path.stem}")
+    # # Holistic evaluation (not yet implemented)
+    # if "holistic" in result.outputs:
+    #     holistic_eval = result.outputs["holistic"]
+    #     holistic_path = save_artifact(
+    #         holistic_eval.model_dump(),
+    #         song_name,
+    #         "holistic_evaluation.json",
+    #         output_dir,
+    #     )
+    #     print(f"📄 Holistic evaluation: {holistic_path.stem}")
 
     # Metrics summary
     print_subsection("Pipeline Metrics")
@@ -394,13 +397,13 @@ async def main() -> None:
         print("  5. Aggregator (collect section plans)")
         print("  6. Holistic Evaluation")
 
-        if "holistic" in result.outputs:
-            holistic = result.outputs["holistic"]
-            print(f"\n🎯 Final Score: {holistic.score:.1f}/10")
-            print(f"   Status: {holistic.status.value}")
-            print(f"   Approved: {'✅ Yes' if holistic.is_approved else '❌ No'}")
-            if holistic.cross_section_issues:
-                print(f"   Issues: {len(holistic.cross_section_issues)}")
+        # if "holistic" in result.outputs:
+        #     holistic = result.outputs["holistic"]
+        #     print(f"\n🎯 Final Score: {holistic.score:.1f}/10")
+        #     print(f"   Status: {holistic.status.value}")
+        #     print(f"   Approved: {'✅ Yes' if holistic.is_approved else '❌ No'}")
+        #     if holistic.cross_section_issues:
+        #         print(f"   Issues: {len(holistic.cross_section_issues)}")
 
         if "aggregate" in result.outputs:
             gps = result.outputs["aggregate"]

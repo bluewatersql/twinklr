@@ -772,7 +772,9 @@ def test_template_simplification_drops_expected_fields(
     assert "description" not in shaped_entry
     assert "presets" not in shaped_entry
     assert "category" not in shaped_entry
-    assert "tags" not in shaped_entry
+    
+    # tags should be INCLUDED (needed for template selection heuristics)
+    assert "tags" in shaped_entry
 
 
 def test_judge_template_simplification_consistent(

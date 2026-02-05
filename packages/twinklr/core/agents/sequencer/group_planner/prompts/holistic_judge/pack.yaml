@@ -22,7 +22,8 @@ variables:
     - global_theme_id
     - global_palette_id
     - global_theme_tags
-    - color_story
+    - global_palette_primary
+    - global_palette_alternates
     - story_notes
     - section_theme_summary
     - learning_context

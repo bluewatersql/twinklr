@@ -1,164 +1,65 @@
-"""Tests for taxonomy utilities."""
+"""Tests for taxonomy utils."""
 
-from twinklr.core.agents.taxonomy_utils import get_taxonomy_dict, inject_taxonomy
-from twinklr.core.sequencer.vocabulary import (
-    BlendMode,
-    ChoreographyStyle,
-    EnergyTarget,
-    LayerRole,
-    MotionDensity,
-    TargetRole,
-    TimingDriver,
+from twinklr.core.agents.taxonomy_utils import (
+    get_supported_motif_ids,
+    get_theming_catalog_dict,
+    get_theming_ids,
 )
 
 
-def test_get_taxonomy_dict_includes_all_enums():
-    """Test that get_taxonomy_dict includes all taxonomy enums."""
-    taxonomy = get_taxonomy_dict()
+def test_get_supported_motif_ids():
+    """Test that get_supported_motif_ids returns only motifs with template support."""
+    supported = get_supported_motif_ids()
 
-    # Check all expected enum classes are present
-    expected_classes = [
-        "LayerRole",
-        "BlendMode",
-        "TimingDriver",
-        "TargetRole",
-        "EnergyTarget",
-        "ChoreographyStyle",
-        "MotionDensity",
-    ]
+    # Should return a set
+    assert isinstance(supported, set)
 
-    for class_name in expected_classes:
-        assert class_name in taxonomy, f"Missing {class_name} in taxonomy dict"
+    # Should have at least some motifs (we know templates have motif tags)
+    assert len(supported) > 0
+
+    # All returned motifs should be strings without 'motif.' prefix
+    for motif_id in supported:
+        assert isinstance(motif_id, str)
+        assert not motif_id.startswith("motif.")
 
 
-def test_get_taxonomy_dict_values_match_enums():
-    """Test that taxonomy dict values match actual enum values."""
-    taxonomy = get_taxonomy_dict()
+def test_theming_catalog_filters_orphaned_motifs():
+    """Test that get_theming_catalog_dict filters motifs to only those with templates."""
+    from twinklr.core.sequencer.theming import MOTIF_REGISTRY
 
-    # Verify LayerRole
-    assert set(taxonomy["LayerRole"]) == {e.value for e in LayerRole}
+    catalog = get_theming_catalog_dict()
+    supported = get_supported_motif_ids()
 
-    # Verify BlendMode
-    assert set(taxonomy["BlendMode"]) == {e.value for e in BlendMode}
+    # Catalog motifs should only include supported ones
+    catalog_motif_ids = {m["id"] for m in catalog["motifs"]}
+    assert catalog_motif_ids == supported
 
-    # Verify TimingDriver
-    assert set(taxonomy["TimingDriver"]) == {e.value for e in TimingDriver}
-
-    # Verify TargetRole
-    assert set(taxonomy["TargetRole"]) == {e.value for e in TargetRole}
-
-    # Verify EnergyTarget
-    assert set(taxonomy["EnergyTarget"]) == {e.value for e in EnergyTarget}
-
-    # Verify ChoreographyStyle
-    assert set(taxonomy["ChoreographyStyle"]) == {e.value for e in ChoreographyStyle}
-
-    # Verify MotionDensity
-    assert set(taxonomy["MotionDensity"]) == {e.value for e in MotionDensity}
+    # Should be fewer than total motifs in registry (unless all have templates)
+    all_motif_ids = set(MOTIF_REGISTRY.list_ids())
+    assert len(catalog_motif_ids) <= len(all_motif_ids)
 
 
-def test_get_taxonomy_dict_returns_strings():
-    """Test that taxonomy dict values are string lists."""
-    taxonomy = get_taxonomy_dict()
+def test_theming_ids_filters_orphaned_motifs():
+    """Test that get_theming_ids filters motif_ids to only those with templates."""
+    ids = get_theming_ids()
+    supported = get_supported_motif_ids()
 
-    for class_name, values in taxonomy.items():
-        assert isinstance(values, list), f"{class_name} values should be a list"
-        for value in values:
-            assert isinstance(value, str), f"{class_name} value {value} should be string"
+    # motif_ids should only include supported ones
+    assert set(ids["motif_ids"]) == supported
 
-
-def test_inject_taxonomy_adds_taxonomy_key():
-    """Test that inject_taxonomy adds taxonomy to variables."""
-    variables = {"foo": "bar"}
-    result = inject_taxonomy(variables)
-
-    assert "taxonomy" in result
-    assert "foo" in result
-    assert result["foo"] == "bar"
+    # Should be a sorted list
+    assert ids["motif_ids"] == sorted(ids["motif_ids"])
 
 
-def test_inject_taxonomy_preserves_existing_taxonomy():
-    """Test that inject_taxonomy doesn't overwrite existing taxonomy."""
-    custom_taxonomy = {"LayerRole": ["CUSTOM_ROLE"]}
-    variables = {"taxonomy": custom_taxonomy}
+def test_motif_filtering_consistency():
+    """Test that all three functions return consistent motif filtering."""
+    supported = get_supported_motif_ids()
+    catalog = get_theming_catalog_dict()
+    ids = get_theming_ids()
 
-    result = inject_taxonomy(variables)
+    # All should agree on which motifs are supported
+    catalog_motifs = {m["id"] for m in catalog["motifs"]}
+    ids_motifs = set(ids["motif_ids"])
 
-    assert result["taxonomy"] == custom_taxonomy
-
-
-def test_inject_taxonomy_returns_new_dict():
-    """Test that inject_taxonomy returns a new dict (doesn't mutate input)."""
-    variables = {"foo": "bar"}
-    result = inject_taxonomy(variables)
-
-    assert "taxonomy" not in variables
-    assert "taxonomy" in result
-    assert variables is not result
-
-
-def test_taxonomy_includes_all_layer_roles():
-    """Test that taxonomy includes all LayerRole values."""
-    taxonomy = get_taxonomy_dict()
-
-    expected_roles = {"BASE", "RHYTHM", "ACCENT", "HIGHLIGHT", "FILL", "TEXTURE", "CUSTOM"}
-    assert set(taxonomy["LayerRole"]) == expected_roles
-
-
-def test_taxonomy_includes_all_target_roles():
-    """Test that taxonomy includes all TargetRole values."""
-    taxonomy = get_taxonomy_dict()
-
-    expected_roles = {
-        "OUTLINE",
-        "MEGA_TREE",
-        "HERO",
-        "ARCHES",
-        "TREES",
-        "PROPS",
-        "FLOODS",
-        "ACCENTS",
-        "WINDOWS",
-        "MATRIX",
-        "MOVING_HEADS",
-    }
-    assert set(taxonomy["TargetRole"]) == expected_roles
-
-
-def test_taxonomy_includes_issue_enums():
-    """Test that taxonomy includes issue-related enums for judge agents."""
-    taxonomy = get_taxonomy_dict()
-
-    # Check issue-related enum classes are present
-    expected_issue_enums = [
-        "IssueCategory",
-        "IssueSeverity",
-        "IssueEffort",
-        "IssueScope",
-        "SuggestedAction",
-    ]
-
-    for enum_name in expected_issue_enums:
-        assert enum_name in taxonomy, f"Missing {enum_name} in taxonomy dict"
-        assert isinstance(taxonomy[enum_name], list), f"{enum_name} should be a list"
-        assert len(taxonomy[enum_name]) > 0, f"{enum_name} should not be empty"
-
-
-def test_taxonomy_issue_category_values():
-    """Test that IssueCategory values match the actual enum."""
-    from twinklr.core.agents.issues import IssueCategory
-
-    taxonomy = get_taxonomy_dict()
-
-    expected_categories = {e.value for e in IssueCategory}
-    assert set(taxonomy["IssueCategory"]) == expected_categories
-
-
-def test_taxonomy_issue_severity_values():
-    """Test that IssueSeverity values match the actual enum."""
-    from twinklr.core.agents.issues import IssueSeverity
-
-    taxonomy = get_taxonomy_dict()
-
-    expected_severities = {e.value for e in IssueSeverity}
-    assert set(taxonomy["IssueSeverity"]) == expected_severities
+    assert catalog_motifs == supported
+    assert ids_motifs == supported

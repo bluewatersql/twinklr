@@ -15,6 +15,10 @@ class CacheKey(BaseModel):
     - Input fingerprint (SHA256 of canonicalized inputs)
     """
 
+    domain: str = Field(description="Cache domain (e.g., 'audio', 'sequencer')")
+    session_id: str | None = Field(
+        default=None, description="Session identifier (e.g., '1234567890')"
+    )
     step_id: str = Field(description="Stable step identifier (e.g., 'audio.features')")
     step_version: str = Field(description="Step version string (bump on logic/schema changes)")
     input_fingerprint: str = Field(description="SHA256 hex digest of canonicalized inputs")
@@ -30,7 +34,11 @@ class CacheMeta(BaseModel):
     Presence of meta.json indicates a complete, valid cache entry.
     """
 
-    step_id: str
+    domain: str = Field(description="Cache domain (e.g., 'audio', 'sequencer')")
+    session_id: str | None = Field(
+        default=None, description="Session identifier (e.g., '1234567890')"
+    )
+    step_id: str = Field(description="Stable step identifier (e.g., 'audio.features')")
     step_version: str
     input_fingerprint: str
     created_at: float = Field(description="Unix timestamp (seconds)")

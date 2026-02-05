@@ -23,16 +23,17 @@ from twinklr.core.sequencer.vocabulary import LaneKind
 logger = logging.getLogger(__name__)
 
 
-# Template name patterns for intent-based filtering
-# Maps energy/density keywords to template name patterns that match well
+# Template name/tag patterns for intent-based filtering
+# Maps energy levels to patterns that match in template name, ID, or tags
+# Includes both descriptive keywords and common template tags (ambient, drive, hit, etc.)
 ENERGY_TEMPLATE_PATTERNS: dict[str, list[str]] = {
-    "LOW": ["glow", "soft", "warm", "gentle", "shimmer", "breathe", "slow"],
-    "MODERATE": ["pulse", "sweep", "wave", "flow", "ripple"],
-    "HIGH": ["chase", "strobe", "burst", "flash", "rapid"],
-    "PEAK": ["burst", "strobe", "hit", "flash", "slam", "big"],
-    "BUILD": ["pulse", "swell", "grow", "shimmer", "wave"],
-    "SUSTAIN": ["glow", "shimmer", "pulse", "steady"],
-    "RELEASE": ["soft", "fade", "gentle", "warm"],
+    "LOW": ["glow", "soft", "warm", "gentle", "shimmer", "breathe", "slow", "ambient"],
+    "MODERATE": ["pulse", "sweep", "wave", "flow", "ripple", "drive"],
+    "HIGH": ["chase", "strobe", "burst", "flash", "rapid", "drive", "hit"],
+    "PEAK": ["burst", "strobe", "hit", "flash", "slam", "big", "emphasis"],
+    "BUILD": ["pulse", "swell", "grow", "shimmer", "wave", "drive"],
+    "SUSTAIN": ["glow", "shimmer", "pulse", "steady", "ambient"],
+    "RELEASE": ["soft", "fade", "gentle", "warm", "ambient"],
 }
 
 # Minimum templates per lane (safety threshold)
@@ -43,16 +44,21 @@ def filter_templates_by_intent(
     catalog: TemplateCatalog,
     energy_target: str,
     motion_density: str,
+    motif_ids: list[str] | None = None,
 ) -> list[TemplateInfo]:
-    """Filter templates based on section intent.
+    """Filter templates based on section intent and motif requirements.
 
     Reduces template count to relevant options, saving tokens and improving
     planner focus. Falls back to full catalog if filtering is too aggressive.
+
+    IMPORTANT: Templates with affinity_tags matching declared motif_ids are
+    always included to ensure motif-aligned options are available.
 
     Args:
         catalog: Full template catalog
         energy_target: Section energy target (LOW, MODERATE, HIGH, PEAK, BUILD, etc.)
         motion_density: Motion density (SPARSE, MODERATE, BUSY)
+        motif_ids: Optional list of motif IDs from the section plan
 
     Returns:
         Filtered list of template entries (empty list if catalog is empty)
@@ -61,23 +67,55 @@ def filter_templates_by_intent(
         logger.debug("Template catalog is empty, returning empty list")
         return []
 
+    # Build motif affinity tags to match (e.g., ["motif.grid", "motif.light_trails"])
+    motif_tags = {f"motif.{mid}" for mid in (motif_ids or [])}
+
     # Get patterns for this energy target
     patterns = ENERGY_TEMPLATE_PATTERNS.get(energy_target.upper(), [])
 
-    # If no patterns for this energy, use all templates
-    if not patterns:
+    # If no patterns for this energy and no motifs, use all templates
+    if not patterns and not motif_tags:
         logger.debug(f"No filter patterns for energy '{energy_target}', using full catalog")
         return list(catalog.entries)
 
-    # Filter templates whose names contain any of the patterns
+    # Filter templates by energy patterns AND motif affinity tags (when both specified)
+    # This provides tighter filtering than OR logic, ensuring templates match section intent
     filtered = []
+    filtered_ids = set()
     for entry in catalog.entries:
         name_lower = entry.name.lower()
         template_id_lower = entry.template_id.lower()
+        # Also check template tags for energy patterns (e.g., "ambient", "drive", "burst")
+        tags_lower = [str(tag).lower() for tag in (entry.tags or [])]
 
-        # Check if any pattern matches in name or ID
-        if any(pattern in name_lower or pattern in template_id_lower for pattern in patterns):
+        # Check if template matches energy patterns (in name, ID, or tags)
+        energy_match = patterns and any(
+            pattern in name_lower or pattern in template_id_lower or any(pattern in tag for tag in tags_lower)
+            for pattern in patterns
+        )
+
+        # Check if template matches declared motifs
+        motif_match = motif_tags and any(tag in motif_tags for tag in entry.affinity_tags)
+
+        # Filtering logic:
+        # - If both patterns and motifs specified: require BOTH to match (AND)
+        # - If only patterns specified: require pattern match
+        # - If only motifs specified: require motif match
+        if patterns and motif_tags:
+            # Both specified - use AND logic for tighter filtering
+            include = energy_match and motif_match
+        elif patterns:
+            # Only energy patterns - use energy match
+            include = energy_match
+        elif motif_tags:
+            # Only motifs - use motif match
+            include = motif_match
+        else:
+            include = False
+
+        if include and entry.template_id not in filtered_ids:
             filtered.append(entry)
+            filtered_ids.add(entry.template_id)
 
     # Safety check: ensure minimum per lane
     for lane in LaneKind:
@@ -182,12 +220,14 @@ def shape_planner_context(section_context: SectionPlanningContext) -> dict[str, 
                 filtered_layer_intents.append(layer)
 
     # Filter and simplify template catalog
-    # 1. Filter by section intent (energy, density) to reduce options
+    # 1. Filter by section intent (energy, density, motifs) to reduce options
     # 2. Simplify entries (drop descriptions to save tokens)
+    # NOTE: motif_ids ensures templates matching declared motifs are always included
     filtered_entries = filter_templates_by_intent(
         section_context.template_catalog,
         section_context.energy_target,
         section_context.motion_density,
+        motif_ids=section_context.motif_ids,
     )
 
     simplified_catalog = {
@@ -199,7 +239,8 @@ def shape_planner_context(section_context: SectionPlanningContext) -> dict[str, 
                 "compatible_lanes": entry.compatible_lanes,
                 "affinity_tags": entry.affinity_tags,
                 "avoid_tags": entry.avoid_tags,
-                # Drop: description, presets, category (save ~40% tokens)
+                "tags": entry.tags,  # Template characteristics (e.g., "sweep", "static")
+                # Drop: description, presets, category (save ~35% tokens)
             }
             for entry in filtered_entries
         ],
@@ -243,9 +284,38 @@ def shape_planner_context(section_context: SectionPlanningContext) -> dict[str, 
         except Exception as e:
             logger.warning(f"Failed to resolve theme '{section_context.theme.theme_id}': {e}")
 
-    # Get tag catalog for validation
+    # Prepare palette context (from MacroSectionPlan palette override or theme default)
+    palette_ref_json: str = "{}"
+    if section_context.palette:
+        # Section has explicit palette override
+        palette_ref_json = json.dumps(section_context.palette, indent=2)
+    elif section_context.theme and section_context.theme.palette_id:
+        # Use theme's palette override
+        palette_ref_json = json.dumps({"palette_id": section_context.theme.palette_id}, indent=2)
+    elif theme_definition_dict.get("default_palette_id"):
+        # Use theme definition's default palette
+        palette_ref_json = json.dumps(
+            {"palette_id": theme_definition_dict["default_palette_id"]}, indent=2
+        )
+
+    # Get tag catalog and motif catalog for validation
     theming_catalog = get_theming_catalog_dict()
     tag_catalog = theming_catalog["tags"]
+    motif_catalog = theming_catalog.get("motifs", [])
+
+    # Build motif catalog summary (compact for prompt)
+    motif_catalog_summary = ""
+    if motif_catalog:
+        motif_lines = []
+        for motif in motif_catalog[:15]:  # Limit to avoid token bloat
+            motif_id = motif.get("id", "")
+            desc = motif.get("description", "")
+            energy = motif.get("energy", "")
+            line = f"  - {motif_id}: {desc[:60]}{'...' if len(desc) > 60 else ''}"
+            if energy:
+                line += f" (energy: {energy})"
+            motif_lines.append(line)
+        motif_catalog_summary = "\n".join(motif_lines)
 
     return {
         # Section identity
@@ -266,8 +336,12 @@ def shape_planner_context(section_context: SectionPlanningContext) -> dict[str, 
         "template_catalog": simplified_catalog,  # Stripped to essentials
         "layer_intents": filtered_layer_intents,  # Only relevant layers
         # Theme context from MacroPlan
+        "theme_ref": section_context.theme,  # ThemeRef object for refinement prompt
         "theme_ref_json": theme_ref_json,
         "theme_definition": theme_definition_dict,
+        "palette_ref_json": palette_ref_json,  # Palette for this section
+        "motif_ids": section_context.motif_ids,  # Motifs for this section
+        "motif_catalog_summary": motif_catalog_summary,  # Motif reference guide
         "tag_catalog": tag_catalog,  # For tag validation
         # timing_context excluded (not used in prompt)
     }
@@ -341,6 +415,10 @@ def shape_section_judge_context(
 
     # Get theming IDs for validation
     theming_ids = get_theming_ids()
+    
+    # Get motif catalog for validation and template support checking
+    from twinklr.core.agents.taxonomy_utils import get_theming_catalog_dict
+    theming_catalog = get_theming_catalog_dict()
 
     return {
         # Section identity
@@ -361,6 +439,7 @@ def shape_section_judge_context(
         # Theme context for validation
         "theme_definition": theme_definition_dict,
         "theming_ids": theming_ids,  # For validating theme_id, tags, palette_id
+        "motif_catalog": theming_catalog["motifs"],  # For validating motif_ids and checking template support
         # Excluded: timing_context, layer_intents, notes
     }
 
@@ -408,8 +487,24 @@ def shape_holistic_judge_context(
     global_theme_id = global_theme.get("theme_id") if isinstance(global_theme, dict) else None
     global_palette_id = global_theme.get("palette_id") if isinstance(global_theme, dict) else None
     global_theme_tags = global_theme.get("tags", []) if isinstance(global_theme, dict) else []
-    color_story = global_story.get("color_story", "") if isinstance(global_story, dict) else ""
     story_notes = global_story.get("story_notes", "") if isinstance(global_story, dict) else ""
+
+    # Extract palette_plan if available
+    palette_plan = global_story.get("palette_plan", {}) if isinstance(global_story, dict) else {}
+    global_palette_primary = (
+        palette_plan.get("primary", {}).get("palette_id")
+        if isinstance(palette_plan, dict)
+        else None
+    )
+    global_palette_alternates = (
+        [
+            alt.get("palette_id")
+            for alt in palette_plan.get("alternates", [])
+            if isinstance(alt, dict)
+        ]
+        if isinstance(palette_plan, dict)
+        else []
+    )
 
     # Extract section theme summaries for cross-section analysis
     section_theme_summary = []
@@ -437,7 +532,8 @@ def shape_holistic_judge_context(
         "global_theme_id": global_theme_id,
         "global_palette_id": global_palette_id,
         "global_theme_tags": global_theme_tags,
-        "color_story": color_story,
+        "global_palette_primary": global_palette_primary,
+        "global_palette_alternates": global_palette_alternates,
         "story_notes": story_notes,
         "section_theme_summary": section_theme_summary,
         # template_catalog excluded (not used in prompt)

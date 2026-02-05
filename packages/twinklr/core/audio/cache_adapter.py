@@ -93,6 +93,7 @@ async def load_audio_features_async(
 
         # Create cache key
         key = CacheKey(
+            domain="audio",
             step_id="audio.features",
             step_version=step_version,
             input_fingerprint=audio_hash,
@@ -134,6 +135,7 @@ async def save_audio_features_async(
 
         # Create cache key
         key = CacheKey(
+            domain="audio",
             step_id="audio.features",
             step_version=step_version,
             input_fingerprint=audio_hash,

@@ -580,7 +580,7 @@ class AudioAnalyzer:
         # Validate
         validation_warnings = validate_features(features)
         if validation_warnings:
-            logger.warning(f"Feature validation warnings: {validation_warnings}")
+            logger.debug(f"Feature validation warnings: {validation_warnings}")
 
         return features
 

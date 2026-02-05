@@ -14,7 +14,6 @@ Uses the Pipeline Framework for declarative, parallel execution.
 import argparse
 import asyncio
 import json
-import os
 from pathlib import Path
 import sys
 
@@ -26,16 +25,11 @@ import logging
 from twinklr.core.agents.audio.lyrics.stage import LyricsStage
 from twinklr.core.agents.audio.profile.stage import AudioProfileStage
 from twinklr.core.agents.audio.stages.analysis import AudioAnalysisStage
-from twinklr.core.agents.logging import create_llm_logger
-from twinklr.core.agents.providers.openai import OpenAIProvider
 from twinklr.core.agents.sequencer.macro_planner.stage import MacroPlannerStage
 from twinklr.core.agents.sequencer.moving_heads.rendering_stage import (
     MovingHeadRenderingStage,
 )
 from twinklr.core.agents.sequencer.moving_heads.stage import MovingHeadStage
-from twinklr.core.caching import FSCache
-from twinklr.core.config.loader import load_app_config, load_job_config
-from twinklr.core.io import RealFileSystem, absolute_path
 from twinklr.core.pipeline import (
     ExecutionPattern,
     PipelineContext,
@@ -45,6 +39,7 @@ from twinklr.core.pipeline import (
 )
 from twinklr.core.sequencer.moving_heads.templates import load_builtin_templates
 from twinklr.core.sequencer.moving_heads.templates.library import list_templates
+from twinklr.core.session import TwinklrSession
 from twinklr.core.utils.formatting import clean_audio_filename
 from twinklr.core.utils.logging import configure_logging
 
@@ -101,17 +96,6 @@ async def main() -> None:
 
     print_section("Moving Head Pipeline Demo (Pipeline Framework)", "=")
 
-    # Check API key
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        print("❌ ERROR: OPENAI_API_KEY environment variable not set")
-        print("\nTo run this demo:")
-        print("  export OPENAI_API_KEY='your-key-here'")
-        print("  python scripts/demo.py [audio_file]")
-        sys.exit(1)
-
-    print("✅ OpenAI API key found")
-
     # Setup paths
     repo_root = Path(__file__).parent.parent
     audio_path = Path(args.audio_file)
@@ -122,24 +106,11 @@ async def main() -> None:
 
     song_name = clean_audio_filename(audio_path.stem)
     output_dir = args.output_dir or repo_root / "artifacts" / song_name
-    logging_dir = Path("data") / "logging"
 
     output_dir.mkdir(parents=True, exist_ok=True)
     print(f"📁 Output directory: {output_dir}")
 
-    # Load configuration
-    print_subsection("0. Loading Configuration")
-    try:
-        app_config = load_app_config(repo_root / "config.json")
-        job_config = load_job_config(repo_root / "job_config.json")
-
-        model = job_config.agent.plan_agent.model
-        print("✅ Configuration loaded")
-        print(f"   Model: {model}")
-        print(f"   Max iterations: {job_config.agent.max_iterations}")
-    except Exception as e:
-        print(f"❌ Could not load config: {e}")
-        sys.exit(1)
+    session = TwinklrSession.from_directory(repo_root)
 
     # Load Moving Head templates
     print_subsection("1. Loading Templates")
@@ -209,7 +180,7 @@ async def main() -> None:
                 stage=MovingHeadStage(
                     fixture_count=4,
                     available_templates=available_templates,
-                    max_iterations=job_config.agent.max_iterations,
+                    max_iterations=session.job_config.agent.max_iterations,
                     min_pass_score=7.0,
                 ),
                 inputs=["audio", "profile", "lyrics", "macro"],
@@ -250,38 +221,15 @@ async def main() -> None:
     # ========================================================================
     print_section("3. Pipeline Execution", "=")
 
-    # Setup caching infrastructure
-    fs = RealFileSystem()
+    # Initialize session services (caches, provider, logger)
+    await session.llm_cache.initialize()
+    await session.agent_cache.initialize()
+    print(f"🔄 LLM cache initialized: {session.llm_cache}")
+    print(f"💾 Agent cache initialized: {session.agent_cache}")
 
-    # LLM cache: Short-lived, transparent deduplication of identical LLM calls
-    llm_cache_dir = absolute_path("data/cache/llm")
-    llm_cache = FSCache(fs, llm_cache_dir)
-    await llm_cache.initialize()
-    print(f"🔄 LLM cache initialized: {llm_cache_dir}")
-
-    # Agent cache: Long-lived, deterministic caching of agent results
-    agent_cache_dir = absolute_path("data/cache/agents")
-    agent_cache = FSCache(fs, agent_cache_dir)
-    await agent_cache.initialize()
-    print(f"💾 Agent cache initialized: {agent_cache_dir}")
-
-    # Create provider with LLM cache
-    provider = OpenAIProvider(api_key=api_key, llm_cache=llm_cache)
-
-    llm_logger = create_llm_logger(
-        enabled=job_config.agent.llm_logging.enabled if job_config else False,
-        output_dir=logging_dir,
-        log_level=job_config.agent.llm_logging.log_level if job_config else "standard",
-        format=job_config.agent.llm_logging.format if job_config else "json",
-    )
-
-    # Create pipeline context with agent cache
+    # Create pipeline context with session
     pipeline_context = PipelineContext(
-        provider=provider,
-        app_config=app_config,
-        job_config=job_config,
-        cache=agent_cache,
-        llm_logger=llm_logger,
+        session=session,
         output_dir=output_dir,
     )
 

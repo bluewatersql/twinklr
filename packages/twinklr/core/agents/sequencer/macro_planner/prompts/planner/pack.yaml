@@ -23,6 +23,7 @@ variables:
     - lyric_context           # LyricContextModel with narrative/thematic analysis (None if no lyrics)
     - iteration               # Current iteration number (int, default: 0)
     - feedback                # Judge feedback from previous iteration (str)
+    - learning_context        # Historical learning context from past jobs (common issues to avoid)
 
     # Optional helpers (nice to have)
     - default_palette_id      # If theme has a default palette; can be derived upstream

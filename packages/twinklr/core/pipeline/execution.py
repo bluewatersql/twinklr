@@ -101,6 +101,8 @@ async def execute_step(
         try:
             cache_key_hash = await cache_key_fn()
             cache_key = CacheKey(
+                domain=stage_name,
+                session_id=context.session.session_id,
                 step_id=stage_name,
                 step_version=cache_version,
                 input_fingerprint=cache_key_hash,

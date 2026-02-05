@@ -289,10 +289,10 @@ class CreativeGuidance(BaseModel):
         description="Recommended asset (images/shaders) usage level"
     )
 
-    recommended_color_story: list[str] = Field(
+    palette_color_guidance: list[str] = Field(
         default_factory=list,
         max_length=5,
-        description="Recommended color palette themes (e.g., 'warm', 'cool', 'vibrant')",
+        description="Color characteristic hints for palette selection (e.g., 'warm', 'cool', 'high-contrast', 'vibrant')",
     )
 
     cautions: list[str] = Field(

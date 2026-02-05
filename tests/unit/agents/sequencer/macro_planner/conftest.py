@@ -1,7 +1,41 @@
 """Shared test fixtures for MacroPlanner tests."""
 
-from twinklr.core.sequencer.planning.models import MotifSpec
+from twinklr.core.sequencer.planning.models import MotifSpec, PalettePlan, PaletteRef
 from twinklr.core.sequencer.vocabulary import EnergyTarget
+
+
+def make_palette_plan(
+    primary_id: str = "core.christmas_traditional",
+    alternate_ids: list[str] | None = None,
+) -> PalettePlan:
+    """Create a valid PalettePlan for testing.
+
+    Args:
+        primary_id: Primary palette ID (default: core.christmas_traditional)
+        alternate_ids: Optional list of alternate palette IDs
+
+    Returns:
+        Valid PalettePlan instance
+    """
+    alternates = []
+    if alternate_ids:
+        for alt_id in alternate_ids:
+            alternates.append(
+                PaletteRef(
+                    palette_id=alt_id,
+                    role="ACCENT",
+                    intensity=1.0,
+                )
+            )
+
+    return PalettePlan(
+        primary=PaletteRef(
+            palette_id=primary_id,
+            role="PRIMARY",
+            intensity=1.0,
+        ),
+        alternates=alternates,
+    )
 
 
 def make_motif_spec(

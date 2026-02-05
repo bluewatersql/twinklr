@@ -11,22 +11,6 @@ Key features:
 - Pydantic model validation
 - Atomic commit pattern (artifact + meta)
 - Graceful error handling
-
-Example:
-    >>> from twinklr.core.caching import FSCache, CacheKey
-    >>> from twinklr.core.io import RealFileSystem, absolute_path
-    >>>
-    >>> fs = RealFileSystem()
-    >>> cache = FSCache(fs, absolute_path("data/cache"))
-    >>> await cache.initialize()
-    >>>
-    >>> key = CacheKey(
-    ...     step_id="audio.features",
-    ...     step_version="1",
-    ...     input_fingerprint="abc123..."
-    ... )
-    >>> await cache.store(key, my_pydantic_model)
-    >>> result = await cache.load(key, MyModel)
 """
 
 from twinklr.core.caching.backends.fs import FSCache, FSCacheSync

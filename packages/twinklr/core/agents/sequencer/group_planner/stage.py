@@ -196,6 +196,9 @@ class GroupPlannerStage:
             template_catalog=self.template_catalog,
             timing_context=timing_context,
             layer_intents=layer_intents,
+            theme=input.theme,
+            motif_ids=input.motif_ids,
+            palette=input.palette.model_dump() if input.palette else None,
         )
 
     def _build_timing_context(self, audio_bundle: Any) -> Any:

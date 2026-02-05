@@ -112,7 +112,7 @@ class MovingHeadStage:
             MovingHeadPlanningContext,
         )
         from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan
-        from twinklr.core.agents.sequencer.moving_heads.orchestrator_v2 import (
+        from twinklr.core.agents.sequencer.moving_heads.orchestrator import (
             MovingHeadPlannerOrchestrator,
         )
         from twinklr.core.agents.shared.judge.controller import IterationResult

@@ -89,7 +89,7 @@ def test_audio_profile_model_complete():
             recommended_contrast=Contrast.HIGH,
             recommended_motion_density=MotionDensity.BUSY,
             recommended_asset_usage=AssetUsage.SPARSE,
-            recommended_color_story=["vibrant", "energetic"],
+            palette_color_guidance=["vibrant", "energetic"],
         ),
         planner_hints=PlannerHints(
             section_objectives={"verse_1": ["Subtle movement"], "chorus_1": ["High energy"]},

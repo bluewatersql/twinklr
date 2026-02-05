@@ -27,7 +27,7 @@ from twinklr.core.sequencer.vocabulary import (
     TimingDriver,
 )
 
-from .conftest import make_motif_spec
+from .conftest import make_motif_spec, make_palette_plan
 
 
 def _make_global_theme() -> ThemeRef:
@@ -92,7 +92,7 @@ def valid_macro_plan(audio_profile: AudioProfileModel) -> MacroPlan:
                 make_motif_spec("crescendo", "Crescendo buildup pattern"),
             ],
             pacing_notes="Start calm and serene in the intro, build energy through the verses, and peak at the chorus with maximum impact.",
-            color_story="Cool blue for serenity, warm white for transitions, festive red for high-energy moments",
+            palette_plan=make_palette_plan(),
         ),
         layering_plan=LayeringPlan(
             layers=[

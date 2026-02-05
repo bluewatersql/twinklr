@@ -20,14 +20,6 @@ class FSCache:
     """
     Async filesystem-backed cache using core.io for all operations.
 
-    Layout:
-        {root}/
-          {step_id}/
-            {step_version}/
-              {input_fingerprint}/
-                artifact.json
-                meta.json (commit marker)
-
     The cache lazily initializes on first use (thread-safe).
     """
 
@@ -61,13 +53,12 @@ class FSCache:
 
     def _entry_dir(self, key: CacheKey) -> AbsolutePath:
         """Compute cache entry directory path (sync)."""
+
         step_id_safe = sanitize_path_component(key.step_id)
-        version_safe = sanitize_path_component(key.step_version)
 
         return self.fs.join(
             self.root,
             step_id_safe,
-            version_safe,
             key.input_fingerprint,
         )
 
@@ -213,6 +204,8 @@ class FSCache:
         ttl_seconds = ttl_seconds or self._ttl_seconds
 
         meta = CacheMeta(
+            domain=key.domain,
+            session_id=key.session_id,
             step_id=key.step_id,
             step_version=key.step_version,
             input_fingerprint=key.input_fingerprint,

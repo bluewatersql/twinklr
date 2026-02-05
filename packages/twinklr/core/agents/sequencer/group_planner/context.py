@@ -65,6 +65,18 @@ class SectionPlanningContext(BaseModel):
         description="Theme reference from MacroPlan for this section",
     )
 
+    # Motifs from MacroSectionPlan (required for template selection)
+    motif_ids: list[str] = Field(
+        default_factory=list,
+        description="Motif IDs from MacroPlan for this section",
+    )
+
+    # Palette override from MacroSectionPlan (optional)
+    palette: dict[str, Any] | None = Field(
+        default=None,
+        description="Palette override from MacroPlan for this section",
+    )
+
     @property
     def duration_ms(self) -> int:
         """Section duration in milliseconds."""
@@ -168,6 +180,8 @@ class GroupPlanningContext(BaseModel):
                 timing_context=self.timing_context,
                 layer_intents=layer_intents,
                 theme=theme,
+                motif_ids=section_plan.get("motif_ids", []),
+                palette=section_plan.get("palette"),
             )
             contexts.append(ctx)
 

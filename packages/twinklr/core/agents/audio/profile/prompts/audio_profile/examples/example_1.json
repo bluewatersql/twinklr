@@ -185,7 +185,7 @@
       "recommended_contrast": "HIGH",
       "recommended_motion_density": "BUSY",
       "recommended_asset_usage": "HEAVY",
-      "recommended_color_story": ["vibrant", "energetic", "pulsing", "electric"],
+      "palette_color_guidance": ["vibrant", "energetic", "pulsing", "electric"],
       "cautions": [
         "Intro is only 8s with rapid 0.30→0.70 ramp - instant-on at beat 1, not fade-in",
         "Three choruses with near-identical energy profiles (0.90-0.95) - must vary choreography to prevent repetition fatigue",

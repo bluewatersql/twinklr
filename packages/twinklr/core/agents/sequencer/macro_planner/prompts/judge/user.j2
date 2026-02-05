@@ -34,6 +34,40 @@ Available target roles:
 
 ---
 
+# Available Catalogs
+
+{% if theme_catalog is defined and theme_catalog %}
+## Theme Catalog (Valid theme_ids)
+
+{% for t in theme_catalog %}
+- **{{ t.theme_id }}** — {{ t.title }}
+{% endfor %}
+{% else %}
+**Theme Catalog:** Not provided (cannot validate theme_ids)
+{% endif %}
+
+{% if palette_catalog is defined and palette_catalog %}
+## Palette Catalog (Valid palette_ids)
+
+{% for p in palette_catalog %}
+- **{{ p.id }}** — {{ p.title }}{% if p.description %} - {{ p.description }}{% endif %}
+{% endfor %}
+{% else %}
+**Palette Catalog:** Not provided (cannot validate palette_ids)
+{% endif %}
+
+{% if motif_catalog is defined and motif_catalog %}
+## Motif Catalog (Valid motif_ids)
+
+{% for m in motif_catalog %}
+- **{{ m.id }}** (energy: {{ m.energy }}){% if m.description %} - {{ m.description }}{% endif %}
+{% endfor %}
+{% else %}
+**Motif Catalog:** Not provided (cannot validate motif_ids)
+{% endif %}
+
+---
+
 # MacroPlan to Evaluate
 
 {% if iteration > 1 %}
@@ -49,19 +83,19 @@ Available target roles:
 **Theme Tags:** {{ macro_plan.global_story.theme.tags | join(', ') if macro_plan.global_story.theme.tags else "None" }}
 
 {% if macro_plan.global_story.palette_plan is defined and macro_plan.global_story.palette_plan %}
-**Palette Primary:** {{ macro_plan.global_story.palette_plan.primary.palette_id }}
+**Palette Plan (structured field global_story.palette_plan):**
+- Primary: {{ macro_plan.global_story.palette_plan.primary.palette_id }} (role: {{ macro_plan.global_story.palette_plan.primary.role.value }}, intensity: {{ macro_plan.global_story.palette_plan.primary.intensity }})
 {% if macro_plan.global_story.palette_plan.alternates %}
-**Palette Alternates:** {{ macro_plan.global_story.palette_plan.alternates | map(attribute='palette_id') | join(', ') }}
+- Alternates: {{ macro_plan.global_story.palette_plan.alternates | map(attribute='palette_id') | join(', ') }}
 {% else %}
-**Palette Alternates:** None
+- Alternates: None
 {% endif %}
 {% else %}
-**Palette Plan:** MISSING
+**Palette Plan:** ❌ MISSING (ERROR: global_story.palette_plan.primary.palette_id is required)
 {% endif %}
 
 **Story Notes:** {{ macro_plan.global_story.story_notes }}
 **Pacing Notes:** {{ macro_plan.global_story.pacing_notes }}
-**Color Story:** {{ macro_plan.global_story.color_story }}
 
 ## Layering Plan
 

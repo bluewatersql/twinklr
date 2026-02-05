@@ -23,18 +23,6 @@ class AsyncFileLogger:
     Writes detailed log files for each LLM call in YAML or JSON format.
     Uses aiofiles for non-blocking I/O.
 
-    Directory structure:
-        {output_dir}/logs/llm/{run_id}/
-            ├── planner/
-            │   ├── iter_00_call_001.yaml
-            │   ├── iter_01_call_002.yaml
-            │   └── ...
-            ├── validator/
-            │   └── ...
-            ├── judge/
-            │   └── ...
-            └── summary.yaml
-
     Example:
         logger = AsyncFileLogger(
             output_dir=Path("artifacts/my_run"),
@@ -50,8 +38,10 @@ class AsyncFileLogger:
 
     def __init__(
         self,
+        *,
         output_dir: Path | str,
         run_id: str,
+        session_id: str | None = None,
         log_level: str = "standard",
         format: str = "yaml",
         sanitize: bool = True,
@@ -66,6 +56,7 @@ class AsyncFileLogger:
             sanitize: Whether to sanitize sensitive data
         """
         self.output_dir = Path(output_dir)
+        self.session_id = session_id or "default"
         self.run_id = run_id
         self.log_level = log_level
         self.format = format
@@ -230,80 +221,6 @@ class AsyncFileLogger:
         """Flush logs and write summary (async)."""
         await self._write_summary_async()
         await self._create_latest_symlink_async()
-
-    # =========================================================================
-    # Sync Wrappers (BACKWARD COMPATIBILITY)
-    # =========================================================================
-
-    def start_call(
-        self,
-        agent_name: str,
-        agent_mode: str,
-        iteration: int | None,
-        model: str,
-        temperature: float,
-        prompts: dict[str, Any],
-        context: dict[str, Any],
-        **metadata: Any,
-    ) -> str:
-        """Log call start (sync wrapper).
-
-        DEPRECATED: Use start_call_async() for new code.
-        """
-        return asyncio.run(
-            self.start_call_async(
-                agent_name,
-                agent_mode,
-                iteration,
-                model,
-                temperature,
-                prompts,
-                context,
-                **metadata,
-            )
-        )
-
-    def complete_call(
-        self,
-        call_id: str,
-        raw_response: Any,
-        validated_response: Any | None,
-        validation_errors: list[str],
-        tokens_used: int,
-        prompt_tokens: int,
-        completion_tokens: int,
-        duration_seconds: float,
-        success: bool,
-        repair_attempts: int,
-    ) -> None:
-        """Log call completion (sync wrapper).
-
-        DEPRECATED: Use complete_call_async() for new code.
-
-        Logs validated_response when validation succeeds, otherwise logs
-        raw_response to avoid redundancy.
-        """
-        asyncio.run(
-            self.complete_call_async(
-                call_id,
-                raw_response,
-                validated_response,
-                validation_errors,
-                tokens_used,
-                prompt_tokens,
-                completion_tokens,
-                duration_seconds,
-                success,
-                repair_attempts,
-            )
-        )
-
-    def flush(self) -> None:
-        """Flush logs (sync wrapper).
-
-        DEPRECATED: Use flush_async() for new code.
-        """
-        asyncio.run(self.flush_async())
 
     # =========================================================================
     # Private Helper Methods

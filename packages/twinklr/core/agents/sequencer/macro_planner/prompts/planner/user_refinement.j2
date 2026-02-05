@@ -1,9 +1,11 @@
 {#
-GroupPlanner User Prompt - REFINEMENT ONLY
+MacroPlanner User Prompt - REFINEMENT ONLY
 Used for iteration 2+ to avoid resending full context.
-References existing conversation context (section, templates, groups).
+References existing conversation context (song, display, structure).
+
+Token Optimization: Reduced context on refinement iterations.
 #}
-# Refinement Request: {{ section_name }} ({{ section_id }})
+# Refinement Request: MacroPlan
 
 ## Iteration {{ iteration + 1 }} Feedback
 
@@ -11,27 +13,11 @@ References existing conversation context (section, templates, groups).
 
 ## Key Reminders (from initial context)
 
-- **Section:** {{ section_name }} ({{ (start_ms / 1000) | round(1) }}s to {{ (end_ms / 1000) | round(1) }}s)
-- **Energy Target:** {{ energy_target }}
-- **Motion Density:** {{ motion_density }}
-- **Primary Targets:** {{ primary_focus_targets | join(", ") }}
-{% if theme_ref %}
-- **Theme:** {{ theme_ref.theme_id }}{% if theme_ref.tags %} (tags: {{ theme_ref.tags | join(", ") }}){% endif %}
-{% endif %}
-{% if palette_ref_json %}
-- **PaletteRef:** {{ palette_ref_json }}
-{% endif %}
-{% if motif_ids %}
-- **Motif IDs:** {{ motif_ids | join(", ") }}
-{% endif %}
-
-## Intensity Limits (STRICT - exceeding = validation failure)
-
-| Lane   | Max   |
-|--------|-------|
-| BASE   | 1.10  |
-| RHYTHM | 1.20  |
-| ACCENT | 1.30  |
+- **Song**: {{ audio_profile.song_identity.title or "Untitled" }} by {{ audio_profile.song_identity.artist or "Unknown" }}
+- **Duration**: {{ (audio_profile.song_identity.duration_ms / 1000) | round(1) }}s
+- **BPM**: {{ audio_profile.song_identity.bpm | round(1) }}
+- **Sections**: {{ audio_profile.structure.sections | length }}
+- **Overall Energy**: {{ audio_profile.energy_profile.macro_energy.value }}
 
 {% if revision_request %}
 ## Revision Priority: {{ revision_request.priority }}
@@ -58,11 +44,37 @@ References existing conversation context (section, templates, groups).
 {% endif %}
 {% endif %}
 
+## Section Structure (Quick Reference)
+
+{% for section in audio_profile.structure.sections %}
+- **{{ section.name }}** ({{ section.section_id }}) - {{ (section.start_ms / 1000) | round(1) }}s to {{ (section.end_ms / 1000) | round(1) }}s
+{% endfor %}
+
+## Theme Catalog (Allowed IDs)
+
+Use only these theme_ids (do not invent):
+{% for t in theme_catalog %}
+- {{ t.theme_id }}
+{% endfor %}
+
+## Critical Reminders
+
+1. **Theme Selection**: Use ONLY theme_ids from the catalog above
+2. **Section Coverage**: Plan all {{ audio_profile.structure.sections | length }} sections
+3. **Layer Architecture**: Maintain proper BASE/RHYTHM/ACCENT structure
+4. **Story Coherence**: Keep global theme consistent across sections
+5. **Palette Plan**: Global primary palette required; use valid palette_ids only; limit overrides to 2-3 sections
+6. **Motif Balance**: 3-8 total motifs; 2-4 "core" motifs in 70%+ of sections; 1-3 "spice" motifs in 2-4 sections only
+7. **Schema**: Return valid MacroPlan JSON per developer prompt
+
 ## Instructions
 
 1. Address ALL ERROR severity issues first
 2. Keep structure that worked - only fix flagged issues
-3. Verify ALL intensity values are within lane limits
-4. Do not change theme_id unless feedback explicitly requests it
-5. Do not invent motif_ids or palette ids; keep them consistent with MacroPlan unless feedback explicitly requests change
-6. Return the complete revised SectionCoordinationPlan
+3. Maintain global story coherence while addressing feedback
+4. Do not change global_story.theme unless feedback explicitly requests it
+5. Do not change palette_plan or motifs unless feedback explicitly requests it
+6. Ensure all palette_ids and motif_ids are from provided catalogs (no invention)
+7. Return complete revised MacroPlan
+
+Remember: Bold impact, main character energy, coordinated wow moments!

@@ -16,7 +16,7 @@ from twinklr.core.agents.sequencer.moving_heads.models import (
     ChoreographyPlan,
     PlanSection,
 )
-from twinklr.core.agents.sequencer.moving_heads.orchestrator_v2 import (
+from twinklr.core.agents.sequencer.moving_heads.orchestrator import (
     MovingHeadPlannerOrchestrator,
     build_judge_variables,
     build_planner_variables,

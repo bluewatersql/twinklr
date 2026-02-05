@@ -19,6 +19,7 @@ from twinklr.core.agents.providers.base import (
 )
 from twinklr.core.agents.providers.conversation import Conversation
 from twinklr.core.agents.providers.errors import LLMProviderError
+from twinklr.core.api.llm.openai.client import OpenAIClient
 
 if TYPE_CHECKING:
     from twinklr.core.caching import Cache
@@ -63,8 +64,10 @@ class OpenAIProvider:
 
     def __init__(
         self,
+        *,
         api_key: str | None = None,
-        timeout: float = 120.0,
+        session_id: str | None = None,
+        timeout: float = 300.0,
         llm_cache: Cache | None = None,
     ):
         """Initialize OpenAI provider.
@@ -76,11 +79,9 @@ class OpenAIProvider:
         """
         # Async client for async-first implementation
         self._async_client = AsyncOpenAI(api_key=api_key, timeout=timeout)
-
-        # Keep sync client for backward compatibility during transition
-        from twinklr.core.api.llm.openai.client import OpenAIClient
-
         self._sync_client = OpenAIClient(api_key=api_key, timeout=timeout)
+
+        self.session_id = session_id or "default"
 
         # LLM call cache (transparent, short-lived)
         self.llm_cache = llm_cache
@@ -306,6 +307,8 @@ class OpenAIProvider:
                 from twinklr.core.caching import CacheKey
 
                 cache_key = CacheKey(
+                    domain="llm",
+                    session_id=self.session_id,
                     step_id="llm.openai.json",
                     step_version="1",
                     input_fingerprint=cache_key_hash,

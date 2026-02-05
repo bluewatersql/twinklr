@@ -22,7 +22,7 @@ from twinklr.core.sequencer.vocabulary import (
     TimingDriver,
 )
 
-from .conftest import make_motif_spec
+from .conftest import make_motif_spec, make_palette_plan
 
 
 def _make_global_theme() -> ThemeRef:
@@ -73,12 +73,12 @@ def _create_global_story() -> GlobalStory:
         theme=_make_global_theme(),
         story_notes="Christmas magic with cascading light waves",
         motifs=[
-            make_motif_spec("starbursts", "Starbursts"),
-            make_motif_spec("waves", "Waves"),
-            make_motif_spec("sparkles", "Sparkles"),
+            make_motif_spec("starbursts", "Starburst explosion patterns"),
+            make_motif_spec("waves", "Wave motion patterns"),
+            make_motif_spec("sparkles", "Sparkle effect patterns"),
         ],
         pacing_notes="Build energy through verses, peak at chorus, gentle outro",
-        color_story="Cool blues transitioning to warm golds at climax",
+        palette_plan=make_palette_plan(),
     )
 
 

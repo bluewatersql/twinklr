@@ -15,16 +15,22 @@ References existing conversation context (section, templates, groups).
 - **Energy Target:** {{ energy_target }}
 - **Motion Density:** {{ motion_density }}
 - **Primary Targets:** {{ primary_focus_targets | join(", ") }}
-{% if theme_ref %}
-- **Theme:** {{ theme_ref.theme_id }}{% if theme_ref.tags %} (tags: {{ theme_ref.tags | join(", ") }}){% endif %}
-{% endif %}
 
+**REQUIRED FIELDS (Copy to response):**
+{% if theme_ref %}
+- **Theme:** {{ theme_ref.theme_id }}{% if theme_ref.tags %} (tags: {{ theme_ref.tags | join(", ") }}){% endif %}, scope={{ theme_ref.scope }}
+{% endif %}
 {% if palette_ref_json %}
 - **Palette:** {{ palette_ref_json }}
 {% endif %}
 {% if motif_ids %}
 - **Motifs:** {{ motif_ids | join(", ") }}
 {% endif %}
+
+**CRITICAL:**
+- Include these exact theme, palette, and motif_ids values in your revised plan
+- When selecting templates, prefer those with matching `motif.*` affinity tags for better variety and alignment
+- Do not use placeholders
 
 ## Intensity Limits (STRICT - exceeding = validation failure)
 
@@ -61,9 +67,18 @@ References existing conversation context (section, templates, groups).
 
 ## Instructions
 
-1. Address ALL ERROR severity issues first
+1. Address ALL ERROR severity issues first (especially zero-duration placements, timing errors)
 2. Keep structure that worked - only fix flagged issues
-3. Verify ALL intensity values are within lane limits
-4. Do not change theme_id unless feedback explicitly requests it
-5. Keep palette/motif_ids consistent with MacroPlan (do not invent)
-6. Return the complete revised SectionCoordinationPlan
+3. Verify ALL intensity values are within lane limits (BASE≤1.10, RHYTHM≤1.20, ACCENT≤1.30)
+4. Ensure all placements have start < end (no identical bar:beat for start and end)
+5. Do not change theme_id unless feedback explicitly requests it
+6. Keep palette/motif_ids consistent with MacroPlan (do not invent)
+7. For TimeRef objects: Use BAR_BEAT with `offset_ms: null` (never 0)
+8. Return the complete revised SectionCoordinationPlan
+
+## Common Patterns to Avoid (Don't introduce while fixing)
+
+- **Identical accents**: Don't give all primary targets the same template/timing/intensity
+- **Peak competition**: Don't have multiple groups hit peak intensity (>1.15) at the exact same beat
+- **Repeated BASE**: Don't use identical template+params on 3+ groups for entire section
+- **Snap rule mismatch**: Keep snap_rule consistent with timing_driver (BAR↔BARS, BEAT↔BEATS)

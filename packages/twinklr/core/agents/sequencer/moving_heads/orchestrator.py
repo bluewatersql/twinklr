@@ -217,9 +217,6 @@ class MovingHeadPlannerOrchestrator:
         - Audio profile (musical analysis)
         - Lyric context (narrative/themes, if present)
         - Fixture configuration
-        - Available templates
-        - Max iterations
-        - Min pass score
         - Model configuration
 
         Args:
@@ -240,9 +237,6 @@ class MovingHeadPlannerOrchestrator:
                 "count": context.fixtures.count,
                 "groups": context.fixtures.groups,
             },
-            "available_templates": sorted(context.available_templates),
-            "max_iterations": self.controller.config.max_iterations,
-            "min_pass_score": self.controller.config.approval_score_threshold,
             "planner_model": self.planner_spec.model,
             "judge_model": self.judge_spec.model,
         }

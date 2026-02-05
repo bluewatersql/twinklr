@@ -45,7 +45,7 @@ def test_creative_guidance_valid_full():
         recommended_contrast=Contrast.HIGH,
         recommended_motion_density=MotionDensity.BUSY,
         recommended_asset_usage=AssetUsage.HEAVY,
-        recommended_color_story=["vibrant", "energetic"],
+        palette_color_guidance=["vibrant", "energetic"],
         cautions=["Respect quiet bridge section"],
     )
 
@@ -53,7 +53,7 @@ def test_creative_guidance_valid_full():
     assert guidance.recommended_contrast == Contrast.HIGH
     assert guidance.recommended_motion_density == MotionDensity.BUSY
     assert guidance.recommended_asset_usage == AssetUsage.HEAVY
-    assert len(guidance.recommended_color_story) == 2
+    assert len(guidance.palette_color_guidance) == 2
     assert len(guidance.cautions) == 1
 
 
@@ -109,7 +109,7 @@ def test_creative_guidance_color_story_max_length():
         recommended_contrast=Contrast.MED,
         recommended_motion_density=MotionDensity.MED,
         recommended_asset_usage=AssetUsage.SPARSE,
-        recommended_color_story=["warm", "cool", "vibrant", "dark", "light"],
+        palette_color_guidance=["warm", "cool", "vibrant", "dark", "light"],
     )
 
     # Invalid: > 5
@@ -119,7 +119,7 @@ def test_creative_guidance_color_story_max_length():
             recommended_contrast=Contrast.MED,
             recommended_motion_density=MotionDensity.MED,
             recommended_asset_usage=AssetUsage.SPARSE,
-            recommended_color_story=["a", "b", "c", "d", "e", "f"],
+            palette_color_guidance=["a", "b", "c", "d", "e", "f"],
         )
 
 

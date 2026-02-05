@@ -53,7 +53,6 @@ class PalettePlan(BaseModel):
     transition_notes: str = Field(
         default="",
         description="Rules for when/how to shift palette usage across song/sections",
-        max_length=500,
     )
 
 
@@ -91,8 +90,8 @@ class GlobalStory(BaseModel):
     pacing_notes: str = Field(
         ..., description="How energy builds/releases across the song", min_length=20
     )
-    color_story: str = Field(
-        ..., description="Color palette and transitions throughout the show", min_length=10
+    palette_plan: PalettePlan = Field(
+        ..., description="Global palette plan with primary and optional alternates"
     )
 
     @field_validator("theme")

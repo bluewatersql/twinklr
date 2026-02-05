@@ -59,6 +59,7 @@ Before evaluating coordination quality, verify the plan is **technically sound**
 - If `palette_catalog` is provided, `plan.palette.palette_id` must exist in it
 - `plan.motif_ids` must be present and non-empty (>= 1)
 - If `motif_catalog` is provided, every motif_id must exist in it
+- **Motif Alignment (Quality Factor)**: Templates should align with the declared motifs when possible. Templates with matching `motif.{motif_id}` affinity tags contribute to visual variety and thematic coherence. However, it's NOT required that every motif has a matching template - judge overall alignment and variety as part of template_appropriateness score, not as a pass/fail criterion.
 
 #### Intensity Validity
 - All intensity values must be in [0.0, 1.5]
@@ -76,11 +77,27 @@ SCHEMA, TIMING, TEMPLATES, CONSTRAINT, LOGIC.
 
 Evaluate across these dimensions:
 
-1. **template_appropriateness** (30%): Fits energy/style and lane intent
+1. **template_appropriateness** (30%): Fits energy/style and lane intent. Consider motif alignment and visual variety positively, but don't penalize heavily if not all motifs have matching templates.
 2. **coordination_coherence** (25%): Modes form readable patterns; clear intent
 3. **group_coverage** (20%): Primary focus targets are actually featured
 4. **timing_precision** (15%): Aligns to musical structure; avoids sloppy windows
 5. **layer_balance** (10%): BASE/RHYTHM/ACCENT interact cleanly; not muddy
+
+**Quality Patterns to Check:**
+
+| Dimension | Good Pattern | Problematic Pattern | Severity |
+|-----------|--------------|---------------------|----------|
+| template_appropriateness | Varied templates across groups | Same template on 3+ groups | NIT→WARN |
+| coordination_coherence | Staggered ACCENT hits across groups | All primaries hit at exact same beat | WARN |
+| timing_precision | Consistent snap rules across aligned lanes | BAR snap on BASE, BEAT on RHYTHM with drift | NIT→WARN |
+| timing_precision | 1-beat gap between windows | Windows that abut at exact same bar:beat | NIT |
+| layer_balance | BASE < RHYTHM < ACCENT intensity | RHYTHM exceeds ACCENT peaks | WARN |
+
+**Calibration Notes:**
+- A plan with 1-2 NIT issues and 0-1 WARN issues is APPROVE-worthy (7.0-7.5)
+- Penalize WARN issues ~0.3-0.5 points each; NIT issues ~0.1-0.2 points
+- Don't stack penalties: if variety AND layering issues stem from same placement, count once
+- Reserve HARD_FAIL for technical errors (missing templates, invalid groups, bad timing)
 
 Populate `score_breakdown` with exactly these keys:
 - template_appropriateness
@@ -108,8 +125,10 @@ For each identified issue, create an `Issue` matching the shared schema.
 **Required**:
 - issue_id: Stable identifier (ALL_CAPS_WITH_UNDERSCORES recommended)
 - category: EXACTLY ONE OF: {{ taxonomy.IssueCategory | join(' | ') }}
+  (Note: Use VARIETY for contrast/variety issues, MUSICALITY for energy/dynamics issues)
 - severity: EXACTLY ONE OF: {{ taxonomy.IssueSeverity | join(' | ') }}
 - estimated_effort: EXACTLY ONE OF: {{ taxonomy.IssueEffort | join(' | ') }}
+  (Note: Use "MEDIUM" not "MED")
 - scope: EXACTLY ONE OF: {{ taxonomy.IssueScope | join(' | ') }}
 - location: Use ONLY IssueLocation fields:
   - section_id

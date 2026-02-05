@@ -164,9 +164,22 @@ def compute_section_descriptors(
         start_s = float(boundaries_orig[i])
         end_s = float(boundaries_orig[i + 1])
 
-        # Boundary strength
-        sb = int(np.argmin(np.abs(beat_times - boundaries_work[i])))
-        eb = int(np.argmin(np.abs(beat_times - boundaries_work[i + 1])))
+        # Boundary strength - use work boundaries if available, else map from original
+        # boundaries_work may be shorter than boundaries_orig due to trimming
+        if i < len(boundaries_work):
+            start_work = boundaries_work[i]
+        else:
+            # Fallback: map original to work timeline (assuming parallel timing)
+            start_work = float(boundaries_orig[i])
+
+        if i + 1 < len(boundaries_work):
+            end_work = boundaries_work[i + 1]
+        else:
+            # Fallback: map original to work timeline
+            end_work = float(boundaries_orig[i + 1])
+
+        sb = int(np.argmin(np.abs(beat_times - start_work)))
+        eb = int(np.argmin(np.abs(beat_times - end_work)))
         sb = int(np.clip(sb, 0, max(0, len(beat_times) - 1)))
         eb = int(np.clip(eb, 0, max(0, len(beat_times) - 1)))
 
