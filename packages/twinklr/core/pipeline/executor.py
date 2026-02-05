@@ -80,14 +80,14 @@ class PipelineExecutor:
                 metadata={"validation_errors": errors},
             )
 
-        logger.debug(f"Executing pipeline: {pipeline.name}")
-        logger.debug(f"  Stages: {len(pipeline.stages)}")
+        logger.info(f"Starting pipeline: {pipeline.name}")
+        logger.info(f"  Stages: {len(pipeline.stages)}")
         logger.debug(f"  Fail fast: {pipeline.fail_fast}")
 
         # Build execution plan (waves of stages that can run in parallel)
         execution_plan = self._build_execution_plan(pipeline, context)
 
-        logger.debug(f"  Execution plan: {len(execution_plan)} waves")
+        logger.info(f"  Execution plan: {len(execution_plan)} waves")
         for i, wave in enumerate(execution_plan):
             logger.debug(f"    Wave {i}: {[s.id for s in wave]}")
 
@@ -111,7 +111,7 @@ class PipelineExecutor:
                     metadata={"cancellation": "User cancelled", "completed_waves": wave_idx},
                 )
 
-            logger.debug(
+            logger.info(
                 f"Executing wave {wave_idx + 1}/{len(execution_plan)}: {[s.id for s in wave]}"
             )
 
@@ -129,36 +129,29 @@ class PipelineExecutor:
 
                 if result.success:
                     outputs[stage_id] = result.output
-                    logger.debug(f"  ✓ {stage_id} completed")
+                    logger.info(f"  ✓ {stage_id} completed")
                 else:
                     failed_stages.append(stage_id)
                     logger.error(f"  ✗ {stage_id} failed: {result.error}")
 
-                    # Check if critical failure
-                    stage_def = pipeline.get_stage(stage_id)
-                    if stage_def and stage_def.critical and pipeline.fail_fast:
-                        logger.error(f"Critical stage '{stage_id}' failed, stopping pipeline")
-                        end_time = time.perf_counter()
-                        return PipelineResult(
-                            success=False,
-                            outputs=outputs,
-                            stage_results=stage_results,
-                            failed_stages=failed_stages,
-                            total_duration_ms=(end_time - start_time) * 1000,
-                            metadata={"fail_fast": True, "failed_stage": stage_id},
-                        )
+                    # Terminate pipeline on any stage failure
+                    logger.error(f"Stage '{stage_id}' failed, terminating pipeline")
+                    end_time = time.perf_counter()
+                    return PipelineResult(
+                        success=False,
+                        outputs=outputs,
+                        stage_results=stage_results,
+                        failed_stages=failed_stages,
+                        total_duration_ms=(end_time - start_time) * 1000,
+                        metadata={"failed_stage": stage_id, "error": result.error},
+                    )
 
         # Pipeline complete
         end_time = time.perf_counter()
         duration_ms = (end_time - start_time) * 1000
 
         success = len(failed_stages) == 0
-        logger.debug(
-            f"Pipeline {'completed' if success else 'finished with errors'} in {duration_ms:.0f}ms"
-        )
-
-        if failed_stages:
-            logger.warning(f"  Failed stages: {failed_stages}")
+        logger.info(f"Pipeline completed successfully in {duration_ms:.0f}ms")
 
         return PipelineResult(
             success=success,

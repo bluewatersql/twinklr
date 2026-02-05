@@ -129,6 +129,7 @@ class TwinklrSession:
         """Get agent cache for this session (universal service).
 
         Lazy-loaded on first access. Cache initializes itself lazily on first use.
+        TTL is configured at cache creation time from job_config.
 
         Returns:
             Cache instance configured with session configs
@@ -137,9 +138,11 @@ class TwinklrSession:
             cache_enabled = self.job_config.agent.agent_cache.enabled if self.job_config else False
             agent_cache: FSCache | NullCache
             if cache_enabled:
+                cache_config = self.job_config.agent.agent_cache
                 agent_cache = FSCache(
                     RealFileSystem(),
-                    absolute_path(self.job_config.agent.agent_cache.cache_path),
+                    absolute_path(cache_config.cache_path),
+                    ttl_seconds=cache_config.ttl_seconds,
                 )
             else:
                 agent_cache = NullCache()
@@ -152,7 +155,7 @@ class TwinklrSession:
     def llm_provider(self) -> LLMProvider:
         """Get LLM provider for this session (universal service).
 
-        Lazy-loaded on first access. LLM cache initializes itself lazily on first use.
+        Lazy-loaded on first access.
 
         Returns:
             LLMProvider instance configured with session configs
@@ -161,18 +164,9 @@ class TwinklrSession:
             if not self.app_config or not self.app_config.llm_provider:
                 raise ValueError("LLM provider not configured")
 
-            cache_enabled = self.job_config.agent.llm_cache.enabled if self.job_config else False
-            llm_cache: FSCache | NullCache
-            if cache_enabled:
-                llm_cache = FSCache(
-                    RealFileSystem(),
-                    absolute_path(self.job_config.agent.llm_cache.cache_path),
-                )
-            else:
-                llm_cache = NullCache()
-
             self._llm_provider = OpenAIProvider(
-                api_key=self.app_config.llm_api_key, llm_cache=llm_cache
+                api_key=self.app_config.llm_api_key,
+                session_id=self.session_id,
             )
         return self._llm_provider
 
@@ -181,6 +175,7 @@ class TwinklrSession:
         """Get LLM logger for this session (universal service).
 
         Lazy-loaded on first access.
+        Log directory structure: <log_path>/<agent>/<session_id>/<step_iteration>.json
 
         Returns:
             LLMCallLogger instance configured with session configs
@@ -192,6 +187,7 @@ class TwinklrSession:
                 self._llm_logger = create_llm_logger(
                     enabled=enabled,
                     output_dir=self.job_config.agent.llm_logging.log_path,
+                    session_id=self.session_id,
                     log_level=self.job_config.agent.llm_logging.log_level,
                     format=self.job_config.agent.llm_logging.format,
                 )

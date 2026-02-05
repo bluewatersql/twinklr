@@ -39,6 +39,7 @@ from twinklr.core.agents.logging.protocol import LLMCallLogger
 def create_llm_logger(
     enabled: bool = True,
     output_dir: Path | str | None = None,
+    session_id: str | None = None,
     run_id: str | None = None,
     log_level: str = "standard",
     format: str = "json",
@@ -49,6 +50,8 @@ def create_llm_logger(
     Creates the appropriate logger implementation based on configuration.
     Respects environment variable overrides.
 
+    Log directory structure: <output_dir>/<agent>/<session_id>/<step_iteration>.json
+
     Environment Variables:
         TWINKLR_DISABLE_LLM_LOGGING: Set to "1" or "true" to disable logging
         TWINKLR_LLM_LOG_LEVEL: Override log level ("minimal", "standard", "full")
@@ -57,7 +60,8 @@ def create_llm_logger(
     Args:
         enabled: Enable LLM call logging (False returns NullLLMCallLogger)
         output_dir: Output directory for log files
-        run_id: Unique run identifier (generated if not provided)
+        session_id: Session identifier (for multi-user isolation)
+        run_id: Unique run identifier (deprecated, use session_id)
         log_level: Detail level ("minimal", "standard", "full")
         format: Output format ("yaml", "json")
         sanitize: Sanitize sensitive data from logs
@@ -69,7 +73,7 @@ def create_llm_logger(
         # Basic usage
         logger = create_llm_logger(
             output_dir=Path("artifacts"),
-            run_id="run_2024_01_28_123456",
+            session_id="abc123",
         )
 
         # Disabled (returns NullLLMCallLogger)
@@ -78,7 +82,7 @@ def create_llm_logger(
         # Full detail logging
         logger = create_llm_logger(
             output_dir=Path("artifacts"),
-            run_id="debug_run",
+            session_id="debug_session",
             log_level="full",
             format="json",
         )
@@ -100,11 +104,12 @@ def create_llm_logger(
     if not enabled:
         return NullLLMCallLogger()
 
-    # Generate run_id if not provided
-    if run_id is None:
+    # Use session_id if provided, fall back to run_id for backward compatibility
+    effective_session_id = session_id or run_id
+    if effective_session_id is None:
         from datetime import datetime
 
-        run_id = f"run_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        effective_session_id = f"session_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
 
     # Use default output_dir if not provided
     if output_dir is None:
@@ -113,7 +118,8 @@ def create_llm_logger(
     # Create and return AsyncFileLogger
     return AsyncFileLogger(
         output_dir=Path(output_dir),
-        run_id=run_id,
+        run_id=effective_session_id,  # Keep run_id for internal tracking
+        session_id=effective_session_id,
         log_level=log_level,
         format=format,
         sanitize=sanitize,

@@ -85,6 +85,9 @@ def mock_context() -> MagicMock:
     ctx.cache = MagicMock()
     ctx.set_state = MagicMock()
     ctx.add_metric = MagicMock()
+    # Provide proper session with session_id string for cache key generation
+    ctx.session = MagicMock()
+    ctx.session.session_id = "test_session_123"
     return ctx
 
 
@@ -601,7 +604,8 @@ async def test_execute_step_cache_key_structure(
     # Extract CacheKey from call args (first positional argument)
     cache_key: CacheKey = load_call_args.args[0]
 
-    assert cache_key.domain == "pipeline"
+    # Domain is now stage_name for isolation: <cache>/<domain>/<session>/<step>/<fingerprint>
+    assert cache_key.domain == "my_stage"
     assert cache_key.session_id == mock_context.session.session_id
     assert cache_key.step_id == "my_stage"
     assert cache_key.step_version == "v2"

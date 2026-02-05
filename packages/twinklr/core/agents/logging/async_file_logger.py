@@ -62,8 +62,9 @@ class AsyncFileLogger:
         self.format = format
         self.sanitize_enabled = sanitize
 
-        # Log directory
-        self.log_dir = self.output_dir / "llm"
+        # Log directory - base path for all agent logs
+        # Structure: <output_dir>/<agent>/<session_id>/<step_iteration>.json
+        self.log_dir = self.output_dir
         self.log_dir.mkdir(parents=True, exist_ok=True)
 
         # Counters and buffers
@@ -220,7 +221,6 @@ class AsyncFileLogger:
     async def flush_async(self) -> None:
         """Flush logs and write summary (async)."""
         await self._write_summary_async()
-        await self._create_latest_symlink_async()
 
     # =========================================================================
     # Private Helper Methods
@@ -233,9 +233,12 @@ class AsyncFileLogger:
         call_num: int,
         log_entry: LLMCallLog,
     ) -> None:
-        """Write log entry to file (async)."""
-        # Create agent directory
-        agent_dir = self.log_dir / agent_name / self.run_id
+        """Write log entry to file (async).
+
+        Structure: <output_dir>/<agent>/<session_id>/<step_iteration>.{format}
+        """
+        # Create agent/session directory
+        agent_dir = self.log_dir / agent_name / self.session_id
         agent_dir.mkdir(parents=True, exist_ok=True)
 
         # Generate filename
@@ -350,8 +353,8 @@ class AsyncFileLogger:
             format=self.format,
         )
 
-        # Write summary
-        summary_path = self.log_dir / f"summary.{self.format}"
+        # Write summary per session: <output_dir>/summary_<session_id>.{format}
+        summary_path = self.log_dir / f"summary_{self.session_id}.{self.format}"
         summary_dict = summary.model_dump(exclude_none=True, mode="json")
 
         if self.format == "yaml":
@@ -365,20 +368,6 @@ class AsyncFileLogger:
         elif self.format == "json":
             async with aiofiles.open(summary_path, "w") as f:
                 await f.write(json.dumps(summary_dict, indent=2, default=str))
-
-    async def _create_latest_symlink_async(self) -> None:
-        """Create 'latest' symlink (async)."""
-        latest_link = self.output_dir / "logs" / "llm" / "latest"
-
-        # Run in executor (symlink operations not async-native)
-        loop = asyncio.get_event_loop()
-        await loop.run_in_executor(None, lambda: self._create_symlink_sync(latest_link))
-
-    def _create_symlink_sync(self, latest_link: Path) -> None:
-        """Create symlink (sync helper)."""
-        if latest_link.exists() or latest_link.is_symlink():
-            latest_link.unlink()
-        latest_link.symlink_to(self.run_id)
 
     def _format_context_summary(self, context: dict[str, Any]) -> str:
         """Format context summary for logging."""

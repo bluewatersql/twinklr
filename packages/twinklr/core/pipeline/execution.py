@@ -95,6 +95,7 @@ async def execute_step(
     """
     from_cache = False
     result = None
+    cache_key: CacheKey | None = None
 
     # Check cache if enabled
     if cache_key_fn and context.cache:
@@ -111,17 +112,18 @@ async def execute_step(
             # Try load from cache
             cached_result = await context.cache.load(cache_key, result_type)
             if cached_result:
-                logger.debug(f"✓ Cache hit: {stage_name}")
+                logger.info(f"✓ Cache hit: {stage_name}")
                 result = cached_result
                 from_cache = True
             else:
-                logger.debug(f"Cache miss: {stage_name}")
+                logger.info(f"Cache miss: {stage_name}")
         except Exception as e:
             logger.warning(f"Cache check failed for {stage_name}: {e}")
+            cache_key = None  # Ensure cache_key is None on failure
 
     # Execute orchestrator if not cached
     if not from_cache:
-        logger.debug(f"Executing {stage_name}")
+        logger.info(f"Executing {stage_name}")
         result = await compute()
 
         # Null check
@@ -141,8 +143,8 @@ async def execute_step(
             logger.error(f"{stage_name} failed: {error_msg}")
             return failure_result(str(error_msg), stage_name=stage_name)
 
-        # Store in cache if enabled
-        if cache_key_fn and context.cache:
+        # Store in cache if enabled (only on success - failure returns early above)
+        if cache_key_fn and context.cache and cache_key is not None:
             try:
                 await context.cache.store(cache_key, result)
                 logger.debug(f"Cached {stage_name}")
@@ -209,5 +211,5 @@ async def execute_step(
         logger.error(f"Result extraction failed for {stage_name}: {e}")
         return failure_result(f"Result extraction failed: {e}", stage_name=stage_name)
 
-    logger.debug(f"{stage_name} complete (cached={from_cache})")
+    logger.info(f"{stage_name} complete (cached={from_cache})")
     return success_result(output, stage_name=stage_name)

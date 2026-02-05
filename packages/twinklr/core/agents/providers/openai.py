@@ -2,14 +2,12 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
 import logging
 import threading
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from openai import AsyncOpenAI
-from pydantic import BaseModel
 
 from twinklr.core.agents.providers.base import (
     LLMResponse,
@@ -21,29 +19,7 @@ from twinklr.core.agents.providers.conversation import Conversation
 from twinklr.core.agents.providers.errors import LLMProviderError
 from twinklr.core.api.llm.openai.client import OpenAIClient
 
-if TYPE_CHECKING:
-    from twinklr.core.caching import Cache
-
 logger = logging.getLogger(__name__)
-
-# LLM cache TTL (1 hour) - short-lived, transient cache for deduplication
-LLM_CACHE_TTL_SECONDS = 3600.0
-
-
-class CachedLLMResponse(BaseModel):
-    """Cacheable LLM response wrapper.
-
-    Wraps response data and metadata for caching LLM calls.
-    Separate from LLMResponse to avoid coupling provider interface to cache.
-    """
-
-    content: dict[str, Any]
-    response_id: str | None = None
-    prompt_tokens: int = 0
-    completion_tokens: int = 0
-    total_tokens: int = 0
-    model: str
-    conversation_id: str | None = None
 
 
 class OpenAIProvider:
@@ -68,23 +44,19 @@ class OpenAIProvider:
         api_key: str | None = None,
         session_id: str | None = None,
         timeout: float = 300.0,
-        llm_cache: Cache | None = None,
     ):
         """Initialize OpenAI provider.
 
         Args:
             api_key: OpenAI API key (uses env var if not provided)
+            session_id: Session identifier for tracking
             timeout: Request timeout
-            llm_cache: Optional short-lived cache for LLM call deduplication
         """
         # Async client for async-first implementation
         self._async_client = AsyncOpenAI(api_key=api_key, timeout=timeout)
         self._sync_client = OpenAIClient(api_key=api_key, timeout=timeout)
 
         self.session_id = session_id or "default"
-
-        # LLM call cache (transparent, short-lived)
-        self.llm_cache = llm_cache
 
         # Thread-safe token tracking
         self._token_lock = threading.Lock()
@@ -238,40 +210,6 @@ class OpenAIProvider:
                 total_tokens=self._total_tokens.total_tokens + total_tokens,
             )
 
-    def _build_llm_cache_key(
-        self,
-        messages: list[dict[str, str]],
-        model: str,
-        temperature: float | None,
-    ) -> str:
-        """Build cache key from LLM call parameters.
-
-        Cache key includes all parameters that affect output:
-        - Full message history (for multi-turn conversations)
-        - Model identifier
-        - Temperature setting
-        - Response format (always JSON for this provider)
-
-        Returns:
-            SHA256 hash of canonical call parameters
-        """
-        cache_data = {
-            "messages": messages,
-            "model": model,
-            "temperature": temperature,
-            "format": "json",
-        }
-
-        # Canonical JSON encoding for stable hashing
-        canonical = json.dumps(
-            cache_data,
-            sort_keys=True,
-            separators=(",", ":"),
-            ensure_ascii=False,
-        )
-
-        return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
-
     # =========================================================================
     # Async Methods (Phase 0 - Primary Implementation)
     # =========================================================================
@@ -283,10 +221,9 @@ class OpenAIProvider:
         temperature: float | None = None,
         **kwargs: Any,
     ) -> LLMResponse:
-        """Generate JSON response asynchronously with transparent caching.
+        """Generate JSON response asynchronously.
 
         This is the primary async implementation using AsyncOpenAI.
-        Automatically caches identical calls to avoid redundant LLM requests.
 
         Args:
             messages: List of message dicts with 'role' and 'content'
@@ -300,47 +237,6 @@ class OpenAIProvider:
         Raises:
             LLMProviderError: On unrecoverable errors
         """
-        # Check LLM cache (transparent, short-lived)
-        if self.llm_cache:
-            try:
-                cache_key_hash = self._build_llm_cache_key(messages, model, temperature)
-                from twinklr.core.caching import CacheKey
-
-                cache_key = CacheKey(
-                    domain="llm",
-                    session_id=self.session_id,
-                    step_id="llm.openai.json",
-                    step_version="1",
-                    input_fingerprint=cache_key_hash,
-                )
-
-                cached_response = await self.llm_cache.load(
-                    cache_key, CachedLLMResponse, ttl_seconds=LLM_CACHE_TTL_SECONDS
-                )
-                if cached_response:
-                    logger.debug(f"LLM cache hit (model={model}, temp={temperature})")
-                    # Update token tracking from cached response
-                    self._update_token_usage(
-                        prompt_tokens=cached_response.prompt_tokens,
-                        completion_tokens=cached_response.completion_tokens,
-                        total_tokens=cached_response.total_tokens,
-                    )
-                    return LLMResponse(
-                        content=cached_response.content,
-                        metadata=ResponseMetadata(
-                            response_id=cached_response.response_id,
-                            token_usage=TokenUsage(
-                                prompt_tokens=cached_response.prompt_tokens,
-                                completion_tokens=cached_response.completion_tokens,
-                                total_tokens=cached_response.total_tokens,
-                            ),
-                            model=cached_response.model,
-                            conversation_id=cached_response.conversation_id,
-                        ),
-                    )
-            except Exception as e:
-                logger.warning(f"LLM cache check failed: {e}")
-
         try:
             # Build request parameters
             request_params: dict[str, Any] = {
@@ -383,7 +279,7 @@ class OpenAIProvider:
                     total_tokens=token_usage.total_tokens,
                 )
 
-            llm_response = LLMResponse(
+            return LLMResponse(
                 content=response_data,
                 metadata=ResponseMetadata(
                     response_id=getattr(response, "id", None),
@@ -391,29 +287,6 @@ class OpenAIProvider:
                     model=model,
                 ),
             )
-
-            # Store in LLM cache
-            if self.llm_cache:
-                try:
-                    cached_resp = CachedLLMResponse(
-                        content=response_data,
-                        response_id=llm_response.metadata.response_id,
-                        prompt_tokens=token_usage.prompt_tokens,
-                        completion_tokens=token_usage.completion_tokens,
-                        total_tokens=token_usage.total_tokens,
-                        model=model,
-                    )
-                    await self.llm_cache.store(
-                        cache_key, cached_resp, ttl_seconds=LLM_CACHE_TTL_SECONDS
-                    )
-                    logger.debug(
-                        f"LLM response cached with TTL={LLM_CACHE_TTL_SECONDS}s "
-                        f"(model={model}, temp={temperature})"
-                    )
-                except Exception as e:
-                    logger.warning(f"LLM cache store failed: {e}")
-
-            return llm_response
 
         except LLMProviderError:
             raise

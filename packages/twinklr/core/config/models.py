@@ -115,9 +115,6 @@ class AgentOrchestrationConfig(BaseModel):
     agent_cache: CacheConfig = Field(
         default_factory=lambda: _get_cache_default("agent"), description="Agent cache configuration"
     )
-    llm_cache: CacheConfig = Field(
-        default_factory=lambda: _get_cache_default("llm"), description="LLM cache configuration"
-    )
 
 
 def _get_cache_default(cache_type: str) -> CacheConfig:
