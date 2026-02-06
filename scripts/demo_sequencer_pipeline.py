@@ -366,16 +366,15 @@ async def main() -> None:
         print(f"📄 Group plan set: {group_plan_path.stem}")
 
     # Holistic evaluation
-    # # Holistic evaluation (not yet implemented)
-    # if "holistic" in result.outputs:
-    #     holistic_eval = result.outputs["holistic"]
-    #     holistic_path = save_artifact(
-    #         holistic_eval.model_dump(),
-    #         song_name,
-    #         "holistic_evaluation.json",
-    #         output_dir,
-    #     )
-    #     print(f"📄 Holistic evaluation: {holistic_path.stem}")
+    if "holistic" in result.outputs:
+        holistic_eval = result.outputs["holistic"]
+        holistic_path = save_artifact(
+            holistic_eval.model_dump(),
+            song_name,
+            "holistic_evaluation.json",
+            output_dir,
+        )
+        print(f"📄 Holistic evaluation: {holistic_path.stem}")
 
     # Metrics summary
     print_subsection("Pipeline Metrics")

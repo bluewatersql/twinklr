@@ -9,6 +9,15 @@ Refinement iterations (2+) use user_refinement.j2 instead.
 **Section ID:** {{ section_id }}
 **Section Name:** {{ section_name }}
 **Timing:** {{ (start_ms / 1000) | round(1) }}s to {{ (end_ms / 1000) | round(1) }}s ({{ ((end_ms - start_ms) / 1000) | round(1) }}s duration)
+**Musical Length:** {{ section_duration_bars }} bars ({{ section_duration_beats }} beats) - you have bars 1 through {{ available_bars }} to work with
+{% if section_duration_bars < 1 %}
+⚠️ **VERY SHORT SECTION (< 1 bar):** This is a pickup/transition. Use minimal placements:
+- ONE accent HIT on primary target at bar 1, beat 1
+- Skip BASE and RHYTHM lanes (no time for patterns)
+- Do NOT use SECTION duration (section is shorter than 1 bar)
+{% elif section_duration_bars < 2 %}
+⚠️ **SHORT SECTION (< 2 bars):** Limited space. Use HIT/BURST durations only. Avoid PHRASE/EXTENDED/SECTION.
+{% endif %}
 
 ## MacroPlan Intent
 
@@ -129,27 +138,27 @@ Theme defaults (for reference only):
 
 # Your Task
 
-Create a SectionCoordinationPlan for **{{ section_name }} ({{ section_id }})** that:
+Create a SectionCoordinationPlan for **{{ section_name }} ({{ section_id }})**.
 
-1. **Assigns lanes** - BASE (foundation), RHYTHM (motion), ACCENT (highlights)
-2. **Selects templates** - From the catalog above, matching section intent
-   - Align with motifs: {{ motif_ids | join(", ") }}
-   - Prefer templates with matching `motif.*` affinity tags to enhance variety and coherence
-3. **Defines coordination** - How groups work together (UNIFIED, SEQUENCED, etc.)
-4. **Sets timing** - Using bar/beat TimeRefs within section bounds
-5. **Sets theme, palette, motifs**:
-   - Copy theme from MacroPlan (do not invent theme_id)
-   - Set palette (inherit unless MacroPlan override)
-   - Copy motif_ids from MacroPlan exactly (these influence template selection for visual variety)
+**Follow the {{ energy_target }} ENERGY RECIPE from the system prompt:**
+{% if energy_target == "HIGH" %}
+- BASE: SOFT intensity, SECTION duration (OUTLINE + WINDOWS)
+- RHYTHM: SEQUENCED mode, STRONG intensity (ARCHES or similar)
+- ACCENT: PEAK on 1 HERO, STRONG on others, HIT/BURST duration, stagger timing
+{% elif energy_target == "LOW" %}
+- BASE: WHISPER-SOFT intensity, SECTION duration
+- RHYTHM: Optional, SOFT intensity if used
+- ACCENT: Optional, MED intensity maximum, HIT only
+{% else %}
+- BASE: SOFT intensity, SECTION duration
+- RHYTHM: MED-STRONG intensity, PHRASE duration
+- ACCENT: STRONG intensity (not PEAK), BURST duration, stagger by 2+ beats
+{% endif %}
 
-**Remember:**
-- Primary targets ({{ primary_focus_targets | join(", ") }}) should get prominent ACCENT treatment
-- Energy target is {{ energy_target }} - design accordingly
-- Motion density is {{ motion_density }} - adjust complexity
-- **Intensity limits:** BASE ≤1.10, RHYTHM ≤1.20, ACCENT ≤1.30
-- **Timing:** Use BAR_BEAT with `offset_ms: null` (never use `offset_ms: 0`); ensure start < end (no zero-duration placements)
+**COPY THESE EXACTLY to your response:**
+- theme: (from ThemeRef above)
+- palette: (from Palette above)
+- motif_ids: [{{ motif_ids | join(", ") }}]
 
-**Common Mistakes to Avoid:**
-1. **Zero-duration placements:** Start and end must be different (e.g., bar 1:1→1:1 is INVALID)
-2. **Identical accents:** Stagger timing by 1+ beat OR vary template/intensity on at least one primary target
-3. **Intensity exceeding limits:** Check every placement against lane max (BASE≤1.10, RHYTHM≤1.20, ACCENT≤1.30)
+**Primary targets for ACCENT:** {{ primary_focus_targets | join(", ") }}
+**Available bars:** 1 to {{ available_bars }}

@@ -10,15 +10,15 @@ Return valid JSON matching this schema:
 {{ response_schema }}
 ```
 
-{% if learning_context %}
 ## Historical Learning (Common Issues to Avoid)
-
+- Common failure: IMAGERY used in only 0–1 sections for character-driven holiday songs; target 3–6 sections.
+{% if learning_context is defined and learning_context %}
 {{ learning_context }}
+{% endif %}
 
 Use this context to avoid common mistakes, but evaluate each song on its own merits.
 
 ---
-{% endif %}
 
 ## Technical Constraints
 
@@ -63,6 +63,11 @@ Use this context to avoid common mistakes, but evaluate each song on its own mer
      - `section_plans[*].theme.theme_id == global_story.theme.theme_id`
    - Only change a section’s `theme_id` when there is a deliberate shift (breakdown/bridge/drop/genre/mood pivot).
    - When you override `theme_id`, add **1–2** tags in `section_plans[*].theme.tags` to justify the shift (e.g., `setting.calm`, `style.minimal`).
+   - Section-type defaults (unless a strong reason otherwise)
+      - **Intro/Outro:** HYBRID (establish/resolve scene)
+      - **Chorus:** IMAGERY or HYBRID (recognizable icons / “hero moments”)
+      - **Verses:** ABSTRACT or HYBRID (unless highly literal narrative)
+      - **Bridge/Breakdown:** HYBRID (scene shift / special visual)
 
 4. **No asset filenames**:
    - Do NOT output asset filenames in MacroPlan. Downstream AssetPlanner derives assets from templates/slots.
@@ -91,3 +96,8 @@ Use this context to avoid common mistakes, but evaluate each song on its own mer
 5. **Choreography style**: Consider mixing IMAGERY/ABSTRACT/HYBRID for variety
 6. **Motif cohesion**: Use 3-8 total motifs; 2-4 "core" motifs must appear in 70%+ of sections; 1-3 "spice" motifs can appear in select sections only
 7. **Palette coherence**: Primary palette should be used in 70-80% of sections; limit palette overrides to 2-3 key moments
+8. **Imagery coverage (narrative songs)**: For character/narrative holiday songs, avoid under-tagging IMAGERY—target **IMAGERY/HYBRID in 30–50% of sections** (typically **3–6 sections**). Bias choruses + intro/outro + one narrative verse/bridge.
+9. **Timestamp validity (CRITICAL)**: All timestamp cues in section notes MUST fall within that section's time range:
+   - Never reference timestamps from other sections
+   - Example: intro (0-12s) notes should only mention times 0-12s, not 45s peaks
+   - If a peak or cue falls outside the section, move that callout to the correct section

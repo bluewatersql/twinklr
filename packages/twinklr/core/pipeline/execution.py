@@ -36,6 +36,7 @@ async def execute_step(
     result_type: type[T],
     cache_key_fn: Callable[[], Awaitable[str]] | None = None,
     cache_version: str = "1",
+    cache_domain: str | None = None,
     state_handler: Callable[[T, PipelineContext], None] | None = None,
     metrics_handler: Callable[[T, PipelineContext], None] | None = None,
 ) -> StageResult[OutputT]:
@@ -55,6 +56,8 @@ async def execute_step(
         result_type: Type of orchestrator result (for cache deserialization)
         cache_key_fn: Optional cache key generator (enables caching)
         cache_version: Cache version string (bump to invalidate cache)
+        cache_domain: Cache domain (folder name). Defaults to stage_name.
+            Use this to group related stages (e.g., all group_planner sections).
         state_handler: Optional handler for additional state (extends defaults)
         metrics_handler: Optional handler for additional metrics (extends defaults)
 
@@ -102,7 +105,7 @@ async def execute_step(
         try:
             cache_key_hash = await cache_key_fn()
             cache_key = CacheKey(
-                domain=stage_name,
+                domain=cache_domain or stage_name,
                 session_id=context.session.session_id,
                 step_id=stage_name,
                 step_version=cache_version,

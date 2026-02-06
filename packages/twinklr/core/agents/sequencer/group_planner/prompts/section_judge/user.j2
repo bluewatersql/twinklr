@@ -1,6 +1,7 @@
 {#
 SectionJudge User Prompt
 Provides section plan and context for evaluation
+CATEGORICAL PLANNING VERSION
 #}
 
 # Section Plan to Evaluate
@@ -70,10 +71,23 @@ Provides section plan and context for evaluation
 
 # Judge Instructions
 
+## Categorical Planning Checks
+
+This plan uses **categorical values**:
+
+**Intensity Levels:** WHISPER, SOFT, MED, STRONG, PEAK
+- Check if levels match section energy ({{ energy_target }}):
+  {% if energy_target == "LOW" %}- Prefer WHISPER, SOFT, MED - warn if PEAK used{% elif energy_target == "HIGH" %}- Prefer MED, STRONG, PEAK - warn if WHISPER used{% else %}- Prefer SOFT, MED, STRONG{% endif %}
+
+**Effect Durations:** HIT, BURST, PHRASE, EXTENDED, SECTION
+- Check if durations match musical intent
+
 1) **Technical Validation**
 - template_ids exist and are lane-compatible
 - group_ids exist in display graph
-- timing within section bounds; no invalid durations
+- start timing within section bounds
+- duration is valid enum (HIT, BURST, PHRASE, EXTENDED, SECTION)
+- intensity is valid enum (WHISPER, SOFT, MED, STRONG, PEAK)
 - no within-lane overlaps on same group_id
 - if mode requires expansion (SEQUENCED/CALL_RESPONSE/RIPPLE): window+config must be present and valid
 - theme must be SECTION-scoped; tags <= 5
@@ -84,7 +98,7 @@ Provides section plan and context for evaluation
 - templates appropriate for lanes + section intent
 - coordination readable + coherent
 - primary targets get meaningful ACCENT treatment
-- energy target reflected in intensity/density choices
+- **energy alignment**: intensity levels match energy target ({{ energy_target }})
 - motion density matches complexity
 - palette/motif choices are respected (no invented ids) and support a cohesive visual
 

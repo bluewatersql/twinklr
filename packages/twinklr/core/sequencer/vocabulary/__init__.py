@@ -17,13 +17,27 @@ from twinklr.core.sequencer.vocabulary.coordination import (
     SpillPolicy,
     StepUnit,
 )
+from twinklr.core.sequencer.vocabulary.duration import (
+    DURATION_BEATS,
+    EffectDuration,
+    resolve_duration_beats,
+)
 from twinklr.core.sequencer.vocabulary.energy import (
     ChoreographyStyle,
     EnergyTarget,
     MotionDensity,
 )
+from twinklr.core.sequencer.vocabulary.intensity import (
+    INTENSITY_MAP,
+    IntensityLevel,
+    resolve_intensity,
+)
 from twinklr.core.sequencer.vocabulary.motion import (
     MotionVerb,
+)
+from twinklr.core.sequencer.vocabulary.planning import (
+    PlanningTimeRef,
+    TimingHint,
 )
 from twinklr.core.sequencer.vocabulary.targets import (
     TargetRole,
@@ -63,12 +77,23 @@ __all__ = [
     "SpatialIntent",
     "SpillPolicy",
     "StepUnit",
+    # Duration (categorical planning)
+    "DURATION_BEATS",
+    "EffectDuration",
+    "resolve_duration_beats",
     # Energy
     "ChoreographyStyle",
     "EnergyTarget",
     "MotionDensity",
+    # Intensity (categorical planning)
+    "INTENSITY_MAP",
+    "IntensityLevel",
+    "resolve_intensity",
     # Motion
     "MotionVerb",
+    # Planning (categorical timing)
+    "PlanningTimeRef",
+    "TimingHint",
     # Targets
     "TargetRole",
     # Templates

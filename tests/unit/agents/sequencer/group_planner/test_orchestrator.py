@@ -29,9 +29,11 @@ from twinklr.core.sequencer.templates.group.models import (
 from twinklr.core.sequencer.timing import TimeRef
 from twinklr.core.sequencer.vocabulary import (
     CoordinationMode,
+    EffectDuration,
     GroupTemplateType,
     GroupVisualIntent,
     LaneKind,
+    PlanningTimeRef,
 )
 from twinklr.core.sequencer.vocabulary.timing import TimeRefKind
 
@@ -147,8 +149,8 @@ def sample_section_plan() -> SectionCoordinationPlan:
                                 placement_id="p1",
                                 group_id="HERO_1",
                                 template_id="gtpl_accent_flash",
-                                start=TimeRef(kind=TimeRefKind.BAR_BEAT, bar=1, beat=1),
-                                end=TimeRef(kind=TimeRefKind.BAR_BEAT, bar=1, beat=4),
+                                start=PlanningTimeRef(bar=1, beat=1),
+                                duration=EffectDuration.HIT,
                             ),
                         ],
                     ),
@@ -214,8 +216,8 @@ class TestGroupPlannerOrchestrator:
                                     placement_id="p1",
                                     group_id="HERO_1",
                                     template_id="NONEXISTENT",  # Invalid!
-                                    start=TimeRef(kind=TimeRefKind.BAR_BEAT, bar=1, beat=1),
-                                    end=TimeRef(kind=TimeRefKind.BAR_BEAT, bar=1, beat=4),
+                                    start=PlanningTimeRef(bar=1, beat=1),
+                                    duration=EffectDuration.HIT,
                                 ),
                             ],
                         ),

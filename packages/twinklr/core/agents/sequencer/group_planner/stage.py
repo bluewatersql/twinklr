@@ -143,6 +143,7 @@ class GroupPlannerStage:
                 result_type=IterationResult,
                 cache_key_fn=lambda: orchestrator.get_cache_key(section_context),
                 cache_version="1",
+                cache_domain=self.name,  # Group all sections under "group_planner"
             )
 
         except ValueError as e:
@@ -174,8 +175,13 @@ class GroupPlannerStage:
         if audio_bundle is None:
             raise ValueError("Missing 'audio_bundle' in context.state")
 
-        # Build timing context from audio bundle
-        timing_context = self._build_timing_context(audio_bundle)
+        # Build timing context from audio bundle with section bounds
+        timing_context = self._build_timing_context(
+            audio_bundle,
+            section_id=input.section.section_id,
+            section_start_ms=input.section.start_ms,
+            section_end_ms=input.section.end_ms,
+        )
 
         # Extract layer intents from macro plan
         layer_intents = self._extract_layer_intents(macro_plan)
@@ -201,29 +207,44 @@ class GroupPlannerStage:
             palette=input.palette.model_dump() if input.palette else None,
         )
 
-    def _build_timing_context(self, audio_bundle: Any) -> Any:
-        """Build timing context from audio bundle.
+    def _build_timing_context(
+        self,
+        audio_bundle: Any,
+        *,
+        section_id: str,
+        section_start_ms: int,
+        section_end_ms: int,
+    ) -> Any:
+        """Build timing context from audio bundle with section bounds.
 
         Args:
             audio_bundle: SongBundle from audio analysis
+            section_id: Current section identifier
+            section_start_ms: Section start time in milliseconds
+            section_end_ms: Section end time in milliseconds
 
         Returns:
-            TimingContext with bar map
+            TimingContext with bar map and section bounds
         """
         from twinklr.core.agents.sequencer.group_planner.timing import (
             BarInfo,
+            SectionBounds,
             TimingContext,
         )
+        from twinklr.core.sequencer.templates.group.models import TimeRef, TimeRefKind
 
         timing_info = audio_bundle.timing
         tempo_bpm = audio_bundle.features.get("tempo_bpm", 120.0)
         beat_duration_ms = 60000.0 / tempo_bpm
         bar_duration_ms = beat_duration_ms * 4  # Assuming 4/4 time
 
+        # Build SECTION-RELATIVE bar_map
+        # Bar 1 = section start, not song start
+        # This matches LLM expectations (bar 1 is always section start)
         bar_map: dict[int, BarInfo] = {}
-        current_ms = 0.0
+        current_ms = float(section_start_ms)  # Start from section start
         bar_num = 1
-        while current_ms < timing_info.duration_ms:
+        while current_ms < section_end_ms:
             bar_map[bar_num] = BarInfo(
                 bar=bar_num,
                 start_ms=int(current_ms),
@@ -232,11 +253,20 @@ class GroupPlannerStage:
             current_ms += bar_duration_ms
             bar_num += 1
 
+        # Build section bounds using MS TimeRefs (exact millisecond values)
+        section_bounds = {
+            section_id: SectionBounds(
+                section_id=section_id,
+                start=TimeRef(kind=TimeRefKind.MS, offset_ms=section_start_ms),
+                end=TimeRef(kind=TimeRefKind.MS, offset_ms=section_end_ms),
+            )
+        }
+
         return TimingContext(
             song_duration_ms=int(timing_info.duration_ms),
             beats_per_bar=4,
             bar_map=bar_map,
-            section_bounds={},
+            section_bounds=section_bounds,
         )
 
     def _extract_layer_intents(self, macro_plan: Any) -> list[dict[str, Any]]:

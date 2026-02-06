@@ -28,14 +28,14 @@ from twinklr.core.sequencer.templates.group.models import (
     DisplayGroup,
     GroupPlacement,
 )
-from twinklr.core.sequencer.timing import TimeRef
 from twinklr.core.sequencer.vocabulary import (
     CoordinationMode,
+    EffectDuration,
     GroupTemplateType,
     GroupVisualIntent,
     LaneKind,
+    PlanningTimeRef,
 )
-from twinklr.core.sequencer.vocabulary.timing import TimeRefKind
 
 from .conftest import DEFAULT_THEME
 
@@ -147,8 +147,8 @@ def sample_group_plan_set() -> GroupPlanSet:
                                 placement_id="p1",
                                 group_id="HERO_1",
                                 template_id="gtpl_accent_flash",
-                                start=TimeRef(kind=TimeRefKind.BAR_BEAT, bar=1, beat=1),
-                                end=TimeRef(kind=TimeRefKind.BAR_BEAT, bar=2, beat=1),
+                                start=PlanningTimeRef(bar=1, beat=1),
+                                duration=EffectDuration.BURST,
                             ),
                         ],
                     ),
@@ -173,8 +173,8 @@ def sample_group_plan_set() -> GroupPlanSet:
                                 placement_id="p2",
                                 group_id="HERO_1",
                                 template_id="gtpl_accent_flash",
-                                start=TimeRef(kind=TimeRefKind.BAR_BEAT, bar=3, beat=1),
-                                end=TimeRef(kind=TimeRefKind.BAR_BEAT, bar=4, beat=1),
+                                start=PlanningTimeRef(bar=3, beat=1),
+                                duration=EffectDuration.BURST,
                             ),
                         ],
                     ),

@@ -10,10 +10,11 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from twinklr.core.sequencer.timing import TimeRef
 from twinklr.core.sequencer.vocabulary import (
     CoordinationMode,
-    SnapRule,
+    EffectDuration,
+    IntensityLevel,
+    PlanningTimeRef,
     SpatialIntent,
     SpillPolicy,
     StepUnit,
@@ -23,7 +24,10 @@ from twinklr.core.sequencer.vocabulary import (
 class GroupPlacement(BaseModel):
     """Individual placement of a template on a group.
 
-    Uses TimeRef for start/end timing (no bar-only fields).
+    Uses categorical planning values:
+    - PlanningTimeRef for start timing (bar + beat only)
+    - EffectDuration for duration (categorical, renderer calculates end)
+    - IntensityLevel for intensity (categorical, renderer resolves to numeric)
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -31,28 +35,38 @@ class GroupPlacement(BaseModel):
     placement_id: str
     group_id: str
     template_id: str
-    start: TimeRef
-    end: TimeRef
+    start: PlanningTimeRef
+    duration: EffectDuration = Field(
+        default=EffectDuration.PHRASE,
+        description="Categorical duration - renderer calculates end time",
+    )
 
     # Optional overrides
     param_overrides: dict[str, Any] = Field(default_factory=dict)
-    intensity: float = Field(default=1.0, ge=0.0, le=1.5)
-    snap_rule: SnapRule = SnapRule.BEAT
+    intensity: IntensityLevel = Field(
+        default=IntensityLevel.MED,
+        description="Categorical intensity - renderer resolves to lane-appropriate value",
+    )
 
 
 class PlacementWindow(BaseModel):
     """Window for sequenced/ripple/call-response expansion.
 
     Defines the overall time window and template for Assembler expansion.
+    Uses explicit start/end PlanningTimeRef (not duration) because the
+    expansion logic needs to know the exact window bounds.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    start: TimeRef
-    end: TimeRef
+    start: PlanningTimeRef
+    end: PlanningTimeRef
     template_id: str
     param_overrides: dict[str, Any] = Field(default_factory=dict)
-    snap_rule: SnapRule = SnapRule.BEAT
+    intensity: IntensityLevel = Field(
+        default=IntensityLevel.MED,
+        description="Categorical intensity for expanded placements",
+    )
 
 
 class CoordinationConfig(BaseModel):

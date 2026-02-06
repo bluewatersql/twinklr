@@ -348,6 +348,16 @@ class StandardIterationController(Generic[TPlan]):
 
             if validation_errors:
                 context.update_state(IterationState.VALIDATION_FAILED)
+                # Log actual validation errors for debugging
+                self.logger.warning(
+                    f"Heuristic validation failed (iteration {iteration + 1}): "
+                    f"{len(validation_errors)} error(s)"
+                )
+                for i, err in enumerate(validation_errors[:5], 1):
+                    self.logger.warning(f"  [{i}] {err}")
+                if len(validation_errors) > 5:
+                    self.logger.warning(f"  ... and {len(validation_errors) - 5} more")
+
                 self.feedback.add_validation_failure(
                     message="; ".join(validation_errors),
                     iteration=iteration,

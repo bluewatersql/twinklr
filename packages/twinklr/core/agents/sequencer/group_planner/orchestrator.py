@@ -96,10 +96,15 @@ class GroupPlannerOrchestrator:
         """Generate cache key for deterministic caching.
 
         Cache key includes all inputs that affect section plan output:
-        - Section planning context (macro section plan, display graph, templates, timing, layer intents)
+        - Section planning context (macro section plan, display graph, templates, layer intents)
         - Max iterations
         - Min pass score
         - Model configuration
+
+        Note: timing_context is excluded from cache key because it contains
+        song-level data (all bars, all section bounds) that would cause cache
+        invalidation when any section changes. The planner prompt doesn't use
+        timing_context directly, and the validator uses it at runtime.
 
         Args:
             section_context: Section planning context for this run
@@ -107,8 +112,22 @@ class GroupPlannerOrchestrator:
         Returns:
             SHA256 hash of canonical inputs
         """
+        # Create filtered section context for cache key
+        section_context_dict = section_context.model_dump()
+
+        # Filter timing_context to only section-relevant data
+        # This prevents song-level data from leaking into cache keys
+        timing_context = section_context_dict.get("timing_context", {})
+        filtered_timing = self._filter_timing_for_cache(
+            timing_context,
+            section_context.section_id,
+            section_context.start_ms,
+            section_context.end_ms,
+        )
+        section_context_dict["timing_context"] = filtered_timing
+
         key_data = {
-            "section_context": section_context.model_dump(),
+            "section_context": section_context_dict,
             "max_iterations": self.config.max_iterations,
             "min_pass_score": self.config.approval_score_threshold,
             "planner_model": self.planner_spec.model,
@@ -125,6 +144,54 @@ class GroupPlannerOrchestrator:
         )
 
         return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+    def _filter_timing_for_cache(
+        self,
+        timing_context: dict[str, Any],
+        section_id: str,
+        start_ms: int,
+        end_ms: int,
+    ) -> dict[str, Any]:
+        """Filter timing_context to only section-relevant data for cache key.
+
+        Excludes song-level data that shouldn't affect cache keys:
+        - song_duration_ms: Not needed for section planning
+        - bar_map: Filtered to only bars overlapping this section
+        - section_bounds: Filtered to only this section
+
+        Args:
+            timing_context: Full timing context dict
+            section_id: Current section ID
+            start_ms: Section start in milliseconds
+            end_ms: Section end in milliseconds
+
+        Returns:
+            Filtered timing context with only section-relevant data
+        """
+        # Only include bars that overlap with this section
+        bar_map = timing_context.get("bar_map", {})
+        filtered_bars: dict[str, Any] = {}
+        for bar_key, bar_info in bar_map.items():
+            if isinstance(bar_info, dict):
+                bar_start = bar_info.get("start_ms", 0)
+                bar_duration = bar_info.get("duration_ms", 0)
+                bar_end = bar_start + bar_duration
+                # Include bar if it overlaps with section
+                if bar_start < end_ms and bar_end > start_ms:
+                    filtered_bars[bar_key] = bar_info
+
+        # Only include bounds for current section
+        section_bounds = timing_context.get("section_bounds", {})
+        filtered_bounds: dict[str, Any] = {}
+        if section_id in section_bounds:
+            filtered_bounds[section_id] = section_bounds[section_id]
+
+        return {
+            "beats_per_bar": timing_context.get("beats_per_bar", 4),
+            "bar_map": filtered_bars,
+            "section_bounds": filtered_bounds,
+            # Intentionally exclude song_duration_ms (song-level data)
+        }
 
     async def run(
         self,

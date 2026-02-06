@@ -114,18 +114,50 @@ class StructuredJSONFormatter(logging.Formatter):
 
 
 def _supress_noisy_loggers() -> None:
-    """Supress noisy loggers."""
+    """Supress noisy loggers from third-party libraries."""
+    import warnings
+
+    # HTTP libraries
     logging.getLogger("httpx").setLevel(logging.ERROR)
     logging.getLogger("httpcore").setLevel(logging.ERROR)
     logging.getLogger("requests").setLevel(logging.ERROR)
     logging.getLogger("urllib3").setLevel(logging.ERROR)
+
+    # OpenAI
     logging.getLogger("openai").setLevel(logging.ERROR)
+
+    # Numeric/scientific
     logging.getLogger("numba").setLevel(logging.ERROR)
-    logging.getLogger("asyncio").setLevel(logging.ERROR)
     logging.getLogger("matplotlib").setLevel(logging.ERROR)
+
+    # Async
+    logging.getLogger("asyncio").setLevel(logging.ERROR)
+
+    # File system
+    logging.getLogger("fsspec").setLevel(logging.ERROR)
+    logging.getLogger("fsspec.local").setLevel(logging.ERROR)
+
+    # Audio/ML libraries (WhisperX, speechbrain, pyannote, pytorch)
     logging.getLogger("speechbrain").setLevel(logging.ERROR)
     logging.getLogger("speechbrain.utils.checkpoints").setLevel(logging.ERROR)
-    logging.getLogger("fsspec.local").setLevel(logging.ERROR)
+    logging.getLogger("pytorch_lightning").setLevel(logging.ERROR)
+    logging.getLogger("pytorch_lightning.utilities.migration").setLevel(logging.ERROR)
+    logging.getLogger("pytorch_lightning.utilities.migration.utils").setLevel(logging.ERROR)
+    logging.getLogger("lightning").setLevel(logging.ERROR)
+    logging.getLogger("lightning_fabric").setLevel(logging.ERROR)
+    logging.getLogger("pyannote").setLevel(logging.ERROR)
+    logging.getLogger("pyannote.audio").setLevel(logging.ERROR)
+    logging.getLogger("whisperx").setLevel(logging.ERROR)
+    logging.getLogger("faster_whisper").setLevel(logging.ERROR)
+
+    # Suppress warnings from ML libraries about version mismatches
+    warnings.filterwarnings("ignore", message=".*Model was trained with.*")
+    warnings.filterwarnings("ignore", message=".*Bad things might happen.*")
+    warnings.filterwarnings("ignore", message=".*torch.load.*weights_only=False.*")
+    warnings.filterwarnings("ignore", message=".*Lightning automatically upgraded.*")
+    warnings.filterwarnings("ignore", category=FutureWarning, module="pytorch_lightning")
+    warnings.filterwarnings("ignore", category=UserWarning, module="pyannote")
+    warnings.filterwarnings("ignore", category=UserWarning, module="lightning_fabric")
 
 
 def configure_logging(

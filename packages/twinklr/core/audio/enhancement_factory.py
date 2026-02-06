@@ -12,6 +12,7 @@ from twinklr.core.api.audio.acoustid import AcoustIDClient
 from twinklr.core.api.audio.musicbrainz import MusicBrainzClient
 from twinklr.core.api.http import AsyncApiClient, HttpClientConfig
 from twinklr.core.audio.lyrics.pipeline import LyricsPipeline, LyricsPipelineConfig
+from twinklr.core.audio.lyrics.whisperx_models import WhisperXConfig
 from twinklr.core.audio.lyrics.providers.genius import GeniusClient
 from twinklr.core.audio.lyrics.providers.lrclib import LRCLibClient
 from twinklr.core.audio.metadata.pipeline import MetadataPipeline, PipelineConfig
@@ -127,10 +128,20 @@ class EnhancementServiceFactory:
             else:
                 logger.debug("Genius provider skipped (no GENIUS_ACCESS_TOKEN provided)")
 
+        # Create WhisperX config with language and device settings
+        whisperx_config = WhisperXConfig(
+            device=config.audio_processing.enhancements.whisperx_device,
+            model=config.audio_processing.enhancements.whisperx_model,
+            batch_size=config.audio_processing.enhancements.whisperx_batch_size,
+            language=config.audio_processing.enhancements.lyrics_language,
+            return_char_alignments=config.audio_processing.enhancements.whisperx_return_char_alignments,
+        )
+
         # Create pipeline config
         pipeline_config = LyricsPipelineConfig(
             require_timed_words=config.audio_processing.enhancements.lyrics_require_timed,
             min_coverage_pct=config.audio_processing.enhancements.lyrics_min_coverage,
+            whisperx_config=whisperx_config,
         )
 
         # Initialize WhisperX service if enabled

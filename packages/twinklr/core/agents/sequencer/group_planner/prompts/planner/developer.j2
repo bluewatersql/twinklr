@@ -1,247 +1,91 @@
 {#
-GroupPlanner Developer Prompt
-Technical constraints and enum guidance
+GroupPlanner Developer Prompt - TECHNICAL CONSTRAINTS ONLY
+See system.j2 for recipes and guidelines
 #}
-{% if learning_context %}
-## Historical Learning (Common Issues to Avoid)
-
-{{ learning_context }}
-
-Use this context to avoid common mistakes, but evaluate each section on its own merits.
-
----
-{% endif %}
-
-## Technical Constraints
-
-**Schema Version:** section-coordination-plan.v1
-**Max Lanes:** 3 (BASE, RHYTHM, ACCENT)
-**Max Coordination Plans per Lane:** 10
-**Max Groups per Coordination Plan:** 20
-
-### Intensity Limits (STRICT - Exceeding will fail validation)
-
-| Lane   | Max Intensity | Typical Range | Purpose |
-|--------|--------------|---------------|---------|
-| BASE   | **1.10**     | 0.60-0.90     | Foundation, never dominate |
-| RHYTHM | **1.20**     | 0.80-1.05     | Motion, support layers |
-| ACCENT | **1.30**     | 0.95-1.20     | Highlights, don't overpower |
-
-**WARNING:** Values exceeding lane max will FAIL validation. Never use intensity >1.30 on ACCENT lane.
-
 ## Response Schema
 
-You must return a `SectionCoordinationPlan` that matches this JSON schema:
+Return a `SectionCoordinationPlan` matching this schema:
 
 ```json
 {{ response_schema }}
 ```
 
-## Enum Values (Use These Exactly)
+## Enum Values (Use Exactly)
 
 {% if taxonomy %}
-**LaneKind:** {{ taxonomy.LaneKind | join(', ') }}
-**CoordinationMode:** {{ taxonomy.CoordinationMode | join(', ') }}
-**StepUnit:** {{ taxonomy.StepUnit | join(', ') }}
-**SpillPolicy:** {{ taxonomy.SpillPolicy | join(', ') }}
+- **LaneKind:** {{ taxonomy.LaneKind | join(', ') }}
+- **CoordinationMode:** {{ taxonomy.CoordinationMode | join(', ') }}
+- **IntensityLevel:** {{ taxonomy.IntensityLevel | join(', ') }}
+- **EffectDuration:** {{ taxonomy.EffectDuration | join(', ') }}
+- **StepUnit:** {{ taxonomy.StepUnit | join(', ') }}
 {% else %}
-{# Fallback if taxonomy not provided #}
-**LaneKind:** BASE, RHYTHM, ACCENT
-**CoordinationMode:** UNIFIED, COMPLEMENTARY, SEQUENCED, CALL_RESPONSE, RIPPLE
-**StepUnit:** BEATS, BARS, MS
-**SpillPolicy:** NONE, OVERLAP, BLEND
+- **LaneKind:** BASE, RHYTHM, ACCENT
+- **CoordinationMode:** UNIFIED, COMPLEMENTARY, SEQUENCED, CALL_RESPONSE, RIPPLE
+- **IntensityLevel:** WHISPER, SOFT, MED, STRONG, PEAK
+- **EffectDuration:** HIT, BURST, PHRASE, EXTENDED, SECTION
+- **StepUnit:** BEATS, BARS
 {% endif %}
 
-## Critical Rules
+## Hard Constraints (Validation Failures)
 
-1. **REQUIRED: Copy Theme, Palette, and Motif IDs from MacroPlan** (STRICT):
-   - **theme**: MUST copy the exact ThemeRef from `theme_ref_json` (includes theme_id, scope, tags, palette_id)
-   - **palette**: MUST copy the exact palette information from `palette_ref_json` (if provided)
-   - **motif_ids**: MUST copy the exact list from the MacroPlan motif_ids shown above
-   - **NEVER use placeholders** like "MISSING", "UNSPECIFIED_FROM_MACROPLAN", or empty arrays
-   - **NEVER leave these fields null or empty** - copy the provided values exactly
-   - These fields enable motif-driven template selection and palette validation
+| Constraint | Rule | Example Violation |
+|------------|------|-------------------|
+| Lane-Template Match | gtpl_base_* → BASE only | Using gtpl_rhythm_* in BASE lane |
+| No Duplicate group_order | Each group once | ["HERO_1", "HERO_1", "HERO_2"] |
+| group_order ⊆ group_ids | All group_order in group_ids | group_order has HERO_3, group_ids missing it |
+| Window for SEQUENCED | Must have window + config | SEQUENCED mode with only placements |
+| Start within bounds | bar 1 to available_bars | bar 10 when section has 4 bars |
+| No mixed approach | Window OR placements per group | HERO_1 in window AND in placements same lane |
 
-2. **Template-Lane Compatibility**:
-   - BASE templates → BASE lane only
-   - RHYTHM templates → RHYTHM lane only
-   - ACCENT templates → ACCENT lane only
-   - Check `compatible_lanes` field in template catalog
+## SEQUENCED Mode Requirements
 
-3. **No Within-Lane Overlaps**:
-   - Same group cannot appear in multiple coordination_plans in same lane with overlapping timing
-   - Cross-lane overlaps are allowed (different lanes can use same groups simultaneously)
-
-4. **Group Order Validation** (for SEQUENCED/CALL_RESPONSE/RIPPLE modes):
-   - No duplicates in group_order array
-   - All groups in group_order must be in group_ids
-   - Order determines execution sequence
-
-5. **Timing Constraints**:
-   - All placements must be within section bounds (start_ms to end_ms)
-   - Window ranges must be within section bounds
-   - No negative durations
-
-6. **Intensity Constraints** (STRICT):
-   - BASE lane: Max 1.10 (typical 0.6-0.9, foundation only)
-   - RHYTHM lane: Max 1.20 (typical 0.8-1.05, motion support)
-   - ACCENT lane: Max 1.30 (typical 0.95-1.20, highlights)
-   - **Exceeding lane max = VALIDATION FAILURE**
-   - For "peak" moments: Use 1.20-1.28 on ACCENT, never >1.30
-
-## Template Catalog Reference
-
-Available templates are provided in `template_catalog`. Each entry shows:
-- `template_id`: Unique identifier
-- `name`: Descriptive name
-- `compatible_lanes`: Which lanes can use this template
-- `affinity_tags`: Theme/style tags this template works well with
-- `avoid_tags`: Theme/style tags this template should avoid
-- `tags`: Template characteristics (e.g., "sweep", "static", "movement")
-
-**Template Selection Guidelines:**
-- Always check `compatible_lanes` before assigning templates to lanes
-- **Motif Alignment**: The section's `motif_ids` represent visual themes that should influence template selection. Prefer templates with matching `motif.{motif_id}` affinity tags to enhance variety and thematic coherence. You don't need to match ALL motifs, but aim for alignment where it fits the section's energy and intent.
-- Match `affinity_tags` with theme tags when possible for better coherence
-- Avoid templates whose `avoid_tags` conflict with the section theme
-- Use affinity tags to guide template selection based on visual intent
-
-## Theme Rules (NEW)
-
-1. **You must set `theme` at the top level of the SectionCoordinationPlan**:
-   - `theme.theme_id` must be a stable id (no prose).
-   - `theme.scope` must be `SECTION`.
-
-2. **Theme tags are limited**:
-   - `theme.tags`: 0-5 items max.
-   - Prefer 0–2 tags; use 3–5 only when necessary.
-   - Use tags only to refine the theme (e.g., "setting.snowy_night", "motif.candy_trim").
-
-3. **Template-theme coherence**:
-   - Prefer templates whose `affinity_tags` match the theme's tags.
-   - Avoid templates whose `avoid_tags` conflict with the theme's tags.
-   - This ensures visual and stylistic consistency across the section.
-
-## Palette + Motifs (Hard Requirements)
-
-- **Palette**:
-  - Set `palette` on the SectionCoordinationPlan as a PaletteRef.
-  - Use MacroPlan section override if present, else inherit MacroPlan global primary palette.
-  - Do not invent palette_id values.
-
-- **Motifs**:
-  - Copy MacroPlan section `motif_ids` into the SectionCoordinationPlan.
-  - Ensure template selections across lanes include motif coverage:
-    - At least one selected template has tags that match one of the section’s motif tags (`motif.*`).
-  - Do not invent motif_ids.
-
-## Timing Requirements for TimeRef Objects (CRITICAL)
-
-**Every placement and window MUST have valid `start` and `end` TimeRef objects.**
-
-**TimeRef Requirements:**
-- **kind**: Either `"BAR_BEAT"` or `"MS"`
-- For **BAR_BEAT** timing (recommended):
-  - `bar`: Integer bar number (e.g., 1, 2, 3)
-  - `beat`: Integer beat number within bar (e.g., 1, 2, 3, 4)
-  - `beat_frac`: Fractional beat position 0.0-1.0 (e.g., 0.0, 0.5)
-  - `offset_ms`: **MUST be null or omitted** (it's only a fine nudge for BAR_BEAT, not required)
-- For **MS** timing:
-  - `offset_ms`: **REQUIRED** - absolute milliseconds within section bounds
-  - `bar`, `beat`, `beat_frac`: **MUST be null**
-
-**Critical Rules:**
-1. **BAR_BEAT is preferred**: Use bar/beat references for readability and beat-grid alignment
-2. **Never use offset_ms=0 for BAR_BEAT**: Either omit `offset_ms` entirely or set it to `null`
-3. **Section bounds**: All timing (whether BAR_BEAT or MS) must resolve within section start/end bounds
-4. **Start < End**: For every placement/window, `start` timing must be STRICTLY BEFORE `end` timing
-5. **No zero-duration**: `start` and `end` must be different (e.g., bar 1:1 → bar 1:1 is INVALID)
-
-**Example (CORRECT):**
 ```json
 {
-  "start": {"kind": "BAR_BEAT", "bar": 1, "beat": 1, "beat_frac": 0.0, "offset_ms": null},
-  "end": {"kind": "BAR_BEAT", "bar": 2, "beat": 3, "beat_frac": 0.0, "offset_ms": null}
+  "coordination_mode": "SEQUENCED",
+  "group_ids": ["ARCHES_1", "ARCHES_2", "ARCHES_3"],
+  "window": {
+    "template_id": "gtpl_rhythm_chase_single",
+    "start": {"bar": 1, "beat": 1},
+    "end": {"bar": 4, "beat": 1},
+    "intensity": "STRONG"
+  },
+  "config": {
+    "group_order": ["ARCHES_1", "ARCHES_2", "ARCHES_3"],
+    "step_unit": "BEATS",
+    "step_duration": 2
+  }
 }
 ```
 
-**Example (WRONG - DO NOT USE):**
+**Window sizing:** duration >= group_count × step_duration
+
+## UNIFIED Mode (Placements)
+
 ```json
 {
-  "start": {"kind": "BAR_BEAT", "bar": 1, "beat": 1, "beat_frac": 0.0, "offset_ms": 0},
-  "end": {"kind": "BAR_BEAT", "bar": 2, "beat": 3, "beat_frac": 0.0, "offset_ms": 0}
+  "coordination_mode": "UNIFIED",
+  "group_ids": ["OUTLINE_1", "OUTLINE_2", "OUTLINE_3"],
+  "placements": [
+    {
+      "placement_id": "base_outline_glow",
+      "group_id": "OUTLINE_1",
+      "template_id": "gtpl_base_glow_warm",
+      "start": {"bar": 1, "beat": 1},
+      "duration": "SECTION",
+      "intensity": "SOFT"
+    }
+  ]
 }
 ```
-## Recurring Soft-Fail Patterns (Address These Proactively)
 
-These issues cause ~80% of first-iteration failures. Avoid them:
+**Note:** For UNIFIED, you can have one placement that applies to all groups, or separate placements per group with staggered timing.
 
-### 1. TIMING: Mixed Snap Rules Across Lanes (CRITICAL)
-**Problem:** Using BAR snap on BASE but BEAT snap on RHYTHM/ACCENT causes alignment issues.
-**Solution:**
-- Use consistent snap rules for lanes that need to align musically
-- If BASE uses BAR, RHYTHM should use BAR or BEAT (multiples align)
-- ACCENT can use BEAT or LYRICS, but ensure peaks don't drift from underlying layers
-- Match `timing_driver` to placement `snap_rule` (BARS→BAR, BEATS→BEAT, LYRICS→BEAT)
+## Timing Format
 
-### 2. VARIETY: Repeated BASE Templates Across Groups
-**Problem:** Using the same BASE template on 3+ groups for the entire section looks monotonous.
-**Solution:**
-- Vary at least ONE parameter across groups: template_id, intensity, or param_overrides
-- For OUTLINE/WINDOWS groups, consider using 2 different ambient templates
-- Alternatively, use one template with varying `param_overrides` per group
+```json
+{"bar": 1, "beat": 1}  // Section-relative (bar 1 = section start)
+```
 
-### 3. LAYERING: Peak Competition / Simultaneous High-Intensity Accents
-**Problem:** Multiple primary groups hitting peak intensity (>1.15) at the exact same beat.
-**Solution:**
-- Stagger ACCENT placements by at least 1 beat across primary targets
-- OR use SEQUENCED/RIPPLE mode to auto-stagger the hits
-- Keep ONE group as the "hero" with highest intensity; others slightly lower (0.05-0.10 difference)
-
-### 4. TIMING: Boundary Touch / Abutting Windows
-**Problem:** Adjacent placements or windows that end and start at the exact same bar:beat.
-**Solution:**
-- Leave a 1-beat gap between windows OR overlap slightly (blend)
-- For continuous coverage: use a single longer window instead of two abutting ones
-- Exception: BASE layer can have continuous coverage with same-template placements
-
-### 5. VARIETY: Identical Accents on All Primary Targets
-**Problem:** All primary targets get the same template at the same time with the same intensity.
-**Solution:**
-- Stagger timing by 1+ beat across groups
-- OR vary template_id on at least one target
-- OR vary intensity (e.g., HERO_1: 1.20, HERO_2: 1.12, HERO_3: 1.08)
-
-### 6. LAYERING: Intensity Hierarchy Violation
-**Problem:** BASE intensity exceeds RHYTHM, or RHYTHM exceeds ACCENT in same bar range.
-**Solution:**
-- Maintain hierarchy: BASE (0.6-0.9) < RHYTHM (0.8-1.05) < ACCENT (0.95-1.25)
-- Exception: Brief RHYTHM "drive" moments can match ACCENT floor (1.0-1.05)
-
-### Quick Reference: Snap Rule Alignment
-| timing_driver | Recommended snap_rule | Notes |
-|---------------|----------------------|-------|
-| BARS          | BAR                  | Phrase-level, BASE lane |
-| BEATS         | BEAT                 | Beat-driven, RHYTHM lane |
-| LYRICS        | BEAT                 | Lyric hits, ACCENT lane |
-
----
-
-## Pre-Submit Checklist (Verify Before Responding)
-
-Before returning your plan, verify these common failure points:
-
-**✅ DO:**
-- [ ] Copy theme, palette, motif_ids EXACTLY from input
-- [ ] Use different BASE templates for different group roles (OUTLINE vs WINDOWS)
-- [ ] Stagger ACCENT timing by 1+ beat OR use SEQUENCED mode
-- [ ] Keep one primary group as "hero" (highest intensity)
-- [ ] Match snap_rule to timing_driver (BARS↔BAR, BEATS↔BEAT, LYRICS↔BEAT)
-- [ ] Vary intensity across groups (e.g., 1.20, 1.15, 1.10)
-
-**❌ DON'T:**
-- [ ] Use same template+intensity on 4+ groups
-- [ ] Give ALL primary targets identical peak accents at same beat
-- [ ] Use BAR snap with LYRICS timing_driver
-- [ ] Create windows that abut exactly at same bar:beat
-- [ ] Exceed lane intensity limits (BASE≤1.10, RHYTHM≤1.20, ACCENT≤1.30)
+- Bars: 1 to available_bars (see user prompt)
+- Beats: 1 to 4 (assuming 4/4)
+- Duration: HIT, BURST, PHRASE, EXTENDED, SECTION

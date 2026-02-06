@@ -1,6 +1,7 @@
 {#
 SectionJudge Developer Prompt
 Technical constraints + issue taxonomy alignment + evaluation criteria
+CATEGORICAL PLANNING VERSION
 #}
 
 ## Response Schema
@@ -37,8 +38,8 @@ Before evaluating coordination quality, verify the plan is **technically sound**
 - Cross-lane overlaps are allowed.
 
 #### Timing Validity
-- All placement `start`/`end` times are within the section bounds (`start_ms`..`end_ms`).
-- Avoid zero/negative durations unless explicitly intended (generally invalid).
+- All placement `start` times are within the section bounds (bar range).
+- Duration categories are valid enum values (HIT, BURST, PHRASE, EXTENDED, SECTION).
 - Window start/end must be valid if using window expansion.
 
 #### Coordination Mode Validity
@@ -54,19 +55,19 @@ Before evaluating coordination quality, verify the plan is **technically sound**
 - `plan.theme.scope` must be SECTION (when present)
 - `len(plan.theme.tags) <= 5`
 
-#### Palette + Motifs Validity (NEW)
+#### Palette + Motifs Validity
 - `plan.palette` must be present and include `palette_id`
 - If `palette_catalog` is provided, `plan.palette.palette_id` must exist in it
 - `plan.motif_ids` must be present and non-empty (>= 1)
 - If `motif_catalog` is provided, every motif_id must exist in it
-- **Motif Alignment (Quality Factor)**: Templates should align with the declared motifs when possible. Templates with matching `motif.{motif_id}` affinity tags contribute to visual variety and thematic coherence. However, it's NOT required that every motif has a matching template - judge overall alignment and variety as part of template_appropriateness score, not as a pass/fail criterion.
+- **Motif Alignment (Quality Factor)**: Templates should align with the declared motifs when possible.
 
-#### Intensity Validity
-- All intensity values must be in [0.0, 1.5]
-- Reasonable lane ranges (guidance, not hard limits):
-  - BASE: ~0.6–0.9
-  - RHYTHM: ~0.8–1.1
-  - ACCENT: ~0.9–1.3
+#### Intensity Validity (CATEGORICAL)
+- All intensity values must be valid IntensityLevel enums: WHISPER, SOFT, MED, STRONG, PEAK
+- Check energy alignment:
+  - LOW energy sections: WHISPER, SOFT, MED preferred (PEAK is a warning)
+  - MED energy sections: SOFT, MED, STRONG preferred
+  - HIGH energy sections: MED, STRONG, PEAK preferred (WHISPER is a warning)
 
 If technically invalid, return **HARD_FAIL** with Issues in categories like:
 SCHEMA, TIMING, TEMPLATES, CONSTRAINT, LOGIC.
@@ -77,10 +78,10 @@ SCHEMA, TIMING, TEMPLATES, CONSTRAINT, LOGIC.
 
 Evaluate across these dimensions:
 
-1. **template_appropriateness** (30%): Fits energy/style and lane intent. Consider motif alignment and visual variety positively, but don't penalize heavily if not all motifs have matching templates.
+1. **template_appropriateness** (30%): Fits energy/style and lane intent. Consider motif alignment and visual variety.
 2. **coordination_coherence** (25%): Modes form readable patterns; clear intent
 3. **group_coverage** (20%): Primary focus targets are actually featured
-4. **timing_precision** (15%): Aligns to musical structure; avoids sloppy windows
+4. **energy_alignment** (15%): Intensity levels match section energy target
 5. **layer_balance** (10%): BASE/RHYTHM/ACCENT interact cleanly; not muddy
 
 **Quality Patterns to Check:**
@@ -89,9 +90,8 @@ Evaluate across these dimensions:
 |-----------|--------------|---------------------|----------|
 | template_appropriateness | Varied templates across groups | Same template on 3+ groups | NIT→WARN |
 | coordination_coherence | Staggered ACCENT hits across groups | All primaries hit at exact same beat | WARN |
-| timing_precision | Consistent snap rules across aligned lanes | BAR snap on BASE, BEAT on RHYTHM with drift | NIT→WARN |
-| timing_precision | 1-beat gap between windows | Windows that abut at exact same bar:beat | NIT |
-| layer_balance | BASE < RHYTHM < ACCENT intensity | RHYTHM exceeds ACCENT peaks | WARN |
+| energy_alignment | STRONG/PEAK in HIGH energy section | PEAK intensity in LOW energy section | WARN |
+| layer_balance | Varied intensity levels across groups | All groups have identical intensity | NIT |
 
 **Calibration Notes:**
 - A plan with 1-2 NIT issues and 0-1 WARN issues is APPROVE-worthy (7.0-7.5)
@@ -103,7 +103,7 @@ Populate `score_breakdown` with exactly these keys:
 - template_appropriateness
 - coordination_coherence
 - group_coverage
-- timing_precision
+- energy_alignment
 - layer_balance
 
 ---
@@ -152,3 +152,4 @@ Do NOT invent additional fields or enum values.
 - Be constructive and specific.
 - Prefer deterministic acceptance tests.
 - Honor MacroPlan intent and section theme.
+- Focus on categorical intent, not numeric precision.

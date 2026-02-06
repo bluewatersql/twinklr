@@ -12,9 +12,15 @@ References existing conversation context (section, templates, groups).
 ## Key Reminders (from initial context)
 
 - **Section:** {{ section_name }} ({{ (start_ms / 1000) | round(1) }}s to {{ (end_ms / 1000) | round(1) }}s)
+- **Musical Length:** {{ section_duration_bars }} bars ({{ section_duration_beats }} beats) - bars 1-{{ available_bars }} available
 - **Energy Target:** {{ energy_target }}
 - **Motion Density:** {{ motion_density }}
 - **Primary Targets:** {{ primary_focus_targets | join(", ") }}
+{% if section_duration_bars < 1 %}
+⚠️ **VERY SHORT SECTION:** Only bar 1 beat 1 with HIT duration. Skip BASE/RHYTHM.
+{% elif section_duration_bars < 2 %}
+⚠️ **SHORT SECTION:** Use HIT/BURST only. Avoid PHRASE/EXTENDED/SECTION.
+{% endif %}
 
 **REQUIRED FIELDS (Copy to response):**
 {% if theme_ref %}
@@ -32,13 +38,32 @@ References existing conversation context (section, templates, groups).
 - When selecting templates, prefer those with matching `motif.*` affinity tags for better variety and alignment
 - Do not use placeholders
 
-## Intensity Limits (STRICT - exceeding = validation failure)
+## Intensity Levels (use categorical, not numeric)
 
-| Lane   | Max   |
-|--------|-------|
-| BASE   | 1.10  |
-| RHYTHM | 1.20  |
-| ACCENT | 1.30  |
+| Level | Description | Typical Use |
+|-------|-------------|-------------|
+| WHISPER | Barely visible | Background ambience |
+| SOFT | Gentle | Supporting layers |
+| MED | Balanced | Default, general |
+| STRONG | Prominent | Primary groups |
+| PEAK | Maximum | Climax moments |
+
+**For {{ energy_target }} energy:** {% if energy_target == "LOW" %}prefer WHISPER, SOFT, MED{% elif energy_target == "HIGH" %}prefer MED, STRONG, PEAK{% else %}prefer SOFT, MED, STRONG{% endif %}
+
+## Effect Durations
+
+| Duration | Length | Use |
+|----------|--------|-----|
+| HIT | 1-2 beats | Quick accent |
+| BURST | 1 bar | Short emphasis |
+| PHRASE | 2-4 bars | Melodic phrase |
+| EXTENDED | 4-8 bars | Build/transition |
+| SECTION | Full | Continuous base |
+
+**Duration by Lane (CRITICAL):**
+- BASE → SECTION or EXTENDED (never HIT/BURST)
+- RHYTHM → PHRASE or EXTENDED
+- ACCENT → HIT or BURST
 
 {% if revision_request %}
 ## Revision Priority: {{ revision_request.priority }}
@@ -67,18 +92,22 @@ References existing conversation context (section, templates, groups).
 
 ## Instructions
 
-1. Address ALL ERROR severity issues first (especially zero-duration placements, timing errors)
+1. Address ALL ERROR severity issues first
 2. Keep structure that worked - only fix flagged issues
-3. Verify ALL intensity values are within lane limits (BASE≤1.10, RHYTHM≤1.20, ACCENT≤1.30)
-4. Ensure all placements have start < end (no identical bar:beat for start and end)
+3. Use categorical intensity levels (WHISPER to PEAK), not numeric values
+4. Use categorical durations (HIT, BURST, PHRASE, EXTENDED, SECTION)
 5. Do not change theme_id unless feedback explicitly requests it
 6. Keep palette/motif_ids consistent with MacroPlan (do not invent)
-7. For TimeRef objects: Use BAR_BEAT with `offset_ms: null` (never 0)
+7. Timing: use bar and beat integers for start, duration category for length
 8. Return the complete revised SectionCoordinationPlan
 
 ## Common Patterns to Avoid (Don't introduce while fixing)
 
 - **Identical accents**: Don't give all primary targets the same template/timing/intensity
-- **Peak competition**: Don't have multiple groups hit peak intensity (>1.15) at the exact same beat
-- **Repeated BASE**: Don't use identical template+params on 3+ groups for entire section
-- **Snap rule mismatch**: Keep snap_rule consistent with timing_driver (BAR↔BARS, BEAT↔BEATS)
+- **Peak overuse**: Don't use PEAK on more than 1-2 groups per accent moment
+- **Repeated templates**: Don't use identical template+params on 3+ groups for entire section
+- **Energy mismatch**: Don't use PEAK in LOW energy sections or WHISPER in HIGH energy sections
+- **Duration mismatch**: Don't use HIT/BURST for BASE lane (use SECTION/EXTENDED instead)
+- **Truncated window**: For SEQUENCED modes, window must span (group_count × step_duration) minimum
+- **Duplicate group_order**: Each group can only appear ONCE in group_order
+- **Mixed window + placement**: Don't use SEQUENCED window for a group AND a separate placement for same group in same lane - choose ONE approach

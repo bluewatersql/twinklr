@@ -317,6 +317,25 @@ def shape_planner_context(section_context: SectionPlanningContext) -> dict[str, 
             motif_lines.append(line)
         motif_catalog_summary = "\n".join(motif_lines)
 
+    # Calculate section duration in bars/beats
+    # This tells the LLM how much space it has to work with
+    section_duration_ms = section_context.end_ms - section_context.start_ms
+    timing_ctx = section_context.timing_context
+    if timing_ctx.bar_map:
+        # Get bar duration from first bar in map
+        first_bar = next(iter(timing_ctx.bar_map.values()))
+        bar_duration_ms = first_bar.duration_ms
+        beat_duration_ms = bar_duration_ms / timing_ctx.beats_per_bar
+        section_bars = section_duration_ms / bar_duration_ms
+        section_beats = section_duration_ms / beat_duration_ms
+        # Number of complete bars available in the section
+        available_bars = max(1, int(section_bars))
+    else:
+        # Fallback estimate
+        available_bars = 4
+        section_bars = 4.0
+        section_beats = 16.0
+
     return {
         # Section identity
         "section_id": section_context.section_id,
@@ -324,6 +343,10 @@ def shape_planner_context(section_context: SectionPlanningContext) -> dict[str, 
         # Timing
         "start_ms": section_context.start_ms,
         "end_ms": section_context.end_ms,
+        # Section duration in musical terms (CRITICAL for LLM to know constraints)
+        "section_duration_bars": round(section_bars, 1),
+        "section_duration_beats": round(section_beats, 1),
+        "available_bars": available_bars,
         # Intent from MacroPlan
         "energy_target": section_context.energy_target,
         "motion_density": section_context.motion_density,
@@ -343,7 +366,6 @@ def shape_planner_context(section_context: SectionPlanningContext) -> dict[str, 
         "motif_ids": section_context.motif_ids,  # Motifs for this section
         "motif_catalog_summary": motif_catalog_summary,  # Motif reference guide
         "tag_catalog": tag_catalog,  # For tag validation
-        # timing_context excluded (not used in prompt)
     }
 
 
@@ -415,7 +437,7 @@ def shape_section_judge_context(
 
     # Get theming IDs for validation
     theming_ids = get_theming_ids()
-    
+
     # Get motif catalog for validation and template support checking
     from twinklr.core.agents.taxonomy_utils import get_theming_catalog_dict
     theming_catalog = get_theming_catalog_dict()

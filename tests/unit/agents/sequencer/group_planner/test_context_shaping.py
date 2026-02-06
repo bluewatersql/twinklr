@@ -416,9 +416,7 @@ def group_plan_set() -> GroupPlanSet:
         CoordinationPlan,
         GroupPlacement,
     )
-    from twinklr.core.sequencer.timing import TimeRef
-    from twinklr.core.sequencer.vocabulary import CoordinationMode
-    from twinklr.core.sequencer.vocabulary.timing import TimeRefKind
+    from twinklr.core.sequencer.vocabulary import CoordinationMode, EffectDuration, PlanningTimeRef
 
     # Create minimal placements
     placements = [
@@ -426,8 +424,8 @@ def group_plan_set() -> GroupPlanSet:
             placement_id="p1",
             group_id="MEGA_TREE_01",
             template_id="sweep_basic",
-            start=TimeRef(kind=TimeRefKind.MS, offset_ms=0),
-            end=TimeRef(kind=TimeRefKind.MS, offset_ms=1000),
+            start=PlanningTimeRef(bar=1, beat=1),
+            duration=EffectDuration.BURST,
         )
     ]
 
@@ -691,9 +689,7 @@ def test_shape_holistic_judge_context_single_section() -> None:
         CoordinationPlan,
         GroupPlacement,
     )
-    from twinklr.core.sequencer.timing import TimeRef
-    from twinklr.core.sequencer.vocabulary import CoordinationMode
-    from twinklr.core.sequencer.vocabulary.timing import TimeRefKind
+    from twinklr.core.sequencer.vocabulary import CoordinationMode, EffectDuration, PlanningTimeRef
 
     # Create minimal placements
     placements = [
@@ -701,8 +697,8 @@ def test_shape_holistic_judge_context_single_section() -> None:
             placement_id="p1",
             group_id="TEST_01",
             template_id="sweep_basic",
-            start=TimeRef(kind=TimeRefKind.MS, offset_ms=0),
-            end=TimeRef(kind=TimeRefKind.MS, offset_ms=1000),
+            start=PlanningTimeRef(bar=1, beat=1),
+            duration=EffectDuration.BURST,
         )
     ]
 
@@ -772,7 +768,7 @@ def test_template_simplification_drops_expected_fields(
     assert "description" not in shaped_entry
     assert "presets" not in shaped_entry
     assert "category" not in shaped_entry
-    
+
     # tags should be INCLUDED (needed for template selection heuristics)
     assert "tags" in shaped_entry
 

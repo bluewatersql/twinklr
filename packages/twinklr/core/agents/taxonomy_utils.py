@@ -32,9 +32,11 @@ def get_taxonomy_dict() -> dict[str, list[str]]:
         BlendMode,
         ChoreographyStyle,
         CoordinationMode,
+        EffectDuration,
         EnergyTarget,
         GroupTemplateType,
         GroupVisualIntent,
+        IntensityLevel,
         LaneKind,
         LayerRole,
         MotionDensity,
@@ -44,6 +46,7 @@ def get_taxonomy_dict() -> dict[str, list[str]]:
         StepUnit,
         TargetRole,
         TimingDriver,
+        TimingHint,
     )
     from twinklr.core.sequencer.vocabulary.timing import TimeRefKind
 
@@ -72,6 +75,10 @@ def get_taxonomy_dict() -> dict[str, list[str]]:
         CoordinationMode,
         StepUnit,
         SpillPolicy,
+        # Categorical planning enums (v2)
+        IntensityLevel,
+        EffectDuration,
+        TimingHint,
     ]
 
     # Extract issue taxonomy enums (for judge agents)

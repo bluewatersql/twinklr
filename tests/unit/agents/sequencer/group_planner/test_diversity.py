@@ -13,9 +13,12 @@ from twinklr.core.sequencer.templates.group.models import (
     CoordinationPlan,
     GroupPlacement,
 )
-from twinklr.core.sequencer.timing import TimeRef
-from twinklr.core.sequencer.vocabulary import CoordinationMode, LaneKind
-from twinklr.core.sequencer.vocabulary.timing import TimeRefKind
+from twinklr.core.sequencer.vocabulary import (
+    CoordinationMode,
+    EffectDuration,
+    LaneKind,
+    PlanningTimeRef,
+)
 
 from .conftest import DEFAULT_THEME
 
@@ -64,8 +67,8 @@ class TestComputeLaneStats:
                 placement_id="p1",
                 group_id="g1",
                 template_id="template_a",
-                start=TimeRef(kind=TimeRefKind.BAR_BEAT, bar=1, beat=1),
-                end=TimeRef(kind=TimeRefKind.BAR_BEAT, bar=2, beat=1),
+                start=PlanningTimeRef(bar=1, beat=1),
+                duration=EffectDuration.BURST,
             )
         ]
         stats = compute_lane_stats(placements, LaneKind.BASE)
@@ -82,8 +85,8 @@ class TestComputeLaneStats:
                 placement_id=f"p{i}",
                 group_id="g1",
                 template_id=f"template_{chr(97 + i)}",  # a, b, c
-                start=TimeRef(kind=TimeRefKind.BAR_BEAT, bar=i * 2 + 1, beat=1),
-                end=TimeRef(kind=TimeRefKind.BAR_BEAT, bar=i * 2 + 2, beat=1),
+                start=PlanningTimeRef(bar=i * 2 + 1, beat=1),
+                duration=EffectDuration.BURST,
             )
             for i in range(3)
         ]
@@ -99,22 +102,22 @@ class TestComputeLaneStats:
                 placement_id="p1",
                 group_id="g1",
                 template_id="template_a",
-                start=TimeRef(kind=TimeRefKind.BAR_BEAT, bar=1, beat=1),
-                end=TimeRef(kind=TimeRefKind.BAR_BEAT, bar=2, beat=1),
+                start=PlanningTimeRef(bar=1, beat=1),
+                duration=EffectDuration.BURST,
             ),
             GroupPlacement(
                 placement_id="p2",
                 group_id="g2",
                 template_id="template_b",
-                start=TimeRef(kind=TimeRefKind.BAR_BEAT, bar=3, beat=1),
-                end=TimeRef(kind=TimeRefKind.BAR_BEAT, bar=4, beat=1),
+                start=PlanningTimeRef(bar=3, beat=1),
+                duration=EffectDuration.BURST,
             ),
             GroupPlacement(
                 placement_id="p3",
                 group_id="g3",
                 template_id="template_a",  # Reuse
-                start=TimeRef(kind=TimeRefKind.BAR_BEAT, bar=5, beat=1),
-                end=TimeRef(kind=TimeRefKind.BAR_BEAT, bar=6, beat=1),
+                start=PlanningTimeRef(bar=5, beat=1),
+                duration=EffectDuration.BURST,
             ),
         ]
         stats = compute_lane_stats(placements, LaneKind.BASE)
@@ -129,8 +132,8 @@ class TestComputeLaneStats:
                 placement_id=f"p{i}",
                 group_id=f"g{i}",
                 template_id="template_a" if i < 3 else "template_b",
-                start=TimeRef(kind=TimeRefKind.BAR_BEAT, bar=i * 2 + 1, beat=1),
-                end=TimeRef(kind=TimeRefKind.BAR_BEAT, bar=i * 2 + 2, beat=1),
+                start=PlanningTimeRef(bar=i * 2 + 1, beat=1),
+                duration=EffectDuration.BURST,
             )
             for i in range(5)
         ]
@@ -149,8 +152,8 @@ class TestComputeLaneStats:
                         placement_id=f"p{len(placements)}",
                         group_id=f"g{len(placements)}",
                         template_id=template_id,
-                        start=TimeRef(kind=TimeRefKind.BAR_BEAT, bar=bar_num, beat=1),
-                        end=TimeRef(kind=TimeRefKind.BAR_BEAT, bar=bar_num + 1, beat=1),
+                        start=PlanningTimeRef(bar=bar_num, beat=1),
+                        duration=EffectDuration.BURST,
                     )
                 )
                 bar_num += 2
@@ -275,8 +278,8 @@ class TestValidateSectionDiversity:
                 placement_id=f"p{i}",
                 group_id=f"g{i}",
                 template_id=f"template_{chr(97 + i)}",  # a, b, c, d, e, f
-                start=TimeRef(kind=TimeRefKind.BAR_BEAT, bar=i * 2 + 1, beat=1),
-                end=TimeRef(kind=TimeRefKind.BAR_BEAT, bar=i * 2 + 2, beat=1),
+                start=PlanningTimeRef(bar=i * 2 + 1, beat=1),
+                duration=EffectDuration.BURST,
             )
             for i in range(6)
         ]
@@ -311,8 +314,8 @@ class TestValidateSectionDiversity:
                 placement_id=f"p{i}",
                 group_id=f"g{i}",
                 template_id="template_a" if i % 2 == 0 else "template_b",
-                start=TimeRef(kind=TimeRefKind.BAR_BEAT, bar=i * 2 + 1, beat=1),
-                end=TimeRef(kind=TimeRefKind.BAR_BEAT, bar=i * 2 + 2, beat=1),
+                start=PlanningTimeRef(bar=i * 2 + 1, beat=1),
+                duration=EffectDuration.BURST,
             )
             for i in range(10)
         ]
@@ -347,8 +350,8 @@ class TestValidateSectionDiversity:
                 placement_id=f"base_p{i}",
                 group_id=f"g{i}",
                 template_id=f"base_template_{i}",
-                start=TimeRef(kind=TimeRefKind.BAR_BEAT, bar=i * 2 + 1, beat=1),
-                end=TimeRef(kind=TimeRefKind.BAR_BEAT, bar=i * 2 + 2, beat=1),
+                start=PlanningTimeRef(bar=i * 2 + 1, beat=1),
+                duration=EffectDuration.BURST,
             )
             for i in range(6)
         ]
@@ -359,8 +362,8 @@ class TestValidateSectionDiversity:
                 placement_id=f"rhythm_p{i}",
                 group_id=f"g{i}",
                 template_id=f"rhythm_template_{i % 3}",  # Only 3 unique
-                start=TimeRef(kind=TimeRefKind.BAR_BEAT, bar=i * 2 + 1, beat=1),
-                end=TimeRef(kind=TimeRefKind.BAR_BEAT, bar=i * 2 + 2, beat=1),
+                start=PlanningTimeRef(bar=i * 2 + 1, beat=1),
+                duration=EffectDuration.BURST,
             )
             for i in range(10)
         ]

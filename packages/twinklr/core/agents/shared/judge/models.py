@@ -6,7 +6,7 @@ and iteration state management across all V2 agents.
 
 from enum import Enum
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from twinklr.core.agents.issues import Issue, IssueSeverity
 
@@ -94,6 +94,47 @@ class JudgeVerdict(BaseModel):
     iteration: int = Field(ge=0, description="Iteration number when verdict issued")
 
     model_config = ConfigDict(frozen=True, extra="forbid", validate_assignment=True)
+
+    @model_validator(mode="after")
+    def enforce_status_matches_score(self) -> "JudgeVerdict":
+        """Enforce that status matches score thresholds.
+
+        The prompts instruct judges to set status based on score thresholds:
+        - APPROVE: score >= 7.0
+        - SOFT_FAIL: score 5.0-6.9
+        - HARD_FAIL: score < 5.0
+
+        This validator overrides status if it doesn't match, ensuring consistent
+        behavior and improving first-iteration approval rates when plans score >= 7.0.
+
+        Returns:
+            JudgeVerdict with corrected status if needed
+        """
+        expected_status = self._expected_status_for_score(self.score)
+
+        if self.status != expected_status:
+            # Override status to match score threshold
+            # Use object.__setattr__ because model is frozen
+            object.__setattr__(self, "status", expected_status)
+
+        return self
+
+    @staticmethod
+    def _expected_status_for_score(score: float) -> VerdictStatus:
+        """Determine expected status for a given score.
+
+        Args:
+            score: Quality score (0-10)
+
+        Returns:
+            Expected VerdictStatus based on score thresholds
+        """
+        if score >= 7.0:
+            return VerdictStatus.APPROVE
+        elif score >= 5.0:
+            return VerdictStatus.SOFT_FAIL
+        else:
+            return VerdictStatus.HARD_FAIL
 
     @property
     def requires_revision(self) -> bool:

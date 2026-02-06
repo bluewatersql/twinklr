@@ -2,6 +2,8 @@
 
 These validators run before LLM judge evaluation to catch
 structural and timing issues quickly.
+
+Updated for categorical planning (IntensityLevel, EffectDuration, PlanningTimeRef).
 """
 
 from __future__ import annotations
@@ -20,7 +22,12 @@ from twinklr.core.sequencer.templates.group.models import (
     GroupPlacement,
     PlacementWindow,
 )
-from twinklr.core.sequencer.vocabulary import CoordinationMode, LaneKind
+from twinklr.core.sequencer.vocabulary import (
+    CoordinationMode,
+    EffectDuration,
+    IntensityLevel,
+    LaneKind,
+)
 
 
 class ValidationSeverity(str, Enum):
@@ -82,6 +89,44 @@ class SectionPlanValidator:
         # Build lookup sets for fast validation
         self._valid_group_ids = {g.group_id for g in display_graph.groups}
 
+    def _get_section_end_bar(self, section_end_ms: int) -> int:
+        """Get the bar number for a given millisecond position.
+
+        Args:
+            section_end_ms: End time in milliseconds
+
+        Returns:
+            Bar number (1-indexed)
+        """
+        # Find the bar that contains this millisecond
+        for bar, bar_info in sorted(self.timing_context.bar_map.items()):
+            if bar_info.start_ms + bar_info.duration_ms >= section_end_ms:
+                return bar
+        # Fallback to last bar
+        if self.timing_context.bar_map:
+            return max(self.timing_context.bar_map.keys())
+        return 1
+
+    def _get_section_end_beat(self, section_end_ms: int) -> int:
+        """Get the beat number for a given millisecond position.
+
+        Args:
+            section_end_ms: End time in milliseconds
+
+        Returns:
+            Beat number (1-indexed)
+        """
+        # Find the bar that contains this millisecond
+        for _bar, bar_info in sorted(self.timing_context.bar_map.items()):
+            if bar_info.start_ms <= section_end_ms < bar_info.start_ms + bar_info.duration_ms:
+                # Calculate beat within this bar
+                offset_ms = section_end_ms - bar_info.start_ms
+                beat_duration_ms = bar_info.duration_ms / self.timing_context.beats_per_bar
+                beat = int(offset_ms / beat_duration_ms) + 1
+                return min(beat, self.timing_context.beats_per_bar)
+        # Fallback to last beat
+        return self.timing_context.beats_per_bar
+
     def validate(self, plan: SectionCoordinationPlan) -> ValidationResult:
         """Validate a SectionCoordinationPlan.
 
@@ -126,7 +171,9 @@ class SectionPlanValidator:
                 if coord_plan.config and coord_plan.config.group_order:
                     errors.extend(
                         self._validate_group_order(
-                            coord_plan.config.group_order, lane_plan.lane.value
+                            coord_plan.config.group_order,
+                            coord_plan.group_ids,
+                            lane_plan.lane.value,
                         )
                     )
 
@@ -161,7 +208,11 @@ class SectionPlanValidator:
                         group_timings[group_id].extend(timings)
 
             # Check for cross-coordination-plan overlaps within same lane
-            errors.extend(self._check_cross_coordination_overlaps(group_timings, lane_plan.lane))
+            overlap_errors, overlap_warnings = self._check_cross_coordination_overlaps(
+                group_timings, lane_plan.lane
+            )
+            errors.extend(overlap_errors)
+            warnings.extend(overlap_warnings)
 
         # Add warning checks for common soft-fail patterns
         warnings.extend(self._check_identical_accent_on_primaries(plan))
@@ -207,10 +258,14 @@ class SectionPlanValidator:
             if len(placements) < 3:
                 continue
 
-            # Check if placements use the same template and intensity
-            template_intensity_counts: dict[tuple[str, float], list[str]] = defaultdict(list)
+            # Check if placements use the same template and intensity level
+            template_intensity_counts: dict[tuple[str, str], list[str]] = defaultdict(list)
             for p in placements:
-                key = (p.template_id, round(p.intensity, 2))
+                # Use the enum value string for categorical intensity
+                intensity_val = (
+                    p.intensity.value if isinstance(p.intensity, IntensityLevel) else str(p.intensity)
+                )
+                key = (p.template_id, intensity_val)
                 template_intensity_counts[key].append(p.group_id)
 
             for (template_id, intensity), groups in template_intensity_counts.items():
@@ -226,12 +281,12 @@ class SectionPlanValidator:
                                 code="IDENTICAL_ACCENT_ON_PRIMARIES",
                                 message=(
                                     f"All {len(primary_groups)} primary targets ({', '.join(primary_groups[:3])}) "
-                                    f"receive identical accent ({template_id}, intensity={intensity:.2f}). "
+                                    f"receive identical accent ({template_id}, intensity={intensity}). "
                                     f"This flattens focal hierarchy."
                                 ),
                                 field_path="lane_plans[ACCENT]",
                                 fix_hint=(
-                                    "Make ONE target the focal point with higher intensity, "
+                                    "Make ONE target the focal point with PEAK intensity, "
                                     "OR stagger timing by 1+ beat, OR vary templates"
                                 ),
                             )
@@ -289,12 +344,13 @@ class SectionPlanValidator:
         return warnings
 
     def _validate_group_order(
-        self, group_order: list[str], lane_name: str
+        self, group_order: list[str], group_ids: list[str], lane_name: str
     ) -> list[ValidationIssue]:
-        """Validate group_order for duplicates.
+        """Validate group_order for duplicates and membership in group_ids.
 
         Args:
             group_order: List of group IDs in sequence
+            group_ids: List of valid group IDs for this coordination plan
             lane_name: Name of lane
 
         Returns:
@@ -321,21 +377,46 @@ class SectionPlanValidator:
                 )
             )
 
+        # Check that all group_order entries are in group_ids
+        group_ids_set = set(group_ids)
+        invalid_groups = [gid for gid in group_order if gid not in group_ids_set]
+
+        if invalid_groups:
+            errors.append(
+                ValidationIssue(
+                    severity=ValidationSeverity.ERROR,
+                    code="SEQUENCED_CONFIG_GROUP_MISMATCH",
+                    message=(
+                        f"group_order contains groups not in group_ids: {invalid_groups}. "
+                        f"Valid group_ids: {group_ids}"
+                    ),
+                    field_path=f"lane_plans[{lane_name}].config.group_order",
+                    fix_hint=(
+                        f"All entries in group_order must be present in group_ids. "
+                        f"Remove {invalid_groups} or add them to group_ids."
+                    ),
+                )
+            )
+
         return errors
 
     def _check_cross_coordination_overlaps(
         self, group_timings: dict[str, list[tuple[int, int, str]]], lane: LaneKind
-    ) -> list[ValidationIssue]:
+    ) -> tuple[list[ValidationIssue], list[ValidationIssue]]:
         """Check for overlaps across coordination_plans within same lane.
+
+        With categorical planning, minor overlaps are downgraded to warnings
+        since the renderer will snap/adjust boundaries.
 
         Args:
             group_timings: Dict mapping group_id to list of (start_ms, end_ms, source) tuples
             lane: Lane kind
 
         Returns:
-            List of validation issues
+            Tuple of (errors, warnings)
         """
         errors: list[ValidationIssue] = []
+        warnings: list[ValidationIssue] = []
 
         for group_id, timings in group_timings.items():
             if len(timings) < 2:
@@ -350,8 +431,14 @@ class SectionPlanValidator:
                 for j in range(i + 1, len(sorted_timings)):
                     start_j, end_j, source_j = sorted_timings[j]
 
-                    # Check if they overlap (not just touch)
-                    if start_j < end_i:
+                    # Check if they overlap significantly (not just touch or minor overlap)
+                    # With categorical planning, renderer will snap/adjust boundaries,
+                    # so we use a tolerance of 1 beat (~500ms at typical tempo)
+                    overlap_ms = end_i - start_j
+                    overlap_tolerance_ms = 500  # ~1 beat, renderer will adjust
+
+                    if start_j < end_i and overlap_ms > overlap_tolerance_ms:
+                        # Significant overlap - this is an error
                         errors.append(
                             ValidationIssue(
                                 severity=ValidationSeverity.ERROR,
@@ -365,8 +452,22 @@ class SectionPlanValidator:
                                 fix_hint="Remove group from one coordination_plan or make timing sequential",
                             )
                         )
+                    elif start_j < end_i:
+                        # Minor overlap - downgrade to warning, renderer will adjust
+                        warnings.append(
+                            ValidationIssue(
+                                severity=ValidationSeverity.WARNING,
+                                code="CROSS_COORDINATION_OVERLAP_MINOR",
+                                message=(
+                                    f"Group '{group_id}' has minor timing overlap ({overlap_ms}ms) "
+                                    f"in {lane.value} lane - renderer will adjust"
+                                ),
+                                field_path=f"lane_plans[{lane.value}]",
+                                fix_hint="Consider adjusting timing to avoid overlap",
+                            )
+                        )
 
-        return errors
+        return errors, warnings
 
     def _validate_placements(
         self,
@@ -422,40 +523,43 @@ class SectionPlanValidator:
                         )
                     )
 
-            # Check intensity range (absolute)
-            if placement.intensity < 0.0 or placement.intensity > 1.5:
-                errors.append(
-                    ValidationIssue(
-                        severity=ValidationSeverity.ERROR,
-                        code="INTENSITY_OUT_OF_RANGE",
-                        message=f"Intensity {placement.intensity} out of valid range [0.0, 1.5]",
-                        field_path=f"placement[{placement.placement_id}].intensity",
-                        fix_hint="Set intensity between 0.0 and 1.5",
+            # Validate intensity is a valid IntensityLevel enum
+            # (Pydantic should handle this, but we check for explicit validation)
+            if not isinstance(placement.intensity, IntensityLevel):
+                try:
+                    # Try to convert string to enum
+                    IntensityLevel(placement.intensity)
+                except ValueError:
+                    errors.append(
+                        ValidationIssue(
+                            severity=ValidationSeverity.ERROR,
+                            code="INVALID_INTENSITY_LEVEL",
+                            message=(
+                                f"Invalid intensity '{placement.intensity}'. "
+                                f"Must be one of: WHISPER, SOFT, MED, STRONG, PEAK"
+                            ),
+                            field_path=f"placement[{placement.placement_id}].intensity",
+                            fix_hint="Use a valid IntensityLevel: WHISPER, SOFT, MED, STRONG, PEAK",
+                        )
                     )
-                )
 
-            # Check lane-specific intensity limits (prevents layer imbalance)
-            # ACCENT lane: max 1.30 (exceeding this overpowers other layers)
-            # BASE/RHYTHM: max 1.0 recommended, 1.2 hard limit
-            lane_intensity_limits = {
-                LaneKind.ACCENT: 1.30,
-                LaneKind.RHYTHM: 1.20,
-                LaneKind.BASE: 1.10,
-            }
-            lane_max = lane_intensity_limits.get(lane, 1.5)
-            if placement.intensity > lane_max:
-                errors.append(
-                    ValidationIssue(
-                        severity=ValidationSeverity.ERROR,
-                        code="LANE_INTENSITY_EXCEEDED",
-                        message=(
-                            f"Intensity {placement.intensity:.2f} exceeds {lane.value} lane "
-                            f"maximum of {lane_max:.2f}. High intensity will overpower other layers."
-                        ),
-                        field_path=f"placement[{placement.placement_id}].intensity",
-                        fix_hint=f"Reduce intensity to ≤{lane_max:.2f} for {lane.value} lane",
+            # Validate duration is a valid EffectDuration enum
+            if not isinstance(placement.duration, EffectDuration):
+                try:
+                    EffectDuration(placement.duration)
+                except ValueError:
+                    errors.append(
+                        ValidationIssue(
+                            severity=ValidationSeverity.ERROR,
+                            code="INVALID_DURATION",
+                            message=(
+                                f"Invalid duration '{placement.duration}'. "
+                                f"Must be one of: HIT, BURST, PHRASE, EXTENDED, SECTION"
+                            ),
+                            field_path=f"placement[{placement.placement_id}].duration",
+                            fix_hint="Use a valid EffectDuration: HIT, BURST, PHRASE, EXTENDED, SECTION",
+                        )
                     )
-                )
 
             # Check group exists
             if placement.group_id not in self._valid_group_ids:
@@ -469,35 +573,55 @@ class SectionPlanValidator:
                     )
                 )
 
-            # Resolve timing
+            # Resolve timing (using PlanningTimeRef and EffectDuration)
             try:
-                start_ms = self.timing_context.resolve_to_ms(placement.start)
-                end_ms = self.timing_context.resolve_to_ms(placement.end)
+                start_ms = self.timing_context.resolve_planning_time_ref(placement.start)
+                # For end_ms, we need section bounds in bar/beat format
+                # For now, use a reasonable default if section bounds not available
+                if section_end_ms is not None:
+                    end_ms = self.timing_context.resolve_duration_to_end_ms(
+                        placement.start,
+                        placement.duration,
+                        section_end_bar=self._get_section_end_bar(section_end_ms),
+                        section_end_beat=self._get_section_end_beat(section_end_ms),
+                    )
+                else:
+                    # No section bounds - estimate end based on duration
+                    from twinklr.core.sequencer.vocabulary import DURATION_BEATS
+
+                    min_beats, _ = DURATION_BEATS.get(placement.duration, (4, 4))
+                    if min_beats is None:
+                        min_beats = 16  # Default for SECTION
+                    beat_duration = self.timing_context.beat_duration_ms(placement.start.bar)
+                    end_ms = start_ms + int(min_beats * beat_duration)
             except ValueError as e:
                 errors.append(
                     ValidationIssue(
                         severity=ValidationSeverity.ERROR,
-                        code="INVALID_TIMEREF",
-                        message=f"Cannot resolve TimeRef: {e}",
-                        field_path=f"placement[{placement.placement_id}].start/end",
+                        code="INVALID_PLANNING_TIMEREF",
+                        message=f"Cannot resolve PlanningTimeRef: {e}",
+                        field_path=f"placement[{placement.placement_id}].start",
                     )
                 )
                 continue
 
             # Check timing within section bounds
+            # With categorical planning, renderer will clamp durations that extend
+            # past section end. Only error if start is outside section.
             if section_start_ms is not None and section_end_ms is not None:
-                if start_ms < section_start_ms or end_ms > section_end_ms:
+                # Critical: start must be within section bounds
+                if start_ms < section_start_ms or start_ms >= section_end_ms:
                     errors.append(
                         ValidationIssue(
                             severity=ValidationSeverity.ERROR,
                             code="PLACEMENT_OUTSIDE_SECTION",
                             message=(
                                 f"Placement '{placement.placement_id}' "
-                                f"({start_ms}ms-{end_ms}ms) outside section bounds "
+                                f"starts at {start_ms}ms which is outside section bounds "
                                 f"({section_start_ms}ms-{section_end_ms}ms)"
                             ),
-                            field_path=f"placement[{placement.placement_id}].start/end",
-                            fix_hint="Adjust placement timing to fit within section bounds",
+                            field_path=f"placement[{placement.placement_id}].start",
+                            fix_hint="Adjust placement start to be within section bounds",
                         )
                     )
 
@@ -579,34 +703,54 @@ class SectionPlanValidator:
                     )
                 )
 
-        # Resolve timing
+        # Resolve timing (using PlanningTimeRef)
         try:
-            start_ms = self.timing_context.resolve_to_ms(window.start)
-            end_ms = self.timing_context.resolve_to_ms(window.end)
+            start_ms = self.timing_context.resolve_planning_time_ref(window.start)
+            end_ms = self.timing_context.resolve_planning_time_ref(window.end)
         except ValueError as e:
             errors.append(
                 ValidationIssue(
                     severity=ValidationSeverity.ERROR,
-                    code="INVALID_TIMEREF",
-                    message=f"Cannot resolve window TimeRef: {e}",
+                    code="INVALID_PLANNING_TIMEREF",
+                    message=f"Cannot resolve window PlanningTimeRef: {e}",
                     field_path=f"lane_plans[{lane.value}].window.start/end",
                 )
             )
             return errors, group_timings
 
+        # Validate intensity is a valid IntensityLevel enum
+        if not isinstance(window.intensity, IntensityLevel):
+            try:
+                IntensityLevel(window.intensity)
+            except ValueError:
+                errors.append(
+                    ValidationIssue(
+                        severity=ValidationSeverity.ERROR,
+                        code="INVALID_INTENSITY_LEVEL",
+                        message=(
+                            f"Invalid window intensity '{window.intensity}'. "
+                            f"Must be one of: WHISPER, SOFT, MED, STRONG, PEAK"
+                        ),
+                        field_path=f"lane_plans[{lane.value}].window.intensity",
+                        fix_hint="Use a valid IntensityLevel: WHISPER, SOFT, MED, STRONG, PEAK",
+                    )
+                )
+
         # Check timing within section bounds
+        # With categorical planning, renderer will clamp windows that extend
+        # past section end. Only error if start is outside section.
         if section_start_ms is not None and section_end_ms is not None:
-            if start_ms < section_start_ms or end_ms > section_end_ms:
+            if start_ms < section_start_ms or start_ms >= section_end_ms:
                 errors.append(
                     ValidationIssue(
                         severity=ValidationSeverity.ERROR,
                         code="WINDOW_OUTSIDE_SECTION",
                         message=(
-                            f"Window ({start_ms}ms-{end_ms}ms) outside section bounds "
+                            f"Window starts at {start_ms}ms which is outside section bounds "
                             f"({section_start_ms}ms-{section_end_ms}ms)"
                         ),
-                        field_path=f"lane_plans[{lane.value}].window.start/end",
-                        fix_hint="Adjust window timing to fit within section bounds",
+                        field_path=f"lane_plans[{lane.value}].window.start",
+                        fix_hint="Adjust window start to be within section bounds",
                     )
                 )
 

@@ -23,9 +23,12 @@ from twinklr.core.sequencer.templates.group.models import (
 from twinklr.core.sequencer.timing import TimeRef
 from twinklr.core.sequencer.vocabulary import (
     CoordinationMode,
+    EffectDuration,
     GroupTemplateType,
     GroupVisualIntent,
+    IntensityLevel,
     LaneKind,
+    PlanningTimeRef,
     SpillPolicy,
     StepUnit,
 )
@@ -205,16 +208,19 @@ class TestGroupPlacement:
     """Tests for GroupPlacement model."""
 
     def test_valid_placement(self) -> None:
-        """Valid placement with TimeRef start/end."""
+        """Valid placement with PlanningTimeRef start and EffectDuration."""
         placement = GroupPlacement(
             placement_id="p1",
             group_id="HERO_1",
             template_id="gtpl_accent_bell",
-            start=TimeRef(kind=TimeRefKind.BAR_BEAT, bar=1, beat=1),
-            end=TimeRef(kind=TimeRefKind.BAR_BEAT, bar=2, beat=1),
+            start=PlanningTimeRef(bar=1, beat=1),
+            duration=EffectDuration.PHRASE,
+            intensity=IntensityLevel.STRONG,
         )
         assert placement.group_id == "HERO_1"
         assert placement.template_id == "gtpl_accent_bell"
+        assert placement.duration == EffectDuration.PHRASE
+        assert placement.intensity == IntensityLevel.STRONG
 
 
 class TestCoordinationPlan:
@@ -230,8 +236,9 @@ class TestCoordinationPlan:
                     placement_id="p1",
                     group_id="HERO_1",
                     template_id="gtpl_accent",
-                    start=TimeRef(kind=TimeRefKind.BAR_BEAT, bar=1, beat=1),
-                    end=TimeRef(kind=TimeRefKind.BAR_BEAT, bar=2, beat=1),
+                    start=PlanningTimeRef(bar=1, beat=1),
+                    duration=EffectDuration.BURST,
+                    intensity=IntensityLevel.STRONG,
                 ),
             ],
         )
@@ -244,9 +251,10 @@ class TestCoordinationPlan:
             coordination_mode=CoordinationMode.SEQUENCED,
             group_ids=["HERO_1", "HERO_2", "HERO_3"],
             window=PlacementWindow(
-                start=TimeRef(kind=TimeRefKind.BAR_BEAT, bar=1, beat=1),
-                end=TimeRef(kind=TimeRefKind.BAR_BEAT, bar=4, beat=1),
+                start=PlanningTimeRef(bar=1, beat=1),
+                end=PlanningTimeRef(bar=4, beat=1),
                 template_id="gtpl_accent",
+                intensity=IntensityLevel.STRONG,
             ),
             config=CoordinationConfig(
                 group_order=["HERO_1", "HERO_2", "HERO_3"],
@@ -277,8 +285,9 @@ class TestLanePlan:
                             placement_id="p1",
                             group_id="HERO_1",
                             template_id="gtpl_accent",
-                            start=TimeRef(kind=TimeRefKind.BAR_BEAT, bar=1, beat=1),
-                            end=TimeRef(kind=TimeRefKind.BAR_BEAT, bar=2, beat=1),
+                            start=PlanningTimeRef(bar=1, beat=1),
+                            duration=EffectDuration.BURST,
+                            intensity=IntensityLevel.PEAK,
                         ),
                     ],
                 ),

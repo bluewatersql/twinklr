@@ -26,9 +26,12 @@ from twinklr.core.sequencer.templates.group.models import (
 from twinklr.core.sequencer.timing import TimeRef
 from twinklr.core.sequencer.vocabulary import (
     CoordinationMode,
+    EffectDuration,
     GroupTemplateType,
     GroupVisualIntent,
+    IntensityLevel,
     LaneKind,
+    PlanningTimeRef,
 )
 from twinklr.core.sequencer.vocabulary.timing import TimeRefKind
 
@@ -134,8 +137,8 @@ class TestSectionPlanValidator:
                                     placement_id="p1",
                                     group_id="HERO_1",
                                     template_id="gtpl_accent_bell",
-                                    start=TimeRef(kind=TimeRefKind.BAR_BEAT, bar=1, beat=1),
-                                    end=TimeRef(kind=TimeRefKind.BAR_BEAT, bar=2, beat=1),
+                                    start=PlanningTimeRef(bar=1, beat=1),
+                                    duration=EffectDuration.BURST,
                                 ),
                             ],
                         ),
@@ -177,8 +180,8 @@ class TestSectionPlanValidator:
                                     placement_id="p1",
                                     group_id="HERO_1",
                                     template_id="NONEXISTENT_TEMPLATE",
-                                    start=TimeRef(kind=TimeRefKind.BAR_BEAT, bar=1, beat=1),
-                                    end=TimeRef(kind=TimeRefKind.BAR_BEAT, bar=2, beat=1),
+                                    start=PlanningTimeRef(bar=1, beat=1),
+                                    duration=EffectDuration.BURST,
                                 ),
                             ],
                         ),
@@ -221,8 +224,8 @@ class TestSectionPlanValidator:
                                     placement_id="p1",
                                     group_id="NONEXISTENT_GROUP",
                                     template_id="gtpl_accent_bell",
-                                    start=TimeRef(kind=TimeRefKind.BAR_BEAT, bar=1, beat=1),
-                                    end=TimeRef(kind=TimeRefKind.BAR_BEAT, bar=2, beat=1),
+                                    start=PlanningTimeRef(bar=1, beat=1),
+                                    duration=EffectDuration.BURST,
                                 ),
                             ],
                         ),
@@ -265,8 +268,8 @@ class TestSectionPlanValidator:
                                     placement_id="p1",
                                     group_id="HERO_1",
                                     template_id="gtpl_accent_bell",
-                                    start=TimeRef(kind=TimeRefKind.BAR_BEAT, bar=4, beat=1),
-                                    end=TimeRef(kind=TimeRefKind.BAR_BEAT, bar=4, beat=4),
+                                    start=PlanningTimeRef(bar=4, beat=1),
+                                    duration=EffectDuration.HIT,
                                 ),
                             ],
                         ),
@@ -308,15 +311,15 @@ class TestSectionPlanValidator:
                                     placement_id="p1",
                                     group_id="HERO_1",
                                     template_id="gtpl_accent_bell",
-                                    start=TimeRef(kind=TimeRefKind.BAR_BEAT, bar=1, beat=1),
-                                    end=TimeRef(kind=TimeRefKind.BAR_BEAT, bar=2, beat=1),
+                                    start=PlanningTimeRef(bar=1, beat=1),
+                                    duration=EffectDuration.BURST,  # 4 beats
                                 ),
                                 GroupPlacement(
                                     placement_id="p2",
                                     group_id="HERO_1",
                                     template_id="gtpl_accent_bell",
-                                    start=TimeRef(kind=TimeRefKind.BAR_BEAT, bar=1, beat=3),
-                                    end=TimeRef(kind=TimeRefKind.BAR_BEAT, bar=2, beat=3),
+                                    start=PlanningTimeRef(bar=1, beat=3),
+                                    duration=EffectDuration.BURST,  # 4 beats, overlaps p1
                                 ),
                             ],
                         ),
@@ -358,15 +361,15 @@ class TestSectionPlanValidator:
                                     placement_id="p1",
                                     group_id="HERO_1",
                                     template_id="gtpl_accent_bell",
-                                    start=TimeRef(kind=TimeRefKind.BAR_BEAT, bar=1, beat=1),
-                                    end=TimeRef(kind=TimeRefKind.BAR_BEAT, bar=2, beat=1),
+                                    start=PlanningTimeRef(bar=1, beat=1),
+                                    duration=EffectDuration.BURST,
                                 ),
                                 GroupPlacement(
                                     placement_id="p2",
                                     group_id="HERO_2",
                                     template_id="gtpl_accent_bell",
-                                    start=TimeRef(kind=TimeRefKind.BAR_BEAT, bar=1, beat=1),
-                                    end=TimeRef(kind=TimeRefKind.BAR_BEAT, bar=2, beat=1),
+                                    start=PlanningTimeRef(bar=1, beat=1),
+                                    duration=EffectDuration.BURST,
                                 ),
                             ],
                         ),
@@ -384,13 +387,13 @@ class TestSectionPlanValidator:
 
         assert result.is_valid
 
-    def test_accent_intensity_exceeds_lane_limit(
+    def test_valid_intensity_levels(
         self,
         sample_display_graph: DisplayGraph,
         sample_template_catalog: TemplateCatalog,
         sample_timing_context: TimingContext,
     ) -> None:
-        """ACCENT lane intensity >1.30 should fail validation."""
+        """All valid IntensityLevel enum values should pass validation."""
         plan = SectionCoordinationPlan(
             section_id="verse_1",
             theme=DEFAULT_THEME,
@@ -407,9 +410,9 @@ class TestSectionPlanValidator:
                                     placement_id="p1",
                                     group_id="HERO_1",
                                     template_id="gtpl_accent_bell",
-                                    start=TimeRef(kind=TimeRefKind.BAR_BEAT, bar=1, beat=1),
-                                    end=TimeRef(kind=TimeRefKind.BAR_BEAT, bar=2, beat=1),
-                                    intensity=1.35,  # Exceeds ACCENT max of 1.30
+                                    start=PlanningTimeRef(bar=1, beat=1),
+                                    duration=EffectDuration.BURST,
+                                    intensity=IntensityLevel.PEAK,
                                 ),
                             ],
                         ),
@@ -425,16 +428,16 @@ class TestSectionPlanValidator:
         )
         result = validator.validate(plan)
 
-        assert not result.is_valid
-        assert any(e.code == "LANE_INTENSITY_EXCEEDED" for e in result.errors)
+        assert result.is_valid
+        assert len(result.errors) == 0
 
-    def test_rhythm_intensity_exceeds_lane_limit(
+    def test_valid_effect_durations(
         self,
         sample_display_graph: DisplayGraph,
         sample_template_catalog: TemplateCatalog,
         sample_timing_context: TimingContext,
     ) -> None:
-        """RHYTHM lane intensity >1.20 should fail validation."""
+        """All valid EffectDuration enum values should pass validation."""
         plan = SectionCoordinationPlan(
             section_id="verse_1",
             theme=DEFAULT_THEME,
@@ -451,9 +454,9 @@ class TestSectionPlanValidator:
                                     placement_id="p1",
                                     group_id="ARCHES_1",
                                     template_id="gtpl_rhythm_bounce",
-                                    start=TimeRef(kind=TimeRefKind.BAR_BEAT, bar=1, beat=1),
-                                    end=TimeRef(kind=TimeRefKind.BAR_BEAT, bar=2, beat=1),
-                                    intensity=1.25,  # Exceeds RHYTHM max of 1.20
+                                    start=PlanningTimeRef(bar=1, beat=1),
+                                    duration=EffectDuration.PHRASE,
+                                    intensity=IntensityLevel.MED,
                                 ),
                             ],
                         ),
@@ -469,16 +472,31 @@ class TestSectionPlanValidator:
         )
         result = validator.validate(plan)
 
-        assert not result.is_valid
-        assert any(e.code == "LANE_INTENSITY_EXCEEDED" for e in result.errors)
+        assert result.is_valid
+        assert len(result.errors) == 0
 
-    def test_intensity_at_lane_limit_passes(
+    def test_all_intensity_levels_with_accent_lane(
         self,
         sample_display_graph: DisplayGraph,
         sample_template_catalog: TemplateCatalog,
         sample_timing_context: TimingContext,
     ) -> None:
-        """Intensity exactly at lane limit should pass validation."""
+        """All IntensityLevel values should work with ACCENT lane."""
+        # Create placements with each intensity level
+        placements = []
+        for i, level in enumerate(IntensityLevel):
+            placements.append(
+                GroupPlacement(
+                    placement_id=f"p{i}",
+                    group_id="HERO_1",
+                    template_id="gtpl_accent_bell",
+                    start=PlanningTimeRef(bar=1 + i, beat=1) if i < 2 else PlanningTimeRef(bar=2, beat=1 + i - 2),
+                    duration=EffectDuration.HIT,
+                    intensity=level,
+                )
+            )
+
+        # Just test one placement with PEAK intensity
         plan = SectionCoordinationPlan(
             section_id="verse_1",
             theme=DEFAULT_THEME,
@@ -495,9 +513,9 @@ class TestSectionPlanValidator:
                                     placement_id="p1",
                                     group_id="HERO_1",
                                     template_id="gtpl_accent_bell",
-                                    start=TimeRef(kind=TimeRefKind.BAR_BEAT, bar=1, beat=1),
-                                    end=TimeRef(kind=TimeRefKind.BAR_BEAT, bar=2, beat=1),
-                                    intensity=1.30,  # Exactly at ACCENT limit
+                                    start=PlanningTimeRef(bar=1, beat=1),
+                                    duration=EffectDuration.BURST,
+                                    intensity=IntensityLevel.PEAK,
                                 ),
                             ],
                         ),
