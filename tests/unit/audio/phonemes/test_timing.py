@@ -2,6 +2,7 @@
 
 Tests cover:
 - distribute_phonemes_uniform() - uniform distribution
+- distribute_word_window_to_phonemes() - weighted distribution (spec)
 - PhonemeType enum
 - Phoneme classification (vowel vs consonant)
 """
@@ -10,6 +11,7 @@ from twinklr.core.audio.phonemes.timing import (
     PhonemeType,
     classify_phoneme,
     distribute_phonemes_uniform,
+    distribute_word_window_to_phonemes,
 )
 
 
@@ -187,3 +189,121 @@ class TestClassifyPhoneme:
         # Each phoneme gets 10ms
         assert result[0] == ("A", 0, 10)
         assert result[99][2] == 1000
+
+
+class TestDistributeWordWindowToPhonemes:
+    """Test weighted phoneme distribution per spec."""
+
+    def test_vowels_get_more_time(self):
+        """Vowels should get proportionally more time than consonants."""
+        # HH=consonant, EH=vowel, L=consonant, OW=vowel
+        result = distribute_word_window_to_phonemes(
+            word_start_ms=0,
+            word_end_ms=600,
+            phonemes=["HH", "EH", "L", "OW"],
+            vowel_weight=2.0,
+            consonant_weight=1.0,
+        )
+
+        assert len(result) == 4
+        # Weights: 1 + 2 + 1 + 2 = 6, duration=600
+        # HH gets 100ms, EH gets 200ms, L gets 100ms, OW gets 200ms
+        hh_dur = result[0][2] - result[0][1]
+        eh_dur = result[1][2] - result[1][1]
+        l_dur = result[2][2] - result[2][1]
+        ow_dur = result[3][2] - result[3][1]
+
+        assert eh_dur > hh_dur, "Vowel EH should get more time than consonant HH"
+        assert ow_dur > l_dur, "Vowel OW should get more time than consonant L"
+        assert result[-1][2] == 600, "Final end must equal word_end_ms"
+
+    def test_monotonic_windows(self):
+        """Phoneme windows should be monotonically increasing with no gaps."""
+        result = distribute_word_window_to_phonemes(
+            word_start_ms=1000,
+            word_end_ms=1500,
+            phonemes=["B", "AE", "T"],
+            vowel_weight=2.0,
+            consonant_weight=1.0,
+        )
+
+        assert result[0][1] == 1000, "First phoneme starts at word_start_ms"
+        for i in range(1, len(result)):
+            assert result[i][1] == result[i - 1][2], "No gaps between phonemes"
+        assert result[-1][2] == 1500, "Last phoneme ends at word_end_ms"
+
+    def test_short_word_collapses_to_single(self):
+        """Words shorter than min_phoneme_ms should collapse to single span."""
+        result = distribute_word_window_to_phonemes(
+            word_start_ms=0,
+            word_end_ms=50,
+            phonemes=["HH", "EH", "L", "OW"],
+            min_phoneme_ms=80,
+            vowel_weight=2.0,
+            consonant_weight=1.0,
+        )
+
+        # Duration 50ms < 80ms min → collapse
+        assert len(result) == 1
+        assert result[0] == ("HH", 0, 50)
+
+    def test_empty_phonemes(self):
+        """Empty phoneme list should return empty."""
+        result = distribute_word_window_to_phonemes(
+            word_start_ms=0,
+            word_end_ms=500,
+            phonemes=[],
+            vowel_weight=2.0,
+            consonant_weight=1.0,
+        )
+
+        assert result == []
+
+    def test_single_phoneme(self):
+        """Single phoneme should span entire word window."""
+        result = distribute_word_window_to_phonemes(
+            word_start_ms=100,
+            word_end_ms=300,
+            phonemes=["AH"],
+            vowel_weight=2.0,
+            consonant_weight=1.0,
+        )
+
+        assert len(result) == 1
+        assert result[0] == ("AH", 100, 300)
+
+    def test_leftover_goes_to_earliest(self):
+        """Leftover ms from floor division should go to earliest phonemes."""
+        # 3 consonants at weight 1.0 each, 100ms total
+        # floor(100/3) = 33ms each, 1ms leftover
+        result = distribute_word_window_to_phonemes(
+            word_start_ms=0,
+            word_end_ms=100,
+            phonemes=["B", "D", "G"],
+            vowel_weight=2.0,
+            consonant_weight=1.0,
+        )
+
+        assert len(result) == 3
+        total_dur = sum(r[2] - r[1] for r in result)
+        assert total_dur == 100, "Total must equal word duration"
+        assert result[-1][2] == 100, "Final end must equal word_end_ms"
+        # First phoneme gets the leftover
+        first_dur = result[0][2] - result[0][1]
+        last_dur = result[2][2] - result[2][1]
+        assert first_dur >= last_dur
+
+    def test_equal_weights_like_uniform(self):
+        """Equal weights should produce near-uniform distribution."""
+        result = distribute_word_window_to_phonemes(
+            word_start_ms=0,
+            word_end_ms=400,
+            phonemes=["B", "D", "G", "K"],
+            vowel_weight=1.0,
+            consonant_weight=1.0,
+        )
+
+        assert len(result) == 4
+        for i, (phoneme, start, end) in enumerate(result):
+            dur = end - start
+            assert dur == 100, f"With equal weights, each should get 100ms, got {dur}"

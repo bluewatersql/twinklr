@@ -49,12 +49,15 @@ class TwinklrSession:
         *,
         app_config: AppConfig | Path | str | None = None,
         job_config: JobConfig | Path | str | None = None,
+        session_id: str | None = None,
     ):
         """Initialize session with configs.
 
         Args:
             app_config: AppConfig instance, path, or None (uses default path)
             job_config: JobConfig instance, path, or None (uses default path)
+            session_id: Optional session ID. If None, generates a new UUID.
+                        Pass a deterministic ID for cache reuse across runs.
 
         Raises:
             FileNotFoundError: If config files don't exist
@@ -63,7 +66,7 @@ class TwinklrSession:
         # Load configs
         self.app_config: AppConfig = self._resolve_config(app_config, AppConfig)
         self.job_config: JobConfig = self._resolve_config(job_config, JobConfig)
-        self.session_id = str(uuid4())
+        self.session_id = session_id or str(uuid4())
 
         # Set up project/artifact management
         self.project_name = self.job_config.project_name or "twinklr_project"
@@ -103,25 +106,32 @@ class TwinklrSession:
             )
 
     @classmethod
-    def from_directory(cls, config_dir: Path | str = ".") -> TwinklrSession:
+    def from_directory(
+        cls,
+        config_dir: Path | str = ".",
+        *,
+        session_id: str | None = None,
+    ) -> TwinklrSession:
         """Create session from a directory containing config files.
 
         Looks for config.json and job_config.json in the specified directory.
 
         Args:
             config_dir: Directory containing config files (default: current directory)
+            session_id: Optional session ID for cache reuse. If None, generates new UUID.
 
         Returns:
             Initialized TwinklrSession
 
         Example:
             session = TwinklrSession.from_directory(".")
-            session = TwinklrSession.from_directory("/path/to/project")
+            session = TwinklrSession.from_directory("/path/to/project", session_id="my-stable-id")
         """
         config_dir = Path(config_dir)
         return cls(
             app_config=config_dir / "config.json",
             job_config=config_dir / "job_config.json",
+            session_id=session_id,
         )
 
     @property

@@ -152,6 +152,10 @@ def shape_context(bundle: SongBundle) -> dict[str, Any]:
     # Phonemes (metadata only)
     context["phonemes"] = _shape_phonemes(bundle.phonemes)
 
+    # Sync lyrics.has_phonemes from actual phoneme availability
+    context["lyrics"]["has_phonemes"] = context["phonemes"]["available"]
+    context["lyrics"]["phoneme_confidence"] = context["phonemes"]["confidence"]
+
     return context
 
 
@@ -289,11 +293,14 @@ def _shape_lyrics(lyrics: Any) -> dict[str, Any]:
 def _shape_phonemes(phonemes: Any) -> dict[str, Any]:
     """Shape phonemes to metadata-only.
 
+    Derives availability from the presence of actual phoneme data,
+    and reads confidence from the PhonemeBundle.confidence field.
+
     Args:
         phonemes: PhonemeBundle or None.
 
     Returns:
-        Phoneme metadata dict.
+        Phoneme metadata dict with 'available' and 'confidence'.
     """
     if phonemes is None:
         return {
@@ -301,8 +308,12 @@ def _shape_phonemes(phonemes: Any) -> dict[str, Any]:
             "confidence": 0.0,
         }
 
+    # Derive availability from actual data presence
+    phoneme_list = getattr(phonemes, "phonemes", [])
+    available = len(phoneme_list) > 0
+
     return {
-        "available": getattr(phonemes, "available", False),
+        "available": available,
         "confidence": getattr(phonemes, "confidence", 0.0),
     }
 

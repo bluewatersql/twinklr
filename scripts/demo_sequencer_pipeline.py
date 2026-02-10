@@ -114,7 +114,26 @@ def parse_args() -> argparse.Namespace:
         default="data/music/Need A Favor.mp3",
         help="Path to audio file (default: data/music/Need A Favor.mp3)",
     )
+    parser.add_argument(
+        "--new-session",
+        action="store_true",
+        help="Force new session ID (invalidates cache). Default uses stable ID based on audio file.",
+    )
     return parser.parse_args()
+
+
+def generate_stable_session_id(audio_path: Path) -> str:
+    """Generate a deterministic session ID from the audio file name.
+
+    This allows cache reuse across runs for the same audio file.
+    """
+    import hashlib
+
+    # Use audio filename (without extension) as basis for stable ID
+    name = audio_path.stem.lower().replace(" ", "_")
+    # Add a hash suffix to handle collisions
+    hash_suffix = hashlib.md5(str(audio_path.resolve()).encode()).hexdigest()[:8]
+    return f"{name}_{hash_suffix}"
 
 
 async def main() -> None:
@@ -136,7 +155,15 @@ async def main() -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
     print(f"📁 Output directory: {output_dir}")
 
-    session = TwinklrSession.from_directory(repo_root)
+    # Generate session ID - stable by default for cache reuse
+    if args.new_session:
+        session_id = None  # Will generate new UUID
+        print("🔄 New session: cache will not be reused")
+    else:
+        session_id = generate_stable_session_id(audio_path)
+        print(f"📦 Session ID: {session_id} (use --new-session to invalidate cache)")
+
+    session = TwinklrSession.from_directory(repo_root, session_id=session_id)
 
     # Build display groups (mock for demo)
     display_groups = [

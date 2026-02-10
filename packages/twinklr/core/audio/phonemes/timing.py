@@ -4,6 +4,7 @@ Functions for distributing word time windows across phonemes.
 
 Functions:
     distribute_phonemes_uniform: Distribute word window uniformly across phonemes
+    distribute_word_window_to_phonemes: Distribute with vowel/consonant weights (spec)
     classify_phoneme: Classify phoneme as VOWEL or CONSONANT
 
 Example:
@@ -13,6 +14,7 @@ Example:
     [('HH', 0, 100), ('EH', 100, 200), ('L', 200, 300), ('OW', 300, 400)]
 """
 
+import math
 from enum import Enum
 
 
@@ -76,6 +78,90 @@ def classify_phoneme(phoneme: str) -> PhonemeType:
 
     # Default to consonant
     return PhonemeType.CONSONANT
+
+
+def distribute_word_window_to_phonemes(
+    *,
+    word_start_ms: int,
+    word_end_ms: int,
+    phonemes: list[str],
+    char_alignments: list[dict[str, object]] | None = None,
+    min_phoneme_ms: int = 30,
+    vowel_weight: float = 2.0,
+    consonant_weight: float = 1.0,
+) -> list[tuple[str, int, int]]:
+    """Distribute word time window across phonemes using vowel/consonant weights.
+
+    Implements the spec algorithm:
+    1. Compute per-phoneme weight (vowel_weight or consonant_weight).
+    2. Allocate dur_i = floor(word_dur * w_i / total_w).
+    3. Distribute leftover ms to earliest phonemes.
+    4. Build monotonic windows; force final end == word_end_ms.
+    5. If word_dur < min_phoneme_ms or phonemes empty, collapse to single span.
+
+    Args:
+        word_start_ms: Word start time in milliseconds.
+        word_end_ms: Word end time in milliseconds.
+        phonemes: List of ARPAbet phonemes for the word.
+        char_alignments: Optional character-level alignments (reserved for future use).
+        min_phoneme_ms: Minimum phoneme duration; words shorter than this collapse.
+        vowel_weight: Relative weight for vowel phoneme duration.
+        consonant_weight: Relative weight for consonant phoneme duration.
+
+    Returns:
+        List of (phoneme, start_ms, end_ms) tuples with monotonic, gapless windows.
+        Empty list if phonemes is empty.
+
+    Example:
+        >>> distribute_word_window_to_phonemes(
+        ...     word_start_ms=0, word_end_ms=600,
+        ...     phonemes=["HH", "EH", "L", "OW"],
+        ...     vowel_weight=2.0, consonant_weight=1.0,
+        ... )
+        [('HH', 0, 100), ('EH', 100, 300), ('L', 300, 400), ('OW', 400, 600)]
+    """
+    if not phonemes:
+        return []
+
+    word_dur = max(0, word_end_ms - word_start_ms)
+
+    # Collapse to single span if duration too short or no phonemes
+    if word_dur < min_phoneme_ms:
+        return [(phonemes[0], word_start_ms, word_end_ms)]
+
+    # Compute weights per phoneme
+    weights: list[float] = []
+    for p in phonemes:
+        ptype = classify_phoneme(p)
+        weights.append(vowel_weight if ptype == PhonemeType.VOWEL else consonant_weight)
+
+    total_weight = sum(weights)
+    if total_weight <= 0:
+        total_weight = float(len(phonemes))
+        weights = [1.0] * len(phonemes)
+
+    # Allocate durations: floor(word_dur * w_i / total_w)
+    durations = [math.floor(word_dur * w / total_weight) for w in weights]
+
+    # Distribute leftover ms to earliest phonemes
+    leftover = word_dur - sum(durations)
+    for i in range(leftover):
+        durations[i] += 1
+
+    # Build monotonic windows
+    result: list[tuple[str, int, int]] = []
+    current_ms = word_start_ms
+    for i, phoneme in enumerate(phonemes):
+        end_ms = current_ms + durations[i]
+        result.append((phoneme, current_ms, end_ms))
+        current_ms = end_ms
+
+    # Force final end == word_end_ms (handles any rounding)
+    if result:
+        last = result[-1]
+        result[-1] = (last[0], last[1], word_end_ms)
+
+    return result
 
 
 def distribute_phonemes_uniform(

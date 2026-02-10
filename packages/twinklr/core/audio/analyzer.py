@@ -33,9 +33,16 @@ from twinklr.core.audio.harmonic.chords import detect_chords
 from twinklr.core.audio.harmonic.hpss import compute_hpss, compute_onset_env
 from twinklr.core.audio.harmonic.key import detect_musical_key, extract_chroma
 from twinklr.core.audio.harmonic.pitch import extract_pitch_tracking
-from twinklr.core.audio.models import LyricsBundle, MetadataBundle, SongBundle, SongTiming
+from twinklr.core.audio.models import (
+    LyricsBundle,
+    MetadataBundle,
+    PhonemeBundle,
+    SongBundle,
+    SongTiming,
+)
 from twinklr.core.audio.models.enums import StageStatus
 from twinklr.core.audio.models.metadata import EmbeddedMetadata
+from twinklr.core.audio.phonemes.bundle import build_phoneme_bundle
 from twinklr.core.audio.rhythm.beats import (
     compute_beats,
     detect_downbeats_phase_aligned,
@@ -258,6 +265,11 @@ class AudioAnalyzer:
                 audio_path, duration_ms, metadata_bundle
             )
 
+        # Extract phonemes from timed words (depends on lyrics)
+        phoneme_bundle = await self._extract_phonemes_if_enabled(
+            lyrics_bundle, duration_ms
+        )
+
         # Build bundle
         return SongBundle(
             schema_version="3.0",
@@ -272,7 +284,7 @@ class AudioAnalyzer:
             ),
             metadata=metadata_bundle,
             lyrics=lyrics_bundle,
-            phonemes=None,  # Phase 6+
+            phonemes=phoneme_bundle,
         )
 
     async def _extract_metadata_if_enabled(
@@ -380,6 +392,62 @@ class AudioAnalyzer:
                 stage_status=StageStatus.FAILED,
                 warnings=[f"Lyrics pipeline failed: {e!s}"],
             )
+
+    async def _extract_phonemes_if_enabled(
+        self,
+        lyrics_bundle: LyricsBundle,
+        duration_ms: int,
+    ) -> PhonemeBundle | None:
+        """Extract phonemes from timed words if feature is enabled.
+
+        Requires lyrics with timed words (LyricWord list). Runs G2P -> distribution
+        -> viseme mapping -> smoothing pipeline via build_phoneme_bundle.
+
+        Args:
+            lyrics_bundle: Resolved lyrics (may have timed words).
+            duration_ms: Song duration in milliseconds.
+
+        Returns:
+            PhonemeBundle if enabled and words available, None otherwise.
+        """
+        enhancements = self.app_config.audio_processing.enhancements
+
+        if not enhancements.enable_phonemes:
+            return None
+
+        # Need timed words for phoneme generation
+        words = lyrics_bundle.words if lyrics_bundle else []
+        if not words:
+            logger.debug("Phoneme pipeline skipped: no timed words available")
+            return None
+
+        try:
+            logger.debug(
+                f"Building phoneme bundle from {len(words)} timed words "
+                f"(duration={duration_ms}ms)"
+            )
+            bundle = await asyncio.to_thread(
+                build_phoneme_bundle,
+                duration_ms=duration_ms,
+                words=words,
+                mapping_version=enhancements.viseme_mapping_version,
+                enable_g2p_en=enhancements.phoneme_enable_g2p_fallback,
+                min_phoneme_ms=enhancements.phoneme_min_duration_ms,
+                vowel_weight=enhancements.phoneme_vowel_weight,
+                consonant_weight=enhancements.phoneme_consonant_weight,
+                min_hold_ms=enhancements.viseme_min_hold_ms,
+                min_burst_ms=enhancements.viseme_min_burst_ms,
+                boundary_soften_ms=enhancements.viseme_boundary_soften_ms,
+            )
+            logger.debug(
+                f"Phoneme bundle built: {len(bundle.phonemes)} phonemes, "
+                f"{len(bundle.visemes)} visemes, confidence={bundle.confidence:.2f}"
+            )
+            return bundle
+
+        except Exception as e:
+            logger.warning(f"Phoneme pipeline failed: {e}")
+            return None
 
     def _process_audio(self, audio_path: str, genre: str | None = None) -> dict[str, Any]:
         """Process audio file (internal implementation).

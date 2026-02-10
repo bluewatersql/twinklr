@@ -108,12 +108,17 @@ class VisemeEvent(BaseModel):
 class PhonemeBundle(BaseModel):
     """Complete phoneme/viseme analysis result.
 
-    Contains phonemes, visemes, and metadata from phoneme analysis.
+    Contains phonemes, visemes, confidence, and quality stats from phoneme analysis.
 
     Attributes:
         phonemes: List of phonemes with timing
-        visemes: List of viseme events (optional)
-        source: Source of phoneme data
+        visemes: List of viseme events (optional, from smoothing pipeline)
+        source: Source of phoneme data (G2P, CMUDICT, ALLOSAURUS)
+        confidence: Overall confidence score (0-1), combining G2P source quality,
+            OOV rate, burst merge count, and coverage penalties.
+        oov_rate: Out-of-vocabulary rate (fraction of words not in dictionary)
+        coverage_pct: Fraction of song duration covered by viseme events
+        burst_merge_count: Number of burst merges applied during smoothing
         metadata: Additional metadata
 
     Example:
@@ -123,7 +128,7 @@ class PhonemeBundle(BaseModel):
         ...     phonemes=phonemes,
         ...     visemes=visemes,
         ...     source=PhonemeSource.G2P,
-        ...     metadata={"model": "g2p_en"}
+        ...     confidence=0.85,
         ... )
         >>> len(bundle.phonemes)
         1
@@ -134,4 +139,10 @@ class PhonemeBundle(BaseModel):
     phonemes: list[Phoneme]
     visemes: list[VisemeEvent] = Field(default_factory=list)
     source: PhonemeSource
+    confidence: float = Field(default=0.0, ge=0.0, le=1.0, description="Overall confidence (0-1)")
+    oov_rate: float = Field(default=0.0, ge=0.0, le=1.0, description="Out-of-vocabulary rate")
+    coverage_pct: float = Field(
+        default=0.0, ge=0.0, le=1.0, description="Viseme coverage of song duration"
+    )
+    burst_merge_count: int = Field(default=0, ge=0, description="Burst merges applied in smoothing")
     metadata: dict[str, object] = Field(default_factory=dict)

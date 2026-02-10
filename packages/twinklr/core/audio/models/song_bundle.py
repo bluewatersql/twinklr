@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from twinklr.core.audio.models.lyrics import LyricsBundle
 from twinklr.core.audio.models.metadata import MetadataBundle
+from twinklr.core.audio.models.phonemes import PhonemeBundle
 
 
 class SongTiming(BaseModel):
@@ -57,7 +58,7 @@ class SongBundle(BaseModel):
     lyrics: LyricsBundle | None = Field(
         default=None, description="Lyrics resolution (LyricsBundle)"
     )
-    phonemes: Any | None = Field(
+    phonemes: PhonemeBundle | None = Field(
         default=None, description="Phoneme/viseme generation (PhonemeBundle)"
     )
 
