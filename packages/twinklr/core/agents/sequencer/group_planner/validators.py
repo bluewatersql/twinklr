@@ -263,7 +263,9 @@ class SectionPlanValidator:
             for p in placements:
                 # Use the enum value string for categorical intensity
                 intensity_val = (
-                    p.intensity.value if isinstance(p.intensity, IntensityLevel) else str(p.intensity)
+                    p.intensity.value
+                    if isinstance(p.intensity, IntensityLevel)
+                    else str(p.intensity)
                 )
                 key = (p.template_id, intensity_val)
                 template_intensity_counts[key].append(p.group_id)

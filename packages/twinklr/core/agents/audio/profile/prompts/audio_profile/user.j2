@@ -28,7 +28,7 @@ Analyze the following song and produce a complete AudioProfileModel.
 The song has {{ shaped_context.sections | length }} sections:
 
 {% for section in shaped_context.sections %}
-{{ loop.index }}. **{{ section.type }}** — {{ section.start_ms }}ms to {{ section.end_ms }}ms ({{ ((section.end_ms - section.start_ms) / 1000) | round(1) }}s)
+{{ loop.index }}. **{{ section.type }}** ({{ section.section_id }}) — {{ section.start_ms }}ms to {{ section.end_ms }}ms ({{ ((section.end_ms - section.start_ms) / 1000) | round(1) }}s)
    - Confidence: {{ section.confidence | round(2) }}
 {% endfor %}
 {% else %}
@@ -92,7 +92,7 @@ Confirm or infer song identity fields from the metadata above.
 
 ### 2. Structure Analysis
 - Convert sections into standardized `SongSectionRef` list
-- Assign clear `section_id` values (e.g., "verse_1", "chorus_1", "bridge")
+- **Use the exact `section_id` values provided above** (e.g., "verse_1", "chorus_1", "intro") — do NOT invent new IDs
 - Provide `structure_confidence` based on section clarity
 - Add any relevant notes about the structure **that capture unique structural traits**
   - Good: "Extended instrumental passages (5 sections, 80s total) dominate runtime unlike typical verse-chorus pop"

@@ -490,7 +490,9 @@ class TestSectionPlanValidator:
                     placement_id=f"p{i}",
                     group_id="HERO_1",
                     template_id="gtpl_accent_bell",
-                    start=PlanningTimeRef(bar=1 + i, beat=1) if i < 2 else PlanningTimeRef(bar=2, beat=1 + i - 2),
+                    start=PlanningTimeRef(bar=1 + i, beat=1)
+                    if i < 2
+                    else PlanningTimeRef(bar=2, beat=1 + i - 2),
                     duration=EffectDuration.HIT,
                     intensity=level,
                 )

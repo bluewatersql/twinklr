@@ -90,7 +90,9 @@ def filter_templates_by_intent(
 
         # Check if template matches energy patterns (in name, ID, or tags)
         energy_match = patterns and any(
-            pattern in name_lower or pattern in template_id_lower or any(pattern in tag for tag in tags_lower)
+            pattern in name_lower
+            or pattern in template_id_lower
+            or any(pattern in tag for tag in tags_lower)
             for pattern in patterns
         )
 
@@ -366,6 +368,8 @@ def shape_planner_context(section_context: SectionPlanningContext) -> dict[str, 
         "motif_ids": section_context.motif_ids,  # Motifs for this section
         "motif_catalog_summary": motif_catalog_summary,  # Motif reference guide
         "tag_catalog": tag_catalog,  # For tag validation
+        # Lyric/narrative context (section-scoped) for narrative asset directives
+        "lyric_context": section_context.lyric_context,
     }
 
 
@@ -440,6 +444,7 @@ def shape_section_judge_context(
 
     # Get motif catalog for validation and template support checking
     from twinklr.core.agents.taxonomy_utils import get_theming_catalog_dict
+
     theming_catalog = get_theming_catalog_dict()
 
     return {
@@ -461,7 +466,9 @@ def shape_section_judge_context(
         # Theme context for validation
         "theme_definition": theme_definition_dict,
         "theming_ids": theming_ids,  # For validating theme_id, tags, palette_id
-        "motif_catalog": theming_catalog["motifs"],  # For validating motif_ids and checking template support
+        "motif_catalog": theming_catalog[
+            "motifs"
+        ],  # For validating motif_ids and checking template support
         # Excluded: timing_context, layer_intents, notes
     }
 

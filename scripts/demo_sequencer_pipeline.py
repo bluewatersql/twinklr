@@ -434,6 +434,14 @@ async def main() -> None:
         if "aggregate" in result.outputs:
             gps = result.outputs["aggregate"]
             print(f"\n📊 GroupPlanSet: {len(gps.section_plans)} sections")
+            if gps.narrative_assets:
+                print(f"📖 Narrative directives: {len(gps.narrative_assets)}")
+                for nd in gps.narrative_assets:
+                    sections = ", ".join(nd.section_ids) if nd.section_ids else "?"
+                    print(
+                        f"   - [{nd.emphasis}] {nd.directive_id}: "
+                        f"{nd.subject[:50]}... (sections: {sections})"
+                    )
 
     else:
         print("❌ Pipeline failed. Check logs for details.")

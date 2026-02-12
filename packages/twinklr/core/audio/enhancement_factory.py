@@ -12,9 +12,9 @@ from twinklr.core.api.audio.acoustid import AcoustIDClient
 from twinklr.core.api.audio.musicbrainz import MusicBrainzClient
 from twinklr.core.api.http import AsyncApiClient, HttpClientConfig
 from twinklr.core.audio.lyrics.pipeline import LyricsPipeline, LyricsPipelineConfig
-from twinklr.core.audio.lyrics.whisperx_models import WhisperXConfig
 from twinklr.core.audio.lyrics.providers.genius import GeniusClient
 from twinklr.core.audio.lyrics.providers.lrclib import LRCLibClient
+from twinklr.core.audio.lyrics.whisperx_models import WhisperXConfig
 from twinklr.core.audio.metadata.pipeline import MetadataPipeline, PipelineConfig
 from twinklr.core.config.models import AppConfig
 

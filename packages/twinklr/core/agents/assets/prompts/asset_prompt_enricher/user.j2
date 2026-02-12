@@ -1,0 +1,112 @@
+Generate an image prompt for the following asset specification.
+
+{% if narrative_subject %}
+{# ── Narrative asset: figurative, story-driven imagery ── #}
+
+{% if song_title %}
+## Narrative Context
+
+- **Song:** {{ song_title }}
+{% endif %}
+
+## Subject
+
+{{ narrative_subject }}
+
+## Visual Description
+
+{{ narrative_description }}
+
+## Story Context
+
+{{ story_context }}
+
+{% if palette_colors %}
+## Color Palette (use these exact colors)
+
+{% for color in palette_colors %}- **{{ color.name }}:** {{ color.hex }}
+{% endfor %}
+{% endif %}
+
+{% if color_guidance %}
+## Additional Color Guidance
+
+{{ color_guidance }}
+{% endif %}
+
+{% if mood %}
+## Mood
+
+{{ mood }}
+{% endif %}
+
+## Asset Context
+
+- **Category:** {{ category }}
+- **Background:** {{ background }}
+- **Dimensions:** {{ width }}x{{ height }}
+
+{% if style_tags %}- **Style Tags:** {{ style_tags | join(", ") }}{% endif %}
+
+## Task
+
+Produce a JSON response with:
+- `prompt`: A rich image generation prompt (3-8 sentences) that faithfully depicts the subject described above. This is a figurative/narrative image — depict the actual subject (characters, scenes, objects), not an abstract pattern. The Song and Story Context are provided to anchor your understanding — use them to produce a culturally accurate depiction. {% if palette_colors %}Use the exact hex colors from the Color Palette section to specify colors in the prompt.{% endif %} Follow the structured format: subject → style → composition → background → lighting → constraints → output intent. The image MUST be LED-display optimized: bold shapes, high contrast, clean crisp edges, no fine detail.
+- `negative_prompt`: A comma-separated list of things to avoid. MUST always include "text, words, letters, labels, logos, watermarks" as the first items (e.g., "text, words, letters, labels, logos, watermarks, thin lines, tiny details, complex gradients, photorealistic, dark, muted").
+
+{{ response_schema }}
+
+{% else %}
+{# ── Effect asset: motif-driven abstract pattern ── #}
+
+## Motif
+
+- **Motif ID:** {{ motif_id }}
+{% if motif_description %}- **Description:** {{ motif_description }}{% endif %}
+{% if motif_usage_notes %}- **Usage Notes:** {{ motif_usage_notes }}{% endif %}
+
+## Asset Context
+
+- **Category:** {{ category }}
+- **Theme:** {{ theme_id }}
+{% if palette_id %}- **Palette:** {{ palette_id }}{% endif %}
+{% if palette_colors %}
+- **Palette Colors (use these exact colors):**
+{% for color in palette_colors %}  - {{ color.name }}: {{ color.hex }}
+{% endfor %}{% endif %}
+- **Display Destinations (metadata only — do NOT depict or name these in the image):** {{ target_roles | join(", ") }}
+- **Background:** {{ background }}
+- **Dimensions:** {{ width }}x{{ height }}
+
+## Style Context
+
+{% if style_tags %}- **Style Tags:** {{ style_tags | join(", ") }}{% endif %}
+{% if content_tags %}- **Content Tags:** {{ content_tags | join(", ") }}{% endif %}
+
+{% if builtin_prompt %}
+## Reference Prompt (from builtin template)
+
+Use this as a starting point and enhance it with the scene context:
+
+{{ builtin_prompt }}
+{% endif %}
+
+{% if scene_context %}
+## Scene Context
+
+These notes describe the mood, intent, and lyric narrative for the sections where this motif is used. Use them to make the image specific to this song:
+
+{% for note in scene_context %}
+- {{ note }}
+{% endfor %}
+{% endif %}
+
+## Task
+
+Produce a JSON response with:
+- `prompt`: A rich image generation prompt (3-8 sentences). Describe the visual concretely, incorporating the scene context. {% if palette_colors %}Use the exact hex colors from the Palette Colors section to specify colors in the prompt.{% endif %} Follow the structured format: subject → style → composition → background → lighting → constraints → output intent.
+- `negative_prompt`: A comma-separated list of things to avoid. MUST always include "text, words, letters, labels, logos, watermarks" as the first items (e.g., "text, words, letters, labels, logos, watermarks, thin lines, tiny details, complex gradients, photorealistic, dark, muted").
+
+{{ response_schema }}
+
+{% endif %}

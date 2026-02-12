@@ -125,8 +125,12 @@ class ThemeRef(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     theme_id: str = Field(..., description="Stable id, e.g. 'christmas.gingerbread_house'")
-    scope: ThemeScope = Field(..., description="How broadly the theme applies (SONG, SECTION, or PLACEMENT)")
-    tags: list[str] = Field(default_factory=list, max_length=5, description="Extra tags to bias generation")
+    scope: ThemeScope = Field(
+        ..., description="How broadly the theme applies (SONG, SECTION, or PLACEMENT)"
+    )
+    tags: list[str] = Field(
+        default_factory=list, max_length=5, description="Extra tags to bias generation"
+    )
     palette_id: str | None = Field(default=None, description="Optional palette override")
 
     @field_validator("scope", mode="before")

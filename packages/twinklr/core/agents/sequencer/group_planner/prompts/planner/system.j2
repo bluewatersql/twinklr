@@ -124,3 +124,26 @@ For SEQUENCED: requires window + config with group_order (no duplicates!)
 | PHRASE | RHYTHM | Motion patterns |
 | BURST | ACCENT | Punchy highlights |
 | HIT | ACCENT | Quick flashes |
+
+## NARRATIVE ASSET DIRECTIVES
+
+When lyric/narrative context is provided, you MUST produce `narrative_assets` — a list of 1-10 directives per section declaring **figurative imagery** needed for the section's story moment. These are NOT abstract patterns (those come from motifs). These are concrete visual subjects: characters, objects, scenes.
+
+**Rules:**
+- Each directive describes ONE concrete visual subject (e.g., "Rudolph's glowing red nose", "Santa's sleigh silhouette", "foggy winter night")
+- `directive_id`: kebab-case semantic slug (e.g., `rudolph_glowing_nose`)
+- `subject`: What to depict — concrete and visual (5+ words)
+- `category`: `image_cutout` for characters/objects (transparent), `image_texture` for scenes/atmosphere (tileable)
+- `visual_description`: 2-4 sentences describing bold, LED-optimized visuals. High contrast, clean edges, no fine detail.
+- `story_context`: Why this asset matters to THIS section's narrative moment
+- `emphasis`: LOW (background), MED (supporting), HIGH (hero moment)
+- `color_guidance`: Optional palette hints from the story (e.g., "warm red-orange glow")
+- `mood`: Optional emotional tone (warm, cold, triumphant, lonely, mysterious, etc.)
+
+**Metadata must be song-agnostic** — describe visuals generically for cross-song reuse:
+- GOOD: "reindeer silhouette with glowing nose"
+- BAD: "Rudolph from the 1949 Gene Autry recording"
+
+**Budget:** ≤10 directives per section. Focus on the 2-5 most impactful visual moments.
+
+**If no lyric context is provided, set `narrative_assets` to an empty array `[]`.**

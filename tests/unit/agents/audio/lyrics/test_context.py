@@ -38,12 +38,19 @@ class TestShapeLyricsContext:
             "end_ms": 5000,
         }
 
-        # Check section structure
+        # Check section structure — uses canonical per-type counter IDs
+        # verse and chorus are singletons, so they get no suffix
         assert context["sections"][0] == {
-            "section_id": "verse_0",
+            "section_id": "verse",
             "name": "verse",
             "start_ms": 0,
             "end_ms": 60000,
+        }
+        assert context["sections"][1] == {
+            "section_id": "chorus",
+            "name": "chorus",
+            "start_ms": 60000,
+            "end_ms": 120000,
         }
 
         # Check quality metrics
@@ -57,6 +64,12 @@ class TestShapeLyricsContext:
         assert context["has_lyrics"] is True
         assert context["quality"]["coverage_pct"] == 0.0
         assert context["quality"]["source_confidence"] == 0.0
+
+    def test_section_ids_use_per_type_counters(self, bundle_multi_sections):
+        """Section IDs use per-type counters matching audio profile convention."""
+        context = shape_lyrics_context(bundle_multi_sections)
+        section_ids = [s["section_id"] for s in context["sections"]]
+        assert section_ids == ["intro", "verse_1", "chorus_1", "verse_2", "chorus_2", "outro"]
 
     def test_shape_context_empty_words_and_phrases(self, bundle_empty_words):
         """Test shaping context with empty words and phrases lists."""
@@ -265,6 +278,50 @@ def bundle_empty_words():
         audio_path="/fake/path.mp3",
         recording_id="test-rec-6",
         timing=SongTiming(sr=44100, hop_length=512, duration_s=180.0, duration_ms=180000),
+        lyrics=lyrics,
+        features=features,
+    )
+
+
+@pytest.fixture
+def bundle_multi_sections():
+    """Bundle with repeated section types to test per-type counter IDs."""
+    from twinklr.core.audio.models.enums import StageStatus
+
+    lyrics = LyricsBundle(
+        schema_version="3.0.0",
+        stage_status=StageStatus.OK,
+        text="Test lyrics for multi-section",
+        words=[LyricWord(text="Test", start_ms=1000, end_ms=2000)],
+        phrases=[LyricPhrase(text="Test lyrics", start_ms=1000, end_ms=3000)],
+        source=LyricsSource(kind="LOOKUP_PLAIN", provider="test", confidence=0.9),
+        quality=LyricsQuality(
+            coverage_pct=0.8,
+            monotonicity_violations=0,
+            overlap_violations=0,
+            out_of_bounds_violations=0,
+            large_gaps_count=0,
+        ),
+    )
+
+    features = {
+        "structure": {
+            "sections": [
+                {"label": "intro", "start_s": 0.0, "end_s": 10.0},
+                {"label": "verse", "start_s": 10.0, "end_s": 40.0},
+                {"label": "chorus", "start_s": 40.0, "end_s": 70.0},
+                {"label": "verse", "start_s": 70.0, "end_s": 100.0},
+                {"label": "chorus", "start_s": 100.0, "end_s": 130.0},
+                {"label": "outro", "start_s": 130.0, "end_s": 150.0},
+            ]
+        }
+    }
+
+    return SongBundle(
+        schema_version="3.0",
+        audio_path="/fake/path.mp3",
+        recording_id="test-rec-7",
+        timing=SongTiming(sr=44100, hop_length=512, duration_s=150.0, duration_ms=150000),
         lyrics=lyrics,
         features=features,
     )

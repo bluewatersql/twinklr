@@ -136,6 +136,33 @@ Theme defaults (for reference only):
 - avoid_tags: {{ theme_definition.avoid_tags | join(", ") }}
 - default_palette_id: {{ theme_definition.default_palette_id }}
 
+{% if lyric_context %}
+## Narrative Context (from Lyrics Analysis)
+
+This section has lyric/narrative context. Use it to produce `narrative_assets` directives — concrete figurative imagery that tells the song's story visually.
+
+{% if lyric_context.has_narrative %}**This song has a clear narrative.** Characters: {{ lyric_context.characters | join(", ") }}{% endif %}
+**Themes:** {{ lyric_context.themes | join(", ") }}
+**Mood Arc:** {{ lyric_context.mood_arc }}
+
+{% if lyric_context.story_beats %}
+### Story Beats for This Section
+{% for beat in lyric_context.story_beats %}
+- **[{{ beat.beat_type }}]** {{ beat.description }}
+  - Visual opportunity: {{ beat.visual_opportunity }}
+{% endfor %}
+{% endif %}
+
+{% if lyric_context.key_phrases %}
+### Key Lyric Phrases for This Section
+{% for phrase in lyric_context.key_phrases %}
+- "{{ phrase.text }}" [{{ phrase.emphasis }}] — {{ phrase.visual_hint }}
+{% endfor %}
+{% endif %}
+
+**TASK:** Based on the above narrative, produce `narrative_assets` with 1-10 directives declaring the figurative imagery this section needs. See system prompt for directive format and rules.
+{% endif %}
+
 # Your Task
 
 Create a SectionCoordinationPlan for **{{ section_name }} ({{ section_id }})**.
@@ -162,3 +189,9 @@ Create a SectionCoordinationPlan for **{{ section_name }} ({{ section_id }})**.
 
 **Primary targets for ACCENT:** {{ primary_focus_targets | join(", ") }}
 **Available bars:** 1 to {{ available_bars }}
+
+{% if lyric_context %}
+**NARRATIVE ASSETS:** Include `narrative_assets` with 1-10 figurative imagery directives based on the narrative context above. These must be concrete visual subjects (characters, objects, scenes), not abstract patterns.
+{% else %}
+**NARRATIVE ASSETS:** No lyric context available — set `narrative_assets` to `[]`.
+{% endif %}

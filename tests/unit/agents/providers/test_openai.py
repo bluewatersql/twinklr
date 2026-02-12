@@ -49,7 +49,9 @@ def test_openai_provider_init(mock_openai_client):
 
 def test_generate_json_success(mock_openai_client):
     """Test successful JSON generation."""
-    with patch("twinklr.core.agents.providers.openai.OpenAIClient", return_value=mock_openai_client):
+    with patch(
+        "twinklr.core.agents.providers.openai.OpenAIClient", return_value=mock_openai_client
+    ):
         provider = OpenAIProvider(api_key="test-key")
 
         messages = [
@@ -74,7 +76,9 @@ def test_generate_json_success(mock_openai_client):
 
 def test_generate_json_error(mock_openai_client):
     """Test error handling in generate_json."""
-    with patch("twinklr.core.agents.providers.openai.OpenAIClient", return_value=mock_openai_client):
+    with patch(
+        "twinklr.core.agents.providers.openai.OpenAIClient", return_value=mock_openai_client
+    ):
         provider = OpenAIProvider(api_key="test-key")
 
         # Make client raise error
@@ -90,7 +94,9 @@ def test_generate_json_error(mock_openai_client):
 
 def test_generate_json_with_conversation_new(mock_openai_client):
     """Test creating new conversation."""
-    with patch("twinklr.core.agents.providers.openai.OpenAIClient", return_value=mock_openai_client):
+    with patch(
+        "twinklr.core.agents.providers.openai.OpenAIClient", return_value=mock_openai_client
+    ):
         provider = OpenAIProvider(api_key="test-key")
 
         conv_id = generate_conversation_id("planner", 1)
@@ -121,7 +127,9 @@ def test_generate_json_with_conversation_new(mock_openai_client):
 
 def test_generate_json_with_conversation_existing(mock_openai_client):
     """Test continuing existing conversation."""
-    with patch("twinklr.core.agents.providers.openai.OpenAIClient", return_value=mock_openai_client):
+    with patch(
+        "twinklr.core.agents.providers.openai.OpenAIClient", return_value=mock_openai_client
+    ):
         provider = OpenAIProvider(api_key="test-key")
 
         conv_id = generate_conversation_id("planner", 1)
@@ -150,7 +158,9 @@ def test_generate_json_with_conversation_existing(mock_openai_client):
 
 def test_add_message_to_conversation(mock_openai_client):
     """Test adding message to conversation."""
-    with patch("twinklr.core.agents.providers.openai.OpenAIClient", return_value=mock_openai_client):
+    with patch(
+        "twinklr.core.agents.providers.openai.OpenAIClient", return_value=mock_openai_client
+    ):
         provider = OpenAIProvider(api_key="test-key")
 
         conv_id = generate_conversation_id("test", 1)
@@ -172,7 +182,9 @@ def test_add_message_to_conversation(mock_openai_client):
 
 def test_add_message_to_nonexistent_conversation(mock_openai_client):
     """Test adding message to nonexistent conversation."""
-    with patch("twinklr.core.agents.providers.openai.OpenAIClient", return_value=mock_openai_client):
+    with patch(
+        "twinklr.core.agents.providers.openai.OpenAIClient", return_value=mock_openai_client
+    ):
         provider = OpenAIProvider(api_key="test-key")
 
         with pytest.raises(ValueError) as exc_info:
@@ -185,7 +197,9 @@ def test_add_message_to_nonexistent_conversation(mock_openai_client):
 
 def test_get_conversation_history(mock_openai_client):
     """Test getting conversation history."""
-    with patch("twinklr.core.agents.providers.openai.OpenAIClient", return_value=mock_openai_client):
+    with patch(
+        "twinklr.core.agents.providers.openai.OpenAIClient", return_value=mock_openai_client
+    ):
         provider = OpenAIProvider(api_key="test-key")
 
         conv_id = generate_conversation_id("test", 1)
@@ -209,7 +223,9 @@ def test_get_conversation_history(mock_openai_client):
 
 def test_get_conversation_history_nonexistent(mock_openai_client):
     """Test getting history for nonexistent conversation."""
-    with patch("twinklr.core.agents.providers.openai.OpenAIClient", return_value=mock_openai_client):
+    with patch(
+        "twinklr.core.agents.providers.openai.OpenAIClient", return_value=mock_openai_client
+    ):
         provider = OpenAIProvider(api_key="test-key")
 
         with pytest.raises(ValueError) as exc_info:
@@ -247,7 +263,9 @@ def test_get_token_usage(mock_openai_client):
 
 def test_reset_token_tracking(mock_openai_client):
     """Test resetting token tracking."""
-    with patch("twinklr.core.agents.providers.openai.OpenAIClient", return_value=mock_openai_client):
+    with patch(
+        "twinklr.core.agents.providers.openai.OpenAIClient", return_value=mock_openai_client
+    ):
         provider = OpenAIProvider(api_key="test-key")
 
         provider.reset_token_tracking()
@@ -257,7 +275,9 @@ def test_reset_token_tracking(mock_openai_client):
 
 def test_conversation_without_system_prompt(mock_openai_client):
     """Test conversation without system prompt."""
-    with patch("twinklr.core.agents.providers.openai.OpenAIClient", return_value=mock_openai_client):
+    with patch(
+        "twinklr.core.agents.providers.openai.OpenAIClient", return_value=mock_openai_client
+    ):
         provider = OpenAIProvider(api_key="test-key")
 
         conv_id = generate_conversation_id("test", 1)

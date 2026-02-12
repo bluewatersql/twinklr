@@ -171,6 +171,7 @@ class GroupPlannerStage:
         # Retrieve shared context from pipeline state
         audio_bundle = context.get_state("audio_bundle")
         macro_plan = context.get_state("macro_plan")
+        lyric_context_model = context.get_state("lyric_context")
 
         if audio_bundle is None:
             raise ValueError("Missing 'audio_bundle' in context.state")
@@ -185,6 +186,14 @@ class GroupPlannerStage:
 
         # Extract layer intents from macro plan
         layer_intents = self._extract_layer_intents(macro_plan)
+
+        # Build section-scoped lyric context
+        section_lyric_context = self._build_section_lyric_context(
+            lyric_context_model,
+            section_id=input.section.section_id,
+            start_ms=input.section.start_ms,
+            end_ms=input.section.end_ms,
+        )
 
         # Build SectionPlanningContext from MacroSectionPlan + constructor args
         return SectionPlanningContext(
@@ -205,6 +214,7 @@ class GroupPlannerStage:
             theme=input.theme,
             motif_ids=input.motif_ids,
             palette=input.palette.model_dump() if input.palette else None,
+            lyric_context=section_lyric_context,
         )
 
     def _build_timing_context(
@@ -268,6 +278,132 @@ class GroupPlannerStage:
             bar_map=bar_map,
             section_bounds=section_bounds,
         )
+
+    def _build_section_lyric_context(
+        self,
+        lyric_context_model: Any,
+        *,
+        section_id: str,
+        start_ms: int,
+        end_ms: int,
+    ) -> dict[str, Any] | None:
+        """Build section-scoped lyric context for narrative asset directives.
+
+        Extracts story beats, key phrases, characters, and themes relevant
+        to the current section from the full LyricContextModel.
+
+        Uses a two-pass matching strategy:
+        1. Primary: match by section_id (fast, exact)
+        2. Fallback: match by timestamp overlap (resilient to ID mismatches)
+
+        Args:
+            lyric_context_model: LyricContextModel from lyrics analysis (or None)
+            section_id: Current section identifier
+            start_ms: Section start time in milliseconds
+            end_ms: Section end time in milliseconds
+
+        Returns:
+            Section-scoped lyric context dict, or None if no lyrics available
+        """
+        if lyric_context_model is None:
+            return None
+
+        if not getattr(lyric_context_model, "has_lyrics", False):
+            return None
+
+        # Filter story beats to this section (by ID, then timestamp fallback)
+        section_beats = []
+        if lyric_context_model.story_beats:
+            for beat in lyric_context_model.story_beats:
+                if self._beat_matches_section(beat, section_id, start_ms, end_ms):
+                    section_beats.append(
+                        {
+                            "beat_type": beat.beat_type,
+                            "description": beat.description,
+                            "visual_opportunity": beat.visual_opportunity,
+                        }
+                    )
+
+        # Filter key phrases to this section (by ID, then timestamp fallback)
+        section_phrases = []
+        if lyric_context_model.key_phrases:
+            for phrase in lyric_context_model.key_phrases:
+                if self._phrase_matches_section(phrase, section_id, start_ms, end_ms):
+                    section_phrases.append(
+                        {
+                            "text": phrase.text,
+                            "visual_hint": phrase.visual_hint,
+                            "emphasis": phrase.emphasis,
+                        }
+                    )
+
+        # Skip if no section-specific content
+        if not section_beats and not section_phrases:
+            return None
+
+        return {
+            "has_narrative": lyric_context_model.has_narrative,
+            "characters": lyric_context_model.characters or [],
+            "themes": lyric_context_model.themes or [],
+            "mood_arc": lyric_context_model.mood_arc or "",
+            "story_beats": section_beats,
+            "key_phrases": section_phrases,
+        }
+
+    @staticmethod
+    def _beat_matches_section(
+        beat: Any,
+        section_id: str,
+        start_ms: int,
+        end_ms: int,
+    ) -> bool:
+        """Check if a story beat belongs to a section.
+
+        Primary match: exact section_id match.
+        Fallback: timestamp_range overlaps the section time window.
+
+        Args:
+            beat: StoryBeat with section_id and timestamp_range
+            section_id: Target section identifier
+            start_ms: Section start in milliseconds
+            end_ms: Section end in milliseconds
+
+        Returns:
+            True if the beat matches this section
+        """
+        if beat.section_id == section_id:
+            return True
+
+        # Timestamp fallback — beat's timestamp_range overlaps section
+        beat_start, beat_end = beat.timestamp_range
+        return bool(beat_start < end_ms and beat_end > start_ms)
+
+    @staticmethod
+    def _phrase_matches_section(
+        phrase: Any,
+        section_id: str,
+        start_ms: int,
+        end_ms: int,
+    ) -> bool:
+        """Check if a key phrase belongs to a section.
+
+        Primary match: exact section_id match.
+        Fallback: timestamp_ms falls within the section time window.
+
+        Args:
+            phrase: KeyPhrase with section_id and timestamp_ms
+            section_id: Target section identifier
+            start_ms: Section start in milliseconds
+            end_ms: Section end in milliseconds
+
+        Returns:
+            True if the phrase matches this section
+        """
+        if phrase.section_id == section_id:
+            return True
+
+        # Timestamp fallback — phrase timestamp is within section bounds
+        return bool(start_ms <= phrase.timestamp_ms < end_ms)
 
     def _extract_layer_intents(self, macro_plan: Any) -> list[dict[str, Any]]:
         """Extract layer intents from macro plan.
@@ -334,19 +470,71 @@ class GroupPlanAggregatorStage:
 
             logger.debug(f"Aggregating {len(input)} section plans")
 
+            # Aggregate + deduplicate narrative directives across sections
+            aggregated_narratives = self._aggregate_narrative_directives(input)
+
             # Create GroupPlanSet from section plans
             group_plan_set = GroupPlanSet(
                 plan_set_id=self.plan_set_id,
                 section_plans=input,
+                narrative_assets=aggregated_narratives,
             )
 
-            logger.debug(f"GroupPlanSet created: {len(group_plan_set.section_plans)} sections")
+            logger.debug(
+                f"GroupPlanSet created: {len(group_plan_set.section_plans)} sections, "
+                f"{len(aggregated_narratives)} narrative directives"
+            )
 
             # Track metrics
             context.add_metric("group_plan_sections", len(group_plan_set.section_plans))
+            context.add_metric("narrative_directives", len(aggregated_narratives))
 
             return success_result(group_plan_set, stage_name=self.name)
 
         except Exception as e:
             logger.exception("Aggregation failed", exc_info=e)
             return failure_result(str(e), stage_name=self.name)
+
+    @staticmethod
+    def _aggregate_narrative_directives(
+        section_plans: list[Any],
+    ) -> list[Any]:
+        """Collect and deduplicate narrative directives across sections.
+
+        Deduplicates by directive_id. When duplicates exist, the first occurrence
+        is kept and section_ids are merged.
+
+        Args:
+            section_plans: List of SectionCoordinationPlan objects
+
+        Returns:
+            List of NarrativeAssetDirective with section_ids populated
+        """
+        from twinklr.core.sequencer.planning.group_plan import NarrativeAssetDirective
+
+        # Collect directives by ID, tracking which sections reference each
+        directives_by_id: dict[str, NarrativeAssetDirective] = {}
+        section_map: dict[str, list[str]] = {}
+
+        for plan in section_plans:
+            section_id = getattr(plan, "section_id", "unknown")
+            for directive in getattr(plan, "narrative_assets", []):
+                did = directive.directive_id
+                if did not in directives_by_id:
+                    directives_by_id[did] = directive
+                    section_map[did] = []
+                section_map[did].append(section_id)
+
+        # Build aggregated directives with section_ids populated
+        aggregated = [
+            d.model_copy(update={"section_ids": section_map[d.directive_id]})
+            for d in directives_by_id.values()
+        ]
+
+        if aggregated:
+            logger.debug(
+                f"Aggregated {len(aggregated)} unique narrative directives "
+                f"from {len(section_plans)} sections"
+            )
+
+        return aggregated

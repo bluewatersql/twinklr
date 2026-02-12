@@ -116,30 +116,37 @@ def shape_context(bundle: SongBundle) -> dict[str, Any]:
             }
 
     # Sections - handle both flat (test) and nested (real) structures
+    # Include canonical section_id to constrain the LLM to use consistent IDs
+    from twinklr.core.audio.sections import generate_section_ids
+
     sections_flat = features.get("sections", [])
     if sections_flat and isinstance(sections_flat[0], dict) and "start_ms" in sections_flat[0]:
         # Flat structure (tests) - sections directly in features
+        section_ids = generate_section_ids(sections_flat)
         context["sections"] = [
             {
+                "section_id": section_ids[i],
                 "type": s.get("type", "unknown"),
                 "start_ms": s.get("start_ms", 0),
                 "end_ms": s.get("end_ms", 0),
                 "confidence": s.get("confidence", 0.8),
             }
-            for s in sections_flat
+            for i, s in enumerate(sections_flat)
         ]
     else:
         # Nested structure (real SongBundle) - sections in structure.sections with seconds
         structure = features.get("structure", {})
         sections_nested = structure.get("sections", [])
+        section_ids = generate_section_ids(sections_nested)
         context["sections"] = [
             {
+                "section_id": section_ids[i],
                 "type": s.get("label", s.get("type", "unknown")),
                 "start_ms": int(s.get("start_s", 0) * 1000),
                 "end_ms": int(s.get("end_s", 0) * 1000),
                 "confidence": s.get("confidence", 0.8),
             }
-            for s in sections_nested
+            for i, s in enumerate(sections_nested)
         ]
 
     # Energy (compressed per-section)
@@ -203,9 +210,10 @@ def _shape_energy(energy_data: dict[str, Any], sections: list[dict[str, Any]]) -
         peaks = energy_data.get("peaks", [])
 
     # Build per-section profiles
+    # Use canonical section_id from context shaping (already includes per-type counters)
     section_profiles = []
     for i, section in enumerate(sections):
-        section_id = f"{section.get('type', 'unknown')}_{i}"
+        section_id = section.get("section_id", f"{section.get('type', 'unknown')}_{i}")
         # Sections already have start_ms/end_ms from context shaping
         start_ms = section.get("start_ms", 0)
         end_ms = section.get("end_ms", 0)

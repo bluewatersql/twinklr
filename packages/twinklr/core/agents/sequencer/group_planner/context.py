@@ -77,6 +77,12 @@ class SectionPlanningContext(BaseModel):
         description="Palette override from MacroPlan for this section",
     )
 
+    # Lyric/narrative context (optional, from lyrics analysis)
+    lyric_context: dict[str, Any] | None = Field(
+        default=None,
+        description="Section-scoped lyric context (story beats, key phrases, characters)",
+    )
+
     @property
     def duration_ms(self) -> int:
         """Section duration in milliseconds."""

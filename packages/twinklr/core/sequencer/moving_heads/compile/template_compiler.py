@@ -271,9 +271,9 @@ def _order_fixtures_for_chase(
         center_idx = len(ROLE_ORDER_LR) // 2
         return sorted(
             fixtures,
-            key=lambda f: abs(ROLE_ORDER_LR.index(f.role) - center_idx)
-            if f.role in ROLE_ORDER_LR
-            else 999,
+            key=lambda f: (
+                abs(ROLE_ORDER_LR.index(f.role) - center_idx) if f.role in ROLE_ORDER_LR else 999
+            ),
             reverse=True,
         )
 
@@ -282,9 +282,9 @@ def _order_fixtures_for_chase(
         center_idx = len(ROLE_ORDER_LR) // 2
         return sorted(
             fixtures,
-            key=lambda f: abs(ROLE_ORDER_LR.index(f.role) - center_idx)
-            if f.role in ROLE_ORDER_LR
-            else 999,
+            key=lambda f: (
+                abs(ROLE_ORDER_LR.index(f.role) - center_idx) if f.role in ROLE_ORDER_LR else 999
+            ),
         )
 
     elif order == ChaseOrder.ODD_EVEN:

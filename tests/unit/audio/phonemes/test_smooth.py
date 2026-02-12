@@ -79,7 +79,7 @@ class TestSmoothVisemes:
             VisemeEvent(viseme="O", start_ms=220, end_ms=400),
         ]
 
-        result, burst_count = smooth_visemes(
+        result, _burst_count = smooth_visemes(
             events,
             min_hold_ms=50,
             min_burst_ms=40,
@@ -188,7 +188,7 @@ class TestSmoothVisemes:
                 )
             )
 
-        result, burst_count = smooth_visemes(
+        result, _burst_count = smooth_visemes(
             events,
             min_hold_ms=50,
             min_burst_ms=40,

@@ -6,6 +6,7 @@ Transforms SongBundle into a focused context for lyric analysis.
 from typing import Any
 
 from twinklr.core.audio.models import SongBundle
+from twinklr.core.audio.sections import generate_section_ids
 
 
 def shape_lyrics_context(bundle: SongBundle) -> dict[str, Any]:
@@ -16,6 +17,10 @@ def shape_lyrics_context(bundle: SongBundle) -> dict[str, Any]:
     - Word/phrase timing (for precise moment identification)
     - Song structure sections (for alignment)
     - Quality metrics (for confidence assessment)
+
+    Uses canonical section IDs (per-type counters) from
+    ``generate_section_ids`` to ensure alignment with the audio profile
+    and downstream pipeline stages.
 
     Args:
         bundle: Complete SongBundle from audio analysis
@@ -31,6 +36,10 @@ def shape_lyrics_context(bundle: SongBundle) -> dict[str, Any]:
     structure = bundle.features.get("structure", {})
     sections = structure.get("sections", [])
 
+    # Generate canonical section IDs using the shared utility
+    # This ensures lyrics use the same IDs as audio profile / macro / group planners
+    section_ids = generate_section_ids(sections)
+
     return {
         "has_lyrics": True,
         "text": bundle.lyrics.text,
@@ -44,7 +53,7 @@ def shape_lyrics_context(bundle: SongBundle) -> dict[str, Any]:
         ],
         "sections": [
             {
-                "section_id": f"{s.get('label', 'unknown')}_{i}",
+                "section_id": section_ids[i],
                 "name": s.get("label", "unknown"),
                 "start_ms": int(s.get("start_s", 0) * 1000),
                 "end_ms": int(s.get("end_s", 0) * 1000),

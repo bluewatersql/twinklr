@@ -266,9 +266,7 @@ class AudioAnalyzer:
             )
 
         # Extract phonemes from timed words (depends on lyrics)
-        phoneme_bundle = await self._extract_phonemes_if_enabled(
-            lyrics_bundle, duration_ms
-        )
+        phoneme_bundle = await self._extract_phonemes_if_enabled(lyrics_bundle, duration_ms)
 
         # Build bundle
         return SongBundle(
@@ -423,8 +421,7 @@ class AudioAnalyzer:
 
         try:
             logger.debug(
-                f"Building phoneme bundle from {len(words)} timed words "
-                f"(duration={duration_ms}ms)"
+                f"Building phoneme bundle from {len(words)} timed words (duration={duration_ms}ms)"
             )
             bundle = await asyncio.to_thread(
                 build_phoneme_bundle,

@@ -304,6 +304,6 @@ class TestDistributeWordWindowToPhonemes:
         )
 
         assert len(result) == 4
-        for i, (phoneme, start, end) in enumerate(result):
+        for _i, (_phoneme, start, end) in enumerate(result):
             dur = end - start
             assert dur == 100, f"With equal weights, each should get 100ms, got {dur}"
