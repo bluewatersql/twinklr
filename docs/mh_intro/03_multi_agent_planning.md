@@ -5,11 +5,9 @@ part: 3
 tags: [ai, llm, python, christmas-lights, xlights, multi-agent, planning, orchestration]
 ---
 
-![Twinklr](../assets/twinklr_logo_colorful_light_mode.png)
+![Twinklr](../assets/twinklr_logo_light_mode.png)
 
 # The Choreographer — Multi-Agent Planning System
-
-<!-- ILLUSTRATION: ILL-03-00 — Blog header banner: planner + judge dialogue cards over timeline. See ILLUSTRATION_INDEX.md for full spec. -->
 ![Planner vs Judge](assets/illustrations/03_banner.png)
 
 The audio profile says "high-energy chorus, building intensity, lyrical hook at bar 12." Great. Now turn that into a concrete plan: which template on which fixture group, at which intensity, for how many bars, coordinated with every other fixture in the display. And get it right — or get told exactly what's wrong so you can try again.
@@ -18,41 +16,7 @@ This is the planner-critic loop: the system's central creative engine and the mo
 
 ---
 
-## System Snapshot
-
-**Purpose:** _(1–2 sentences: what this stage produces and why it exists.)_
-
-**Inputs**
-- _(e.g., raw audio file, metadata, prior stage outputs)_
-
-**Outputs**
-- _(e.g., BeatGrid, SectionMap, AudioProfile, GroupPlanSet, RenderPlan)_
-
-**LLM vs Deterministic**
-- **LLM does:** _(categorical intent / choices / summaries)_  
-- **Code does:** _(math, snapping, curves, exports, validation)_
-
-**Key invariants**
-- _(3–5 invariants that must always hold; treat as contracts)_
-
-**Telemetry to watch**
-- _(success rate, avg runtime, token/cost, top failure modes)_
-
-
-## Repo Anchors
-
-**Key modules**
-- `twinklr/...` _(add canonical paths for the main code in this part)_
-
-**Key models**
-- _(Pydantic models / schemas that define the contracts)_
-
-**Key tests / tools**
-- _(validators, golden tests, regression fixtures, debug utilities)_
-
-
 ## Agents Are Data, Not Classes
-
 Before we get into the loop, let's talk about how agents are built — because this decision shaped everything else.
 
 There are no `PlannerAgent`, `JudgeAgent`, or `ValidatorAgent` classes in Twinklr. There's one `AsyncAgentRunner` and different configurations:
@@ -94,18 +58,9 @@ The judge uses a cheaper, faster model because it's doing classification (good/b
 ---
 
 ## The Loop
-
 Here's how a plan gets made:
 
-<!-- ILLUSTRATION: ILL-03-02 — Multi-agent planning + evaluation loop illustration. See ILLUSTRATION_INDEX.md for full spec. -->
-![Planning Loop Overview (Illustrated, not Mermaid)](assets/illustrations/03_multi_agent_loop.png)
-
-<details>
-<summary>Diagram: Iteration Loop (click to expand if diagram doesn't render)</summary>
-
-![Iteration Loop](assets/diagrams/03_iteration_loop.png)
-
-</details>
+![Planning Loop Overview](assets/illustrations/03_multi_agent_loop.png)
 
 Three iterations max. Each one costs real money (LLM calls), so the system is designed to converge fast. Most plans approve on iteration 1 or 2. Reaching iteration 3 usually means something is fundamentally wrong with the section context, not that the planner needs one more try.
 
@@ -143,7 +98,6 @@ for iteration in range(self.config.max_iterations):
     revision = RevisionRequest.from_verdict(verdict)
 ```
 
-<!-- ILLUSTRATION: ILL-03-01 — The planner and judge as two agents in a back-and-forth dialogue: planner proposes, judge scores and critiques, planner revises, judge approves. Chat-bubble style showing convergence. See ILLUSTRATION_INDEX.md for full spec. -->
 ![Planner/Judge Dialogue](assets/illustrations/03_iteration_loop.png)
 
 The key detail: if heuristic validation fails, the judge never runs. No point scoring a plan that has invalid template IDs or overlapping placements. Fix the structural problems first, then worry about creative quality. This saves a full LLM call on plans that would obviously fail anyway.
@@ -151,12 +105,9 @@ The key detail: if heuristic validation fails, the judge never runs. No point sc
 ---
 
 ## Two Tiers of Validation
-
 This is the pattern we're proudest of. And it came from frustration — we were burning judge tokens on plans that had trivially wrong template names.
 
 ### Tier 1: Heuristic Validator (free, instant)
-
-<!-- ILLUSTRATION: ILL-03-03 — Validator “stoplight gate”: Tier-1 heuristic checks catch cheap failures; only green plans go to judge. See ILLUSTRATION_INDEX.md for full spec. -->
 ![Validator Stoplight Gate](assets/illustrations/03_validator_gate.png)
 
 The `SectionPlanValidator` catches structural problems without touching an LLM:
@@ -179,7 +130,6 @@ These are all things a Pydantic validator *could* catch, but we wanted richer er
 It also catches subtler issues: diversity constraints per lane (minimum unique templates, maximum consecutive reuse of the same template), timing driver mismatches (lyrics-driven lane with beat-snapped placements), and identical accent patterns across primary fixtures that flatten the focal hierarchy.
 
 ### Tier 2: LLM Judge (expensive, semantic)
-
 The judge evaluates things heuristics can't:
 
 - **Template appropriateness** — is `gentle_shimmer` really the right choice for a PEAK intensity chorus?
@@ -202,7 +152,6 @@ The judge returns a `JudgeVerdict` with a score (0–10), structured issues with
 ---
 
 ## Structured Feedback: Not Just "Please Fix It"
-
 When the judge returns SOFT_FAIL or HARD_FAIL, the system builds a `RevisionRequest` with typed fields:
 
 ```python
@@ -228,7 +177,6 @@ This matters more than it sounds. Early versions used natural language feedback:
 ---
 
 ## Context Shaping for Planning
-
 As we saw in Part 2, context shaping matters. The planner gets a lot of information — display graph (fixture groups), template catalog, section energy targets, motifs, timing constraints — and most of it is irrelevant to any given section.
 
 The `shape_planner_context` function performs ~40% token reduction:
@@ -254,7 +202,6 @@ But the filtering has a safety floor: minimum 3 templates per lane. If aggressiv
 ---
 
 ## Conversational Mode: Why the Planner Remembers
-
 The planner runs in `CONVERSATIONAL` mode — it keeps its message history across iterations. The judge runs in `ONESHOT` mode — fresh context every time.
 
 This asymmetry is deliberate. On iteration 2, the planner doesn't need the full section context re-sent. It's already in the conversation history. The refinement prompt (`user_refinement.j2`) is just the feedback and revision request. This saves roughly 40% of tokens on iterations 2 and 3.
@@ -268,7 +215,6 @@ The judge, conversely, *should* be fresh. You don't want it thinking "well, I ga
 ---
 
 ## Issue Tracking: Learning Across Runs
-
 One more thing the iteration controller does quietly: every issue from every verdict — even from plans that get approved — gets recorded to a persistent `IssueRepository`. This isn't for the current run. It's for the next one.
 
 When a new planning job starts, the controller loads historical issues and injects them into the developer prompt as "Common patterns to avoid." If the planner consistently produces timing misalignment on bridge sections, the next run starts with that knowledge. The system gets better at planning over time, not by fine-tuning the model, but by accumulating feedback.

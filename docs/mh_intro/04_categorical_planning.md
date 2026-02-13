@@ -5,52 +5,16 @@ part: 4
 tags: [ai, llm, python, christmas-lights, xlights, categorical-planning, architecture, design-patterns]
 ---
 
-![Twinklr](../assets/twinklr_logo_colorful_light_mode.png)
+![Twinklr](../assets/twinklr_logo_light_mode.png)
 
 # The Categorical Pivot — Teaching an LLM to Think in Intent, Not Numbers
-
-<!-- ILLUSTRATION: ILL-04-00 — Blog header banner: categorical vocabulary tiles bridging intent → curves. See ILLUSTRATION_INDEX.md for full spec. -->
 ![Categorical Tiles](assets/illustrations/04_banner.png)
 
 In our first 50 planning runs, 38% of judge failures came from numeric precision issues. The LLM would output intensity 1.24 when the limit was 1.20 — a 0.04 difference that a human wouldn't care about but a validator had to flag. We were asking the LLM to do what it's worst at. This is the story of the most consequential design change in the project, and the lesson most likely to generalize to whatever you're building.
 
 ---
 
-## System Snapshot
-
-**Purpose:** _(1–2 sentences: what this stage produces and why it exists.)_
-
-**Inputs**
-- _(e.g., raw audio file, metadata, prior stage outputs)_
-
-**Outputs**
-- _(e.g., BeatGrid, SectionMap, AudioProfile, GroupPlanSet, RenderPlan)_
-
-**LLM vs Deterministic**
-- **LLM does:** _(categorical intent / choices / summaries)_  
-- **Code does:** _(math, snapping, curves, exports, validation)_
-
-**Key invariants**
-- _(3–5 invariants that must always hold; treat as contracts)_
-
-**Telemetry to watch**
-- _(success rate, avg runtime, token/cost, top failure modes)_
-
-
-## Repo Anchors
-
-**Key modules**
-- `twinklr/...` _(add canonical paths for the main code in this part)_
-
-**Key models**
-- _(Pydantic models / schemas that define the contracts)_
-
-**Key tests / tools**
-- _(validators, golden tests, regression fixtures, debug utilities)_
-
-
 ## The Evidence
-
 We keep analytics on every judge verdict. When we sorted the failure patterns, a clear picture emerged:
 
 | Issue Type | Frequency | Root Cause |
@@ -79,18 +43,15 @@ The LLM wasn't stupid. It was being asked to be a calculator.
 ---
 
 ## The Insight
-
-> LLMs excel at categorical reasoning but struggle with precise numeric values. The architecture was asking the LLM to do what it's bad at (precision) instead of what it's good at (intent, relationships, patterns).
+LLMs excel at categorical reasoning but struggle with precise numeric values. The architecture was asking the LLM to do what it's bad at (precision) instead of what it's good at (intent, relationships, patterns).
 
 This isn't a Twinklr-specific observation. If you're building any system where an LLM makes decisions that get executed by deterministic code, you'll hit this. The question is whether you hit it after 50 runs of analytics or after six months of whack-a-mole prompt engineering.
 
 ---
 
 ## The Fix: Categories Instead of Numbers
-
 We replaced every numeric field the LLM touched with a categorical enum. The principle: **the LLM expresses intent, the renderer implements precision.**
 
-<!-- ILLUSTRATION: ILL-04-01 — Horizontal bridge: LLM's creative world (fuzzy, word bubbles) on the left, categorical vocabulary (WHISPER→PEAK scale) in the center, renderer's numeric world (DMX values, lane-aware mapping) on the right. See ILLUSTRATION_INDEX.md for full spec. -->
 ![Numbers Out, Categories In](assets/illustrations/04_categorical_bridge.png)
 
 ### Before (numeric)
@@ -132,7 +93,6 @@ The names aren't arbitrary. They carry semantic meaning the LLM can reason about
 > **Decision Point:** Why WHISPER/SOFT/MED/STRONG/PEAK rather than numeric ranges — the names carry semantic weight. The LLM isn't just picking from a list; it's reasoning about musical dynamics using words that *mean something* about energy and presence. This makes the prompt simpler and the output more reliable.
 
 ## EffectDuration: Musical Time, Not Milliseconds
-
 ```python
 class EffectDuration(str, Enum):
     HIT      = "HIT"       # 1-2 beats — quick accent
@@ -159,7 +119,6 @@ No more boundary-touch issues. No more "ends at bar 5 beat 1, next starts at bar
 ---
 
 ## Lane-Aware Intensity: The Clever Part
-
 This is where the design really pays off. The same `IntensityLevel` produces different numeric values depending on which lane it's in:
 
 ```python
@@ -183,7 +142,6 @@ Now the planner says "MED" and the renderer produces 0.55 for BASE, 0.75 for RHY
 ---
 
 ## Timing: Just Bar and Beat
-
 The old `TimeRef` had four fields:
 
 ```python
@@ -211,7 +169,6 @@ All gone. Bar and beat, both integers. The renderer handles sub-beat feel throug
 ---
 
 ## The Prompt Before and After
-
 This is what the prompt instructions looked like before:
 
 ```
@@ -239,7 +196,6 @@ The prompt went from rules the LLM had to memorize and apply to vocabulary the L
 ---
 
 ## Results
-
 | Metric | Before | After |
 |---|---|---|
 | LAYERING_* issues per run | ~8-12 | 0 (automatic) |
@@ -253,7 +209,6 @@ The first-iteration approval rate jumped. Plans that would have taken 2-3 iterat
 ---
 
 ## The Generalizable Principle
-
 This applies to any system where an LLM makes decisions that get executed by deterministic code. The process:
 
 1. **Track your failures.** Analytics first, opinions second. We knew numeric precision was the problem because we counted the issue types, not because we guessed.

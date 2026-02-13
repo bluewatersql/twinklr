@@ -5,11 +5,9 @@ part: 5
 tags: [ai, llm, python, christmas-lights, xlights, prompt-engineering, schema-injection, jinja2]
 ---
 
-![Twinklr](../assets/twinklr_logo_colorful_light_mode.png)
+![Twinklr](../assets/twinklr_logo_light_mode.png)
 
 # Prompt Engineering — Schema Injection, Taxonomy, and Anti-Patterns
-
-<!-- ILLUSTRATION: ILL-05-00 — Blog header banner: prompt pack layers + schema injection. See ILLUSTRATION_INDEX.md for full spec. -->
 ![Prompt Packs & Contracts](assets/illustrations/05_banner.png)
 
 The dirty secret of production LLM systems is that prompts break silently. You update a Pydantic model — add a field, rename an enum value, change a constraint — and forget to update the prompt. The LLM starts generating fields that don't exist, or misses new required fields, or uses the old enum value that Pydantic now rejects. Schema drift doesn't crash. It just degrades quality until someone notices, which in our case was three weeks after we renamed `MEDIUM` to `MED`.
@@ -18,41 +16,7 @@ Here's how we solved it, and a few things we tried that didn't work.
 
 ---
 
-## System Snapshot
-
-**Purpose:** _(1–2 sentences: what this stage produces and why it exists.)_
-
-**Inputs**
-- _(e.g., raw audio file, metadata, prior stage outputs)_
-
-**Outputs**
-- _(e.g., BeatGrid, SectionMap, AudioProfile, GroupPlanSet, RenderPlan)_
-
-**LLM vs Deterministic**
-- **LLM does:** _(categorical intent / choices / summaries)_  
-- **Code does:** _(math, snapping, curves, exports, validation)_
-
-**Key invariants**
-- _(3–5 invariants that must always hold; treat as contracts)_
-
-**Telemetry to watch**
-- _(success rate, avg runtime, token/cost, top failure modes)_
-
-
-## Repo Anchors
-
-**Key modules**
-- `twinklr/...` _(add canonical paths for the main code in this part)_
-
-**Key models**
-- _(Pydantic models / schemas that define the contracts)_
-
-**Key tests / tools**
-- _(validators, golden tests, regression fixtures, debug utilities)_
-
-
 ## The Prompt Pack Architecture
-
 Every agent in the system has a prompt pack: a directory of Jinja2 templates plus metadata.
 
 ```
@@ -74,8 +38,6 @@ This separation means you can change the creative direction without touching the
 ---
 
 ## Schema Auto-Injection: The Key Technique
-
-<!-- ILLUSTRATION: ILL-05-01 — Before/after split: top shows schema drift (Pydantic model and prompt diverged, LLM confused), bottom shows auto-injection (model_json_schema() connecting them, always in sync). See ILLUSTRATION_INDEX.md for full spec. -->
 ![Schema Repair Loop](assets/illustrations/05_schema_repair.png)
 
 This is the single most impactful prompt engineering decision we made, and it's four lines of code:
@@ -113,7 +75,6 @@ This is the safety rail that prevents “prompt drift” when schemas evolve.
 **Failure mode this prevents**
 - Model outputs “valid-looking” JSON that silently violates the latest schema → judge fails late → expensive iteration.
 
-<!-- ILLUSTRATION: ILL-05-03 — Contract test cartoon: schema file changes → CI test fails → prompt pack updated → green build. See ILLUSTRATION_INDEX.md for full spec. -->
 ![Schema Injection Contract Test (CI Guardrail)](assets/illustrations/05_schema_contract_test.png)
 
 
@@ -131,7 +92,6 @@ Before this, we had hardcoded JSON schemas in prompts. We'd update the model, th
 ---
 
 ## Taxonomy Injection: Keeping Enums in Sync
-
 Beyond the schema, the system injects every vocabulary enum into prompts. The `inject_taxonomy()` function collects all enum values from the vocabulary module and makes them available as template variables:
 
 ```python
@@ -156,18 +116,15 @@ The taxonomy covers 26 enum types across choreography, group planning, and issue
 ---
 
 ## The Three-Layer Strategy in Practice
-
 Here's how the layers work together, using the group planner as the example:
 
 ### Layer 1: System Prompt (the "who")
-
 ```jinja2
 {# system.j2 — abbreviated #}
 You are a Christmas light show choreographer designing
 coordinated group choreography for holiday displays.
 
 ## Energy Recipes
-
 ### HIGH Energy Section
 - BASE lane: SECTION duration, MED intensity (continuous bed)
 - RHYTHM lane: PHRASE or EXTENDED, STRONG intensity (drive)
@@ -182,7 +139,6 @@ coordinated group choreography for holiday displays.
 The system prompt includes concrete recipes per energy level — not "consider the energy" but "here's exactly what HIGH/MED/LOW configurations look like." These recipes are the distilled knowledge of what works, expressed in the categorical vocabulary from Part 4. The LLM has a playbook, not a blank page.
 
 ### Layer 2: Developer Prompt (the "what")
-
 ```jinja2
 {# developer.j2 — abbreviated #}
 ## Response Schema
@@ -207,7 +163,6 @@ The system prompt includes concrete recipes per energy level — not "consider t
 Hard constraints as a table with examples and violations. This format works better than prose rules because the LLM can pattern-match against concrete examples. "Don't use templates not in the catalog" is vague. "✅ gtpl_base_warm_glow / ❌ my_custom_effect" is specific.
 
 ### Layer 3: User Prompt (the "with")
-
 ```jinja2
 {# user.j2 — abbreviated #}
 ## Section: {{ section_id }} ({{ section_name }})
@@ -233,20 +188,11 @@ On iteration 1, the user prompt contains the full section context: templates, gr
 ---
 
 ## The Schema Repair Loop
-
 Even with auto-injected schemas and taxonomy, the LLM sometimes produces invalid output. A missing required field. An enum value with a typo. A nested object where a string was expected.
 
 The runner handles this with a repair loop:
 
-<!-- ILLUSTRATION: ILL-05-02 — Prompt engineering system overview illustration (prompt pack, schema, validators). See ILLUSTRATION_INDEX.md for full spec. -->
-![Prompt Engineering System Overview (Illustrated, not Mermaid)](assets/illustrations/05_prompt_system.png)
-
-<details>
-<summary>Diagram: Schema Repair Loop (click to expand if diagram doesn't render)</summary>
-
-![Schema Repair Loop](assets/diagrams/05_schema_repair.png)
-
-</details>
+![Prompt Engineering System Overview](assets/illustrations/05_prompt_system.png)
 
 The repair message includes both the specific error and the full expected schema:
 
@@ -267,7 +213,6 @@ Most repairs succeed on the first attempt. The LLM sees exactly what went wrong 
 ---
 
 ## What Didn't Work
-
 **Natural language schema descriptions.** Before auto-injection, we described the output format in prose: "Return a JSON object with a section_id string, a list of lane_plans, each containing..." The LLM would get creative. Extra fields, renamed fields, slightly different nesting. Prose invites interpretation. JSON schema doesn't.
 
 **Giant monolithic prompts.** The first version had everything in one template. Role, constraints, schema, context, examples — 800 lines of Jinja2. Changing anything required reading the whole thing. Splitting into layers was a sanity decision before it was an engineering one.

@@ -5,11 +5,9 @@ part: 2
 tags: [ai, llm, python, christmas-lights, xlights, audio-profiling, context-shaping, prompt-engineering]
 ---
 
-![Twinklr](../assets/twinklr_logo_colorful_light_mode.png)
+![Twinklr](../assets/twinklr_logo_light_mode.png)
 
 # Making Sense of Sound — LLM-Based Audio & Lyric Profiling
-
-<!-- ILLUSTRATION: ILL-02-00 — Blog header banner: compression lens over musical features. See ILLUSTRATION_INDEX.md for full spec. -->
 ![Compression With Taste](assets/illustrations/02_banner.png)
 
 After Part 1, you've got ~100KB of structured audio features. Tempo, beats, energy curves at three scales, section boundaries with confidence scores, harmonic analysis, and maybe lyrics with quality metrics. It's precise. It's deterministic. And it's completely useless for making creative decisions.
@@ -18,57 +16,13 @@ Here's the problem: "section chorus_2 has mean energy 0.87, peak energy 0.94, ch
 
 This is where the LLM enters the Twinklr pipeline for the first time. And the first thing we do is throw away 90% of the data we just extracted.
 
-<!-- ILLUSTRATION: ILL-02-02 — Profiling pipeline illustration (raw features → compact profile). See ILLUSTRATION_INDEX.md for full spec. -->
-![Profiling Pipeline (Illustrated, not Mermaid)](assets/illustrations/02_profiling_pipeline_overview.png)
-
-<details>
-<summary>Diagram: Profiling Pipeline (click to expand if diagram doesn't render)</summary>
-
-![Profiling Pipeline](assets/diagrams/02_profiling_pipeline.png)
-
-</details>
+![Profiling Pipeline](assets/illustrations/02_profiling_pipeline_overview.png)
 
 ---
 
-## System Snapshot
-
-**Purpose:** _(1–2 sentences: what this stage produces and why it exists.)_
-
-**Inputs**
-- _(e.g., raw audio file, metadata, prior stage outputs)_
-
-**Outputs**
-- _(e.g., BeatGrid, SectionMap, AudioProfile, GroupPlanSet, RenderPlan)_
-
-**LLM vs Deterministic**
-- **LLM does:** _(categorical intent / choices / summaries)_  
-- **Code does:** _(math, snapping, curves, exports, validation)_
-
-**Key invariants**
-- _(3–5 invariants that must always hold; treat as contracts)_
-
-**Telemetry to watch**
-- _(success rate, avg runtime, token/cost, top failure modes)_
-
-
-## Repo Anchors
-
-**Key modules**
-- `twinklr/...` _(add canonical paths for the main code in this part)_
-
-**Key models**
-- _(Pydantic models / schemas that define the contracts)_
-
-**Key tests / tools**
-- _(validators, golden tests, regression fixtures, debug utilities)_
-
-
 ## The 10x Compression: Why Less Is More
-
-<!-- ILLUSTRATION: ILL-02-01 — Funnel/sieve showing 100KB of noisy raw data compressed to 10KB of clean shaped context via shape_context(). See ILLUSTRATION_INDEX.md for full spec. -->
 ![Profiling Pipeline (Filtering the Signal)](assets/illustrations/02_profiling_pipeline.png)
 
-<!-- ILLUSTRATION: ILL-02-03 — What survives compression: feature sieve that keeps only actionable signals (energy arc, groove, lyric anchors) and drops raw noise. See ILLUSTRATION_INDEX.md for full spec. -->
 ![What Survives Compression (Feature Sieve)](assets/illustrations/02_survives_compression.png)
 
 Sending 100KB of audio features to an LLM is a terrible idea. Not because the LLM can't handle the tokens — it can. But because drowning it in frame-level energy data and per-beat spectral centroids produces worse output than giving it a curated summary. We tested this. The verbose version generated generic, wishy-washy creative guidance. The compressed version gave us specific, actionable direction. More data, worse results. LLMs are not databases.
@@ -144,7 +98,6 @@ Simple threshold logic. No ML. The labels give the LLM quick handles — "this s
 ---
 
 ## The Audio Profiling Agent
-
 The compressed context goes to a single-shot LLM call that produces an `AudioProfileModel`. Here's what comes out:
 
 ```
@@ -173,14 +126,12 @@ The `planner_hints` section is where the real value lives. This is the LLM addin
 ---
 
 ## Anti-Generic Prompting: The Hardest Problem
-
 Here's a confession: the first version of the audio profiler was useless. Not wrong — useless. It produced perfectly structured JSON that said absolutely nothing specific about any particular song. Every ballad got "keep motion minimal in the intro." Every chorus got "build gradually." Every bridge got "provide contrast." You could have swapped the output between "O Holy Night" and "Wizards in Winter" and nobody would notice.
 
 The fix wasn't a model change or a temperature tweak. It was prompt engineering with teeth. From the system prompt:
 
 ```
 ## Anti-Patterns to AVOID
-
 **FORBIDDEN - Generic Copy-Paste Advice:**
 - ❌ "Start with gentle fade-in" (applies to every song with quiet intro)
 - ❌ "Build gradually through section" (too generic)
@@ -214,7 +165,6 @@ Does the LLM always follow this perfectly? No. But the failure rate dropped dram
 ---
 
 ## The Lyrics Profiling Agent
-
 Lyrics get their own agent. Separate context, separate prompt pack, separate model. This isn't over-engineering — it's a fundamentally different task.
 
 The audio profiler gets *metadata only* about lyrics: "lyrics exist, they're timed, confidence 0.82." That's it. The lyrics agent gets the full text, every word timestamp, every phrase boundary:
@@ -252,7 +202,6 @@ The same anti-generic techniques apply. The lyrics prompt explicitly forbids "Br
 ---
 
 ## Why Two Agents, Not One?
-
 We get this question. If both agents look at the same song, why not combine them?
 
 Three reasons:
@@ -268,7 +217,6 @@ Three reasons:
 ---
 
 ## What the Planner Sees
-
 By the time the profiling stage finishes, the downstream planner receives:
 
 1. **Audio Profile** — energy dynamics, section character, creative guidance, planner hints (all song-specific, all grounded in timestamps and data)

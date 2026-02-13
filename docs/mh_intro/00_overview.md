@@ -5,11 +5,10 @@ part: 0
 tags: [ai, llm, python, christmas-lights, xlights, choreography, moving-heads]
 ---
 
-![Twinklr](../assets/twinklr_logo_colorful_light_mode.png)
+![Twinklr](../assets/twinklr_logo_light_mode.png)
 
-# Can an LLM Choreograph a Light Show?
+# An LLM xLights Choreographer?
 
-<!-- ILLUSTRATION: ILL-00-00 — Blog header banner: Twinklr + AI choreography vibe (roofline + beat ticks). See ILLUSTRATION_INDEX.md for full spec. -->
 ![From Beats to Beams](assets/illustrations/00_banner.png)
 
 Picture eight moving head fixtures bolted across your roofline. Each one has a pan motor (540° of horizontal rotation), a tilt motor (270° vertical), and a dimmer channel. You've got a three-minute Christmas song at 120 BPM — that's 360 beats to fill. Every pan angle, every tilt position, every brightness curve needs to be choreographed across all eight fixtures, synchronized to the music, producing formations that look intentional instead of like eight searchlights having a seizure.
@@ -18,46 +17,11 @@ This is what show designers spend 20+ hours doing by hand in xLights. For a sing
 
 We wanted to know if an LLM could do it. The short answer: yes. The longer answer involves six months of learning exactly how bad LLMs are at trigonometry.
 
-<!-- ILLUSTRATION: ILL-00-01 — Moving heads on a residential roofline at night, beams fanning outward. See ILLUSTRATION_INDEX.md for full spec. -->
 ![Moving Heads on a Roofline](assets/illustrations/00_moving_heads_roofline.png)
 
 ---
 
-## System Snapshot
-
-**Purpose:** _(1–2 sentences: what this stage produces and why it exists.)_
-
-**Inputs**
-- _(e.g., raw audio file, metadata, prior stage outputs)_
-
-**Outputs**
-- _(e.g., BeatGrid, SectionMap, AudioProfile, GroupPlanSet, RenderPlan)_
-
-**LLM vs Deterministic**
-- **LLM does:** _(categorical intent / choices / summaries)_  
-- **Code does:** _(math, snapping, curves, exports, validation)_
-
-**Key invariants**
-- _(3–5 invariants that must always hold; treat as contracts)_
-
-**Telemetry to watch**
-- _(success rate, avg runtime, token/cost, top failure modes)_
-
-
-## Repo Anchors
-
-**Key modules**
-- `twinklr/...` _(add canonical paths for the main code in this part)_
-
-**Key models**
-- _(Pydantic models / schemas that define the contracts)_
-
-**Key tests / tools**
-- _(validators, golden tests, regression fixtures, debug utilities)_
-
-
-## Moving Heads: The Show-Offs of the Rig
-
+## Moving Heads: Main Character Energy
 If you've watched those viral YouTube Christmas light shows — whole houses pulsing and dancing to "Wizards in Winter" — you've seen the simpler side of Christmas lighting. Strings, arches, pixel matrices. They turn on, they change color, they dim. That's it.
 
 Moving heads are different. Borrowed from concert stages and adopted by the Christmas lighting community as high-impact accent fixtures, they're motorized lights that physically *point* in different directions. When you coordinate them into formations — fans, chevrons, waves, chases — the effect stops people mid-sidewalk.
@@ -82,7 +46,6 @@ That's thousands of individual data points for one three-minute track.
 ---
 
 ## The Naive Approach (How Hard Could It Be?)
-
 The first thing we tried — and probably the first thing you'd try — is the obvious one. Feed the LLM the song structure and ask it to generate DMX values directly. "Here are the beats. Here are 8 fixtures. Generate the choreography."
 
 It failed. Immediately.
@@ -101,24 +64,14 @@ The LLM works with a vocabulary of pre-built choreography templates — `fan_pul
 
 We thought: if we get this boundary right, the LLM doesn't need to understand trigonometry. It needs to understand *music*.
 
-<!-- ILLUSTRATION: ILL-00-02 — Split-panel: LLM's creative world (intent, words, fuzzy) vs renderer's precise world (DMX, angles, curves), bridged by categorical vocabulary. See ILLUSTRATION_INDEX.md for full spec. -->
 ![The Creative ↔ Deterministic Boundary](assets/illustrations/00_boundary_split.png)
 
 ---
 
 ## The Pipeline
-
 Here's the full system:
 
-<!-- ILLUSTRATION: ILL-00-03 — Full end-to-end pipeline overview illustration (analysis→planning→rendering). See ILLUSTRATION_INDEX.md for full spec. -->
-![End-to-End Pipeline (Illustrated, not Mermaid)](assets/illustrations/00_full_pipeline.png)
-
-<details>
-<summary>Diagram: Full Pipeline Flow (click to expand if diagram doesn't render)</summary>
-
 ![Full Pipeline Flow](assets/diagrams/00_full_pipeline.png)
-
-</details>
 
 Here's where it gets interesting — the LLM only touches two of these five stages. Everything else is pure math.
 

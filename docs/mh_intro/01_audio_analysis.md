@@ -5,11 +5,9 @@ part: 1
 tags: [ai, llm, python, christmas-lights, xlights, audio-analysis, signal-processing, librosa]
 ---
 
-![Twinklr](../assets/twinklr_logo_colorful_light_mode.png)
+![Twinklr](../assets/twinklr_logo_light_mode.png)
 
 # Hearing the Music — Audio Analysis & Feature Extraction
-
-<!-- ILLUSTRATION: ILL-01-00 — Blog header banner: audio waves → lights choreography. See ILLUSTRATION_INDEX.md for full spec. -->
 ![Hearing the Music](assets/illustrations/01_banner.png)
 
 A choreographer doesn't listen to music the way you or I do. They're counting bars. They're tracking where the energy builds. They're noting *exactly* which beat the chorus hits — not approximately, because "approximately" makes lights look drunk.
@@ -20,41 +18,7 @@ No LLM touches any of this. It's pure signal processing, a multi-source lyrics p
 
 ---
 
-## System Snapshot
-
-**Purpose:** _(1–2 sentences: what this stage produces and why it exists.)_
-
-**Inputs**
-- _(e.g., raw audio file, metadata, prior stage outputs)_
-
-**Outputs**
-- _(e.g., BeatGrid, SectionMap, AudioProfile, GroupPlanSet, RenderPlan)_
-
-**LLM vs Deterministic**
-- **LLM does:** _(categorical intent / choices / summaries)_  
-- **Code does:** _(math, snapping, curves, exports, validation)_
-
-**Key invariants**
-- _(3–5 invariants that must always hold; treat as contracts)_
-
-**Telemetry to watch**
-- _(success rate, avg runtime, token/cost, top failure modes)_
-
-
-## Repo Anchors
-
-**Key modules**
-- `twinklr/...` _(add canonical paths for the main code in this part)_
-
-**Key models**
-- _(Pydantic models / schemas that define the contracts)_
-
-**Key tests / tools**
-- _(validators, golden tests, regression fixtures, debug utilities)_
-
-
 ## The BeatGrid: Where Everything Starts
-
 Every decision the system makes downstream — which template to use, when to start a sweep, how long to hold a pulse — eventually resolves to one question: *where are we in the music right now?*
 
 The answer lives in a frozen Pydantic model called `BeatGrid`:
@@ -75,7 +39,6 @@ class BeatGrid(BaseModel, frozen=True):
 
 Four resolution levels — bar, beat, eighth, sixteenth — pre-calculated from the detected beat positions. When the rendering pipeline needs to align a template to "bar 12, beat 3," it calls `beat_grid.snap_to_grid(time_ms, quantize_to="beat")` and gets back an exact millisecond value. Binary search under the hood. No re-computation, no floating-point drift.
 
-<!-- ILLUSTRATION: ILL-01-04 — Snap-to-grid before/after: raw hit times snapping to beat grid, with visible drift removed. See ILLUSTRATION_INDEX.md for full spec. -->
 ![Snap to Grid (Before/After)](assets/illustrations/01_snap_to_grid.png)
 
 The `frozen=True` matters. The BeatGrid is a contract between audio analysis and every stage downstream. If anything could mutate it mid-pipeline, we'd spend our lives debugging timing inconsistencies that only reproduce on the 47th bar of specific songs. We were paranoid about this one from the start. (The lyrics pipeline, on the other hand, taught us caution the hard way. More on that shortly.)
@@ -83,18 +46,9 @@ The `frozen=True` matters. The BeatGrid is a contract between audio analysis and
 ---
 
 ## Seven Domains, One Song
-
 The audio file goes through parallel analysis across seven feature domains. It starts with HPSS — Harmonic/Percussive Source Separation — which splits the audio into its tonal content (vocals, chords, sustained notes) and its percussive content (drums, clicks, attacks). Beat detection works better on the percussive signal. Key detection works better on the harmonic. Feeding both through the same mixed signal is like trying to read a book and listen to a podcast at the same time — technically possible, practically worse at both.
 
-<!-- ILLUSTRATION: ILL-01-03 — Audio analysis pipeline illustration (beats/energy/lyrics extraction). See ILLUSTRATION_INDEX.md for full spec. -->
-![Audio Analysis Pipeline (Illustrated, not Mermaid)](assets/illustrations/01_audio_pipeline.png)
-
-<details>
-<summary>Diagram: Audio Analysis Pipeline (click to expand if diagram doesn't render)</summary>
-
-![Audio Analysis Pipeline](assets/diagrams/01_audio_pipeline.png)
-
-</details>
+![Audio Analysis Pipeline](assets/illustrations/01_audio_pipeline.png)
 
 Here's what comes out the other end:
 
@@ -113,7 +67,6 @@ The complete output is a `SongBundle` — about 100KB of structured JSON for a t
 ---
 
 ## Energy: Why You Need Three Ears
-
 Energy analysis seems straightforward: compute RMS from the waveform, done. But a snare hit on beat 3 and a four-bar orchestral build into the chorus are both "energy events" — and they demand completely different choreographic responses. The snare triggers a quick dimmer flash. The build should drive a gradual widening of the fan formation. You need to hear both, which means hearing at different temporal scales.
 
 ```python
@@ -127,7 +80,6 @@ rms_section = gaussian_filter1d(rms_norm, sigma=50)  # ← Section-level: the ma
 
 Sigma 2 sees every snare hit. Sigma 50 sees the chorus. Sigma 10 is the sweet spot that reveals the *breathing* of the music — the building and releasing that happens at the phrase level, the thing that makes a pre-chorus feel like it's going somewhere.
 
-<!-- ILLUSTRATION: ILL-01-01 — Three overlaid energy curves (beat/phrase/section scale) on a shared time axis, showing the same song at different smoothing levels. See ILLUSTRATION_INDEX.md for full spec. -->
 ![Energy Curves at Multiple Scales](assets/illustrations/01_energy_curves.png)
 
 The system also derives a `smoothness_score`: the ratio of phrase-level variance to raw variance. High smoothness means gradual energy changes — a gentle "O Holy Night." Low smoothness means sharp dynamic contrast — Trans-Siberian Orchestra doing literally anything. The downstream profiler uses this to decide between gradual transitions and hard cuts between choreography sections.
@@ -137,7 +89,6 @@ On top of the curves, the system detects **builds** (sustained energy increases)
 ---
 
 ## Section Detection: Christmas Music Is Weird
-
 Section detection — figuring out where the intro ends, where the verse begins, where the chorus kicks in — turned out to be the single most consequential part of this pipeline. Bad boundaries don't cause local problems. They *cascade*. The profiler interprets sections wrong, the planner assigns templates to the wrong musical moments, and the whole show feels disconnected from the music.
 
 We used a hybrid approach: Foote novelty function (self-similarity matrix analysis) combined with a baseline time grid. Foote novelty finds moments where the music changes character. The baseline grid ensures minimum coverage when novelty peaks are sparse.
@@ -211,10 +162,8 @@ Thirty lines of code. Prevents an absurd number of bugs.
 ---
 
 ## The Lyrics Problem
-
 Lyrics matter for choreography — the planner can time a warm red glow to "Rudolph with your nose so bright," the lyrics profiler can find narrative themes that shape the show's visual arc. But getting reliable lyrics with accurate timing is a real-world data quality problem, and it humbled us.
 
-<!-- ILLUSTRATION: ILL-01-02 — Five-stage lyrics fallback waterfall, showing each source tried in order with escalating time cost and quality gates. See ILLUSTRATION_INDEX.md for full spec. -->
 ![Lyrics Waterfall Fallback](assets/illustrations/01_lyrics_waterfall.png)
 
 > **Decision Point:** No single lyrics source is reliable for the Christmas music catalog. Embedded tags are often missing. LRCLib has good synced lyrics but gaps in coverage. Genius has great text but no timing. WhisperX can transcribe but struggles with singing vs. speech. We built a five-stage fallback chain: each source tried in order, each result quality-scored before acceptance.
@@ -271,7 +220,6 @@ The pipeline degrades gracefully. Missing API keys? Those lookup stages just get
 ---
 
 ## Caching: Analyze Once, Forget About It
-
 Audio analysis takes 15–30 seconds per song. But it's deterministic — same input, same output — so we cache aggressively. The cache key is a SHA256 of the first 10MB of the audio file plus the file size. Not the whole file — just enough to fingerprint it without reading gigabytes of FLAC. The key includes a schema version, so when we change the output shape, old caches invalidate automatically.
 
 Metadata enrichment and lyrics resolution run in parallel via `asyncio.gather` — no reason to wait for AcoustID fingerprinting before hitting LRCLib. Phonemes depend on lyrics, so they run sequentially after. The whole enhancement pipeline is created by `EnhancementServiceFactory`, which only initializes the services that are enabled. Missing API keys get logged as warnings, not errors.

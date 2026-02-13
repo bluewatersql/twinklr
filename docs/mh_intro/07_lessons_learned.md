@@ -5,11 +5,9 @@ part: 7
 tags: [ai, llm, python, christmas-lights, xlights, lessons-learned, architecture, roadmap]
 ---
 
-![Twinklr](../assets/twinklr_logo_colorful_light_mode.png)
+![Twinklr](../assets/twinklr_logo_light_mode.png)
 
 # Lessons Learned & What's Next
-
-<!-- ILLUSTRATION: ILL-07-00 — Blog header banner: “what to steal” toolbelt + lights. See ILLUSTRATION_INDEX.md for full spec. -->
 ![The Twinklr Playbook](assets/illustrations/07_banner.png)
 
 Deep breath. Months of work. Five audio extraction libraries. Three complete rewrites of the planning loop. One categorical pivot that should have been obvious from day one. And at the end of it all, an LLM that can take a Christmas song it's never heard before and produce a coordinated moving head show that actually looks... good?
@@ -19,27 +17,6 @@ We're still a little surprised it works.
 This is the retrospective. Not the polished "and then we solved it" version — the honest accounting of what worked, what didn't, what we'd do over, and where the whole thing goes next.
 
 ---
-
-## System Snapshot
-
-**Purpose:** _(1–2 sentences: what this stage produces and why it exists.)_
-
-**Inputs**
-- _(e.g., raw audio file, metadata, prior stage outputs)_
-
-**Outputs**
-- _(e.g., BeatGrid, SectionMap, AudioProfile, GroupPlanSet, RenderPlan)_
-
-**LLM vs Deterministic**
-- **LLM does:** _(categorical intent / choices / summaries)_  
-- **Code does:** _(math, snapping, curves, exports, validation)_
-
-**Key invariants**
-- _(3–5 invariants that must always hold; treat as contracts)_
-
-**Telemetry to watch**
-- _(success rate, avg runtime, token/cost, top failure modes)_
-
 
 ## What Worked
 
@@ -65,7 +42,6 @@ The categorical pivot (Part 4) was the turning point. Once we stopped asking the
 ---
 
 ## What Surprised Us
-
 **Numeric precision was the #1 failure mode.** Not hallucination. Not wrong template choices. Not bad creative judgment. The LLM consistently understood the *intent* perfectly and mangled the *numbers* every time. Intensity 1.24 when the limit was 1.20. Beat fraction 0.33 when it should have been 0.0. We expected creative failures. We got arithmetic failures.
 
 38% of judge failures in the first 50 runs were numeric precision issues. That number is still wild to us. The LLM was reliably creative and reliably imprecise — which is exactly the opposite of what we'd been designing for.
@@ -79,7 +55,6 @@ The categorical pivot (Part 4) was the turning point. Once we stopped asking the
 ---
 
 ## What We'd Do Differently
-
 **Start categorical from day one.** The six weeks of numeric experiments were "educational" in the way that touching a hot stove is educational. LLMs are bad at precise numbers. This was known. We tested it anyway because we thought *our* numbers might be different. They were not.
 
 Honestly, if you're building any system where an LLM makes decisions that get executed by deterministic code, skip the numeric phase. Define your vocabulary in categories. Let the LLM pick from meaningful labels. Let the deterministic side own the precision. You'll save yourself the same six weeks we burned.
@@ -93,7 +68,6 @@ The structured version — here are 3 blocking errors, here are 2 warnings, here
 ---
 
 ## Where AI Helps vs. Where Determinism Wins
-
 Seven parts in, here's the explicit split:
 
 | AI Excels At | Determinism Excels At |
@@ -113,10 +87,8 @@ The system works because neither side tries to do the other's job. The LLM doesn
 
 
 ## What to Steal (5 Transferable Patterns)
-
 These are the pieces you can copy into *any* LLM+determinism system — even if you’re not doing Christmas lights.
 
-<!-- ILLUSTRATION: ILL-07-01 — “What to steal” toolbox infographic: 5 labeled tools with tiny examples (categorical vocab, schema injection, two-tier validation, context compression, deterministic compiler). See ILLUSTRATION_INDEX.md for full spec. -->
 ![What to Steal Toolbox Infographic](assets/illustrations/07_what_to_steal.png)
 
 1) **Categorical vocabulary as a bridge**  
@@ -136,7 +108,6 @@ These are the pieces you can copy into *any* LLM+determinism system — even if 
 
 
 ## What's Next
-
 The moving head pipeline is the foundation. Here's what's being built on top of it.
 
 **Display Renderer** — the same agent architecture extended to LED strips, mega trees, pixel matrices, and outlines. The `DisplayRenderer` is already in development: `GroupPlanSet → CompositionEngine → RenderPlan → XSQWriter`. Same AgentSpec pattern, same iteration loop, different template domain. The planner selects from group-specific effect templates (`effect_map.py`) instead of moving head geometry templates, but the categorical vocabulary and rendering pipeline are shared.
@@ -147,20 +118,11 @@ The moving head pipeline is the foundation. Here's what's being built on top of 
 
 **Template Library Expansion** — the current library has 21 builtin moving head templates covering fans, sweeps, pendulums, circles, cascades, and waves. The target is 40+ with broader coverage of formation types, movement combinations, and energy profiles. More templates means more creative variety, and the categorical system makes them safe to add — the LLM picks from the catalog, the renderer handles the math, and invalid combinations are caught by heuristic validation before the judge ever runs.
 
-<!-- ILLUSTRATION: ILL-07-02 — Roadmap / lessons pipeline illustration. See ILLUSTRATION_INDEX.md for full spec. -->
-![Lessons Roadmap (Illustrated, not Mermaid)](assets/illustrations/07_roadmap.png)
-
-<details>
-<summary>Diagram: Roadmap (click to expand if diagram doesn't render)</summary>
-
-![Roadmap](assets/diagrams/07_roadmap.png)
-
-</details>
+![Lessons Roadmap](assets/illustrations/07_roadmap.png)
 
 ---
 
 ## The Honest Summary
-
 We set out to answer one question: can an LLM choreograph a Christmas light show? The answer, after months of building, is *yes, but only if you don't let it do the hard parts.*
 
 An LLM can't calculate pan angles. It can't interpolate DMX curves. It can't maintain millisecond timing precision. It will confidently output `beat_frac: 0.33` when it has no idea what that means.

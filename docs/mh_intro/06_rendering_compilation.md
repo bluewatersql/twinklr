@@ -5,11 +5,9 @@ part: 6
 tags: [ai, llm, python, christmas-lights, xlights, rendering, dmx, curves, templates]
 ---
 
-![Twinklr](../assets/twinklr_logo_colorful_light_mode.png)
+![Twinklr](../assets/twinklr_logo_light_mode.png)
 
 # From Plan to Pixels — Rendering & Compilation
-
-<!-- ILLUSTRATION: ILL-06-00 — Blog header banner: moving-head curves + DMX lanes + beat ticks. See ILLUSTRATION_INDEX.md for full spec. -->
 ![Curves, Not Guesswork](assets/illustrations/06_banner.png)
 
 The LLM has done its job: "fan_pulse template, MED intensity, PHRASE duration, starting at bar 5 beat 1, on the LEFT group." Beautiful. Concise. Categorical. Now the renderer takes over, and this side of the system has zero LLM involvement. It's geometry, curve math, timing, and DMX channel values — all deterministic, all precise, all reproducible. Same plan in, same lights out, every time.
@@ -18,41 +16,7 @@ This is the part where the architecture principle from Part 0 earns its keep. Th
 
 ---
 
-## System Snapshot
-
-**Purpose:** _(1–2 sentences: what this stage produces and why it exists.)_
-
-**Inputs**
-- _(e.g., raw audio file, metadata, prior stage outputs)_
-
-**Outputs**
-- _(e.g., BeatGrid, SectionMap, AudioProfile, GroupPlanSet, RenderPlan)_
-
-**LLM vs Deterministic**
-- **LLM does:** _(categorical intent / choices / summaries)_  
-- **Code does:** _(math, snapping, curves, exports, validation)_
-
-**Key invariants**
-- _(3–5 invariants that must always hold; treat as contracts)_
-
-**Telemetry to watch**
-- _(success rate, avg runtime, token/cost, top failure modes)_
-
-
-## Repo Anchors
-
-**Key modules**
-- `twinklr/...` _(add canonical paths for the main code in this part)_
-
-**Key models**
-- _(Pydantic models / schemas that define the contracts)_
-
-**Key tests / tools**
-- _(validators, golden tests, regression fixtures, debug utilities)_
-
-
 ## What a Template Actually Is
-
 A template is a complete choreography unit — geometry, movement, dimmer — defined in Python. Here's `fan_pulse` from the builtins:
 
 ```python
@@ -94,8 +58,7 @@ def make_template() -> TemplateDoc:
     )
 ```
 
-<!-- ILLUSTRATION: ILL-06-02 — Front view of 8 moving heads in a symmetric fan formation, beams at graduated angles (-60° to +60°), with angle labels. Shows geometry as math: pan_angle = f(position, fixture_count). See ILLUSTRATION_INDEX.md for full spec. -->
-![Compilation Pipeline (Already-Rendered Reference)](assets/illustrations/06_compilation_pipeline.png)
+![Compilation Pipeline](assets/illustrations/06_compilation_pipeline.png)
 
 Every template has the same anatomy:
 
@@ -111,13 +74,11 @@ The planner picks `template_id` + `preset_id`. A single template can have multip
 ---
 
 ## The Compilation Pipeline
-
 ## Hero Walkthrough: One Template → Rendered Curves (What You’d Actually See)
 
 This is the “make it real” bridge: one phrase-level template becomes **smooth moving-head motion + dimmer choreography** that reads from the street.
 
-<!-- ILLUSTRATION: ILL-06-04 — Hero diagram: beat timeline + template card → pan/tilt/dimmer curves (with easing), plus a night scene showing beams following those curves. See ILLUSTRATION_INDEX.md for full spec. -->
-![Hero: Template Card → Pan/Tilt/Dimmer Curves → Street View](assets/illustrations/06_hero_template_to_curves.png)
+![Pan/Tilt/Dimmer Curves → Street View](assets/illustrations/06_hero_template_to_curves.png)
 
 **What to notice**
 - The template is **categorical** (PHRASE / MED / fan_pulse), not numeric micromanagement.
@@ -126,16 +87,7 @@ This is the “make it real” bridge: one phrase-level template becomes **smoot
 
 
 Here's what happens when the renderer processes a plan:
-
-<!-- ILLUSTRATION: ILL-06-03 — Rendering & compilation pipeline illustration (plan → curves → export). See ILLUSTRATION_INDEX.md for full spec. -->
-![Rendering & Compilation Pipeline (Illustrated, not Mermaid)](assets/illustrations/06_rendering_pipeline_overview.png)
-
-<details>
-<summary>Diagram: Compilation Pipeline (click to expand if diagram doesn't render)</summary>
-
-![Compilation Pipeline](assets/diagrams/06_compilation_pipeline.png)
-
-</details>
+![Rendering & Compilation Pipeline](assets/illustrations/06_rendering_pipeline_overview.png)
 
 The `compile_template` function orchestrates this from `template_compiler.py`. The interesting stages:
 
@@ -151,7 +103,6 @@ Each handler produces a `ChannelValue` — either a static DMX byte or a normali
 ---
 
 ## Phase Offsets: Making Lights Chase
-
 This is one of the most visually satisfying concepts in the system. A phase offset means different fixtures start the same animation at slightly different times — creating a wave or chase effect.
 
 ```python
@@ -180,7 +131,6 @@ Offset:      0.0    0.33    0.67    1.0   (bars)
     The audience sees a pulse rippling left to right.
 ```
 
-<!-- ILLUSTRATION: ILL-06-01 — 4 moving heads with staggered brightness pulses: a left-to-right chase effect shown across multiple time frames, light rippling across fixtures. See ILLUSTRATION_INDEX.md for full spec. -->
 ![Phase Offsets (Chase Motion)](assets/illustrations/06_phase_offsets.png)
 
 The same template + different `PhaseOffset` configs produce all variants: left-to-right, right-to-left, outside-in, inside-out. One template definition, multiple visual effects through timing alone.
@@ -192,7 +142,6 @@ Key consequence: fixtures with different phase offsets have different curves, so
 ---
 
 ## Curves: Why xLights Builtins Aren't Enough
-
 xLights has built-in curve types — sine, ramp, ease-in-out. We use them where they fit. But three requirements forced us to build custom curve generation:
 
 **Offset-centered movement curves.** Pan and tilt curves center around 0.5 (representing the geometry's base position), not 0.0. A SWEEP from -30° to +30° is values oscillating around 0.5, where the amplitude maps to degrees. xLights' built-in curves are 0-to-1 linear, not center-offset.
@@ -215,7 +164,6 @@ dmx = base_dmx + amplitude_dmx * (v - 0.5)
 ---
 
 ## ChannelValue: The Dual Representation
-
 Every channel in every segment is either a static DMX byte or a curve:
 
 ```
@@ -236,7 +184,6 @@ A fixture that's holding a fan position but pulsing its dimmer has static pan/ti
 ---
 
 ## Transitions: Different Channels, Different Strategies
-
 At section boundaries — where one template ends and the next begins — the `ChannelBlender` handles transitions per channel type:
 
 | Channel | Strategy | Why |
@@ -261,7 +208,6 @@ The `SMOOTH_INTERPOLATION` for pan/tilt uses the curve generator to produce ease
 ---
 
 ## xLights Export: The Final Translation
-
 The `DmxSettingsBuilder` converts `FixtureSegment` objects into xLights-format DMX settings strings:
 
 ```
@@ -280,7 +226,6 @@ The export also handles per-fixture channel inversion (some fixtures wire DMX ba
 ---
 
 ## The Full Stack, One Last Time
-
 Starting from "fan_pulse, MED, PHRASE, bar 5 beat 1":
 
 1. **Template load**: `fan_pulse` → FAN geometry + HOLD movement + PULSE dimmer
