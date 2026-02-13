@@ -36,7 +36,6 @@ CLAUDE.md
 .claude/
 
 # IDEs
-.vscode/settings.json
 .idea/
 *.swp
 *.swo
