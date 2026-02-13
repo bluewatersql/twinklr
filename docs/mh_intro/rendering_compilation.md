@@ -116,20 +116,7 @@ def calculate_fixture_offsets(
 
 Concrete example: 4 fixtures with LEFT_TO_RIGHT chase order and `spread_bars=1.0`:
 
-```
-Fixture:     [1]     [2]     [3]     [4]
-Offset:      0.0    0.33    0.67    1.0   (bars)
-
-    Time →
-    ┌─────┐
-[1] ██████░░░░░░░░░░░░░░   ← starts immediately
-[2] ░░░██████░░░░░░░░░░░   ← starts +0.33 bars later
-[3] ░░░░░░██████░░░░░░░░   ← starts +0.67 bars later
-[4] ░░░░░░░░░██████░░░░░   ← starts +1.0 bar later
-
-    Same animation on all fixtures, just staggered in time.
-    The audience sees a pulse rippling left to right.
-```
+![Phase Offset Chase Visualization](assets/illustrations/06_phase_offset_diagram.png)
 
 ![Phase Offsets (Chase Motion)](assets/illustrations/06_phase_offsets.png)
 
@@ -166,18 +153,7 @@ dmx = base_dmx + amplitude_dmx * (v - 0.5)
 ## ChannelValue: The Dual Representation
 Every channel in every segment is either a static DMX byte or a curve:
 
-```
-ChannelValue:
-  ├── Static: fixed DMX value (0-255)
-  │   Example: tilt angle = 180 (pointing down)
-  │
-  └── Curve: normalized 0-1 points, mapped differently per channel:
-      ├── Pan/Tilt (offset-centered):
-      │   dmx = base_dmx + amplitude * (v - 0.5)
-      │
-      └── Dimmer (linear):
-          dmx = clamp_min + v * (clamp_max - clamp_min)
-```
+![ChannelValue Dual Representation](assets/illustrations/06_channel_value_tree.png)
 
 A fixture that's holding a fan position but pulsing its dimmer has static pan/tilt channels and a curve dimmer channel. A fixture that's sweeping while pulsing has curves on pan, tilt, *and* dimmer. The compiler decides based on the template's movement and dimmer types.
 
@@ -186,12 +162,7 @@ A fixture that's holding a fan position but pulsing its dimmer has static pan/ti
 ## Transitions: Different Channels, Different Strategies
 At section boundaries — where one template ends and the next begins — the `ChannelBlender` handles transitions per channel type:
 
-| Channel | Strategy | Why |
-|---|---|---|
-| **Pan/Tilt** | `SMOOTH_INTERPOLATION` | Don't jerk the servo. Interpolate smoothly between positions. |
-| **Dimmer** | `FADE_VIA_BLACK` | Dim to 0, switch geometry, dim back up. Hides the position change. |
-| **Gobo/Color** | `SNAP` | Instant change. You can't crossfade a mechanical gobo wheel. |
-| **Shutter** | `SEQUENCE` | Close, hold, open. Timed sequence for clean shutter cuts. |
+![Per-Channel Transition Strategies](assets/illustrations/06_tbl_transitions.png)
 
 ```python
 # FADE_VIA_BLACK: the workhorse transition for dimmer

@@ -17,12 +17,7 @@ In our first 50 planning runs, 38% of judge failures came from numeric precision
 ## The Evidence
 We keep analytics on every judge verdict. When we sorted the failure patterns, a clear picture emerged:
 
-| Issue Type | Frequency | Root Cause |
-|---|---|---|
-| `LAYERING_*` | Very High | Numeric intensity: RHYTHM at 1.12 vs ACCENT at 1.18 — "too close" |
-| `TIMING_MIXED_SNAP_RULES` | High | `snap_rule: BEAT` when `timing_driver: BARS` requires `BAR` |
-| `ACCENT_INTENSITY_*` | High | Values exceeding lane-specific thresholds by 0.05–0.10 |
-| `TIMING_BOUNDARY_TOUCH` | Medium | Sub-beat precision: `beat_frac: 0.33` when it should be `0.0` |
+![Issue Type Frequencies Before the Categorical Pivot](assets/illustrations/04_tbl_issue_types.png)
 
 Here's what a concrete failure looked like. The planner would generate:
 
@@ -196,13 +191,7 @@ The prompt went from rules the LLM had to memorize and apply to vocabulary the L
 ---
 
 ## Results
-| Metric | Before | After |
-|---|---|---|
-| LAYERING_* issues per run | ~8-12 | 0 (automatic) |
-| TIMING_MIXED_SNAP_* issues | ~5-8 | 0 (eliminated) |
-| INTENSITY_* threshold issues | ~3-5 | 0 (categorical) |
-| Prompt instruction lines | ~150 | ~80 |
-| Validator rules | ~25 | ~15 |
+![Before / After Results](assets/illustrations/04_tbl_results.png)
 
 The first-iteration approval rate jumped. Plans that would have taken 2-3 iterations to pass now approved on the first try — not because the LLM got smarter, but because we stopped asking it to do the wrong job.
 

@@ -44,12 +44,7 @@ Adding a new agent means creating a new spec and a prompt pack directory. No sub
 
 Here's what the planner and judge look like side-by-side:
 
-| Property | Planner | Judge |
-|---|---|---|
-| **Mode** | `CONVERSATIONAL` (keeps history) | `ONESHOT` (fresh each time) |
-| **Model** | gpt-5.2 | gpt-5-mini |
-| **Temperature** | 0.7 (creative) | 0.3 (precise) |
-| **Purpose** | Generate choreography plan | Score and critique plan |
+![Planner vs. Judge Properties](assets/illustrations/03_tbl_agent_properties.png)
 
 The planner is conversational because refinement works better when the LLM remembers what it tried last time. The judge is oneshot because each evaluation should be independent — you don't want the judge anchoring to its previous score.
 
@@ -141,13 +136,7 @@ The judge returns a `JudgeVerdict` with a score (0–10), structured issues with
 
 > **Decision Point:** Heuristic validation before the LLM judge — catching structural failures cheaply before spending tokens on semantic evaluation. In practice, about 15% of first-iteration plans fail heuristics. That's 15% of judge calls saved, and the feedback is more actionable because it's precise ("template not found") rather than narrative ("the template choice doesn't seem right").
 
-| | Heuristic Validator | LLM Judge |
-|---|---|---|
-| **Cost** | Zero (pure Python) | ~$0.02-0.05 per call |
-| **Speed** | < 10ms | 3-8 seconds |
-| **Catches** | Structural errors: missing templates, overlaps, out-of-bounds | Semantic issues: appropriateness, coherence, thematic consistency |
-| **Feedback** | Exact error codes with fix hints | Scored issues with acceptance tests |
-| **Runs when** | Every iteration | Only after heuristics pass |
+![Heuristic Validator vs. LLM Judge](assets/illustrations/03_tbl_validation_tiers.png)
 
 ---
 

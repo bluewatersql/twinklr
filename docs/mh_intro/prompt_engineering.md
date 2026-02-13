@@ -19,14 +19,7 @@ Here's how we solved it, and a few things we tried that didn't work.
 ## The Prompt Pack Architecture
 Every agent in the system has a prompt pack: a directory of Jinja2 templates plus metadata.
 
-```
-prompts/planner/
-├── system.j2             # Role, rules, energy-based recipes
-├── developer.j2          # Hard constraints, schema, enum values
-├── user.j2               # Task context (first iteration)
-├── user_refinement.j2    # Feedback context (iteration 2+)
-└── examples.jsonl        # Optional few-shot examples
-```
+![Prompt Pack Directory Structure](assets/illustrations/05_prompt_pack_tree.png)
 
 Each file is a separate concern:
 - **system.j2** — who the agent *is*. Role definition, creative principles, domain recipes ("for HIGH energy sections, use 3-lane configuration with PEAK accents"). Changes when you want the agent to think differently.

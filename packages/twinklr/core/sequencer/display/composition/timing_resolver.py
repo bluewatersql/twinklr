@@ -37,25 +37,33 @@ class TimingResolver:
     def __init__(self, beat_grid: BeatGrid) -> None:
         self._beat_grid = beat_grid
 
-    def resolve_start_ms(self, time_ref: PlanningTimeRef) -> int:
+    def resolve_start_ms(
+        self,
+        time_ref: PlanningTimeRef,
+        section_start_bar: int = 0,
+    ) -> int:
         """Resolve a PlanningTimeRef to start time in milliseconds.
 
-        PlanningTimeRef uses 1-indexed bar/beat. BeatGrid uses 0-indexed.
-        bar=1, beat=1 → first beat of first bar.
+        PlanningTimeRef uses 1-indexed, section-relative bar/beat.
+        ``section_start_bar`` anchors the reference to a song position
+        so that *bar=1, beat=1* resolves to the section's first beat,
+        not the song's first beat.
 
         Args:
-            time_ref: Planning time reference (bar + beat).
+            time_ref: Planning time reference (bar + beat, 1-indexed).
+            section_start_bar: 0-indexed bar in the song where this
+                section begins (from the section bar map).
 
         Returns:
             Start time in milliseconds, snapped to 20ms grid.
         """
-        # Convert 1-indexed to 0-indexed
-        bar_0 = time_ref.bar - 1
+        # Section-relative bar → song-absolute bar (0-indexed)
+        song_bar_0 = (time_ref.bar - 1) + section_start_bar
         beat_within_bar = time_ref.beat - 1
 
         # Calculate absolute beat index
         beats_per_bar = self._beat_grid.beats_per_bar
-        absolute_beat = (bar_0 * beats_per_bar) + beat_within_bar
+        absolute_beat = (song_bar_0 * beats_per_bar) + beat_within_bar
 
         # Clamp to available beats
         max_beat = len(self._beat_grid.beat_boundaries) - 1

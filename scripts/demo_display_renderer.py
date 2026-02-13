@@ -414,8 +414,11 @@ def main() -> None:
     tempo_bpm = audio["tempo_bpm"]
     duration_ms = float(audio["duration_ms"])
 
-    # 3. Populate section timing on the plan from audio profile
-    plan_set = populate_section_timing(plan_set, audio["sections"])
+    # 3. Build section boundaries for the renderer (BeatGrid timing authority)
+    section_boundaries: list[tuple[str, int, int]] = [
+        (sec["section_id"], sec["start_ms"], sec["end_ms"])
+        for sec in audio["sections"]
+    ]
 
     # 4. Optional: Load asset catalog and resolve plan assets
     catalog_index: dict[str, object] | None = None
@@ -458,6 +461,7 @@ def main() -> None:
         sequence,
         asset_base_path=args.asset_base_path,
         catalog_index=catalog_index,
+        section_boundaries=section_boundaries,
     )
 
     # 8. Print summary

@@ -226,6 +226,9 @@ class DisplayRenderStage:
                     ),
                 )
 
+            # Extract section boundaries from macro plan (audio-sourced timing)
+            section_boundaries = self._extract_section_boundaries(context)
+
             # Create renderer and render
             renderer = DisplayRenderer(
                 beat_grid=beat_grid,
@@ -237,6 +240,7 @@ class DisplayRenderStage:
                 sequence=sequence,
                 asset_base_path=asset_base_path,
                 catalog_index=catalog_index,
+                section_boundaries=section_boundaries,
             )
 
             # Track metrics
@@ -260,6 +264,45 @@ class DisplayRenderStage:
             logger.exception("Display rendering failed", exc_info=e)
             return failure_result(str(e), stage_name=self.name)
 
+
+    @staticmethod
+    def _extract_section_boundaries(
+        context: PipelineContext,
+    ) -> list[tuple[str, int, int]] | None:
+        """Extract section boundaries from the macro plan in context.
+
+        The macro plan (stored by ``MacroPlannerStage``) contains
+        ``SongSectionRef`` objects with audio-sourced ``start_ms`` /
+        ``end_ms`` values.  These are transformed into the simple
+        tuple format the ``CompositionEngine`` expects.
+
+        Args:
+            context: Pipeline context.
+
+        Returns:
+            List of ``(section_id, start_ms, end_ms)`` tuples, or
+            None if no macro plan is available.
+        """
+        macro_plan = context.get_state("macro_plan")
+        if macro_plan is None:
+            logger.warning(
+                "No macro_plan in context — section boundaries unavailable; "
+                "all effects will render from song start"
+            )
+            return None
+
+        boundaries: list[tuple[str, int, int]] = []
+        for sp in macro_plan.section_plans:
+            sec = sp.section
+            boundaries.append(
+                (sec.section_id, sec.start_ms, sec.end_ms)
+            )
+
+        logger.info(
+            "Extracted %d section boundaries from macro plan",
+            len(boundaries),
+        )
+        return boundaries
 
     @staticmethod
     def _build_beat_grid_from_context(context: PipelineContext) -> BeatGrid | None:

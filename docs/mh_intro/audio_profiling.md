@@ -41,14 +41,7 @@ def shape_context(bundle: SongBundle) -> dict[str, Any]:
 
 Here's what survives the cut and what doesn't:
 
-| Category | What's Kept | What's Dropped | Why |
-|---|---|---|---|
-| **Metadata** | Tempo, key, duration | Raw waveform, spectrograms | LLM needs the *what*, not the *how* |
-| **Sections** | Canonical IDs, type, start/end ms, confidence | Frame-level segmentation data | Boundaries matter, internals don't |
-| **Energy** | 8 sampled points per section, mean/peak, characteristics | Hundreds of per-frame RMS values | Shape preserved, noise removed |
-| **Lyrics** | `has_plain_lyrics`, `has_timed_words`, confidence | Full lyric text, word timings | The audio profiler doesn't read lyrics — that's a different agent |
-| **Harmonic** | Key, mode | Full chroma vectors, pitch curves | Key context is enough for mood |
-| **Spectral** | Nothing | Centroid, flatness, brightness | Profiler doesn't need timbral detail |
+![Context Compression — What Survives the Cut](assets/illustrations/02_tbl_context_compression.png)
 
 The energy compression is the most interesting part. Hundreds of data points per section get reduced to exactly 8 via uniform sampling:
 
@@ -100,24 +93,7 @@ Simple threshold logic. No ML. The labels give the LLM quick handles — "this s
 ## The Audio Profiling Agent
 The compressed context goes to a single-shot LLM call that produces an `AudioProfileModel`. Here's what comes out:
 
-```
-AudioProfileModel
-├── song_identity          # title, artist, BPM, key, time signature
-├── structure              # section refs with canonical IDs, confidence
-├── energy_profile
-│   ├── macro_energy       # LOW / MED / HIGH / DYNAMIC
-│   ├── section_profiles   # per-section: curve, mean, peak, characteristics
-│   └── peaks              # top energy moments (up to 10)
-├── creative_guidance
-│   ├── recommended_layer_count   # 1-3 choreography layers
-│   ├── recommended_contrast      # LOW / MED / HIGH
-│   ├── recommended_motion_density # SPARSE / MED / BUSY
-│   └── palette_color_guidance    # color suggestions
-└── planner_hints
-    ├── section_objectives  # per-section choreography goals
-    ├── avoid_patterns      # what NOT to do
-    └── emphasize_groups    # fixture groups to highlight
-```
+![AudioProfileModel Structure](assets/illustrations/02_audio_profile_model_tree.png)
 
 The `planner_hints` section is where the real value lives. This is the LLM adding interpretation that no amount of signal processing can provide. "Section verse_1 has an unusual mid-section spike at 13.8s (0.87 peak) before dropping back — use this as a surprise accent moment, not a sustained build" is the kind of observation that requires understanding *how music works*, not just what the numbers say.
 

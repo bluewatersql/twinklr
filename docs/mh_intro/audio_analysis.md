@@ -52,15 +52,7 @@ The audio file goes through parallel analysis across seven feature domains. It s
 
 Here's what comes out the other end:
 
-| Domain | What It Extracts | Why It Matters |
-|---|---|---|
-| **Rhythm** | Tempo, beats, downbeats, time signature | Builds the BeatGrid — everything aligns to this |
-| **Energy** | RMS at 3 temporal scales, build/drop events | Tells the profiler *how intense* each moment is |
-| **Spectral** | Centroid, flatness, brightness, motion | Vocal detection, timbral character |
-| **Harmonic** | Key, mode, chroma, chords, pitch | Section detection, tension analysis |
-| **Structure** | Section boundaries, labels, confidence | The map every downstream stage plans against |
-| **Tension** | Composite curve (harmony + energy + onsets) | Creative arc decisions in profiling |
-| **Timeline** | Frame-aligned unified features | Dense per-frame data for downstream consumers |
+![Seven Audio Feature Domains](assets/illustrations/01_tbl_feature_domains.png)
 
 The complete output is a `SongBundle` — about 100KB of structured JSON for a typical three-minute song. Every field deterministic. Same MP3 in, same bundle out, every time.
 
@@ -146,16 +138,7 @@ def generate_section_ids(sections: list[dict[str, Any]]) -> list[str]:
 
 For a typical Christmas song:
 
-| Section ID | Type | Start | End | Confidence |
-|---|---|---|---|---|
-| `intro` | intro | 0.0s | 8.2s | 0.72 |
-| `verse_1` | verse | 8.2s | 32.5s | 0.85 |
-| `chorus_1` | chorus | 32.5s | 56.8s | 0.91 |
-| `verse_2` | verse | 56.8s | 80.1s | 0.83 |
-| `chorus_2` | chorus | 80.1s | 104.4s | 0.89 |
-| `bridge` | bridge | 104.4s | 120.7s | 0.68 |
-| `chorus_3` | chorus | 120.7s | 152.0s | 0.88 |
-| `outro` | outro | 152.0s | 168.3s | 0.65 |
+![Section ID Examples](assets/illustrations/01_tbl_section_ids.png)
 
 Thirty lines of code. Prevents an absurd number of bugs.
 
@@ -168,13 +151,7 @@ Lyrics matter for choreography — the planner can time a warm red glow to "Rudo
 
 > **Decision Point:** No single lyrics source is reliable for the Christmas music catalog. Embedded tags are often missing. LRCLib has good synced lyrics but gaps in coverage. Genius has great text but no timing. WhisperX can transcribe but struggles with singing vs. speech. We built a five-stage fallback chain: each source tried in order, each result quality-scored before acceptance.
 
-| Stage | Source | What You Get | Speed | Triggers When... |
-|---|---|---|---|---|
-| 1 | Embedded (LRC/SYLT/USLT) | Synced lyrics | Instant | Always tried first |
-| 2 | LRCLib API | Synced lyrics | ~200ms | Embedded is empty |
-| 3 | Genius API | Text only (no timing) | ~500ms | LRCLib has no match |
-| 4 | WhisperX Align | Timed words | ~10s | Genius has text, we need timing |
-| 5 | WhisperX Transcribe | Full transcription | 30s+ | Everything else failed |
+![Lyrics Fallback Pipeline](assets/illustrations/01_tbl_lyrics_fallback.png)
 
 Each stage only fires if the previous one missed. You don't run a 30-second WhisperX transcription if LRCLib already had synced lyrics sitting there.
 

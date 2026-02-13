@@ -120,6 +120,7 @@ class DisplayRenderer:
         sequence: XSequence,
         asset_base_path: Path | None = None,
         catalog_index: dict[str, object] | None = None,
+        section_boundaries: list[tuple[str, int, int]] | None = None,
     ) -> RenderResult:
         """Render a GroupPlanSet into an XSequence.
 
@@ -140,6 +141,10 @@ class DisplayRenderer:
                 ``AssetCatalog.build_index()``. When provided, placements
                 with ``resolved_asset_ids`` produce dual-layer output
                 (procedural + Pictures overlay).
+            section_boundaries: List of ``(section_id, start_ms, end_ms)``
+                tuples from the audio profile / macro plan.  Anchors
+                section-relative bar/beat references to absolute song
+                positions via the BeatGrid.
 
         Returns:
             RenderResult with the plan, statistics, and diagnostics.
@@ -156,6 +161,7 @@ class DisplayRenderer:
             beat_grid=self._beat_grid,
             display_graph=self._display_graph,
             palette_resolver=self._palette_resolver,
+            section_boundaries=section_boundaries,
             config=composition_config,
             catalog_index=catalog_index,
         )

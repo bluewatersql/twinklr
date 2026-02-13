@@ -22,14 +22,7 @@ This is the retrospective. Not the polished "and then we solved it" version — 
 
 Some of these feel obvious in hindsight. None of them were obvious at the time.
 
-| Principle | Impact | Part |
-|---|---|---|
-| LLM plans intent, renderer implements precision | Foundation of everything | All |
-| Categorical over numeric | ~60% fewer validation failures | 4 |
-| Two-tier validation (heuristic + LLM judge) | Saved 15% of judge token costs | 3 |
-| Schema auto-injection | Eliminated schema drift bugs entirely | 5 |
-| 10x context compression | Better output quality, not just cheaper | 2 |
-| AgentSpec pattern | New agents in hours, not days | 3 |
+![What Worked — Key Principles and Impact](assets/illustrations/07_tbl_what_worked.png)
 
 The biggest one: **the boundary between AI and determinism is an architectural decision, not an implementation detail.** Get it wrong and you spend your time building guardrails around an LLM that keeps trying to do math. Get it right and each side does what it's naturally good at.
 
@@ -70,14 +63,7 @@ The structured version — here are 3 blocking errors, here are 2 warnings, here
 ## Where AI Helps vs. Where Determinism Wins
 Seven parts in, here's the explicit split:
 
-| AI Excels At | Determinism Excels At |
-|---|---|
-| Interpreting musical feel | Precise DMX calculations |
-| Selecting templates for mood | Timing to millisecond accuracy |
-| Choosing energy and intensity arcs | Curve math and interpolation |
-| Narrative and thematic reasoning | Phase offset geometry |
-| Creative variety and surprise | File format compliance |
-| Evaluating semantic quality | Structural validation |
+![AI Excels At vs. Determinism Excels At](assets/illustrations/07_tbl_ai_vs_determinism.png)
 
 The middle column is the interesting one — the handoff point. The LLM says `STRONG`. The renderer turns that into 0.95 for RHYTHM lane or 1.10 for ACCENT lane, guaranteed to maintain layer hierarchy. The LLM says `PHRASE`. The renderer calculates 8-16 beats, clamps to section boundaries, handles remainders. The LLM says `fan_pulse`. The renderer computes eight unique pan angles, applies phase offsets, generates DMX curves.
 

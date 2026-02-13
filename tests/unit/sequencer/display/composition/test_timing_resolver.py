@@ -124,3 +124,66 @@ class TestTimingResolver:
         # which are already on the 20ms grid
         ms = resolver.resolve_start_ms(PlanningTimeRef(bar=1, beat=1))
         assert ms % 20 == 0
+
+
+class TestTimingResolverSectionOffset:
+    """Tests for section-relative bar/beat resolution."""
+
+    def test_bar1_beat1_with_zero_offset(self) -> None:
+        """section_start_bar=0 gives same result as no offset."""
+        grid = _make_beat_grid()  # 120 BPM, 2000ms/bar
+        resolver = TimingResolver(grid)
+        ms = resolver.resolve_start_ms(
+            PlanningTimeRef(bar=1, beat=1), section_start_bar=0
+        )
+        assert ms == 0
+
+    def test_bar1_beat1_offset_to_bar4(self) -> None:
+        """bar=1 in a section starting at song-bar 4 → 8000ms."""
+        grid = _make_beat_grid()  # 120 BPM, 2000ms/bar
+        resolver = TimingResolver(grid)
+        # Song bar 4 starts at 4 * 2000 = 8000ms
+        ms = resolver.resolve_start_ms(
+            PlanningTimeRef(bar=1, beat=1), section_start_bar=4
+        )
+        assert ms == 8000
+
+    def test_bar3_beat2_with_section_offset(self) -> None:
+        """Section-relative bar=3, beat=2 with offset."""
+        grid = _make_beat_grid()  # 120 BPM, 500ms/beat, 2000ms/bar
+        resolver = TimingResolver(grid)
+        # Section starts at song-bar 2 (4000ms)
+        # bar=3 → song-bar 4, beat=2 → +500ms = 8000 + 500 = 8500
+        ms = resolver.resolve_start_ms(
+            PlanningTimeRef(bar=3, beat=2), section_start_bar=2
+        )
+        assert ms == 8500
+
+    def test_section_offset_clamps_to_max_beat(self) -> None:
+        """Large offset clamps to last available beat."""
+        grid = _make_beat_grid(num_bars=4)  # 4 bars = 16 beats
+        resolver = TimingResolver(grid)
+        # bar=1 + offset=100 → song-bar 100 → way past 4 bars
+        ms = resolver.resolve_start_ms(
+            PlanningTimeRef(bar=1, beat=1), section_start_bar=100
+        )
+        # Clamped to last beat time, snapped to 20ms grid
+        assert ms == resolver.snap(grid.beat_boundaries[-1])
+
+    def test_section_offset_with_section_end(self) -> None:
+        """SECTION duration respects section_end_ms from bar map."""
+        grid = _make_beat_grid()  # 120 BPM, 2000ms/bar
+        resolver = TimingResolver(grid)
+        # Section starts at song-bar 4 (8000ms)
+        start_ms = resolver.resolve_start_ms(
+            PlanningTimeRef(bar=1, beat=1), section_start_bar=4
+        )
+        assert start_ms == 8000
+
+        # Section ends at 16000ms (bar 8)
+        end_ms = resolver.resolve_end_ms(
+            start_ms=start_ms,
+            duration=EffectDuration.SECTION,
+            section_end_ms=16000,
+        )
+        assert end_ms == 16000

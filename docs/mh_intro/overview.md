@@ -78,14 +78,7 @@ Here's where it gets interesting — the LLM only touches two of these five stag
 
 The critical pattern: **the LLM never sees a DMX value, a pan angle, or a curve equation.** It works in the language of template names, intensity levels, and musical sections. The renderer translates intent into math.
 
-| LLM's Job (Creative Intent) | Deterministic Code (Precise Implementation) |
-|---|---|
-| Interpret musical energy and mood | Extract tempo, beats, energy curves from audio |
-| Select choreography template per section | Calculate exact pan/tilt angles per fixture |
-| Choose intensity: `STRONG` for the chorus | Map `STRONG` → numeric values per channel lane |
-| Pick formations: fan at the verse, chevron at the drop | Compute phase offsets for chase effects |
-| Evaluate plan quality, suggest revisions | Generate beat-aligned dimmer curves |
-| Reason about narrative and thematic arc | Export to xLights `.xsq` format |
+![Pipeline Table](assets/illustrations/00_pipeline_steps_table.png)
 
 ---
 

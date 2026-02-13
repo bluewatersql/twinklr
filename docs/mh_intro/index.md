@@ -16,16 +16,7 @@ The series follows the full pipeline: from raw audio analysis through LLM-based 
 
 ## Series Contents
 
-| Part | Title | Summary |
-|:----:|-------|---------|
-| 0 | [An LLM xLights Choreographer?](overview.md) | The problem space, why naive LLM approaches fail, and the architecture that makes it work — LLM plans intent, deterministic code implements it. |
-| 1 | [Hearing the Music — Audio Analysis & Feature Extraction](audio_analysis.md) | Deterministic audio analysis: BeatGrid timing, seven feature domains, multi-scale energy, genre-aware section detection, and a 5-stage lyrics fallback pipeline. |
-| 2 | [Making Sense of Sound — LLM-Based Audio & Lyric Profiling](audio_profiling.md) | Compressing ~100KB of features to ~10KB for the LLM. Context shaping, anti-generic prompting, and why audio and lyrics need separate agents. |
-| 3 | [The Choreographer — Multi-Agent Planning System](multi_agent_planning.md) | The planner-judge loop: data-driven agent specs, heuristic validation before LLM evaluation, conversational refinement, and structured feedback. |
-| 4 | [The Categorical Pivot](categorical_planning.md) | The most consequential design change — replacing numeric outputs with categorical vocabularies (`IntensityLevel`, `EffectDuration`, `PlanningTimeRef`) to eliminate 38% of judge failures. |
-| 5 | [Prompt Engineering — Schema Injection, Taxonomy, and Anti-Patterns](prompt_engineering.md) | Prompt packs, Jinja2 templates, auto-injected Pydantic schemas, taxonomy injection, and the schema repair loop. Plus what didn't work. |
-| 6 | [From Plan to Pixels — Rendering & Compilation](rendering_compilation.md) | Template anatomy, the compilation pipeline, phase offsets for chase effects, custom curve generation, per-channel transitions, and xLights export. |
-| 7 | [Lessons Learned & What's Next](lessons_learned.md) | Retrospective: what worked, what surprised us, what we'd change, and the roadmap ahead. |
+![Series Contents](assets/illustrations/00_tbl_series_contents.png)
 
 ---
 

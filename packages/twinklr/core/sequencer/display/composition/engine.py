@@ -20,6 +20,10 @@ from twinklr.core.sequencer.display.composition.layer_allocator import (
 from twinklr.core.sequencer.display.composition.palette_resolver import (
     PaletteResolver,
 )
+from twinklr.core.sequencer.display.composition.section_map import (
+    SectionBarRange,
+    build_section_bar_map,
+)
 from twinklr.core.sequencer.display.composition.target_resolver import (
     TargetResolver,
 )
@@ -103,14 +107,23 @@ class CompositionEngine:
     concrete timing, target elements, layer indices, palettes, and
     effect types.
 
+    Section-relative bar/beat references from the LLM planners are
+    anchored to absolute song positions via the ``section_boundaries``
+    parameter and the BeatGrid.  The BeatGrid is the sole timing
+    authority — all ms values are derived from it.
+
     When an optional ``catalog_index`` is provided, placements with
     ``resolved_asset_ids`` produce dual-layer output: a procedural
     effect on the base layer and a Pictures overlay on the layer above.
 
     Args:
-        beat_grid: Musical timing grid.
+        beat_grid: Musical timing grid (source of truth for all timing).
         display_graph: Display topology.
         palette_resolver: Resolves PaletteRef → ResolvedPalette.
+        section_boundaries: List of ``(section_id, start_ms, end_ms)``
+            tuples from the audio profile / macro plan.  Used to build
+            a section-to-bar mapping so section-relative bar/beat
+            references resolve to the correct song position.
         config: Composition configuration.
         catalog_index: Optional mapping of asset_id → CatalogEntry
             for resolving asset file paths during overlay rendering.
@@ -121,6 +134,7 @@ class CompositionEngine:
         beat_grid: BeatGrid,
         display_graph: DisplayGraph,
         palette_resolver: PaletteResolver,
+        section_boundaries: list[tuple[str, int, int]] | None = None,
         config: CompositionConfig | None = None,
         catalog_index: dict[str, object] | None = None,
     ) -> None:
@@ -133,6 +147,12 @@ class CompositionEngine:
         self._catalog_index: dict[str, object] = catalog_index or {}
         # Tracks blend mode per (element_name, layer_index) tuple
         self._layer_blend_modes: dict[tuple[str, int], str] = {}
+        # Section → bar range mapping (built from audio section boundaries)
+        self._section_map: dict[str, SectionBarRange] = (
+            build_section_bar_map(section_boundaries, beat_grid)
+            if section_boundaries
+            else {}
+        )
 
     def compose(self, plan_set: GroupPlanSet) -> RenderPlan:
         """Compose a GroupPlanSet into a RenderPlan.
@@ -197,8 +217,17 @@ class CompositionEngine:
         # Resolve section palette
         section_palette = self._resolve_palette(section.palette)
 
-        # Section boundary for effect clamping (from audio profile)
-        section_end_ms = section.end_ms
+        # Resolve section boundaries from the bar map (BeatGrid is
+        # the timing authority).  Falls back to plan-level values for
+        # backward compatibility, but those are expected to be None
+        # in the normal pipeline flow.
+        section_range = self._section_map.get(section.section_id)
+        if section_range is not None:
+            section_start_bar = section_range.start_bar
+            section_end_ms: int | None = int(section_range.end_ms)
+        else:
+            section_start_bar = 0
+            section_end_ms = section.end_ms
 
         for lane_plan in section.lane_plans:
             lane = lane_plan.lane
@@ -219,6 +248,7 @@ class CompositionEngine:
                     lane=lane,
                     layer_idx=layer_idx,
                     section_palette=section_palette,
+                    section_start_bar=section_start_bar,
                     section_end_ms=section_end_ms,
                     element_layers=element_layers,
                     diagnostics=diagnostics,
@@ -231,6 +261,7 @@ class CompositionEngine:
         lane: LaneKind,
         layer_idx: int,
         section_palette: ResolvedPalette,
+        section_start_bar: int,
         section_end_ms: int | None,
         element_layers: dict[str, dict[int, list[RenderEvent]]],
         diagnostics: list[CompositionDiagnostic],
@@ -248,6 +279,7 @@ class CompositionEngine:
             lane: Lane kind for intensity resolution.
             layer_idx: Target layer index.
             section_palette: Resolved palette for this section.
+            section_start_bar: 0-indexed song bar where this section starts.
             section_end_ms: Section end boundary for clamping (None = no clamp).
             element_layers: Accumulator.
             diagnostics: Accumulator.
@@ -285,6 +317,7 @@ class CompositionEngine:
                 section=section,
                 lane=lane,
                 section_palette=section_palette,
+                section_start_bar=section_start_bar,
                 section_end_ms=section_end_ms,
                 placement_index=idx,
                 diagnostics=diagnostics,
@@ -501,6 +534,7 @@ class CompositionEngine:
         section: SectionCoordinationPlan,
         lane: LaneKind,
         section_palette: ResolvedPalette,
+        section_start_bar: int,
         section_end_ms: int | None,
         placement_index: int,
         diagnostics: list[CompositionDiagnostic],
@@ -512,6 +546,7 @@ class CompositionEngine:
             section: Parent section.
             lane: Lane kind.
             section_palette: Resolved palette.
+            section_start_bar: 0-indexed song bar where this section starts.
             section_end_ms: Section end boundary for clamping (None = no clamp).
             placement_index: Index within the coordination plan.
             diagnostics: Accumulator.
@@ -519,13 +554,13 @@ class CompositionEngine:
         Returns:
             RenderEvent or None if the placement is invalid.
         """
-        # Resolve timing — bar/beat refs are section-relative, so we
-        # offset by the section's start_ms when available and re-snap
-        # to the 20ms grid (section boundaries from audio analysis are
-        # at arbitrary ms values).
-        section_offset_ms = section.start_ms or 0
-        start_ms = self._timing_resolver.resolve_start_ms(placement.start)
-        start_ms = self._timing_resolver.snap(start_ms + section_offset_ms)
+        # Resolve timing — bar/beat refs are section-relative.
+        # The BeatGrid is the sole timing authority; section_start_bar
+        # anchors the reference to the correct song position.
+        start_ms = self._timing_resolver.resolve_start_ms(
+            placement.start,
+            section_start_bar=section_start_bar,
+        )
 
         end_ms = self._timing_resolver.resolve_end_ms(
             start_ms=start_ms,
