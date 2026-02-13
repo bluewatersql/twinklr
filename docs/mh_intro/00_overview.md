@@ -71,7 +71,7 @@ We thought: if we get this boundary right, the LLM doesn't need to understand tr
 ## The Pipeline
 Here's the full system:
 
-![Full Pipeline Flow](assets/diagrams/00_full_pipeline.png)
+![Full Pipeline Flow](assets/illustrations/00_full_pipeline.png)
 
 Here's where it gets interesting — the LLM only touches two of these five stages. Everything else is pure math.
 
