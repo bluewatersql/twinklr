@@ -21,6 +21,7 @@ class OnHandler:
 
     Produces a solid color fill. Intensity is controlled via the
     event's intensity field (mapped to E_TEXTCTRL_Eff_On_End/Start).
+    Supports optional shimmer modifier for subtle sparkle.
     """
 
     @property
@@ -29,7 +30,7 @@ class OnHandler:
 
     @property
     def handler_version(self) -> str:
-        return "1.0.0"
+        return "1.1.0"
 
     def build_settings(
         self,
@@ -38,6 +39,11 @@ class OnHandler:
     ) -> EffectSettings:
         """Build On effect settings.
 
+        Supported parameters in event.parameters:
+            - shimmer: bool (default False) — enables shimmer modifier.
+            - shimmer_cycles: float (default 1.0) — shimmer cycle count
+              (only emitted when shimmer is True).
+
         Args:
             event: Render event with intensity and parameters.
             ctx: Rendering context.
@@ -45,11 +51,20 @@ class OnHandler:
         Returns:
             EffectSettings with the On effect settings string.
         """
+        params = event.parameters
         intensity_pct = int(event.intensity * 100)
+        shimmer = params.get("shimmer", False)
 
         builder = SettingsStringBuilder()
         builder.add("E_TEXTCTRL_Eff_On_End", intensity_pct)
         builder.add("E_TEXTCTRL_Eff_On_Start", intensity_pct)
+
+        if shimmer:
+            builder.add("E_CHECKBOX_On_Shimmer", 1)
+            shimmer_cycles = params.get("shimmer_cycles")
+            if shimmer_cycles is not None:
+                builder.add("E_TEXTCTRL_On_Cycles", shimmer_cycles)
+
         builder.add_buffer_style(event.buffer_style)
 
         if event.buffer_transform:

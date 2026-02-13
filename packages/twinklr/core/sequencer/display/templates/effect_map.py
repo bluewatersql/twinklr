@@ -292,6 +292,8 @@ _SINGLE_STRAND_PRESETS: dict[str, dict[str, Any]] = {
         "speed": 50,
         "color_chase": True,
         "group_count": 3,
+        "fade_type": "None",
+        "colors": "Palette",
     },
 }
 
@@ -380,7 +382,9 @@ _VALID_PARAMS: dict[str, frozenset[str]] = {
     "Strobe": frozenset({
         "num_strobes", "strobe_duration", "strobe_type", "music_reactive",
     }),
-    "On": frozenset(),  # On uses intensity, not params
+    "On": frozenset({
+        "shimmer", "shimmer_cycles",
+    }),
     "Snowflakes": frozenset({
         "count", "speed", "snowflake_type",
     }),
@@ -390,7 +394,7 @@ _VALID_PARAMS: dict[str, frozenset[str]] = {
     }),
     "SingleStrand": frozenset({
         "chase_type", "speed", "color_chase", "group_count",
-        "chase_rotations",
+        "chase_rotations", "fade_type", "colors",
     }),
     "Pictures": frozenset({
         "filename", "movement", "direction", "speed",

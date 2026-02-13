@@ -651,3 +651,39 @@ class TestBlendModeAssignment:
         for layer in group.layers:
             assert isinstance(layer.blend_mode, str)
             assert len(layer.blend_mode) > 0
+
+
+class TestBufferStyleResolution:
+    """Tests for _resolve_buffer_style including BufferTransform."""
+
+    def test_spirals_gets_rotate_transform(self) -> None:
+        """Spirals effect should get Rotate CC 90 buffer transform."""
+        engine = CompositionEngine(
+            beat_grid=_make_beat_grid(),
+            display_graph=_make_display_graph(),
+            palette_resolver=_make_palette_resolver(),
+        )
+        style, transform = engine._resolve_buffer_style("Spirals")
+        assert style == "Horizontal Per Model/Strand"
+        assert transform == "Rotate CC 90"
+
+    def test_fan_no_transform(self) -> None:
+        """Fan effect uses centered overlay but no transform."""
+        engine = CompositionEngine(
+            beat_grid=_make_beat_grid(),
+            display_graph=_make_display_graph(),
+            palette_resolver=_make_palette_resolver(),
+        )
+        style, transform = engine._resolve_buffer_style("Fan")
+        assert style == "Overlay - Centered"
+        assert transform is None
+
+    def test_default_no_transform(self) -> None:
+        """Default effects get no buffer transform."""
+        engine = CompositionEngine(
+            beat_grid=_make_beat_grid(),
+            display_graph=_make_display_graph(),
+            palette_resolver=_make_palette_resolver(),
+        )
+        _style, transform = engine._resolve_buffer_style("Color Wash")
+        assert transform is None

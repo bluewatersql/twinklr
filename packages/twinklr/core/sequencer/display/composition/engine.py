@@ -604,7 +604,7 @@ class CompositionEngine:
         if effect_type in centered_effects:
             return "Overlay - Centered", None
         elif effect_type in strand_effects:
-            return "Horizontal Per Model/Strand", None
+            return "Horizontal Per Model/Strand", "Rotate CC 90"
         else:
             return self._config.default_buffer_style, None
 

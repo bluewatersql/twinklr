@@ -81,6 +81,27 @@ class TestOnHandler:
         settings = h.build_settings(_event("On"), _ctx())
         assert "B_CHOICE_BufferStyle=Per Model Default" in settings.settings_string
 
+    def test_shimmer_enabled(self) -> None:
+        """On effect with shimmer=True emits the shimmer checkbox key."""
+        h = OnHandler()
+        event = _event("On", parameters={"shimmer": True})
+        settings = h.build_settings(event, _ctx())
+        assert "E_CHECKBOX_On_Shimmer=1" in settings.settings_string
+
+    def test_shimmer_disabled_by_default(self) -> None:
+        """On effect without shimmer param does not emit shimmer key."""
+        h = OnHandler()
+        settings = h.build_settings(_event("On"), _ctx())
+        assert "E_CHECKBOX_On_Shimmer" not in settings.settings_string
+
+    def test_shimmer_cycles(self) -> None:
+        """On effect with shimmer_cycles sets the cycle count."""
+        h = OnHandler()
+        event = _event("On", parameters={"shimmer": True, "shimmer_cycles": 5.0})
+        settings = h.build_settings(event, _ctx())
+        assert "E_CHECKBOX_On_Shimmer=1" in settings.settings_string
+        assert "E_TEXTCTRL_On_Cycles=5.0" in settings.settings_string
+
 
 class TestColorWashHandler:
     """Tests for the ColorWashHandler."""
@@ -117,6 +138,18 @@ class TestChaseHandler:
         assert "E_CHOICE_Chase_Type1=Left-Right" in settings.settings_string
         assert "E_SLIDER_Chase_Speed1=50" in settings.settings_string
 
+    def test_default_fade_type(self) -> None:
+        """Default settings include Fade_Type."""
+        h = ChaseHandler()
+        settings = h.build_settings(_event("SingleStrand"), _ctx())
+        assert "E_CHOICE_Fade_Type=None" in settings.settings_string
+
+    def test_default_colors(self) -> None:
+        """Default settings include SingleStrand_Colors."""
+        h = ChaseHandler()
+        settings = h.build_settings(_event("SingleStrand"), _ctx())
+        assert "E_CHOICE_SingleStrand_Colors=Palette" in settings.settings_string
+
     def test_custom_chase_type(self) -> None:
         h = ChaseHandler()
         event = _event(
@@ -125,6 +158,26 @@ class TestChaseHandler:
         )
         settings = h.build_settings(event, _ctx())
         assert "E_CHOICE_Chase_Type1=Bounce from Left" in settings.settings_string
+
+    def test_custom_fade_type(self) -> None:
+        """Custom fade_type is emitted."""
+        h = ChaseHandler()
+        event = _event(
+            "SingleStrand",
+            parameters={"fade_type": "In/Out"},
+        )
+        settings = h.build_settings(event, _ctx())
+        assert "E_CHOICE_Fade_Type=In/Out" in settings.settings_string
+
+    def test_custom_colors(self) -> None:
+        """Custom colors param is emitted."""
+        h = ChaseHandler()
+        event = _event(
+            "SingleStrand",
+            parameters={"colors": "Rainbow"},
+        )
+        settings = h.build_settings(event, _ctx())
+        assert "E_CHOICE_SingleStrand_Colors=Rainbow" in settings.settings_string
 
 
 class TestSpiralsHandler:

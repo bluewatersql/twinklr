@@ -48,6 +48,10 @@ class ChaseHandler:
             - color_chase: bool (default True)
             - group_count: int (1-50, default 1)
             - chase_rotations: float (default 1.0)
+            - fade_type: str (default "None")
+              Options: "None", "Fade In", "Fade Out", "In/Out"
+            - colors: str (default "Palette")
+              Options: "Palette", "Rainbow"
 
         Args:
             event: Render event with parameters.
@@ -63,6 +67,8 @@ class ChaseHandler:
         color_chase = params.get("color_chase", True)
         group_count = params.get("group_count", 1)
         rotations = params.get("chase_rotations", 1.0)
+        fade_type = params.get("fade_type", "None")
+        colors = params.get("colors", "Palette")
 
         builder = SettingsStringBuilder()
         builder.add("E_CHOICE_Chase_Type1", chase_type)
@@ -70,6 +76,8 @@ class ChaseHandler:
         builder.add("E_CHECKBOX_Chase_Color2Color1", 1 if color_chase else 0)
         builder.add("E_SLIDER_Chase_Group_All", group_count)
         builder.add("E_SLIDER_Chase_Rotations", rotations)
+        builder.add("E_CHOICE_Fade_Type", fade_type)
+        builder.add("E_CHOICE_SingleStrand_Colors", colors)
         builder.add_buffer_style(event.buffer_style)
 
         if event.buffer_transform:
