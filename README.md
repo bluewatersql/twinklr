@@ -19,7 +19,6 @@
 </p>
 
 ---
-
 ## What is Twinklr?
 
 Twinklr is a choreography engine that takes an audio file and automatically generates synchronized moving head sequences for Christmas light displays. Instead of spending dozens of hours manually programming pan angles, tilt curves, and dimmer patterns in xLights, Twinklr does it in minutes.
