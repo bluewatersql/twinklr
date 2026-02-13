@@ -5,7 +5,7 @@ part: 0
 tags: [ai, llm, python, christmas-lights, xlights, choreography, moving-heads]
 ---
 
-![Twinklr](../assets/twinklr_logo_colorful_led.png)
+![Twinklr](../assets/twinklr_logo_colorful_light_mode.png)
 
 # Can an LLM Choreograph a Light Show?
 

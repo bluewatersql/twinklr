@@ -5,7 +5,7 @@ part: 7
 tags: [ai, llm, python, christmas-lights, xlights, lessons-learned, architecture, roadmap]
 ---
 
-![Twinklr](../assets/twinklr_logo_colorful_led.png)
+![Twinklr](../assets/twinklr_logo_colorful_light_mode.png)
 
 # Lessons Learned & What's Next
 

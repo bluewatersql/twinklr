@@ -5,7 +5,7 @@ part: 6
 tags: [ai, llm, python, christmas-lights, xlights, rendering, dmx, curves, templates]
 ---
 
-![Twinklr](../assets/twinklr_logo_colorful_led.png)
+![Twinklr](../assets/twinklr_logo_colorful_light_mode.png)
 
 # From Plan to Pixels — Rendering & Compilation
 

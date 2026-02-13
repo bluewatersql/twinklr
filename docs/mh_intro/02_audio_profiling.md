@@ -5,7 +5,7 @@ part: 2
 tags: [ai, llm, python, christmas-lights, xlights, audio-profiling, context-shaping, prompt-engineering]
 ---
 
-![Twinklr](../assets/twinklr_logo_colorful_led.png)
+![Twinklr](../assets/twinklr_logo_colorful_light_mode.png)
 
 # Making Sense of Sound — LLM-Based Audio & Lyric Profiling
 

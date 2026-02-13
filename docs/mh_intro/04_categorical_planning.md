@@ -5,7 +5,7 @@ part: 4
 tags: [ai, llm, python, christmas-lights, xlights, categorical-planning, architecture, design-patterns]
 ---
 
-![Twinklr](../assets/twinklr_logo_colorful_led.png)
+![Twinklr](../assets/twinklr_logo_colorful_light_mode.png)
 
 # The Categorical Pivot — Teaching an LLM to Think in Intent, Not Numbers
 
