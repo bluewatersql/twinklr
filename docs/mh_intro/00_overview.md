@@ -5,7 +5,7 @@ part: 0
 tags: [ai, llm, python, christmas-lights, xlights, choreography, moving-heads]
 ---
 
-![Twinklr](../assets/twinklr_logo_light_mode.png)
+![Twinklr](../assets/twinklr_logo_light.png)
 
 # An LLM xLights Choreographer?
 

@@ -5,7 +5,7 @@ part: 3
 tags: [ai, llm, python, christmas-lights, xlights, multi-agent, planning, orchestration]
 ---
 
-![Twinklr](../assets/twinklr_logo_light_mode.png)
+![Twinklr](../assets/twinklr_logo_light.png)
 
 # The Choreographer — Multi-Agent Planning System
 ![Planner vs Judge](assets/illustrations/03_banner.png)

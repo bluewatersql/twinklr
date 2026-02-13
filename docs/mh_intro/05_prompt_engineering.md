@@ -5,7 +5,7 @@ part: 5
 tags: [ai, llm, python, christmas-lights, xlights, prompt-engineering, schema-injection, jinja2]
 ---
 
-![Twinklr](../assets/twinklr_logo_light_mode.png)
+![Twinklr](../assets/twinklr_logo_light.png)
 
 # Prompt Engineering — Schema Injection, Taxonomy, and Anti-Patterns
 ![Prompt Packs & Contracts](assets/illustrations/05_banner.png)

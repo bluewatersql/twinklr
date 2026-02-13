@@ -5,7 +5,7 @@ part: 1
 tags: [ai, llm, python, christmas-lights, xlights, audio-analysis, signal-processing, librosa]
 ---
 
-![Twinklr](../assets/twinklr_logo_light_mode.png)
+![Twinklr](../assets/twinklr_logo_light.png)
 
 # Hearing the Music — Audio Analysis & Feature Extraction
 ![Hearing the Music](assets/illustrations/01_banner.png)
