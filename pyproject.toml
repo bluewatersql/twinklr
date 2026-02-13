@@ -53,6 +53,7 @@ exclude = [
     ".archive",
     "__pycache__",
     "*.egg-info",
+    "data/blog/content_manager",
 ]
 
 [tool.ruff.lint]
@@ -122,6 +123,7 @@ exclude = [
     "scripts/*",
     "changes/archive/",
     "utils/",
+    "data/blog/content_manager/",
 ]
 
 [tool.pydantic-mypy]

@@ -231,4 +231,4 @@ The LLM has done its job: translate data into intent. Now the planner needs to t
 
 *This is Part 2 of the [Building an AI Choreographer for Christmas Light Shows](#) series.*
 
-← [Previous: Hearing the Music — Audio Analysis & Feature Extraction](01_audio_analysis.md) | [Next: The Choreographer — Multi-Agent Planning System →](03_multi_agent_planning.md)
+← [Previous: Hearing the Music — Audio Analysis & Feature Extraction](audio_analysis.md) | [Next: The Choreographer — Multi-Agent Planning System →](multi_agent_planning.md)

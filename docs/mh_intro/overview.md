@@ -1,5 +1,5 @@
 ---
-title: "Can an LLM Choreograph a Light Show?"
+title: "An LLM xLights Choreographer?"
 series: "Building an AI Choreographer for Christmas Light Shows"
 part: 0
 tags: [ai, llm, python, christmas-lights, xlights, choreography, moving-heads]
@@ -127,4 +127,4 @@ In Part 1, we start at the beginning: teaching the system to hear music. Beat de
 
 *This is the Overview of the [Building an AI Choreographer for Christmas Light Shows](#) series.*
 
-[Next: Hearing the Music — Audio Analysis & Feature Extraction →](01_audio_analysis.md)
+[Next: Hearing the Music — Audio Analysis & Feature Extraction →](audio_analysis.md)

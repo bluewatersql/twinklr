@@ -245,4 +245,4 @@ That's the boundary working as designed.
 
 *This is Part 6 of the [Building an AI Choreographer for Christmas Light Shows](#) series.*
 
-← [Previous: Prompt Engineering — Schema Injection, Taxonomy, and Anti-Patterns](05_prompt_engineering.md) | [Next: Lessons Learned & What's Next →](07_lessons_learned.md)
+← [Previous: Prompt Engineering — Schema Injection, Taxonomy, and Anti-Patterns](prompt_engineering.md) | [Next: Lessons Learned & What's Next →](lessons_learned.md)

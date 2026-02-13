@@ -119,6 +119,7 @@ class DisplayRenderer:
         plan_set: GroupPlanSet,
         sequence: XSequence,
         asset_base_path: Path | None = None,
+        catalog_index: dict[str, object] | None = None,
     ) -> RenderResult:
         """Render a GroupPlanSet into an XSequence.
 
@@ -134,6 +135,11 @@ class DisplayRenderer:
             plan_set: Aggregated group plans for all sections.
             sequence: XSequence to write effects into.
             asset_base_path: Base path for image/video assets.
+            catalog_index: Optional mapping of asset_id → CatalogEntry
+                for resolving asset overlay rendering. Build this from
+                ``AssetCatalog.build_index()``. When provided, placements
+                with ``resolved_asset_ids`` produce dual-layer output
+                (procedural + Pictures overlay).
 
         Returns:
             RenderResult with the plan, statistics, and diagnostics.
@@ -151,6 +157,7 @@ class DisplayRenderer:
             display_graph=self._display_graph,
             palette_resolver=self._palette_resolver,
             config=composition_config,
+            catalog_index=catalog_index,
         )
         render_plan = engine.compose(plan_set)
 

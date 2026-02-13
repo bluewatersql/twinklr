@@ -20,6 +20,7 @@ exclude:
   - packages/
   - tests/
   - data/blog/utils/
+  - data/blog/content_manager/
   - changes/
   - "*.py"
   - uv.lock

@@ -229,4 +229,4 @@ Part 5 dives into the mechanical side of prompting: how schemas get auto-injecte
 
 *This is Part 4 of the [Building an AI Choreographer for Christmas Light Shows](#) series.*
 
-← [Previous: The Choreographer — Multi-Agent Planning System](03_multi_agent_planning.md) | [Next: Prompt Engineering — Schema Injection, Taxonomy, and Anti-Patterns →](05_prompt_engineering.md)
+← [Previous: The Choreographer — Multi-Agent Planning System](multi_agent_planning.md) | [Next: Prompt Engineering — Schema Injection, Taxonomy, and Anti-Patterns →](prompt_engineering.md)

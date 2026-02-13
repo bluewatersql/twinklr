@@ -236,4 +236,4 @@ But 100KB is far too much to hand to an LLM. In Part 2, we'll see how the audio 
 
 *This is Part 1 of the [Building an AI Choreographer for Christmas Light Shows](#) series.*
 
-← [Previous: Can an LLM Choreograph a Light Show?](00_overview.md) | [Next: Making Sense of Sound — LLM-Based Audio & Lyric Profiling →](02_audio_profiling.md)
+← [Previous: Can an LLM Choreograph a Light Show?](overview.md) | [Next: Making Sense of Sound — LLM-Based Audio & Lyric Profiling →](audio_profiling.md)

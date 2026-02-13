@@ -348,3 +348,14 @@ class AssetCatalog(BaseModel):
             else:
                 self.entries.append(entry)
                 existing[entry.asset_id] = len(self.entries) - 1
+
+    def build_index(self) -> dict[str, CatalogEntry]:
+        """Build a fast-lookup index of successful entries by asset_id.
+
+        Used by the CompositionEngine to resolve asset overlays.
+        Only includes entries with CREATED or CACHED status (not FAILED).
+
+        Returns:
+            Dict mapping asset_id → CatalogEntry for all successful entries.
+        """
+        return {e.asset_id: e for e in self.entries if e.status != AssetStatus.FAILED}

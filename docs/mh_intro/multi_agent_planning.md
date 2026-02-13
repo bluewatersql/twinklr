@@ -231,4 +231,4 @@ But we skipped something important. The plan the planner produces uses categoric
 
 *This is Part 3 of the [Building an AI Choreographer for Christmas Light Shows](#) series.*
 
-← [Previous: Making Sense of Sound — LLM-Based Audio & Lyric Profiling](02_audio_profiling.md) | [Next: The Categorical Pivot — Teaching an LLM to Think in Intent, Not Numbers →](04_categorical_planning.md)
+← [Previous: Making Sense of Sound — LLM-Based Audio & Lyric Profiling](audio_profiling.md) | [Next: The Categorical Pivot — Teaching an LLM to Think in Intent, Not Numbers →](categorical_planning.md)

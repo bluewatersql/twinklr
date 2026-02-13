@@ -357,3 +357,22 @@ class TestAssetCatalog:
         found = catalog.get("a1")
         assert found is not None
         assert found.status == AssetStatus.CACHED
+
+    def test_build_index_excludes_failed(self) -> None:
+        """build_index returns only successful entries keyed by asset_id."""
+        e1 = _make_entry(asset_id="ok", status=AssetStatus.CREATED, prompt_hash="h1")
+        e2 = _make_entry(asset_id="fail", status=AssetStatus.FAILED, prompt_hash="h2")
+        e3 = _make_entry(asset_id="cached", status=AssetStatus.CACHED, prompt_hash="h3")
+        catalog = AssetCatalog(catalog_id="cat_idx", entries=[e1, e2, e3])
+
+        index = catalog.build_index()
+        assert len(index) == 2
+        assert "ok" in index
+        assert "cached" in index
+        assert "fail" not in index
+        assert index["ok"].asset_id == "ok"
+
+    def test_build_index_empty_catalog(self) -> None:
+        """build_index on empty catalog returns empty dict."""
+        catalog = AssetCatalog(catalog_id="empty", entries=[])
+        assert catalog.build_index() == {}

@@ -256,7 +256,7 @@ class TestCompositionEngine:
         assert len(render_plan.groups[0].layers) == 2
         layer_indices = {ly.layer_index for ly in render_plan.groups[0].layers}
         assert 0 in layer_indices  # BASE
-        assert 1 in layer_indices  # RHYTHM
+        assert 2 in layer_indices  # RHYTHM
 
     def test_overlap_trim(self) -> None:
         """Overlapping events in same layer are trimmed."""
@@ -687,3 +687,271 @@ class TestBufferStyleResolution:
         )
         _style, transform = engine._resolve_buffer_style("Color Wash")
         assert transform is None
+
+
+# ---------------------------------------------------------------------------
+# Catalog-backed helpers for overlay tests
+# ---------------------------------------------------------------------------
+
+
+def _make_fake_catalog_entry(asset_id: str, file_path: str) -> object:
+    """Create a minimal object that quacks like CatalogEntry for overlay tests."""
+
+    class _FakeCatalogEntry:
+        def __init__(self, aid: str, fp: str) -> None:
+            self.asset_id = aid
+            self.file_path = fp
+
+    return _FakeCatalogEntry(asset_id, file_path)
+
+
+class TestAssetOverlayRendering:
+    """Tests for dual-layer asset overlay event emission."""
+
+    def test_no_overlay_without_catalog(self) -> None:
+        """Without a catalog_index, no overlay events are emitted."""
+        placement = GroupPlacement(
+            placement_id="p_asset",
+            group_id="OUTLINE_1",
+            template_id="gtpl_base_wash_soft",
+            start=PlanningTimeRef(bar=1, beat=1),
+            duration=EffectDuration.PHRASE,
+            resolved_asset_ids=["asset_abc"],
+        )
+        plan_set = _make_plan_set(placements=[placement])
+        engine = CompositionEngine(
+            beat_grid=_make_beat_grid(),
+            display_graph=_make_display_graph(),
+            palette_resolver=_make_palette_resolver(),
+        )
+        render_plan = engine.compose(plan_set)
+
+        # Only the procedural event, no overlay layer
+        assert render_plan.total_events == 1
+        assert len(render_plan.groups[0].layers) == 1
+
+    def test_no_overlay_without_resolved_ids(self) -> None:
+        """Placements without resolved_asset_ids produce no overlays."""
+        plan_set = _make_plan_set()  # default placement has no assets
+        catalog_index = {"x": _make_fake_catalog_entry("x", "x.png")}
+        engine = CompositionEngine(
+            beat_grid=_make_beat_grid(),
+            display_graph=_make_display_graph(),
+            palette_resolver=_make_palette_resolver(),
+            catalog_index=catalog_index,
+        )
+        render_plan = engine.compose(plan_set)
+
+        assert render_plan.total_events == 1
+        assert len(render_plan.groups[0].layers) == 1
+
+    def test_overlay_emitted_with_catalog_and_ids(self) -> None:
+        """Placement with resolved_asset_ids + catalog produces overlay events."""
+        entry = _make_fake_catalog_entry("asset_001", "images/snowflake.png")
+        catalog_index = {"asset_001": entry}
+
+        placement = GroupPlacement(
+            placement_id="p_asset",
+            group_id="OUTLINE_1",
+            template_id="gtpl_base_wash_soft",
+            start=PlanningTimeRef(bar=1, beat=1),
+            duration=EffectDuration.PHRASE,
+            resolved_asset_ids=["asset_001"],
+        )
+        plan_set = _make_plan_set(placements=[placement])
+        engine = CompositionEngine(
+            beat_grid=_make_beat_grid(),
+            display_graph=_make_display_graph(),
+            palette_resolver=_make_palette_resolver(),
+            catalog_index=catalog_index,
+        )
+        render_plan = engine.compose(plan_set)
+
+        # 2 events: procedural + overlay
+        assert render_plan.total_events == 2
+        # 2 layers: procedural (0) and overlay (1)
+        assert len(render_plan.groups[0].layers) == 2
+
+        layer_indices = {ly.layer_index for ly in render_plan.groups[0].layers}
+        assert 0 in layer_indices
+        assert 1 in layer_indices
+
+        # Find the overlay layer (layer index 1)
+        overlay_layer = next(
+            ly for ly in render_plan.groups[0].layers if ly.layer_index == 1
+        )
+        assert len(overlay_layer.events) == 1
+        assert overlay_layer.events[0].effect_type == "Pictures"
+        assert overlay_layer.events[0].parameters["filename"] == "images/snowflake.png"
+
+    def test_overlay_timing_matches_procedural(self) -> None:
+        """Overlay events share start/end with the procedural event."""
+        entry = _make_fake_catalog_entry("asset_002", "images/star.png")
+        catalog_index = {"asset_002": entry}
+
+        placement = GroupPlacement(
+            placement_id="p_timing",
+            group_id="OUTLINE_1",
+            template_id="gtpl_base_wash_soft",
+            start=PlanningTimeRef(bar=3, beat=1),
+            duration=EffectDuration.PHRASE,
+            resolved_asset_ids=["asset_002"],
+        )
+        plan_set = _make_plan_set(placements=[placement])
+        engine = CompositionEngine(
+            beat_grid=_make_beat_grid(),
+            display_graph=_make_display_graph(),
+            palette_resolver=_make_palette_resolver(),
+            catalog_index=catalog_index,
+        )
+        render_plan = engine.compose(plan_set)
+
+        procedural = render_plan.groups[0].layers[0].events[0]
+        overlay = next(
+            ly for ly in render_plan.groups[0].layers if ly.layer_index == 1
+        ).events[0]
+
+        assert overlay.start_ms == procedural.start_ms
+        assert overlay.end_ms == procedural.end_ms
+
+    def test_multiple_assets_uses_first_valid(self) -> None:
+        """Multiple resolved_asset_ids uses the first valid entry (best match)."""
+        entries = {
+            "a1": _make_fake_catalog_entry("a1", "img/tree.png"),
+            "a2": _make_fake_catalog_entry("a2", "img/present.png"),
+        }
+
+        placement = GroupPlacement(
+            placement_id="p_multi",
+            group_id="OUTLINE_1",
+            template_id="gtpl_base_wash_soft",
+            start=PlanningTimeRef(bar=1, beat=1),
+            duration=EffectDuration.PHRASE,
+            resolved_asset_ids=["a1", "a2"],
+        )
+        plan_set = _make_plan_set(placements=[placement])
+        engine = CompositionEngine(
+            beat_grid=_make_beat_grid(),
+            display_graph=_make_display_graph(),
+            palette_resolver=_make_palette_resolver(),
+            catalog_index=entries,
+        )
+        render_plan = engine.compose(plan_set)
+
+        # 2 events: 1 procedural + 1 overlay (first valid match)
+        assert render_plan.total_events == 2
+        overlay_layer = next(
+            ly for ly in render_plan.groups[0].layers if ly.layer_index == 1
+        )
+        assert len(overlay_layer.events) == 1
+        assert overlay_layer.events[0].parameters["filename"] == "img/tree.png"
+
+    def test_missing_asset_falls_through_to_next(self) -> None:
+        """Missing first asset falls through to the next valid one."""
+        catalog_index = {
+            "exists": _make_fake_catalog_entry("exists", "img/ok.png"),
+        }
+
+        placement = GroupPlacement(
+            placement_id="p_skip",
+            group_id="OUTLINE_1",
+            template_id="gtpl_base_wash_soft",
+            start=PlanningTimeRef(bar=1, beat=1),
+            duration=EffectDuration.PHRASE,
+            resolved_asset_ids=["missing", "exists"],
+        )
+        plan_set = _make_plan_set(placements=[placement])
+        engine = CompositionEngine(
+            beat_grid=_make_beat_grid(),
+            display_graph=_make_display_graph(),
+            palette_resolver=_make_palette_resolver(),
+            catalog_index=catalog_index,
+        )
+        render_plan = engine.compose(plan_set)
+
+        # 2 events: 1 procedural + 1 overlay (skipped missing, used exists)
+        assert render_plan.total_events == 2
+        overlay_layer = next(
+            ly for ly in render_plan.groups[0].layers if ly.layer_index == 1
+        )
+        assert overlay_layer.events[0].parameters["filename"] == "img/ok.png"
+
+    def test_all_assets_missing_no_overlay(self) -> None:
+        """When all resolved_asset_ids are missing from catalog, no overlay."""
+        catalog_index: dict[str, object] = {}
+
+        placement = GroupPlacement(
+            placement_id="p_all_missing",
+            group_id="OUTLINE_1",
+            template_id="gtpl_base_wash_soft",
+            start=PlanningTimeRef(bar=1, beat=1),
+            duration=EffectDuration.PHRASE,
+            resolved_asset_ids=["ghost_1", "ghost_2"],
+        )
+        plan_set = _make_plan_set(placements=[placement])
+        engine = CompositionEngine(
+            beat_grid=_make_beat_grid(),
+            display_graph=_make_display_graph(),
+            palette_resolver=_make_palette_resolver(),
+            catalog_index=catalog_index,
+        )
+        render_plan = engine.compose(plan_set)
+
+        # Only the procedural event, no overlay
+        assert render_plan.total_events == 1
+        assert len(render_plan.groups[0].layers) == 1
+
+    def test_overlay_source_traceability(self) -> None:
+        """Overlay events carry the same source traceability as the procedural event."""
+        entry = _make_fake_catalog_entry("trace_id", "img/trace.png")
+        catalog_index = {"trace_id": entry}
+
+        placement = GroupPlacement(
+            placement_id="p_trace",
+            group_id="OUTLINE_1",
+            template_id="gtpl_base_wash_soft",
+            start=PlanningTimeRef(bar=1, beat=1),
+            duration=EffectDuration.PHRASE,
+            resolved_asset_ids=["trace_id"],
+        )
+        plan_set = _make_plan_set(placements=[placement])
+        engine = CompositionEngine(
+            beat_grid=_make_beat_grid(),
+            display_graph=_make_display_graph(),
+            palette_resolver=_make_palette_resolver(),
+            catalog_index=catalog_index,
+        )
+        render_plan = engine.compose(plan_set)
+
+        overlay_event = next(
+            ly for ly in render_plan.groups[0].layers if ly.layer_index == 1
+        ).events[0]
+        assert overlay_event.source.section_id == "intro"
+        assert overlay_event.source.lane == LaneKind.BASE
+        assert overlay_event.source.template_id == "gtpl_base_wash_soft"
+
+    def test_rhythm_lane_overlay_on_correct_layer(self) -> None:
+        """RHYTHM lane overlays go to layer 3 (RHYTHM procedural=2, overlay=3)."""
+        entry = _make_fake_catalog_entry("rhythm_asset", "img/pulse.png")
+        catalog_index = {"rhythm_asset": entry}
+
+        placement = GroupPlacement(
+            placement_id="p_rhythm_overlay",
+            group_id="OUTLINE_1",
+            template_id="gtpl_rhythm_chase_single",
+            start=PlanningTimeRef(bar=1, beat=1),
+            duration=EffectDuration.PHRASE,
+            resolved_asset_ids=["rhythm_asset"],
+        )
+        plan_set = _make_plan_set(placements=[placement], lane=LaneKind.RHYTHM)
+        engine = CompositionEngine(
+            beat_grid=_make_beat_grid(),
+            display_graph=_make_display_graph(),
+            palette_resolver=_make_palette_resolver(),
+            catalog_index=catalog_index,
+        )
+        render_plan = engine.compose(plan_set)
+
+        layer_indices = {ly.layer_index for ly in render_plan.groups[0].layers}
+        assert 2 in layer_indices  # RHYTHM procedural
+        assert 3 in layer_indices  # RHYTHM overlay

@@ -137,4 +137,4 @@ We just wish we'd figured that out before week six.
 
 *This is Part 7 of the [Building an AI Choreographer for Christmas Light Shows](#) series.*
 
-← [Previous: From Plan to Pixels — Rendering & Compilation](06_rendering_compilation.md) | [Series Overview](00_overview.md)
+← [Previous: From Plan to Pixels — Rendering & Compilation](rendering_compilation.md) | [Series Overview](index.md)

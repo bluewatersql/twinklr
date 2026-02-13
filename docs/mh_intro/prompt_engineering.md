@@ -227,4 +227,4 @@ We've covered the full LLM-powered side of the pipeline: audio profiling turns f
 
 *This is Part 5 of the [Building an AI Choreographer for Christmas Light Shows](#) series.*
 
-← [Previous: The Categorical Pivot — Teaching an LLM to Think in Intent, Not Numbers](04_categorical_planning.md) | [Next: From Plan to Pixels — Rendering & Compilation →](06_rendering_compilation.md)
+← [Previous: The Categorical Pivot — Teaching an LLM to Think in Intent, Not Numbers](categorical_planning.md) | [Next: From Plan to Pixels — Rendering & Compilation →](rendering_compilation.md)

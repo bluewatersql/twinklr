@@ -4,12 +4,9 @@ The CompositionEngine is the core decision-making stage. It walks the
 GroupPlanSet section by section, resolving targets, timing, layers,
 and palettes to produce the intermediate RenderPlan.
 
-Phase 1 scope:
-- UNIFIED coordination mode (placements are pre-expanded)
-- Static layer allocation (BASE=0, RHYTHM=1, ACCENT=2)
-- TRIM overlap policy
-- No transitions (hard cuts)
-- Identity target resolution (group_id = element name)
+Supports dual-layer rendering: when a placement has resolved_asset_ids
+(from the asset resolution step), the engine emits both a procedural
+effect event AND a Pictures overlay event on adjacent layers.
 """
 
 from __future__ import annotations
@@ -106,11 +103,17 @@ class CompositionEngine:
     concrete timing, target elements, layer indices, palettes, and
     effect types.
 
+    When an optional ``catalog_index`` is provided, placements with
+    ``resolved_asset_ids`` produce dual-layer output: a procedural
+    effect on the base layer and a Pictures overlay on the layer above.
+
     Args:
         beat_grid: Musical timing grid.
         display_graph: Display topology.
         palette_resolver: Resolves PaletteRef → ResolvedPalette.
         config: Composition configuration.
+        catalog_index: Optional mapping of asset_id → CatalogEntry
+            for resolving asset file paths during overlay rendering.
     """
 
     def __init__(
@@ -119,6 +122,7 @@ class CompositionEngine:
         display_graph: DisplayGraph,
         palette_resolver: PaletteResolver,
         config: CompositionConfig | None = None,
+        catalog_index: dict[str, object] | None = None,
     ) -> None:
         self._beat_grid = beat_grid
         self._config = config or CompositionConfig()
@@ -126,6 +130,7 @@ class CompositionEngine:
         self._layer_allocator = LayerAllocator()
         self._timing_resolver = TimingResolver(beat_grid)
         self._palette_resolver = palette_resolver
+        self._catalog_index: dict[str, object] = catalog_index or {}
         # Tracks blend mode per (element_name, layer_index) tuple
         self._layer_blend_modes: dict[tuple[str, int], str] = {}
 
@@ -272,6 +277,8 @@ class CompositionEngine:
         if not placements:
             return
 
+        overlay_layer_idx = self._layer_allocator.allocate_overlay(lane)
+
         for idx, placement in enumerate(placements):
             event = self._compose_placement(
                 placement=placement,
@@ -293,6 +300,26 @@ class CompositionEngine:
                 element_layers[element_name][layer_idx] = []
 
             element_layers[element_name][layer_idx].append(event)
+
+            # Emit asset overlay events for placements with resolved assets
+            overlay_events = self._build_asset_overlay_events(
+                placement=placement,
+                procedural_event=event,
+                section=section,
+                lane=lane,
+                section_palette=section_palette,
+                placement_index=idx,
+            )
+            if overlay_events:
+                if overlay_layer_idx not in element_layers[element_name]:
+                    element_layers[element_name][overlay_layer_idx] = []
+                element_layers[element_name][overlay_layer_idx].extend(
+                    overlay_events
+                )
+                # Track blend mode for the overlay layer
+                overlay_key = (element_name, overlay_layer_idx)
+                if overlay_key not in self._layer_blend_modes:
+                    self._layer_blend_modes[overlay_key] = "Normal"
 
     def _expand_window(
         self,
@@ -564,6 +591,90 @@ class CompositionEngine:
                 placement_index=placement_index,
             ),
         )
+
+    def _build_asset_overlay_events(
+        self,
+        placement: GroupPlacement,
+        procedural_event: RenderEvent,
+        section: SectionCoordinationPlan,
+        lane: LaneKind,
+        section_palette: ResolvedPalette,
+        placement_index: int,
+    ) -> list[RenderEvent]:
+        """Build Pictures overlay events for a placement with resolved assets.
+
+        Returns one RenderEvent per resolved asset ID.  If the placement
+        has no ``resolved_asset_ids`` or no ``catalog_index`` is configured,
+        returns an empty list.
+
+        Args:
+            placement: Group placement (may have resolved_asset_ids).
+            procedural_event: The procedural RenderEvent for timing/palette.
+            section: Parent section.
+            lane: Lane kind.
+            section_palette: Resolved palette.
+            placement_index: Index within the coordination plan.
+
+        Returns:
+            List of Pictures overlay RenderEvents (may be empty).
+        """
+        if not placement.resolved_asset_ids or not self._catalog_index:
+            return []
+
+        # Use the first valid resolved asset (best match from resolver).
+        # xLights cannot stack multiple Pictures effects on the same
+        # layer at the same time, so we pick only one per placement.
+        for asset_id in placement.resolved_asset_ids:
+            entry = self._catalog_index.get(asset_id)
+            if entry is None:
+                logger.warning(
+                    "Asset %s not found in catalog index, skipping",
+                    asset_id,
+                )
+                continue
+
+            # CatalogEntry has a file_path field with the generated file
+            file_path = getattr(entry, "file_path", None)
+            if not file_path:
+                logger.warning(
+                    "Asset %s has no file_path, skipping",
+                    asset_id,
+                )
+                continue
+
+            overlay_event = RenderEvent(
+                event_id=f"{procedural_event.event_id}_overlay_{asset_id[:8]}",
+                start_ms=procedural_event.start_ms,
+                end_ms=procedural_event.end_ms,
+                effect_type="Pictures",
+                parameters={"filename": str(file_path)},
+                buffer_style="Per Model Default",
+                buffer_transform=None,
+                palette=section_palette,
+                intensity=procedural_event.intensity,
+                transition_in=procedural_event.transition_in,
+                transition_out=procedural_event.transition_out,
+                source=RenderEventSource(
+                    section_id=section.section_id,
+                    lane=lane,
+                    group_id=placement.group_id,
+                    template_id=placement.template_id,
+                    placement_index=placement_index,
+                ),
+            )
+
+            logger.debug(
+                "Emitted overlay event for placement %s (asset=%s)",
+                placement.placement_id,
+                asset_id,
+            )
+            return [overlay_event]
+
+        logger.debug(
+            "No valid catalog entry found for placement %s",
+            placement.placement_id,
+        )
+        return []
 
     def _resolve_palette(
         self, palette_ref: PaletteRef | None

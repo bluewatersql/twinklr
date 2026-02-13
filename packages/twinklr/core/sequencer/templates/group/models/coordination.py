@@ -48,6 +48,16 @@ class GroupPlacement(BaseModel):
         description="Categorical intensity - renderer resolves to lane-appropriate value",
     )
 
+    # Asset resolution — populated by resolve_plan_assets(), not by LLM
+    resolved_asset_ids: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Catalog asset_ids resolved for this placement. "
+            "Populated by the asset resolution step pre-render. "
+            "Empty means no asset match (procedural-only rendering)."
+        ),
+    )
+
 
 class PlacementWindow(BaseModel):
     """Window for sequenced/ripple/call-response expansion.
