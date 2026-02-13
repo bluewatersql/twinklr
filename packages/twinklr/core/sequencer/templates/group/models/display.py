@@ -1,11 +1,44 @@
 """Display graph models.
 
 Models for defining display topology and group configurations.
+
+xLights supports two kinds of targetable elements:
+- **Individual models** (e.g., "Arch 1") — a single physical element.
+- **Model groups** (e.g., "61 - Arches") — a set of models sequenced as one.
+
+Both use ``type="model"`` in the XSQ XML; the distinction is semantic.
+
+Each ``DisplayGroup`` entry maps 1:1 to an xLights element. The plan
+references these entries by ``group_id``, and the ``TargetResolver``
+maps that to the xLights ``display_name``.
+
+In V0 (group-based), most entries will be ``MODEL_GROUP`` — the plan
+targets groups like ``ARCHES`` and the renderer places effects on the
+corresponding xLights group element (``"61 - Arches"``).
+
+For per-model targeting (future), entries can use ``element_type=MODEL``
+to target individual models within a group (e.g., odds/evens with
+different effect configs).
 """
 
 from __future__ import annotations
 
+from enum import Enum
+
 from pydantic import BaseModel, ConfigDict, Field, computed_field
+
+
+class ElementType(str, Enum):
+    """xLights element targeting type.
+
+    Determines how effects are placed in the sequence:
+    - MODEL: Effect targets a single physical model.
+    - MODEL_GROUP: Effect targets a group; xLights renders across all
+      member models as a single canvas.
+    """
+
+    MODEL = "model"
+    MODEL_GROUP = "model_group"
 
 
 class GroupPosition(BaseModel):
@@ -20,13 +53,26 @@ class GroupPosition(BaseModel):
 
 
 class DisplayGroup(BaseModel):
-    """Single display group definition."""
+    """Single display group definition.
+
+    Represents a targetable xLights element — either an individual model
+    or a model group. Each entry maps 1:1 to an element that the plan
+    can target by ``group_id``.
+
+    The ``display_name`` must match the exact xLights element name
+    (e.g., ``"61 - Arches"``) since groups cannot be created in the
+    sequence file alone — they must already exist in the xLights layout.
+    """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     group_id: str = Field(pattern=r"^[A-Z][A-Z0-9_]*$")
     role: str
     display_name: str
+    element_type: ElementType = Field(
+        default=ElementType.MODEL_GROUP,
+        description="Whether this entry targets a model group or individual model",
+    )
 
     position: GroupPosition | None = None
     capabilities: list[str] = Field(default_factory=list)
@@ -36,7 +82,12 @@ class DisplayGroup(BaseModel):
 class DisplayGraph(BaseModel):
     """Complete display configuration with group-to-role mapping.
 
-    Provides groups_by_role computed property for role expansion.
+    Each entry in ``groups`` maps 1:1 to an xLights element. The
+    mapping from ``group_id`` to ``display_name`` is provided
+    externally (e.g., from a fixture config or user mapping file).
+
+    The renderer does NOT create or infer groups — the xLights layout
+    defines what groups exist, and this graph mirrors that.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -63,5 +114,6 @@ class DisplayGraph(BaseModel):
 __all__ = [
     "DisplayGraph",
     "DisplayGroup",
+    "ElementType",
     "GroupPosition",
 ]

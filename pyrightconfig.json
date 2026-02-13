@@ -11,7 +11,8 @@
     "tests/**",
     ".dev/**",
     "scripts/**",
-    "utils/**"
+    "utils/**",
+    "data/**"
   ],
   "ignore": [
     "tests/**",

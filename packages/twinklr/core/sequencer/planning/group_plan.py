@@ -108,6 +108,10 @@ class SectionCoordinationPlan(BaseModel):
     """Complete coordination plan for a single section.
 
     This is the output of one GroupPlanner invocation.
+
+    The ``start_ms`` and ``end_ms`` fields are NOT produced by the LLM —
+    they are populated by the pipeline from the audio profile's section
+    timing data, providing concrete section boundaries for the renderer.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -129,6 +133,18 @@ class SectionCoordinationPlan(BaseModel):
 
     # Optional notes for debugging/tracing
     planning_notes: str | None = None
+
+    # Section timing — populated by pipeline from audio profile, NOT by LLM
+    start_ms: int | None = Field(
+        default=None,
+        ge=0,
+        description="Section start time in ms (from audio profile, not LLM)",
+    )
+    end_ms: int | None = Field(
+        default=None,
+        gt=0,
+        description="Section end time in ms (from audio profile, not LLM)",
+    )
 
 
 class GroupPlanSet(BaseModel):

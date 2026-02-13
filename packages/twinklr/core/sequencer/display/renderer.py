@@ -1,0 +1,198 @@
+"""Display renderer: top-level coordinator for the display rendering pipeline.
+
+Orchestrates the full pipeline:
+  GroupPlanSet → CompositionEngine → RenderPlan → XSQWriter → XSequence
+
+This is the primary entry point for display (non-moving-head) rendering.
+"""
+
+from __future__ import annotations
+
+import logging
+from pathlib import Path
+
+from pydantic import BaseModel, ConfigDict, Field
+
+from twinklr.core.formats.xlights.sequence.models.xsq import XSequence
+from twinklr.core.sequencer.display.composition.engine import (
+    CompositionEngine,
+)
+from twinklr.core.sequencer.display.composition.palette_resolver import (
+    PaletteResolver,
+)
+from twinklr.core.sequencer.display.effects.handlers import (
+    load_builtin_handlers,
+)
+from twinklr.core.sequencer.display.effects.protocol import RenderContext
+from twinklr.core.sequencer.display.effects.registry import HandlerRegistry
+from twinklr.core.sequencer.display.export.writer import XSQWriter
+from twinklr.core.sequencer.display.models.config import (
+    RenderConfig,
+)
+from twinklr.core.sequencer.display.models.palette import ResolvedPalette
+from twinklr.core.sequencer.display.models.render_plan import RenderPlan
+from twinklr.core.sequencer.planning.group_plan import GroupPlanSet
+from twinklr.core.sequencer.templates.group.models.display import DisplayGraph
+from twinklr.core.sequencer.theming.catalog import PaletteCatalog
+from twinklr.core.sequencer.timing.beat_grid import BeatGrid
+
+logger = logging.getLogger(__name__)
+
+
+class RenderResult(BaseModel):
+    """Result of the display rendering pipeline.
+
+    Attributes:
+        render_plan: The intermediate RenderPlan (for debugging/inspection).
+        effects_written: Number of effects placed in the sequence.
+        elements_created: Number of xLights elements used.
+        effectdb_entries: Number of EffectDB entries.
+        palette_entries: Number of palette entries.
+        warnings: All warnings from composition and rendering.
+        missing_assets: Asset paths that were not found.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    render_plan: RenderPlan
+    effects_written: int = 0
+    elements_created: int = 0
+    effectdb_entries: int = 0
+    palette_entries: int = 0
+    warnings: list[str] = Field(default_factory=list)
+    missing_assets: list[str] = Field(default_factory=list)
+
+
+class DisplayRenderer:
+    """Top-level display renderer.
+
+    Orchestrates the full pipeline from GroupPlanSet to XSequence effects.
+
+    Usage:
+        >>> renderer = DisplayRenderer(beat_grid, display_graph)
+        >>> result = renderer.render(plan_set, sequence)
+        >>> # sequence now has effects; export with XSQExporter
+    """
+
+    # Default fallback palette when catalog lookup fails (Christmas red+green)
+    _FALLBACK_PALETTE = ResolvedPalette(
+        colors=["#FF0000", "#00FF00"],
+        active_slots=[1, 2],
+    )
+
+    def __init__(
+        self,
+        beat_grid: BeatGrid,
+        display_graph: DisplayGraph,
+        palette_catalog: PaletteCatalog | None = None,
+        config: RenderConfig | None = None,
+        handler_registry: HandlerRegistry | None = None,
+    ) -> None:
+        """Initialize the display renderer.
+
+        Args:
+            beat_grid: Musical timing grid for the sequence.
+            display_graph: Display topology (groups → elements).
+            palette_catalog: Theming palette catalog for color resolution.
+                If None, uses the global PALETTE_REGISTRY.
+            config: Render configuration. Defaults to sensible defaults.
+            handler_registry: Custom handler registry. If None, loads
+                builtin handlers (On, Color Wash, Chase, Spirals, Pictures).
+        """
+        self._beat_grid = beat_grid
+        self._display_graph = display_graph
+        self._config = config or RenderConfig()
+        self._handlers = handler_registry or load_builtin_handlers()
+
+        # Build palette resolver from catalog
+        if palette_catalog is None:
+            from twinklr.core.sequencer.theming.catalog import PALETTE_REGISTRY
+
+            palette_catalog = PALETTE_REGISTRY
+        self._palette_resolver = PaletteResolver(
+            catalog=palette_catalog,
+            default=self._FALLBACK_PALETTE,
+        )
+
+    def render(
+        self,
+        plan_set: GroupPlanSet,
+        sequence: XSequence,
+        asset_base_path: Path | None = None,
+    ) -> RenderResult:
+        """Render a GroupPlanSet into an XSequence.
+
+        This is the main entry point. It:
+        1. Runs the CompositionEngine to produce a RenderPlan
+        2. Creates an XSQWriter with the handler registry
+        3. Writes the RenderPlan into the XSequence
+
+        The XSequence is mutated in-place. After this call, export
+        it with XSQExporter.
+
+        Args:
+            plan_set: Aggregated group plans for all sections.
+            sequence: XSequence to write effects into.
+            asset_base_path: Base path for image/video assets.
+
+        Returns:
+            RenderResult with the plan, statistics, and diagnostics.
+        """
+        logger.info(
+            "DisplayRenderer: rendering %d sections for '%s'",
+            len(plan_set.section_plans),
+            plan_set.plan_set_id,
+        )
+
+        # Stage 1: Composition
+        composition_config = self._config.composition
+        engine = CompositionEngine(
+            beat_grid=self._beat_grid,
+            display_graph=self._display_graph,
+            palette_resolver=self._palette_resolver,
+            config=composition_config,
+        )
+        render_plan = engine.compose(plan_set)
+
+        # Stage 2: XSQ Writing (includes effect handler dispatch)
+        render_ctx = RenderContext(
+            sequence_duration_ms=int(self._beat_grid.duration_ms),
+            asset_base_path=asset_base_path or Path(self._config.asset_base_path or "."),
+            default_buffer_style=composition_config.default_buffer_style,
+            frame_interval_ms=self._config.frame_interval_ms,
+        )
+
+        writer = XSQWriter(
+            handler_registry=self._handlers,
+            render_context=render_ctx,
+        )
+        write_result = writer.write(render_plan, sequence)
+
+        # Collect all diagnostics
+        all_warnings = [d.message for d in render_plan.diagnostics if d.level == "warning"]
+        all_warnings.extend(write_result.warnings)
+
+        result = RenderResult(
+            render_plan=render_plan,
+            effects_written=write_result.effects_written,
+            elements_created=write_result.elements_created,
+            effectdb_entries=write_result.effectdb_entries,
+            palette_entries=write_result.palette_entries,
+            warnings=all_warnings,
+            missing_assets=write_result.missing_assets,
+        )
+
+        logger.info(
+            "DisplayRenderer: complete — %d effects on %d elements (%d warnings)",
+            result.effects_written,
+            result.elements_created,
+            len(result.warnings),
+        )
+
+        return result
+
+
+__all__ = [
+    "DisplayRenderer",
+    "RenderResult",
+]

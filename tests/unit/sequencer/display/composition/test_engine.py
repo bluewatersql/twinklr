@@ -1,0 +1,653 @@
+"""Unit tests for the CompositionEngine."""
+
+from __future__ import annotations
+
+from twinklr.core.sequencer.display.composition.engine import (
+    CompositionEngine,
+)
+from twinklr.core.sequencer.display.composition.palette_resolver import (
+    PaletteResolver,
+)
+from twinklr.core.sequencer.display.models.palette import (
+    ResolvedPalette,
+    TransitionSpec,
+)
+from twinklr.core.sequencer.planning.group_plan import (
+    GroupPlanSet,
+    LanePlan,
+    SectionCoordinationPlan,
+)
+from twinklr.core.sequencer.planning.models import PaletteRef
+from twinklr.core.sequencer.templates.group.models.coordination import (
+    CoordinationPlan,
+    GroupPlacement,
+)
+from twinklr.core.sequencer.templates.group.models.display import (
+    DisplayGraph,
+    DisplayGroup,
+)
+from twinklr.core.sequencer.theming import PALETTE_REGISTRY, ThemeRef
+from twinklr.core.sequencer.theming.enums import ThemeScope
+from twinklr.core.sequencer.timing.beat_grid import BeatGrid
+from twinklr.core.sequencer.vocabulary import (
+    CoordinationMode,
+    EffectDuration,
+    IntensityLevel,
+    LaneKind,
+    PlanningTimeRef,
+)
+
+
+def _make_beat_grid() -> BeatGrid:
+    """Create a 120 BPM, 4/4, 16-bar beat grid."""
+    tempo = 120.0
+    bpb = 4
+    num_bars = 16
+    ms_per_beat = 60_000.0 / tempo
+    ms_per_bar = ms_per_beat * bpb
+    total_beats = num_bars * bpb
+
+    return BeatGrid(
+        bar_boundaries=[i * ms_per_bar for i in range(num_bars + 1)],
+        beat_boundaries=[i * ms_per_beat for i in range(total_beats + 1)],
+        eighth_boundaries=[i * ms_per_beat / 2 for i in range(total_beats * 2 + 1)],
+        sixteenth_boundaries=[i * ms_per_beat / 4 for i in range(total_beats * 4 + 1)],
+        tempo_bpm=tempo,
+        beats_per_bar=bpb,
+        duration_ms=num_bars * ms_per_bar,
+    )
+
+
+def _make_display_graph() -> DisplayGraph:
+    """Create a simple display graph with 3 groups."""
+    return DisplayGraph(
+        display_id="test_display",
+        display_name="Test Display",
+        groups=[
+            DisplayGroup(
+                group_id="OUTLINE_1",
+                role="OUTLINE",
+                display_name="Outline 1",
+            ),
+            DisplayGroup(
+                group_id="ARCHES_1",
+                role="ARCHES",
+                display_name="Arches 1",
+            ),
+            DisplayGroup(
+                group_id="MEGA_TREE_1",
+                role="MEGA_TREE",
+                display_name="Mega Tree 1",
+            ),
+        ],
+    )
+
+
+def _make_palette_resolver() -> PaletteResolver:
+    """Create a palette resolver backed by the global registry."""
+    return PaletteResolver(
+        catalog=PALETTE_REGISTRY,
+        default=ResolvedPalette(colors=["#FF0000", "#00FF00"], active_slots=[1, 2]),
+    )
+
+
+def _make_plan_set(
+    placements: list[GroupPlacement] | None = None,
+    lane: LaneKind = LaneKind.BASE,
+) -> GroupPlanSet:
+    """Create a minimal GroupPlanSet for testing."""
+    if placements is None:
+        placements = [
+            GroupPlacement(
+                placement_id="p1",
+                group_id="OUTLINE_1",
+                template_id="gtpl_base_wash_soft",
+                start=PlanningTimeRef(bar=1, beat=1),
+                duration=EffectDuration.PHRASE,
+                intensity=IntensityLevel.MED,
+            ),
+        ]
+
+    section = SectionCoordinationPlan(
+        section_id="intro",
+        theme=ThemeRef(theme_id="theme.holiday.traditional", scope=ThemeScope.SECTION),
+        palette=PaletteRef(palette_id="core.christmas_traditional"),
+        lane_plans=[
+            LanePlan(
+                lane=lane,
+                target_roles=["OUTLINE"],
+                coordination_plans=[
+                    CoordinationPlan(
+                        coordination_mode=CoordinationMode.UNIFIED,
+                        group_ids=["OUTLINE_1"],
+                        placements=placements,
+                    )
+                ],
+            )
+        ],
+    )
+
+    return GroupPlanSet(
+        plan_set_id="test_plan",
+        section_plans=[section],
+    )
+
+
+class TestCompositionEngine:
+    """Tests for the CompositionEngine."""
+
+    def test_basic_composition(self) -> None:
+        """Single placement produces one event on one element."""
+        engine = CompositionEngine(
+            beat_grid=_make_beat_grid(),
+            display_graph=_make_display_graph(),
+            palette_resolver=_make_palette_resolver(),
+        )
+        plan_set = _make_plan_set()
+        render_plan = engine.compose(plan_set)
+
+        assert len(render_plan.groups) == 1
+        assert render_plan.groups[0].element_name == "Outline 1"
+        assert render_plan.total_events == 1
+
+    def test_effect_type_resolved(self) -> None:
+        """Template ID is resolved to xLights effect type."""
+        engine = CompositionEngine(
+            beat_grid=_make_beat_grid(),
+            display_graph=_make_display_graph(),
+            palette_resolver=_make_palette_resolver(),
+        )
+        plan_set = _make_plan_set()
+        render_plan = engine.compose(plan_set)
+
+        event = render_plan.groups[0].layers[0].events[0]
+        # gtpl_base_wash_soft → "Color Wash" via keyword heuristic
+        assert event.effect_type == "Color Wash"
+
+    def test_timing_resolved(self) -> None:
+        """PlanningTimeRef is resolved to milliseconds."""
+        engine = CompositionEngine(
+            beat_grid=_make_beat_grid(),
+            display_graph=_make_display_graph(),
+            palette_resolver=_make_palette_resolver(),
+        )
+        plan_set = _make_plan_set()
+        render_plan = engine.compose(plan_set)
+
+        event = render_plan.groups[0].layers[0].events[0]
+        assert event.start_ms == 0  # bar=1, beat=1
+        assert event.end_ms > 0
+
+    def test_intensity_resolved(self) -> None:
+        """IntensityLevel is resolved to a float."""
+        engine = CompositionEngine(
+            beat_grid=_make_beat_grid(),
+            display_graph=_make_display_graph(),
+            palette_resolver=_make_palette_resolver(),
+        )
+        plan_set = _make_plan_set()
+        render_plan = engine.compose(plan_set)
+
+        event = render_plan.groups[0].layers[0].events[0]
+        # MED intensity for BASE lane
+        assert 0.0 < event.intensity < 1.0
+
+    def test_multi_lane_layout(self) -> None:
+        """BASE and RHYTHM placements go to different layers."""
+        base_placement = GroupPlacement(
+            placement_id="p_base",
+            group_id="OUTLINE_1",
+            template_id="gtpl_base_wash_soft",
+            start=PlanningTimeRef(bar=1, beat=1),
+            duration=EffectDuration.SECTION,
+        )
+        rhythm_placement = GroupPlacement(
+            placement_id="p_rhythm",
+            group_id="OUTLINE_1",
+            template_id="gtpl_rhythm_chase_single",
+            start=PlanningTimeRef(bar=1, beat=1),
+            duration=EffectDuration.SECTION,
+        )
+
+        section = SectionCoordinationPlan(
+            section_id="intro",
+            theme=ThemeRef(theme_id="theme.holiday.traditional", scope=ThemeScope.SECTION),
+            palette=PaletteRef(palette_id="core.christmas_traditional"),
+            lane_plans=[
+                LanePlan(
+                    lane=LaneKind.BASE,
+                    target_roles=["OUTLINE"],
+                    coordination_plans=[
+                        CoordinationPlan(
+                            coordination_mode=CoordinationMode.UNIFIED,
+                            group_ids=["OUTLINE_1"],
+                            placements=[base_placement],
+                        )
+                    ],
+                ),
+                LanePlan(
+                    lane=LaneKind.RHYTHM,
+                    target_roles=["OUTLINE"],
+                    coordination_plans=[
+                        CoordinationPlan(
+                            coordination_mode=CoordinationMode.UNIFIED,
+                            group_ids=["OUTLINE_1"],
+                            placements=[rhythm_placement],
+                        )
+                    ],
+                ),
+            ],
+        )
+
+        plan_set = GroupPlanSet(
+            plan_set_id="test",
+            section_plans=[section],
+        )
+
+        engine = CompositionEngine(
+            beat_grid=_make_beat_grid(),
+            display_graph=_make_display_graph(),
+            palette_resolver=_make_palette_resolver(),
+        )
+        render_plan = engine.compose(plan_set)
+
+        # Should have 1 element with 2 layers
+        assert len(render_plan.groups) == 1
+        assert len(render_plan.groups[0].layers) == 2
+        layer_indices = {ly.layer_index for ly in render_plan.groups[0].layers}
+        assert 0 in layer_indices  # BASE
+        assert 1 in layer_indices  # RHYTHM
+
+    def test_overlap_trim(self) -> None:
+        """Overlapping events in same layer are trimmed."""
+        p1 = GroupPlacement(
+            placement_id="p1",
+            group_id="OUTLINE_1",
+            template_id="gtpl_base_wash_soft",
+            start=PlanningTimeRef(bar=1, beat=1),
+            duration=EffectDuration.PHRASE,  # ~8000ms
+        )
+        p2 = GroupPlacement(
+            placement_id="p2",
+            group_id="OUTLINE_1",
+            template_id="gtpl_base_wash_split",
+            start=PlanningTimeRef(bar=3, beat=1),  # 4000ms
+            duration=EffectDuration.PHRASE,
+        )
+
+        plan_set = _make_plan_set(placements=[p1, p2])
+
+        engine = CompositionEngine(
+            beat_grid=_make_beat_grid(),
+            display_graph=_make_display_graph(),
+            palette_resolver=_make_palette_resolver(),
+        )
+        render_plan = engine.compose(plan_set)
+
+        events = render_plan.groups[0].layers[0].events
+        assert len(events) == 2
+        # First event should be trimmed: its end should not exceed second's start
+        assert events[0].end_ms <= events[1].start_ms
+
+    def test_palette_resolved(self) -> None:
+        """Section palette reference is resolved to colors."""
+        engine = CompositionEngine(
+            beat_grid=_make_beat_grid(),
+            display_graph=_make_display_graph(),
+            palette_resolver=_make_palette_resolver(),
+        )
+        plan_set = _make_plan_set()
+        render_plan = engine.compose(plan_set)
+
+        event = render_plan.groups[0].layers[0].events[0]
+        # core.christmas_traditional palette from the catalog
+        assert "#E53935" in event.palette.colors  # christmas_red
+        assert "#43A047" in event.palette.colors  # christmas_green
+
+    def test_source_traceability(self) -> None:
+        """RenderEvent has source traceability."""
+        engine = CompositionEngine(
+            beat_grid=_make_beat_grid(),
+            display_graph=_make_display_graph(),
+            palette_resolver=_make_palette_resolver(),
+        )
+        plan_set = _make_plan_set()
+        render_plan = engine.compose(plan_set)
+
+        event = render_plan.groups[0].layers[0].events[0]
+        assert event.source.section_id == "intro"
+        assert event.source.lane == LaneKind.BASE
+        assert event.source.template_id == "gtpl_base_wash_soft"
+
+    def test_diagnostics_on_zero_duration(self) -> None:
+        """Zero-duration placements produce a diagnostic."""
+        # Place at the very end of the sequence
+        p = GroupPlacement(
+            placement_id="p_end",
+            group_id="OUTLINE_1",
+            template_id="gtpl_accent_hit_white",
+            start=PlanningTimeRef(bar=16, beat=4),
+            duration=EffectDuration.PHRASE,  # extends past sequence end
+        )
+        plan_set = _make_plan_set(placements=[p], lane=LaneKind.ACCENT)
+        engine = CompositionEngine(
+            beat_grid=_make_beat_grid(),
+            display_graph=_make_display_graph(),
+            palette_resolver=_make_palette_resolver(),
+        )
+        render_plan = engine.compose(plan_set)
+
+        # The placement should either produce an event clamped to
+        # sequence end, or produce a diagnostic if zero-duration
+        total = render_plan.total_events + len(render_plan.diagnostics)
+        assert total >= 1  # Something was produced
+
+
+class TestSectionBoundaryClamping:
+    """Tests for section boundary clamping via start_ms/end_ms."""
+
+    def test_effect_clamped_to_section_end(self) -> None:
+        """An effect extending past section_end_ms should be clamped."""
+        # Section ends at bar 4 (4000ms at 120 BPM, 4/4)
+        section_end_ms = 4000
+
+        # Place a PHRASE effect (16 beats = 8000ms) starting at bar 1
+        # Without clamping it would end at 8000ms; with clamping → 4000ms
+        p = GroupPlacement(
+            placement_id="p1",
+            group_id="OUTLINE_1",
+            template_id="gtpl_base_wash_soft",
+            start=PlanningTimeRef(bar=1, beat=1),
+            duration=EffectDuration.PHRASE,
+            intensity=IntensityLevel.MED,
+        )
+
+        section = SectionCoordinationPlan(
+            section_id="test_section",
+            theme=ThemeRef(
+                theme_id="theme.holiday.traditional", scope=ThemeScope.SECTION
+            ),
+            palette=PaletteRef(palette_id="core.christmas_traditional"),
+            start_ms=0,
+            end_ms=section_end_ms,
+            lane_plans=[
+                LanePlan(
+                    lane=LaneKind.BASE,
+                    target_roles=["OUTLINE"],
+                    coordination_plans=[
+                        CoordinationPlan(
+                            coordination_mode=CoordinationMode.UNIFIED,
+                            group_ids=["OUTLINE_1"],
+                            placements=[p],
+                        )
+                    ],
+                )
+            ],
+        )
+
+        plan_set = GroupPlanSet(
+            plan_set_id="test_clamp",
+            section_plans=[section],
+        )
+
+        engine = CompositionEngine(
+            beat_grid=_make_beat_grid(),
+            display_graph=_make_display_graph(),
+            palette_resolver=_make_palette_resolver(),
+        )
+        render_plan = engine.compose(plan_set)
+
+        assert render_plan.total_events == 1
+        event = render_plan.groups[0].layers[0].events[0]
+        # Effect should be clamped to section end (snapped to 20ms grid)
+        assert event.end_ms <= section_end_ms
+
+    def test_section_duration_fills_to_section_end(self) -> None:
+        """SECTION duration should use section_end_ms, not sequence end."""
+        section_end_ms = 6000
+
+        p = GroupPlacement(
+            placement_id="p1",
+            group_id="OUTLINE_1",
+            template_id="gtpl_base_wash_soft",
+            start=PlanningTimeRef(bar=1, beat=1),
+            duration=EffectDuration.SECTION,
+            intensity=IntensityLevel.MED,
+        )
+
+        section = SectionCoordinationPlan(
+            section_id="test_section",
+            theme=ThemeRef(
+                theme_id="theme.holiday.traditional", scope=ThemeScope.SECTION
+            ),
+            palette=PaletteRef(palette_id="core.christmas_traditional"),
+            start_ms=0,
+            end_ms=section_end_ms,
+            lane_plans=[
+                LanePlan(
+                    lane=LaneKind.BASE,
+                    target_roles=["OUTLINE"],
+                    coordination_plans=[
+                        CoordinationPlan(
+                            coordination_mode=CoordinationMode.UNIFIED,
+                            group_ids=["OUTLINE_1"],
+                            placements=[p],
+                        )
+                    ],
+                )
+            ],
+        )
+
+        plan_set = GroupPlanSet(
+            plan_set_id="test_section_dur",
+            section_plans=[section],
+        )
+
+        engine = CompositionEngine(
+            beat_grid=_make_beat_grid(),
+            display_graph=_make_display_graph(),
+            palette_resolver=_make_palette_resolver(),
+        )
+        render_plan = engine.compose(plan_set)
+
+        assert render_plan.total_events == 1
+        event = render_plan.groups[0].layers[0].events[0]
+        # SECTION duration should use section_end_ms (snapped to 20ms)
+        assert event.end_ms == 6000
+
+    def test_no_section_timing_uses_sequence_end(self) -> None:
+        """Without section timing, SECTION duration uses full sequence."""
+        # This is the backward-compatible behavior
+        plan_set = _make_plan_set(
+            placements=[
+                GroupPlacement(
+                    placement_id="p1",
+                    group_id="OUTLINE_1",
+                    template_id="gtpl_base_wash_soft",
+                    start=PlanningTimeRef(bar=1, beat=1),
+                    duration=EffectDuration.SECTION,
+                    intensity=IntensityLevel.MED,
+                ),
+            ]
+        )
+        # plan_set sections have no start_ms/end_ms (defaults to None)
+
+        engine = CompositionEngine(
+            beat_grid=_make_beat_grid(),
+            display_graph=_make_display_graph(),
+            palette_resolver=_make_palette_resolver(),
+        )
+        render_plan = engine.compose(plan_set)
+
+        assert render_plan.total_events == 1
+        event = render_plan.groups[0].layers[0].events[0]
+        # Should fill to sequence end (16 bars at 120 BPM = 32000ms)
+        assert event.end_ms == 32000
+
+
+class TestTransitionPolicy:
+    """Tests for per-lane fade-in / fade-out transition assignment."""
+
+    def test_base_lane_has_long_fade(self) -> None:
+        """BASE lane effects should have 1.0s fade-in and fade-out."""
+        engine = CompositionEngine(
+            beat_grid=_make_beat_grid(),
+            display_graph=_make_display_graph(),
+            palette_resolver=_make_palette_resolver(),
+        )
+        plan_set = _make_plan_set(lane=LaneKind.BASE)
+        render_plan = engine.compose(plan_set)
+
+        event = render_plan.groups[0].layers[0].events[0]
+        assert event.transition_in is not None
+        assert event.transition_in.type == "Fade"
+        assert event.transition_in.duration_ms == 1000
+        assert event.transition_out is not None
+        assert event.transition_out.type == "Fade"
+        assert event.transition_out.duration_ms == 1000
+
+    def test_rhythm_lane_has_short_fade(self) -> None:
+        """RHYTHM lane effects should have 0.3s fade-in and fade-out."""
+        engine = CompositionEngine(
+            beat_grid=_make_beat_grid(),
+            display_graph=_make_display_graph(),
+            palette_resolver=_make_palette_resolver(),
+        )
+        plan_set = _make_plan_set(lane=LaneKind.RHYTHM)
+        render_plan = engine.compose(plan_set)
+
+        event = render_plan.groups[0].layers[0].events[0]
+        assert event.transition_in is not None
+        assert event.transition_in.duration_ms == 300
+        assert event.transition_out is not None
+        assert event.transition_out.duration_ms == 300
+
+    def test_accent_lane_no_fade_in(self) -> None:
+        """ACCENT lane effects should have no fade-in (punchy entrance)."""
+        engine = CompositionEngine(
+            beat_grid=_make_beat_grid(),
+            display_graph=_make_display_graph(),
+            palette_resolver=_make_palette_resolver(),
+        )
+        plan_set = _make_plan_set(lane=LaneKind.ACCENT)
+        render_plan = engine.compose(plan_set)
+
+        event = render_plan.groups[0].layers[0].events[0]
+        assert event.transition_in is None
+
+    def test_accent_lane_has_short_fade_out(self) -> None:
+        """ACCENT lane effects should have 0.2s fade-out."""
+        engine = CompositionEngine(
+            beat_grid=_make_beat_grid(),
+            display_graph=_make_display_graph(),
+            palette_resolver=_make_palette_resolver(),
+        )
+        plan_set = _make_plan_set(lane=LaneKind.ACCENT)
+        render_plan = engine.compose(plan_set)
+
+        event = render_plan.groups[0].layers[0].events[0]
+        assert event.transition_out is not None
+        assert event.transition_out.type == "Fade"
+        assert event.transition_out.duration_ms == 200
+
+    def test_resolve_transitions_static(self) -> None:
+        """_resolve_transitions returns correct TransitionSpec objects."""
+        t_in, t_out = CompositionEngine._resolve_transitions(LaneKind.BASE)
+        assert isinstance(t_in, TransitionSpec)
+        assert isinstance(t_out, TransitionSpec)
+        assert t_in.duration_ms == 1000
+        assert t_out.duration_ms == 1000
+
+        t_in, t_out = CompositionEngine._resolve_transitions(LaneKind.ACCENT)
+        assert t_in is None
+        assert t_out is not None
+        assert t_out.duration_ms == 200
+
+
+class TestBlendModeAssignment:
+    """Tests for blend mode assignment on RenderLayerPlan."""
+
+    def test_base_layer_blend_mode_normal(self) -> None:
+        """BASE layer should have 'Normal' blend mode."""
+        engine = CompositionEngine(
+            beat_grid=_make_beat_grid(),
+            display_graph=_make_display_graph(),
+            palette_resolver=_make_palette_resolver(),
+        )
+        plan_set = _make_plan_set(lane=LaneKind.BASE)
+        render_plan = engine.compose(plan_set)
+
+        layer = render_plan.groups[0].layers[0]
+        assert layer.blend_mode == "Normal"
+
+    def test_multi_lane_blend_modes(self) -> None:
+        """Multiple lanes get correct blend modes from the allocator."""
+        base_p = GroupPlacement(
+            placement_id="p_base",
+            group_id="OUTLINE_1",
+            template_id="gtpl_base_wash_soft",
+            start=PlanningTimeRef(bar=1, beat=1),
+            duration=EffectDuration.SECTION,
+            intensity=IntensityLevel.MED,
+        )
+        accent_p = GroupPlacement(
+            placement_id="p_accent",
+            group_id="OUTLINE_1",
+            template_id="gtpl_accent_motif_strobe_hit_big",
+            start=PlanningTimeRef(bar=1, beat=1),
+            duration=EffectDuration.HIT,
+            intensity=IntensityLevel.PEAK,
+        )
+
+        section = SectionCoordinationPlan(
+            section_id="multi_lane",
+            theme=ThemeRef(
+                theme_id="theme.holiday.traditional",
+                scope=ThemeScope.SECTION,
+            ),
+            palette=PaletteRef(palette_id="core.christmas_traditional"),
+            lane_plans=[
+                LanePlan(
+                    lane=LaneKind.BASE,
+                    target_roles=["OUTLINE"],
+                    coordination_plans=[
+                        CoordinationPlan(
+                            coordination_mode=CoordinationMode.UNIFIED,
+                            group_ids=["OUTLINE_1"],
+                            placements=[base_p],
+                        )
+                    ],
+                ),
+                LanePlan(
+                    lane=LaneKind.ACCENT,
+                    target_roles=["OUTLINE"],
+                    coordination_plans=[
+                        CoordinationPlan(
+                            coordination_mode=CoordinationMode.UNIFIED,
+                            group_ids=["OUTLINE_1"],
+                            placements=[accent_p],
+                        )
+                    ],
+                ),
+            ],
+        )
+
+        plan_set = GroupPlanSet(
+            plan_set_id="blend_test",
+            section_plans=[section],
+        )
+
+        engine = CompositionEngine(
+            beat_grid=_make_beat_grid(),
+            display_graph=_make_display_graph(),
+            palette_resolver=_make_palette_resolver(),
+        )
+        render_plan = engine.compose(plan_set)
+
+        # Should have 2 layers on the same element
+        group = render_plan.groups[0]
+        assert len(group.layers) == 2
+        # Both layers have their blend mode set (even if both are Normal)
+        for layer in group.layers:
+            assert isinstance(layer.blend_mode, str)
+            assert len(layer.blend_mode) > 0

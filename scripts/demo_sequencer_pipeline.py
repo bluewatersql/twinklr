@@ -50,6 +50,7 @@ from twinklr.core.sequencer.templates.group import load_builtin_group_templates
 from twinklr.core.sequencer.templates.group.catalog import (
     build_template_catalog as build_catalog_from_registry,
 )
+from twinklr.core.sequencer.templates.group.models.display import ElementType
 from twinklr.core.session import TwinklrSession
 from twinklr.core.utils.formatting import clean_audio_filename
 from twinklr.core.utils.logging import configure_logging
@@ -83,20 +84,33 @@ def save_artifact(data: dict, song_name: str, filename: str, output_dir: Path) -
 
 
 def build_display_graph(display_groups: list[dict]) -> DisplayGraph:
-    """Build DisplayGraph from display group configs."""
+    """Build DisplayGraph from display group configs.
+
+    Creates one DisplayGroup entry per role (group-based targeting).
+    Each entry represents an xLights model group that the planner
+    targets directly (e.g., ``ARCHES`` not ``ARCHES_1``).
+
+    The ``fixture_count`` field carries the model count for planning
+    context (e.g., how many arches are in the group).
+
+    Single-model roles (model_count=1) use ``ElementType.MODEL``.
+    Multi-model roles use ``ElementType.MODEL_GROUP``.
+    """
     groups_list = []
     for g in display_groups:
         role_key = str(g["role_key"])
         model_count: int = g["model_count"]  # type: ignore[assignment]
-        count = min(model_count, 3)
-        for i in range(1, count + 1):
-            groups_list.append(
-                DisplayGroup(
-                    group_id=f"{role_key}_{i}",
-                    role=role_key,
-                    display_name=f"{role_key} {i}",
-                )
+        element_type = ElementType.MODEL if model_count == 1 else ElementType.MODEL_GROUP
+
+        groups_list.append(
+            DisplayGroup(
+                group_id=role_key,
+                role=role_key,
+                display_name=role_key,
+                element_type=element_type,
+                fixture_count=model_count,
             )
+        )
 
     return DisplayGraph(
         display_id="demo_display",
