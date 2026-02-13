@@ -5,7 +5,7 @@ remote_theme: pages-themes/minimal@v0.2.0
 
 title: "Twinklr"
 description: "AI-powered choreography for Christmas light shows"
-logo: assets/twinklr_logo_light_mode.png
+logo: assets/twinklr_logo_light.png
 
 # Markdown rendering
 markdown: kramdown
