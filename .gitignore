@@ -2,6 +2,7 @@
 .archive/
 .venv/
 .dev/
+.vscode/
 
 # Python cache and test artifacts
 .pytest_cache/
