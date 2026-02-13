@@ -46,6 +46,10 @@ from twinklr.core.pipeline import (
     PipelineExecutor,
     StageDefinition,
 )
+from twinklr.core.pipeline.display_stages import (
+    AssetResolutionStage,
+    DisplayRenderStage,
+)
 from twinklr.core.sequencer.templates.group import load_builtin_group_templates
 from twinklr.core.sequencer.templates.group.catalog import (
     build_template_catalog as build_catalog_from_registry,
@@ -282,6 +286,22 @@ async def main() -> None:
             #     inputs=["aggregate"],
             #     description="Evaluate complete GroupPlanSet quality",
             # ),
+            # Stage 7: Asset Resolution (resolve plan → catalog entries)
+            # Reads optional asset_catalog from context.state
+            StageDefinition(
+                id="asset_resolution",
+                stage=AssetResolutionStage(),
+                inputs=["aggregate"],
+                description="Resolve plan assets against catalog (overlay rendering)",
+            ),
+            # Stage 8: Display Rendering (GroupPlanSet → XSequence)
+            # Reads beat_grid, display_graph, asset_catalog from context.state
+            StageDefinition(
+                id="display_render",
+                stage=DisplayRenderStage(display_graph=display_graph),
+                inputs=["asset_resolution"],
+                description="Render effects into xLights .xsq sequence",
+            ),
         ],
     )
 
@@ -310,6 +330,9 @@ async def main() -> None:
         session=session,
         output_dir=output_dir,
     )
+
+    # Store display graph in state for rendering stages
+    pipeline_context.set_state("display_graph", display_graph)
 
     print(f"🎵 Input: {audio_path.name}")
     print("🚀 Starting pipeline execution...")
@@ -417,6 +440,25 @@ async def main() -> None:
         )
         print(f"📄 Holistic evaluation: {holistic_path.stem}")
 
+    # Display render → XSQ export
+    if "display_render" in result.outputs:
+        render_output = result.outputs["display_render"]
+        render_result = render_output["render_result"]
+        xsequence = render_output["sequence"]
+
+        # Export .xsq file
+        from twinklr.core.formats.xlights.sequence.exporter import XSQExporter
+
+        xsq_path = output_dir / f"{song_name}_display.xsq"
+        exporter = XSQExporter()
+        exporter.export(xsequence, xsq_path)
+        print(f"📄 XSQ output: {xsq_path.name}")
+        print(
+            f"   Effects: {render_result.effects_written}, "
+            f"Elements: {render_result.elements_created}, "
+            f"Warnings: {len(render_result.warnings)}"
+        )
+
     # Metrics summary
     print_subsection("Pipeline Metrics")
     for key, value in pipeline_context.metrics.items():
@@ -435,15 +477,8 @@ async def main() -> None:
         print("  3. MacroPlanner → list[MacroSectionPlan]")
         print("  4. GroupPlanner (FAN_OUT per section)")
         print("  5. Aggregator (collect section plans)")
-        print("  6. Holistic Evaluation")
-
-        # if "holistic" in result.outputs:
-        #     holistic = result.outputs["holistic"]
-        #     print(f"\n🎯 Final Score: {holistic.score:.1f}/10")
-        #     print(f"   Status: {holistic.status.value}")
-        #     print(f"   Approved: {'✅ Yes' if holistic.is_approved else '❌ No'}")
-        #     if holistic.cross_section_issues:
-        #         print(f"   Issues: {len(holistic.cross_section_issues)}")
+        print("  6. Asset Resolution")
+        print("  7. Display Rendering → .xsq export")
 
         if "aggregate" in result.outputs:
             gps = result.outputs["aggregate"]
@@ -457,15 +492,14 @@ async def main() -> None:
                         f"{nd.subject[:50]}... (sections: {sections})"
                     )
 
+        if "display_render" in result.outputs:
+            rr = result.outputs["display_render"]["render_result"]
+            print(f"\n🎄 Display Render: {rr.effects_written} effects on {rr.elements_created} elements")
+
     else:
         print("❌ Pipeline failed. Check logs for details.")
 
     print(f"\n📁 All artifacts saved to: {output_dir}")
-
-    print("\nPending stages (not yet implemented):")
-    print("  8. Asset Generation (imagery/shaders)")
-    print("  9. Sequence Assembly (IR composition)")
-    print(" 10. Rendering & Export (xLights .xsq)")
 
 
 if __name__ == "__main__":

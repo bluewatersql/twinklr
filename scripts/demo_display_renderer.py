@@ -313,6 +313,57 @@ def print_result_summary(result: RenderResult) -> None:
     print("=" * 60)
 
 
+def load_catalog(catalog_path: Path) -> object:
+    """Load an AssetCatalog from a JSON file.
+
+    Args:
+        catalog_path: Path to asset_catalog.json.
+
+    Returns:
+        AssetCatalog with all entries.
+    """
+    from twinklr.core.agents.assets.models import AssetCatalog
+
+    logger.info("Loading asset catalog from %s", catalog_path)
+    with catalog_path.open() as f:
+        data = json.load(f)
+    catalog = AssetCatalog.model_validate(data)
+    logger.info(
+        "Catalog loaded: %d entries (%d created, %d cached, %d failed)",
+        len(catalog.entries),
+        catalog.total_created,
+        catalog.total_cached,
+        catalog.total_failed,
+    )
+    return catalog
+
+
+def print_asset_resolution_summary(
+    plan_set: GroupPlanSet,
+    resolved_plan: GroupPlanSet,
+) -> None:
+    """Print a summary of asset resolution results.
+
+    Args:
+        plan_set: Original plan (before resolution).
+        resolved_plan: Plan after resolution.
+    """
+    resolved_count = 0
+    total_placements = 0
+    for sp in resolved_plan.section_plans:
+        for lp in sp.lane_plans:
+            for cp in lp.coordination_plans:
+                for p in cp.placements:
+                    total_placements += 1
+                    if p.resolved_asset_ids:
+                        resolved_count += 1
+
+    print("\n--- Asset Resolution ---")
+    print(f"  Placements:  {total_placements}")
+    print(f"  Resolved:    {resolved_count}")
+    print(f"  Unresolved:  {total_placements - resolved_count}")
+
+
 def main() -> None:
     """Run the display renderer demo."""
     default_artifact = Path("artifacts/02_rudolph_the_red_nosed_reindeer")
@@ -329,6 +380,18 @@ def main() -> None:
         type=Path,
         default=default_artifact / "audio_profile.json",
         help="Path to audio_profile.json (provides tempo, duration, section timing)",
+    )
+    parser.add_argument(
+        "--catalog",
+        type=Path,
+        default=None,
+        help="Path to asset_catalog.json (enables asset overlay rendering)",
+    )
+    parser.add_argument(
+        "--asset-base-path",
+        type=Path,
+        default=None,
+        help="Base path for image/video assets (for Pictures handler)",
     )
     parser.add_argument(
         "--out",
@@ -354,14 +417,35 @@ def main() -> None:
     # 3. Populate section timing on the plan from audio profile
     plan_set = populate_section_timing(plan_set, audio["sections"])
 
-    # 4. Build supporting infrastructure
+    # 4. Optional: Load asset catalog and resolve plan assets
+    catalog_index: dict[str, object] | None = None
+    if args.catalog and args.catalog.exists():
+        catalog = load_catalog(args.catalog)
+
+        # Resolve plan assets (populate resolved_asset_ids)
+        from twinklr.core.agents.assets.resolver import resolve_plan_assets
+
+        resolved_plan = resolve_plan_assets(plan_set, catalog)
+        print_asset_resolution_summary(plan_set, resolved_plan)
+        plan_set = resolved_plan
+
+        # Build catalog index for overlay rendering
+        catalog_index = catalog.build_index()
+        logger.info(
+            "Catalog index: %d entries available for overlay rendering",
+            len(catalog_index),
+        )
+    elif args.catalog:
+        logger.warning("Catalog file not found: %s", args.catalog)
+
+    # 5. Build supporting infrastructure
     beat_grid = build_beat_grid(duration_ms, tempo_bpm=tempo_bpm)
     display_graph = build_display_graph()
 
-    # 5. Create empty XSequence
+    # 6. Create empty XSequence
     sequence = build_empty_sequence(int(duration_ms))
 
-    # 6. Run the display renderer
+    # 7. Run the display renderer
     config = RenderConfig()
     renderer = DisplayRenderer(
         beat_grid=beat_grid,
@@ -369,12 +453,17 @@ def main() -> None:
         config=config,
     )
 
-    result = renderer.render(plan_set, sequence)
+    result = renderer.render(
+        plan_set,
+        sequence,
+        asset_base_path=args.asset_base_path,
+        catalog_index=catalog_index,
+    )
 
-    # 7. Print summary
+    # 8. Print summary
     print_result_summary(result)
 
-    # 8. Export .xsq
+    # 9. Export .xsq
     args.out.parent.mkdir(parents=True, exist_ok=True)
     exporter = XSQExporter()
     exporter.export(sequence, args.out)

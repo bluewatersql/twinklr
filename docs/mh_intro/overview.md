@@ -28,16 +28,7 @@ Moving heads are different. Borrowed from concert stages and adopted by the Chri
 
 The problem is that "coordinated" is doing a lot of heavy lifting. Here's what a fan formation actually means:
 
-```
-    8 moving heads on a roofline, "fan" formation:
-
-     [1]    [2]    [3]    [4]    [5]    [6]    [7]    [8]
-      ↙      ↙      ↙      ↙      ↘      ↘      ↘      ↘
-    -60°   -45°   -30°   -15°   +15°   +30°   +45°   +60°
-
-    Every angle = f(position, fixture_count).
-    The LLM says "fan_pulse." The rest is trig.
-```
+![8 moving heads on a roofline, "fan" formation](assets/illustrations/00_coordinated_moving_heads.png)
 
 Every fixture's pan angle is mathematically derived from its position. Then that geometry needs to *evolve with the music* — tighter formations during quiet verses, wide dramatic fans at the chorus, staggered chase patterns during builds. Every one of those parameters is a DMX channel value that changes over time, aligned to the beat grid of the song.
 
