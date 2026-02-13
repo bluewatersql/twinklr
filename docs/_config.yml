@@ -1,0 +1,26 @@
+# GitHub Pages configuration for Twinklr blog
+# Theme: "minimal" — clean, neutral base that stays out of the way.
+# Custom CSS in assets/css/style.scss handles the warm cream palette.
+remote_theme: pages-themes/minimal@v0.2.0
+
+title: "Twinklr"
+description: "AI-powered choreography for Christmas light shows"
+logo: assets/twinklr_logo_light_mode.png
+
+# Markdown rendering
+markdown: kramdown
+kramdown:
+  input: GFM
+  hard_wrap: false
+  syntax_highlighter: rouge
+
+# Exclude build/dev artifacts from the published site
+exclude:
+  - Makefile
+  - packages/
+  - tests/
+  - data/blog/utils/
+  - changes/
+  - "*.py"
+  - uv.lock
+  - pyproject.toml
