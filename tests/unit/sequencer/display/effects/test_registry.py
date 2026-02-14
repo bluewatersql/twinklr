@@ -84,7 +84,7 @@ class TestLoadBuiltinHandlers:
         expected = {
             "On", "Color Wash", "SingleStrand", "Spirals", "Pictures",
             "Fan", "Shockwave", "Strobe", "Twinkle", "Snowflakes",
-            "Marquee", "Meteors",
+            "Marquee", "Meteors", "Ripple", "Fire", "Pinwheel",
         }
         assert set(reg.registered_types) == expected
 

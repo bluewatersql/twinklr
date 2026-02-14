@@ -1,4 +1,4 @@
-"""Unit tests for XSQWriter — transition and blend-mode augmentation."""
+"""Unit tests for XSQWriter — transition, blend-mode, and intensity augmentation."""
 
 from __future__ import annotations
 
@@ -13,23 +13,29 @@ from twinklr.core.sequencer.display.models.render_event import (
 )
 from twinklr.core.sequencer.vocabulary import LaneKind
 
+_DEFAULT_PALETTE = ResolvedPalette(
+    colors=["#FF0000", "#00FF00"],
+    active_slots=[1, 2],
+)
+
 
 def _make_event(
     *,
     transition_in: TransitionSpec | None = None,
     transition_out: TransitionSpec | None = None,
+    intensity: float = 1.0,
+    effect_type: str = "Color Wash",
+    palette: ResolvedPalette | None = None,
 ) -> RenderEvent:
     """Create a minimal RenderEvent for testing augmentation."""
     return RenderEvent(
         event_id="test_evt",
         start_ms=0,
         end_ms=1000,
-        effect_type="Color Wash",
+        effect_type=effect_type,
         parameters={},
-        palette=ResolvedPalette(
-            colors=["#FF0000", "#00FF00"],
-            active_slots=[1, 2],
-        ),
+        intensity=intensity,
+        palette=palette or _DEFAULT_PALETTE,
         transition_in=transition_in,
         transition_out=transition_out,
         source=RenderEventSource(
@@ -193,3 +199,94 @@ class TestAugmentSettings:
             blend_mode="Normal",
         )
         assert "T_CHECKBOX_Out_Transition_Reverse=1" in result
+
+
+class TestApplyIntensityBrightness:
+    """Tests for XSQWriter._apply_intensity_brightness.
+
+    Intensity (0.0-1.0) is mapped to xLights C_SLIDER_Brightness
+    (0-100) on the palette, providing universal brightness control
+    for all non-On effects.
+    """
+
+    def test_full_intensity_unchanged(self) -> None:
+        """intensity=1.0 leaves palette unchanged (no brightness key)."""
+        palette = _DEFAULT_PALETTE
+        result = XSQWriter._apply_intensity_brightness(
+            palette, intensity=1.0, effect_name="Color Wash"
+        )
+        assert result.brightness is None  # No brightness override
+
+    def test_half_intensity_sets_brightness_50(self) -> None:
+        """intensity=0.5 sets brightness to 50."""
+        palette = _DEFAULT_PALETTE
+        result = XSQWriter._apply_intensity_brightness(
+            palette, intensity=0.5, effect_name="Spirals"
+        )
+        assert result.brightness == 50
+
+    def test_zero_intensity_sets_brightness_0(self) -> None:
+        """intensity=0.0 sets brightness to 0 (blackout)."""
+        palette = _DEFAULT_PALETTE
+        result = XSQWriter._apply_intensity_brightness(
+            palette, intensity=0.0, effect_name="Twinkle"
+        )
+        assert result.brightness == 0
+
+    def test_quarter_intensity(self) -> None:
+        """intensity=0.25 sets brightness to 25."""
+        palette = _DEFAULT_PALETTE
+        result = XSQWriter._apply_intensity_brightness(
+            palette, intensity=0.25, effect_name="Fan"
+        )
+        assert result.brightness == 25
+
+    def test_on_effect_skipped(self) -> None:
+        """On effects are skipped — they handle intensity via E_ keys."""
+        palette = _DEFAULT_PALETTE
+        result = XSQWriter._apply_intensity_brightness(
+            palette, intensity=0.3, effect_name="On"
+        )
+        assert result.brightness is None  # Unchanged
+
+    def test_composes_with_existing_brightness(self) -> None:
+        """If palette already has brightness, intensity multiplies it."""
+        palette = ResolvedPalette(
+            colors=["#FF0000"],
+            active_slots=[1],
+            brightness=80,  # Already reduced
+        )
+        result = XSQWriter._apply_intensity_brightness(
+            palette, intensity=0.5, effect_name="Color Wash"
+        )
+        # 80 * 0.5 = 40
+        assert result.brightness == 40
+
+    def test_preserves_other_palette_fields(self) -> None:
+        """Non-brightness palette fields are preserved."""
+        palette = ResolvedPalette(
+            colors=["#FF0000", "#00FF00"],
+            active_slots=[1, 2],
+            sparkle_frequency=50,
+            music_sparkles=True,
+        )
+        result = XSQWriter._apply_intensity_brightness(
+            palette, intensity=0.5, effect_name="Color Wash"
+        )
+        assert result.brightness == 50
+        assert result.sparkle_frequency == 50
+        assert result.music_sparkles is True
+        assert result.colors == ["#FF0000", "#00FF00"]
+
+    def test_works_for_all_non_on_effect_types(self) -> None:
+        """Brightness is applied for every non-On effect type."""
+        palette = _DEFAULT_PALETTE
+        for effect_name in [
+            "Color Wash", "Spirals", "SingleStrand", "Fan",
+            "Shockwave", "Strobe", "Twinkle", "Snowflakes",
+            "Marquee", "Meteors", "Pictures",
+        ]:
+            result = XSQWriter._apply_intensity_brightness(
+                palette, intensity=0.5, effect_name=effect_name
+            )
+            assert result.brightness == 50, f"Failed for {effect_name}"

@@ -10,18 +10,9 @@ import logging
 
 from twinklr.core.sequencer.timing.beat_grid import BeatGrid
 from twinklr.core.sequencer.vocabulary import EffectDuration, PlanningTimeRef
+from twinklr.core.sequencer.vocabulary.duration import DURATION_BEATS
 
 logger = logging.getLogger(__name__)
-
-# Duration → beat count mapping
-# These are approximate; the resolver clamps to section boundaries.
-_DURATION_BEATS: dict[EffectDuration, int] = {
-    EffectDuration.HIT: 1,       # 1 beat
-    EffectDuration.BURST: 4,     # 1 bar (4 beats)
-    EffectDuration.PHRASE: 16,   # 4 bars (16 beats)
-    EffectDuration.EXTENDED: 32,  # 8 bars (32 beats)
-    EffectDuration.SECTION: -1,  # Special: full section
-}
 
 
 class TimingResolver:
@@ -78,8 +69,16 @@ class TimingResolver:
         start_ms: int,
         duration: EffectDuration,
         section_end_ms: int | None = None,
+        duration_bias: float = 0.5,
     ) -> int:
         """Resolve an EffectDuration to an end time in milliseconds.
+
+        Duration categories with ranges (like PHRASE = 2-4 bars) are
+        interpolated using ``duration_bias``:
+
+        - ``0.0`` → minimum (tighter, shorter effects)
+        - ``0.5`` → midpoint (default, balanced)
+        - ``1.0`` → maximum (longest allowed for category)
 
         When ``section_end_ms`` is provided, the result is snapped DOWN
         to the 20ms grid to avoid bleeding past the section boundary.
@@ -89,6 +88,8 @@ class TimingResolver:
             duration: Categorical duration.
             section_end_ms: Optional section end time for clamping.
                 If provided and duration is SECTION, uses this as end.
+            duration_bias: Interpolation between min and max of the
+                duration range (0.0-1.0, default 0.5 = midpoint).
 
         Returns:
             End time in milliseconds, snapped to 20ms grid.
@@ -101,7 +102,7 @@ class TimingResolver:
             # Fallback: use sequence duration
             return self._snap_to_grid(self._beat_grid.duration_ms)
 
-        beat_count = _DURATION_BEATS.get(duration, 4)
+        beat_count = self._resolve_beat_count(duration, duration_bias)
         ms_per_beat = 60_000.0 / self._beat_grid.tempo_bpm
         end_ms = start_ms + int(beat_count * ms_per_beat)
 
@@ -120,6 +121,33 @@ class TimingResolver:
         if clamped:
             return self._snap_down_to_grid(end_ms)
         return self._snap_to_grid(end_ms)
+
+    @staticmethod
+    def _resolve_beat_count(
+        duration: EffectDuration, bias: float = 0.5
+    ) -> int:
+        """Resolve an EffectDuration to a beat count using the vocabulary range.
+
+        Interpolates between the min and max beats defined in
+        ``DURATION_BEATS`` using the ``bias`` parameter.
+
+        Args:
+            duration: Categorical duration.
+            bias: Interpolation (0.0 = min, 0.5 = mid, 1.0 = max).
+
+        Returns:
+            Beat count as integer.
+        """
+        bounds = DURATION_BEATS.get(duration)
+        if bounds is None:
+            return 4  # Sensible default
+
+        min_b, max_b = bounds
+        if min_b is None or max_b is None:
+            return 4  # SECTION or unknown
+
+        bias = max(0.0, min(1.0, bias))
+        return min_b + int((max_b - min_b) * bias)
 
     def snap(self, ms: float) -> int:
         """Snap a time value to the nearest 20ms xLights timing grid.

@@ -50,6 +50,14 @@ class PaletteResolver:
     def resolve(self, palette_ref: PaletteRef | None) -> ResolvedPalette:
         """Resolve a PaletteRef to a concrete ResolvedPalette.
 
+        Performs a catalog lookup by ``palette_id``, then applies the
+        optional ``intensity`` scaler (0.0-1.0) as palette brightness.
+
+        .. note::
+           ``PaletteRef.role`` and ``PaletteRef.variant`` are available
+           for future use (e.g., color subset selection, palette variant
+           lookup) but are not currently consumed.
+
         Args:
             palette_ref: Palette reference from the plan, or None for default.
 
@@ -61,31 +69,56 @@ class PaletteResolver:
 
         palette_id = palette_ref.palette_id
 
-        # Check cache first
+        # Cache lookup on palette_id (base colors only)
         if palette_id in self._cache:
-            return self._cache[palette_id]
+            base = self._cache[palette_id]
+        else:
+            try:
+                definition = self._catalog.get(palette_id)
+            except (ItemNotFoundError, KeyError):
+                logger.warning(
+                    "Palette '%s' not found in catalog, using default",
+                    palette_id,
+                )
+                return self._default
 
-        # Look up in catalog
-        try:
-            definition = self._catalog.get(palette_id)
-        except (ItemNotFoundError, KeyError):
-            logger.warning(
-                "Palette '%s' not found in catalog, using default",
+            base = self._definition_to_palette(definition)
+            self._cache[palette_id] = base
+
+            logger.debug(
+                "Resolved palette '%s': %d colors %s",
                 palette_id,
+                len(base.colors),
+                base.colors,
             )
-            return self._default
 
-        resolved = self._definition_to_palette(definition)
-        self._cache[palette_id] = resolved
+        # Apply palette-level intensity scaler
+        return self._apply_palette_intensity(base, palette_ref.intensity)
 
-        logger.debug(
-            "Resolved palette '%s': %d colors %s",
-            palette_id,
-            len(resolved.colors),
-            resolved.colors,
-        )
+    @staticmethod
+    def _apply_palette_intensity(
+        palette: ResolvedPalette,
+        intensity: float | None,
+    ) -> ResolvedPalette:
+        """Apply a PaletteRef intensity scaler to the resolved palette.
 
-        return resolved
+        Maps ``intensity`` (0.0-1.0) to ``C_SLIDER_Brightness`` (0-100).
+        Composes with any existing brightness on the palette.
+
+        Args:
+            palette: Base resolved palette.
+            intensity: Optional intensity scaler (0.0-1.0). None or 1.0
+                means no adjustment.
+
+        Returns:
+            Palette with brightness applied, or unchanged if not needed.
+        """
+        if intensity is None or intensity >= 1.0:
+            return palette
+
+        base_brightness = palette.brightness if palette.brightness is not None else 100
+        effective = max(0, min(100, int(base_brightness * intensity)))
+        return palette.model_copy(update={"brightness": effective})
 
     @staticmethod
     def _definition_to_palette(definition: PaletteDefinition) -> ResolvedPalette:

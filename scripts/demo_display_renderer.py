@@ -2,9 +2,9 @@
 """Demo script for the display renderer pipeline.
 
 Loads the group plan set and audio profile, creates a BeatGrid using
-the real tempo/duration from audio analysis, populates section timing
-boundaries, runs the display renderer, and exports an .xsq file for
-validation in xLights.
+the real tempo/duration from audio analysis, builds section boundaries,
+runs the display renderer, and exports an .xsq file for validation
+in xLights.
 
 Usage:
     uv run python scripts/demo_display_renderer.py [--plan PATH] [--out PATH]
@@ -219,54 +219,6 @@ def load_audio_profile(profile_path: Path) -> dict:
         "duration_ms": duration_ms,
         "sections": sections,
     }
-
-
-def populate_section_timing(
-    plan_set: GroupPlanSet,
-    sections: list[dict],
-) -> GroupPlanSet:
-    """Populate start_ms/end_ms on each SectionCoordinationPlan.
-
-    Matches section_id from the audio profile to the plan sections.
-    Returns a new GroupPlanSet with timing populated (does not mutate).
-
-    Args:
-        plan_set: GroupPlanSet to enrich with timing.
-        sections: Section timing dicts from audio profile.
-
-    Returns:
-        New GroupPlanSet with section timing populated.
-    """
-    # Build lookup: section_id → {start_ms, end_ms}
-    timing_map: dict[str, dict] = {}
-    for sec in sections:
-        timing_map[sec["section_id"]] = {
-            "start_ms": sec["start_ms"],
-            "end_ms": sec["end_ms"],
-        }
-
-    enriched_sections = []
-    matched = 0
-    for section in plan_set.section_plans:
-        timing = timing_map.get(section.section_id)
-        if timing:
-            # Pydantic model — create a copy with timing fields set
-            section = section.model_copy(update=timing)
-            matched += 1
-        else:
-            logger.warning(
-                "No audio timing for section '%s' — effects won't be clamped",
-                section.section_id,
-            )
-        enriched_sections.append(section)
-
-    logger.info(
-        "Section timing: %d/%d sections matched",
-        matched,
-        len(plan_set.section_plans),
-    )
-
-    return plan_set.model_copy(update={"section_plans": enriched_sections})
 
 
 def print_result_summary(result: RenderResult) -> None:

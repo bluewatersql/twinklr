@@ -323,3 +323,66 @@ class TestFilterValidOverrides:
         overrides = {"cycles": 2.5}
         result = filter_valid_overrides("Color Wash", overrides)
         assert result == {"cycles": 2.5}
+
+    # -- Ripple/Fire/Pinwheel override tests ------------------------------
+
+    def test_ripple_valid_keys(self) -> None:
+        """Ripple handler keys pass through, planning keys dropped."""
+        overrides = {
+            "object_to_draw": "Star",
+            "thickness": 30,
+            "feel": "smooth",  # planning key
+        }
+        result = filter_valid_overrides("Ripple", overrides)
+        assert result == {"object_to_draw": "Star", "thickness": 30}
+
+    def test_ripple_invalid_movement_rejected(self) -> None:
+        """Invalid Ripple movement value rejected."""
+        overrides = {"movement": "Outward"}
+        result = filter_valid_overrides("Ripple", overrides)
+        assert result == {}
+
+    def test_ripple_valid_movement_accepted(self) -> None:
+        """Valid Ripple movement values accepted."""
+        overrides = {"movement": "Implode"}
+        result = filter_valid_overrides("Ripple", overrides)
+        assert result == {"movement": "Implode"}
+
+    def test_fire_valid_keys(self) -> None:
+        """Fire handler keys pass through."""
+        overrides = {
+            "height": 80,
+            "grow_with_music": True,
+            "energy": "high",  # planning key
+        }
+        result = filter_valid_overrides("Fire", overrides)
+        assert result == {"height": 80, "grow_with_music": True}
+
+    def test_fire_invalid_location_rejected(self) -> None:
+        """Invalid Fire location value rejected."""
+        overrides = {"location": "Center"}
+        result = filter_valid_overrides("Fire", overrides)
+        assert result == {}
+
+    def test_pinwheel_valid_keys(self) -> None:
+        """Pinwheel handler keys pass through."""
+        overrides = {
+            "arms": 6,
+            "twist": 120,
+            "clockwise": True,
+            "density": 0.5,  # planning key
+        }
+        result = filter_valid_overrides("Pinwheel", overrides)
+        assert result == {"arms": 6, "twist": 120, "clockwise": True}
+
+    def test_pinwheel_3d_choice_accepted(self) -> None:
+        """Pinwheel 3d is a choice (not boolean), valid values accepted."""
+        overrides = {"3d": "3D"}
+        result = filter_valid_overrides("Pinwheel", overrides)
+        assert result == {"3d": "3D"}
+
+    def test_pinwheel_3d_invalid_rejected(self) -> None:
+        """Pinwheel 3d rejects invalid string values."""
+        overrides = {"3d": "flat"}
+        result = filter_valid_overrides("Pinwheel", overrides)
+        assert result == {}

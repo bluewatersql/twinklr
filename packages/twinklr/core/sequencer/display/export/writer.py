@@ -25,6 +25,7 @@ from twinklr.core.sequencer.display.effects.settings_builder import (
 from twinklr.core.sequencer.display.export.effectdb_registry import (
     EffectDBRegistry,
 )
+from twinklr.core.sequencer.display.models.palette import ResolvedPalette
 from twinklr.core.sequencer.display.models.render_event import RenderEvent
 from twinklr.core.sequencer.display.models.render_plan import (
     RenderGroupPlan,
@@ -218,8 +219,11 @@ class XSQWriter:
         # 3. Register augmented settings in EffectDB
         effectdb_idx = effectdb_reg.register(augmented)
 
-        # 4. Build and register palette
-        palette_string = build_palette_string(event.palette)
+        # 4. Build and register palette (with intensity-based brightness)
+        palette = self._apply_intensity_brightness(
+            event.palette, event.intensity, settings.effect_name
+        )
+        palette_string = build_palette_string(palette)
         palette_idx = palette_reg.register(palette_string)
 
         # 5. Create Effect and add to sequence
@@ -287,6 +291,47 @@ class XSQWriter:
         if not base_settings:
             return suffix
         return f"{base_settings},{suffix}"
+
+    @staticmethod
+    def _apply_intensity_brightness(
+        palette: ResolvedPalette,
+        intensity: float,
+        effect_name: str,
+    ) -> ResolvedPalette:
+        """Map event intensity to xLights palette brightness.
+
+        Applies intensity (0.0-1.0) as ``C_SLIDER_Brightness`` (0-100)
+        on the palette.  This is a cross-cutting concern — like
+        transitions — applied universally for all non-On effects.
+
+        **On** effects are skipped because they handle intensity
+        through their own ``E_TEXTCTRL_Eff_On_Start/End`` keys;
+        applying palette brightness as well would double-attenuate.
+
+        If the palette already carries a brightness value, intensity
+        is composed (multiplied) with it.
+
+        Args:
+            palette: Resolved color palette.
+            intensity: Event intensity (0.0-1.0).
+            effect_name: xLights effect type name.
+
+        Returns:
+            Palette with brightness applied, or the original palette
+            if no adjustment is needed.
+        """
+        # On effects handle intensity via their own E_ parameters
+        if effect_name == "On":
+            return palette
+
+        # Full intensity needs no brightness override
+        if intensity >= 1.0:
+            return palette
+
+        # Compose with any existing brightness
+        base_brightness = palette.brightness if palette.brightness is not None else 100
+        effective = max(0, min(100, int(base_brightness * intensity)))
+        return palette.model_copy(update={"brightness": effective})
 
     def _sync_effectdb(
         self,

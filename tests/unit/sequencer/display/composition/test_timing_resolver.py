@@ -79,12 +79,31 @@ class TestTimingResolver:
         end = resolver.resolve_end_ms(start_ms=0, duration=EffectDuration.BURST)
         assert end == 2000
 
-    def test_phrase_duration(self) -> None:
-        """PHRASE = 16 beats = 8000ms at 120 BPM."""
+    def test_phrase_duration_default_bias(self) -> None:
+        """PHRASE at default bias (0.5) = 12 beats = 6000ms at 120 BPM."""
         grid = _make_beat_grid()
         resolver = TimingResolver(grid)
         end = resolver.resolve_end_ms(start_ms=0, duration=EffectDuration.PHRASE)
+        # PHRASE range: 8-16 beats, bias=0.5 → 12 beats → 6000ms
+        assert end == 6000
+
+    def test_phrase_duration_max_bias(self) -> None:
+        """PHRASE at max bias (1.0) = 16 beats = 8000ms at 120 BPM."""
+        grid = _make_beat_grid()
+        resolver = TimingResolver(grid)
+        end = resolver.resolve_end_ms(
+            start_ms=0, duration=EffectDuration.PHRASE, duration_bias=1.0
+        )
         assert end == 8000
+
+    def test_phrase_duration_min_bias(self) -> None:
+        """PHRASE at min bias (0.0) = 8 beats = 4000ms at 120 BPM."""
+        grid = _make_beat_grid()
+        resolver = TimingResolver(grid)
+        end = resolver.resolve_end_ms(
+            start_ms=0, duration=EffectDuration.PHRASE, duration_bias=0.0
+        )
+        assert end == 4000
 
     def test_section_duration(self) -> None:
         """SECTION uses section_end_ms when provided."""
@@ -108,11 +127,12 @@ class TestTimingResolver:
         """Duration clamped to section end."""
         grid = _make_beat_grid()
         resolver = TimingResolver(grid)
-        # EXTENDED = 32 beats = 16000ms, but section ends at 5000ms
+        # EXTENDED at max bias = 32 beats = 16000ms, but section ends at 5000ms
         end = resolver.resolve_end_ms(
             start_ms=0,
             duration=EffectDuration.EXTENDED,
             section_end_ms=5000,
+            duration_bias=1.0,
         )
         assert end == 5000
 

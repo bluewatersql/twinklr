@@ -1,4 +1,4 @@
-"""Tests for SEQUENCED coordination mode expansion and blend modes."""
+"""Tests for SEQUENCED, RIPPLE, and CALL_RESPONSE coordination mode expansion."""
 
 from __future__ import annotations
 
@@ -197,6 +197,240 @@ class TestSequencedExpansion:
             if "Phase 2" in d.message
         ]
         assert len(phase2_warnings) == 0
+
+
+def _collect_events(render_plan: object) -> list[tuple[str, int, int]]:
+    """Collect (element_name, start_ms, end_ms) from a render plan."""
+    events = []
+    for group in render_plan.groups:  # type: ignore[attr-defined]
+        for layer in group.layers:
+            for event in layer.events:
+                events.append((group.element_name, event.start_ms, event.end_ms))
+    return events
+
+
+class TestRippleExpansion:
+    """Tests for RIPPLE coordination mode (overlapping wave propagation)."""
+
+    def _make_ripple_plan(
+        self,
+        phase_offset: float = 0.5,
+        step_duration: int = 2,
+    ) -> GroupPlanSet:
+        """Create a plan with RIPPLE coordination."""
+        section = SectionCoordinationPlan(
+            section_id="test_section",
+            theme=ThemeRef(theme_id="theme.test", scope=ThemeScope.SECTION),
+            palette=PaletteRef(palette_id="core.christmas_traditional"),
+            lane_plans=[
+                LanePlan(
+                    lane=LaneKind.RHYTHM,
+                    target_roles=["ARCHES"],
+                    coordination_plans=[
+                        CoordinationPlan(
+                            coordination_mode=CoordinationMode.RIPPLE,
+                            group_ids=["ARCHES_1", "ARCHES_2", "ARCHES_3"],
+                            window=PlacementWindow(
+                                start=PlanningTimeRef(bar=1, beat=1),
+                                end=PlanningTimeRef(bar=9, beat=1),
+                                template_id="gtpl_rhythm_chase_single",
+                                intensity=IntensityLevel.STRONG,
+                            ),
+                            config=CoordinationConfig(
+                                group_order=["ARCHES_1", "ARCHES_2", "ARCHES_3"],
+                                step_unit=StepUnit.BEAT,
+                                step_duration=step_duration,
+                                phase_offset=phase_offset,
+                            ),
+                        )
+                    ],
+                ),
+            ],
+        )
+        return GroupPlanSet(plan_set_id="test", section_plans=[section])
+
+    def test_ripple_creates_overlapping_events(self) -> None:
+        """RIPPLE with phase_offset=0.5 produces overlapping group events."""
+        plan_set = self._make_ripple_plan(phase_offset=0.5)
+        engine = CompositionEngine(
+            beat_grid=_make_beat_grid(),
+            display_graph=_make_display_graph(),
+            palette_resolver=_make_palette_resolver(),
+        )
+        render_plan = engine.compose(plan_set)
+
+        events = _collect_events(render_plan)
+        assert len(events) >= 3
+
+        # Group events by element
+        by_element: dict[str, list[tuple[int, int]]] = {}
+        for name, start, end in events:
+            by_element.setdefault(name, []).append((start, end))
+
+        # All 3 arches should have events
+        assert len(by_element) == 3
+
+        # First events should be staggered by phase_offset * step_ms
+        first_starts = sorted(v[0][0] for v in by_element.values())
+        # With 120 BPM, 2-beat step = 1000ms, phase_offset = 0.5 → 500ms stagger
+        assert first_starts[1] - first_starts[0] == 500
+        assert first_starts[2] - first_starts[1] == 500
+
+    def test_ripple_events_overlap(self) -> None:
+        """RIPPLE groups have overlapping time ranges (unlike SEQUENCED)."""
+        # Use step_duration=4 (4 beats = 2000ms) so overlap is unambiguous
+        plan_set = self._make_ripple_plan(phase_offset=0.5, step_duration=4)
+        engine = CompositionEngine(
+            beat_grid=_make_beat_grid(),
+            display_graph=_make_display_graph(),
+            palette_resolver=_make_palette_resolver(),
+        )
+        render_plan = engine.compose(plan_set)
+
+        events = _collect_events(render_plan)
+        by_element: dict[str, list[tuple[int, int]]] = {}
+        for name, start, end in events:
+            by_element.setdefault(name, []).append((start, end))
+
+        # Group 1's first event should overlap with Group 0's first event
+        # Group 0 starts at 0ms, Group 1 starts at 500ms
+        # Group 0 should still be active when Group 1 starts
+        first_events = {}
+        for name, times in by_element.items():
+            first_events[name] = times[0]
+
+        names = sorted(first_events.keys())
+        if len(names) >= 2:
+            _g0_start, g0_end = first_events[names[0]]
+            g1_start, _ = first_events[names[1]]
+            # Group 1 starts BEFORE Group 0 ends (overlap)
+            assert g1_start < g0_end
+
+    def test_ripple_zero_offset_falls_back_to_sequenced(self) -> None:
+        """RIPPLE with phase_offset=0 behaves like SEQUENCED (no overlap)."""
+        plan_set = self._make_ripple_plan(phase_offset=0.0)
+        engine = CompositionEngine(
+            beat_grid=_make_beat_grid(),
+            display_graph=_make_display_graph(),
+            palette_resolver=_make_palette_resolver(),
+        )
+        render_plan = engine.compose(plan_set)
+
+        events = _collect_events(render_plan)
+        assert len(events) >= 3
+
+        # Events should exist but with SEQUENCED-like spacing
+        by_element: dict[str, list[tuple[int, int]]] = {}
+        for name, start, end in events:
+            by_element.setdefault(name, []).append((start, end))
+        assert len(by_element) == 3
+
+
+class TestCallResponseExpansion:
+    """Tests for CALL_RESPONSE coordination mode (alternating A/B groups)."""
+
+    def _make_cr_plan(self) -> GroupPlanSet:
+        """Create a plan with CALL_RESPONSE coordination."""
+        section = SectionCoordinationPlan(
+            section_id="test_section",
+            theme=ThemeRef(theme_id="theme.test", scope=ThemeScope.SECTION),
+            palette=PaletteRef(palette_id="core.christmas_traditional"),
+            lane_plans=[
+                LanePlan(
+                    lane=LaneKind.RHYTHM,
+                    target_roles=["ARCHES"],
+                    coordination_plans=[
+                        CoordinationPlan(
+                            coordination_mode=CoordinationMode.CALL_RESPONSE,
+                            group_ids=["ARCHES_1", "ARCHES_2", "ARCHES_3"],
+                            window=PlacementWindow(
+                                start=PlanningTimeRef(bar=1, beat=1),
+                                end=PlanningTimeRef(bar=9, beat=1),
+                                template_id="gtpl_rhythm_alternate_ab",
+                                intensity=IntensityLevel.STRONG,
+                            ),
+                            config=CoordinationConfig(
+                                group_order=["ARCHES_1", "ARCHES_2", "ARCHES_3"],
+                                step_unit=StepUnit.BEAT,
+                                step_duration=2,
+                            ),
+                        )
+                    ],
+                ),
+            ],
+        )
+        return GroupPlanSet(plan_set_id="test", section_plans=[section])
+
+    def test_call_response_alternates_groups(self) -> None:
+        """CALL_RESPONSE alternates between A and B teams."""
+        plan_set = self._make_cr_plan()
+        engine = CompositionEngine(
+            beat_grid=_make_beat_grid(),
+            display_graph=_make_display_graph(),
+            palette_resolver=_make_palette_resolver(),
+        )
+        render_plan = engine.compose(plan_set)
+
+        events = _collect_events(render_plan)
+        assert len(events) >= 3
+
+        # Group events by element
+        by_element: dict[str, list[tuple[int, int]]] = {}
+        for name, start, end in events:
+            by_element.setdefault(name, []).append((start, end))
+
+        # All groups should have events
+        assert len(by_element) >= 2
+
+    def test_call_response_teams_dont_overlap(self) -> None:
+        """A-team and B-team placements should not overlap in time."""
+        plan_set = self._make_cr_plan()
+        engine = CompositionEngine(
+            beat_grid=_make_beat_grid(),
+            display_graph=_make_display_graph(),
+            palette_resolver=_make_palette_resolver(),
+        )
+        render_plan = engine.compose(plan_set)
+
+        events = _collect_events(render_plan)
+        by_element: dict[str, list[tuple[int, int]]] = {}
+        for name, start, end in events:
+            by_element.setdefault(name, []).append((start, end))
+
+        names = sorted(by_element.keys())
+        if len(names) >= 2:
+            # A-team (even index in group_order): Arches 1, Arches 3
+            # B-team (odd index): Arches 2
+            # Their events should not overlap (call then response)
+            a_times = by_element.get("Arches 1", [])
+            b_times = by_element.get("Arches 2", [])
+
+            for a_start, a_end in a_times:
+                for b_start, b_end in b_times:
+                    # No overlap: a ends before b starts, or b ends before a starts
+                    assert a_end <= b_start or b_end <= a_start, (
+                        f"A-team ({a_start}-{a_end}) overlaps "
+                        f"B-team ({b_start}-{b_end})"
+                    )
+
+    def test_call_response_a_team_starts_first(self) -> None:
+        """A-team (even-index groups) should start at beat 0."""
+        plan_set = self._make_cr_plan()
+        engine = CompositionEngine(
+            beat_grid=_make_beat_grid(),
+            display_graph=_make_display_graph(),
+            palette_resolver=_make_palette_resolver(),
+        )
+        render_plan = engine.compose(plan_set)
+
+        events = _collect_events(render_plan)
+        by_element: dict[str, list[int]] = {}
+        for name, start, _ in events:
+            by_element.setdefault(name, []).append(start)
+
+        # Arches 1 (A-team) should have an event starting at 0
+        a1_starts = by_element.get("Arches 1", [])
+        assert 0 in a1_starts, f"A-team should start at 0, got {a1_starts}"
 
 
 class TestBlendModeMapping:

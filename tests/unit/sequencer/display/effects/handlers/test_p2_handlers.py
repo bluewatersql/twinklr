@@ -3,11 +3,18 @@
 from __future__ import annotations
 
 from twinklr.core.sequencer.display.effects.handlers.fan import FanHandler
+from twinklr.core.sequencer.display.effects.handlers.fire import FireHandler
 from twinklr.core.sequencer.display.effects.handlers.marquee import (
     MarqueeHandler,
 )
 from twinklr.core.sequencer.display.effects.handlers.meteors import (
     MeteorsHandler,
+)
+from twinklr.core.sequencer.display.effects.handlers.pinwheel import (
+    PinwheelHandler,
+)
+from twinklr.core.sequencer.display.effects.handlers.ripple import (
+    RippleHandler,
 )
 from twinklr.core.sequencer.display.effects.handlers.shockwave import (
     ShockwaveHandler,
@@ -197,3 +204,116 @@ class TestMeteorsHandler:
         settings = h.build_settings(event, _ctx())
         assert "E_CHOICE_Meteors_Effect=Up" in settings.settings_string
         assert "E_SLIDER_Meteors_Count=50" in settings.settings_string
+
+
+class TestRippleHandler:
+    """Tests for the RippleHandler."""
+
+    def test_effect_type(self) -> None:
+        assert RippleHandler().effect_type == "Ripple"
+
+    def test_default_settings(self) -> None:
+        h = RippleHandler()
+        settings = h.build_settings(_event("Ripple"), _ctx())
+        assert "E_CHOICE_Ripple_Object_To_Draw=Circle" in settings.settings_string
+        assert "E_CHOICE_Ripple_Movement=Explode" in settings.settings_string
+        assert "E_SLIDER_Ripple_Thickness=50" in settings.settings_string
+        assert "E_TEXTCTRL_Ripple_Cycles=1.0" in settings.settings_string
+        assert settings.effect_name == "Ripple"
+
+    def test_custom_shape(self) -> None:
+        h = RippleHandler()
+        event = _event("Ripple", parameters={"object_to_draw": "Star", "points": 8})
+        settings = h.build_settings(event, _ctx())
+        assert "E_CHOICE_Ripple_Object_To_Draw=Star" in settings.settings_string
+        assert "E_SLIDER_Ripple_Points=8" in settings.settings_string
+
+    def test_implode_movement(self) -> None:
+        h = RippleHandler()
+        event = _event("Ripple", parameters={"movement": "Implode"})
+        settings = h.build_settings(event, _ctx())
+        assert "E_CHOICE_Ripple_Movement=Implode" in settings.settings_string
+
+    def test_3d_enabled(self) -> None:
+        h = RippleHandler()
+        event = _event("Ripple", parameters={"3d": True})
+        settings = h.build_settings(event, _ctx())
+        assert "E_CHECKBOX_Ripple3D=1" in settings.settings_string
+
+    def test_velocity_omitted_when_zero(self) -> None:
+        h = RippleHandler()
+        settings = h.build_settings(_event("Ripple"), _ctx())
+        assert "Ripple_Velocity" not in settings.settings_string
+
+    def test_velocity_emitted_when_nonzero(self) -> None:
+        h = RippleHandler()
+        event = _event("Ripple", parameters={"velocity": 5.0})
+        settings = h.build_settings(event, _ctx())
+        assert "E_TEXTCTRL_Ripple_Velocity=5.0" in settings.settings_string
+
+
+class TestFireHandler:
+    """Tests for the FireHandler."""
+
+    def test_effect_type(self) -> None:
+        assert FireHandler().effect_type == "Fire"
+
+    def test_default_settings(self) -> None:
+        h = FireHandler()
+        settings = h.build_settings(_event("Fire"), _ctx())
+        assert "E_SLIDER_Fire_Height=50" in settings.settings_string
+        assert "E_SLIDER_Fire_HueShift=0" in settings.settings_string
+        assert "E_CHOICE_Fire_Location=Bottom" in settings.settings_string
+        assert settings.effect_name == "Fire"
+
+    def test_custom_height_and_location(self) -> None:
+        h = FireHandler()
+        event = _event("Fire", parameters={"height": 80, "location": "Top"})
+        settings = h.build_settings(event, _ctx())
+        assert "E_SLIDER_Fire_Height=80" in settings.settings_string
+        assert "E_CHOICE_Fire_Location=Top" in settings.settings_string
+
+    def test_grow_with_music(self) -> None:
+        h = FireHandler()
+        event = _event("Fire", parameters={"grow_with_music": True})
+        settings = h.build_settings(event, _ctx())
+        assert "E_CHECKBOX_Fire_GrowWithMusic=1" in settings.settings_string
+
+    def test_hue_shift(self) -> None:
+        h = FireHandler()
+        event = _event("Fire", parameters={"hue_shift": 50})
+        settings = h.build_settings(event, _ctx())
+        assert "E_SLIDER_Fire_HueShift=50" in settings.settings_string
+
+
+class TestPinwheelHandler:
+    """Tests for the PinwheelHandler."""
+
+    def test_effect_type(self) -> None:
+        assert PinwheelHandler().effect_type == "Pinwheel"
+
+    def test_default_settings(self) -> None:
+        h = PinwheelHandler()
+        settings = h.build_settings(_event("Pinwheel"), _ctx())
+        assert "E_SLIDER_Pinwheel_Arms=3" in settings.settings_string
+        assert "E_SLIDER_Pinwheel_Speed=10" in settings.settings_string
+        assert settings.effect_name == "Pinwheel"
+
+    def test_custom_arms_and_twist(self) -> None:
+        h = PinwheelHandler()
+        event = _event("Pinwheel", parameters={"arms": 6, "twist": 120})
+        settings = h.build_settings(event, _ctx())
+        assert "E_SLIDER_Pinwheel_Arms=6" in settings.settings_string
+        assert "E_SLIDER_Pinwheel_Twist=120" in settings.settings_string
+
+    def test_counterclockwise(self) -> None:
+        h = PinwheelHandler()
+        event = _event("Pinwheel", parameters={"clockwise": False})
+        settings = h.build_settings(event, _ctx())
+        assert "E_CHECKBOX_Pinwheel_Rotation=0" in settings.settings_string
+
+    def test_3d_shading(self) -> None:
+        h = PinwheelHandler()
+        event = _event("Pinwheel", parameters={"3d": "3D"})
+        settings = h.build_settings(event, _ctx())
+        assert "E_CHOICE_Pinwheel_3D=3D" in settings.settings_string

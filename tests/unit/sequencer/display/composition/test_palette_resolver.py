@@ -159,6 +159,62 @@ class TestPaletteResolverColorOrder:
         assert len(result.active_slots) <= 8
 
 
+class TestPaletteRefIntensity:
+    """Tests for PaletteRef.intensity consumption."""
+
+    def test_no_intensity_no_brightness(self) -> None:
+        """PaletteRef without intensity leaves brightness unset."""
+        resolver = PaletteResolver(catalog=_make_catalog(), default=_make_default())
+        ref = PaletteRef(palette_id="core.christmas_traditional")
+        result = resolver.resolve(ref)
+        assert result.brightness is None
+
+    def test_full_intensity_no_brightness(self) -> None:
+        """PaletteRef with intensity=1.0 leaves brightness unset."""
+        resolver = PaletteResolver(catalog=_make_catalog(), default=_make_default())
+        ref = PaletteRef(palette_id="core.christmas_traditional", intensity=1.0)
+        result = resolver.resolve(ref)
+        assert result.brightness is None
+
+    def test_half_intensity_sets_brightness_50(self) -> None:
+        """PaletteRef with intensity=0.5 sets brightness to 50."""
+        resolver = PaletteResolver(catalog=_make_catalog(), default=_make_default())
+        ref = PaletteRef(palette_id="core.christmas_traditional", intensity=0.5)
+        result = resolver.resolve(ref)
+        assert result.brightness == 50
+
+    def test_zero_intensity_sets_brightness_0(self) -> None:
+        """PaletteRef with intensity=0.0 sets brightness to 0."""
+        resolver = PaletteResolver(catalog=_make_catalog(), default=_make_default())
+        ref = PaletteRef(palette_id="core.christmas_traditional", intensity=0.0)
+        result = resolver.resolve(ref)
+        assert result.brightness == 0
+
+    def test_intensity_doesnt_pollute_cache(self) -> None:
+        """Different intensities on the same palette_id produce different results."""
+        resolver = PaletteResolver(catalog=_make_catalog(), default=_make_default())
+        full = PaletteRef(palette_id="core.christmas_traditional", intensity=1.0)
+        half = PaletteRef(palette_id="core.christmas_traditional", intensity=0.5)
+
+        result_full = resolver.resolve(full)
+        result_half = resolver.resolve(half)
+
+        assert result_full.brightness is None
+        assert result_half.brightness == 50
+
+    def test_colors_preserved_with_intensity(self) -> None:
+        """Intensity only affects brightness, not colors."""
+        resolver = PaletteResolver(catalog=_make_catalog(), default=_make_default())
+        ref_no_int = PaletteRef(palette_id="core.christmas_traditional")
+        ref_half = PaletteRef(palette_id="core.christmas_traditional", intensity=0.5)
+
+        result_no_int = resolver.resolve(ref_no_int)
+        result_half = resolver.resolve(ref_half)
+
+        assert result_no_int.colors == result_half.colors
+        assert result_no_int.active_slots == result_half.active_slots
+
+
 class TestPaletteResolverImmutability:
     """Resolved palettes should be frozen (immutable)."""
 

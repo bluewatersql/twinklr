@@ -301,6 +301,7 @@ class CompositionEngine:
             placements = self._expand_window(
                 window=coord_plan.window,
                 config=coord_plan.config,
+                coordination_mode=coord_plan.coordination_mode,
                 section=section,
                 lane=lane,
                 diagnostics=diagnostics,
@@ -358,23 +359,23 @@ class CompositionEngine:
         self,
         window: PlacementWindow,
         config: CoordinationConfig,
+        coordination_mode: CoordinationMode,
         section: SectionCoordinationPlan,
         lane: LaneKind,
         diagnostics: list[CompositionDiagnostic],
     ) -> list[GroupPlacement]:
-        """Expand a SEQUENCED/RIPPLE window into per-group placements.
+        """Expand a window into per-group placements by coordination mode.
 
-        Creates a staggered sequence of placements where each group
-        in the order gets the same template, offset by step_duration
-        in the specified step_unit.
+        Dispatches to mode-specific expansion logic:
 
-        For SEQUENCED: each group gets a non-overlapping time slot.
-        For RIPPLE: groups overlap with phase_offset.
-        For CALL_RESPONSE: alternating A/B groups.
+        - **SEQUENCED**: non-overlapping time slots, one group at a time.
+        - **RIPPLE**: overlapping wave propagation using ``phase_offset``.
+        - **CALL_RESPONSE**: alternating A/B group teams.
 
         Args:
             window: Time window and template definition.
             config: Coordination config (group_order, step_unit, etc.).
+            coordination_mode: How groups relate to each other.
             section: Parent section for context.
             lane: Lane kind.
             diagnostics: Accumulator.
@@ -382,12 +383,9 @@ class CompositionEngine:
         Returns:
             List of expanded GroupPlacement objects.
         """
-        placements: list[GroupPlacement] = []
-
-        # Resolve window start/end to ms for calculating step boundaries.
-        # Window refs are section-relative (like all PlanningTimeRefs in
-        # the plan). _compose_placement handles the section offset, so
-        # we work in section-relative time here.
+        # Resolve window boundaries to ms (section-relative).
+        # _compose_placement handles the section offset, so we
+        # work in section-relative time here.
         window_start_ms = self._timing_resolver.resolve_start_ms(window.start)
         window_end_ms = self._timing_resolver.resolve_start_ms(window.end)
 
@@ -404,49 +402,67 @@ class CompositionEngine:
             )
             return []
 
-        # Calculate step size in ms
         step_ms = self._resolve_step_ms(config.step_unit, config.step_duration)
 
-        group_count = len(config.group_order)
-
-        if group_count == 0:
+        if len(config.group_order) == 0:
             return []
 
-        # For SEQUENCED: divide window into equal slots per group
-        # Each group gets a repeating slot at step_ms intervals
-        for group_idx, group_id in enumerate(config.group_order):
-            # Stagger start: each group starts step_ms * group_idx later
-            group_offset_ms = group_idx * step_ms
+        if coordination_mode == CoordinationMode.RIPPLE:
+            return self._expand_ripple(
+                window, config, step_ms, window_start_ms, window_end_ms
+            )
+        if coordination_mode == CoordinationMode.CALL_RESPONSE:
+            return self._expand_call_response(
+                window, config, step_ms, window_start_ms, window_end_ms
+            )
 
-            # Generate placements for this group across the window
+        # Default: SEQUENCED
+        return self._expand_sequenced(
+            window, config, step_ms, window_start_ms, window_end_ms
+        )
+
+    def _expand_sequenced(
+        self,
+        window: PlacementWindow,
+        config: CoordinationConfig,
+        step_ms: int,
+        window_start_ms: int,
+        window_end_ms: int,
+    ) -> list[GroupPlacement]:
+        """SEQUENCED: non-overlapping round-robin slots.
+
+        Each group gets a time slot of ``step_ms``, then the next group
+        takes over. Groups cycle through in order across the window.
+        """
+        placements: list[GroupPlacement] = []
+        group_count = len(config.group_order)
+
+        for group_idx, group_id in enumerate(config.group_order):
+            group_offset_ms = group_idx * step_ms
             current_ms = window_start_ms + group_offset_ms
             slot_idx = 0
 
             while current_ms < window_end_ms:
-                # Each group's placement spans step_ms * group_count
-                # (time between this group's consecutive appearances)
                 slot_duration_ms = step_ms * group_count
                 slot_end_ms = min(current_ms + slot_duration_ms, window_end_ms)
 
                 if slot_end_ms <= current_ms:
                     break
 
-                # Convert back to bar/beat for PlanningTimeRef
                 start_ref = self._ms_to_planning_ref(current_ms)
-                # Use SECTION duration to fill to the calculated end,
-                # but we'll set it based on actual step size
                 duration = self._ms_to_duration(slot_end_ms - current_ms)
 
-                placement = GroupPlacement(
-                    placement_id=f"seq_{group_id}_{slot_idx}",
-                    group_id=group_id,
-                    template_id=window.template_id,
-                    start=start_ref,
-                    duration=duration,
-                    param_overrides=dict(window.param_overrides),
-                    intensity=window.intensity,
+                placements.append(
+                    GroupPlacement(
+                        placement_id=f"seq_{group_id}_{slot_idx}",
+                        group_id=group_id,
+                        template_id=window.template_id,
+                        start=start_ref,
+                        duration=duration,
+                        param_overrides=dict(window.param_overrides),
+                        intensity=window.intensity,
+                    )
                 )
-                placements.append(placement)
 
                 current_ms += slot_duration_ms
                 slot_idx += 1
@@ -457,7 +473,142 @@ class CompositionEngine:
             step_ms,
             len(placements),
         )
+        return placements
 
+    def _expand_ripple(
+        self,
+        window: PlacementWindow,
+        config: CoordinationConfig,
+        step_ms: int,
+        window_start_ms: int,
+        window_end_ms: int,
+    ) -> list[GroupPlacement]:
+        """RIPPLE: overlapping wave propagation across groups.
+
+        Each group plays the full ``step_ms`` duration, but starts
+        ``phase_offset * step_ms`` after the previous group. When
+        ``phase_offset`` < 1.0, groups overlap in time — creating
+        a ripple/wave visual that propagates across the display.
+
+        With ``phase_offset=0.0``, falls back to SEQUENCED spacing
+        (one step per group, no overlap).
+        """
+        placements: list[GroupPlacement] = []
+        group_count = len(config.group_order)
+
+        # Phase offset between consecutive groups (in ms)
+        offset_ms = int(config.phase_offset * step_ms)
+        if offset_ms <= 0:
+            # Fallback: no overlap → use SEQUENCED spacing
+            offset_ms = step_ms
+
+        # Wave period: time between the start of consecutive waves.
+        # One wave = all groups staggered by offset_ms.
+        wave_period_ms = max(step_ms, offset_ms * group_count)
+
+        wave_idx = 0
+        while True:
+            wave_start_ms = window_start_ms + wave_idx * wave_period_ms
+            if wave_start_ms >= window_end_ms:
+                break
+
+            for group_idx, group_id in enumerate(config.group_order):
+                start_ms = wave_start_ms + group_idx * offset_ms
+
+                if start_ms >= window_end_ms:
+                    break
+
+                end_ms = min(start_ms + step_ms, window_end_ms)
+                if end_ms <= start_ms:
+                    break
+
+                start_ref = self._ms_to_planning_ref(start_ms)
+                duration = self._ms_to_duration(end_ms - start_ms)
+
+                placements.append(
+                    GroupPlacement(
+                        placement_id=f"rpl_{group_id}_{wave_idx}",
+                        group_id=group_id,
+                        template_id=window.template_id,
+                        start=start_ref,
+                        duration=duration,
+                        param_overrides=dict(window.param_overrides),
+                        intensity=window.intensity,
+                    )
+                )
+
+            wave_idx += 1
+
+        logger.debug(
+            "Expanded RIPPLE window: %d groups × %dms offset → %d placements",
+            group_count,
+            offset_ms,
+            len(placements),
+        )
+        return placements
+
+    def _expand_call_response(
+        self,
+        window: PlacementWindow,
+        config: CoordinationConfig,
+        step_ms: int,
+        window_start_ms: int,
+        window_end_ms: int,
+    ) -> list[GroupPlacement]:
+        """CALL_RESPONSE: alternating A/B group teams.
+
+        Groups are split into two teams based on position in
+        ``group_order``: even-indexed groups form team A ("call"),
+        odd-indexed form team B ("response"). Teams take turns,
+        each active for ``step_ms`` before the other team responds.
+        """
+        placements: list[GroupPlacement] = []
+
+        a_groups = [
+            g for i, g in enumerate(config.group_order) if i % 2 == 0
+        ]
+        b_groups = [
+            g for i, g in enumerate(config.group_order) if i % 2 == 1
+        ]
+
+        current_ms = window_start_ms
+        slot_idx = 0
+        is_a_turn = True
+
+        while current_ms < window_end_ms:
+            active_groups = a_groups if is_a_turn else b_groups
+            slot_end_ms = min(current_ms + step_ms, window_end_ms)
+
+            if slot_end_ms <= current_ms:
+                break
+
+            start_ref = self._ms_to_planning_ref(current_ms)
+            duration = self._ms_to_duration(slot_end_ms - current_ms)
+            prefix = "cr_a" if is_a_turn else "cr_b"
+
+            for group_id in active_groups:
+                placements.append(
+                    GroupPlacement(
+                        placement_id=f"{prefix}_{group_id}_{slot_idx}",
+                        group_id=group_id,
+                        template_id=window.template_id,
+                        start=start_ref,
+                        duration=duration,
+                        param_overrides=dict(window.param_overrides),
+                        intensity=window.intensity,
+                    )
+                )
+
+            current_ms += step_ms
+            is_a_turn = not is_a_turn
+            slot_idx += 1
+
+        logger.debug(
+            "Expanded CALL_RESPONSE window: A=%d, B=%d groups → %d placements",
+            len(a_groups),
+            len(b_groups),
+            len(placements),
+        )
         return placements
 
     def _resolve_step_ms(self, step_unit: StepUnit, step_duration: int) -> int:
@@ -507,6 +658,16 @@ class CompositionEngine:
     def _ms_to_duration(self, duration_ms: float) -> EffectDuration:
         """Map a millisecond duration to the nearest EffectDuration category.
 
+        Boundaries are aligned with the vocabulary ranges in
+        ``DURATION_BEATS``, using midpoints between consecutive
+        categories as thresholds:
+
+        - HIT: 1-2 beats → <=3 beats
+        - BURST: 4 beats → <=6 beats
+        - PHRASE: 8-16 beats → <=16 beats
+        - EXTENDED: 16-32 beats → <=32 beats
+        - SECTION: anything longer
+
         Args:
             duration_ms: Duration in milliseconds.
 
@@ -517,13 +678,13 @@ class CompositionEngine:
 
         beats = duration_ms / ms_per_beat
 
-        if beats <= 2:
+        if beats <= 3:
             return EffectDuration.HIT
-        elif beats <= 5:
+        elif beats <= 6:
             return EffectDuration.BURST
-        elif beats <= 20:
+        elif beats <= 16:
             return EffectDuration.PHRASE
-        elif beats <= 40:
+        elif beats <= 32:
             return EffectDuration.EXTENDED
         else:
             return EffectDuration.SECTION
@@ -743,7 +904,7 @@ class CompositionEngine:
             Tuple of (buffer_style, buffer_transform or None).
         """
         # Effects that benefit from centered overlay rendering
-        centered_effects = {"Fan", "Shockwave", "Pinwheel"}
+        centered_effects = {"Fan", "Shockwave", "Pinwheel", "Ripple", "Fire"}
         # Effects that benefit from horizontal strand rendering
         strand_effects = {"Spirals"}
 

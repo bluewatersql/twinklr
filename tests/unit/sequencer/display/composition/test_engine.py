@@ -678,6 +678,28 @@ class TestBufferStyleResolution:
         assert style == "Overlay - Centered"
         assert transform is None
 
+    def test_ripple_gets_centered(self) -> None:
+        """Ripple effect should get centered overlay (radial effect)."""
+        engine = CompositionEngine(
+            beat_grid=_make_beat_grid(),
+            display_graph=_make_display_graph(),
+            palette_resolver=_make_palette_resolver(),
+        )
+        style, transform = engine._resolve_buffer_style("Ripple")
+        assert style == "Overlay - Centered"
+        assert transform is None
+
+    def test_fire_gets_centered(self) -> None:
+        """Fire effect should get centered overlay (radial effect)."""
+        engine = CompositionEngine(
+            beat_grid=_make_beat_grid(),
+            display_graph=_make_display_graph(),
+            palette_resolver=_make_palette_resolver(),
+        )
+        style, transform = engine._resolve_buffer_style("Fire")
+        assert style == "Overlay - Centered"
+        assert transform is None
+
     def test_default_no_transform(self) -> None:
         """Default effects get no buffer transform."""
         engine = CompositionEngine(

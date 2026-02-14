@@ -5,6 +5,7 @@ from twinklr.core.sequencer.display.effects.handlers.color_wash import (
     ColorWashHandler,
 )
 from twinklr.core.sequencer.display.effects.handlers.fan import FanHandler
+from twinklr.core.sequencer.display.effects.handlers.fire import FireHandler
 from twinklr.core.sequencer.display.effects.handlers.marquee import (
     MarqueeHandler,
 )
@@ -14,6 +15,12 @@ from twinklr.core.sequencer.display.effects.handlers.meteors import (
 from twinklr.core.sequencer.display.effects.handlers.on import OnHandler
 from twinklr.core.sequencer.display.effects.handlers.pictures import (
     PicturesHandler,
+)
+from twinklr.core.sequencer.display.effects.handlers.pinwheel import (
+    PinwheelHandler,
+)
+from twinklr.core.sequencer.display.effects.handlers.ripple import (
+    RippleHandler,
 )
 from twinklr.core.sequencer.display.effects.handlers.shockwave import (
     ShockwaveHandler,
@@ -59,6 +66,9 @@ def load_builtin_handlers() -> HandlerRegistry:
     registry.register(SnowflakesHandler())
     registry.register(MarqueeHandler())
     registry.register(MeteorsHandler())
+    registry.register(RippleHandler())
+    registry.register(FireHandler())
+    registry.register(PinwheelHandler())
 
     # On is the fallback for unknown effect types
     registry.set_default(on_handler)
@@ -70,10 +80,13 @@ __all__ = [
     "ChaseHandler",
     "ColorWashHandler",
     "FanHandler",
+    "FireHandler",
     "MarqueeHandler",
     "MeteorsHandler",
     "OnHandler",
     "PicturesHandler",
+    "PinwheelHandler",
+    "RippleHandler",
     "ShockwaveHandler",
     "SnowflakesHandler",
     "SpiralsHandler",

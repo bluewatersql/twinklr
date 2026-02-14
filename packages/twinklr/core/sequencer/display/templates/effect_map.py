@@ -297,6 +297,109 @@ _SINGLE_STRAND_PRESETS: dict[str, dict[str, Any]] = {
     },
 }
 
+_RIPPLE_PRESETS: dict[str, dict[str, Any]] = {
+    "ambient": {
+        "object_to_draw": "Circle",
+        "movement": "Explode",
+        "thickness": 60,
+        "cycles": 1.0,
+        "3d": False,
+    },
+    "drive": {
+        "object_to_draw": "Circle",
+        "movement": "Explode",
+        "thickness": 40,
+        "cycles": 2.0,
+        "3d": False,
+    },
+    "hit_small": {
+        "object_to_draw": "Circle",
+        "movement": "Explode",
+        "thickness": 30,
+        "cycles": 3.0,
+        "velocity": 5.0,
+        "3d": True,
+    },
+    "hit_big": {
+        "object_to_draw": "Star",
+        "movement": "Explode",
+        "thickness": 20,
+        "cycles": 5.0,
+        "velocity": 10.0,
+        "3d": True,
+    },
+}
+
+_FIRE_PRESETS: dict[str, dict[str, Any]] = {
+    "ambient": {
+        "height": 30,
+        "hue_shift": 0,
+        "growth_cycles": 0.0,
+        "grow_with_music": False,
+        "location": "Bottom",
+    },
+    "drive": {
+        "height": 60,
+        "hue_shift": 0,
+        "growth_cycles": 1.0,
+        "grow_with_music": True,
+        "location": "Bottom",
+    },
+    "hit_small": {
+        "height": 75,
+        "hue_shift": 0,
+        "growth_cycles": 2.0,
+        "grow_with_music": True,
+        "location": "Bottom",
+    },
+    "hit_big": {
+        "height": 100,
+        "hue_shift": 0,
+        "growth_cycles": 3.0,
+        "grow_with_music": True,
+        "location": "Bottom",
+    },
+}
+
+_PINWHEEL_PRESETS: dict[str, dict[str, Any]] = {
+    "ambient": {
+        "arms": 3,
+        "arm_size": 100,
+        "twist": 0,
+        "thickness": 50,
+        "speed": 5,
+        "clockwise": True,
+        "3d": "none",
+    },
+    "drive": {
+        "arms": 4,
+        "arm_size": 100,
+        "twist": 30,
+        "thickness": 40,
+        "speed": 15,
+        "clockwise": True,
+        "3d": "3D",
+    },
+    "hit_small": {
+        "arms": 6,
+        "arm_size": 80,
+        "twist": 60,
+        "thickness": 30,
+        "speed": 25,
+        "clockwise": True,
+        "3d": "3D",
+    },
+    "hit_big": {
+        "arms": 8,
+        "arm_size": 60,
+        "twist": 120,
+        "thickness": 25,
+        "speed": 40,
+        "clockwise": True,
+        "3d": "3D",
+    },
+}
+
 
 # ===================================================================
 # Preset lookup by effect type
@@ -314,6 +417,9 @@ _EFFECT_PRESETS: dict[str, dict[str, dict[str, Any]]] = {
     "Snowflakes": _SNOWFLAKES_PRESETS,
     "Marquee": _MARQUEE_PRESETS,
     "SingleStrand": _SINGLE_STRAND_PRESETS,
+    "Ripple": _RIPPLE_PRESETS,
+    "Fire": _FIRE_PRESETS,
+    "Pinwheel": _PINWHEEL_PRESETS,
 }
 
 
@@ -398,6 +504,18 @@ _VALID_PARAMS: dict[str, frozenset[str]] = {
     }),
     "Pictures": frozenset({
         "filename", "movement", "direction", "speed",
+    }),
+    "Ripple": frozenset({
+        "object_to_draw", "movement", "thickness", "cycles",
+        "rotation", "points", "3d", "velocity", "spacing",
+    }),
+    "Fire": frozenset({
+        "height", "hue_shift", "growth_cycles",
+        "grow_with_music", "location",
+    }),
+    "Pinwheel": frozenset({
+        "arms", "arm_size", "twist", "thickness",
+        "speed", "offset", "style", "clockwise", "3d",
     }),
 }
 
@@ -506,6 +624,21 @@ _CHOICE_CONSTRAINTS: dict[str, dict[str, frozenset[str]]] = {
     "Twinkle": {
         "style": frozenset({"New Render Method", "Old Render Method"}),
     },
+    "Ripple": {
+        "object_to_draw": frozenset({
+            "Circle", "Square", "Triangle", "Star", "Polygon",
+            "Heart", "Tree", "Candy Cane", "Snow Flake",
+            "Crucifix", "Present",
+        }),
+        "movement": frozenset({"Explode", "Implode"}),
+    },
+    "Fire": {
+        "location": frozenset({"Bottom", "Top", "Left", "Right"}),
+    },
+    "Pinwheel": {
+        "style": frozenset({"New Render Method", "Old Render Method"}),
+        "3d": frozenset({"none", "3D", "3D Inverted", "Pinwheel 3D"}),
+    },
 }
 
 # Boolean parameter names (across all handlers)
@@ -517,6 +650,7 @@ _BOOLEAN_PARAMS: frozenset[str] = frozenset({
     "blend_edges", "reverse", "scale",
     "color_chase",
     "wrap_x", "wrap_y",
+    "grow_with_music", "clockwise",
 })
 
 
