@@ -123,9 +123,7 @@ class TimingResolver:
         return self._snap_to_grid(end_ms)
 
     @staticmethod
-    def _resolve_beat_count(
-        duration: EffectDuration, bias: float = 0.5
-    ) -> int:
+    def _resolve_beat_count(duration: EffectDuration, bias: float = 0.5) -> int:
         """Resolve an EffectDuration to a beat count using the vocabulary range.
 
         Interpolates between the min and max beats defined in

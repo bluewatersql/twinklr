@@ -174,7 +174,9 @@ class DisplayRenderStage:
                 asset_base_path: Path | None = context.get_state("asset_base_path")
             elif isinstance(input, dict):
                 plan_set = input["plan_set"]
-                beat_grid = input.get("beat_grid") or self._beat_grid or context.get_state("beat_grid")
+                beat_grid = (
+                    input.get("beat_grid") or self._beat_grid or context.get_state("beat_grid")
+                )
                 display_graph = (
                     input.get("display_graph")
                     or self._display_graph
@@ -182,7 +184,9 @@ class DisplayRenderStage:
                 )
                 catalog = input.get("catalog") or context.get_state("asset_catalog")
                 sequence = input.get("sequence") or context.get_state("sequence")
-                asset_base_path = input.get("asset_base_path") or context.get_state("asset_base_path")
+                asset_base_path = input.get("asset_base_path") or context.get_state(
+                    "asset_base_path"
+                )
             else:
                 return failure_result(
                     f"Unexpected input type: {type(input).__name__}",
@@ -229,10 +233,19 @@ class DisplayRenderStage:
             # Extract section boundaries from macro plan (audio-sourced timing)
             section_boundaries = self._extract_section_boundaries(context)
 
+            # Load the group template registry for multi-layer rendering
+            from twinklr.core.sequencer.templates.group import (
+                REGISTRY,
+                load_builtin_group_templates,
+            )
+
+            load_builtin_group_templates()
+
             # Create renderer and render
             renderer = DisplayRenderer(
                 beat_grid=beat_grid,
                 display_graph=display_graph,
+                template_registry=REGISTRY,
             )
 
             result: RenderResult = renderer.render(
@@ -264,7 +277,6 @@ class DisplayRenderStage:
             logger.exception("Display rendering failed", exc_info=e)
             return failure_result(str(e), stage_name=self.name)
 
-
     @staticmethod
     def _extract_section_boundaries(
         context: PipelineContext,
@@ -294,9 +306,7 @@ class DisplayRenderStage:
         boundaries: list[tuple[str, int, int]] = []
         for sp in macro_plan.section_plans:
             sec = sp.section
-            boundaries.append(
-                (sec.section_id, sec.start_ms, sec.end_ms)
-            )
+            boundaries.append((sec.section_id, sec.start_ms, sec.end_ms))
 
         logger.info(
             "Extracted %d section boundaries from macro plan",
@@ -342,12 +352,8 @@ class DisplayRenderStage:
         return BeatGrid(
             bar_boundaries=[i * ms_per_bar for i in range(num_bars + 1)],
             beat_boundaries=[i * ms_per_beat for i in range(total_beats + 1)],
-            eighth_boundaries=[
-                i * ms_per_beat / 2 for i in range(total_beats * 2 + 1)
-            ],
-            sixteenth_boundaries=[
-                i * ms_per_beat / 4 for i in range(total_beats * 4 + 1)
-            ],
+            eighth_boundaries=[i * ms_per_beat / 2 for i in range(total_beats * 2 + 1)],
+            sixteenth_boundaries=[i * ms_per_beat / 4 for i in range(total_beats * 4 + 1)],
             tempo_bpm=tempo_bpm,
             beats_per_bar=beats_per_bar,
             duration_ms=duration_ms,

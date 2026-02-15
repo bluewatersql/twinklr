@@ -6,7 +6,6 @@ import pytest
 
 from twinklr.core.sequencer.display.models import (
     CompositionConfig,
-    CompositionDiagnostic,
     GapPolicy,
     OverlapPolicy,
     RenderConfig,
@@ -20,7 +19,6 @@ from twinklr.core.sequencer.display.models import (
     TransitionSpec,
 )
 from twinklr.core.sequencer.vocabulary import LaneKind
-
 
 # ---------------------------------------------------------------------------
 # ResolvedPalette

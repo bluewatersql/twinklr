@@ -43,9 +43,7 @@ class SettingsStringBuilder:
         self._parts.append(f"{key}={value}")
         return self
 
-    def add_if(
-        self, key: str, value: Any, condition: bool
-    ) -> SettingsStringBuilder:
+    def add_if(self, key: str, value: Any, condition: bool) -> SettingsStringBuilder:
         """Add a key=value pair only if condition is True.
 
         Args:
@@ -143,6 +141,42 @@ class SettingsStringBuilder:
             self.add("T_SLIDER_Out_Transition_Adjust", adjust)
         if reverse:
             self.add("T_CHECKBOX_Out_Transition_Reverse", 1)
+        return self
+
+    def add_value_curve(self, param_suffix: str, curve_string: str) -> SettingsStringBuilder:
+        """Add a ValueCurve key for an effect parameter.
+
+        Appends ``E_VALUECURVE_{param_suffix}={curve_string}`` to the
+        settings.  The corresponding static value (e.g.,
+        ``E_SLIDER_{param_suffix}``) should also be present so xLights
+        has a fallback when the curve is inactive.
+
+        Args:
+            param_suffix: Parameter suffix matching the static key
+                (e.g., ``"Twinkle_Count"`` produces
+                ``E_VALUECURVE_Twinkle_Count``).
+            curve_string: Complete xLights ValueCurve string
+                (``Active=TRUE|Id=...|Type=...|...``).
+
+        Returns:
+            Self for chaining.
+        """
+        return self.add(f"E_VALUECURVE_{param_suffix}", curve_string)
+
+    def add_value_curves(self, curves: dict[str, str]) -> SettingsStringBuilder:
+        """Add multiple ValueCurve keys from a dict.
+
+        Convenience wrapper around :meth:`add_value_curve` for bulk
+        insertion.
+
+        Args:
+            curves: Mapping of param_suffix → curve_string.
+
+        Returns:
+            Self for chaining.
+        """
+        for suffix, curve_str in curves.items():
+            self.add_value_curve(suffix, curve_str)
         return self
 
     def build(self) -> str:

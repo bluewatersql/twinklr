@@ -172,9 +172,7 @@ class TestAugmentSettings:
     def test_wipe_transition_type(self) -> None:
         """Non-Fade transition types are correctly emitted."""
         event = _make_event(
-            transition_in=TransitionSpec(
-                type="Wipe", duration_ms=400, adjust=75
-            ),
+            transition_in=TransitionSpec(type="Wipe", duration_ms=400, adjust=75),
         )
         result = XSQWriter._augment_settings(
             "E_SLIDER_Speed=50",
@@ -188,9 +186,7 @@ class TestAugmentSettings:
     def test_reverse_transition(self) -> None:
         """Reversed transitions include the checkbox key."""
         event = _make_event(
-            transition_out=TransitionSpec(
-                type="Fade", duration_ms=300, reverse=True
-            ),
+            transition_out=TransitionSpec(type="Fade", duration_ms=300, reverse=True),
         )
         result = XSQWriter._augment_settings(
             "E_SLIDER_Speed=50",
@@ -199,6 +195,47 @@ class TestAugmentSettings:
             blend_mode="Normal",
         )
         assert "T_CHECKBOX_Out_Transition_Reverse=1" in result
+
+    def test_value_curves_appended(self) -> None:
+        """Value curves from RenderEvent are appended to settings string."""
+        event = RenderEvent(
+            event_id="test_vc",
+            start_ms=0,
+            end_ms=1000,
+            effect_type="Twinkle",
+            parameters={"count": 10},
+            value_curves={
+                "Twinkle_Count": "Active=TRUE|Id=ID_VALUECURVE_Twinkle_Count|Type=Custom|Min=0.00|Max=25.00|Values=0.00:0.20;1.00:0.80|",
+            },
+            palette=_DEFAULT_PALETTE,
+            source=RenderEventSource(
+                section_id="s1",
+                lane=LaneKind.BASE,
+                group_id="g1",
+                template_id="t1",
+                placement_index=0,
+            ),
+        )
+        result = XSQWriter._augment_settings(
+            "E_SLIDER_Speed=50",
+            event=event,
+            layer_index=0,
+            blend_mode="Normal",
+        )
+        assert "E_VALUECURVE_Twinkle_Count=Active=TRUE" in result
+        # Base settings still present
+        assert "E_SLIDER_Speed=50" in result
+
+    def test_empty_value_curves_no_change(self) -> None:
+        """Empty value_curves dict doesn't add anything."""
+        event = _make_event()
+        result = XSQWriter._augment_settings(
+            "E_SLIDER_Speed=50",
+            event=event,
+            layer_index=0,
+            blend_mode="Normal",
+        )
+        assert "VALUECURVE" not in result
 
 
 class TestApplyIntensityBrightness:
@@ -236,17 +273,13 @@ class TestApplyIntensityBrightness:
     def test_quarter_intensity(self) -> None:
         """intensity=0.25 sets brightness to 25."""
         palette = _DEFAULT_PALETTE
-        result = XSQWriter._apply_intensity_brightness(
-            palette, intensity=0.25, effect_name="Fan"
-        )
+        result = XSQWriter._apply_intensity_brightness(palette, intensity=0.25, effect_name="Fan")
         assert result.brightness == 25
 
     def test_on_effect_skipped(self) -> None:
         """On effects are skipped — they handle intensity via E_ keys."""
         palette = _DEFAULT_PALETTE
-        result = XSQWriter._apply_intensity_brightness(
-            palette, intensity=0.3, effect_name="On"
-        )
+        result = XSQWriter._apply_intensity_brightness(palette, intensity=0.3, effect_name="On")
         assert result.brightness is None  # Unchanged
 
     def test_composes_with_existing_brightness(self) -> None:
@@ -282,9 +315,17 @@ class TestApplyIntensityBrightness:
         """Brightness is applied for every non-On effect type."""
         palette = _DEFAULT_PALETTE
         for effect_name in [
-            "Color Wash", "Spirals", "SingleStrand", "Fan",
-            "Shockwave", "Strobe", "Twinkle", "Snowflakes",
-            "Marquee", "Meteors", "Pictures",
+            "Color Wash",
+            "Spirals",
+            "SingleStrand",
+            "Fan",
+            "Shockwave",
+            "Strobe",
+            "Twinkle",
+            "Snowflakes",
+            "Marquee",
+            "Meteors",
+            "Pictures",
         ]:
             result = XSQWriter._apply_intensity_brightness(
                 palette, intensity=0.5, effect_name=effect_name

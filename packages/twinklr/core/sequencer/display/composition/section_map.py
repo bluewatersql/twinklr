@@ -76,12 +76,8 @@ def build_section_bar_map(
     result: dict[str, SectionBarRange] = {}
 
     for section_id, raw_start_ms, raw_end_ms in sections:
-        start_bar = _find_nearest_bar_index(
-            beat_grid.bar_boundaries, float(raw_start_ms)
-        )
-        end_bar = _find_nearest_bar_index(
-            beat_grid.bar_boundaries, float(raw_end_ms)
-        )
+        start_bar = _find_nearest_bar_index(beat_grid.bar_boundaries, float(raw_start_ms))
+        end_bar = _find_nearest_bar_index(beat_grid.bar_boundaries, float(raw_end_ms))
 
         # Guarantee end_bar >= start_bar
         if end_bar < start_bar:
@@ -101,9 +97,7 @@ def build_section_bar_map(
     return result
 
 
-def _find_nearest_bar_index(
-    bar_boundaries: list[float], time_ms: float
-) -> int:
+def _find_nearest_bar_index(bar_boundaries: list[float], time_ms: float) -> int:
     """Find the index of the bar boundary nearest to *time_ms*.
 
     Uses binary search for efficiency.

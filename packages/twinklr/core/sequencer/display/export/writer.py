@@ -120,8 +120,7 @@ class XSQWriter:
         result.palette_entries = len(palette_reg)
 
         logger.info(
-            "XSQWriter: wrote %d effects on %d elements "
-            "(%d effectdb, %d palettes, %d warnings)",
+            "XSQWriter: wrote %d effects on %d elements (%d effectdb, %d palettes, %d warnings)",
             result.effects_written,
             result.elements_created,
             result.effectdb_entries,
@@ -285,6 +284,10 @@ class XSQWriter:
                 reverse=event.transition_out.reverse,
             )
 
+        # Value curves — animated parameters from template compilation
+        if event.value_curves:
+            extra.add_value_curves(event.value_curves)
+
         suffix = extra.build()
         if not suffix:
             return base_settings
@@ -363,9 +366,7 @@ class XSQWriter:
             palette_reg: Populated palette registry.
             sequence: XSequence to update.
         """
-        sequence.color_palettes = [
-            ColorPalette(settings=s) for s in palette_reg.get_entries()
-        ]
+        sequence.color_palettes = [ColorPalette(settings=s) for s in palette_reg.get_entries()]
 
 
 __all__ = [

@@ -241,8 +241,7 @@ def print_result_summary(result: RenderResult) -> None:
     for group in plan.groups:
         total = sum(len(ly.events) for ly in group.layers)
         layer_str = ", ".join(
-            f"L{ly.layer_index}({ly.layer_role.value}: {len(ly.events)})"
-            for ly in group.layers
+            f"L{ly.layer_index}({ly.layer_role.value}: {len(ly.events)})" for ly in group.layers
         )
         print(f"  {group.element_name}: {total} effects [{layer_str}]")
 
@@ -368,8 +367,7 @@ def main() -> None:
 
     # 3. Build section boundaries for the renderer (BeatGrid timing authority)
     section_boundaries: list[tuple[str, int, int]] = [
-        (sec["section_id"], sec["start_ms"], sec["end_ms"])
-        for sec in audio["sections"]
+        (sec["section_id"], sec["start_ms"], sec["end_ms"]) for sec in audio["sections"]
     ]
 
     # 4. Optional: Load asset catalog and resolve plan assets
@@ -401,11 +399,19 @@ def main() -> None:
     sequence = build_empty_sequence(int(duration_ms))
 
     # 7. Run the display renderer
+    from twinklr.core.sequencer.templates.group import (
+        REGISTRY,
+        load_builtin_group_templates,
+    )
+
+    load_builtin_group_templates()
+
     config = RenderConfig()
     renderer = DisplayRenderer(
         beat_grid=beat_grid,
         display_graph=display_graph,
         config=config,
+        template_registry=REGISTRY,
     )
 
     result = renderer.render(

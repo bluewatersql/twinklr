@@ -18,6 +18,10 @@ from twinklr.core.sequencer.planning.group_plan import (
     SectionCoordinationPlan,
 )
 from twinklr.core.sequencer.planning.models import PaletteRef
+from twinklr.core.sequencer.templates.group import (
+    REGISTRY,
+    load_builtin_group_templates,
+)
 from twinklr.core.sequencer.templates.group.models.coordination import (
     CoordinationConfig,
     CoordinationPlan,
@@ -38,6 +42,9 @@ from twinklr.core.sequencer.vocabulary import (
     PlanningTimeRef,
     StepUnit,
 )
+
+# Ensure builtins are loaded once for all tests in this module
+load_builtin_group_templates()
 
 
 def _make_beat_grid() -> BeatGrid:
@@ -123,6 +130,7 @@ class TestSequencedExpansion:
             beat_grid=_make_beat_grid(),
             display_graph=_make_display_graph(),
             palette_resolver=_make_palette_resolver(),
+            template_registry=REGISTRY,
         )
         render_plan = engine.compose(plan_set)
 
@@ -188,14 +196,12 @@ class TestSequencedExpansion:
             beat_grid=_make_beat_grid(),
             display_graph=_make_display_graph(),
             palette_resolver=_make_palette_resolver(),
+            template_registry=REGISTRY,
         )
         render_plan = engine.compose(plan_set)
 
         # No "Phase 2" warnings — SEQUENCED is now implemented
-        phase2_warnings = [
-            d for d in render_plan.diagnostics
-            if "Phase 2" in d.message
-        ]
+        phase2_warnings = [d for d in render_plan.diagnostics if "Phase 2" in d.message]
         assert len(phase2_warnings) == 0
 
 
@@ -256,6 +262,7 @@ class TestRippleExpansion:
             beat_grid=_make_beat_grid(),
             display_graph=_make_display_graph(),
             palette_resolver=_make_palette_resolver(),
+            template_registry=REGISTRY,
         )
         render_plan = engine.compose(plan_set)
 
@@ -284,6 +291,7 @@ class TestRippleExpansion:
             beat_grid=_make_beat_grid(),
             display_graph=_make_display_graph(),
             palette_resolver=_make_palette_resolver(),
+            template_registry=REGISTRY,
         )
         render_plan = engine.compose(plan_set)
 
@@ -313,6 +321,7 @@ class TestRippleExpansion:
             beat_grid=_make_beat_grid(),
             display_graph=_make_display_graph(),
             palette_resolver=_make_palette_resolver(),
+            template_registry=REGISTRY,
         )
         render_plan = engine.compose(plan_set)
 
@@ -368,6 +377,7 @@ class TestCallResponseExpansion:
             beat_grid=_make_beat_grid(),
             display_graph=_make_display_graph(),
             palette_resolver=_make_palette_resolver(),
+            template_registry=REGISTRY,
         )
         render_plan = engine.compose(plan_set)
 
@@ -389,6 +399,7 @@ class TestCallResponseExpansion:
             beat_grid=_make_beat_grid(),
             display_graph=_make_display_graph(),
             palette_resolver=_make_palette_resolver(),
+            template_registry=REGISTRY,
         )
         render_plan = engine.compose(plan_set)
 
@@ -409,8 +420,7 @@ class TestCallResponseExpansion:
                 for b_start, b_end in b_times:
                     # No overlap: a ends before b starts, or b ends before a starts
                     assert a_end <= b_start or b_end <= a_start, (
-                        f"A-team ({a_start}-{a_end}) overlaps "
-                        f"B-team ({b_start}-{b_end})"
+                        f"A-team ({a_start}-{a_end}) overlaps B-team ({b_start}-{b_end})"
                     )
 
     def test_call_response_a_team_starts_first(self) -> None:
@@ -420,6 +430,7 @@ class TestCallResponseExpansion:
             beat_grid=_make_beat_grid(),
             display_graph=_make_display_graph(),
             palette_resolver=_make_palette_resolver(),
+            template_registry=REGISTRY,
         )
         render_plan = engine.compose(plan_set)
 

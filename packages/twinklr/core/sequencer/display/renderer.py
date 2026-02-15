@@ -32,6 +32,9 @@ from twinklr.core.sequencer.display.models.config import (
 from twinklr.core.sequencer.display.models.palette import ResolvedPalette
 from twinklr.core.sequencer.display.models.render_plan import RenderPlan
 from twinklr.core.sequencer.planning.group_plan import GroupPlanSet
+from twinklr.core.sequencer.templates.group.library import (
+    GroupTemplateRegistry,
+)
 from twinklr.core.sequencer.templates.group.models.display import DisplayGraph
 from twinklr.core.sequencer.theming.catalog import PaletteCatalog
 from twinklr.core.sequencer.timing.beat_grid import BeatGrid
@@ -87,6 +90,7 @@ class DisplayRenderer:
         palette_catalog: PaletteCatalog | None = None,
         config: RenderConfig | None = None,
         handler_registry: HandlerRegistry | None = None,
+        template_registry: GroupTemplateRegistry | None = None,
     ) -> None:
         """Initialize the display renderer.
 
@@ -98,11 +102,18 @@ class DisplayRenderer:
             config: Render configuration. Defaults to sensible defaults.
             handler_registry: Custom handler registry. If None, loads
                 builtin handlers (On, Color Wash, Chase, Spirals, Pictures).
+            template_registry: Group template registry for the template
+                compiler.  Enables multi-layer rendering via
+                TemplateCompiler (motif-primary effect resolution,
+                value curves, multi-depth layers).  Required for
+                production rendering; raises ``RuntimeError`` if
+                omitted and rendering is attempted.
         """
         self._beat_grid = beat_grid
         self._display_graph = display_graph
         self._config = config or RenderConfig()
         self._handlers = handler_registry or load_builtin_handlers()
+        self._template_registry = template_registry
 
         # Build palette resolver from catalog
         if palette_catalog is None:
@@ -164,6 +175,7 @@ class DisplayRenderer:
             section_boundaries=section_boundaries,
             config=composition_config,
             catalog_index=catalog_index,
+            template_registry=self._template_registry,
         )
         render_plan = engine.compose(plan_set)
 

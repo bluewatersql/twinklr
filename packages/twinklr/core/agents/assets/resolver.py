@@ -18,7 +18,6 @@ from twinklr.core.agents.assets.models import (
     AssetCatalog,
     AssetCategory,
     AssetStatus,
-    CatalogEntry,
 )
 from twinklr.core.sequencer.planning.group_plan import (
     GroupPlanSet,
@@ -128,19 +127,13 @@ def _find_matching_entries(
         List of matching asset_ids (may be empty).
     """
     # Find all successful entries for this motif
-    motif_entries = [
-        e
-        for e in catalog.find_by_motif(motif_id)
-        if e.status != AssetStatus.FAILED
-    ]
+    motif_entries = [e for e in catalog.find_by_motif(motif_id) if e.status != AssetStatus.FAILED]
 
     if not motif_entries:
         return []
 
     # Try preferred category first
-    preferred = [
-        e for e in motif_entries if e.spec.category == preferred_category
-    ]
+    preferred = [e for e in motif_entries if e.spec.category == preferred_category]
     if preferred:
         return [e.asset_id for e in preferred]
 
@@ -178,9 +171,7 @@ def _resolve_placement(
         return placement
 
     # Determine preferred category from group role
-    preferred = ROLE_CATEGORY_PREFERENCE.get(
-        placement.group_id, _DEFAULT_CATEGORY
-    )
+    preferred = ROLE_CATEGORY_PREFERENCE.get(placement.group_id, _DEFAULT_CATEGORY)
 
     asset_ids = _find_matching_entries(motif_id, catalog, preferred)
     if not asset_ids:
@@ -219,14 +210,10 @@ def _resolve_coordination_plan(
     if not coord_plan.placements:
         return coord_plan
 
-    resolved_placements = [
-        _resolve_placement(p, catalog) for p in coord_plan.placements
-    ]
+    resolved_placements = [_resolve_placement(p, catalog) for p in coord_plan.placements]
 
     # Only create a new plan if something changed
-    if all(
-        r is o for r, o in zip(resolved_placements, coord_plan.placements)
-    ):
+    if all(r is o for r, o in zip(resolved_placements, coord_plan.placements, strict=True)):
         return coord_plan
 
     return coord_plan.model_copy(update={"placements": resolved_placements})
@@ -246,13 +233,10 @@ def _resolve_lane_plan(
         New LanePlan with resolved coordination plans.
     """
     resolved_coords = [
-        _resolve_coordination_plan(cp, catalog)
-        for cp in lane_plan.coordination_plans
+        _resolve_coordination_plan(cp, catalog) for cp in lane_plan.coordination_plans
     ]
 
-    if all(
-        r is o for r, o in zip(resolved_coords, lane_plan.coordination_plans)
-    ):
+    if all(r is o for r, o in zip(resolved_coords, lane_plan.coordination_plans, strict=True)):
         return lane_plan
 
     return lane_plan.model_copy(update={"coordination_plans": resolved_coords})
@@ -271,13 +255,9 @@ def _resolve_section(
     Returns:
         New SectionCoordinationPlan with resolved lane plans.
     """
-    resolved_lanes = [
-        _resolve_lane_plan(lp, catalog) for lp in section.lane_plans
-    ]
+    resolved_lanes = [_resolve_lane_plan(lp, catalog) for lp in section.lane_plans]
 
-    if all(
-        r is o for r, o in zip(resolved_lanes, section.lane_plans)
-    ):
+    if all(r is o for r, o in zip(resolved_lanes, section.lane_plans, strict=True)):
         return section
 
     return section.model_copy(update={"lane_plans": resolved_lanes})
@@ -306,9 +286,7 @@ def resolve_plan_assets(
         New GroupPlanSet with resolved_asset_ids populated on
         placements that match catalog entries.
     """
-    resolved_sections = [
-        _resolve_section(s, catalog) for s in plan_set.section_plans
-    ]
+    resolved_sections = [_resolve_section(s, catalog) for s in plan_set.section_plans]
 
     # Count resolutions for logging
     total_placements = 0
@@ -327,9 +305,7 @@ def resolve_plan_assets(
         total_placements,
     )
 
-    if all(
-        r is o for r, o in zip(resolved_sections, plan_set.section_plans)
-    ):
+    if all(r is o for r, o in zip(resolved_sections, plan_set.section_plans, strict=True)):
         return plan_set
 
     return plan_set.model_copy(update={"section_plans": resolved_sections})

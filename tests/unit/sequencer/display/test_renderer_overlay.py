@@ -24,6 +24,10 @@ from twinklr.core.sequencer.planning.group_plan import (
     SectionCoordinationPlan,
 )
 from twinklr.core.sequencer.planning.models import PaletteRef
+from twinklr.core.sequencer.templates.group import (
+    REGISTRY,
+    load_builtin_group_templates,
+)
 from twinklr.core.sequencer.templates.group.models.coordination import (
     CoordinationPlan,
     GroupPlacement,
@@ -43,6 +47,9 @@ from twinklr.core.sequencer.vocabulary import (
     LaneKind,
     PlanningTimeRef,
 )
+
+# Ensure builtins are loaded once for all tests in this module
+load_builtin_group_templates()
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -167,6 +174,7 @@ class TestDisplayRendererOverlayWiring:
         renderer = DisplayRenderer(
             beat_grid=_make_beat_grid(),
             display_graph=_make_display_graph(),
+            template_registry=REGISTRY,
         )
         plan_set = _make_plan_set(resolved_asset_ids=["asset_sparkles"])
         result = renderer.render(plan_set, _make_sequence())
@@ -182,18 +190,17 @@ class TestDisplayRendererOverlayWiring:
         renderer = DisplayRenderer(
             beat_grid=_make_beat_grid(),
             display_graph=_make_display_graph(),
+            template_registry=REGISTRY,
         )
         plan_set = _make_plan_set(resolved_asset_ids=["asset_sparkles"])
-        result = renderer.render(
-            plan_set, _make_sequence(), catalog_index=catalog_index
-        )
+        result = renderer.render(plan_set, _make_sequence(), catalog_index=catalog_index)
 
         # 2 events: procedural + overlay
         assert result.render_plan.total_events == 2
         group = result.render_plan.groups[0]
         assert len(group.layers) == 2
 
-        overlay_layer = next(ly for ly in group.layers if ly.layer_index == 1)
+        overlay_layer = next(ly for ly in group.layers if ly.layer_index == 5)
         assert overlay_layer.events[0].effect_type == "Pictures"
 
     def test_build_index_integration(self) -> None:
@@ -208,14 +215,13 @@ class TestDisplayRendererOverlayWiring:
         renderer = DisplayRenderer(
             beat_grid=_make_beat_grid(),
             display_graph=_make_display_graph(),
+            template_registry=REGISTRY,
         )
         plan_set = _make_plan_set(resolved_asset_ids=["asset_sparkles"])
-        result = renderer.render(
-            plan_set, _make_sequence(), catalog_index=catalog_index
-        )
+        result = renderer.render(plan_set, _make_sequence(), catalog_index=catalog_index)
 
         assert result.render_plan.total_events == 2
         overlay_layer = next(
-            ly for ly in result.render_plan.groups[0].layers if ly.layer_index == 1
+            ly for ly in result.render_plan.groups[0].layers if ly.layer_index == 5
         )
         assert overlay_layer.events[0].parameters["filename"] == "images/sparkles.png"

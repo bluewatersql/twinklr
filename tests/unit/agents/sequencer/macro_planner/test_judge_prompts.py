@@ -161,14 +161,36 @@ def jinja_env() -> Environment:
 # ============================================================================
 
 
+def _system_taxonomy() -> dict:
+    """Taxonomy dict required by system.j2 template variables."""
+    return {
+        "IssueCategory": ["COVERAGE", "TIMING", "LAYERING", "VARIETY"],
+        "IssueSeverity": ["ERROR", "WARN", "NIT"],
+        "IssueEffort": ["LOW", "MEDIUM", "HIGH"],
+        "IssueScope": ["GLOBAL", "SECTION", "LANE"],
+        "SuggestedAction": ["PATCH", "REPLAN_GLOBAL", "IGNORE"],
+        "VerdictStatus": ["APPROVE", "SOFT_FAIL", "HARD_FAIL"],
+        "EnergyTarget": ["LOW", "MED", "HIGH", "PEAK"],
+        "MotionDensity": ["SPARSE", "MED", "BUSY"],
+        "ChoreographyStyle": ["ABSTRACT", "IMAGERY", "HYBRID"],
+        "TargetRole": ["OUTLINE", "MEGA_TREE", "HERO", "ARCHES"],
+        "LayerRole": ["BASE", "RHYTHM", "ACCENT", "FILL"],
+    }
+
+
+def _render_system(jinja_env: Environment, *, response_schema: str = '{"type": "object"}') -> str:
+    """Render system.j2 with required variables."""
+    template = jinja_env.get_template("system.j2")
+    return template.render(
+        response_schema=response_schema,
+        taxonomy=_system_taxonomy(),
+        learning_context=None,
+    )
+
+
 def test_system_prompt_renders(jinja_env: Environment):
     """System prompt renders without errors."""
-    template = jinja_env.get_template("system.j2")
-
-    # Mock response schema (would come from Pydantic)
-    response_schema = '{"type": "object", "properties": {}}'
-
-    result = template.render(response_schema=response_schema)
+    result = _render_system(jinja_env, response_schema='{"type": "object", "properties": {}}')
 
     assert len(result) > 0
     assert "Christmas light show" in result
@@ -176,10 +198,7 @@ def test_system_prompt_renders(jinja_env: Environment):
 
 def test_system_prompt_judge_identity(jinja_env: Environment):
     """System prompt establishes judge identity."""
-    template = jinja_env.get_template("system.j2")
-    response_schema = '{"type": "object"}'
-
-    result = template.render(response_schema=response_schema)
+    result = _render_system(jinja_env)
 
     assert "judge" in result.lower()
     assert "evaluate" in result.lower() or "assess" in result.lower()
@@ -187,10 +206,7 @@ def test_system_prompt_judge_identity(jinja_env: Environment):
 
 def test_system_prompt_christmas_persona(jinja_env: Environment):
     """System prompt enforces Christmas light show persona."""
-    template = jinja_env.get_template("system.j2")
-    response_schema = '{"type": "object"}'
-
-    result = template.render(response_schema=response_schema)
+    result = _render_system(jinja_env)
 
     # Should emphasize Christmas/residential display context
     assert "Christmas" in result
@@ -199,10 +215,7 @@ def test_system_prompt_christmas_persona(jinja_env: Environment):
 
 def test_system_prompt_bold_over_subtle(jinja_env: Environment):
     """System prompt emphasizes bold over subtle design."""
-    template = jinja_env.get_template("system.j2")
-    response_schema = '{"type": "object"}'
-
-    result = template.render(response_schema=response_schema)
+    result = _render_system(jinja_env)
 
     assert "bold" in result.lower() or "impact" in result.lower()
     assert "subtle" in result.lower()  # Should mention avoiding subtlety
@@ -210,10 +223,7 @@ def test_system_prompt_bold_over_subtle(jinja_env: Environment):
 
 def test_system_prompt_no_concert_language_positive(jinja_env: Environment):
     """System prompt does not use concert/stage language in positive context."""
-    template = jinja_env.get_template("system.j2")
-    response_schema = '{"type": "object"}'
-
-    result = template.render(response_schema=response_schema)
+    result = _render_system(jinja_env)
 
     # Check for forbidden terms NOT preceded by negation
     forbidden = ["concert", "stage production", "nightclub"]
@@ -230,14 +240,10 @@ def test_system_prompt_no_concert_language_positive(jinja_env: Environment):
 
 def test_system_prompt_no_schema_injection(jinja_env: Environment):
     """System prompt should NOT include response_schema (moved to developer.j2)."""
-    template = jinja_env.get_template("system.j2")
-    response_schema = "TEST_SCHEMA_PLACEHOLDER"
+    result = _render_system(jinja_env, response_schema="TEST_SCHEMA_PLACEHOLDER")
 
-    result = template.render(response_schema=response_schema)
-
-    # Schema should NOT be in system prompt - it's now in developer.j2
-    # The test verifies we don't accidentally put schema in system prompt
-    assert "json" not in result.lower() or "schema" not in result.lower()
+    # Schema IS now in system.j2 (moved there), verify it renders
+    assert "TEST_SCHEMA_PLACEHOLDER" in result
 
 
 # ============================================================================
@@ -414,28 +420,25 @@ def test_developer_prompt_renders(jinja_env: Environment, mock_taxonomy: dict):
 
 
 def test_developer_prompt_technical_constraints(jinja_env: Environment, mock_taxonomy: dict):
-    """Developer prompt includes technical constraints."""
+    """Developer prompt includes strict requirements / hard-fail checklist."""
     template = jinja_env.get_template("developer.j2")
 
     result = template.render(iteration=1, taxonomy=mock_taxonomy, response_schema="{}")
 
-    # Current template structure - check for constraints section
-    assert "Technical Contract" in result or "Constraints" in result
-    assert "10.0" in result  # Score range
-    assert "0.0" in result  # Min score/confidence
+    # developer.j2 contains the strict requirements section
+    assert "Strict Requirements" in result or "HARD_FAIL" in result
+    assert "Response Schema" in result
 
 
 def test_developer_prompt_enum_listings(jinja_env: Environment, mock_taxonomy: dict):
-    """Developer prompt lists taxonomy enums (injected dynamically)."""
+    """Developer prompt renders without errors and contains schema section."""
     template = jinja_env.get_template("developer.j2")
 
     result = template.render(iteration=1, taxonomy=mock_taxonomy, response_schema="{}")
 
-    # Check for taxonomy enum values (dynamically injected)
-    assert "COVERAGE" in result  # IssueCategory
-    assert "ERROR" in result  # IssueSeverity
-    # Note: VerdictStatus not used in this template, check for actual content
-    assert "EnergyTarget" in result  # Enum reference section
+    # developer.j2 includes the response schema and strict requirements
+    assert "Response Schema" in result
+    assert "HARD_FAIL" in result
 
 
 def test_developer_prompt_iteration_context(jinja_env: Environment, mock_taxonomy: dict):

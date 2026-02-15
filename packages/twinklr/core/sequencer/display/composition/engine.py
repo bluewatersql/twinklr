@@ -4,6 +4,12 @@ The CompositionEngine is the core decision-making stage. It walks the
 GroupPlanSet section by section, resolving targets, timing, layers,
 and palettes to produce the intermediate RenderPlan.
 
+Uses a ``TemplateCompiler`` (when provided) to translate each
+``GroupPlacement`` into one or more ``CompiledEffect``s via the
+template's ``LayerRecipe`` definitions.  Each ``CompiledEffect`` is
+tagged with a ``VisualDepth`` so the engine can assign it to the
+correct xLights layer.
+
 Supports dual-layer rendering: when a placement has resolved_asset_ids
 (from the asset resolution step), the engine emits both a procedural
 effect event AND a Pictures overlay event on adjacent layers.
@@ -17,6 +23,9 @@ from uuid import uuid4
 from twinklr.core.sequencer.display.composition.layer_allocator import (
     LayerAllocator,
 )
+from twinklr.core.sequencer.display.composition.models import (
+    CompiledEffect,
+)
 from twinklr.core.sequencer.display.composition.palette_resolver import (
     PaletteResolver,
 )
@@ -26,6 +35,11 @@ from twinklr.core.sequencer.display.composition.section_map import (
 )
 from twinklr.core.sequencer.display.composition.target_resolver import (
     TargetResolver,
+)
+from twinklr.core.sequencer.display.composition.template_compiler import (
+    DefaultTemplateCompiler,
+    TemplateCompileContext,
+    TemplateCompiler,
 )
 from twinklr.core.sequencer.display.composition.timing_resolver import (
     TimingResolver,
@@ -45,15 +59,14 @@ from twinklr.core.sequencer.display.models.render_plan import (
     RenderLayerPlan,
     RenderPlan,
 )
-from twinklr.core.sequencer.display.templates.effect_map import (
-    filter_valid_overrides,
-    resolve_effect_type,
-)
 from twinklr.core.sequencer.planning.group_plan import (
     GroupPlanSet,
     SectionCoordinationPlan,
 )
 from twinklr.core.sequencer.planning.models import PaletteRef
+from twinklr.core.sequencer.templates.group.library import (
+    GroupTemplateRegistry,
+)
 from twinklr.core.sequencer.templates.group.models.coordination import (
     CoordinationConfig,
     CoordinationPlan,
@@ -127,6 +140,14 @@ class CompositionEngine:
         config: Composition configuration.
         catalog_index: Optional mapping of asset_id → CatalogEntry
             for resolving asset file paths during overlay rendering.
+        template_compiler: Optional ``TemplateCompiler`` for multi-layer
+            template rendering.  Uses the compiler to produce
+            ``CompiledEffect``s from ``GroupPlanTemplate`` layer recipes.
+        template_registry: Optional ``GroupTemplateRegistry`` used to
+            build a ``DefaultTemplateCompiler`` when ``template_compiler``
+            is not provided.  Either ``template_compiler`` or
+            ``template_registry`` must be supplied; a ``RuntimeError``
+            is raised at composition time if neither is configured.
     """
 
     def __init__(
@@ -137,6 +158,8 @@ class CompositionEngine:
         section_boundaries: list[tuple[str, int, int]] | None = None,
         config: CompositionConfig | None = None,
         catalog_index: dict[str, object] | None = None,
+        template_compiler: TemplateCompiler | None = None,
+        template_registry: GroupTemplateRegistry | None = None,
     ) -> None:
         self._beat_grid = beat_grid
         self._config = config or CompositionConfig()
@@ -149,10 +172,16 @@ class CompositionEngine:
         self._layer_blend_modes: dict[tuple[str, int], str] = {}
         # Section → bar range mapping (built from audio section boundaries)
         self._section_map: dict[str, SectionBarRange] = (
-            build_section_bar_map(section_boundaries, beat_grid)
-            if section_boundaries
-            else {}
+            build_section_bar_map(section_boundaries, beat_grid) if section_boundaries else {}
         )
+        # Template compiler — when provided, enables multi-layer rendering.
+        # When a registry is given but no explicit compiler, construct the default.
+        if template_compiler is not None:
+            self._template_compiler: TemplateCompiler | None = template_compiler
+        elif template_registry is not None:
+            self._template_compiler = DefaultTemplateCompiler(template_registry)
+        else:
+            self._template_compiler = None
 
     def compose(self, plan_set: GroupPlanSet) -> RenderPlan:
         """Compose a GroupPlanSet into a RenderPlan.
@@ -246,7 +275,6 @@ class CompositionEngine:
                     coord_plan=coord_plan,
                     section=section,
                     lane=lane,
-                    layer_idx=layer_idx,
                     section_palette=section_palette,
                     section_start_bar=section_start_bar,
                     section_end_ms=section_end_ms,
@@ -259,7 +287,6 @@ class CompositionEngine:
         coord_plan: CoordinationPlan,
         section: SectionCoordinationPlan,
         lane: LaneKind,
-        layer_idx: int,
         section_palette: ResolvedPalette,
         section_start_bar: int,
         section_end_ms: int | None,
@@ -273,17 +300,29 @@ class CompositionEngine:
         - SEQUENCED/CALL_RESPONSE/RIPPLE: window + config are expanded
           into staggered per-group placements.
 
+        Uses the TemplateCompiler to resolve each placement into one or
+        more CompiledEffects via the template's LayerRecipe definitions.
+
         Args:
             coord_plan: Coordination plan with placements.
             section: Parent section (for context).
             lane: Lane kind for intensity resolution.
-            layer_idx: Target layer index.
             section_palette: Resolved palette for this section.
             section_start_bar: 0-indexed song bar where this section starts.
             section_end_ms: Section end boundary for clamping (None = no clamp).
             element_layers: Accumulator.
             diagnostics: Accumulator.
+
+        Raises:
+            RuntimeError: If no template compiler is configured.
         """
+        if self._template_compiler is None:
+            raise RuntimeError(
+                "CompositionEngine requires a TemplateCompiler (or "
+                "GroupTemplateRegistry) for rendering.  Pass "
+                "template_registry to DisplayRenderer or "
+                "template_compiler to CompositionEngine."
+            )
         # Expand SEQUENCED/CALL_RESPONSE/RIPPLE windows into placements
         placements = list(coord_plan.placements)
 
@@ -313,7 +352,7 @@ class CompositionEngine:
         overlay_layer_idx = self._layer_allocator.allocate_overlay(lane)
 
         for idx, placement in enumerate(placements):
-            event = self._compose_placement(
+            compiled_effects = self._compose_placement_compiled(
                 placement=placement,
                 section=section,
                 lane=lane,
@@ -323,37 +362,34 @@ class CompositionEngine:
                 placement_index=idx,
                 diagnostics=diagnostics,
             )
-            if event is None:
-                continue
-
             element_name = self._target_resolver.resolve(placement.group_id)
 
-            if element_name not in element_layers:
-                element_layers[element_name] = {}
-            if layer_idx not in element_layers[element_name]:
-                element_layers[element_name][layer_idx] = []
+            for ce in compiled_effects:
+                sub_layer = self._layer_allocator.allocate_sub_layer(lane, ce.visual_depth)
+                if element_name not in element_layers:
+                    element_layers[element_name] = {}
+                if sub_layer not in element_layers[element_name]:
+                    element_layers[element_name][sub_layer] = []
+                element_layers[element_name][sub_layer].append(ce.event)
 
-            element_layers[element_name][layer_idx].append(event)
-
-            # Emit asset overlay events for placements with resolved assets
-            overlay_events = self._build_asset_overlay_events(
-                placement=placement,
-                procedural_event=event,
-                section=section,
-                lane=lane,
-                section_palette=section_palette,
-                placement_index=idx,
-            )
-            if overlay_events:
-                if overlay_layer_idx not in element_layers[element_name]:
-                    element_layers[element_name][overlay_layer_idx] = []
-                element_layers[element_name][overlay_layer_idx].extend(
-                    overlay_events
+            # Asset overlays — use the first compiled event as the
+            # procedural reference for timing/palette.
+            if compiled_effects:
+                overlay_events = self._build_asset_overlay_events(
+                    placement=placement,
+                    procedural_event=compiled_effects[0].event,
+                    section=section,
+                    lane=lane,
+                    section_palette=section_palette,
+                    placement_index=idx,
                 )
-                # Track blend mode for the overlay layer
-                overlay_key = (element_name, overlay_layer_idx)
-                if overlay_key not in self._layer_blend_modes:
-                    self._layer_blend_modes[overlay_key] = "Normal"
+                if overlay_events:
+                    if overlay_layer_idx not in element_layers.get(element_name, {}):
+                        element_layers.setdefault(element_name, {})[overlay_layer_idx] = []
+                    element_layers[element_name][overlay_layer_idx].extend(overlay_events)
+                    overlay_key = (element_name, overlay_layer_idx)
+                    if overlay_key not in self._layer_blend_modes:
+                        self._layer_blend_modes[overlay_key] = "Normal"
 
     def _expand_window(
         self,
@@ -408,18 +444,14 @@ class CompositionEngine:
             return []
 
         if coordination_mode == CoordinationMode.RIPPLE:
-            return self._expand_ripple(
-                window, config, step_ms, window_start_ms, window_end_ms
-            )
+            return self._expand_ripple(window, config, step_ms, window_start_ms, window_end_ms)
         if coordination_mode == CoordinationMode.CALL_RESPONSE:
             return self._expand_call_response(
                 window, config, step_ms, window_start_ms, window_end_ms
             )
 
         # Default: SEQUENCED
-        return self._expand_sequenced(
-            window, config, step_ms, window_start_ms, window_end_ms
-        )
+        return self._expand_sequenced(window, config, step_ms, window_start_ms, window_end_ms)
 
     def _expand_sequenced(
         self,
@@ -564,12 +596,8 @@ class CompositionEngine:
         """
         placements: list[GroupPlacement] = []
 
-        a_groups = [
-            g for i, g in enumerate(config.group_order) if i % 2 == 0
-        ]
-        b_groups = [
-            g for i, g in enumerate(config.group_order) if i % 2 == 1
-        ]
+        a_groups = [g for i, g in enumerate(config.group_order) if i % 2 == 0]
+        b_groups = [g for i, g in enumerate(config.group_order) if i % 2 == 1]
 
         current_ms = window_start_ms
         slot_idx = 0
@@ -689,7 +717,7 @@ class CompositionEngine:
         else:
             return EffectDuration.SECTION
 
-    def _compose_placement(
+    def _compose_placement_compiled(
         self,
         placement: GroupPlacement,
         section: SectionCoordinationPlan,
@@ -699,8 +727,15 @@ class CompositionEngine:
         section_end_ms: int | None,
         placement_index: int,
         diagnostics: list[CompositionDiagnostic],
-    ) -> RenderEvent | None:
-        """Compose a single placement into a RenderEvent.
+    ) -> list[CompiledEffect]:
+        """Compose a placement via the TemplateCompiler (multi-layer path).
+
+        Resolves timing, intensity, and transitions, then delegates to
+        the compiler which reads the template's LayerRecipe list and
+        returns one CompiledEffect per recipe.
+
+        Raises ``TemplateCompileError`` on any template issue (no
+        silent fallback).
 
         Args:
             placement: Group placement from the plan.
@@ -708,21 +743,24 @@ class CompositionEngine:
             lane: Lane kind.
             section_palette: Resolved palette.
             section_start_bar: 0-indexed song bar where this section starts.
-            section_end_ms: Section end boundary for clamping (None = no clamp).
+            section_end_ms: Section end boundary for clamping.
             placement_index: Index within the coordination plan.
             diagnostics: Accumulator.
 
         Returns:
-            RenderEvent or None if the placement is invalid.
+            List of CompiledEffect (empty on zero-duration placement).
+
+        Raises:
+            TemplateCompileError: On missing template, empty recipes,
+                or unrecognised motifs.
         """
-        # Resolve timing — bar/beat refs are section-relative.
-        # The BeatGrid is the sole timing authority; section_start_bar
-        # anchors the reference to the correct song position.
+        assert self._template_compiler is not None  # caller guarantees
+
+        # Resolve timing
         start_ms = self._timing_resolver.resolve_start_ms(
             placement.start,
             section_start_bar=section_start_bar,
         )
-
         end_ms = self._timing_resolver.resolve_end_ms(
             start_ms=start_ms,
             duration=placement.duration,
@@ -741,52 +779,27 @@ class CompositionEngine:
                     source_group=placement.group_id,
                 )
             )
-            return None
+            return []
 
-        # Resolve effect type from template
-        mapping = resolve_effect_type(placement.template_id)
-
-        # Merge defaults from mapping with placement overrides.
-        # param_overrides from the LLM planner use planning vocabulary
-        # (motif_bias, beacon_color, decay, etc.) — only handler-recognized
-        # keys are allowed through to prevent invalid xLights settings.
-        params = dict(mapping.defaults)
-        valid_overrides = filter_valid_overrides(
-            mapping.effect_type, placement.param_overrides
-        )
-        params.update(valid_overrides)
-
-        # Resolve intensity
+        # Resolve intensity and transitions
         intensity = self._resolve_intensity(lane, placement.intensity)
-
-        # Resolve buffer style based on effect type
-        buffer_style, buffer_transform = self._resolve_buffer_style(
-            mapping.effect_type
-        )
-
-        # Resolve transitions based on lane
         transition_in, transition_out = self._resolve_transitions(lane)
 
-        return RenderEvent(
-            event_id=f"{section.section_id}_{placement.placement_id}",
+        # Build compile context
+        ctx = TemplateCompileContext(
+            section_id=section.section_id,
+            lane=lane,
+            palette=section_palette,
             start_ms=start_ms,
             end_ms=end_ms,
-            effect_type=mapping.effect_type,
-            parameters=params,
-            buffer_style=buffer_style,
-            buffer_transform=buffer_transform,
-            palette=section_palette,
             intensity=intensity,
+            placement_index=placement_index,
             transition_in=transition_in,
             transition_out=transition_out,
-            source=RenderEventSource(
-                section_id=section.section_id,
-                lane=lane,
-                group_id=placement.group_id,
-                template_id=placement.template_id,
-                placement_index=placement_index,
-            ),
         )
+
+        # Delegate to compiler — raises TemplateCompileError on failure
+        return self._template_compiler.compile(placement, ctx)
 
     def _build_asset_overlay_events(
         self,
@@ -872,9 +885,7 @@ class CompositionEngine:
         )
         return []
 
-    def _resolve_palette(
-        self, palette_ref: PaletteRef | None
-    ) -> ResolvedPalette:
+    def _resolve_palette(self, palette_ref: PaletteRef | None) -> ResolvedPalette:
         """Resolve a PaletteRef to a ResolvedPalette.
 
         Delegates to the injected PaletteResolver which performs
@@ -888,36 +899,7 @@ class CompositionEngine:
         """
         return self._palette_resolver.resolve(palette_ref)
 
-    def _resolve_buffer_style(
-        self, effect_type: str
-    ) -> tuple[str, str | None]:
-        """Resolve the appropriate xLights buffer style for an effect.
-
-        Some effect types render better with specific buffer configurations.
-        For example, radial effects (Fan, Shockwave, Pinwheel) benefit from
-        centered overlay, while strand effects (Chase) use per-model default.
-
-        Args:
-            effect_type: xLights effect type name.
-
-        Returns:
-            Tuple of (buffer_style, buffer_transform or None).
-        """
-        # Effects that benefit from centered overlay rendering
-        centered_effects = {"Fan", "Shockwave", "Pinwheel", "Ripple", "Fire"}
-        # Effects that benefit from horizontal strand rendering
-        strand_effects = {"Spirals"}
-
-        if effect_type in centered_effects:
-            return "Overlay - Centered", None
-        elif effect_type in strand_effects:
-            return "Horizontal Per Model/Strand", "Rotate CC 90"
-        else:
-            return self._config.default_buffer_style, None
-
-    def _resolve_intensity(
-        self, lane: LaneKind, level: IntensityLevel
-    ) -> float:
+    def _resolve_intensity(self, lane: LaneKind, level: IntensityLevel) -> float:
         """Resolve categorical intensity to a normalized float.
 
         Respects the lane hierarchy guarantee:
@@ -966,9 +948,7 @@ class CompositionEngine:
             TransitionSpec(type="Fade", duration_ms=200),
         )
 
-    def _resolve_overlaps(
-        self, events: list[RenderEvent]
-    ) -> list[RenderEvent]:
+    def _resolve_overlaps(self, events: list[RenderEvent]) -> list[RenderEvent]:
         """Resolve overlapping events within a single layer.
 
         Phase 1: TRIM policy — when events overlap, the earlier event's

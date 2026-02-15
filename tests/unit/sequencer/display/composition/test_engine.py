@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from twinklr.core.sequencer.display.composition.engine import (
     CompositionEngine,
 )
@@ -18,6 +20,10 @@ from twinklr.core.sequencer.planning.group_plan import (
     SectionCoordinationPlan,
 )
 from twinklr.core.sequencer.planning.models import PaletteRef
+from twinklr.core.sequencer.templates.group import (
+    REGISTRY,
+    load_builtin_group_templates,
+)
 from twinklr.core.sequencer.templates.group.models.coordination import (
     CoordinationPlan,
     GroupPlacement,
@@ -36,6 +42,9 @@ from twinklr.core.sequencer.vocabulary import (
     LaneKind,
     PlanningTimeRef,
 )
+
+# Ensure builtins are loaded once for all tests in this module
+load_builtin_group_templates()
 
 
 def _make_beat_grid() -> BeatGrid:
@@ -91,6 +100,22 @@ def _make_palette_resolver() -> PaletteResolver:
     )
 
 
+def _make_engine(**kwargs: Any) -> CompositionEngine:
+    """Create a CompositionEngine with sensible defaults.
+
+    Accepts the same kwargs as ``CompositionEngine.__init__``.
+    Always includes the builtin template registry.
+    """
+    defaults: dict[str, Any] = {
+        "beat_grid": _make_beat_grid(),
+        "display_graph": _make_display_graph(),
+        "palette_resolver": _make_palette_resolver(),
+        "template_registry": REGISTRY,
+    }
+    defaults.update(kwargs)
+    return CompositionEngine(**defaults)
+
+
 def _make_plan_set(
     placements: list[GroupPlacement] | None = None,
     lane: LaneKind = LaneKind.BASE,
@@ -138,11 +163,7 @@ class TestCompositionEngine:
 
     def test_basic_composition(self) -> None:
         """Single placement produces one event on one element."""
-        engine = CompositionEngine(
-            beat_grid=_make_beat_grid(),
-            display_graph=_make_display_graph(),
-            palette_resolver=_make_palette_resolver(),
-        )
+        engine = _make_engine()
         plan_set = _make_plan_set()
         render_plan = engine.compose(plan_set)
 
@@ -152,11 +173,7 @@ class TestCompositionEngine:
 
     def test_effect_type_resolved(self) -> None:
         """Template ID is resolved to xLights effect type."""
-        engine = CompositionEngine(
-            beat_grid=_make_beat_grid(),
-            display_graph=_make_display_graph(),
-            palette_resolver=_make_palette_resolver(),
-        )
+        engine = _make_engine()
         plan_set = _make_plan_set()
         render_plan = engine.compose(plan_set)
 
@@ -166,11 +183,7 @@ class TestCompositionEngine:
 
     def test_timing_resolved(self) -> None:
         """PlanningTimeRef is resolved to milliseconds."""
-        engine = CompositionEngine(
-            beat_grid=_make_beat_grid(),
-            display_graph=_make_display_graph(),
-            palette_resolver=_make_palette_resolver(),
-        )
+        engine = _make_engine()
         plan_set = _make_plan_set()
         render_plan = engine.compose(plan_set)
 
@@ -180,11 +193,7 @@ class TestCompositionEngine:
 
     def test_intensity_resolved(self) -> None:
         """IntensityLevel is resolved to a float."""
-        engine = CompositionEngine(
-            beat_grid=_make_beat_grid(),
-            display_graph=_make_display_graph(),
-            palette_resolver=_make_palette_resolver(),
-        )
+        engine = _make_engine()
         plan_set = _make_plan_set()
         render_plan = engine.compose(plan_set)
 
@@ -244,19 +253,18 @@ class TestCompositionEngine:
             section_plans=[section],
         )
 
-        engine = CompositionEngine(
-            beat_grid=_make_beat_grid(),
-            display_graph=_make_display_graph(),
-            palette_resolver=_make_palette_resolver(),
-        )
+        engine = _make_engine()
         render_plan = engine.compose(plan_set)
 
-        # Should have 1 element with 2 layers
+        # Should have 1 element with layers from both BASE (0-5) and
+        # RHYTHM (6-11) lane ranges.
         assert len(render_plan.groups) == 1
-        assert len(render_plan.groups[0].layers) == 2
         layer_indices = {ly.layer_index for ly in render_plan.groups[0].layers}
-        assert 0 in layer_indices  # BASE
-        assert 2 in layer_indices  # RHYTHM
+        # At least one layer in BASE range and one in RHYTHM range
+        base_layers = {i for i in layer_indices if 0 <= i <= 5}
+        rhythm_layers = {i for i in layer_indices if 6 <= i <= 11}
+        assert len(base_layers) >= 1, f"Expected BASE layers in 0-5, got {layer_indices}"
+        assert len(rhythm_layers) >= 1, f"Expected RHYTHM layers in 6-11, got {layer_indices}"
 
     def test_overlap_trim(self) -> None:
         """Overlapping events in same layer are trimmed."""
@@ -277,11 +285,7 @@ class TestCompositionEngine:
 
         plan_set = _make_plan_set(placements=[p1, p2])
 
-        engine = CompositionEngine(
-            beat_grid=_make_beat_grid(),
-            display_graph=_make_display_graph(),
-            palette_resolver=_make_palette_resolver(),
-        )
+        engine = _make_engine()
         render_plan = engine.compose(plan_set)
 
         events = render_plan.groups[0].layers[0].events
@@ -291,11 +295,7 @@ class TestCompositionEngine:
 
     def test_palette_resolved(self) -> None:
         """Section palette reference is resolved to colors."""
-        engine = CompositionEngine(
-            beat_grid=_make_beat_grid(),
-            display_graph=_make_display_graph(),
-            palette_resolver=_make_palette_resolver(),
-        )
+        engine = _make_engine()
         plan_set = _make_plan_set()
         render_plan = engine.compose(plan_set)
 
@@ -306,11 +306,7 @@ class TestCompositionEngine:
 
     def test_source_traceability(self) -> None:
         """RenderEvent has source traceability."""
-        engine = CompositionEngine(
-            beat_grid=_make_beat_grid(),
-            display_graph=_make_display_graph(),
-            palette_resolver=_make_palette_resolver(),
-        )
+        engine = _make_engine()
         plan_set = _make_plan_set()
         render_plan = engine.compose(plan_set)
 
@@ -330,11 +326,7 @@ class TestCompositionEngine:
             duration=EffectDuration.PHRASE,  # extends past sequence end
         )
         plan_set = _make_plan_set(placements=[p], lane=LaneKind.ACCENT)
-        engine = CompositionEngine(
-            beat_grid=_make_beat_grid(),
-            display_graph=_make_display_graph(),
-            palette_resolver=_make_palette_resolver(),
-        )
+        engine = _make_engine()
         render_plan = engine.compose(plan_set)
 
         # The placement should either produce an event clamped to
@@ -364,9 +356,7 @@ class TestSectionBoundaryClamping:
 
         section = SectionCoordinationPlan(
             section_id="test_section",
-            theme=ThemeRef(
-                theme_id="theme.holiday.traditional", scope=ThemeScope.SECTION
-            ),
+            theme=ThemeRef(theme_id="theme.holiday.traditional", scope=ThemeScope.SECTION),
             palette=PaletteRef(palette_id="core.christmas_traditional"),
             start_ms=0,
             end_ms=section_end_ms,
@@ -390,11 +380,7 @@ class TestSectionBoundaryClamping:
             section_plans=[section],
         )
 
-        engine = CompositionEngine(
-            beat_grid=_make_beat_grid(),
-            display_graph=_make_display_graph(),
-            palette_resolver=_make_palette_resolver(),
-        )
+        engine = _make_engine()
         render_plan = engine.compose(plan_set)
 
         assert render_plan.total_events == 1
@@ -417,9 +403,7 @@ class TestSectionBoundaryClamping:
 
         section = SectionCoordinationPlan(
             section_id="test_section",
-            theme=ThemeRef(
-                theme_id="theme.holiday.traditional", scope=ThemeScope.SECTION
-            ),
+            theme=ThemeRef(theme_id="theme.holiday.traditional", scope=ThemeScope.SECTION),
             palette=PaletteRef(palette_id="core.christmas_traditional"),
             start_ms=0,
             end_ms=section_end_ms,
@@ -443,11 +427,7 @@ class TestSectionBoundaryClamping:
             section_plans=[section],
         )
 
-        engine = CompositionEngine(
-            beat_grid=_make_beat_grid(),
-            display_graph=_make_display_graph(),
-            palette_resolver=_make_palette_resolver(),
-        )
+        engine = _make_engine()
         render_plan = engine.compose(plan_set)
 
         assert render_plan.total_events == 1
@@ -472,11 +452,7 @@ class TestSectionBoundaryClamping:
         )
         # plan_set sections have no start_ms/end_ms (defaults to None)
 
-        engine = CompositionEngine(
-            beat_grid=_make_beat_grid(),
-            display_graph=_make_display_graph(),
-            palette_resolver=_make_palette_resolver(),
-        )
+        engine = _make_engine()
         render_plan = engine.compose(plan_set)
 
         assert render_plan.total_events == 1
@@ -490,11 +466,7 @@ class TestTransitionPolicy:
 
     def test_base_lane_has_long_fade(self) -> None:
         """BASE lane effects should have 1.0s fade-in and fade-out."""
-        engine = CompositionEngine(
-            beat_grid=_make_beat_grid(),
-            display_graph=_make_display_graph(),
-            palette_resolver=_make_palette_resolver(),
-        )
+        engine = _make_engine()
         plan_set = _make_plan_set(lane=LaneKind.BASE)
         render_plan = engine.compose(plan_set)
 
@@ -508,11 +480,7 @@ class TestTransitionPolicy:
 
     def test_rhythm_lane_has_short_fade(self) -> None:
         """RHYTHM lane effects should have 0.3s fade-in and fade-out."""
-        engine = CompositionEngine(
-            beat_grid=_make_beat_grid(),
-            display_graph=_make_display_graph(),
-            palette_resolver=_make_palette_resolver(),
-        )
+        engine = _make_engine()
         plan_set = _make_plan_set(lane=LaneKind.RHYTHM)
         render_plan = engine.compose(plan_set)
 
@@ -524,11 +492,7 @@ class TestTransitionPolicy:
 
     def test_accent_lane_no_fade_in(self) -> None:
         """ACCENT lane effects should have no fade-in (punchy entrance)."""
-        engine = CompositionEngine(
-            beat_grid=_make_beat_grid(),
-            display_graph=_make_display_graph(),
-            palette_resolver=_make_palette_resolver(),
-        )
+        engine = _make_engine()
         plan_set = _make_plan_set(lane=LaneKind.ACCENT)
         render_plan = engine.compose(plan_set)
 
@@ -537,11 +501,7 @@ class TestTransitionPolicy:
 
     def test_accent_lane_has_short_fade_out(self) -> None:
         """ACCENT lane effects should have 0.2s fade-out."""
-        engine = CompositionEngine(
-            beat_grid=_make_beat_grid(),
-            display_graph=_make_display_graph(),
-            palette_resolver=_make_palette_resolver(),
-        )
+        engine = _make_engine()
         plan_set = _make_plan_set(lane=LaneKind.ACCENT)
         render_plan = engine.compose(plan_set)
 
@@ -569,11 +529,7 @@ class TestBlendModeAssignment:
 
     def test_base_layer_blend_mode_normal(self) -> None:
         """BASE layer should have 'Normal' blend mode."""
-        engine = CompositionEngine(
-            beat_grid=_make_beat_grid(),
-            display_graph=_make_display_graph(),
-            palette_resolver=_make_palette_resolver(),
-        )
+        engine = _make_engine()
         plan_set = _make_plan_set(lane=LaneKind.BASE)
         render_plan = engine.compose(plan_set)
 
@@ -593,7 +549,7 @@ class TestBlendModeAssignment:
         accent_p = GroupPlacement(
             placement_id="p_accent",
             group_id="OUTLINE_1",
-            template_id="gtpl_accent_motif_strobe_hit_big",
+            template_id="gtpl_accent_hit_color",
             start=PlanningTimeRef(bar=1, beat=1),
             duration=EffectDuration.HIT,
             intensity=IntensityLevel.PEAK,
@@ -637,78 +593,20 @@ class TestBlendModeAssignment:
             section_plans=[section],
         )
 
-        engine = CompositionEngine(
-            beat_grid=_make_beat_grid(),
-            display_graph=_make_display_graph(),
-            palette_resolver=_make_palette_resolver(),
-        )
+        engine = _make_engine()
         render_plan = engine.compose(plan_set)
 
-        # Should have 2 layers on the same element
+        # Should have layers from both BASE (0-5) and ACCENT (12-17) ranges
         group = render_plan.groups[0]
-        assert len(group.layers) == 2
-        # Both layers have their blend mode set (even if both are Normal)
+        layer_indices = {ly.layer_index for ly in group.layers}
+        base_layers = {i for i in layer_indices if 0 <= i <= 5}
+        accent_layers = {i for i in layer_indices if 12 <= i <= 17}
+        assert len(base_layers) >= 1, f"Expected BASE layers, got {layer_indices}"
+        assert len(accent_layers) >= 1, f"Expected ACCENT layers, got {layer_indices}"
+        # All layers have their blend mode set
         for layer in group.layers:
             assert isinstance(layer.blend_mode, str)
             assert len(layer.blend_mode) > 0
-
-
-class TestBufferStyleResolution:
-    """Tests for _resolve_buffer_style including BufferTransform."""
-
-    def test_spirals_gets_rotate_transform(self) -> None:
-        """Spirals effect should get Rotate CC 90 buffer transform."""
-        engine = CompositionEngine(
-            beat_grid=_make_beat_grid(),
-            display_graph=_make_display_graph(),
-            palette_resolver=_make_palette_resolver(),
-        )
-        style, transform = engine._resolve_buffer_style("Spirals")
-        assert style == "Horizontal Per Model/Strand"
-        assert transform == "Rotate CC 90"
-
-    def test_fan_no_transform(self) -> None:
-        """Fan effect uses centered overlay but no transform."""
-        engine = CompositionEngine(
-            beat_grid=_make_beat_grid(),
-            display_graph=_make_display_graph(),
-            palette_resolver=_make_palette_resolver(),
-        )
-        style, transform = engine._resolve_buffer_style("Fan")
-        assert style == "Overlay - Centered"
-        assert transform is None
-
-    def test_ripple_gets_centered(self) -> None:
-        """Ripple effect should get centered overlay (radial effect)."""
-        engine = CompositionEngine(
-            beat_grid=_make_beat_grid(),
-            display_graph=_make_display_graph(),
-            palette_resolver=_make_palette_resolver(),
-        )
-        style, transform = engine._resolve_buffer_style("Ripple")
-        assert style == "Overlay - Centered"
-        assert transform is None
-
-    def test_fire_gets_centered(self) -> None:
-        """Fire effect should get centered overlay (radial effect)."""
-        engine = CompositionEngine(
-            beat_grid=_make_beat_grid(),
-            display_graph=_make_display_graph(),
-            palette_resolver=_make_palette_resolver(),
-        )
-        style, transform = engine._resolve_buffer_style("Fire")
-        assert style == "Overlay - Centered"
-        assert transform is None
-
-    def test_default_no_transform(self) -> None:
-        """Default effects get no buffer transform."""
-        engine = CompositionEngine(
-            beat_grid=_make_beat_grid(),
-            display_graph=_make_display_graph(),
-            palette_resolver=_make_palette_resolver(),
-        )
-        _style, transform = engine._resolve_buffer_style("Color Wash")
-        assert transform is None
 
 
 # ---------------------------------------------------------------------------
@@ -741,11 +639,7 @@ class TestAssetOverlayRendering:
             resolved_asset_ids=["asset_abc"],
         )
         plan_set = _make_plan_set(placements=[placement])
-        engine = CompositionEngine(
-            beat_grid=_make_beat_grid(),
-            display_graph=_make_display_graph(),
-            palette_resolver=_make_palette_resolver(),
-        )
+        engine = _make_engine()
         render_plan = engine.compose(plan_set)
 
         # Only the procedural event, no overlay layer
@@ -756,12 +650,7 @@ class TestAssetOverlayRendering:
         """Placements without resolved_asset_ids produce no overlays."""
         plan_set = _make_plan_set()  # default placement has no assets
         catalog_index = {"x": _make_fake_catalog_entry("x", "x.png")}
-        engine = CompositionEngine(
-            beat_grid=_make_beat_grid(),
-            display_graph=_make_display_graph(),
-            palette_resolver=_make_palette_resolver(),
-            catalog_index=catalog_index,
-        )
+        engine = _make_engine(catalog_index=catalog_index)
         render_plan = engine.compose(plan_set)
 
         assert render_plan.total_events == 1
@@ -781,27 +670,20 @@ class TestAssetOverlayRendering:
             resolved_asset_ids=["asset_001"],
         )
         plan_set = _make_plan_set(placements=[placement])
-        engine = CompositionEngine(
-            beat_grid=_make_beat_grid(),
-            display_graph=_make_display_graph(),
-            palette_resolver=_make_palette_resolver(),
-            catalog_index=catalog_index,
-        )
+        engine = _make_engine(catalog_index=catalog_index)
         render_plan = engine.compose(plan_set)
 
         # 2 events: procedural + overlay
         assert render_plan.total_events == 2
-        # 2 layers: procedural (0) and overlay (1)
+        # 2 layers: procedural (0) and overlay (5 = BASE overlay)
         assert len(render_plan.groups[0].layers) == 2
 
         layer_indices = {ly.layer_index for ly in render_plan.groups[0].layers}
         assert 0 in layer_indices
-        assert 1 in layer_indices
+        assert 5 in layer_indices  # BASE overlay in new sub-layer scheme
 
-        # Find the overlay layer (layer index 1)
-        overlay_layer = next(
-            ly for ly in render_plan.groups[0].layers if ly.layer_index == 1
-        )
+        # Find the overlay layer (layer index 5 = BASE overlay)
+        overlay_layer = next(ly for ly in render_plan.groups[0].layers if ly.layer_index == 5)
         assert len(overlay_layer.events) == 1
         assert overlay_layer.events[0].effect_type == "Pictures"
         assert overlay_layer.events[0].parameters["filename"] == "images/snowflake.png"
@@ -820,18 +702,11 @@ class TestAssetOverlayRendering:
             resolved_asset_ids=["asset_002"],
         )
         plan_set = _make_plan_set(placements=[placement])
-        engine = CompositionEngine(
-            beat_grid=_make_beat_grid(),
-            display_graph=_make_display_graph(),
-            palette_resolver=_make_palette_resolver(),
-            catalog_index=catalog_index,
-        )
+        engine = _make_engine(catalog_index=catalog_index)
         render_plan = engine.compose(plan_set)
 
         procedural = render_plan.groups[0].layers[0].events[0]
-        overlay = next(
-            ly for ly in render_plan.groups[0].layers if ly.layer_index == 1
-        ).events[0]
+        overlay = next(ly for ly in render_plan.groups[0].layers if ly.layer_index == 5).events[0]
 
         assert overlay.start_ms == procedural.start_ms
         assert overlay.end_ms == procedural.end_ms
@@ -852,19 +727,12 @@ class TestAssetOverlayRendering:
             resolved_asset_ids=["a1", "a2"],
         )
         plan_set = _make_plan_set(placements=[placement])
-        engine = CompositionEngine(
-            beat_grid=_make_beat_grid(),
-            display_graph=_make_display_graph(),
-            palette_resolver=_make_palette_resolver(),
-            catalog_index=entries,
-        )
+        engine = _make_engine(catalog_index=entries)
         render_plan = engine.compose(plan_set)
 
         # 2 events: 1 procedural + 1 overlay (first valid match)
         assert render_plan.total_events == 2
-        overlay_layer = next(
-            ly for ly in render_plan.groups[0].layers if ly.layer_index == 1
-        )
+        overlay_layer = next(ly for ly in render_plan.groups[0].layers if ly.layer_index == 5)
         assert len(overlay_layer.events) == 1
         assert overlay_layer.events[0].parameters["filename"] == "img/tree.png"
 
@@ -883,19 +751,12 @@ class TestAssetOverlayRendering:
             resolved_asset_ids=["missing", "exists"],
         )
         plan_set = _make_plan_set(placements=[placement])
-        engine = CompositionEngine(
-            beat_grid=_make_beat_grid(),
-            display_graph=_make_display_graph(),
-            palette_resolver=_make_palette_resolver(),
-            catalog_index=catalog_index,
-        )
+        engine = _make_engine(catalog_index=catalog_index)
         render_plan = engine.compose(plan_set)
 
         # 2 events: 1 procedural + 1 overlay (skipped missing, used exists)
         assert render_plan.total_events == 2
-        overlay_layer = next(
-            ly for ly in render_plan.groups[0].layers if ly.layer_index == 1
-        )
+        overlay_layer = next(ly for ly in render_plan.groups[0].layers if ly.layer_index == 5)
         assert overlay_layer.events[0].parameters["filename"] == "img/ok.png"
 
     def test_all_assets_missing_no_overlay(self) -> None:
@@ -911,12 +772,7 @@ class TestAssetOverlayRendering:
             resolved_asset_ids=["ghost_1", "ghost_2"],
         )
         plan_set = _make_plan_set(placements=[placement])
-        engine = CompositionEngine(
-            beat_grid=_make_beat_grid(),
-            display_graph=_make_display_graph(),
-            palette_resolver=_make_palette_resolver(),
-            catalog_index=catalog_index,
-        )
+        engine = _make_engine(catalog_index=catalog_index)
         render_plan = engine.compose(plan_set)
 
         # Only the procedural event, no overlay
@@ -937,23 +793,18 @@ class TestAssetOverlayRendering:
             resolved_asset_ids=["trace_id"],
         )
         plan_set = _make_plan_set(placements=[placement])
-        engine = CompositionEngine(
-            beat_grid=_make_beat_grid(),
-            display_graph=_make_display_graph(),
-            palette_resolver=_make_palette_resolver(),
-            catalog_index=catalog_index,
-        )
+        engine = _make_engine(catalog_index=catalog_index)
         render_plan = engine.compose(plan_set)
 
         overlay_event = next(
-            ly for ly in render_plan.groups[0].layers if ly.layer_index == 1
+            ly for ly in render_plan.groups[0].layers if ly.layer_index == 5
         ).events[0]
         assert overlay_event.source.section_id == "intro"
         assert overlay_event.source.lane == LaneKind.BASE
         assert overlay_event.source.template_id == "gtpl_base_wash_soft"
 
     def test_rhythm_lane_overlay_on_correct_layer(self) -> None:
-        """RHYTHM lane overlays go to layer 3 (RHYTHM procedural=2, overlay=3)."""
+        """RHYTHM lane overlays go to layer 11 (RHYTHM overlay in sub-layer scheme)."""
         entry = _make_fake_catalog_entry("rhythm_asset", "img/pulse.png")
         catalog_index = {"rhythm_asset": entry}
 
@@ -966,14 +817,11 @@ class TestAssetOverlayRendering:
             resolved_asset_ids=["rhythm_asset"],
         )
         plan_set = _make_plan_set(placements=[placement], lane=LaneKind.RHYTHM)
-        engine = CompositionEngine(
-            beat_grid=_make_beat_grid(),
-            display_graph=_make_display_graph(),
-            palette_resolver=_make_palette_resolver(),
-            catalog_index=catalog_index,
-        )
+        engine = _make_engine(catalog_index=catalog_index)
         render_plan = engine.compose(plan_set)
 
         layer_indices = {ly.layer_index for ly in render_plan.groups[0].layers}
-        assert 2 in layer_indices  # RHYTHM procedural
-        assert 3 in layer_indices  # RHYTHM overlay
+        # RHYTHM sub-layers are in range 6-10; overlay is at 11
+        rhythm_sub = {i for i in layer_indices if 6 <= i <= 10}
+        assert len(rhythm_sub) >= 1, f"Expected RHYTHM sub-layers, got {layer_indices}"
+        assert 11 in layer_indices  # RHYTHM overlay in sub-layer scheme

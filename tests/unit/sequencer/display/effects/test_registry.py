@@ -7,7 +7,6 @@ import pytest
 from twinklr.core.sequencer.display.effects.handlers import load_builtin_handlers
 from twinklr.core.sequencer.display.effects.handlers.on import OnHandler
 from twinklr.core.sequencer.display.effects.protocol import (
-    EffectSettings,
     RenderContext,
 )
 from twinklr.core.sequencer.display.effects.registry import HandlerRegistry
@@ -82,9 +81,21 @@ class TestLoadBuiltinHandlers:
     def test_loads_all_handlers(self) -> None:
         reg = load_builtin_handlers()
         expected = {
-            "On", "Color Wash", "SingleStrand", "Spirals", "Pictures",
-            "Fan", "Shockwave", "Strobe", "Twinkle", "Snowflakes",
-            "Marquee", "Meteors", "Ripple", "Fire", "Pinwheel",
+            "On",
+            "Color Wash",
+            "SingleStrand",
+            "Spirals",
+            "Pictures",
+            "Fan",
+            "Shockwave",
+            "Strobe",
+            "Twinkle",
+            "Snowflakes",
+            "Marquee",
+            "Meteors",
+            "Ripple",
+            "Fire",
+            "Pinwheel",
         }
         assert set(reg.registered_types) == expected
 

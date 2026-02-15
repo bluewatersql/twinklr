@@ -296,10 +296,7 @@ def _resolve_palette_colors(palette_id: str | None) -> list[dict[str, str]]:
 
     try:
         palette_def = PALETTE_REGISTRY.get(palette_id)
-        return [
-            {"hex": stop.hex, "name": stop.name or "unnamed"}
-            for stop in palette_def.stops
-        ]
+        return [{"hex": stop.hex, "name": stop.name or "unnamed"} for stop in palette_def.stops]
     except Exception:
         logger.debug("Palette '%s' not found in registry", palette_id)
         return []

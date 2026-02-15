@@ -85,9 +85,7 @@ class PicturesHandler:
         builder.add("E_CHOICE_Pictures_Direction", movement)
         builder.add("E_SLIDER_Pictures_Speed", speed)
         builder.add("E_SLIDER_Pictures_FrameRateAdj", frame_rate)
-        builder.add(
-            "E_CHECKBOX_Pictures_ScaleToFit", 1 if scale_to_fit else 0
-        )
+        builder.add("E_CHECKBOX_Pictures_ScaleToFit", 1 if scale_to_fit else 0)
         builder.add_buffer_style(event.buffer_style)
 
         if event.buffer_transform:

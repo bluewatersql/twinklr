@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+from typing import ClassVar
+
 import pytest
 
 from twinklr.core.sequencer.display.templates.effect_map import (
-    EffectMapping,
     filter_valid_overrides,
     resolve_effect_type,
 )
@@ -173,13 +174,11 @@ class TestEffectParameterDefaults:
         """Keyword-resolved templates should also get lane-aware defaults."""
         m = resolve_effect_type(template_id)
         assert m.effect_type == expected_type
-        assert m.defaults, (
-            f"Keyword-resolved '{template_id}' has empty defaults"
-        )
+        assert m.defaults, f"Keyword-resolved '{template_id}' has empty defaults"
 
     # -- Rudolph plan coverage -----------------------------------------
 
-    RUDOLPH_TEMPLATES = [
+    RUDOLPH_TEMPLATES: ClassVar[list[str]] = [
         "gtpl_base_motif_abstract_ambient",
         "gtpl_base_motif_bokeh_ambient",
         "gtpl_base_motif_sparkles_ambient",
@@ -205,9 +204,7 @@ class TestEffectParameterDefaults:
     def test_rudolph_plan_templates_have_defaults(self, template_id: str) -> None:
         """Every template used in the Rudolph plan must have parameter defaults."""
         m = resolve_effect_type(template_id)
-        assert m.defaults, (
-            f"Rudolph template '{template_id}' ({m.effect_type}) has no defaults"
-        )
+        assert m.defaults, f"Rudolph template '{template_id}' ({m.effect_type}) has no defaults"
 
 
 class TestFilterValidOverrides:

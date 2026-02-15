@@ -91,6 +91,15 @@ class RenderEvent(BaseModel):
         default=None,
         description="Optional outgoing transition",
     )
+    value_curves: dict[str, str] = Field(
+        default_factory=dict,
+        description=(
+            "Parameter name -> xLights ValueCurve string for animated "
+            "parameters. When both parameters[k] and value_curves[k] "
+            "exist, xLights uses the curve when active, falling back "
+            "to the static slider value."
+        ),
+    )
     source: RenderEventSource = Field(
         description="Traceability to planning origin",
     )

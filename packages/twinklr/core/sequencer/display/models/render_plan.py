@@ -101,11 +101,7 @@ class RenderPlan(BaseModel):
     @property
     def total_events(self) -> int:
         """Total number of render events across all elements."""
-        return sum(
-            len(layer.events)
-            for group in self.groups
-            for layer in group.layers
-        )
+        return sum(len(layer.events) for group in self.groups for layer in group.layers)
 
     @property
     def element_names(self) -> list[str]:

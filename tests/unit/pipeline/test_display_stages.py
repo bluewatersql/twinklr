@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
@@ -49,7 +48,6 @@ from twinklr.core.sequencer.vocabulary import (
     PlanningTimeRef,
 )
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -66,9 +64,7 @@ def _make_beat_grid() -> BeatGrid:
         bar_boundaries=[i * ms_per_bar for i in range(num_bars + 1)],
         beat_boundaries=[i * ms_per_beat for i in range(total_beats + 1)],
         eighth_boundaries=[i * ms_per_beat / 2 for i in range(total_beats * 2 + 1)],
-        sixteenth_boundaries=[
-            i * ms_per_beat / 4 for i in range(total_beats * 4 + 1)
-        ],
+        sixteenth_boundaries=[i * ms_per_beat / 4 for i in range(total_beats * 4 + 1)],
         tempo_bpm=tempo,
         beats_per_bar=bpb,
         duration_ms=num_bars * ms_per_bar,
@@ -104,9 +100,7 @@ def _make_plan_set(
     )
     section = SectionCoordinationPlan(
         section_id="intro",
-        theme=ThemeRef(
-            theme_id="theme.holiday.traditional", scope=ThemeScope.SECTION
-        ),
+        theme=ThemeRef(theme_id="theme.holiday.traditional", scope=ThemeScope.SECTION),
         palette=PaletteRef(palette_id="core.christmas_traditional"),
         lane_plans=[
             LanePlan(
@@ -137,9 +131,7 @@ def _make_spec(motif_id: str = "sparkles") -> AssetSpec:
     )
 
 
-def _make_catalog_entry(
-    asset_id: str, file_path: str, motif_id: str = "sparkles"
-) -> CatalogEntry:
+def _make_catalog_entry(asset_id: str, file_path: str, motif_id: str = "sparkles") -> CatalogEntry:
     return CatalogEntry(
         asset_id=asset_id,
         spec=_make_spec(motif_id=motif_id),
@@ -230,12 +222,8 @@ class TestAssetResolutionStage:
         """Motif-based templates get resolved_asset_ids from catalog."""
         stage = AssetResolutionStage()
         # Template with motif pattern
-        plan_set = _make_plan_set(
-            template_id="gtpl_base_motif_sparkles_ambient"
-        )
-        entry = _make_catalog_entry(
-            "asset_sparkles", "images/sparkles.png", motif_id="sparkles"
-        )
+        plan_set = _make_plan_set(template_id="gtpl_base_motif_sparkles_ambient")
+        entry = _make_catalog_entry("asset_sparkles", "images/sparkles.png", motif_id="sparkles")
         catalog = _make_catalog(entries=[entry])
         context = _make_context()
 
@@ -247,24 +235,15 @@ class TestAssetResolutionStage:
         assert result.success
         assert result.output is not None
         resolved_plan = result.output
-        placement = (
-            resolved_plan.section_plans[0]
-            .lane_plans[0]
-            .coordination_plans[0]
-            .placements[0]
-        )
+        placement = resolved_plan.section_plans[0].lane_plans[0].coordination_plans[0].placements[0]
         assert len(placement.resolved_asset_ids) > 0
 
     @pytest.mark.asyncio
     async def test_tracks_metrics(self) -> None:
         """Resolved count is tracked in context metrics."""
         stage = AssetResolutionStage()
-        plan_set = _make_plan_set(
-            template_id="gtpl_base_motif_sparkles_ambient"
-        )
-        entry = _make_catalog_entry(
-            "asset_sparkles", "images/sparkles.png", motif_id="sparkles"
-        )
+        plan_set = _make_plan_set(template_id="gtpl_base_motif_sparkles_ambient")
+        entry = _make_catalog_entry("asset_sparkles", "images/sparkles.png", motif_id="sparkles")
         catalog = _make_catalog(entries=[entry])
         context = _make_context()
 
@@ -445,9 +424,7 @@ class TestDisplayRenderStage:
         """AssetResolutionStage: pipeline mode with catalog in context state."""
         stage = AssetResolutionStage()
         plan_set = _make_plan_set(template_id="gtpl_base_motif_sparkles_ambient")
-        entry = _make_catalog_entry(
-            "asset_sparkles", "images/sparkles.png", motif_id="sparkles"
-        )
+        entry = _make_catalog_entry("asset_sparkles", "images/sparkles.png", motif_id="sparkles")
         catalog = _make_catalog(entries=[entry])
         context = _make_context()
         context.set_state("asset_catalog", catalog)
@@ -456,12 +433,7 @@ class TestDisplayRenderStage:
         result = await stage.execute(plan_set, context)
 
         assert result.success
-        placement = (
-            result.output.section_plans[0]
-            .lane_plans[0]
-            .coordination_plans[0]
-            .placements[0]
-        )
+        placement = result.output.section_plans[0].lane_plans[0].coordination_plans[0].placements[0]
         assert len(placement.resolved_asset_ids) > 0
 
     @pytest.mark.asyncio

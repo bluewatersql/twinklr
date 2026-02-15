@@ -17,16 +17,12 @@ from rich.console import Console
 from twinklr.core.agents.audio.lyrics.stage import LyricsStage
 from twinklr.core.agents.audio.profile.stage import AudioProfileStage
 from twinklr.core.agents.audio.stages.analysis import AudioAnalysisStage
-from twinklr.core.agents.logging import create_llm_logger
-from twinklr.core.agents.providers.openai import OpenAIProvider
 from twinklr.core.agents.sequencer.macro_planner.stage import MacroPlannerStage
 from twinklr.core.agents.sequencer.moving_heads.rendering_stage import (
     MovingHeadRenderingStage,
 )
 from twinklr.core.agents.sequencer.moving_heads.stage import MovingHeadStage
-from twinklr.core.caching import FSCache
 from twinklr.core.config.loader import load_app_config, load_job_config
-from twinklr.core.io import RealFileSystem, absolute_path
 from twinklr.core.pipeline import (
     ExecutionPattern,
     PipelineContext,
@@ -36,6 +32,7 @@ from twinklr.core.pipeline import (
 )
 from twinklr.core.sequencer.moving_heads.templates import load_builtin_templates
 from twinklr.core.sequencer.moving_heads.templates.library import list_templates
+from twinklr.core.session import TwinklrSession
 from twinklr.core.utils.formatting import clean_audio_filename
 from twinklr.core.utils.logging import configure_logging
 
@@ -169,32 +166,15 @@ async def run_pipeline_async(
 
     console.print(f"[green]✅ Pipeline validated[/green] ({len(pipeline.stages)} stages)")
 
-    # Setup caching
-    fs = RealFileSystem()
-    llm_cache_dir = absolute_path("data/cache/llm")
-    llm_cache = FSCache(fs, llm_cache_dir)
-    await llm_cache.initialize()
-
-    agent_cache_dir = absolute_path("data/cache/agents")
-    agent_cache = FSCache(fs, agent_cache_dir)
-    await agent_cache.initialize()
-
-    # Create provider and logger
-    provider = OpenAIProvider(api_key=api_key, llm_cache=llm_cache)
-    llm_logger = create_llm_logger(
-        enabled=job_config.agent.llm_logging.enabled,
-        output_dir=artifact_dir / "llm_calls",
-        log_level=job_config.agent.llm_logging.log_level,
-        format=job_config.agent.llm_logging.format,
+    # Create session (manages provider, cache, logger lazily)
+    session = TwinklrSession(
+        app_config=app_config,
+        job_config=job_config,
     )
 
     # Create pipeline context
     pipeline_context = PipelineContext(
-        provider=provider,
-        app_config=app_config,
-        job_config=job_config,
-        cache=agent_cache,
-        llm_logger=llm_logger,
+        session=session,
         output_dir=artifact_dir,
     )
 

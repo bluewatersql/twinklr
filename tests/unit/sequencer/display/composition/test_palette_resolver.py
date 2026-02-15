@@ -145,10 +145,7 @@ class TestPaletteResolverColorOrder:
                 palette_id="test.many_colors",
                 title="Many Colors",
                 description="Too many stops.",
-                stops=[
-                    ColorStop(hex=f"#FF{i:02X}00", name=f"color_{i}")
-                    for i in range(10)
-                ],
+                stops=[ColorStop(hex=f"#FF{i:02X}00", name=f"color_{i}") for i in range(10)],
             )
         )
         resolver = PaletteResolver(catalog=cat, default=_make_default())

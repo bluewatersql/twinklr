@@ -31,9 +31,7 @@ def _make_beat_grid(
         bar_boundaries=[i * ms_per_bar for i in range(num_bars + 1)],
         beat_boundaries=[i * ms_per_beat for i in range(total_beats + 1)],
         eighth_boundaries=[i * ms_per_beat / 2 for i in range(total_beats * 2 + 1)],
-        sixteenth_boundaries=[
-            i * ms_per_beat / 4 for i in range(total_beats * 4 + 1)
-        ],
+        sixteenth_boundaries=[i * ms_per_beat / 4 for i in range(total_beats * 4 + 1)],
         tempo_bpm=tempo_bpm,
         beats_per_bar=beats_per_bar,
         duration_ms=num_bars * ms_per_bar,
@@ -151,9 +149,9 @@ class TestBuildSectionBarMap:
         """Multiple sections covering the full song."""
         grid = _make_beat_grid(num_bars=16)  # 16 bars = 32000ms
         sections = [
-            ("intro", 0, 4000),        # bars 0-2
-            ("verse", 4000, 16000),     # bars 2-8
-            ("chorus", 16000, 32000),   # bars 8-16
+            ("intro", 0, 4000),  # bars 0-2
+            ("verse", 4000, 16000),  # bars 2-8
+            ("chorus", 16000, 32000),  # bars 8-16
         ]
         result = build_section_bar_map(sections, grid)
 

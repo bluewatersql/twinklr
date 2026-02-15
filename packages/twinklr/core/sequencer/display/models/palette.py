@@ -74,9 +74,7 @@ class ResolvedPalette(BaseModel):
         """Validate all colors are valid hex format."""
         for color in v:
             if not color.startswith("#") or len(color) != 7:
-                raise ValueError(
-                    f"Color must be #RRGGBB format, got '{color}'"
-                )
+                raise ValueError(f"Color must be #RRGGBB format, got '{color}'")
         return v
 
     @field_validator("active_slots")
@@ -85,9 +83,7 @@ class ResolvedPalette(BaseModel):
         """Validate slot indices are 1-8."""
         for slot in v:
             if not 1 <= slot <= 8:
-                raise ValueError(
-                    f"Active slot must be 1-8, got {slot}"
-                )
+                raise ValueError(f"Active slot must be 1-8, got {slot}")
         return v
 
 

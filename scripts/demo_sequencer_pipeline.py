@@ -494,7 +494,9 @@ async def main() -> None:
 
         if "display_render" in result.outputs:
             rr = result.outputs["display_render"]["render_result"]
-            print(f"\n🎄 Display Render: {rr.effects_written} effects on {rr.elements_created} elements")
+            print(
+                f"\n🎄 Display Render: {rr.effects_written} effects on {rr.elements_created} elements"
+            )
 
     else:
         print("❌ Pipeline failed. Check logs for details.")

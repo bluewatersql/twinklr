@@ -225,19 +225,19 @@ def test_shape_planner_context_simplifies_template_catalog(
     catalog = result["template_catalog"]
     entries = catalog["entries"]
 
-    # Should have all templates
+    # Should have all templates (order may vary due to intent filtering)
     assert len(entries) == 3
 
-    # Check first entry
-    entry = entries[0]
-    assert entry["template_id"] == "sweep_basic"
-    assert entry["name"] == "Basic Sweep"
-    assert entry["compatible_lanes"] == ["BASE"]
+    # Find sweep_basic entry regardless of order
+    entry_map = {e["template_id"]: e for e in entries}
+    sweep = entry_map["sweep_basic"]
+    assert sweep["name"] == "Basic Sweep"
+    assert sweep["compatible_lanes"] == ["BASE"]
 
     # CRITICAL: Description should be DROPPED (token savings)
-    assert "description" not in entry
-    assert "presets" not in entry
-    assert "category" not in entry
+    assert "description" not in sweep
+    assert "presets" not in sweep
+    assert "category" not in sweep
 
 
 def test_shape_planner_context_filters_layer_intents(

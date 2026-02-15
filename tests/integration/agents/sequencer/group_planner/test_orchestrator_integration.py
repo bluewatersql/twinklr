@@ -29,7 +29,12 @@ from twinklr.core.agents.sequencer.group_planner.timing import (
 )
 from twinklr.core.agents.shared.judge.models import JudgeVerdict, VerdictStatus
 from twinklr.core.sequencer.theming import ThemeRef, ThemeScope
-from twinklr.core.sequencer.vocabulary import GroupTemplateType, GroupVisualIntent
+from twinklr.core.sequencer.vocabulary import (
+    EffectDuration,
+    GroupTemplateType,
+    GroupVisualIntent,
+    PlanningTimeRef,
+)
 
 
 @pytest.fixture
@@ -152,15 +157,15 @@ def create_mock_section_plan() -> SectionCoordinationPlan:
                                 placement_id="p1",
                                 group_id="HERO_1",
                                 template_id="gtpl_accent_flash",
-                                start=TimeRef(kind=TimeRefKind.BAR_BEAT, bar=1, beat=1),
-                                end=TimeRef(kind=TimeRefKind.BAR_BEAT, bar=2, beat=1),
+                                start=PlanningTimeRef(bar=1, beat=1),
+                                duration=EffectDuration.PHRASE,
                             ),
                             GroupPlacement(
                                 placement_id="p2",
                                 group_id="HERO_2",
                                 template_id="gtpl_accent_flash",
-                                start=TimeRef(kind=TimeRefKind.BAR_BEAT, bar=1, beat=1),
-                                end=TimeRef(kind=TimeRefKind.BAR_BEAT, bar=2, beat=1),
+                                start=PlanningTimeRef(bar=1, beat=1),
+                                duration=EffectDuration.PHRASE,
                             ),
                         ],
                     ),
@@ -178,8 +183,8 @@ def create_mock_section_plan() -> SectionCoordinationPlan:
                                 placement_id="p3",
                                 group_id="ARCHES_1",
                                 template_id="gtpl_base_glow_warm",
-                                start=TimeRef(kind=TimeRefKind.BAR_BEAT, bar=1, beat=1),
-                                end=TimeRef(kind=TimeRefKind.BAR_BEAT, bar=3, beat=1),
+                                start=PlanningTimeRef(bar=1, beat=1),
+                                duration=EffectDuration.SECTION,
                             ),
                         ],
                     ),
@@ -263,8 +268,8 @@ class TestGroupPlannerOrchestratorIntegration:
                                     placement_id="p1",
                                     group_id="HERO_1",
                                     template_id="INVALID_TEMPLATE",
-                                    start=TimeRef(kind=TimeRefKind.BAR_BEAT, bar=1, beat=1),
-                                    end=TimeRef(kind=TimeRefKind.BAR_BEAT, bar=2, beat=1),
+                                    start=PlanningTimeRef(bar=1, beat=1),
+                                    duration=EffectDuration.BURST,
                                 ),
                             ],
                         ),

@@ -462,61 +462,164 @@ def _get_preset(effect_type: str, energy: str) -> dict[str, Any]:
 # into xLights settings strings.
 
 _VALID_PARAMS: dict[str, frozenset[str]] = {
-    "Color Wash": frozenset({
-        "horizontal_fade", "vertical_fade", "shimmer", "cycles", "speed",
-    }),
-    "Spirals": frozenset({
-        "palette_count", "movement", "rotation", "thickness",
-        "blend", "3d", "grow", "shrink",
-    }),
-    "Twinkle": frozenset({
-        "count", "steps", "strobe", "re_random", "style",
-    }),
-    "Meteors": frozenset({
-        "count", "length", "speed", "swirl_intensity",
-        "direction", "color_type", "music_reactive",
-    }),
-    "Fan": frozenset({
-        "num_blades", "blade_width", "revolutions", "start_angle",
-        "start_radius", "end_radius", "center_x", "center_y",
-        "duration", "num_elements", "blend_edges", "reverse",
-    }),
-    "Shockwave": frozenset({
-        "start_radius", "end_radius", "start_width", "end_width",
-        "center_x", "center_y", "accel", "blend_edges", "scale",
-    }),
-    "Strobe": frozenset({
-        "num_strobes", "strobe_duration", "strobe_type", "music_reactive",
-    }),
-    "On": frozenset({
-        "shimmer", "shimmer_cycles",
-    }),
-    "Snowflakes": frozenset({
-        "count", "speed", "snowflake_type",
-    }),
-    "Marquee": frozenset({
-        "band_size", "skip_size", "speed", "stagger", "start",
-        "thickness", "reverse", "wrap_x", "wrap_y",
-    }),
-    "SingleStrand": frozenset({
-        "chase_type", "speed", "color_chase", "group_count",
-        "chase_rotations", "fade_type", "colors",
-    }),
-    "Pictures": frozenset({
-        "filename", "movement", "direction", "speed",
-    }),
-    "Ripple": frozenset({
-        "object_to_draw", "movement", "thickness", "cycles",
-        "rotation", "points", "3d", "velocity", "spacing",
-    }),
-    "Fire": frozenset({
-        "height", "hue_shift", "growth_cycles",
-        "grow_with_music", "location",
-    }),
-    "Pinwheel": frozenset({
-        "arms", "arm_size", "twist", "thickness",
-        "speed", "offset", "style", "clockwise", "3d",
-    }),
+    "Color Wash": frozenset(
+        {
+            "horizontal_fade",
+            "vertical_fade",
+            "shimmer",
+            "cycles",
+            "speed",
+        }
+    ),
+    "Spirals": frozenset(
+        {
+            "palette_count",
+            "movement",
+            "rotation",
+            "thickness",
+            "blend",
+            "3d",
+            "grow",
+            "shrink",
+        }
+    ),
+    "Twinkle": frozenset(
+        {
+            "count",
+            "steps",
+            "strobe",
+            "re_random",
+            "style",
+        }
+    ),
+    "Meteors": frozenset(
+        {
+            "count",
+            "length",
+            "speed",
+            "swirl_intensity",
+            "direction",
+            "color_type",
+            "music_reactive",
+        }
+    ),
+    "Fan": frozenset(
+        {
+            "num_blades",
+            "blade_width",
+            "revolutions",
+            "start_angle",
+            "start_radius",
+            "end_radius",
+            "center_x",
+            "center_y",
+            "duration",
+            "num_elements",
+            "blend_edges",
+            "reverse",
+        }
+    ),
+    "Shockwave": frozenset(
+        {
+            "start_radius",
+            "end_radius",
+            "start_width",
+            "end_width",
+            "center_x",
+            "center_y",
+            "accel",
+            "blend_edges",
+            "scale",
+        }
+    ),
+    "Strobe": frozenset(
+        {
+            "num_strobes",
+            "strobe_duration",
+            "strobe_type",
+            "music_reactive",
+        }
+    ),
+    "On": frozenset(
+        {
+            "shimmer",
+            "shimmer_cycles",
+        }
+    ),
+    "Snowflakes": frozenset(
+        {
+            "count",
+            "speed",
+            "snowflake_type",
+        }
+    ),
+    "Marquee": frozenset(
+        {
+            "band_size",
+            "skip_size",
+            "speed",
+            "stagger",
+            "start",
+            "thickness",
+            "reverse",
+            "wrap_x",
+            "wrap_y",
+        }
+    ),
+    "SingleStrand": frozenset(
+        {
+            "chase_type",
+            "speed",
+            "color_chase",
+            "group_count",
+            "chase_rotations",
+            "fade_type",
+            "colors",
+        }
+    ),
+    "Pictures": frozenset(
+        {
+            "filename",
+            "movement",
+            "direction",
+            "speed",
+        }
+    ),
+    "Ripple": frozenset(
+        {
+            "object_to_draw",
+            "movement",
+            "thickness",
+            "cycles",
+            "rotation",
+            "points",
+            "3d",
+            "velocity",
+            "spacing",
+        }
+    ),
+    "Fire": frozenset(
+        {
+            "height",
+            "hue_shift",
+            "growth_cycles",
+            "grow_with_music",
+            "location",
+        }
+    ),
+    "Pinwheel": frozenset(
+        {
+            "arms",
+            "arm_size",
+            "twist",
+            "thickness",
+            "speed",
+            "offset",
+            "style",
+            "clockwise",
+            "3d",
+        }
+    ),
 }
 
 
@@ -609,27 +712,50 @@ def _is_valid_param_value(effect_type: str, key: str, value: Any) -> bool:
 # Choice parameter constraints — valid option values
 _CHOICE_CONSTRAINTS: dict[str, dict[str, frozenset[str]]] = {
     "Meteors": {
-        "direction": frozenset({
-            "Down", "Up", "Left", "Right",
-            "Explode", "Implode", "Icicles", "Icicles + bkg",
-        }),
+        "direction": frozenset(
+            {
+                "Down",
+                "Up",
+                "Left",
+                "Right",
+                "Explode",
+                "Implode",
+                "Icicles",
+                "Icicles + bkg",
+            }
+        ),
         "color_type": frozenset({"Palette", "Rainbow"}),
     },
     "SingleStrand": {
-        "chase_type": frozenset({
-            "Left-Right", "Right-Left",
-            "Bounce from Left", "Bounce from Right", "Dual Bounce",
-        }),
+        "chase_type": frozenset(
+            {
+                "Left-Right",
+                "Right-Left",
+                "Bounce from Left",
+                "Bounce from Right",
+                "Dual Bounce",
+            }
+        ),
     },
     "Twinkle": {
         "style": frozenset({"New Render Method", "Old Render Method"}),
     },
     "Ripple": {
-        "object_to_draw": frozenset({
-            "Circle", "Square", "Triangle", "Star", "Polygon",
-            "Heart", "Tree", "Candy Cane", "Snow Flake",
-            "Crucifix", "Present",
-        }),
+        "object_to_draw": frozenset(
+            {
+                "Circle",
+                "Square",
+                "Triangle",
+                "Star",
+                "Polygon",
+                "Heart",
+                "Tree",
+                "Candy Cane",
+                "Snow Flake",
+                "Crucifix",
+                "Present",
+            }
+        ),
         "movement": frozenset({"Explode", "Implode"}),
     },
     "Fire": {
@@ -642,16 +768,28 @@ _CHOICE_CONSTRAINTS: dict[str, dict[str, frozenset[str]]] = {
 }
 
 # Boolean parameter names (across all handlers)
-_BOOLEAN_PARAMS: frozenset[str] = frozenset({
-    "horizontal_fade", "vertical_fade", "shimmer",
-    "blend", "3d", "grow", "shrink",
-    "strobe", "re_random",
-    "music_reactive",
-    "blend_edges", "reverse", "scale",
-    "color_chase",
-    "wrap_x", "wrap_y",
-    "grow_with_music", "clockwise",
-})
+_BOOLEAN_PARAMS: frozenset[str] = frozenset(
+    {
+        "horizontal_fade",
+        "vertical_fade",
+        "shimmer",
+        "blend",
+        "3d",
+        "grow",
+        "shrink",
+        "strobe",
+        "re_random",
+        "music_reactive",
+        "blend_edges",
+        "reverse",
+        "scale",
+        "color_chase",
+        "wrap_x",
+        "wrap_y",
+        "grow_with_music",
+        "clockwise",
+    }
+)
 
 
 # ===================================================================
@@ -768,8 +906,7 @@ def resolve_effect_type(template_id: str) -> EffectMapping:
                 energy = _detect_energy(template_id)
                 defaults = _get_preset(effect_type, energy)
                 logger.debug(
-                    "Matched template '%s' to '%s' via keyword '%s' "
-                    "(energy=%s, %d params)",
+                    "Matched template '%s' to '%s' via keyword '%s' (energy=%s, %d params)",
                     template_id,
                     effect_type,
                     keyword,

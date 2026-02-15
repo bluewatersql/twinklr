@@ -33,7 +33,6 @@ from twinklr.core.sequencer.vocabulary import (
     PlanningTimeRef,
 )
 
-
 # ---------------------------------------------------------------------------
 # extract_motif_id tests
 # ---------------------------------------------------------------------------
@@ -212,10 +211,7 @@ class TestResolvePlanAssets:
 
         # Should have resolved_asset_ids populated
         resolved_placement = (
-            resolved.section_plans[0]
-            .lane_plans[0]
-            .coordination_plans[0]
-            .placements[0]
+            resolved.section_plans[0].lane_plans[0].coordination_plans[0].placements[0]
         )
         assert resolved_placement.resolved_asset_ids == ["asset_image_cutout_sparkles"]
 
@@ -238,10 +234,7 @@ class TestResolvePlanAssets:
         resolved = resolve_plan_assets(plan_set, catalog)
 
         resolved_placement = (
-            resolved.section_plans[0]
-            .lane_plans[0]
-            .coordination_plans[0]
-            .placements[0]
+            resolved.section_plans[0].lane_plans[0].coordination_plans[0].placements[0]
         )
         assert resolved_placement.resolved_asset_ids == []
 
@@ -264,10 +257,7 @@ class TestResolvePlanAssets:
         resolved = resolve_plan_assets(plan_set, catalog)
 
         resolved_placement = (
-            resolved.section_plans[0]
-            .lane_plans[0]
-            .coordination_plans[0]
-            .placements[0]
+            resolved.section_plans[0].lane_plans[0].coordination_plans[0].placements[0]
         )
         assert resolved_placement.resolved_asset_ids == []
 
@@ -298,10 +288,7 @@ class TestResolvePlanAssets:
         resolved = resolve_plan_assets(plan_set, catalog)
 
         resolved_placement = (
-            resolved.section_plans[0]
-            .lane_plans[0]
-            .coordination_plans[0]
-            .placements[0]
+            resolved.section_plans[0].lane_plans[0].coordination_plans[0].placements[0]
         )
         # MEGA_TREE prefers IMAGE_TEXTURE
         assert "asset_image_texture_sparkles" in resolved_placement.resolved_asset_ids
@@ -328,10 +315,7 @@ class TestResolvePlanAssets:
         resolved = resolve_plan_assets(plan_set, catalog)
 
         resolved_placement = (
-            resolved.section_plans[0]
-            .lane_plans[0]
-            .coordination_plans[0]
-            .placements[0]
+            resolved.section_plans[0].lane_plans[0].coordination_plans[0].placements[0]
         )
         # Should fall back to cutout since no texture exists
         assert resolved_placement.resolved_asset_ids == ["asset_image_cutout_sparkles"]
@@ -355,10 +339,7 @@ class TestResolvePlanAssets:
         resolved = resolve_plan_assets(plan_set, catalog)
 
         resolved_placement = (
-            resolved.section_plans[0]
-            .lane_plans[0]
-            .coordination_plans[0]
-            .placements[0]
+            resolved.section_plans[0].lane_plans[0].coordination_plans[0].placements[0]
         )
         assert resolved_placement.resolved_asset_ids == []
 
@@ -382,18 +363,12 @@ class TestResolvePlanAssets:
 
         # Original should be untouched
         original_placement = (
-            plan_set.section_plans[0]
-            .lane_plans[0]
-            .coordination_plans[0]
-            .placements[0]
+            plan_set.section_plans[0].lane_plans[0].coordination_plans[0].placements[0]
         )
         assert original_placement.resolved_asset_ids == []
         # Resolved should have IDs
         resolved_placement = (
-            resolved.section_plans[0]
-            .lane_plans[0]
-            .coordination_plans[0]
-            .placements[0]
+            resolved.section_plans[0].lane_plans[0].coordination_plans[0].placements[0]
         )
         assert len(resolved_placement.resolved_asset_ids) > 0
 
@@ -408,10 +383,7 @@ class TestResolvePlanAssets:
         resolved = resolve_plan_assets(plan_set, catalog)
 
         resolved_placement = (
-            resolved.section_plans[0]
-            .lane_plans[0]
-            .coordination_plans[0]
-            .placements[0]
+            resolved.section_plans[0].lane_plans[0].coordination_plans[0].placements[0]
         )
         assert resolved_placement.resolved_asset_ids == []
 
@@ -443,12 +415,7 @@ class TestResolvePlanAssets:
 
         resolved = resolve_plan_assets(plan_set, catalog)
 
-        placements = (
-            resolved.section_plans[0]
-            .lane_plans[0]
-            .coordination_plans[0]
-            .placements
-        )
+        placements = resolved.section_plans[0].lane_plans[0].coordination_plans[0].placements
         assert placements[0].resolved_asset_ids == ["asset_image_cutout_sparkles"]
         assert placements[1].resolved_asset_ids == ["asset_image_cutout_bokeh"]
 
