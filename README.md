@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/assets/twinklr_logo.png" alt="Twinklr" width="400">
+  <img src="docs/_posts/assets/twinklr_logo_light.png" alt="Twinklr" width="400">
 </p>
 
 <h3 align="center">AI-Powered Choreography Engine for Christmas Light Shows</h3>
