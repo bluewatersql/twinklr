@@ -6,6 +6,8 @@ remote_theme: pages-themes/primer@v0.6.0
 title: "Twinklr"
 description: "AI-powered choreography for Christmas light shows"
 logo: assets/twinklr_logo_light.png
+url: "https://bluewatersql.github.io"
+baseurl: "/twinklr/docs"
 
 # Markdown rendering
 markdown: kramdown
@@ -13,6 +15,9 @@ kramdown:
   input: GFM
   hard_wrap: false
   syntax_highlighter: rouge
+
+plugins:
+  - jekyll-feed
 
 # Exclude build/dev artifacts from the published site
 exclude:
