@@ -1,11 +1,6 @@
----
-title: "Inside the Template Engine: How Moving Heads Learn to Dance"
-layout: default
----
-
 # Inside the Template Engine: How Moving Heads Learn to Dance
 
-### Part 0: [The LLM Clocked Out. The Math Punched In.](00_overview.md)
+### Intro: [The LLM Clocked Out. The Math Punched In.](00_overview.md)
 
 > The planner says “use sweep_lr_chevron_breathe.” Cool. Now we have to turn that sentence into 0–255 DMX values that make real motors move without blasting the neighbor’s driveway.
 
