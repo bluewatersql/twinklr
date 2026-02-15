@@ -1,7 +1,10 @@
 # GitHub Pages configuration for Twinklr blog
 # Theme: "minimal" — clean, neutral base that stays out of the way.
 # Custom CSS in assets/css/style.scss handles the warm cream palette.
-remote_theme: pages-themes/minimal@v0.2.0
+#remote_theme: pages-themes/minimal@v0.2.0
+remote_theme: mmistakes/so-simple-theme
+plugins:
+  - jekyll-remote-theme
 
 title: "Twinklr"
 description: "AI-powered choreography for Christmas light shows"
