@@ -22,6 +22,7 @@ from twinklr.core.sequencer.templates.group.models.coordination import (
 from twinklr.core.sequencer.templates.group.models.display import (
     DisplayGraph,
     DisplayGroup,
+    ElementType,
     GroupPosition,
 )
 from twinklr.core.sequencer.templates.group.models.template import (
@@ -67,6 +68,7 @@ __all__ = [
     # Display models
     "DisplayGraph",
     "DisplayGroup",
+    "ElementType",
     "GroupPosition",
     # Coordination models
     "CoordinationConfig",

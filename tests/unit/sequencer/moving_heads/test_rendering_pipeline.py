@@ -29,6 +29,7 @@ from twinklr.core.sequencer.timing.beat_grid import BeatGrid
 # Fixtures
 # ---------------------------------------------------------------------------
 
+
 def _make_dmx_mapping() -> DmxMapping:
     return DmxMapping(pan_channel=11, tilt_channel=13, dimmer_channel=15)
 
@@ -230,9 +231,7 @@ class TestRender:
         mock_compile.return_value = mock_result
 
         rp = RenderingPipeline(
-            choreography_plan=_make_plan(
-                [("intro", 1, 4, "sweep_lr_fan_hold")]
-            ),
+            choreography_plan=_make_plan([("intro", 1, 4, "sweep_lr_fan_hold")]),
             beat_grid=_make_beat_grid(bars=4),
             fixture_group=_make_fixture_group(4),
             job_config=JobConfig(),

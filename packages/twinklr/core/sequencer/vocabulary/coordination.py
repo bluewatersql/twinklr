@@ -82,10 +82,14 @@ class SpatialIntent(str, Enum):
 
     Attributes:
         NONE: No spatial pattern.
-        L2R: Left to right.
-        R2L: Right to left.
-        C2O: Center to outer.
-        O2C: Outer to center.
+        L2R: Left to right (horizontal).
+        R2L: Right to left (horizontal).
+        C2O: Center to outer (horizontal).
+        O2C: Outer to center (horizontal).
+        B2T: Bottom to top (vertical).
+        T2B: Top to bottom (vertical).
+        F2B: Front to back (depth).
+        B2F: Back to front (depth).
         RANDOM: Random order.
     """
 
@@ -94,4 +98,8 @@ class SpatialIntent(str, Enum):
     R2L = "R2L"
     C2O = "C2O"
     O2C = "O2C"
+    B2T = "B2T"
+    T2B = "T2B"
+    F2B = "F2B"
+    B2F = "B2F"
     RANDOM = "RANDOM"

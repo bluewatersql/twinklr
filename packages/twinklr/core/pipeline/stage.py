@@ -118,10 +118,7 @@ def resolve_typed_input(
         if value is not None:
             extras = {k: v for k, v in input.items() if k != dict_key}
             return value, extras
-        raise TypeError(
-            f"Dict input missing key '{dict_key}' "
-            f"(expected {model_type.__name__})"
-        )
+        raise TypeError(f"Dict input missing key '{dict_key}' (expected {model_type.__name__})")
 
     raise TypeError(
         f"Expected {model_type.__name__}"

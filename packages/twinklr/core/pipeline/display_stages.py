@@ -156,9 +156,7 @@ class DisplayRenderStage:
         """
         try:
             plan_set, extras = resolve_typed_input(input, GroupPlanSet, "plan_set")
-            beat_grid = (
-                extras.get("beat_grid") or self._beat_grid or context.get_state("beat_grid")
-            )
+            beat_grid = extras.get("beat_grid") or self._beat_grid or context.get_state("beat_grid")
             display_graph = (
                 extras.get("display_graph")
                 or self._display_graph

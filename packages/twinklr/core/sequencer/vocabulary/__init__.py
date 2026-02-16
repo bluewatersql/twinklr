@@ -17,6 +17,12 @@ from twinklr.core.sequencer.vocabulary.coordination import (
     SpillPolicy,
     StepUnit,
 )
+from twinklr.core.sequencer.vocabulary.display import (
+    DisplayElementKind,
+    DisplayProminence,
+    GroupArrangement,
+    PixelDensity,
+)
 from twinklr.core.sequencer.vocabulary.duration import (
     DURATION_BEATS,
     EffectDuration,
@@ -38,6 +44,12 @@ from twinklr.core.sequencer.vocabulary.motion import (
 from twinklr.core.sequencer.vocabulary.planning import (
     PlanningTimeRef,
     TimingHint,
+)
+from twinklr.core.sequencer.vocabulary.spatial import (
+    DepthZone,
+    DisplayZone,
+    HorizontalZone,
+    VerticalZone,
 )
 from twinklr.core.sequencer.vocabulary.targets import (
     TargetRole,
@@ -71,6 +83,11 @@ __all__ = [
     "GPBlendMode",
     "LaneKind",
     "LayerRole",
+    # Display (physical metadata)
+    "DisplayElementKind",
+    "DisplayProminence",
+    "GroupArrangement",
+    "PixelDensity",
     # Coordination
     "CoordinationMode",
     "SnapRule",
@@ -91,6 +108,11 @@ __all__ = [
     "resolve_intensity",
     # Motion
     "MotionVerb",
+    # Spatial (categorical position)
+    "DepthZone",
+    "DisplayZone",
+    "HorizontalZone",
+    "VerticalZone",
     # Planning (categorical timing)
     "PlanningTimeRef",
     "TimingHint",

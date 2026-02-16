@@ -92,8 +92,8 @@ class AssetCreationStage:
         """
         try:
             plan_set, extras = resolve_typed_input(input, GroupPlanSet, "aggregate")
-            lyric_context: LyricContextModel | None = (
-                extras.get("lyrics") or context.get_state("lyric_context")
+            lyric_context: LyricContextModel | None = extras.get("lyrics") or context.get_state(
+                "lyric_context"
             )
 
             # Determine output paths

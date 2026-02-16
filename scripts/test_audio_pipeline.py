@@ -376,7 +376,9 @@ async def run_analysis(args: argparse.Namespace) -> dict[str, Any]:
         if pb.visemes:
             print("\n  First 10 visemes:")
             for v in pb.visemes[:10]:
-                print(f"    {v.start_ms:6d}ms - {v.end_ms:6d}ms: {v.viseme} (conf={v.confidence:.2f})")
+                print(
+                    f"    {v.start_ms:6d}ms - {v.end_ms:6d}ms: {v.viseme} (conf={v.confidence:.2f})"
+                )
 
     # Generate markdown report if requested
     if args.markdown:
@@ -449,10 +451,7 @@ def _write_markdown_report(
         for phrase in bundle.lyrics.phrases:
             phrase_start = int(phrase.start_ms)
             phrase_end = int(phrase.end_ms)
-            lines.append(
-                f"### Phrase: \"{phrase.text}\" "
-                f"({phrase_start}ms - {phrase_end}ms)\n"
-            )
+            lines.append(f'### Phrase: "{phrase.text}" ({phrase_start}ms - {phrase_end}ms)\n')
 
             words = phrase.words if phrase.words else []
             if not words:

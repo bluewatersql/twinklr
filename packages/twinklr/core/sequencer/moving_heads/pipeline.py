@@ -54,9 +54,7 @@ ENERGY_TO_INTENSITY: dict[str, Intensity] = {
 """Maps energy-level keywords (from preset IDs) to movement Intensity enums."""
 
 
-def _compute_section_duration_ms(
-    start_bar: int, end_bar: int, ms_per_bar: float
-) -> int:
+def _compute_section_duration_ms(start_bar: int, end_bar: int, ms_per_bar: float) -> int:
     """Compute the duration of a section in milliseconds.
 
     Args:

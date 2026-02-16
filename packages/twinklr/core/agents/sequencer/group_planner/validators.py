@@ -86,8 +86,9 @@ class SectionPlanValidator:
         self.template_catalog = template_catalog
         self.timing_context = timing_context
 
-        # Build lookup sets for fast validation
-        self._valid_group_ids = {g.group_id for g in display_graph.groups}
+        # Build lookup sets for fast validation (plannable groups only;
+        # CONTAINER groups are not valid plan targets)
+        self._valid_group_ids = {g.group_id for g in display_graph.plannable_groups}
 
     def _get_section_end_bar(self, section_end_ms: int) -> int:
         """Get the bar number for a given millisecond position.

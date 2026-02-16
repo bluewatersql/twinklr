@@ -139,7 +139,9 @@ class GroupPlannerStage:
                 llm_logger=context.llm_logger,
             )
 
-            def extract_plan(r: IterationResult[SectionCoordinationPlan]) -> SectionCoordinationPlan:
+            def extract_plan(
+                r: IterationResult[SectionCoordinationPlan],
+            ) -> SectionCoordinationPlan:
                 """Extract plan from result (guaranteed non-None by execute_step)."""
                 if r.plan is None:
                     raise ValueError("IterationResult.plan is None")

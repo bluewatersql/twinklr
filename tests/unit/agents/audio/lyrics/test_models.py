@@ -33,6 +33,28 @@ class TestStoryBeat:
         assert len(beat.description) >= 10
         assert len(beat.visual_opportunity) >= 10
 
+    def test_zero_duration_beat_accepted(self):
+        """Zero-duration beats are valid at the StoryBeat level."""
+        beat = StoryBeat(
+            section_id="verse_4",
+            timestamp_range=(159753, 159753),
+            beat_type="coda",
+            description="Final moment of the song landing the moral",
+            visual_opportunity="Sustained bright hold like a storybook closing",
+        )
+        assert beat.timestamp_range == (159753, 159753)
+
+    def test_inverted_range_rejected(self):
+        """Inverted ranges (end < start) are still rejected."""
+        with pytest.raises(ValidationError, match=r"end_ms must not be before start_ms"):
+            StoryBeat(
+                section_id="test",
+                timestamp_range=(5000, 1000),
+                beat_type="setup",
+                description="Test description here",
+                visual_opportunity="Test visual hint here",
+            )
+
     def test_all_beat_types_valid(self):
         """Test all allowed beat types."""
         valid_types = ["setup", "conflict", "climax", "resolution", "coda"]
@@ -276,6 +298,65 @@ class TestStoryBeat:
                     for i in range(5)
                 ],
                 recommended_visual_themes=["t1", "t2", "t3", "t4", "t5", "t6"],
+            )
+
+    def test_zero_duration_beat_at_end_accepted(self):
+        """Zero-duration story beat as the last beat is valid (song boundary)."""
+        model = LyricContextModel(
+            has_lyrics=True,
+            themes=["theme_a", "theme_b"],
+            vocal_coverage_pct=0.5,
+            key_phrases=[
+                KeyPhrase(
+                    text=f"phrase {i}", timestamp_ms=1000 * i,
+                    section_id="v", visual_hint=f"hint {i}",
+                )
+                for i in range(5)
+            ],
+            recommended_visual_themes=["vis1", "vis2", "vis3"],
+            story_beats=[
+                StoryBeat(
+                    section_id="verse_1", timestamp_range=(1000, 10000),
+                    beat_type="setup", description="Setup for the story here",
+                    visual_opportunity="Slow build from outline to spotlight",
+                ),
+                StoryBeat(
+                    section_id="verse_4", timestamp_range=(50000, 50000),
+                    beat_type="coda", description="Final moment of the song landing",
+                    visual_opportunity="Sustained bright hold storybook close",
+                ),
+            ],
+        )
+        assert model.story_beats is not None
+        assert len(model.story_beats) == 2
+
+    def test_zero_duration_beat_mid_song_rejected(self):
+        """Zero-duration story beat NOT at the end is invalid."""
+        with pytest.raises(ValidationError, match=r"zero-duration.*only.*last"):
+            LyricContextModel(
+                has_lyrics=True,
+                themes=["theme_a", "theme_b"],
+                vocal_coverage_pct=0.5,
+                key_phrases=[
+                    KeyPhrase(
+                        text=f"phrase {i}", timestamp_ms=1000 * i,
+                        section_id="v", visual_hint=f"hint {i}",
+                    )
+                    for i in range(5)
+                ],
+                recommended_visual_themes=["vis1", "vis2", "vis3"],
+                story_beats=[
+                    StoryBeat(
+                        section_id="verse_1", timestamp_range=(1000, 1000),
+                        beat_type="setup", description="Setup for the story here",
+                        visual_opportunity="Slow build from outline to spotlight",
+                    ),
+                    StoryBeat(
+                        section_id="verse_4", timestamp_range=(50000, 60000),
+                        beat_type="resolution", description="Resolution of the whole arc",
+                        visual_opportunity="Full ensemble unity warm white pulses",
+                    ),
+                ],
             )
 
     def test_severity_values(self):

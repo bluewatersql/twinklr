@@ -138,7 +138,11 @@ Notable examples:
 
 Available target roles in this display:
 {% for group in display_groups %}
-- **{{ group.role_key }}** ({{ group.group_type }}) - {{ group.model_count }} models
+- **{{ group.role_key }}** ({{ group.group_type }}){% if group.element_kind is defined %} [{{ group.element_kind }}]{% endif %} - {{ group.model_count }} model{{ "s" if group.model_count != 1 else "" }}{% if group.pixel_fraction is defined %}, {{ (group.pixel_fraction * 100) | round(0) | int }}% of display{% endif %}{% if group.prominence is defined %} ({{ group.prominence }}){% endif %}
+
+{% if group.horizontal is defined or group.arrangement is defined %}  Layout: {% if group.arrangement is defined %}{{ group.arrangement }}{% endif %}{% if group.horizontal is defined %} — {{ group.horizontal }}{% if group.vertical is defined %} / {{ group.vertical }}{% endif %}{% if group.depth is defined and group.depth != "NEAR" %} / {{ group.depth }}{% endif %}{% endif %}{% if group.zone is defined %} [{{ group.zone }}]{% endif %}
+
+{% endif %}
 {% endfor %}
 
 # Your Task

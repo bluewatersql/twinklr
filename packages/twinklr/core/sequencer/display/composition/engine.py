@@ -83,6 +83,7 @@ from twinklr.core.sequencer.vocabulary import (
     PlanningTimeRef,
     StepUnit,
 )
+from twinklr.core.sequencer.vocabulary.coordination import SpatialIntent
 
 logger = logging.getLogger(__name__)
 
@@ -162,6 +163,7 @@ class CompositionEngine:
         template_registry: GroupTemplateRegistry | None = None,
     ) -> None:
         self._beat_grid = beat_grid
+        self._display_graph = display_graph
         self._config = config or CompositionConfig()
         self._target_resolver = TargetResolver(display_graph)
         self._layer_allocator = LayerAllocator()
@@ -443,15 +445,44 @@ class CompositionEngine:
         if len(config.group_order) == 0:
             return []
 
+        # Apply spatial ordering when SpatialIntent is specified.
+        # Reorders group_order based on categorical GroupPosition metadata
+        # from the DisplayGraph so that e.g. L2R sweeps groups left-to-right
+        # regardless of the planner-specified order.
+        group_order = list(config.group_order)
+        if config.spatial_intent != SpatialIntent.NONE:
+            sorted_groups = self._display_graph.groups_sorted_by(config.spatial_intent)
+            sorted_ids = [g.group_id for g in sorted_groups]
+            order_set = set(group_order)
+            reordered = [gid for gid in sorted_ids if gid in order_set]
+            # Preserve any group_order entries not in the display graph
+            remaining = [gid for gid in group_order if gid not in set(reordered)]
+            group_order = reordered + remaining
+
+        # Construct a config copy with the spatially-ordered group_order.
+        # CoordinationConfig is frozen, so we create a new instance.
+        effective_config = CoordinationConfig(
+            group_order=group_order,
+            step_unit=config.step_unit,
+            step_duration=config.step_duration,
+            phase_offset=config.phase_offset,
+            spill_policy=config.spill_policy,
+            spatial_intent=config.spatial_intent,
+        )
+
         if coordination_mode == CoordinationMode.RIPPLE:
-            return self._expand_ripple(window, config, step_ms, window_start_ms, window_end_ms)
+            return self._expand_ripple(
+                window, effective_config, step_ms, window_start_ms, window_end_ms
+            )
         if coordination_mode == CoordinationMode.CALL_RESPONSE:
             return self._expand_call_response(
-                window, config, step_ms, window_start_ms, window_end_ms
+                window, effective_config, step_ms, window_start_ms, window_end_ms
             )
 
         # Default: SEQUENCED
-        return self._expand_sequenced(window, config, step_ms, window_start_ms, window_end_ms)
+        return self._expand_sequenced(
+            window, effective_config, step_ms, window_start_ms, window_end_ms
+        )
 
     def _expand_sequenced(
         self,

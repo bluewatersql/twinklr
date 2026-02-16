@@ -19,12 +19,120 @@ from twinklr.core.pipeline import PipelineContext, PipelineExecutor
 from twinklr.core.pipeline.definitions import build_moving_heads_pipeline
 from twinklr.core.sequencer.moving_heads.templates import load_builtin_templates
 from twinklr.core.sequencer.moving_heads.templates.library import list_templates
+from twinklr.core.sequencer.templates.group.models.display import (
+    DisplayGraph,
+    DisplayGroup,
+    ElementType,
+    GroupPosition,
+)
+from twinklr.core.sequencer.vocabulary.display import (
+    DisplayElementKind,
+    DisplayProminence,
+    GroupArrangement,
+    PixelDensity,
+)
+from twinklr.core.sequencer.vocabulary.spatial import (
+    DepthZone,
+    DisplayZone,
+    HorizontalZone,
+    VerticalZone,
+)
 from twinklr.core.session import TwinklrSession
 from twinklr.core.utils.formatting import clean_audio_filename
 from twinklr.core.utils.logging import configure_logging
 
 console = Console()
 logger = logging.getLogger(__name__)
+
+
+def build_display_graph() -> DisplayGraph:
+    """Build a default DisplayGraph for the moving-heads CLI pipeline.
+
+    Constructs a v2 DisplayGraph with hierarchy and spatial metadata
+    representing a typical residential Christmas display.  The layout
+    parser will eventually auto-populate this; for now values are
+    hardcoded as sensible defaults.
+
+    Structure::
+
+        ALL_DISPLAY (CONTAINER, 100%)
+        ├── MOVING_HEADS (MODEL_GROUP, 4 fixtures, CENTER/FULL_HEIGHT, 30%)
+        ├── OUTLINE (STRING, HORIZONTAL_ROW, FULL_WIDTH/HIGH, 50%)
+        └── MEGA_TREE (TREE, SINGLE, CENTER/FULL_HEIGHT, 20%)
+
+    Returns:
+        Fully populated DisplayGraph.
+    """
+    return DisplayGraph(
+        display_id="cli_display",
+        display_name="CLI Display",
+        groups=[
+            DisplayGroup(
+                group_id="ALL_DISPLAY",
+                role="ALL_DISPLAY",
+                display_name="ALL Display",
+                element_type=ElementType.CONTAINER,
+                pixel_fraction=1.0,
+            ),
+            DisplayGroup(
+                group_id="MOVING_HEADS",
+                role="MOVING_HEADS",
+                display_name="Moving Heads",
+                element_type=ElementType.MODEL_GROUP,
+                parent_group_id="ALL_DISPLAY",
+                element_kind=DisplayElementKind.MOVING_HEAD,
+                arrangement=GroupArrangement.HORIZONTAL_ROW,
+                pixel_density=PixelDensity.LOW,
+                prominence=DisplayProminence.HERO,
+                position=GroupPosition(
+                    horizontal=HorizontalZone.CENTER,
+                    vertical=VerticalZone.FULL_HEIGHT,
+                    depth=DepthZone.NEAR,
+                    zone=DisplayZone.YARD,
+                ),
+                fixture_count=4,
+                pixel_fraction=0.30,
+            ),
+            DisplayGroup(
+                group_id="OUTLINE",
+                role="OUTLINE",
+                display_name="Outline",
+                element_type=ElementType.MODEL_GROUP,
+                parent_group_id="ALL_DISPLAY",
+                element_kind=DisplayElementKind.STRING,
+                arrangement=GroupArrangement.HORIZONTAL_ROW,
+                pixel_density=PixelDensity.MEDIUM,
+                prominence=DisplayProminence.ANCHOR,
+                position=GroupPosition(
+                    horizontal=HorizontalZone.FULL_WIDTH,
+                    vertical=VerticalZone.HIGH,
+                    depth=DepthZone.FAR,
+                    zone=DisplayZone.HOUSE,
+                ),
+                fixture_count=10,
+                pixel_fraction=0.50,
+            ),
+            DisplayGroup(
+                group_id="MEGA_TREE",
+                role="MEGA_TREE",
+                display_name="Mega Tree",
+                element_type=ElementType.MODEL,
+                parent_group_id="ALL_DISPLAY",
+                element_kind=DisplayElementKind.TREE,
+                arrangement=GroupArrangement.SINGLE,
+                pixel_density=PixelDensity.HIGH,
+                prominence=DisplayProminence.HERO,
+                position=GroupPosition(
+                    horizontal=HorizontalZone.CENTER,
+                    vertical=VerticalZone.FULL_HEIGHT,
+                    depth=DepthZone.NEAR,
+                    zone=DisplayZone.YARD,
+                ),
+                fixture_count=1,
+                pixel_fraction=0.20,
+            ),
+        ],
+    )
 
 
 async def run_pipeline_async(
@@ -81,12 +189,17 @@ async def run_pipeline_async(
     available_templates = [t.template_id for t in list_templates()]
     console.print(f"[green]📚 Templates loaded:[/green] {len(available_templates)}")
 
-    # Build display groups for MacroPlanner coordination
-    display_groups = [
-        {"role_key": "MOVING_HEADS", "model_count": 4, "group_type": "moving_head"},
-        {"role_key": "OUTLINE", "model_count": 10, "group_type": "string"},
-        {"role_key": "MEGA_TREE", "model_count": 1, "group_type": "tree"},
-    ]
+    # Build display graph with hierarchy and spatial metadata
+    display_graph = build_display_graph()
+    display_groups = display_graph.to_planner_summary()
+
+    console.print(f"[green]🗺️  Display groups:[/green] {len(display_groups)} plannable")
+    for dg in display_groups:
+        console.print(
+            f"   • {dg['role_key']} ({dg['element_kind']}) — "
+            f"{dg['pixel_fraction']:.0%} of display, "
+            f"{dg['prominence']}, {dg['horizontal']}/{dg['vertical']}"
+        )
 
     # Define pipeline via pipeline definitions module
     console.print("\n[bold]Defining pipeline...[/bold]")

@@ -39,7 +39,22 @@ from twinklr.core.sequencer.templates.group import load_builtin_group_templates
 from twinklr.core.sequencer.templates.group.catalog import (
     build_template_catalog as build_catalog_from_registry,
 )
-from twinklr.core.sequencer.templates.group.models.display import ElementType
+from twinklr.core.sequencer.templates.group.models.display import (
+    ElementType,
+    GroupPosition,
+)
+from twinklr.core.sequencer.vocabulary.display import (
+    DisplayElementKind,
+    DisplayProminence,
+    GroupArrangement,
+    PixelDensity,
+)
+from twinklr.core.sequencer.vocabulary.spatial import (
+    DepthZone,
+    DisplayZone,
+    HorizontalZone,
+    VerticalZone,
+)
 from twinklr.core.session import TwinklrSession
 from twinklr.core.utils.formatting import clean_audio_filename
 from twinklr.core.utils.logging import configure_logging
@@ -72,39 +87,146 @@ def save_artifact(data: dict, song_name: str, filename: str, output_dir: Path) -
     return output_path
 
 
-def build_display_graph(display_groups: list[dict]) -> DisplayGraph:
-    """Build DisplayGraph from display group configs.
+def build_display_graph() -> DisplayGraph:
+    """Build a demo DisplayGraph with hierarchy and spatial metadata.
 
-    Creates one DisplayGroup entry per role (group-based targeting).
-    Each entry represents an xLights model group that the planner
-    targets directly (e.g., ``ARCHES`` not ``ARCHES_1``).
-
-    The ``fixture_count`` field carries the model count for planning
-    context (e.g., how many arches are in the group).
-
-    Single-model roles (model_count=1) use ``ElementType.MODEL``.
-    Multi-model roles use ``ElementType.MODEL_GROUP``.
+    Structure:
+        ALL_DISPLAY (CONTAINER, 100%)
+        ├── HOUSE (CONTAINER, 35%)
+        │   ├── OUTLINE (STRING, HORIZONTAL_ROW, FULL_WIDTH/HIGH, 20%)
+        │   └── WINDOWS (WINDOW, GRID, CENTER/MID, 15%)
+        ├── YARD (CONTAINER, 55%)
+        │   ├── MEGA_TREE (TREE, SINGLE, CENTER/FULL_HEIGHT, 25%)
+        │   ├── ARCHES (ARCH, HORIZONTAL_ROW, FULL_WIDTH/LOW, 15%)
+        │   └── HERO (PROP, CLUSTER, CENTER_LEFT/LOW, 15%)
+        └── ACCENT (CONTAINER, 10% — placeholder)
     """
-    groups_list = []
-    for g in display_groups:
-        role_key = str(g["role_key"])
-        model_count: int = g["model_count"]  # type: ignore[assignment]
-        element_type = ElementType.MODEL if model_count == 1 else ElementType.MODEL_GROUP
-
-        groups_list.append(
-            DisplayGroup(
-                group_id=role_key,
-                role=role_key,
-                display_name=role_key,
-                element_type=element_type,
-                fixture_count=model_count,
-            )
-        )
-
     return DisplayGraph(
         display_id="demo_display",
         display_name="Demo Display",
-        groups=groups_list,
+        groups=[
+            # Root container
+            DisplayGroup(
+                group_id="ALL_DISPLAY",
+                role="ALL_DISPLAY",
+                display_name="ALL Display",
+                element_type=ElementType.CONTAINER,
+                pixel_fraction=1.0,
+            ),
+            # House zone container
+            DisplayGroup(
+                group_id="HOUSE",
+                role="HOUSE",
+                display_name="House",
+                element_type=ElementType.CONTAINER,
+                parent_group_id="ALL_DISPLAY",
+                pixel_fraction=0.35,
+            ),
+            DisplayGroup(
+                group_id="OUTLINE",
+                role="OUTLINE",
+                display_name="OUTLINE",
+                element_type=ElementType.MODEL_GROUP,
+                parent_group_id="HOUSE",
+                element_kind=DisplayElementKind.STRING,
+                arrangement=GroupArrangement.HORIZONTAL_ROW,
+                pixel_density=PixelDensity.MEDIUM,
+                prominence=DisplayProminence.ANCHOR,
+                position=GroupPosition(
+                    horizontal=HorizontalZone.FULL_WIDTH,
+                    vertical=VerticalZone.HIGH,
+                    depth=DepthZone.FAR,
+                    zone=DisplayZone.HOUSE,
+                ),
+                fixture_count=10,
+                pixel_fraction=0.20,
+            ),
+            DisplayGroup(
+                group_id="WINDOWS",
+                role="WINDOWS",
+                display_name="WINDOWS",
+                element_type=ElementType.MODEL_GROUP,
+                parent_group_id="HOUSE",
+                element_kind=DisplayElementKind.WINDOW,
+                arrangement=GroupArrangement.GRID,
+                pixel_density=PixelDensity.HIGH,
+                prominence=DisplayProminence.SUPPORTING,
+                position=GroupPosition(
+                    horizontal=HorizontalZone.CENTER,
+                    vertical=VerticalZone.MID,
+                    depth=DepthZone.FAR,
+                    zone=DisplayZone.HOUSE,
+                ),
+                fixture_count=8,
+                pixel_fraction=0.15,
+            ),
+            # Yard zone container
+            DisplayGroup(
+                group_id="YARD",
+                role="YARD",
+                display_name="Yard",
+                element_type=ElementType.CONTAINER,
+                parent_group_id="ALL_DISPLAY",
+                pixel_fraction=0.55,
+            ),
+            DisplayGroup(
+                group_id="MEGA_TREE",
+                role="MEGA_TREE",
+                display_name="MEGA_TREE",
+                element_type=ElementType.MODEL,
+                parent_group_id="YARD",
+                element_kind=DisplayElementKind.TREE,
+                arrangement=GroupArrangement.SINGLE,
+                pixel_density=PixelDensity.HIGH,
+                prominence=DisplayProminence.HERO,
+                position=GroupPosition(
+                    horizontal=HorizontalZone.CENTER,
+                    vertical=VerticalZone.FULL_HEIGHT,
+                    depth=DepthZone.NEAR,
+                    zone=DisplayZone.YARD,
+                ),
+                fixture_count=1,
+                pixel_fraction=0.25,
+            ),
+            DisplayGroup(
+                group_id="ARCHES",
+                role="ARCHES",
+                display_name="ARCHES",
+                element_type=ElementType.MODEL_GROUP,
+                parent_group_id="YARD",
+                element_kind=DisplayElementKind.ARCH,
+                arrangement=GroupArrangement.HORIZONTAL_ROW,
+                pixel_density=PixelDensity.MEDIUM,
+                prominence=DisplayProminence.ANCHOR,
+                position=GroupPosition(
+                    horizontal=HorizontalZone.FULL_WIDTH,
+                    vertical=VerticalZone.LOW,
+                    depth=DepthZone.NEAR,
+                    zone=DisplayZone.YARD,
+                ),
+                fixture_count=5,
+                pixel_fraction=0.15,
+            ),
+            DisplayGroup(
+                group_id="HERO",
+                role="HERO",
+                display_name="HERO",
+                element_type=ElementType.MODEL_GROUP,
+                parent_group_id="YARD",
+                element_kind=DisplayElementKind.PROP,
+                arrangement=GroupArrangement.CLUSTER,
+                pixel_density=PixelDensity.MEDIUM,
+                prominence=DisplayProminence.ANCHOR,
+                position=GroupPosition(
+                    horizontal=HorizontalZone.CENTER_LEFT,
+                    vertical=VerticalZone.LOW,
+                    depth=DepthZone.NEAR,
+                    zone=DisplayZone.YARD,
+                ),
+                fixture_count=5,
+                pixel_fraction=0.15,
+            ),
+        ],
     )
 
 
@@ -168,26 +290,23 @@ async def main() -> None:
 
     session = TwinklrSession.from_directory(repo_root, session_id=session_id)
 
-    # Build display groups (mock for demo)
-    display_groups = [
-        {"role_key": "OUTLINE", "model_count": 10, "group_type": "string"},
-        {"role_key": "MEGA_TREE", "model_count": 1, "group_type": "tree"},
-        {"role_key": "HERO", "model_count": 5, "group_type": "prop"},
-        {"role_key": "ARCHES", "model_count": 5, "group_type": "arch"},
-        {"role_key": "WINDOWS", "model_count": 8, "group_type": "window"},
-    ]
-
-    # Build display graph and template catalog
-    display_graph = build_display_graph(display_groups)
+    # Build display graph with hierarchy and metadata
+    display_graph = build_display_graph()
+    display_groups = display_graph.to_planner_summary()
 
     # Build catalog from registry
     load_builtin_group_templates()
     template_catalog = build_catalog_from_registry()
 
     print_subsection("1. Display Configuration")
-    print(f"🎯 Display graph: {len(display_graph.groups)} groups")
-    for role, group_ids in display_graph.groups_by_role.items():
-        print(f"   - {role}: {', '.join(group_ids)}")
+    print(
+        f"🎯 Display graph: {len(display_graph.groups)} total, "
+        f"{len(display_graph.plannable_groups)} plannable"
+    )
+    for g in display_graph.plannable_groups:
+        kind_str = f" [{g.element_kind.value}]" if g.element_kind else ""
+        pct_str = f" {g.pixel_fraction:.0%}" if g.pixel_fraction > 0 else ""
+        print(f"   - {g.group_id}{kind_str} ({g.fixture_count} models{pct_str})")
 
     print(f"\n📚 Template catalog: {len(template_catalog.entries)} templates")
     for lane in LaneKind:
@@ -208,6 +327,7 @@ async def main() -> None:
         max_iterations=session.job_config.agent.max_iterations,
         min_pass_score=session.job_config.agent.success_threshold / 10.0,
         enable_holistic=True,
+        enable_assets=True,
     )
 
     # Validate pipeline

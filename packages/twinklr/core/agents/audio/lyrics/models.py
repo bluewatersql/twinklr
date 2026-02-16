@@ -3,7 +3,7 @@
 from datetime import UTC, datetime
 from enum import Enum
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class Severity(str, Enum):
@@ -77,14 +77,18 @@ class StoryBeat(BaseModel):
     @field_validator("timestamp_range")
     @classmethod
     def validate_timestamp_range(cls, v: tuple[int, int]) -> tuple[int, int]:
-        """Validate timestamp range is valid."""
+        """Validate timestamp range is valid.
+
+        Zero-duration ranges (start == end) are allowed here — they
+        represent point-in-time beats (e.g. a coda at the song boundary).
+        The ``LyricContextModel`` validator enforces that zero-duration
+        beats only appear as the last story beat.
+        """
         start_ms, end_ms = v
         if start_ms < 0:
             raise ValueError("start_ms must be non-negative")
-        if end_ms <= start_ms:
-            raise ValueError("end_ms must be greater than start_ms")
-        if end_ms - start_ms < 100:  # At least 100ms
-            raise ValueError("Story beat must be at least 100ms long")
+        if end_ms < start_ms:
+            raise ValueError("end_ms must not be before start_ms")
         return v
 
     @field_validator("beat_type")
@@ -265,3 +269,23 @@ class LyricContextModel(BaseModel):
         if v not in allowed:
             raise ValueError(f"lyric_density must be one of {allowed}, got '{v}'")
         return v
+
+    @model_validator(mode="after")
+    def validate_zero_duration_beats(self) -> "LyricContextModel":
+        """Reject zero-duration story beats that aren't at the song boundary.
+
+        A zero-duration beat (start == end) is only valid as the last
+        story beat — it represents a point-in-time marker like a coda
+        tag at the end of the song.
+        """
+        if not self.story_beats:
+            return self
+        for beat in self.story_beats[:-1]:
+            start, end = beat.timestamp_range
+            if start == end:
+                raise ValueError(
+                    f"zero-duration story beat '{beat.beat_type}' in "
+                    f"'{beat.section_id}' is only valid as the last beat "
+                    f"(song boundary)"
+                )
+        return self

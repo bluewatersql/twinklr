@@ -30,6 +30,7 @@ from twinklr.core.sequencer.templates.group.models.coordination import (
 from twinklr.core.sequencer.templates.group.models.display import (
     DisplayGraph,
     DisplayGroup,
+    GroupPosition,
 )
 from twinklr.core.sequencer.theming import PALETTE_REGISTRY, ThemeRef
 from twinklr.core.sequencer.theming.enums import ThemeScope
@@ -41,6 +42,12 @@ from twinklr.core.sequencer.vocabulary import (
     LaneKind,
     PlanningTimeRef,
     StepUnit,
+)
+from twinklr.core.sequencer.vocabulary.coordination import SpatialIntent
+from twinklr.core.sequencer.vocabulary.spatial import (
+    DepthZone,
+    HorizontalZone,
+    VerticalZone,
 )
 
 # Ensure builtins are loaded once for all tests in this module
@@ -458,3 +465,270 @@ class TestBlendModeMapping:
     def test_alpha_over_maps_to_reveals(self) -> None:
         result = LayerAllocator.resolve_blend_mode(GPBlendMode.ALPHA_OVER)
         assert result == "1 reveals 2"
+
+
+class TestSpatialIntentOrdering:
+    """Tests that SpatialIntent reorders group_order in expand methods."""
+
+    def test_l2r_reorders_groups_by_horizontal_position(self) -> None:
+        """L2R spatial intent should reorder groups left-to-right."""
+        # Create groups with explicit horizontal positions: 3=RIGHT, 2=CENTER, 1=LEFT
+        display_graph = DisplayGraph(
+            display_id="test",
+            display_name="Test",
+            groups=[
+                DisplayGroup(
+                    group_id="ARCHES_1",
+                    role="ARCHES",
+                    display_name="Arches 1",
+                    position=GroupPosition(
+                        horizontal=HorizontalZone.LEFT, vertical=VerticalZone.LOW
+                    ),
+                ),
+                DisplayGroup(
+                    group_id="ARCHES_2",
+                    role="ARCHES",
+                    display_name="Arches 2",
+                    position=GroupPosition(
+                        horizontal=HorizontalZone.CENTER, vertical=VerticalZone.LOW
+                    ),
+                ),
+                DisplayGroup(
+                    group_id="ARCHES_3",
+                    role="ARCHES",
+                    display_name="Arches 3",
+                    position=GroupPosition(
+                        horizontal=HorizontalZone.RIGHT, vertical=VerticalZone.LOW
+                    ),
+                ),
+            ],
+        )
+
+        # Plan specifies group_order as [3, 1, 2] (wrong spatial order)
+        # but SpatialIntent.L2R should reorder to [1, 2, 3]
+        section = SectionCoordinationPlan(
+            section_id="test_section",
+            theme=ThemeRef(theme_id="theme.test", scope=ThemeScope.SECTION),
+            palette=PaletteRef(palette_id="core.christmas_traditional"),
+            lane_plans=[
+                LanePlan(
+                    lane=LaneKind.RHYTHM,
+                    target_roles=["ARCHES"],
+                    coordination_plans=[
+                        CoordinationPlan(
+                            coordination_mode=CoordinationMode.SEQUENCED,
+                            group_ids=["ARCHES_3", "ARCHES_1", "ARCHES_2"],
+                            window=PlacementWindow(
+                                start=PlanningTimeRef(bar=1, beat=1),
+                                end=PlanningTimeRef(bar=5, beat=1),
+                                template_id="gtpl_rhythm_chase_single",
+                                intensity=IntensityLevel.STRONG,
+                            ),
+                            config=CoordinationConfig(
+                                group_order=["ARCHES_3", "ARCHES_1", "ARCHES_2"],
+                                step_unit=StepUnit.BEAT,
+                                step_duration=2,
+                                spatial_intent=SpatialIntent.L2R,
+                            ),
+                        )
+                    ],
+                ),
+            ],
+        )
+
+        plan_set = GroupPlanSet(plan_set_id="test", section_plans=[section])
+        engine = CompositionEngine(
+            beat_grid=_make_beat_grid(),
+            display_graph=display_graph,
+            palette_resolver=_make_palette_resolver(),
+            template_registry=REGISTRY,
+        )
+        render_plan = engine.compose(plan_set)
+
+        events = _collect_events(render_plan)
+        by_element: dict[str, list[int]] = {}
+        for name, start, _ in events:
+            by_element.setdefault(name, []).append(start)
+
+        # With L2R ordering: Arches 1 (LEFT) should start first,
+        # then Arches 2 (CENTER), then Arches 3 (RIGHT)
+        a1_first = min(by_element.get("Arches 1", [999999]))
+        a2_first = min(by_element.get("Arches 2", [999999]))
+        a3_first = min(by_element.get("Arches 3", [999999]))
+
+        assert a1_first < a2_first, "LEFT group should start before CENTER"
+        assert a2_first < a3_first, "CENTER group should start before RIGHT"
+
+    def test_b2t_reorders_groups_by_vertical_position(self) -> None:
+        """B2T spatial intent should reorder groups bottom-to-top."""
+        display_graph = DisplayGraph(
+            display_id="test",
+            display_name="Test",
+            groups=[
+                DisplayGroup(
+                    group_id="ROW_HIGH",
+                    role="ROW",
+                    display_name="Row High",
+                    position=GroupPosition(
+                        horizontal=HorizontalZone.CENTER, vertical=VerticalZone.HIGH
+                    ),
+                ),
+                DisplayGroup(
+                    group_id="ROW_LOW",
+                    role="ROW",
+                    display_name="Row Low",
+                    position=GroupPosition(
+                        horizontal=HorizontalZone.CENTER, vertical=VerticalZone.LOW
+                    ),
+                ),
+                DisplayGroup(
+                    group_id="ROW_GROUND",
+                    role="ROW",
+                    display_name="Row Ground",
+                    position=GroupPosition(
+                        horizontal=HorizontalZone.CENTER, vertical=VerticalZone.GROUND
+                    ),
+                ),
+            ],
+        )
+
+        section = SectionCoordinationPlan(
+            section_id="test_section",
+            theme=ThemeRef(theme_id="theme.test", scope=ThemeScope.SECTION),
+            palette=PaletteRef(palette_id="core.christmas_traditional"),
+            lane_plans=[
+                LanePlan(
+                    lane=LaneKind.RHYTHM,
+                    target_roles=["ROW"],
+                    coordination_plans=[
+                        CoordinationPlan(
+                            coordination_mode=CoordinationMode.SEQUENCED,
+                            group_ids=["ROW_HIGH", "ROW_LOW", "ROW_GROUND"],
+                            window=PlacementWindow(
+                                start=PlanningTimeRef(bar=1, beat=1),
+                                end=PlanningTimeRef(bar=5, beat=1),
+                                template_id="gtpl_rhythm_chase_single",
+                                intensity=IntensityLevel.STRONG,
+                            ),
+                            config=CoordinationConfig(
+                                group_order=["ROW_HIGH", "ROW_LOW", "ROW_GROUND"],
+                                step_unit=StepUnit.BEAT,
+                                step_duration=2,
+                                spatial_intent=SpatialIntent.B2T,
+                            ),
+                        )
+                    ],
+                ),
+            ],
+        )
+
+        plan_set = GroupPlanSet(plan_set_id="test", section_plans=[section])
+        engine = CompositionEngine(
+            beat_grid=_make_beat_grid(),
+            display_graph=display_graph,
+            palette_resolver=_make_palette_resolver(),
+            template_registry=REGISTRY,
+        )
+        render_plan = engine.compose(plan_set)
+
+        events = _collect_events(render_plan)
+        by_element: dict[str, list[int]] = {}
+        for name, start, _ in events:
+            by_element.setdefault(name, []).append(start)
+
+        ground_first = min(by_element.get("Row Ground", [999999]))
+        low_first = min(by_element.get("Row Low", [999999]))
+        high_first = min(by_element.get("Row High", [999999]))
+
+        assert ground_first < low_first, "GROUND group should start before LOW"
+        assert low_first < high_first, "LOW group should start before HIGH"
+
+    def test_f2b_reorders_groups_by_depth_position(self) -> None:
+        """F2B spatial intent should reorder groups front-to-back."""
+        display_graph = DisplayGraph(
+            display_id="test",
+            display_name="Test",
+            groups=[
+                DisplayGroup(
+                    group_id="LAYER_FAR",
+                    role="LAYER",
+                    display_name="Layer Far",
+                    position=GroupPosition(
+                        horizontal=HorizontalZone.CENTER,
+                        vertical=VerticalZone.MID,
+                        depth=DepthZone.FAR,
+                    ),
+                ),
+                DisplayGroup(
+                    group_id="LAYER_NEAR",
+                    role="LAYER",
+                    display_name="Layer Near",
+                    position=GroupPosition(
+                        horizontal=HorizontalZone.CENTER,
+                        vertical=VerticalZone.MID,
+                        depth=DepthZone.NEAR,
+                    ),
+                ),
+                DisplayGroup(
+                    group_id="LAYER_MID",
+                    role="LAYER",
+                    display_name="Layer Mid",
+                    position=GroupPosition(
+                        horizontal=HorizontalZone.CENTER,
+                        vertical=VerticalZone.MID,
+                        depth=DepthZone.MID,
+                    ),
+                ),
+            ],
+        )
+
+        section = SectionCoordinationPlan(
+            section_id="test_section",
+            theme=ThemeRef(theme_id="theme.test", scope=ThemeScope.SECTION),
+            palette=PaletteRef(palette_id="core.christmas_traditional"),
+            lane_plans=[
+                LanePlan(
+                    lane=LaneKind.RHYTHM,
+                    target_roles=["LAYER"],
+                    coordination_plans=[
+                        CoordinationPlan(
+                            coordination_mode=CoordinationMode.SEQUENCED,
+                            group_ids=["LAYER_FAR", "LAYER_NEAR", "LAYER_MID"],
+                            window=PlacementWindow(
+                                start=PlanningTimeRef(bar=1, beat=1),
+                                end=PlanningTimeRef(bar=5, beat=1),
+                                template_id="gtpl_rhythm_chase_single",
+                                intensity=IntensityLevel.STRONG,
+                            ),
+                            config=CoordinationConfig(
+                                group_order=["LAYER_FAR", "LAYER_NEAR", "LAYER_MID"],
+                                step_unit=StepUnit.BEAT,
+                                step_duration=2,
+                                spatial_intent=SpatialIntent.F2B,
+                            ),
+                        )
+                    ],
+                ),
+            ],
+        )
+
+        plan_set = GroupPlanSet(plan_set_id="test", section_plans=[section])
+        engine = CompositionEngine(
+            beat_grid=_make_beat_grid(),
+            display_graph=display_graph,
+            palette_resolver=_make_palette_resolver(),
+            template_registry=REGISTRY,
+        )
+        render_plan = engine.compose(plan_set)
+
+        events = _collect_events(render_plan)
+        by_element: dict[str, list[int]] = {}
+        for name, start, _ in events:
+            by_element.setdefault(name, []).append(start)
+
+        near_first = min(by_element.get("Layer Near", [999999]))
+        mid_first = min(by_element.get("Layer Mid", [999999]))
+        far_first = min(by_element.get("Layer Far", [999999]))
+
+        assert near_first < mid_first, "NEAR group should start before MID"
+        assert mid_first < far_first, "MID group should start before FAR"

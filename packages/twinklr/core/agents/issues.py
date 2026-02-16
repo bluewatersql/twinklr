@@ -29,6 +29,7 @@ class IssueCategory(str, Enum):
     MUSICALITY = "MUSICALITY"  # Music synchronization or energy matching issues
     COMPLEXITY = "COMPLEXITY"  # Over/under-complexity issues
     STYLE = "STYLE"  # Style consistency or coherence issues
+    PALETTE = "PALETTE"  # Palette selection, overuse, or coherence issues
     DATA_QUALITY = "DATA_QUALITY"  # Input data quality or completeness issues
     LOGIC = "LOGIC"  # Logical consistency or contradiction issues
     CONSTRAINT = "CONSTRAINT"  # Constraint violation issues

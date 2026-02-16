@@ -34,8 +34,21 @@ from twinklr.core.sequencer.templates.group.models.display import (
     DisplayGraph,
     DisplayGroup,
     ElementType,
+    GroupPosition,
 )
 from twinklr.core.sequencer.timing.beat_grid import BeatGrid
+from twinklr.core.sequencer.vocabulary.display import (
+    DisplayElementKind,
+    DisplayProminence,
+    GroupArrangement,
+    PixelDensity,
+)
+from twinklr.core.sequencer.vocabulary.spatial import (
+    DepthZone,
+    DisplayZone,
+    HorizontalZone,
+    VerticalZone,
+)
 
 if TYPE_CHECKING:
     from twinklr.core.sequencer.display.renderer import RenderResult
@@ -112,28 +125,100 @@ def build_display_graph() -> DisplayGraph:
     xLights layout — groups cannot be created in the sequence
     file alone.
     """
-    # (group_id, role, display_name, element_type)
-    # group_id is what the plan references
-    # display_name is the exact xLights element name
-    group_defs: list[tuple[str, str, str, ElementType]] = [
-        ("OUTLINE", "OUTLINE", "Outlines", ElementType.MODEL_GROUP),
-        ("MEGA_TREE", "MEGA_TREE", "MegaTree", ElementType.MODEL),
-        ("HERO", "HERO", "Heroes", ElementType.MODEL_GROUP),
-        ("ARCHES", "ARCHES", "Arches", ElementType.MODEL_GROUP),
-        ("WINDOWS", "WINDOWS", "Windows", ElementType.MODEL_GROUP),
-    ]
-
-    groups = [
+    groups: list[DisplayGroup] = [
         DisplayGroup(
-            group_id=group_id,
-            role=role,
-            display_name=display_name,
-            element_type=etype,
-        )
-        for group_id, role, display_name, etype in group_defs
+            group_id="OUTLINE",
+            role="OUTLINE",
+            display_name="Outlines",
+            element_type=ElementType.MODEL_GROUP,
+            element_kind=DisplayElementKind.STRING,
+            arrangement=GroupArrangement.HORIZONTAL_ROW,
+            pixel_density=PixelDensity.MEDIUM,
+            prominence=DisplayProminence.ANCHOR,
+            position=GroupPosition(
+                horizontal=HorizontalZone.FULL_WIDTH,
+                vertical=VerticalZone.HIGH,
+                depth=DepthZone.FAR,
+                zone=DisplayZone.HOUSE,
+            ),
+            fixture_count=10,
+            pixel_fraction=0.20,
+        ),
+        DisplayGroup(
+            group_id="MEGA_TREE",
+            role="MEGA_TREE",
+            display_name="MegaTree",
+            element_type=ElementType.MODEL,
+            element_kind=DisplayElementKind.TREE,
+            arrangement=GroupArrangement.SINGLE,
+            pixel_density=PixelDensity.HIGH,
+            prominence=DisplayProminence.HERO,
+            position=GroupPosition(
+                horizontal=HorizontalZone.CENTER,
+                vertical=VerticalZone.FULL_HEIGHT,
+                depth=DepthZone.NEAR,
+                zone=DisplayZone.YARD,
+            ),
+            fixture_count=1,
+            pixel_fraction=0.25,
+        ),
+        DisplayGroup(
+            group_id="HERO",
+            role="HERO",
+            display_name="Heroes",
+            element_type=ElementType.MODEL_GROUP,
+            element_kind=DisplayElementKind.PROP,
+            arrangement=GroupArrangement.CLUSTER,
+            pixel_density=PixelDensity.MEDIUM,
+            prominence=DisplayProminence.ANCHOR,
+            position=GroupPosition(
+                horizontal=HorizontalZone.CENTER_LEFT,
+                vertical=VerticalZone.LOW,
+                depth=DepthZone.NEAR,
+                zone=DisplayZone.YARD,
+            ),
+            fixture_count=5,
+            pixel_fraction=0.15,
+        ),
+        DisplayGroup(
+            group_id="ARCHES",
+            role="ARCHES",
+            display_name="Arches",
+            element_type=ElementType.MODEL_GROUP,
+            element_kind=DisplayElementKind.ARCH,
+            arrangement=GroupArrangement.HORIZONTAL_ROW,
+            pixel_density=PixelDensity.MEDIUM,
+            prominence=DisplayProminence.ANCHOR,
+            position=GroupPosition(
+                horizontal=HorizontalZone.FULL_WIDTH,
+                vertical=VerticalZone.LOW,
+                depth=DepthZone.NEAR,
+                zone=DisplayZone.YARD,
+            ),
+            fixture_count=5,
+            pixel_fraction=0.15,
+        ),
+        DisplayGroup(
+            group_id="WINDOWS",
+            role="WINDOWS",
+            display_name="Windows",
+            element_type=ElementType.MODEL_GROUP,
+            element_kind=DisplayElementKind.WINDOW,
+            arrangement=GroupArrangement.GRID,
+            pixel_density=PixelDensity.HIGH,
+            prominence=DisplayProminence.SUPPORTING,
+            position=GroupPosition(
+                horizontal=HorizontalZone.CENTER,
+                vertical=VerticalZone.MID,
+                depth=DepthZone.FAR,
+                zone=DisplayZone.HOUSE,
+            ),
+            fixture_count=8,
+            pixel_fraction=0.15,
+        ),
     ]
 
-    logger.info("DisplayGraph: %d groups across %d roles", len(groups), len(group_defs))
+    logger.info("DisplayGraph: %d groups", len(groups))
 
     return DisplayGraph(
         display_id="rudolph_display",
