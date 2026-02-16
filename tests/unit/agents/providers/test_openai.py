@@ -1,6 +1,6 @@
 """Tests for OpenAI provider."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -292,3 +292,60 @@ def test_conversation_without_system_prompt(mock_openai_client):
         assert len(conversation.messages) == 2
         assert conversation.messages[0]["role"] == "user"
         assert conversation.messages[1]["role"] == "assistant"
+
+
+@pytest.mark.asyncio
+async def test_generate_json_async_passes_supported_kwargs() -> None:
+    """Async JSON generation should pass supported kwargs through to API request."""
+    response = MagicMock()
+    response.output_text = '{"ok": true}'
+    response.id = "resp_1"
+    response.usage = MagicMock(prompt_tokens=10, completion_tokens=2, total_tokens=12)
+
+    with (
+        patch("twinklr.core.agents.providers.openai.OpenAIClient"),
+        patch("twinklr.core.agents.providers.openai.AsyncOpenAI") as mock_async_openai,
+    ):
+        mock_client = MagicMock()
+        mock_client.responses.create = AsyncMock(return_value=response)
+        mock_async_openai.return_value = mock_client
+        provider = OpenAIProvider(api_key="test-key")
+
+        result = await provider.generate_json_async(
+            messages=[{"role": "user", "content": "hello"}],
+            model="gpt-5",
+            top_p=0.9,
+            max_output_tokens=120,
+        )
+
+    assert result.content["ok"] is True
+    request_kwargs = mock_client.responses.create.call_args.kwargs
+    assert request_kwargs["top_p"] == 0.9
+    assert request_kwargs["max_output_tokens"] == 120
+
+
+@pytest.mark.asyncio
+async def test_generate_json_async_retries_transient_errors() -> None:
+    """Async path should retry transient provider errors before succeeding."""
+    first_error = RuntimeError("connection reset")
+    response = MagicMock()
+    response.output_text = '{"ok": true}'
+    response.id = "resp_2"
+    response.usage = None
+
+    with (
+        patch("twinklr.core.agents.providers.openai.OpenAIClient"),
+        patch("twinklr.core.agents.providers.openai.AsyncOpenAI") as mock_async_openai,
+        patch("twinklr.core.agents.providers.openai.asyncio.sleep", new_callable=AsyncMock),
+    ):
+        mock_client = MagicMock()
+        mock_client.responses.create = AsyncMock(side_effect=[first_error, response])
+        mock_async_openai.return_value = mock_client
+        provider = OpenAIProvider(api_key="test-key")
+
+        result = await provider.generate_json_async(
+            messages=[{"role": "user", "content": "hello"}], model="gpt-5"
+        )
+
+    assert result.content["ok"] is True
+    assert mock_client.responses.create.await_count == 2

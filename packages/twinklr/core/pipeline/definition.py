@@ -67,7 +67,7 @@ class StageDefinition:
         condition: Optional condition function (for CONDITIONAL pattern)
         retry_config: Optional retry configuration
         timeout_ms: Optional timeout in milliseconds
-        critical: Whether failure should fail entire pipeline (default: True)
+        critical: Legacy field (reserved). Pipeline execution is fail-fast on stage failure.
         max_concurrent_fan_out: Max concurrent executions for FAN_OUT (default: 4, None=unlimited)
         description: Optional human-readable description
         input_type: Optional type annotation string for stage input (documentation/validation)

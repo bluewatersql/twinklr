@@ -250,12 +250,41 @@ class TestBuildDisplayPipeline:
         stage_ids = [s.id for s in pipeline.stages]
         assert "asset_creation" in stage_ids
 
-        # asset_resolution should chain from asset_creation
+        # asset_resolution should depend on both plan source and asset catalog producer
         asset_res = next(s for s in pipeline.stages if s.id == "asset_resolution")
+        assert "holistic" in asset_res.inputs
         assert "asset_creation" in asset_res.inputs
 
         errors = pipeline.validate_pipeline()
         assert errors == [], f"Validation errors: {errors}"
+
+    def test_enable_assets_without_holistic_uses_aggregate_and_asset_creation(self) -> None:
+        """Asset resolution consumes aggregate plan + asset creation output when holistic disabled."""
+        from twinklr.core.pipeline.definitions.display import build_display_pipeline
+        from twinklr.core.sequencer.templates.group.catalog import TemplateCatalog
+        from twinklr.core.sequencer.templates.group.models import (
+            DisplayGraph,
+            DisplayGroup,
+        )
+
+        display_graph = DisplayGraph(
+            display_id="test",
+            display_name="Test",
+            groups=[DisplayGroup(group_id="G1", role="OUTLINE", display_name="G1")],
+        )
+        catalog = TemplateCatalog(entries=[])
+
+        pipeline = build_display_pipeline(
+            display_graph=display_graph,
+            template_catalog=catalog,
+            display_groups=MOCK_DISPLAY_GROUPS,
+            enable_holistic=False,
+            enable_assets=True,
+        )
+
+        asset_res = next(s for s in pipeline.stages if s.id == "asset_resolution")
+        assert "aggregate" in asset_res.inputs
+        assert "asset_creation" in asset_res.inputs
 
     def test_assets_disabled_by_default(self) -> None:
         """Default pipeline does not include asset_creation."""

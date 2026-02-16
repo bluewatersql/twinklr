@@ -314,17 +314,37 @@ class TestMovingHeadStageStateHandler:
         mock_context.set_state.assert_called_with("choreography_plan", plan)
 
     def test_handle_state_with_dict(self, stage: MovingHeadStage) -> None:
-        """Test state handler with dict result (from cache)."""
+        """Test state handler normalizes dict payload to ChoreographyPlan."""
         mock_context = MagicMock()
         result = {
             "success": True,
-            "plan": {"sections": [], "overall_strategy": "Test"},
-            "context": {},
+            "plan": {
+                "sections": [
+                    {
+                        "section_name": "intro",
+                        "start_bar": 1,
+                        "end_bar": 8,
+                        "template_id": "template1",
+                    }
+                ],
+                "overall_strategy": "Test",
+            },
+            "context": {
+                "current_iteration": 1,
+                "state": "COMPLETE",
+                "verdicts": [],
+                "revision_requests": [],
+                "total_tokens_used": 0,
+                "termination_reason": None,
+                "final_verdict": None,
+            },
+            "error_message": None,
         }
 
         stage._handle_state(result, mock_context)
 
-        mock_context.set_state.assert_called_once()
+        stored_plan = mock_context.set_state.call_args[0][1]
+        assert isinstance(stored_plan, ChoreographyPlan)
 
 
 class TestMovingHeadStageMetricsHandler:
@@ -401,7 +421,14 @@ class TestMovingHeadStageMetricsHandler:
         result = {
             "success": True,
             "plan": {
-                "sections": [{"section_name": "intro", "template_id": "t1"}],
+                "sections": [
+                    {
+                        "section_name": "intro",
+                        "start_bar": 1,
+                        "end_bar": 8,
+                        "template_id": "t1",
+                    }
+                ],
                 "overall_strategy": "Test",
             },
             "context": {

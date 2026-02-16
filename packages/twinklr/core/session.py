@@ -20,7 +20,7 @@ from uuid import uuid4
 
 from twinklr.core.agents.logging import LLMCallLogger, NullLLMCallLogger, create_llm_logger
 from twinklr.core.agents.providers.base import LLMProvider
-from twinklr.core.agents.providers.openai import OpenAIProvider
+from twinklr.core.agents.providers.factory import create_llm_provider
 from twinklr.core.audio.analyzer import AudioAnalyzer
 from twinklr.core.caching import Cache
 from twinklr.core.caching.backends.fs import FSCache
@@ -174,10 +174,7 @@ class TwinklrSession:
             if not self.app_config or not self.app_config.llm_provider:
                 raise ValueError("LLM provider not configured")
 
-            self._llm_provider = OpenAIProvider(
-                api_key=self.app_config.llm_api_key,
-                session_id=self.session_id,
-            )
+            self._llm_provider = create_llm_provider(self.app_config, self.session_id)
         return self._llm_provider
 
     @property

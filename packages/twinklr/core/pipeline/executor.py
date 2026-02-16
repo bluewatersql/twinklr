@@ -428,14 +428,12 @@ class PipelineExecutor:
 
         if failures:
             logger.warning(f"Fan-out {stage_name}: {len(failures)}/{len(inputs)} executions failed")
-            if stage_def.critical:
-                # Critical stage - fail entire fan-out
-                failure_details = "; ".join([f"[{i}]: {err}" for i, err in failures])
-                return failure_result(
-                    error=f"Fan-out failures: {failure_details}",
-                    stage_name=stage_name,
-                    metadata={"successes": len(successes), "failures": len(failures)},
-                )
+            failure_details = "; ".join([f"[{i}]: {err}" for i, err in failures])
+            return failure_result(
+                error=f"Fan-out failures: {failure_details}",
+                stage_name=stage_name,
+                metadata={"successes": len(successes), "failures": len(failures)},
+            )
 
         logger.debug(f"Fan-out {stage_name}: {len(successes)}/{len(inputs)} succeeded")
 

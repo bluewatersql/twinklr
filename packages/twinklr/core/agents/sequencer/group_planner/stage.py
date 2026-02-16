@@ -259,7 +259,17 @@ class GroupPlannerStage:
         timing_info = audio_bundle.timing
         tempo_bpm = audio_bundle.features.get("tempo_bpm", 120.0)
         beat_duration_ms = 60000.0 / tempo_bpm
-        bar_duration_ms = beat_duration_ms * 4  # Assuming 4/4 time
+        beats_per_bar_raw = audio_bundle.features.get("assumptions", {}).get("beats_per_bar")
+        beats_per_bar: int
+        if isinstance(beats_per_bar_raw, int) and beats_per_bar_raw > 0:
+            beats_per_bar = beats_per_bar_raw
+        else:
+            logger.warning(
+                "Derived timing meter missing for section '%s'; falling back to 4/4",
+                section_id,
+            )
+            beats_per_bar = 4
+        bar_duration_ms = beat_duration_ms * beats_per_bar
 
         # Build SECTION-RELATIVE bar_map
         # Bar 1 = section start, not song start
@@ -287,7 +297,7 @@ class GroupPlannerStage:
 
         return TimingContext(
             song_duration_ms=int(timing_info.duration_ms),
-            beats_per_bar=4,
+            beats_per_bar=beats_per_bar,
             bar_map=bar_map,
             section_bounds=section_bounds,
         )

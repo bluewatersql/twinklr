@@ -136,6 +136,7 @@ class DisplayGroup(BaseModel):
         description="Fraction of total display pixels (0.0-1.0)",
     )
 
+
 # Center reference for center-outward sorting
 _HORIZONTAL_CENTER: int = HorizontalZone.CENTER.sort_key()
 

@@ -35,7 +35,7 @@ T = TypeVar("T", bound=BaseModel)
 async def compute_audio_file_hash(audio_path: str) -> str:
     """Compute SHA256 hash of audio file for cache key.
 
-    Uses first 10MB + file size for fast fingerprinting.
+    Uses full-file content to reduce collision risk for cache keys.
 
     Args:
         audio_path: Path to audio file
@@ -52,14 +52,10 @@ async def compute_audio_file_hash(audio_path: str) -> str:
 
     audio_file = Path(audio_path)
 
-    # Hash first 10MB for speed
+    # Hash full file contents for robust cache fingerprinting
     with audio_file.open("rb") as f:
-        chunk = f.read(10 * 1024 * 1024)
-        hasher.update(chunk)
-
-    # Include file size
-    file_size = audio_file.stat().st_size
-    hasher.update(str(file_size).encode())
+        for chunk in iter(lambda: f.read(1024 * 1024), b""):
+            hasher.update(chunk)
 
     return hasher.hexdigest()
 

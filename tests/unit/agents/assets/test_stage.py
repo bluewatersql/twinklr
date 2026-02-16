@@ -189,3 +189,17 @@ class TestAssetCreationStage:
 
         assert "asset_specs_total" in context.metrics
         assert context.metrics["asset_specs_total"] >= 1
+
+    def test_build_image_client_prefers_session_provider(self, tmp_path: Path) -> None:
+        """Image client should reuse provider async client when available."""
+        stage = AssetCreationStage()
+        context = _mock_context(tmp_path)
+        provider_async_client = MagicMock()
+        context.session.llm_provider = MagicMock(_async_client=provider_async_client)
+
+        with patch("twinklr.core.agents.assets.stage._create_openai_client") as create_client:
+            image_client = stage._build_image_client(context)
+
+        assert image_client is not None
+        assert image_client._client is provider_async_client
+        create_client.assert_not_called()

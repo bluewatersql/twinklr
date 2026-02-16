@@ -124,7 +124,7 @@ def build_display_pipeline(
         aggregate_output_id = "holistic"
 
     # Asset creation (if enabled) — extract, enrich, and generate assets
-    pre_resolution_id = aggregate_output_id
+    resolution_inputs = [aggregate_output_id]
     if enable_assets:
         display_stages.append(
             StageDefinition(
@@ -136,7 +136,7 @@ def build_display_pipeline(
                 description="Extract, enrich, and generate assets (pass-through; catalog in state)",
             )
         )
-        pre_resolution_id = "asset_creation"
+        resolution_inputs.append("asset_creation")
 
     # Asset resolution and rendering
     display_stages.extend(
@@ -144,8 +144,8 @@ def build_display_pipeline(
             StageDefinition(
                 id="asset_resolution",
                 stage=AssetResolutionStage(),
-                inputs=[pre_resolution_id],
-                input_type="GroupPlanSet",
+                inputs=resolution_inputs,
+                input_type="GroupPlanSet | dict[str, GroupPlanSet]",
                 output_type="GroupPlanSet",
                 description="Resolve plan assets against catalog (overlay rendering)",
             ),

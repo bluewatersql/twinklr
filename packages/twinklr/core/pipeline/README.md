@@ -121,6 +121,7 @@ StageDefinition(
 ```
 
 Input to fan-out stage must be a list. The stage executes once per item, and returns a list of outputs.
+If any fan-out item fails, the fan-out stage fails and the pipeline aborts.
 
 ### Conditional Execution
 
@@ -133,7 +134,6 @@ StageDefinition(
     pattern=ExecutionPattern.CONDITIONAL,
     inputs=["audio"],
     condition=lambda ctx: ctx.get_state("has_lyrics", False),
-    critical=False,  # Non-critical: pipeline continues if skipped
 )
 ```
 

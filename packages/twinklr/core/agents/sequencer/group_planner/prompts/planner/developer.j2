@@ -36,6 +36,11 @@ Return a `SectionCoordinationPlan` matching this schema:
 | Window for SEQUENCED | Must have window + config | SEQUENCED mode with only placements |
 | Start within bounds | bar 1 to available_bars | bar 10 when section has 4 bars |
 | No mixed approach | Window OR placements per group | HERO_1 in window AND in placements same lane |
+| No invented group_ids | `group_ids` ⊆ available groups | `group_ids` includes an ID not present in `display_graph.groups[].group_id` |
+| No invented template_ids | every `template_id` ∈ template catalog | placement uses `template_id` not present in the template catalog |
+| UNIFIED covers all groups | UNIFIED requires **1 placement per `group_id`** | `group_ids` has N groups but placements only cover < N group_ids |
+| No within-lane overlap (placements) | For same lane+group_id: [start,end) intervals must be disjoint | accent_a: (bar2 beat1..bar2 beat3) overlaps accent_b: (bar2 beat2..bar2 beat4) |
+
 
 ## SEQUENCED Mode Requirements
 
@@ -67,8 +72,24 @@ Return a `SectionCoordinationPlan` matching this schema:
   "group_ids": ["OUTLINE_1", "OUTLINE_2", "OUTLINE_3"],
   "placements": [
     {
-      "placement_id": "base_outline_glow",
+      "placement_id": "base_outline_glow_1",
       "group_id": "OUTLINE_1",
+      "template_id": "gtpl_base_glow_warm",
+      "start": {"bar": 1, "beat": 1},
+      "duration": "SECTION",
+      "intensity": "SOFT"
+    },
+    {
+      "placement_id": "base_outline_glow_2",
+      "group_id": "OUTLINE_2",
+      "template_id": "gtpl_base_glow_warm",
+      "start": {"bar": 1, "beat": 1},
+      "duration": "SECTION",
+      "intensity": "SOFT"
+    },
+    {
+      "placement_id": "base_outline_glow_3",
+      "group_id": "OUTLINE_3",
       "template_id": "gtpl_base_glow_warm",
       "start": {"bar": 1, "beat": 1},
       "duration": "SECTION",
@@ -77,8 +98,9 @@ Return a `SectionCoordinationPlan` matching this schema:
   ]
 }
 ```
+> **Example correctness requirement:** If `group_ids` contains multiple groups, UNIFIED output must include one placement per group (unless wildcard is supported). Do not provide a single placement and assume it broadcasts.
 
-**Note:** For UNIFIED, you can have one placement that applies to all groups, or separate placements per group with staggered timing.
+**Note:** UNIFIED requires placements for **each** `group_id` (same timing/template/intensity).
 
 ## Timing Format
 

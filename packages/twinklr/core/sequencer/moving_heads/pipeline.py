@@ -323,17 +323,17 @@ class RenderingPipeline:
         """
         logger.debug("Detecting transition boundaries...")
 
+        flattened_sections = list(self.iterate_plan_sections(self.choreography_plan))
+
         # Detect section boundaries
         boundaries = self.transition_detector.detect_section_boundaries(
-            self.choreography_plan, self.beat_grid
+            ChoreographyPlan(sections=flattened_sections), self.beat_grid
         )
 
         logger.debug(f"Detected {len(boundaries)} section boundaries")
 
         # Build section lookup for duration computation
-        section_lookup: dict[str, PlanSection] = {
-            s.section_name: s for s in self.choreography_plan.sections
-        }
+        section_lookup: dict[str, PlanSection] = {s.section_name: s for s in flattened_sections}
         ms_per_bar = self.beat_grid.ms_per_bar
 
         # Plan transitions for each boundary

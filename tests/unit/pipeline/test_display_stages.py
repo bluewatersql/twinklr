@@ -408,6 +408,39 @@ class TestDisplayRenderStage:
         assert result.output["render_result"].effects_written > 0
 
     @pytest.mark.asyncio
+    async def test_pipeline_mode_beat_grid_uses_derived_beats_per_bar(self) -> None:
+        """Pipeline mode: derived timing meter should flow into beat grid construction."""
+        stage = DisplayRenderStage(display_graph=_make_display_graph())
+        plan_set = _make_plan_set()
+        context = _make_context()
+        context.add_metric("audio_duration_ms", 32000)
+        context.add_metric("tempo_bpm", 120.0)
+        context.set_state("beats_per_bar", 3)
+
+        result = await stage.execute(plan_set, context)
+
+        assert result.success
+        assert context.metrics.get("beat_grid_beats_per_bar") == 3
+
+    @pytest.mark.asyncio
+    async def test_pipeline_mode_beat_grid_warns_and_falls_back_to_4_4(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """When derived timing is unavailable, a warning is emitted and 4/4 is used."""
+        stage = DisplayRenderStage(display_graph=_make_display_graph())
+        plan_set = _make_plan_set()
+        context = _make_context()
+        context.add_metric("audio_duration_ms", 32000)
+        context.add_metric("tempo_bpm", 120.0)
+
+        with caplog.at_level("WARNING"):
+            result = await stage.execute(plan_set, context)
+
+        assert result.success
+        assert context.metrics.get("beat_grid_beats_per_bar") == 4
+        assert "falling back to 4/4" in caplog.text
+
+    @pytest.mark.asyncio
     async def test_pipeline_mode_missing_beat_grid_fails(self) -> None:
         """Pipeline mode: fails gracefully when beat_grid unavailable."""
         stage = DisplayRenderStage(display_graph=_make_display_graph())
@@ -418,6 +451,20 @@ class TestDisplayRenderStage:
 
         assert not result.success
         assert "beat_grid" in (result.error or "")
+
+    @pytest.mark.asyncio
+    async def test_pipeline_mode_zero_tempo_fails(self) -> None:
+        """Pipeline mode: fails when tempo metric is invalid."""
+        stage = DisplayRenderStage(display_graph=_make_display_graph())
+        plan_set = _make_plan_set()
+        context = _make_context()
+        context.add_metric("audio_duration_ms", 32000)
+        context.add_metric("tempo_bpm", 0.0)
+
+        result = await stage.execute(plan_set, context)
+
+        assert not result.success
+        assert "tempo_bpm" in (result.error or "")
 
     @pytest.mark.asyncio
     async def test_asset_resolution_pipeline_mode(self) -> None:
@@ -435,6 +482,18 @@ class TestDisplayRenderStage:
         assert result.success
         placement = result.output.section_plans[0].lane_plans[0].coordination_plans[0].placements[0]
         assert len(placement.resolved_asset_ids) > 0
+
+    @pytest.mark.asyncio
+    async def test_asset_resolution_accepts_multi_input_payload(self) -> None:
+        """Asset resolution should accept plan+asset stage payload shape from pipeline executor."""
+        stage = AssetResolutionStage()
+        plan_set = _make_plan_set()
+        context = _make_context()
+
+        result = await stage.execute({"aggregate": plan_set, "asset_creation": plan_set}, context)
+
+        assert result.success
+        assert result.output is plan_set
 
     @pytest.mark.asyncio
     async def test_name_property(self) -> None:

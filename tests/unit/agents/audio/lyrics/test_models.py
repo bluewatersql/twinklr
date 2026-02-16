@@ -308,21 +308,27 @@ class TestStoryBeat:
             vocal_coverage_pct=0.5,
             key_phrases=[
                 KeyPhrase(
-                    text=f"phrase {i}", timestamp_ms=1000 * i,
-                    section_id="v", visual_hint=f"hint {i}",
+                    text=f"phrase {i}",
+                    timestamp_ms=1000 * i,
+                    section_id="v",
+                    visual_hint=f"hint {i}",
                 )
                 for i in range(5)
             ],
             recommended_visual_themes=["vis1", "vis2", "vis3"],
             story_beats=[
                 StoryBeat(
-                    section_id="verse_1", timestamp_range=(1000, 10000),
-                    beat_type="setup", description="Setup for the story here",
+                    section_id="verse_1",
+                    timestamp_range=(1000, 10000),
+                    beat_type="setup",
+                    description="Setup for the story here",
                     visual_opportunity="Slow build from outline to spotlight",
                 ),
                 StoryBeat(
-                    section_id="verse_4", timestamp_range=(50000, 50000),
-                    beat_type="coda", description="Final moment of the song landing",
+                    section_id="verse_4",
+                    timestamp_range=(50000, 50000),
+                    beat_type="coda",
+                    description="Final moment of the song landing",
                     visual_opportunity="Sustained bright hold storybook close",
                 ),
             ],
@@ -339,21 +345,27 @@ class TestStoryBeat:
                 vocal_coverage_pct=0.5,
                 key_phrases=[
                     KeyPhrase(
-                        text=f"phrase {i}", timestamp_ms=1000 * i,
-                        section_id="v", visual_hint=f"hint {i}",
+                        text=f"phrase {i}",
+                        timestamp_ms=1000 * i,
+                        section_id="v",
+                        visual_hint=f"hint {i}",
                     )
                     for i in range(5)
                 ],
                 recommended_visual_themes=["vis1", "vis2", "vis3"],
                 story_beats=[
                     StoryBeat(
-                        section_id="verse_1", timestamp_range=(1000, 1000),
-                        beat_type="setup", description="Setup for the story here",
+                        section_id="verse_1",
+                        timestamp_range=(1000, 1000),
+                        beat_type="setup",
+                        description="Setup for the story here",
                         visual_opportunity="Slow build from outline to spotlight",
                     ),
                     StoryBeat(
-                        section_id="verse_4", timestamp_range=(50000, 60000),
-                        beat_type="resolution", description="Resolution of the whole arc",
+                        section_id="verse_4",
+                        timestamp_range=(50000, 60000),
+                        beat_type="resolution",
+                        description="Resolution of the whole arc",
                         visual_opportunity="Full ensemble unity warm white pulses",
                     ),
                 ],

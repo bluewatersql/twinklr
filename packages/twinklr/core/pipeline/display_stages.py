@@ -24,6 +24,7 @@ from twinklr.core.pipeline.context import PipelineContext
 from twinklr.core.pipeline.result import StageResult, failure_result, success_result
 from twinklr.core.pipeline.stage import resolve_typed_input
 from twinklr.core.sequencer.display.renderer import DisplayRenderer, RenderResult
+from twinklr.core.sequencer.planning import MacroPlan
 from twinklr.core.sequencer.planning.group_plan import GroupPlanSet
 from twinklr.core.sequencer.templates.group.models.display import DisplayGraph
 from twinklr.core.sequencer.timing.beat_grid import BeatGrid
@@ -65,7 +66,7 @@ class AssetResolutionStage:
             StageResult containing GroupPlanSet with resolved asset IDs.
         """
         try:
-            plan_set, extras = resolve_typed_input(input, GroupPlanSet, "plan_set")
+            plan_set, extras = self._resolve_stage_input(input)
             catalog = extras.get("catalog") or context.get_state("asset_catalog")
 
             if catalog is None or not catalog.entries:
@@ -95,6 +96,30 @@ class AssetResolutionStage:
         except Exception as e:
             logger.exception("Asset resolution failed", exc_info=e)
             return failure_result(str(e), stage_name=self.name)
+
+    @staticmethod
+    def _resolve_stage_input(
+        input: GroupPlanSet | dict[str, Any],
+    ) -> tuple[GroupPlanSet, dict[str, Any]]:
+        """Resolve stage input across direct and multi-input pipeline payloads."""
+        if isinstance(input, GroupPlanSet):
+            return input, {}
+
+        if "plan_set" in input:
+            return resolve_typed_input(input, GroupPlanSet, "plan_set")
+
+        # Pipeline multi-input payload shape:
+        # {"aggregate"/"holistic": GroupPlanSet, "asset_creation": GroupPlanSet}
+        plan_payload = (
+            input.get("holistic") or input.get("aggregate") or input.get("asset_creation")
+        )
+        if not isinstance(plan_payload, GroupPlanSet):
+            raise TypeError("Could not resolve GroupPlanSet from pipeline payload")
+
+        extras = {
+            k: v for k, v in input.items() if k not in {"holistic", "aggregate", "asset_creation"}
+        }
+        return plan_payload, extras
 
 
 class DisplayRenderStage:
@@ -183,6 +208,7 @@ class DisplayRenderStage:
                     "display_graph is required (via input, constructor, or context state)",
                     stage_name=self.name,
                 )
+            context.add_metric("beat_grid_beats_per_bar", beat_grid.beats_per_bar)
 
             # Build catalog index for overlay rendering
             catalog_index: dict[str, object] | None = None
@@ -280,24 +306,18 @@ class DisplayRenderStage:
             )
             return None
 
-        # Handle both Pydantic model and dict (from cache deserialization)
         if isinstance(macro_plan, dict):
-            section_plans = macro_plan.get("section_plans", [])
-        else:
-            section_plans = macro_plan.section_plans
+            macro_plan = MacroPlan.model_validate(macro_plan)
+
+        if not isinstance(macro_plan, MacroPlan):
+            raise TypeError("context.state['macro_plan'] must be MacroPlan")
+
+        section_plans = macro_plan.section_plans
 
         boundaries: list[tuple[str, int, int]] = []
         for sp in section_plans:
-            if isinstance(sp, dict):
-                sec = sp.get("section", {})
-                boundaries.append((
-                    sec.get("section_id", ""),
-                    sec.get("start_ms", 0),
-                    sec.get("end_ms", 0),
-                ))
-            else:
-                sec = sp.section
-                boundaries.append((sec.section_id, sec.start_ms, sec.end_ms))
+            sec = sp.section
+            boundaries.append((sec.section_id, sec.start_ms, sec.end_ms))
 
         logger.info(
             "Extracted %d section boundaries from macro plan",
@@ -326,7 +346,18 @@ class DisplayRenderStage:
 
         duration_ms = float(duration_ms)
         tempo_bpm = float(tempo_bpm)
-        beats_per_bar = 4  # Default 4/4 time
+        if tempo_bpm <= 0.0:
+            raise ValueError("tempo_bpm must be > 0 to build beat_grid from context metrics")
+
+        beats_per_bar_raw = context.get_state("beats_per_bar")
+        beats_per_bar: int
+        if isinstance(beats_per_bar_raw, int) and beats_per_bar_raw > 0:
+            beats_per_bar = beats_per_bar_raw
+        else:
+            logger.warning(
+                "Derived timing meter missing; falling back to 4/4 for display beat grid"
+            )
+            beats_per_bar = 4
 
         ms_per_beat = 60_000.0 / tempo_bpm
         ms_per_bar = ms_per_beat * beats_per_bar

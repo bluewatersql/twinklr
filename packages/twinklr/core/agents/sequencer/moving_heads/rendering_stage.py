@@ -216,11 +216,24 @@ class MovingHeadRenderingStage:
         # Try job_config path
         if hasattr(context.job_config, "fixture_config_path"):
             fixture_path = getattr(context.job_config, "fixture_config_path", None)
-            if fixture_path and Path(fixture_path).exists():
-                try:
-                    return load_fixture_group(Path(fixture_path))
-                except Exception as e:
-                    logger.warning(f"Failed to load fixture config from {fixture_path}: {e}")
+            if fixture_path:
+                candidate_path = Path(fixture_path)
+                if not candidate_path.is_absolute():
+                    job_config_dir = context.get_state("job_config_dir")
+                    if isinstance(job_config_dir, Path):
+                        candidate_path = job_config_dir / candidate_path
+
+                if candidate_path.exists():
+                    try:
+                        return load_fixture_group(candidate_path)
+                    except Exception as e:
+                        logger.warning(
+                            "Failed to load fixture config from %s: %s",
+                            candidate_path,
+                            e,
+                        )
+                else:
+                    logger.warning("Fixture config does not exist at %s", candidate_path)
 
         logger.error("No fixture configuration provided - fixture_config_path required")
         return None

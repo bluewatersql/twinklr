@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -12,6 +12,7 @@ from twinklr.core.agents.sequencer.macro_planner.stage import MacroPlannerStage
 from twinklr.core.caching.backends.null import NullCache
 from twinklr.core.config.models import AppConfig, JobConfig
 from twinklr.core.pipeline.context import PipelineContext
+from twinklr.core.sequencer.planning import MacroPlan
 
 
 class MockProvider(LLMProvider):
@@ -81,3 +82,39 @@ async def test_macro_planner_missing_input(mock_context, display_groups):
 
     assert result.success is False
     assert "Missing required input" in result.error
+
+
+def test_handle_state_normalizes_cached_plan_to_model(display_groups):
+    """Cached dict payloads should be normalized to MacroPlan in context state."""
+    stage = MacroPlannerStage(display_groups=display_groups)
+    context = MagicMock()
+    normalized_plan = MacroPlan.model_construct(
+        global_story=MagicMock(),
+        layering_plan=MagicMock(),
+        section_plans=[],
+        asset_requirements=[],
+    )
+    result = {
+        "success": True,
+        "plan": {"raw": "cached"},
+        "context": {
+            "current_iteration": 1,
+            "state": "COMPLETE",
+            "verdicts": [],
+            "revision_requests": [],
+            "total_tokens_used": 0,
+            "termination_reason": None,
+            "final_verdict": None,
+        },
+        "error_message": None,
+    }
+
+    with patch(
+        "twinklr.core.sequencer.planning.MacroPlan.model_validate",
+        return_value=normalized_plan,
+    ) as validate_mock:
+        stage._handle_state(result, context)
+
+    stored_plan = context.set_state.call_args[0][1]
+    assert isinstance(stored_plan, MacroPlan)
+    validate_mock.assert_called_once_with({"raw": "cached"})

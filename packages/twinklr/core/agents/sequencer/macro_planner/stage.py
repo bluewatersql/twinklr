@@ -105,33 +105,17 @@ class MacroPlannerStage:
             )
 
             def extract_sections(r: Any) -> list[MacroSectionPlan]:
-                """Extract section plans from result (handles both Pydantic model and dict)."""
-                from twinklr.core.sequencer.planning import MacroSectionPlan
+                """Extract section plans from IterationResult."""
+                from twinklr.core.agents.shared.judge.controller import IterationResult
+                from twinklr.core.sequencer.planning import MacroPlan
 
-                # Handle both IterationResult model and dict from cache
-                if isinstance(r, dict):
-                    plan = r.get("plan")
-                else:
-                    plan = getattr(r, "plan", None)
-
+                normalized_result = IterationResult.model_validate(r) if isinstance(r, dict) else r
+                plan = normalized_result.plan
                 if plan is None:
                     raise ValueError("IterationResult.plan is None")
 
-                # Handle both MacroPlan model and dict from cache
-                if isinstance(plan, dict):
-                    section_plans_data = plan.get("section_plans")
-                else:
-                    section_plans_data = getattr(plan, "section_plans", None)
-
-                if section_plans_data is None:
-                    raise ValueError("MacroPlan.section_plans is None")
-
-                # Convert dicts to MacroSectionPlan models if needed
-                if section_plans_data and isinstance(section_plans_data[0], dict):
-                    return [MacroSectionPlan.model_validate(s) for s in section_plans_data]
-
-                # section_plans_data is already a list of MacroSectionPlan
-                result: list[MacroSectionPlan] = section_plans_data
+                normalized_plan = MacroPlan.model_validate(plan)
+                result: list[MacroSectionPlan] = normalized_plan.section_plans
                 return result
 
             # Execute with caching and automatic metrics/state handling
@@ -156,29 +140,25 @@ class MacroPlannerStage:
 
     def _handle_state(self, result: Any, context: PipelineContext) -> None:
         """Store macro plan in state for downstream stages."""
-        # Handle both IterationResult model and dict from cache
-        if isinstance(result, dict):
-            plan = result.get("plan")
-        else:
-            plan = getattr(result, "plan", None)
+        from twinklr.core.agents.shared.judge.controller import IterationResult
+        from twinklr.core.sequencer.planning import MacroPlan
 
+        normalized_result = (
+            IterationResult.model_validate(result) if isinstance(result, dict) else result
+        )
+        plan = normalized_result.plan
         if plan:
-            context.set_state("macro_plan", plan)
+            context.set_state("macro_plan", MacroPlan.model_validate(plan))
 
     def _handle_metrics(self, result: Any, context: PipelineContext) -> None:
         """Track section count metric (extends defaults)."""
-        # Handle both IterationResult model and dict from cache
-        if isinstance(result, dict):
-            plan = result.get("plan")
-        else:
-            plan = getattr(result, "plan", None)
+        from twinklr.core.agents.shared.judge.controller import IterationResult
+        from twinklr.core.sequencer.planning import MacroPlan
 
+        normalized_result = (
+            IterationResult.model_validate(result) if isinstance(result, dict) else result
+        )
+        plan = normalized_result.plan
         if plan:
-            # Handle both MacroPlan model and dict from cache
-            if isinstance(plan, dict):
-                section_plans = plan.get("section_plans")
-            else:
-                section_plans = getattr(plan, "section_plans", None)
-
-            if section_plans:
-                context.add_metric("section_count", len(section_plans))
+            normalized_plan = MacroPlan.model_validate(plan)
+            context.add_metric("section_count", len(normalized_plan.section_plans))

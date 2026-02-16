@@ -2,12 +2,20 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import threading
 from typing import Any
 
-from openai import AsyncOpenAI
+from openai import (
+    APIConnectionError,
+    APIError,
+    APIStatusError,
+    APITimeoutError,
+    AsyncOpenAI,
+    RateLimitError,
+)
 
 from twinklr.core.agents.providers.base import (
     LLMResponse,
@@ -44,6 +52,7 @@ class OpenAIProvider:
         api_key: str | None = None,
         session_id: str | None = None,
         timeout: float = 300.0,
+        base_url: str | None = None,
     ):
         """Initialize OpenAI provider.
 
@@ -53,7 +62,7 @@ class OpenAIProvider:
             timeout: Request timeout
         """
         # Async client for async-first implementation
-        self._async_client = AsyncOpenAI(api_key=api_key, timeout=timeout)
+        self._async_client = AsyncOpenAI(api_key=api_key, timeout=timeout, base_url=base_url)
         self._sync_client = OpenAIClient(api_key=api_key, timeout=timeout)
 
         self.session_id = session_id or "default"
@@ -237,6 +246,16 @@ class OpenAIProvider:
         Raises:
             LLMProviderError: On unrecoverable errors
         """
+        allowed_request_kwargs = {
+            "max_output_tokens",
+            "max_tokens",
+            "top_p",
+            "frequency_penalty",
+            "presence_penalty",
+            "reasoning",
+            "metadata",
+        }
+
         try:
             # Build request parameters
             request_params: dict[str, Any] = {
@@ -250,8 +269,24 @@ class OpenAIProvider:
             if temperature is not None and not is_mini_model:
                 request_params["temperature"] = temperature
 
-            # Make async API call
-            response = await self._async_client.responses.create(**request_params)
+            for key, value in kwargs.items():
+                if key in allowed_request_kwargs:
+                    request_params[key] = value
+
+            # Make async API call with transient retry handling
+            response = None
+            max_attempts = 3
+            for attempt in range(max_attempts):
+                try:
+                    response = await self._async_client.responses.create(**request_params)
+                    break
+                except Exception as error:
+                    if not self._should_retry_async_error(error, attempt, max_attempts):
+                        raise
+                    await asyncio.sleep(0.5 * (2**attempt))
+
+            if response is None:
+                raise LLMProviderError("No response received from OpenAI API")
 
             # Extract response content
             content = response.output_text
@@ -293,6 +328,30 @@ class OpenAIProvider:
         except Exception as e:
             logger.error(f"Async OpenAI provider error: {e}")
             raise LLMProviderError(f"Provider error: {e}") from e
+
+    @staticmethod
+    def _should_retry_async_error(error: Exception, attempt: int, max_attempts: int) -> bool:
+        """Determine whether async request should be retried."""
+        if attempt >= max_attempts - 1:
+            return False
+
+        if (
+            isinstance(error, APIStatusError)
+            and 400 <= error.status_code < 500
+            and error.status_code != 429
+        ):
+            return False
+
+        retryable_types = (
+            RateLimitError,
+            APITimeoutError,
+            APIConnectionError,
+            APIError,
+            TimeoutError,
+            ConnectionError,
+            RuntimeError,
+        )
+        return isinstance(error, retryable_types)
 
     async def generate_json_with_conversation_async(
         self,

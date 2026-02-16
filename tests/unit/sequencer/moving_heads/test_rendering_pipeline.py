@@ -14,6 +14,7 @@ import pytest
 from twinklr.core.agents.sequencer.moving_heads.models import (
     ChoreographyPlan,
     PlanSection,
+    PlanSegment,
 )
 from twinklr.core.config.fixtures import FixtureGroup
 from twinklr.core.config.fixtures.dmx import DmxMapping
@@ -196,6 +197,55 @@ class TestTransitionPlanning:
             job_config=job,
         )
         assert rp.job_config.transitions.enabled is False
+
+    def test_segmented_sections_transition_detection_uses_flattened_ids(self) -> None:
+        """Segmented plans should produce transition IDs compatible with flattened section keys."""
+        job = JobConfig()
+        job.transitions.enabled = True
+        plan = ChoreographyPlan(
+            sections=[
+                PlanSection(
+                    section_name="verse",
+                    start_bar=1,
+                    end_bar=8,
+                    segments=[
+                        PlanSegment(
+                            segment_id="A",
+                            start_bar=1,
+                            end_bar=4,
+                            template_id="sweep_lr_fan_hold",
+                        ),
+                        PlanSegment(
+                            segment_id="B",
+                            start_bar=5,
+                            end_bar=8,
+                            template_id="pendulum_chevron_breathe",
+                        ),
+                    ],
+                ),
+                PlanSection(
+                    section_name="chorus",
+                    start_bar=9,
+                    end_bar=12,
+                    template_id="pendulum_chevron_breathe",
+                ),
+            ]
+        )
+        rp = RenderingPipeline(
+            choreography_plan=plan,
+            beat_grid=_make_beat_grid(),
+            fixture_group=_make_fixture_group(),
+            job_config=job,
+        )
+
+        registry = rp._detect_and_plan_transitions()
+
+        assert len(registry.transitions) >= 1
+        transition_ids = [t.transition_id for t in registry.transitions]
+        assert any(
+            "verse|A" in transition_id or "verse|B" in transition_id
+            for transition_id in transition_ids
+        )
 
 
 # ---------------------------------------------------------------------------

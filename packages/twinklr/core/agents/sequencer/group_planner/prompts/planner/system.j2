@@ -22,7 +22,8 @@ RHYTHM (1-2 coordination plans):
 ACCENT (1-2 coordination plans):
   - Primary targets (HERO): PEAK intensity, HIT/BURST duration
   - Stagger timing by 1+ beat between groups
-  - Maximum 1 group at PEAK per accent moment
+  - Maximum 1 ACCENT placement active per group at any time (no overlap)
+  - Maximum 1 group at PEAK per beat across the ACCENT lane
 ```
 
 ### MED Energy Section Recipe
@@ -56,11 +57,31 @@ ACCENT (0-1 coordination plan):
 ## STRICT RULES (Violations = Rejection)
 
 1. **One approach per group per lane**: Either use a window OR placements for a group - NEVER both
-2. **No duplicates in group_order**: Each group appears exactly once
-3. **Stagger accents**: Never put multiple groups at PEAK on the same beat
-4. **Energy matching**: HIGH → STRONG/PEAK, MED → MED/STRONG, LOW → WHISPER/SOFT/MED
-5. **Lane-template matching**: BASE templates in BASE lane only
-6. **Duration by lane**: BASE = SECTION/EXTENDED, RHYTHM = PHRASE/EXTENDED, ACCENT = HIT/BURST
+2. **No cross-lane reuse (default)**: A group_id may appear in exactly one of all lane_plans[].coordination_plans[].group_ids across the entire section.
+   - **BASE**: BACKGROUND roles only (e.g., OUTLINE, WINDOWS, HOUSE_WASH)
+   - **RHYTHM**: MID roles only (e.g., ARCHES, MEGA_TREE, SPINNERS, MINI_TREES)
+   - **ACCENT**: HERO roles only (use primary_focus_targets first; if those targets are MID-role groups, they are treated as HERO for ACCENT)
+   - **Exception**: Only allowed if `layer_intents` explicitly permit multi-lane usage for that role AND it is necessary for the section’s plan.
+
+3. **Never invent IDs**: Every `group_id` and `template_id` **must** come from the lists provided in the user prompt (display groups + template catalog).
+   - If something seems missing, choose the closest valid option from the provided lists.
+   - Do **not** fabricate new IDs to “make it work.”
+
+4. **No duplicates in group_order**: Each group appears exactly once
+5. **Stagger accents**: Never put multiple groups at PEAK on the same beat
+6. **Energy matching**: HIGH → STRONG/PEAK, MED → MED/STRONG, LOW → WHISPER/SOFT/MED
+7. **Lane-template matching**: BASE templates in BASE lane only
+8. **Duration by lane**: BASE = SECTION/EXTENDED, RHYTHM = PHRASE/EXTENDED, ACCENT = HIT/BURST
+9. **No within-lane overlap per group**: In a given lane, a `group_id` may not have overlapping active time ranges across placements/windows.
+   - For placements: if two placements share the same `group_id` in the same lane, their time ranges must be strictly non-overlapping.
+   - For windows: a group included in a lane’s `group_ids` may not also appear in any placement in that same lane (already covered by “No mixed approach”).
+10. **ACCENT uniqueness per group**: In ACCENT, each `group_id` may have **at most one active accent at a time**. If multiple accent moments are needed, they must be scheduled as separate non-overlapping HIT/BURST events with gaps (>= 1 beat).
+
+## ID INTEGRITY (Violations = Rejection)
+
+- **No invented group_ids:** Every `group_id` and `template_id` **must** come from the lists provided in the user prompt (display groups + template catalog).
+- **No invented template_ids:** Every `template_id` must exist in the provided template catalog.
+- If a desired effect/behavior is not available, select the closest valid group/template rather than inventing one.
 
 ## REQUIRED COPY (From MacroPlan)
 

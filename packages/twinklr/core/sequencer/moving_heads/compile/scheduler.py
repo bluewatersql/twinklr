@@ -5,6 +5,8 @@ a playback window, handling PING_PONG and JOINER repeat modes,
 and remainder policies.
 """
 
+import logging
+
 from pydantic import BaseModel, ConfigDict, Field
 
 from twinklr.core.sequencer.models.compiler import ScheduledInstance
@@ -13,6 +15,8 @@ from twinklr.core.sequencer.models.template import (
     RepeatContract,
     RepeatMode,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class ScheduleResult(BaseModel):
@@ -90,6 +94,11 @@ def schedule_repeats(
 
     # Handle case where window is smaller than one cycle
     if num_complete_cycles == 0:
+        logger.warning(
+            "Section window shorter than cycle: duration_bars=%.3f cycle_bars=%.3f",
+            duration_bars,
+            contract.cycle_bars,
+        )
         return ScheduleResult(
             instances=[],
             num_complete_cycles=0,

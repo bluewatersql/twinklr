@@ -254,7 +254,11 @@ class AssetCreationStage:
             OpenAIImageClient or None if no OpenAI client available.
         """
         try:
-            client = _create_openai_client()
+            provider = context.provider
+            if hasattr(provider, "_async_client"):
+                client = provider._async_client
+            else:
+                client = _create_openai_client()
             return OpenAIImageClient(client)
         except Exception:
             logger.warning("Could not create OpenAI image client")

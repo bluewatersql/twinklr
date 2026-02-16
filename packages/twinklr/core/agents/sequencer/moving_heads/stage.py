@@ -171,23 +171,15 @@ class MovingHeadStage:
             )
 
             def extract_plan(r: Any) -> ChoreographyPlan:
-                """Extract choreography plan from result (handles both model and dict)."""
-                # Handle both IterationResult model and dict from cache
-                if isinstance(r, dict):
-                    plan = r.get("plan")
-                else:
-                    plan = getattr(r, "plan", None)
+                """Extract choreography plan from IterationResult."""
+                from twinklr.core.agents.shared.judge.controller import IterationResult
 
+                normalized_result = IterationResult.model_validate(r) if isinstance(r, dict) else r
+                plan = normalized_result.plan
                 if plan is None:
                     raise ValueError("IterationResult.plan is None")
 
-                # Handle both ChoreographyPlan model and dict from cache
-                if isinstance(plan, dict):
-                    return ChoreographyPlan.model_validate(plan)
-
-                # plan is already a ChoreographyPlan
-                assert isinstance(plan, ChoreographyPlan)
-                return plan
+                return ChoreographyPlan.model_validate(plan)
 
             # Execute with caching and automatic metrics/state handling
             return await execute_step(
@@ -211,18 +203,19 @@ class MovingHeadStage:
 
     def _handle_state(self, result: Any, context: PipelineContext) -> None:
         """Store choreography plan in state for downstream stages."""
-        # Handle both IterationResult model and dict from cache
+        from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan
+
         if isinstance(result, dict):
             plan = result.get("plan")
         else:
             plan = getattr(result, "plan", None)
-
         if plan:
-            context.set_state("choreography_plan", plan)
+            context.set_state("choreography_plan", ChoreographyPlan.model_validate(plan))
 
     def _handle_metrics(self, result: Any, context: PipelineContext) -> None:
         """Track iteration metrics (extends defaults from execute_step)."""
-        # Handle both IterationResult model and dict from cache
+        from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan
+
         if isinstance(result, dict):
             plan = result.get("plan")
             ctx = result.get("context", {})
@@ -232,10 +225,7 @@ class MovingHeadStage:
 
         # Track section count
         if plan:
-            if isinstance(plan, dict):
-                sections = plan.get("sections", [])
-            else:
-                sections = getattr(plan, "sections", [])
+            sections = ChoreographyPlan.model_validate(plan).sections
             context.add_metric("mh_section_count", len(sections))
 
         # Track iteration details

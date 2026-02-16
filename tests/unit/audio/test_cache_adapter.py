@@ -60,6 +60,29 @@ class TestComputeAudioHash:
             Path(path1).unlink()
             Path(path2).unlink()
 
+    @pytest.mark.asyncio
+    async def test_hash_uses_full_file_not_prefix_only(self) -> None:
+        """Files sharing first 10MB but differing later must hash differently."""
+        prefix = b"a" * (10 * 1024 * 1024)
+
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as f1:
+            f1.write(prefix)
+            f1.write(b"tail_one")
+            path1 = f1.name
+
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as f2:
+            f2.write(prefix)
+            f2.write(b"tail_two")
+            path2 = f2.name
+
+        try:
+            hash1 = await compute_audio_file_hash(path1)
+            hash2 = await compute_audio_file_hash(path2)
+            assert hash1 != hash2
+        finally:
+            Path(path1).unlink()
+            Path(path2).unlink()
+
 
 class TestLoadAudioFeatures:
     """Tests for load_audio_features_async()."""

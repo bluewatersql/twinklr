@@ -30,6 +30,8 @@ class IssueCategory(str, Enum):
     COMPLEXITY = "COMPLEXITY"  # Over/under-complexity issues
     STYLE = "STYLE"  # Style consistency or coherence issues
     PALETTE = "PALETTE"  # Palette selection, overuse, or coherence issues
+    MOTIF_COHESION = "MOTIF_COHESION"  # Motif reuse, overreliance, or identity issues
+    CONTRAST_DYNAMICS = "CONTRAST_DYNAMICS"  # Energy contrast or headroom issues
     DATA_QUALITY = "DATA_QUALITY"  # Input data quality or completeness issues
     LOGIC = "LOGIC"  # Logical consistency or contradiction issues
     CONSTRAINT = "CONSTRAINT"  # Constraint violation issues

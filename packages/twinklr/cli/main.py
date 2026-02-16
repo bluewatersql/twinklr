@@ -44,6 +44,18 @@ console = Console()
 logger = logging.getLogger(__name__)
 
 
+def _resolve_fixture_config_path(job_config_path: Path, fixture_config_path: str) -> Path:
+    """Resolve fixture config path from job config location.
+
+    Relative paths are interpreted from the job config directory.
+    Absolute paths are preserved.
+    """
+    fixture_path = Path(fixture_config_path)
+    if fixture_path.is_absolute():
+        return fixture_path
+    return job_config_path.parent / fixture_path
+
+
 def build_display_graph() -> DisplayGraph:
     """Build a default DisplayGraph for the moving-heads CLI pipeline.
 
@@ -196,7 +208,10 @@ async def run_pipeline_async(
         min_pass_score=7.0,
         xsq_output_path=artifact_dir / f"{song_name}_twinklr_mh.xsq",
         xsq_template_path=xsq_in,
-        fixture_config_path=job_config_path.parent / "fixture_config.json",
+        fixture_config_path=_resolve_fixture_config_path(
+            job_config_path,
+            job_config.fixture_config_path,
+        ),
     )
 
     # Validate pipeline
@@ -218,6 +233,7 @@ async def run_pipeline_async(
         session=session,
         output_dir=artifact_dir,
     )
+    pipeline_context.set_state("job_config_dir", job_config_path.parent)
 
     # Execute pipeline
     console.print(f"\n[bold]🎵 Processing:[/bold] {audio_path.name}")

@@ -308,6 +308,41 @@ async def test_fan_out_execution(mock_context):
 
 
 @pytest.mark.asyncio
+async def test_fan_out_any_failure_fails_stage_even_when_non_critical(mock_context):
+    """Fan-out stages must fail on any item failure to avoid partial downstream outputs."""
+
+    class SelectiveFailStage:
+        @property
+        def name(self) -> str:
+            return "selective_fail"
+
+        async def execute(self, input: Any, context: PipelineContext) -> StageResult[str]:
+            if input == "bad":
+                return failure_result("boom", stage_name=self.name)
+            return success_result("ok", stage_name=self.name)
+
+    pipeline = PipelineDefinition(
+        name="fanout_fail",
+        stages=[
+            StageDefinition("producer", MockStage("producer", ["ok1", "bad", "ok2"])),
+            StageDefinition(
+                "consumer",
+                SelectiveFailStage(),
+                pattern=ExecutionPattern.FAN_OUT,
+                inputs=["producer"],
+                critical=False,
+            ),
+        ],
+    )
+
+    executor = PipelineExecutor()
+    result = await executor.execute(pipeline, "initial", mock_context)
+
+    assert result.success is False
+    assert "consumer" in result.failed_stages
+
+
+@pytest.mark.asyncio
 async def test_stage_failure_stops_pipeline(mock_context):
     """Test that stage failure stops pipeline (fail_fast=True)."""
     pipeline = PipelineDefinition(
