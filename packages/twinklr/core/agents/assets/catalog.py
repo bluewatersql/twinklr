@@ -114,3 +114,36 @@ def check_reuse(catalog: AssetCatalog, spec: AssetSpec) -> CatalogEntry | None:
 
     logger.debug("Cache hit for %s → %s", spec.spec_id, entry.asset_id)
     return entry
+
+
+def check_reuse_by_spec_id(catalog: AssetCatalog, spec: AssetSpec) -> CatalogEntry | None:
+    """Check reuse by deterministic spec_id + dimensions (pre-enrichment).
+
+    Image specs don't have a prompt before LLM enrichment, and enrichment
+    is non-deterministic. This function matches by the stable identity
+    (spec_id derived from motif_id + category) so existing assets can be
+    reused without re-running enrichment.
+
+    Args:
+        catalog: The existing catalog.
+        spec: The spec to check (prompt may not be set yet).
+
+    Returns:
+        Existing CatalogEntry if reusable, None otherwise.
+    """
+    entry = catalog.find_by_spec_id(spec.spec_id, spec.width, spec.height)
+    if entry is None:
+        return None
+
+    # Verify file still exists on disk
+    file_path = Path(entry.file_path)
+    if not file_path.exists():
+        logger.debug(
+            "Spec-id cache hit for %s but file missing: %s",
+            spec.spec_id,
+            entry.file_path,
+        )
+        return None
+
+    logger.debug("Spec-id cache hit for %s → %s", spec.spec_id, entry.asset_id)
+    return entry

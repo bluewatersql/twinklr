@@ -144,11 +144,17 @@ def _extract_macro_plan_summary(
 
     Handles both Pydantic model and dict (from cache deserialization).
 
+    Extracts:
+    - global_story: Theme, motifs, pacing notes
+    - expected_section_ids: Ordered list of section IDs from MacroPlan
+      so the holistic judge can verify completeness against the canonical
+      section list rather than guessing.
+
     Args:
         macro_plan: MacroPlan from context state, or None
 
     Returns:
-        Summary dict with global_story if available, empty dict otherwise
+        Summary dict with global_story and expected_section_ids
     """
     if macro_plan is None:
         return {}
@@ -165,5 +171,30 @@ def _extract_macro_plan_summary(
             summary["global_story"] = global_story
         else:
             summary["global_story"] = global_story.model_dump()
+
+    # Extract expected section IDs from MacroPlan.section_plans
+    expected_ids: list[str] = []
+    if isinstance(macro_plan, dict):
+        section_plans = macro_plan.get("section_plans", [])
+        if section_plans:
+            for sp in section_plans:
+                if isinstance(sp, dict):
+                    section = sp.get("section", {})
+                    if isinstance(section, dict):
+                        sid = section.get("section_id")
+                        if sid:
+                            expected_ids.append(sid)
+    else:
+        section_plans = getattr(macro_plan, "section_plans", None)
+        if section_plans:
+            for sp in section_plans:
+                section = getattr(sp, "section", None)
+                if section is not None:
+                    sid = getattr(section, "section_id", None)
+                    if sid:
+                        expected_ids.append(sid)
+
+    if expected_ids:
+        summary["expected_section_ids"] = expected_ids
 
     return summary

@@ -152,3 +152,135 @@ class TestCheckReuse:
 
         result = check_reuse(catalog, spec)
         assert result is None
+
+
+class TestCheckReuseBySpecId:
+    """Tests for spec_id-based reuse (pre-enrichment image cache check)."""
+
+    def test_cache_hit_by_spec_id(self, tmp_path: Path) -> None:
+        """Image spec with matching spec_id + dimensions reuses existing entry."""
+        from twinklr.core.agents.assets.catalog import check_reuse_by_spec_id
+
+        file_path = tmp_path / "sparkles.png"
+        file_path.write_bytes(b"fake png data")
+
+        entry = _make_entry(file_path=str(file_path))
+        catalog = AssetCatalog(catalog_id="test", entries=[entry])
+
+        # New spec with same spec_id but different/no prompt (pre-enrichment)
+        spec = AssetSpec(
+            spec_id="test_spec",
+            category=AssetCategory.IMAGE_TEXTURE,
+            theme_id="theme.holiday.traditional",
+            section_ids=["s1"],
+            background=BackgroundMode.OPAQUE,
+            width=256,
+            height=256,
+        )
+
+        result = check_reuse_by_spec_id(catalog, spec)
+        assert result is not None
+        assert result.asset_id == "test_asset"
+
+    def test_cache_miss_different_spec_id(self, tmp_path: Path) -> None:
+        """Different spec_id does not match."""
+        from twinklr.core.agents.assets.catalog import check_reuse_by_spec_id
+
+        file_path = tmp_path / "sparkles.png"
+        file_path.write_bytes(b"fake png data")
+
+        entry = _make_entry(file_path=str(file_path))
+        catalog = AssetCatalog(catalog_id="test", entries=[entry])
+
+        spec = AssetSpec(
+            spec_id="different_spec",
+            category=AssetCategory.IMAGE_TEXTURE,
+            theme_id="theme.holiday.traditional",
+            section_ids=["s1"],
+            background=BackgroundMode.OPAQUE,
+            width=256,
+            height=256,
+        )
+
+        result = check_reuse_by_spec_id(catalog, spec)
+        assert result is None
+
+    def test_cache_miss_different_dimensions(self, tmp_path: Path) -> None:
+        """Same spec_id but different dimensions does not match."""
+        from twinklr.core.agents.assets.catalog import check_reuse_by_spec_id
+
+        file_path = tmp_path / "sparkles.png"
+        file_path.write_bytes(b"fake png data")
+
+        entry = _make_entry(file_path=str(file_path))
+        catalog = AssetCatalog(catalog_id="test", entries=[entry])
+
+        spec = AssetSpec(
+            spec_id="test_spec",
+            category=AssetCategory.IMAGE_TEXTURE,
+            theme_id="theme.holiday.traditional",
+            section_ids=["s1"],
+            background=BackgroundMode.OPAQUE,
+            width=512,
+            height=512,
+        )
+
+        result = check_reuse_by_spec_id(catalog, spec)
+        assert result is None
+
+    def test_cache_miss_file_deleted(self, tmp_path: Path) -> None:
+        """Matching spec_id but file no longer on disk returns None."""
+        from twinklr.core.agents.assets.catalog import check_reuse_by_spec_id
+
+        entry = _make_entry(file_path=str(tmp_path / "deleted.png"))
+        catalog = AssetCatalog(catalog_id="test", entries=[entry])
+
+        spec = AssetSpec(
+            spec_id="test_spec",
+            category=AssetCategory.IMAGE_TEXTURE,
+            theme_id="theme.holiday.traditional",
+            section_ids=["s1"],
+            background=BackgroundMode.OPAQUE,
+            width=256,
+            height=256,
+        )
+
+        result = check_reuse_by_spec_id(catalog, spec)
+        assert result is None
+
+    def test_cache_miss_failed_entry(self, tmp_path: Path) -> None:
+        """Failed entries are not reused even with matching spec_id."""
+        from twinklr.core.agents.assets.catalog import check_reuse_by_spec_id
+
+        file_path = tmp_path / "sparkles.png"
+        file_path.write_bytes(b"fake png data")
+
+        entry = CatalogEntry(
+            asset_id="test_asset",
+            spec=_make_spec(),
+            file_path=str(file_path),
+            content_hash="sha256_content",
+            status=AssetStatus.FAILED,
+            width=256,
+            height=256,
+            has_alpha=False,
+            file_size_bytes=0,
+            created_at="2026-02-10T12:00:00Z",
+            source_plan_id="plan_001",
+            generation_model="gpt-image-1.5",
+            prompt_hash="hash_abc",
+        )
+        catalog = AssetCatalog(catalog_id="test", entries=[entry])
+
+        spec = AssetSpec(
+            spec_id="test_spec",
+            category=AssetCategory.IMAGE_TEXTURE,
+            theme_id="theme.holiday.traditional",
+            section_ids=["s1"],
+            background=BackgroundMode.OPAQUE,
+            width=256,
+            height=256,
+        )
+
+        result = check_reuse_by_spec_id(catalog, spec)
+        assert result is None

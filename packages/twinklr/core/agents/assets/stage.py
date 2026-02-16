@@ -15,6 +15,7 @@ from typing import Any
 from twinklr.core.agents._paths import AGENTS_BASE_PATH
 from twinklr.core.agents.assets.catalog import (
     check_reuse,
+    check_reuse_by_spec_id,
     load_catalog,
     save_catalog,
 )
@@ -121,10 +122,18 @@ class AssetCreationStage:
             cached_entries: list[CatalogEntry] = []
 
             for spec in specs:
-                # Text specs without text_content or image specs without prompt
-                # can't be checked for reuse yet (prompt not set)
+                # Text specs: check reuse by prompt_hash (prompt is deterministic)
                 if spec.category.is_text() and spec.text_content:
                     existing = check_reuse(catalog, spec)
+                    if existing:
+                        cached_entry = existing.model_copy(update={"status": AssetStatus.CACHED})
+                        cached_entries.append(cached_entry)
+                        continue
+                # Image specs: check reuse by spec_id + dimensions before enrichment.
+                # Enrichment is non-deterministic (LLM), so prompt_hash won't match
+                # across runs. spec_id is deterministic (motif_id + category).
+                elif spec.category.is_image():
+                    existing = check_reuse_by_spec_id(catalog, spec)
                     if existing:
                         cached_entry = existing.model_copy(update={"status": AssetStatus.CACHED})
                         cached_entries.append(cached_entry)

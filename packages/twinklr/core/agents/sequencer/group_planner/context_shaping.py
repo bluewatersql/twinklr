@@ -549,11 +549,25 @@ def shape_holistic_judge_context(
             }
         )
 
+    # Extract expected section IDs from macro_plan_summary (if provided)
+    expected_section_ids: list[str] = []
+    if macro_plan_summary:
+        expected_section_ids = list(macro_plan_summary.get("expected_section_ids", []))
+
+    # Build group hierarchy: parent → [children] for groups that have children
+    group_hierarchy: dict[str, list[str]] = {}
+    for g in display_graph.groups:
+        children = display_graph.get_children(g.group_id)
+        if children:
+            group_hierarchy[g.group_id] = [c.group_id for c in children]
+
     return {
         "group_plan_set": group_plan_set_dict,
         "display_graph": {"groups_by_role": display_graph.groups_by_role},
+        "group_hierarchy": group_hierarchy,
         "section_count": len(group_plan_set.section_plans),
         "section_ids": [sp.section_id for sp in group_plan_set.section_plans],
+        "expected_section_ids": expected_section_ids,
         "macro_plan_summary": macro_plan_summary or {},
         # Explicitly extracted theme/palette context for holistic evaluation
         "global_theme_id": global_theme_id,

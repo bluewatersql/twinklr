@@ -5,19 +5,39 @@ Provides complete GroupPlanSet for holistic evaluation
 # GroupPlanSet to Evaluate
 
 **Plan Set ID:** {{ group_plan_set.plan_set_id }}
-**Sections:** {{ section_count }} total
+**Sections in GroupPlanSet:** {{ section_count }} total
 
-## Section Order
+## Sections Present in GroupPlanSet
 
 {% for section_id in section_ids %}
 {{ loop.index }}. {{ section_id }}
 {% endfor %}
+
+{% if expected_section_ids %}
+## Expected Sections from MacroPlan
+
+The MacroPlan defines **{{ expected_section_ids | length }}** sections. Compare this canonical list against the sections present in the GroupPlanSet above.
+
+{% for section_id in expected_section_ids %}
+{{ loop.index }}. {{ section_id }}
+{% endfor %}
+{% endif %}
 
 ## Available Display Groups
 
 {% for role, group_ids in display_graph.groups_by_role.items() %}
 - **{{ role }}**: {{ group_ids | join(", ") }}
 {% endfor %}
+
+{% if group_hierarchy %}
+## Group Hierarchy (parent → children)
+
+{% for parent, children in group_hierarchy.items() %}
+- **{{ parent }}** contains: {{ children | join(", ") }}
+{% endfor %}
+
+When a parent group is used in a section, all its children are implicitly covered.
+{% endif %}
 
 {% if macro_plan_summary and macro_plan_summary.global_story %}
 

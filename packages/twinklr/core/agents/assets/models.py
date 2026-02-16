@@ -327,6 +327,33 @@ class AssetCatalog(BaseModel):
                 return entry
         return None
 
+    def find_by_spec_id(
+        self, spec_id: str, width: int, height: int
+    ) -> CatalogEntry | None:
+        """Find entry by deterministic spec_id and dimensions.
+
+        Used for pre-enrichment reuse: matches assets by their stable
+        identity (spec_id derived from motif_id + category) without
+        requiring the enriched prompt to match.
+
+        Args:
+            spec_id: Deterministic spec identifier.
+            width: Expected output width.
+            height: Expected output height.
+
+        Returns:
+            First matching non-failed CatalogEntry, or None.
+        """
+        for entry in self.entries:
+            if (
+                entry.spec.spec_id == spec_id
+                and entry.spec.width == width
+                and entry.spec.height == height
+                and entry.status != AssetStatus.FAILED
+            ):
+                return entry
+        return None
+
     def successful_entries(self) -> list[CatalogEntry]:
         """Return all non-failed entries (CREATED or CACHED).
 

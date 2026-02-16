@@ -127,6 +127,36 @@ class TestCrossSectionIssue:
         assert issue.issue_id == "TEMPLATE_MONOTONY"
         assert len(issue.affected_sections) == 2
 
+    def test_cross_section_issue_with_targeted_actions(self) -> None:
+        """Targeted actions provide specific group plan changes."""
+        issue = CrossSectionIssue(
+            issue_id="GROUP_UNDERUTILIZED",
+            severity=IssueSeverity.WARN,
+            affected_sections=["chorus_1", "instrumental"],
+            description="ARCHES group is absent in key sections",
+            recommendation="Add ARCHES to high-energy sections",
+            targeted_actions=[
+                "In section chorus_1, add ARCHES to RHYTHM lane with gtpl_rhythm_sparkle_beat",
+                "In section instrumental, add ARCHES to BASE lane with gtpl_base_candy_stripes",
+            ],
+        )
+
+        assert len(issue.targeted_actions) == 2
+        assert "chorus_1" in issue.targeted_actions[0]
+        assert "ARCHES" in issue.targeted_actions[0]
+
+    def test_cross_section_issue_targeted_actions_default_empty(self) -> None:
+        """Targeted actions default to empty list when not provided."""
+        issue = CrossSectionIssue(
+            issue_id="NIT_ISSUE",
+            severity=IssueSeverity.NIT,
+            affected_sections=["verse_1"],
+            description="Minor style concern",
+            recommendation="Consider adjusting",
+        )
+
+        assert issue.targeted_actions == []
+
 
 @pytest.fixture
 def sample_group_plan_set() -> GroupPlanSet:

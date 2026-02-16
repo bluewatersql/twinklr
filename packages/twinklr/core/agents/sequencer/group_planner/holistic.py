@@ -42,7 +42,16 @@ class CrossSectionIssue(BaseModel):
         description="Section IDs affected by this issue",
     )
     description: str = Field(description="Clear description of the issue")
-    recommendation: str = Field(description="Actionable recommendation to fix")
+    recommendation: str = Field(description="High-level recommendation summary")
+    targeted_actions: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Specific, directly actionable changes referencing concrete "
+            "section_ids, group_ids, template_ids, palette_ids, and/or lanes. "
+            "Each action should be a single instruction that can be applied to "
+            "a specific group plan without further interpretation."
+        ),
+    )
 
 
 class HolisticEvaluation(BaseModel):

@@ -682,6 +682,108 @@ def test_shape_section_judge_context_no_matching_groups(
     assert result["display_graph"]["groups_by_role"] == {}
 
 
+def test_shape_holistic_judge_context_group_hierarchy(
+    group_plan_set: GroupPlanSet,
+    display_graph: DisplayGraph,
+    template_catalog: TemplateCatalog,
+) -> None:
+    """Test group_hierarchy is computed from DisplayGraph parent-child relationships."""
+    # Add a parent group that contains existing groups
+    from twinklr.core.sequencer.templates.group.models import DisplayGroup as DG
+
+    parent = DG(group_id="ALL_DISPLAY", role="ALL", display_name="All Display")
+    # Reparent MEGA_TREE and HERO_02 under ALL_DISPLAY
+    reparented = []
+    for g in display_graph.groups:
+        reparented.append(
+            g.model_copy(update={"parent_group_id": "ALL_DISPLAY"})
+        )
+
+    graph_with_hierarchy = DisplayGraph(
+        schema_version="display-graph.v1",
+        display_id="test_display",
+        display_name="Test Display",
+        groups=[parent] + reparented,
+    )
+
+    result = shape_holistic_judge_context(
+        group_plan_set, graph_with_hierarchy, template_catalog, macro_plan_summary=None
+    )
+
+    assert "group_hierarchy" in result
+    assert "ALL_DISPLAY" in result["group_hierarchy"]
+    children = result["group_hierarchy"]["ALL_DISPLAY"]
+    assert "MEGA_TREE" in children
+    assert "HERO_02" in children
+
+
+def test_shape_holistic_judge_context_group_hierarchy_empty_when_flat(
+    group_plan_set: GroupPlanSet,
+    display_graph: DisplayGraph,
+    template_catalog: TemplateCatalog,
+) -> None:
+    """Test group_hierarchy is empty dict when no parent-child relationships exist."""
+    result = shape_holistic_judge_context(
+        group_plan_set, display_graph, template_catalog, macro_plan_summary=None
+    )
+
+    assert result["group_hierarchy"] == {}
+
+
+def test_shape_holistic_judge_context_expected_section_ids_from_macro_plan(
+    group_plan_set: GroupPlanSet,
+    display_graph: DisplayGraph,
+    template_catalog: TemplateCatalog,
+) -> None:
+    """Test expected_section_ids are extracted from macro_plan_summary."""
+    summary = {
+        "global_story": {"theme": {"theme_id": "test"}},
+        "expected_section_ids": ["intro", "verse_1", "chorus_1", "verse_2", "outro"],
+    }
+
+    result = shape_holistic_judge_context(
+        group_plan_set, display_graph, template_catalog, macro_plan_summary=summary
+    )
+
+    assert "expected_section_ids" in result
+    assert result["expected_section_ids"] == [
+        "intro",
+        "verse_1",
+        "chorus_1",
+        "verse_2",
+        "outro",
+    ]
+
+
+def test_shape_holistic_judge_context_expected_section_ids_none(
+    group_plan_set: GroupPlanSet,
+    display_graph: DisplayGraph,
+    template_catalog: TemplateCatalog,
+) -> None:
+    """Test expected_section_ids is empty when macro_plan_summary has none."""
+    result = shape_holistic_judge_context(
+        group_plan_set, display_graph, template_catalog, macro_plan_summary=None
+    )
+
+    assert result["expected_section_ids"] == []
+
+
+def test_shape_holistic_judge_context_expected_section_ids_empty_summary(
+    group_plan_set: GroupPlanSet,
+    display_graph: DisplayGraph,
+    template_catalog: TemplateCatalog,
+) -> None:
+    """Test expected_section_ids is empty when macro_plan_summary lacks the key."""
+    result = shape_holistic_judge_context(
+        group_plan_set,
+        display_graph,
+        template_catalog,
+        macro_plan_summary={"global_story": {"theme": "test"}},
+    )
+
+    assert result["expected_section_ids"] == []
+
+
 def test_shape_holistic_judge_context_single_section() -> None:
     """Test holistic handles single section plan."""
     from twinklr.core.sequencer.planning import LanePlan

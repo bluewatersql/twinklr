@@ -28,22 +28,19 @@ This context helps you be more vigilant about recurring patterns, but evaluate e
 Before evaluating holistic quality, verify the plan set is **technically sound**:
 
 **Completeness**
-- All sections from MacroPlan are present
+- If "Expected Sections from MacroPlan" is provided, compare the GroupPlanSet's section_ids against the expected list. Only flag missing/extra sections if the two lists differ.
+- If no expected section list is provided, skip the completeness check — do NOT guess which sections should exist.
 - Each section has a valid SectionCoordinationPlan
-- No missing or extra sections
 
 **Cross-Section Coverage**
 - Sections cover full song timeline
 - No gaps or overlaps between sections
-- Section ordering matches MacroPlan (if provided)
 
 **Resource Consistency**
 - All group_ids used across sections exist in display graph
-- All template_ids used across sections exist in template catalog
 - Palette/motif ids are present where required:
   - Every SectionCoordinationPlan has plan.palette.palette_id
   - Every SectionCoordinationPlan has plan.motif_ids (>=1)
-  - If palette_catalog/motif_catalog is provided, ids must exist in those catalogs
 
 **If technically invalid**
 - Return status `HARD_FAIL` immediately with critical cross_section_issues
@@ -57,7 +54,7 @@ Evaluate **cross-section quality** across these dimensions:
 2. **energy_arc** (25%): build/peak/release placement
 3. **visual_variety** (20%): contrast vs repetition across sections
 4. **transitions** (15%): smoothness between adjacent sections
-5. **resource_utilization** (15%): balanced group usage; focus targets shine
+5. **resource_utilization** (15%): balanced group usage; focus targets shine. **Important:** If a "Group Hierarchy" is provided, a parent group implicitly covers all its children. Do NOT flag a child group as absent/underutilized when its parent group is used in that section.
 
 Populate `score_breakdown` with exactly these keys:
 - story_coherence
@@ -113,6 +110,22 @@ Required fields:
 - `severity`: {{ taxonomy.IssueSeverity | join(' | ') }}
 - `affected_sections`: list of section_ids (>=1)
 - `description`: 2–4 sentences, specific
-- `recommendation`: 2–3 sentences, actionable
+- `recommendation`: 1–2 sentence high-level summary of what should change
+- `targeted_actions`: list of **specific, directly actionable** instructions (required for ERROR and WARN severity). Each action must reference concrete identifiers from the GroupPlanSet.
+
+### Targeted Actions Format
+
+Each `targeted_action` must be a single, executable instruction that can be applied to a specific group plan without further interpretation. Reference actual `section_id`, `group_id`, `template_id`, `palette_id`, and/or `lane` values from the GroupPlanSet.
+
+**Good examples:**
+- "In section chorus_2, add ARCHES to RHYTHM lane with gtpl_rhythm_sparkle_beat (bars 5-8)"
+- "In section break_1, change HERO palette from core.mono_cool to core.christmas_traditional for transition continuity"
+- "In sections verse_3 and verse_4, replace gtpl_accent_burst_big on MEGA_TREE with gtpl_accent_bell_double for variety"
+- "In section instrumental, add WINDOWS to BASE lane with gtpl_base_candy_stripes to improve group utilization"
+
+**Bad examples (too vague):**
+- "Add more variety to templates" (which section? which group? which template?)
+- "Smooth the palette transitions" (between which sections? change to what?)
+- "Rebalance group utilization" (add which groups to which sections/lanes?)
 
 Do NOT invent additional fields or enum values.

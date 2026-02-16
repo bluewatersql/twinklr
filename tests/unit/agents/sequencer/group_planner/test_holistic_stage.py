@@ -153,6 +153,82 @@ def approved_evaluation() -> HolisticEvaluation:
     )
 
 
+class TestExtractMacroPlanSummary:
+    """Tests for _extract_macro_plan_summary helper."""
+
+    def test_extract_expected_section_ids_from_pydantic_model(self) -> None:
+        """Extract expected section IDs from a Pydantic MacroPlan model."""
+        from twinklr.core.agents.sequencer.group_planner.holistic_stage import (
+            _extract_macro_plan_summary,
+        )
+
+        mock_section_1 = MagicMock()
+        mock_section_1.section = MagicMock()
+        mock_section_1.section.section_id = "intro"
+
+        mock_section_2 = MagicMock()
+        mock_section_2.section = MagicMock()
+        mock_section_2.section.section_id = "chorus_1"
+
+        mock_macro_plan = MagicMock()
+        mock_macro_plan.global_story = MagicMock()
+        mock_macro_plan.global_story.model_dump.return_value = {"theme": "test"}
+        mock_macro_plan.section_plans = [mock_section_1, mock_section_2]
+
+        summary = _extract_macro_plan_summary(mock_macro_plan)
+
+        assert "expected_section_ids" in summary
+        assert summary["expected_section_ids"] == ["intro", "chorus_1"]
+
+    def test_extract_expected_section_ids_from_dict(self) -> None:
+        """Extract expected section IDs from a dict (cached) MacroPlan."""
+        from twinklr.core.agents.sequencer.group_planner.holistic_stage import (
+            _extract_macro_plan_summary,
+        )
+
+        macro_plan_dict = {
+            "global_story": {"theme": "test"},
+            "section_plans": [
+                {"section": {"section_id": "verse_1"}},
+                {"section": {"section_id": "chorus_1"}},
+                {"section": {"section_id": "outro"}},
+            ],
+        }
+
+        summary = _extract_macro_plan_summary(macro_plan_dict)
+
+        assert "expected_section_ids" in summary
+        assert summary["expected_section_ids"] == ["verse_1", "chorus_1", "outro"]
+
+    def test_extract_expected_section_ids_none_macro_plan(self) -> None:
+        """Return empty dict when macro_plan is None."""
+        from twinklr.core.agents.sequencer.group_planner.holistic_stage import (
+            _extract_macro_plan_summary,
+        )
+
+        summary = _extract_macro_plan_summary(None)
+        assert summary == {}
+
+    def test_extract_expected_section_ids_no_section_plans(self) -> None:
+        """Handle MacroPlan without section_plans gracefully."""
+        from twinklr.core.agents.sequencer.group_planner.holistic_stage import (
+            _extract_macro_plan_summary,
+        )
+
+        mock_macro_plan = MagicMock()
+        mock_macro_plan.global_story = MagicMock()
+        mock_macro_plan.global_story.model_dump.return_value = {"theme": "test"}
+        mock_macro_plan.section_plans = None
+        # Simulate getattr returning None
+        del mock_macro_plan.section_plans
+        mock_macro_plan.configure_mock(**{"section_plans": None})
+
+        summary = _extract_macro_plan_summary(mock_macro_plan)
+
+        assert "global_story" in summary
+        assert summary.get("expected_section_ids", []) == []
+
+
 class TestHolisticEvaluatorStage:
     """Tests for HolisticEvaluatorStage."""
 
