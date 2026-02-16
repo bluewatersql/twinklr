@@ -5,7 +5,7 @@ remote_theme: pages-themes/primer@v0.6.0
 
 title: "Twinklr"
 description: "AI-powered design for Christmas light shows"
-logo: assets/twinklr_logo_light.png
+logo: assets/twinklr_logo_color_light.png
 url: "https://bluewatersql.github.io"
 baseurl: "/twinklr"
 

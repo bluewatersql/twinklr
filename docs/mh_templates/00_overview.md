@@ -330,7 +330,7 @@ Until then, if you remember one thing: the planner’s output is where the story
 ---
 
 ## About twinklr
-![Twinklr](../assets/twinklr_logo_light.png)
+![Twinklr](../assets/twinklr_logo_color_light.png)
 
 twinklr is our ongoing science experiment in weaponizing holiday cheer. It's an AI-driven choreography and composition engine that takes an audio file and spits out fully synchronized sequences for Christmas light displays in xLights — because apparently we looked at a normal, peaceful hobby and thought, "What if we added AI, machine learning and sleepless nights?"
 

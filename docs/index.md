@@ -3,7 +3,7 @@ title: "Twinklr Documentation"
 description: "Documentation hub for Twinklr — AI-powered choreography for Christmas light shows."
 ---
 
-![Twinklr](assets/twinklr_logo_light.png)
+![Twinklr](assets/twinklr_logo_color_light.png)
 
 # Twinklr Documentation
 
