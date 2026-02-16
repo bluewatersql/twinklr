@@ -512,36 +512,6 @@ Preview for Part 5/6: we’re going to do stuff like “`Intensity.HIGH` means m
 
 ---
 
-## The Possessed Desk Fan Incident (A Quick Confession)
-
-I promised failures, so here’s one.
-
-Our first motion curves were:
-
-- triangle-based for “crispness”
-- undersampled (32 points over 4 bars)
-- looped without caring about endpoint derivatives
-
-On paper: fine.
-
-In the driveway: four moving heads doing synchronized chevrons with a tiny jerk at each turnaround, plus quantization making that jerk land *exactly on the downbeat*.
-
-It looked like the fixtures were nodding along to the song while quietly disagreeing with it.
-
-We fixed it with:
-
-- smoother curves (sine/eased triangle hybrids)
-- more samples for motion
-- explicit loop boundary rules (don’t trust “it’s probably close enough”)
-
-And honestly, the funniest part was how *small* the numeric discontinuity was. We’re talking a few DMX counts at a boundary.
-
-But because it was consistent and rhythmic, your eyes locked onto it immediately.
-
-Humans are incredible signal processors when the signal is “something looks off.”
-
----
-
 ## Up Next: When 0.5 Means Two Different Things
 
 Right now we’ve been pretending curves are just math.
@@ -569,3 +539,7 @@ And yes, it contains the moment we realized we’d been normalizing correctly an
 twinklr is our ongoing science experiment in weaponizing holiday cheer. It's an AI-driven choreography and composition engine that takes an audio file and spits out fully synchronized sequences for Christmas light displays in xLights — because apparently we looked at a normal, peaceful hobby and thought, "What if we added AI, machine learning and sleepless nights?"
 
 Here's the honest disclaimer: we're not professional lighting designers. We're developers, engineers, and AI researchers who spend our days building at the frontier of AI… and our nights obsessing over why a dimmer curve feels "late" by half a beat and whether a roofline sweep should be dramatic or merely aggressively festive. If you're expecting polished stage-production wisdom, you're in the wrong place. If you're into nerdy overengineering, mildly unhinged experimentation, and the occasional "how did that even work?" moment — welcome.
+
+This blog is the running log of our journey.
+
+---

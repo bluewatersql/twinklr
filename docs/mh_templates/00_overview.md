@@ -162,8 +162,6 @@ Templates live in a registry because we want a **fresh instance every time**. Mu
 
 Registry code is in:
 
-`packages/twinklr/core/sequencer/moving_heads/templates/library.py`
-
 ```python
 def _norm_key(s: str) -> str:
     # "Sweep LR Chevron Breathe" -> "sweep_lr_chevron_breathe"
@@ -328,8 +326,6 @@ And Part 2 is where we get into geometry math and discover that “just point th
 Until then, if you remember one thing: the planner’s output is where the story starts…
 
 …and the compiler is where it becomes real.
-
-![Part 0 index card illustration: sleepy LLM hands a clipboard labeled “Plan” to a calculator in a hard hat labeled “DMX”; arrow in between](assets/illustrations/00_index_card.png)
 
 ---
 
