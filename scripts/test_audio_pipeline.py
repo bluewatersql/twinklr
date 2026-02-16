@@ -129,6 +129,12 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Show full debug output",
     )
+    output_group.add_argument(
+        "--markdown",
+        type=Path,
+        default=None,
+        help="Write lyrics/phoneme mapping report to markdown file",
+    )
 
     return parser.parse_args()
 
@@ -352,6 +358,29 @@ async def run_analysis(args: argparse.Namespace) -> dict[str, Any]:
     # Phonemes
     if bundle.phonemes:
         print_bundle_summary(bundle.phonemes, "Phonemes")
+        pb = bundle.phonemes
+        print(f"  Source: {pb.source.value}")
+        print(f"  Confidence: {pb.confidence:.2f}")
+        print(f"  OOV Rate: {pb.oov_rate:.2%}")
+        print(f"  Coverage: {pb.coverage_pct:.2%}")
+        print(f"  Burst Merges: {pb.burst_merge_count}")
+        print(f"  Phonemes: {len(pb.phonemes)}")
+        print(f"  Visemes: {len(pb.visemes)}")
+
+        if pb.phonemes:
+            print("\n  First 10 phonemes:")
+            for p in pb.phonemes[:10]:
+                ptype = f" ({p.phoneme_type})" if p.phoneme_type else ""
+                print(f"    {p.start_ms:6d}ms - {p.end_ms:6d}ms: {p.text}{ptype}")
+
+        if pb.visemes:
+            print("\n  First 10 visemes:")
+            for v in pb.visemes[:10]:
+                print(f"    {v.start_ms:6d}ms - {v.end_ms:6d}ms: {v.viseme} (conf={v.confidence:.2f})")
+
+    # Generate markdown report if requested
+    if args.markdown:
+        _write_markdown_report(bundle, args.markdown, clean_file_name)
 
     ## Save to file
     print_section("Saving Output")
@@ -367,6 +396,125 @@ async def run_analysis(args: argparse.Namespace) -> dict[str, Any]:
 
     result: dict[str, Any] = bundle.model_dump(mode="json")
     return result
+
+
+def _write_markdown_report(
+    bundle: Any,
+    output_path: Path,
+    song_name: str,
+) -> None:
+    """Write a structured markdown report showing lyrics/phoneme/viseme mapping.
+
+    Args:
+        bundle: SongBundle with lyrics and phonemes.
+        output_path: Path to write the markdown file.
+        song_name: Cleaned song filename for the report title.
+    """
+    lines: list[str] = []
+    lines.append(f"# Audio Analysis Report: {song_name}\n")
+
+    # --- Quality Summary ---
+    lines.append("## Quality Summary\n")
+    lines.append("| Metric | Value |")
+    lines.append("|--------|-------|")
+
+    if bundle.lyrics:
+        lines.append(f"| Lyrics Source | {bundle.lyrics.source or 'N/A'} |")
+        if bundle.lyrics.quality:
+            q = bundle.lyrics.quality
+            lines.append(f"| Alignment Score | {q.alignment_score:.2f} |")
+            if q.avg_word_duration_ms is not None:
+                lines.append(f"| Avg Word Duration | {q.avg_word_duration_ms:.0f} ms |")
+            lines.append(f"| Gap Violations | {q.gap_violations} |")
+            lines.append(f"| Overlap Violations | {q.overlap_violations} |")
+    if bundle.phonemes:
+        pb = bundle.phonemes
+        lines.append(f"| Phoneme Source | {pb.source.value} |")
+        lines.append(f"| Phoneme Confidence | {pb.confidence:.2f} |")
+        lines.append(f"| OOV Rate | {pb.oov_rate:.2%} |")
+        lines.append(f"| Viseme Coverage | {pb.coverage_pct:.2%} |")
+        lines.append(f"| Burst Merges | {pb.burst_merge_count} |")
+        lines.append(f"| Total Phonemes | {len(pb.phonemes)} |")
+        lines.append(f"| Total Visemes | {len(pb.visemes)} |")
+    lines.append("")
+
+    # --- Lyrics Mapping ---
+    if bundle.lyrics and bundle.lyrics.phrases:
+        lines.append("## Lyrics Mapping\n")
+
+        # Build lookup helpers for phonemes and visemes by time range
+        phonemes_list = bundle.phonemes.phonemes if bundle.phonemes else []
+        visemes_list = bundle.phonemes.visemes if bundle.phonemes else []
+
+        for phrase in bundle.lyrics.phrases:
+            phrase_start = int(phrase.start_ms)
+            phrase_end = int(phrase.end_ms)
+            lines.append(
+                f"### Phrase: \"{phrase.text}\" "
+                f"({phrase_start}ms - {phrase_end}ms)\n"
+            )
+
+            words = phrase.words if phrase.words else []
+            if not words:
+                # Fall back to bundle-level words within this phrase's time range
+                words = [
+                    w
+                    for w in (bundle.lyrics.words or [])
+                    if int(w.start_ms) >= phrase_start and int(w.end_ms) <= phrase_end
+                ]
+
+            if words:
+                lines.append("| Word | Start | End | Phonemes | Visemes |")
+                lines.append("|------|-------|-----|----------|---------|")
+
+                for word in words:
+                    ws = int(word.start_ms)
+                    we = int(word.end_ms)
+
+                    # Find phonemes within this word's time window
+                    word_phonemes = [
+                        p.text for p in phonemes_list if p.start_ms >= ws and p.end_ms <= we
+                    ]
+                    # Find visemes within this word's time window
+                    word_visemes = [
+                        v.viseme for v in visemes_list if v.start_ms >= ws and v.end_ms <= we
+                    ]
+
+                    ph_str = " ".join(word_phonemes) if word_phonemes else "-"
+                    vi_str = " ".join(word_visemes) if word_visemes else "-"
+                    lines.append(f"| {word.text} | {ws} | {we} | {ph_str} | {vi_str} |")
+
+                lines.append("")
+
+    # --- Raw Phoneme Timeline (first 50) ---
+    if bundle.phonemes and bundle.phonemes.phonemes:
+        lines.append("## Phoneme Timeline (first 50)\n")
+        lines.append("| Start (ms) | End (ms) | Phoneme | Type |")
+        lines.append("|------------|----------|---------|------|")
+        for p in bundle.phonemes.phonemes[:50]:
+            ptype = p.phoneme_type or "-"
+            lines.append(f"| {p.start_ms} | {p.end_ms} | {p.text} | {ptype} |")
+        if len(bundle.phonemes.phonemes) > 50:
+            remaining = len(bundle.phonemes.phonemes) - 50
+            lines.append(f"\n*... {remaining} more phonemes omitted*\n")
+        lines.append("")
+
+    # --- Raw Viseme Timeline (first 50) ---
+    if bundle.phonemes and bundle.phonemes.visemes:
+        lines.append("## Viseme Timeline (first 50)\n")
+        lines.append("| Start (ms) | End (ms) | Viseme | Confidence |")
+        lines.append("|------------|----------|--------|------------|")
+        for v in bundle.phonemes.visemes[:50]:
+            lines.append(f"| {v.start_ms} | {v.end_ms} | {v.viseme} | {v.confidence:.2f} |")
+        if len(bundle.phonemes.visemes) > 50:
+            remaining = len(bundle.phonemes.visemes) - 50
+            lines.append(f"\n*... {remaining} more visemes omitted*\n")
+        lines.append("")
+
+    # Write file
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text("\n".join(lines))
+    print(f"\nMarkdown report saved to: {output_path}")
 
 
 async def main() -> None:

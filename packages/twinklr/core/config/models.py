@@ -11,6 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from twinklr.core.config.poses import PoseConfig
 from twinklr.core.curves.library import CurveLibrary
+from twinklr.core.formats.xlights.sequence.timeline import TimelineTracksConfig
 from twinklr.core.sequencer.models.enum import TransitionMode
 from twinklr.core.sequencer.models.transition import TransitionStrategy
 
@@ -543,6 +544,14 @@ class JobConfig(ConfigBase):
     transitions: TransitionConfig = Field(
         default_factory=TransitionConfig,
         description="Transition behavior configuration for smooth blending between sections and steps",
+    )
+
+    timeline_tracks: TimelineTracksConfig = Field(
+        default_factory=TimelineTracksConfig,
+        description=(
+            "Controls which timing reference tracks are written to XSQ output. "
+            "Each track appears as a named timing layer in xLights."
+        ),
     )
 
     @classmethod

@@ -12,6 +12,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
+from twinklr.core.agents._paths import AGENTS_BASE_PATH
 from twinklr.core.agents.assets.catalog import (
     check_reuse,
     load_catalog,
@@ -34,6 +35,7 @@ from twinklr.core.agents.async_runner import AsyncAgentRunner
 from twinklr.core.agents.audio.lyrics.models import LyricContextModel
 from twinklr.core.pipeline.context import PipelineContext
 from twinklr.core.pipeline.result import StageResult, failure_result, success_result
+from twinklr.core.pipeline.stage import resolve_typed_input
 from twinklr.core.sequencer.planning.group_plan import GroupPlanSet
 from twinklr.core.sequencer.theming.catalog import MOTIF_REGISTRY
 
@@ -73,22 +75,26 @@ class AssetCreationStage:
 
     async def execute(
         self,
-        input: Any,
+        input: GroupPlanSet | dict[str, Any],
         context: PipelineContext,
     ) -> StageResult[Any]:
         """Execute the full asset creation pipeline.
 
         Args:
-            input: Dict with "aggregate" (GroupPlanSet) and optionally "lyrics".
+            input: GroupPlanSet directly, or dict with "aggregate"
+                (GroupPlanSet) and optionally "lyrics".  When a GroupPlanSet
+                is passed directly, lyric context is read from
+                ``context.state["lyric_context"]``.
             context: Pipeline context with provider, session, output_dir.
 
         Returns:
             StageResult containing AssetCatalog.
         """
         try:
-            # Extract inputs
-            plan_set: GroupPlanSet = input["aggregate"]
-            lyric_context: LyricContextModel | None = input.get("lyrics")
+            plan_set, extras = resolve_typed_input(input, GroupPlanSet, "aggregate")
+            lyric_context: LyricContextModel | None = (
+                extras.get("lyrics") or context.get_state("lyric_context")
+            )
 
             # Determine output paths
             assets_dir = self._resolve_assets_dir(context)
@@ -128,7 +134,7 @@ class AssetCreationStage:
             enricher_agent_spec = build_enricher_spec()
             runner = AsyncAgentRunner(
                 provider=context.provider,
-                prompt_base_path=Path("packages/twinklr/core/agents"),
+                prompt_base_path=AGENTS_BASE_PATH,
                 llm_logger=context.llm_logger,
             )
 

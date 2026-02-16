@@ -14,22 +14,9 @@ import sys
 
 from rich.console import Console
 
-from twinklr.core.agents.audio.lyrics.stage import LyricsStage
-from twinklr.core.agents.audio.profile.stage import AudioProfileStage
-from twinklr.core.agents.audio.stages.analysis import AudioAnalysisStage
-from twinklr.core.agents.sequencer.macro_planner.stage import MacroPlannerStage
-from twinklr.core.agents.sequencer.moving_heads.rendering_stage import (
-    MovingHeadRenderingStage,
-)
-from twinklr.core.agents.sequencer.moving_heads.stage import MovingHeadStage
 from twinklr.core.config.loader import load_app_config, load_job_config
-from twinklr.core.pipeline import (
-    ExecutionPattern,
-    PipelineContext,
-    PipelineDefinition,
-    PipelineExecutor,
-    StageDefinition,
-)
+from twinklr.core.pipeline import PipelineContext, PipelineExecutor
+from twinklr.core.pipeline.definitions import build_moving_heads_pipeline
 from twinklr.core.sequencer.moving_heads.templates import load_builtin_templates
 from twinklr.core.sequencer.moving_heads.templates.library import list_templates
 from twinklr.core.session import TwinklrSession
@@ -101,61 +88,17 @@ async def run_pipeline_async(
         {"role_key": "MEGA_TREE", "model_count": 1, "group_type": "tree"},
     ]
 
-    # Define pipeline
+    # Define pipeline via pipeline definitions module
     console.print("\n[bold]Defining pipeline...[/bold]")
-    pipeline = PipelineDefinition(
-        name="twinklr_pipeline",
-        description="Twinklr choreography pipeline",
-        fail_fast=True,
-        stages=[
-            StageDefinition(
-                id="audio",
-                stage=AudioAnalysisStage(),
-                description="Analyze audio file",
-            ),
-            StageDefinition(
-                id="profile",
-                stage=AudioProfileStage(),
-                inputs=["audio"],
-                description="Generate audio profile",
-            ),
-            StageDefinition(
-                id="lyrics",
-                stage=LyricsStage(),
-                inputs=["audio"],
-                pattern=ExecutionPattern.CONDITIONAL,
-                condition=lambda ctx: ctx.get_state("has_lyrics", False),
-                critical=False,
-                description="Analyze lyrics (if available)",
-            ),
-            StageDefinition(
-                id="macro",
-                stage=MacroPlannerStage(display_groups=display_groups),
-                inputs=["profile", "lyrics"],
-                description="Generate macro choreography strategy",
-            ),
-            StageDefinition(
-                id="moving_heads",
-                stage=MovingHeadStage(
-                    fixture_count=4,
-                    available_templates=available_templates,
-                    max_iterations=job_config.agent.max_iterations,
-                    min_pass_score=7.0,
-                ),
-                inputs=["audio", "profile", "lyrics", "macro"],
-                description="Generate moving head choreography",
-            ),
-            StageDefinition(
-                id="render",
-                stage=MovingHeadRenderingStage(
-                    xsq_output_path=artifact_dir / f"{song_name}_twinklr_mh.xsq",
-                    xsq_template_path=xsq_in,
-                    fixture_config_path=job_config_path.parent / "fixture_config.json",
-                ),
-                inputs=["moving_heads"],
-                description="Render to XSQ",
-            ),
-        ],
+    pipeline = build_moving_heads_pipeline(
+        display_groups=display_groups,
+        fixture_count=4,
+        available_templates=available_templates,
+        max_iterations=job_config.agent.max_iterations,
+        min_pass_score=7.0,
+        xsq_output_path=artifact_dir / f"{song_name}_twinklr_mh.xsq",
+        xsq_template_path=xsq_in,
+        fixture_config_path=job_config_path.parent / "fixture_config.json",
     )
 
     # Validate pipeline

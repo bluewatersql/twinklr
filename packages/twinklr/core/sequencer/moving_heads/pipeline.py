@@ -3,7 +3,10 @@ from __future__ import annotations
 import logging
 from collections.abc import Iterator
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from twinklr.core.sequencer.models.context import FixtureContext
 
 from twinklr.core.agents.sequencer.moving_heads import ChoreographyPlan
 from twinklr.core.agents.sequencer.moving_heads.models import PlanSection
@@ -11,15 +14,12 @@ from twinklr.core.config.fixtures import FixtureGroup
 from twinklr.core.config.models import JobConfig
 from twinklr.core.curves.generator import CurveGenerator
 from twinklr.core.curves.registry import CurveRegistry
-from twinklr.core.formats.xlights.sequence.exporter import XSQExporter
 from twinklr.core.formats.xlights.sequence.models.xsq import (
-    Effect,
-    SequenceHead,
     TimeMarker,
-    XSequence,
+    TimingTrack,
 )
-from twinklr.core.formats.xlights.sequence.parser import XSQParser
-from twinklr.core.sequencer.models.context import FixtureContext, TemplateCompileContext
+from twinklr.core.sequencer.models.context import TemplateCompileContext
+from twinklr.core.sequencer.models.enum import Intensity
 from twinklr.core.sequencer.models.moving_heads.rig import rig_profile_from_fixture_group
 from twinklr.core.sequencer.models.transition import TransitionRegistry
 from twinklr.core.sequencer.moving_heads.channels.state import FixtureSegment
@@ -32,15 +32,42 @@ from twinklr.core.sequencer.moving_heads.compile.transition_planner import Trans
 from twinklr.core.sequencer.moving_heads.compile.transition_segment_compiler import (
     TransitionSegmentCompiler,
 )
-from twinklr.core.sequencer.moving_heads.export.xsq_adapter import XsqAdapter
+from twinklr.core.sequencer.moving_heads.fixture_builder import build_fixture_contexts
 from twinklr.core.sequencer.moving_heads.handlers.defaults import create_default_registries
 from twinklr.core.sequencer.moving_heads.templates import (
     get_template,
     load_builtin_templates,
 )
+from twinklr.core.sequencer.moving_heads.xsq_export import export_to_xsq
 from twinklr.core.sequencer.timing.beat_grid import BeatGrid
 
 logger = logging.getLogger(__name__)
+
+# --- Module-level constants and helpers ---
+
+ENERGY_TO_INTENSITY: dict[str, Intensity] = {
+    "CHILL": Intensity.SLOW,
+    "MODERATE": Intensity.SMOOTH,
+    "ENERGETIC": Intensity.DRAMATIC,
+    "INTENSE": Intensity.FAST,
+}
+"""Maps energy-level keywords (from preset IDs) to movement Intensity enums."""
+
+
+def _compute_section_duration_ms(
+    start_bar: int, end_bar: int, ms_per_bar: float
+) -> int:
+    """Compute the duration of a section in milliseconds.
+
+    Args:
+        start_bar: First bar of the section (1-indexed).
+        end_bar: Last bar of the section (1-indexed, inclusive).
+        ms_per_bar: Milliseconds per bar from the beat grid.
+
+    Returns:
+        Duration in milliseconds (rounded to int).
+    """
+    return int((end_bar - start_bar + 1) * ms_per_bar)
 
 
 class RenderingPipeline:
@@ -55,6 +82,7 @@ class RenderingPipeline:
         job_config: JobConfig,
         output_path: Path | None = None,
         template_xsq: Path | None = None,
+        timeline_tracks: list[TimingTrack] | None = None,
     ):
         """Initialize rendering pipeline.
 
@@ -65,6 +93,7 @@ class RenderingPipeline:
             job_config: Job configuration
             output_path: Optional output path for XSQ file
             template_xsq: Optional template XSQ path
+            timeline_tracks: Optional pre-built timeline tracks (beats, bars, lyrics, etc.)
         """
         self.choreography_plan = choreography_plan
         self.fixture_group = fixture_group
@@ -72,6 +101,7 @@ class RenderingPipeline:
         self.beat_grid = beat_grid
         self.output_path = output_path
         self.template_xsq = template_xsq
+        self.timeline_tracks = timeline_tracks or []
 
         # Create shared infrastructure
         self.curve_generator = CurveGenerator()
@@ -162,20 +192,12 @@ class RenderingPipeline:
                     logger.debug(f"Applying preset: {preset.name}")
                 except StopIteration:
                     # Preset not found - try to infer intensity from preset_id
-                    from twinklr.core.sequencer.models.enum import Intensity
                     from twinklr.core.sequencer.models.template import StepPatch, TemplatePreset
 
-                    intensity_map = {
-                        "CHILL": Intensity.SLOW,
-                        "MODERATE": Intensity.SMOOTH,
-                        "ENERGETIC": Intensity.DRAMATIC,
-                        "INTENSE": Intensity.FAST,
-                    }
-
                     preset_id_upper = section.preset_id.upper()
-                    if preset_id_upper in intensity_map:
+                    if preset_id_upper in ENERGY_TO_INTENSITY:
                         # Auto-create preset with inferred intensity
-                        intensity = intensity_map[preset_id_upper]
+                        intensity = ENERGY_TO_INTENSITY[preset_id_upper]
                         step_patches = {
                             step.step_id: StepPatch(
                                 movement={"intensity": intensity.value},
@@ -211,7 +233,6 @@ class RenderingPipeline:
                 beat_grid=self.beat_grid,
                 start_bar=section.start_bar,
                 duration_bars=section.end_bar - section.start_bar + 1,
-                n_samples=64,  # Default sample count
                 curve_registry=self.curve_registry,
                 geometry_registry=self.geometry_registry,
                 movement_registry=self.movement_registry,
@@ -311,17 +332,39 @@ class RenderingPipeline:
 
         logger.debug(f"Detected {len(boundaries)} section boundaries")
 
+        # Build section lookup for duration computation
+        section_lookup: dict[str, PlanSection] = {
+            s.section_name: s for s in self.choreography_plan.sections
+        }
+        ms_per_bar = self.beat_grid.ms_per_bar
+
         # Plan transitions for each boundary
         registry = TransitionRegistry()
         fixture_ids = [fx.fixture_id for fx in self.rig_profile.fixtures]
 
         for boundary in boundaries:
-            # Get transition hint from target section
+            # Get transition hint and section durations from the plan
             hint = None
-            for section in self.choreography_plan.sections:
-                if section.section_name == boundary.target_id:
-                    hint = section.transition_in
-                    break
+            source_section = section_lookup.get(boundary.source_id)
+            target_section = section_lookup.get(boundary.target_id)
+
+            if target_section is not None:
+                hint = target_section.transition_in
+
+            source_duration_ms = (
+                _compute_section_duration_ms(
+                    source_section.start_bar, source_section.end_bar, ms_per_bar
+                )
+                if source_section is not None
+                else 0
+            )
+            target_duration_ms = (
+                _compute_section_duration_ms(
+                    target_section.start_bar, target_section.end_bar, ms_per_bar
+                )
+                if target_section is not None
+                else 0
+            )
 
             # Plan transition
             transition_id = f"trans_{boundary.source_id}_to_{boundary.target_id}"
@@ -332,9 +375,7 @@ class RenderingPipeline:
                 transition_id=transition_id,
             )
 
-            # Validate feasibility (using reasonable default durations)
-            source_duration_ms = 10000  # Placeholder
-            target_duration_ms = 10000  # Placeholder
+            # Validate feasibility using actual section durations
             is_feasible, warnings = self.transition_planner.validate_transition_feasibility(
                 transition_plan, source_duration_ms, target_duration_ms
             )
@@ -451,130 +492,33 @@ class RenderingPipeline:
     def _build_fixture_contexts(self) -> list[FixtureContext]:
         """Build fixture contexts from rig profile.
 
+        Delegates to :func:`build_fixture_contexts` in ``fixture_builder``.
+
         Returns:
             List of FixtureContext objects for all fixtures in the rig.
         """
-        contexts = []
-
-        # Get actual fixture configs from fixture_group for degree->DMX conversion
-        fixture_configs = {fx.fixture_id: fx.config for fx in self.fixture_group.expand_fixtures()}
-
-        for fixture_def in self.rig_profile.fixtures:
-            # Build calibration dict from FixtureCalibration model
-            calibration: dict[str, Any] = {}
-            if fixture_def.calibration:
-                calibration = {
-                    "pan_min_dmx": fixture_def.calibration.pan_min_dmx,
-                    "pan_max_dmx": fixture_def.calibration.pan_max_dmx,
-                    "tilt_min_dmx": fixture_def.calibration.tilt_min_dmx,
-                    "tilt_max_dmx": fixture_def.calibration.tilt_max_dmx,
-                    "pan_inverted": fixture_def.calibration.pan_inverted,
-                    "tilt_inverted": fixture_def.calibration.tilt_inverted,
-                    "dimmer_floor_dmx": fixture_def.calibration.dimmer_floor_dmx,
-                    "dimmer_ceiling_dmx": fixture_def.calibration.dimmer_ceiling_dmx,
-                }
-
-            # Add the full FixtureConfig for degree->DMX conversion in geometry handlers
-            if fixture_def.fixture_id in fixture_configs:
-                calibration["fixture_config"] = fixture_configs[fixture_def.fixture_id]
-
-            # Infer role from fixture groups (first group that contains this fixture)
-            role = "UNKNOWN"
-            for group in self.rig_profile.groups:
-                if fixture_def.fixture_id in group.fixture_ids:
-                    # Simple role inference: use position in group
-                    idx = group.fixture_ids.index(fixture_def.fixture_id)
-                    if len(group.fixture_ids) == 4:
-                        roles = ["OUTER_LEFT", "INNER_LEFT", "INNER_RIGHT", "OUTER_RIGHT"]
-                        role = roles[idx] if idx < len(roles) else f"FIXTURE_{idx}"
-                    else:
-                        role = f"{group.group_id}_{idx}"
-                    break
-
-            contexts.append(
-                FixtureContext(
-                    fixture_id=fixture_def.fixture_id,
-                    role=role,
-                    calibration=calibration,
-                )
-            )
-
-        return contexts
+        return build_fixture_contexts(self.rig_profile, self.fixture_group)
 
     def _export_to_xsq(
         self, segments: list[FixtureSegment], time_markers: list[TimeMarker]
     ) -> None:
         """Export segments to XSQ file.
 
+        Delegates to :func:`export_to_xsq` in ``xsq_export``.
+
         Args:
             segments: List of fixture segments to export.
             time_markers: List of time markers to export.
-        Raises:
-            ValueError: If output_path is not set or XSQ operations fail.
         """
         if not self.output_path:
             logger.warning("No output_path specified, skipping XSQ export")
             return
 
-        logger.debug(f"Exporting {len(segments)} segments to {self.output_path}")
-
-        # Load template XSQ if provided, otherwise create new
-        if self.template_xsq and Path(self.template_xsq).exists():
-            logger.debug(f"Loading template XSQ from {self.template_xsq}")
-            parser = XSQParser()
-            xsq = parser.parse(self.template_xsq)
-            logger.debug(
-                f"Template loaded: {len(xsq.element_effects)} elements, "
-                f"{len(xsq.effect_db.entries)} effects in DB"
-            )
-        else:
-            # Create minimal XSQ
-            logger.debug("Creating new XSQ (no template provided)")
-            # Calculate duration from segments
-            duration_ms = max((s.t1_ms for s in segments), default=0)
-
-            xsq = XSequence(
-                head=SequenceHead(
-                    version="2024.10",
-                    media_file="",
-                    sequence_duration_ms=duration_ms,
-                    song="Generated Sequence",
-                    artist="Twinklr",
-                    sequence_timing="50 ms",
-                )
-            )
-
-        # Add timing markers to XSQ
-        xsq.add_timing_layer(timing_name="Twinklr AudioSections", markers=time_markers)
-
-        adapter = XsqAdapter()
-        placements = adapter.convert(segments, self.fixture_group, xsq)
-
-        logger.debug(f"Converted to {len(placements)} effect placements")
-
-        # Add placements to XSQ
-        for placement in placements:
-            # Create Effect object
-            effect = Effect(
-                effect_type=placement.effect_name,
-                start_time_ms=placement.start_ms,
-                end_time_ms=placement.end_ms,
-                ref=placement.ref,
-                label=placement.effect_label or "",
-                palette=str(placement.palette) if placement.palette else "",
-            )
-
-            # Add to element with layer_index (creates element and layers as needed)
-            xsq.add_effect(
-                element_name=placement.element_name,
-                effect=effect,
-                layer_index=placement.layer_index,
-            )
-
-        logger.debug(f"Added {len(placements)} effects to XSQ")
-
-        # Export to file
-        exporter = XSQExporter()
-        exporter.export(xsq, self.output_path, pretty=True)
-
-        logger.debug(f"Successfully exported XSQ to {self.output_path}")
+        export_to_xsq(
+            segments,
+            time_markers,
+            fixture_group=self.fixture_group,
+            output_path=self.output_path,
+            template_xsq=self.template_xsq,
+            timeline_tracks=self.timeline_tracks,
+        )

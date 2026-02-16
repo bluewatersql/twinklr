@@ -14,6 +14,7 @@ from typing import Any, Generic, TypeVar, cast
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from twinklr.core.agents._paths import AGENTS_BASE_PATH
 from twinklr.core.agents.analytics.repository import IssueRepository
 from twinklr.core.agents.async_runner import AsyncAgentRunner
 from twinklr.core.agents.logging import LLMCallLogger
@@ -265,7 +266,7 @@ class StandardIterationController(Generic[TPlan]):
         validator: Callable[[TPlan], list[str]],
         provider: LLMProvider,
         llm_logger: LLMCallLogger,
-        prompt_base_path: Path | str = Path("packages/twinklr/core/agents"),
+        prompt_base_path: Path | str = AGENTS_BASE_PATH,
     ) -> IterationResult[TPlan]:
         """Run iteration loop until approval or termination.
 
@@ -276,7 +277,7 @@ class StandardIterationController(Generic[TPlan]):
             validator: Heuristic validator function (returns list of errors)
             provider: LLM provider
             llm_logger: LLM call logger
-            prompt_base_path: Base path for prompt packs (default: packages/twinklr/core/agents)
+            prompt_base_path: Base path for prompt packs (default: AGENTS_BASE_PATH)
 
         Returns:
             IterationResult with final plan and metadata

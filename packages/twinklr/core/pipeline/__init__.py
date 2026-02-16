@@ -48,7 +48,7 @@ from twinklr.core.pipeline.result import (
     skipped_result,
     success_result,
 )
-from twinklr.core.pipeline.stage import PipelineStage
+from twinklr.core.pipeline.stage import PipelineStage, resolve_typed_input
 
 __all__ = [
     "ExecutionPattern",
@@ -61,6 +61,7 @@ __all__ = [
     "StageResult",
     "cancelled_result",
     "failure_result",
+    "resolve_typed_input",
     "skipped_result",
     "success_result",
 ]

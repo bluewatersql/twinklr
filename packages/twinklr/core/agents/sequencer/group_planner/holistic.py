@@ -12,6 +12,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from twinklr.core.agents._paths import AGENTS_BASE_PATH
 from twinklr.core.agents.issues import IssueSeverity
 from twinklr.core.agents.logging import LLMCallLogger, NullLLMCallLogger
 from twinklr.core.agents.providers.base import LLMProvider
@@ -212,7 +213,6 @@ class HolisticEvaluator:
         Raises:
             ValueError: If group_plan_set is empty
         """
-        from pathlib import Path
 
         from twinklr.core.agents.async_runner import AsyncAgentRunner
 
@@ -232,7 +232,7 @@ class HolisticEvaluator:
         # Create runner and execute
         runner = AsyncAgentRunner(
             provider=self.provider,
-            prompt_base_path=Path("packages/twinklr/core/agents"),
+            prompt_base_path=AGENTS_BASE_PATH,
             llm_logger=self.llm_logger,
         )
 

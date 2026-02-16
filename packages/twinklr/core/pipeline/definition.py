@@ -70,6 +70,8 @@ class StageDefinition:
         critical: Whether failure should fail entire pipeline (default: True)
         max_concurrent_fan_out: Max concurrent executions for FAN_OUT (default: 4, None=unlimited)
         description: Optional human-readable description
+        input_type: Optional type annotation string for stage input (documentation/validation)
+        output_type: Optional type annotation string for stage output (documentation/validation)
 
     Example:
         >>> # Simple sequential stage
@@ -117,6 +119,8 @@ class StageDefinition:
     critical: bool = True
     max_concurrent_fan_out: int | None = 4
     description: str | None = None
+    input_type: str | None = None
+    output_type: str | None = None
 
     def should_execute(self, context: PipelineContext) -> bool:
         """Check if stage should execute based on condition.

@@ -18,9 +18,20 @@ from twinklr.core.pipeline.result import failure_result, success_result
 from twinklr.core.sequencer.planning import GroupPlanSet
 
 if TYPE_CHECKING:
+    from twinklr.core.agents.audio.lyrics.models import (
+        KeyPhrase,
+        LyricContextModel,
+        StoryBeat,
+    )
+    from twinklr.core.agents.sequencer.group_planner.timing import TimingContext
+    from twinklr.core.agents.shared.judge.controller import IterationResult
+    from twinklr.core.audio.models.song_bundle import SongBundle
     from twinklr.core.pipeline.context import PipelineContext
     from twinklr.core.pipeline.result import StageResult
     from twinklr.core.sequencer.planning import MacroSectionPlan, SectionCoordinationPlan
+    from twinklr.core.sequencer.planning.group_plan import NarrativeAssetDirective
+    from twinklr.core.sequencer.templates.group.catalog import TemplateCatalog
+    from twinklr.core.sequencer.templates.group.models.display import DisplayGraph
 
 logger = logging.getLogger(__name__)
 
@@ -65,8 +76,8 @@ class GroupPlannerStage:
 
     def __init__(
         self,
-        display_graph: Any,  # DisplayGraph - using Any to avoid circular import
-        template_catalog: Any,  # TemplateCatalog
+        display_graph: DisplayGraph,
+        template_catalog: TemplateCatalog,
         max_iterations: int = 3,
         min_pass_score: float = 7.0,
     ) -> None:
@@ -128,7 +139,7 @@ class GroupPlannerStage:
                 llm_logger=context.llm_logger,
             )
 
-            def extract_plan(r: Any) -> SectionCoordinationPlan:
+            def extract_plan(r: IterationResult[SectionCoordinationPlan]) -> SectionCoordinationPlan:
                 """Extract plan from result (guaranteed non-None by execute_step)."""
                 if r.plan is None:
                     raise ValueError("IterationResult.plan is None")
@@ -219,12 +230,12 @@ class GroupPlannerStage:
 
     def _build_timing_context(
         self,
-        audio_bundle: Any,
+        audio_bundle: SongBundle,
         *,
         section_id: str,
         section_start_ms: int,
         section_end_ms: int,
-    ) -> Any:
+    ) -> TimingContext:
         """Build timing context from audio bundle with section bounds.
 
         Args:
@@ -281,7 +292,7 @@ class GroupPlannerStage:
 
     def _build_section_lyric_context(
         self,
-        lyric_context_model: Any,
+        lyric_context_model: LyricContextModel | None,
         *,
         section_id: str,
         start_ms: int,
@@ -352,7 +363,7 @@ class GroupPlannerStage:
 
     @staticmethod
     def _beat_matches_section(
-        beat: Any,
+        beat: StoryBeat,
         section_id: str,
         start_ms: int,
         end_ms: int,
@@ -380,7 +391,7 @@ class GroupPlannerStage:
 
     @staticmethod
     def _phrase_matches_section(
-        phrase: Any,
+        phrase: KeyPhrase,
         section_id: str,
         start_ms: int,
         end_ms: int,
@@ -405,7 +416,7 @@ class GroupPlannerStage:
         # Timestamp fallback — phrase timestamp is within section bounds
         return bool(start_ms <= phrase.timestamp_ms < end_ms)
 
-    def _extract_layer_intents(self, macro_plan: Any) -> list[dict[str, Any]]:
+    def _extract_layer_intents(self, macro_plan: MacroSectionPlan | None) -> list[dict[str, Any]]:
         """Extract layer intents from macro plan.
 
         Args:
@@ -452,9 +463,9 @@ class GroupPlanAggregatorStage:
 
     async def execute(
         self,
-        input: list[Any],  # list[SectionCoordinationPlan]
+        input: list[SectionCoordinationPlan],
         context: PipelineContext,
-    ) -> StageResult[Any]:  # StageResult[GroupPlanSet]
+    ) -> StageResult[GroupPlanSet]:
         """Aggregate section plans into GroupPlanSet.
 
         Args:
@@ -497,8 +508,8 @@ class GroupPlanAggregatorStage:
 
     @staticmethod
     def _aggregate_narrative_directives(
-        section_plans: list[Any],
-    ) -> list[Any]:
+        section_plans: list[SectionCoordinationPlan],
+    ) -> list[NarrativeAssetDirective]:
         """Collect and deduplicate narrative directives across sections.
 
         Deduplicates by directive_id. When duplicates exist, the first occurrence
@@ -510,7 +521,6 @@ class GroupPlanAggregatorStage:
         Returns:
             List of NarrativeAssetDirective with section_ids populated
         """
-        from twinklr.core.sequencer.planning.group_plan import NarrativeAssetDirective
 
         # Collect directives by ID, tracking which sections reference each
         directives_by_id: dict[str, NarrativeAssetDirective] = {}

@@ -11,9 +11,12 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan
     from twinklr.core.config.fixtures import FixtureGroup
+    from twinklr.core.formats.xlights.sequence.models.xsq import TimingTrack
     from twinklr.core.pipeline.context import PipelineContext
     from twinklr.core.pipeline.result import StageResult
+    from twinklr.core.sequencer.timing.beat_grid import BeatGrid
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +75,7 @@ class MovingHeadRenderingStage:
 
     async def execute(
         self,
-        input: dict[str, Any],
+        input: ChoreographyPlan | dict[str, Any],
         context: PipelineContext,
     ) -> StageResult[Path]:
         """Render choreography plan to XSQ file.
@@ -90,26 +93,17 @@ class MovingHeadRenderingStage:
             - Adds "mh_render_segments" to context.metrics
             - Adds "mh_render_transitions" to context.metrics
         """
+        from twinklr.core.agents.sequencer.moving_heads.models import (
+            ChoreographyPlan as _ChoreographyPlan,
+        )
         from twinklr.core.pipeline.result import failure_result, success_result
+        from twinklr.core.pipeline.stage import resolve_typed_input
         from twinklr.core.sequencer.moving_heads.pipeline import RenderingPipeline
 
         try:
-            # Get choreography plan from input (output of MovingHeadStage)
-            # Input may be a dict with keys or the ChoreographyPlan directly
-            from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan
-
-            if isinstance(input, ChoreographyPlan):
-                choreography_plan = input
-            elif isinstance(input, dict):
-                choreography_plan = input.get("moving_heads")
-            else:
-                choreography_plan = None
-
-            if choreography_plan is None:
-                return failure_result(
-                    "Missing 'moving_heads' input (ChoreographyPlan)",
-                    stage_name=self.name,
-                )
+            choreography_plan, _extras = resolve_typed_input(
+                input, _ChoreographyPlan, "moving_heads"
+            )
 
             # Get beat_grid from state (set by MovingHeadStage)
             beat_grid = context.get_state("beat_grid")
@@ -132,6 +126,9 @@ class MovingHeadRenderingStage:
                 f"{beat_grid.total_bars} bars"
             )
 
+            # Build timeline tracks from audio data
+            timeline_tracks = self._build_timeline_tracks(beat_grid, context)
+
             # Create and run rendering pipeline
             pipeline = RenderingPipeline(
                 choreography_plan=choreography_plan,
@@ -140,6 +137,7 @@ class MovingHeadRenderingStage:
                 job_config=context.job_config,
                 output_path=self.xsq_output_path,
                 template_xsq=self.xsq_template_path,
+                timeline_tracks=timeline_tracks,
             )
 
             # Render to segments and export to XSQ
@@ -160,6 +158,36 @@ class MovingHeadRenderingStage:
         except Exception as e:
             logger.exception("Rendering failed", exc_info=e)
             return failure_result(str(e), stage_name=self.name)
+
+    @staticmethod
+    def _build_timeline_tracks(
+        beat_grid: BeatGrid,
+        context: PipelineContext,
+    ) -> list[TimingTrack]:
+        """Build timeline tracks from audio data in pipeline context.
+
+        Reads the audio bundle from context state to extract lyrics and
+        phonemes, then builds timing tracks according to job config.
+
+        Args:
+            beat_grid: Musical timing grid.
+            context: Pipeline context with audio_bundle in state.
+
+        Returns:
+            List of TimingTrack objects for XSQ export.
+        """
+        from twinklr.core.formats.xlights.sequence.timeline import build_timeline_tracks
+
+        audio_bundle = context.get_state("audio_bundle")
+        lyrics_bundle = getattr(audio_bundle, "lyrics", None) if audio_bundle else None
+        phoneme_bundle = getattr(audio_bundle, "phonemes", None) if audio_bundle else None
+
+        return build_timeline_tracks(
+            config=context.job_config.timeline_tracks,
+            beat_grid=beat_grid,
+            lyrics_bundle=lyrics_bundle,
+            phoneme_bundle=phoneme_bundle,
+        )
 
     def _load_fixture_config(self, context: PipelineContext) -> FixtureGroup | None:
         """Load fixture configuration.

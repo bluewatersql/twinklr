@@ -22,6 +22,7 @@ from twinklr.core.formats.xlights.sequence.models.xsq import (
 )
 from twinklr.core.pipeline.context import PipelineContext
 from twinklr.core.pipeline.result import StageResult, failure_result, success_result
+from twinklr.core.pipeline.stage import resolve_typed_input
 from twinklr.core.sequencer.display.renderer import DisplayRenderer, RenderResult
 from twinklr.core.sequencer.planning.group_plan import GroupPlanSet
 from twinklr.core.sequencer.templates.group.models.display import DisplayGraph
@@ -50,7 +51,7 @@ class AssetResolutionStage:
 
     async def execute(
         self,
-        input: Any,
+        input: GroupPlanSet | dict[str, Any],
         context: PipelineContext,
     ) -> StageResult[GroupPlanSet]:
         """Resolve plan assets against the catalog.
@@ -64,18 +65,8 @@ class AssetResolutionStage:
             StageResult containing GroupPlanSet with resolved asset IDs.
         """
         try:
-            # Accept both GroupPlanSet directly and dict input
-            if isinstance(input, GroupPlanSet):
-                plan_set = input
-                catalog = context.get_state("asset_catalog")
-            elif isinstance(input, dict):
-                plan_set = input["plan_set"]
-                catalog = input.get("catalog") or context.get_state("asset_catalog")
-            else:
-                return failure_result(
-                    f"Unexpected input type: {type(input).__name__}",
-                    stage_name=self.name,
-                )
+            plan_set, extras = resolve_typed_input(input, GroupPlanSet, "plan_set")
+            catalog = extras.get("catalog") or context.get_state("asset_catalog")
 
             if catalog is None or not catalog.entries:
                 logger.info("No asset catalog available — skipping resolution")
@@ -151,7 +142,7 @@ class DisplayRenderStage:
 
     async def execute(
         self,
-        input: Any,
+        input: GroupPlanSet | dict[str, Any],
         context: PipelineContext,
     ) -> StageResult[dict[str, Any]]:
         """Render GroupPlanSet to XSequence.
@@ -164,34 +155,22 @@ class DisplayRenderStage:
             StageResult containing dict with ``sequence`` and ``render_result``.
         """
         try:
-            # Accept both GroupPlanSet directly and dict input
-            if isinstance(input, GroupPlanSet):
-                plan_set = input
-                beat_grid = self._beat_grid or context.get_state("beat_grid")
-                display_graph = self._display_graph or context.get_state("display_graph")
-                catalog: AssetCatalog | None = context.get_state("asset_catalog")
-                sequence: XSequence | None = context.get_state("sequence")
-                asset_base_path: Path | None = context.get_state("asset_base_path")
-            elif isinstance(input, dict):
-                plan_set = input["plan_set"]
-                beat_grid = (
-                    input.get("beat_grid") or self._beat_grid or context.get_state("beat_grid")
-                )
-                display_graph = (
-                    input.get("display_graph")
-                    or self._display_graph
-                    or context.get_state("display_graph")
-                )
-                catalog = input.get("catalog") or context.get_state("asset_catalog")
-                sequence = input.get("sequence") or context.get_state("sequence")
-                asset_base_path = input.get("asset_base_path") or context.get_state(
-                    "asset_base_path"
-                )
-            else:
-                return failure_result(
-                    f"Unexpected input type: {type(input).__name__}",
-                    stage_name=self.name,
-                )
+            plan_set, extras = resolve_typed_input(input, GroupPlanSet, "plan_set")
+            beat_grid = (
+                extras.get("beat_grid") or self._beat_grid or context.get_state("beat_grid")
+            )
+            display_graph = (
+                extras.get("display_graph")
+                or self._display_graph
+                or context.get_state("display_graph")
+            )
+            catalog: AssetCatalog | None = extras.get("catalog") or context.get_state(
+                "asset_catalog"
+            )
+            sequence: XSequence | None = extras.get("sequence") or context.get_state("sequence")
+            asset_base_path: Path | None = extras.get("asset_base_path") or context.get_state(
+                "asset_base_path"
+            )
 
             if beat_grid is None:
                 # Try to build from context metrics (set by AudioAnalysisStage)

@@ -1,20 +1,26 @@
 """Holistic evaluator pipeline stage.
 
 Wraps HolisticEvaluator for pipeline execution.
+
+The stage evaluates the complete GroupPlanSet for cross-section coherence,
+stores the evaluation in context state and metrics, and passes the
+GroupPlanSet through to downstream stages unchanged.
 """
 
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any
 
-if TYPE_CHECKING:
-    from twinklr.core.agents.sequencer.group_planner.holistic import HolisticEvaluation
-    from twinklr.core.pipeline.context import PipelineContext
-    from twinklr.core.pipeline.result import StageResult
-
-from twinklr.core.agents.sequencer.group_planner.holistic import HolisticEvaluator
-from twinklr.core.pipeline.result import failure_result
+from twinklr.core.agents.sequencer.group_planner.holistic import (
+    HolisticEvaluation,
+    HolisticEvaluator,
+)
+from twinklr.core.pipeline.context import PipelineContext
+from twinklr.core.pipeline.execution import execute_step
+from twinklr.core.pipeline.result import StageResult, failure_result
+from twinklr.core.sequencer.planning import GroupPlanSet
+from twinklr.core.sequencer.templates.group.catalog import TemplateCatalog
+from twinklr.core.sequencer.templates.group.models import DisplayGraph
 
 logger = logging.getLogger(__name__)
 
@@ -25,22 +31,28 @@ class HolisticEvaluatorStage:
     Evaluates the complete GroupPlanSet for cross-section coherence,
     energy arc, template variety, and MacroPlan alignment.
 
+    This is an informational pass-through stage: the evaluation is stored
+    in context state (``holistic_evaluator_result``) and metrics, but the
+    original GroupPlanSet is returned as output so downstream stages
+    receive the plan unchanged.
+
     Input: GroupPlanSet (from aggregator stage)
-    Output: HolisticEvaluation
+    Output: GroupPlanSet (pass-through; evaluation in state/metrics)
 
     Example:
         >>> stage = HolisticEvaluatorStage(display_graph, template_catalog)
         >>> result = await stage.execute(group_plan_set, context)
         >>> if result.success:
-        ...     evaluation = result.output
-        ...     print(f"Score: {evaluation.score}, Approved: {evaluation.is_approved}")
+        ...     plan = result.output  # GroupPlanSet (unchanged)
+        ...     eval = context.get_state("holistic_evaluator_result")
+        ...     print(f"Score: {eval.score}, Approved: {eval.is_approved}")
     """
 
     def __init__(
         self,
-        display_graph: Any,  # DisplayGraph
-        template_catalog: Any,  # TemplateCatalog
-    ):
+        display_graph: DisplayGraph,
+        template_catalog: TemplateCatalog,
+    ) -> None:
         """Initialize holistic evaluator stage.
 
         Args:
@@ -57,56 +69,42 @@ class HolisticEvaluatorStage:
 
     async def execute(
         self,
-        input: Any,  # GroupPlanSet
+        input: GroupPlanSet,
         context: PipelineContext,
-    ) -> StageResult[HolisticEvaluation]:
+    ) -> StageResult[GroupPlanSet]:
         """Run holistic evaluation on GroupPlanSet.
+
+        The evaluation is stored in context state and metrics. The
+        original GroupPlanSet is returned as output (pass-through) so
+        downstream stages (e.g. asset resolution) receive the plan
+        unchanged.
 
         Args:
             input: GroupPlanSet from aggregator stage
-            context: Pipeline context with state (display_graph, template_catalog, macro_plan)
+            context: Pipeline context with state (macro_plan, etc.)
 
         Returns:
-            StageResult containing HolisticEvaluation
+            StageResult containing the original GroupPlanSet
 
         Side Effects:
-            - Adds "holistic_score" to context.metrics
-            - Adds "holistic_status" to context.metrics
-            - Adds "holistic_issues_count" to context.metrics
+            - Stores HolisticEvaluation in context state as ``holistic_evaluator_result``
+            - Adds ``holistic_score`` to context.metrics
+            - Adds ``holistic_status`` to context.metrics
+            - Adds ``holistic_issues_count`` to context.metrics
         """
-
         try:
-            logger.debug(f"Running holistic evaluation on {len(input.section_plans)} sections")
+            logger.debug("Running holistic evaluation on %d sections", len(input.section_plans))
 
-            # Retrieve macro_plan from state (set by MacroPlannerStage)
             macro_plan = context.get_state("macro_plan")
+            macro_plan_summary = _extract_macro_plan_summary(macro_plan)
 
-            # Build macro_plan_summary for holistic judge
-            macro_plan_summary: dict[str, Any] = {}
-            if macro_plan is not None:
-                # Handle both Pydantic model and dict from cache
-                if isinstance(macro_plan, dict):
-                    global_story = macro_plan.get("global_story")
-                else:
-                    global_story = getattr(macro_plan, "global_story", None)
-
-                if global_story:
-                    # Convert to dict if needed
-                    if isinstance(global_story, dict):
-                        macro_plan_summary["global_story"] = global_story
-                    else:
-                        macro_plan_summary["global_story"] = global_story.model_dump()
-
-            # Create evaluator
             evaluator = HolisticEvaluator(
                 provider=context.provider,
                 llm_logger=context.llm_logger,
             )
 
-            # Use execute_step for caching and metrics
-            from twinklr.core.agents.sequencer.group_planner.holistic import HolisticEvaluation
-            from twinklr.core.pipeline.execution import execute_step
-
+            # Pass-through: evaluate() produces HolisticEvaluation (stored in
+            # state by execute_step), but we return the original GroupPlanSet.
             return await execute_step(
                 stage_name=self.name,
                 context=context,
@@ -116,7 +114,7 @@ class HolisticEvaluatorStage:
                     template_catalog=self.template_catalog,
                     macro_plan_summary=macro_plan_summary,
                 ),
-                result_extractor=lambda r: r,  # Result is already HolisticEvaluation
+                result_extractor=lambda _: input,
                 result_type=HolisticEvaluation,
                 cache_key_fn=lambda: evaluator.get_cache_key(
                     group_plan_set=input,
@@ -132,11 +130,40 @@ class HolisticEvaluatorStage:
             logger.exception("Holistic evaluation failed", exc_info=e)
             return failure_result(str(e), stage_name=self.name)
 
-    def _handle_metrics(self, result: Any, context: PipelineContext) -> None:
+    def _handle_metrics(self, result: HolisticEvaluation, context: PipelineContext) -> None:
         """Track holistic evaluation metrics (extends defaults)."""
-        from twinklr.core.agents.sequencer.group_planner.holistic import HolisticEvaluation
+        context.add_metric("holistic_score", result.score)
+        context.add_metric("holistic_status", result.status.value)
+        context.add_metric("holistic_issues_count", len(result.cross_section_issues))
 
-        if isinstance(result, HolisticEvaluation):
-            context.add_metric("holistic_score", result.score)
-            context.add_metric("holistic_status", result.status.value)
-            context.add_metric("holistic_issues_count", len(result.cross_section_issues))
+
+def _extract_macro_plan_summary(
+    macro_plan: object | None,
+) -> dict[str, object]:
+    """Extract macro plan summary for holistic judge context.
+
+    Handles both Pydantic model and dict (from cache deserialization).
+
+    Args:
+        macro_plan: MacroPlan from context state, or None
+
+    Returns:
+        Summary dict with global_story if available, empty dict otherwise
+    """
+    if macro_plan is None:
+        return {}
+
+    summary: dict[str, object] = {}
+
+    if isinstance(macro_plan, dict):
+        global_story = macro_plan.get("global_story")
+    else:
+        global_story = getattr(macro_plan, "global_story", None)
+
+    if global_story is not None:
+        if isinstance(global_story, dict):
+            summary["global_story"] = global_story
+        else:
+            summary["global_story"] = global_story.model_dump()
+
+    return summary

@@ -24,32 +24,17 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import logging
 
-from twinklr.core.agents.audio.lyrics.stage import LyricsStage
-from twinklr.core.agents.audio.profile.stage import AudioProfileStage
-from twinklr.core.agents.audio.stages.analysis import AudioAnalysisStage
 from twinklr.core.agents.sequencer.group_planner import (
     DisplayGraph,
     DisplayGroup,
     LaneKind,
 )
-from twinklr.core.agents.sequencer.group_planner.stage import (
-    GroupPlanAggregatorStage,
-    GroupPlannerStage,
-)
-
-# from twinklr.core.agents.sequencer.holistic_evaluator.stage import HolisticEvaluatorStage  # Not yet implemented
-from twinklr.core.agents.sequencer.macro_planner.stage import MacroPlannerStage
 from twinklr.core.pipeline import (
     ExecutionPattern,
     PipelineContext,
-    PipelineDefinition,
     PipelineExecutor,
-    StageDefinition,
 )
-from twinklr.core.pipeline.display_stages import (
-    AssetResolutionStage,
-    DisplayRenderStage,
-)
+from twinklr.core.pipeline.definitions import build_display_pipeline
 from twinklr.core.sequencer.templates.group import load_builtin_group_templates
 from twinklr.core.sequencer.templates.group.catalog import (
     build_template_catalog as build_catalog_from_registry,
@@ -215,94 +200,14 @@ async def main() -> None:
     # ========================================================================
     print_section("2. Pipeline Definition", "=")
 
-    pipeline = PipelineDefinition(
-        name="sequencer_pipeline",
-        description="Complete audio to group coordination pipeline",
-        fail_fast=True,
-        stages=[
-            # Stage 1: Audio Analysis
-            StageDefinition(
-                id="audio",
-                stage=AudioAnalysisStage(),
-                description="Analyze audio file for tempo, structure, features",
-            ),
-            # Stage 2a: Audio Profile (parallel with lyrics)
-            StageDefinition(
-                id="profile",
-                stage=AudioProfileStage(),
-                inputs=["audio"],
-                description="Generate musical analysis and creative guidance",
-            ),
-            # Stage 2b: Lyrics Analysis (parallel with profile, conditional)
-            StageDefinition(
-                id="lyrics",
-                stage=LyricsStage(),
-                inputs=["audio"],
-                pattern=ExecutionPattern.CONDITIONAL,
-                condition=lambda ctx: ctx.get_state("has_lyrics", False),
-                critical=False,  # Pipeline continues if no lyrics
-                description="Generate narrative and thematic analysis",
-            ),
-            # Stage 3: Macro Planning
-            # Outputs list[MacroSectionPlan] for direct FAN_OUT
-            # Stores full MacroPlan in state
-            StageDefinition(
-                id="macro",
-                stage=MacroPlannerStage(display_groups=display_groups),
-                inputs=["profile", "lyrics"],
-                description="Generate high-level choreography strategy (outputs section list)",
-            ),
-            # Stage 4: GroupPlanner (FAN_OUT - parallel per section)
-            # Each invocation:
-            # - Receives ONE MacroSectionPlan
-            # - Builds its own context from state (audio_bundle, macro_plan)
-            # - Uses display_graph, template_catalog from constructor
-            StageDefinition(
-                id="groups",
-                stage=GroupPlannerStage(
-                    display_graph=display_graph,
-                    template_catalog=template_catalog,
-                    max_iterations=session.job_config.agent.max_iterations,
-                    min_pass_score=session.job_config.agent.success_threshold / 10.0,
-                ),
-                inputs=["macro"],
-                pattern=ExecutionPattern.FAN_OUT,
-                description="Generate section coordination plans (parallel per section)",
-            ),
-            # Stage 5: Aggregator
-            StageDefinition(
-                id="aggregate",
-                stage=GroupPlanAggregatorStage(plan_set_id=f"{song_name}_group_plan"),
-                inputs=["groups"],
-                description="Aggregate section plans into GroupPlanSet",
-            ),
-            # # Stage 6: Holistic Evaluation (Not yet implemented)
-            # StageDefinition(
-            #     id="holistic",
-            #     stage=HolisticEvaluatorStage(
-            #         display_graph=display_graph,
-            #         template_catalog=template_catalog,
-            #     ),
-            #     inputs=["aggregate"],
-            #     description="Evaluate complete GroupPlanSet quality",
-            # ),
-            # Stage 7: Asset Resolution (resolve plan → catalog entries)
-            # Reads optional asset_catalog from context.state
-            StageDefinition(
-                id="asset_resolution",
-                stage=AssetResolutionStage(),
-                inputs=["aggregate"],
-                description="Resolve plan assets against catalog (overlay rendering)",
-            ),
-            # Stage 8: Display Rendering (GroupPlanSet → XSequence)
-            # Reads beat_grid, display_graph, asset_catalog from context.state
-            StageDefinition(
-                id="display_render",
-                stage=DisplayRenderStage(display_graph=display_graph),
-                inputs=["asset_resolution"],
-                description="Render effects into xLights .xsq sequence",
-            ),
-        ],
+    pipeline = build_display_pipeline(
+        display_graph=display_graph,
+        template_catalog=template_catalog,
+        display_groups=display_groups,
+        song_name=song_name,
+        max_iterations=session.job_config.agent.max_iterations,
+        min_pass_score=session.job_config.agent.success_threshold / 10.0,
+        enable_holistic=True,
     )
 
     # Validate pipeline
@@ -429,9 +334,9 @@ async def main() -> None:
         )
         print(f"📄 Group plan set: {group_plan_path.stem}")
 
-    # Holistic evaluation
-    if "holistic" in result.outputs:
-        holistic_eval = result.outputs["holistic"]
+    # Holistic evaluation (stored in context state, not output — stage is pass-through)
+    holistic_eval = pipeline_context.get_state("holistic_evaluator_result")
+    if holistic_eval is not None:
         holistic_path = save_artifact(
             holistic_eval.model_dump(),
             song_name,
@@ -439,6 +344,7 @@ async def main() -> None:
             output_dir,
         )
         print(f"📄 Holistic evaluation: {holistic_path.stem}")
+        print(f"   Score: {holistic_eval.score:.1f}, Status: {holistic_eval.status.value}")
 
     # Display render → XSQ export
     if "display_render" in result.outputs:
@@ -477,8 +383,9 @@ async def main() -> None:
         print("  3. MacroPlanner → list[MacroSectionPlan]")
         print("  4. GroupPlanner (FAN_OUT per section)")
         print("  5. Aggregator (collect section plans)")
-        print("  6. Asset Resolution")
-        print("  7. Display Rendering → .xsq export")
+        print("  6. Holistic Evaluation (cross-section quality)")
+        print("  7. Asset Resolution")
+        print("  8. Display Rendering → .xsq export")
 
         if "aggregate" in result.outputs:
             gps = result.outputs["aggregate"]
