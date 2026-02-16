@@ -154,10 +154,12 @@ The choreography planner uses an iterative refinement loop:
 1. **Planner** generates a `ChoreographyPlan` (template + preset per song section)
 2. **Heuristic Validator** checks structural validity (fast, free)
 3. **LLM Validator** checks semantic quality (template appropriateness, coordination)
-4. **Judge** scores the plan (0-10) and decides: approve, soft-fail (refine), or hard-fail (redo)
+4. **Judge** scores the plan (0-10) and decides: approve, soft-fail (revise), or hard-fail (redo)
 5. Structured feedback loops back to the planner for the next iteration
 
 Plans that score 7.0+ are approved. The loop runs up to 3 iterations by default.
+
+Pipeline failure policy is fail-fast: non-judge stage failures abort execution and partial render output is not emitted. Step restartability is handled through successful-stage cache reuse on rerun after the failure condition is corrected.
 
 ## Development
 

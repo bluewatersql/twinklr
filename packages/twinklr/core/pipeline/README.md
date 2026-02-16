@@ -11,7 +11,7 @@ The pipeline framework provides a clean abstraction for building complex multi-s
 - **Fan-out pattern** - Execute a stage N times in parallel (e.g., per display group)
 - **Conditional execution** - Skip stages based on runtime conditions
 - **Retry logic** - Configurable exponential backoff retry
-- **Error handling** - Fail-fast or continue-on-error modes
+- **Error handling** - Fail-fast execution (no partial render outputs)
 - **State management** - Shared context across stages
 - **Metrics tracking** - Built-in observability
 
@@ -47,9 +47,17 @@ PipelineStage (Protocol)
 3. For each wave:
    a. Execute all stages in wave concurrently
    b. Collect outputs
-   c. Handle failures (fail-fast or continue)
+   c. Fail immediately on any stage failure (no partial continuation)
 4. Return PipelineResult with all outputs
 ```
+
+## Failure Strategy
+
+- **Fail-fast is the default and required pipeline behavior** for render/export workflows.
+- **No partial rendering**: when any non-judge stage fails, the pipeline aborts and does not emit partial sequence output.
+- **Only exception**: judge/critic `soft_fail` used inside iterative planning loops when token budget or iteration ceilings are reached.
+- **Restartability is cache-backed**: successful stages are cached, and reruns reuse those cached artifacts after the error condition is resolved.
+- **Cache writes are success-only**: failed stage outputs are never committed as resumable artifacts.
 
 ## Usage
 
