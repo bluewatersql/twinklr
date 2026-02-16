@@ -86,9 +86,8 @@ class SectionPlanValidator:
         self.template_catalog = template_catalog
         self.timing_context = timing_context
 
-        # Build lookup sets for fast validation (plannable groups only;
-        # CONTAINER groups are not valid plan targets)
-        self._valid_group_ids = {g.group_id for g in display_graph.plannable_groups}
+        # Build lookup set for fast validation
+        self._valid_group_ids = {g.group_id for g in display_graph.groups}
 
     def _get_section_end_bar(self, section_end_ms: int) -> int:
         """Get the bar number for a given millisecond position.
@@ -452,7 +451,11 @@ class SectionPlanValidator:
                                     f"{source_i} ({start_i}-{end_i}ms) and {source_j} ({start_j}-{end_j}ms)"
                                 ),
                                 field_path=f"lane_plans[{lane.value}]",
-                                fix_hint="Remove group from one coordination_plan or make timing sequential",
+                                fix_hint=(
+                                    f"MERGE '{group_id}' into a single coordination_plan in {lane.value} "
+                                    f"lane, OR remove the shorter placement ({source_j}), OR adjust "
+                                    f"timing so {source_j} starts after {end_i}ms"
+                                ),
                             )
                         )
                     elif start_j < end_i:
@@ -510,19 +513,26 @@ class SectionPlanValidator:
                     )
                 )
             else:
-                # Check template-lane compatibility
-                expected_prefix = f"gtpl_{lane.value.lower()}_"
-                if not placement.template_id.startswith(expected_prefix):
+                # Check template-lane compatibility using catalog metadata
+                entry = self.template_catalog.get_entry(placement.template_id)
+                if entry and lane not in entry.compatible_lanes:
+                    # Suggest valid alternatives from the same lane
+                    lane_templates = self.template_catalog.list_by_lane(lane)
+                    suggestions = [t.template_id for t in lane_templates[:5]]
                     errors.append(
                         ValidationIssue(
                             severity=ValidationSeverity.ERROR,
                             code="TEMPLATE_LANE_MISMATCH",
                             message=(
-                                f"Template '{placement.template_id}' in {lane.value} lane "
-                                f"(expected {expected_prefix}* templates)"
+                                f"Template '{placement.template_id}' is not compatible "
+                                f"with {lane.value} lane (compatible: "
+                                f"{[lk.value for lk in entry.compatible_lanes]})"
                             ),
                             field_path=f"placement[{placement.placement_id}].template_id",
-                            fix_hint=f"Use a {lane.value} template (gtpl_{lane.value.lower()}_*)",
+                            fix_hint=(
+                                f"Replace with a {lane.value}-compatible template. "
+                                f"Examples: {', '.join(suggestions)}"
+                            ),
                         )
                     )
 
@@ -655,7 +665,12 @@ class SectionPlanValidator:
                                 f"placements '{pid1}' and '{pid2}'"
                             ),
                             field_path=f"lane_plans[{lane.value}].placements",
-                            fix_hint="Adjust placement timing to avoid overlaps",
+                            fix_hint=(
+                                f"Each group can only have ONE active placement at a time "
+                                f"per lane. Remove '{pid2}' or change its start to after "
+                                f"'{pid1}' ends. For continuous coverage, use a single "
+                                f"SECTION-duration placement instead of multiple overlapping ones."
+                            ),
                         )
                     )
 
@@ -690,19 +705,25 @@ class SectionPlanValidator:
                 )
             )
         else:
-            # Check template-lane compatibility
-            expected_prefix = f"gtpl_{lane.value.lower()}_"
-            if not window.template_id.startswith(expected_prefix):
+            # Check template-lane compatibility using catalog metadata
+            entry = self.template_catalog.get_entry(window.template_id)
+            if entry and lane not in entry.compatible_lanes:
+                lane_templates = self.template_catalog.list_by_lane(lane)
+                suggestions = [t.template_id for t in lane_templates[:5]]
                 errors.append(
                     ValidationIssue(
                         severity=ValidationSeverity.ERROR,
                         code="TEMPLATE_LANE_MISMATCH",
                         message=(
-                            f"Template '{window.template_id}' in {lane.value} lane "
-                            f"(expected {expected_prefix}* templates)"
+                            f"Template '{window.template_id}' is not compatible "
+                            f"with {lane.value} lane (compatible: "
+                            f"{[lk.value for lk in entry.compatible_lanes]})"
                         ),
                         field_path=f"lane_plans[{lane.value}].window.template_id",
-                        fix_hint=f"Use a {lane.value} template (gtpl_{lane.value.lower()}_*)",
+                        fix_hint=(
+                            f"Replace with a {lane.value}-compatible template. "
+                            f"Examples: {', '.join(suggestions)}"
+                        ),
                     )
                 )
 

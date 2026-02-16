@@ -68,7 +68,10 @@ class CacheConfig(BaseModel):
 
     enabled: bool = Field(default=True, description="Enable cache")
     cache_path: str = Field(default="data/cache", description="Path to cache")
-    ttl_seconds: float = Field(default=3600.0, description="Cache TTL in seconds")
+    ttl_seconds: float | None = Field(
+        default=None,
+        description="Cache TTL in seconds (None = no expiration, fingerprint handles invalidation)",
+    )
 
 
 class AgentOrchestrationConfig(BaseModel):
@@ -120,7 +123,7 @@ class AgentOrchestrationConfig(BaseModel):
 
 def _get_cache_default(cache_type: str) -> CacheConfig:
     """Return default cache configuration."""
-    return CacheConfig(enabled=True, cache_path=f"data/cache/{cache_type}", ttl_seconds=3600.0)
+    return CacheConfig(enabled=True, cache_path=f"data/cache/{cache_type}", ttl_seconds=None)
 
 
 class ChannelDefaults(BaseModel):

@@ -40,7 +40,6 @@ from twinklr.core.sequencer.templates.group.catalog import (
     build_template_catalog as build_catalog_from_registry,
 )
 from twinklr.core.sequencer.templates.group.models.display import (
-    ElementType,
     GroupPosition,
 )
 from twinklr.core.sequencer.vocabulary.display import (
@@ -90,44 +89,22 @@ def save_artifact(data: dict, song_name: str, filename: str, output_dir: Path) -
 def build_display_graph() -> DisplayGraph:
     """Build a demo DisplayGraph with hierarchy and spatial metadata.
 
-    Structure:
-        ALL_DISPLAY (CONTAINER, 100%)
-        ├── HOUSE (CONTAINER, 35%)
-        │   ├── OUTLINE (STRING, HORIZONTAL_ROW, FULL_WIDTH/HIGH, 20%)
-        │   └── WINDOWS (WINDOW, GRID, CENTER/MID, 15%)
-        ├── YARD (CONTAINER, 55%)
-        │   ├── MEGA_TREE (TREE, SINGLE, CENTER/FULL_HEIGHT, 25%)
-        │   ├── ARCHES (ARCH, HORIZONTAL_ROW, FULL_WIDTH/LOW, 15%)
-        │   └── HERO (PROP, CLUSTER, CENTER_LEFT/LOW, 15%)
-        └── ACCENT (CONTAINER, 10% — placeholder)
+    Structure::
+
+        OUTLINE (STRING, HORIZONTAL_ROW, FULL_WIDTH/HIGH, 20%)
+        WINDOWS (WINDOW, GRID, CENTER/MID, 15%)
+        MEGA_TREE (TREE, SINGLE, CENTER/FULL_HEIGHT, 25%)
+        ARCHES (ARCH, HORIZONTAL_ROW, FULL_WIDTH/LOW, 15%)
+        HERO (PROP, CLUSTER, CENTER_LEFT/LOW, 15%)
     """
     return DisplayGraph(
         display_id="demo_display",
         display_name="Demo Display",
         groups=[
-            # Root container
-            DisplayGroup(
-                group_id="ALL_DISPLAY",
-                role="ALL_DISPLAY",
-                display_name="ALL Display",
-                element_type=ElementType.CONTAINER,
-                pixel_fraction=1.0,
-            ),
-            # House zone container
-            DisplayGroup(
-                group_id="HOUSE",
-                role="HOUSE",
-                display_name="House",
-                element_type=ElementType.CONTAINER,
-                parent_group_id="ALL_DISPLAY",
-                pixel_fraction=0.35,
-            ),
             DisplayGroup(
                 group_id="OUTLINE",
                 role="OUTLINE",
                 display_name="OUTLINE",
-                element_type=ElementType.MODEL_GROUP,
-                parent_group_id="HOUSE",
                 element_kind=DisplayElementKind.STRING,
                 arrangement=GroupArrangement.HORIZONTAL_ROW,
                 pixel_density=PixelDensity.MEDIUM,
@@ -145,8 +122,6 @@ def build_display_graph() -> DisplayGraph:
                 group_id="WINDOWS",
                 role="WINDOWS",
                 display_name="WINDOWS",
-                element_type=ElementType.MODEL_GROUP,
-                parent_group_id="HOUSE",
                 element_kind=DisplayElementKind.WINDOW,
                 arrangement=GroupArrangement.GRID,
                 pixel_density=PixelDensity.HIGH,
@@ -160,21 +135,10 @@ def build_display_graph() -> DisplayGraph:
                 fixture_count=8,
                 pixel_fraction=0.15,
             ),
-            # Yard zone container
-            DisplayGroup(
-                group_id="YARD",
-                role="YARD",
-                display_name="Yard",
-                element_type=ElementType.CONTAINER,
-                parent_group_id="ALL_DISPLAY",
-                pixel_fraction=0.55,
-            ),
             DisplayGroup(
                 group_id="MEGA_TREE",
                 role="MEGA_TREE",
                 display_name="MEGA_TREE",
-                element_type=ElementType.MODEL,
-                parent_group_id="YARD",
                 element_kind=DisplayElementKind.TREE,
                 arrangement=GroupArrangement.SINGLE,
                 pixel_density=PixelDensity.HIGH,
@@ -192,8 +156,6 @@ def build_display_graph() -> DisplayGraph:
                 group_id="ARCHES",
                 role="ARCHES",
                 display_name="ARCHES",
-                element_type=ElementType.MODEL_GROUP,
-                parent_group_id="YARD",
                 element_kind=DisplayElementKind.ARCH,
                 arrangement=GroupArrangement.HORIZONTAL_ROW,
                 pixel_density=PixelDensity.MEDIUM,
@@ -211,8 +173,6 @@ def build_display_graph() -> DisplayGraph:
                 group_id="HERO",
                 role="HERO",
                 display_name="HERO",
-                element_type=ElementType.MODEL_GROUP,
-                parent_group_id="YARD",
                 element_kind=DisplayElementKind.PROP,
                 arrangement=GroupArrangement.CLUSTER,
                 pixel_density=PixelDensity.MEDIUM,
@@ -299,11 +259,8 @@ async def main() -> None:
     template_catalog = build_catalog_from_registry()
 
     print_subsection("1. Display Configuration")
-    print(
-        f"🎯 Display graph: {len(display_graph.groups)} total, "
-        f"{len(display_graph.plannable_groups)} plannable"
-    )
-    for g in display_graph.plannable_groups:
+    print(f"🎯 Display graph: {len(display_graph.groups)} groups")
+    for g in display_graph.groups:
         kind_str = f" [{g.element_kind.value}]" if g.element_kind else ""
         pct_str = f" {g.pixel_fraction:.0%}" if g.pixel_fraction > 0 else ""
         print(f"   - {g.group_id}{kind_str} ({g.fixture_count} models{pct_str})")

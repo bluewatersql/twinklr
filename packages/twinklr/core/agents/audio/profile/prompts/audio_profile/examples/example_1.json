@@ -26,7 +26,7 @@
       "overall": 0.82,
       "section_profiles": [
         {
-          "section_id": "intro_0",
+          "section_id": "intro",
           "energy_curve": [
             {"t_ms": 0, "energy": 0.3},
             {"t_ms": 2000, "energy": 0.4},
@@ -52,7 +52,7 @@
           "characteristics": ["building", "sustained"]
         },
         {
-          "section_id": "chorus_2",
+          "section_id": "chorus_1",
           "energy_curve": [
             {"t_ms": 38000, "energy": 0.90},
             {"t_ms": 45000, "energy": 0.93},

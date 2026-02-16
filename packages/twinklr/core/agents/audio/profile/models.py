@@ -87,9 +87,21 @@ class SongIdentity(BaseModel):
 class SongSectionRef(BaseModel):
     """Reference to a song section with timing."""
 
-    section_id: str = Field(description="Unique section identifier")
+    section_id: str = Field(
+        description=(
+            "Unique section identifier — must be distinct across ALL sections "
+            "(e.g., 'intro', 'chorus_1', 'chorus_2', 'verse_1', 'verse_2', 'break_1', 'outro'). "
+            "Append _N suffix when a section type repeats."
+        )
+    )
 
-    name: str = Field(description="Section name (e.g., 'verse_1', 'chorus', 'bridge')")
+    name: str = Field(
+        description=(
+            "Generic section type label (e.g., 'intro', 'verse', 'chorus', 'bridge', "
+            "'instrumental', 'outro'). NOT the unique ID — use the same label for "
+            "repeated types (both chorus_1 and chorus_2 have name='chorus')."
+        )
+    )
 
     start_ms: int = Field(ge=0, description="Section start time in milliseconds")
 

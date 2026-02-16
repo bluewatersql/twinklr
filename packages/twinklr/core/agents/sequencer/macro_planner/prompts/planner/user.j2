@@ -15,10 +15,10 @@ Refinement iterations (2+) use user_refinement.j2 instead.
 ## Song Structure (YOU MUST PLAN ALL {{ audio_profile.structure.sections | length }} SECTIONS)
 
 {% for section in audio_profile.structure.sections %}
-- **{{ section.name }}** ({{ section.section_id }}) - {{ (section.start_ms / 1000) | round(1) }}s to {{ (section.end_ms / 1000) | round(1) }}s
+- **{{ section.section_id }}** — {{ (section.start_ms / 1000) | round(1) }}s to {{ (section.end_ms / 1000) | round(1) }}s
 {% endfor %}
 
-**CRITICAL**: Your section_plans array MUST include exactly {{ audio_profile.structure.sections | length }} entries, one for each section_id listed above.
+**CRITICAL**: Your `section_plans` array MUST include exactly {{ audio_profile.structure.sections | length }} entries. Each entry's `section.section_id` MUST be the exact unique ID from the list above (e.g., `chorus_1`, NOT `chorus`). Copy `section_id` values verbatim — they include `_N` suffixes when a type repeats.
 
 ## Energy Profile
 

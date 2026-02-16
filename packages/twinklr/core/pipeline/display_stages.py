@@ -280,10 +280,24 @@ class DisplayRenderStage:
             )
             return None
 
+        # Handle both Pydantic model and dict (from cache deserialization)
+        if isinstance(macro_plan, dict):
+            section_plans = macro_plan.get("section_plans", [])
+        else:
+            section_plans = macro_plan.section_plans
+
         boundaries: list[tuple[str, int, int]] = []
-        for sp in macro_plan.section_plans:
-            sec = sp.section
-            boundaries.append((sec.section_id, sec.start_ms, sec.end_ms))
+        for sp in section_plans:
+            if isinstance(sp, dict):
+                sec = sp.get("section", {})
+                boundaries.append((
+                    sec.get("section_id", ""),
+                    sec.get("start_ms", 0),
+                    sec.get("end_ms", 0),
+                ))
+            else:
+                sec = sp.section
+                boundaries.append((sec.section_id, sec.start_ms, sec.end_ms))
 
         logger.info(
             "Extracted %d section boundaries from macro plan",

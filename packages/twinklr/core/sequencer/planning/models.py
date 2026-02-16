@@ -308,8 +308,17 @@ class MacroPlan(BaseModel):
 
         # Check for duplicate section IDs
         section_ids = [plan.section.section_id for plan in v]
-        if len(section_ids) != len(set(section_ids)):
-            raise ValueError("Duplicate section_id found")
+        seen: set[str] = set()
+        duplicates: list[str] = []
+        for sid in section_ids:
+            if sid in seen:
+                duplicates.append(sid)
+            seen.add(sid)
+        if duplicates:
+            raise ValueError(
+                f"Duplicate section_id found: {duplicates}. "
+                f"Each section_id must be unique (e.g., 'chorus_1', 'chorus_2', not 'chorus')."
+            )
 
         # Check sections are sorted by start_ms
         start_times = [plan.section.start_ms for plan in v]

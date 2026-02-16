@@ -34,27 +34,11 @@ from twinklr.core.sequencer.vocabulary.spatial import (
 # ---------------------------------------------------------------------------
 
 
-def _make_container(
-    group_id: str,
-    *,
-    parent: str | None = None,
-    pixel_fraction: float = 0.0,
-) -> DisplayGroup:
-    """Helper to create a CONTAINER group."""
-    return DisplayGroup(
-        group_id=group_id,
-        role=group_id,
-        display_name=group_id,
-        element_type=ElementType.CONTAINER,
-        parent_group_id=parent,
-        pixel_fraction=pixel_fraction,
-    )
-
-
 def _make_group(
     group_id: str,
     *,
     parent: str | None = None,
+    element_type: ElementType = ElementType.MODEL_GROUP,
     kind: DisplayElementKind = DisplayElementKind.STRING,
     arrangement: GroupArrangement = GroupArrangement.HORIZONTAL_ROW,
     density: PixelDensity = PixelDensity.MEDIUM,
@@ -66,12 +50,12 @@ def _make_group(
     pixel_fraction: float = 0.1,
     fixture_count: int = 1,
 ) -> DisplayGroup:
-    """Helper to create a MODEL_GROUP with full metadata."""
+    """Helper to create a DisplayGroup with full metadata."""
     return DisplayGroup(
         group_id=group_id,
         role=group_id,
         display_name=group_id,
-        element_type=ElementType.MODEL_GROUP,
+        element_type=element_type,
         parent_group_id=parent,
         element_kind=kind,
         arrangement=arrangement,
@@ -92,23 +76,34 @@ def _make_group(
 def sample_graph() -> DisplayGraph:
     """Realistic display hierarchy for testing.
 
-    ALL_DISPLAY (CONTAINER)
-    ├── HOUSE (CONTAINER)
+    ALL_DISPLAY (MODEL_GROUP, parent of all)
+    ├── HOUSE (MODEL_GROUP, parent of OUTLINE + WINDOWS)
     │   ├── OUTLINE (MODEL_GROUP, STRING, h=FULL_WIDTH, v=HIGH, d=FAR)
     │   └── WINDOWS (MODEL_GROUP, WINDOW, h=CENTER, v=MID, d=MID)
-    ├── YARD (CONTAINER)
-    │   ├── MEGA_TREE (MODEL_GROUP, TREE, h=CENTER, v=FULL_HEIGHT, d=NEAR)
+    ├── YARD (MODEL_GROUP, parent of MEGA_TREE + ARCHES + CANDY_CANES)
+    │   ├── MEGA_TREE (MODEL, TREE, h=CENTER, v=FULL_HEIGHT, d=NEAR)
     │   ├── ARCHES (MODEL_GROUP, ARCH, h=FULL_WIDTH, v=LOW, d=NEAR)
     │   └── CANDY_CANES (MODEL_GROUP, CANDY_CANE, h=RIGHT, v=LOW, d=NEAR)
-    └── ACCENT_ZONE (CONTAINER)
+    └── ACCENT_ZONE (MODEL_GROUP, parent of SANTA)
         └── SANTA (MODEL_GROUP, PROP, h=LEFT, v=GROUND, d=NEAR)
     """
     return DisplayGraph(
         display_id="test_display",
         display_name="Test Display",
         groups=[
-            _make_container("ALL_DISPLAY", pixel_fraction=1.0),
-            _make_container("HOUSE", parent="ALL_DISPLAY", pixel_fraction=0.35),
+            _make_group(
+                "ALL_DISPLAY",
+                kind=DisplayElementKind.MIXED,
+                arrangement=GroupArrangement.CLUSTER,
+                pixel_fraction=1.0,
+            ),
+            _make_group(
+                "HOUSE",
+                parent="ALL_DISPLAY",
+                kind=DisplayElementKind.MIXED,
+                arrangement=GroupArrangement.CLUSTER,
+                pixel_fraction=0.35,
+            ),
             _make_group(
                 "OUTLINE",
                 parent="HOUSE",
@@ -137,10 +132,17 @@ def sample_graph() -> DisplayGraph:
                 pixel_fraction=0.15,
                 fixture_count=8,
             ),
-            _make_container("YARD", parent="ALL_DISPLAY", pixel_fraction=0.55),
+            _make_group(
+                "YARD",
+                parent="ALL_DISPLAY",
+                kind=DisplayElementKind.MIXED,
+                arrangement=GroupArrangement.CLUSTER,
+                pixel_fraction=0.55,
+            ),
             _make_group(
                 "MEGA_TREE",
                 parent="YARD",
+                element_type=ElementType.MODEL,
                 kind=DisplayElementKind.TREE,
                 arrangement=GroupArrangement.SINGLE,
                 density=PixelDensity.HIGH,
@@ -177,7 +179,13 @@ def sample_graph() -> DisplayGraph:
                 pixel_fraction=0.15,
                 fixture_count=4,
             ),
-            _make_container("ACCENT_ZONE", parent="ALL_DISPLAY", pixel_fraction=0.10),
+            _make_group(
+                "ACCENT_ZONE",
+                parent="ALL_DISPLAY",
+                kind=DisplayElementKind.MIXED,
+                arrangement=GroupArrangement.CLUSTER,
+                pixel_fraction=0.10,
+            ),
             _make_group(
                 "SANTA",
                 parent="ACCENT_ZONE",
@@ -242,7 +250,7 @@ class TestHierarchyTraversal:
 
     def test_get_descendants_of_root(self, sample_graph: DisplayGraph) -> None:
         descendants = sample_graph.get_descendants("ALL_DISPLAY")
-        # 3 containers (HOUSE, YARD, ACCENT_ZONE) + 6 plannable groups
+        # 3 zone groups + 6 leaf groups = 9
         assert len(descendants) == 9
 
     def test_get_root_groups(self, sample_graph: DisplayGraph) -> None:
@@ -266,22 +274,10 @@ class TestHierarchyTraversal:
 
 
 class TestFilteredViews:
-    """Test plannable_groups, groups_in_zone, and groups_by_role."""
+    """Test groups_in_zone and groups_by_role."""
 
-    def test_plannable_groups_excludes_containers(self, sample_graph: DisplayGraph) -> None:
-        plannable = sample_graph.plannable_groups
-        plannable_ids = {g.group_id for g in plannable}
-        assert plannable_ids == {
-            "OUTLINE",
-            "WINDOWS",
-            "MEGA_TREE",
-            "ARCHES",
-            "CANDY_CANES",
-            "SANTA",
-        }
-        # No containers in plannable groups
-        for g in plannable:
-            assert g.element_type != ElementType.CONTAINER
+    def test_all_groups_are_in_graph(self, sample_graph: DisplayGraph) -> None:
+        assert len(sample_graph.groups) == 10
 
     def test_groups_in_zone(self, sample_graph: DisplayGraph) -> None:
         yard_groups = sample_graph.groups_in_zone(DisplayZone.YARD)
@@ -292,8 +288,7 @@ class TestFilteredViews:
         perimeter_groups = sample_graph.groups_in_zone(DisplayZone.PERIMETER)
         assert perimeter_groups == []
 
-    def test_groups_by_role_unchanged(self, sample_graph: DisplayGraph) -> None:
-        """groups_by_role should include all groups (backward compat)."""
+    def test_groups_by_role(self, sample_graph: DisplayGraph) -> None:
         by_role = sample_graph.groups_by_role
         assert "OUTLINE" in by_role
         assert "ALL_DISPLAY" in by_role
@@ -360,16 +355,9 @@ class TestSpatialSorting:
         # OUTLINE (FAR=2) should come before ARCHES (NEAR=0)
         assert ids.index("OUTLINE") < ids.index("ARCHES")
 
-    def test_none_returns_plannable_in_order(self, sample_graph: DisplayGraph) -> None:
+    def test_none_returns_groups_in_order(self, sample_graph: DisplayGraph) -> None:
         sorted_groups = sample_graph.groups_sorted_by(SpatialIntent.NONE)
-        plannable = sample_graph.plannable_groups
-        assert [g.group_id for g in sorted_groups] == [g.group_id for g in plannable]
-
-    def test_sorted_by_excludes_containers(self, sample_graph: DisplayGraph) -> None:
-        for intent in SpatialIntent:
-            sorted_groups = sample_graph.groups_sorted_by(intent)
-            for g in sorted_groups:
-                assert g.element_type != ElementType.CONTAINER
+        assert [g.group_id for g in sorted_groups] == [g.group_id for g in sample_graph.groups]
 
 
 # ---------------------------------------------------------------------------
@@ -446,32 +434,9 @@ class TestValidation:
                 display_id="test",
                 display_name="Test",
                 groups=[
-                    DisplayGroup(
-                        group_id="A",
-                        role="A",
-                        display_name="A",
-                        element_type=ElementType.CONTAINER,
-                        parent_group_id="B",
-                    ),
-                    DisplayGroup(
-                        group_id="B",
-                        role="B",
-                        display_name="B",
-                        element_type=ElementType.CONTAINER,
-                        parent_group_id="A",
-                    ),
+                    _make_group("A", parent="B"),
+                    _make_group("B", parent="A"),
                 ],
-            )
-
-    def test_container_rejects_physical_metadata(self) -> None:
-        """CONTAINER groups must not have element_kind or arrangement."""
-        with pytest.raises(ValidationError, match="CONTAINER"):
-            DisplayGroup(
-                group_id="BAD",
-                role="BAD",
-                display_name="Bad Container",
-                element_type=ElementType.CONTAINER,
-                element_kind=DisplayElementKind.TREE,
             )
 
     def test_flat_graph_no_hierarchy_valid(self) -> None:
@@ -484,7 +449,7 @@ class TestValidation:
                 _make_group("B"),
             ],
         )
-        assert len(graph.plannable_groups) == 2
+        assert len(graph.groups) == 2
 
     def test_schema_version_v2(self, sample_graph: DisplayGraph) -> None:
         assert sample_graph.schema_version == "display-graph.v2"

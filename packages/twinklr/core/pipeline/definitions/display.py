@@ -132,8 +132,8 @@ def build_display_pipeline(
                 stage=AssetCreationStage(),
                 inputs=[aggregate_output_id],
                 input_type="GroupPlanSet",
-                output_type="AssetCatalog",
-                description="Extract, enrich, and generate figurative/narrative assets",
+                output_type="GroupPlanSet",
+                description="Extract, enrich, and generate assets (pass-through; catalog in state)",
             )
         )
         pre_resolution_id = "asset_creation"

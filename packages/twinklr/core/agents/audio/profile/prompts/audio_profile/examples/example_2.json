@@ -23,7 +23,7 @@
       "overall": 0.35,
       "section_profiles": [
         {
-          "section_id": "intro_0",
+          "section_id": "intro",
           "energy_curve": [
             {"t_ms": 0, "energy": 0.15},
             {"t_ms": 3000, "energy": 0.18},
@@ -49,7 +49,7 @@
           "characteristics": ["building", "sustained"]
         },
         {
-          "section_id": "chorus_2",
+          "section_id": "chorus_1",
           "energy_curve": [
             {"t_ms": 48000, "energy": 0.55},
             {"t_ms": 56000, "energy": 0.58},
@@ -62,7 +62,7 @@
           "characteristics": ["peak"]
         },
         {
-          "section_id": "outro_3",
+          "section_id": "outro",
           "energy_curve": [
             {"t_ms": 78000, "energy": 0.45},
             {"t_ms": 87000, "energy": 0.38},

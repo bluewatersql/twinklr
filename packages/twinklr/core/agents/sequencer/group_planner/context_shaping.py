@@ -504,7 +504,6 @@ def shape_holistic_judge_context(
     """
     # Serialize for Jinja2 tojson filter
     group_plan_set_dict = group_plan_set.model_dump()
-    display_graph_dict = display_graph.model_dump()
 
     # Extract global theme context for explicit display
     # Handle both dict and string formats for global_story
@@ -552,8 +551,7 @@ def shape_holistic_judge_context(
 
     return {
         "group_plan_set": group_plan_set_dict,
-        # Only groups_by_role used in prompt
-        "display_graph": {"groups_by_role": display_graph_dict.get("groups_by_role", {})},
+        "display_graph": {"groups_by_role": display_graph.groups_by_role},
         "section_count": len(group_plan_set.section_plans),
         "section_ids": [sp.section_id for sp in group_plan_set.section_plans],
         "macro_plan_summary": macro_plan_summary or {},

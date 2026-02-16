@@ -121,8 +121,12 @@ class TestAssetCreationStage:
             )
 
         assert result.success
-        assert isinstance(result.output, AssetCatalog)
-        catalog: AssetCatalog = result.output
+        # Stage is pass-through: output is the original GroupPlanSet
+        assert isinstance(result.output, GroupPlanSet)
+        assert result.output.plan_set_id == "test_plan"
+        # Catalog stored in context state
+        catalog = context.get_state("asset_catalog")
+        assert isinstance(catalog, AssetCatalog)
         assert len(catalog.entries) >= 1  # At least the text banner
 
     @pytest.mark.asyncio

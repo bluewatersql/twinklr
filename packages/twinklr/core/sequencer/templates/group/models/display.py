@@ -9,17 +9,15 @@ xLights supports two kinds of targetable elements:
 
 Both use ``type="model"`` in the XSQ XML; the distinction is semantic.
 
-Each ``DisplayGroup`` entry maps 1:1 to an xLights element (or is a
-``CONTAINER`` used purely for hierarchy).  The plan references plannable
-entries by ``group_id``, and the ``TargetResolver`` maps that to the
-xLights ``display_name``.
+Each ``DisplayGroup`` entry maps 1:1 to an xLights element.  The plan
+references entries by ``group_id``, and the ``TargetResolver`` maps that
+to the xLights ``display_name``.
 
 **v2 additions (over v1):**
 - Hierarchy via ``parent_group_id`` on ``DisplayGroup``.
 - Categorical spatial position via ``GroupPosition`` (replacing float-based).
 - Physical metadata: ``element_kind``, ``arrangement``, ``pixel_density``,
   ``prominence``, ``pixel_fraction``.
-- ``CONTAINER`` element type for organizational-only groups.
 - Hierarchy traversal and spatial sorting methods on ``DisplayGraph``.
 """
 
@@ -52,14 +50,10 @@ class ElementType(str, Enum):
     - MODEL: Effect targets a single physical model.
     - MODEL_GROUP: Effect targets a group; xLights renders across all
       member models as a single canvas.
-    - CONTAINER: Organizational only — used for hierarchy (e.g.,
-      "ALL Display", "House", "Yard").  Not plannable, not targetable
-      in xLights.
     """
 
     MODEL = "model"
     MODEL_GROUP = "model_group"
-    CONTAINER = "container"
 
 
 class GroupPosition(BaseModel):
@@ -88,20 +82,19 @@ class GroupPosition(BaseModel):
 class DisplayGroup(BaseModel):
     """Single display group definition (v2).
 
-    Represents a targetable xLights element, an individual model, or a
-    ``CONTAINER`` used purely for hierarchy.
+    Represents a targetable xLights element — either an individual model
+    or a model group.
 
     The ``display_name`` must match the exact xLights element name
     (e.g., ``"61 - Arches"``) since groups cannot be created in the
     sequence file alone — they must already exist in the xLights layout.
-    ``CONTAINER`` groups do not map to xLights elements.
 
     Attributes:
         group_id: Unique identifier (UPPER_SNAKE_CASE).
         role: Role name for group-level targeting.
-        display_name: Exact xLights element name (or label for containers).
+        display_name: Exact xLights element name.
         parent_group_id: Parent group for hierarchy (None = top-level).
-        element_type: MODEL, MODEL_GROUP, or CONTAINER.
+        element_type: MODEL or MODEL_GROUP.
         element_kind: Physical type (ARCH, TREE, MATRIX, etc.).
         arrangement: How models are laid out (HORIZONTAL_ROW, GRID, etc.).
         pixel_density: Effect suitability category (LOW, MEDIUM, HIGH).
@@ -122,16 +115,16 @@ class DisplayGroup(BaseModel):
     parent_group_id: str | None = None
     element_type: ElementType = Field(
         default=ElementType.MODEL_GROUP,
-        description="MODEL, MODEL_GROUP, or CONTAINER",
+        description="MODEL or MODEL_GROUP",
     )
 
-    # Physical description (None for CONTAINER groups)
+    # Physical description
     element_kind: DisplayElementKind | None = None
     arrangement: GroupArrangement | None = None
     pixel_density: PixelDensity | None = None
     prominence: DisplayProminence | None = None
 
-    # Spatial position (None for CONTAINER groups)
+    # Spatial position
     position: GroupPosition | None = None
 
     # Metrics
@@ -143,27 +136,6 @@ class DisplayGroup(BaseModel):
         description="Fraction of total display pixels (0.0-1.0)",
     )
 
-    @model_validator(mode="after")
-    def _validate_container_rules(self) -> DisplayGroup:
-        """CONTAINER groups must not carry physical metadata."""
-        if self.element_type == ElementType.CONTAINER:
-            if self.element_kind is not None:
-                msg = "CONTAINER groups must not have element_kind"
-                raise ValueError(msg)
-            if self.arrangement is not None:
-                msg = "CONTAINER groups must not have arrangement"
-                raise ValueError(msg)
-            if self.pixel_density is not None:
-                msg = "CONTAINER groups must not have pixel_density"
-                raise ValueError(msg)
-            if self.prominence is not None:
-                msg = "CONTAINER groups must not have prominence"
-                raise ValueError(msg)
-        return self
-
-
-_PLANNABLE_TYPES: frozenset[ElementType] = frozenset({ElementType.MODEL, ElementType.MODEL_GROUP})
-
 # Center reference for center-outward sorting
 _HORIZONTAL_CENTER: int = HorizontalZone.CENTER.sort_key()
 
@@ -171,17 +143,16 @@ _HORIZONTAL_CENTER: int = HorizontalZone.CENTER.sort_key()
 class DisplayGraph(BaseModel):
     """Complete display configuration with hierarchy and spatial metadata.
 
-    Each entry in ``groups`` maps 1:1 to an xLights element (or is a
-    ``CONTAINER`` for hierarchy).  The mapping from ``group_id`` to
-    ``display_name`` is provided externally.
+    Each entry in ``groups`` maps 1:1 to an xLights element.  The
+    mapping from ``group_id`` to ``display_name`` is provided externally.
 
     **Hierarchy:** Groups form a tree via ``parent_group_id``.  Roots
     have ``parent_group_id=None``.  Cycles and dangling references are
     rejected at validation time.
 
-    **Spatial sorting:** ``groups_sorted_by(intent)`` orders plannable
-    groups using their ``GroupPosition`` for spatial coordination
-    patterns (L2R, R2L, C2O, O2C).
+    **Spatial sorting:** ``groups_sorted_by(intent)`` orders groups
+    using their ``GroupPosition`` for spatial coordination patterns
+    (L2R, R2L, C2O, O2C, B2T, T2B, F2B, B2F).
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -236,12 +207,6 @@ class DisplayGraph(BaseModel):
         for g in self.groups:
             result.setdefault(g.role, []).append(g.group_id)
         return result
-
-    @computed_field  # type: ignore[prop-decorator]
-    @property
-    def plannable_groups(self) -> list[DisplayGroup]:
-        """Groups targetable by the planner (MODEL or MODEL_GROUP)."""
-        return [g for g in self.groups if g.element_type in _PLANNABLE_TYPES]
 
     # -------------------------------------------------------------------
     # Lookup
@@ -305,34 +270,30 @@ class DisplayGraph(BaseModel):
     # -------------------------------------------------------------------
 
     def groups_in_zone(self, zone: DisplayZone) -> list[DisplayGroup]:
-        """All plannable groups whose position is in the given zone."""
-        return [
-            g for g in self.plannable_groups if g.position is not None and g.position.zone == zone
-        ]
+        """All groups whose position is in the given zone."""
+        return [g for g in self.groups if g.position is not None and g.position.zone == zone]
 
     def groups_sorted_by(self, intent: SpatialIntent) -> list[DisplayGroup]:
-        """Plannable groups ordered by spatial intent.
+        """Groups ordered by spatial intent.
 
         Args:
             intent: The spatial direction for ordering.
 
         Returns:
-            Plannable groups sorted according to the intent.
+            Groups sorted according to the intent.
             Groups without a position sort after groups with positions.
-            ``NONE`` returns plannable groups in declaration order.
-            ``RANDOM`` returns plannable groups in a shuffled order.
+            ``NONE`` returns groups in declaration order.
+            ``RANDOM`` returns groups in a shuffled order.
         """
-        plannable = self.plannable_groups
-
         if intent == SpatialIntent.NONE:
-            return plannable
+            return list(self.groups)
 
         if intent == SpatialIntent.RANDOM:
-            result = list(plannable)
+            result = list(self.groups)
             random.shuffle(result)
             return result
 
-        return self._sort_by_intent(plannable, intent)
+        return self._sort_by_intent(list(self.groups), intent)
 
     @staticmethod
     def _sort_by_intent(
@@ -407,7 +368,7 @@ class DisplayGraph(BaseModel):
     # -------------------------------------------------------------------
 
     def to_planner_summary(self) -> list[dict[str, object]]:
-        """Export plannable groups as enriched dicts for LLM planner prompts.
+        """Export groups as enriched dicts for LLM planner prompts.
 
         Each dict includes the group's identity, physical metadata, and
         spatial position so the planner can make informed decisions.
@@ -420,7 +381,7 @@ class DisplayGraph(BaseModel):
             ``parent_group``.
         """
         result: list[dict[str, object]] = []
-        for g in self.plannable_groups:
+        for g in self.groups:
             summary: dict[str, object] = {
                 "role_key": g.role,
                 "group_type": g.element_type.value,

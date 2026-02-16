@@ -45,15 +45,19 @@ logger = logging.getLogger(__name__)
 class AssetCreationStage:
     """Pipeline stage: extract, enrich, generate, and catalog assets.
 
-    Input: dict with keys "aggregate" (GroupPlanSet) and optionally "lyrics" (LyricContextModel)
-    Output: AssetCatalog
+    This is a pass-through stage: the AssetCatalog is stored in context
+    state (``asset_catalog``) and the original GroupPlanSet is returned
+    as output so downstream stages receive the plan unchanged.
+
+    Input: GroupPlanSet (or dict with key "aggregate")
+    Output: GroupPlanSet (pass-through; catalog in context state)
 
     Example:
         >>> stage = AssetCreationStage()
-        >>> input = {"aggregate": group_plan_set, "lyrics": lyric_context}
-        >>> result = await stage.execute(input, context)
+        >>> result = await stage.execute(group_plan_set, context)
         >>> if result.success:
-        ...     catalog = result.output
+        ...     plan = result.output  # GroupPlanSet (unchanged)
+        ...     catalog = context.get_state("asset_catalog")
     """
 
     def __init__(
@@ -77,8 +81,11 @@ class AssetCreationStage:
         self,
         input: GroupPlanSet | dict[str, Any],
         context: PipelineContext,
-    ) -> StageResult[Any]:
+    ) -> StageResult[GroupPlanSet]:
         """Execute the full asset creation pipeline.
+
+        The catalog is stored in ``context.state["asset_catalog"]`` and
+        the original GroupPlanSet is returned as output (pass-through).
 
         Args:
             input: GroupPlanSet directly, or dict with "aggregate"
@@ -88,7 +95,7 @@ class AssetCreationStage:
             context: Pipeline context with provider, session, output_dir.
 
         Returns:
-            StageResult containing AssetCatalog.
+            StageResult containing the original GroupPlanSet (pass-through).
         """
         try:
             plan_set, extras = resolve_typed_input(input, GroupPlanSet, "aggregate")
@@ -214,7 +221,11 @@ class AssetCreationStage:
                 failed,
             )
 
-            return success_result(catalog, stage_name=self.name)
+            # Store catalog in context state for downstream stages
+            context.set_state("asset_catalog", catalog)
+
+            # Pass-through: return the original GroupPlanSet unchanged
+            return success_result(plan_set, stage_name=self.name)
 
         except Exception as e:
             logger.exception("Asset creation failed", exc_info=e)

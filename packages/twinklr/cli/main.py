@@ -22,7 +22,6 @@ from twinklr.core.sequencer.moving_heads.templates.library import list_templates
 from twinklr.core.sequencer.templates.group.models.display import (
     DisplayGraph,
     DisplayGroup,
-    ElementType,
     GroupPosition,
 )
 from twinklr.core.sequencer.vocabulary.display import (
@@ -55,10 +54,9 @@ def build_display_graph() -> DisplayGraph:
 
     Structure::
 
-        ALL_DISPLAY (CONTAINER, 100%)
-        ├── MOVING_HEADS (MODEL_GROUP, 4 fixtures, CENTER/FULL_HEIGHT, 30%)
-        ├── OUTLINE (STRING, HORIZONTAL_ROW, FULL_WIDTH/HIGH, 50%)
-        └── MEGA_TREE (TREE, SINGLE, CENTER/FULL_HEIGHT, 20%)
+        MOVING_HEADS (MODEL_GROUP, 4 fixtures, CENTER/FULL_HEIGHT, 30%)
+        OUTLINE (STRING, HORIZONTAL_ROW, FULL_WIDTH/HIGH, 50%)
+        MEGA_TREE (TREE, SINGLE, CENTER/FULL_HEIGHT, 20%)
 
     Returns:
         Fully populated DisplayGraph.
@@ -68,18 +66,9 @@ def build_display_graph() -> DisplayGraph:
         display_name="CLI Display",
         groups=[
             DisplayGroup(
-                group_id="ALL_DISPLAY",
-                role="ALL_DISPLAY",
-                display_name="ALL Display",
-                element_type=ElementType.CONTAINER,
-                pixel_fraction=1.0,
-            ),
-            DisplayGroup(
                 group_id="MOVING_HEADS",
                 role="MOVING_HEADS",
                 display_name="Moving Heads",
-                element_type=ElementType.MODEL_GROUP,
-                parent_group_id="ALL_DISPLAY",
                 element_kind=DisplayElementKind.MOVING_HEAD,
                 arrangement=GroupArrangement.HORIZONTAL_ROW,
                 pixel_density=PixelDensity.LOW,
@@ -97,8 +86,6 @@ def build_display_graph() -> DisplayGraph:
                 group_id="OUTLINE",
                 role="OUTLINE",
                 display_name="Outline",
-                element_type=ElementType.MODEL_GROUP,
-                parent_group_id="ALL_DISPLAY",
                 element_kind=DisplayElementKind.STRING,
                 arrangement=GroupArrangement.HORIZONTAL_ROW,
                 pixel_density=PixelDensity.MEDIUM,
@@ -116,8 +103,6 @@ def build_display_graph() -> DisplayGraph:
                 group_id="MEGA_TREE",
                 role="MEGA_TREE",
                 display_name="Mega Tree",
-                element_type=ElementType.MODEL,
-                parent_group_id="ALL_DISPLAY",
                 element_kind=DisplayElementKind.TREE,
                 arrangement=GroupArrangement.SINGLE,
                 pixel_density=PixelDensity.HIGH,
@@ -193,7 +178,7 @@ async def run_pipeline_async(
     display_graph = build_display_graph()
     display_groups = display_graph.to_planner_summary()
 
-    console.print(f"[green]🗺️  Display groups:[/green] {len(display_groups)} plannable")
+    console.print(f"[green]🗺️  Display groups:[/green] {len(display_groups)}")
     for dg in display_groups:
         console.print(
             f"   • {dg['role_key']} ({dg['element_kind']}) — "

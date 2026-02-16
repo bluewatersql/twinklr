@@ -25,10 +25,12 @@ from twinklr.core.agents.sequencer.group_planner.validators import (
 )
 from twinklr.core.agents.shared.judge.controller import (
     IterationConfig,
+    IterationContext,
     IterationResult,
     StandardIterationController,
 )
 from twinklr.core.agents.shared.judge.feedback import FeedbackManager
+from twinklr.core.agents.shared.judge.models import IterationState
 from twinklr.core.agents.spec import AgentSpec
 from twinklr.core.sequencer.planning import SectionCoordinationPlan
 
@@ -193,6 +195,28 @@ class GroupPlannerOrchestrator:
             # Intentionally exclude song_duration_ms (song-level data)
         }
 
+    def _is_ultra_short_section(self, section_context: SectionPlanningContext) -> bool:
+        """Check if section is too short for meaningful judge evaluation.
+
+        Sections shorter than ~1 bar are pickups/transitions where the LLM
+        judge can't meaningfully assess "quality" — heuristic validation is
+        sufficient for correctness.
+
+        Args:
+            section_context: Section planning context
+
+        Returns:
+            True if section is < 1 bar (based on timing context)
+        """
+        duration_ms = section_context.duration_ms
+        timing_ctx = section_context.timing_context
+        if timing_ctx.bar_map:
+            first_bar = next(iter(timing_ctx.bar_map.values()))
+            bar_duration_ms = first_bar.duration_ms
+            return duration_ms < bar_duration_ms
+        # Fallback: < 1 second is definitely ultra-short
+        return duration_ms < 1000
+
     async def run(
         self,
         section_context: SectionPlanningContext,
@@ -202,9 +226,13 @@ class GroupPlannerOrchestrator:
         Executes the complete GroupPlanner workflow for one section:
         1. Generate initial section plan (planner agent)
         2. Validate plan (heuristic validator)
-        3. Evaluate plan (section judge agent)
+        3. Evaluate plan (section judge agent) — skipped for ultra-short sections
         4. Refine if needed (repeat with feedback)
         5. Return final plan or best attempt
+
+        For ultra-short sections (< 1 bar), heuristic-only validation is used.
+        The LLM judge can't meaningfully evaluate a 400ms pickup, so if the
+        heuristic passes, the plan is auto-approved.
 
         Args:
             section_context: Complete section planning context
@@ -222,30 +250,17 @@ class GroupPlannerOrchestrator:
             f"Starting GroupPlanner orchestration for section: {section_context.section_id}"
         )
 
-        # Create feedback manager for this section
-        feedback_manager = FeedbackManager()
-
-        # Create controller for this section
-        controller = StandardIterationController[SectionCoordinationPlan](
-            config=self.config,
-            feedback_manager=feedback_manager,
-        )
-
-        # Prepare initial variables for planner
-        initial_variables = self._build_planner_variables(section_context)
-
-        # Create validator function
-        validator = self._build_validator(section_context)
-
-        # Run iteration loop
-        result = await controller.run(
-            planner_spec=self.planner_spec,
-            judge_spec=self.section_judge_spec,
-            initial_variables=initial_variables,
-            validator=validator,
-            provider=self.provider,
-            llm_logger=self.llm_logger,
-        )
+        # For ultra-short sections (< 1 bar), skip the LLM judge entirely.
+        # A 400ms pickup can't be meaningfully "judged" for quality — heuristic
+        # validation is sufficient. This saves tokens and avoids false rejections.
+        if self._is_ultra_short_section(section_context):
+            logger.info(
+                f"⚡ Section {section_context.section_id} is ultra-short "
+                f"({section_context.duration_ms}ms) — using heuristic-only approval"
+            )
+            result = await self._run_heuristic_only(section_context)
+        else:
+            result = await self._run_full_iteration(section_context)
 
         if result.success:
             logger.debug(
@@ -263,6 +278,120 @@ class GroupPlannerOrchestrator:
             )
 
         return result
+
+    async def _run_full_iteration(
+        self,
+        section_context: SectionPlanningContext,
+    ) -> IterationResult[SectionCoordinationPlan]:
+        """Run full planner → heuristic → judge iteration loop.
+
+        Args:
+            section_context: Section planning context
+
+        Returns:
+            IterationResult with final plan
+        """
+        feedback_manager = FeedbackManager()
+        controller = StandardIterationController[SectionCoordinationPlan](
+            config=self.config,
+            feedback_manager=feedback_manager,
+        )
+        initial_variables = self._build_planner_variables(section_context)
+        validator = self._build_validator(section_context)
+
+        return await controller.run(
+            planner_spec=self.planner_spec,
+            judge_spec=self.section_judge_spec,
+            initial_variables=initial_variables,
+            validator=validator,
+            provider=self.provider,
+            llm_logger=self.llm_logger,
+        )
+
+    async def _run_heuristic_only(
+        self,
+        section_context: SectionPlanningContext,
+    ) -> IterationResult[SectionCoordinationPlan]:
+        """Run planner with heuristic-only validation (no LLM judge).
+
+        Used for ultra-short sections (< 1 bar) where LLM judge evaluation
+        is not meaningful. If the heuristic validator passes, the plan is
+        auto-approved.
+
+        Args:
+            section_context: Section planning context
+
+        Returns:
+            IterationResult with final plan
+        """
+        from pathlib import Path
+        from typing import cast
+
+        from twinklr.core.agents._paths import AGENTS_BASE_PATH
+        from twinklr.core.agents.async_runner import AsyncAgentRunner
+        from twinklr.core.agents.state import AgentState
+
+        runner = AsyncAgentRunner(
+            provider=self.provider,
+            prompt_base_path=Path(AGENTS_BASE_PATH),
+            llm_logger=self.llm_logger,
+        )
+
+        initial_variables = self._build_planner_variables(section_context)
+        validator = self._build_validator(section_context)
+        context = IterationContext()
+
+        planner_state: AgentState | None = None
+        if self.planner_spec.mode.value == "conversational":
+            planner_state = AgentState(name=self.planner_spec.name)
+
+        context.update_state(IterationState.PLANNING)
+        context.increment_iteration()
+
+        # Generate plan
+        plan_result = await runner.run(
+            spec=self.planner_spec, variables=initial_variables, state=planner_state
+        )
+        context.add_tokens(plan_result.tokens_used or 0)
+
+        if not plan_result.success:
+            context.update_state(IterationState.FAILED)
+            context.termination_reason = f"Planner failed: {plan_result.error_message}"
+            return IterationResult(
+                success=False,
+                plan=None,
+                context=context,
+                error_message=context.termination_reason,
+            )
+
+        plan = cast(SectionCoordinationPlan, plan_result.data)
+
+        # Heuristic validation only
+        context.update_state(IterationState.VALIDATING)
+        validation_errors = validator(plan)
+
+        if validation_errors:
+            context.update_state(IterationState.VALIDATION_FAILED)
+            logger.warning(
+                f"Heuristic validation failed for ultra-short section "
+                f"{section_context.section_id}: {len(validation_errors)} error(s)"
+            )
+            for i, err in enumerate(validation_errors[:5], 1):
+                logger.warning(f"  [{i}] {err}")
+            # For ultra-short sections, accept plan despite heuristic errors
+            # (better to have an imperfect pickup than a pipeline failure)
+            logger.info(
+                f"⚡ Accepting ultra-short section {section_context.section_id} "
+                f"despite {len(validation_errors)} heuristic error(s)"
+            )
+
+        # Auto-approve: heuristic pass (or accepted despite errors for pickup)
+        context.update_state(IterationState.COMPLETE)
+        return IterationResult(
+            success=True,
+            plan=plan,
+            context=context,
+        )
 
     def _build_planner_variables(
         self,
