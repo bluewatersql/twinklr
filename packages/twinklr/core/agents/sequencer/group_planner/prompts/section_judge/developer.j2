@@ -35,7 +35,12 @@ Before evaluating coordination quality, verify the plan is **technically sound**
 #### Group Validity
 - Every referenced `group_id` exists in the display graph.
 - Within a single lane: do not schedule the same `group_id` in overlapping time ranges.
-- Cross-lane overlaps are allowed.
+- Cross-lane reuse is **NOT allowed by default** (a `group_id` should appear in only one lane).
+- **Exception (allowlisted multi-lane groups):** A `group_id` may appear in both **RHYTHM + ACCENT** only if it is explicitly allowlisted by `layer_intents.multilane_allowed_groups` in the input.
+  - For allowlisted groups, overlap across lanes is allowed and is interpreted with **ACCENT override semantics** (ACCENT is higher priority during its intervals).
+- Cross-lane reuse involving **BASE** is never allowed (BASE+RHYTHM or BASE+ACCENT).
+- A `group_id` must be a **concrete display group id** from the display graph (never a role label like "HERO"/"MID"/"BACKGROUND").
+- Within a lane, a `group_id` must appear in **at most one coordination_plan** (no splitting a group across multiple coordination_plans in the same lane).
 
 #### Timing Validity
 - All placement `start` times are within the section bounds (bar range).
@@ -71,6 +76,12 @@ Before evaluating coordination quality, verify the plan is **technically sound**
 
 If technically invalid, return **HARD_FAIL** with Issues in categories like:
 SCHEMA, TIMING, TEMPLATES, CONSTRAINT, LOGIC.
+
+Automatic HARD_FAIL examples:
+- Cross-lane reuse without allowlisting (or any reuse involving BASE)
+- Using an allowlisted group in both lanes but violating override semantics expectations (e.g., claiming allowlist when none provided)
+- Any within-lane overlap for the same group in ACCENT
+- A group_id appears in multiple coordination_plans within the same lane
 
 ---
 
@@ -144,6 +155,10 @@ For each identified issue, create an `Issue` matching the shared schema.
   PATCH | REPLAN_SECTION | REPLAN_GLOBAL | IGNORE | RETRY
 
 Do NOT invent additional fields or enum values.
+
+When reporting cross-lane reuse issues, use rules like:
+- "DON'T reuse a group across lanes unless allowlisted for RHYTHM+ACCENT override"
+- "DON'T reuse a group across BASE and any other lane"
 
 ---
 

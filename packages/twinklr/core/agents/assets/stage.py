@@ -241,16 +241,24 @@ class AssetCreationStage:
             return failure_result(str(e), stage_name=self.name)
 
     def _resolve_assets_dir(self, context: PipelineContext) -> Path:
-        """Resolve the assets output directory.
+        """Resolve the shared assets directory.
+
+        Assets are stored in a shared location (sibling to per-song output dirs)
+        so they can be reused across multiple songs and workflows. The catalog
+        and generated images live outside the per-song artifact directory.
+
+        Resolution order:
+        1. output_dir.parent / "shared" / "assets" (e.g. artifacts/shared/assets/)
+        2. Path("assets") as fallback
 
         Args:
             context: Pipeline context.
 
         Returns:
-            Path to assets/ directory.
+            Path to shared assets/ directory.
         """
         if context.output_dir:
-            return context.output_dir / "assets"
+            return context.output_dir.parent / "shared" / "assets"
         return Path("assets")
 
     def _build_image_client(self, context: PipelineContext) -> OpenAIImageClient | None:

@@ -18,12 +18,14 @@ Return a `SectionCoordinationPlan` matching this schema:
 - **IntensityLevel:** {{ taxonomy.IntensityLevel | join(', ') }}
 - **EffectDuration:** {{ taxonomy.EffectDuration | join(', ') }}
 - **StepUnit:** {{ taxonomy.StepUnit | join(', ') }}
+- **TargetRole:** {{ taxonomy.TargetRole | join(', ') }}
 {% else %}
 - **LaneKind:** BASE, RHYTHM, ACCENT
 - **CoordinationMode:** UNIFIED, COMPLEMENTARY, SEQUENCED, CALL_RESPONSE, RIPPLE
 - **IntensityLevel:** WHISPER, SOFT, MED, STRONG, PEAK
 - **EffectDuration:** HIT, BURST, PHRASE, EXTENDED, SECTION
 - **StepUnit:** BEATS, BARS
+- **TargetRole:** BACKGROUND, MID, HERO
 {% endif %}
 
 ## Hard Constraints (Validation Failures)
@@ -35,11 +37,23 @@ Return a `SectionCoordinationPlan` matching this schema:
 | group_order ⊆ group_ids | All group_order in group_ids | group_order has HERO_3, group_ids missing it |
 | Window for SEQUENCED | Must have window + config | SEQUENCED mode with only placements |
 | Start within bounds | bar 1 to available_bars | bar 10 when section has 4 bars |
-| No mixed approach | Window OR placements per group | HERO_1 in window AND in placements same lane |
+| Single approach per group per lane | A group_id uses window OR placements within a single coordination_plan | group appears in two coordination_plans in same lane |
 | No invented group_ids | `group_ids` ⊆ available groups | `group_ids` includes an ID not present in `display_graph.groups[].group_id` |
 | No invented template_ids | every `template_id` ∈ template catalog | placement uses `template_id` not present in the template catalog |
 | UNIFIED covers all groups | UNIFIED requires **1 placement per `group_id`** | `group_ids` has N groups but placements only cover < N group_ids |
-| No within-lane overlap (placements) | For same lane+group_id: [start,end) intervals must be disjoint | accent_a: (bar2 beat1..bar2 beat3) overlaps accent_b: (bar2 beat2..bar2 beat4) |
+| No within-lane overlap (placements) | For same lane+group_id: [start,end) intervals must be disjoint (ACCENT remains strict even when multi-lane is allowed) | accent_a overlaps accent_b on same group |
+| lane→target_roles mapping | BASE→[BACKGROUND], RHYTHM→[MID], ACCENT→[HERO] | ACCENT has target_roles [MID] |
+| Disjoint group_ids across coordination_plans (same lane) | For any two coordination_plans in same lane: `A.group_ids ∩ B.group_ids = ∅` | RHYTHM plan A and B both include MEGA_TREE_1 |
+| No role-label group_ids | `group_id` must be a concrete `display_graph.groups[].group_id` (never BACKGROUND/MID/HERO) | placement.group_id = "HERO" |
+| Cross-lane reuse policy | Default: group_id appears in only one lane. Exception: group may appear in both RHYTHM+ACCENT only if allowlisted by `layer_intents.multilane_allowed_groups` | MEGA_TREE_1 in RHYTHM+ACCENT without allowlist |
+| Multi-lane override semantics | For allowlisted groups in both RHYTHM+ACCENT: overlap across lanes is allowed; ACCENT is higher-priority override during its intervals | Non-allowlisted group overlaps across lanes |
+| No lane_plans planning_notes | `lane_plans[*]` must not include `planning_notes` | lane_plans.1.planning_notes present |
+
+**Do not invent `layer_intents` fields. Only apply allowlist rules if `layer_intents.multilane_allowed_groups` is present in the user prompt.**
+
+**IMPORTANT**:
+- **No extra fields:** Do not output any keys not present in the response schema.
+  - Specifically: `lane_plans[*]` must NOT include `planning_notes` (only top-level `planning_notes` if schema supports it).
 
 
 ## SEQUENCED Mode Requirements

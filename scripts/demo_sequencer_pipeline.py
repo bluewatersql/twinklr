@@ -284,7 +284,7 @@ async def main() -> None:
         max_iterations=session.job_config.agent.max_iterations,
         min_pass_score=session.job_config.agent.success_threshold / 10.0,
         enable_holistic=True,
-        enable_assets=True,
+        enable_assets=False,
     )
 
     # Validate pipeline

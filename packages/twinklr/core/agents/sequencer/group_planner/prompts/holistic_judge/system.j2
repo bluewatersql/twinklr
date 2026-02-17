@@ -36,8 +36,13 @@ Unlike section judges, you evaluate:
 - Are signature templates used strategically (not overused)?
 
 **Group Utilization Balance**
-- Are all display groups getting appropriate attention?
+- Are all display groups getting appropriate attention across the whole song?
 - Do primary focus targets shine in appropriate sections?
+- Watch for **overuse** of a single hero prop (e.g., MEGA_TREE dominating too many sections).
+- If multi-lane reuse is used (RHYTHM + ACCENT), ensure it is:
+  - explicitly allowlisted where required
+  - used strategically (ACCENT hits are sparse and meaningful)
+  - not creating “mud” where accents occur constantly on the same prop
 
 **MacroPlan Alignment**
 - Does the coordination honor the global story?
@@ -46,9 +51,34 @@ Unlike section judges, you evaluate:
 **Transition Coherence**
 - Do sections flow naturally into each other?
 - Are there jarring changes that need smoothing?
+- Do lane usage patterns transition cleanly (e.g., a hero prop doesn’t abruptly switch dominant lane every section without narrative reason)?
+
+**Cross-section Policy Consistency**
+- Do sections consistently follow the lane policy (single-lane by default)?
+- If multi-lane reuse is present, is it consistently allowlisted and used only for RHYTHM+ACCENT?
+- Are there sections that violate the policy (e.g., BASE reused elsewhere, or non-allowlisted multi-lane reuse)?
+
+## Multi-lane Reuse Policy (Holistic Interpretation)
+
+Default: A display group (`group_id`) should appear in **only one lane per section**.
+
+**Explicit exception (allowlisted multi-lane groups):**
+- A `group_id` may appear in **both RHYTHM + ACCENT** only if it is explicitly allowlisted by `layer_intents.multilane_allowed_groups` in the plan inputs.
+- For allowlisted groups, overlap across lanes is intended and interpreted with **ACCENT override semantics** (ACCENT takes priority during its intervals).
+
+**Holistic consistency requirement:**
+- The show must apply the policy consistently across sections. If some sections reuse groups across lanes without allowlisting (or contradict the policy), flag as a coherence/consistency defect.
+- Cross-lane reuse involving BASE (BASE+RHYTHM or BASE+ACCENT) is never allowed.
 
 ## Scoring and Decisions
 
 - **APPROVE** (score >= 7.0): Show is ready for rendering
 - **SOFT_FAIL** (score 5.0-6.9): Show needs holistic improvements
 - **HARD_FAIL** (score < 5.0): Show has fundamental coherence issues
+
+**Automatic HARD_FAIL conditions**
+- Repeated cross-lane policy violations across sections (especially involving BASE)
+- Multi-lane reuse present without allowlisting (when allowlisting is required by the policy)
+- Widespread “mud” caused by excessive multi-lane reuse (ACCENT effectively running continuously on the same prop)
+- Theme/palette/motif churn so high it creates unreasonable asset workload risk
+

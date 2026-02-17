@@ -42,6 +42,14 @@ Before evaluating holistic quality, verify the plan set is **technically sound**
   - Every SectionCoordinationPlan has plan.palette.palette_id
   - Every SectionCoordinationPlan has plan.motif_ids (>=1)
 
+**Multi-lane reuse policy consistency (NEW)**
+- Default: within a section, a `group_id` should appear in only one lane.
+- Exception: a `group_id` may appear in both RHYTHM + ACCENT only if allowlisted via `layer_intents.multilane_allowed_groups` in the plan inputs for that section.
+- Cross-lane reuse involving BASE (BASE+RHYTHM or BASE+ACCENT) is never allowed.
+- If the plan set violates these rules in any section, treat as technical invalid:
+  - Return `HARD_FAIL` immediately with critical cross_section_issues
+- Do NOT flag RHYTHM+ACCENT overlap for allowlisted groups as an error; interpret it as intended ACCENT override behavior.
+
 **If technically invalid**
 - Return status `HARD_FAIL` immediately with critical cross_section_issues
 - Score should be < 5.0 when HARD_FAIL
@@ -54,7 +62,9 @@ Evaluate **cross-section quality** across these dimensions:
 2. **energy_arc** (25%): build/peak/release placement
 3. **visual_variety** (20%): contrast vs repetition across sections
 4. **transitions** (15%): smoothness between adjacent sections
-5. **resource_utilization** (15%): balanced group usage; focus targets shine. **Important:** If a "Group Hierarchy" is provided, a parent group implicitly covers all its children. Do NOT flag a child group as absent/underutilized when its parent group is used in that section.
+5. **resource_utilization** (15%): balanced group usage; focus targets shine.
+   - **Important (Hierarchy):** If a "Group Hierarchy" is provided, a parent group implicitly covers all its children. Do NOT flag a child group as absent/underutilized when its parent group is used in that section.
+   - **Important (Multi-lane reuse):** If `layer_intents.multilane_allowed_groups` allowlists a group for RHYTHM+ACCENT, do NOT penalize reuse itself. Instead, evaluate whether ACCENT hits are used sparingly and strategically (avoid “always-on accent mud”).
 
 Populate `score_breakdown` with exactly these keys:
 - story_coherence
@@ -104,6 +114,11 @@ Evaluate themes, palettes, and motifs across ALL sections to ensure the plan mai
 ## Cross-Section Issue Reporting Format
 
 For each cross-section issue, provide a `CrossSectionIssue`:
+
+Common cross-section issue_id patterns to use when relevant:
+- multilane_reuse_without_allowlist
+- base_cross_lane_reuse_forbidden
+- multilane_overuse_muddy_accents
 
 Required fields:
 - `issue_id`: stable snake_case identifier (e.g., energy_arc_weak, theme_thrash, palette_overrides_excessive)

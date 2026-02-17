@@ -15,7 +15,8 @@ from twinklr.core.agents.sequencer.group_planner.orchestrator import (
     GroupPlannerOrchestrator,
 )
 from twinklr.core.pipeline.result import failure_result, success_result
-from twinklr.core.sequencer.planning import GroupPlanSet
+from twinklr.core.sequencer.planning import GroupPlanSet, SectionCoordinationPlan
+from twinklr.core.sequencer.planning.group_plan import NarrativeAssetDirective
 
 if TYPE_CHECKING:
     from twinklr.core.agents.audio.lyrics.models import (
@@ -28,8 +29,7 @@ if TYPE_CHECKING:
     from twinklr.core.audio.models.song_bundle import SongBundle
     from twinklr.core.pipeline.context import PipelineContext
     from twinklr.core.pipeline.result import StageResult
-    from twinklr.core.sequencer.planning import MacroSectionPlan, SectionCoordinationPlan
-    from twinklr.core.sequencer.planning.group_plan import NarrativeAssetDirective
+    from twinklr.core.sequencer.planning import MacroSectionPlan
     from twinklr.core.sequencer.templates.group.catalog import TemplateCatalog
     from twinklr.core.sequencer.templates.group.models.display import DisplayGraph
 
@@ -142,11 +142,17 @@ class GroupPlannerStage:
             def extract_plan(
                 r: IterationResult[SectionCoordinationPlan],
             ) -> SectionCoordinationPlan:
-                """Extract plan from result (guaranteed non-None by execute_step)."""
+                """Extract plan from result (guaranteed non-None by execute_step).
+
+                When deserialized from cache, IterationResult is loaded without
+                the generic type parameter, so plan may be a raw dict instead
+                of a SectionCoordinationPlan. Validate explicitly.
+                """
                 if r.plan is None:
                     raise ValueError("IterationResult.plan is None")
-                result_plan: SectionCoordinationPlan = r.plan
-                return result_plan
+                if isinstance(r.plan, dict):
+                    return SectionCoordinationPlan.model_validate(r.plan)
+                return r.plan
 
             return await execute_step(
                 stage_name=f"{self.name}_{section_id}",
@@ -539,8 +545,21 @@ class GroupPlanAggregatorStage:
         section_map: dict[str, list[str]] = {}
 
         for plan in section_plans:
-            section_id = getattr(plan, "section_id", "unknown")
-            for directive in getattr(plan, "narrative_assets", []):
+            # Handle both Pydantic model and dict (cache deserialization)
+            if isinstance(plan, dict):
+                section_id = plan.get("section_id", "unknown")
+                raw_assets = plan.get("narrative_assets", [])
+            else:
+                section_id = getattr(plan, "section_id", "unknown")
+                raw_assets = getattr(plan, "narrative_assets", [])
+
+            for raw_directive in raw_assets:
+                # Normalize to NarrativeAssetDirective if dict
+                if isinstance(raw_directive, dict):
+                    directive = NarrativeAssetDirective.model_validate(raw_directive)
+                else:
+                    directive = raw_directive
+
                 did = directive.directive_id
                 if did not in directives_by_id:
                     directives_by_id[did] = directive
