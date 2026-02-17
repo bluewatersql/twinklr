@@ -13,12 +13,14 @@ from twinklr.core.sequencer.templates.group.models import (
     CoordinationPlan,
     GroupPlacement,
 )
+from twinklr.core.sequencer.templates.group.models.coordination import PlanTarget
 from twinklr.core.sequencer.vocabulary import (
     CoordinationMode,
     EffectDuration,
     LaneKind,
     PlanningTimeRef,
 )
+from twinklr.core.sequencer.vocabulary.choreography import TargetType
 
 from .conftest import DEFAULT_THEME
 
@@ -65,7 +67,7 @@ class TestComputeLaneStats:
         placements = [
             GroupPlacement(
                 placement_id="p1",
-                group_id="g1",
+                target=PlanTarget(type=TargetType.GROUP, id="g1"),
                 template_id="template_a",
                 start=PlanningTimeRef(bar=1, beat=1),
                 duration=EffectDuration.BURST,
@@ -83,7 +85,7 @@ class TestComputeLaneStats:
         placements = [
             GroupPlacement(
                 placement_id=f"p{i}",
-                group_id="g1",
+                target=PlanTarget(type=TargetType.GROUP, id="g1"),
                 template_id=f"template_{chr(97 + i)}",  # a, b, c
                 start=PlanningTimeRef(bar=i * 2 + 1, beat=1),
                 duration=EffectDuration.BURST,
@@ -100,21 +102,21 @@ class TestComputeLaneStats:
         placements = [
             GroupPlacement(
                 placement_id="p1",
-                group_id="g1",
+                target=PlanTarget(type=TargetType.GROUP, id="g1"),
                 template_id="template_a",
                 start=PlanningTimeRef(bar=1, beat=1),
                 duration=EffectDuration.BURST,
             ),
             GroupPlacement(
                 placement_id="p2",
-                group_id="g2",
+                target=PlanTarget(type=TargetType.GROUP, id="g2"),
                 template_id="template_b",
                 start=PlanningTimeRef(bar=3, beat=1),
                 duration=EffectDuration.BURST,
             ),
             GroupPlacement(
                 placement_id="p3",
-                group_id="g3",
+                target=PlanTarget(type=TargetType.GROUP, id="g3"),
                 template_id="template_a",  # Reuse
                 start=PlanningTimeRef(bar=5, beat=1),
                 duration=EffectDuration.BURST,
@@ -130,7 +132,7 @@ class TestComputeLaneStats:
         placements = [
             GroupPlacement(
                 placement_id=f"p{i}",
-                group_id=f"g{i}",
+                target=PlanTarget(type=TargetType.GROUP, id=f"g{i}"),
                 template_id="template_a" if i < 3 else "template_b",
                 start=PlanningTimeRef(bar=i * 2 + 1, beat=1),
                 duration=EffectDuration.BURST,
@@ -150,7 +152,7 @@ class TestComputeLaneStats:
                 placements.append(
                     GroupPlacement(
                         placement_id=f"p{len(placements)}",
-                        group_id=f"g{len(placements)}",
+                        target=PlanTarget(type=TargetType.GROUP, id=f"g{len(placements)}"),
                         template_id=template_id,
                         start=PlanningTimeRef(bar=bar_num, beat=1),
                         duration=EffectDuration.BURST,
@@ -276,7 +278,7 @@ class TestValidateSectionDiversity:
         placements = [
             GroupPlacement(
                 placement_id=f"p{i}",
-                group_id=f"g{i}",
+                target=PlanTarget(type=TargetType.GROUP, id=f"g{i}"),
                 template_id=f"template_{chr(97 + i)}",  # a, b, c, d, e, f
                 start=PlanningTimeRef(bar=i * 2 + 1, beat=1),
                 duration=EffectDuration.BURST,
@@ -294,7 +296,10 @@ class TestValidateSectionDiversity:
                     coordination_plans=[
                         CoordinationPlan(
                             coordination_mode=CoordinationMode.UNIFIED,
-                            group_ids=["g1", "g2"],
+                            targets=[
+                                PlanTarget(type=TargetType.GROUP, id="g1"),
+                                PlanTarget(type=TargetType.GROUP, id="g2"),
+                            ],
                             placements=placements,
                         )
                     ],
@@ -312,7 +317,7 @@ class TestValidateSectionDiversity:
         placements = [
             GroupPlacement(
                 placement_id=f"p{i}",
-                group_id=f"g{i}",
+                target=PlanTarget(type=TargetType.GROUP, id=f"g{i}"),
                 template_id="template_a" if i % 2 == 0 else "template_b",
                 start=PlanningTimeRef(bar=i * 2 + 1, beat=1),
                 duration=EffectDuration.BURST,
@@ -330,7 +335,10 @@ class TestValidateSectionDiversity:
                     coordination_plans=[
                         CoordinationPlan(
                             coordination_mode=CoordinationMode.UNIFIED,
-                            group_ids=["g1", "g2"],
+                            targets=[
+                                PlanTarget(type=TargetType.GROUP, id="g1"),
+                                PlanTarget(type=TargetType.GROUP, id="g2"),
+                            ],
                             placements=placements,
                         )
                     ],
@@ -348,7 +356,7 @@ class TestValidateSectionDiversity:
         base_placements = [
             GroupPlacement(
                 placement_id=f"base_p{i}",
-                group_id=f"g{i}",
+                target=PlanTarget(type=TargetType.GROUP, id=f"g{i}"),
                 template_id=f"base_template_{i}",
                 start=PlanningTimeRef(bar=i * 2 + 1, beat=1),
                 duration=EffectDuration.BURST,
@@ -360,7 +368,7 @@ class TestValidateSectionDiversity:
         rhythm_placements = [
             GroupPlacement(
                 placement_id=f"rhythm_p{i}",
-                group_id=f"g{i}",
+                target=PlanTarget(type=TargetType.GROUP, id=f"g{i}"),
                 template_id=f"rhythm_template_{i % 3}",  # Only 3 unique
                 start=PlanningTimeRef(bar=i * 2 + 1, beat=1),
                 duration=EffectDuration.BURST,
@@ -378,7 +386,10 @@ class TestValidateSectionDiversity:
                     coordination_plans=[
                         CoordinationPlan(
                             coordination_mode=CoordinationMode.UNIFIED,
-                            group_ids=["g1", "g2"],
+                            targets=[
+                                PlanTarget(type=TargetType.GROUP, id="g1"),
+                                PlanTarget(type=TargetType.GROUP, id="g2"),
+                            ],
                             placements=base_placements,
                         )
                     ],
@@ -389,7 +400,10 @@ class TestValidateSectionDiversity:
                     coordination_plans=[
                         CoordinationPlan(
                             coordination_mode=CoordinationMode.UNIFIED,
-                            group_ids=["g1", "g2"],
+                            targets=[
+                                PlanTarget(type=TargetType.GROUP, id="g1"),
+                                PlanTarget(type=TargetType.GROUP, id="g2"),
+                            ],
                             placements=rhythm_placements,
                         )
                     ],

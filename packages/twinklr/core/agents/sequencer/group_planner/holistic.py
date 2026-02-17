@@ -47,7 +47,7 @@ class CrossSectionIssue(BaseModel):
         default_factory=list,
         description=(
             "Specific, directly actionable changes referencing concrete "
-            "section_ids, group_ids, template_ids, palette_ids, and/or lanes. "
+            "section_ids, targets (type+id), template_ids, palette_ids, and/or lanes. "
             "Each action should be a single instruction that can be applied to "
             "a specific group plan without further interpretation."
         ),

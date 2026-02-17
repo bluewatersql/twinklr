@@ -2,6 +2,11 @@
 
 Models for group placement, coordination configuration, and coordination plans.
 These define how templates are placed and coordinated across groups.
+
+Targets use the typed ``PlanTarget`` model to unambiguously specify whether
+a placement targets an individual group, a display zone, or a split
+partition.  The composition engine expands zone/split targets to concrete
+group IDs at render time.
 """
 
 from __future__ import annotations
@@ -18,22 +23,54 @@ from twinklr.core.sequencer.vocabulary import (
     SpatialIntent,
     SpillPolicy,
     StepUnit,
+    TargetType,
 )
 
 
+class PlanTarget(BaseModel):
+    """Typed target for choreography coordination.
+
+    Enables the LLM to target groups, zones, or splits without
+    ambiguity.  The composition engine expands zone/split targets
+    to concrete group IDs at render time.
+
+    Examples::
+
+        PlanTarget(type=TargetType.GROUP, id="MEGA_TREE")
+        PlanTarget(type=TargetType.ZONE, id="HOUSE")
+        PlanTarget(type=TargetType.SPLIT, id="HALVES_LEFT")
+
+    Attributes:
+        type: Target type discriminator (group, zone, split).
+        id: Target identifier.  Interpretation depends on ``type``:
+            - group: ``ChoreoGroup.id`` (e.g., ``"ARCHES"``).
+            - zone: ``ChoreoTag`` value (e.g., ``"HOUSE"``).
+            - split: ``SplitDimension`` value (e.g., ``"HALVES_LEFT"``).
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    type: TargetType
+    id: str = Field(min_length=1)
+
+
 class GroupPlacement(BaseModel):
-    """Individual placement of a template on a group.
+    """Individual placement of a template on a target.
 
     Uses categorical planning values:
     - PlanningTimeRef for start timing (bar + beat only)
     - EffectDuration for duration (categorical, renderer calculates end)
     - IntensityLevel for intensity (categorical, renderer resolves to numeric)
+
+    The ``target`` field specifies what this placement targets.
+    After target expansion, ``target.type`` is always ``GROUP`` and
+    ``target.id`` is the concrete ``ChoreoGroup.id``.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     placement_id: str
-    group_id: str
+    target: PlanTarget
     template_id: str
     start: PlanningTimeRef
     duration: EffectDuration = Field(
@@ -83,11 +120,13 @@ class CoordinationConfig(BaseModel):
     """Configuration for SEQUENCED/CALL_RESPONSE/RIPPLE modes.
 
     Assembler uses this to expand to per-group placements deterministically.
+    ``group_order`` may be empty when using zone/split targets — the
+    target expansion engine populates it using spatial sorting.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    group_order: list[str] = Field(min_length=1)
+    group_order: list[str] = Field(default_factory=list)
     step_unit: StepUnit = StepUnit.BEAT
     step_duration: int = Field(default=1, ge=1)
     phase_offset: float = Field(default=0.0, ge=0.0, le=1.0)
@@ -96,7 +135,11 @@ class CoordinationConfig(BaseModel):
 
 
 class CoordinationPlan(BaseModel):
-    """Coordination plan for a set of groups within a lane.
+    """Coordination plan for a set of targets within a lane.
+
+    Targets can be individual groups, zones, or splits.  The
+    composition engine resolves zone/split targets to concrete
+    group IDs via :class:`TargetExpander` before rendering.
 
     For UNIFIED/COMPLEMENTARY: placements are provided directly.
     For SEQUENCED/CALL_RESPONSE/RIPPLE: window + config provided, Assembler expands.
@@ -105,7 +148,9 @@ class CoordinationPlan(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     coordination_mode: CoordinationMode
-    group_ids: list[str] = Field(min_length=1)
+
+    # Typed targets — sole source of truth for what this plan targets
+    targets: list[PlanTarget] = Field(min_length=1)
 
     # For UNIFIED/COMPLEMENTARY modes
     placements: list[GroupPlacement] = Field(default_factory=list)
@@ -120,4 +165,5 @@ __all__ = [
     "CoordinationPlan",
     "GroupPlacement",
     "PlacementWindow",
+    "PlanTarget",
 ]

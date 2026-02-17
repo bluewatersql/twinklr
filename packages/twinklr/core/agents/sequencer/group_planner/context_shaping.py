@@ -16,7 +16,10 @@ from twinklr.core.agents.taxonomy_utils import get_theming_catalog_dict, get_the
 from twinklr.core.sequencer.planning import GroupPlanSet
 from twinklr.core.sequencer.templates.group.catalog import TemplateCatalog
 from twinklr.core.sequencer.templates.group.library import TemplateInfo
-from twinklr.core.sequencer.templates.group.models.choreography import ChoreographyGraph
+from twinklr.core.sequencer.templates.group.models.choreography import (
+    ChoreographyGraph,
+    ChoreoGroup,
+)
 from twinklr.core.sequencer.theming import get_theme
 from twinklr.core.sequencer.vocabulary import LaneKind
 
@@ -336,6 +339,11 @@ def shape_planner_context(section_context: SectionPlanningContext) -> dict[str, 
         section_bars = 4.0
         section_beats = 16.0
 
+    # Build spatial map data for prompt
+    display_graph_zones = _build_zone_summary(filtered_groups)
+    display_graph_spatial = _build_spatial_layout(filtered_groups)
+    display_graph_splits = _build_split_summary(filtered_groups)
+
     return {
         # Section identity
         "section_id": section_context.section_id,
@@ -358,6 +366,10 @@ def shape_planner_context(section_context: SectionPlanningContext) -> dict[str, 
         "display_graph": section_choreo_graph,
         "template_catalog": simplified_catalog,  # Stripped to essentials
         "layer_intents": filtered_layer_intents,  # Only relevant layers
+        # Spatial planning context
+        "display_graph_zones": display_graph_zones,
+        "display_graph_spatial": display_graph_spatial,
+        "display_graph_splits": display_graph_splits,
         # Theme context from MacroPlan
         "theme_ref": section_context.theme,  # ThemeRef object for refinement prompt
         "theme_ref_json": theme_ref_json,
@@ -369,6 +381,69 @@ def shape_planner_context(section_context: SectionPlanningContext) -> dict[str, 
         # Lyric/narrative context (section-scoped) for narrative asset directives
         "lyric_context": section_context.lyric_context,
     }
+
+
+# ---------------------------------------------------------------------------
+# Spatial map helpers (for prompt injection)
+# ---------------------------------------------------------------------------
+
+
+def _build_zone_summary(groups: list[ChoreoGroup]) -> list[dict[str, Any]]:
+    """Build zone → group_ids summary for prompt.
+
+    Args:
+        groups: Filtered list of ChoreoGroup instances.
+
+    Returns:
+        List of dicts with ``zone`` and ``group_ids`` keys.
+    """
+    zone_map: dict[str, list[str]] = {}
+    for g in groups:
+        for tag in g.tags:
+            zone_map.setdefault(tag.value, []).append(g.id)
+    return [{"zone": zone, "group_ids": gids} for zone, gids in zone_map.items()]
+
+
+def _build_spatial_layout(groups: list[ChoreoGroup]) -> dict[str, list[dict[str, str | None]]]:
+    """Build horizontal layout summary for prompt.
+
+    Args:
+        groups: Filtered list of ChoreoGroup instances.
+
+    Returns:
+        Dict with ``horizontal`` key mapping to sorted group list.
+    """
+    horizontal: list[dict[str, str | None]] = []
+    sorted_groups = sorted(
+        [g for g in groups if g.position],
+        key=lambda g: g.position.horizontal.sort_key() if g.position else 999,
+    )
+    for g in sorted_groups:
+        horizontal.append(
+            {
+                "position": g.position.horizontal.value if g.position else "UNKNOWN",
+                "id": g.id,
+                "role": g.role,
+                "detail": g.detail_capability.value,
+            }
+        )
+    return {"horizontal": horizontal}
+
+
+def _build_split_summary(groups: list[ChoreoGroup]) -> dict[str, list[str]]:
+    """Build split → group_ids summary for prompt.
+
+    Args:
+        groups: Filtered list of ChoreoGroup instances.
+
+    Returns:
+        Dict mapping split value strings to lists of group IDs.
+    """
+    split_map: dict[str, list[str]] = {}
+    for g in groups:
+        for split in g.split_membership:
+            split_map.setdefault(split.value, []).append(g.id)
+    return split_map
 
 
 def shape_section_judge_context(
@@ -459,7 +534,17 @@ def shape_section_judge_context(
         "primary_focus_targets": section_context.primary_focus_targets,
         "secondary_targets": section_context.secondary_targets,
         # Section-scoped shared context
-        "display_graph": {"groups_by_role": filtered_groups_by_role},
+        "display_graph": {
+            "groups_by_role": filtered_groups_by_role,
+            "groups_by_tag": {
+                tag.value: ids
+                for tag, ids in section_context.choreo_graph.groups_by_tag.items()
+            },
+            "groups_by_split": {
+                split.value: ids
+                for split, ids in section_context.choreo_graph.groups_by_split.items()
+            },
+        },
         "template_catalog": simplified_catalog,
         # Theme context for validation
         "theme_definition": theme_definition_dict,
@@ -557,7 +642,17 @@ def shape_holistic_judge_context(
 
     return {
         "group_plan_set": group_plan_set_dict,
-        "display_graph": {"groups_by_role": choreo_graph.groups_by_role},
+        "display_graph": {
+            "groups_by_role": choreo_graph.groups_by_role,
+            "groups_by_tag": {
+                tag.value: ids
+                for tag, ids in choreo_graph.groups_by_tag.items()
+            },
+            "groups_by_split": {
+                split.value: ids
+                for split, ids in choreo_graph.groups_by_split.items()
+            },
+        },
         "group_hierarchy": group_hierarchy,
         "section_count": len(group_plan_set.section_plans),
         "section_ids": [sp.section_id for sp in group_plan_set.section_plans],

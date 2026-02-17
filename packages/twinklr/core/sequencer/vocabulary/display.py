@@ -109,6 +109,27 @@ class PixelDensity(str, Enum):
     HIGH = "HIGH"
 
 
+class DetailCapability(str, Enum):
+    """Visual detail capability based on pixel density.
+
+    Guides template selection — high-detail groups can render
+    imagery and complex patterns; low-detail groups should use
+    simple chases and solid color effects.
+
+    Attributes:
+        LOW: Simple on/off, solid colors, basic chases.
+            Examples: candy canes, snowflakes, stars, simple strings.
+        MEDIUM: Patterns, gradients, moderate complexity.
+            Examples: arches, window frames, wreaths.
+        HIGH: Imagery, text, complex animations.
+            Examples: matrices, mega trees, dense pixel trees.
+    """
+
+    LOW = "LOW"
+    MEDIUM = "MEDIUM"
+    HIGH = "HIGH"
+
+
 class DisplayProminence(str, Enum):
     """Visual weight / prominence in the overall display.
 
@@ -130,6 +151,7 @@ class DisplayProminence(str, Enum):
 
 
 __all__ = [
+    "DetailCapability",
     "DisplayElementKind",
     "DisplayProminence",
     "GroupArrangement",

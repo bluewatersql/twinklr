@@ -22,6 +22,7 @@ from twinklr.core.sequencer.planning.group_plan import (
 from twinklr.core.sequencer.templates.group.models.coordination import (
     CoordinationPlan,
     GroupPlacement,
+    PlanTarget,
 )
 from twinklr.core.sequencer.theming import ThemeRef
 from twinklr.core.sequencer.theming.enums import ThemeScope
@@ -32,6 +33,7 @@ from twinklr.core.sequencer.vocabulary import (
     LaneKind,
     PlanningTimeRef,
 )
+from twinklr.core.sequencer.vocabulary.choreography import TargetType
 
 # ---------------------------------------------------------------------------
 # extract_motif_id tests
@@ -143,7 +145,7 @@ def _make_placement(
     """Create a GroupPlacement for testing."""
     return GroupPlacement(
         placement_id=placement_id,
-        group_id=group_id,
+        target=PlanTarget(type=TargetType.GROUP, id=group_id),
         template_id=template_id,
         start=PlanningTimeRef(bar=1, beat=1),
         duration=EffectDuration.PHRASE,
@@ -166,7 +168,7 @@ def _make_plan_set(
                 coordination_plans=[
                     CoordinationPlan(
                         coordination_mode=CoordinationMode.UNIFIED,
-                        group_ids=["ARCHES"],
+                        targets=[PlanTarget(type=TargetType.GROUP, id="ARCHES")],
                         placements=placements,
                     )
                 ],

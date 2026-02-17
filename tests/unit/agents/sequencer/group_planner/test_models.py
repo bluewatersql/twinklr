@@ -20,6 +20,7 @@ from twinklr.core.sequencer.templates.group.models import (
     GroupPlacement,
     PlacementWindow,
 )
+from twinklr.core.sequencer.templates.group.models.coordination import PlanTarget
 from twinklr.core.sequencer.timing import TimeRef
 from twinklr.core.sequencer.vocabulary import (
     CoordinationMode,
@@ -32,6 +33,7 @@ from twinklr.core.sequencer.vocabulary import (
     SpillPolicy,
     StepUnit,
 )
+from twinklr.core.sequencer.vocabulary.choreography import TargetType
 from twinklr.core.sequencer.vocabulary.timing import TimeRefKind
 
 from .conftest import DEFAULT_THEME
@@ -211,13 +213,13 @@ class TestGroupPlacement:
         """Valid placement with PlanningTimeRef start and EffectDuration."""
         placement = GroupPlacement(
             placement_id="p1",
-            group_id="HERO_1",
+            target=PlanTarget(type=TargetType.GROUP, id="HERO_1"),
             template_id="gtpl_accent_bell",
             start=PlanningTimeRef(bar=1, beat=1),
             duration=EffectDuration.PHRASE,
             intensity=IntensityLevel.STRONG,
         )
-        assert placement.group_id == "HERO_1"
+        assert placement.target.id == "HERO_1"
         assert placement.template_id == "gtpl_accent_bell"
         assert placement.duration == EffectDuration.PHRASE
         assert placement.intensity == IntensityLevel.STRONG
@@ -230,11 +232,14 @@ class TestCoordinationPlan:
         """UNIFIED mode should have placements, no config."""
         plan = CoordinationPlan(
             coordination_mode=CoordinationMode.UNIFIED,
-            group_ids=["HERO_1", "HERO_2"],
+            targets=[
+                PlanTarget(type=TargetType.GROUP, id="HERO_1"),
+                PlanTarget(type=TargetType.GROUP, id="HERO_2"),
+            ],
             placements=[
                 GroupPlacement(
                     placement_id="p1",
-                    group_id="HERO_1",
+                    target=PlanTarget(type=TargetType.GROUP, id="HERO_1"),
                     template_id="gtpl_accent",
                     start=PlanningTimeRef(bar=1, beat=1),
                     duration=EffectDuration.BURST,
@@ -249,7 +254,11 @@ class TestCoordinationPlan:
         """SEQUENCED mode should have window + config, no pre-expanded placements."""
         plan = CoordinationPlan(
             coordination_mode=CoordinationMode.SEQUENCED,
-            group_ids=["HERO_1", "HERO_2", "HERO_3"],
+            targets=[
+                PlanTarget(type=TargetType.GROUP, id="HERO_1"),
+                PlanTarget(type=TargetType.GROUP, id="HERO_2"),
+                PlanTarget(type=TargetType.GROUP, id="HERO_3"),
+            ],
             window=PlacementWindow(
                 start=PlanningTimeRef(bar=1, beat=1),
                 end=PlanningTimeRef(bar=4, beat=1),
@@ -279,11 +288,11 @@ class TestLanePlan:
             coordination_plans=[
                 CoordinationPlan(
                     coordination_mode=CoordinationMode.UNIFIED,
-                    group_ids=["HERO_1"],
+                    targets=[PlanTarget(type=TargetType.GROUP, id="HERO_1")],
                     placements=[
                         GroupPlacement(
                             placement_id="p1",
-                            group_id="HERO_1",
+                            target=PlanTarget(type=TargetType.GROUP, id="HERO_1"),
                             template_id="gtpl_accent",
                             start=PlanningTimeRef(bar=1, beat=1),
                             duration=EffectDuration.BURST,

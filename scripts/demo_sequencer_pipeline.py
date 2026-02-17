@@ -13,8 +13,9 @@ Demonstrates the full orchestrated flow:
 Uses the Pipeline Framework for declarative, parallel execution.
 
 Features a realistic residential display graph with 11 prop types,
-spatial positions across all axes, zone/tag semantics (yard, house,
-roof), and choreographic grouping tags (halves, thirds, odd/even).
+spatial positions across all axes, zone tags (HOUSE, YARD, ROOF,
+PERIMETER), detail capability, and split membership (halves, thirds,
+odd/even).
 """
 
 import argparse
@@ -49,9 +50,10 @@ from twinklr.core.sequencer.templates.group.models.choreography import (
 from twinklr.core.sequencer.templates.group.models.display import (
     GroupPosition,
 )
-from twinklr.core.sequencer.vocabulary.choreography import ChoreoTag
+from twinklr.core.sequencer.vocabulary.choreography import ChoreoTag, SplitDimension
 from twinklr.core.sequencer.vocabulary.composition import LaneKind
 from twinklr.core.sequencer.vocabulary.display import (
+    DetailCapability,
     DisplayElementKind,
     DisplayProminence,
     GroupArrangement,
@@ -119,8 +121,8 @@ def build_display_graph() -> tuple[ChoreographyGraph, XLightsMapping]:
     """Build a realistic residential Christmas display graph.
 
     11 prop types with spatial diversity across x/y/z axes,
-    zone assignments (house, yard, roof), and choreographic tags
-    (halves, thirds, odd/even patterns).
+    zone tags (HOUSE, YARD, ROOF, PERIMETER), detail capability,
+    and split membership (halves, thirds, odd/even).
 
     Returns:
         Tuple of (ChoreographyGraph, XLightsMapping).
@@ -141,7 +143,9 @@ def build_display_graph() -> tuple[ChoreographyGraph, XLightsMapping]:
             ),
             fixture_count=3,
             pixel_fraction=0.04,
-            tags=[ChoreoTag.ROOF, ChoreoTag.CENTER_THIRD, ChoreoTag.VERTICAL],
+            detail_capability=DetailCapability.LOW,
+            split_membership=[],
+            tags=[ChoreoTag.ROOF],
         ),
         ChoreoGroup(
             id="ICICLES",
@@ -157,13 +161,14 @@ def build_display_graph() -> tuple[ChoreographyGraph, XLightsMapping]:
             ),
             fixture_count=12,
             pixel_fraction=0.08,
-            tags=[
-                ChoreoTag.ROOF,
-                ChoreoTag.HOUSE,
-                ChoreoTag.HORIZONTAL,
-                ChoreoTag.ODD_EVEN,
-                ChoreoTag.LEFT_RIGHT,
+            detail_capability=DetailCapability.MEDIUM,
+            split_membership=[
+                SplitDimension.HALVES_LEFT,
+                SplitDimension.HALVES_RIGHT,
+                SplitDimension.ODD,
+                SplitDimension.EVEN,
             ],
+            tags=[ChoreoTag.ROOF],
         ),
         # === HOUSE ZONE ===
         ChoreoGroup(
@@ -180,11 +185,14 @@ def build_display_graph() -> tuple[ChoreographyGraph, XLightsMapping]:
             ),
             fixture_count=8,
             pixel_fraction=0.12,
-            tags=[
-                ChoreoTag.HOUSE,
-                ChoreoTag.HORIZONTAL,
-                ChoreoTag.LEFT_RIGHT,
+            detail_capability=DetailCapability.MEDIUM,
+            split_membership=[
+                SplitDimension.HALVES_LEFT,
+                SplitDimension.HALVES_RIGHT,
+                SplitDimension.ODD,
+                SplitDimension.EVEN,
             ],
+            tags=[ChoreoTag.HOUSE],
         ),
         ChoreoGroup(
             id="WINDOWS",
@@ -200,12 +208,9 @@ def build_display_graph() -> tuple[ChoreographyGraph, XLightsMapping]:
             ),
             fixture_count=6,
             pixel_fraction=0.08,
-            tags=[
-                ChoreoTag.HOUSE,
-                ChoreoTag.CENTER_THIRD,
-                ChoreoTag.ODD_EVEN,
-                ChoreoTag.LEFT_RIGHT,
-            ],
+            detail_capability=DetailCapability.MEDIUM,
+            split_membership=[SplitDimension.ODD, SplitDimension.EVEN],
+            tags=[ChoreoTag.HOUSE],
         ),
         ChoreoGroup(
             id="WREATHS",
@@ -221,11 +226,13 @@ def build_display_graph() -> tuple[ChoreographyGraph, XLightsMapping]:
             ),
             fixture_count=3,
             pixel_fraction=0.03,
-            tags=[ChoreoTag.HOUSE, ChoreoTag.CENTER_THIRD],
+            detail_capability=DetailCapability.MEDIUM,
+            split_membership=[SplitDimension.ODD, SplitDimension.EVEN],
+            tags=[ChoreoTag.HOUSE],
         ),
         # === YARD ZONE — far depth (background washes) ===
         ChoreoGroup(
-            id="FLOODLIGHTS",
+            id="FLOODS",
             role="FLOODS",
             element_kind=DisplayElementKind.FLOOD,
             arrangement=GroupArrangement.HORIZONTAL_ROW,
@@ -238,12 +245,14 @@ def build_display_graph() -> tuple[ChoreographyGraph, XLightsMapping]:
             ),
             fixture_count=6,
             pixel_fraction=0.05,
-            tags=[
-                ChoreoTag.YARD,
-                ChoreoTag.HORIZONTAL,
-                ChoreoTag.ODD_EVEN,
-                ChoreoTag.LEFT_RIGHT,
+            detail_capability=DetailCapability.LOW,
+            split_membership=[
+                SplitDimension.HALVES_LEFT,
+                SplitDimension.HALVES_RIGHT,
+                SplitDimension.ODD,
+                SplitDimension.EVEN,
             ],
+            tags=[ChoreoTag.YARD],
         ),
         # === YARD ZONE — mid depth (hero elements) ===
         ChoreoGroup(
@@ -260,7 +269,9 @@ def build_display_graph() -> tuple[ChoreographyGraph, XLightsMapping]:
             ),
             fixture_count=1,
             pixel_fraction=0.20,
-            tags=[ChoreoTag.YARD, ChoreoTag.CENTER_THIRD, ChoreoTag.VERTICAL],
+            detail_capability=DetailCapability.HIGH,
+            split_membership=[],
+            tags=[ChoreoTag.YARD],
         ),
         ChoreoGroup(
             id="TREES",
@@ -276,12 +287,14 @@ def build_display_graph() -> tuple[ChoreographyGraph, XLightsMapping]:
             ),
             fixture_count=6,
             pixel_fraction=0.12,
-            tags=[
-                ChoreoTag.YARD,
-                ChoreoTag.HORIZONTAL,
-                ChoreoTag.ODD_EVEN,
-                ChoreoTag.LEFT_RIGHT,
+            detail_capability=DetailCapability.HIGH,
+            split_membership=[
+                SplitDimension.HALVES_LEFT,
+                SplitDimension.HALVES_RIGHT,
+                SplitDimension.ODD,
+                SplitDimension.EVEN,
             ],
+            tags=[ChoreoTag.YARD],
         ),
         # === YARD ZONE — near depth (foreground) ===
         ChoreoGroup(
@@ -298,13 +311,14 @@ def build_display_graph() -> tuple[ChoreographyGraph, XLightsMapping]:
             ),
             fixture_count=7,
             pixel_fraction=0.10,
-            tags=[
-                ChoreoTag.YARD,
-                ChoreoTag.PERIMETER,
-                ChoreoTag.HORIZONTAL,
-                ChoreoTag.ODD_EVEN,
-                ChoreoTag.LEFT_RIGHT,
+            detail_capability=DetailCapability.MEDIUM,
+            split_membership=[
+                SplitDimension.HALVES_LEFT,
+                SplitDimension.HALVES_RIGHT,
+                SplitDimension.ODD,
+                SplitDimension.EVEN,
             ],
+            tags=[ChoreoTag.YARD, ChoreoTag.PERIMETER],
         ),
         ChoreoGroup(
             id="CANDY_CANES",
@@ -320,13 +334,14 @@ def build_display_graph() -> tuple[ChoreographyGraph, XLightsMapping]:
             ),
             fixture_count=8,
             pixel_fraction=0.06,
-            tags=[
-                ChoreoTag.YARD,
-                ChoreoTag.PERIMETER,
-                ChoreoTag.HORIZONTAL,
-                ChoreoTag.ODD_EVEN,
-                ChoreoTag.LEFT_RIGHT,
+            detail_capability=DetailCapability.LOW,
+            split_membership=[
+                SplitDimension.HALVES_LEFT,
+                SplitDimension.HALVES_RIGHT,
+                SplitDimension.ODD,
+                SplitDimension.EVEN,
             ],
+            tags=[ChoreoTag.YARD, ChoreoTag.PERIMETER],
         ),
         ChoreoGroup(
             id="MATRIX",
@@ -342,7 +357,9 @@ def build_display_graph() -> tuple[ChoreographyGraph, XLightsMapping]:
             ),
             fixture_count=1,
             pixel_fraction=0.06,
-            tags=[ChoreoTag.YARD, ChoreoTag.LEFT_HALF, ChoreoTag.LEFT_THIRD],
+            detail_capability=DetailCapability.HIGH,
+            split_membership=[SplitDimension.HALVES_LEFT],
+            tags=[ChoreoTag.YARD],
         ),
         ChoreoGroup(
             id="SNOWFLAKES",
@@ -358,12 +375,9 @@ def build_display_graph() -> tuple[ChoreographyGraph, XLightsMapping]:
             ),
             fixture_count=8,
             pixel_fraction=0.06,
-            tags=[
-                ChoreoTag.YARD,
-                ChoreoTag.RIGHT_HALF,
-                ChoreoTag.RIGHT_THIRD,
-                ChoreoTag.ODD_EVEN,
-            ],
+            detail_capability=DetailCapability.LOW,
+            split_membership=[SplitDimension.HALVES_RIGHT, SplitDimension.ODD, SplitDimension.EVEN],
+            tags=[ChoreoTag.YARD],
         ),
     ]
 
@@ -379,7 +393,7 @@ def build_display_graph() -> tuple[ChoreographyGraph, XLightsMapping]:
             XLightsGroupMapping(choreo_id="OUTLINE", group_name="House Outline"),
             XLightsGroupMapping(choreo_id="WINDOWS", group_name="Windows"),
             XLightsGroupMapping(choreo_id="WREATHS", group_name="Wreaths"),
-            XLightsGroupMapping(choreo_id="FLOODLIGHTS", group_name="Floods"),
+            XLightsGroupMapping(choreo_id="FLOODS", group_name="Floods"),
             XLightsGroupMapping(choreo_id="MEGA_TREE", group_name="Mega Tree"),
             XLightsGroupMapping(choreo_id="TREES", group_name="Yard Trees"),
             XLightsGroupMapping(choreo_id="ARCHES", group_name="Arches"),

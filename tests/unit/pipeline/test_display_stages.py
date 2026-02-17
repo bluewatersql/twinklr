@@ -39,6 +39,7 @@ from twinklr.core.sequencer.templates.group.models.choreography import (
 from twinklr.core.sequencer.templates.group.models.coordination import (
     CoordinationPlan,
     GroupPlacement,
+    PlanTarget,
 )
 from twinklr.core.sequencer.theming import ThemeRef
 from twinklr.core.sequencer.theming.enums import ThemeScope
@@ -51,6 +52,7 @@ from twinklr.core.sequencer.vocabulary import (
     LaneKind,
     PlanningTimeRef,
 )
+from twinklr.core.sequencer.vocabulary.choreography import TargetType
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -94,7 +96,7 @@ def _make_plan_set(
 ) -> GroupPlanSet:
     placement = GroupPlacement(
         placement_id="p1",
-        group_id="MEGA_TREE_1",
+        target=PlanTarget(type=TargetType.GROUP, id="MEGA_TREE_1"),
         template_id=template_id,
         start=PlanningTimeRef(bar=1, beat=1),
         duration=EffectDuration.PHRASE,
@@ -112,7 +114,7 @@ def _make_plan_set(
                 coordination_plans=[
                     CoordinationPlan(
                         coordination_mode=CoordinationMode.UNIFIED,
-                        group_ids=["MEGA_TREE_1"],
+                        targets=[PlanTarget(type=TargetType.GROUP, id="MEGA_TREE_1")],
                         placements=[placement],
                     )
                 ],

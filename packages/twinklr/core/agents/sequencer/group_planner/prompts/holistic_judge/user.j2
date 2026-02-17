@@ -29,6 +29,22 @@ The MacroPlan defines **{{ expected_section_ids | length }}** sections. Compare 
 - **{{ role }}**: {{ group_ids | join(", ") }}
 {% endfor %}
 
+{% if display_graph.groups_by_tag is defined and display_graph.groups_by_tag %}
+## Available Zones (valid zone targets)
+
+{% for tag, group_ids in display_graph.groups_by_tag.items() %}
+- **{{ tag }}**: {{ group_ids | join(", ") }}
+{% endfor %}
+{% endif %}
+
+{% if display_graph.groups_by_split is defined and display_graph.groups_by_split %}
+## Available Splits (valid split targets)
+
+{% for split, group_ids in display_graph.groups_by_split.items() %}
+- **{{ split }}**: {{ group_ids | join(", ") }}
+{% endfor %}
+{% endif %}
+
 {% if group_hierarchy %}
 ## Group Hierarchy (parent → children)
 

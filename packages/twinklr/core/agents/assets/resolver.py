@@ -171,15 +171,15 @@ def _resolve_placement(
         return placement
 
     # Determine preferred category from group role
-    preferred = ROLE_CATEGORY_PREFERENCE.get(placement.group_id, _DEFAULT_CATEGORY)
+    preferred = ROLE_CATEGORY_PREFERENCE.get(placement.target.id, _DEFAULT_CATEGORY)
 
     asset_ids = _find_matching_entries(motif_id, catalog, preferred)
     if not asset_ids:
         logger.debug(
-            "No catalog match for motif '%s' (template=%s, group=%s)",
+            "No catalog match for motif '%s' (template=%s, target=%s)",
             motif_id,
             placement.template_id,
-            placement.group_id,
+            placement.target.id,
         )
         return placement
 
@@ -271,7 +271,7 @@ def resolve_plan_assets(
 
     For each GroupPlacement in the plan_set:
     1. Extract motif_id from template_id.
-    2. Determine preferred category from group_id role.
+    2. Determine preferred category from target group role.
     3. Search catalog for matching assets by (motif_id, category).
     4. Write matched asset_ids into placement.resolved_asset_ids.
 

@@ -32,15 +32,18 @@ Before evaluating coordination quality, verify the plan is **technically sound**
 - Every referenced `template_id` exists in the provided template catalog.
 - Each template is compatible with the lane where it is used (via catalog `compatible_lanes`).
 
-#### Group Validity
-- Every referenced `group_id` exists in the display graph.
-- Within a single lane: do not schedule the same `group_id` in overlapping time ranges.
-- Cross-lane reuse is **NOT allowed by default** (a `group_id` should appear in only one lane).
-- **Exception (allowlisted multi-lane groups):** A `group_id` may appear in both **RHYTHM + ACCENT** only if it is explicitly allowlisted by `layer_intents.multilane_allowed_groups` in the input.
+#### Target Validity
+- Targets use the **typed PlanTarget** model: `{"type": "group"|"zone"|"split", "id": "..."}`.
+- **Group targets** (`type: "group"`): `id` must be a concrete ChoreoGroup id from the display graph (e.g., `ARCHES`, `MEGA_TREE`).
+- **Zone targets** (`type: "zone"`): `id` must be a valid zone name (e.g., `HOUSE`, `YARD`, `ROOF`, `PERIMETER`). Zone targets are expanded by the renderer to all groups in that zone. These are **valid targets** — do NOT reject them.
+- **Split targets** (`type: "split"`): `id` must be a valid split dimension (e.g., `HALVES_LEFT`, `ODD`, `EVEN`). Split targets are expanded by the renderer. These are **valid targets** — do NOT reject them.
+- Never use role labels (`HERO`, `ANCHOR`, `SUPPORTING`) as target ids.
+- Within a single lane: do not schedule the **same target** (same type+id) in overlapping time ranges. Different targets may overlap (even if they resolve to overlapping groups — the renderer handles blending).
+- Cross-lane reuse is **NOT allowed by default** (a target should appear in only one lane).
+- **Exception (allowlisted multi-lane targets):** A target may appear in both **RHYTHM + ACCENT** only if it is explicitly allowlisted by `layer_intents.multilane_allowed_groups` in the input.
   - For allowlisted groups, overlap across lanes is allowed and is interpreted with **ACCENT override semantics** (ACCENT is higher priority during its intervals).
 - Cross-lane reuse involving **BASE** is never allowed (BASE+RHYTHM or BASE+ACCENT).
-- A `group_id` must be a **concrete display group id** from the display graph (never a role label like "HERO"/"MID"/"BACKGROUND").
-- Within a lane, a `group_id` must appear in **at most one coordination_plan** (no splitting a group across multiple coordination_plans in the same lane).
+- Within a lane, a target (same type+id) must appear in **at most one coordination_plan** (no splitting a target across multiple coordination_plans in the same lane).
 
 #### Timing Validity
 - All placement `start` times are within the section bounds (bar range).
@@ -51,8 +54,8 @@ Before evaluating coordination quality, verify the plan is **technically sound**
 - For modes that require expansion (e.g., SEQUENCED, CALL_RESPONSE, RIPPLE):
   - `window` is present
   - `config` is present
-  - `config.group_order` has no duplicates
-  - every group in `config.group_order` is contained in `group_ids`
+  - `config.group_order` has no duplicates (optional; if present, must be valid)
+  - every item in `config.group_order` is contained in `targets`
 - For modes that do NOT require expansion (e.g., UNIFIED / direct placements):
   - placements are provided directly (non-empty unless explicitly justified)
 
@@ -80,8 +83,8 @@ SCHEMA, TIMING, TEMPLATES, CONSTRAINT, LOGIC.
 Automatic HARD_FAIL examples:
 - Cross-lane reuse without allowlisting (or any reuse involving BASE)
 - Using an allowlisted group in both lanes but violating override semantics expectations (e.g., claiming allowlist when none provided)
-- Any within-lane overlap for the same group in ACCENT
-- A group_id appears in multiple coordination_plans within the same lane
+- Any within-lane overlap for the same target (type+id) in ACCENT
+- A target (same type+id) appears in multiple coordination_plans within the same lane
 
 ---
 
@@ -143,7 +146,7 @@ For each identified issue, create an `Issue` matching the shared schema.
 - scope: EXACTLY ONE OF: {{ taxonomy.IssueScope | join(' | ') }}
 - location: Use ONLY IssueLocation fields:
   - section_id
-  - group_id
+  - target
   - effect_id
   - bar_start / bar_end (only if deterministically derivable)
   - field_path (dot notation; REQUIRED whenever possible)

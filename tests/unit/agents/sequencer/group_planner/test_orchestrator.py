@@ -28,6 +28,7 @@ from twinklr.core.sequencer.templates.group.models.choreography import (
     ChoreographyGraph,
     ChoreoGroup,
 )
+from twinklr.core.sequencer.templates.group.models.coordination import PlanTarget
 from twinklr.core.sequencer.timing import TimeRef
 from twinklr.core.sequencer.vocabulary import (
     CoordinationMode,
@@ -37,6 +38,7 @@ from twinklr.core.sequencer.vocabulary import (
     LaneKind,
     PlanningTimeRef,
 )
+from twinklr.core.sequencer.vocabulary.choreography import TargetType
 from twinklr.core.sequencer.vocabulary.timing import TimeRefKind
 
 from .conftest import DEFAULT_THEME
@@ -144,11 +146,11 @@ def sample_section_plan() -> SectionCoordinationPlan:
                 coordination_plans=[
                     CoordinationPlan(
                         coordination_mode=CoordinationMode.UNIFIED,
-                        group_ids=["HERO_1"],
+                        targets=[PlanTarget(type=TargetType.GROUP, id="HERO_1")],
                         placements=[
                             GroupPlacement(
                                 placement_id="p1",
-                                group_id="HERO_1",
+                                target=PlanTarget(type=TargetType.GROUP, id="HERO_1"),
                                 template_id="gtpl_accent_flash",
                                 start=PlanningTimeRef(bar=1, beat=1),
                                 duration=EffectDuration.HIT,
@@ -211,11 +213,11 @@ class TestGroupPlannerOrchestrator:
                     coordination_plans=[
                         CoordinationPlan(
                             coordination_mode=CoordinationMode.UNIFIED,
-                            group_ids=["HERO_1"],
+                            targets=[PlanTarget(type=TargetType.GROUP, id="HERO_1")],
                             placements=[
                                 GroupPlacement(
                                     placement_id="p1",
-                                    group_id="HERO_1",
+                                    target=PlanTarget(type=TargetType.GROUP, id="HERO_1"),
                                     template_id="NONEXISTENT",  # Invalid!
                                     start=PlanningTimeRef(bar=1, beat=1),
                                     duration=EffectDuration.HIT,

@@ -17,6 +17,7 @@ from twinklr.core.sequencer.templates.group.library import (
 )
 from twinklr.core.sequencer.templates.group.models.coordination import (
     GroupPlacement,
+    PlanTarget,
 )
 from twinklr.core.sequencer.templates.group.models.template import (
     GroupConstraints,
@@ -34,6 +35,7 @@ from twinklr.core.sequencer.vocabulary import (
     ProjectionIntent,
     VisualDepth,
 )
+from twinklr.core.sequencer.vocabulary.choreography import TargetType
 
 # ------------------------------------------------------------------
 # Test helpers
@@ -84,7 +86,7 @@ def _make_placement(template_id: str = "gtpl_test_wash") -> GroupPlacement:
     """Build a minimal GroupPlacement for testing."""
     return GroupPlacement(
         placement_id="p-1",
-        group_id="ARCHES",
+        target=PlanTarget(type=TargetType.GROUP, id="ARCHES"),
         template_id=template_id,
         start=PlanningTimeRef(bar=1, beat=1),
     )
@@ -260,7 +262,7 @@ class TestDefaultTemplateCompiler:
         compiler = DefaultTemplateCompiler(registry)
         placement = GroupPlacement(
             placement_id="p-ovr",
-            group_id="ARCHES",
+            target=PlanTarget(type=TargetType.GROUP, id="ARCHES"),
             template_id="gtpl_test_wash",
             start=PlanningTimeRef(bar=1, beat=1),
             param_overrides={"speed": 80},  # Valid for Color Wash
@@ -276,7 +278,7 @@ class TestDefaultTemplateCompiler:
         compiler = DefaultTemplateCompiler(registry)
         placement = GroupPlacement(
             placement_id="p-bad",
-            group_id="ARCHES",
+            target=PlanTarget(type=TargetType.GROUP, id="ARCHES"),
             template_id="gtpl_test_wash",
             start=PlanningTimeRef(bar=1, beat=1),
             param_overrides={"motif_bias": "sparkly"},  # Not a handler param

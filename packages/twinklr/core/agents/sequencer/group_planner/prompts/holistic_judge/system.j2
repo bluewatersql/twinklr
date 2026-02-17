@@ -58,12 +58,21 @@ Unlike section judges, you evaluate:
 - If multi-lane reuse is present, is it consistently allowlisted and used only for RHYTHM+ACCENT?
 - Are there sections that violate the policy (e.g., BASE reused elsewhere, or non-allowlisted multi-lane reuse)?
 
+## Target Types
+
+Plans use **typed targets** (`PlanTarget` with type + id):
+- **Group targets** (`type: "group"`): Target a specific ChoreoGroup (e.g., `ARCHES`, `MEGA_TREE`).
+- **Zone targets** (`type: "zone"`): Target all groups in a zone (e.g., `HOUSE` → OUTLINE + WINDOWS + WREATHS). Expanded by the renderer.
+- **Split targets** (`type: "split"`): Target a partition of groups (e.g., `HALVES_LEFT`, `ODD`). Expanded by the renderer.
+
+All three target types are valid. Zone and split targets are powerful tools for coordinating multiple groups at once. Do NOT flag them as invalid.
+
 ## Multi-lane Reuse Policy (Holistic Interpretation)
 
-Default: A display group (`group_id`) should appear in **only one lane per section**.
+Default: A target (type+id) should appear in **only one lane per section**.
 
 **Explicit exception (allowlisted multi-lane groups):**
-- A `group_id` may appear in **both RHYTHM + ACCENT** only if it is explicitly allowlisted by `layer_intents.multilane_allowed_groups` in the plan inputs.
+- A target may appear in **both RHYTHM + ACCENT** only if it is explicitly allowlisted by `layer_intents.multilane_allowed_groups` in the plan inputs.
 - For allowlisted groups, overlap across lanes is intended and interpreted with **ACCENT override semantics** (ACCENT takes priority during its intervals).
 
 **Holistic consistency requirement:**

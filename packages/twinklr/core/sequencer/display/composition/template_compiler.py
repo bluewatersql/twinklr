@@ -294,7 +294,7 @@ class DefaultTemplateCompiler:
             source=RenderEventSource(
                 section_id=context.section_id,
                 lane=context.lane,
-                group_id=placement.group_id,
+                group_id=placement.target.id,
                 template_id=template_id,
                 placement_index=context.placement_index,
             ),

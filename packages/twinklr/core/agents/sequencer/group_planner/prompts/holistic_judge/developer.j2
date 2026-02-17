@@ -37,14 +37,18 @@ Before evaluating holistic quality, verify the plan set is **technically sound**
 - No gaps or overlaps between sections
 
 **Resource Consistency**
-- All group_ids used across sections exist in display graph
+- All target IDs used across sections are valid (use `targets` list)
+  - **Group targets**: `id` must be a concrete ChoreoGroup id from the display graph (e.g., ARCHES, MEGA_TREE)
+  - **Zone targets**: `id` must be a valid zone (e.g., HOUSE, YARD, ROOF, PERIMETER). These are valid and expanded by the renderer — do NOT reject them.
+  - **Split targets**: `id` must be a valid split dimension (e.g., HALVES_LEFT, ODD, EVEN). These are valid and expanded by the renderer — do NOT reject them.
 - Palette/motif ids are present where required:
   - Every SectionCoordinationPlan has plan.palette.palette_id
   - Every SectionCoordinationPlan has plan.motif_ids (>=1)
 
 **Multi-lane reuse policy consistency (NEW)**
-- Default: within a section, a `group_id` should appear in only one lane.
-- Exception: a `group_id` may appear in both RHYTHM + ACCENT only if allowlisted via `layer_intents.multilane_allowed_groups` in the plan inputs for that section.
+- Overlap rules apply only to **same-target self-overlap** (same type+id). Different targets CAN overlap.
+- Default: within a section, a target (type+id) should appear in only one lane.
+- Exception: a target may appear in both RHYTHM + ACCENT only if allowlisted via `layer_intents.multilane_allowed_groups` in the plan inputs for that section.
 - Cross-lane reuse involving BASE (BASE+RHYTHM or BASE+ACCENT) is never allowed.
 - If the plan set violates these rules in any section, treat as technical invalid:
   - Return `HARD_FAIL` immediately with critical cross_section_issues
@@ -130,13 +134,13 @@ Required fields:
 
 ### Targeted Actions Format
 
-Each `targeted_action` must be a single, executable instruction that can be applied to a specific group plan without further interpretation. Reference actual `section_id`, `group_id`, `template_id`, `palette_id`, and/or `lane` values from the GroupPlanSet.
+Each `targeted_action` must be a single, executable instruction that can be applied to a specific group plan without further interpretation. Reference actual `section_id`, target (type+id, e.g. group:ARCHES or zone:HOUSE), `template_id`, `palette_id`, and/or `lane` values from the GroupPlanSet.
 
 **Good examples:**
-- "In section chorus_2, add ARCHES to RHYTHM lane with gtpl_rhythm_sparkle_beat (bars 5-8)"
-- "In section break_1, change HERO palette from core.mono_cool to core.christmas_traditional for transition continuity"
-- "In sections verse_3 and verse_4, replace gtpl_accent_burst_big on MEGA_TREE with gtpl_accent_bell_double for variety"
-- "In section instrumental, add WINDOWS to BASE lane with gtpl_base_candy_stripes to improve group utilization"
+- "In section chorus_2, add target group:ARCHES to RHYTHM lane with gtpl_rhythm_sparkle_beat (bars 5-8)"
+- "In section break_1, change palette from core.mono_cool to core.christmas_traditional for transition continuity"
+- "In sections verse_3 and verse_4, replace gtpl_accent_burst_big on target group:MEGA_TREE with gtpl_accent_bell_double for variety"
+- "In section instrumental, add target zone:HOUSE to BASE lane with gtpl_base_candy_stripes to cover all house elements"
 
 **Bad examples (too vague):**
 - "Add more variety to templates" (which section? which group? which template?)

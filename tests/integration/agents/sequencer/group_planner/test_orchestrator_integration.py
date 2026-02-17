@@ -30,6 +30,7 @@ from twinklr.core.sequencer.templates.group.models.choreography import (
     ChoreographyGraph,
     ChoreoGroup,
 )
+from twinklr.core.sequencer.templates.group.models.coordination import PlanTarget
 from twinklr.core.sequencer.theming import ThemeRef, ThemeScope
 from twinklr.core.sequencer.vocabulary import (
     EffectDuration,
@@ -37,6 +38,7 @@ from twinklr.core.sequencer.vocabulary import (
     GroupVisualIntent,
     PlanningTimeRef,
 )
+from twinklr.core.sequencer.vocabulary.choreography import TargetType
 
 
 @pytest.fixture
@@ -152,18 +154,21 @@ def create_mock_section_plan() -> SectionCoordinationPlan:
                 coordination_plans=[
                     CoordinationPlan(
                         coordination_mode=CoordinationMode.UNIFIED,
-                        group_ids=["HERO_1", "HERO_2"],
+                        targets=[
+                            PlanTarget(type=TargetType.GROUP, id="HERO_1"),
+                            PlanTarget(type=TargetType.GROUP, id="HERO_2"),
+                        ],
                         placements=[
                             GroupPlacement(
                                 placement_id="p1",
-                                group_id="HERO_1",
+                                target=PlanTarget(type=TargetType.GROUP, id="HERO_1"),
                                 template_id="gtpl_accent_flash",
                                 start=PlanningTimeRef(bar=1, beat=1),
                                 duration=EffectDuration.PHRASE,
                             ),
                             GroupPlacement(
                                 placement_id="p2",
-                                group_id="HERO_2",
+                                target=PlanTarget(type=TargetType.GROUP, id="HERO_2"),
                                 template_id="gtpl_accent_flash",
                                 start=PlanningTimeRef(bar=1, beat=1),
                                 duration=EffectDuration.PHRASE,
@@ -178,11 +183,11 @@ def create_mock_section_plan() -> SectionCoordinationPlan:
                 coordination_plans=[
                     CoordinationPlan(
                         coordination_mode=CoordinationMode.UNIFIED,
-                        group_ids=["ARCHES_1"],
+                        targets=[PlanTarget(type=TargetType.GROUP, id="ARCHES_1")],
                         placements=[
                             GroupPlacement(
                                 placement_id="p3",
-                                group_id="ARCHES_1",
+                                target=PlanTarget(type=TargetType.GROUP, id="ARCHES_1"),
                                 template_id="gtpl_base_glow_warm",
                                 start=PlanningTimeRef(bar=1, beat=1),
                                 duration=EffectDuration.SECTION,
@@ -263,11 +268,11 @@ class TestGroupPlannerOrchestratorIntegration:
                     coordination_plans=[
                         CoordinationPlan(
                             coordination_mode=CoordinationMode.UNIFIED,
-                            group_ids=["HERO_1"],
+                            targets=[PlanTarget(type=TargetType.GROUP, id="HERO_1")],
                             placements=[
                                 GroupPlacement(
                                     placement_id="p1",
-                                    group_id="HERO_1",
+                                    target=PlanTarget(type=TargetType.GROUP, id="HERO_1"),
                                     template_id="INVALID_TEMPLATE",
                                     start=PlanningTimeRef(bar=1, beat=1),
                                     duration=EffectDuration.BURST,

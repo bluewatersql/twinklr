@@ -70,6 +70,12 @@ def get_taxonomy_dict() -> dict[str, list[str]]:
         AssetSlotType,
     ]
 
+    from twinklr.core.sequencer.vocabulary import (
+        DetailCapability,
+        SplitDimension,
+        TargetType,
+    )
+
     # Group planner enums
     group_planner_enums: list[type[Enum]] = [
         ChoreoTag,
@@ -81,6 +87,10 @@ def get_taxonomy_dict() -> dict[str, list[str]]:
         IntensityLevel,
         EffectDuration,
         TimingHint,
+        # Spatial targeting enums
+        TargetType,
+        SplitDimension,
+        DetailCapability,
     ]
 
     # Extract issue taxonomy enums (for judge agents)

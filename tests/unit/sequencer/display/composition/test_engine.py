@@ -35,6 +35,7 @@ from twinklr.core.sequencer.templates.group.models.choreography import (
 from twinklr.core.sequencer.templates.group.models.coordination import (
     CoordinationPlan,
     GroupPlacement,
+    PlanTarget,
 )
 from twinklr.core.sequencer.theming import PALETTE_REGISTRY, ThemeRef
 from twinklr.core.sequencer.theming.enums import ThemeScope
@@ -46,6 +47,7 @@ from twinklr.core.sequencer.vocabulary import (
     LaneKind,
     PlanningTimeRef,
 )
+from twinklr.core.sequencer.vocabulary.choreography import TargetType
 
 # Ensure builtins are loaded once for all tests in this module
 load_builtin_group_templates()
@@ -128,7 +130,7 @@ def _make_plan_set(
         placements = [
             GroupPlacement(
                 placement_id="p1",
-                group_id="OUTLINE_1",
+                target=PlanTarget(type=TargetType.GROUP, id="OUTLINE_1"),
                 template_id="gtpl_base_wash_soft",
                 start=PlanningTimeRef(bar=1, beat=1),
                 duration=EffectDuration.PHRASE,
@@ -147,7 +149,7 @@ def _make_plan_set(
                 coordination_plans=[
                     CoordinationPlan(
                         coordination_mode=CoordinationMode.UNIFIED,
-                        group_ids=["OUTLINE_1"],
+                        targets=[PlanTarget(type=TargetType.GROUP, id="OUTLINE_1")],
                         placements=placements,
                     )
                 ],
@@ -208,14 +210,14 @@ class TestCompositionEngine:
         """BASE and RHYTHM placements go to different layers."""
         base_placement = GroupPlacement(
             placement_id="p_base",
-            group_id="OUTLINE_1",
+            target=PlanTarget(type=TargetType.GROUP, id="OUTLINE_1"),
             template_id="gtpl_base_wash_soft",
             start=PlanningTimeRef(bar=1, beat=1),
             duration=EffectDuration.SECTION,
         )
         rhythm_placement = GroupPlacement(
             placement_id="p_rhythm",
-            group_id="OUTLINE_1",
+            target=PlanTarget(type=TargetType.GROUP, id="OUTLINE_1"),
             template_id="gtpl_rhythm_chase_single",
             start=PlanningTimeRef(bar=1, beat=1),
             duration=EffectDuration.SECTION,
@@ -232,7 +234,7 @@ class TestCompositionEngine:
                     coordination_plans=[
                         CoordinationPlan(
                             coordination_mode=CoordinationMode.UNIFIED,
-                            group_ids=["OUTLINE_1"],
+                            targets=[PlanTarget(type=TargetType.GROUP, id="OUTLINE_1")],
                             placements=[base_placement],
                         )
                     ],
@@ -243,7 +245,7 @@ class TestCompositionEngine:
                     coordination_plans=[
                         CoordinationPlan(
                             coordination_mode=CoordinationMode.UNIFIED,
-                            group_ids=["OUTLINE_1"],
+                            targets=[PlanTarget(type=TargetType.GROUP, id="OUTLINE_1")],
                             placements=[rhythm_placement],
                         )
                     ],
@@ -273,14 +275,14 @@ class TestCompositionEngine:
         """Overlapping events in same layer are trimmed."""
         p1 = GroupPlacement(
             placement_id="p1",
-            group_id="OUTLINE_1",
+            target=PlanTarget(type=TargetType.GROUP, id="OUTLINE_1"),
             template_id="gtpl_base_wash_soft",
             start=PlanningTimeRef(bar=1, beat=1),
             duration=EffectDuration.PHRASE,  # ~8000ms
         )
         p2 = GroupPlacement(
             placement_id="p2",
-            group_id="OUTLINE_1",
+            target=PlanTarget(type=TargetType.GROUP, id="OUTLINE_1"),
             template_id="gtpl_base_wash_split",
             start=PlanningTimeRef(bar=3, beat=1),  # 4000ms
             duration=EffectDuration.PHRASE,
@@ -323,7 +325,7 @@ class TestCompositionEngine:
         # Place at the very end of the sequence
         p = GroupPlacement(
             placement_id="p_end",
-            group_id="OUTLINE_1",
+            target=PlanTarget(type=TargetType.GROUP, id="OUTLINE_1"),
             template_id="gtpl_accent_hit_white",
             start=PlanningTimeRef(bar=16, beat=4),
             duration=EffectDuration.PHRASE,  # extends past sequence end
@@ -350,7 +352,7 @@ class TestSectionBoundaryClamping:
         # Without clamping it would end at 8000ms; with clamping → 4000ms
         p = GroupPlacement(
             placement_id="p1",
-            group_id="OUTLINE_1",
+            target=PlanTarget(type=TargetType.GROUP, id="OUTLINE_1"),
             template_id="gtpl_base_wash_soft",
             start=PlanningTimeRef(bar=1, beat=1),
             duration=EffectDuration.PHRASE,
@@ -370,7 +372,7 @@ class TestSectionBoundaryClamping:
                     coordination_plans=[
                         CoordinationPlan(
                             coordination_mode=CoordinationMode.UNIFIED,
-                            group_ids=["OUTLINE_1"],
+                            targets=[PlanTarget(type=TargetType.GROUP, id="OUTLINE_1")],
                             placements=[p],
                         )
                     ],
@@ -397,7 +399,7 @@ class TestSectionBoundaryClamping:
 
         p = GroupPlacement(
             placement_id="p1",
-            group_id="OUTLINE_1",
+            target=PlanTarget(type=TargetType.GROUP, id="OUTLINE_1"),
             template_id="gtpl_base_wash_soft",
             start=PlanningTimeRef(bar=1, beat=1),
             duration=EffectDuration.SECTION,
@@ -417,7 +419,7 @@ class TestSectionBoundaryClamping:
                     coordination_plans=[
                         CoordinationPlan(
                             coordination_mode=CoordinationMode.UNIFIED,
-                            group_ids=["OUTLINE_1"],
+                            targets=[PlanTarget(type=TargetType.GROUP, id="OUTLINE_1")],
                             placements=[p],
                         )
                     ],
@@ -445,7 +447,7 @@ class TestSectionBoundaryClamping:
             placements=[
                 GroupPlacement(
                     placement_id="p1",
-                    group_id="OUTLINE_1",
+                    target=PlanTarget(type=TargetType.GROUP, id="OUTLINE_1"),
                     template_id="gtpl_base_wash_soft",
                     start=PlanningTimeRef(bar=1, beat=1),
                     duration=EffectDuration.SECTION,
@@ -543,7 +545,7 @@ class TestBlendModeAssignment:
         """Multiple lanes get correct blend modes from the allocator."""
         base_p = GroupPlacement(
             placement_id="p_base",
-            group_id="OUTLINE_1",
+            target=PlanTarget(type=TargetType.GROUP, id="OUTLINE_1"),
             template_id="gtpl_base_wash_soft",
             start=PlanningTimeRef(bar=1, beat=1),
             duration=EffectDuration.SECTION,
@@ -551,7 +553,7 @@ class TestBlendModeAssignment:
         )
         accent_p = GroupPlacement(
             placement_id="p_accent",
-            group_id="OUTLINE_1",
+            target=PlanTarget(type=TargetType.GROUP, id="OUTLINE_1"),
             template_id="gtpl_accent_hit_color",
             start=PlanningTimeRef(bar=1, beat=1),
             duration=EffectDuration.HIT,
@@ -572,7 +574,7 @@ class TestBlendModeAssignment:
                     coordination_plans=[
                         CoordinationPlan(
                             coordination_mode=CoordinationMode.UNIFIED,
-                            group_ids=["OUTLINE_1"],
+                            targets=[PlanTarget(type=TargetType.GROUP, id="OUTLINE_1")],
                             placements=[base_p],
                         )
                     ],
@@ -583,7 +585,7 @@ class TestBlendModeAssignment:
                     coordination_plans=[
                         CoordinationPlan(
                             coordination_mode=CoordinationMode.UNIFIED,
-                            group_ids=["OUTLINE_1"],
+                            targets=[PlanTarget(type=TargetType.GROUP, id="OUTLINE_1")],
                             placements=[accent_p],
                         )
                     ],
@@ -635,7 +637,7 @@ class TestAssetOverlayRendering:
         """Without a catalog_index, no overlay events are emitted."""
         placement = GroupPlacement(
             placement_id="p_asset",
-            group_id="OUTLINE_1",
+            target=PlanTarget(type=TargetType.GROUP, id="OUTLINE_1"),
             template_id="gtpl_base_wash_soft",
             start=PlanningTimeRef(bar=1, beat=1),
             duration=EffectDuration.PHRASE,
@@ -666,7 +668,7 @@ class TestAssetOverlayRendering:
 
         placement = GroupPlacement(
             placement_id="p_asset",
-            group_id="OUTLINE_1",
+            target=PlanTarget(type=TargetType.GROUP, id="OUTLINE_1"),
             template_id="gtpl_base_wash_soft",
             start=PlanningTimeRef(bar=1, beat=1),
             duration=EffectDuration.PHRASE,
@@ -698,7 +700,7 @@ class TestAssetOverlayRendering:
 
         placement = GroupPlacement(
             placement_id="p_timing",
-            group_id="OUTLINE_1",
+            target=PlanTarget(type=TargetType.GROUP, id="OUTLINE_1"),
             template_id="gtpl_base_wash_soft",
             start=PlanningTimeRef(bar=3, beat=1),
             duration=EffectDuration.PHRASE,
@@ -723,7 +725,7 @@ class TestAssetOverlayRendering:
 
         placement = GroupPlacement(
             placement_id="p_multi",
-            group_id="OUTLINE_1",
+            target=PlanTarget(type=TargetType.GROUP, id="OUTLINE_1"),
             template_id="gtpl_base_wash_soft",
             start=PlanningTimeRef(bar=1, beat=1),
             duration=EffectDuration.PHRASE,
@@ -747,7 +749,7 @@ class TestAssetOverlayRendering:
 
         placement = GroupPlacement(
             placement_id="p_skip",
-            group_id="OUTLINE_1",
+            target=PlanTarget(type=TargetType.GROUP, id="OUTLINE_1"),
             template_id="gtpl_base_wash_soft",
             start=PlanningTimeRef(bar=1, beat=1),
             duration=EffectDuration.PHRASE,
@@ -768,7 +770,7 @@ class TestAssetOverlayRendering:
 
         placement = GroupPlacement(
             placement_id="p_all_missing",
-            group_id="OUTLINE_1",
+            target=PlanTarget(type=TargetType.GROUP, id="OUTLINE_1"),
             template_id="gtpl_base_wash_soft",
             start=PlanningTimeRef(bar=1, beat=1),
             duration=EffectDuration.PHRASE,
@@ -789,7 +791,7 @@ class TestAssetOverlayRendering:
 
         placement = GroupPlacement(
             placement_id="p_trace",
-            group_id="OUTLINE_1",
+            target=PlanTarget(type=TargetType.GROUP, id="OUTLINE_1"),
             template_id="gtpl_base_wash_soft",
             start=PlanningTimeRef(bar=1, beat=1),
             duration=EffectDuration.PHRASE,
@@ -813,7 +815,7 @@ class TestAssetOverlayRendering:
 
         placement = GroupPlacement(
             placement_id="p_rhythm_overlay",
-            group_id="OUTLINE_1",
+            target=PlanTarget(type=TargetType.GROUP, id="OUTLINE_1"),
             template_id="gtpl_rhythm_chase_single",
             start=PlanningTimeRef(bar=1, beat=1),
             duration=EffectDuration.PHRASE,

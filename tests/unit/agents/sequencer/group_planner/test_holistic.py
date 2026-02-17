@@ -30,6 +30,7 @@ from twinklr.core.sequencer.templates.group.models.choreography import (
     ChoreographyGraph,
     ChoreoGroup,
 )
+from twinklr.core.sequencer.templates.group.models.coordination import PlanTarget
 from twinklr.core.sequencer.vocabulary import (
     CoordinationMode,
     EffectDuration,
@@ -38,6 +39,7 @@ from twinklr.core.sequencer.vocabulary import (
     LaneKind,
     PlanningTimeRef,
 )
+from twinklr.core.sequencer.vocabulary.choreography import TargetType
 
 from .conftest import DEFAULT_THEME
 
@@ -173,11 +175,11 @@ def sample_group_plan_set() -> GroupPlanSet:
                 coordination_plans=[
                     CoordinationPlan(
                         coordination_mode=CoordinationMode.UNIFIED,
-                        group_ids=["HERO_1"],
+                        targets=[PlanTarget(type=TargetType.GROUP, id="HERO_1")],
                         placements=[
                             GroupPlacement(
                                 placement_id="p1",
-                                group_id="HERO_1",
+                                target=PlanTarget(type=TargetType.GROUP, id="HERO_1"),
                                 template_id="gtpl_accent_flash",
                                 start=PlanningTimeRef(bar=1, beat=1),
                                 duration=EffectDuration.BURST,
@@ -199,11 +201,11 @@ def sample_group_plan_set() -> GroupPlanSet:
                 coordination_plans=[
                     CoordinationPlan(
                         coordination_mode=CoordinationMode.UNIFIED,
-                        group_ids=["HERO_1"],
+                        targets=[PlanTarget(type=TargetType.GROUP, id="HERO_1")],
                         placements=[
                             GroupPlacement(
                                 placement_id="p2",
-                                group_id="HERO_1",
+                                target=PlanTarget(type=TargetType.GROUP, id="HERO_1"),
                                 template_id="gtpl_accent_flash",
                                 start=PlanningTimeRef(bar=3, beat=1),
                                 duration=EffectDuration.BURST,

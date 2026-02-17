@@ -413,13 +413,15 @@ def group_plan_set() -> GroupPlanSet:
         CoordinationPlan,
         GroupPlacement,
     )
+    from twinklr.core.sequencer.templates.group.models.coordination import PlanTarget
     from twinklr.core.sequencer.vocabulary import CoordinationMode, EffectDuration, PlanningTimeRef
+    from twinklr.core.sequencer.vocabulary.choreography import TargetType
 
     # Create minimal placements
     placements = [
         GroupPlacement(
             placement_id="p1",
-            group_id="MEGA_TREE_01",
+            target=PlanTarget(type=TargetType.GROUP, id="MEGA_TREE_01"),
             template_id="sweep_basic",
             start=PlanningTimeRef(bar=1, beat=1),
             duration=EffectDuration.BURST,
@@ -434,7 +436,7 @@ def group_plan_set() -> GroupPlanSet:
             coordination_plans=[
                 CoordinationPlan(
                     coordination_mode=CoordinationMode.UNIFIED,
-                    group_ids=["MEGA_TREE_01"],
+                    targets=[PlanTarget(type=TargetType.GROUP, id="MEGA_TREE_01")],
                     placements=placements,
                 )
             ],
@@ -527,16 +529,17 @@ def test_shape_holistic_judge_context_display_graph_minimal(
     choreo_graph: ChoreographyGraph,
     template_catalog: TemplateCatalog,
 ) -> None:
-    """Test display_graph only includes groups_by_role."""
+    """Test display_graph includes groups_by_role, groups_by_tag, groups_by_split."""
     result = shape_holistic_judge_context(
         group_plan_set, choreo_graph, template_catalog, macro_plan_summary=None
     )
 
     dg = result["display_graph"]
 
-    # Should ONLY have groups_by_role
+    # Should have groups_by_role, groups_by_tag, groups_by_split
     assert "groups_by_role" in dg
-    assert len(dg) == 1  # Only one key
+    assert "groups_by_tag" in dg
+    assert "groups_by_split" in dg
 
 
 def test_shape_holistic_judge_context_excludes_template_catalog(
@@ -766,13 +769,15 @@ def test_shape_holistic_judge_context_single_section() -> None:
         CoordinationPlan,
         GroupPlacement,
     )
+    from twinklr.core.sequencer.templates.group.models.coordination import PlanTarget
     from twinklr.core.sequencer.vocabulary import CoordinationMode, EffectDuration, PlanningTimeRef
+    from twinklr.core.sequencer.vocabulary.choreography import TargetType
 
     # Create minimal placements
     placements = [
         GroupPlacement(
             placement_id="p1",
-            group_id="TEST_01",
+            target=PlanTarget(type=TargetType.GROUP, id="TEST_01"),
             template_id="sweep_basic",
             start=PlanningTimeRef(bar=1, beat=1),
             duration=EffectDuration.BURST,
@@ -787,7 +792,7 @@ def test_shape_holistic_judge_context_single_section() -> None:
             coordination_plans=[
                 CoordinationPlan(
                     coordination_mode=CoordinationMode.UNIFIED,
-                    group_ids=["TEST_01"],
+                    targets=[PlanTarget(type=TargetType.GROUP, id="TEST_01")],
                     placements=placements,
                 )
             ],

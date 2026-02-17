@@ -76,6 +76,7 @@ from twinklr.core.sequencer.templates.group.models.coordination import (
     CoordinationPlan,
     GroupPlacement,
     PlacementWindow,
+    PlanTarget,
 )
 from twinklr.core.sequencer.timing.beat_grid import BeatGrid
 from twinklr.core.sequencer.vocabulary import (
@@ -86,6 +87,7 @@ from twinklr.core.sequencer.vocabulary import (
     PlanningTimeRef,
     StepUnit,
 )
+from twinklr.core.sequencer.vocabulary.choreography import TargetType
 from twinklr.core.sequencer.vocabulary.coordination import SpatialIntent
 
 logger = logging.getLogger(__name__)
@@ -274,8 +276,8 @@ class CompositionEngine:
             blend_mode = LayerAllocator.resolve_blend_mode(lane_plan.blend_mode)
 
             # Track blend mode per element/layer
-            for group_id in self._collect_group_ids(lane_plan.coordination_plans):
-                element_name = self._target_resolver.resolve(group_id)
+            for target_id in self._collect_target_ids(lane_plan.coordination_plans):
+                element_name = self._target_resolver.resolve(target_id)
                 key = (element_name, layer_idx)
                 if key not in self._layer_blend_modes:
                     self._layer_blend_modes[key] = blend_mode
@@ -372,7 +374,7 @@ class CompositionEngine:
                 placement_index=idx,
                 diagnostics=diagnostics,
             )
-            element_name = self._target_resolver.resolve(placement.group_id)
+            element_name = self._target_resolver.resolve(placement.target.id)
 
             for ce in compiled_effects:
                 sub_layer = self._layer_allocator.allocate_sub_layer(lane, ce.visual_depth)
@@ -526,7 +528,7 @@ class CompositionEngine:
                 placements.append(
                     GroupPlacement(
                         placement_id=f"seq_{group_id}_{slot_idx}",
-                        group_id=group_id,
+                        target=PlanTarget(type=TargetType.GROUP, id=group_id),
                         template_id=window.template_id,
                         start=start_ref,
                         duration=duration,
@@ -599,7 +601,7 @@ class CompositionEngine:
                 placements.append(
                     GroupPlacement(
                         placement_id=f"rpl_{group_id}_{wave_idx}",
-                        group_id=group_id,
+                        target=PlanTarget(type=TargetType.GROUP, id=group_id),
                         template_id=window.template_id,
                         start=start_ref,
                         duration=duration,
@@ -657,7 +659,7 @@ class CompositionEngine:
                 placements.append(
                     GroupPlacement(
                         placement_id=f"{prefix}_{group_id}_{slot_idx}",
-                        group_id=group_id,
+                        target=PlanTarget(type=TargetType.GROUP, id=group_id),
                         template_id=window.template_id,
                         start=start_ref,
                         duration=duration,
@@ -815,7 +817,7 @@ class CompositionEngine:
                         f"duration (start={start_ms}, end={end_ms})"
                     ),
                     source_section=section.section_id,
-                    source_group=placement.group_id,
+                    source_group=placement.target.id,
                 )
             )
             return []
@@ -905,7 +907,7 @@ class CompositionEngine:
                 source=RenderEventSource(
                     section_id=section.section_id,
                     lane=lane,
-                    group_id=placement.group_id,
+                    group_id=placement.target.id,
                     template_id=placement.template_id,
                     placement_index=placement_index,
                 ),
@@ -1035,24 +1037,24 @@ class CompositionEngine:
         return resolved
 
     @staticmethod
-    def _collect_group_ids(
+    def _collect_target_ids(
         coordination_plans: list[CoordinationPlan],
     ) -> list[str]:
-        """Collect all group_ids referenced in coordination plans.
+        """Collect all target IDs referenced in coordination plans.
 
         Args:
             coordination_plans: List of coordination plans.
 
         Returns:
-            List of unique group_ids.
+            List of unique target IDs.
         """
         seen: set[str] = set()
         result: list[str] = []
         for cp in coordination_plans:
-            for gid in cp.group_ids:
-                if gid not in seen:
-                    seen.add(gid)
-                    result.append(gid)
+            for t in cp.targets:
+                if t.id not in seen:
+                    seen.add(t.id)
+                    result.append(t.id)
         return result
 
     def _build_groups(

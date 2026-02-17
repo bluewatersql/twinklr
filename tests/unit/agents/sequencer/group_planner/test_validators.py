@@ -25,6 +25,7 @@ from twinklr.core.sequencer.templates.group.models.choreography import (
     ChoreographyGraph,
     ChoreoGroup,
 )
+from twinklr.core.sequencer.templates.group.models.coordination import PlanTarget
 from twinklr.core.sequencer.timing import TimeRef
 from twinklr.core.sequencer.vocabulary import (
     CoordinationMode,
@@ -35,6 +36,7 @@ from twinklr.core.sequencer.vocabulary import (
     LaneKind,
     PlanningTimeRef,
 )
+from twinklr.core.sequencer.vocabulary.choreography import TargetType
 from twinklr.core.sequencer.vocabulary.timing import TimeRefKind
 
 from .conftest import DEFAULT_THEME
@@ -132,11 +134,11 @@ class TestSectionPlanValidator:
                     coordination_plans=[
                         CoordinationPlan(
                             coordination_mode=CoordinationMode.UNIFIED,
-                            group_ids=["HERO_1"],
+                            targets=[PlanTarget(type=TargetType.GROUP, id="HERO_1")],
                             placements=[
                                 GroupPlacement(
                                     placement_id="p1",
-                                    group_id="HERO_1",
+                                    target=PlanTarget(type=TargetType.GROUP, id="HERO_1"),
                                     template_id="gtpl_accent_bell",
                                     start=PlanningTimeRef(bar=1, beat=1),
                                     duration=EffectDuration.BURST,
@@ -175,11 +177,11 @@ class TestSectionPlanValidator:
                     coordination_plans=[
                         CoordinationPlan(
                             coordination_mode=CoordinationMode.UNIFIED,
-                            group_ids=["HERO_1"],
+                            targets=[PlanTarget(type=TargetType.GROUP, id="HERO_1")],
                             placements=[
                                 GroupPlacement(
                                     placement_id="p1",
-                                    group_id="HERO_1",
+                                    target=PlanTarget(type=TargetType.GROUP, id="HERO_1"),
                                     template_id="NONEXISTENT_TEMPLATE",
                                     start=PlanningTimeRef(bar=1, beat=1),
                                     duration=EffectDuration.BURST,
@@ -219,11 +221,11 @@ class TestSectionPlanValidator:
                     coordination_plans=[
                         CoordinationPlan(
                             coordination_mode=CoordinationMode.UNIFIED,
-                            group_ids=["NONEXISTENT_GROUP"],
+                            targets=[PlanTarget(type=TargetType.GROUP, id="NONEXISTENT_GROUP")],
                             placements=[
                                 GroupPlacement(
                                     placement_id="p1",
-                                    group_id="NONEXISTENT_GROUP",
+                                    target=PlanTarget(type=TargetType.GROUP, id="NONEXISTENT_GROUP"),
                                     template_id="gtpl_accent_bell",
                                     start=PlanningTimeRef(bar=1, beat=1),
                                     duration=EffectDuration.BURST,
@@ -263,11 +265,11 @@ class TestSectionPlanValidator:
                     coordination_plans=[
                         CoordinationPlan(
                             coordination_mode=CoordinationMode.UNIFIED,
-                            group_ids=["HERO_1"],
+                            targets=[PlanTarget(type=TargetType.GROUP, id="HERO_1")],
                             placements=[
                                 GroupPlacement(
                                     placement_id="p1",
-                                    group_id="HERO_1",
+                                    target=PlanTarget(type=TargetType.GROUP, id="HERO_1"),
                                     template_id="gtpl_accent_bell",
                                     start=PlanningTimeRef(bar=4, beat=1),
                                     duration=EffectDuration.HIT,
@@ -306,18 +308,18 @@ class TestSectionPlanValidator:
                     coordination_plans=[
                         CoordinationPlan(
                             coordination_mode=CoordinationMode.UNIFIED,
-                            group_ids=["HERO_1"],
+                            targets=[PlanTarget(type=TargetType.GROUP, id="HERO_1")],
                             placements=[
                                 GroupPlacement(
                                     placement_id="p1",
-                                    group_id="HERO_1",
+                                    target=PlanTarget(type=TargetType.GROUP, id="HERO_1"),
                                     template_id="gtpl_accent_bell",
                                     start=PlanningTimeRef(bar=1, beat=1),
                                     duration=EffectDuration.BURST,  # 4 beats
                                 ),
                                 GroupPlacement(
                                     placement_id="p2",
-                                    group_id="HERO_1",
+                                    target=PlanTarget(type=TargetType.GROUP, id="HERO_1"),
                                     template_id="gtpl_accent_bell",
                                     start=PlanningTimeRef(bar=1, beat=3),
                                     duration=EffectDuration.BURST,  # 4 beats, overlaps p1
@@ -356,18 +358,21 @@ class TestSectionPlanValidator:
                     coordination_plans=[
                         CoordinationPlan(
                             coordination_mode=CoordinationMode.UNIFIED,
-                            group_ids=["HERO_1", "HERO_2"],
+                            targets=[
+                                PlanTarget(type=TargetType.GROUP, id="HERO_1"),
+                                PlanTarget(type=TargetType.GROUP, id="HERO_2"),
+                            ],
                             placements=[
                                 GroupPlacement(
                                     placement_id="p1",
-                                    group_id="HERO_1",
+                                    target=PlanTarget(type=TargetType.GROUP, id="HERO_1"),
                                     template_id="gtpl_accent_bell",
                                     start=PlanningTimeRef(bar=1, beat=1),
                                     duration=EffectDuration.BURST,
                                 ),
                                 GroupPlacement(
                                     placement_id="p2",
-                                    group_id="HERO_2",
+                                    target=PlanTarget(type=TargetType.GROUP, id="HERO_2"),
                                     template_id="gtpl_accent_bell",
                                     start=PlanningTimeRef(bar=1, beat=1),
                                     duration=EffectDuration.BURST,
@@ -405,11 +410,11 @@ class TestSectionPlanValidator:
                     coordination_plans=[
                         CoordinationPlan(
                             coordination_mode=CoordinationMode.UNIFIED,
-                            group_ids=["HERO_1"],
+                            targets=[PlanTarget(type=TargetType.GROUP, id="HERO_1")],
                             placements=[
                                 GroupPlacement(
                                     placement_id="p1",
-                                    group_id="HERO_1",
+                                    target=PlanTarget(type=TargetType.GROUP, id="HERO_1"),
                                     template_id="gtpl_accent_bell",
                                     start=PlanningTimeRef(bar=1, beat=1),
                                     duration=EffectDuration.BURST,
@@ -449,11 +454,11 @@ class TestSectionPlanValidator:
                     coordination_plans=[
                         CoordinationPlan(
                             coordination_mode=CoordinationMode.UNIFIED,
-                            group_ids=["ARCHES_1"],
+                            targets=[PlanTarget(type=TargetType.GROUP, id="ARCHES_1")],
                             placements=[
                                 GroupPlacement(
                                     placement_id="p1",
-                                    group_id="ARCHES_1",
+                                    target=PlanTarget(type=TargetType.GROUP, id="ARCHES_1"),
                                     template_id="gtpl_rhythm_bounce",
                                     start=PlanningTimeRef(bar=1, beat=1),
                                     duration=EffectDuration.PHRASE,
@@ -489,7 +494,7 @@ class TestSectionPlanValidator:
             placements.append(
                 GroupPlacement(
                     placement_id=f"p{i}",
-                    group_id="HERO_1",
+                    target=PlanTarget(type=TargetType.GROUP, id="HERO_1"),
                     template_id="gtpl_accent_bell",
                     start=PlanningTimeRef(bar=1 + i, beat=1)
                     if i < 2
@@ -510,11 +515,11 @@ class TestSectionPlanValidator:
                     coordination_plans=[
                         CoordinationPlan(
                             coordination_mode=CoordinationMode.UNIFIED,
-                            group_ids=["HERO_1"],
+                            targets=[PlanTarget(type=TargetType.GROUP, id="HERO_1")],
                             placements=[
                                 GroupPlacement(
                                     placement_id="p1",
-                                    group_id="HERO_1",
+                                    target=PlanTarget(type=TargetType.GROUP, id="HERO_1"),
                                     template_id="gtpl_accent_bell",
                                     start=PlanningTimeRef(bar=1, beat=1),
                                     duration=EffectDuration.BURST,

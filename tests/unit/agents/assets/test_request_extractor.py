@@ -26,6 +26,7 @@ from twinklr.core.sequencer.planning.models import PaletteRef
 from twinklr.core.sequencer.templates.group.models.coordination import (
     CoordinationPlan,
     GroupPlacement,
+    PlanTarget,
 )
 from twinklr.core.sequencer.theming import ThemeRef
 from twinklr.core.sequencer.vocabulary import (
@@ -34,6 +35,7 @@ from twinklr.core.sequencer.vocabulary import (
     GPTimingDriver,
     LaneKind,
 )
+from twinklr.core.sequencer.vocabulary.choreography import TargetType
 from twinklr.core.sequencer.vocabulary.planning import PlanningTimeRef
 
 # ---------------------------------------------------------------------------
@@ -59,7 +61,7 @@ def _lane(
         coord_plans = [
             CoordinationPlan(
                 coordination_mode=CoordinationMode.UNIFIED,
-                group_ids=["G1"],
+                targets=[PlanTarget(type=TargetType.GROUP, id="G1")],
                 placements=placements,
             )
         ]
@@ -75,7 +77,7 @@ def _lane(
 def _placement_with_motif_hint(motif_hints: list[str]) -> GroupPlacement:
     return GroupPlacement(
         placement_id="p1",
-        group_id="G1",
+        target=PlanTarget(type=TargetType.GROUP, id="G1"),
         template_id="gtpl_test",
         start=PlanningTimeRef(bar=1, beat=1),
         param_overrides={"motif_hint": motif_hints},

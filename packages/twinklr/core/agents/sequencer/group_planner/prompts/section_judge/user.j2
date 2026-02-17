@@ -52,6 +52,22 @@ CATEGORICAL PLANNING VERSION
 - **{{ role }}**: {{ group_ids | join(", ") }}
 {% endfor %}
 
+## Available Zones (valid zone targets)
+
+{% if display_graph.groups_by_tag is defined %}
+{% for tag, group_ids in display_graph.groups_by_tag.items() %}
+- **{{ tag }}**: {{ group_ids | join(", ") }}
+{% endfor %}
+{% endif %}
+
+{% if display_graph.groups_by_split is defined and display_graph.groups_by_split %}
+## Available Splits (valid split targets)
+
+{% for split, group_ids in display_graph.groups_by_split.items() %}
+- **{{ split }}**: {{ group_ids | join(", ") }}
+{% endfor %}
+{% endif %}
+
 ## Available Templates
 
 {% for entry in template_catalog.entries %}
@@ -84,11 +100,11 @@ This plan uses **categorical values**:
 
 1) **Technical Validation**
 - template_ids exist and are lane-compatible
-- group_ids exist in display graph
+- targets are valid: group ids exist in display graph, zone ids are valid zones (see above), split ids are valid splits (see above)
 - start timing within section bounds
 - duration is valid enum (HIT, BURST, PHRASE, EXTENDED, SECTION)
 - intensity is valid enum (WHISPER, SOFT, MED, STRONG, PEAK)
-- no within-lane overlaps on same group_id
+- no same-target self-overlap within a lane (same type+id; different targets may overlap)
 - if mode requires expansion (SEQUENCED/CALL_RESPONSE/RIPPLE): window+config must be present and valid
 - theme must be SECTION-scoped; tags <= 5
 - palette must be present with palette_id

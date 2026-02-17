@@ -6,6 +6,8 @@ and agents.
 
 from twinklr.core.sequencer.vocabulary.choreography import (
     ChoreoTag,
+    SplitDimension,
+    TargetType,
 )
 from twinklr.core.sequencer.vocabulary.composition import (
     BlendMode,
@@ -21,6 +23,7 @@ from twinklr.core.sequencer.vocabulary.coordination import (
     StepUnit,
 )
 from twinklr.core.sequencer.vocabulary.display import (
+    DetailCapability,
     DisplayElementKind,
     DisplayProminence,
     GroupArrangement,
@@ -87,6 +90,7 @@ __all__ = [
     "LaneKind",
     "LayerRole",
     # Display (physical metadata)
+    "DetailCapability",
     "DisplayElementKind",
     "DisplayProminence",
     "GroupArrangement",
@@ -119,8 +123,10 @@ __all__ = [
     # Planning (categorical timing)
     "PlanningTimeRef",
     "TimingHint",
-    # Choreographic tags
+    # Choreographic tags & splits
     "ChoreoTag",
+    "SplitDimension",
+    "TargetType",
     # Targets
     "TargetRole",
     # Templates

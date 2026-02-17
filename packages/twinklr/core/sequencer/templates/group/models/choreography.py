@@ -23,9 +23,10 @@ import random
 from pydantic import BaseModel, ConfigDict, Field, computed_field
 
 from twinklr.core.sequencer.templates.group.models.display import GroupPosition
-from twinklr.core.sequencer.vocabulary.choreography import ChoreoTag
+from twinklr.core.sequencer.vocabulary.choreography import ChoreoTag, SplitDimension
 from twinklr.core.sequencer.vocabulary.coordination import SpatialIntent
 from twinklr.core.sequencer.vocabulary.display import (
+    DetailCapability,
     DisplayElementKind,
     DisplayProminence,
     GroupArrangement,
@@ -44,11 +45,17 @@ class ChoreoGroup(BaseModel):
         role: Physical type / role name (e.g., ``ARCHES``, ``TREES``).
         element_kind: Detailed physical form of the element.
         prominence: Visual weight driving lane assignment.
+        detail_capability: Pixel density for template suitability.
         position: Categorical spatial position for spatial sorting.
         arrangement: How models within the group are laid out.
         fixture_count: Number of physical models in this group.
         pixel_fraction: Fraction of total display pixels (0.0-1.0).
-        tags: Well-defined choreographic grouping tags.
+        tags: Zone membership tags (ChoreoTag).
+        split_membership: Which split partition values this group
+            belongs to.  Cross-group splits (e.g., HALVES_LEFT)
+            declare that the entire group is part of the left half.
+            Within-group splits (e.g., ODD) declare that this
+            group's models can be partitioned.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -61,6 +68,7 @@ class ChoreoGroup(BaseModel):
     element_kind: DisplayElementKind | None = None
     prominence: DisplayProminence | None = None
     arrangement: GroupArrangement | None = None
+    detail_capability: DetailCapability = DetailCapability.MEDIUM
 
     # Spatial position
     position: GroupPosition | None = None
@@ -74,8 +82,11 @@ class ChoreoGroup(BaseModel):
         description="Fraction of total display pixels (0.0-1.0)",
     )
 
-    # Choreographic grouping
+    # Choreographic grouping (zone membership only)
     tags: list[ChoreoTag] = Field(default_factory=list)
+
+    # Split partition membership
+    split_membership: list[SplitDimension] = Field(default_factory=list)
 
 
 # Center reference for center-outward sorting
@@ -128,6 +139,19 @@ class ChoreographyGraph(BaseModel):
                 result.setdefault(tag, []).append(g.id)
         return result
 
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def groups_by_split(self) -> dict[SplitDimension, list[str]]:
+        """Map split dimension -> list of ChoreoGroup ids.
+
+        Only split values that appear on at least one group are included.
+        """
+        result: dict[SplitDimension, list[str]] = {}
+        for g in self.groups:
+            for split in g.split_membership:
+                result.setdefault(split, []).append(g.id)
+        return result
+
     # -------------------------------------------------------------------
     # Lookup
     # -------------------------------------------------------------------
@@ -135,6 +159,17 @@ class ChoreographyGraph(BaseModel):
     def get_group(self, group_id: str) -> ChoreoGroup | None:
         """Get group by id, or None if not found."""
         return next((g for g in self.groups if g.id == group_id), None)
+
+    def get_split_groups(self, split: SplitDimension) -> list[ChoreoGroup]:
+        """Get all groups belonging to a split value.
+
+        Args:
+            split: The split dimension to look up.
+
+        Returns:
+            List of ChoreoGroup instances with this split in their membership.
+        """
+        return [g for g in self.groups if split in g.split_membership]
 
     # -------------------------------------------------------------------
     # Spatial queries
@@ -232,20 +267,23 @@ class ChoreographyGraph(BaseModel):
     def to_planner_summary(self) -> list[dict[str, object]]:
         """Export groups as enriched dicts for LLM planner prompts.
 
-        Each dict includes the group's identity, physical metadata, and
-        spatial position so the planner can make informed decisions.
+        Each dict includes the group's identity, physical metadata,
+        spatial position, detail capability, and split membership so
+        the planner can make informed decisions.
 
         Returns:
             List of dicts with keys: ``role_key``, ``model_count``,
             ``element_kind``, ``arrangement``, ``prominence``,
-            ``pixel_fraction``, ``horizontal``, ``vertical``, ``depth``,
-            ``zone``, ``tags``.
+            ``detail_capability``, ``pixel_fraction``, ``horizontal``,
+            ``vertical``, ``depth``, ``zone``, ``tags``,
+            ``split_membership``.
         """
         result: list[dict[str, object]] = []
         for g in self.groups:
             summary: dict[str, object] = {
                 "role_key": g.role,
                 "model_count": g.fixture_count,
+                "detail_capability": g.detail_capability.value,
             }
             if g.element_kind is not None:
                 summary["element_kind"] = g.element_kind.value
@@ -263,6 +301,8 @@ class ChoreographyGraph(BaseModel):
                     summary["zone"] = g.position.zone.value
             if g.tags:
                 summary["tags"] = [t.value for t in g.tags]
+            if g.split_membership:
+                summary["split_membership"] = [s.value for s in g.split_membership]
             result.append(summary)
         return result
 

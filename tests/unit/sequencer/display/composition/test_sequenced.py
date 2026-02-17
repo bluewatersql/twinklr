@@ -34,6 +34,7 @@ from twinklr.core.sequencer.templates.group.models.coordination import (
     CoordinationConfig,
     CoordinationPlan,
     PlacementWindow,
+    PlanTarget,
 )
 from twinklr.core.sequencer.templates.group.models.display import GroupPosition
 from twinklr.core.sequencer.theming import PALETTE_REGISTRY, ThemeRef
@@ -46,6 +47,7 @@ from twinklr.core.sequencer.vocabulary import (
     LaneKind,
     PlanningTimeRef,
     StepUnit,
+    TargetType,
 )
 from twinklr.core.sequencer.vocabulary.coordination import SpatialIntent
 from twinklr.core.sequencer.vocabulary.spatial import (
@@ -123,7 +125,11 @@ class TestSequencedExpansion:
                     coordination_plans=[
                         CoordinationPlan(
                             coordination_mode=CoordinationMode.SEQUENCED,
-                            group_ids=["ARCHES_1", "ARCHES_2", "ARCHES_3"],
+                            targets=[
+                                PlanTarget(type=TargetType.GROUP, id="ARCHES_1"),
+                                PlanTarget(type=TargetType.GROUP, id="ARCHES_2"),
+                                PlanTarget(type=TargetType.GROUP, id="ARCHES_3"),
+                            ],
                             window=PlacementWindow(
                                 start=PlanningTimeRef(bar=1, beat=1),
                                 end=PlanningTimeRef(bar=5, beat=1),
@@ -195,7 +201,10 @@ class TestSequencedExpansion:
                     coordination_plans=[
                         CoordinationPlan(
                             coordination_mode=CoordinationMode.SEQUENCED,
-                            group_ids=["ARCHES_1", "ARCHES_2"],
+                            targets=[
+                                PlanTarget(type=TargetType.GROUP, id="ARCHES_1"),
+                                PlanTarget(type=TargetType.GROUP, id="ARCHES_2"),
+                            ],
                             window=PlacementWindow(
                                 start=PlanningTimeRef(bar=1, beat=1),
                                 end=PlanningTimeRef(bar=5, beat=1),
@@ -257,7 +266,11 @@ class TestRippleExpansion:
                     coordination_plans=[
                         CoordinationPlan(
                             coordination_mode=CoordinationMode.RIPPLE,
-                            group_ids=["ARCHES_1", "ARCHES_2", "ARCHES_3"],
+                            targets=[
+                                PlanTarget(type=TargetType.GROUP, id="ARCHES_1"),
+                                PlanTarget(type=TargetType.GROUP, id="ARCHES_2"),
+                                PlanTarget(type=TargetType.GROUP, id="ARCHES_3"),
+                            ],
                             window=PlacementWindow(
                                 start=PlanningTimeRef(bar=1, beat=1),
                                 end=PlanningTimeRef(bar=9, beat=1),
@@ -376,7 +389,11 @@ class TestCallResponseExpansion:
                     coordination_plans=[
                         CoordinationPlan(
                             coordination_mode=CoordinationMode.CALL_RESPONSE,
-                            group_ids=["ARCHES_1", "ARCHES_2", "ARCHES_3"],
+                            targets=[
+                                PlanTarget(type=TargetType.GROUP, id="ARCHES_1"),
+                                PlanTarget(type=TargetType.GROUP, id="ARCHES_2"),
+                                PlanTarget(type=TargetType.GROUP, id="ARCHES_3"),
+                            ],
                             window=PlacementWindow(
                                 start=PlanningTimeRef(bar=1, beat=1),
                                 end=PlanningTimeRef(bar=9, beat=1),
@@ -541,7 +558,11 @@ class TestSpatialIntentOrdering:
                     coordination_plans=[
                         CoordinationPlan(
                             coordination_mode=CoordinationMode.SEQUENCED,
-                            group_ids=["ARCHES_3", "ARCHES_1", "ARCHES_2"],
+                            targets=[
+                                PlanTarget(type=TargetType.GROUP, id="ARCHES_3"),
+                                PlanTarget(type=TargetType.GROUP, id="ARCHES_1"),
+                                PlanTarget(type=TargetType.GROUP, id="ARCHES_2"),
+                            ],
                             window=PlacementWindow(
                                 start=PlanningTimeRef(bar=1, beat=1),
                                 end=PlanningTimeRef(bar=5, beat=1),
@@ -631,7 +652,11 @@ class TestSpatialIntentOrdering:
                     coordination_plans=[
                         CoordinationPlan(
                             coordination_mode=CoordinationMode.SEQUENCED,
-                            group_ids=["ROW_HIGH", "ROW_LOW", "ROW_GROUND"],
+                            targets=[
+                                PlanTarget(type=TargetType.GROUP, id="ROW_HIGH"),
+                                PlanTarget(type=TargetType.GROUP, id="ROW_LOW"),
+                                PlanTarget(type=TargetType.GROUP, id="ROW_GROUND"),
+                            ],
                             window=PlacementWindow(
                                 start=PlanningTimeRef(bar=1, beat=1),
                                 end=PlanningTimeRef(bar=5, beat=1),
@@ -725,7 +750,11 @@ class TestSpatialIntentOrdering:
                     coordination_plans=[
                         CoordinationPlan(
                             coordination_mode=CoordinationMode.SEQUENCED,
-                            group_ids=["LAYER_FAR", "LAYER_NEAR", "LAYER_MID"],
+                            targets=[
+                                PlanTarget(type=TargetType.GROUP, id="LAYER_FAR"),
+                                PlanTarget(type=TargetType.GROUP, id="LAYER_NEAR"),
+                                PlanTarget(type=TargetType.GROUP, id="LAYER_MID"),
+                            ],
                             window=PlacementWindow(
                                 start=PlanningTimeRef(bar=1, beat=1),
                                 end=PlanningTimeRef(bar=5, beat=1),

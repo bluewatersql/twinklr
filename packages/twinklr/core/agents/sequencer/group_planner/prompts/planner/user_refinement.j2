@@ -22,6 +22,8 @@ References existing conversation context (section, templates, groups).
 ⚠️ **SHORT SECTION:** Use HIT/BURST only. Avoid PHRASE/EXTENDED/SECTION.
 {% endif %}
 
+**Targeting:** Use typed targets: `{"type": "group", "id": "..."}`, `{"type": "zone", "id": "..."}`, or `{"type": "split", "id": "..."}`. Zone targets expand to all groups in that zone. Split targets expand to partition groups. The same target (same type+id) must not overlap itself within a lane.
+
 **REQUIRED FIELDS (Copy to response):**
 {% if theme_ref %}
 - **Theme:** {{ theme_ref.theme_id }}{% if theme_ref.tags %} (tags: {{ theme_ref.tags | join(", ") }}){% endif %}, scope={{ theme_ref.scope }}

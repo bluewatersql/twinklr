@@ -18,36 +18,63 @@ Return a `SectionCoordinationPlan` matching this schema:
 - **IntensityLevel:** {{ taxonomy.IntensityLevel | join(', ') }}
 - **EffectDuration:** {{ taxonomy.EffectDuration | join(', ') }}
 - **StepUnit:** {{ taxonomy.StepUnit | join(', ') }}
-- **TargetRole:** {{ taxonomy.TargetRole | join(', ') }}
+- **TargetType:** {{ taxonomy.TargetType | join(', ') }}
+- **SplitDimension:** {{ taxonomy.SplitDimension | join(', ') }}
+- **DetailCapability:** {{ taxonomy.DetailCapability | join(', ') }}
 {% else %}
 - **LaneKind:** BASE, RHYTHM, ACCENT
 - **CoordinationMode:** UNIFIED, COMPLEMENTARY, SEQUENCED, CALL_RESPONSE, RIPPLE
 - **IntensityLevel:** WHISPER, SOFT, MED, STRONG, PEAK
 - **EffectDuration:** HIT, BURST, PHRASE, EXTENDED, SECTION
 - **StepUnit:** BEATS, BARS
-- **TargetRole:** BACKGROUND, MID, HERO
+- **TargetType:** group, zone, split
+- **SplitDimension:** HALVES_LEFT, HALVES_RIGHT, THIRDS_LEFT, THIRDS_CENTER, THIRDS_RIGHT, ODD, EVEN
+- **DetailCapability:** LOW, MEDIUM, HIGH
 {% endif %}
+
+**IMPORTANT:** Valid group target IDs are the exact `ChoreoGroup.id` values listed in the display graph (user prompt), NOT role names. Zone IDs are ChoreoTag values. Split IDs are SplitDimension values above.
+
+## Targeting System
+
+Use typed targets to specify what each coordination plan affects. Each target has a `type` and `id`:
+
+| Type | id is | Example | Resolves To |
+|------|-------|---------|-------------|
+| `group` | ChoreoGroup.id | `{"type": "group", "id": "ARCHES"}` | That specific group |
+| `zone` | ChoreoTag value | `{"type": "zone", "id": "HOUSE"}` | All groups tagged with HOUSE |
+| `split` | SplitDimension value | `{"type": "split", "id": "HALVES_LEFT"}` | All groups with HALVES_LEFT membership |
+
+**CRITICAL RULES:**
+- Targets go in `coordination_plan.targets[]` (list of `{"type": ..., "id": ...}` objects).
+- Placements also have a `target` field (single `{"type": ..., "id": ...}` object).
+- The renderer resolves zone/split targets to concrete groups at composition time.
+- **Different targets may overlap** in the same lane — this is valid and the renderer will blend/layer them.
+- **The SAME target must NOT overlap itself** in the same lane (timing must be disjoint).
+
+## Detail Capability (Template Suitability)
+
+Match template complexity to group detail capability:
+- **HIGH** (matrices, mega trees): Any template, including imagery and complex patterns
+- **MEDIUM** (arches, wreaths, window frames): Patterns, gradients, moderate complexity
+- **LOW** (candy canes, snowflakes, stars): Simple chases, solid colors, basic on/off
 
 ## Hard Constraints (Validation Failures)
 
 | Constraint | Rule | Example Violation |
 |------------|------|-------------------|
 | Lane-Template Match | gtpl_base_* → BASE only | Using gtpl_rhythm_* in BASE lane |
-| No Duplicate group_order | Each group once | ["HERO_1", "HERO_1", "HERO_2"] |
-| group_order ⊆ group_ids | All group_order in group_ids | group_order has HERO_3, group_ids missing it |
+| Valid targets | Target type/id must be valid group, zone, or split | `{"type": "zone", "id": "INVALID"}` |
+| No Duplicate group_order | Each group once | ["ARCHES", "ARCHES", "CANDY_CANES"] |
 | Window for SEQUENCED | Must have window + config | SEQUENCED mode with only placements |
 | Start within bounds | bar 1 to available_bars | bar 10 when section has 4 bars |
-| Single approach per group per lane | A group_id uses window OR placements within a single coordination_plan | group appears in two coordination_plans in same lane |
-| No invented group_ids | `group_ids` ⊆ available groups | `group_ids` includes an ID not present in `display_graph.groups[].id` |
 | No invented template_ids | every `template_id` ∈ template catalog | placement uses `template_id` not present in the template catalog |
-| UNIFIED covers all groups | UNIFIED requires **1 placement per `group_id`** | `group_ids` has N groups but placements only cover < N group_ids |
-| No within-lane overlap (placements) | For same lane+group_id: [start,end) intervals must be disjoint (ACCENT remains strict even when multi-lane is allowed) | accent_a overlaps accent_b on same group |
+| No same-target self-overlap | Same target (type+id) must be time-disjoint in a lane | Two zone:HOUSE placements overlap in RHYTHM lane |
 | lane→target_roles mapping | BASE→[BACKGROUND], RHYTHM→[MID], ACCENT→[HERO] | ACCENT has target_roles [MID] |
-| Disjoint group_ids across coordination_plans (same lane) | For any two coordination_plans in same lane: `A.group_ids ∩ B.group_ids = ∅` | RHYTHM plan A and B both include MEGA_TREE_1 |
-| No role-label group_ids | `group_id` must be a concrete `display_graph.groups[].id` (never BACKGROUND/MID/HERO) | placement.group_id = "HERO" |
-| Cross-lane reuse policy | Default: group_id appears in only one lane. Exception: group may appear in both RHYTHM+ACCENT only if allowlisted by `layer_intents.multilane_allowed_groups` | MEGA_TREE_1 in RHYTHM+ACCENT without allowlist |
+| Cross-lane reuse policy | Default: a target appears in only one lane. Exception: group may appear in both RHYTHM+ACCENT only if allowlisted by `layer_intents.multilane_allowed_groups` | MEGA_TREE in RHYTHM+ACCENT without allowlist |
 | Multi-lane override semantics | For allowlisted groups in both RHYTHM+ACCENT: overlap across lanes is allowed; ACCENT is higher-priority override during its intervals | Non-allowlisted group overlaps across lanes |
 | No lane_plans planning_notes | `lane_plans[*]` must not include `planning_notes` | lane_plans.1.planning_notes present |
+
+**Different targets CAN overlap.** For example, `zone:HOUSE` and `group:OUTLINE` can overlap in the same lane — the renderer will blend them.
 
 **Do not invent `layer_intents` fields. Only apply allowlist rules if `layer_intents.multilane_allowed_groups` is present in the user prompt.**
 
@@ -61,7 +88,7 @@ Return a `SectionCoordinationPlan` matching this schema:
 ```json
 {
   "coordination_mode": "SEQUENCED",
-  "group_ids": ["ARCHES_1", "ARCHES_2", "ARCHES_3"],
+  "targets": [{"type": "group", "id": "ARCHES"}],
   "window": {
     "template_id": "gtpl_rhythm_chase_single",
     "start": {"bar": 1, "beat": 1},
@@ -69,7 +96,6 @@ Return a `SectionCoordinationPlan` matching this schema:
     "intensity": "STRONG"
   },
   "config": {
-    "group_order": ["ARCHES_1", "ARCHES_2", "ARCHES_3"],
     "step_unit": "BEATS",
     "step_duration": 2
   }
@@ -78,32 +104,16 @@ Return a `SectionCoordinationPlan` matching this schema:
 
 **Window sizing:** duration >= group_count × step_duration
 
-## UNIFIED Mode (Placements)
+## UNIFIED Mode (Placements) — Zone Target Example
 
 ```json
 {
   "coordination_mode": "UNIFIED",
-  "group_ids": ["OUTLINE_1", "OUTLINE_2", "OUTLINE_3"],
+  "targets": [{"type": "zone", "id": "HOUSE"}],
   "placements": [
     {
-      "placement_id": "base_outline_glow_1",
-      "group_id": "OUTLINE_1",
-      "template_id": "gtpl_base_glow_warm",
-      "start": {"bar": 1, "beat": 1},
-      "duration": "SECTION",
-      "intensity": "SOFT"
-    },
-    {
-      "placement_id": "base_outline_glow_2",
-      "group_id": "OUTLINE_2",
-      "template_id": "gtpl_base_glow_warm",
-      "start": {"bar": 1, "beat": 1},
-      "duration": "SECTION",
-      "intensity": "SOFT"
-    },
-    {
-      "placement_id": "base_outline_glow_3",
-      "group_id": "OUTLINE_3",
+      "placement_id": "base_house_glow",
+      "target": {"type": "zone", "id": "HOUSE"},
       "template_id": "gtpl_base_glow_warm",
       "start": {"bar": 1, "beat": 1},
       "duration": "SECTION",
@@ -112,9 +122,46 @@ Return a `SectionCoordinationPlan` matching this schema:
   ]
 }
 ```
-> **Example correctness requirement:** If `group_ids` contains multiple groups, UNIFIED output must include one placement per group (unless wildcard is supported). Do not provide a single placement and assume it broadcasts.
 
-**Note:** UNIFIED requires placements for **each** `group_id` (same timing/template/intensity).
+The renderer expands `zone:HOUSE` to all HOUSE-tagged groups automatically.
+
+## UNIFIED Mode — Group Target Example
+
+```json
+{
+  "coordination_mode": "UNIFIED",
+  "targets": [{"type": "group", "id": "MEGA_TREE"}],
+  "placements": [
+    {
+      "placement_id": "accent_mega_tree_hit",
+      "target": {"type": "group", "id": "MEGA_TREE"},
+      "template_id": "gtpl_accent_flash_peak",
+      "start": {"bar": 2, "beat": 1},
+      "duration": "HIT",
+      "intensity": "PEAK"
+    }
+  ]
+}
+```
+
+## CALL_RESPONSE Mode — Split Target Example
+
+```json
+{
+  "coordination_mode": "CALL_RESPONSE",
+  "targets": [{"type": "split", "id": "ODD"}, {"type": "split", "id": "EVEN"}],
+  "window": {
+    "template_id": "gtpl_rhythm_pulse_strong",
+    "start": {"bar": 1, "beat": 1},
+    "end": {"bar": 4, "beat": 1},
+    "intensity": "STRONG"
+  },
+  "config": {
+    "step_unit": "BEATS",
+    "step_duration": 2
+  }
+}
+```
 
 ## Timing Format
 

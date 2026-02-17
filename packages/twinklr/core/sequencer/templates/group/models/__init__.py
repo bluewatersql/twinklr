@@ -22,6 +22,7 @@ from twinklr.core.sequencer.templates.group.models.coordination import (
     CoordinationPlan,
     GroupPlacement,
     PlacementWindow,
+    PlanTarget,
 )
 from twinklr.core.sequencer.templates.group.models.display import (
     DisplayGraph,
@@ -82,6 +83,7 @@ __all__ = [
     "CoordinationPlan",
     "GroupPlacement",
     "PlacementWindow",
+    "PlanTarget",
     "ThemeRef",
     "TimeRef",
     "TimeRefKind",

@@ -60,6 +60,7 @@ from twinklr.core.sequencer.planning.models import PaletteRef
 from twinklr.core.sequencer.templates.group.models.coordination import (
     CoordinationPlan,
     GroupPlacement,
+    PlanTarget,
 )
 from twinklr.core.sequencer.theming import ThemeRef
 from twinklr.core.sequencer.theming.catalog import MOTIF_REGISTRY
@@ -69,6 +70,7 @@ from twinklr.core.sequencer.vocabulary import (
     GPTimingDriver,
     LaneKind,
 )
+from twinklr.core.sequencer.vocabulary.choreography import TargetType
 from twinklr.core.sequencer.vocabulary.planning import PlanningTimeRef
 
 logging.basicConfig(
@@ -401,11 +403,11 @@ def build_rudolph_plan_set() -> GroupPlanSet:
             coordination_plans=[
                 CoordinationPlan(
                     coordination_mode=CoordinationMode.UNIFIED,
-                    group_ids=["G1"],
+                    targets=[PlanTarget(type=TargetType.GROUP, id="G1")],
                     placements=[
                         GroupPlacement(
                             placement_id="p1",
-                            group_id="G1",
+                            target=PlanTarget(type=TargetType.GROUP, id="G1"),
                             template_id="gtpl_test",
                             start=PlanningTimeRef(bar=1, beat=1),
                         )

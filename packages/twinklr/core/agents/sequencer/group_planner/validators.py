@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass
+from difflib import get_close_matches
 from enum import Enum
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -19,12 +20,16 @@ from twinklr.core.sequencer.planning import SectionCoordinationPlan
 from twinklr.core.sequencer.templates.group.catalog import TemplateCatalog
 from twinklr.core.sequencer.templates.group.models import GroupPlacement, PlacementWindow
 from twinklr.core.sequencer.templates.group.models.choreography import ChoreographyGraph
+from twinklr.core.sequencer.templates.group.models.coordination import PlanTarget
 from twinklr.core.sequencer.vocabulary import (
     CoordinationMode,
     EffectDuration,
     IntensityLevel,
     LaneKind,
+    SplitDimension,
+    TargetType,
 )
+from twinklr.core.sequencer.vocabulary.choreography import ChoreoTag
 
 
 class ValidationSeverity(str, Enum):
@@ -83,8 +88,10 @@ class SectionPlanValidator:
         self.template_catalog = template_catalog
         self.timing_context = timing_context
 
-        # Build lookup set for fast validation
+        # Build lookup sets for fast validation
         self._valid_group_ids = {g.id for g in choreo_graph.groups}
+        self._valid_zone_ids = {tag.value for tag in ChoreoTag}
+        self._valid_split_ids = {split.value for split in SplitDimension}
 
     def _get_section_end_bar(self, section_end_ms: int) -> int:
         """Get the bar number for a given millisecond position.
@@ -147,29 +154,25 @@ class SectionPlanValidator:
 
         # Validate each lane plan
         for lane_plan in plan.lane_plans:
-            # Track group timings across ALL coordination_plans in this lane
-            group_timings: dict[str, list[tuple[int, int, str]]] = defaultdict(list)
+            # Track timings by target key (type:id) for self-overlap detection
+            target_timings: dict[str, list[tuple[int, int, str]]] = defaultdict(list)
 
             for coord_plan in lane_plan.coordination_plans:
-                # Validate group_ids exist
-                for group_id in coord_plan.group_ids:
-                    if group_id not in self._valid_group_ids:
-                        errors.append(
-                            ValidationIssue(
-                                severity=ValidationSeverity.ERROR,
-                                code="UNKNOWN_GROUP",
-                                message=f"Group '{group_id}' not found in ChoreographyGraph",
-                                field_path=f"lane_plans[{lane_plan.lane.value}].group_ids",
-                                fix_hint="Use a valid group id from ChoreographyGraph.groups",
-                            )
-                        )
+                # Validate targets
+                coord_target_keys: list[str] = []
+                for target in coord_plan.targets:
+                    target_errors = self._validate_target(target, lane_plan.lane.value)
+                    errors.extend(target_errors)
+                    coord_target_keys.append(f"{target.type.value}:{target.id}")
 
                 # Validate config for sequenced modes
                 if coord_plan.config and coord_plan.config.group_order:
+                    # Collect target IDs for group_order validation
+                    target_ids = [t.id for t in coord_plan.targets]
                     errors.extend(
                         self._validate_group_order(
                             coord_plan.config.group_order,
-                            coord_plan.group_ids,
+                            target_ids,
                             lane_plan.lane.value,
                         )
                     )
@@ -184,29 +187,29 @@ class SectionPlanValidator:
                 )
                 errors.extend(placement_errors)
 
-                # Accumulate timings for cross-coordination overlap check
-                for group_id, timings in placement_timings.items():
-                    group_timings[group_id].extend(timings)
+                # Accumulate timings by placement's target key
+                for target_key, timings in placement_timings.items():
+                    target_timings[target_key].extend(timings)
 
                 # Validate window (for sequenced modes)
                 if coord_plan.window:
                     window_errors, window_timings = self._validate_window(
                         coord_plan.window,
                         coord_plan.coordination_mode,
-                        coord_plan.group_ids,
+                        coord_plan.targets,
                         lane_plan.lane,
                         section_start_ms,
                         section_end_ms,
                     )
                     errors.extend(window_errors)
 
-                    # Accumulate window timings for cross-coordination overlap check
-                    for group_id, timings in window_timings.items():
-                        group_timings[group_id].extend(timings)
+                    # Accumulate window timings — already keyed per target
+                    for target_key, timings in window_timings.items():
+                        target_timings[target_key].extend(timings)
 
-            # Check for cross-coordination-plan overlaps within same lane
-            overlap_errors, overlap_warnings = self._check_cross_coordination_overlaps(
-                group_timings, lane_plan.lane
+            # Check for self-overlap of same target within same lane
+            overlap_errors, overlap_warnings = self._check_target_self_overlaps(
+                target_timings, lane_plan.lane
             )
             errors.extend(overlap_errors)
             warnings.extend(overlap_warnings)
@@ -217,6 +220,71 @@ class SectionPlanValidator:
 
         is_valid = len(errors) == 0
         return ValidationResult(is_valid=is_valid, errors=errors, warnings=warnings)
+
+    def _validate_target(self, target: PlanTarget, lane_name: str) -> list[ValidationIssue]:
+        """Validate a typed PlanTarget.
+
+        Checks that the target id is valid for its type.
+
+        Args:
+            target: Target to validate.
+            lane_name: Name of the lane (for error messages).
+
+        Returns:
+            List of validation issues.
+        """
+        errors: list[ValidationIssue] = []
+        if target.type == TargetType.GROUP:
+            if target.id not in self._valid_group_ids:
+                sorted_ids = sorted(self._valid_group_ids)
+                close = get_close_matches(target.id, sorted_ids, n=2, cutoff=0.4)
+                suggestion = f" Did you mean: {', '.join(close)}?" if close else ""
+                errors.append(
+                    ValidationIssue(
+                        severity=ValidationSeverity.ERROR,
+                        code="UNKNOWN_GROUP",
+                        message=(
+                            f"Group target '{target.id}' not found in "
+                            f"ChoreographyGraph. Valid groups: {sorted_ids}.{suggestion}"
+                        ),
+                        field_path=f"lane_plans[{lane_name}].targets",
+                        fix_hint=(
+                            f"Replace '{target.id}' with an exact group id from "
+                            f"the list above."
+                            + (f" Closest match: {close[0]}" if close else "")
+                        ),
+                    )
+                )
+        elif target.type == TargetType.ZONE:
+            if target.id not in self._valid_zone_ids:
+                errors.append(
+                    ValidationIssue(
+                        severity=ValidationSeverity.ERROR,
+                        code="UNKNOWN_ZONE",
+                        message=(
+                            f"Zone target '{target.id}' is not a valid ChoreoTag. "
+                            f"Valid zones: {sorted(self._valid_zone_ids)}"
+                        ),
+                        field_path=f"lane_plans[{lane_name}].targets",
+                        fix_hint="Use a valid ChoreoTag zone value",
+                    )
+                )
+        elif target.type == TargetType.SPLIT:
+            if target.id not in self._valid_split_ids:
+                errors.append(
+                    ValidationIssue(
+                        severity=ValidationSeverity.ERROR,
+                        code="UNKNOWN_SPLIT",
+                        message=(
+                            f"Split target '{target.id}' is not a valid "
+                            f"SplitDimension. Valid splits: "
+                            f"{sorted(self._valid_split_ids)}"
+                        ),
+                        field_path=f"lane_plans[{lane_name}].targets",
+                        fix_hint="Use a valid SplitDimension value",
+                    )
+                )
+        return errors
 
     def _check_identical_accent_on_primaries(
         self, plan: SectionCoordinationPlan
@@ -265,7 +333,7 @@ class SectionPlanValidator:
                     else str(p.intensity)
                 )
                 key = (p.template_id, intensity_val)
-                template_intensity_counts[key].append(p.group_id)
+                template_intensity_counts[key].append(p.target.id)
 
             for (template_id, intensity), groups in template_intensity_counts.items():
                 if len(groups) >= 3:
@@ -343,13 +411,13 @@ class SectionPlanValidator:
         return warnings
 
     def _validate_group_order(
-        self, group_order: list[str], group_ids: list[str], lane_name: str
+        self, group_order: list[str], target_ids: list[str], lane_name: str
     ) -> list[ValidationIssue]:
-        """Validate group_order for duplicates and membership in group_ids.
+        """Validate group_order for duplicates and membership in targets.
 
         Args:
             group_order: List of group IDs in sequence
-            group_ids: List of valid group IDs for this coordination plan
+            target_ids: List of target IDs from the coordination plan
             lane_name: Name of lane
 
         Returns:
@@ -358,12 +426,12 @@ class SectionPlanValidator:
         errors: list[ValidationIssue] = []
 
         # Check for duplicates
-        seen = set()
-        duplicates = set()
-        for group_id in group_order:
-            if group_id in seen:
-                duplicates.add(group_id)
-            seen.add(group_id)
+        seen: set[str] = set()
+        duplicates: set[str] = set()
+        for gid in group_order:
+            if gid in seen:
+                duplicates.add(gid)
+            seen.add(gid)
 
         if duplicates:
             errors.append(
@@ -376,94 +444,97 @@ class SectionPlanValidator:
                 )
             )
 
-        # Check that all group_order entries are in group_ids
-        group_ids_set = set(group_ids)
-        invalid_groups = [gid for gid in group_order if gid not in group_ids_set]
+        # Check that all group_order entries are in targets
+        target_ids_set = set(target_ids)
+        invalid_entries = [gid for gid in group_order if gid not in target_ids_set]
 
-        if invalid_groups:
+        if invalid_entries:
             errors.append(
                 ValidationIssue(
                     severity=ValidationSeverity.ERROR,
                     code="SEQUENCED_CONFIG_GROUP_MISMATCH",
                     message=(
-                        f"group_order contains groups not in group_ids: {invalid_groups}. "
-                        f"Valid group_ids: {group_ids}"
+                        f"group_order contains IDs not in targets: {invalid_entries}. "
+                        f"Valid target IDs: {target_ids}"
                     ),
                     field_path=f"lane_plans[{lane_name}].config.group_order",
                     fix_hint=(
-                        f"All entries in group_order must be present in group_ids. "
-                        f"Remove {invalid_groups} or add them to group_ids."
+                        f"All entries in group_order must match target IDs. "
+                        f"Remove {invalid_entries} or add them to targets."
                     ),
                 )
             )
 
         return errors
 
-    def _check_cross_coordination_overlaps(
-        self, group_timings: dict[str, list[tuple[int, int, str]]], lane: LaneKind
+    def _check_target_self_overlaps(
+        self,
+        target_timings: dict[str, list[tuple[int, int, str]]],
+        lane: LaneKind,
     ) -> tuple[list[ValidationIssue], list[ValidationIssue]]:
-        """Check for overlaps across coordination_plans within same lane.
+        """Check for self-overlap of the same target within a lane.
 
-        With categorical planning, minor overlaps are downgraded to warnings
-        since the renderer will snap/adjust boundaries.
+        Only the *same* target (same type:id) overlapping itself is an
+        error.  Different targets overlapping is expected and handled
+        by the renderer's blending/layering capabilities.
+
+        With categorical planning, minor overlaps (≤ 1 beat) are
+        downgraded to warnings since the renderer will snap/adjust
+        boundaries.
 
         Args:
-            group_timings: Dict mapping group_id to list of (start_ms, end_ms, source) tuples
-            lane: Lane kind
+            target_timings: Dict mapping target key (type:id) to list of
+                (start_ms, end_ms, source) tuples.
+            lane: Lane kind.
 
         Returns:
-            Tuple of (errors, warnings)
+            Tuple of (errors, warnings).
         """
         errors: list[ValidationIssue] = []
         warnings: list[ValidationIssue] = []
 
-        for group_id, timings in group_timings.items():
+        for target_key, timings in target_timings.items():
             if len(timings) < 2:
                 continue
 
-            # Sort by start time
             sorted_timings = sorted(timings, key=lambda x: x[0])
 
-            # Check each pair for overlap
             for i in range(len(sorted_timings)):
                 start_i, end_i, source_i = sorted_timings[i]
                 for j in range(i + 1, len(sorted_timings)):
                     start_j, end_j, source_j = sorted_timings[j]
 
-                    # Check if they overlap significantly (not just touch or minor overlap)
-                    # With categorical planning, renderer will snap/adjust boundaries,
-                    # so we use a tolerance of 1 beat (~500ms at typical tempo)
                     overlap_ms = end_i - start_j
-                    overlap_tolerance_ms = 500  # ~1 beat, renderer will adjust
+                    overlap_tolerance_ms = 500  # ~1 beat
 
                     if start_j < end_i and overlap_ms > overlap_tolerance_ms:
-                        # Significant overlap - this is an error
                         errors.append(
                             ValidationIssue(
                                 severity=ValidationSeverity.ERROR,
-                                code="CROSS_COORDINATION_OVERLAP",
+                                code="TARGET_SELF_OVERLAP",
                                 message=(
-                                    f"Group '{group_id}' appears in multiple coordination_plans "
-                                    f"in {lane.value} lane with overlapping timing: "
-                                    f"{source_i} ({start_i}-{end_i}ms) and {source_j} ({start_j}-{end_j}ms)"
+                                    f"Target '{target_key}' has overlapping "
+                                    f"placements in {lane.value} lane: "
+                                    f"{source_i} ({start_i}-{end_i}ms) and "
+                                    f"{source_j} ({start_j}-{end_j}ms)"
                                 ),
                                 field_path=f"lane_plans[{lane.value}]",
                                 fix_hint=(
-                                    f"MERGE '{group_id}' into a single coordination_plan in {lane.value} "
-                                    f"lane, OR remove the shorter placement ({source_j}), OR adjust "
-                                    f"timing so {source_j} starts after {end_i}ms"
+                                    f"Ensure target '{target_key}' is only "
+                                    f"used once at a time in {lane.value} "
+                                    f"lane. Adjust timing or merge placements."
                                 ),
                             )
                         )
                     elif start_j < end_i:
-                        # Minor overlap - downgrade to warning, renderer will adjust
                         warnings.append(
                             ValidationIssue(
                                 severity=ValidationSeverity.WARNING,
-                                code="CROSS_COORDINATION_OVERLAP_MINOR",
+                                code="TARGET_SELF_OVERLAP_MINOR",
                                 message=(
-                                    f"Group '{group_id}' has minor timing overlap ({overlap_ms}ms) "
-                                    f"in {lane.value} lane - renderer will adjust"
+                                    f"Target '{target_key}' has minor timing "
+                                    f"overlap ({overlap_ms}ms) in {lane.value} "
+                                    f"lane — renderer will adjust"
                                 ),
                                 field_path=f"lane_plans[{lane.value}]",
                                 fix_hint="Consider adjusting timing to avoid overlap",
@@ -483,19 +554,19 @@ class SectionPlanValidator:
 
         Checks:
         - Template exists and matches lane
-        - Group exists
+        - Target is valid
         - Timing within section bounds
         - Intensity in valid range
-        - No within-coordination overlaps on same group
+        - No within-coordination overlaps on same target
 
         Returns:
-            Tuple of (errors, group_timings)
+            Tuple of (errors, target_timings keyed by ``type:id``).
         """
         errors: list[ValidationIssue] = []
 
-        # Track placements by group for overlap detection
-        placements_by_group: dict[str, list[tuple[int, int, str]]] = defaultdict(list)
-        group_timings: dict[str, list[tuple[int, int, str]]] = defaultdict(list)
+        # Track placements by target key (type:id) for overlap detection
+        placements_by_target: dict[str, list[tuple[int, int, str]]] = defaultdict(list)
+        target_timings: dict[str, list[tuple[int, int, str]]] = defaultdict(list)
 
         for placement in placements:
             # Check template exists
@@ -571,17 +642,12 @@ class SectionPlanValidator:
                         )
                     )
 
-            # Check group exists
-            if placement.group_id not in self._valid_group_ids:
-                errors.append(
-                    ValidationIssue(
-                        severity=ValidationSeverity.ERROR,
-                        code="UNKNOWN_GROUP",
-                        message=f"Group '{placement.group_id}' not found in ChoreographyGraph",
-                        field_path=f"placement[{placement.placement_id}].group_id",
-                        fix_hint="Use a valid group_id from DisplayGraph.groups",
-                    )
-                )
+            # Validate target
+            target_errors = self._validate_target(
+                placement.target,
+                f"placement[{placement.placement_id}]",
+            )
+            errors.extend(target_errors)
 
             # Resolve timing (using PlanningTimeRef and EffectDuration)
             try:
@@ -635,18 +701,18 @@ class SectionPlanValidator:
                         )
                     )
 
-            # Track for overlap detection (both within-coordination and cross-coordination)
-            placements_by_group[placement.group_id].append(
+            # Track for overlap detection using target key
+            target_key = f"{placement.target.type.value}:{placement.target.id}"
+            placements_by_target[target_key].append(
                 (start_ms, end_ms, placement.placement_id)
             )
-            group_timings[placement.group_id].append(
+            target_timings[target_key].append(
                 (start_ms, end_ms, f"placement:{placement.placement_id}")
             )
 
-        # Check for within-coordination overlaps on same group (same coordination_plan)
-        for group_id, group_placements in placements_by_group.items():
-            # Sort by start time
-            sorted_placements = sorted(group_placements, key=lambda x: x[0])
+        # Check for within-coordination overlaps on same target
+        for t_key, t_placements in placements_by_target.items():
+            sorted_placements = sorted(t_placements, key=lambda x: x[0])
 
             for i in range(len(sorted_placements) - 1):
                 _, end_ms, pid1 = sorted_placements[i]
@@ -658,26 +724,27 @@ class SectionPlanValidator:
                             severity=ValidationSeverity.ERROR,
                             code="WITHIN_COORDINATION_OVERLAP",
                             message=(
-                                f"Overlap in {lane.value} lane on group '{group_id}': "
+                                f"Overlap in {lane.value} lane on target '{t_key}': "
                                 f"placements '{pid1}' and '{pid2}'"
                             ),
                             field_path=f"lane_plans[{lane.value}].placements",
                             fix_hint=(
-                                f"Each group can only have ONE active placement at a time "
-                                f"per lane. Remove '{pid2}' or change its start to after "
-                                f"'{pid1}' ends. For continuous coverage, use a single "
-                                f"SECTION-duration placement instead of multiple overlapping ones."
+                                f"Each target can only have ONE active placement at a "
+                                f"time per lane. Remove '{pid2}' or change its start to "
+                                f"after '{pid1}' ends. For continuous coverage, use a "
+                                f"single SECTION-duration placement instead of multiple "
+                                f"overlapping ones."
                             ),
                         )
                     )
 
-        return errors, group_timings
+        return errors, target_timings
 
     def _validate_window(
         self,
         window: PlacementWindow,
         coordination_mode: CoordinationMode,
-        group_ids: list[str],
+        targets: list[PlanTarget],
         lane: LaneKind,
         section_start_ms: int | None,
         section_end_ms: int | None,
@@ -685,10 +752,10 @@ class SectionPlanValidator:
         """Validate a placement window.
 
         Returns:
-            Tuple of (errors, group_timings)
+            Tuple of (errors, target_timings keyed by ``type:id``).
         """
         errors: list[ValidationIssue] = []
-        group_timings: dict[str, list[tuple[int, int, str]]] = defaultdict(list)
+        target_timings: dict[str, list[tuple[int, int, str]]] = defaultdict(list)
 
         # Check template exists
         if not self.template_catalog.has_template(window.template_id):
@@ -737,7 +804,7 @@ class SectionPlanValidator:
                     field_path=f"lane_plans[{lane.value}].window.start/end",
                 )
             )
-            return errors, group_timings
+            return errors, target_timings
 
         # Validate intensity is a valid IntensityLevel enum
         if not isinstance(window.intensity, IntensityLevel):
@@ -775,11 +842,14 @@ class SectionPlanValidator:
                     )
                 )
 
-        # Track window timing for all groups in this coordination_plan
-        for group_id in group_ids:
-            group_timings[group_id].append((start_ms, end_ms, f"window:{coordination_mode.value}"))
+        # Track window timing for all targets in this coordination_plan
+        for target in targets:
+            target_key = f"{target.type.value}:{target.id}"
+            target_timings[target_key].append(
+                (start_ms, end_ms, f"window:{coordination_mode.value}")
+            )
 
-        return errors, group_timings
+        return errors, target_timings
 
 
 # =============================================================================

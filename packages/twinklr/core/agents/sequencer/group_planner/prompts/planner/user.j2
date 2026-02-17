@@ -67,7 +67,7 @@ Motif Catalog (summary for reference):
 ## Available Display Groups
 
 {% for group in display_graph.groups %}
-- **{{ group.id }}** (role: {{ group.role }}){% if group.element_kind is defined and group.element_kind %} [{{ group.element_kind }}]{% endif %}, {{ group.fixture_count }} model{{ "s" if group.fixture_count != 1 else "" }}{% if group.pixel_fraction is defined and group.pixel_fraction > 0 %}, {{ (group.pixel_fraction * 100) | round(0) | int }}% of display{% endif %}{% if group.prominence is defined and group.prominence %} ({{ group.prominence }}){% endif %}{% if group.tags is defined and group.tags %} tags: {{ group.tags | join(", ") }}{% endif %}
+- **{{ group.id }}** (role: {{ group.role }}){% if group.element_kind is defined and group.element_kind %} [{{ group.element_kind }}]{% endif %}, {{ group.fixture_count }} model{{ "s" if group.fixture_count != 1 else "" }}{% if group.pixel_fraction is defined and group.pixel_fraction > 0 %}, {{ (group.pixel_fraction * 100) | round(0) | int }}% of display{% endif %}{% if group.prominence is defined and group.prominence %} ({{ group.prominence }}){% endif %} detail: {{ group.detail_capability }}{% if group.tags is defined and group.tags %} zones: {{ group.tags | join(", ") }}{% endif %}{% if group.split_membership is defined and group.split_membership %} splits: {{ group.split_membership | join(", ") }}{% endif %}
 
 {% if (group.position is defined and group.position) or (group.arrangement is defined and group.arrangement) %}  Layout: {% if group.arrangement is defined and group.arrangement %}{{ group.arrangement }}{% endif %}{% if group.position is defined and group.position %}{% if group.position.horizontal is defined %} — {{ group.position.horizontal }}{% endif %}{% if group.position.vertical is defined %} / {{ group.position.vertical }}{% endif %}{% if group.position.depth is defined and group.position.depth != "NEAR" %} / {{ group.position.depth }}{% endif %}{% if group.position.zone is defined and group.position.zone %} [{{ group.position.zone }}]{% endif %}{% endif %}
 
@@ -78,6 +78,27 @@ Motif Catalog (summary for reference):
 {% for role, group_ids in display_graph.groups_by_role.items() %}
 - **{{ role }}**: {{ group_ids | join(", ") }}
 {% endfor %}
+
+{% if display_graph_zones %}
+### Zone Map (target type: "zone")
+{% for zone_entry in display_graph_zones %}
+- **{{ zone_entry.zone }}**: {{ zone_entry.group_ids | join(", ") }}
+{% endfor %}
+{% endif %}
+
+{% if display_graph_splits %}
+### Available Splits (target type: "split")
+{% for split_name, split_groups in display_graph_splits.items() %}
+- **{{ split_name }}**: {{ split_groups | join(", ") }}
+{% endfor %}
+{% endif %}
+
+{% if display_graph_spatial and display_graph_spatial.horizontal %}
+### Spatial Layout (left → right)
+{% for entry in display_graph_spatial.horizontal %}
+- {{ entry.position }}: **{{ entry.id }}** ({{ entry.role }}, detail: {{ entry.detail }})
+{% endfor %}
+{% endif %}
 
 ## Available Templates
 
@@ -173,8 +194,8 @@ Create a SectionCoordinationPlan for **{{ section_name }} ({{ section_id }})**.
 
 **Follow the {{ energy_target }} ENERGY RECIPE from the system prompt:**
 {% if energy_target == "HIGH" %}
-- BASE: SOFT intensity, SECTION duration (OUTLINE + WINDOWS)
-- RHYTHM: SEQUENCED mode, STRONG intensity (ARCHES or similar)
+- BASE: SOFT intensity, SECTION duration (ANCHOR/SUPPORTING structural groups or zone targets)
+- RHYTHM: SEQUENCED mode, STRONG intensity (ANCHOR groups with motion potential)
 - ACCENT: PEAK on 1 HERO, STRONG on others, HIT/BURST duration, stagger timing
 {% elif energy_target == "LOW" %}
 - BASE: WHISPER-SOFT intensity, SECTION duration

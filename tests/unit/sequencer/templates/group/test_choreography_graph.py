@@ -103,14 +103,14 @@ class TestChoreoGroup:
             zone=DisplayZone.YARD,
             fixture_count=10,
             pixel_fraction=0.15,
-            tags=[ChoreoTag.YARD, ChoreoTag.ODD_EVEN],
+            tags=[ChoreoTag.YARD, ChoreoTag.HOUSE],
         )
         assert group.id == "ARCHES"
         assert group.element_kind == DisplayElementKind.ARCH
         assert group.prominence == DisplayProminence.ANCHOR
         assert group.fixture_count == 10
         assert ChoreoTag.YARD in group.tags
-        assert ChoreoTag.ODD_EVEN in group.tags
+        assert ChoreoTag.HOUSE in group.tags
 
     def test_frozen(self) -> None:
         """ChoreoGroup is immutable after creation."""
@@ -155,13 +155,13 @@ class TestChoreographyGraphLookups:
     def test_groups_by_tag(self) -> None:
         """groups_by_tag groups ids by their tags."""
         graph = _make_graph(
-            _make_group("ARCHES", tags=[ChoreoTag.YARD, ChoreoTag.ODD_EVEN]),
+            _make_group("ARCHES", tags=[ChoreoTag.YARD, ChoreoTag.ROOF]),
             _make_group("MEGA_TREE", tags=[ChoreoTag.YARD]),
             _make_group("OUTLINE", tags=[ChoreoTag.HOUSE]),
         )
         by_tag = graph.groups_by_tag
         assert set(by_tag[ChoreoTag.YARD]) == {"ARCHES", "MEGA_TREE"}
-        assert by_tag[ChoreoTag.ODD_EVEN] == ["ARCHES"]
+        assert by_tag[ChoreoTag.ROOF] == ["ARCHES"]
         assert by_tag[ChoreoTag.HOUSE] == ["OUTLINE"]
 
     def test_groups_by_tag_empty(self) -> None:
@@ -242,7 +242,7 @@ class TestChoreographyGraphPlannerSummary:
     """Tests for to_planner_summary export."""
 
     def test_summary_includes_core_fields(self) -> None:
-        """Planner summary includes role, fixture count, and prominence."""
+        """Planner summary includes role, fixture count, prominence, and detail."""
         graph = _make_graph(
             _make_group(
                 "ARCHES",
@@ -260,11 +260,12 @@ class TestChoreographyGraphPlannerSummary:
         assert s["model_count"] == 10
         assert s["element_kind"] == "ARCH"
         assert s["prominence"] == "ANCHOR"
+        assert s["detail_capability"] == "MEDIUM"
 
     def test_summary_includes_tags(self) -> None:
         """Planner summary includes tags when present."""
         graph = _make_graph(
-            _make_group("ARCHES", tags=[ChoreoTag.YARD, ChoreoTag.ODD_EVEN]),
+            _make_group("ARCHES", tags=[ChoreoTag.YARD, ChoreoTag.ROOF]),
         )
         summaries = graph.to_planner_summary()
         assert "tags" in summaries[0]
