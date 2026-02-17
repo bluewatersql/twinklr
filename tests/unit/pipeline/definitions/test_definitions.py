@@ -114,23 +114,30 @@ class TestBuildDisplayPipeline:
     def test_returns_valid_pipeline(self) -> None:
         """Pipeline validates without errors."""
         from twinklr.core.pipeline.definitions.display import build_display_pipeline
+        from twinklr.core.sequencer.display.xlights_mapping import (
+            XLightsGroupMapping,
+            XLightsMapping,
+        )
         from twinklr.core.sequencer.templates.group.catalog import TemplateCatalog
-        from twinklr.core.sequencer.templates.group.models import (
-            DisplayGraph,
-            DisplayGroup,
+        from twinklr.core.sequencer.templates.group.models.choreography import (
+            ChoreographyGraph,
+            ChoreoGroup,
         )
 
-        display_graph = DisplayGraph(
-            display_id="test",
-            display_name="Test",
-            groups=[DisplayGroup(group_id="G1", role="OUTLINE", display_name="G1")],
+        choreo_graph = ChoreographyGraph(
+            graph_id="test",
+            groups=[ChoreoGroup(id="G1", role="OUTLINE")],
+        )
+        xlights_mapping = XLightsMapping(
+            entries=[XLightsGroupMapping(choreo_id="G1", group_name="G1")],
         )
         catalog = TemplateCatalog(entries=[])
 
         pipeline = build_display_pipeline(
-            display_graph=display_graph,
+            choreo_graph=choreo_graph,
             template_catalog=catalog,
             display_groups=MOCK_DISPLAY_GROUPS,
+            xlights_mapping=xlights_mapping,
         )
 
         errors = pipeline.validate_pipeline()
@@ -139,23 +146,30 @@ class TestBuildDisplayPipeline:
     def test_contains_all_expected_stages(self) -> None:
         """Display pipeline has common + groups + aggregate + holistic + asset_resolution + display_render."""
         from twinklr.core.pipeline.definitions.display import build_display_pipeline
+        from twinklr.core.sequencer.display.xlights_mapping import (
+            XLightsGroupMapping,
+            XLightsMapping,
+        )
         from twinklr.core.sequencer.templates.group.catalog import TemplateCatalog
-        from twinklr.core.sequencer.templates.group.models import (
-            DisplayGraph,
-            DisplayGroup,
+        from twinklr.core.sequencer.templates.group.models.choreography import (
+            ChoreographyGraph,
+            ChoreoGroup,
         )
 
-        display_graph = DisplayGraph(
-            display_id="test",
-            display_name="Test",
-            groups=[DisplayGroup(group_id="G1", role="OUTLINE", display_name="G1")],
+        choreo_graph = ChoreographyGraph(
+            graph_id="test",
+            groups=[ChoreoGroup(id="G1", role="OUTLINE")],
+        )
+        xlights_mapping = XLightsMapping(
+            entries=[XLightsGroupMapping(choreo_id="G1", group_name="G1")],
         )
         catalog = TemplateCatalog(entries=[])
 
         pipeline = build_display_pipeline(
-            display_graph=display_graph,
+            choreo_graph=choreo_graph,
             template_catalog=catalog,
             display_groups=MOCK_DISPLAY_GROUPS,
+            xlights_mapping=xlights_mapping,
         )
 
         stage_ids = [s.id for s in pipeline.stages]
@@ -169,23 +183,30 @@ class TestBuildDisplayPipeline:
     def test_groups_is_fan_out(self) -> None:
         """Groups stage uses FAN_OUT pattern."""
         from twinklr.core.pipeline.definitions.display import build_display_pipeline
+        from twinklr.core.sequencer.display.xlights_mapping import (
+            XLightsGroupMapping,
+            XLightsMapping,
+        )
         from twinklr.core.sequencer.templates.group.catalog import TemplateCatalog
-        from twinklr.core.sequencer.templates.group.models import (
-            DisplayGraph,
-            DisplayGroup,
+        from twinklr.core.sequencer.templates.group.models.choreography import (
+            ChoreographyGraph,
+            ChoreoGroup,
         )
 
-        display_graph = DisplayGraph(
-            display_id="test",
-            display_name="Test",
-            groups=[DisplayGroup(group_id="G1", role="OUTLINE", display_name="G1")],
+        choreo_graph = ChoreographyGraph(
+            graph_id="test",
+            groups=[ChoreoGroup(id="G1", role="OUTLINE")],
+        )
+        xlights_mapping = XLightsMapping(
+            entries=[XLightsGroupMapping(choreo_id="G1", group_name="G1")],
         )
         catalog = TemplateCatalog(entries=[])
 
         pipeline = build_display_pipeline(
-            display_graph=display_graph,
+            choreo_graph=choreo_graph,
             template_catalog=catalog,
             display_groups=MOCK_DISPLAY_GROUPS,
+            xlights_mapping=xlights_mapping,
         )
 
         groups = next(s for s in pipeline.stages if s.id == "groups")
@@ -194,24 +215,31 @@ class TestBuildDisplayPipeline:
     def test_holistic_can_be_disabled(self) -> None:
         """When enable_holistic=False, holistic stage is absent."""
         from twinklr.core.pipeline.definitions.display import build_display_pipeline
+        from twinklr.core.sequencer.display.xlights_mapping import (
+            XLightsGroupMapping,
+            XLightsMapping,
+        )
         from twinklr.core.sequencer.templates.group.catalog import TemplateCatalog
-        from twinklr.core.sequencer.templates.group.models import (
-            DisplayGraph,
-            DisplayGroup,
+        from twinklr.core.sequencer.templates.group.models.choreography import (
+            ChoreographyGraph,
+            ChoreoGroup,
         )
 
-        display_graph = DisplayGraph(
-            display_id="test",
-            display_name="Test",
-            groups=[DisplayGroup(group_id="G1", role="OUTLINE", display_name="G1")],
+        choreo_graph = ChoreographyGraph(
+            graph_id="test",
+            groups=[ChoreoGroup(id="G1", role="OUTLINE")],
+        )
+        xlights_mapping = XLightsMapping(
+            entries=[XLightsGroupMapping(choreo_id="G1", group_name="G1")],
         )
         catalog = TemplateCatalog(entries=[])
 
         pipeline = build_display_pipeline(
-            display_graph=display_graph,
+            choreo_graph=choreo_graph,
             template_catalog=catalog,
             display_groups=MOCK_DISPLAY_GROUPS,
             enable_holistic=False,
+            xlights_mapping=xlights_mapping,
         )
 
         stage_ids = [s.id for s in pipeline.stages]
@@ -227,24 +255,31 @@ class TestBuildDisplayPipeline:
     def test_enable_assets_inserts_asset_creation_stage(self) -> None:
         """When enable_assets=True, asset_creation stage is present."""
         from twinklr.core.pipeline.definitions.display import build_display_pipeline
+        from twinklr.core.sequencer.display.xlights_mapping import (
+            XLightsGroupMapping,
+            XLightsMapping,
+        )
         from twinklr.core.sequencer.templates.group.catalog import TemplateCatalog
-        from twinklr.core.sequencer.templates.group.models import (
-            DisplayGraph,
-            DisplayGroup,
+        from twinklr.core.sequencer.templates.group.models.choreography import (
+            ChoreographyGraph,
+            ChoreoGroup,
         )
 
-        display_graph = DisplayGraph(
-            display_id="test",
-            display_name="Test",
-            groups=[DisplayGroup(group_id="G1", role="OUTLINE", display_name="G1")],
+        choreo_graph = ChoreographyGraph(
+            graph_id="test",
+            groups=[ChoreoGroup(id="G1", role="OUTLINE")],
+        )
+        xlights_mapping = XLightsMapping(
+            entries=[XLightsGroupMapping(choreo_id="G1", group_name="G1")],
         )
         catalog = TemplateCatalog(entries=[])
 
         pipeline = build_display_pipeline(
-            display_graph=display_graph,
+            choreo_graph=choreo_graph,
             template_catalog=catalog,
             display_groups=MOCK_DISPLAY_GROUPS,
             enable_assets=True,
+            xlights_mapping=xlights_mapping,
         )
 
         stage_ids = [s.id for s in pipeline.stages]
@@ -261,25 +296,32 @@ class TestBuildDisplayPipeline:
     def test_enable_assets_without_holistic_uses_aggregate_and_asset_creation(self) -> None:
         """Asset resolution consumes aggregate plan + asset creation output when holistic disabled."""
         from twinklr.core.pipeline.definitions.display import build_display_pipeline
+        from twinklr.core.sequencer.display.xlights_mapping import (
+            XLightsGroupMapping,
+            XLightsMapping,
+        )
         from twinklr.core.sequencer.templates.group.catalog import TemplateCatalog
-        from twinklr.core.sequencer.templates.group.models import (
-            DisplayGraph,
-            DisplayGroup,
+        from twinklr.core.sequencer.templates.group.models.choreography import (
+            ChoreographyGraph,
+            ChoreoGroup,
         )
 
-        display_graph = DisplayGraph(
-            display_id="test",
-            display_name="Test",
-            groups=[DisplayGroup(group_id="G1", role="OUTLINE", display_name="G1")],
+        choreo_graph = ChoreographyGraph(
+            graph_id="test",
+            groups=[ChoreoGroup(id="G1", role="OUTLINE")],
+        )
+        xlights_mapping = XLightsMapping(
+            entries=[XLightsGroupMapping(choreo_id="G1", group_name="G1")],
         )
         catalog = TemplateCatalog(entries=[])
 
         pipeline = build_display_pipeline(
-            display_graph=display_graph,
+            choreo_graph=choreo_graph,
             template_catalog=catalog,
             display_groups=MOCK_DISPLAY_GROUPS,
             enable_holistic=False,
             enable_assets=True,
+            xlights_mapping=xlights_mapping,
         )
 
         asset_res = next(s for s in pipeline.stages if s.id == "asset_resolution")
@@ -289,23 +331,30 @@ class TestBuildDisplayPipeline:
     def test_assets_disabled_by_default(self) -> None:
         """Default pipeline does not include asset_creation."""
         from twinklr.core.pipeline.definitions.display import build_display_pipeline
+        from twinklr.core.sequencer.display.xlights_mapping import (
+            XLightsGroupMapping,
+            XLightsMapping,
+        )
         from twinklr.core.sequencer.templates.group.catalog import TemplateCatalog
-        from twinklr.core.sequencer.templates.group.models import (
-            DisplayGraph,
-            DisplayGroup,
+        from twinklr.core.sequencer.templates.group.models.choreography import (
+            ChoreographyGraph,
+            ChoreoGroup,
         )
 
-        display_graph = DisplayGraph(
-            display_id="test",
-            display_name="Test",
-            groups=[DisplayGroup(group_id="G1", role="OUTLINE", display_name="G1")],
+        choreo_graph = ChoreographyGraph(
+            graph_id="test",
+            groups=[ChoreoGroup(id="G1", role="OUTLINE")],
+        )
+        xlights_mapping = XLightsMapping(
+            entries=[XLightsGroupMapping(choreo_id="G1", group_name="G1")],
         )
         catalog = TemplateCatalog(entries=[])
 
         pipeline = build_display_pipeline(
-            display_graph=display_graph,
+            choreo_graph=choreo_graph,
             template_catalog=catalog,
             display_groups=MOCK_DISPLAY_GROUPS,
+            xlights_mapping=xlights_mapping,
         )
 
         stage_ids = [s.id for s in pipeline.stages]

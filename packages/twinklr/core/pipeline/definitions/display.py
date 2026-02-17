@@ -25,12 +25,15 @@ from twinklr.core.pipeline.display_stages import (
     AssetResolutionStage,
     DisplayRenderStage,
 )
+from twinklr.core.sequencer.display.xlights_mapping import XLightsMapping
 from twinklr.core.sequencer.templates.group.catalog import TemplateCatalog
-from twinklr.core.sequencer.templates.group.models import DisplayGraph
+from twinklr.core.sequencer.templates.group.models.choreography import (
+    ChoreographyGraph,
+)
 
 
 def build_display_pipeline(
-    display_graph: DisplayGraph,
+    choreo_graph: ChoreographyGraph,
     template_catalog: TemplateCatalog,
     display_groups: list[dict[str, object]],
     *,
@@ -39,6 +42,7 @@ def build_display_pipeline(
     min_pass_score: float = 0.7,
     enable_holistic: bool = True,
     enable_assets: bool = False,
+    xlights_mapping: XLightsMapping | None = None,
 ) -> PipelineDefinition:
     """Build the display sequencer pipeline.
 
@@ -55,7 +59,7 @@ def build_display_pipeline(
     and generate figurative/narrative assets.
 
     Args:
-        display_graph: Display group configuration (groups, roles, fixtures).
+        choreo_graph: Choreographic display configuration.
         template_catalog: Available group templates for planning.
         display_groups: Display group configs for MacroPlannerStage.
         song_name: Song name for plan set identification.
@@ -63,13 +67,14 @@ def build_display_pipeline(
         min_pass_score: Minimum score for section plan approval (0.0-1.0).
         enable_holistic: Include the holistic evaluation stage.
         enable_assets: Include the asset creation stage (extract → enrich → generate).
+        xlights_mapping: xLights element name resolution.
 
     Returns:
         PipelineDefinition ready for execution.
 
     Example:
         >>> pipeline = build_display_pipeline(
-        ...     display_graph=graph,
+        ...     choreo_graph=graph,
         ...     template_catalog=catalog,
         ...     display_groups=[{"role_key": "OUTLINE", "model_count": 10, ...}],
         ...     enable_holistic=True,
@@ -84,7 +89,7 @@ def build_display_pipeline(
         StageDefinition(
             id="groups",
             stage=GroupPlannerStage(
-                display_graph=display_graph,
+                choreo_graph=choreo_graph,
                 template_catalog=template_catalog,
                 max_iterations=max_iterations,
                 min_pass_score=min_pass_score,
@@ -112,7 +117,7 @@ def build_display_pipeline(
             StageDefinition(
                 id="holistic",
                 stage=HolisticEvaluatorStage(
-                    display_graph=display_graph,
+                    choreo_graph=choreo_graph,
                     template_catalog=template_catalog,
                 ),
                 inputs=["aggregate"],
@@ -151,7 +156,10 @@ def build_display_pipeline(
             ),
             StageDefinition(
                 id="display_render",
-                stage=DisplayRenderStage(display_graph=display_graph),
+                stage=DisplayRenderStage(
+                    choreo_graph=choreo_graph,
+                    xlights_mapping=xlights_mapping,
+                ),
                 inputs=["asset_resolution"],
                 input_type="GroupPlanSet",
                 output_type="dict[str, Any]",

@@ -22,9 +22,11 @@ from twinklr.core.sequencer.templates.group.catalog import (
 )
 from twinklr.core.sequencer.templates.group.models import (
     CoordinationPlan,
-    DisplayGraph,
-    DisplayGroup,
     GroupPlacement,
+)
+from twinklr.core.sequencer.templates.group.models.choreography import (
+    ChoreographyGraph,
+    ChoreoGroup,
 )
 from twinklr.core.sequencer.timing import TimeRef
 from twinklr.core.sequencer.vocabulary import (
@@ -49,14 +51,13 @@ def mock_provider() -> MagicMock:
 
 
 @pytest.fixture
-def sample_display_graph() -> DisplayGraph:
-    """Sample display graph."""
-    return DisplayGraph(
-        display_id="test",
-        display_name="Test",
+def sample_choreo_graph() -> ChoreographyGraph:
+    """Sample choreography graph."""
+    return ChoreographyGraph(
+        graph_id="test",
         groups=[
-            DisplayGroup(group_id="HERO_1", role="HERO", display_name="Hero 1"),
-            DisplayGroup(group_id="ARCHES_1", role="ARCHES", display_name="Arches"),
+            ChoreoGroup(id="HERO_1", role="HERO"),
+            ChoreoGroup(id="ARCHES_1", role="ARCHES"),
         ],
     )
 
@@ -108,7 +109,7 @@ def sample_timing_context() -> TimingContext:
 
 @pytest.fixture
 def sample_section_context(
-    sample_display_graph: DisplayGraph,
+    sample_choreo_graph: ChoreographyGraph,
     sample_template_catalog: TemplateCatalog,
     sample_timing_context: TimingContext,
 ) -> SectionPlanningContext:
@@ -124,7 +125,7 @@ def sample_section_context(
         primary_focus_targets=["HERO"],
         secondary_targets=["ARCHES"],
         notes=None,
-        display_graph=sample_display_graph,
+        choreo_graph=sample_choreo_graph,
         template_catalog=sample_template_catalog,
         timing_context=sample_timing_context,
     )

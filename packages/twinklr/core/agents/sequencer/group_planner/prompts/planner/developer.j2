@@ -38,13 +38,13 @@ Return a `SectionCoordinationPlan` matching this schema:
 | Window for SEQUENCED | Must have window + config | SEQUENCED mode with only placements |
 | Start within bounds | bar 1 to available_bars | bar 10 when section has 4 bars |
 | Single approach per group per lane | A group_id uses window OR placements within a single coordination_plan | group appears in two coordination_plans in same lane |
-| No invented group_ids | `group_ids` ⊆ available groups | `group_ids` includes an ID not present in `display_graph.groups[].group_id` |
+| No invented group_ids | `group_ids` ⊆ available groups | `group_ids` includes an ID not present in `display_graph.groups[].id` |
 | No invented template_ids | every `template_id` ∈ template catalog | placement uses `template_id` not present in the template catalog |
 | UNIFIED covers all groups | UNIFIED requires **1 placement per `group_id`** | `group_ids` has N groups but placements only cover < N group_ids |
 | No within-lane overlap (placements) | For same lane+group_id: [start,end) intervals must be disjoint (ACCENT remains strict even when multi-lane is allowed) | accent_a overlaps accent_b on same group |
 | lane→target_roles mapping | BASE→[BACKGROUND], RHYTHM→[MID], ACCENT→[HERO] | ACCENT has target_roles [MID] |
 | Disjoint group_ids across coordination_plans (same lane) | For any two coordination_plans in same lane: `A.group_ids ∩ B.group_ids = ∅` | RHYTHM plan A and B both include MEGA_TREE_1 |
-| No role-label group_ids | `group_id` must be a concrete `display_graph.groups[].group_id` (never BACKGROUND/MID/HERO) | placement.group_id = "HERO" |
+| No role-label group_ids | `group_id` must be a concrete `display_graph.groups[].id` (never BACKGROUND/MID/HERO) | placement.group_id = "HERO" |
 | Cross-lane reuse policy | Default: group_id appears in only one lane. Exception: group may appear in both RHYTHM+ACCENT only if allowlisted by `layer_intents.multilane_allowed_groups` | MEGA_TREE_1 in RHYTHM+ACCENT without allowlist |
 | Multi-lane override semantics | For allowlisted groups in both RHYTHM+ACCENT: overlap across lanes is allowed; ACCENT is higher-priority override during its intervals | Non-allowlisted group overlaps across lanes |
 | No lane_plans planning_notes | `lane_plans[*]` must not include `planning_notes` | lane_plans.1.planning_notes present |

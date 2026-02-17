@@ -4,6 +4,9 @@ Single source of truth for all enums used across planning, templates,
 and agents.
 """
 
+from twinklr.core.sequencer.vocabulary.choreography import (
+    ChoreoTag,
+)
 from twinklr.core.sequencer.vocabulary.composition import (
     BlendMode,
     GPBlendMode,
@@ -116,6 +119,8 @@ __all__ = [
     # Planning (categorical timing)
     "PlanningTimeRef",
     "TimingHint",
+    # Choreographic tags
+    "ChoreoTag",
     # Targets
     "TargetRole",
     # Templates

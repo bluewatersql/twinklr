@@ -27,9 +27,11 @@ from twinklr.core.sequencer.planning import (
 from twinklr.core.sequencer.templates.group.catalog import TemplateCatalog
 from twinklr.core.sequencer.templates.group.models import (
     CoordinationPlan,
-    DisplayGraph,
-    DisplayGroup,
     GroupPlacement,
+)
+from twinklr.core.sequencer.templates.group.models.choreography import (
+    ChoreographyGraph,
+    ChoreoGroup,
 )
 from twinklr.core.sequencer.theming import ThemeRef, ThemeScope
 from twinklr.core.sequencer.vocabulary import (
@@ -89,12 +91,11 @@ def mock_context() -> PipelineContext:
 
 
 @pytest.fixture
-def sample_display_graph() -> DisplayGraph:
-    """Minimal display graph."""
-    return DisplayGraph(
-        display_id="test",
-        display_name="Test",
-        groups=[DisplayGroup(group_id="HERO_1", role="HERO", display_name="Hero 1")],
+def sample_choreo_graph() -> ChoreographyGraph:
+    """Minimal choreography graph."""
+    return ChoreographyGraph(
+        graph_id="test",
+        groups=[ChoreoGroup(id="HERO_1", role="HERO")],
     )
 
 
@@ -221,7 +222,7 @@ class TestExtractMacroPlanSummary:
         mock_macro_plan.section_plans = None
         # Simulate getattr returning None
         del mock_macro_plan.section_plans
-        mock_macro_plan.configure_mock(**{"section_plans": None})
+        mock_macro_plan.configure_mock(section_plans=None)
 
         summary = _extract_macro_plan_summary(mock_macro_plan)
 
@@ -234,12 +235,12 @@ class TestHolisticEvaluatorStage:
 
     def test_stage_name(
         self,
-        sample_display_graph: DisplayGraph,
+        sample_choreo_graph: ChoreographyGraph,
         sample_template_catalog: TemplateCatalog,
     ) -> None:
         """Stage reports correct name."""
         stage = HolisticEvaluatorStage(
-            display_graph=sample_display_graph,
+            choreo_graph=sample_choreo_graph,
             template_catalog=sample_template_catalog,
         )
         assert stage.name == "holistic_evaluator"
@@ -247,7 +248,7 @@ class TestHolisticEvaluatorStage:
     @pytest.mark.asyncio
     async def test_execute_passes_through_group_plan_set(
         self,
-        sample_display_graph: DisplayGraph,
+        sample_choreo_graph: ChoreographyGraph,
         sample_template_catalog: TemplateCatalog,
         sample_group_plan_set: GroupPlanSet,
         approved_evaluation: HolisticEvaluation,
@@ -255,7 +256,7 @@ class TestHolisticEvaluatorStage:
     ) -> None:
         """execute() returns the original GroupPlanSet (pass-through)."""
         stage = HolisticEvaluatorStage(
-            display_graph=sample_display_graph,
+            choreo_graph=sample_choreo_graph,
             template_catalog=sample_template_catalog,
         )
 
@@ -281,7 +282,7 @@ class TestHolisticEvaluatorStage:
     @pytest.mark.asyncio
     async def test_execute_stores_evaluation_in_state(
         self,
-        sample_display_graph: DisplayGraph,
+        sample_choreo_graph: ChoreographyGraph,
         sample_template_catalog: TemplateCatalog,
         sample_group_plan_set: GroupPlanSet,
         approved_evaluation: HolisticEvaluation,
@@ -289,7 +290,7 @@ class TestHolisticEvaluatorStage:
     ) -> None:
         """execute() stores HolisticEvaluation in context state."""
         stage = HolisticEvaluatorStage(
-            display_graph=sample_display_graph,
+            choreo_graph=sample_choreo_graph,
             template_catalog=sample_template_catalog,
         )
 
@@ -317,7 +318,7 @@ class TestHolisticEvaluatorStage:
     @pytest.mark.asyncio
     async def test_execute_tracks_metrics(
         self,
-        sample_display_graph: DisplayGraph,
+        sample_choreo_graph: ChoreographyGraph,
         sample_template_catalog: TemplateCatalog,
         sample_group_plan_set: GroupPlanSet,
         approved_evaluation: HolisticEvaluation,
@@ -325,7 +326,7 @@ class TestHolisticEvaluatorStage:
     ) -> None:
         """execute() adds holistic score, status, and issues count to metrics."""
         stage = HolisticEvaluatorStage(
-            display_graph=sample_display_graph,
+            choreo_graph=sample_choreo_graph,
             template_catalog=sample_template_catalog,
         )
 
@@ -352,14 +353,14 @@ class TestHolisticEvaluatorStage:
     @pytest.mark.asyncio
     async def test_execute_failure_returns_failure_result(
         self,
-        sample_display_graph: DisplayGraph,
+        sample_choreo_graph: ChoreographyGraph,
         sample_template_catalog: TemplateCatalog,
         sample_group_plan_set: GroupPlanSet,
         mock_context: PipelineContext,
     ) -> None:
         """execute() returns failure StageResult on unhandled exception."""
         stage = HolisticEvaluatorStage(
-            display_graph=sample_display_graph,
+            choreo_graph=sample_choreo_graph,
             template_catalog=sample_template_catalog,
         )
 
@@ -386,7 +387,7 @@ class TestHolisticEvaluatorStage:
     @pytest.mark.asyncio
     async def test_execute_reads_macro_plan_from_state(
         self,
-        sample_display_graph: DisplayGraph,
+        sample_choreo_graph: ChoreographyGraph,
         sample_template_catalog: TemplateCatalog,
         sample_group_plan_set: GroupPlanSet,
         approved_evaluation: HolisticEvaluation,
@@ -394,7 +395,7 @@ class TestHolisticEvaluatorStage:
     ) -> None:
         """execute() reads macro_plan from context state and passes to evaluator."""
         stage = HolisticEvaluatorStage(
-            display_graph=sample_display_graph,
+            choreo_graph=sample_choreo_graph,
             template_catalog=sample_template_catalog,
         )
 

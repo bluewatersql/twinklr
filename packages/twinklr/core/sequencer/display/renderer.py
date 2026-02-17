@@ -31,11 +31,14 @@ from twinklr.core.sequencer.display.models.config import (
 )
 from twinklr.core.sequencer.display.models.palette import ResolvedPalette
 from twinklr.core.sequencer.display.models.render_plan import RenderPlan
+from twinklr.core.sequencer.display.xlights_mapping import XLightsMapping
 from twinklr.core.sequencer.planning.group_plan import GroupPlanSet
 from twinklr.core.sequencer.templates.group.library import (
     GroupTemplateRegistry,
 )
-from twinklr.core.sequencer.templates.group.models.display import DisplayGraph
+from twinklr.core.sequencer.templates.group.models.choreography import (
+    ChoreographyGraph,
+)
 from twinklr.core.sequencer.theming.catalog import PaletteCatalog
 from twinklr.core.sequencer.timing.beat_grid import BeatGrid
 
@@ -86,17 +89,18 @@ class DisplayRenderer:
     def __init__(
         self,
         beat_grid: BeatGrid,
-        display_graph: DisplayGraph,
+        choreo_graph: ChoreographyGraph,
         palette_catalog: PaletteCatalog | None = None,
         config: RenderConfig | None = None,
         handler_registry: HandlerRegistry | None = None,
         template_registry: GroupTemplateRegistry | None = None,
+        xlights_mapping: XLightsMapping | None = None,
     ) -> None:
         """Initialize the display renderer.
 
         Args:
             beat_grid: Musical timing grid for the sequence.
-            display_graph: Display topology (groups → elements).
+            choreo_graph: Choreographic display configuration.
             palette_catalog: Theming palette catalog for color resolution.
                 If None, uses the global PALETTE_REGISTRY.
             config: Render configuration. Defaults to sensible defaults.
@@ -108,9 +112,12 @@ class DisplayRenderer:
                 value curves, multi-depth layers).  Required for
                 production rendering; raises ``RuntimeError`` if
                 omitted and rendering is attempted.
+            xlights_mapping: xLights element name resolution.  If None,
+                creates an empty mapping (IDs used as element names).
         """
         self._beat_grid = beat_grid
-        self._display_graph = display_graph
+        self._choreo_graph = choreo_graph
+        self._xlights_mapping = xlights_mapping or XLightsMapping()
         self._config = config or RenderConfig()
         self._handlers = handler_registry or load_builtin_handlers()
         self._template_registry = template_registry
@@ -170,12 +177,13 @@ class DisplayRenderer:
         composition_config = self._config.composition
         engine = CompositionEngine(
             beat_grid=self._beat_grid,
-            display_graph=self._display_graph,
+            choreo_graph=self._choreo_graph,
             palette_resolver=self._palette_resolver,
             section_boundaries=section_boundaries,
             config=composition_config,
             catalog_index=catalog_index,
             template_registry=self._template_registry,
+            xlights_mapping=self._xlights_mapping,
         )
         render_plan = engine.compose(plan_set)
 

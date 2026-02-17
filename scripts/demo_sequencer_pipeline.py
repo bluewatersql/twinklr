@@ -11,6 +11,10 @@ Demonstrates the full orchestrated flow:
 7. Holistic Evaluation
 
 Uses the Pipeline Framework for declarative, parallel execution.
+
+Features a realistic residential display graph with 11 prop types,
+spatial positions across all axes, zone/tag semantics (yard, house,
+roof), and choreographic grouping tags (halves, thirds, odd/even).
 """
 
 import argparse
@@ -24,29 +28,33 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import logging
 
-from twinklr.core.agents.sequencer.group_planner import (
-    DisplayGraph,
-    DisplayGroup,
-    LaneKind,
-)
 from twinklr.core.pipeline import (
     ExecutionPattern,
     PipelineContext,
     PipelineExecutor,
 )
 from twinklr.core.pipeline.definitions import build_display_pipeline
+from twinklr.core.sequencer.display.xlights_mapping import (
+    XLightsGroupMapping,
+    XLightsMapping,
+)
 from twinklr.core.sequencer.templates.group import load_builtin_group_templates
 from twinklr.core.sequencer.templates.group.catalog import (
     build_template_catalog as build_catalog_from_registry,
 )
+from twinklr.core.sequencer.templates.group.models.choreography import (
+    ChoreographyGraph,
+    ChoreoGroup,
+)
 from twinklr.core.sequencer.templates.group.models.display import (
     GroupPosition,
 )
+from twinklr.core.sequencer.vocabulary.choreography import ChoreoTag
+from twinklr.core.sequencer.vocabulary.composition import LaneKind
 from twinklr.core.sequencer.vocabulary.display import (
     DisplayElementKind,
     DisplayProminence,
     GroupArrangement,
-    PixelDensity,
 )
 from twinklr.core.sequencer.vocabulary.spatial import (
     DepthZone,
@@ -86,108 +94,302 @@ def save_artifact(data: dict, song_name: str, filename: str, output_dir: Path) -
     return output_path
 
 
-def build_display_graph() -> DisplayGraph:
-    """Build a demo DisplayGraph with hierarchy and spatial metadata.
+# ---------------------------------------------------------------------------
+# Display graph: realistic residential Christmas display
+# ---------------------------------------------------------------------------
+#
+# Physical layout:
+#
+#   ┌─────────────────────────────────────────────────────┐
+#   │  ROOF: stars (peak), icicles (eaves)                │  FAR / HIGH
+#   │                                                     │
+#   │  HOUSE: outline (roofline+eaves), windows, wreaths  │  FAR / MID-HIGH
+#   │                                                     │
+#   │  YARD:                                              │
+#   │    FAR:  floodlights (wash, behind props)           │  NEAR / LOW
+#   │    MID:  mega_tree (center), trees (flanking)       │  NEAR / MID-FULL
+#   │    NEAR: arches (foreground row), candy_canes       │  NEAR / LOW
+#   │          matrix (left), snowflakes (scattered)      │
+#   └─────────────────────────────────────────────────────┘
+#
+# Total pixel budget: 100% across 11 groups
 
-    Structure::
 
-        OUTLINE (STRING, HORIZONTAL_ROW, FULL_WIDTH/HIGH, 20%)
-        WINDOWS (WINDOW, GRID, CENTER/MID, 15%)
-        MEGA_TREE (TREE, SINGLE, CENTER/FULL_HEIGHT, 25%)
-        ARCHES (ARCH, HORIZONTAL_ROW, FULL_WIDTH/LOW, 15%)
-        HERO (PROP, CLUSTER, CENTER_LEFT/LOW, 15%)
+def build_display_graph() -> tuple[ChoreographyGraph, XLightsMapping]:
+    """Build a realistic residential Christmas display graph.
+
+    11 prop types with spatial diversity across x/y/z axes,
+    zone assignments (house, yard, roof), and choreographic tags
+    (halves, thirds, odd/even patterns).
+
+    Returns:
+        Tuple of (ChoreographyGraph, XLightsMapping).
     """
-    return DisplayGraph(
-        display_id="demo_display",
-        display_name="Demo Display",
-        groups=[
-            DisplayGroup(
-                group_id="OUTLINE",
-                role="OUTLINE",
-                display_name="OUTLINE",
-                element_kind=DisplayElementKind.STRING,
-                arrangement=GroupArrangement.HORIZONTAL_ROW,
-                pixel_density=PixelDensity.MEDIUM,
-                prominence=DisplayProminence.ANCHOR,
-                position=GroupPosition(
-                    horizontal=HorizontalZone.FULL_WIDTH,
-                    vertical=VerticalZone.HIGH,
-                    depth=DepthZone.FAR,
-                    zone=DisplayZone.HOUSE,
-                ),
-                fixture_count=10,
-                pixel_fraction=0.20,
+    groups = [
+        # === ROOF ZONE ===
+        ChoreoGroup(
+            id="STARS",
+            role="STARS",
+            element_kind=DisplayElementKind.STAR,
+            arrangement=GroupArrangement.CLUSTER,
+            prominence=DisplayProminence.ACCENT,
+            position=GroupPosition(
+                horizontal=HorizontalZone.CENTER,
+                vertical=VerticalZone.HIGH,
+                depth=DepthZone.FAR,
+                zone=DisplayZone.ROOF,
             ),
-            DisplayGroup(
-                group_id="WINDOWS",
-                role="WINDOWS",
-                display_name="WINDOWS",
-                element_kind=DisplayElementKind.WINDOW,
-                arrangement=GroupArrangement.GRID,
-                pixel_density=PixelDensity.HIGH,
-                prominence=DisplayProminence.SUPPORTING,
-                position=GroupPosition(
-                    horizontal=HorizontalZone.CENTER,
-                    vertical=VerticalZone.MID,
-                    depth=DepthZone.FAR,
-                    zone=DisplayZone.HOUSE,
-                ),
-                fixture_count=8,
-                pixel_fraction=0.15,
+            fixture_count=3,
+            pixel_fraction=0.04,
+            tags=[ChoreoTag.ROOF, ChoreoTag.CENTER_THIRD, ChoreoTag.VERTICAL],
+        ),
+        ChoreoGroup(
+            id="ICICLES",
+            role="ICICLES",
+            element_kind=DisplayElementKind.ICICLES,
+            arrangement=GroupArrangement.HORIZONTAL_ROW,
+            prominence=DisplayProminence.SUPPORTING,
+            position=GroupPosition(
+                horizontal=HorizontalZone.FULL_WIDTH,
+                vertical=VerticalZone.HIGH,
+                depth=DepthZone.FAR,
+                zone=DisplayZone.ROOF,
             ),
-            DisplayGroup(
-                group_id="MEGA_TREE",
-                role="MEGA_TREE",
-                display_name="MEGA_TREE",
-                element_kind=DisplayElementKind.TREE,
-                arrangement=GroupArrangement.SINGLE,
-                pixel_density=PixelDensity.HIGH,
-                prominence=DisplayProminence.HERO,
-                position=GroupPosition(
-                    horizontal=HorizontalZone.CENTER,
-                    vertical=VerticalZone.FULL_HEIGHT,
-                    depth=DepthZone.NEAR,
-                    zone=DisplayZone.YARD,
-                ),
-                fixture_count=1,
-                pixel_fraction=0.25,
+            fixture_count=12,
+            pixel_fraction=0.08,
+            tags=[
+                ChoreoTag.ROOF,
+                ChoreoTag.HOUSE,
+                ChoreoTag.HORIZONTAL,
+                ChoreoTag.ODD_EVEN,
+                ChoreoTag.LEFT_RIGHT,
+            ],
+        ),
+        # === HOUSE ZONE ===
+        ChoreoGroup(
+            id="OUTLINE",
+            role="OUTLINE",
+            element_kind=DisplayElementKind.STRING,
+            arrangement=GroupArrangement.HORIZONTAL_ROW,
+            prominence=DisplayProminence.ANCHOR,
+            position=GroupPosition(
+                horizontal=HorizontalZone.FULL_WIDTH,
+                vertical=VerticalZone.HIGH,
+                depth=DepthZone.FAR,
+                zone=DisplayZone.HOUSE,
             ),
-            DisplayGroup(
-                group_id="ARCHES",
-                role="ARCHES",
-                display_name="ARCHES",
-                element_kind=DisplayElementKind.ARCH,
-                arrangement=GroupArrangement.HORIZONTAL_ROW,
-                pixel_density=PixelDensity.MEDIUM,
-                prominence=DisplayProminence.ANCHOR,
-                position=GroupPosition(
-                    horizontal=HorizontalZone.FULL_WIDTH,
-                    vertical=VerticalZone.LOW,
-                    depth=DepthZone.NEAR,
-                    zone=DisplayZone.YARD,
-                ),
-                fixture_count=5,
-                pixel_fraction=0.15,
+            fixture_count=8,
+            pixel_fraction=0.12,
+            tags=[
+                ChoreoTag.HOUSE,
+                ChoreoTag.HORIZONTAL,
+                ChoreoTag.LEFT_RIGHT,
+            ],
+        ),
+        ChoreoGroup(
+            id="WINDOWS",
+            role="WINDOWS",
+            element_kind=DisplayElementKind.WINDOW,
+            arrangement=GroupArrangement.GRID,
+            prominence=DisplayProminence.SUPPORTING,
+            position=GroupPosition(
+                horizontal=HorizontalZone.CENTER,
+                vertical=VerticalZone.MID,
+                depth=DepthZone.FAR,
+                zone=DisplayZone.HOUSE,
             ),
-            DisplayGroup(
-                group_id="HERO",
-                role="HERO",
-                display_name="HERO",
-                element_kind=DisplayElementKind.PROP,
-                arrangement=GroupArrangement.CLUSTER,
-                pixel_density=PixelDensity.MEDIUM,
-                prominence=DisplayProminence.ANCHOR,
-                position=GroupPosition(
-                    horizontal=HorizontalZone.CENTER_LEFT,
-                    vertical=VerticalZone.LOW,
-                    depth=DepthZone.NEAR,
-                    zone=DisplayZone.YARD,
-                ),
-                fixture_count=5,
-                pixel_fraction=0.15,
+            fixture_count=6,
+            pixel_fraction=0.08,
+            tags=[
+                ChoreoTag.HOUSE,
+                ChoreoTag.CENTER_THIRD,
+                ChoreoTag.ODD_EVEN,
+                ChoreoTag.LEFT_RIGHT,
+            ],
+        ),
+        ChoreoGroup(
+            id="WREATHS",
+            role="WREATH",
+            element_kind=DisplayElementKind.WREATH,
+            arrangement=GroupArrangement.HORIZONTAL_ROW,
+            prominence=DisplayProminence.ACCENT,
+            position=GroupPosition(
+                horizontal=HorizontalZone.CENTER,
+                vertical=VerticalZone.MID,
+                depth=DepthZone.FAR,
+                zone=DisplayZone.HOUSE,
             ),
+            fixture_count=3,
+            pixel_fraction=0.03,
+            tags=[ChoreoTag.HOUSE, ChoreoTag.CENTER_THIRD],
+        ),
+        # === YARD ZONE — far depth (background washes) ===
+        ChoreoGroup(
+            id="FLOODLIGHTS",
+            role="FLOODS",
+            element_kind=DisplayElementKind.FLOOD,
+            arrangement=GroupArrangement.HORIZONTAL_ROW,
+            prominence=DisplayProminence.SUPPORTING,
+            position=GroupPosition(
+                horizontal=HorizontalZone.FULL_WIDTH,
+                vertical=VerticalZone.LOW,
+                depth=DepthZone.FAR,
+                zone=DisplayZone.YARD,
+            ),
+            fixture_count=6,
+            pixel_fraction=0.05,
+            tags=[
+                ChoreoTag.YARD,
+                ChoreoTag.HORIZONTAL,
+                ChoreoTag.ODD_EVEN,
+                ChoreoTag.LEFT_RIGHT,
+            ],
+        ),
+        # === YARD ZONE — mid depth (hero elements) ===
+        ChoreoGroup(
+            id="MEGA_TREE",
+            role="MEGA_TREE",
+            element_kind=DisplayElementKind.TREE,
+            arrangement=GroupArrangement.SINGLE,
+            prominence=DisplayProminence.HERO,
+            position=GroupPosition(
+                horizontal=HorizontalZone.CENTER,
+                vertical=VerticalZone.FULL_HEIGHT,
+                depth=DepthZone.NEAR,
+                zone=DisplayZone.YARD,
+            ),
+            fixture_count=1,
+            pixel_fraction=0.20,
+            tags=[ChoreoTag.YARD, ChoreoTag.CENTER_THIRD, ChoreoTag.VERTICAL],
+        ),
+        ChoreoGroup(
+            id="TREES",
+            role="TREES",
+            element_kind=DisplayElementKind.TREE,
+            arrangement=GroupArrangement.HORIZONTAL_ROW,
+            prominence=DisplayProminence.ANCHOR,
+            position=GroupPosition(
+                horizontal=HorizontalZone.FULL_WIDTH,
+                vertical=VerticalZone.MID,
+                depth=DepthZone.NEAR,
+                zone=DisplayZone.YARD,
+            ),
+            fixture_count=6,
+            pixel_fraction=0.12,
+            tags=[
+                ChoreoTag.YARD,
+                ChoreoTag.HORIZONTAL,
+                ChoreoTag.ODD_EVEN,
+                ChoreoTag.LEFT_RIGHT,
+            ],
+        ),
+        # === YARD ZONE — near depth (foreground) ===
+        ChoreoGroup(
+            id="ARCHES",
+            role="ARCHES",
+            element_kind=DisplayElementKind.ARCH,
+            arrangement=GroupArrangement.HORIZONTAL_ROW,
+            prominence=DisplayProminence.ANCHOR,
+            position=GroupPosition(
+                horizontal=HorizontalZone.FULL_WIDTH,
+                vertical=VerticalZone.LOW,
+                depth=DepthZone.NEAR,
+                zone=DisplayZone.YARD,
+            ),
+            fixture_count=7,
+            pixel_fraction=0.10,
+            tags=[
+                ChoreoTag.YARD,
+                ChoreoTag.PERIMETER,
+                ChoreoTag.HORIZONTAL,
+                ChoreoTag.ODD_EVEN,
+                ChoreoTag.LEFT_RIGHT,
+            ],
+        ),
+        ChoreoGroup(
+            id="CANDY_CANES",
+            role="CANDY_CANES",
+            element_kind=DisplayElementKind.CANDY_CANE,
+            arrangement=GroupArrangement.HORIZONTAL_ROW,
+            prominence=DisplayProminence.SUPPORTING,
+            position=GroupPosition(
+                horizontal=HorizontalZone.FULL_WIDTH,
+                vertical=VerticalZone.LOW,
+                depth=DepthZone.NEAR,
+                zone=DisplayZone.YARD,
+            ),
+            fixture_count=8,
+            pixel_fraction=0.06,
+            tags=[
+                ChoreoTag.YARD,
+                ChoreoTag.PERIMETER,
+                ChoreoTag.HORIZONTAL,
+                ChoreoTag.ODD_EVEN,
+                ChoreoTag.LEFT_RIGHT,
+            ],
+        ),
+        ChoreoGroup(
+            id="MATRIX",
+            role="MATRICES",
+            element_kind=DisplayElementKind.MATRIX,
+            arrangement=GroupArrangement.SINGLE,
+            prominence=DisplayProminence.ANCHOR,
+            position=GroupPosition(
+                horizontal=HorizontalZone.LEFT,
+                vertical=VerticalZone.MID,
+                depth=DepthZone.NEAR,
+                zone=DisplayZone.YARD,
+            ),
+            fixture_count=1,
+            pixel_fraction=0.06,
+            tags=[ChoreoTag.YARD, ChoreoTag.LEFT_HALF, ChoreoTag.LEFT_THIRD],
+        ),
+        ChoreoGroup(
+            id="SNOWFLAKES",
+            role="SNOWFLAKES",
+            element_kind=DisplayElementKind.SNOWFLAKE,
+            arrangement=GroupArrangement.CLUSTER,
+            prominence=DisplayProminence.ACCENT,
+            position=GroupPosition(
+                horizontal=HorizontalZone.RIGHT,
+                vertical=VerticalZone.MID,
+                depth=DepthZone.NEAR,
+                zone=DisplayZone.YARD,
+            ),
+            fixture_count=8,
+            pixel_fraction=0.06,
+            tags=[
+                ChoreoTag.YARD,
+                ChoreoTag.RIGHT_HALF,
+                ChoreoTag.RIGHT_THIRD,
+                ChoreoTag.ODD_EVEN,
+            ],
+        ),
+    ]
+
+    choreo_graph = ChoreographyGraph(
+        graph_id="demo_residential_display",
+        groups=groups,
+    )
+
+    xlights_mapping = XLightsMapping(
+        entries=[
+            XLightsGroupMapping(choreo_id="STARS", group_name="Roof Stars"),
+            XLightsGroupMapping(choreo_id="ICICLES", group_name="Icicles"),
+            XLightsGroupMapping(choreo_id="OUTLINE", group_name="House Outline"),
+            XLightsGroupMapping(choreo_id="WINDOWS", group_name="Windows"),
+            XLightsGroupMapping(choreo_id="WREATHS", group_name="Wreaths"),
+            XLightsGroupMapping(choreo_id="FLOODLIGHTS", group_name="Floods"),
+            XLightsGroupMapping(choreo_id="MEGA_TREE", group_name="Mega Tree"),
+            XLightsGroupMapping(choreo_id="TREES", group_name="Yard Trees"),
+            XLightsGroupMapping(choreo_id="ARCHES", group_name="Arches"),
+            XLightsGroupMapping(choreo_id="CANDY_CANES", group_name="Candy Canes"),
+            XLightsGroupMapping(choreo_id="MATRIX", group_name="LED Matrix"),
+            XLightsGroupMapping(choreo_id="SNOWFLAKES", group_name="Snowflakes"),
         ],
     )
+
+    return choreo_graph, xlights_mapping
 
 
 def parse_args() -> argparse.Namespace:
@@ -231,45 +433,64 @@ async def main() -> None:
     audio_path = Path(args.audio_file)
 
     if not audio_path.exists():
-        print(f"❌ ERROR: Audio file not found: {audio_path}")
+        print(f"ERROR: Audio file not found: {audio_path}")
         sys.exit(1)
 
     song_name = clean_audio_filename(audio_path.stem)
     output_dir = repo_root / "artifacts" / song_name
 
     output_dir.mkdir(parents=True, exist_ok=True)
-    print(f"📁 Output directory: {output_dir}")
+    print(f"Output directory: {output_dir}")
 
     # Generate session ID - stable by default for cache reuse
     if args.new_session:
         session_id = None  # Will generate new UUID
-        print("🔄 New session: cache will not be reused")
+        print("New session: cache will not be reused")
     else:
         session_id = generate_stable_session_id(audio_path)
-        print(f"📦 Session ID: {session_id} (use --new-session to invalidate cache)")
+        print(f"Session ID: {session_id} (use --new-session to invalidate cache)")
 
     session = TwinklrSession.from_directory(repo_root, session_id=session_id)
 
     # Build display graph with hierarchy and metadata
-    display_graph = build_display_graph()
-    display_groups = display_graph.to_planner_summary()
+    choreo_graph, xlights_mapping = build_display_graph()
+    display_groups = choreo_graph.to_planner_summary()
 
     # Build catalog from registry
     load_builtin_group_templates()
     template_catalog = build_catalog_from_registry()
 
     print_subsection("1. Display Configuration")
-    print(f"🎯 Display graph: {len(display_graph.groups)} groups")
-    for g in display_graph.groups:
-        kind_str = f" [{g.element_kind.value}]" if g.element_kind else ""
-        pct_str = f" {g.pixel_fraction:.0%}" if g.pixel_fraction > 0 else ""
-        print(f"   - {g.group_id}{kind_str} ({g.fixture_count} models{pct_str})")
+    print(f"Choreography graph: {len(choreo_graph.groups)} groups")
 
-    print(f"\n📚 Template catalog: {len(template_catalog.entries)} templates")
+    # Show groups by zone
+    for tag in [ChoreoTag.ROOF, ChoreoTag.HOUSE, ChoreoTag.YARD]:
+        zone_ids = choreo_graph.groups_by_tag.get(tag, [])
+        if zone_ids:
+            print(f"\n  {tag.value} zone:")
+            for gid in zone_ids:
+                g = choreo_graph.get_group(gid)
+                if g is None:
+                    continue
+                kind_str = f" [{g.element_kind.value}]" if g.element_kind else ""
+                prom_str = f" {g.prominence.value}" if g.prominence else ""
+                pct_str = f" {g.pixel_fraction:.0%}" if g.pixel_fraction > 0 else ""
+                tag_str = ", ".join(t.value for t in g.tags if t != tag)
+                print(
+                    f"    {g.id}{kind_str} ({g.fixture_count} models{pct_str})"
+                    f" [{prom_str.strip()}]" + (f"  tags: {tag_str}" if tag_str else "")
+                )
+
+    # Show tag summary
+    print("\n  Tag summary:")
+    for tag, ids in choreo_graph.groups_by_tag.items():
+        print(f"    {tag.value}: {', '.join(ids)}")
+
+    print(f"\n  Template catalog: {len(template_catalog.entries)} templates")
     for lane in LaneKind:
         lane_templates = template_catalog.list_by_lane(lane)
         if lane_templates:
-            print(f"   - {lane.value}: {len(lane_templates)} templates")
+            print(f"    {lane.value}: {len(lane_templates)} templates")
 
     # ========================================================================
     # Define Pipeline
@@ -277,7 +498,7 @@ async def main() -> None:
     print_section("2. Pipeline Definition", "=")
 
     pipeline = build_display_pipeline(
-        display_graph=display_graph,
+        choreo_graph=choreo_graph,
         template_catalog=template_catalog,
         display_groups=display_groups,
         song_name=song_name,
@@ -285,15 +506,16 @@ async def main() -> None:
         min_pass_score=session.job_config.agent.success_threshold / 10.0,
         enable_holistic=True,
         enable_assets=False,
+        xlights_mapping=xlights_mapping,
     )
 
     # Validate pipeline
     errors = pipeline.validate_pipeline()
     if errors:
-        print(f"❌ Pipeline validation failed: {errors}")
+        print(f"Pipeline validation failed: {errors}")
         sys.exit(1)
 
-    print(f"✅ Pipeline '{pipeline.name}' validated")
+    print(f"Pipeline '{pipeline.name}' validated")
     print(f"   Stages: {len(pipeline.stages)}")
     for stage in pipeline.stages:
         deps = f" (inputs: {stage.inputs})" if stage.inputs else ""
@@ -313,11 +535,12 @@ async def main() -> None:
         output_dir=output_dir,
     )
 
-    # Store display graph in state for rendering stages
-    pipeline_context.set_state("display_graph", display_graph)
+    # Store choreo graph and mapping in state for rendering stages
+    pipeline_context.set_state("choreo_graph", choreo_graph)
+    pipeline_context.set_state("xlights_mapping", xlights_mapping)
 
-    print(f"🎵 Input: {audio_path.name}")
-    print("🚀 Starting pipeline execution...")
+    print(f"Input: {audio_path.name}")
+    print("Starting pipeline execution...")
 
     # ========================================================================
     # Execute Pipeline
@@ -334,12 +557,12 @@ async def main() -> None:
     # ========================================================================
     print_section("4. Pipeline Results", "=")
 
-    print(f"Overall Success: {'✅' if result.success else '❌'}")
+    print(f"Overall Success: {'YES' if result.success else 'NO'}")
     print(f"Duration: {result.total_duration_ms:.0f}ms ({result.total_duration_ms / 1000:.1f}s)")
     print(f"Stages Completed: {len(result.outputs)}/{len(pipeline.stages)}")
 
     if result.failed_stages:
-        print(f"\n❌ Failed stages: {result.failed_stages}")
+        print(f"\nFailed stages: {result.failed_stages}")
         for stage_id in result.failed_stages:
             stage_result = result.stage_results.get(stage_id)
             if stage_result:
@@ -364,7 +587,7 @@ async def main() -> None:
             "audio_bundle_summary.json",
             output_dir,
         )
-        print(f"📄 Audio bundle: {bundle_path.stem}")
+        print(f"Audio bundle: {bundle_path.stem}")
 
     # Audio profile
     if "profile" in result.outputs:
@@ -375,7 +598,7 @@ async def main() -> None:
             "audio_profile.json",
             output_dir,
         )
-        print(f"📄 Audio profile: {profile_path.stem}")
+        print(f"Audio profile: {profile_path.stem}")
 
     # Lyrics context
     if "lyrics" in result.outputs:
@@ -386,7 +609,7 @@ async def main() -> None:
             "lyric_context.json",
             output_dir,
         )
-        print(f"📄 Lyric context: {lyrics_path.stem}")
+        print(f"Lyric context: {lyrics_path.stem}")
 
     # Macro plan (output is list[MacroSectionPlan], not MacroPlan)
     if "macro" in result.outputs:
@@ -398,7 +621,7 @@ async def main() -> None:
             "macro_sections.json",
             output_dir,
         )
-        print(f"📄 Macro sections: {macro_path.stem}")
+        print(f"Macro sections: {macro_path.stem}")
 
     # GroupPlanSet
     if "aggregate" in result.outputs:
@@ -409,9 +632,9 @@ async def main() -> None:
             "group_plan_set.json",
             output_dir,
         )
-        print(f"📄 Group plan set: {group_plan_path.stem}")
+        print(f"Group plan set: {group_plan_path.stem}")
 
-    # Holistic evaluation (stored in context state, not output — stage is pass-through)
+    # Holistic evaluation (stored in context state, not output -- stage is pass-through)
     holistic_eval = pipeline_context.get_state("holistic_evaluator_result")
     if holistic_eval is not None:
         holistic_path = save_artifact(
@@ -420,10 +643,10 @@ async def main() -> None:
             "holistic_evaluation.json",
             output_dir,
         )
-        print(f"📄 Holistic evaluation: {holistic_path.stem}")
+        print(f"Holistic evaluation: {holistic_path.stem}")
         print(f"   Score: {holistic_eval.score:.1f}, Status: {holistic_eval.status.value}")
 
-    # Display render → XSQ export
+    # Display render -> XSQ export
     if "display_render" in result.outputs:
         render_output = result.outputs["display_render"]
         render_result = render_output["render_result"]
@@ -435,7 +658,7 @@ async def main() -> None:
         xsq_path = output_dir / f"{song_name}_display.xsq"
         exporter = XSQExporter()
         exporter.export(xsequence, xsq_path)
-        print(f"📄 XSQ output: {xsq_path.name}")
+        print(f"XSQ output: {xsq_path.name}")
         print(
             f"   Effects: {render_result.effects_written}, "
             f"Elements: {render_result.elements_created}, "
@@ -450,25 +673,25 @@ async def main() -> None:
     # ========================================================================
     # Summary
     # ========================================================================
-    print_section("Pipeline Complete! 🎉", "=")
+    print_section("Pipeline Complete!", "=")
 
     if result.success:
-        print("✅ Full pipeline completed successfully!")
+        print("Full pipeline completed successfully!")
         print("\nStages executed:")
         print("  1. Audio Analysis")
         print("  2. Audio Profile + Lyrics (parallel)")
-        print("  3. MacroPlanner → list[MacroSectionPlan]")
+        print("  3. MacroPlanner -> list[MacroSectionPlan]")
         print("  4. GroupPlanner (FAN_OUT per section)")
         print("  5. Aggregator (collect section plans)")
         print("  6. Holistic Evaluation (cross-section quality)")
         print("  7. Asset Resolution")
-        print("  8. Display Rendering → .xsq export")
+        print("  8. Display Rendering -> .xsq export")
 
         if "aggregate" in result.outputs:
             gps = result.outputs["aggregate"]
-            print(f"\n📊 GroupPlanSet: {len(gps.section_plans)} sections")
+            print(f"\nGroupPlanSet: {len(gps.section_plans)} sections")
             if gps.narrative_assets:
-                print(f"📖 Narrative directives: {len(gps.narrative_assets)}")
+                print(f"Narrative directives: {len(gps.narrative_assets)}")
                 for nd in gps.narrative_assets:
                     sections = ", ".join(nd.section_ids) if nd.section_ids else "?"
                     print(
@@ -479,13 +702,13 @@ async def main() -> None:
         if "display_render" in result.outputs:
             rr = result.outputs["display_render"]["render_result"]
             print(
-                f"\n🎄 Display Render: {rr.effects_written} effects on {rr.elements_created} elements"
+                f"\nDisplay Render: {rr.effects_written} effects on {rr.elements_created} elements"
             )
 
     else:
-        print("❌ Pipeline failed. Check logs for details.")
+        print("Pipeline failed. Check logs for details.")
 
-    print(f"\n📁 All artifacts saved to: {output_dir}")
+    print(f"\nAll artifacts saved to: {output_dir}")
 
 
 if __name__ == "__main__":

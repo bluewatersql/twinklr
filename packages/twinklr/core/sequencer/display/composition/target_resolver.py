@@ -1,79 +1,89 @@
-"""Target resolver: maps group_ids to xLights element names.
+"""Target resolver: maps choreography IDs to xLights element names.
 
-Each ``group_id`` in the plan maps directly to a ``DisplayGroup``
-entry in the ``DisplayGraph``. The ``display_name`` on that entry
-is the exact xLights element name used in the XSQ output.
-
-The DisplayGraph is provided externally (from fixture config or
-user mapping) — the renderer does not create or infer groups.
+Each choreography ID (``ChoreoGroup.id``) resolves to one or more
+xLights element names via the ``XLightsMapping``.  Role-based
+resolution uses the ``ChoreographyGraph`` to find IDs by role, then
+resolves each through the mapping.
 """
 
 from __future__ import annotations
 
 import logging
 
-from twinklr.core.sequencer.templates.group.models.display import DisplayGraph
+from twinklr.core.sequencer.display.xlights_mapping import XLightsMapping
+from twinklr.core.sequencer.templates.group.models.choreography import (
+    ChoreographyGraph,
+)
 
 logger = logging.getLogger(__name__)
 
 
 class TargetResolver:
-    """Resolves group_ids from the plan to xLights element names.
+    """Resolves choreography IDs to xLights element names.
 
-    Direct 1:1 mapping: ``group_id`` → ``DisplayGroup.display_name``.
-    Unknown IDs fall back to using the group_id as the element name
-    (with a debug log warning).
-
-    The DisplayGraph determines whether the target is a model group
-    (e.g., ``"61 - Arches"``) or an individual model (e.g.,
-    ``"Arch 1"``). The resolver does not distinguish — it just maps
-    the ID to the configured display_name.
+    Uses group-first resolution via :class:`XLightsMapping`.
+    Role-based resolution uses :class:`ChoreographyGraph` for the
+    role-to-id lookup, then resolves through the mapping.
 
     Args:
-        display_graph: Display graph for name resolution.
+        choreo_graph: Choreography graph for role lookups.
+        xlights_mapping: Mapping for name resolution.
     """
 
-    def __init__(self, display_graph: DisplayGraph) -> None:
-        self._display_graph = display_graph
-        # Build lookup: group_id → display_name
-        self._group_map: dict[str, str] = {}
-        for group in display_graph.groups:
-            self._group_map[group.group_id] = group.display_name
+    def __init__(
+        self,
+        choreo_graph: ChoreographyGraph,
+        xlights_mapping: XLightsMapping,
+    ) -> None:
+        self._choreo_graph = choreo_graph
+        self._xlights_mapping = xlights_mapping
 
-    def resolve(self, group_id: str) -> str:
-        """Resolve a group_id to an xLights element name.
+    def resolve(self, choreo_id: str) -> str:
+        """Resolve a choreography ID to a single xLights element name.
+
+        For group-based resolution this returns the group name.
+        For multi-model fallback this returns the first model name.
 
         Args:
-            group_id: Group ID from the plan.
+            choreo_id: ChoreoGroup.id from the plan.
 
         Returns:
-            xLights element name.
+            xLights element name (single string for backward compatibility).
         """
-        if group_id in self._group_map:
-            return self._group_map[group_id]
+        names = self._xlights_mapping.resolve(choreo_id)
+        return names[0]
 
-        # Fallback: use group_id directly as element name
-        logger.debug(
-            "Group '%s' not in DisplayGraph, using as element name directly",
-            group_id,
-        )
-        return group_id
+    def resolve_all(self, choreo_id: str) -> list[str]:
+        """Resolve a choreography ID to all xLights element names.
 
-    def resolve_roles(self, target_roles: list[str]) -> list[str]:
-        """Resolve target_roles to a list of element names.
-
-        Finds all groups matching any of the given roles.
+        Returns all resolved names (useful for model-level fallback).
 
         Args:
-            target_roles: Role names (e.g., ["OUTLINE", "ARCHES"]).
+            choreo_id: ChoreoGroup.id from the plan.
+
+        Returns:
+            List of xLights element names.
+        """
+        return self._xlights_mapping.resolve(choreo_id)
+
+    def resolve_roles(self, target_roles: list[str]) -> list[str]:
+        """Resolve target roles to a list of element names.
+
+        Finds all groups matching any of the given roles via the
+        choreography graph, then resolves each to element names.
+
+        Args:
+            target_roles: Role names (e.g., ``["ARCHES", "WINDOWS"]``).
 
         Returns:
             List of xLights element names for matching groups.
         """
         elements: list[str] = []
-        for group in self._display_graph.groups:
-            if group.role in target_roles:
-                elements.append(group.display_name)
+        groups_by_role = self._choreo_graph.groups_by_role
+        for role in target_roles:
+            for choreo_id in groups_by_role.get(role, []):
+                names = self._xlights_mapping.resolve(choreo_id)
+                elements.extend(names)
         return elements
 
 

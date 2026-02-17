@@ -20,7 +20,7 @@ from twinklr.core.pipeline.execution import execute_step
 from twinklr.core.pipeline.result import StageResult, failure_result
 from twinklr.core.sequencer.planning import GroupPlanSet
 from twinklr.core.sequencer.templates.group.catalog import TemplateCatalog
-from twinklr.core.sequencer.templates.group.models import DisplayGraph
+from twinklr.core.sequencer.templates.group.models.choreography import ChoreographyGraph
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +40,7 @@ class HolisticEvaluatorStage:
     Output: GroupPlanSet (pass-through; evaluation in state/metrics)
 
     Example:
-        >>> stage = HolisticEvaluatorStage(display_graph, template_catalog)
+        >>> stage = HolisticEvaluatorStage(choreo_graph, template_catalog)
         >>> result = await stage.execute(group_plan_set, context)
         >>> if result.success:
         ...     plan = result.output  # GroupPlanSet (unchanged)
@@ -50,16 +50,16 @@ class HolisticEvaluatorStage:
 
     def __init__(
         self,
-        display_graph: DisplayGraph,
+        choreo_graph: ChoreographyGraph,
         template_catalog: TemplateCatalog,
     ) -> None:
         """Initialize holistic evaluator stage.
 
         Args:
-            display_graph: Display group configuration
+            choreo_graph: Choreography graph configuration
             template_catalog: Available templates
         """
-        self.display_graph = display_graph
+        self.choreo_graph = choreo_graph
         self.template_catalog = template_catalog
 
     @property
@@ -110,7 +110,7 @@ class HolisticEvaluatorStage:
                 context=context,
                 compute=lambda: evaluator.evaluate(
                     group_plan_set=input,
-                    display_graph=self.display_graph,
+                    choreo_graph=self.choreo_graph,
                     template_catalog=self.template_catalog,
                     macro_plan_summary=macro_plan_summary,
                 ),
@@ -118,7 +118,7 @@ class HolisticEvaluatorStage:
                 result_type=HolisticEvaluation,
                 cache_key_fn=lambda: evaluator.get_cache_key(
                     group_plan_set=input,
-                    display_graph=self.display_graph,
+                    choreo_graph=self.choreo_graph,
                     template_catalog=self.template_catalog,
                     macro_plan_summary=macro_plan_summary,
                 ),

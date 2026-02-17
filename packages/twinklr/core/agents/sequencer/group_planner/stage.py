@@ -31,7 +31,7 @@ if TYPE_CHECKING:
     from twinklr.core.pipeline.result import StageResult
     from twinklr.core.sequencer.planning import MacroSectionPlan
     from twinklr.core.sequencer.templates.group.catalog import TemplateCatalog
-    from twinklr.core.sequencer.templates.group.models.display import DisplayGraph
+    from twinklr.core.sequencer.templates.group.models.choreography import ChoreographyGraph
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +44,7 @@ class GroupPlannerStage:
     and returns one SectionCoordinationPlan.
 
     Constructor args (configuration):
-        - display_graph: DisplayGraph
+        - choreo_graph: ChoreographyGraph
         - template_catalog: TemplateCatalog
 
     State retrieved from PipelineContext (set by upstream stages):
@@ -57,7 +57,7 @@ class GroupPlannerStage:
         StageDefinition(
             id="groups",
             stage=GroupPlannerStage(
-                display_graph=display_graph,
+                choreo_graph=choreo_graph,
                 template_catalog=template_catalog,
             ),
             pattern=ExecutionPattern.FAN_OUT,
@@ -76,7 +76,7 @@ class GroupPlannerStage:
 
     def __init__(
         self,
-        display_graph: DisplayGraph,
+        choreo_graph: ChoreographyGraph,
         template_catalog: TemplateCatalog,
         max_iterations: int = 3,
         min_pass_score: float = 7.0,
@@ -84,12 +84,12 @@ class GroupPlannerStage:
         """Initialize group planner stage.
 
         Args:
-            display_graph: Display group configuration
+            choreo_graph: Choreography graph configuration
             template_catalog: Available templates for coordination
             max_iterations: Max refinement iterations per section (default: 3)
             min_pass_score: Min score for section approval (default: 7.0)
         """
-        self.display_graph = display_graph
+        self.choreo_graph = choreo_graph
         self.template_catalog = template_catalog
         self.max_iterations = max_iterations
         self.min_pass_score = min_pass_score
@@ -226,7 +226,7 @@ class GroupPlannerStage:
             primary_focus_targets=input.primary_focus_targets,
             secondary_targets=input.secondary_targets,
             notes=input.notes,
-            display_graph=self.display_graph,
+            choreo_graph=self.choreo_graph,
             template_catalog=self.template_catalog,
             timing_context=timing_context,
             layer_intents=layer_intents,

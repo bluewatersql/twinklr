@@ -18,24 +18,25 @@ from twinklr.core.sequencer.templates.group.catalog import (
     TemplateInfo,
 )
 from twinklr.core.sequencer.templates.group.models import (
-    DisplayGraph,
-    DisplayGroup,
     LaneKind,
     TimeRef,
     TimeRefKind,
+)
+from twinklr.core.sequencer.templates.group.models.choreography import (
+    ChoreographyGraph,
+    ChoreoGroup,
 )
 from twinklr.core.sequencer.vocabulary import GroupTemplateType, GroupVisualIntent
 
 
 @pytest.fixture
-def sample_display_graph() -> DisplayGraph:
-    """Sample display graph."""
-    return DisplayGraph(
-        display_id="test_display",
-        display_name="Test Display",
+def sample_choreo_graph() -> ChoreographyGraph:
+    """Sample choreography graph."""
+    return ChoreographyGraph(
+        graph_id="test_display",
         groups=[
-            DisplayGroup(group_id="HERO_1", role="HERO", display_name="Hero 1"),
-            DisplayGroup(group_id="ARCHES_1", role="ARCHES", display_name="Arches"),
+            ChoreoGroup(id="HERO_1", role="HERO"),
+            ChoreoGroup(id="ARCHES_1", role="ARCHES"),
         ],
     )
 
@@ -110,7 +111,7 @@ class TestSectionPlanningContext:
     def test_create_from_macro_section(
         self,
         sample_macro_section: dict,
-        sample_display_graph: DisplayGraph,
+        sample_choreo_graph: ChoreographyGraph,
         sample_template_catalog: TemplateCatalog,
         sample_timing_context: TimingContext,
     ) -> None:
@@ -126,7 +127,7 @@ class TestSectionPlanningContext:
             primary_focus_targets=["HERO"],
             secondary_targets=["ARCHES"],
             notes="Standard verse section",
-            display_graph=sample_display_graph,
+            choreo_graph=sample_choreo_graph,
             template_catalog=sample_template_catalog,
             timing_context=sample_timing_context,
         )
@@ -138,7 +139,7 @@ class TestSectionPlanningContext:
     def test_get_target_groups(
         self,
         sample_macro_section: dict,
-        sample_display_graph: DisplayGraph,
+        sample_choreo_graph: ChoreographyGraph,
         sample_template_catalog: TemplateCatalog,
         sample_timing_context: TimingContext,
     ) -> None:
@@ -154,7 +155,7 @@ class TestSectionPlanningContext:
             primary_focus_targets=["HERO"],
             secondary_targets=["ARCHES"],
             notes=None,
-            display_graph=sample_display_graph,
+            choreo_graph=sample_choreo_graph,
             template_catalog=sample_template_catalog,
             timing_context=sample_timing_context,
         )
@@ -167,7 +168,7 @@ class TestSectionPlanningContext:
 
     def test_templates_for_lane(
         self,
-        sample_display_graph: DisplayGraph,
+        sample_choreo_graph: ChoreographyGraph,
         sample_template_catalog: TemplateCatalog,
         sample_timing_context: TimingContext,
     ) -> None:
@@ -183,7 +184,7 @@ class TestSectionPlanningContext:
             primary_focus_targets=["HERO"],
             secondary_targets=[],
             notes=None,
-            display_graph=sample_display_graph,
+            choreo_graph=sample_choreo_graph,
             template_catalog=sample_template_catalog,
             timing_context=sample_timing_context,
         )
@@ -202,7 +203,7 @@ class TestGroupPlanningContext:
 
     def test_build_section_contexts(
         self,
-        sample_display_graph: DisplayGraph,
+        sample_choreo_graph: ChoreographyGraph,
         sample_template_catalog: TemplateCatalog,
         sample_timing_context: TimingContext,
     ) -> None:
@@ -240,7 +241,7 @@ class TestGroupPlanningContext:
         ]
 
         ctx = GroupPlanningContext(
-            display_graph=sample_display_graph,
+            choreo_graph=sample_choreo_graph,
             template_catalog=sample_template_catalog,
             timing_context=sample_timing_context,
         )

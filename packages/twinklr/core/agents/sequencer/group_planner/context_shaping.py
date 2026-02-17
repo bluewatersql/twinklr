@@ -16,7 +16,7 @@ from twinklr.core.agents.taxonomy_utils import get_theming_catalog_dict, get_the
 from twinklr.core.sequencer.planning import GroupPlanSet
 from twinklr.core.sequencer.templates.group.catalog import TemplateCatalog
 from twinklr.core.sequencer.templates.group.library import TemplateInfo
-from twinklr.core.sequencer.templates.group.models import DisplayGraph
+from twinklr.core.sequencer.templates.group.models.choreography import ChoreographyGraph
 from twinklr.core.sequencer.theming import get_theme
 from twinklr.core.sequencer.vocabulary import LaneKind
 
@@ -169,8 +169,8 @@ def shape_planner_context(section_context: SectionPlanningContext) -> dict[str, 
     - Uses: section_id, section_name, start_ms, end_ms
     - Uses: energy_target, motion_density, choreography_style
     - Uses: primary_focus_targets, secondary_targets, notes
-    - Uses: display_graph.groups (FILTERED to section targets)
-    - Uses: display_graph.groups_by_role (FILTERED)
+    - Uses: choreo_graph.groups (FILTERED to section targets)
+    - Uses: choreo_graph.groups_by_role (FILTERED)
     - Uses: template_catalog.entries (SIMPLIFIED to ID/name/lanes)
     - Uses: layer_intents (FILTERED to relevant layers)
     - Does NOT use: timing_context (not referenced in prompt)
@@ -186,21 +186,19 @@ def shape_planner_context(section_context: SectionPlanningContext) -> dict[str, 
     all_target_roles = section_context.primary_focus_targets + section_context.secondary_targets
 
     # Filter groups to only those in target roles
-    filtered_groups = [
-        g for g in section_context.display_graph.groups if g.role in all_target_roles
-    ]
+    filtered_groups = [g for g in section_context.choreo_graph.groups if g.role in all_target_roles]
 
     # Filter groups_by_role to only target roles
     filtered_groups_by_role = {
         role: groups
-        for role, groups in section_context.display_graph.groups_by_role.items()
+        for role, groups in section_context.choreo_graph.groups_by_role.items()
         if role in all_target_roles
     }
 
     # Log filtering results
     logger.debug(
         f"Context shaping for {section_context.section_id}: "
-        f"{len(section_context.display_graph.groups)} → {len(filtered_groups)} groups, "
+        f"{len(section_context.choreo_graph.groups)} → {len(filtered_groups)} groups, "
         f"{len(section_context.template_catalog.entries)} templates (simplified)"
     )
 
@@ -254,10 +252,10 @@ def shape_planner_context(section_context: SectionPlanningContext) -> dict[str, 
         f"(energy={section_context.energy_target})"
     )
 
-    # Create section-scoped display graph
-    section_display_graph = {
-        "schema_version": section_context.display_graph.schema_version,
-        "display_id": section_context.display_graph.display_id,
+    # Create section-scoped choreography graph summary
+    section_choreo_graph = {
+        "schema_version": "choreography-graph.v1",
+        "graph_id": section_context.choreo_graph.graph_id,
         "groups": [g.model_dump() for g in filtered_groups],
         "groups_by_role": filtered_groups_by_role,
     }
@@ -357,7 +355,7 @@ def shape_planner_context(section_context: SectionPlanningContext) -> dict[str, 
         "secondary_targets": section_context.secondary_targets,
         "notes": section_context.notes,
         # Section-scoped shared context (FILTERED + SIMPLIFIED)
-        "display_graph": section_display_graph,
+        "display_graph": section_choreo_graph,
         "template_catalog": simplified_catalog,  # Stripped to essentials
         "layer_intents": filtered_layer_intents,  # Only relevant layers
         # Theme context from MacroPlan
@@ -386,7 +384,7 @@ def shape_section_judge_context(
     - Uses: start_ms, end_ms (for bounds checking)
     - Uses: energy_target, motion_density, choreography_style
     - Uses: primary_focus_targets, secondary_targets
-    - Uses: display_graph.groups_by_role (FILTERED to section targets)
+    - Uses: choreo_graph.groups_by_role (FILTERED to section targets)
     - Uses: template_catalog (simplified to IDs only)
     - Uses: plan.theme (for validation)
     - Does NOT use: timing_context, layer_intents
@@ -405,7 +403,7 @@ def shape_section_judge_context(
     # Filter groups_by_role to only target roles
     filtered_groups_by_role = {
         role: groups
-        for role, groups in section_context.display_graph.groups_by_role.items()
+        for role, groups in section_context.choreo_graph.groups_by_role.items()
         if role in all_target_roles
     }
 
@@ -475,7 +473,7 @@ def shape_section_judge_context(
 
 def shape_holistic_judge_context(
     group_plan_set: GroupPlanSet,
-    display_graph: DisplayGraph,
+    choreo_graph: ChoreographyGraph,
     template_catalog: TemplateCatalog,
     macro_plan_summary: dict[str, Any] | None,
 ) -> dict[str, Any]:
@@ -489,13 +487,13 @@ def shape_holistic_judge_context(
     Analyzed from holistic_judge/user.j2:
     - Uses: group_plan_set (serialized to JSON)
     - Uses: section_count, section_ids (computed from plan set)
-    - Uses: display_graph.groups_by_role (NOT full groups)
+    - Uses: choreo_graph.groups_by_role (NOT full groups)
     - Uses: macro_plan_summary.global_story (theme, motifs, pacing_notes)
     - Does NOT use: template_catalog, timing_context
 
     Args:
         group_plan_set: Complete set of section plans
-        display_graph: Display configuration
+        choreo_graph: Choreography graph configuration
         template_catalog: Available templates
         macro_plan_summary: Optional MacroPlan summary
 
@@ -554,16 +552,12 @@ def shape_holistic_judge_context(
     if macro_plan_summary:
         expected_section_ids = list(macro_plan_summary.get("expected_section_ids", []))
 
-    # Build group hierarchy: parent → [children] for groups that have children
+    # ChoreographyGraph has no hierarchy (ChoreoGroup has no parent_group_id)
     group_hierarchy: dict[str, list[str]] = {}
-    for g in display_graph.groups:
-        children = display_graph.get_children(g.group_id)
-        if children:
-            group_hierarchy[g.group_id] = [c.group_id for c in children]
 
     return {
         "group_plan_set": group_plan_set_dict,
-        "display_graph": {"groups_by_role": display_graph.groups_by_role},
+        "display_graph": {"groups_by_role": choreo_graph.groups_by_role},
         "group_hierarchy": group_hierarchy,
         "section_count": len(group_plan_set.section_plans),
         "section_ids": [sp.section_id for sp in group_plan_set.section_plans],

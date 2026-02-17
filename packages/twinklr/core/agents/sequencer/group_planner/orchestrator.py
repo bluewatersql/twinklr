@@ -429,7 +429,7 @@ class GroupPlannerOrchestrator:
         """
         # Create deterministic validator
         validator = SectionPlanValidator(
-            display_graph=section_context.display_graph,
+            choreo_graph=section_context.choreo_graph,
             template_catalog=section_context.template_catalog,
             timing_context=section_context.timing_context,
         )

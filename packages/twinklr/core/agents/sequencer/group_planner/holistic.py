@@ -21,7 +21,7 @@ from twinklr.core.agents.spec import AgentMode, AgentSpec
 from twinklr.core.agents.taxonomy_utils import get_taxonomy_dict
 from twinklr.core.sequencer.planning import GroupPlanSet
 from twinklr.core.sequencer.templates.group.catalog import TemplateCatalog
-from twinklr.core.sequencer.templates.group.models import DisplayGraph
+from twinklr.core.sequencer.templates.group.models.choreography import ChoreographyGraph
 
 logger = logging.getLogger(__name__)
 
@@ -160,7 +160,7 @@ class HolisticEvaluator:
     async def get_cache_key(
         self,
         group_plan_set: GroupPlanSet,
-        display_graph: DisplayGraph,
+        choreo_graph: ChoreographyGraph,
         template_catalog: TemplateCatalog,
         macro_plan_summary: dict[str, Any] | None = None,
     ) -> str:
@@ -168,14 +168,14 @@ class HolisticEvaluator:
 
         Cache key includes all inputs that affect holistic evaluation:
         - Group plan set (all section plans)
-        - Display graph configuration
+        - Choreography graph configuration
         - Template catalog
         - Macro plan summary
         - Model configuration
 
         Args:
             group_plan_set: Complete set of section plans
-            display_graph: Display configuration
+            choreo_graph: Choreography graph configuration
             template_catalog: Available templates
             macro_plan_summary: Optional MacroPlan summary
 
@@ -184,7 +184,7 @@ class HolisticEvaluator:
         """
         key_data = {
             "group_plan_set": group_plan_set.model_dump(),
-            "display_graph": display_graph.model_dump(),
+            "choreo_graph": choreo_graph.model_dump(),
             "template_catalog": template_catalog.model_dump(),
             "macro_plan_summary": macro_plan_summary or {},
             "model": self.holistic_judge_spec.model,
@@ -204,7 +204,7 @@ class HolisticEvaluator:
     async def evaluate(
         self,
         group_plan_set: GroupPlanSet,
-        display_graph: DisplayGraph,
+        choreo_graph: ChoreographyGraph,
         template_catalog: TemplateCatalog,
         macro_plan_summary: dict[str, Any] | None = None,
     ) -> HolisticEvaluation:
@@ -212,7 +212,7 @@ class HolisticEvaluator:
 
         Args:
             group_plan_set: Complete set of section plans to evaluate
-            display_graph: Display configuration
+            choreo_graph: Choreography graph configuration
             template_catalog: Available templates
             macro_plan_summary: Optional summary from MacroPlan (global_story, etc.)
 
@@ -233,7 +233,7 @@ class HolisticEvaluator:
         # Build variables for judge
         variables = self._build_judge_variables(
             group_plan_set=group_plan_set,
-            display_graph=display_graph,
+            choreo_graph=choreo_graph,
             template_catalog=template_catalog,
             macro_plan_summary=macro_plan_summary,
         )
@@ -273,7 +273,7 @@ class HolisticEvaluator:
     def _build_judge_variables(
         self,
         group_plan_set: GroupPlanSet,
-        display_graph: DisplayGraph,
+        choreo_graph: ChoreographyGraph,
         template_catalog: TemplateCatalog,
         macro_plan_summary: dict[str, Any] | None,
     ) -> dict[str, Any]:
@@ -281,7 +281,7 @@ class HolisticEvaluator:
 
         Args:
             group_plan_set: Plans to evaluate
-            display_graph: Display configuration
+            choreo_graph: Choreography graph configuration
             template_catalog: Available templates
             macro_plan_summary: Optional MacroPlan summary
 
@@ -294,7 +294,7 @@ class HolisticEvaluator:
 
         variables = shape_holistic_judge_context(
             group_plan_set=group_plan_set,
-            display_graph=display_graph,
+            choreo_graph=choreo_graph,
             template_catalog=template_catalog,
             macro_plan_summary=macro_plan_summary,
         )

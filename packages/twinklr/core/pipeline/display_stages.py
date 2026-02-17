@@ -24,9 +24,12 @@ from twinklr.core.pipeline.context import PipelineContext
 from twinklr.core.pipeline.result import StageResult, failure_result, success_result
 from twinklr.core.pipeline.stage import resolve_typed_input
 from twinklr.core.sequencer.display.renderer import DisplayRenderer, RenderResult
+from twinklr.core.sequencer.display.xlights_mapping import XLightsMapping
 from twinklr.core.sequencer.planning import MacroPlan
 from twinklr.core.sequencer.planning.group_plan import GroupPlanSet
-from twinklr.core.sequencer.templates.group.models.display import DisplayGraph
+from twinklr.core.sequencer.templates.group.models.choreography import (
+    ChoreographyGraph,
+)
 from twinklr.core.sequencer.timing.beat_grid import BeatGrid
 
 logger = logging.getLogger(__name__)
@@ -129,14 +132,15 @@ class DisplayRenderStage:
     Supports optional asset overlay rendering via catalog_index.
 
     Input (two modes):
-        - Pipeline mode: ``GroupPlanSet`` directly (beat_grid, display_graph,
+        - Pipeline mode: ``GroupPlanSet`` directly (beat_grid, choreo_graph,
           catalog, sequence from context state)
         - Direct mode: dict with all keys explicitly provided
 
     Dict keys (direct mode):
         - ``plan_set``: GroupPlanSet (optionally with resolved_asset_ids)
         - ``beat_grid``: BeatGrid
-        - ``display_graph``: DisplayGraph
+        - ``choreo_graph``: ChoreographyGraph
+        - ``xlights_mapping``: XLightsMapping (optional)
         - ``catalog``: AssetCatalog (optional, for overlay rendering)
         - ``sequence``: XSequence (optional, creates new if absent)
         - ``asset_base_path``: Path (optional, for Pictures handler)
@@ -149,16 +153,19 @@ class DisplayRenderStage:
     def __init__(
         self,
         beat_grid: BeatGrid | None = None,
-        display_graph: DisplayGraph | None = None,
+        choreo_graph: ChoreographyGraph | None = None,
+        xlights_mapping: XLightsMapping | None = None,
     ) -> None:
         """Initialize the stage with optional pre-configured dependencies.
 
         Args:
             beat_grid: Pre-configured beat grid (overrides context/input).
-            display_graph: Pre-configured display graph (overrides context/input).
+            choreo_graph: Choreographic display configuration.
+            xlights_mapping: xLights element name resolution.
         """
         self._beat_grid = beat_grid
-        self._display_graph = display_graph
+        self._choreo_graph = choreo_graph
+        self._xlights_mapping = xlights_mapping
 
     @property
     def name(self) -> str:
@@ -182,10 +189,15 @@ class DisplayRenderStage:
         try:
             plan_set, extras = resolve_typed_input(input, GroupPlanSet, "plan_set")
             beat_grid = extras.get("beat_grid") or self._beat_grid or context.get_state("beat_grid")
-            display_graph = (
-                extras.get("display_graph")
-                or self._display_graph
-                or context.get_state("display_graph")
+            choreo_graph = (
+                extras.get("choreo_graph")
+                or self._choreo_graph
+                or context.get_state("choreo_graph")
+            )
+            xlights_mapping: XLightsMapping | None = (
+                extras.get("xlights_mapping")
+                or self._xlights_mapping
+                or context.get_state("xlights_mapping")
             )
             catalog: AssetCatalog | None = extras.get("catalog") or context.get_state(
                 "asset_catalog"
@@ -203,9 +215,9 @@ class DisplayRenderStage:
                     "beat_grid is required (via input, constructor, or context state)",
                     stage_name=self.name,
                 )
-            if display_graph is None:
+            if choreo_graph is None:
                 return failure_result(
-                    "display_graph is required (via input, constructor, or context state)",
+                    "choreo_graph is required (via input, constructor, or context state)",
                     stage_name=self.name,
                 )
             context.add_metric("beat_grid_beats_per_bar", beat_grid.beats_per_bar)
@@ -247,8 +259,9 @@ class DisplayRenderStage:
             # Create renderer and render
             renderer = DisplayRenderer(
                 beat_grid=beat_grid,
-                display_graph=display_graph,
+                choreo_graph=choreo_graph,
                 template_registry=REGISTRY,
+                xlights_mapping=xlights_mapping,
             )
 
             result: RenderResult = renderer.render(

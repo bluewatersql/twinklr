@@ -5,15 +5,17 @@ from __future__ import annotations
 from twinklr.core.agents.sequencer.group_planner.stage import GroupPlannerStage
 from twinklr.core.audio.models import SongBundle, SongTiming
 from twinklr.core.sequencer.templates.group.catalog import TemplateCatalog
-from twinklr.core.sequencer.templates.group.models import DisplayGraph, DisplayGroup
+from twinklr.core.sequencer.templates.group.models.choreography import (
+    ChoreographyGraph,
+    ChoreoGroup,
+)
 
 
 def _make_stage() -> GroupPlannerStage:
     return GroupPlannerStage(
-        display_graph=DisplayGraph(
-            display_id="test",
-            display_name="Test",
-            groups=[DisplayGroup(group_id="G1", role="OUTLINE", display_name="G1")],
+        choreo_graph=ChoreographyGraph(
+            graph_id="test",
+            groups=[ChoreoGroup(id="G1", role="OUTLINE")],
         ),
         template_catalog=TemplateCatalog(entries=[]),
     )

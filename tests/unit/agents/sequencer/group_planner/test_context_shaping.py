@@ -21,7 +21,10 @@ from twinklr.core.agents.sequencer.group_planner.timing import TimingContext
 from twinklr.core.sequencer.planning import GroupPlanSet, SectionCoordinationPlan
 from twinklr.core.sequencer.templates.group.catalog import TemplateCatalog
 from twinklr.core.sequencer.templates.group.library import TemplateInfo
-from twinklr.core.sequencer.templates.group.models import DisplayGraph, DisplayGroup
+from twinklr.core.sequencer.templates.group.models.choreography import (
+    ChoreographyGraph,
+    ChoreoGroup,
+)
 from twinklr.core.sequencer.vocabulary import GroupTemplateType, GroupVisualIntent, LaneKind
 
 from .conftest import DEFAULT_THEME
@@ -38,13 +41,9 @@ TemplateInfo.model_rebuild()
 # Layer intents are dicts, not Pydantic models
 
 
-def make_display_group(group_id: str, role: str) -> DisplayGroup:
-    """Helper to create DisplayGroup for testing."""
-    return DisplayGroup(
-        group_id=group_id,
-        role=role,
-        display_name=f"{role}_{group_id}",
-    )
+def make_choreo_group(group_id: str, role: str) -> ChoreoGroup:
+    """Helper to create ChoreoGroup for testing."""
+    return ChoreoGroup(id=group_id, role=role)
 
 
 def make_template_entry(
@@ -84,21 +83,19 @@ def make_template_entry(
 @pytest.fixture
 def section_context() -> SectionPlanningContext:
     """Create mock section planning context."""
-    # Create display groups with various roles
-    # Note: group_id must match pattern ^[A-Z][A-Z0-9_]*$
+    # Create choreo groups with various roles
+    # Note: id must match pattern ^[A-Z][A-Z0-9_]*$
     groups = [
-        make_display_group("MEGA_TREE_01", "MEGA_TREE"),
-        make_display_group("HERO_01", "HERO"),
-        make_display_group("ARCHES_01", "ARCHES"),
-        make_display_group("TREES_01", "TREES"),
-        make_display_group("PROPS_01", "PROPS"),
+        make_choreo_group("MEGA_TREE_01", "MEGA_TREE"),
+        make_choreo_group("HERO_01", "HERO"),
+        make_choreo_group("ARCHES_01", "ARCHES"),
+        make_choreo_group("TREES_01", "TREES"),
+        make_choreo_group("CUSTOM_01", "CUSTOM"),
     ]
 
-    # DisplayGraph computes groups_by_role automatically from groups
-    display_graph = DisplayGraph(
-        schema_version="display-graph.v1",
-        display_id="test_display",
-        display_name="Test Display",
+    # ChoreographyGraph computes groups_by_role automatically from groups
+    choreo_graph = ChoreographyGraph(
+        graph_id="test_display",
         groups=groups,
     )
 
@@ -148,7 +145,7 @@ def section_context() -> SectionPlanningContext:
         primary_focus_targets=["MEGA_TREE", "HERO"],
         secondary_targets=["ARCHES"],
         notes="Big chorus moment",
-        display_graph=display_graph,
+        choreo_graph=choreo_graph,
         template_catalog=template_catalog,
         timing_context=timing_context,
         layer_intents=layer_intents,  # type: ignore[arg-type]
@@ -197,7 +194,7 @@ def test_shape_planner_context_filters_groups_by_role(
     assert "HERO" in group_roles
     assert "ARCHES" in group_roles
     assert "TREES" not in group_roles
-    assert "PROPS" not in group_roles
+    assert "CUSTOM" not in group_roles
 
 
 def test_shape_planner_context_filters_groups_by_role_dict(
@@ -213,7 +210,7 @@ def test_shape_planner_context_filters_groups_by_role_dict(
     assert "HERO" in groups_by_role
     assert "ARCHES" in groups_by_role
     assert "TREES" not in groups_by_role
-    assert "PROPS" not in groups_by_role
+    assert "CUSTOM" not in groups_by_role
 
 
 def test_shape_planner_context_simplifies_template_catalog(
@@ -352,7 +349,7 @@ def test_shape_section_judge_context_filters_groups_by_role(
     assert "HERO" in groups_by_role
     assert "ARCHES" in groups_by_role
     assert "TREES" not in groups_by_role
-    assert "PROPS" not in groups_by_role
+    assert "CUSTOM" not in groups_by_role
 
 
 def test_shape_section_judge_context_simplifies_template_catalog(
@@ -457,17 +454,15 @@ def group_plan_set() -> GroupPlanSet:
 
 
 @pytest.fixture
-def display_graph() -> DisplayGraph:
-    """Create mock DisplayGraph."""
+def choreo_graph() -> ChoreographyGraph:
+    """Create mock ChoreographyGraph."""
     groups = [
-        make_display_group("MEGA_TREE", "MEGA_TREE"),
-        make_display_group("HERO_02", "HERO"),
+        make_choreo_group("MEGA_TREE", "MEGA_TREE"),
+        make_choreo_group("HERO_02", "HERO"),
     ]
 
-    return DisplayGraph(
-        schema_version="display-graph.v1",
-        display_id="test_display",
-        display_name="Test Display",
+    return ChoreographyGraph(
+        graph_id="test_display",
         groups=groups,
     )
 
@@ -484,12 +479,12 @@ def template_catalog() -> TemplateCatalog:
 
 def test_shape_holistic_judge_context_basic_structure(
     group_plan_set: GroupPlanSet,
-    display_graph: DisplayGraph,
+    choreo_graph: ChoreographyGraph,
     template_catalog: TemplateCatalog,
 ) -> None:
     """Test basic structure of holistic judge context."""
     result = shape_holistic_judge_context(
-        group_plan_set, display_graph, template_catalog, macro_plan_summary=None
+        group_plan_set, choreo_graph, template_catalog, macro_plan_summary=None
     )
 
     # Required fields
@@ -502,12 +497,12 @@ def test_shape_holistic_judge_context_basic_structure(
 
 def test_shape_holistic_judge_context_section_count(
     group_plan_set: GroupPlanSet,
-    display_graph: DisplayGraph,
+    choreo_graph: ChoreographyGraph,
     template_catalog: TemplateCatalog,
 ) -> None:
     """Test section_count is computed correctly."""
     result = shape_holistic_judge_context(
-        group_plan_set, display_graph, template_catalog, macro_plan_summary=None
+        group_plan_set, choreo_graph, template_catalog, macro_plan_summary=None
     )
 
     assert result["section_count"] == 3
@@ -515,12 +510,12 @@ def test_shape_holistic_judge_context_section_count(
 
 def test_shape_holistic_judge_context_section_ids(
     group_plan_set: GroupPlanSet,
-    display_graph: DisplayGraph,
+    choreo_graph: ChoreographyGraph,
     template_catalog: TemplateCatalog,
 ) -> None:
     """Test section_ids are extracted correctly."""
     result = shape_holistic_judge_context(
-        group_plan_set, display_graph, template_catalog, macro_plan_summary=None
+        group_plan_set, choreo_graph, template_catalog, macro_plan_summary=None
     )
 
     section_ids = result["section_ids"]
@@ -529,12 +524,12 @@ def test_shape_holistic_judge_context_section_ids(
 
 def test_shape_holistic_judge_context_display_graph_minimal(
     group_plan_set: GroupPlanSet,
-    display_graph: DisplayGraph,
+    choreo_graph: ChoreographyGraph,
     template_catalog: TemplateCatalog,
 ) -> None:
     """Test display_graph only includes groups_by_role."""
     result = shape_holistic_judge_context(
-        group_plan_set, display_graph, template_catalog, macro_plan_summary=None
+        group_plan_set, choreo_graph, template_catalog, macro_plan_summary=None
     )
 
     dg = result["display_graph"]
@@ -546,12 +541,12 @@ def test_shape_holistic_judge_context_display_graph_minimal(
 
 def test_shape_holistic_judge_context_excludes_template_catalog(
     group_plan_set: GroupPlanSet,
-    display_graph: DisplayGraph,
+    choreo_graph: ChoreographyGraph,
     template_catalog: TemplateCatalog,
 ) -> None:
     """Test template_catalog is excluded (not used in prompt)."""
     result = shape_holistic_judge_context(
-        group_plan_set, display_graph, template_catalog, macro_plan_summary=None
+        group_plan_set, choreo_graph, template_catalog, macro_plan_summary=None
     )
 
     assert "template_catalog" not in result
@@ -559,12 +554,12 @@ def test_shape_holistic_judge_context_excludes_template_catalog(
 
 def test_shape_holistic_judge_context_macro_plan_summary_none(
     group_plan_set: GroupPlanSet,
-    display_graph: DisplayGraph,
+    choreo_graph: ChoreographyGraph,
     template_catalog: TemplateCatalog,
 ) -> None:
     """Test handles None macro_plan_summary."""
     result = shape_holistic_judge_context(
-        group_plan_set, display_graph, template_catalog, macro_plan_summary=None
+        group_plan_set, choreo_graph, template_catalog, macro_plan_summary=None
     )
 
     assert result["macro_plan_summary"] == {}
@@ -572,7 +567,7 @@ def test_shape_holistic_judge_context_macro_plan_summary_none(
 
 def test_shape_holistic_judge_context_macro_plan_summary_provided(
     group_plan_set: GroupPlanSet,
-    display_graph: DisplayGraph,
+    choreo_graph: ChoreographyGraph,
     template_catalog: TemplateCatalog,
 ) -> None:
     """Test includes macro_plan_summary when provided."""
@@ -582,7 +577,7 @@ def test_shape_holistic_judge_context_macro_plan_summary_provided(
     }
 
     result = shape_holistic_judge_context(
-        group_plan_set, display_graph, template_catalog, macro_plan_summary=summary
+        group_plan_set, choreo_graph, template_catalog, macro_plan_summary=summary
     )
 
     assert result["macro_plan_summary"] == summary
@@ -590,12 +585,12 @@ def test_shape_holistic_judge_context_macro_plan_summary_provided(
 
 def test_shape_holistic_judge_context_serialization(
     group_plan_set: GroupPlanSet,
-    display_graph: DisplayGraph,
+    choreo_graph: ChoreographyGraph,
     template_catalog: TemplateCatalog,
 ) -> None:
     """Test group_plan_set is properly serialized to dict."""
     result = shape_holistic_judge_context(
-        group_plan_set, display_graph, template_catalog, macro_plan_summary=None
+        group_plan_set, choreo_graph, template_catalog, macro_plan_summary=None
     )
 
     gps = result["group_plan_set"]
@@ -684,47 +679,27 @@ def test_shape_section_judge_context_no_matching_groups(
 
 def test_shape_holistic_judge_context_group_hierarchy(
     group_plan_set: GroupPlanSet,
-    display_graph: DisplayGraph,
+    choreo_graph: ChoreographyGraph,
     template_catalog: TemplateCatalog,
 ) -> None:
-    """Test group_hierarchy is computed from DisplayGraph parent-child relationships."""
-    # Add a parent group that contains existing groups
-    from twinklr.core.sequencer.templates.group.models import DisplayGroup as DG
-
-    parent = DG(group_id="ALL_DISPLAY", role="ALL", display_name="All Display")
-    # Reparent MEGA_TREE and HERO_02 under ALL_DISPLAY
-    reparented = []
-    for g in display_graph.groups:
-        reparented.append(
-            g.model_copy(update={"parent_group_id": "ALL_DISPLAY"})
-        )
-
-    graph_with_hierarchy = DisplayGraph(
-        schema_version="display-graph.v1",
-        display_id="test_display",
-        display_name="Test Display",
-        groups=[parent] + reparented,
-    )
-
+    """Test group_hierarchy is always empty for ChoreographyGraph (no parent_group_id)."""
     result = shape_holistic_judge_context(
-        group_plan_set, graph_with_hierarchy, template_catalog, macro_plan_summary=None
+        group_plan_set, choreo_graph, template_catalog, macro_plan_summary=None
     )
 
+    # ChoreographyGraph has no parent-child hierarchy (ChoreoGroup has no parent_group_id)
     assert "group_hierarchy" in result
-    assert "ALL_DISPLAY" in result["group_hierarchy"]
-    children = result["group_hierarchy"]["ALL_DISPLAY"]
-    assert "MEGA_TREE" in children
-    assert "HERO_02" in children
+    assert result["group_hierarchy"] == {}
 
 
 def test_shape_holistic_judge_context_group_hierarchy_empty_when_flat(
     group_plan_set: GroupPlanSet,
-    display_graph: DisplayGraph,
+    choreo_graph: ChoreographyGraph,
     template_catalog: TemplateCatalog,
 ) -> None:
     """Test group_hierarchy is empty dict when no parent-child relationships exist."""
     result = shape_holistic_judge_context(
-        group_plan_set, display_graph, template_catalog, macro_plan_summary=None
+        group_plan_set, choreo_graph, template_catalog, macro_plan_summary=None
     )
 
     assert result["group_hierarchy"] == {}
@@ -732,7 +707,7 @@ def test_shape_holistic_judge_context_group_hierarchy_empty_when_flat(
 
 def test_shape_holistic_judge_context_expected_section_ids_from_macro_plan(
     group_plan_set: GroupPlanSet,
-    display_graph: DisplayGraph,
+    choreo_graph: ChoreographyGraph,
     template_catalog: TemplateCatalog,
 ) -> None:
     """Test expected_section_ids are extracted from macro_plan_summary."""
@@ -742,7 +717,7 @@ def test_shape_holistic_judge_context_expected_section_ids_from_macro_plan(
     }
 
     result = shape_holistic_judge_context(
-        group_plan_set, display_graph, template_catalog, macro_plan_summary=summary
+        group_plan_set, choreo_graph, template_catalog, macro_plan_summary=summary
     )
 
     assert "expected_section_ids" in result
@@ -757,12 +732,12 @@ def test_shape_holistic_judge_context_expected_section_ids_from_macro_plan(
 
 def test_shape_holistic_judge_context_expected_section_ids_none(
     group_plan_set: GroupPlanSet,
-    display_graph: DisplayGraph,
+    choreo_graph: ChoreographyGraph,
     template_catalog: TemplateCatalog,
 ) -> None:
     """Test expected_section_ids is empty when macro_plan_summary has none."""
     result = shape_holistic_judge_context(
-        group_plan_set, display_graph, template_catalog, macro_plan_summary=None
+        group_plan_set, choreo_graph, template_catalog, macro_plan_summary=None
     )
 
     assert result["expected_section_ids"] == []
@@ -770,13 +745,13 @@ def test_shape_holistic_judge_context_expected_section_ids_none(
 
 def test_shape_holistic_judge_context_expected_section_ids_empty_summary(
     group_plan_set: GroupPlanSet,
-    display_graph: DisplayGraph,
+    choreo_graph: ChoreographyGraph,
     template_catalog: TemplateCatalog,
 ) -> None:
     """Test expected_section_ids is empty when macro_plan_summary lacks the key."""
     result = shape_holistic_judge_context(
         group_plan_set,
-        display_graph,
+        choreo_graph,
         template_catalog,
         macro_plan_summary={"global_story": {"theme": "test"}},
     )
@@ -826,17 +801,15 @@ def test_shape_holistic_judge_context_single_section() -> None:
         ],
     )
 
-    display_graph = DisplayGraph(
-        schema_version="display-graph.v1",
-        display_id="test",
-        display_name="Test Display",
-        groups=[make_display_group("TEST_01", "HERO_02")],
+    choreo_graph = ChoreographyGraph(
+        graph_id="test",
+        groups=[make_choreo_group("TEST_01", "HERO_02")],
     )
 
     template_catalog = TemplateCatalog(schema_version="template-catalog.v1", entries=[])
 
     result = shape_holistic_judge_context(
-        single_plan_set, display_graph, template_catalog, macro_plan_summary=None
+        single_plan_set, choreo_graph, template_catalog, macro_plan_summary=None
     )
 
     assert result["section_count"] == 1

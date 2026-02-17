@@ -93,7 +93,7 @@ def test_layering_plan_too_many_layers():
         _create_layer(0, LayerRole.BASE, ["OUTLINE"], BlendMode.NORMAL, TimingDriver.BARS),
         _create_layer(1, LayerRole.RHYTHM, ["MEGA_TREE"], BlendMode.ADD, TimingDriver.BEATS),
         _create_layer(2, LayerRole.ACCENT, ["HERO"], BlendMode.ADD, TimingDriver.PEAKS),
-        _create_layer(3, LayerRole.FILL, ["PROPS"], BlendMode.ADD, TimingDriver.DOWNBEATS),
+        _create_layer(3, LayerRole.FILL, ["CUSTOM"], BlendMode.ADD, TimingDriver.DOWNBEATS),
         _create_layer(4, LayerRole.TEXTURE, ["FLOODS"], BlendMode.ADD, TimingDriver.PHRASES),
         _create_layer(
             0, LayerRole.RHYTHM, ["TREES"], BlendMode.ADD, TimingDriver.BEATS

@@ -29,19 +29,21 @@ from twinklr.core.formats.xlights.sequence.models.xsq import (
 )
 from twinklr.core.sequencer.display.models.config import RenderConfig
 from twinklr.core.sequencer.display.renderer import DisplayRenderer
-from twinklr.core.sequencer.planning.group_plan import GroupPlanSet
-from twinklr.core.sequencer.templates.group.models.display import (
-    DisplayGraph,
-    DisplayGroup,
-    ElementType,
-    GroupPosition,
+from twinklr.core.sequencer.display.xlights_mapping import (
+    XLightsGroupMapping,
+    XLightsMapping,
 )
+from twinklr.core.sequencer.planning.group_plan import GroupPlanSet
+from twinklr.core.sequencer.templates.group.models.choreography import (
+    ChoreographyGraph,
+    ChoreoGroup,
+)
+from twinklr.core.sequencer.templates.group.models.display import GroupPosition
 from twinklr.core.sequencer.timing.beat_grid import BeatGrid
 from twinklr.core.sequencer.vocabulary.display import (
     DisplayElementKind,
     DisplayProminence,
     GroupArrangement,
-    PixelDensity,
 )
 from twinklr.core.sequencer.vocabulary.spatial import (
     DepthZone,
@@ -109,31 +111,28 @@ def build_beat_grid(
 
 
 # ---------------------------------------------------------------------------
-# Display Graph (matches typical display groups in plans)
+# Choreography Graph + XLights Mapping (matches typical display groups in plans)
 # ---------------------------------------------------------------------------
 
 
-def build_display_graph() -> DisplayGraph:
-    """Build a display graph with groups matching the Rudolph plan.
+def build_display_graph() -> tuple[ChoreographyGraph, XLightsMapping]:
+    """Build a choreography graph and xLights mapping for the Rudolph plan.
 
-    Each entry maps a plan-level group_id directly to an xLights
-    element name. In V0 (group-based), the plan targets groups
+    Each ChoreoGroup maps a plan-level group_id to choreography metadata.
+    The XLightsMapping maps each ChoreoGroup.id to its xLights element
+    name (group_name). In V0 (group-based), the plan targets groups
     like ``ARCHES`` and the renderer places effects on the
     corresponding xLights model group (e.g., ``"Arches"``).
 
-    The display_name must match an element that exists in the
-    xLights layout — groups cannot be created in the sequence
-    file alone.
+    The group_name must match an element that exists in the xLights
+    layout — groups cannot be created in the sequence file alone.
     """
-    groups: list[DisplayGroup] = [
-        DisplayGroup(
-            group_id="OUTLINE",
+    groups: list[ChoreoGroup] = [
+        ChoreoGroup(
+            id="OUTLINE",
             role="OUTLINE",
-            display_name="Outlines",
-            element_type=ElementType.MODEL_GROUP,
             element_kind=DisplayElementKind.STRING,
             arrangement=GroupArrangement.HORIZONTAL_ROW,
-            pixel_density=PixelDensity.MEDIUM,
             prominence=DisplayProminence.ANCHOR,
             position=GroupPosition(
                 horizontal=HorizontalZone.FULL_WIDTH,
@@ -144,14 +143,11 @@ def build_display_graph() -> DisplayGraph:
             fixture_count=10,
             pixel_fraction=0.20,
         ),
-        DisplayGroup(
-            group_id="MEGA_TREE",
+        ChoreoGroup(
+            id="MEGA_TREE",
             role="MEGA_TREE",
-            display_name="MegaTree",
-            element_type=ElementType.MODEL,
             element_kind=DisplayElementKind.TREE,
             arrangement=GroupArrangement.SINGLE,
-            pixel_density=PixelDensity.HIGH,
             prominence=DisplayProminence.HERO,
             position=GroupPosition(
                 horizontal=HorizontalZone.CENTER,
@@ -162,14 +158,11 @@ def build_display_graph() -> DisplayGraph:
             fixture_count=1,
             pixel_fraction=0.25,
         ),
-        DisplayGroup(
-            group_id="HERO",
+        ChoreoGroup(
+            id="HERO",
             role="HERO",
-            display_name="Heroes",
-            element_type=ElementType.MODEL_GROUP,
-            element_kind=DisplayElementKind.PROP,
+            element_kind=DisplayElementKind.CUSTOM,
             arrangement=GroupArrangement.CLUSTER,
-            pixel_density=PixelDensity.MEDIUM,
             prominence=DisplayProminence.ANCHOR,
             position=GroupPosition(
                 horizontal=HorizontalZone.CENTER_LEFT,
@@ -180,14 +173,11 @@ def build_display_graph() -> DisplayGraph:
             fixture_count=5,
             pixel_fraction=0.15,
         ),
-        DisplayGroup(
-            group_id="ARCHES",
+        ChoreoGroup(
+            id="ARCHES",
             role="ARCHES",
-            display_name="Arches",
-            element_type=ElementType.MODEL_GROUP,
             element_kind=DisplayElementKind.ARCH,
             arrangement=GroupArrangement.HORIZONTAL_ROW,
-            pixel_density=PixelDensity.MEDIUM,
             prominence=DisplayProminence.ANCHOR,
             position=GroupPosition(
                 horizontal=HorizontalZone.FULL_WIDTH,
@@ -198,14 +188,11 @@ def build_display_graph() -> DisplayGraph:
             fixture_count=5,
             pixel_fraction=0.15,
         ),
-        DisplayGroup(
-            group_id="WINDOWS",
+        ChoreoGroup(
+            id="WINDOWS",
             role="WINDOWS",
-            display_name="Windows",
-            element_type=ElementType.MODEL_GROUP,
             element_kind=DisplayElementKind.WINDOW,
             arrangement=GroupArrangement.GRID,
-            pixel_density=PixelDensity.HIGH,
             prominence=DisplayProminence.SUPPORTING,
             position=GroupPosition(
                 horizontal=HorizontalZone.CENTER,
@@ -218,13 +205,21 @@ def build_display_graph() -> DisplayGraph:
         ),
     ]
 
-    logger.info("DisplayGraph: %d groups", len(groups))
-
-    return DisplayGraph(
-        display_id="rudolph_display",
-        display_name="Rudolph Demo Display",
-        groups=groups,
+    xlights_mapping = XLightsMapping(
+        entries=[
+            XLightsGroupMapping(choreo_id="OUTLINE", group_name="Outlines"),
+            XLightsGroupMapping(choreo_id="MEGA_TREE", group_name="MegaTree"),
+            XLightsGroupMapping(choreo_id="HERO", group_name="Heroes"),
+            XLightsGroupMapping(choreo_id="ARCHES", group_name="Arches"),
+            XLightsGroupMapping(choreo_id="WINDOWS", group_name="Windows"),
+        ]
     )
+
+    choreo_graph = ChoreographyGraph(graph_id="rudolph_display", groups=groups)
+
+    logger.info("ChoreographyGraph: %d groups", len(groups))
+
+    return choreo_graph, xlights_mapping
 
 
 # ---------------------------------------------------------------------------
@@ -478,7 +473,7 @@ def main() -> None:
 
     # 5. Build supporting infrastructure
     beat_grid = build_beat_grid(duration_ms, tempo_bpm=tempo_bpm)
-    display_graph = build_display_graph()
+    choreo_graph, xlights_mapping = build_display_graph()
 
     # 6. Create empty XSequence
     sequence = build_empty_sequence(int(duration_ms))
@@ -494,7 +489,8 @@ def main() -> None:
     config = RenderConfig()
     renderer = DisplayRenderer(
         beat_grid=beat_grid,
-        display_graph=display_graph,
+        choreo_graph=choreo_graph,
+        xlights_mapping=xlights_mapping,
         config=config,
         template_registry=REGISTRY,
     )

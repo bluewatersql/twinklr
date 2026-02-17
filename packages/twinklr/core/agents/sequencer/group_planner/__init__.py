@@ -53,6 +53,10 @@ from twinklr.core.sequencer.templates.group.catalog import (
     TemplateCatalog,
     TemplateInfo,
 )
+from twinklr.core.sequencer.templates.group.models.choreography import (
+    ChoreographyGraph,
+    ChoreoGroup,
+)
 from twinklr.core.sequencer.templates.group.models.coordination import (
     CoordinationConfig,
     CoordinationPlan,
@@ -90,7 +94,9 @@ __all__ = [
     "TimeRefKind",
     # Models - TimeRef
     "TimeRef",
-    # Models - Display
+    # Models - Display / Choreography
+    "ChoreoGroup",
+    "ChoreographyGraph",
     "DisplayGraph",
     "DisplayGroup",
     "GroupPosition",

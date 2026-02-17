@@ -22,19 +22,23 @@ from twinklr.core.pipeline.display_stages import (
     AssetResolutionStage,
     DisplayRenderStage,
 )
+from twinklr.core.sequencer.display.xlights_mapping import (
+    XLightsGroupMapping,
+    XLightsMapping,
+)
 from twinklr.core.sequencer.planning.group_plan import (
     GroupPlanSet,
     LanePlan,
     SectionCoordinationPlan,
 )
 from twinklr.core.sequencer.planning.models import PaletteRef
+from twinklr.core.sequencer.templates.group.models.choreography import (
+    ChoreographyGraph,
+    ChoreoGroup,
+)
 from twinklr.core.sequencer.templates.group.models.coordination import (
     CoordinationPlan,
     GroupPlacement,
-)
-from twinklr.core.sequencer.templates.group.models.display import (
-    DisplayGraph,
-    DisplayGroup,
 )
 from twinklr.core.sequencer.theming import ThemeRef
 from twinklr.core.sequencer.theming.enums import ThemeScope
@@ -71,17 +75,16 @@ def _make_beat_grid() -> BeatGrid:
     )
 
 
-def _make_display_graph() -> DisplayGraph:
-    return DisplayGraph(
-        display_id="test",
-        display_name="Test",
-        groups=[
-            DisplayGroup(
-                group_id="MEGA_TREE_1",
-                role="MEGA_TREE",
-                display_name="Mega Tree 1",
-            ),
-        ],
+def _make_choreo_graph() -> ChoreographyGraph:
+    return ChoreographyGraph(
+        graph_id="test",
+        groups=[ChoreoGroup(id="MEGA_TREE_1", role="MEGA_TREE")],
+    )
+
+
+def _make_xlights_mapping() -> XLightsMapping:
+    return XLightsMapping(
+        entries=[XLightsGroupMapping(choreo_id="MEGA_TREE_1", group_name="Mega Tree 1")],
     )
 
 
@@ -279,7 +282,8 @@ class TestDisplayRenderStage:
             {
                 "plan_set": plan_set,
                 "beat_grid": _make_beat_grid(),
-                "display_graph": _make_display_graph(),
+                "choreo_graph": _make_choreo_graph(),
+                "xlights_mapping": _make_xlights_mapping(),
             },
             context,
         )
@@ -302,7 +306,8 @@ class TestDisplayRenderStage:
             {
                 "plan_set": plan_set,
                 "beat_grid": _make_beat_grid(),
-                "display_graph": _make_display_graph(),
+                "choreo_graph": _make_choreo_graph(),
+                "xlights_mapping": _make_xlights_mapping(),
             },
             context,
         )
@@ -322,7 +327,8 @@ class TestDisplayRenderStage:
             {
                 "plan_set": plan_set,
                 "beat_grid": _make_beat_grid(),
-                "display_graph": _make_display_graph(),
+                "choreo_graph": _make_choreo_graph(),
+                "xlights_mapping": _make_xlights_mapping(),
                 "sequence": sequence,
             },
             context,
@@ -345,7 +351,8 @@ class TestDisplayRenderStage:
             {
                 "plan_set": plan_set,
                 "beat_grid": _make_beat_grid(),
-                "display_graph": _make_display_graph(),
+                "choreo_graph": _make_choreo_graph(),
+                "xlights_mapping": _make_xlights_mapping(),
                 "catalog": catalog,
             },
             context,
@@ -367,7 +374,8 @@ class TestDisplayRenderStage:
             {
                 "plan_set": plan_set,
                 "beat_grid": _make_beat_grid(),
-                "display_graph": _make_display_graph(),
+                "choreo_graph": _make_choreo_graph(),
+                "xlights_mapping": _make_xlights_mapping(),
             },
             context,
         )
@@ -380,7 +388,8 @@ class TestDisplayRenderStage:
         """Pipeline mode: accepts GroupPlanSet directly with deps in constructor."""
         stage = DisplayRenderStage(
             beat_grid=_make_beat_grid(),
-            display_graph=_make_display_graph(),
+            choreo_graph=_make_choreo_graph(),
+            xlights_mapping=_make_xlights_mapping(),
         )
         plan_set = _make_plan_set()
         context = _make_context()
@@ -394,7 +403,10 @@ class TestDisplayRenderStage:
     @pytest.mark.asyncio
     async def test_pipeline_mode_beat_grid_from_context_metrics(self) -> None:
         """Pipeline mode: builds BeatGrid from context metrics when not provided."""
-        stage = DisplayRenderStage(display_graph=_make_display_graph())
+        stage = DisplayRenderStage(
+            choreo_graph=_make_choreo_graph(),
+            xlights_mapping=_make_xlights_mapping(),
+        )
         plan_set = _make_plan_set()
         context = _make_context()
 
@@ -410,7 +422,10 @@ class TestDisplayRenderStage:
     @pytest.mark.asyncio
     async def test_pipeline_mode_beat_grid_uses_derived_beats_per_bar(self) -> None:
         """Pipeline mode: derived timing meter should flow into beat grid construction."""
-        stage = DisplayRenderStage(display_graph=_make_display_graph())
+        stage = DisplayRenderStage(
+            choreo_graph=_make_choreo_graph(),
+            xlights_mapping=_make_xlights_mapping(),
+        )
         plan_set = _make_plan_set()
         context = _make_context()
         context.add_metric("audio_duration_ms", 32000)
@@ -427,7 +442,10 @@ class TestDisplayRenderStage:
         self, caplog: pytest.LogCaptureFixture
     ) -> None:
         """When derived timing is unavailable, a warning is emitted and 4/4 is used."""
-        stage = DisplayRenderStage(display_graph=_make_display_graph())
+        stage = DisplayRenderStage(
+            choreo_graph=_make_choreo_graph(),
+            xlights_mapping=_make_xlights_mapping(),
+        )
         plan_set = _make_plan_set()
         context = _make_context()
         context.add_metric("audio_duration_ms", 32000)
@@ -443,7 +461,10 @@ class TestDisplayRenderStage:
     @pytest.mark.asyncio
     async def test_pipeline_mode_missing_beat_grid_fails(self) -> None:
         """Pipeline mode: fails gracefully when beat_grid unavailable."""
-        stage = DisplayRenderStage(display_graph=_make_display_graph())
+        stage = DisplayRenderStage(
+            choreo_graph=_make_choreo_graph(),
+            xlights_mapping=_make_xlights_mapping(),
+        )
         plan_set = _make_plan_set()
         context = _make_context()
 
@@ -455,7 +476,10 @@ class TestDisplayRenderStage:
     @pytest.mark.asyncio
     async def test_pipeline_mode_zero_tempo_fails(self) -> None:
         """Pipeline mode: fails when tempo metric is invalid."""
-        stage = DisplayRenderStage(display_graph=_make_display_graph())
+        stage = DisplayRenderStage(
+            choreo_graph=_make_choreo_graph(),
+            xlights_mapping=_make_xlights_mapping(),
+        )
         plan_set = _make_plan_set()
         context = _make_context()
         context.add_metric("audio_duration_ms", 32000)

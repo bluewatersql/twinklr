@@ -24,9 +24,11 @@ from twinklr.core.sequencer.templates.group.catalog import (
 )
 from twinklr.core.sequencer.templates.group.models import (
     CoordinationPlan,
-    DisplayGraph,
-    DisplayGroup,
     GroupPlacement,
+)
+from twinklr.core.sequencer.templates.group.models.choreography import (
+    ChoreographyGraph,
+    ChoreoGroup,
 )
 from twinklr.core.sequencer.vocabulary import (
     CoordinationMode,
@@ -220,13 +222,12 @@ def sample_group_plan_set() -> GroupPlanSet:
 
 
 @pytest.fixture
-def sample_display_graph() -> DisplayGraph:
-    """Sample display graph."""
-    return DisplayGraph(
-        display_id="test",
-        display_name="Test",
+def sample_choreo_graph() -> ChoreographyGraph:
+    """Sample choreography graph."""
+    return ChoreographyGraph(
+        graph_id="test",
         groups=[
-            DisplayGroup(group_id="HERO_1", role="HERO", display_name="Hero 1"),
+            ChoreoGroup(id="HERO_1", role="HERO"),
         ],
     )
 
@@ -262,7 +263,7 @@ class TestHolisticEvaluator:
     def test_build_judge_variables(
         self,
         sample_group_plan_set: GroupPlanSet,
-        sample_display_graph: DisplayGraph,
+        sample_choreo_graph: ChoreographyGraph,
         sample_template_catalog: TemplateCatalog,
     ) -> None:
         """Evaluator builds correct judge variables."""
@@ -271,7 +272,7 @@ class TestHolisticEvaluator:
 
         variables = evaluator._build_judge_variables(
             group_plan_set=sample_group_plan_set,
-            display_graph=sample_display_graph,
+            choreo_graph=sample_choreo_graph,
             template_catalog=sample_template_catalog,
             macro_plan_summary={"global_story": {"theme": "Test theme"}},
         )

@@ -483,6 +483,12 @@ class StandardIterationController(Generic[TPlan]):
                 context.revision_requests[-1] if context.revision_requests else None
             )
 
+            # Extract strengths from latest verdict for preserve_elements
+            # (empty list if no verdict yet, e.g. heuristic validation failed)
+            variables["preserve_elements"] = (
+                list(context.verdicts[-1].strengths) if context.verdicts else []
+            )
+
         return variables
 
     def _prepare_judge_variables(

@@ -17,18 +17,21 @@ from rich.console import Console
 from twinklr.core.config.loader import load_app_config, load_job_config
 from twinklr.core.pipeline import PipelineContext, PipelineExecutor
 from twinklr.core.pipeline.definitions import build_moving_heads_pipeline
+from twinklr.core.sequencer.display.xlights_mapping import (
+    XLightsGroupMapping,
+    XLightsMapping,
+)
 from twinklr.core.sequencer.moving_heads.templates import load_builtin_templates
 from twinklr.core.sequencer.moving_heads.templates.library import list_templates
-from twinklr.core.sequencer.templates.group.models.display import (
-    DisplayGraph,
-    DisplayGroup,
-    GroupPosition,
+from twinklr.core.sequencer.templates.group.models.choreography import (
+    ChoreographyGraph,
+    ChoreoGroup,
 )
+from twinklr.core.sequencer.templates.group.models.display import GroupPosition
 from twinklr.core.sequencer.vocabulary.display import (
     DisplayElementKind,
     DisplayProminence,
     GroupArrangement,
-    PixelDensity,
 )
 from twinklr.core.sequencer.vocabulary.spatial import (
     DepthZone,
@@ -56,80 +59,80 @@ def _resolve_fixture_config_path(job_config_path: Path, fixture_config_path: str
     return job_config_path.parent / fixture_path
 
 
-def build_display_graph() -> DisplayGraph:
-    """Build a default DisplayGraph for the moving-heads CLI pipeline.
+def build_display_graph() -> tuple[ChoreographyGraph, XLightsMapping]:
+    """Build a default ChoreographyGraph and XLightsMapping for the CLI pipeline.
 
-    Constructs a v2 DisplayGraph with hierarchy and spatial metadata
+    Constructs a choreography graph with hierarchy and spatial metadata
     representing a typical residential Christmas display.  The layout
     parser will eventually auto-populate this; for now values are
-    hardcoded as sensible defaults.
+    hardcoded as sensible defaults.  XLightsMapping maps each ChoreoGroup.id
+    to its xLights element display name for XSQ output.
 
     Structure::
 
-        MOVING_HEADS (MODEL_GROUP, 4 fixtures, CENTER/FULL_HEIGHT, 30%)
+        MOVING_HEADS (MOVING_HEAD, HORIZONTAL_ROW, CENTER/FULL_HEIGHT, 30%)
         OUTLINE (STRING, HORIZONTAL_ROW, FULL_WIDTH/HIGH, 50%)
         MEGA_TREE (TREE, SINGLE, CENTER/FULL_HEIGHT, 20%)
 
     Returns:
-        Fully populated DisplayGraph.
+        Tuple of (ChoreographyGraph, XLightsMapping).
     """
-    return DisplayGraph(
-        display_id="cli_display",
-        display_name="CLI Display",
-        groups=[
-            DisplayGroup(
-                group_id="MOVING_HEADS",
-                role="MOVING_HEADS",
-                display_name="Moving Heads",
-                element_kind=DisplayElementKind.MOVING_HEAD,
-                arrangement=GroupArrangement.HORIZONTAL_ROW,
-                pixel_density=PixelDensity.LOW,
-                prominence=DisplayProminence.HERO,
-                position=GroupPosition(
-                    horizontal=HorizontalZone.CENTER,
-                    vertical=VerticalZone.FULL_HEIGHT,
-                    depth=DepthZone.NEAR,
-                    zone=DisplayZone.YARD,
-                ),
-                fixture_count=4,
-                pixel_fraction=0.30,
+    groups = [
+        ChoreoGroup(
+            id="MOVING_HEADS",
+            role="MOVING_HEADS",
+            element_kind=DisplayElementKind.MOVING_HEAD,
+            arrangement=GroupArrangement.HORIZONTAL_ROW,
+            prominence=DisplayProminence.HERO,
+            position=GroupPosition(
+                horizontal=HorizontalZone.CENTER,
+                vertical=VerticalZone.FULL_HEIGHT,
+                depth=DepthZone.NEAR,
+                zone=DisplayZone.YARD,
             ),
-            DisplayGroup(
-                group_id="OUTLINE",
-                role="OUTLINE",
-                display_name="Outline",
-                element_kind=DisplayElementKind.STRING,
-                arrangement=GroupArrangement.HORIZONTAL_ROW,
-                pixel_density=PixelDensity.MEDIUM,
-                prominence=DisplayProminence.ANCHOR,
-                position=GroupPosition(
-                    horizontal=HorizontalZone.FULL_WIDTH,
-                    vertical=VerticalZone.HIGH,
-                    depth=DepthZone.FAR,
-                    zone=DisplayZone.HOUSE,
-                ),
-                fixture_count=10,
-                pixel_fraction=0.50,
+            fixture_count=4,
+            pixel_fraction=0.30,
+        ),
+        ChoreoGroup(
+            id="OUTLINE",
+            role="OUTLINE",
+            element_kind=DisplayElementKind.STRING,
+            arrangement=GroupArrangement.HORIZONTAL_ROW,
+            prominence=DisplayProminence.ANCHOR,
+            position=GroupPosition(
+                horizontal=HorizontalZone.FULL_WIDTH,
+                vertical=VerticalZone.HIGH,
+                depth=DepthZone.FAR,
+                zone=DisplayZone.HOUSE,
             ),
-            DisplayGroup(
-                group_id="MEGA_TREE",
-                role="MEGA_TREE",
-                display_name="Mega Tree",
-                element_kind=DisplayElementKind.TREE,
-                arrangement=GroupArrangement.SINGLE,
-                pixel_density=PixelDensity.HIGH,
-                prominence=DisplayProminence.HERO,
-                position=GroupPosition(
-                    horizontal=HorizontalZone.CENTER,
-                    vertical=VerticalZone.FULL_HEIGHT,
-                    depth=DepthZone.NEAR,
-                    zone=DisplayZone.YARD,
-                ),
-                fixture_count=1,
-                pixel_fraction=0.20,
+            fixture_count=10,
+            pixel_fraction=0.50,
+        ),
+        ChoreoGroup(
+            id="MEGA_TREE",
+            role="MEGA_TREE",
+            element_kind=DisplayElementKind.TREE,
+            arrangement=GroupArrangement.SINGLE,
+            prominence=DisplayProminence.HERO,
+            position=GroupPosition(
+                horizontal=HorizontalZone.CENTER,
+                vertical=VerticalZone.FULL_HEIGHT,
+                depth=DepthZone.NEAR,
+                zone=DisplayZone.YARD,
             ),
-        ],
+            fixture_count=1,
+            pixel_fraction=0.20,
+        ),
+    ]
+    choreo_graph = ChoreographyGraph(graph_id="cli_display", groups=groups)
+    xlights_mapping = XLightsMapping(
+        entries=[
+            XLightsGroupMapping(choreo_id="MOVING_HEADS", group_name="Moving Heads"),
+            XLightsGroupMapping(choreo_id="OUTLINE", group_name="Outline"),
+            XLightsGroupMapping(choreo_id="MEGA_TREE", group_name="Mega Tree"),
+        ]
     )
+    return choreo_graph, xlights_mapping
 
 
 async def run_pipeline_async(
@@ -186,9 +189,9 @@ async def run_pipeline_async(
     available_templates = [t.template_id for t in list_templates()]
     console.print(f"[green]📚 Templates loaded:[/green] {len(available_templates)}")
 
-    # Build display graph with hierarchy and spatial metadata
-    display_graph = build_display_graph()
-    display_groups = display_graph.to_planner_summary()
+    # Build choreography graph and xLights mapping
+    choreo_graph, xlights_mapping = build_display_graph()
+    display_groups = choreo_graph.to_planner_summary()
 
     console.print(f"[green]🗺️  Display groups:[/green] {len(display_groups)}")
     for dg in display_groups:
@@ -234,6 +237,8 @@ async def run_pipeline_async(
         output_dir=artifact_dir,
     )
     pipeline_context.set_state("job_config_dir", job_config_path.parent)
+    pipeline_context.set_state("choreo_graph", choreo_graph)
+    pipeline_context.set_state("xlights_mapping", xlights_mapping)
 
     # Execute pipeline
     console.print(f"\n[bold]🎵 Processing:[/bold] {audio_path.name}")

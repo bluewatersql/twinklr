@@ -138,12 +138,14 @@ class DisplayZone(str, Enum):
 
     Attributes:
         HOUSE: Structure-mounted elements (rooflines, windows, eaves).
+        ROOF: Roof-mounted elements (peak stars, ridge lines, icicles).
         YARD: Ground-level elements (arches, trees, candy canes).
         PERIMETER: Boundary/edge elements (fence lines, driveway borders).
         ACCENT: Focal / decorative elements (stars, hero props).
     """
 
     HOUSE = "HOUSE"
+    ROOF = "ROOF"
     YARD = "YARD"
     PERIMETER = "PERIMETER"
     ACCENT = "ACCENT"

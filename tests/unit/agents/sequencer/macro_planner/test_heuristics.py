@@ -582,7 +582,7 @@ def test_layer_count_maximum_warning(simple_audio_profile: AudioProfileModel):
         LayerSpec(
             layer_index=3,
             layer_role=LayerRole.FILL,
-            target_selector=TargetSelector(roles=["PROPS"]),
+            target_selector=TargetSelector(roles=["CUSTOM"]),
             blend_mode=BlendMode.ADD,
             timing_driver=TimingDriver.DOWNBEATS,
             usage_notes="Fill layer for gaps",
@@ -652,7 +652,7 @@ def test_target_validity_always_passes(simple_audio_profile: AudioProfileModel):
                 theme=_make_section_theme(),
                 energy_target=EnergyTarget.MED,
                 primary_focus_targets=["HERO", "ARCHES"],
-                secondary_targets=["PROPS"],
+                secondary_targets=["CUSTOM"],
                 choreography_style=ChoreographyStyle.ABSTRACT,
                 motion_density=MotionDensity.MED,
                 notes="Test section with valid targets for validation",

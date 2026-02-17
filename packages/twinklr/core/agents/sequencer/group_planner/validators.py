@@ -17,11 +17,8 @@ from pydantic import BaseModel, ConfigDict, Field
 from twinklr.core.agents.sequencer.group_planner.timing import TimingContext
 from twinklr.core.sequencer.planning import SectionCoordinationPlan
 from twinklr.core.sequencer.templates.group.catalog import TemplateCatalog
-from twinklr.core.sequencer.templates.group.models import (
-    DisplayGraph,
-    GroupPlacement,
-    PlacementWindow,
-)
+from twinklr.core.sequencer.templates.group.models import GroupPlacement, PlacementWindow
+from twinklr.core.sequencer.templates.group.models.choreography import ChoreographyGraph
 from twinklr.core.sequencer.vocabulary import (
     CoordinationMode,
     EffectDuration,
@@ -64,30 +61,30 @@ class SectionPlanValidator:
 
     Validates:
     - Template existence in catalog
-    - Group existence in DisplayGraph
+    - Group existence in ChoreographyGraph
     - Timing bounds (placements within section)
     - No within-lane overlaps on same group
     """
 
     def __init__(
         self,
-        display_graph: DisplayGraph,
+        choreo_graph: ChoreographyGraph,
         template_catalog: TemplateCatalog,
         timing_context: TimingContext,
     ) -> None:
         """Initialize validator with context.
 
         Args:
-            display_graph: Display configuration
+            choreo_graph: Choreography graph configuration
             template_catalog: Available templates
             timing_context: Timing information for TimeRef resolution
         """
-        self.display_graph = display_graph
+        self.choreo_graph = choreo_graph
         self.template_catalog = template_catalog
         self.timing_context = timing_context
 
         # Build lookup set for fast validation
-        self._valid_group_ids = {g.group_id for g in display_graph.groups}
+        self._valid_group_ids = {g.id for g in choreo_graph.groups}
 
     def _get_section_end_bar(self, section_end_ms: int) -> int:
         """Get the bar number for a given millisecond position.
@@ -161,9 +158,9 @@ class SectionPlanValidator:
                             ValidationIssue(
                                 severity=ValidationSeverity.ERROR,
                                 code="UNKNOWN_GROUP",
-                                message=f"Group '{group_id}' not found in DisplayGraph",
+                                message=f"Group '{group_id}' not found in ChoreographyGraph",
                                 field_path=f"lane_plans[{lane_plan.lane.value}].group_ids",
-                                fix_hint="Use a valid group_id from DisplayGraph.groups",
+                                fix_hint="Use a valid group id from ChoreographyGraph.groups",
                             )
                         )
 
@@ -580,7 +577,7 @@ class SectionPlanValidator:
                     ValidationIssue(
                         severity=ValidationSeverity.ERROR,
                         code="UNKNOWN_GROUP",
-                        message=f"Group '{placement.group_id}' not found in DisplayGraph",
+                        message=f"Group '{placement.group_id}' not found in ChoreographyGraph",
                         field_path=f"placement[{placement.placement_id}].group_id",
                         fix_hint="Use a valid group_id from DisplayGraph.groups",
                     )

@@ -31,6 +31,7 @@ def get_taxonomy_dict() -> dict[str, list[str]]:
         AssetSlotType,
         BlendMode,
         ChoreographyStyle,
+        ChoreoTag,
         CoordinationMode,
         EffectDuration,
         EnergyTarget,
@@ -71,6 +72,7 @@ def get_taxonomy_dict() -> dict[str, list[str]]:
 
     # Group planner enums
     group_planner_enums: list[type[Enum]] = [
+        ChoreoTag,
         LaneKind,
         CoordinationMode,
         StepUnit,

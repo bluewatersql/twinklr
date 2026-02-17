@@ -120,7 +120,7 @@ def test_macro_section_plan_with_secondary():
         theme=_make_section_theme(),
         energy_target=EnergyTarget.PEAK,
         primary_focus_targets=["MEGA_TREE", "OUTLINE"],
-        secondary_targets=["PROPS", "FLOODS"],
+        secondary_targets=["CUSTOM", "FLOODS"],
         choreography_style=ChoreographyStyle.HYBRID,
         motion_density=MotionDensity.BUSY,
         notes="Peak moment with all elements engaged for maximum wow factor",

@@ -9,30 +9,50 @@ from enum import Enum
 class TargetRole(str, Enum):
     """Abstract roles for residential display props.
 
-    Defines logical groupings of display elements.
+    Defines logical groupings of display elements by physical prop type.
+    Choreographic intent (hero/accent weighting) is expressed via
+    ``DisplayProminence``, not here.
 
     Attributes:
-        OUTLINE: House/roofline outline.
-        MEGA_TREE: Central hero element.
-        HERO: Featured prop (star, spinner, etc.).
         ARCHES: Archway elements.
-        TREES: Yard trees.
-        PROPS: Generic props.
-        FLOODS: Floodlights/wash lights.
-        ACCENTS: Small accent props.
-        WINDOWS: Window lighting.
-        MATRIX: LED matrix for imagery.
+        CANDY_CANES: Candy cane elements.
+        CIRCLES: Circle elements.
+        CUBES: Cube elements.
+        CUSTOM: Custom / generic elements (xLights "Custom" model type).
+        FLOODS: Floodlights / wash lights.
+        HERO: Featured prop (star, spinner, etc.).
+        ICICLES: Icicle / drip lights.
+        LINES: Line elements.
+        MATRICES: LED matrices for imagery.
+        MEGA_TREE: Central hero element.
         MOVING_HEADS: Moving head fixtures.
+        OUTLINE: House / roofline outline.
+        SNOWFLAKES: Snowflake elements.
+        SPHERES: Sphere elements.
+        SPINNERS: Spinning / rotating elements.
+        STARS: Star elements.
+        TREES: Yard trees.
+        WINDOWS: Window lighting.
+        WREATH: Wreath element.
     """
 
-    OUTLINE = "OUTLINE"
-    MEGA_TREE = "MEGA_TREE"
-    HERO = "HERO"
     ARCHES = "ARCHES"
-    TREES = "TREES"
-    PROPS = "PROPS"
+    CANDY_CANES = "CANDY_CANES"
+    CIRCLES = "CIRCLES"
+    CUBES = "CUBES"
+    CUSTOM = "CUSTOM"
     FLOODS = "FLOODS"
-    ACCENTS = "ACCENTS"
-    WINDOWS = "WINDOWS"
-    MATRIX = "MATRIX"
+    HERO = "HERO"
+    ICICLES = "ICICLES"
+    LINES = "LINES"
+    MATRICES = "MATRICES"
+    MEGA_TREE = "MEGA_TREE"
     MOVING_HEADS = "MOVING_HEADS"
+    OUTLINE = "OUTLINE"
+    SNOWFLAKES = "SNOWFLAKES"
+    SPHERES = "SPHERES"
+    SPINNERS = "SPINNERS"
+    STARS = "STARS"
+    TREES = "TREES"
+    WINDOWS = "WINDOWS"
+    WREATH = "WREATH"

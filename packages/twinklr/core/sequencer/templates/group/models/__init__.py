@@ -13,6 +13,10 @@ imported from `twinklr.core.sequencer.planning`.
 """
 
 from twinklr.core.sequencer.templates.assets.models import AssetRequest
+from twinklr.core.sequencer.templates.group.models.choreography import (
+    ChoreographyGraph,
+    ChoreoGroup,
+)
 from twinklr.core.sequencer.templates.group.models.coordination import (
     CoordinationConfig,
     CoordinationPlan,
@@ -65,7 +69,10 @@ __all__ = [
     "ProjectionParams",
     "ProjectionSpec",
     "TimingHints",
-    # Display models
+    # Choreography models
+    "ChoreoGroup",
+    "ChoreographyGraph",
+    # Display models (legacy — being replaced by ChoreographyGraph)
     "DisplayGraph",
     "DisplayGroup",
     "ElementType",

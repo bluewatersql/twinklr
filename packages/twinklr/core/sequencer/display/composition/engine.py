@@ -59,6 +59,7 @@ from twinklr.core.sequencer.display.models.render_plan import (
     RenderLayerPlan,
     RenderPlan,
 )
+from twinklr.core.sequencer.display.xlights_mapping import XLightsMapping
 from twinklr.core.sequencer.planning.group_plan import (
     GroupPlanSet,
     SectionCoordinationPlan,
@@ -67,13 +68,15 @@ from twinklr.core.sequencer.planning.models import PaletteRef
 from twinklr.core.sequencer.templates.group.library import (
     GroupTemplateRegistry,
 )
+from twinklr.core.sequencer.templates.group.models.choreography import (
+    ChoreographyGraph,
+)
 from twinklr.core.sequencer.templates.group.models.coordination import (
     CoordinationConfig,
     CoordinationPlan,
     GroupPlacement,
     PlacementWindow,
 )
-from twinklr.core.sequencer.templates.group.models.display import DisplayGraph
 from twinklr.core.sequencer.timing.beat_grid import BeatGrid
 from twinklr.core.sequencer.vocabulary import (
     CoordinationMode,
@@ -132,7 +135,7 @@ class CompositionEngine:
 
     Args:
         beat_grid: Musical timing grid (source of truth for all timing).
-        display_graph: Display topology.
+        choreo_graph: Choreographic display configuration (spatial ordering).
         palette_resolver: Resolves PaletteRef → ResolvedPalette.
         section_boundaries: List of ``(section_id, start_ms, end_ms)``
             tuples from the audio profile / macro plan.  Used to build
@@ -149,23 +152,28 @@ class CompositionEngine:
             is not provided.  Either ``template_compiler`` or
             ``template_registry`` must be supplied; a ``RuntimeError``
             is raised at composition time if neither is configured.
+        xlights_mapping: Mapping for resolving choreography IDs to
+            xLights element names.  If None, creates an empty mapping
+            (IDs fall back to themselves as element names).
     """
 
     def __init__(
         self,
         beat_grid: BeatGrid,
-        display_graph: DisplayGraph,
+        choreo_graph: ChoreographyGraph,
         palette_resolver: PaletteResolver,
         section_boundaries: list[tuple[str, int, int]] | None = None,
         config: CompositionConfig | None = None,
         catalog_index: dict[str, object] | None = None,
         template_compiler: TemplateCompiler | None = None,
         template_registry: GroupTemplateRegistry | None = None,
+        xlights_mapping: XLightsMapping | None = None,
     ) -> None:
         self._beat_grid = beat_grid
-        self._display_graph = display_graph
+        self._choreo_graph = choreo_graph
         self._config = config or CompositionConfig()
-        self._target_resolver = TargetResolver(display_graph)
+        self._xlights_mapping = xlights_mapping or XLightsMapping()
+        self._target_resolver = TargetResolver(choreo_graph, self._xlights_mapping)
         self._layer_allocator = LayerAllocator()
         self._timing_resolver = TimingResolver(beat_grid)
         self._palette_resolver = palette_resolver
@@ -451,8 +459,8 @@ class CompositionEngine:
         # regardless of the planner-specified order.
         group_order = list(config.group_order)
         if config.spatial_intent != SpatialIntent.NONE:
-            sorted_groups = self._display_graph.groups_sorted_by(config.spatial_intent)
-            sorted_ids = [g.group_id for g in sorted_groups]
+            sorted_groups = self._choreo_graph.groups_sorted_by(config.spatial_intent)
+            sorted_ids = [g.id for g in sorted_groups]
             order_set = set(group_order)
             reordered = [gid for gid in sorted_ids if gid in order_set]
             # Preserve any group_order entries not in the display graph

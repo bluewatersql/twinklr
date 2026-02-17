@@ -14,9 +14,7 @@ from twinklr.core.sequencer.templates.group.catalog import (
     TemplateCatalog,
     TemplateInfo,
 )
-from twinklr.core.sequencer.templates.group.models import (
-    DisplayGraph,
-)
+from twinklr.core.sequencer.templates.group.models.choreography import ChoreographyGraph
 from twinklr.core.sequencer.theming import ThemeRef
 from twinklr.core.sequencer.vocabulary import LaneKind
 
@@ -49,7 +47,7 @@ class SectionPlanningContext(BaseModel):
     notes: str | None = Field(default=None, description="Section-specific notes from MacroPlan")
 
     # Shared context references
-    display_graph: DisplayGraph = Field(description="Display group configuration")
+    choreo_graph: ChoreographyGraph = Field(description="Choreography graph configuration")
     template_catalog: TemplateCatalog = Field(description="Available templates")
     timing_context: TimingContext = Field(description="Timing resolution context")
 
@@ -98,7 +96,7 @@ class SectionPlanningContext(BaseModel):
             List of group_ids matching those roles
         """
         group_ids: list[str] = []
-        groups_by_role = self.display_graph.groups_by_role
+        groups_by_role = self.choreo_graph.groups_by_role
         for role in roles:
             if role in groups_by_role:
                 group_ids.extend(groups_by_role[role])
@@ -125,7 +123,7 @@ class GroupPlanningContext(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    display_graph: DisplayGraph = Field(description="Display group configuration")
+    choreo_graph: ChoreographyGraph = Field(description="Choreography graph configuration")
     template_catalog: TemplateCatalog = Field(description="Available templates")
     timing_context: TimingContext = Field(description="Timing resolution context")
 
@@ -181,7 +179,7 @@ class GroupPlanningContext(BaseModel):
                 primary_focus_targets=section_plan.get("primary_focus_targets", []),
                 secondary_targets=section_plan.get("secondary_targets", []),
                 notes=section_plan.get("notes"),
-                display_graph=self.display_graph,
+                choreo_graph=self.choreo_graph,
                 template_catalog=self.template_catalog,
                 timing_context=self.timing_context,
                 layer_intents=layer_intents,

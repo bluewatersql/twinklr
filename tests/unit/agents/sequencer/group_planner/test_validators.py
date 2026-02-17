@@ -19,9 +19,11 @@ from twinklr.core.sequencer.templates.group.catalog import (
 )
 from twinklr.core.sequencer.templates.group.models import (
     CoordinationPlan,
-    DisplayGraph,
-    DisplayGroup,
     GroupPlacement,
+)
+from twinklr.core.sequencer.templates.group.models.choreography import (
+    ChoreographyGraph,
+    ChoreoGroup,
 )
 from twinklr.core.sequencer.timing import TimeRef
 from twinklr.core.sequencer.vocabulary import (
@@ -42,16 +44,15 @@ TemplateInfo.model_rebuild()
 
 
 @pytest.fixture
-def sample_display_graph() -> DisplayGraph:
-    """Sample display graph with multiple groups."""
-    return DisplayGraph(
-        display_id="test_display",
-        display_name="Test Display",
+def sample_choreo_graph() -> ChoreographyGraph:
+    """Sample choreography graph with multiple groups."""
+    return ChoreographyGraph(
+        graph_id="test_display",
         groups=[
-            DisplayGroup(group_id="HERO_1", role="HERO", display_name="Hero 1"),
-            DisplayGroup(group_id="HERO_2", role="HERO", display_name="Hero 2"),
-            DisplayGroup(group_id="ARCHES_1", role="ARCHES", display_name="Arches"),
-            DisplayGroup(group_id="OUTLINE_1", role="OUTLINE", display_name="Outline"),
+            ChoreoGroup(id="HERO_1", role="HERO"),
+            ChoreoGroup(id="HERO_2", role="HERO"),
+            ChoreoGroup(id="ARCHES_1", role="ARCHES"),
+            ChoreoGroup(id="OUTLINE_1", role="OUTLINE"),
         ],
     )
 
@@ -116,7 +117,7 @@ class TestSectionPlanValidator:
 
     def test_valid_plan_passes(
         self,
-        sample_display_graph: DisplayGraph,
+        sample_choreo_graph: ChoreographyGraph,
         sample_template_catalog: TemplateCatalog,
         sample_timing_context: TimingContext,
     ) -> None:
@@ -148,7 +149,7 @@ class TestSectionPlanValidator:
         )
 
         validator = SectionPlanValidator(
-            display_graph=sample_display_graph,
+            choreo_graph=sample_choreo_graph,
             template_catalog=sample_template_catalog,
             timing_context=sample_timing_context,
         )
@@ -159,7 +160,7 @@ class TestSectionPlanValidator:
 
     def test_unknown_template_fails(
         self,
-        sample_display_graph: DisplayGraph,
+        sample_choreo_graph: ChoreographyGraph,
         sample_template_catalog: TemplateCatalog,
         sample_timing_context: TimingContext,
     ) -> None:
@@ -191,7 +192,7 @@ class TestSectionPlanValidator:
         )
 
         validator = SectionPlanValidator(
-            display_graph=sample_display_graph,
+            choreo_graph=sample_choreo_graph,
             template_catalog=sample_template_catalog,
             timing_context=sample_timing_context,
         )
@@ -203,7 +204,7 @@ class TestSectionPlanValidator:
 
     def test_unknown_group_id_fails(
         self,
-        sample_display_graph: DisplayGraph,
+        sample_choreo_graph: ChoreographyGraph,
         sample_template_catalog: TemplateCatalog,
         sample_timing_context: TimingContext,
     ) -> None:
@@ -235,7 +236,7 @@ class TestSectionPlanValidator:
         )
 
         validator = SectionPlanValidator(
-            display_graph=sample_display_graph,
+            choreo_graph=sample_choreo_graph,
             template_catalog=sample_template_catalog,
             timing_context=sample_timing_context,
         )
@@ -246,7 +247,7 @@ class TestSectionPlanValidator:
 
     def test_placement_outside_section_fails(
         self,
-        sample_display_graph: DisplayGraph,
+        sample_choreo_graph: ChoreographyGraph,
         sample_template_catalog: TemplateCatalog,
         sample_timing_context: TimingContext,
     ) -> None:
@@ -279,7 +280,7 @@ class TestSectionPlanValidator:
         )
 
         validator = SectionPlanValidator(
-            display_graph=sample_display_graph,
+            choreo_graph=sample_choreo_graph,
             template_catalog=sample_template_catalog,
             timing_context=sample_timing_context,
         )
@@ -290,7 +291,7 @@ class TestSectionPlanValidator:
 
     def test_within_lane_overlap_fails(
         self,
-        sample_display_graph: DisplayGraph,
+        sample_choreo_graph: ChoreographyGraph,
         sample_template_catalog: TemplateCatalog,
         sample_timing_context: TimingContext,
     ) -> None:
@@ -329,7 +330,7 @@ class TestSectionPlanValidator:
         )
 
         validator = SectionPlanValidator(
-            display_graph=sample_display_graph,
+            choreo_graph=sample_choreo_graph,
             template_catalog=sample_template_catalog,
             timing_context=sample_timing_context,
         )
@@ -340,7 +341,7 @@ class TestSectionPlanValidator:
 
     def test_different_groups_can_overlap(
         self,
-        sample_display_graph: DisplayGraph,
+        sample_choreo_graph: ChoreographyGraph,
         sample_template_catalog: TemplateCatalog,
         sample_timing_context: TimingContext,
     ) -> None:
@@ -379,7 +380,7 @@ class TestSectionPlanValidator:
         )
 
         validator = SectionPlanValidator(
-            display_graph=sample_display_graph,
+            choreo_graph=sample_choreo_graph,
             template_catalog=sample_template_catalog,
             timing_context=sample_timing_context,
         )
@@ -389,7 +390,7 @@ class TestSectionPlanValidator:
 
     def test_valid_intensity_levels(
         self,
-        sample_display_graph: DisplayGraph,
+        sample_choreo_graph: ChoreographyGraph,
         sample_template_catalog: TemplateCatalog,
         sample_timing_context: TimingContext,
     ) -> None:
@@ -422,7 +423,7 @@ class TestSectionPlanValidator:
         )
 
         validator = SectionPlanValidator(
-            display_graph=sample_display_graph,
+            choreo_graph=sample_choreo_graph,
             template_catalog=sample_template_catalog,
             timing_context=sample_timing_context,
         )
@@ -433,7 +434,7 @@ class TestSectionPlanValidator:
 
     def test_valid_effect_durations(
         self,
-        sample_display_graph: DisplayGraph,
+        sample_choreo_graph: ChoreographyGraph,
         sample_template_catalog: TemplateCatalog,
         sample_timing_context: TimingContext,
     ) -> None:
@@ -466,7 +467,7 @@ class TestSectionPlanValidator:
         )
 
         validator = SectionPlanValidator(
-            display_graph=sample_display_graph,
+            choreo_graph=sample_choreo_graph,
             template_catalog=sample_template_catalog,
             timing_context=sample_timing_context,
         )
@@ -477,7 +478,7 @@ class TestSectionPlanValidator:
 
     def test_all_intensity_levels_with_accent_lane(
         self,
-        sample_display_graph: DisplayGraph,
+        sample_choreo_graph: ChoreographyGraph,
         sample_template_catalog: TemplateCatalog,
         sample_timing_context: TimingContext,
     ) -> None:
@@ -527,7 +528,7 @@ class TestSectionPlanValidator:
         )
 
         validator = SectionPlanValidator(
-            display_graph=sample_display_graph,
+            choreo_graph=sample_choreo_graph,
             template_catalog=sample_template_catalog,
             timing_context=sample_timing_context,
         )

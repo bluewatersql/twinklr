@@ -17,39 +17,53 @@ class DisplayElementKind(str, Enum):
 
     Attributes:
         ARCH: Arch element (pixel arch, wire arch).
-        TREE: Tree (mega tree, mini tree, spiral tree).
-        MATRIX: LED matrix / panel.
-        STRING: Standard string lights (eaves, outlines, rooflines).
-        WINDOW: Window frame / window grid.
-        STAR: Star element.
-        SNOWFLAKE: Snowflake element.
-        SPINNER: Spinning / rotating element.
-        PROP: Generic decorative prop (Santa, reindeer, nativity).
         CANDY_CANE: Candy cane element.
-        WREATH: Wreath element.
-        ICICLE: Icicle / drip lights.
+        CIRCLE: Circle element.
+        CUBE: Cube element.
+        CUSTOM: Custom element.
+        DMX: Generic DMX fixture.
         FLOOD: Flood / wash lights.
-        PIXEL_STICK: Pixel stick / bullet node.
+        GROUP: Group containing heterogeneous model types.
+        ICICLES: Icicle / drip lights (plural alias).
+        MATRIX: LED matrix / panel.
         MOVING_HEAD: DMX moving head fixture.
-        MIXED: Group containing heterogeneous model types.
+        PIXEL_STICK: Pixel stick / bullet node.
+        POLYLINE: Polyline element.
+        SINGLE_LINE: Single line element.
+        SNOWFLAKE: Snowflake element.
+        SPHERE: Sphere element.
+        SPINNER: Spinning / rotating element.
+        STAR: Star element.
+        STRING: Standard string lights (eaves, outlines, rooflines).
+        TREE: Tree (mega tree, mini tree, spiral tree).
+        WINDOW: Window frame / window grid.
+        WINDOW_FRAME: Window frame element.
+        WREATH: Wreath element.
     """
 
     ARCH = "ARCH"
-    TREE = "TREE"
-    MATRIX = "MATRIX"
-    STRING = "STRING"
-    WINDOW = "WINDOW"
-    STAR = "STAR"
-    SNOWFLAKE = "SNOWFLAKE"
-    SPINNER = "SPINNER"
-    PROP = "PROP"
     CANDY_CANE = "CANDY_CANE"
-    WREATH = "WREATH"
-    ICICLE = "ICICLE"
+    CIRCLE = "CIRCLE"
+    CUBE = "CUBE"
+    CUSTOM = "CUSTOM"
+    DMX = "DMX"
     FLOOD = "FLOOD"
-    PIXEL_STICK = "PIXEL_STICK"
+    GROUP = "GROUP"
+    ICICLES = "ICICLES"
+    MATRIX = "MATRIX"
     MOVING_HEAD = "MOVING_HEAD"
-    MIXED = "MIXED"
+    PIXEL_STICK = "PIXEL_STICK"
+    POLYLINE = "POLYLINE"
+    SINGLE_LINE = "SINGLE_LINE"
+    SNOWFLAKE = "SNOWFLAKE"
+    SPHERE = "SPHERE"
+    SPINNER = "SPINNER"
+    STAR = "STAR"
+    STRING = "STRING"
+    TREE = "TREE"
+    WINDOW = "WINDOW"
+    WINDOW_FRAME = "WINDOW_FRAME"
+    WREATH = "WREATH"
 
 
 class GroupArrangement(str, Enum):

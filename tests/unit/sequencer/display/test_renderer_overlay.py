@@ -18,6 +18,10 @@ from twinklr.core.formats.xlights.sequence.models.xsq import (
     XSequence,
 )
 from twinklr.core.sequencer.display.renderer import DisplayRenderer
+from twinklr.core.sequencer.display.xlights_mapping import (
+    XLightsGroupMapping,
+    XLightsMapping,
+)
 from twinklr.core.sequencer.planning.group_plan import (
     GroupPlanSet,
     LanePlan,
@@ -28,13 +32,13 @@ from twinklr.core.sequencer.templates.group import (
     REGISTRY,
     load_builtin_group_templates,
 )
+from twinklr.core.sequencer.templates.group.models.choreography import (
+    ChoreographyGraph,
+    ChoreoGroup,
+)
 from twinklr.core.sequencer.templates.group.models.coordination import (
     CoordinationPlan,
     GroupPlacement,
-)
-from twinklr.core.sequencer.templates.group.models.display import (
-    DisplayGraph,
-    DisplayGroup,
 )
 from twinklr.core.sequencer.theming import ThemeRef
 from twinklr.core.sequencer.theming.enums import ThemeScope
@@ -75,13 +79,16 @@ def _make_beat_grid() -> BeatGrid:
     )
 
 
-def _make_display_graph() -> DisplayGraph:
-    return DisplayGraph(
-        display_id="test",
-        display_name="Test",
-        groups=[
-            DisplayGroup(group_id="OUTLINE_1", role="OUTLINE", display_name="Outline 1"),
-        ],
+def _make_choreo_graph() -> ChoreographyGraph:
+    return ChoreographyGraph(
+        graph_id="test",
+        groups=[ChoreoGroup(id="OUTLINE_1", role="OUTLINE")],
+    )
+
+
+def _make_xlights_mapping() -> XLightsMapping:
+    return XLightsMapping(
+        entries=[XLightsGroupMapping(choreo_id="OUTLINE_1", group_name="Outline 1")],
     )
 
 
@@ -173,8 +180,9 @@ class TestDisplayRendererOverlayWiring:
         """Default render (no catalog) produces only procedural events."""
         renderer = DisplayRenderer(
             beat_grid=_make_beat_grid(),
-            display_graph=_make_display_graph(),
+            choreo_graph=_make_choreo_graph(),
             template_registry=REGISTRY,
+            xlights_mapping=_make_xlights_mapping(),
         )
         plan_set = _make_plan_set(resolved_asset_ids=["asset_sparkles"])
         result = renderer.render(plan_set, _make_sequence())
@@ -189,8 +197,9 @@ class TestDisplayRendererOverlayWiring:
 
         renderer = DisplayRenderer(
             beat_grid=_make_beat_grid(),
-            display_graph=_make_display_graph(),
+            choreo_graph=_make_choreo_graph(),
             template_registry=REGISTRY,
+            xlights_mapping=_make_xlights_mapping(),
         )
         plan_set = _make_plan_set(resolved_asset_ids=["asset_sparkles"])
         result = renderer.render(plan_set, _make_sequence(), catalog_index=catalog_index)
@@ -214,8 +223,9 @@ class TestDisplayRendererOverlayWiring:
 
         renderer = DisplayRenderer(
             beat_grid=_make_beat_grid(),
-            display_graph=_make_display_graph(),
+            choreo_graph=_make_choreo_graph(),
             template_registry=REGISTRY,
+            xlights_mapping=_make_xlights_mapping(),
         )
         plan_set = _make_plan_set(resolved_asset_ids=["asset_sparkles"])
         result = renderer.render(plan_set, _make_sequence(), catalog_index=catalog_index)

@@ -1,18 +1,19 @@
 #!/usr/bin/env python3
 """Demo script for Moving Head Pipeline using Pipeline Framework.
 
-Demonstrates the Moving Head choreography flow per V2 Migration spec:
+Demonstrates the Moving Head choreography flow:
 1. Audio Analysis (feature extraction)
 2. Audio Profile + Lyrics (parallel)
 3. MacroPlanner (overall show strategy)
 4. MovingHeadPlanner (template selection coordinated with macro)
-5. Rendering to XSQ (future)
+5. Rendering to XSQ
 
-Uses the Pipeline Framework for declarative, parallel execution.
+Uses the native pipeline definition factory for declarative execution.
 """
 
 import argparse
 import asyncio
+import hashlib
 import json
 from pathlib import Path
 import sys
@@ -22,21 +23,12 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import logging
 
-from twinklr.core.agents.audio.lyrics.stage import LyricsStage
-from twinklr.core.agents.audio.profile.stage import AudioProfileStage
-from twinklr.core.agents.audio.stages.analysis import AudioAnalysisStage
-from twinklr.core.agents.sequencer.macro_planner.stage import MacroPlannerStage
-from twinklr.core.agents.sequencer.moving_heads.rendering_stage import (
-    MovingHeadRenderingStage,
-)
-from twinklr.core.agents.sequencer.moving_heads.stage import MovingHeadStage
 from twinklr.core.pipeline import (
     ExecutionPattern,
     PipelineContext,
-    PipelineDefinition,
     PipelineExecutor,
-    StageDefinition,
 )
+from twinklr.core.pipeline.definitions import build_moving_heads_pipeline
 from twinklr.core.sequencer.moving_heads.templates import load_builtin_templates
 from twinklr.core.sequencer.moving_heads.templates.library import list_templates
 from twinklr.core.session import TwinklrSession
@@ -71,9 +63,18 @@ def save_artifact(data: dict | list, song_name: str, filename: str, output_dir: 
     return output_path
 
 
-async def main() -> None:
-    """Run Moving Head Pipeline demo using Pipeline Framework."""
-    # Parse arguments
+def generate_stable_session_id(audio_path: Path) -> str:
+    """Generate a deterministic session ID from the audio file name.
+
+    This allows cache reuse across runs for the same audio file.
+    """
+    name = audio_path.stem.lower().replace(" ", "_")
+    hash_suffix = hashlib.md5(str(audio_path.resolve()).encode()).hexdigest()[:8]
+    return f"{name}_{hash_suffix}"
+
+
+def parse_args() -> argparse.Namespace:
+    """Parse command line arguments."""
     parser = argparse.ArgumentParser(description="Moving Head Pipeline Demo")
     parser.add_argument(
         "audio_file",
@@ -82,17 +83,34 @@ async def main() -> None:
         help="Path to audio file (default: data/music/Need A Favor.mp3)",
     )
     parser.add_argument(
-        "--no-cache",
+        "--new-session",
         action="store_true",
-        help="Force reanalysis of audio (skip cache)",
+        help="Force new session ID (invalidates cache). Default uses stable ID based on audio file.",
     )
     parser.add_argument(
-        "--output-dir",
+        "--xsq-template",
         type=Path,
         default=None,
-        help="Output directory for artifacts",
+        help="Optional template .xsq to merge into",
     )
-    args = parser.parse_args()
+    parser.add_argument(
+        "--fixture-config",
+        type=Path,
+        default=None,
+        help="Path to fixture config JSON",
+    )
+    parser.add_argument(
+        "--fixtures",
+        type=int,
+        default=4,
+        help="Number of moving head fixtures (default: 4)",
+    )
+    return parser.parse_args()
+
+
+async def main() -> None:
+    """Run Moving Head Pipeline demo using native pipeline definitions."""
+    args = parse_args()
 
     print_section("Moving Head Pipeline Demo (Pipeline Framework)", "=")
 
@@ -105,12 +123,20 @@ async def main() -> None:
         sys.exit(1)
 
     song_name = clean_audio_filename(audio_path.stem)
-    output_dir = args.output_dir or repo_root / "artifacts" / song_name
+    output_dir = repo_root / "artifacts" / song_name
 
     output_dir.mkdir(parents=True, exist_ok=True)
     print(f"📁 Output directory: {output_dir}")
 
-    session = TwinklrSession.from_directory(repo_root)
+    # Generate session ID - stable by default for cache reuse
+    if args.new_session:
+        session_id = None
+        print("🔄 New session: cache will not be reused")
+    else:
+        session_id = generate_stable_session_id(audio_path)
+        print(f"📦 Session ID: {session_id} (use --new-session to invalidate cache)")
+
+    session = TwinklrSession.from_directory(repo_root, session_id=session_id)
 
     # Load Moving Head templates
     print_subsection("1. Loading Templates")
@@ -122,83 +148,32 @@ async def main() -> None:
     if len(available_templates) > 5:
         print(f"   ... and {len(available_templates) - 5} more")
 
-    # Build display groups (mock for MacroPlanner coordination)
-    display_groups = [
-        {"role_key": "MOVING_HEADS", "model_count": 4, "group_type": "moving_head"},
+    # Build display groups (for MacroPlanner coordination)
+    display_groups: list[dict[str, object]] = [
+        {"role_key": "MOVING_HEADS", "model_count": args.fixtures, "group_type": "moving_head"},
         {"role_key": "OUTLINE", "model_count": 10, "group_type": "string"},
         {"role_key": "MEGA_TREE", "model_count": 1, "group_type": "tree"},
     ]
 
+    # Resolve paths
+    xsq_output_path = output_dir / f"{song_name}_twinklr_mh.xsq"
+    xsq_template_path = args.xsq_template or (repo_root / "data/sequences/Need A Favor.xsq")
+    fixture_config_path = args.fixture_config or (repo_root / "fixture_config.json")
+
     # ========================================================================
-    # Define Pipeline
-    # Per spec section 4.4: Audio → Profile → Lyrics → Macro → MovingHead
+    # Define Pipeline (using native factory)
     # ========================================================================
     print_section("2. Pipeline Definition", "=")
 
-    pipeline = PipelineDefinition(
-        name="moving_head_pipeline",
-        description="Moving Head choreography pipeline with macro coordination",
-        fail_fast=True,
-        stages=[
-            # Stage 1: Audio Analysis (entry point)
-            StageDefinition(
-                id="audio",
-                stage=AudioAnalysisStage(),
-                description="Analyze audio file for tempo, structure, features",
-            ),
-            # Stage 2a: Audio Profile (parallel with lyrics)
-            StageDefinition(
-                id="profile",
-                stage=AudioProfileStage(),
-                inputs=["audio"],
-                description="Generate musical analysis and creative guidance",
-            ),
-            # Stage 2b: Lyrics Analysis (parallel with profile, conditional)
-            StageDefinition(
-                id="lyrics",
-                stage=LyricsStage(),
-                inputs=["audio"],
-                pattern=ExecutionPattern.CONDITIONAL,
-                condition=lambda ctx: ctx.get_state("has_lyrics", False),
-                critical=False,  # Pipeline continues if no lyrics
-                description="Generate narrative and thematic analysis",
-            ),
-            # Stage 3: Macro Planning (coordinates overall show strategy)
-            # Outputs list[MacroSectionPlan] with energy targets, motion density, style
-            StageDefinition(
-                id="macro",
-                stage=MacroPlannerStage(display_groups=display_groups),
-                inputs=["profile", "lyrics"],
-                description="Generate high-level choreography strategy (outputs section list)",
-            ),
-            # Stage 4: Moving Head Planning (V2 - coordinates with macro)
-            # inputs=["audio", "profile", "lyrics", "macro"]
-            # - audio: For building BeatGrid (stored in state for rendering)
-            # - profile, lyrics, macro: For coordinated planning
-            StageDefinition(
-                id="moving_heads",
-                stage=MovingHeadStage(
-                    fixture_count=4,
-                    available_templates=available_templates,
-                    max_iterations=session.job_config.agent.max_iterations,
-                    min_pass_score=7.0,
-                ),
-                inputs=["audio", "profile", "lyrics", "macro"],
-                description="Generate moving head choreography plan (coordinated with macro)",
-            ),
-            # Stage 5: Rendering to XSQ
-            # Consumes choreography_plan and beat_grid from pipeline state
-            StageDefinition(
-                id="render",
-                stage=MovingHeadRenderingStage(
-                    xsq_output_path=output_dir / f"{song_name}_twinklr_mh.xsq",
-                    xsq_template_path=repo_root / "data/sequences/Need A Favor.xsq",
-                    fixture_config_path=repo_root / "fixture_config.json",
-                ),
-                inputs=["moving_heads"],
-                description="Render choreography to XSQ effects file",
-            ),
-        ],
+    pipeline = build_moving_heads_pipeline(
+        display_groups=display_groups,
+        fixture_count=args.fixtures,
+        available_templates=available_templates,
+        xsq_output_path=xsq_output_path,
+        max_iterations=session.job_config.agent.max_iterations,
+        min_pass_score=7.0,
+        xsq_template_path=xsq_template_path if xsq_template_path.exists() else None,
+        fixture_config_path=fixture_config_path if fixture_config_path.exists() else None,
     )
 
     # Validate pipeline
@@ -221,13 +196,6 @@ async def main() -> None:
     # ========================================================================
     print_section("3. Pipeline Execution", "=")
 
-    # Initialize session services (caches, provider, logger)
-    await session.llm_cache.initialize()
-    await session.agent_cache.initialize()
-    print(f"🔄 LLM cache initialized: {session.llm_cache}")
-    print(f"💾 Agent cache initialized: {session.agent_cache}")
-
-    # Create pipeline context with session
     pipeline_context = PipelineContext(
         session=session,
         output_dir=output_dir,
@@ -340,16 +308,16 @@ async def main() -> None:
     # ========================================================================
     # Summary
     # ========================================================================
-    print_section("Pipeline Complete! 🎉", "=")
+    print_section("Pipeline Complete!", "=")
 
     if result.success:
         print("✅ Full pipeline completed successfully!")
         print("\nStages executed:")
         print("  1. Audio Analysis")
         print("  2. Audio Profile + Lyrics (parallel)")
-        print("  3. MacroPlanner → list[MacroSectionPlan]")
+        print("  3. MacroPlanner -> list[MacroSectionPlan]")
         print("  4. MovingHeadPlanner (coordinated with macro)")
-        print("  5. Rendering → XSQ file")
+        print("  5. Rendering -> XSQ file")
 
         if "moving_heads" in result.outputs:
             plan = result.outputs["moving_heads"]

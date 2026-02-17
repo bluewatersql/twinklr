@@ -14,6 +14,10 @@ from twinklr.core.sequencer.display.models.palette import (
     ResolvedPalette,
     TransitionSpec,
 )
+from twinklr.core.sequencer.display.xlights_mapping import (
+    XLightsGroupMapping,
+    XLightsMapping,
+)
 from twinklr.core.sequencer.planning.group_plan import (
     GroupPlanSet,
     LanePlan,
@@ -24,13 +28,13 @@ from twinklr.core.sequencer.templates.group import (
     REGISTRY,
     load_builtin_group_templates,
 )
+from twinklr.core.sequencer.templates.group.models.choreography import (
+    ChoreographyGraph,
+    ChoreoGroup,
+)
 from twinklr.core.sequencer.templates.group.models.coordination import (
     CoordinationPlan,
     GroupPlacement,
-)
-from twinklr.core.sequencer.templates.group.models.display import (
-    DisplayGraph,
-    DisplayGroup,
 )
 from twinklr.core.sequencer.theming import PALETTE_REGISTRY, ThemeRef
 from twinklr.core.sequencer.theming.enums import ThemeScope
@@ -67,27 +71,25 @@ def _make_beat_grid() -> BeatGrid:
     )
 
 
-def _make_display_graph() -> DisplayGraph:
-    """Create a simple display graph with 3 groups."""
-    return DisplayGraph(
-        display_id="test_display",
-        display_name="Test Display",
+def _make_choreo_graph() -> ChoreographyGraph:
+    """Create a simple choreography graph with 3 groups."""
+    return ChoreographyGraph(
+        graph_id="test_display",
         groups=[
-            DisplayGroup(
-                group_id="OUTLINE_1",
-                role="OUTLINE",
-                display_name="Outline 1",
-            ),
-            DisplayGroup(
-                group_id="ARCHES_1",
-                role="ARCHES",
-                display_name="Arches 1",
-            ),
-            DisplayGroup(
-                group_id="MEGA_TREE_1",
-                role="MEGA_TREE",
-                display_name="Mega Tree 1",
-            ),
+            ChoreoGroup(id="OUTLINE_1", role="OUTLINE"),
+            ChoreoGroup(id="ARCHES_1", role="ARCHES"),
+            ChoreoGroup(id="MEGA_TREE_1", role="MEGA_TREE"),
+        ],
+    )
+
+
+def _make_xlights_mapping() -> XLightsMapping:
+    """Map choreo group IDs to xLights element names."""
+    return XLightsMapping(
+        entries=[
+            XLightsGroupMapping(choreo_id="OUTLINE_1", group_name="Outline 1"),
+            XLightsGroupMapping(choreo_id="ARCHES_1", group_name="Arches 1"),
+            XLightsGroupMapping(choreo_id="MEGA_TREE_1", group_name="Mega Tree 1"),
         ],
     )
 
@@ -108,9 +110,10 @@ def _make_engine(**kwargs: Any) -> CompositionEngine:
     """
     defaults: dict[str, Any] = {
         "beat_grid": _make_beat_grid(),
-        "display_graph": _make_display_graph(),
+        "choreo_graph": _make_choreo_graph(),
         "palette_resolver": _make_palette_resolver(),
         "template_registry": REGISTRY,
+        "xlights_mapping": _make_xlights_mapping(),
     }
     defaults.update(kwargs)
     return CompositionEngine(**defaults)

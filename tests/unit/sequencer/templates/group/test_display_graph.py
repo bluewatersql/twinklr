@@ -93,14 +93,14 @@ def sample_graph() -> DisplayGraph:
         groups=[
             _make_group(
                 "ALL_DISPLAY",
-                kind=DisplayElementKind.MIXED,
+                kind=DisplayElementKind.GROUP,
                 arrangement=GroupArrangement.CLUSTER,
                 pixel_fraction=1.0,
             ),
             _make_group(
                 "HOUSE",
                 parent="ALL_DISPLAY",
-                kind=DisplayElementKind.MIXED,
+                kind=DisplayElementKind.GROUP,
                 arrangement=GroupArrangement.CLUSTER,
                 pixel_fraction=0.35,
             ),
@@ -135,7 +135,7 @@ def sample_graph() -> DisplayGraph:
             _make_group(
                 "YARD",
                 parent="ALL_DISPLAY",
-                kind=DisplayElementKind.MIXED,
+                kind=DisplayElementKind.GROUP,
                 arrangement=GroupArrangement.CLUSTER,
                 pixel_fraction=0.55,
             ),
@@ -182,14 +182,14 @@ def sample_graph() -> DisplayGraph:
             _make_group(
                 "ACCENT_ZONE",
                 parent="ALL_DISPLAY",
-                kind=DisplayElementKind.MIXED,
+                kind=DisplayElementKind.GROUP,
                 arrangement=GroupArrangement.CLUSTER,
                 pixel_fraction=0.10,
             ),
             _make_group(
                 "SANTA",
                 parent="ACCENT_ZONE",
-                kind=DisplayElementKind.PROP,
+                kind=DisplayElementKind.CUSTOM,
                 arrangement=GroupArrangement.SINGLE,
                 density=PixelDensity.LOW,
                 prominence=DisplayProminence.ACCENT,

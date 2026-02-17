@@ -327,9 +327,7 @@ class AssetCatalog(BaseModel):
                 return entry
         return None
 
-    def find_by_spec_id(
-        self, spec_id: str, width: int, height: int
-    ) -> CatalogEntry | None:
+    def find_by_spec_id(self, spec_id: str, width: int, height: int) -> CatalogEntry | None:
         """Find entry by deterministic spec_id and dimensions.
 
         Used for pre-enrichment reuse: matches assets by their stable

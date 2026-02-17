@@ -12,6 +12,10 @@ from twinklr.core.sequencer.display.composition.palette_resolver import (
     PaletteResolver,
 )
 from twinklr.core.sequencer.display.models.palette import ResolvedPalette
+from twinklr.core.sequencer.display.xlights_mapping import (
+    XLightsGroupMapping,
+    XLightsMapping,
+)
 from twinklr.core.sequencer.planning.group_plan import (
     GroupPlanSet,
     LanePlan,
@@ -22,16 +26,16 @@ from twinklr.core.sequencer.templates.group import (
     REGISTRY,
     load_builtin_group_templates,
 )
+from twinklr.core.sequencer.templates.group.models.choreography import (
+    ChoreographyGraph,
+    ChoreoGroup,
+)
 from twinklr.core.sequencer.templates.group.models.coordination import (
     CoordinationConfig,
     CoordinationPlan,
     PlacementWindow,
 )
-from twinklr.core.sequencer.templates.group.models.display import (
-    DisplayGraph,
-    DisplayGroup,
-    GroupPosition,
-)
+from twinklr.core.sequencer.templates.group.models.display import GroupPosition
 from twinklr.core.sequencer.theming import PALETTE_REGISTRY, ThemeRef
 from twinklr.core.sequencer.theming.enums import ThemeScope
 from twinklr.core.sequencer.timing.beat_grid import BeatGrid
@@ -82,14 +86,23 @@ def _make_palette_resolver() -> PaletteResolver:
     )
 
 
-def _make_display_graph() -> DisplayGraph:
-    return DisplayGraph(
-        display_id="test",
-        display_name="Test",
+def _make_choreo_graph() -> ChoreographyGraph:
+    return ChoreographyGraph(
+        graph_id="test",
         groups=[
-            DisplayGroup(group_id="ARCHES_1", role="ARCHES", display_name="Arches 1"),
-            DisplayGroup(group_id="ARCHES_2", role="ARCHES", display_name="Arches 2"),
-            DisplayGroup(group_id="ARCHES_3", role="ARCHES", display_name="Arches 3"),
+            ChoreoGroup(id="ARCHES_1", role="ARCHES"),
+            ChoreoGroup(id="ARCHES_2", role="ARCHES"),
+            ChoreoGroup(id="ARCHES_3", role="ARCHES"),
+        ],
+    )
+
+
+def _make_xlights_mapping() -> XLightsMapping:
+    return XLightsMapping(
+        entries=[
+            XLightsGroupMapping(choreo_id="ARCHES_1", group_name="Arches 1"),
+            XLightsGroupMapping(choreo_id="ARCHES_2", group_name="Arches 2"),
+            XLightsGroupMapping(choreo_id="ARCHES_3", group_name="Arches 3"),
         ],
     )
 
@@ -135,9 +148,10 @@ class TestSequencedExpansion:
 
         engine = CompositionEngine(
             beat_grid=_make_beat_grid(),
-            display_graph=_make_display_graph(),
+            choreo_graph=_make_choreo_graph(),
             palette_resolver=_make_palette_resolver(),
             template_registry=REGISTRY,
+            xlights_mapping=_make_xlights_mapping(),
         )
         render_plan = engine.compose(plan_set)
 
@@ -201,9 +215,10 @@ class TestSequencedExpansion:
         plan_set = GroupPlanSet(plan_set_id="test", section_plans=[section])
         engine = CompositionEngine(
             beat_grid=_make_beat_grid(),
-            display_graph=_make_display_graph(),
+            choreo_graph=_make_choreo_graph(),
             palette_resolver=_make_palette_resolver(),
             template_registry=REGISTRY,
+            xlights_mapping=_make_xlights_mapping(),
         )
         render_plan = engine.compose(plan_set)
 
@@ -267,9 +282,10 @@ class TestRippleExpansion:
         plan_set = self._make_ripple_plan(phase_offset=0.5)
         engine = CompositionEngine(
             beat_grid=_make_beat_grid(),
-            display_graph=_make_display_graph(),
+            choreo_graph=_make_choreo_graph(),
             palette_resolver=_make_palette_resolver(),
             template_registry=REGISTRY,
+            xlights_mapping=_make_xlights_mapping(),
         )
         render_plan = engine.compose(plan_set)
 
@@ -296,9 +312,10 @@ class TestRippleExpansion:
         plan_set = self._make_ripple_plan(phase_offset=0.5, step_duration=4)
         engine = CompositionEngine(
             beat_grid=_make_beat_grid(),
-            display_graph=_make_display_graph(),
+            choreo_graph=_make_choreo_graph(),
             palette_resolver=_make_palette_resolver(),
             template_registry=REGISTRY,
+            xlights_mapping=_make_xlights_mapping(),
         )
         render_plan = engine.compose(plan_set)
 
@@ -326,9 +343,10 @@ class TestRippleExpansion:
         plan_set = self._make_ripple_plan(phase_offset=0.0)
         engine = CompositionEngine(
             beat_grid=_make_beat_grid(),
-            display_graph=_make_display_graph(),
+            choreo_graph=_make_choreo_graph(),
             palette_resolver=_make_palette_resolver(),
             template_registry=REGISTRY,
+            xlights_mapping=_make_xlights_mapping(),
         )
         render_plan = engine.compose(plan_set)
 
@@ -382,9 +400,10 @@ class TestCallResponseExpansion:
         plan_set = self._make_cr_plan()
         engine = CompositionEngine(
             beat_grid=_make_beat_grid(),
-            display_graph=_make_display_graph(),
+            choreo_graph=_make_choreo_graph(),
             palette_resolver=_make_palette_resolver(),
             template_registry=REGISTRY,
+            xlights_mapping=_make_xlights_mapping(),
         )
         render_plan = engine.compose(plan_set)
 
@@ -404,9 +423,10 @@ class TestCallResponseExpansion:
         plan_set = self._make_cr_plan()
         engine = CompositionEngine(
             beat_grid=_make_beat_grid(),
-            display_graph=_make_display_graph(),
+            choreo_graph=_make_choreo_graph(),
             palette_resolver=_make_palette_resolver(),
             template_registry=REGISTRY,
+            xlights_mapping=_make_xlights_mapping(),
         )
         render_plan = engine.compose(plan_set)
 
@@ -435,9 +455,10 @@ class TestCallResponseExpansion:
         plan_set = self._make_cr_plan()
         engine = CompositionEngine(
             beat_grid=_make_beat_grid(),
-            display_graph=_make_display_graph(),
+            choreo_graph=_make_choreo_graph(),
             palette_resolver=_make_palette_resolver(),
             template_registry=REGISTRY,
+            xlights_mapping=_make_xlights_mapping(),
         )
         render_plan = engine.compose(plan_set)
 
@@ -473,34 +494,37 @@ class TestSpatialIntentOrdering:
     def test_l2r_reorders_groups_by_horizontal_position(self) -> None:
         """L2R spatial intent should reorder groups left-to-right."""
         # Create groups with explicit horizontal positions: 3=RIGHT, 2=CENTER, 1=LEFT
-        display_graph = DisplayGraph(
-            display_id="test",
-            display_name="Test",
+        choreo_graph = ChoreographyGraph(
+            graph_id="test",
             groups=[
-                DisplayGroup(
-                    group_id="ARCHES_1",
+                ChoreoGroup(
+                    id="ARCHES_1",
                     role="ARCHES",
-                    display_name="Arches 1",
                     position=GroupPosition(
                         horizontal=HorizontalZone.LEFT, vertical=VerticalZone.LOW
                     ),
                 ),
-                DisplayGroup(
-                    group_id="ARCHES_2",
+                ChoreoGroup(
+                    id="ARCHES_2",
                     role="ARCHES",
-                    display_name="Arches 2",
                     position=GroupPosition(
                         horizontal=HorizontalZone.CENTER, vertical=VerticalZone.LOW
                     ),
                 ),
-                DisplayGroup(
-                    group_id="ARCHES_3",
+                ChoreoGroup(
+                    id="ARCHES_3",
                     role="ARCHES",
-                    display_name="Arches 3",
                     position=GroupPosition(
                         horizontal=HorizontalZone.RIGHT, vertical=VerticalZone.LOW
                     ),
                 ),
+            ],
+        )
+        xlights_mapping = XLightsMapping(
+            entries=[
+                XLightsGroupMapping(choreo_id="ARCHES_1", group_name="Arches 1"),
+                XLightsGroupMapping(choreo_id="ARCHES_2", group_name="Arches 2"),
+                XLightsGroupMapping(choreo_id="ARCHES_3", group_name="Arches 3"),
             ],
         )
 
@@ -539,9 +563,10 @@ class TestSpatialIntentOrdering:
         plan_set = GroupPlanSet(plan_set_id="test", section_plans=[section])
         engine = CompositionEngine(
             beat_grid=_make_beat_grid(),
-            display_graph=display_graph,
+            choreo_graph=choreo_graph,
             palette_resolver=_make_palette_resolver(),
             template_registry=REGISTRY,
+            xlights_mapping=xlights_mapping,
         )
         render_plan = engine.compose(plan_set)
 
@@ -561,34 +586,37 @@ class TestSpatialIntentOrdering:
 
     def test_b2t_reorders_groups_by_vertical_position(self) -> None:
         """B2T spatial intent should reorder groups bottom-to-top."""
-        display_graph = DisplayGraph(
-            display_id="test",
-            display_name="Test",
+        choreo_graph = ChoreographyGraph(
+            graph_id="test",
             groups=[
-                DisplayGroup(
-                    group_id="ROW_HIGH",
+                ChoreoGroup(
+                    id="ROW_HIGH",
                     role="ROW",
-                    display_name="Row High",
                     position=GroupPosition(
                         horizontal=HorizontalZone.CENTER, vertical=VerticalZone.HIGH
                     ),
                 ),
-                DisplayGroup(
-                    group_id="ROW_LOW",
+                ChoreoGroup(
+                    id="ROW_LOW",
                     role="ROW",
-                    display_name="Row Low",
                     position=GroupPosition(
                         horizontal=HorizontalZone.CENTER, vertical=VerticalZone.LOW
                     ),
                 ),
-                DisplayGroup(
-                    group_id="ROW_GROUND",
+                ChoreoGroup(
+                    id="ROW_GROUND",
                     role="ROW",
-                    display_name="Row Ground",
                     position=GroupPosition(
                         horizontal=HorizontalZone.CENTER, vertical=VerticalZone.GROUND
                     ),
                 ),
+            ],
+        )
+        xlights_mapping = XLightsMapping(
+            entries=[
+                XLightsGroupMapping(choreo_id="ROW_HIGH", group_name="Row High"),
+                XLightsGroupMapping(choreo_id="ROW_LOW", group_name="Row Low"),
+                XLightsGroupMapping(choreo_id="ROW_GROUND", group_name="Row Ground"),
             ],
         )
 
@@ -625,9 +653,10 @@ class TestSpatialIntentOrdering:
         plan_set = GroupPlanSet(plan_set_id="test", section_plans=[section])
         engine = CompositionEngine(
             beat_grid=_make_beat_grid(),
-            display_graph=display_graph,
+            choreo_graph=choreo_graph,
             palette_resolver=_make_palette_resolver(),
             template_registry=REGISTRY,
+            xlights_mapping=xlights_mapping,
         )
         render_plan = engine.compose(plan_set)
 
@@ -645,40 +674,43 @@ class TestSpatialIntentOrdering:
 
     def test_f2b_reorders_groups_by_depth_position(self) -> None:
         """F2B spatial intent should reorder groups front-to-back."""
-        display_graph = DisplayGraph(
-            display_id="test",
-            display_name="Test",
+        choreo_graph = ChoreographyGraph(
+            graph_id="test",
             groups=[
-                DisplayGroup(
-                    group_id="LAYER_FAR",
+                ChoreoGroup(
+                    id="LAYER_FAR",
                     role="LAYER",
-                    display_name="Layer Far",
                     position=GroupPosition(
                         horizontal=HorizontalZone.CENTER,
                         vertical=VerticalZone.MID,
                         depth=DepthZone.FAR,
                     ),
                 ),
-                DisplayGroup(
-                    group_id="LAYER_NEAR",
+                ChoreoGroup(
+                    id="LAYER_NEAR",
                     role="LAYER",
-                    display_name="Layer Near",
                     position=GroupPosition(
                         horizontal=HorizontalZone.CENTER,
                         vertical=VerticalZone.MID,
                         depth=DepthZone.NEAR,
                     ),
                 ),
-                DisplayGroup(
-                    group_id="LAYER_MID",
+                ChoreoGroup(
+                    id="LAYER_MID",
                     role="LAYER",
-                    display_name="Layer Mid",
                     position=GroupPosition(
                         horizontal=HorizontalZone.CENTER,
                         vertical=VerticalZone.MID,
                         depth=DepthZone.MID,
                     ),
                 ),
+            ],
+        )
+        xlights_mapping = XLightsMapping(
+            entries=[
+                XLightsGroupMapping(choreo_id="LAYER_FAR", group_name="Layer Far"),
+                XLightsGroupMapping(choreo_id="LAYER_NEAR", group_name="Layer Near"),
+                XLightsGroupMapping(choreo_id="LAYER_MID", group_name="Layer Mid"),
             ],
         )
 
@@ -715,9 +747,10 @@ class TestSpatialIntentOrdering:
         plan_set = GroupPlanSet(plan_set_id="test", section_plans=[section])
         engine = CompositionEngine(
             beat_grid=_make_beat_grid(),
-            display_graph=display_graph,
+            choreo_graph=choreo_graph,
             palette_resolver=_make_palette_resolver(),
             template_registry=REGISTRY,
+            xlights_mapping=xlights_mapping,
         )
         render_plan = engine.compose(plan_set)
 
