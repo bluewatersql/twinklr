@@ -79,6 +79,8 @@ ACCENT (0-1 coordination plan):
 11. **SEQUENCED window exclusivity per lane**: At most **one** SEQUENCED coordination_plan per lane per section.
    - If a second RHYTHM plan is needed, it must be UNIFIED or COMPLEMENTARY and must use **disjoint targets**.
 12. **Minimum separation for same target**: For any two placements on the same target in the same lane, enforce a gap of **>= 1 beat**.
+    - If either placement uses **BURST** duration, enforce **>= 1 full bar** separation for that same target.
+    - For ACCENT on the same target, prefer **>= 2 beats** separation even for HIT/HIT.
 13. **lane_plans.target_roles is required**: Each `lane_plans[*].target_roles` must be a **non-empty** list.
    - BASE → `target_roles` must include `BACKGROUND`
    - RHYTHM → `target_roles` must include `MID`
@@ -95,6 +97,7 @@ ACCENT (0-1 coordination plan):
    - Never schedule a HIT inside any BURST interval for that same target.
    - If using BURST on a single HERO target, enforce a gap of **>= 1 bar** before/after any other ACCENT placement.
    - Practical rule: schedule **at most one ACCENT placement per bar** on a single-HERO target.
+   - Safe default: use only one ACCENT coordination_plan (UNIFIED) for that target.
 16. **Section bar bounds are hard limits**:
    - Every placement `start.bar` and every window `start.bar`/`end.bar` must be within section bars provided in user prompt (`1..section_max_bar` / `available_bars`).
    - Never extend window end beyond section max bar.

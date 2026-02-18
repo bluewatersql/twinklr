@@ -296,7 +296,13 @@ def shape_planner_context(section_context: SectionPlanningContext) -> dict[str, 
         except Exception as e:
             logger.warning(f"Failed to resolve theme '{section_context.theme.theme_id}': {e}")
 
-    # Prepare palette context (from MacroSectionPlan palette override or theme default)
+    # Prepare palette context.
+    # Priority:
+    # 1) Section explicit palette override from MacroSectionPlan
+    # 2) Section ThemeRef palette_id (if explicitly set)
+    # 3) Macro global primary palette
+    # Do NOT auto-fallback to theme default palette here; that can introduce
+    # unintended palette churn not explicitly requested by MacroPlan.
     palette_ref_json: str = "{}"
     if section_context.palette:
         # Section has explicit palette override
@@ -304,11 +310,9 @@ def shape_planner_context(section_context: SectionPlanningContext) -> dict[str, 
     elif section_context.theme and section_context.theme.palette_id:
         # Use theme's palette override
         palette_ref_json = json.dumps({"palette_id": section_context.theme.palette_id}, indent=2)
-    elif theme_definition_dict.get("default_palette_id"):
-        # Use theme definition's default palette
-        palette_ref_json = json.dumps(
-            {"palette_id": theme_definition_dict["default_palette_id"]}, indent=2
-        )
+    elif section_context.global_palette_id:
+        # Use macro global primary palette as default
+        palette_ref_json = json.dumps({"palette_id": section_context.global_palette_id}, indent=2)
 
     # Get tag catalog and motif catalog for validation
     theming_catalog = get_theming_catalog_dict()
@@ -577,8 +581,7 @@ def shape_section_judge_context(
         "display_graph": {
             "groups_by_role": groups_by_role,
             "groups_by_tag": {
-                tag.value: ids
-                for tag, ids in section_context.choreo_graph.groups_by_tag.items()
+                tag.value: ids for tag, ids in section_context.choreo_graph.groups_by_tag.items()
             },
             "groups_by_split": {
                 split.value: ids
@@ -597,11 +600,39 @@ def shape_section_judge_context(
     }
 
 
+def _shape_lyric_context_summary(lyric_context: Any | None) -> dict[str, Any] | None:
+    """Extract a compact narrative summary from LyricContextModel for holistic judge.
+
+    Args:
+        lyric_context: LyricContextModel instance (or None)
+
+    Returns:
+        Compact dict with narrative fields, or None if no lyrics/narrative context.
+    """
+    if lyric_context is None:
+        return None
+
+    has_lyrics = getattr(lyric_context, "has_lyrics", False)
+    if not has_lyrics:
+        return None
+
+    return {
+        "has_narrative": getattr(lyric_context, "has_narrative", False),
+        "characters": getattr(lyric_context, "characters", None) or [],
+        "themes": getattr(lyric_context, "themes", None) or [],
+        "mood_arc": getattr(lyric_context, "mood_arc", ""),
+        "genre_markers": getattr(lyric_context, "genre_markers", None) or [],
+        "recommended_visual_themes": getattr(lyric_context, "recommended_visual_themes", None)
+        or [],
+    }
+
+
 def shape_holistic_judge_context(
     group_plan_set: GroupPlanSet,
     choreo_graph: ChoreographyGraph,
     template_catalog: TemplateCatalog,
     macro_plan_summary: dict[str, Any] | None,
+    lyric_context: Any | None = None,
 ) -> dict[str, Any]:
     """Shape context for HolisticJudge agent (cross-section evaluation).
 
@@ -609,12 +640,14 @@ def shape_holistic_judge_context(
     - Global theme ID and palette from macro_plan_summary.global_story
     - Per-section theme IDs and palette overrides
     - Color story narrative (if provided)
+    - Lyric/narrative context for calibrating variety + utilization scores
 
     Analyzed from holistic_judge/user.j2:
     - Uses: group_plan_set (serialized to JSON)
     - Uses: section_count, section_ids (computed from plan set)
     - Uses: choreo_graph.groups_by_role (NOT full groups)
     - Uses: macro_plan_summary.global_story (theme, motifs, pacing_notes)
+    - Uses: lyric_context (narrative summary for score calibration)
     - Does NOT use: template_catalog, timing_context
 
     Args:
@@ -622,6 +655,7 @@ def shape_holistic_judge_context(
         choreo_graph: Choreography graph configuration
         template_catalog: Available templates
         macro_plan_summary: Optional MacroPlan summary
+        lyric_context: Optional LyricContextModel for narrative calibration
 
     Returns:
         Shaped context dict for holistic judge
@@ -685,13 +719,9 @@ def shape_holistic_judge_context(
         "group_plan_set": group_plan_set_dict,
         "display_graph": {
             "groups_by_role": choreo_graph.groups_by_role,
-            "groups_by_tag": {
-                tag.value: ids
-                for tag, ids in choreo_graph.groups_by_tag.items()
-            },
+            "groups_by_tag": {tag.value: ids for tag, ids in choreo_graph.groups_by_tag.items()},
             "groups_by_split": {
-                split.value: ids
-                for split, ids in choreo_graph.groups_by_split.items()
+                split.value: ids for split, ids in choreo_graph.groups_by_split.items()
             },
         },
         "group_hierarchy": group_hierarchy,
@@ -707,5 +737,7 @@ def shape_holistic_judge_context(
         "global_palette_alternates": global_palette_alternates,
         "story_notes": story_notes,
         "section_theme_summary": section_theme_summary,
+        # Lyric/narrative context — used to calibrate variety + utilization scoring
+        "lyric_context": _shape_lyric_context_summary(lyric_context),
         # template_catalog excluded (not used in prompt)
     }

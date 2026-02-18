@@ -250,8 +250,7 @@ class SectionPlanValidator:
                         field_path=f"lane_plans[{lane_name}].targets",
                         fix_hint=(
                             f"Replace '{target.id}' with an exact group id from "
-                            f"the list above."
-                            + (f" Closest match: {close[0]}" if close else "")
+                            f"the list above." + (f" Closest match: {close[0]}" if close else "")
                         ),
                     )
                 )
@@ -703,9 +702,7 @@ class SectionPlanValidator:
 
             # Track for overlap detection using target key
             target_key = f"{placement.target.type.value}:{placement.target.id}"
-            placements_by_target[target_key].append(
-                (start_ms, end_ms, placement.placement_id)
-            )
+            placements_by_target[target_key].append((start_ms, end_ms, placement.placement_id))
             target_timings[target_key].append(
                 (start_ms, end_ms, f"placement:{placement.placement_id}")
             )

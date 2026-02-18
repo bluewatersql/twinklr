@@ -224,6 +224,7 @@ Create a SectionCoordinationPlan for **{{ section_name }} ({{ section_id }})**.
 **Primary targets for ACCENT:** {{ primary_focus_targets | join(", ") }}
 **Available bars:** 1 to {{ available_bars }}
 **Do not exceed bar {{ section_max_bar }} for any start or window end.**
+**Same-target timing safety:** If ACCENT uses repeated hits on the same target, keep starts at least 2 beats apart; if any placement is BURST, keep same-target starts at least 1 full bar apart.
 
 {% if lyric_context %}
 **NARRATIVE ASSETS:** Include `narrative_assets` with 1-10 figurative imagery directives based on the narrative context above. These must be concrete visual subjects (characters, objects, scenes), not abstract patterns.

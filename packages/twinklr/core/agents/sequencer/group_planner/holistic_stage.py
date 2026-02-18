@@ -98,6 +98,8 @@ class HolisticEvaluatorStage:
             macro_plan = context.get_state("macro_plan")
             macro_plan_summary = _extract_macro_plan_summary(macro_plan)
 
+            lyric_context = context.get_state("lyric_context")
+
             evaluator = HolisticEvaluator(
                 provider=context.provider,
                 llm_logger=context.llm_logger,
@@ -113,6 +115,7 @@ class HolisticEvaluatorStage:
                     choreo_graph=self.choreo_graph,
                     template_catalog=self.template_catalog,
                     macro_plan_summary=macro_plan_summary,
+                    lyric_context=lyric_context,
                 ),
                 result_extractor=lambda _: input,
                 result_type=HolisticEvaluation,
@@ -121,8 +124,9 @@ class HolisticEvaluatorStage:
                     choreo_graph=self.choreo_graph,
                     template_catalog=self.template_catalog,
                     macro_plan_summary=macro_plan_summary,
+                    lyric_context=lyric_context,
                 ),
-                cache_version="1",
+                cache_version="2",
                 metrics_handler=self._handle_metrics,
             )
 

@@ -8,8 +8,8 @@ from twinklr.core.formats.xlights.layout.models.rgb_effects import (
     Settings,
     Viewpoints,
 )
+from twinklr.core.parsers.xml import XMLParser
 from twinklr.core.utils.logging import get_logger
-from twinklr.core.utils.xml import XMLParser
 
 logger = get_logger(__name__)
 

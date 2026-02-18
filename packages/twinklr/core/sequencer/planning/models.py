@@ -6,6 +6,7 @@ Models for strategic planning at the macro (song/section) level.
 from pydantic import BaseModel, Field, field_validator
 
 from twinklr.core.agents.audio.profile.models import SongSectionRef
+from twinklr.core.sequencer.templates.group.models.coordination import PlanTarget
 from twinklr.core.sequencer.theming import ThemeRef, ThemeScope
 from twinklr.core.sequencer.vocabulary import (
     BlendMode,
@@ -13,7 +14,6 @@ from twinklr.core.sequencer.vocabulary import (
     EnergyTarget,
     LayerRole,
     MotionDensity,
-    TargetRole,
     TimingDriver,
 )
 from twinklr.core.sequencer.vocabulary.visual import PaletteRole
@@ -122,11 +122,19 @@ class MacroSectionPlan(BaseModel):
     section: SongSectionRef = Field(..., description="Reference to audio section")
     theme: ThemeRef = Field(..., description="Section theme reference")
     energy_target: EnergyTarget = Field(..., description="Target energy level for section")
-    primary_focus_targets: list[str] = Field(
-        ..., description="Main display roles (e.g. OUTLINE, MEGA_TREE)", min_length=1, max_length=5
+    primary_focus_targets: list[PlanTarget] = Field(
+        ...,
+        description=(
+            "Main display targets for section intent using typed targets "
+            "(group/zone/split). At least one target is required."
+        ),
+        min_length=1,
+        max_length=8,
     )
-    secondary_targets: list[str] = Field(
-        default_factory=list, description="Supporting roles", max_length=10
+    secondary_targets: list[PlanTarget] = Field(
+        default_factory=list,
+        description="Supporting typed targets (group/zone/split)",
+        max_length=12,
     )
     choreography_style: ChoreographyStyle = Field(
         ..., description="Visual approach (IMAGERY, ABSTRACT, HYBRID)"
@@ -148,12 +156,14 @@ class MacroSectionPlan(BaseModel):
 
     @field_validator("primary_focus_targets", "secondary_targets")
     @classmethod
-    def validate_target_roles(cls, v: list[str]) -> list[str]:
-        """Validate target roles are valid TargetRole names."""
-        valid_roles = {r.name for r in TargetRole}
-        for role in v:
-            if role not in valid_roles:
-                raise ValueError(f"Invalid target role: {role}")
+    def validate_focus_targets(cls, v: list[PlanTarget]) -> list[PlanTarget]:
+        """Validate typed focus targets are unique by (type,id)."""
+        seen: set[tuple[str, str]] = set()
+        for target in v:
+            key = (target.type.value, target.id)
+            if key in seen:
+                raise ValueError(f"Duplicate focus target: {target.type.value}:{target.id}")
+            seen.add(key)
         return v
 
     @field_validator("theme")
@@ -177,7 +187,10 @@ class TargetSelector(BaseModel):
     model_config = {"extra": "forbid"}
 
     roles: list[str] = Field(
-        ..., description="Target roles (e.g. OUTLINE, MEGA_TREE)", min_length=1, max_length=10
+        ...,
+        description="Concrete display group IDs (e.g. OUTLINE, MEGA_TREE, WREATHS, MATRIX)",
+        min_length=1,
+        max_length=10,
     )
     coordination: str = Field(
         default="unified",
@@ -186,13 +199,12 @@ class TargetSelector(BaseModel):
 
     @field_validator("roles")
     @classmethod
-    def validate_roles(cls, v: list[str]) -> list[str]:
-        """Validate roles are valid TargetRole names."""
-        valid_roles = {r.name for r in TargetRole}
-        for role in v:
-            if role not in valid_roles:
-                raise ValueError(f"Invalid role: {role}")
-        return v
+    def validate_roles_non_empty(cls, v: list[str]) -> list[str]:
+        """Validate role ids are non-empty strings."""
+        cleaned = [role.strip() for role in v if role and role.strip()]
+        if len(cleaned) != len(v):
+            raise ValueError("roles must not contain empty values")
+        return cleaned
 
 
 class LayerSpec(BaseModel):

@@ -136,7 +136,7 @@ Notable examples:
 {% endif %}
 ## Display Layout
 
-Available target roles in this display:
+Available concrete display group IDs in this display:
 {% for group in display_groups %}
 - **{{ group.role_key }}**{% if group.element_kind is defined %} [{{ group.element_kind }}]{% endif %} - {{ group.model_count }} model{{ "s" if group.model_count != 1 else "" }}{% if group.pixel_fraction is defined %}, {{ (group.pixel_fraction * 100) | round(0) | int }}% of display{% endif %}{% if group.prominence is defined %} ({{ group.prominence }}){% endif %}
 
@@ -145,12 +145,29 @@ Available target roles in this display:
 {% endif %}
 {% endfor %}
 
-**CRITICAL ROLE LOCK:** Use only the exact role IDs listed above in:
-- `layering_plan.layers[*].target_selector.roles`
-- `section_plans[*].primary_focus_targets`
-- `section_plans[*].secondary_targets`
+{% if available_zone_ids is defined and available_zone_ids %}
+Available zone IDs:
+{% for zone in available_zone_ids %}
+- **{{ zone }}**
+{% endfor %}
+{% endif %}
 
-Do not invent roles (for example: `LINES` is invalid unless it appears above).
+{% if available_split_ids is defined and available_split_ids %}
+Available split IDs:
+{% for split in available_split_ids %}
+- **{{ split }}**
+{% endfor %}
+{% endif %}
+
+**CRITICAL TARGET LOCK:**
+- `layering_plan.layers[*].target_selector.roles` must use only concrete display group IDs listed above.
+- `section_plans[*].primary_focus_targets` and `section_plans[*].secondary_targets` must be typed target objects:
+  - `{"type":"group","id":"<group_id>"}`
+  - `{"type":"zone","id":"<zone_id>"}`
+  - `{"type":"split","id":"<split_id>"}`
+- `primary_focus_targets` must include at least one target object of type `group` or `zone` or `split`.
+- Do not emit plain strings for focus targets.
+- Do not invent IDs.
 
 # Your Task
 
@@ -177,6 +194,6 @@ Example for {{ audio_profile.structure.sections | length }} sections:
 2. Global theme scope is `SONG`; all section theme scopes are `SECTION`.
 3. Global palette plan has valid primary `palette_id`; section overrides are rare and justified in notes.
 4. Every section has non-empty `motif_ids`; 2-4 core motifs are clearly dominant.
-5. All target roles come from the Display Layout role list above.
+5. All layer targets are concrete display group IDs; all focus targets are typed `group|zone|split` objects with valid IDs.
 
 Remember: Bold impact, main character energy, coordinated wow moments!

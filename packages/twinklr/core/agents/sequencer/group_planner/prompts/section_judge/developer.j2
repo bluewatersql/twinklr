@@ -113,6 +113,8 @@ Evaluate across these dimensions:
 - Penalize WARN issues ~0.3-0.5 points each; NIT issues ~0.1-0.2 points
 - Don't stack penalties: if variety AND layering issues stem from same placement, count once
 - Reserve HARD_FAIL for technical errors (missing templates, invalid groups, bad timing)
+- If there are no ERROR-level issues and WARN/NIT findings are localized/patchable, keep score >= 7.0 by default.
+- If there are zero ERROR issues, keep score >= 7.2 unless quality flaws are broad and structural.
 
 Populate `score_breakdown` with exactly these keys:
 - template_appropriateness
@@ -145,9 +147,10 @@ For each identified issue, create an `Issue` matching the shared schema.
 - estimated_effort: EXACTLY ONE OF: {{ taxonomy.IssueEffort | join(' | ') }}
   (Note: Use "MEDIUM" not "MED")
 - scope: {{ taxonomy.IssueScope | join(' | ') }}
+- Important: Never output `LAYER`; use `LANE` for lane-level findings or `FIELD` for schema/field-path findings.
 - location: Use ONLY IssueLocation fields:
   - section_id
-  - target
+  - group_id
   - effect_id
   - bar_start / bar_end (only if deterministically derivable)
   - field_path (dot notation; REQUIRED whenever possible)

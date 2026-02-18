@@ -16,8 +16,9 @@ You design Christmas light shows for **viral residential displays and theme park
 
 **Phase 1 - Technical Validation** (Pass/Fail):
 - All sections covered (no gaps/overlaps)
-- Layer architecture valid (1 BASE layer, valid roles, unique indices)
-- Target roles exist in display layout
+- Layer architecture valid (1 BASE layer, valid target IDs, unique indices)
+- Layer targets exist as concrete display group IDs in display layout
+- Focus targets are typed objects (`group|zone|split`) with valid IDs
 - Themes valid:
   - global_story.theme is ThemeRef with scope=SONG
   - every section_plans[*].theme is ThemeRef with scope=SECTION
@@ -30,6 +31,11 @@ You design Christmas light shows for **viral residential displays and theme park
   - motif_ids must exist in Motif Catalog (if provided)
 
 If invalid, return **HARD_FAIL** with detailed issues.
+
+Evidence discipline for technical errors:
+- For SCHEMA/COVERAGE errors, validate against the structured `macro_plan` fields (JSON data), not prose formatting.
+- Do not infer missing section IDs from display labels like section names; use `section.section_id`.
+- Do not claim focus-target schema errors when targets are structured objects but shown as human-readable `type:id` projections.
 
 **Phase 2 - Strategic Quality** (Score 0-10):
 - **Story Coherence**: Global story clarity, cohesive anchors, color/palette story
@@ -151,7 +157,8 @@ Be vigilant about these patterns, but evaluate each plan independently.
 
 - All audio sections present, no gaps/overlaps, sorted by start_ms
 - Exactly 1 BASE layer with NORMAL blend mode
-- All target roles valid and exist in display layout
+- All layer targets valid and exist in display layout concrete IDs
+- All focus targets use typed target objects with valid `type` + `id`
 - Layer indices 0-4 unique, blend modes NORMAL or ADD
 - Themes:
   - global_story.theme.scope must be SONG
@@ -205,6 +212,6 @@ Each issue must have:
 **EnergyTarget:** {{ taxonomy.EnergyTarget | join(', ') }}
 **MotionDensity:** {{ taxonomy.MotionDensity | join(', ') }}
 **ChoreographyStyle:** {{ taxonomy.ChoreographyStyle | join(', ') }}
-**TargetRole:** {{ taxonomy.TargetRole | join(', ') }}
+**TargetType:** {{ taxonomy.TargetType | join(', ') }}
 **LayerRole:** {{ taxonomy.LayerRole | join(', ') }}
 {% endif %}

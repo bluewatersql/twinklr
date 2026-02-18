@@ -42,8 +42,13 @@ class SectionPlanningContext(BaseModel):
     energy_target: str = Field(description="Energy target (LOW, MED, HIGH, BUILD, etc.)")
     motion_density: str = Field(description="Motion density (SPARSE, MED, BUSY)")
     choreography_style: str = Field(description="Choreography style (IMAGERY, ABSTRACT, HYBRID)")
-    primary_focus_targets: list[str] = Field(description="Primary focus role targets")
-    secondary_targets: list[str] = Field(default_factory=list, description="Secondary role targets")
+    primary_focus_targets: list[str] = Field(
+        description="Primary concrete group IDs resolved from macro targets"
+    )
+    secondary_targets: list[str] = Field(
+        default_factory=list,
+        description="Secondary concrete group IDs resolved from macro targets",
+    )
     notes: str | None = Field(default=None, description="Section-specific notes from MacroPlan")
 
     # Shared context references
@@ -74,6 +79,10 @@ class SectionPlanningContext(BaseModel):
         default=None,
         description="Palette override from MacroPlan for this section",
     )
+    global_palette_id: str | None = Field(
+        default=None,
+        description="Global primary palette_id from MacroPlan.global_story.palette_plan.primary",
+    )
 
     # Lyric/narrative context (optional, from lyrics analysis)
     lyric_context: dict[str, Any] | None = Field(
@@ -87,10 +96,10 @@ class SectionPlanningContext(BaseModel):
         return self.end_ms - self.start_ms
 
     def get_target_groups(self, roles: list[str]) -> list[str]:
-        """Expand role names to concrete group_ids.
+        """Expand target identifiers to concrete group_ids.
 
         Args:
-            roles: List of role names (e.g., ["HERO", "ARCHES"])
+            roles: List of target identifiers
 
         Returns:
             List of group_ids matching those roles
@@ -168,6 +177,13 @@ class GroupPlanningContext(BaseModel):
                 elif isinstance(theme_data, dict):
                     theme = ThemeRef.model_validate(theme_data)
 
+            resolved_primary = self._resolve_focus_targets(
+                section_plan.get("primary_focus_targets", [])
+            )
+            resolved_secondary = self._resolve_focus_targets(
+                section_plan.get("secondary_targets", [])
+            )
+
             ctx = SectionPlanningContext(
                 section_id=section_info.get("section_id", "unknown"),
                 section_name=section_info.get("name", "unknown"),
@@ -176,8 +192,8 @@ class GroupPlanningContext(BaseModel):
                 energy_target=section_plan.get("energy_target", "MED"),
                 motion_density=section_plan.get("motion_density", "MED"),
                 choreography_style=section_plan.get("choreography_style", "HYBRID"),
-                primary_focus_targets=section_plan.get("primary_focus_targets", []),
-                secondary_targets=section_plan.get("secondary_targets", []),
+                primary_focus_targets=resolved_primary,
+                secondary_targets=resolved_secondary,
                 notes=section_plan.get("notes"),
                 choreo_graph=self.choreo_graph,
                 template_catalog=self.template_catalog,
@@ -186,7 +202,39 @@ class GroupPlanningContext(BaseModel):
                 theme=theme,
                 motif_ids=section_plan.get("motif_ids", []),
                 palette=section_plan.get("palette"),
+                global_palette_id=None,
             )
             contexts.append(ctx)
 
         return contexts
+
+    def _resolve_focus_targets(self, targets: list[Any]) -> list[str]:
+        """Resolve typed macro focus targets to concrete group IDs."""
+        resolved: list[str] = []
+        for target in targets:
+            if isinstance(target, dict):
+                ttype = target.get("type")
+                tid = target.get("id")
+            else:
+                ttype = getattr(target, "type", None)
+                tid = getattr(target, "id", None)
+                if hasattr(ttype, "value"):
+                    ttype = ttype.value
+            if not ttype or not tid:
+                continue
+
+            if ttype == "group":
+                resolved.append(str(tid))
+            elif ttype == "zone":
+                for tag, ids in self.choreo_graph.groups_by_tag.items():
+                    if getattr(tag, "value", str(tag)) == tid:
+                        resolved.extend(ids)
+                        break
+            elif ttype == "split":
+                for split, ids in self.choreo_graph.groups_by_split.items():
+                    if getattr(split, "value", str(split)) == tid:
+                        resolved.extend(ids)
+                        break
+
+        seen: set[str] = set()
+        return [gid for gid in resolved if not (gid in seen or seen.add(gid))]

@@ -33,7 +33,7 @@ Use this context to avoid common mistakes, but evaluate each song on its own mer
 **BlendMode:** {{ taxonomy.BlendMode | join(', ') }}  
 **TimingDriver:** {{ taxonomy.TimingDriver | join(', ') }}  
 
-**TargetRole:** {{ taxonomy.TargetRole | join(', ') }}  
+**TargetType:** {{ taxonomy.TargetType | join(', ') }}  
 **EnergyTarget:** {{ taxonomy.EnergyTarget | join(', ') }}  
 **ChoreographyStyle:** {{ taxonomy.ChoreographyStyle | join(', ') }}  
 **MotionDensity:** {{ taxonomy.MotionDensity | join(', ') }}
@@ -43,7 +43,7 @@ Use this context to avoid common mistakes, but evaluate each song on its own mer
 **BlendMode:** NORMAL, ADD, MASK  
 **TimingDriver:** BEATS, DOWNBEATS, BARS, PHRASES, PEAKS, LYRICS  
 
-**TargetRole:** OUTLINE, MEGA_TREE, HERO, ARCHES, TREES, PROPS, FLOODS, ACCENTS, MATRIX, MOVING_HEADS  
+**TargetType:** group, zone, split  
 **EnergyTarget:** LOW, MED, HIGH, BUILD, RELEASE, PEAK  
 **ChoreographyStyle:** IMAGERY, ABSTRACT, HYBRID  
 **MotionDensity:** SPARSE, MED, BUSY
@@ -83,7 +83,10 @@ Use this context to avoid common mistakes, but evaluate each song on its own mer
    - No extra sections beyond what's in audio
    - No gaps or overlaps
    - Do NOT use generic labels without section_id
-4. **Target roles** must be from available display groups
+4. **Targeting contract**:
+   - `section_plans[*].primary_focus_targets` must include at least 1 typed target object (`group|zone|split`)
+   - `section_plans[*].secondary_targets` must be typed target objects if present
+   - `layering_plan.layers[*].target_selector.roles` must use concrete display group IDs only
 
 **Note on MASK blend mode:** While MASK exists in the schema, it is reserved for advanced use cases and should NOT be used in standard macro plans. Stick to NORMAL (for BASE layer only) and ADD (for all other layers).
 

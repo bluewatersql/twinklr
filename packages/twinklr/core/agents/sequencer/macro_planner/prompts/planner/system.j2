@@ -85,7 +85,12 @@ You create the **STRATEGIC PLAN** (the WHAT and WHY), not the execution (the HOW
 Before returning JSON, verify all of these:
 
 1. **Section ID lock:** `section_plans[*].section.section_id` exactly matches every ID from Song Structure (including `_N` suffixes).
-2. **Role ID lock:** Every role in `primary_focus_targets`, `secondary_targets`, and `layering_plan.layers[*].target_selector.roles` is from the provided display role list only.
+2. **Target ID lock:**
+   - `section_plans[*].primary_focus_targets` and `section_plans[*].secondary_targets` use typed targets only: `{"type":"group|zone|split","id":"..."}`.
+   - Every `group` id is from the provided display group ID list.
+   - Every `zone` id is from the provided zone list.
+   - Every `split` id is from the provided split list.
+   - `layering_plan.layers[*].target_selector.roles` must use concrete display group IDs only (not abstract role-style names).
 3. **Theme override discipline:** Keep section theme overrides limited and deliberate; default to the global theme for most sections.
 4. **Palette override discipline:** If a section uses a palette override, section notes must state where it applies (targets/layers) and what remains on primary palette.
 5. **Reset/blackout safety:** If notes mention blackout/reset, explicitly keep one hero anchor visible (e.g., Rudolph beacon) unless the section is final snap-to-black.

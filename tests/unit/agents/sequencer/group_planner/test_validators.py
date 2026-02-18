@@ -225,7 +225,9 @@ class TestSectionPlanValidator:
                             placements=[
                                 GroupPlacement(
                                     placement_id="p1",
-                                    target=PlanTarget(type=TargetType.GROUP, id="NONEXISTENT_GROUP"),
+                                    target=PlanTarget(
+                                        type=TargetType.GROUP, id="NONEXISTENT_GROUP"
+                                    ),
                                     template_id="gtpl_accent_bell",
                                     start=PlanningTimeRef(bar=1, beat=1),
                                     duration=EffectDuration.BURST,

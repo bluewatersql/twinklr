@@ -106,6 +106,7 @@ References existing conversation context (section, templates, groups).
 1. Address ALL ERROR severity issues first
 2. If any cross-lane reuse errors are present, make lane target sets disjoint before other edits
 3. Keep every placement start and window end within bars 1..{{ section_max_bar }}
+3a. For repeated placements on the same target: keep starts >=2 beats apart; if any placement is BURST, keep same-target starts >=1 full bar apart
 4. Keep structure that worked - only fix flagged issues
 5. Use categorical intensity levels (WHISPER to PEAK), not numeric values
 6. Use categorical durations (HIT, BURST, PHRASE, EXTENDED, SECTION)

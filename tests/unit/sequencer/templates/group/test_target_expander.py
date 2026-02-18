@@ -329,5 +329,3 @@ class TestExpandPlanSequenced:
         expanded = expander.expand_plan(plan)
         assert expanded.config is not None
         assert expanded.config.group_order == ["B", "A"]
-
-

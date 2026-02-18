@@ -9,10 +9,12 @@ that catch common structural and logical issues.
 from __future__ import annotations
 
 from collections import Counter
+from typing import Any
 
 from twinklr.core.agents.audio.profile.models import AudioProfileModel
 from twinklr.core.agents.issues import Issue, IssueSeverity
 from twinklr.core.sequencer.planning import MacroPlan
+from twinklr.core.sequencer.vocabulary import TargetType
 
 
 class MacroPlanHeuristicValidator:
@@ -37,6 +39,7 @@ class MacroPlanHeuristicValidator:
         *,
         motif_by_id: dict[str, object] | None = None,
         palette_ids: set[str] | None = None,
+        display_groups: list[dict[str, Any]] | None = None,
     ) -> list[Issue]:
         """Run all validation checks on MacroPlan.
 
@@ -54,7 +57,7 @@ class MacroPlanHeuristicValidator:
         # Existing checks
         issues.extend(self._validate_section_coverage(plan, audio_profile))
         issues.extend(self._validate_layer_count(plan))
-        issues.extend(self._validate_target_validity(plan))
+        issues.extend(self._validate_target_validity(plan, display_groups))
         issues.extend(self._validate_asset_types(plan))
         issues.extend(self._validate_focus_targets(plan))
         issues.extend(self._check_contrast(plan))
@@ -185,8 +188,125 @@ class MacroPlanHeuristicValidator:
 
         return issues
 
-    def _validate_target_validity(self, plan: MacroPlan) -> list[Issue]:
-        return []
+    def _validate_target_validity(
+        self,
+        plan: MacroPlan,
+        display_groups: list[dict[str, Any]] | None,
+    ) -> list[Issue]:
+        """Validate typed focus target IDs against display inventory."""
+        from twinklr.core.agents.issues import (
+            IssueCategory,
+            IssueEffort,
+            IssueLocation,
+            IssueScope,
+            IssueSeverity,
+            SuggestedAction,
+        )
+
+        issues: list[Issue] = []
+        if not display_groups:
+            return issues
+
+        valid_group_ids: set[str] = set()
+        valid_zones: set[str] = set()
+        valid_splits: set[str] = set()
+
+        for group in display_groups:
+            gid = str(group.get("role_key") or group.get("id") or "").strip()
+            if gid:
+                valid_group_ids.add(gid)
+
+            zone = group.get("zone")
+            if zone:
+                valid_zones.add(str(zone))
+            tags = group.get("tags") or group.get("zones") or []
+            if isinstance(tags, list):
+                valid_zones.update(str(tag) for tag in tags if tag)
+
+            splits = group.get("split_membership") or group.get("splits") or []
+            if isinstance(splits, list):
+                valid_splits.update(str(split) for split in splits if split)
+
+        for sp in plan.section_plans:
+            section_id = sp.section.section_id
+            for target in [*sp.primary_focus_targets, *sp.secondary_targets]:
+                if target.type == TargetType.GROUP and target.id not in valid_group_ids:
+                    issues.append(
+                        Issue(
+                            issue_id=f"TARGET_GROUP_UNKNOWN_{section_id}_{target.id}",
+                            category=IssueCategory.CONSTRAINT,
+                            severity=IssueSeverity.ERROR,
+                            estimated_effort=IssueEffort.LOW,
+                            scope=IssueScope.SECTION,
+                            location=IssueLocation(section_id=section_id),
+                            rule="DON'T reference group targets that are not in the display graph",
+                            message=f"Section '{section_id}' uses unknown group target '{target.id}'.",
+                            fix_hint="Use only group IDs listed in display layout.",
+                            acceptance_test="All group focus targets exist in display group IDs.",
+                            suggested_action=SuggestedAction.PATCH,
+                        )
+                    )
+                elif target.type == TargetType.ZONE and target.id not in valid_zones:
+                    issues.append(
+                        Issue(
+                            issue_id=f"TARGET_ZONE_UNKNOWN_{section_id}_{target.id}",
+                            category=IssueCategory.CONSTRAINT,
+                            severity=IssueSeverity.ERROR,
+                            estimated_effort=IssueEffort.LOW,
+                            scope=IssueScope.SECTION,
+                            location=IssueLocation(section_id=section_id),
+                            rule="DON'T reference zone targets that are not in the display graph",
+                            message=f"Section '{section_id}' uses unknown zone target '{target.id}'.",
+                            fix_hint="Use only zone IDs listed in display zones.",
+                            acceptance_test="All zone focus targets exist in display zone IDs.",
+                            suggested_action=SuggestedAction.PATCH,
+                        )
+                    )
+                elif target.type == TargetType.SPLIT and target.id not in valid_splits:
+                    issues.append(
+                        Issue(
+                            issue_id=f"TARGET_SPLIT_UNKNOWN_{section_id}_{target.id}",
+                            category=IssueCategory.CONSTRAINT,
+                            severity=IssueSeverity.ERROR,
+                            estimated_effort=IssueEffort.LOW,
+                            scope=IssueScope.SECTION,
+                            location=IssueLocation(section_id=section_id),
+                            rule="DON'T reference split targets that are not available in the display graph",
+                            message=f"Section '{section_id}' uses unknown split target '{target.id}'.",
+                            fix_hint="Use only split IDs listed in display splits.",
+                            acceptance_test="All split focus targets exist in available split IDs.",
+                            suggested_action=SuggestedAction.PATCH,
+                        )
+                    )
+
+        # Layer target selectors must also use concrete display group IDs.
+        for layer in plan.layering_plan.layers:
+            for role_id in layer.target_selector.roles:
+                if role_id not in valid_group_ids:
+                    issues.append(
+                        Issue(
+                            issue_id=f"LAYER_TARGET_UNKNOWN_{layer.layer_index}_{role_id}",
+                            category=IssueCategory.CONSTRAINT,
+                            severity=IssueSeverity.ERROR,
+                            estimated_effort=IssueEffort.LOW,
+                            scope=IssueScope.FIELD,
+                            location=IssueLocation(
+                                field_path=f"layering_plan.layers[{layer.layer_index}].target_selector.roles"
+                            ),
+                            rule="DON'T reference layer targets that are not concrete display group IDs",
+                            message=(
+                                f"Layer {layer.layer_index} references unknown target '{role_id}'. "
+                                "Layer targets must use concrete display group IDs."
+                            ),
+                            fix_hint="Use only group IDs listed in display layout for layer target_selector.roles.",
+                            acceptance_test=(
+                                "Every layering_plan.layers[*].target_selector.roles entry exists in display group IDs."
+                            ),
+                            suggested_action=SuggestedAction.PATCH,
+                        )
+                    )
+
+        return issues
 
     def _validate_asset_types(self, plan: MacroPlan) -> list[Issue]:
         from twinklr.core.agents.issues import (
@@ -235,7 +355,32 @@ class MacroPlanHeuristicValidator:
         issues: list[Issue] = []
         primary_targets: list[str] = []
         for section_plan in plan.section_plans:
-            primary_targets.extend(section_plan.primary_focus_targets)
+            # Track focus variety by typed target identity
+            primary_targets.extend(
+                [f"{t.type.value}:{t.id}" for t in section_plan.primary_focus_targets]
+            )
+
+            # Split-only primary sets are valid but usually too abstract.
+            # Encourage at least one group/zone anchor for readability.
+            if all(t.type == TargetType.SPLIT for t in section_plan.primary_focus_targets):
+                issues.append(
+                    Issue(
+                        issue_id=f"FOCUS_SPLIT_ONLY_{section_plan.section.section_id}",
+                        category=IssueCategory.COORDINATION,
+                        severity=IssueSeverity.WARN,
+                        estimated_effort=IssueEffort.LOW,
+                        scope=IssueScope.SECTION,
+                        location=IssueLocation(section_id=section_plan.section.section_id),
+                        rule="DON'T use split-only primaries without a group or zone anchor",
+                        message=(
+                            f"Section '{section_plan.section.section_id}' primary_focus_targets are split-only; "
+                            "intent may be too abstract for downstream emphasis."
+                        ),
+                        fix_hint="Add at least one group or zone target to primary_focus_targets.",
+                        acceptance_test="Each split-only primary set includes at least one group or zone anchor.",
+                        suggested_action=SuggestedAction.PATCH,
+                    )
+                )
 
         target_counts = Counter(primary_targets)
         total_sections = len(plan.section_plans)
@@ -255,7 +400,7 @@ class MacroPlanHeuristicValidator:
                             f"Target '{target}' is primary focus in {count}/{total_sections} sections "
                             f"({count / total_sections * 100:.0f}%). Consider more target variety."
                         ),
-                        fix_hint="Vary primary focus targets across sections. Use other targets like MEGA_TREE, HERO, ARCHES, etc.",
+                        fix_hint="Vary primary focus targets across sections (group/zone/split) to avoid repetition.",
                         acceptance_test="No single target is primary focus in more than 70% of sections",
                         suggested_action=SuggestedAction.PATCH,
                     )

@@ -10,7 +10,7 @@ templates:
 variables:
   required:
     - audio_profile           # AudioProfileModel with song analysis
-    - display_groups          # List of DisplayGroup objects with target roles
+    - display_groups          # List of DisplayGroup objects with concrete group IDs and metadata
     - response_schema         # JSON schema for MacroPlan (auto-injected)
     - taxonomy                # Dict of enum names to value lists (auto-injected)
     - theme_catalog           # List of ThemeDefinition summaries (theme_id, title)
@@ -29,6 +29,9 @@ variables:
     - default_palette_id      # If theme has a default palette; can be derived upstream
     - allowed_palette_ids     # If you want to constrain palette choices per run (subset of palette_catalog)
     - motif_policy            # Cohesion constraints (e.g. min motifs per section, recurrence targets)
+    - available_group_ids     # Concrete display group IDs for layer/focus target validation
+    - available_zone_ids      # Available zone IDs for typed zone targets
+    - available_split_ids     # Available split IDs for typed split targets
 
 metadata:
   agent_type: strategic_planner

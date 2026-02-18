@@ -65,10 +65,14 @@ Evaluate **cross-section quality** across these dimensions:
 1. **story_coherence** (25%): cohesive story + thematic throughline
 2. **energy_arc** (25%): build/peak/release placement
 3. **visual_variety** (20%): contrast vs repetition across sections
+   - **Calibrate against song structure and MacroPlan intent.** If `global_story.motifs` or `pacing_notes` designate certain motifs as signature or recurring (e.g., “always-on”), score variety within that constraint — not as if the signature motif were absent. A plan that uses 2–3 motifs consistently as show identity should not score below 6.5 on this dimension for motif repetition alone.
+   - For narrative ballads, traditional standards, or songs with a distinct genre identity (see `genre_markers` in the Song Narrative Context), repeating structural elements across sections reflects intentional show identity. Assess variety on: template diversity within motifs, group rotation, spatial contrast (different zones/splits), and section-specific staging choices.
+   - Reserve scores below 6.0 for plans where the *same template on the same group* repeats across unrelated sections with no staging variation whatsoever.
 4. **transitions** (15%): smoothness between adjacent sections
 5. **resource_utilization** (15%): balanced group usage; focus targets shine.
+   - **Important (Narrative protagonist):** If the Song Narrative Context shows `has_narrative: true` with named characters, a single hero prop dominating multiple sections is narrative intent, not a planning failure. Evaluate whether *supporting* groups still receive meaningful moments across the show — not whether all groups are equally represented. A hero prop appearing in 5–7 of 10+ sections is acceptable when it represents the song’s protagonist; only score below 6.0 if non-hero groups receive zero attention across the entire show.
    - **Important (Hierarchy):** If a "Group Hierarchy" is provided, a parent group implicitly covers all its children. Do NOT flag a child group as absent/underutilized when its parent group is used in that section.
-   - **Important (Multi-lane reuse):** If `layer_intents.multilane_allowed_groups` allowlists a group for RHYTHM+ACCENT, do NOT penalize reuse itself. Instead, evaluate whether ACCENT hits are used sparingly and strategically (avoid “always-on accent mud”).
+   - **Important (Multi-lane reuse):** If `layer_intents.multilane_allowed_groups` allowlists a group for RHYTHM+ACCENT, do NOT penalize reuse itself. Instead, evaluate whether ACCENT hits are used sparingly and strategically (avoid "always-on accent mud").
 
 Populate `score_breakdown` with exactly these keys:
 - story_coherence

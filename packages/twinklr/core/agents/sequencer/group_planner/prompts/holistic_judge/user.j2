@@ -55,6 +55,30 @@ The MacroPlan defines **{{ expected_section_ids | length }}** sections. Compare 
 When a parent group is used in a section, all its children are implicitly covered.
 {% endif %}
 
+{% if lyric_context %}
+## Song Narrative Context
+
+**Has Narrative:** {{ lyric_context.has_narrative }}
+{% if lyric_context.has_narrative and lyric_context.characters %}
+**Characters:** {{ lyric_context.characters | join(", ") }}
+{% endif %}
+{% if lyric_context.themes %}
+**Themes:** {{ lyric_context.themes | join("; ") }}
+{% endif %}
+**Mood Arc:** {{ lyric_context.mood_arc }}
+{% if lyric_context.genre_markers %}
+**Genre:** {{ lyric_context.genre_markers | join(", ") }}
+{% endif %}
+{% if lyric_context.recommended_visual_themes %}
+**Recommended Visual Identity:**
+{% for vt in lyric_context.recommended_visual_themes %}
+- {{ vt }}
+{% endfor %}
+{% endif %}
+
+*Use this context when calibrating `visual_variety` and `resource_utilization` scores. For songs with a named protagonist, a single hero prop dominating multiple sections is narrative intent. For genre-defining motifs (e.g., "signature" or "always-on" motifs in the MacroPlan), recurring use reflects intentional show identity.*
+
+{% endif %}
 {% if macro_plan_summary and macro_plan_summary.global_story %}
 
 ## Macro Plan Theme & Palette Summary

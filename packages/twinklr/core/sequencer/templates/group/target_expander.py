@@ -98,10 +98,7 @@ class TargetExpander:
             try:
                 split = SplitDimension(target.id)
             except ValueError:
-                msg = (
-                    f"Unknown split target: '{target.id}' "
-                    f"(not a valid SplitDimension)"
-                )
+                msg = f"Unknown split target: '{target.id}' (not a valid SplitDimension)"
                 raise ValueError(msg) from None
             resolved = self._graph.groups_by_split.get(split, [])
             if not resolved:

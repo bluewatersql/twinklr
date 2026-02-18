@@ -69,6 +69,7 @@ Match template complexity to group detail capability:
 | Start within bounds | bar 1 to available_bars | bar 10 when section has 4 bars |
 | No invented template_ids | every `template_id` ∈ template catalog | placement uses `template_id` not present in the template catalog |
 | No same-target self-overlap | Same target (type+id) must be time-disjoint in a lane | Two zone:HOUSE placements overlap in RHYTHM lane |
+| Same-target spacing | If either placement uses BURST, same target starts must be >= 1 bar apart; ACCENT same-target HITs should be >= 2 beats apart | BURST at bar 2 beat 1 and HIT at bar 2 beat 3 on same target |
 | lane→target_roles mapping | BASE→[BACKGROUND], RHYTHM→[MID], ACCENT→[HERO] | ACCENT has target_roles [MID] |
 | Cross-lane reuse policy | Default: a target appears in only one lane. Exception: group may appear in both RHYTHM+ACCENT only if allowlisted by `layer_intents.multilane_allowed_groups` | MEGA_TREE in RHYTHM+ACCENT without allowlist |
 | Multi-lane override semantics | For allowlisted groups in both RHYTHM+ACCENT: overlap across lanes is allowed; ACCENT is higher-priority override during its intervals | Non-allowlisted group overlaps across lanes |

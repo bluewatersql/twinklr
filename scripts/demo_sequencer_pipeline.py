@@ -519,7 +519,7 @@ async def main() -> None:
         max_iterations=session.job_config.agent.max_iterations,
         min_pass_score=session.job_config.agent.success_threshold / 10.0,
         enable_holistic=True,
-        enable_assets=True,
+        enable_assets=False,
         xlights_mapping=xlights_mapping,
     )
 
@@ -615,7 +615,7 @@ async def main() -> None:
         print(f"Audio profile: {profile_path.stem}")
 
     # Lyrics context
-    if "lyrics" in result.outputs:
+    if "lyrics" in result.outputs and result.outputs["lyrics"] is not None:
         lyrics = result.outputs["lyrics"]
         lyrics_path = save_artifact(
             lyrics.model_dump(),

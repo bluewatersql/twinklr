@@ -29,12 +29,28 @@ Provides the MacroPlan to evaluate along with song context
 
 ## Display Layout
 
-Available target roles:
+Available concrete display group IDs:
 {% for group in display_groups %}
 - **{{ group.role_key }}** ({{ group.model_count }} models)
 {% endfor %}
 
-Count target-role validity against this exact list only.
+Layer targets must match this exact list.
+
+{% if available_zone_ids is defined and available_zone_ids %}
+Available zone IDs:
+{% for zone in available_zone_ids %}
+- **{{ zone }}**
+{% endfor %}
+{% endif %}
+
+{% if available_split_ids is defined and available_split_ids %}
+Available split IDs:
+{% for split in available_split_ids %}
+- **{{ split }}**
+{% endfor %}
+{% endif %}
+
+Focus targets must be typed objects using `type` in `group|zone|split` with IDs from the corresponding lists.
 
 ---
 
@@ -115,8 +131,11 @@ Count target-role validity against this exact list only.
 
 ## Section Plans
 
+Use `section.section_id` as the canonical section identifier for coverage checks.
+Primary/Secondary Focus lines below are human-readable projections of typed target objects; schema validity must be judged from the structured plan data.
+
 {% for section in macro_plan.section_plans %}
-### {{ section.section.name }} ({{ (section.section.start_ms / 1000) | round(1) }}s - {{ (section.section.end_ms / 1000) | round(1) }}s)
+### {{ section.section.name }} ({{ section.section.section_id }}) ({{ (section.section.start_ms / 1000) | round(1) }}s - {{ (section.section.end_ms / 1000) | round(1) }}s)
 
 - **Theme ID:** {{ section.theme.theme_id }}
 - **Theme Scope:** {{ section.theme.scope.value if section.theme.scope else 'MISSING' }}
@@ -137,8 +156,22 @@ Count target-role validity against this exact list only.
 - **Energy Target:** {{ section.energy_target.value }}
 - **Motion Density:** {{ section.motion_density.value }}
 - **Choreography Style:** {{ section.choreography_style.value }}
-- **Primary Focus:** {{ section.primary_focus_targets | join(', ') if section.primary_focus_targets else 'None' }}
-- **Secondary Targets:** {{ section.secondary_targets | join(', ') if section.secondary_targets else 'None' }}
+- **Primary Focus:**
+{% if section.primary_focus_targets %}
+{% for target in section.primary_focus_targets %}
+  - {{ target.type.value if target.type is defined and target.type.value is defined else target.type }}:{{ target.id }}
+{% endfor %}
+{% else %}
+  - None
+{% endif %}
+- **Secondary Targets:**
+{% if section.secondary_targets %}
+{% for target in section.secondary_targets %}
+  - {{ target.type.value if target.type is defined and target.type.value is defined else target.type }}:{{ target.id }}
+{% endfor %}
+{% else %}
+  - None
+{% endif %}
 - **Notes:** {{ section.notes }}
 
 {% endfor %}

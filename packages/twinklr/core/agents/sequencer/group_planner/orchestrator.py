@@ -33,6 +33,7 @@ from twinklr.core.agents.shared.judge.feedback import FeedbackManager
 from twinklr.core.agents.shared.judge.models import IterationState
 from twinklr.core.agents.spec import AgentSpec
 from twinklr.core.sequencer.planning import SectionCoordinationPlan
+from twinklr.core.sequencer.vocabulary import EffectDuration, LaneKind
 
 logger = logging.getLogger(__name__)
 
@@ -436,6 +437,10 @@ class GroupPlannerOrchestrator:
 
         def validate(plan: SectionCoordinationPlan) -> list[str]:
             """Validate plan and return list of error messages."""
+            # Deterministic safety pass to reduce avoidable first-iteration failures.
+            # This removes same-target placements that are too tightly packed for
+            # categorical duration expansion, which commonly causes overlap errors.
+            self._sanitize_same_target_spacing(plan, section_context)
             result = validator.validate(plan)
 
             # Return only ERROR severity issues as strings
@@ -447,3 +452,53 @@ class GroupPlannerOrchestrator:
             return errors
 
         return validate
+
+    def _sanitize_same_target_spacing(
+        self,
+        plan: SectionCoordinationPlan,
+        section_context: SectionPlanningContext,
+    ) -> None:
+        """Drop same-target placements that are too close to safely coexist.
+
+        This is intentionally conservative and deterministic:
+        - BASE/RHYTHM same-target starts must be >= 1 beat apart.
+        - ACCENT same-target starts must be >= 2 beats apart.
+        - If either placement is BURST, same-target starts must be >= 1 bar apart.
+        """
+        beats_per_bar = max(1, section_context.timing_context.beats_per_bar)
+
+        for lane_plan in plan.lane_plans:
+            # Track last kept start+duration per target across entire lane.
+            last_kept: dict[str, tuple[int, EffectDuration]] = {}
+
+            for coordination_plan in lane_plan.coordination_plans:
+                if not coordination_plan.placements:
+                    continue
+
+                placements_sorted = sorted(
+                    coordination_plan.placements,
+                    key=lambda p: (p.start.bar, p.start.beat, p.placement_id),
+                )
+                kept = []
+                for placement in placements_sorted:
+                    target_key = f"{placement.target.type.value}:{placement.target.id}"
+                    start_beat = (placement.start.bar - 1) * beats_per_bar + placement.start.beat
+
+                    prev = last_kept.get(target_key)
+                    keep = True
+                    if prev is not None:
+                        prev_start, prev_duration = prev
+                        min_gap = beats_per_bar if lane_plan.lane == LaneKind.ACCENT else 1
+                        if (
+                            prev_duration == EffectDuration.BURST
+                            or placement.duration == EffectDuration.BURST
+                        ):
+                            min_gap = beats_per_bar
+                        if start_beat - prev_start < min_gap:
+                            keep = False
+
+                    if keep:
+                        kept.append(placement)
+                        last_kept[target_key] = (start_beat, placement.duration)
+
+                coordination_plan.placements = kept

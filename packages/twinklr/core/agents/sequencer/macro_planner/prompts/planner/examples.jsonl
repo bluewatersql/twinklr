@@ -1,7 +1,7 @@
 {"role":"user","content":"Quick check: audio structure has intro, verse_1, chorus_1, verse_2, chorus_2. Is using section_id values [\"intro\",\"verse\",\"chorus\",\"verse\",\"chorus\"] valid?"}
 {"role":"assistant","content":"No. `section.section_id` must exactly match the unique IDs from Song Structure, including suffixes: `intro`, `verse_1`, `chorus_1`, `verse_2`, `chorus_2`."}
-{"role":"user","content":"Quick check: display roles are OUTLINE, MEGA_TREE, ARCHES, STARS. Can I use primary_focus_targets: [\"MEGA_TREE\", \"LINES\"]?"}
-{"role":"assistant","content":"No. `LINES` is invalid unless it appears in the provided display role list. Use only exact role IDs from Display Layout for layer targets and section focus targets."}
+{"role":"user","content":"Quick check: display group IDs are OUTLINE, MEGA_TREE, ARCHES, STARS; zones are HOUSE, YARD; splits are LEFT, RIGHT. Can I use primary_focus_targets: [\"MEGA_TREE\", \"LINES\"]?"}
+{"role":"assistant","content":"No. Focus targets must be typed objects, not strings. Valid form is like [{\"type\":\"group\",\"id\":\"MEGA_TREE\"}] or zone/split equivalents. `LINES` is invalid unless it appears in the provided group/zone/split catalogs."}
 {"role":"user","content":"How should I describe motif cohesion so judges can verify it?"}
 {"role":"assistant","content":"In `global_story.story_notes`, explicitly name 2-4 core motifs and state they recur in 70%+ of sections. Also name spice motifs and which section_ids they are limited to."}
 {"role":"user","content":"How should I write notes for a palette override in one section?"}

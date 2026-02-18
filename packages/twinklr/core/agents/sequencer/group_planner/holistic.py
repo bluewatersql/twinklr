@@ -163,6 +163,7 @@ class HolisticEvaluator:
         choreo_graph: ChoreographyGraph,
         template_catalog: TemplateCatalog,
         macro_plan_summary: dict[str, Any] | None = None,
+        lyric_context: Any | None = None,
     ) -> str:
         """Generate cache key for deterministic caching.
 
@@ -171,6 +172,7 @@ class HolisticEvaluator:
         - Choreography graph configuration
         - Template catalog
         - Macro plan summary
+        - Lyric context (narrative calibration)
         - Model configuration
 
         Args:
@@ -178,15 +180,21 @@ class HolisticEvaluator:
             choreo_graph: Choreography graph configuration
             template_catalog: Available templates
             macro_plan_summary: Optional MacroPlan summary
+            lyric_context: Optional LyricContextModel for narrative calibration
 
         Returns:
             SHA256 hash of canonical inputs
         """
+        from twinklr.core.agents.sequencer.group_planner.context_shaping import (
+            _shape_lyric_context_summary,
+        )
+
         key_data = {
             "group_plan_set": group_plan_set.model_dump(),
             "choreo_graph": choreo_graph.model_dump(),
             "template_catalog": template_catalog.model_dump(),
             "macro_plan_summary": macro_plan_summary or {},
+            "lyric_context": _shape_lyric_context_summary(lyric_context),
             "model": self.holistic_judge_spec.model,
         }
 
@@ -207,6 +215,7 @@ class HolisticEvaluator:
         choreo_graph: ChoreographyGraph,
         template_catalog: TemplateCatalog,
         macro_plan_summary: dict[str, Any] | None = None,
+        lyric_context: Any | None = None,
     ) -> HolisticEvaluation:
         """Evaluate GroupPlanSet for cross-section quality.
 
@@ -215,6 +224,7 @@ class HolisticEvaluator:
             choreo_graph: Choreography graph configuration
             template_catalog: Available templates
             macro_plan_summary: Optional summary from MacroPlan (global_story, etc.)
+            lyric_context: Optional LyricContextModel for narrative calibration
 
         Returns:
             HolisticEvaluation with score and issues
@@ -236,6 +246,7 @@ class HolisticEvaluator:
             choreo_graph=choreo_graph,
             template_catalog=template_catalog,
             macro_plan_summary=macro_plan_summary,
+            lyric_context=lyric_context,
         )
 
         # Create runner and execute
@@ -276,6 +287,7 @@ class HolisticEvaluator:
         choreo_graph: ChoreographyGraph,
         template_catalog: TemplateCatalog,
         macro_plan_summary: dict[str, Any] | None,
+        lyric_context: Any | None = None,
     ) -> dict[str, Any]:
         """Build variables for holistic judge prompt.
 
@@ -284,6 +296,7 @@ class HolisticEvaluator:
             choreo_graph: Choreography graph configuration
             template_catalog: Available templates
             macro_plan_summary: Optional MacroPlan summary
+            lyric_context: Optional LyricContextModel for narrative calibration
 
         Returns:
             Variables dict for judge prompt
@@ -297,6 +310,7 @@ class HolisticEvaluator:
             choreo_graph=choreo_graph,
             template_catalog=template_catalog,
             macro_plan_summary=macro_plan_summary,
+            lyric_context=lyric_context,
         )
 
         # Always set learning_context (empty if no data) to avoid template errors

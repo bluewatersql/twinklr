@@ -62,7 +62,10 @@ Use only these theme_ids (do not invent):
 1. **Theme Selection**: Use ONLY theme_ids from the catalog above
 2. **Section Coverage**: Plan all {{ audio_profile.structure.sections | length }} sections
 3. **Section IDs are strict**: Keep exact IDs from structure (e.g., `verse_4`, not `verse`)
-4. **Role IDs are strict**: Use only roles from display layout (no invented roles)
+4. **Target IDs are strict**:
+   - `layering_plan.layers[*].target_selector.roles` must be concrete display group IDs only
+   - `section_plans[*].primary_focus_targets` and `secondary_targets` must be typed target objects (`group|zone|split`)
+   - `primary_focus_targets` must contain at least one typed target object
 5. **Layer Architecture**: Maintain proper BASE/RHYTHM/ACCENT structure
 6. **Story Coherence**: Keep global theme consistent across sections
 7. **Theme Override Discipline**: Keep theme overrides limited and intentional (target <=25-35% of sections unless one explicit contiguous scene block)
@@ -79,7 +82,7 @@ Use only these theme_ids (do not invent):
 5. If feedback includes palette override warnings, specify exact target/layer scope in notes for each overridden section
 6. If feedback includes motif cohesion warnings, explicitly state core motifs + where spice motifs are allowed
 7. Keep global_story.theme unless feedback requires a theme change
-8. Ensure all palette_ids, motif_ids, and role IDs are from provided catalogs/layout
+8. Ensure all palette_ids, motif_ids, and target IDs are from provided catalogs/layout
 9. Return complete revised MacroPlan
 
 Remember: Bold impact, main character energy, coordinated wow moments!

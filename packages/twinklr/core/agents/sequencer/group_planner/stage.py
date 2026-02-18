@@ -212,8 +212,9 @@ class GroupPlannerStage:
             section_end_ms=input.section.end_ms,
         )
 
-        # Extract layer intents from macro plan
+        # Extract layer intents and global palette context from macro plan
         layer_intents = self._extract_layer_intents(macro_plan)
+        global_palette_id = self._extract_global_palette_id(macro_plan)
 
         # Build section-scoped lyric context
         section_lyric_context = self._build_section_lyric_context(
@@ -224,6 +225,9 @@ class GroupPlannerStage:
         )
 
         # Build SectionPlanningContext from MacroSectionPlan + constructor args
+        resolved_primary_targets = self._resolve_focus_targets(input.primary_focus_targets)
+        resolved_secondary_targets = self._resolve_focus_targets(input.secondary_targets)
+
         return SectionPlanningContext(
             section_id=input.section.section_id,
             section_name=input.section.name,
@@ -232,8 +236,8 @@ class GroupPlannerStage:
             energy_target=input.energy_target.value,
             motion_density=input.motion_density.value,
             choreography_style=input.choreography_style.value,
-            primary_focus_targets=input.primary_focus_targets,
-            secondary_targets=input.secondary_targets,
+            primary_focus_targets=resolved_primary_targets,
+            secondary_targets=resolved_secondary_targets,
             notes=input.notes,
             choreo_graph=self.choreo_graph,
             template_catalog=self.template_catalog,
@@ -242,8 +246,41 @@ class GroupPlannerStage:
             theme=input.theme,
             motif_ids=input.motif_ids,
             palette=input.palette.model_dump() if input.palette else None,
+            global_palette_id=global_palette_id,
             lyric_context=section_lyric_context,
         )
+
+    def _resolve_focus_targets(self, targets: list[Any]) -> list[str]:
+        """Resolve macro typed targets to concrete group IDs for section planning.
+
+        GroupPlanner operates on concrete groups for lane-level planning.
+        Macro section focus can be group/zone/split, so expand zone/split to groups.
+        """
+        from twinklr.core.sequencer.vocabulary import TargetType
+
+        resolved: list[str] = []
+        for target in targets:
+            ttype = getattr(target, "type", None)
+            tid = getattr(target, "id", None)
+            if ttype is None or not tid:
+                continue
+
+            if ttype == TargetType.GROUP:
+                resolved.append(str(tid))
+            elif ttype == TargetType.ZONE:
+                for tag, ids in self.choreo_graph.groups_by_tag.items():
+                    if getattr(tag, "value", str(tag)) == tid:
+                        resolved.extend(ids)
+                        break
+            elif ttype == TargetType.SPLIT:
+                for split, ids in self.choreo_graph.groups_by_split.items():
+                    if getattr(split, "value", str(split)) == tid:
+                        resolved.extend(ids)
+                        break
+
+        # Deduplicate, preserve order
+        seen: set[str] = set()
+        return [gid for gid in resolved if not (gid in seen or seen.add(gid))]
 
     def _build_timing_context(
         self,
@@ -456,6 +493,21 @@ class GroupPlannerStage:
         if macro_plan and hasattr(macro_plan, "layering_plan") and macro_plan.layering_plan:
             layer_intents = [layer.model_dump() for layer in macro_plan.layering_plan.layers]
         return layer_intents
+
+    def _extract_global_palette_id(self, macro_plan: Any | None) -> str | None:
+        """Extract MacroPlan.global_story.palette_plan.primary.palette_id."""
+        if macro_plan is None:
+            return None
+        global_story = getattr(macro_plan, "global_story", None)
+        if global_story is None:
+            return None
+        palette_plan = getattr(global_story, "palette_plan", None)
+        if palette_plan is None:
+            return None
+        primary = getattr(palette_plan, "primary", None)
+        if primary is None:
+            return None
+        return getattr(primary, "palette_id", None)
 
 
 class GroupPlanAggregatorStage:

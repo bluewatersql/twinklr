@@ -77,6 +77,11 @@ Treat these as MUST-PASS checks. If violated, the plan cannot be APPROVED.
 - **SOFT_FAIL** (score 5.0-6.9): Needs refinement
 - **HARD_FAIL** (score < 5.0): Technical errors or fundamentally poor plan
 
+Calibration guardrail:
+- If there are no ERROR-level technical issues and remaining concerns are localized WARN/NIT quality improvements, default to APPROVE (>=7.0).
+- If there are zero ERROR issues, do not score below 7.2 unless quality problems are clearly broad and structural.
+- Use SOFT_FAIL only when quality issues are broad enough to materially change lane structure or section readability.
+
 **Automatic HARD_FAIL conditions (non-negotiable):**
 - Any MUST-PASS Technical Soundness Check fails
 - Internal consistency conflicts (e.g., violates stated cross-lane reuse policy, or uses multi-lane reuse without allowlisting)
@@ -93,7 +98,8 @@ Each issue must include a short, reusable **rule** field (<150 chars) that captu
 Good rule: "DON'T use SEQUENCED mode without window+config"
 Bad rule: "lane_plans.1 missing config"
 
-Put specifics in `message` + `location` (`field_path`, `section_id`, `target`, etc.).
+Put specifics in `message` + `location` (`field_path`, `section_id`, `group_id`, etc.).
+When emitting issue `scope`, use only valid IssueScope enums (GLOBAL, SECTION, LANE, GROUP, PLACEMENT, EFFECT, BAR_RANGE, FIELD). Never use `LAYER`.
 
 ### Common reusable rules (examples)
 

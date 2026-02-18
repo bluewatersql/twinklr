@@ -17,7 +17,8 @@ Return HARD_FAIL if any are true:
 - Missing sections or mismatched section_id coverage vs audio_profile.structure.sections
 - Gaps/overlaps or unsorted section timing
 - Layering invalid (not 1-5, missing BASE, duplicate indices)
-- Target roles referenced that do not exist in display_groups
+- Layer target_selector roles referenced that do not exist in display_groups
+- Section focus targets missing/invalid typed ids (`group|zone|split`)
 - Theme invalid:
   - global_story.theme does not use song-level ThemeScope (`SONG`)
   - any section.theme does not use section-level ThemeScope (`SECTION`)
@@ -34,6 +35,8 @@ Return HARD_FAIL if any are true:
 - Use `audio_profile.structure.sections` for section counts and percentages.
 - If there are no ERROR issues and all WARN issues are localized/patchable, default to score >= 7.0 unless coherence is fundamentally broken.
 - Avoid contradictory counting in issue messages (section totals and override counts must align).
+- Coverage/schema issues must reference concrete structured evidence from `macro_plan.section_plans[*].section.section_id` and typed target objects.
+- Do not emit coverage/schema ERRORs from section display names or other prose summaries.
 
 ## Notes
 

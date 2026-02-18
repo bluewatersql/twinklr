@@ -14,7 +14,7 @@ variables:
     description: Full AudioProfileModel for the song
     required: true
   - name: display_groups
-    description: List of available display groups with role keys
+    description: List of available display groups with concrete group IDs
     required: true
   - name: macro_plan
     description: MacroPlan to evaluate
@@ -41,4 +41,10 @@ variables:
     required: false
   - name: palette_catalog
     description: Palette catalog (list of palette_ids or summary objects) used to validate palette ids
+    required: false
+  - name: available_zone_ids
+    description: Available zone IDs for validating typed zone targets
+    required: false
+  - name: available_split_ids
+    description: Available split IDs for validating typed split targets
     required: false
