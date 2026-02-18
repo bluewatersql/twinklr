@@ -160,20 +160,20 @@ def shape_planner_context(section_context: SectionPlanningContext) -> dict[str, 
     """Shape context for GroupPlanner agent (per-section coordination planning).
 
     **SECTION-FOCUSED + TOKEN-OPTIMIZED**:
-    - Groups: Filtered to primary_focus + secondary target roles only
+    - Groups: Full display graph (avoids forcing cross-lane reuse from target scarcity)
     - Templates: Simplified to {ID, name, lanes} (descriptions dropped, saves ~40% tokens)
     - Layer intents: Filtered to only layers targeting these roles
 
     Token savings example (chorus section):
-    - Before: ~75K tokens (9 groups + 61 full templates + 3 layers)
-    - After: ~45K tokens (9 groups + 61 minimal templates + 2 layers) = 40% reduction
+    - Before: ~75K tokens (full templates + full layer intents)
+    - After: ~45K-55K tokens (minimal templates + filtered layer intents)
 
     Analyzed from planner/user.j2:
     - Uses: section_id, section_name, start_ms, end_ms
     - Uses: energy_target, motion_density, choreography_style
     - Uses: primary_focus_targets, secondary_targets, notes
-    - Uses: choreo_graph.groups (FILTERED to section targets)
-    - Uses: choreo_graph.groups_by_role (FILTERED)
+    - Uses: choreo_graph.groups (full graph)
+    - Uses: choreo_graph.groups_by_role (full graph)
     - Uses: template_catalog.entries (SIMPLIFIED to ID/name/lanes)
     - Uses: layer_intents (FILTERED to relevant layers)
     - Does NOT use: timing_context (not referenced in prompt)
@@ -184,24 +184,19 @@ def shape_planner_context(section_context: SectionPlanningContext) -> dict[str, 
     Returns:
         Shaped context dict for planner prompt
     """
-    # Filter display graph to only relevant groups for this section
-    # Keep ALL roles assigned by MacroPlanner (both primary and secondary)
+    # Priority roles from MacroPlan intent (used for emphasis guidance in prompts)
+    # Keep this list explicit even though the full display graph is provided.
     all_target_roles = section_context.primary_focus_targets + section_context.secondary_targets
 
-    # Filter groups to only those in target roles
-    filtered_groups = [g for g in section_context.choreo_graph.groups if g.role in all_target_roles]
-
-    # Filter groups_by_role to only target roles
-    filtered_groups_by_role = {
-        role: groups
-        for role, groups in section_context.choreo_graph.groups_by_role.items()
-        if role in all_target_roles
-    }
+    # Keep full display graph for planning so lane ownership can be made disjoint
+    # without forcing the model to reuse the same few groups across lanes.
+    planner_groups = list(section_context.choreo_graph.groups)
+    planner_groups_by_role = dict(section_context.choreo_graph.groups_by_role)
 
     # Log filtering results
     logger.debug(
         f"Context shaping for {section_context.section_id}: "
-        f"{len(section_context.choreo_graph.groups)} → {len(filtered_groups)} groups, "
+        f"{len(section_context.choreo_graph.groups)} groups (full graph), "
         f"{len(section_context.template_catalog.entries)} templates (simplified)"
     )
 
@@ -248,6 +243,20 @@ def shape_planner_context(section_context: SectionPlanningContext) -> dict[str, 
             for entry in filtered_entries
         ],
     }
+    full_catalog_for_judge = {
+        "schema_version": section_context.template_catalog.schema_version,
+        "entries": [
+            {
+                "template_id": entry.template_id,
+                "name": entry.name,
+                "compatible_lanes": entry.compatible_lanes,
+                "affinity_tags": entry.affinity_tags,
+                "avoid_tags": entry.avoid_tags,
+                "tags": entry.tags,
+            }
+            for entry in section_context.template_catalog.entries
+        ],
+    }
 
     logger.debug(
         f"Template catalog for {section_context.section_id}: "
@@ -259,8 +268,8 @@ def shape_planner_context(section_context: SectionPlanningContext) -> dict[str, 
     section_choreo_graph = {
         "schema_version": "choreography-graph.v1",
         "graph_id": section_context.choreo_graph.graph_id,
-        "groups": [g.model_dump() for g in filtered_groups],
-        "groups_by_role": filtered_groups_by_role,
+        "groups": [g.model_dump() for g in planner_groups],
+        "groups_by_role": planner_groups_by_role,
     }
 
     # Prepare theme context if theme is available
@@ -320,6 +329,22 @@ def shape_planner_context(section_context: SectionPlanningContext) -> dict[str, 
             motif_lines.append(line)
         motif_catalog_summary = "\n".join(motif_lines)
 
+    # Extract explicit multi-lane allowlist (if provided by upstream layer intents)
+    # This is optional and defaults to empty.
+    multilane_allowed_groups: list[str] = []
+    for layer in filtered_layer_intents:
+        if isinstance(layer, dict):
+            raw = layer.get("multilane_allowed_groups")
+            if isinstance(raw, list):
+                multilane_allowed_groups.extend([str(g) for g in raw if g])
+
+    if multilane_allowed_groups:
+        # Deduplicate while preserving order
+        seen: set[str] = set()
+        multilane_allowed_groups = [
+            g for g in multilane_allowed_groups if not (g in seen or seen.add(g))
+        ]
+
     # Calculate section duration in bars/beats
     # This tells the LLM how much space it has to work with
     section_duration_ms = section_context.end_ms - section_context.start_ms
@@ -331,18 +356,20 @@ def shape_planner_context(section_context: SectionPlanningContext) -> dict[str, 
         beat_duration_ms = bar_duration_ms / timing_ctx.beats_per_bar
         section_bars = section_duration_ms / bar_duration_ms
         section_beats = section_duration_ms / beat_duration_ms
-        # Number of complete bars available in the section
-        available_bars = max(1, int(section_bars))
+        # Hard bar limit should match the section-relative timing context
+        section_max_bar = max(timing_ctx.bar_map.keys())
+        available_bars = section_max_bar
     else:
         # Fallback estimate
         available_bars = 4
+        section_max_bar = available_bars
         section_bars = 4.0
         section_beats = 16.0
 
     # Build spatial map data for prompt
-    display_graph_zones = _build_zone_summary(filtered_groups)
-    display_graph_spatial = _build_spatial_layout(filtered_groups)
-    display_graph_splits = _build_split_summary(filtered_groups)
+    display_graph_zones = _build_zone_summary(planner_groups)
+    display_graph_spatial = _build_spatial_layout(planner_groups)
+    display_graph_splits = _build_split_summary(planner_groups)
 
     return {
         # Section identity
@@ -355,16 +382,19 @@ def shape_planner_context(section_context: SectionPlanningContext) -> dict[str, 
         "section_duration_bars": round(section_bars, 1),
         "section_duration_beats": round(section_beats, 1),
         "available_bars": available_bars,
+        "section_max_bar": section_max_bar,
         # Intent from MacroPlan
         "energy_target": section_context.energy_target,
         "motion_density": section_context.motion_density,
         "choreography_style": section_context.choreography_style,
         "primary_focus_targets": section_context.primary_focus_targets,
         "secondary_targets": section_context.secondary_targets,
+        "priority_roles": all_target_roles,
         "notes": section_context.notes,
         # Section-scoped shared context (FILTERED + SIMPLIFIED)
         "display_graph": section_choreo_graph,
-        "template_catalog": simplified_catalog,  # Stripped to essentials
+        "template_catalog": simplified_catalog,  # Planner-focused filtered catalog
+        "template_catalog_full": full_catalog_for_judge,  # Judge fallback catalog
         "layer_intents": filtered_layer_intents,  # Only relevant layers
         # Spatial planning context
         "display_graph_zones": display_graph_zones,
@@ -378,6 +408,7 @@ def shape_planner_context(section_context: SectionPlanningContext) -> dict[str, 
         "motif_ids": section_context.motif_ids,  # Motifs for this section
         "motif_catalog_summary": motif_catalog_summary,  # Motif reference guide
         "tag_catalog": tag_catalog,  # For tag validation
+        "multilane_allowed_groups": multilane_allowed_groups,
         # Lyric/narrative context (section-scoped) for narrative asset directives
         "lyric_context": section_context.lyric_context,
     }
@@ -451,7 +482,7 @@ def shape_section_judge_context(
 ) -> dict[str, Any]:
     """Shape context for SectionJudge agent (per-section evaluation).
 
-    **SECTION-FOCUSED**: Only includes groups relevant to this section.
+    **SECTION-FOCUSED**: Includes full display graph validity context and section intent.
     Templates kept minimal (IDs only for validation).
     Theme context included for drift/tag validation.
 
@@ -459,10 +490,10 @@ def shape_section_judge_context(
     - Uses: start_ms, end_ms (for bounds checking)
     - Uses: energy_target, motion_density, choreography_style
     - Uses: primary_focus_targets, secondary_targets
-    - Uses: choreo_graph.groups_by_role (FILTERED to section targets)
+    - Uses: choreo_graph.groups_by_role (full graph for ID validation)
     - Uses: template_catalog (simplified to IDs only)
     - Uses: plan.theme (for validation)
-    - Does NOT use: timing_context, layer_intents
+    - Does NOT use: timing_context
 
     Note: The plan itself is added by the controller.
 
@@ -472,15 +503,9 @@ def shape_section_judge_context(
     Returns:
         Shaped context dict for section judge (excluding plan)
     """
-    # Filter to only relevant roles for this section
+    # Keep full role map so judge can validate IDs against the full display graph.
     all_target_roles = section_context.primary_focus_targets + section_context.secondary_targets
-
-    # Filter groups_by_role to only target roles
-    filtered_groups_by_role = {
-        role: groups
-        for role, groups in section_context.choreo_graph.groups_by_role.items()
-        if role in all_target_roles
-    }
+    groups_by_role = dict(section_context.choreo_graph.groups_by_role)
 
     # Simplify template catalog to just IDs and names (judge only needs to validate existence)
     simplified_catalog = {
@@ -520,6 +545,20 @@ def shape_section_judge_context(
 
     theming_catalog = get_theming_catalog_dict()
 
+    # Extract explicit multi-lane allowlist (if provided upstream)
+    multilane_allowed_groups: list[str] = []
+    if section_context.layer_intents:
+        for layer in section_context.layer_intents:
+            if isinstance(layer, dict):
+                raw = layer.get("multilane_allowed_groups")
+                if isinstance(raw, list):
+                    multilane_allowed_groups.extend([str(g) for g in raw if g])
+    if multilane_allowed_groups:
+        seen: set[str] = set()
+        multilane_allowed_groups = [
+            g for g in multilane_allowed_groups if not (g in seen or seen.add(g))
+        ]
+
     return {
         # Section identity
         "section_id": section_context.section_id,
@@ -533,9 +572,10 @@ def shape_section_judge_context(
         "choreography_style": section_context.choreography_style,
         "primary_focus_targets": section_context.primary_focus_targets,
         "secondary_targets": section_context.secondary_targets,
+        "priority_roles": all_target_roles,
         # Section-scoped shared context
         "display_graph": {
-            "groups_by_role": filtered_groups_by_role,
+            "groups_by_role": groups_by_role,
             "groups_by_tag": {
                 tag.value: ids
                 for tag, ids in section_context.choreo_graph.groups_by_tag.items()
@@ -552,6 +592,7 @@ def shape_section_judge_context(
         "motif_catalog": theming_catalog[
             "motifs"
         ],  # For validating motif_ids and checking template support
+        "multilane_allowed_groups": multilane_allowed_groups,
         # Excluded: timing_context, layer_intents, notes
     }
 

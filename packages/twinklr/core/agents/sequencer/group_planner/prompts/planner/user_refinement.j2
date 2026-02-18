@@ -13,6 +13,7 @@ References existing conversation context (section, templates, groups).
 
 - **Section:** {{ section_name }} ({{ (start_ms / 1000) | round(1) }}s to {{ (end_ms / 1000) | round(1) }}s)
 - **Musical Length:** {{ section_duration_bars }} bars ({{ section_duration_beats }} beats) - bars 1-{{ available_bars }} available
+- **Hard Bar Limit:** `section_max_bar = {{ section_max_bar }}` (all starts and window ends must be <= this bar)
 - **Energy Target:** {{ energy_target }}
 - **Motion Density:** {{ motion_density }}
 - **Primary Targets:** {{ primary_focus_targets | join(", ") }}
@@ -23,6 +24,14 @@ References existing conversation context (section, templates, groups).
 {% endif %}
 
 **Targeting:** Use typed targets: `{"type": "group", "id": "..."}`, `{"type": "zone", "id": "..."}`, or `{"type": "split", "id": "..."}`. Zone targets expand to all groups in that zone. Split targets expand to partition groups. The same target (same type+id) must not overlap itself within a lane.
+
+**Cross-lane reuse policy reminder:**
+{% if multilane_allowed_groups %}
+- Allowlisted RHYTHM+ACCENT groups only: {{ multilane_allowed_groups | join(", ") }}
+{% else %}
+- No allowlist present: do NOT reuse any target across lanes.
+{% endif %}
+- BASE may not share targets with any other lane.
 
 **REQUIRED FIELDS (Copy to response):**
 {% if theme_ref %}
@@ -95,13 +104,15 @@ References existing conversation context (section, templates, groups).
 ## Instructions
 
 1. Address ALL ERROR severity issues first
-2. Keep structure that worked - only fix flagged issues
-3. Use categorical intensity levels (WHISPER to PEAK), not numeric values
-4. Use categorical durations (HIT, BURST, PHRASE, EXTENDED, SECTION)
-5. Do not change theme_id unless feedback explicitly requests it
-6. Keep palette/motif_ids consistent with MacroPlan (do not invent)
-7. Timing: use bar and beat integers for start, duration category for length
-8. Return the complete revised SectionCoordinationPlan
+2. If any cross-lane reuse errors are present, make lane target sets disjoint before other edits
+3. Keep every placement start and window end within bars 1..{{ section_max_bar }}
+4. Keep structure that worked - only fix flagged issues
+5. Use categorical intensity levels (WHISPER to PEAK), not numeric values
+6. Use categorical durations (HIT, BURST, PHRASE, EXTENDED, SECTION)
+7. Do not change theme_id unless feedback explicitly requests it
+8. Keep palette/motif_ids consistent with MacroPlan (do not invent)
+9. Timing: use bar and beat integers for start, duration category for length
+10. Return the complete revised SectionCoordinationPlan
 
 ## Common Patterns to Avoid (Don't introduce while fixing)
 

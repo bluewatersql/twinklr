@@ -61,20 +61,25 @@ Use only these theme_ids (do not invent):
 
 1. **Theme Selection**: Use ONLY theme_ids from the catalog above
 2. **Section Coverage**: Plan all {{ audio_profile.structure.sections | length }} sections
-3. **Layer Architecture**: Maintain proper BASE/RHYTHM/ACCENT structure
-4. **Story Coherence**: Keep global theme consistent across sections
-5. **Palette Plan**: Global primary palette required; use valid palette_ids only; limit overrides to 2-3 sections
-6. **Motif Balance**: 3-8 total motifs; 2-4 "core" motifs in 70%+ of sections; 1-3 "spice" motifs in 2-4 sections only
-7. **Schema**: Return valid MacroPlan JSON per developer prompt
+3. **Section IDs are strict**: Keep exact IDs from structure (e.g., `verse_4`, not `verse`)
+4. **Role IDs are strict**: Use only roles from display layout (no invented roles)
+5. **Layer Architecture**: Maintain proper BASE/RHYTHM/ACCENT structure
+6. **Story Coherence**: Keep global theme consistent across sections
+7. **Theme Override Discipline**: Keep theme overrides limited and intentional (target <=25-35% of sections unless one explicit contiguous scene block)
+8. **Palette Plan**: Global primary palette required; use valid palette_ids only; section overrides must say exactly where they apply
+9. **Motif Balance**: 3-8 total motifs; 2-4 "core" motifs in 70%+ of sections; 1-3 "spice" motifs in 2-4 sections only
+10. **Schema**: Return valid MacroPlan JSON per developer prompt
 
 ## Instructions
 
-1. Address ALL ERROR severity issues first
+1. Address ALL ERROR severity issues first, then resolve WARN issues that block score >= 7.0
 2. Keep structure that worked - only fix flagged issues
 3. Maintain global story coherence while addressing feedback
-4. Do not change global_story.theme unless feedback explicitly requests it
-5. Do not change palette_plan or motifs unless feedback explicitly requests it
-6. Ensure all palette_ids and motif_ids are from provided catalogs (no invention)
-7. Return complete revised MacroPlan
+4. If feedback includes `THEME_SHIFT_OVERUSED`, reduce theme overrides and keep any remaining overrides in one bounded scene block
+5. If feedback includes palette override warnings, specify exact target/layer scope in notes for each overridden section
+6. If feedback includes motif cohesion warnings, explicitly state core motifs + where spice motifs are allowed
+7. Keep global_story.theme unless feedback requires a theme change
+8. Ensure all palette_ids, motif_ids, and role IDs are from provided catalogs/layout
+9. Return complete revised MacroPlan
 
 Remember: Bold impact, main character energy, coordinated wow moments!

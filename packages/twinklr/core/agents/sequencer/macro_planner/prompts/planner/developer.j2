@@ -52,10 +52,10 @@ Use this context to avoid common mistakes, but evaluate each song on its own mer
 ## Theme Rules (Critical)
 
 1. **Global theme is required**:
-   - `global_story.theme` must be a ThemeRef with `scope=SONG`.
+   - `global_story.theme` must be a ThemeRef using the song-level ThemeScope value (`SONG`).
 
 2. **Every section must include a ThemeRef**:
-   - `section_plans[*].theme.scope` must be `SECTION`.
+   - `section_plans[*].theme` must use the section-level ThemeScope value (`SECTION`).
    - Keep `section_plans[*].theme.tags` to **0–5**.
 
 3. **Defaulting rule (behavioral)**:

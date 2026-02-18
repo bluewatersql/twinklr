@@ -181,36 +181,36 @@ def test_shape_planner_context_basic_fields(section_context: SectionPlanningCont
 def test_shape_planner_context_filters_groups_by_role(
     section_context: SectionPlanningContext,
 ) -> None:
-    """Test display graph filtering to only target roles."""
+    """Planner context keeps full display graph for lane disambiguation."""
     result = shape_planner_context(section_context)
 
     display_graph = result["display_graph"]
     groups = display_graph["groups"]
 
-    # Should only include MEGA_TREE, HERO, ARCHES (not TREES, PROPS)
-    assert len(groups) == 3
+    # Should include all configured groups
+    assert len(groups) == 5
     group_roles = [g["role"] for g in groups]
     assert "MEGA_TREE" in group_roles
     assert "HERO" in group_roles
     assert "ARCHES" in group_roles
-    assert "TREES" not in group_roles
-    assert "CUSTOM" not in group_roles
+    assert "TREES" in group_roles
+    assert "CUSTOM" in group_roles
 
 
 def test_shape_planner_context_filters_groups_by_role_dict(
     section_context: SectionPlanningContext,
 ) -> None:
-    """Test groups_by_role filtering."""
+    """Planner context keeps full groups_by_role map."""
     result = shape_planner_context(section_context)
 
     groups_by_role = result["display_graph"]["groups_by_role"]
 
-    # Should only include target roles
+    # Should include both priority and non-priority roles
     assert "MEGA_TREE" in groups_by_role
     assert "HERO" in groups_by_role
     assert "ARCHES" in groups_by_role
-    assert "TREES" not in groups_by_role
-    assert "CUSTOM" not in groups_by_role
+    assert "TREES" in groups_by_role
+    assert "CUSTOM" in groups_by_role
 
 
 def test_shape_planner_context_simplifies_template_catalog(
@@ -303,10 +303,11 @@ def test_shape_planner_context_all_roles_primary_and_secondary(
     display_graph = result["display_graph"]
     group_roles = [g["role"] for g in display_graph["groups"]]
 
-    # Should include ALL target roles (primary + secondary)
+    # Should include target roles while keeping full graph
     assert "MEGA_TREE" in group_roles  # Primary
     assert "HERO" in group_roles  # Secondary
     assert "ARCHES" in group_roles  # Secondary
+    assert "TREES" in group_roles
 
 
 # ============================================================================
@@ -339,17 +340,17 @@ def test_shape_section_judge_context_basic_fields(
 def test_shape_section_judge_context_filters_groups_by_role(
     section_context: SectionPlanningContext,
 ) -> None:
-    """Test groups_by_role filtering."""
+    """Judge context keeps full groups_by_role for ID validation."""
     result = shape_section_judge_context(section_context)
 
     groups_by_role = result["display_graph"]["groups_by_role"]
 
-    # Should only include target roles
+    # Should include both target and non-target roles
     assert "MEGA_TREE" in groups_by_role
     assert "HERO" in groups_by_role
     assert "ARCHES" in groups_by_role
-    assert "TREES" not in groups_by_role
-    assert "CUSTOM" not in groups_by_role
+    assert "TREES" in groups_by_role
+    assert "CUSTOM" in groups_by_role
 
 
 def test_shape_section_judge_context_simplifies_template_catalog(
@@ -618,11 +619,12 @@ def test_shape_planner_context_empty_primary_focus(
 
     result = shape_planner_context(section_context)
 
-    # Should still filter to secondary targets only
+    # Should keep full graph and preserve target role hints
     display_graph = result["display_graph"]
     group_roles = [g["role"] for g in display_graph["groups"]]
     assert "HERO" in group_roles
-    assert len(group_roles) == 1
+    assert len(group_roles) == 5
+    assert result["priority_roles"] == ["HERO"]
 
 
 def test_shape_planner_context_empty_secondary_targets(
@@ -634,11 +636,12 @@ def test_shape_planner_context_empty_secondary_targets(
 
     result = shape_planner_context(section_context)
 
-    # Should filter to primary targets only
+    # Should keep full graph and preserve target role hints
     display_graph = result["display_graph"]
     group_roles = [g["role"] for g in display_graph["groups"]]
     assert "MEGA_TREE" in group_roles
-    assert len(group_roles) == 1
+    assert len(group_roles) == 5
+    assert result["priority_roles"] == ["MEGA_TREE"]
 
 
 def test_shape_planner_context_no_matching_groups(
@@ -650,10 +653,11 @@ def test_shape_planner_context_no_matching_groups(
 
     result = shape_planner_context(section_context)
 
-    # Should return empty groups list
+    # Should still keep full groups and empty priority_roles usage is allowed
     display_graph = result["display_graph"]
-    assert display_graph["groups"] == []
-    assert display_graph["groups_by_role"] == {}
+    assert len(display_graph["groups"]) == 5
+    assert "MEGA_TREE" in display_graph["groups_by_role"]
+    assert result["priority_roles"] == ["NONEXISTENT_ROLE"]
 
 
 def test_shape_planner_context_empty_template_catalog(
@@ -671,13 +675,13 @@ def test_shape_planner_context_empty_template_catalog(
 def test_shape_section_judge_context_no_matching_groups(
     section_context: SectionPlanningContext,
 ) -> None:
-    """Test judge handles no matching groups."""
+    """Judge keeps full groups even when section target roles are unknown."""
     section_context.primary_focus_targets = ["NONEXISTENT"]
     section_context.secondary_targets = []
 
     result = shape_section_judge_context(section_context)
 
-    assert result["display_graph"]["groups_by_role"] == {}
+    assert "MEGA_TREE" in result["display_graph"]["groups_by_role"]
 
 
 def test_shape_holistic_judge_context_group_hierarchy(

@@ -52,7 +52,7 @@ You create the **STRATEGIC PLAN** (the WHAT and WHY), not the execution (the HOW
   - Each section must include at least **1 motif_id** (prefer 2-3 including core motifs)
   - Match motif energy levels to section energy targets when possible
 
-**REQUIRED: Explicitly declare core motifs** in `global_story.notes`:
+**REQUIRED: Explicitly declare core motifs** in `global_story.story_notes`:
 - Name the 2-4 core motifs that carry the show's identity
 - Example: "Core motifs: radial_rays, sparkles, candy_stripes (used in 70%+ of sections)"
 - This prevents ambiguity about which motifs are identity vs spice
@@ -79,3 +79,13 @@ You create the **STRATEGIC PLAN** (the WHAT and WHY), not the execution (the HOW
 - Prefer IMAGERY/HYBRID on **choruses**, plus **intro/outro**, plus **one** narrative verse or bridge.
 - Use ABSTRACT in remaining sections to preserve motion/energy variety.
 - IMAGERY/HYBRID only signals intent; **do not include asset details**. Downstream AssetPlanner derives assets when applicable (e.g., MATRIX targets).
+
+## Final Integrity Check (Required Before You Respond)
+
+Before returning JSON, verify all of these:
+
+1. **Section ID lock:** `section_plans[*].section.section_id` exactly matches every ID from Song Structure (including `_N` suffixes).
+2. **Role ID lock:** Every role in `primary_focus_targets`, `secondary_targets`, and `layering_plan.layers[*].target_selector.roles` is from the provided display role list only.
+3. **Theme override discipline:** Keep section theme overrides limited and deliberate; default to the global theme for most sections.
+4. **Palette override discipline:** If a section uses a palette override, section notes must state where it applies (targets/layers) and what remains on primary palette.
+5. **Reset/blackout safety:** If notes mention blackout/reset, explicitly keep one hero anchor visible (e.g., Rudolph beacon) unless the section is final snap-to-black.

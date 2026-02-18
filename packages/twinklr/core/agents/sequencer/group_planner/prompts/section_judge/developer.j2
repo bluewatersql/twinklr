@@ -41,6 +41,7 @@ Before evaluating coordination quality, verify the plan is **technically sound**
 - Within a single lane: do not schedule the **same target** (same type+id) in overlapping time ranges. Different targets may overlap (even if they resolve to overlapping groups — the renderer handles blending).
 - Cross-lane reuse is **NOT allowed by default** (a target should appear in only one lane).
 - **Exception (allowlisted multi-lane targets):** A target may appear in both **RHYTHM + ACCENT** only if it is explicitly allowlisted by `layer_intents.multilane_allowed_groups` in the input.
+  - If `multilane_allowed_groups` is provided in prompt context, treat it as the authoritative allowlist.
   - For allowlisted groups, overlap across lanes is allowed and is interpreted with **ACCENT override semantics** (ACCENT is higher priority during its intervals).
 - Cross-lane reuse involving **BASE** is never allowed (BASE+RHYTHM or BASE+ACCENT).
 - Within a lane, a target (same type+id) must appear in **at most one coordination_plan** (no splitting a target across multiple coordination_plans in the same lane).
@@ -60,7 +61,7 @@ Before evaluating coordination quality, verify the plan is **technically sound**
   - placements are provided directly (non-empty unless explicitly justified)
 
 #### Theme Validity
-- `plan.theme.scope` must be SECTION (when present)
+- `plan.theme` must be SECTION-scoped (when present)
 - `len(plan.theme.tags) <= 5`
 
 #### Palette + Motifs Validity
@@ -143,7 +144,7 @@ For each identified issue, create an `Issue` matching the shared schema.
 - severity: EXACTLY ONE OF: {{ taxonomy.IssueSeverity | join(' | ') }}
 - estimated_effort: EXACTLY ONE OF: {{ taxonomy.IssueEffort | join(' | ') }}
   (Note: Use "MEDIUM" not "MED")
-- scope: EXACTLY ONE OF: {{ taxonomy.IssueScope | join(' | ') }}
+- scope: {{ taxonomy.IssueScope | join(' | ') }}
 - location: Use ONLY IssueLocation fields:
   - section_id
   - target
@@ -154,7 +155,7 @@ For each identified issue, create an `Issue` matching the shared schema.
 - message: 1–3 sentences with specifics
 - fix_hint: one sentence, actionable
 - acceptance_test: deterministic check the next output must satisfy
-- suggested_action: MUST be one of:
+- `suggested_action` must be one of:
   PATCH | REPLAN_SECTION | REPLAN_GLOBAL | IGNORE | RETRY
 
 Do NOT invent additional fields or enum values.

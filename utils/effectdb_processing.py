@@ -281,16 +281,19 @@ def save_results(results: dict[str, Any], output_file: Path):
 
 if __name__ == "__main__":
     repo_root = Path(__file__).parent.parent
-    input_file = repo_root / Path("data/test/base_effect_events.json")
-    output_file = repo_root / Path("data/test/effect_analysis_results.json")
 
-    print(f"Processing: {input_file}")
-    print(f"File size: {input_file.stat().st_size / 1024 / 1024:.2f} MB")
+    for x in range(1, 14):
+        input_file = repo_root / Path(f"data/test/example{x}/base_effect_events.json")
+        output_file = repo_root / Path(f"data/test/example{x}/effect_analysis_results.json")
 
-    results = analyze_effects(input_file)
+        print(
+            f"Processing: {input_file} - File size: {input_file.stat().st_size / 1024 / 1024:.2f} MB"
+        )
 
-    print_results(results)
-    save_results(results, output_file)
+        results = analyze_effects(input_file)
+
+        print_results(results)
+        save_results(results, output_file)
 
     print("\n" + "=" * 80)
     print("ANALYSIS COMPLETE")

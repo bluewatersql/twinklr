@@ -522,6 +522,11 @@ class StandardIterationController(Generic[TPlan]):
             }
         )
 
+        # Optional override: planners may provide a richer/full validation catalog
+        # for judge use while keeping a filtered catalog for planning.
+        if "template_catalog_full" in variables:
+            variables["template_catalog"] = variables["template_catalog_full"]
+
         # Only alias macro_plan = plan for MacroPlanner judge
         # For other judges, macro_plan should come from initial_vars if present
         if "macro_plan" not in variables:

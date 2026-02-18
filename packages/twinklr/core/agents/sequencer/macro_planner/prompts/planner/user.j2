@@ -145,6 +145,13 @@ Available target roles in this display:
 {% endif %}
 {% endfor %}
 
+**CRITICAL ROLE LOCK:** Use only the exact role IDs listed above in:
+- `layering_plan.layers[*].target_selector.roles`
+- `section_plans[*].primary_focus_targets`
+- `section_plans[*].secondary_targets`
+
+Do not invent roles (for example: `LINES` is invalid unless it appears above).
+
 # Your Task
 
 Create a strategic MacroPlan for this Christmas light show that:
@@ -163,5 +170,13 @@ Select 3-8 motifs total. Structure them as:
 Example for {{ audio_profile.structure.sections | length }} sections:
 - Core: 3 motifs appearing in {{ ((audio_profile.structure.sections | length) * 0.7) | round(0) | int }}+ sections each
 - Spice: 1-2 motifs appearing in 2-4 sections for specific moments
+
+## Final Checklist (Must Pass)
+
+1. `section_plans` has exactly {{ audio_profile.structure.sections | length }} entries and exact section IDs from Song Structure.
+2. Global theme scope is `SONG`; all section theme scopes are `SECTION`.
+3. Global palette plan has valid primary `palette_id`; section overrides are rare and justified in notes.
+4. Every section has non-empty `motif_ids`; 2-4 core motifs are clearly dominant.
+5. All target roles come from the Display Layout role list above.
 
 Remember: Bold impact, main character energy, coordinated wow moments!

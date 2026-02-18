@@ -142,17 +142,26 @@ class GroupPlannerStage:
             def extract_plan(
                 r: IterationResult[SectionCoordinationPlan],
             ) -> SectionCoordinationPlan:
-                """Extract plan from result (guaranteed non-None by execute_step).
+                """Extract plan from result and stamp section timing.
 
                 When deserialized from cache, IterationResult is loaded without
                 the generic type parameter, so plan may be a raw dict instead
                 of a SectionCoordinationPlan. Validate explicitly.
+
+                Also stamps start_ms/end_ms from the audio profile onto the
+                plan (the LLM doesn't produce these — they come from the
+                MacroSectionPlan's SongSectionRef).
                 """
                 if r.plan is None:
                     raise ValueError("IterationResult.plan is None")
                 if isinstance(r.plan, dict):
-                    return SectionCoordinationPlan.model_validate(r.plan)
-                return r.plan
+                    plan = SectionCoordinationPlan.model_validate(r.plan)
+                else:
+                    plan = r.plan
+                # Stamp section timing from audio profile (not produced by LLM)
+                plan.start_ms = input.section.start_ms
+                plan.end_ms = input.section.end_ms
+                return plan
 
             return await execute_step(
                 stage_name=f"{self.name}_{section_id}",

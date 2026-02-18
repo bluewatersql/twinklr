@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import base64
+import contextlib
 import hashlib
 import json
 import logging
 from pathlib import Path
 import re
+import shutil
 from typing import TYPE_CHECKING, Any, Literal
 import uuid
 from xml.etree import ElementTree as ET
@@ -282,8 +284,35 @@ def parse_color_palettes_from_sequence(seq_path: Path) -> dict[str, Any]:
     return palettes
 
 
+_HEX_COLOR_RE = re.compile(r"^#[0-9A-Fa-f]{6}$")
+_COLOR_CURVE_RE = re.compile(r"c=(#[0-9A-Fa-f]{6})")
+
+
+def _parse_color_curve(value: str) -> list[str]:
+    """Extract hex colors from an xLights color curve value.
+
+    Color curves encode time-varying colors in the format:
+        Active=TRUE|Id=...|Values=x=0.190^c=#c8102e;x=0.240^c=#000000;...|
+
+    Returns de-duplicated list of hex colors found in the Values field.
+    """
+    colors = _COLOR_CURVE_RE.findall(value)
+    seen: set[str] = set()
+    unique: list[str] = []
+    for c in colors:
+        upper = c.upper()
+        if upper not in seen:
+            seen.add(upper)
+            unique.append(upper)
+    return unique
+
+
 def _parse_palette_entry(palette_str: str) -> dict[str, Any]:
     """Parse a single palette entry string from sequence file.
+
+    Handles two value formats for C_BUTTON_Palette slots:
+      - Simple hex: ``#RRGGBB``
+      - Color curve: ``Active=TRUE|Id=...|Values=x=0.190^c=#c8102e;...|``
 
     Extracts color codes where corresponding checkbox value is 1.
 
@@ -293,8 +322,8 @@ def _parse_palette_entry(palette_str: str) -> dict[str, Any]:
     """
     parts = palette_str.split(",")
 
-    color_buttons = {}  # palette_slot (1-based, e.g., 1-8) -> color code
-    checkboxes = {}  # palette_slot -> enabled boolean
+    color_buttons: dict[int, list[str]] = {}
+    checkboxes: dict[int, bool] = {}
 
     for part in parts:
         if "=" not in part:
@@ -304,14 +333,29 @@ def _parse_palette_entry(palette_str: str) -> dict[str, Any]:
         key = key.strip()
         value = value.strip()
 
-        # Parse C_BUTTON_Palette{N}=#RRGGBB
         if key.startswith("C_BUTTON_Palette"):
             match = re.match(r"C_BUTTON_Palette(\d+)", key)
             if match:
                 palette_slot = int(match.group(1))
-                color_buttons[palette_slot] = value
+                if _HEX_COLOR_RE.match(value):
+                    color_buttons[palette_slot] = [value.upper()]
+                elif value.startswith("Active="):
+                    curve_colors = _parse_color_curve(value)
+                    if curve_colors:
+                        color_buttons[palette_slot] = curve_colors
+                    else:
+                        logger.warning(
+                            "Color curve in palette slot %d has no parseable colors: %s",
+                            palette_slot,
+                            value[:200],
+                        )
+                else:
+                    logger.warning(
+                        "Unrecognised palette slot %d value format: %r",
+                        palette_slot,
+                        value[:200],
+                    )
 
-        # Parse C_CHECKBOX_Palette{N}=1
         elif key.startswith("C_CHECKBOX_Palette"):
             match = re.match(r"C_CHECKBOX_Palette(\d+)", key)
             if match:
@@ -319,19 +363,20 @@ def _parse_palette_entry(palette_str: str) -> dict[str, Any]:
                 checkboxes[palette_slot] = value == "1"
 
     # Build enabled colors list (checkbox=1 only)
-    enabled_colors = []
-    enabled_slot_indices = []
+    enabled_colors: list[str] = []
+    enabled_slot_indices: list[int] = []
 
     for palette_slot in sorted(color_buttons.keys()):
         if checkboxes.get(palette_slot, False):
-            color = color_buttons[palette_slot]
-            enabled_colors.append(color)
-            enabled_slot_indices.append(palette_slot - 1)  # 0-based slot index
+            slot_idx = palette_slot - 1
+            for color in color_buttons[palette_slot]:
+                enabled_colors.append(color)
+                enabled_slot_indices.append(slot_idx)
 
     # De-duplicate colors within this entry while preserving order
-    seen_colors = set()
-    unique_colors = []
-    unique_slot_indices = []
+    seen_colors: set[str] = set()
+    unique_colors: list[str] = []
+    unique_slot_indices: list[int] = []
 
     for color, slot_idx in zip(enabled_colors, enabled_slot_indices, strict=False):
         if color not in seen_colors:
@@ -353,30 +398,46 @@ def classify_palettes_by_color_properties(palette_data: dict[str, Any]) -> dict[
     - etc.
     """
 
-    def hex_to_rgb(hex_color: str) -> tuple[int, int, int]:
-        """Convert hex color to RGB tuple."""
+    def hex_to_rgb(hex_color: str) -> tuple[int, int, int] | None:
+        """Convert hex color to RGB tuple, or None if not a valid 6-char hex string."""
         hex_color = hex_color.lstrip("#")
+        if len(hex_color) != 6 or not all(c in "0123456789ABCDEFabcdef" for c in hex_color):
+            logger.warning("Invalid hex color passed to hex_to_rgb: %r", hex_color)
+            return None
         return tuple(int(hex_color[i : i + 2], 16) for i in (0, 2, 4))
 
     def is_grayscale(hex_color: str) -> bool:
         """Check if color is grayscale (R=G=B)."""
-        r, g, b = hex_to_rgb(hex_color)
+        rgb = hex_to_rgb(hex_color)
+        if rgb is None:
+            return False
+        r, g, b = rgb
         return r == g == b
 
     def is_warm(hex_color: str) -> bool:
         """Check if color is warm (red/orange/yellow dominant)."""
-        r, g, b = hex_to_rgb(hex_color)
-        return r > b and r > g * 0.8  # Red dominant or red/yellow
+        rgb = hex_to_rgb(hex_color)
+        if rgb is None:
+            return False
+        r, g, b = rgb
+        return r > b and r > g * 0.8
 
     def is_cool(hex_color: str) -> bool:
         """Check if color is cool (blue/green dominant)."""
-        r, g, b = hex_to_rgb(hex_color)
+        rgb = hex_to_rgb(hex_color)
+        if rgb is None:
+            return False
+        r, g, b = rgb
         return (b > r and b > g * 0.8) or (g > r and g > b * 0.8)
 
     def color_category(hex_color: str) -> str:
         """Categorize color into basic color families."""
-        if is_grayscale(hex_color):
-            r, _, _ = hex_to_rgb(hex_color)
+        rgb = hex_to_rgb(hex_color)
+        if rgb is None:
+            return "unknown"
+
+        r, g, b = rgb
+        if r == g == b:
             if r == 0:
                 return "black"
             elif r == 255:
@@ -384,10 +445,8 @@ def classify_palettes_by_color_properties(palette_data: dict[str, Any]) -> dict[
             else:
                 return "gray"
 
-        r, g, b = hex_to_rgb(hex_color)
         max_val = max(r, g, b)
 
-        # Simple color categorization
         if r == max_val and g < 100 and b < 100:
             return "red"
         elif g == max_val and r < 100 and b < 100:
@@ -792,6 +851,10 @@ def main(zip_path: str, out_dir: str, config_mode: ConfigMode) -> None:
 
     zip_p = repo_root / Path(zip_path)
     out_p = repo_root / Path(out_dir)
+
+    with contextlib.suppress(FileNotFoundError):
+        shutil.rmtree(out_p)
+
     out_p.mkdir(parents=True, exist_ok=True)
 
     manifest = ingest_zip(zip_p)
@@ -803,7 +866,7 @@ def main(zip_path: str, out_dir: str, config_mode: ConfigMode) -> None:
     files_by_id = {f.file_id: f for f in manifest.files}
 
     if manifest.sequence_file_id is None:
-        raise RuntimeError("No .xsq/.seq found in zip")
+        raise RuntimeError(f"No .xsq/.seq found in zip: {zip_p}")
 
     seq_file = files_by_id[manifest.sequence_file_id]
     seq_path = extracted_dir / seq_file.filename
@@ -929,7 +992,13 @@ def main(zip_path: str, out_dir: str, config_mode: ConfigMode) -> None:
 
 if __name__ == "__main__":
     # "plain" or "compressed"
-    zip_path = "data/vendor_packages/example.zip"
-    out_dir = "data/test"
-    config_mode: ConfigMode = "plain"
-    main(zip_path, out_dir, config_mode)
+    # zip_path = "data/vendor_packages/example.zip"
+    for x in range(1, 14):
+        zip_path = f"data/vendor_packages/example{x}.zip"
+        out_dir = f"data/test/example{x}"
+        config_mode: ConfigMode = "plain"
+        try:
+            main(zip_path, out_dir, config_mode)
+        except RuntimeError as e:
+            logger.warning("Skipping example%d: %s", x, e)
+            continue

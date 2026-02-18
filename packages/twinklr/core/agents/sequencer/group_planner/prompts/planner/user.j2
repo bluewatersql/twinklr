@@ -10,6 +10,7 @@ Refinement iterations (2+) use user_refinement.j2 instead.
 **Section Name:** {{ section_name }}
 **Timing:** {{ (start_ms / 1000) | round(1) }}s to {{ (end_ms / 1000) | round(1) }}s ({{ ((end_ms - start_ms) / 1000) | round(1) }}s duration)
 **Musical Length:** {{ section_duration_bars }} bars ({{ section_duration_beats }} beats) - you have bars 1 through {{ available_bars }} to work with
+**Hard Bar Limit:** `section_max_bar = {{ section_max_bar }}` (all placement starts and all window ends must be <= this bar)
 {% if section_duration_bars < 1 %}
 ⚠️ **VERY SHORT SECTION (< 1 bar):** This is a pickup/transition. Use minimal placements:
 - ONE accent HIT on primary target at bar 1, beat 1
@@ -148,6 +149,14 @@ Motif Catalog (summary for reference):
 {% endfor %}
 {% endif %}
 
+## Multi-Lane Reuse Allowlist (RHYTHM+ACCENT only)
+
+{% if multilane_allowed_groups %}
+Only these groups may appear in both RHYTHM and ACCENT: {{ multilane_allowed_groups | join(", ") }}
+{% else %}
+No allowlist provided. Treat multi-lane reuse as NOT allowed.
+{% endif %}
+
 ## Theme Context (from MacroPlan)
 
 **ThemeRef for This Section** (COPY THIS EXACTLY to your response):
@@ -194,8 +203,8 @@ Create a SectionCoordinationPlan for **{{ section_name }} ({{ section_id }})**.
 
 **Follow the {{ energy_target }} ENERGY RECIPE from the system prompt:**
 {% if energy_target == "HIGH" %}
-- BASE: SOFT intensity, SECTION duration (ANCHOR/SUPPORTING structural groups or zone targets)
-- RHYTHM: SEQUENCED mode, STRONG intensity (ANCHOR groups with motion potential)
+- BASE: SOFT intensity, SECTION duration (OUTLINE + WINDOWS)
+- RHYTHM: SEQUENCED mode, STRONG intensity (ARCHES or similar)
 - ACCENT: PEAK on 1 HERO, STRONG on others, HIT/BURST duration, stagger timing
 {% elif energy_target == "LOW" %}
 - BASE: WHISPER-SOFT intensity, SECTION duration
@@ -214,6 +223,7 @@ Create a SectionCoordinationPlan for **{{ section_name }} ({{ section_id }})**.
 
 **Primary targets for ACCENT:** {{ primary_focus_targets | join(", ") }}
 **Available bars:** 1 to {{ available_bars }}
+**Do not exceed bar {{ section_max_bar }} for any start or window end.**
 
 {% if lyric_context %}
 **NARRATIVE ASSETS:** Include `narrative_assets` with 1-10 figurative imagery directives based on the narrative context above. These must be concrete visual subjects (characters, objects, scenes), not abstract patterns.

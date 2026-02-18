@@ -21,6 +21,8 @@ Provides the MacroPlan to evaluate along with song context
 
 ## Song Structure
 
+**Expected section count:** {{ audio_profile.structure.sections | length }}
+
 {% for section in audio_profile.structure.sections %}
 - **{{ section.name }}** ({{ section.section_id }}) - {{ (section.start_ms / 1000) | round(1) }}s to {{ (section.end_ms / 1000) | round(1) }}s
 {% endfor %}
@@ -31,6 +33,8 @@ Available target roles:
 {% for group in display_groups %}
 - **{{ group.role_key }}** ({{ group.model_count }} models)
 {% endfor %}
+
+Count target-role validity against this exact list only.
 
 ---
 

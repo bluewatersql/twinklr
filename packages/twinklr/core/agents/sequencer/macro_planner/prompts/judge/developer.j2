@@ -19,8 +19,8 @@ Return HARD_FAIL if any are true:
 - Layering invalid (not 1-5, missing BASE, duplicate indices)
 - Target roles referenced that do not exist in display_groups
 - Theme invalid:
-  - global_story.theme.scope != SONG
-  - any section.theme.scope != SECTION
+  - global_story.theme does not use song-level ThemeScope (`SONG`)
+  - any section.theme does not use section-level ThemeScope (`SECTION`)
   - any ThemeRef.tags length > 5
 - **Palette invalid (NEW):**
   - global_story.palette_plan.primary.palette_id missing/empty
@@ -28,6 +28,12 @@ Return HARD_FAIL if any are true:
 - **Motifs invalid (NEW):**
   - any section has 0 motif_ids
   - motif_id not in motif_catalog (if provided)
+
+## Strategic Scoring Guardrails (Phase 2)
+
+- Use `audio_profile.structure.sections` for section counts and percentages.
+- If there are no ERROR issues and all WARN issues are localized/patchable, default to score >= 7.0 unless coherence is fundamentally broken.
+- Avoid contradictory counting in issue messages (section totals and override counts must align).
 
 ## Notes
 
