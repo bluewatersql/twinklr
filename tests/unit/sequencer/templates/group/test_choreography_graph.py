@@ -256,6 +256,7 @@ class TestChoreographyGraphPlannerSummary:
         summaries = graph.to_planner_summary()
         assert len(summaries) == 1
         s = summaries[0]
+        assert s["id"] == "ARCHES"
         assert s["role_key"] == "ARCHES"
         assert s["model_count"] == 10
         assert s["element_kind"] == "ARCH"

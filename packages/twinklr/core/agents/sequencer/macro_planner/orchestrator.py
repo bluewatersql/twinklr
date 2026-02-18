@@ -161,7 +161,7 @@ class MacroPlannerOrchestrator:
             planning_context: Complete planning context containing:
                 - audio_profile: Musical analysis and creative guidance
                 - lyric_context: Narrative and thematic analysis (optional)
-                - display_groups: Available display groups with role keys
+                - display_groups: Available display groups with concrete IDs
 
         Returns:
             IterationResult containing the final MacroPlan and metadata
@@ -176,6 +176,17 @@ class MacroPlannerOrchestrator:
 
         if not planning_context.display_groups:
             raise ValueError("At least one display group must be provided")
+
+        missing_group_ids = [
+            idx
+            for idx, group in enumerate(planning_context.display_groups)
+            if not str(group.get("id") or "").strip()
+        ]
+        if missing_group_ids:
+            raise ValueError(
+                "Display metadata missing concrete group id(s) at index(es): "
+                f"{missing_group_ids}. Macro planner requires group['id'] for all groups."
+            )
 
         logger.debug(
             f"Starting MacroPlanner orchestration: "
@@ -213,7 +224,7 @@ class MacroPlannerOrchestrator:
         available_zones: set[str] = set()
         available_splits: set[str] = set()
         for group in planning_context.display_groups:
-            gid = str(group.get("role_key") or group.get("id") or "").strip()
+            gid = str(group.get("id") or "").strip()
             if gid:
                 available_group_ids.append(gid)
 

@@ -59,8 +59,8 @@ def mock_context():
 def display_groups():
     """Create mock display groups."""
     return [
-        {"role_key": "OUTLINE", "model_count": 10, "group_type": "string"},
-        {"role_key": "MEGA_TREE", "model_count": 1, "group_type": "tree"},
+        {"id": "OUTLINE", "role_key": "OUTLINE", "model_count": 10, "group_type": "string"},
+        {"id": "MEGA_TREE", "role_key": "MEGA_TREE", "model_count": 1, "group_type": "tree"},
     ]
 
 

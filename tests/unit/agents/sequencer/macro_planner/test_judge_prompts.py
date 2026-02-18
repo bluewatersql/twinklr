@@ -71,9 +71,9 @@ def audio_profile() -> AudioProfileModel:
 def display_groups() -> list[dict]:
     """Mock display groups."""
     return [
-        {"role_key": "OUTLINE", "model_count": 200},
-        {"role_key": "MEGA_TREE", "model_count": 500},
-        {"role_key": "HERO", "model_count": 100},
+        {"id": "OUTLINE", "role_key": "OUTLINE", "model_count": 200},
+        {"id": "MEGA_TREE", "role_key": "MEGA_TREE", "model_count": 500},
+        {"id": "HERO", "role_key": "HERO", "model_count": 100},
     ]
 
 
@@ -331,7 +331,7 @@ def test_user_prompt_display_groups(
     )
 
     for group in display_groups:
-        assert group["role_key"] in result
+        assert group["id"] in result
 
 
 def test_user_prompt_macro_plan_content(

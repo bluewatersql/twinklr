@@ -18,7 +18,7 @@ class TestPlanningContext:
         ctx = PlanningContext(
             audio_profile=audio_profile_fixture,
             lyric_context=None,
-            display_groups=[{"role_key": "OUTLINE", "model_count": 10}],
+            display_groups=[{"id": "OUTLINE", "role_key": "OUTLINE", "model_count": 10}],
         )
 
         assert ctx.audio_profile == audio_profile_fixture
@@ -31,7 +31,7 @@ class TestPlanningContext:
         ctx = PlanningContext(
             audio_profile=audio_profile_fixture,
             lyric_context=lyric_context_fixture,
-            display_groups=[{"role_key": "OUTLINE", "model_count": 10}],
+            display_groups=[{"id": "OUTLINE", "role_key": "OUTLINE", "model_count": 10}],
         )
 
         assert ctx.audio_profile == audio_profile_fixture

@@ -212,7 +212,7 @@ class MacroPlanHeuristicValidator:
         valid_splits: set[str] = set()
 
         for group in display_groups:
-            gid = str(group.get("role_key") or group.get("id") or "").strip()
+            gid = str(group.get("id") or "").strip()
             if gid:
                 valid_group_ids.add(gid)
 

@@ -375,7 +375,7 @@ class DisplayGraph(BaseModel):
         spatial position so the planner can make informed decisions.
 
         Returns:
-            List of dicts with keys: ``role_key``, ``group_type``,
+            List of dicts with keys: ``id``, ``role_key``, ``group_type``,
             ``model_count``, ``element_kind``, ``arrangement``,
             ``pixel_density``, ``prominence``, ``pixel_fraction``,
             ``horizontal``, ``vertical``, ``depth``, ``zone``,
@@ -384,6 +384,7 @@ class DisplayGraph(BaseModel):
         result: list[dict[str, object]] = []
         for g in self.groups:
             summary: dict[str, object] = {
+                "id": g.id,
                 "role_key": g.role,
                 "group_type": g.element_type.value,
                 "model_count": g.fixture_count,

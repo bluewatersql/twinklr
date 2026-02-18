@@ -158,6 +158,14 @@ class SectionPlanValidator:
             target_timings: dict[str, list[tuple[int, int, str]]] = defaultdict(list)
 
             for coord_plan in lane_plan.coordination_plans:
+                # Validate coordination-mode-specific required fields
+                errors.extend(
+                    self._validate_coordination_requirements(
+                        coord_plan,
+                        lane_plan.lane,
+                    )
+                )
+
                 # Validate targets
                 coord_target_keys: list[str] = []
                 for target in coord_plan.targets:
@@ -220,6 +228,59 @@ class SectionPlanValidator:
 
         is_valid = len(errors) == 0
         return ValidationResult(is_valid=is_valid, errors=errors, warnings=warnings)
+
+    def _validate_coordination_requirements(
+        self,
+        coord_plan: CoordinationPlan,
+        lane: LaneKind,
+    ) -> list[ValidationIssue]:
+        """Validate required fields for expansion coordination modes."""
+        errors: list[ValidationIssue] = []
+        mode = coord_plan.coordination_mode
+
+        requires_window_config = {
+            CoordinationMode.SEQUENCED,
+            CoordinationMode.CALL_RESPONSE,
+            CoordinationMode.RIPPLE,
+        }
+        if mode in requires_window_config:
+            if coord_plan.window is None or coord_plan.config is None:
+                errors.append(
+                    ValidationIssue(
+                        severity=ValidationSeverity.ERROR,
+                        code=f"{mode.value}_MISSING_WINDOW_CONFIG",
+                        message=(
+                            f"{mode.value} mode in {lane.value} lane requires both "
+                            "window and config."
+                        ),
+                        field_path=f"lane_plans[{lane.value}].coordination_plans",
+                        fix_hint=(
+                            f"Add both window and config for {mode.value} mode, "
+                            "or switch to UNIFIED/COMPLEMENTARY with placements."
+                        ),
+                    )
+                )
+                return errors
+
+        if mode == CoordinationMode.CALL_RESPONSE:
+            if coord_plan.config is None or not coord_plan.config.group_order:
+                errors.append(
+                    ValidationIssue(
+                        severity=ValidationSeverity.ERROR,
+                        code="CALL_RESPONSE_MISSING_GROUP_ORDER",
+                        message=(
+                            f"CALL_RESPONSE mode in {lane.value} lane requires "
+                            "a non-empty config.group_order."
+                        ),
+                        field_path=f"lane_plans[{lane.value}].coordination_plans.config.group_order",
+                        fix_hint=(
+                            "Populate config.group_order with the alternating call/response "
+                            "participant IDs in execution order."
+                        ),
+                    )
+                )
+
+        return errors
 
     def _validate_target(self, target: PlanTarget, lane_name: str) -> list[ValidationIssue]:
         """Validate a typed PlanTarget.

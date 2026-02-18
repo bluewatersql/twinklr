@@ -7,8 +7,8 @@ from pathlib import Path
 from twinklr.core.pipeline import ExecutionPattern
 
 MOCK_DISPLAY_GROUPS = [
-    {"role_key": "OUTLINE", "model_count": 10, "group_type": "string"},
-    {"role_key": "MEGA_TREE", "model_count": 1, "group_type": "tree"},
+    {"id": "OUTLINE", "role_key": "OUTLINE", "model_count": 10, "group_type": "string"},
+    {"id": "MEGA_TREE", "role_key": "MEGA_TREE", "model_count": 1, "group_type": "tree"},
 ]
 
 

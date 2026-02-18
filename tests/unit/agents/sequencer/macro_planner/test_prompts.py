@@ -52,9 +52,14 @@ def audio_profile() -> AudioProfileModel:
 def display_groups() -> list:
     """Create mock display groups."""
     return [
-        {"role_key": "OUTLINE", "group_type": "outline", "model_count": 200},
-        {"role_key": "MEGA_TREE", "group_type": "mega_tree", "model_count": 300},
-        {"role_key": "ARCHES", "group_type": "arches", "model_count": 150},
+        {"id": "OUTLINE", "role_key": "OUTLINE", "group_type": "outline", "model_count": 200},
+        {
+            "id": "MEGA_TREE",
+            "role_key": "MEGA_TREE",
+            "group_type": "mega_tree",
+            "model_count": 300,
+        },
+        {"id": "ARCHES", "role_key": "ARCHES", "group_type": "arches", "model_count": 150},
     ]
 
 

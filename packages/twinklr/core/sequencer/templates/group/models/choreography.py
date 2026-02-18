@@ -272,7 +272,7 @@ class ChoreographyGraph(BaseModel):
         the planner can make informed decisions.
 
         Returns:
-            List of dicts with keys: ``role_key``, ``model_count``,
+            List of dicts with keys: ``id``, ``role_key``, ``model_count``,
             ``element_kind``, ``arrangement``, ``prominence``,
             ``detail_capability``, ``pixel_fraction``, ``horizontal``,
             ``vertical``, ``depth``, ``zone``, ``tags``,
@@ -281,6 +281,7 @@ class ChoreographyGraph(BaseModel):
         result: list[dict[str, object]] = []
         for g in self.groups:
             summary: dict[str, object] = {
+                "id": g.id,
                 "role_key": g.role,
                 "model_count": g.fixture_count,
                 "detail_capability": g.detail_capability.value,

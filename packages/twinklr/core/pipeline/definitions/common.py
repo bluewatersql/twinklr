@@ -31,14 +31,14 @@ def build_common_stages(
 
     Args:
         display_groups: Display group configurations for the MacroPlannerStage.
-            Each dict must have ``role_key``, ``model_count``, and ``group_type``.
+            Each dict must include concrete ``id`` (plus planner metadata fields).
 
     Returns:
         List of 4 StageDefinitions in dependency order.
 
     Example:
         >>> stages = build_common_stages(display_groups=[
-        ...     {"role_key": "OUTLINE", "model_count": 10, "group_type": "string"},
+        ...     {"id": "OUTLINE", "role_key": "OUTLINE", "model_count": 10, "group_type": "string"},
         ... ])
         >>> [s.id for s in stages]
         ['audio', 'profile', 'lyrics', 'macro']

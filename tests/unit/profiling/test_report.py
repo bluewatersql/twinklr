@@ -155,11 +155,15 @@ def _profile() -> SequencePackProfile:
 def test_generate_layout_report_md() -> None:
     md = generate_layout_report_md(_layout_profile())
     assert "# RGB Effects Layout Profile" in md
+    assert "## Display Models (Top 25)" in md
+    assert "| # | Name | DisplayAs | Category | Pixels | Channels | Layout Group | Tags |" in md
 
 
 def test_generate_profile_summary_md_contains_song() -> None:
     md = generate_profile_summary_md(_profile())
     assert "Carol of the Bells" in md
+    assert "## Top Effect Types (Top 20)" not in md  # no events in this fixture
+    assert "## Effect Statistics" in md
 
 
 def test_report_generation_idempotent() -> None:

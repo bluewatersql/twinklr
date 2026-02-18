@@ -45,7 +45,7 @@ class MacroPlannerStage:
         """Initialize macro planner stage.
 
         Args:
-            display_groups: List of display group configs with role_key, model_count, group_type
+            display_groups: List of display group configs with concrete id, model_count, group_type
         """
         self.display_groups = display_groups
 

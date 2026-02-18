@@ -10,6 +10,7 @@ import hashlib
 import json
 import logging
 from collections.abc import Callable
+from difflib import get_close_matches
 from typing import Any
 
 from twinklr.core.agents.logging import LLMCallLogger, NullLLMCallLogger
@@ -437,6 +438,10 @@ class GroupPlannerOrchestrator:
 
         def validate(plan: SectionCoordinationPlan) -> list[str]:
             """Validate plan and return list of error messages."""
+            # Deterministic ID normalization to recover common alias drift
+            # (e.g., MATRICES -> MATRIX) without spending an iteration.
+            self._normalize_group_target_ids(plan, section_context)
+
             # Deterministic safety pass to reduce avoidable first-iteration failures.
             # This removes same-target placements that are too tightly packed for
             # categorical duration expansion, which commonly causes overlap errors.
@@ -452,6 +457,74 @@ class GroupPlannerOrchestrator:
             return errors
 
         return validate
+
+    def _normalize_group_target_ids(
+        self,
+        plan: SectionCoordinationPlan,
+        section_context: SectionPlanningContext,
+    ) -> None:
+        """Normalize near-miss group IDs to valid concrete display IDs.
+
+        This is intentionally conservative and only applies when there is a
+        single high-confidence match in the current choreography graph.
+        """
+        from twinklr.core.sequencer.templates.group.models.coordination import PlanTarget
+        from twinklr.core.sequencer.vocabulary import TargetType
+
+        valid_ids = {g.id for g in section_context.choreo_graph.groups}
+        if not valid_ids:
+            return
+
+        def canonicalize(raw_id: str) -> str:
+            token = raw_id.strip().upper()
+            if token == "MATRICES" and "MATRIX" in valid_ids:
+                return "MATRIX"
+            if token == "WREATH" and "WREATHS" in valid_ids:
+                return "WREATHS"
+            if token == "ICICLE" and "ICICLES" in valid_ids:
+                return "ICICLES"
+            if token == "SNOWFLAKE" and "SNOWFLAKES" in valid_ids:
+                return "SNOWFLAKES"
+            if token in valid_ids:
+                return token
+            close = get_close_matches(token, sorted(valid_ids), n=1, cutoff=0.84)
+            return close[0] if close else token
+
+        for lane_plan in plan.lane_plans:
+            for coord_plan in lane_plan.coordination_plans:
+                # Normalize coordination targets
+                normalized_targets: list[PlanTarget] = []
+                for target in coord_plan.targets:
+                    if target.type != TargetType.GROUP:
+                        normalized_targets.append(target)
+                        continue
+                    normalized_id = canonicalize(target.id)
+                    if normalized_id != target.id:
+                        logger.warning(
+                            "Normalized group target id in %s/%s: %s -> %s",
+                            section_context.section_id,
+                            lane_plan.lane.value,
+                            target.id,
+                            normalized_id,
+                        )
+                    normalized_targets.append(target.model_copy(update={"id": normalized_id}))
+                coord_plan.targets = normalized_targets
+
+                # Normalize placement targets
+                normalized_placements = []
+                for placement in coord_plan.placements:
+                    ptarget = placement.target
+                    if ptarget.type != TargetType.GROUP:
+                        normalized_placements.append(placement)
+                        continue
+                    normalized_id = canonicalize(ptarget.id)
+                    new_target = (
+                        ptarget
+                        if normalized_id == ptarget.id
+                        else ptarget.model_copy(update={"id": normalized_id})
+                    )
+                    normalized_placements.append(placement.model_copy(update={"target": new_target}))
+                coord_plan.placements = normalized_placements
 
     def _sanitize_same_target_spacing(
         self,

@@ -35,7 +35,7 @@ class PlanningContext(BaseModel):
 
     # Display Configuration
     display_groups: list[dict[str, Any]] = Field(
-        description="Available display groups with role keys and capabilities"
+        description="Available display groups with concrete IDs and capabilities"
     )
 
     # Future extensibility (commented out, not yet implemented):
