@@ -33,6 +33,13 @@ from twinklr.core.feature_engineering.models.clustering import (
     TemplateClusterCandidate,
     TemplateClusterCatalog,
 )
+from twinklr.core.feature_engineering.models.color_arc import (
+    ArcKeyframe,
+    ColorTransitionRule,
+    NamedPalette,
+    SectionColorAssignment,
+    SongColorArc,
+)
 from twinklr.core.feature_engineering.models.color_narrative import ColorNarrativeRow
 from twinklr.core.feature_engineering.models.layering import LayeringFeatureRow
 from twinklr.core.feature_engineering.models.learned_taxonomy import (
@@ -108,6 +115,11 @@ __all__ = [
     "AnnRetrievalIndex",
     "ClusterMember",
     "ClusterReviewQueueRow",
+    "ArcKeyframe",
+    "ColorTransitionRule",
+    "NamedPalette",
+    "SectionColorAssignment",
+    "SongColorArc",
     "ColorClass",
     "ContinuityClass",
     "EffectPhrase",
