@@ -4,6 +4,22 @@ from twinklr.core.feature_engineering.models.alignment import (
     AlignedEffectEvent,
     AlignmentStatus,
 )
+from twinklr.core.feature_engineering.models.adapters import (
+    GroupPlannerAdapterPayload,
+    MacroPlannerAdapterPayload,
+    PlannerChangeMode,
+    RoleBindingContext,
+    SequenceAdapterContext,
+    SequencerAdapterBundle,
+    SequencerAdapterScope,
+    TemplateConstraint,
+    TransitionConstraint,
+)
+from twinklr.core.feature_engineering.models.ann_retrieval import (
+    AnnIndexEntry,
+    AnnRetrievalEvalReport,
+    AnnRetrievalIndex,
+)
 from twinklr.core.feature_engineering.models.bundle import (
     AudioCandidate,
     AudioCandidateOrigin,
@@ -11,8 +27,23 @@ from twinklr.core.feature_engineering.models.bundle import (
     AudioStatus,
     FeatureBundle,
 )
+from twinklr.core.feature_engineering.models.clustering import (
+    ClusterMember,
+    ClusterReviewQueueRow,
+    TemplateClusterCandidate,
+    TemplateClusterCatalog,
+)
 from twinklr.core.feature_engineering.models.color_narrative import ColorNarrativeRow
 from twinklr.core.feature_engineering.models.layering import LayeringFeatureRow
+from twinklr.core.feature_engineering.models.learned_taxonomy import (
+    LearnedTaxonomyEvalReport,
+    LearnedTaxonomyModel,
+)
+from twinklr.core.feature_engineering.models.motifs import (
+    MinedMotif,
+    MotifCatalog,
+    MotifOccurrence,
+)
 from twinklr.core.feature_engineering.models.phrases import (
     ColorClass,
     ContinuityClass,
@@ -26,12 +57,22 @@ from twinklr.core.feature_engineering.models.quality import (
     QualityCheckResult,
     QualityReport,
 )
+from twinklr.core.feature_engineering.models.retrieval import (
+    TemplateRecommendation,
+    TemplateRetrievalIndex,
+)
 from twinklr.core.feature_engineering.models.taxonomy import (
     PhraseTaxonomyRecord,
     TargetRole,
     TargetRoleAssignment,
     TaxonomyLabel,
     TaxonomyLabelScore,
+)
+from twinklr.core.feature_engineering.models.template_diagnostics import (
+    TemplateDiagnosticFlag,
+    TemplateDiagnosticRow,
+    TemplateDiagnosticsReport,
+    TemplateDiagnosticThresholds,
 )
 from twinklr.core.feature_engineering.models.templates import (
     MinedTemplate,
@@ -51,16 +92,33 @@ from twinklr.core.feature_engineering.models.transitions import (
 __all__ = [
     "AlignedEffectEvent",
     "AlignmentStatus",
+    "GroupPlannerAdapterPayload",
+    "MacroPlannerAdapterPayload",
+    "PlannerChangeMode",
+    "RoleBindingContext",
+    "SequenceAdapterContext",
+    "SequencerAdapterBundle",
+    "SequencerAdapterScope",
     "AudioCandidate",
     "AudioCandidateOrigin",
     "AudioDiscoveryResult",
     "AudioStatus",
+    "AnnIndexEntry",
+    "AnnRetrievalEvalReport",
+    "AnnRetrievalIndex",
+    "ClusterMember",
+    "ClusterReviewQueueRow",
     "ColorClass",
     "ContinuityClass",
     "EffectPhrase",
     "EnergyClass",
     "FeatureBundle",
+    "LearnedTaxonomyEvalReport",
+    "LearnedTaxonomyModel",
+    "MinedMotif",
     "MotionClass",
+    "MotifCatalog",
+    "MotifOccurrence",
     "PhraseSource",
     "PhraseTaxonomyRecord",
     "SpatialClass",
@@ -71,15 +129,25 @@ __all__ = [
     "MinedTemplate",
     "TemplateAssignment",
     "TemplateCatalog",
+    "TemplateClusterCandidate",
+    "TemplateClusterCatalog",
+    "TemplateConstraint",
     "TemplateKind",
     "TemplateProvenance",
     "TransitionAnomaly",
     "TransitionEdge",
     "TransitionGraph",
+    "TransitionConstraint",
     "TransitionRecord",
     "TransitionType",
     "LayeringFeatureRow",
     "ColorNarrativeRow",
     "QualityCheckResult",
     "QualityReport",
+    "TemplateRecommendation",
+    "TemplateRetrievalIndex",
+    "TemplateDiagnosticFlag",
+    "TemplateDiagnosticRow",
+    "TemplateDiagnosticsReport",
+    "TemplateDiagnosticThresholds",
 ]

@@ -7,6 +7,7 @@ import argparse
 from collections import Counter
 import json
 from pathlib import Path
+import shutil
 from typing import Any
 
 from twinklr.core.config.models import AppConfig, JobConfig
@@ -53,14 +54,20 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--quality-max-unknown-effect-family-ratio",
         type=float,
-        default=0.85,
+        default=0.02,
         help="Maximum unknown effect-family ratio quality threshold.",
     )
     parser.add_argument(
         "--quality-max-unknown-motion-ratio",
         type=float,
-        default=0.85,
+        default=0.02,
         help="Maximum unknown motion-class ratio quality threshold.",
+    )
+    parser.add_argument(
+        "--quality-max-single-unknown-effect-type-ratio",
+        type=float,
+        default=0.01,
+        help="Maximum ratio allowed for any one unknown effect type.",
     )
     parser.add_argument("--top-n", type=int, default=10, help="Top-N rows to show in summaries.")
     return parser.parse_args()
@@ -226,6 +233,9 @@ def _write_markdown(
     orchestration_template_rows: list[tuple[str, ...]],
     transition_graph: dict[str, Any] | None,
     quality_report: dict[str, Any] | None,
+    unknown_diagnostics: dict[str, Any] | None,
+    template_retrieval_index: dict[str, Any] | None,
+    template_diagnostics: dict[str, Any] | None,
     total_phrases: int,
     duplicate_groups: list[tuple[str, list[tuple[str, str, str]]]],
 ) -> Path:
@@ -339,6 +349,146 @@ def _write_markdown(
             )
             lines.append("")
 
+    if unknown_diagnostics:
+        lines.append("## Unknown Diagnostics")
+        lines.append("")
+        lines.append(
+            f"- Unknown effect-family ratio: {unknown_diagnostics.get('unknown_effect_family_ratio', 0)}"
+        )
+        lines.append(
+            f"- Unknown motion ratio: {unknown_diagnostics.get('unknown_motion_ratio', 0)}"
+        )
+        top_unknown = unknown_diagnostics.get("top_unknown_effect_types", [])
+        if isinstance(top_unknown, list) and top_unknown:
+            rows: list[tuple[str, str, str, str]] = []
+            for row in top_unknown[:10]:
+                if not isinstance(row, dict):
+                    continue
+                rows.append(
+                    (
+                        str(row.get("effect_type", "")),
+                        str(row.get("normalized_key", "")),
+                        str(row.get("count", 0)),
+                        str(row.get("distinct_sequence_count", 0)),
+                    )
+                )
+            if rows:
+                lines.append("")
+                lines.append("### Top Unknown Effect Types")
+                lines.append("")
+                lines.append(
+                    _render_markdown_table(
+                        ("effect_type", "normalized_key", "count", "sequences"),
+                        rows,
+                    )
+                )
+                lines.append("")
+
+        alias_groups = unknown_diagnostics.get("alias_candidate_groups", [])
+        if isinstance(alias_groups, list) and alias_groups:
+            alias_rows: list[tuple[str, str]] = []
+            for group in alias_groups[:10]:
+                if not isinstance(group, dict):
+                    continue
+                values = group.get("raw_effect_types", [])
+                rendered = (
+                    ", ".join(str(value) for value in values[:6])
+                    if isinstance(values, list)
+                    else ""
+                )
+                alias_rows.append((str(group.get("normalized_key", "")), rendered))
+            if alias_rows:
+                lines.append("### Alias Candidate Groups")
+                lines.append("")
+                lines.append(
+                    _render_markdown_table(("normalized_key", "raw_effect_types"), alias_rows)
+                )
+                lines.append("")
+
+    if template_retrieval_index:
+        recommendations = template_retrieval_index.get("recommendations", [])
+        rows: list[tuple[str, str, str, str, str]] = []
+        if isinstance(recommendations, list):
+            for row in recommendations[:10]:
+                if not isinstance(row, dict):
+                    continue
+                rows.append(
+                    (
+                        str(row.get("rank", "")),
+                        str(row.get("template_kind", "")),
+                        str(row.get("retrieval_score", "")),
+                        str(row.get("effect_family", "")),
+                        str(row.get("template_id", "")),
+                    )
+                )
+        if rows:
+            lines.append("## Template Retrieval Baseline")
+            lines.append("")
+            lines.append(
+                _render_markdown_table(
+                    ("rank", "kind", "score", "effect_family", "template_id"),
+                    rows,
+                )
+            )
+            lines.append("")
+
+    if template_diagnostics:
+        lines.append("## Template Diagnostics")
+        lines.append("")
+        lines.append(
+            f"- Flagged templates: {template_diagnostics.get('flagged_template_count', 0)} / "
+            f"{template_diagnostics.get('total_templates', 0)}"
+        )
+        lines.append(f"- Low support: {len(template_diagnostics.get('low_support_templates', []))}")
+        lines.append(
+            f"- High concentration: {len(template_diagnostics.get('high_concentration_templates', []))}"
+        )
+        lines.append(
+            f"- High variance: {len(template_diagnostics.get('high_variance_templates', []))}"
+        )
+        lines.append(
+            f"- Over generic: {len(template_diagnostics.get('over_generic_templates', []))}"
+        )
+
+        rows = template_diagnostics.get("rows", [])
+        rendered: list[tuple[str, str, str, str, str, str]] = []
+        if isinstance(rows, list):
+            candidates = [row for row in rows if isinstance(row, dict) and row.get("flags")]
+            candidates.sort(
+                key=lambda row: (
+                    -int(row.get("support_count", 0)),
+                    str(row.get("template_id", "")),
+                )
+            )
+            for row in candidates[:10]:
+                flags = row.get("flags", [])
+                rendered.append(
+                    (
+                        str(row.get("template_id", "")),
+                        str(row.get("template_kind", "")),
+                        str(row.get("support_count", 0)),
+                        str(row.get("concentration_ratio", 0)),
+                        str(row.get("variance_score", 0)),
+                        ",".join(str(flag) for flag in flags) if isinstance(flags, list) else "",
+                    )
+                )
+        if rendered:
+            lines.append("")
+            lines.append(
+                _render_markdown_table(
+                    (
+                        "template_id",
+                        "kind",
+                        "support",
+                        "concentration",
+                        "variance",
+                        "flags",
+                    ),
+                    rendered,
+                )
+            )
+        lines.append("")
+
     report_path = output_dir / "feature_engineering_demo.md"
     report_path.write_text("\n".join(lines), encoding="utf-8")
     return report_path
@@ -349,6 +499,7 @@ def main() -> int:
     output_dir = args.output_dir.resolve()
 
     if not args.skip_build:
+        shutil.rmtree(output_dir, ignore_errors=True)
         if args.corpus_dir is None:
             print("ERROR: --corpus-dir is required unless --skip-build is set.")
             return 2
@@ -364,6 +515,7 @@ def main() -> int:
                 template_min_distinct_pack_count=args.template_min_distinct_pack_count,
                 quality_max_unknown_effect_family_ratio=args.quality_max_unknown_effect_family_ratio,
                 quality_max_unknown_motion_ratio=args.quality_max_unknown_motion_ratio,
+                quality_max_single_unknown_effect_type_ratio=args.quality_max_single_unknown_effect_type_ratio,
             ),
             analyzer=analyzer,
         )
@@ -400,6 +552,21 @@ def main() -> int:
     quality_report_path = output_dir / "quality_report.json"
     if quality_report_path.exists():
         quality_report = _read_json(quality_report_path)
+
+    unknown_diagnostics = None
+    unknown_diagnostics_path = output_dir / "unknown_diagnostics.json"
+    if unknown_diagnostics_path.exists():
+        unknown_diagnostics = _read_json(unknown_diagnostics_path)
+
+    template_retrieval_index = None
+    template_retrieval_index_path = output_dir / "template_retrieval_index.json"
+    if template_retrieval_index_path.exists():
+        template_retrieval_index = _read_json(template_retrieval_index_path)
+
+    template_diagnostics = None
+    template_diagnostics_path = output_dir / "template_diagnostics.json"
+    if template_diagnostics_path.exists():
+        template_diagnostics = _read_json(template_diagnostics_path)
 
     print("\nFeature Engineering Summary")
     print("===========================")
@@ -488,6 +655,117 @@ def main() -> int:
         if check_rows:
             print(_render_table(("check", "passed", "value", "threshold"), check_rows))
 
+    if unknown_diagnostics is not None:
+        print("\nUnknown Diagnostics")
+        print(
+            f"Unknown effect-family ratio : {unknown_diagnostics.get('unknown_effect_family_ratio', 0)}"
+        )
+        print(f"Unknown motion ratio        : {unknown_diagnostics.get('unknown_motion_ratio', 0)}")
+        top_unknown = unknown_diagnostics.get("top_unknown_effect_types", [])
+        if isinstance(top_unknown, list) and top_unknown:
+            rows: list[tuple[str, str, str, str]] = []
+            for row in top_unknown[:10]:
+                if not isinstance(row, dict):
+                    continue
+                rows.append(
+                    (
+                        str(row.get("effect_type", "")),
+                        str(row.get("normalized_key", "")),
+                        str(row.get("count", 0)),
+                        str(row.get("distinct_sequence_count", 0)),
+                    )
+                )
+            if rows:
+                print("\nTop Unknown Effect Types")
+                print(_render_table(("effect_type", "normalized_key", "count", "sequences"), rows))
+
+        alias_groups = unknown_diagnostics.get("alias_candidate_groups", [])
+        if isinstance(alias_groups, list) and alias_groups:
+            alias_rows: list[tuple[str, str]] = []
+            for group in alias_groups[:10]:
+                if not isinstance(group, dict):
+                    continue
+                values = group.get("raw_effect_types", [])
+                rendered = (
+                    ", ".join(str(value) for value in values[:6])
+                    if isinstance(values, list)
+                    else ""
+                )
+                alias_rows.append((str(group.get("normalized_key", "")), rendered))
+            if alias_rows:
+                print("\nAlias Candidate Groups")
+                print(_render_table(("normalized_key", "raw_effect_types"), alias_rows))
+
+    if template_retrieval_index is not None:
+        recommendations = template_retrieval_index.get("recommendations", [])
+        rows: list[tuple[str, str, str, str, str]] = []
+        if isinstance(recommendations, list):
+            for row in recommendations[:10]:
+                if not isinstance(row, dict):
+                    continue
+                rows.append(
+                    (
+                        str(row.get("rank", "")),
+                        str(row.get("template_kind", "")),
+                        str(row.get("retrieval_score", "")),
+                        str(row.get("effect_family", "")),
+                        str(row.get("template_id", "")),
+                    )
+                )
+        if rows:
+            print("\nTemplate Retrieval Baseline")
+            print(_render_table(("rank", "kind", "score", "effect_family", "template_id"), rows))
+
+    if template_diagnostics is not None:
+        print("\nTemplate Diagnostics")
+        total_templates = int(template_diagnostics.get("total_templates", 0))
+        flagged_template_count = int(template_diagnostics.get("flagged_template_count", 0))
+        print(f"Flagged templates : {flagged_template_count}/{total_templates}")
+        print(f"Low support       : {len(template_diagnostics.get('low_support_templates', []))}")
+        print(
+            "High concentration: "
+            f"{len(template_diagnostics.get('high_concentration_templates', []))}"
+        )
+        print(f"High variance     : {len(template_diagnostics.get('high_variance_templates', []))}")
+        print(f"Over generic      : {len(template_diagnostics.get('over_generic_templates', []))}")
+
+        rows = template_diagnostics.get("rows", [])
+        rendered: list[tuple[str, str, str, str, str, str]] = []
+        if isinstance(rows, list):
+            candidates = [row for row in rows if isinstance(row, dict) and row.get("flags")]
+            candidates.sort(
+                key=lambda row: (
+                    -int(row.get("support_count", 0)),
+                    str(row.get("template_id", "")),
+                )
+            )
+            for row in candidates[:10]:
+                flags = row.get("flags", [])
+                rendered.append(
+                    (
+                        str(row.get("template_id", "")),
+                        str(row.get("template_kind", "")),
+                        str(row.get("support_count", 0)),
+                        str(row.get("concentration_ratio", 0)),
+                        str(row.get("variance_score", 0)),
+                        ",".join(str(flag) for flag in flags) if isinstance(flags, list) else "",
+                    )
+                )
+        if rendered:
+            print(
+                _render_table(
+                    (
+                        "template_id",
+                        "kind",
+                        "support",
+                        "concentration",
+                        "variance",
+                        "flags",
+                    ),
+                    rendered,
+                )
+            )
+
     report_path = _write_markdown(
         output_dir=output_dir,
         sequence_rows=sequence_rows,
@@ -497,6 +775,9 @@ def main() -> int:
         orchestration_template_rows=orchestration_template_rows,
         transition_graph=transition_graph,
         quality_report=quality_report,
+        unknown_diagnostics=unknown_diagnostics,
+        template_retrieval_index=template_retrieval_index,
+        template_diagnostics=template_diagnostics,
         total_phrases=total_phrases,
         duplicate_groups=duplicate_groups,
     )

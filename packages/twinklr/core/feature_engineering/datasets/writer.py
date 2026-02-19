@@ -11,12 +11,27 @@ from twinklr.core.feature_engineering.models import (
     EffectPhrase,
     FeatureBundle,
 )
+from twinklr.core.feature_engineering.models.adapters import SequencerAdapterBundle
+from twinklr.core.feature_engineering.models.ann_retrieval import (
+    AnnRetrievalEvalReport,
+    AnnRetrievalIndex,
+)
+from twinklr.core.feature_engineering.models.clustering import TemplateClusterCatalog
 from twinklr.core.feature_engineering.models.color_narrative import ColorNarrativeRow
 from twinklr.core.feature_engineering.models.layering import LayeringFeatureRow
+from twinklr.core.feature_engineering.models.learned_taxonomy import (
+    LearnedTaxonomyEvalReport,
+    LearnedTaxonomyModel,
+)
+from twinklr.core.feature_engineering.models.motifs import MotifCatalog
 from twinklr.core.feature_engineering.models.quality import QualityReport
+from twinklr.core.feature_engineering.models.retrieval import TemplateRetrievalIndex
 from twinklr.core.feature_engineering.models.taxonomy import (
     PhraseTaxonomyRecord,
     TargetRoleAssignment,
+)
+from twinklr.core.feature_engineering.models.template_diagnostics import (
+    TemplateDiagnosticsReport,
 )
 from twinklr.core.feature_engineering.models.templates import TemplateCatalog
 from twinklr.core.feature_engineering.models.transitions import TransitionGraph
@@ -185,7 +200,92 @@ class FeatureEngineeringWriter:
         self._write_json(output_path, report.model_dump(mode="json"))
         return output_path
 
+    def write_unknown_diagnostics(self, output_root: Path, payload: dict[str, object]) -> Path:
+        output_path = output_root / "unknown_diagnostics.json"
+        self._write_json(output_path, payload)
+        return output_path
+
+    def write_template_retrieval_index(
+        self, output_root: Path, index: TemplateRetrievalIndex
+    ) -> Path:
+        output_path = output_root / "template_retrieval_index.json"
+        self._write_json(output_path, index.model_dump(mode="json"))
+        return output_path
+
+    def write_template_diagnostics(
+        self, output_root: Path, diagnostics: TemplateDiagnosticsReport
+    ) -> Path:
+        output_path = output_root / "template_diagnostics.json"
+        self._write_json(output_path, diagnostics.model_dump(mode="json"))
+        return output_path
+
     def write_feature_store_manifest(self, output_root: Path, manifest: dict[str, str]) -> Path:
         output_path = output_root / "feature_store_manifest.json"
         self._write_json(output_path, manifest)
+        return output_path
+
+    def write_motif_catalog(self, output_root: Path, catalog: MotifCatalog) -> Path:
+        output_path = output_root / "motif_catalog.json"
+        self._write_json(output_path, catalog.model_dump(mode="json"))
+        return output_path
+
+    def write_cluster_catalog(self, output_root: Path, catalog: TemplateClusterCatalog) -> Path:
+        output_path = output_root / "cluster_candidates.json"
+        self._write_json(output_path, catalog.model_dump(mode="json"))
+        return output_path
+
+    def write_cluster_review_queue(self, output_root: Path, catalog: TemplateClusterCatalog) -> Path:
+        output_path = output_root / "cluster_review_queue.jsonl"
+        output_root.mkdir(parents=True, exist_ok=True)
+        with output_path.open("w", encoding="utf-8") as handle:
+            for row in catalog.review_queue:
+                handle.write(json.dumps(row.model_dump(mode="json"), ensure_ascii=False))
+                handle.write("\n")
+        return output_path
+
+    def write_learned_taxonomy_model(
+        self, output_root: Path, model: LearnedTaxonomyModel
+    ) -> Path:
+        output_path = output_root / "taxonomy_model_bundle.json"
+        self._write_json(output_path, model.model_dump(mode="json"))
+        return output_path
+
+    def write_learned_taxonomy_eval(
+        self, output_root: Path, report: LearnedTaxonomyEvalReport
+    ) -> Path:
+        output_path = output_root / "taxonomy_eval_report.json"
+        self._write_json(output_path, report.model_dump(mode="json"))
+        return output_path
+
+    def write_ann_retrieval_index(
+        self, output_root: Path, index: AnnRetrievalIndex
+    ) -> Path:
+        output_path = output_root / "retrieval_ann_index.json"
+        self._write_json(output_path, index.model_dump(mode="json"))
+        return output_path
+
+    def write_ann_retrieval_eval(
+        self, output_root: Path, report: AnnRetrievalEvalReport
+    ) -> Path:
+        output_path = output_root / "retrieval_eval_report.json"
+        self._write_json(output_path, report.model_dump(mode="json"))
+        return output_path
+
+    def write_planner_adapter_payloads(
+        self, output_root: Path, payloads: tuple[SequencerAdapterBundle, ...]
+    ) -> Path:
+        payload_dir = output_root / "planner_adapter_payloads"
+        payload_dir.mkdir(parents=True, exist_ok=True)
+        output_path = payload_dir / "sequencer_adapter_payloads.jsonl"
+        with output_path.open("w", encoding="utf-8") as handle:
+            for payload in payloads:
+                handle.write(json.dumps(payload.model_dump(mode="json"), ensure_ascii=False))
+                handle.write("\n")
+        return output_path
+
+    def write_planner_adapter_acceptance(
+        self, output_root: Path, payload: dict[str, object]
+    ) -> Path:
+        output_path = output_root / "planner_adapter_acceptance.json"
+        self._write_json(output_path, payload)
         return output_path

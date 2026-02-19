@@ -54,7 +54,7 @@ def _write_audio(path: Path) -> None:
     path.write_bytes(b"audio")
 
 
-def _seed_profile(profile_dir: Path) -> None:
+def _seed_profile(profile_dir: Path, *, effect_type: str = "On") -> None:
     _write_json(
         profile_dir / "sequence_metadata.json",
         {
@@ -81,7 +81,7 @@ def _seed_profile(profile_dir: Path) -> None:
                 "effect_event_id": "evt-1",
                 "target_name": "Tree",
                 "layer_index": 0,
-                "effect_type": "On",
+                "effect_type": effect_type,
                 "start_ms": 0,
                 "end_ms": 1000,
             }
@@ -203,4 +203,68 @@ def test_pipeline_run_corpus_iterates_sequence_index(tmp_path: Path) -> None:
         or (output_root / "color_narrative.jsonl").exists()
     )
     assert (output_root / "quality_report.json").exists()
+    assert (output_root / "unknown_diagnostics.json").exists()
+    assert (output_root / "template_retrieval_index.json").exists()
+    assert (output_root / "template_diagnostics.json").exists()
+    assert (output_root / "motif_catalog.json").exists()
+    assert (output_root / "cluster_candidates.json").exists()
+    assert (output_root / "cluster_review_queue.jsonl").exists()
+    assert (output_root / "taxonomy_model_bundle.json").exists()
+    assert (output_root / "taxonomy_eval_report.json").exists()
+    assert (output_root / "retrieval_ann_index.json").exists()
+    assert (output_root / "retrieval_eval_report.json").exists()
+    assert (output_root / "planner_adapter_payloads" / "sequencer_adapter_payloads.jsonl").exists()
+    assert (output_root / "planner_adapter_acceptance.json").exists()
     assert (output_root / "feature_store_manifest.json").exists()
+
+    manifest = json.loads((output_root / "feature_store_manifest.json").read_text(encoding="utf-8"))
+    assert "unknown_diagnostics" in manifest
+    assert "template_retrieval_index" in manifest
+    assert "template_diagnostics" in manifest
+    assert "motif_catalog" in manifest
+    assert "cluster_candidates" in manifest
+    assert "cluster_review_queue" in manifest
+    assert "taxonomy_model_bundle" in manifest
+    assert "taxonomy_eval_report" in manifest
+    assert "retrieval_ann_index" in manifest
+    assert "retrieval_eval_report" in manifest
+    assert "planner_adapter_payloads" in manifest
+    assert "planner_adapter_acceptance" in manifest
+
+    acceptance = json.loads((output_root / "planner_adapter_acceptance.json").read_text(encoding="utf-8"))
+    assert acceptance["planner_change_mode_enforced"] is True
+    assert acceptance["planner_runtime_changes_applied"] is False
+
+
+def test_pipeline_run_corpus_writes_unknown_diagnostics_content(tmp_path: Path) -> None:
+    profile_dir = tmp_path / "profiles" / "show_profile"
+    corpus_dir = tmp_path / "corpus"
+    output_root = tmp_path / "features"
+    extracted_root = tmp_path / "vendor"
+    _seed_profile(profile_dir, effect_type="Totally Unknown Effect")
+    _write_audio(extracted_root / "show_extracted" / "Need A Favor.mp3")
+    (corpus_dir / "sequence_index.jsonl").parent.mkdir(parents=True, exist_ok=True)
+    (corpus_dir / "sequence_index.jsonl").write_text(
+        json.dumps(
+            {
+                "profile_path": str(profile_dir),
+                "package_id": "pkg-1",
+                "sequence_file_id": "seq-1",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    pipeline = FeatureEngineeringPipeline(
+        options=FeatureEngineeringPipelineOptions(extracted_search_roots=(extracted_root,)),
+        analyzer=_FakeAnalyzer(),
+    )
+    pipeline.run_corpus(corpus_dir, output_root)
+
+    diagnostics = json.loads((output_root / "unknown_diagnostics.json").read_text(encoding="utf-8"))
+    assert diagnostics["unknown_effect_family_count"] == 1
+    assert diagnostics["unknown_motion_count"] == 1
+    top = diagnostics["top_unknown_effect_types"]
+    assert isinstance(top, list) and top
+    assert top[0]["effect_type"] == "Totally Unknown Effect"

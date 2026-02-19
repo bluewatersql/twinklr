@@ -3,16 +3,26 @@
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from twinklr.core.feature_engineering.adapters import GroupAdapterBuilder, MacroAdapterBuilder
 from twinklr.core.feature_engineering.alignment import TemporalAlignmentEngine
+from twinklr.core.feature_engineering.ann_retrieval import (
+    AnnRetrievalOptions,
+    AnnTemplateRetrievalIndexer,
+)
 from twinklr.core.feature_engineering.audio_discovery import (
     AudioAnalyzerLike,
     AudioDiscoveryContext,
     AudioDiscoveryOptions,
     AudioDiscoveryService,
+)
+from twinklr.core.feature_engineering.clustering import (
+    TemplateClusterer,
+    TemplateClustererOptions,
 )
 from twinklr.core.feature_engineering.color_narrative import ColorNarrativeExtractor
 from twinklr.core.feature_engineering.constants import FEATURE_BUNDLE_SCHEMA_VERSION
@@ -29,16 +39,26 @@ from twinklr.core.feature_engineering.models import (
     FeatureBundle,
     LayeringFeatureRow,
     PhraseTaxonomyRecord,
+    PlannerChangeMode,
     QualityReport,
+    SequencerAdapterBundle,
     TargetRoleAssignment,
     TemplateCatalog,
+    TemplateRetrievalIndex,
     TransitionGraph,
 )
+from twinklr.core.feature_engineering.motifs import MotifMiner, MotifMinerOptions
 from twinklr.core.feature_engineering.phrase_encoder import PhraseEncoder
+from twinklr.core.feature_engineering.retrieval import TemplateRetrievalRanker
 from twinklr.core.feature_engineering.taxonomy import (
+    LearnedTaxonomyTrainer,
+    LearnedTaxonomyTrainerOptions,
     TargetRoleAssigner,
     TaxonomyClassifier,
     TaxonomyClassifierOptions,
+)
+from twinklr.core.feature_engineering.template_diagnostics import (
+    TemplateDiagnosticsBuilder,
 )
 from twinklr.core.feature_engineering.templates import TemplateMiner, TemplateMinerOptions
 from twinklr.core.feature_engineering.transitions import TransitionModeler
@@ -60,6 +80,22 @@ class FeatureEngineeringPipelineOptions:
     enable_target_roles: bool = True
     enable_template_mining: bool = True
     enable_transition_modeling: bool = True
+    enable_template_retrieval_ranking: bool = True
+    enable_template_diagnostics: bool = True
+    enable_v2_motif_mining: bool = True
+    enable_v2_clustering: bool = True
+    enable_v2_learned_taxonomy: bool = True
+    enable_v2_ann_retrieval: bool = True
+    enable_v2_adapter_contracts: bool = True
+    v2_motif_min_support_count: int = 2
+    v2_motif_min_distinct_pack_count: int = 1
+    v2_motif_min_distinct_sequence_count: int = 2
+    v2_cluster_similarity_threshold: float = 0.92
+    v2_cluster_min_size: int = 2
+    v2_taxonomy_min_recall_for_promotion: float = 0.55
+    v2_taxonomy_min_f1_for_promotion: float = 0.60
+    v2_retrieval_min_recall_at_5: float = 0.80
+    v2_retrieval_max_avg_latency_ms: float = 10.0
     enable_layering_features: bool = True
     enable_color_narrative: bool = True
     enable_quality_gates: bool = True
@@ -68,8 +104,9 @@ class FeatureEngineeringPipelineOptions:
     template_min_distinct_pack_count: int = 1
     quality_min_template_coverage: float = 0.80
     quality_min_taxonomy_confidence_mean: float = 0.30
-    quality_max_unknown_effect_family_ratio: float = 0.85
-    quality_max_unknown_motion_ratio: float = 0.85
+    quality_max_unknown_effect_family_ratio: float = 0.02
+    quality_max_unknown_motion_ratio: float = 0.02
+    quality_max_single_unknown_effect_type_ratio: float = 0.01
 
 
 @dataclass(frozen=True)
@@ -113,6 +150,35 @@ class FeatureEngineeringPipeline:
             )
         )
         self._transition_modeler = TransitionModeler()
+        self._template_retrieval_ranker = TemplateRetrievalRanker()
+        self._template_diagnostics = TemplateDiagnosticsBuilder()
+        self._motif_miner = MotifMiner(
+            MotifMinerOptions(
+                min_support_count=self._options.v2_motif_min_support_count,
+                min_distinct_pack_count=self._options.v2_motif_min_distinct_pack_count,
+                min_distinct_sequence_count=self._options.v2_motif_min_distinct_sequence_count,
+            )
+        )
+        self._template_clusterer = TemplateClusterer(
+            TemplateClustererOptions(
+                similarity_threshold=self._options.v2_cluster_similarity_threshold,
+                min_cluster_size=self._options.v2_cluster_min_size,
+            )
+        )
+        self._learned_taxonomy_trainer = LearnedTaxonomyTrainer(
+            LearnedTaxonomyTrainerOptions(
+                min_recall_for_promotion=self._options.v2_taxonomy_min_recall_for_promotion,
+                min_f1_for_promotion=self._options.v2_taxonomy_min_f1_for_promotion,
+            )
+        )
+        self._ann_retrieval_indexer = AnnTemplateRetrievalIndexer(
+            AnnRetrievalOptions(
+                min_same_effect_family_recall_at_5=self._options.v2_retrieval_min_recall_at_5,
+                max_avg_query_latency_ms=self._options.v2_retrieval_max_avg_latency_ms,
+            )
+        )
+        self._macro_adapter_builder = MacroAdapterBuilder()
+        self._group_adapter_builder = GroupAdapterBuilder()
         self._layering = LayeringFeatureExtractor()
         self._color_narrative = ColorNarrativeExtractor()
         self._quality_gates = FeatureQualityGates(
@@ -121,6 +187,7 @@ class FeatureEngineeringPipeline:
                 min_taxonomy_confidence_mean=self._options.quality_min_taxonomy_confidence_mean,
                 max_unknown_effect_family_ratio=self._options.quality_max_unknown_effect_family_ratio,
                 max_unknown_motion_ratio=self._options.quality_max_unknown_motion_ratio,
+                max_single_unknown_effect_type_ratio=self._options.quality_max_single_unknown_effect_type_ratio,
             )
         )
 
@@ -240,8 +307,10 @@ class FeatureEngineeringPipeline:
         )
         self._write_v1_tail_artifacts(
             output_root=output_root,
+            bundles=tuple(bundles),
             phrases=tuple(corpus_phrases),
             taxonomy_rows=tuple(corpus_taxonomy),
+            target_roles=tuple(corpus_target_roles),
             template_catalogs=template_catalogs,
         )
         return bundles
@@ -375,11 +444,14 @@ class FeatureEngineeringPipeline:
         self,
         *,
         output_root: Path,
+        bundles: tuple[FeatureBundle, ...],
         phrases: tuple[EffectPhrase, ...],
         taxonomy_rows: tuple[PhraseTaxonomyRecord, ...],
+        target_roles: tuple[TargetRoleAssignment, ...],
         template_catalogs: tuple[TemplateCatalog, TemplateCatalog] | None,
     ) -> None:
         manifest: dict[str, str] = {}
+        retrieval_index: TemplateRetrievalIndex | None = None
 
         transition_graph: TransitionGraph | None = None
         if self._options.enable_transition_modeling and template_catalogs is not None:
@@ -417,10 +489,232 @@ class FeatureEngineeringPipeline:
             path = self._writer.write_quality_report(output_root, quality_report)
             manifest["quality_report"] = str(path)
 
+        if phrases:
+            path = self._writer.write_unknown_diagnostics(
+                output_root,
+                self._build_unknown_diagnostics(phrases),
+            )
+            manifest["unknown_diagnostics"] = str(path)
+
         if template_catalogs is not None:
             manifest["content_templates"] = str(output_root / "content_templates.json")
             manifest["orchestration_templates"] = str(output_root / "orchestration_templates.json")
+            if self._options.enable_template_retrieval_ranking:
+                retrieval_index = self._template_retrieval_ranker.build_index(
+                    content_catalog=template_catalogs[0],
+                    orchestration_catalog=template_catalogs[1],
+                    transition_graph=transition_graph,
+                )
+                path = self._writer.write_template_retrieval_index(output_root, retrieval_index)
+                manifest["template_retrieval_index"] = str(path)
+            if self._options.enable_template_diagnostics:
+                diagnostics = self._template_diagnostics.build(
+                    content_catalog=template_catalogs[0],
+                    orchestration_catalog=template_catalogs[1],
+                    taxonomy_rows=taxonomy_rows,
+                )
+                path = self._writer.write_template_diagnostics(output_root, diagnostics)
+                manifest["template_diagnostics"] = str(path)
+            if self._options.enable_v2_motif_mining:
+                motif_catalog = self._motif_miner.mine(
+                    phrases=phrases,
+                    taxonomy_rows=taxonomy_rows,
+                    content_catalog=template_catalogs[0],
+                    orchestration_catalog=template_catalogs[1],
+                )
+                path = self._writer.write_motif_catalog(output_root, motif_catalog)
+                manifest["motif_catalog"] = str(path)
+            if self._options.enable_v2_clustering:
+                cluster_catalog = self._template_clusterer.build_clusters(
+                    content_catalog=template_catalogs[0],
+                    orchestration_catalog=template_catalogs[1],
+                    retrieval_index=retrieval_index,
+                )
+                path = self._writer.write_cluster_catalog(output_root, cluster_catalog)
+                manifest["cluster_candidates"] = str(path)
+                queue_path = self._writer.write_cluster_review_queue(output_root, cluster_catalog)
+                manifest["cluster_review_queue"] = str(queue_path)
+        if self._options.enable_v2_learned_taxonomy and phrases and taxonomy_rows:
+            model, report = self._learned_taxonomy_trainer.train(
+                phrases=phrases,
+                taxonomy_rows=taxonomy_rows,
+            )
+            path = self._writer.write_learned_taxonomy_model(output_root, model)
+            manifest["taxonomy_model_bundle"] = str(path)
+            eval_path = self._writer.write_learned_taxonomy_eval(output_root, report)
+            manifest["taxonomy_eval_report"] = str(eval_path)
+        if self._options.enable_v2_ann_retrieval and retrieval_index is not None:
+            ann_index = self._ann_retrieval_indexer.build_index(retrieval_index)
+            path = self._writer.write_ann_retrieval_index(output_root, ann_index)
+            manifest["retrieval_ann_index"] = str(path)
+            eval_report = self._ann_retrieval_indexer.evaluate(
+                index=ann_index,
+                retrieval_index=retrieval_index,
+            )
+            eval_path = self._writer.write_ann_retrieval_eval(output_root, eval_report)
+            manifest["retrieval_eval_report"] = str(eval_path)
+        if self._options.enable_v2_adapter_contracts:
+            payloads, acceptance = self._build_adapter_payloads(
+                bundles=bundles,
+                retrieval_index=retrieval_index,
+                transition_graph=transition_graph,
+                target_roles=target_roles,
+            )
+            payload_path = self._writer.write_planner_adapter_payloads(output_root, payloads)
+            acceptance_path = self._writer.write_planner_adapter_acceptance(output_root, acceptance)
+            manifest["planner_adapter_payloads"] = str(payload_path)
+            manifest["planner_adapter_acceptance"] = str(acceptance_path)
         if quality_report is not None:
             manifest["quality_passed"] = str(quality_report.passed)
 
         self._writer.write_feature_store_manifest(output_root, manifest)
+
+    def _build_adapter_payloads(
+        self,
+        *,
+        bundles: tuple[FeatureBundle, ...],
+        retrieval_index: TemplateRetrievalIndex | None,
+        transition_graph: TransitionGraph | None,
+        target_roles: tuple[TargetRoleAssignment, ...],
+    ) -> tuple[tuple[SequencerAdapterBundle, ...], dict[str, object]]:
+        recommendations = retrieval_index.recommendations if retrieval_index is not None else ()
+        roles_by_sequence: dict[str, list[TargetRoleAssignment]] = {}
+        for row in target_roles:
+            roles_by_sequence.setdefault(row.sequence_file_id, []).append(row)
+
+        payloads: list[SequencerAdapterBundle] = []
+        contract_only_violations: list[str] = []
+        for bundle in sorted(
+            bundles,
+            key=lambda item: (item.package_id, item.sequence_file_id),
+        ):
+            assignments = tuple(roles_by_sequence.get(bundle.sequence_file_id, []))
+            macro = self._macro_adapter_builder.build(
+                bundle=bundle,
+                recommendations=recommendations,
+                transition_graph=transition_graph,
+                role_assignments=assignments,
+            )
+            group = self._group_adapter_builder.build(
+                bundle=bundle,
+                recommendations=recommendations,
+                transition_graph=transition_graph,
+                role_assignments=assignments,
+            )
+            if macro.planner_change_mode is not PlannerChangeMode.CONTRACT_ONLY:
+                contract_only_violations.append(
+                    f"{bundle.package_id}/{bundle.sequence_file_id}:macro"
+                )
+            if group.planner_change_mode is not PlannerChangeMode.CONTRACT_ONLY:
+                contract_only_violations.append(
+                    f"{bundle.package_id}/{bundle.sequence_file_id}:group"
+                )
+            payloads.append(
+                SequencerAdapterBundle(
+                    schema_version=macro.schema_version,
+                    adapter_version=macro.adapter_version,
+                    macro=macro,
+                    group=group,
+                )
+            )
+
+        acceptance = {
+            "schema_version": "v2.4.0",
+            "adapter_version": "sequencer_adapter_v1",
+            "sequence_count": len(payloads),
+            "macro_payload_count": len(payloads),
+            "group_payload_count": len(payloads),
+            "planner_change_mode_enforced": len(contract_only_violations) == 0,
+            "contract_only_violations": contract_only_violations,
+            "planner_runtime_changes_applied": False,
+        }
+        return tuple(payloads), acceptance
+
+    @staticmethod
+    def _normalize_effect_key(effect_type: str) -> str:
+        return re.sub(r"[^a-z0-9]+", "", effect_type.strip().lower())
+
+    def _build_unknown_diagnostics(self, phrases: tuple[EffectPhrase, ...]) -> dict[str, object]:
+        total = len(phrases)
+        unknown_effect_rows = [row for row in phrases if row.effect_family == "unknown"]
+        unknown_motion_rows = [row for row in phrases if row.motion_class.value == "unknown"]
+
+        unknown_effect_ratio = len(unknown_effect_rows) / total if total > 0 else 0.0
+        unknown_motion_ratio = len(unknown_motion_rows) / total if total > 0 else 0.0
+
+        by_effect_type: dict[str, list[EffectPhrase]] = {}
+        for row in unknown_effect_rows:
+            by_effect_type.setdefault(row.effect_type, []).append(row)
+
+        top_unknown_effect_types: list[dict[str, object]] = []
+        sorted_unknown = sorted(
+            by_effect_type.items(),
+            key=lambda item: (-len(item[1]), self._normalize_effect_key(item[0]), item[0]),
+        )
+        for effect_type, rows in sorted_unknown[:25]:
+            top_unknown_effect_types.append(
+                {
+                    "effect_type": effect_type,
+                    "normalized_key": self._normalize_effect_key(effect_type),
+                    "count": len(rows),
+                    "distinct_package_count": len({row.package_id for row in rows}),
+                    "distinct_sequence_count": len({row.sequence_file_id for row in rows}),
+                    "sample_rows": [
+                        {
+                            "phrase_id": row.phrase_id,
+                            "package_id": row.package_id,
+                            "sequence_file_id": row.sequence_file_id,
+                            "target_name": row.target_name,
+                            "start_ms": row.start_ms,
+                            "duration_ms": row.duration_ms,
+                            "map_confidence": row.map_confidence,
+                            "effect_family": row.effect_family,
+                            "motion_class": row.motion_class.value,
+                        }
+                        for row in rows[:3]
+                    ],
+                }
+            )
+
+        alias_candidate_groups: list[dict[str, object]] = []
+        by_normalized_key: dict[str, list[str]] = {}
+        for effect_type in by_effect_type:
+            normalized = self._normalize_effect_key(effect_type)
+            by_normalized_key.setdefault(normalized, []).append(effect_type)
+        for normalized_key, names in sorted(by_normalized_key.items()):
+            distinct = sorted(set(names))
+            if len(distinct) <= 1:
+                continue
+            alias_candidate_groups.append(
+                {
+                    "normalized_key": normalized_key,
+                    "raw_effect_types": distinct,
+                }
+            )
+
+        unknown_motion_by_effect_family: list[dict[str, object]] = []
+        by_motion_family: dict[str, list[EffectPhrase]] = {}
+        for row in unknown_motion_rows:
+            by_motion_family.setdefault(row.effect_family, []).append(row)
+        for family, rows in sorted(by_motion_family.items(), key=lambda item: (-len(item[1]), item[0]))[:25]:
+            unknown_motion_by_effect_family.append(
+                {
+                    "effect_family": family,
+                    "count": len(rows),
+                    "distinct_package_count": len({row.package_id for row in rows}),
+                    "distinct_sequence_count": len({row.sequence_file_id for row in rows}),
+                    "sample_effect_types": sorted({row.effect_type for row in rows})[:5],
+                }
+            )
+
+        return {
+            "schema_version": "v1.0.0",
+            "total_phrase_count": total,
+            "unknown_effect_family_count": len(unknown_effect_rows),
+            "unknown_effect_family_ratio": round(unknown_effect_ratio, 6),
+            "unknown_motion_count": len(unknown_motion_rows),
+            "unknown_motion_ratio": round(unknown_motion_ratio, 6),
+            "top_unknown_effect_types": top_unknown_effect_types,
+            "alias_candidate_groups": alias_candidate_groups,
+            "unknown_motion_by_effect_family": unknown_motion_by_effect_family,
+        }

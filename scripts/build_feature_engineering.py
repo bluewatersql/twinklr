@@ -120,14 +120,62 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--quality-max-unknown-effect-family-ratio",
         type=float,
-        default=0.85,
+        default=0.02,
         help="Maximum unknown effect-family ratio quality threshold",
     )
     parser.add_argument(
         "--quality-max-unknown-motion-ratio",
         type=float,
-        default=0.85,
+        default=0.02,
         help="Maximum unknown motion-class ratio quality threshold",
+    )
+    parser.add_argument(
+        "--quality-max-single-unknown-effect-type-ratio",
+        type=float,
+        default=0.01,
+        help="Maximum ratio allowed for any one unknown effect type",
+    )
+    parser.add_argument(
+        "--v2-cluster-similarity-threshold",
+        type=float,
+        default=0.92,
+        help="Minimum pairwise similarity required for V2 clustering membership.",
+    )
+    parser.add_argument(
+        "--v2-cluster-min-size",
+        type=int,
+        default=2,
+        help="Minimum template count per V2 cluster candidate.",
+    )
+    parser.add_argument(
+        "--v2-motif-min-distinct-sequences",
+        type=int,
+        default=2,
+        help="Minimum distinct sequences required for reusable motifs.",
+    )
+    parser.add_argument(
+        "--v2-taxonomy-min-recall-for-promotion",
+        type=float,
+        default=0.55,
+        help="Minimum recall required to mark learned taxonomy model promotable.",
+    )
+    parser.add_argument(
+        "--v2-taxonomy-min-f1-for-promotion",
+        type=float,
+        default=0.60,
+        help="Minimum F1 required to mark learned taxonomy model promotable.",
+    )
+    parser.add_argument(
+        "--v2-retrieval-min-recall-at-5",
+        type=float,
+        default=0.80,
+        help="Minimum same-effect-family recall@5 retrieval gate.",
+    )
+    parser.add_argument(
+        "--v2-retrieval-max-avg-latency-ms",
+        type=float,
+        default=10.0,
+        help="Maximum average retrieval query latency gate in milliseconds.",
     )
     return parser.parse_args()
 
@@ -165,6 +213,14 @@ def main() -> int:
             quality_min_taxonomy_confidence_mean=args.quality_min_taxonomy_confidence_mean,
             quality_max_unknown_effect_family_ratio=args.quality_max_unknown_effect_family_ratio,
             quality_max_unknown_motion_ratio=args.quality_max_unknown_motion_ratio,
+            quality_max_single_unknown_effect_type_ratio=args.quality_max_single_unknown_effect_type_ratio,
+            v2_cluster_similarity_threshold=args.v2_cluster_similarity_threshold,
+            v2_cluster_min_size=args.v2_cluster_min_size,
+            v2_motif_min_distinct_sequence_count=args.v2_motif_min_distinct_sequences,
+            v2_taxonomy_min_recall_for_promotion=args.v2_taxonomy_min_recall_for_promotion,
+            v2_taxonomy_min_f1_for_promotion=args.v2_taxonomy_min_f1_for_promotion,
+            v2_retrieval_min_recall_at_5=args.v2_retrieval_min_recall_at_5,
+            v2_retrieval_max_avg_latency_ms=args.v2_retrieval_max_avg_latency_ms,
         ),
         analyzer=analyzer,
     )

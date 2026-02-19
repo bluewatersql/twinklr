@@ -186,3 +186,56 @@ def test_quality_gate_fails_when_unknown_motion_ratio_exceeds_threshold() -> Non
     )
     check = next(row for row in report.checks if row.check_id == "unknown_motion_ratio")
     assert check.passed is False
+
+
+def test_quality_gate_fails_when_single_unknown_type_is_dominant() -> None:
+    known = tuple(_phrase(f"p-known-{idx}") for idx in range(10))
+    unknown_1 = _phrase("p-unknown-1").model_copy(
+        update={
+            "effect_type": "SketchFX",
+            "effect_family": "unknown",
+            "motion_class": MotionClass.UNKNOWN,
+        }
+    )
+    unknown_2 = _phrase("p-unknown-2").model_copy(
+        update={
+            "effect_type": "SketchFX",
+            "effect_family": "unknown",
+            "motion_class": MotionClass.UNKNOWN,
+        }
+    )
+    phrases = (*known, unknown_1, unknown_2)
+    report = FeatureQualityGates(
+        QualityGateOptions(
+            max_unknown_effect_family_ratio=1.0,
+            max_unknown_motion_ratio=1.0,
+            max_single_unknown_effect_type_ratio=0.10,
+        )
+    ).evaluate(
+        phrases=phrases,
+        taxonomy_rows=tuple(_taxonomy(f"p-{idx}") for idx in range(len(phrases))),
+        orchestration_catalog=TemplateCatalog(
+            schema_version="v1.5.0",
+            miner_version="template_miner_v1",
+            template_kind=TemplateKind.ORCHESTRATION,
+            total_phrase_count=len(phrases),
+            assigned_phrase_count=len(phrases),
+            assignment_coverage=1.0,
+            min_instance_count=1,
+            min_distinct_pack_count=1,
+            templates=(),
+            assignments=(),
+        ),
+        transition_graph=TransitionGraph(
+            schema_version="v1.6.0",
+            graph_version="transition_graph_v1",
+            total_transitions=0,
+            total_nodes=0,
+            total_edges=0,
+            edges=(),
+            transitions=(),
+            anomalies=(),
+        ),
+    )
+    check = next(row for row in report.checks if row.check_id == "single_unknown_effect_type_ratio")
+    assert check.passed is False

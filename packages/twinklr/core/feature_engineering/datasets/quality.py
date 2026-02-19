@@ -19,8 +19,9 @@ class QualityGateOptions:
 
     min_template_coverage: float = 0.80
     min_taxonomy_confidence_mean: float = 0.30
-    max_unknown_effect_family_ratio: float = 0.85
-    max_unknown_motion_ratio: float = 0.85
+    max_unknown_effect_family_ratio: float = 0.02
+    max_unknown_motion_ratio: float = 0.02
+    max_single_unknown_effect_type_ratio: float = 0.01
 
 
 class FeatureQualityGates:
@@ -117,6 +118,28 @@ class FeatureQualityGates:
             )
         )
 
+        unknown_by_effect_type: dict[str, int] = {}
+        for phrase in phrases:
+            if phrase.effect_family != "unknown":
+                continue
+            unknown_by_effect_type[phrase.effect_type] = (
+                unknown_by_effect_type.get(phrase.effect_type, 0) + 1
+            )
+        max_single_unknown_effect_type_count = max(unknown_by_effect_type.values(), default=0)
+        max_single_unknown_effect_type_ratio = (
+            max_single_unknown_effect_type_count / len(phrases) if phrases else 0.0
+        )
+        checks.append(
+            QualityCheckResult(
+                check_id="single_unknown_effect_type_ratio",
+                passed=max_single_unknown_effect_type_ratio
+                <= self._options.max_single_unknown_effect_type_ratio,
+                value=round(max_single_unknown_effect_type_ratio, 6),
+                threshold=self._options.max_single_unknown_effect_type_ratio,
+                message="Largest unknown effect-type ratio should remain under threshold.",
+            )
+        )
+
         graph_integrity_ok = transition_graph.total_edges >= 0 and transition_graph.total_nodes >= 0
         checks.append(
             QualityCheckResult(
@@ -140,5 +163,6 @@ class FeatureQualityGates:
                 "transition_edges": str(transition_graph.total_edges),
                 "unknown_effect_family_count": str(unknown_effect_family_count),
                 "unknown_motion_count": str(unknown_motion_count),
+                "max_single_unknown_effect_type_count": str(max_single_unknown_effect_type_count),
             },
         )

@@ -28,6 +28,7 @@ _EFFECT_ALIASES: dict[str, str] = {
     "vumeter": "vumeter",
     "vumeters": "vumeter",
     "vu": "vumeter",
+    "tendril": "tendrils",
     "singlestrands": "singlestrand",
     "movingheads": "movinghead",
 }
@@ -416,6 +417,14 @@ _DEFAULT_MAP: dict[str, dict[str, str]] = {
         "color_class": "palette",
         "energy_class": "mid",
         "continuity_class": "rhythmic",
+        "spatial_class": "multi_target",
+    },
+    "sketch": {
+        "effect_family": "sketch",
+        "motion_class": "sweep",
+        "color_class": "multi",
+        "energy_class": "mid",
+        "continuity_class": "transitional",
         "spatial_class": "multi_target",
     },
     "text": {

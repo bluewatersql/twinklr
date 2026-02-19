@@ -80,6 +80,30 @@ def test_phrase_encoder_maps_alias_effect_name() -> None:
     assert phrase.source is PhraseSource.EFFECT_TYPE_MAP
 
 
+def test_phrase_encoder_maps_tendril_alias_to_tendrils() -> None:
+    encoder = PhraseEncoder()
+    phrase = encoder.encode(
+        package_id="pkg-1",
+        sequence_file_id="seq-1",
+        aligned_events=(_aligned("evt-1", "Tendril"),),
+        enriched_events=[{"effect_event_id": "evt-1", "config_fingerprint": "abc123"}],
+    )[0]
+    assert phrase.effect_family == "tendrils"
+    assert phrase.source is PhraseSource.EFFECT_TYPE_MAP
+
+
+def test_phrase_encoder_maps_sketch_effect() -> None:
+    encoder = PhraseEncoder()
+    phrase = encoder.encode(
+        package_id="pkg-1",
+        sequence_file_id="seq-1",
+        aligned_events=(_aligned("evt-1", "Sketch"),),
+        enriched_events=[{"effect_event_id": "evt-1", "config_fingerprint": "abc123"}],
+    )[0]
+    assert phrase.effect_family == "sketch"
+    assert phrase.source is PhraseSource.EFFECT_TYPE_MAP
+
+
 def test_phrase_encoder_derives_energy_from_audio_features() -> None:
     encoder = PhraseEncoder()
     phrase = encoder.encode(
@@ -161,6 +185,7 @@ def test_phrase_encoder_default_map_covers_all_known_xlights_effects() -> None:
         "state",
         "strobe",
         "tendrils",
+        "sketch",
         "text",
         "tree",
         "twinkle",
