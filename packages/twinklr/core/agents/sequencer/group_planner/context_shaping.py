@@ -415,6 +415,12 @@ def shape_planner_context(section_context: SectionPlanningContext) -> dict[str, 
         "multilane_allowed_groups": multilane_allowed_groups,
         # Lyric/narrative context (section-scoped) for narrative asset directives
         "lyric_context": section_context.lyric_context,
+        # Feature Engineering enrichment (Phase 1 context, all optional)
+        "color_arc": section_context.color_arc,
+        "propensity_hints": section_context.propensity_hints,
+        "style_constraints": section_context.style_constraints,
+        "transition_hints": section_context.transition_hints,
+        "layering_budget": section_context.layering_budget,
     }
 
 
