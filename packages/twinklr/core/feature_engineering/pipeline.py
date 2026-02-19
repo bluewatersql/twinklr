@@ -24,6 +24,7 @@ from twinklr.core.feature_engineering.clustering import (
     TemplateClusterer,
     TemplateClustererOptions,
 )
+from twinklr.core.feature_engineering.color_arc import ColorArcExtractor
 from twinklr.core.feature_engineering.color_narrative import ColorNarrativeExtractor
 from twinklr.core.feature_engineering.constants import FEATURE_BUNDLE_SCHEMA_VERSION
 from twinklr.core.feature_engineering.datasets.quality import (
@@ -35,6 +36,7 @@ from twinklr.core.feature_engineering.layering import LayeringFeatureExtractor
 from twinklr.core.feature_engineering.models import (
     AlignedEffectEvent,
     ColorNarrativeRow,
+    SongColorArc,
     EffectPhrase,
     FeatureBundle,
     LayeringFeatureRow,
@@ -98,6 +100,7 @@ class FeatureEngineeringPipelineOptions:
     v2_retrieval_max_avg_latency_ms: float = 10.0
     enable_layering_features: bool = True
     enable_color_narrative: bool = True
+    enable_color_arc: bool = True
     enable_quality_gates: bool = True
     taxonomy_rules_path: Path | None = None
     template_min_instance_count: int = 2
@@ -181,6 +184,7 @@ class FeatureEngineeringPipeline:
         self._group_adapter_builder = GroupAdapterBuilder()
         self._layering = LayeringFeatureExtractor()
         self._color_narrative = ColorNarrativeExtractor()
+        self._color_arc = ColorArcExtractor()
         self._quality_gates = FeatureQualityGates(
             QualityGateOptions(
                 min_template_coverage=self._options.quality_min_template_coverage,
@@ -421,6 +425,20 @@ class FeatureEngineeringPipeline:
         self._writer.write_target_roles(output_dir, rows)
         return rows
 
+    def _write_color_arc(
+        self,
+        *,
+        output_root: Path,
+        phrases: tuple[EffectPhrase, ...],
+        color_rows: tuple[ColorNarrativeRow, ...],
+    ) -> Path | None:
+        if not self._options.enable_color_arc or not color_rows:
+            return None
+        arc = self._color_arc.extract(phrases=phrases, color_narrative=color_rows)
+        output_path = output_root / "color_arc.json"
+        self._writer._write_json(output_path, arc.model_dump(mode="json"))
+        return output_path
+
     def _write_template_catalogs(
         self,
         *,
@@ -473,6 +491,12 @@ class FeatureEngineeringPipeline:
             color_rows = self._color_narrative.extract(phrases)
             path = self._writer.write_color_narrative(output_root, color_rows)
             manifest["color_narrative"] = str(path)
+
+        color_arc_path = self._write_color_arc(
+            output_root=output_root, phrases=phrases, color_rows=color_rows
+        )
+        if color_arc_path is not None:
+            manifest["color_arc"] = str(color_arc_path)
 
         quality_report: QualityReport | None = None
         if (
