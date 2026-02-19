@@ -27,6 +27,7 @@ from twinklr.core.feature_engineering.clustering import (
 from twinklr.core.feature_engineering.color_arc import ColorArcExtractor
 from twinklr.core.feature_engineering.color_narrative import ColorNarrativeExtractor
 from twinklr.core.feature_engineering.propensity import PropensityMiner
+from twinklr.core.feature_engineering.style import StyleFingerprintExtractor
 from twinklr.core.feature_engineering.constants import FEATURE_BUNDLE_SCHEMA_VERSION
 from twinklr.core.feature_engineering.datasets.quality import (
     FeatureQualityGates,
@@ -45,6 +46,7 @@ from twinklr.core.feature_engineering.models import (
     PlannerChangeMode,
     QualityReport,
     SequencerAdapterBundle,
+    StyleFingerprint,
     TargetRoleAssignment,
     TemplateCatalog,
     TemplateRetrievalIndex,
@@ -103,6 +105,7 @@ class FeatureEngineeringPipelineOptions:
     enable_color_narrative: bool = True
     enable_color_arc: bool = True
     enable_propensity: bool = True
+    enable_style_fingerprint: bool = True
     enable_quality_gates: bool = True
     taxonomy_rules_path: Path | None = None
     template_min_instance_count: int = 2
@@ -188,6 +191,7 @@ class FeatureEngineeringPipeline:
         self._color_narrative = ColorNarrativeExtractor()
         self._color_arc = ColorArcExtractor()
         self._propensity_miner = PropensityMiner()
+        self._style_fingerprint = StyleFingerprintExtractor()
         self._quality_gates = FeatureQualityGates(
             QualityGateOptions(
                 min_template_coverage=self._options.quality_min_template_coverage,
@@ -455,6 +459,29 @@ class FeatureEngineeringPipeline:
         self._writer._write_json(output_path, index.model_dump(mode="json"))
         return output_path
 
+    def _write_style_fingerprint(
+        self,
+        *,
+        output_root: Path,
+        creator_id: str,
+        phrases: tuple[EffectPhrase, ...],
+        layering_rows: tuple[LayeringFeatureRow, ...],
+        color_rows: tuple[ColorNarrativeRow, ...],
+        transition_graph: TransitionGraph | None,
+    ) -> Path | None:
+        if not self._options.enable_style_fingerprint or not phrases:
+            return None
+        fingerprint = self._style_fingerprint.extract(
+            creator_id=creator_id,
+            phrases=phrases,
+            layering_rows=layering_rows,
+            color_rows=color_rows,
+            transition_graph=transition_graph,
+        )
+        output_path = output_root / "style_fingerprint.json"
+        self._writer._write_json(output_path, fingerprint.model_dump(mode="json"))
+        return output_path
+
     def _write_template_catalogs(
         self,
         *,
@@ -517,6 +544,19 @@ class FeatureEngineeringPipeline:
         propensity_path = self._write_propensity(output_root=output_root, phrases=phrases)
         if propensity_path is not None:
             manifest["propensity_index"] = str(propensity_path)
+
+        # Derive a creator_id from the first bundle's package_id for corpus-level fingerprint.
+        creator_id = bundles[0].package_id if bundles else "unknown"
+        style_path = self._write_style_fingerprint(
+            output_root=output_root,
+            creator_id=creator_id,
+            phrases=phrases,
+            layering_rows=layering_rows,
+            color_rows=color_rows,
+            transition_graph=transition_graph,
+        )
+        if style_path is not None:
+            manifest["style_fingerprint"] = str(style_path)
 
         quality_report: QualityReport | None = None
         if (

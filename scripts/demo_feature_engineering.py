@@ -240,6 +240,7 @@ def _write_markdown(
     duplicate_groups: list[tuple[str, list[tuple[str, str, str]]]],
     color_arc: dict[str, Any] | None = None,
     propensity_index: dict[str, Any] | None = None,
+    style_fingerprint: dict[str, Any] | None = None,
 ) -> Path:
     lines: list[str] = []
     lines.append("# Feature Engineering Demo Report")
@@ -409,6 +410,45 @@ def _write_markdown(
                         prop_rows,
                     )
                 )
+        lines.append("")
+
+    if style_fingerprint:
+        lines.append("## Style Fingerprint")
+        lines.append("")
+        lines.append(f"- Creator: {style_fingerprint.get('creator_id', '-')}")
+        lines.append(f"- Corpus sequences: {style_fingerprint.get('corpus_sequence_count', 0)}")
+        recipe_prefs = style_fingerprint.get("recipe_preferences", {})
+        if isinstance(recipe_prefs, dict) and recipe_prefs:
+            style_pref_rows: list[tuple[str, str]] = []
+            for family, weight in sorted(recipe_prefs.items(), key=lambda x: -float(x[1])):
+                style_pref_rows.append((str(family), str(weight)))
+            lines.append("")
+            lines.append("### Recipe Preferences")
+            lines.append("")
+            lines.append(_render_markdown_table(("effect_family", "weight"), style_pref_rows))
+        transition = style_fingerprint.get("transition_style", {})
+        color = style_fingerprint.get("color_tendencies", {})
+        timing = style_fingerprint.get("timing_style", {})
+        layering = style_fingerprint.get("layering_style", {})
+        if isinstance(transition, dict) and transition:
+            lines.append("")
+            lines.append("### Sub-Profiles")
+            lines.append("")
+            sub_rows: list[tuple[str, str]] = [
+                ("transition.preferred_gap_ms", str(transition.get("preferred_gap_ms", ""))),
+                ("transition.overlap_tendency", str(transition.get("overlap_tendency", ""))),
+                ("transition.variety_score", str(transition.get("variety_score", ""))),
+                ("color.palette_complexity", str(color.get("palette_complexity", ""))),
+                ("color.contrast_preference", str(color.get("contrast_preference", ""))),
+                ("color.temperature_preference", str(color.get("temperature_preference", ""))),
+                ("timing.beat_alignment", str(timing.get("beat_alignment_strictness", ""))),
+                ("timing.density_preference", str(timing.get("density_preference", ""))),
+                ("timing.section_change_aggression", str(timing.get("section_change_aggression", ""))),
+                ("layering.mean_layers", str(layering.get("mean_layers", ""))),
+                ("layering.max_layers", str(layering.get("max_layers", ""))),
+                ("layering.blend_mode", str(layering.get("blend_mode_preference", ""))),
+            ]
+            lines.append(_render_markdown_table(("metric", "value"), sub_rows))
         lines.append("")
 
     if unknown_diagnostics:
@@ -630,6 +670,11 @@ def main() -> int:
     if propensity_index_path.exists():
         propensity_index = _read_json(propensity_index_path)
 
+    style_fingerprint = None
+    style_fingerprint_path = output_dir / "style_fingerprint.json"
+    if style_fingerprint_path.exists():
+        style_fingerprint = _read_json(style_fingerprint_path)
+
     template_retrieval_index = None
     template_retrieval_index_path = output_dir / "template_retrieval_index.json"
     if template_retrieval_index_path.exists():
@@ -782,6 +827,39 @@ def main() -> int:
                     )
                 )
 
+    if style_fingerprint is not None:
+        print("\nStyle Fingerprint")
+        print(f"Creator          : {style_fingerprint.get('creator_id', '-')}")
+        print(f"Corpus sequences : {style_fingerprint.get('corpus_sequence_count', 0)}")
+        recipe_prefs = style_fingerprint.get("recipe_preferences", {})
+        if isinstance(recipe_prefs, dict) and recipe_prefs:
+            style_pref_rows: list[tuple[str, str]] = []
+            for family, weight in sorted(recipe_prefs.items(), key=lambda x: -float(x[1])):
+                style_pref_rows.append((str(family), str(weight)))
+            print(
+                _render_table(("effect_family", "weight"), style_pref_rows)
+            )
+        transition = style_fingerprint.get("transition_style", {})
+        color_t = style_fingerprint.get("color_tendencies", {})
+        timing = style_fingerprint.get("timing_style", {})
+        layering = style_fingerprint.get("layering_style", {})
+        if isinstance(transition, dict) and transition:
+            sub_rows: list[tuple[str, str]] = [
+                ("transition.preferred_gap_ms", str(transition.get("preferred_gap_ms", ""))),
+                ("transition.overlap_tendency", str(transition.get("overlap_tendency", ""))),
+                ("transition.variety_score", str(transition.get("variety_score", ""))),
+                ("color.palette_complexity", str(color_t.get("palette_complexity", ""))),
+                ("color.contrast_preference", str(color_t.get("contrast_preference", ""))),
+                ("color.temperature_preference", str(color_t.get("temperature_preference", ""))),
+                ("timing.beat_alignment", str(timing.get("beat_alignment_strictness", ""))),
+                ("timing.density_preference", str(timing.get("density_preference", ""))),
+                ("timing.section_aggression", str(timing.get("section_change_aggression", ""))),
+                ("layering.mean_layers", str(layering.get("mean_layers", ""))),
+                ("layering.max_layers", str(layering.get("max_layers", ""))),
+                ("layering.blend_mode", str(layering.get("blend_mode_preference", ""))),
+            ]
+            print(_render_table(("metric", "value"), sub_rows))
+
     if unknown_diagnostics is not None:
         print("\nUnknown Diagnostics")
         print(
@@ -909,6 +987,7 @@ def main() -> int:
         duplicate_groups=duplicate_groups,
         color_arc=color_arc,
         propensity_index=propensity_index,
+        style_fingerprint=style_fingerprint,
     )
     print(f"\nMarkdown report written: {report_path}")
     return 0
