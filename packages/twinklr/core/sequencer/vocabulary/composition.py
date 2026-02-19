@@ -54,11 +54,13 @@ class BlendMode(str, Enum):
     Attributes:
         NORMAL: Replace (new layer overwrites).
         ADD: Additive blending (lights combine).
+        SCREEN: Screen blending (brightens, common for sparkle/accent overlays).
         MASK: Mask/subtract (blocks/dims).
     """
 
     NORMAL = "NORMAL"
     ADD = "ADD"
+    SCREEN = "SCREEN"
     MASK = "MASK"
 
 
