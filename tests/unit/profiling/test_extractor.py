@@ -11,6 +11,7 @@ from twinklr.core.formats.xlights.sequence.models.xsq import (
     XSequence,
 )
 from twinklr.core.profiling.effects.extractor import extract_effect_events
+from twinklr.core.profiling.models.enums import EffectDbParseStatus
 
 
 def _sequence_with_effects() -> XSequence:
@@ -96,6 +97,7 @@ def test_extract_effect_events_effectdb_resolution() -> None:
     result = extract_effect_events(_sequence_with_effects(), "pkg", "seq", "sha")
     first = result.events[0]
     assert first.effectdb_ref == 0
-    assert first.effectdb_settings is not None
-    assert "speed=10" in first.effectdb_settings
-    assert "Invert=0" in first.effectdb_settings
+    assert first.effectdb_settings_raw is not None
+    assert "E_TEXTCTRL_Eff_speed=10" in first.effectdb_settings_raw
+    assert first.effectdb_parse_status is EffectDbParseStatus.PARSED
+    assert any(param.param_name_normalized == "eff_speed" for param in first.effectdb_params)

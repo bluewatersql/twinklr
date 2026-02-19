@@ -59,3 +59,32 @@ class TargetKind(str, Enum):
     MODEL = "model"
     GROUP = "group"
     UNKNOWN = "unknown"
+
+
+class EffectDbNamespace(str, Enum):
+    """Namespace prefix of an EffectDB parameter key."""
+
+    E = "E"
+    B = "B"
+    T = "T"
+    UNKNOWN = "UNKNOWN"
+
+
+class EffectDbControlType(str, Enum):
+    """Control type segment of an EffectDB parameter key."""
+
+    SLIDER = "SLIDER"
+    CHECKBOX = "CHECKBOX"
+    CHOICE = "CHOICE"
+    TEXTCTRL = "TEXTCTRL"
+    VALUECURVE = "VALUECURVE"
+    UNKNOWN = "UNKNOWN"
+
+
+class EffectDbParseStatus(str, Enum):
+    """Parse status for an EffectDB settings payload."""
+
+    PARSED = "parsed"
+    PARTIAL = "partial"
+    FAILED = "failed"
+    EMPTY = "empty"

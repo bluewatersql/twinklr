@@ -1,5 +1,11 @@
 """Profiling models package."""
 
+from twinklr.core.profiling.models.corpus import (
+    CorpusManifest,
+    CorpusQualityReport,
+    CorpusRowCounts,
+)
+from twinklr.core.profiling.models.effectdb import EffectDbParam
 from twinklr.core.profiling.models.effects import (
     CategoricalValueProfile,
     DurationStats,
@@ -9,6 +15,9 @@ from twinklr.core.profiling.models.effects import (
     ParameterProfile,
 )
 from twinklr.core.profiling.models.enums import (
+    EffectDbControlType,
+    EffectDbNamespace,
+    EffectDbParseStatus,
     FileKind,
     ModelCategory,
     ParameterValueType,
@@ -50,10 +59,17 @@ __all__ = [
     "BaseEffectEventsFile",
     "CategoricalValueProfile",
     "ColorPaletteProfile",
+    "CorpusManifest",
+    "CorpusQualityReport",
+    "CorpusRowCounts",
     "DmxColorWheelEntry",
     "DmxFixtureProfile",
     "DmxMotorProfile",
     "DurationStats",
+    "EffectDbControlType",
+    "EffectDbNamespace",
+    "EffectDbParam",
+    "EffectDbParseStatus",
     "EffectEventRecord",
     "EffectStatistics",
     "EffectTypeProfile",

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import contextlib
-import re
 import statistics
 from collections import Counter, defaultdict
 from collections.abc import Sequence
@@ -18,42 +17,6 @@ from twinklr.core.profiling.models.effects import (
 )
 from twinklr.core.profiling.models.enums import ParameterValueType
 from twinklr.core.profiling.models.events import EffectEventRecord
-
-_EFF_PREFIX_RE = re.compile(r"^[A-Z]_[A-Za-z0-9]+_Eff_")
-
-
-def parse_effectdb_settings(settings_str: str) -> dict[str, str]:
-    """Parse comma-separated `key=value` settings into a dictionary."""
-    if not settings_str:
-        return {}
-
-    params: dict[str, str] = {}
-    for part in settings_str.split(","):
-        if "=" not in part:
-            continue
-        key, value = part.split("=", 1)
-        clean_key = _EFF_PREFIX_RE.sub("", key.strip())
-        params[clean_key] = value.strip()
-    return params
-
-
-def infer_param_type(value: str) -> ParameterValueType:
-    """Infer scalar value type from a string value."""
-    if value == "":
-        return ParameterValueType.EMPTY
-
-    with contextlib.suppress(ValueError):
-        int(value)
-        return ParameterValueType.INT
-
-    with contextlib.suppress(ValueError):
-        float(value)
-        return ParameterValueType.FLOAT
-
-    if value.lower() in {"true", "false", "0", "1"}:
-        return ParameterValueType.BOOL
-
-    return ParameterValueType.STRING
 
 
 def is_high_cardinality(param_name: str, values: list[str], n_instances: int) -> bool:
@@ -81,7 +44,7 @@ def is_high_cardinality(param_name: str, values: list[str], n_instances: int) ->
 
 
 def _is_filtered_param(param_name: str) -> bool:
-    return param_name == "BufferStyle" or param_name.startswith("MH") or "DMX" in param_name
+    return param_name == "bufferstyle" or param_name.startswith("mh") or "dmx" in param_name
 
 
 def compute_effect_statistics(events: Sequence[EffectEventRecord]) -> EffectStatistics:
@@ -108,6 +71,9 @@ def compute_effect_statistics(events: Sequence[EffectEventRecord]) -> EffectStat
     per_type_durations: dict[str, list[int]] = defaultdict(list)
     per_type_buffer_styles: dict[str, set[str]] = defaultdict(set)
     per_type_params: dict[str, dict[str, list[str]]] = defaultdict(lambda: defaultdict(list))
+    per_type_param_types: dict[str, dict[str, list[ParameterValueType]]] = defaultdict(
+        lambda: defaultdict(list)
+    )
 
     total_duration = 0
 
@@ -122,14 +88,17 @@ def compute_effect_statistics(events: Sequence[EffectEventRecord]) -> EffectStat
 
         per_type_durations[event.effect_type].append(duration)
 
-        settings = parse_effectdb_settings(event.effectdb_settings or "")
-        buffer_style = settings.get("BufferStyle", "default")
-        per_type_buffer_styles[event.effect_type].add(buffer_style)
-
-        for param_name, param_value in settings.items():
+        buffer_style = "default"
+        for param in event.effectdb_params:
+            param_name = param.param_name_normalized
+            param_value = param.value_raw
+            per_type_param_types[event.effect_type][param_name].append(param.value_type)
+            if param_name == "bufferstyle":
+                buffer_style = param_value or "default"
             if _is_filtered_param(param_name):
                 continue
             per_type_params[event.effect_type][param_name].append(param_value)
+        per_type_buffer_styles[event.effect_type].add(buffer_style)
 
     effect_type_profiles: dict[str, EffectTypeProfile] = {}
 
@@ -154,7 +123,7 @@ def compute_effect_statistics(events: Sequence[EffectEventRecord]) -> EffectStat
             if is_high_cardinality(param_name, values, len(durations)):
                 continue
 
-            inferred_types = Counter(infer_param_type(v) for v in values)
+            inferred_types = Counter(per_type_param_types.get(effect_type, {}).get(param_name, []))
             primary_type = inferred_types.most_common(1)[0][0]
 
             numeric_profile: NumericValueProfile | None = None

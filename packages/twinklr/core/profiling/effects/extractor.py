@@ -4,18 +4,13 @@ from __future__ import annotations
 
 import hashlib
 import json
-import re
 import uuid
 from typing import Any
 
 from twinklr.core.formats.xlights.sequence.models.xsq import Effect, XSequence
+from twinklr.core.profiling.constants import EFFECTDB_PARSER_VERSION
+from twinklr.core.profiling.effects.effectdb_parser import parse_effectdb_settings
 from twinklr.core.profiling.models.events import BaseEffectEventsFile, EffectEventRecord
-
-_EFFECTDB_PREFIX_RE = re.compile(r"[ETBE]_\w+_")
-
-
-def _clean_effectdb_settings(settings: str) -> str:
-    return _EFFECTDB_PREFIX_RE.sub("", settings)
 
 
 def _canonical_json(data: dict[str, Any]) -> str:
@@ -43,8 +38,8 @@ def _build_effect_config_dict(
     if effectdb_ref is not None:
         settings = sequence.effect_db.get(effectdb_ref)
         if settings is not None:
-            effectdb_settings = _clean_effectdb_settings(settings)
-            config["_effectdb_settings"] = effectdb_settings
+            effectdb_settings = settings
+            config["_effectdb_settings_raw"] = effectdb_settings
 
     return config, effectdb_ref, effectdb_settings
 
@@ -69,6 +64,7 @@ def extract_effect_events(
                 config, effectdb_ref, effectdb_settings = _build_effect_config_dict(
                     sequence, effect
                 )
+                parsed_settings = parse_effectdb_settings(effectdb_settings)
                 events.append(
                     EffectEventRecord(
                         effect_event_id=str(uuid.uuid4()),
@@ -80,7 +76,11 @@ def extract_effect_events(
                         end_ms=effect.end_time_ms,
                         config_fingerprint=_config_fingerprint(config),
                         effectdb_ref=effectdb_ref,
-                        effectdb_settings=effectdb_settings,
+                        effectdb_settings_raw=effectdb_settings,
+                        effectdb_parser_version=EFFECTDB_PARSER_VERSION,
+                        effectdb_parse_status=parsed_settings.status,
+                        effectdb_params=parsed_settings.params,
+                        effectdb_parse_errors=parsed_settings.errors,
                         palette=effect.palette,
                         protected=effect.protected,
                         label=effect.label,

@@ -1,7 +1,16 @@
 """Public API for sequence pack profiling."""
 
+from twinklr.core.profiling.models.corpus import (
+    CorpusManifest,
+    CorpusQualityReport,
+    CorpusRowCounts,
+)
+from twinklr.core.profiling.models.effectdb import EffectDbParam
 from twinklr.core.profiling.models.effects import EffectStatistics
 from twinklr.core.profiling.models.enums import (
+    EffectDbControlType,
+    EffectDbNamespace,
+    EffectDbParseStatus,
     FileKind,
     ModelCategory,
     ParameterValueType,
@@ -19,6 +28,10 @@ from twinklr.core.profiling.profiler import SequencePackProfiler
 __all__ = [
     "SequencePackProfiler",
     "FileKind",
+    "EffectDbControlType",
+    "EffectDbNamespace",
+    "EffectDbParam",
+    "EffectDbParseStatus",
     "ModelCategory",
     "ParameterValueType",
     "SemanticSize",
@@ -28,6 +41,9 @@ __all__ = [
     "LayoutProfile",
     "EffectStatistics",
     "ColorPaletteProfile",
+    "CorpusManifest",
+    "CorpusQualityReport",
+    "CorpusRowCounts",
     "PackageManifest",
     "FileEntry",
     "EffectEventRecord",

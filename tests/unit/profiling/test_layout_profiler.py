@@ -5,10 +5,16 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from twinklr.core.profiling.layout.profiler import LayoutProfiler
 
 FIXTURE_XML = Path("data/test/example2/extracted/xlights_rgbeffects.xml")
 BASELINE_JSON = Path("data/test/example2/rgbeffects_profile.json")
+pytestmark = pytest.mark.skipif(
+    not FIXTURE_XML.exists() or not BASELINE_JSON.exists(),
+    reason="layout fixture files are not present in this environment",
+)
 
 
 def test_layout_profiler_profiles_real_fixture() -> None:
