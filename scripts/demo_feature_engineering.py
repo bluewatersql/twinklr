@@ -238,6 +238,8 @@ def _write_markdown(
     template_diagnostics: dict[str, Any] | None,
     total_phrases: int,
     duplicate_groups: list[tuple[str, list[tuple[str, str, str]]]],
+    color_arc: dict[str, Any] | None = None,
+    propensity_index: dict[str, Any] | None = None,
 ) -> Path:
     lines: list[str] = []
     lines.append("# Feature Engineering Demo Report")
@@ -348,6 +350,66 @@ def _write_markdown(
                 _render_markdown_table(("check", "passed", "value", "threshold"), check_rows)
             )
             lines.append("")
+
+    if color_arc:
+        lines.append("## Color Arc")
+        lines.append("")
+        palettes = color_arc.get("palette_library", [])
+        assignments = color_arc.get("section_assignments", [])
+        transitions = color_arc.get("transition_rules", [])
+        lines.append(f"- Palettes: {len(palettes)}")
+        lines.append(f"- Assignments: {len(assignments)}")
+        lines.append(f"- Transitions: {len(transitions)}")
+        if isinstance(assignments, list) and assignments:
+            arc_rows: list[tuple[str, str, str, str]] = []
+            for a in assignments:
+                if not isinstance(a, dict):
+                    continue
+                arc_rows.append((
+                    str(a.get("section_label", "")),
+                    str(a.get("palette_id", "")),
+                    str(a.get("shift_timing", "")),
+                    str(a.get("contrast_target", "")),
+                ))
+            if arc_rows:
+                lines.append("")
+                lines.append(
+                    _render_markdown_table(
+                        ("section", "palette_id", "shift_timing", "contrast"), arc_rows
+                    )
+                )
+        lines.append("")
+
+    if propensity_index:
+        lines.append("## Propensity Index")
+        lines.append("")
+        affinities = propensity_index.get("affinities", [])
+        anti_affinities = propensity_index.get("anti_affinities", [])
+        lines.append(f"- Affinities: {len(affinities)}")
+        lines.append(f"- Anti-affinities: {len(anti_affinities)}")
+        if isinstance(affinities, list) and affinities:
+            prop_rows: list[tuple[str, str, str, str, str]] = []
+            sorted_aff = sorted(
+                [a for a in affinities if isinstance(a, dict)],
+                key=lambda a: (-float(a.get("frequency", 0)), str(a.get("effect_family", ""))),
+            )
+            for a in sorted_aff[:20]:
+                prop_rows.append((
+                    str(a.get("effect_family", "")),
+                    str(a.get("model_type", "")),
+                    str(a.get("frequency", "")),
+                    str(a.get("exclusivity", "")),
+                    str(a.get("corpus_support", "")),
+                ))
+            if prop_rows:
+                lines.append("")
+                lines.append(
+                    _render_markdown_table(
+                        ("effect_family", "model_type", "frequency", "exclusivity", "support"),
+                        prop_rows,
+                    )
+                )
+        lines.append("")
 
     if unknown_diagnostics:
         lines.append("## Unknown Diagnostics")
@@ -558,6 +620,16 @@ def main() -> int:
     if unknown_diagnostics_path.exists():
         unknown_diagnostics = _read_json(unknown_diagnostics_path)
 
+    color_arc = None
+    color_arc_path = output_dir / "color_arc.json"
+    if color_arc_path.exists():
+        color_arc = _read_json(color_arc_path)
+
+    propensity_index = None
+    propensity_index_path = output_dir / "propensity_index.json"
+    if propensity_index_path.exists():
+        propensity_index = _read_json(propensity_index_path)
+
     template_retrieval_index = None
     template_retrieval_index_path = output_dir / "template_retrieval_index.json"
     if template_retrieval_index_path.exists():
@@ -654,6 +726,61 @@ def main() -> int:
                 )
         if check_rows:
             print(_render_table(("check", "passed", "value", "threshold"), check_rows))
+
+    if color_arc is not None:
+        print("\nColor Arc")
+        palettes = color_arc.get("palette_library", [])
+        assignments = color_arc.get("section_assignments", [])
+        transitions = color_arc.get("transition_rules", [])
+        print(f"Palettes     : {len(palettes)}")
+        print(f"Assignments  : {len(assignments)}")
+        print(f"Transitions  : {len(transitions)}")
+        if isinstance(assignments, list) and assignments:
+            arc_rows: list[tuple[str, str, str, str]] = []
+            for a in assignments[:args.top_n]:
+                if not isinstance(a, dict):
+                    continue
+                arc_rows.append((
+                    str(a.get("section_label", "")),
+                    str(a.get("palette_id", "")),
+                    str(a.get("shift_timing", "")),
+                    str(a.get("contrast_target", "")),
+                ))
+            if arc_rows:
+                print(
+                    _render_table(
+                        ("section", "palette_id", "shift_timing", "contrast"),
+                        arc_rows,
+                    )
+                )
+
+    if propensity_index is not None:
+        print("\nPropensity Index")
+        affinities = propensity_index.get("affinities", [])
+        anti_affinities = propensity_index.get("anti_affinities", [])
+        print(f"Affinities      : {len(affinities)}")
+        print(f"Anti-affinities : {len(anti_affinities)}")
+        if isinstance(affinities, list) and affinities:
+            prop_rows: list[tuple[str, str, str, str, str]] = []
+            sorted_aff = sorted(
+                [a for a in affinities if isinstance(a, dict)],
+                key=lambda a: (-float(a.get("frequency", 0)), str(a.get("effect_family", ""))),
+            )
+            for a in sorted_aff[:args.top_n]:
+                prop_rows.append((
+                    str(a.get("effect_family", "")),
+                    str(a.get("model_type", "")),
+                    str(a.get("frequency", "")),
+                    str(a.get("exclusivity", "")),
+                    str(a.get("corpus_support", "")),
+                ))
+            if prop_rows:
+                print(
+                    _render_table(
+                        ("effect_family", "model_type", "frequency", "exclusivity", "support"),
+                        prop_rows,
+                    )
+                )
 
     if unknown_diagnostics is not None:
         print("\nUnknown Diagnostics")
@@ -780,6 +907,8 @@ def main() -> int:
         template_diagnostics=template_diagnostics,
         total_phrases=total_phrases,
         duplicate_groups=duplicate_groups,
+        color_arc=color_arc,
+        propensity_index=propensity_index,
     )
     print(f"\nMarkdown report written: {report_path}")
     return 0

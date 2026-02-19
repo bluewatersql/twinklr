@@ -26,6 +26,7 @@ from twinklr.core.feature_engineering.clustering import (
 )
 from twinklr.core.feature_engineering.color_arc import ColorArcExtractor
 from twinklr.core.feature_engineering.color_narrative import ColorNarrativeExtractor
+from twinklr.core.feature_engineering.propensity import PropensityMiner
 from twinklr.core.feature_engineering.constants import FEATURE_BUNDLE_SCHEMA_VERSION
 from twinklr.core.feature_engineering.datasets.quality import (
     FeatureQualityGates,
@@ -101,6 +102,7 @@ class FeatureEngineeringPipelineOptions:
     enable_layering_features: bool = True
     enable_color_narrative: bool = True
     enable_color_arc: bool = True
+    enable_propensity: bool = True
     enable_quality_gates: bool = True
     taxonomy_rules_path: Path | None = None
     template_min_instance_count: int = 2
@@ -185,6 +187,7 @@ class FeatureEngineeringPipeline:
         self._layering = LayeringFeatureExtractor()
         self._color_narrative = ColorNarrativeExtractor()
         self._color_arc = ColorArcExtractor()
+        self._propensity_miner = PropensityMiner()
         self._quality_gates = FeatureQualityGates(
             QualityGateOptions(
                 min_template_coverage=self._options.quality_min_template_coverage,
@@ -439,6 +442,19 @@ class FeatureEngineeringPipeline:
         self._writer._write_json(output_path, arc.model_dump(mode="json"))
         return output_path
 
+    def _write_propensity(
+        self,
+        *,
+        output_root: Path,
+        phrases: tuple[EffectPhrase, ...],
+    ) -> Path | None:
+        if not self._options.enable_propensity or not phrases:
+            return None
+        index = self._propensity_miner.mine(phrases=phrases)
+        output_path = output_root / "propensity_index.json"
+        self._writer._write_json(output_path, index.model_dump(mode="json"))
+        return output_path
+
     def _write_template_catalogs(
         self,
         *,
@@ -497,6 +513,10 @@ class FeatureEngineeringPipeline:
         )
         if color_arc_path is not None:
             manifest["color_arc"] = str(color_arc_path)
+
+        propensity_path = self._write_propensity(output_root=output_root, phrases=phrases)
+        if propensity_path is not None:
+            manifest["propensity_index"] = str(propensity_path)
 
         quality_report: QualityReport | None = None
         if (
