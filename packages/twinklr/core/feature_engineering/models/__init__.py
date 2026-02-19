@@ -42,6 +42,11 @@ from twinklr.core.feature_engineering.models.color_arc import (
 )
 from twinklr.core.feature_engineering.models.color_narrative import ColorNarrativeRow
 from twinklr.core.feature_engineering.models.layering import LayeringFeatureRow
+from twinklr.core.feature_engineering.models.propensity import (
+    EffectModelAffinity,
+    EffectModelAntiAffinity,
+    PropensityIndex,
+)
 from twinklr.core.feature_engineering.models.learned_taxonomy import (
     LearnedTaxonomyEvalReport,
     LearnedTaxonomyModel,
@@ -122,6 +127,8 @@ __all__ = [
     "SongColorArc",
     "ColorClass",
     "ContinuityClass",
+    "EffectModelAffinity",
+    "EffectModelAntiAffinity",
     "EffectPhrase",
     "EnergyClass",
     "FeatureBundle",
@@ -133,6 +140,7 @@ __all__ = [
     "MotifOccurrence",
     "PhraseSource",
     "PhraseTaxonomyRecord",
+    "PropensityIndex",
     "SpatialClass",
     "TargetRole",
     "TargetRoleAssignment",
