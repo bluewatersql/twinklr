@@ -47,6 +47,15 @@ from twinklr.core.feature_engineering.models.propensity import (
     EffectModelAntiAffinity,
     PropensityIndex,
 )
+from twinklr.core.feature_engineering.models.style import (
+    ColorStyleProfile,
+    LayeringStyleProfile,
+    StyleBlend,
+    StyleEvolution,
+    StyleFingerprint,
+    TimingStyleProfile,
+    TransitionStyleProfile,
+)
 from twinklr.core.feature_engineering.models.learned_taxonomy import (
     LearnedTaxonomyEvalReport,
     LearnedTaxonomyModel,
@@ -141,6 +150,13 @@ __all__ = [
     "PhraseSource",
     "PhraseTaxonomyRecord",
     "PropensityIndex",
+    "ColorStyleProfile",
+    "LayeringStyleProfile",
+    "StyleBlend",
+    "StyleEvolution",
+    "StyleFingerprint",
+    "TimingStyleProfile",
+    "TransitionStyleProfile",
     "SpatialClass",
     "TargetRole",
     "TargetRoleAssignment",
