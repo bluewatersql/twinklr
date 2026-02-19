@@ -13,7 +13,7 @@ from twinklr.core.profiling.report import generate_layout_report_md
 
 ROOT = Path(__file__).resolve().parents[1]
 VENDOR_DIR = ROOT / "data" / "vendor_packages"
-TEST_DIR = ROOT / "data" / "sequence_profiles"
+TEST_DIR = ROOT / "data" / "profiles"
 
 
 def _find_default_inputs() -> list[Path]:

@@ -445,7 +445,7 @@ Here’s a cheat sheet of the geometry types you’ll keep running into as you r
 
 And yes, we keep it brief on purpose. This isn’t a catalog — it’s just enough to stop you from going “wait, what does that one do again?”
 
-![Table listing geometry types and one-line descriptions with tiny sketch icons per row. Headers: “GeometryType”, “What it does (in human words)”, “When it’s handy”. Rows: “CHEVRON_V | V-shape from center out; often uses inner/outer tilt bias | Sweeps that need depth and structure”, “FAN | Linear left→right pan spread; usually uniform tilt | Wide ‘wash the sky’ moments”, “ROLE_POSE | Direct mapping from role→pose anchors (e.g., OUTER_LEFT=wide_left) | Precise, predictable formations”, “AIM_ZONE | Points fixtures toward a named zone (SKY/HORIZON/CROWD/STAGE) | Quick ‘everyone look there’ moments”, “NONE/NEUTRAL | Leaves fixtures at home/soft pose | When movement handles everything or you need calm”](assets/illustrations/02_geometry_types_table.png)
+![Twinklr](assets/illustrations/02_geometry_types_table.png)
 
 ---
 

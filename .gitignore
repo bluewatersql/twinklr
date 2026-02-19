@@ -3,6 +3,7 @@
 .venv/
 .dev/
 .vscode/
+.omc/
 
 # Python cache and test artifacts
 .pytest_cache/

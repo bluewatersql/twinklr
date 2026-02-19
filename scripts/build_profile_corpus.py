@@ -11,8 +11,6 @@ from twinklr.core.profiling.unify import CorpusBuildOptions, ProfileCorpusBuilde
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Build unified profile corpus artifacts.")
-    parser.add_argument("--profiles-root", type=Path, required=True, help="Root with profile dirs")
-    parser.add_argument("--output-dir", type=Path, required=True, help="Output corpus root dir")
     parser.add_argument("--include-glob", type=str, default=None, help="Include glob pattern")
     parser.add_argument("--exclude-glob", type=str, default=None, help="Exclude glob pattern")
     parser.add_argument("--schema-version", type=str, default=None, help="Optional schema version")
@@ -45,10 +43,14 @@ def main() -> int:
             fail_on_quality_gate=args.fail_on_quality_gate,
         )
     )
+
+    output_dir = Path("data/profiles_corpus")
+    profiles_root = Path("data/profiles")
+
     try:
         results = builder.build(
-            profiles_root=args.profiles_root,
-            output_root=args.output_dir,
+            profiles_root=profiles_root,
+            output_root=output_dir,
             include_glob=args.include_glob,
             exclude_glob=args.exclude_glob,
             schema_version_filter=args.schema_version,
