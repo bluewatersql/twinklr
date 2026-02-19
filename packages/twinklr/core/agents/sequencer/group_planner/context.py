@@ -90,6 +90,28 @@ class SectionPlanningContext(BaseModel):
         description="Section-scoped lyric context (story beats, key phrases, characters)",
     )
 
+    # Feature Engineering enrichment (optional, from FE pipeline Phase 1)
+    color_arc: dict[str, Any] | None = Field(
+        default=None,
+        description="Section color assignment from Color Arc Engine (palette, shift timing, contrast).",
+    )
+    propensity_hints: dict[str, Any] | None = Field(
+        default=None,
+        description="Effect-model affinities from Propensity Miner.",
+    )
+    style_constraints: dict[str, Any] | None = Field(
+        default=None,
+        description="Style fingerprint constraints (timing, layering, color preferences).",
+    )
+    transition_hints: dict[str, Any] | None = Field(
+        default=None,
+        description="Transition style hints (gap, overlap tendency, variety).",
+    )
+    layering_budget: dict[str, Any] | None = Field(
+        default=None,
+        description="Layering budget (max concurrent layers, blend mode preference).",
+    )
+
     @property
     def duration_ms(self) -> int:
         """Section duration in milliseconds."""
