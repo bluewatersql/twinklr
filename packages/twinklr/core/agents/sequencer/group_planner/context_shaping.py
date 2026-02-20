@@ -421,7 +421,52 @@ def shape_planner_context(section_context: SectionPlanningContext) -> dict[str, 
         "style_constraints": section_context.style_constraints,
         "transition_hints": section_context.transition_hints,
         "layering_budget": section_context.layering_budget,
+        # Recipe catalog (Phase 2, optional)
+        "recipe_catalog": _shape_recipe_catalog(section_context),
     }
+
+
+# ---------------------------------------------------------------------------
+# Recipe catalog shaping (Phase 2)
+# ---------------------------------------------------------------------------
+
+
+def _shape_recipe_catalog(section_context: SectionPlanningContext) -> dict[str, Any] | None:
+    """Shape recipe catalog for planner prompt.
+
+    Produces a compact representation with layer count, effect types,
+    and model affinities — enough for the LLM to make informed selections.
+
+    Args:
+        section_context: Section planning context with optional recipe_catalog.
+
+    Returns:
+        Shaped recipe catalog dict, or None if no recipe catalog.
+    """
+    if section_context.recipe_catalog is None:
+        return None
+
+    entries = []
+    for recipe in section_context.recipe_catalog.recipes:
+        # Collect unique effect types across layers
+        effect_types = list(dict.fromkeys(layer.effect_type for layer in recipe.layers))
+
+        entry: dict[str, Any] = {
+            "recipe_id": recipe.recipe_id,
+            "name": recipe.name,
+            "template_type": recipe.template_type.value,
+            "visual_intent": recipe.visual_intent.value,
+            "layer_count": len(recipe.layers),
+            "effect_types": effect_types,
+            "tags": recipe.tags,
+            "model_affinities": [
+                {"model_type": a.model_type, "score": a.score}
+                for a in recipe.model_affinities
+            ],
+        }
+        entries.append(entry)
+
+    return {"entries": entries}
 
 
 # ---------------------------------------------------------------------------

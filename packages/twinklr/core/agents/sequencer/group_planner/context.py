@@ -15,6 +15,8 @@ from twinklr.core.sequencer.templates.group.catalog import (
     TemplateInfo,
 )
 from twinklr.core.sequencer.templates.group.models.choreography import ChoreographyGraph
+from twinklr.core.sequencer.templates.group.recipe import EffectRecipe
+from twinklr.core.sequencer.templates.group.recipe_catalog import RecipeCatalog
 from twinklr.core.sequencer.theming import ThemeRef
 from twinklr.core.sequencer.vocabulary import LaneKind
 
@@ -28,7 +30,7 @@ class SectionPlanningContext(BaseModel):
     This is the input to the GroupPlanner orchestrator's run() method.
     """
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
 
     # Section identity (from MacroPlan)
     section_id: str = Field(description="Section identifier (e.g., 'verse_1')")
@@ -90,6 +92,12 @@ class SectionPlanningContext(BaseModel):
         description="Section-scoped lyric context (story beats, key phrases, characters)",
     )
 
+    # Recipe catalog (optional, from FE pipeline Phase 2)
+    recipe_catalog: RecipeCatalog | None = Field(
+        default=None,
+        description="Recipe catalog with FE-promoted and builtin recipes.",
+    )
+
     # Feature Engineering enrichment (optional, from FE pipeline Phase 1)
     color_arc: dict[str, Any] | None = Field(
         default=None,
@@ -143,6 +151,19 @@ class SectionPlanningContext(BaseModel):
             List of compatible template catalog entries
         """
         return self.template_catalog.list_by_lane(lane)
+
+    def recipes_for_lane(self, lane: LaneKind) -> list[EffectRecipe]:
+        """Get recipes compatible with a lane.
+
+        Args:
+            lane: Lane kind (BASE, RHYTHM, ACCENT)
+
+        Returns:
+            List of compatible recipes, or empty list if no recipe catalog.
+        """
+        if self.recipe_catalog is None:
+            return []
+        return self.recipe_catalog.list_by_lane(lane)
 
 
 class GroupPlanningContext(BaseModel):
