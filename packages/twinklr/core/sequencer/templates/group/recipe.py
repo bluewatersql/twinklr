@@ -155,6 +155,20 @@ class StyleMarkers(BaseModel):
     )
 
 
+class MotifCompatibility(BaseModel):
+    """Motif compatibility score for a recipe.
+
+    Indicates how well this recipe supports a particular motif
+    (e.g., "grid", "light_trails", "wave_cascade").
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    motif_id: str = Field(description="Motif identifier")
+    score: float = Field(ge=0.0, le=1.0, description="Compatibility score")
+    reason: str = Field(default="", description="Why this motif matches")
+
+
 class EffectRecipe(BaseModel):
     """Multi-layer composite effect specification.
 
@@ -196,4 +210,8 @@ class EffectRecipe(BaseModel):
     style_markers: StyleMarkers | None = Field(
         default=None,
         description="Style metadata for matching",
+    )
+    motif_compatibility: list[MotifCompatibility] = Field(
+        default_factory=list,
+        description="Motif compatibility scores",
     )
