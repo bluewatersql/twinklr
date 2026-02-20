@@ -173,3 +173,16 @@ The renderer expands `zone:HOUSE` to all HOUSE-tagged groups automatically.
 - Bars: 1 to available_bars (see user prompt)
 - Beats: 1 to 4 (assuming 4/4)
 - Duration: HIT, BURST, PHRASE, EXTENDED, SECTION
+
+{% if recipe_catalog and recipe_catalog.entries %}
+## Recipe Catalog (FE-Promoted)
+
+These recipes are multi-layer composite effects derived from feature engineering analysis. Prefer recipes with high model affinity for the target groups.
+
+| recipe_id | name | type | layers | effect_types | model_affinities |
+|-----------|------|------|--------|--------------|------------------|
+{% for r in recipe_catalog.entries -%}
+| {{ r.recipe_id }} | {{ r.name }} | {{ r.template_type }} | {{ r.layer_count }} | {{ r.effect_types | join(', ') }} | {% for a in r.model_affinities %}{{ a.model_type }}={{ a.score }}{% if not loop.last %}, {% endif %}{% endfor %} |
+{% endfor %}
+**Note:** Recipe IDs can be used as `template_id` in placements. The renderer will handle multi-layer composition automatically.
+{% endif %}

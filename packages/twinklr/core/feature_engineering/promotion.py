@@ -1,0 +1,128 @@
+"""Promotion Pipeline — MinedTemplate to curated EffectRecipe.
+
+Orchestrates: quality gate → cluster dedup → recipe synthesis → result.
+Converts high-quality mined templates into renderable EffectRecipes
+with provenance tracking and quality reporting.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from typing import Any
+
+from twinklr.core.feature_engineering.models.templates import MinedTemplate
+from twinklr.core.feature_engineering.recipe_synthesizer import RecipeSynthesizer
+from twinklr.core.sequencer.templates.group.recipe import EffectRecipe
+
+
+@dataclass(frozen=True)
+class PromotionResult:
+    """Result of running the promotion pipeline."""
+
+    promoted_recipes: list[EffectRecipe]
+    report: dict[str, Any]
+
+
+class PromotionPipeline:
+    """Promotes MinedTemplates to EffectRecipes through quality gates.
+
+    Pipeline stages:
+    1. Quality gate: filter by min_support and min_stability
+    2. Cluster dedup: merge similar templates using provided clusters
+    3. Recipe synthesis: convert surviving templates to EffectRecipes
+    """
+
+    def __init__(self) -> None:
+        self._synthesizer = RecipeSynthesizer()
+
+    def run(
+        self,
+        candidates: list[MinedTemplate],
+        *,
+        min_support: int = 5,
+        min_stability: float = 0.3,
+        clusters: list[dict[str, Any]] | None = None,
+    ) -> PromotionResult:
+        """Run the promotion pipeline.
+
+        Args:
+            candidates: MinedTemplates to evaluate for promotion.
+            min_support: Minimum support count to pass quality gate.
+            min_stability: Minimum cross-pack stability to pass quality gate.
+            clusters: Optional cluster dedup specs, each with
+                cluster_id, member_ids, and keep_id.
+
+        Returns:
+            PromotionResult with promoted recipes and a quality report.
+        """
+        # Stage 1: Quality gate
+        passed: list[MinedTemplate] = []
+        rejected_count = 0
+        for t in candidates:
+            if t.support_count >= min_support and t.cross_pack_stability >= min_stability:
+                passed.append(t)
+            else:
+                rejected_count += 1
+
+        # Stage 2: Cluster dedup
+        if clusters:
+            passed = self._apply_cluster_dedup(passed, clusters)
+
+        # Stage 3: Recipe synthesis
+        promoted: list[EffectRecipe] = []
+        for t in passed:
+            recipe_id = f"synth_{t.effect_family}_{t.motion_class}_{t.template_id}"
+            # Check if this template has cluster provenance
+            extra_ids = self._get_cluster_member_ids(t.template_id, clusters)
+            recipe = self._synthesizer.synthesize(t, recipe_id=recipe_id)
+            if extra_ids:
+                # Rebuild with merged provenance
+                from twinklr.core.sequencer.templates.group.recipe import RecipeProvenance
+
+                merged_prov = RecipeProvenance(
+                    source="mined",
+                    mined_template_ids=[t.template_id] + extra_ids,
+                )
+                recipe = recipe.model_copy(update={"provenance": merged_prov})
+            promoted.append(recipe)
+
+        report = {
+            "total_candidates": len(candidates),
+            "passed_quality_gate": len(passed) + rejected_count - rejected_count,
+            "rejected_count": rejected_count,
+            "promoted_count": len(promoted),
+        }
+
+        return PromotionResult(promoted_recipes=promoted, report=report)
+
+    def _apply_cluster_dedup(
+        self,
+        templates: list[MinedTemplate],
+        clusters: list[dict[str, Any]],
+    ) -> list[MinedTemplate]:
+        """Remove cluster duplicates, keeping only the designated template."""
+        # Build set of template IDs to remove (cluster members that aren't the keeper)
+        remove_ids: set[str] = set()
+        for cluster in clusters:
+            member_ids = cluster.get("member_ids", [])
+            keep_id = cluster.get("keep_id")
+            for mid in member_ids:
+                if mid != keep_id:
+                    remove_ids.add(mid)
+
+        return [t for t in templates if t.template_id not in remove_ids]
+
+    def _get_cluster_member_ids(
+        self,
+        template_id: str,
+        clusters: list[dict[str, Any]] | None,
+    ) -> list[str]:
+        """Get other member IDs from the cluster this template belongs to."""
+        if not clusters:
+            return []
+        for cluster in clusters:
+            keep_id = cluster.get("keep_id")
+            member_ids = cluster.get("member_ids", [])
+            if keep_id == template_id and len(member_ids) > 1:
+                return [mid for mid in member_ids if mid != template_id]
+        return []
