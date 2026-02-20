@@ -11,6 +11,8 @@ display groups and rendering to an xLights .xsq sequence file.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from twinklr.core.agents.assets.stage import AssetCreationStage
 from twinklr.core.agents.sequencer.group_planner.holistic_stage import (
     HolisticEvaluatorStage,
@@ -30,6 +32,10 @@ from twinklr.core.sequencer.templates.group.catalog import TemplateCatalog
 from twinklr.core.sequencer.templates.group.models.choreography import (
     ChoreographyGraph,
 )
+from twinklr.core.sequencer.templates.group.recipe_catalog import RecipeCatalog
+
+if TYPE_CHECKING:
+    from twinklr.core.feature_engineering.loader import FEArtifactBundle
 
 
 def build_display_pipeline(
@@ -37,6 +43,8 @@ def build_display_pipeline(
     template_catalog: TemplateCatalog,
     display_groups: list[dict[str, object]],
     *,
+    recipe_catalog: RecipeCatalog | None = None,
+    fe_bundle: FEArtifactBundle | None = None,
     song_name: str = "sequence",
     max_iterations: int = 3,
     min_pass_score: float = 0.7,
@@ -62,6 +70,8 @@ def build_display_pipeline(
         choreo_graph: Choreographic display configuration.
         template_catalog: Available group templates for planning.
         display_groups: Display group configs for MacroPlannerStage.
+        recipe_catalog: Unified recipe catalog (builtins + promoted).
+        fe_bundle: Loaded FE artifacts for planner context enrichment.
         song_name: Song name for plan set identification.
         max_iterations: Maximum GroupPlanner iteration cycles.
         min_pass_score: Minimum score for section plan approval (0.0-1.0).
@@ -91,6 +101,8 @@ def build_display_pipeline(
             stage=GroupPlannerStage(
                 choreo_graph=choreo_graph,
                 template_catalog=template_catalog,
+                recipe_catalog=recipe_catalog,
+                fe_bundle=fe_bundle,
                 max_iterations=max_iterations,
                 min_pass_score=min_pass_score,
             ),

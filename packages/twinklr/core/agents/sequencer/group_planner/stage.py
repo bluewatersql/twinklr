@@ -27,11 +27,13 @@ if TYPE_CHECKING:
     from twinklr.core.agents.sequencer.group_planner.timing import TimingContext
     from twinklr.core.agents.shared.judge.controller import IterationResult
     from twinklr.core.audio.models.song_bundle import SongBundle
+    from twinklr.core.feature_engineering.loader import FEArtifactBundle
     from twinklr.core.pipeline.context import PipelineContext
     from twinklr.core.pipeline.result import StageResult
     from twinklr.core.sequencer.planning import MacroSectionPlan
     from twinklr.core.sequencer.templates.group.catalog import TemplateCatalog
     from twinklr.core.sequencer.templates.group.models.choreography import ChoreographyGraph
+    from twinklr.core.sequencer.templates.group.recipe_catalog import RecipeCatalog
 
 logger = logging.getLogger(__name__)
 
@@ -78,6 +80,8 @@ class GroupPlannerStage:
         self,
         choreo_graph: ChoreographyGraph,
         template_catalog: TemplateCatalog,
+        recipe_catalog: RecipeCatalog | None = None,
+        fe_bundle: FEArtifactBundle | None = None,
         max_iterations: int = 3,
         min_pass_score: float = 7.0,
     ) -> None:
@@ -86,11 +90,15 @@ class GroupPlannerStage:
         Args:
             choreo_graph: Choreography graph configuration
             template_catalog: Available templates for coordination
+            recipe_catalog: Unified recipe catalog (builtins + promoted)
+            fe_bundle: Loaded FE artifacts for context enrichment
             max_iterations: Max refinement iterations per section (default: 3)
             min_pass_score: Min score for section approval (default: 7.0)
         """
         self.choreo_graph = choreo_graph
         self.template_catalog = template_catalog
+        self.recipe_catalog = recipe_catalog
+        self.fe_bundle = fe_bundle
         self.max_iterations = max_iterations
         self.min_pass_score = min_pass_score
 
@@ -228,6 +236,8 @@ class GroupPlannerStage:
         resolved_primary_targets = self._resolve_focus_targets(input.primary_focus_targets)
         resolved_secondary_targets = self._resolve_focus_targets(input.secondary_targets)
 
+        fe_fields = self._extract_fe_fields(section_id=input.section.section_id)
+
         return SectionPlanningContext(
             section_id=input.section.section_id,
             section_name=input.section.name,
@@ -248,7 +258,70 @@ class GroupPlannerStage:
             palette=input.palette.model_dump() if input.palette else None,
             global_palette_id=global_palette_id,
             lyric_context=section_lyric_context,
+            recipe_catalog=self.recipe_catalog,
+            **fe_fields,
         )
+
+    def _extract_fe_fields(self, *, section_id: str) -> dict[str, Any]:
+        """Extract FE context fields from the loaded artifact bundle.
+
+        Args:
+            section_id: Current section identifier for section-specific lookups.
+
+        Returns:
+            Dict of keyword arguments for SectionPlanningContext FE fields.
+            All values default to None when fe_bundle is absent.
+        """
+        if self.fe_bundle is None:
+            return {}
+
+        result: dict[str, Any] = {}
+
+        if self.fe_bundle.color_arc is not None:
+            section_assignment = self._find_section_color_assignment(
+                self.fe_bundle.color_arc, section_id
+            )
+            if section_assignment is not None:
+                result["color_arc"] = section_assignment.model_dump(mode="json")
+
+        if self.fe_bundle.propensity_index is not None:
+            result["propensity_hints"] = self.fe_bundle.propensity_index.model_dump(mode="json")
+        if self.fe_bundle.style_fingerprint is not None:
+            fp = self.fe_bundle.style_fingerprint
+            # Only expose timing_style (sequencer-level).
+            # layering_style and transition_style are DMX model-level
+            # metrics and out of scope for the sequencer/planner.
+            result["style_constraints"] = {
+                "timing_style": fp.timing_style.model_dump(mode="json"),
+            }
+        return result
+
+    @staticmethod
+    def _find_section_color_assignment(
+        color_arc: Any,
+        section_id: str,
+    ) -> Any | None:
+        """Find the SectionColorAssignment matching section_id.
+
+        Matches by section_label (exact, then prefix). Falls back to None
+        if no match found.
+
+        Args:
+            color_arc: SongColorArc with section_assignments tuple.
+            section_id: Section identifier to match.
+
+        Returns:
+            Matching SectionColorAssignment or None.
+        """
+        assignments = getattr(color_arc, "section_assignments", ())
+        for assignment in assignments:
+            if assignment.section_label == section_id:
+                return assignment
+        # Prefix match fallback (e.g., "chorus_1" matches "chorus")
+        for assignment in assignments:
+            if section_id.startswith(assignment.section_label):
+                return assignment
+        return None
 
     def _resolve_focus_targets(self, targets: list[Any]) -> list[str]:
         """Resolve macro typed targets to concrete group IDs for section planning.

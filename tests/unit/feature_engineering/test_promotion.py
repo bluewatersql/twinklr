@@ -7,6 +7,7 @@ from twinklr.core.feature_engineering.models.templates import (
     TemplateKind,
 )
 from twinklr.core.feature_engineering.promotion import (
+    EXCLUDED_FAMILIES,
     PromotionPipeline,
     PromotionResult,
 )
@@ -105,3 +106,34 @@ def test_promotion_produces_valid_recipes() -> None:
         assert isinstance(recipe, EffectRecipe)
         assert recipe.provenance.source == "mined"
         assert len(recipe.layers) >= 1
+
+
+# ── Family filter ──────────────────────────────────────────────────────────
+
+
+def test_promotion_filters_excluded_families() -> None:
+    """DMX, moving_head, servo, state, duplicate, glediator are excluded."""
+    included = _make_template(template_id="ok", effect_family="sparkle")
+    excluded = [
+        _make_template(template_id=f"ex_{fam}", effect_family=fam)
+        for fam in ("dmx", "moving_head", "servo", "state", "duplicate", "glediator")
+    ]
+    result = PromotionPipeline().run(candidates=[included, *excluded])
+    assert len(result.promoted_recipes) == 1
+    assert result.report["filtered_families"] == 6
+    assert result.promoted_recipes[0].provenance.mined_template_ids == ["ok"]
+
+
+def test_promotion_excluded_families_constant() -> None:
+    """EXCLUDED_FAMILIES contains the expected set."""
+    expected = {"dmx", "moving_head", "servo", "glediator", "state", "duplicate"}
+    assert expected == EXCLUDED_FAMILIES
+
+
+def test_promotion_custom_excluded_families() -> None:
+    """Pipeline accepts custom exclusion set."""
+    t1 = _make_template(template_id="t1", effect_family="fire")
+    pipeline = PromotionPipeline(excluded_families=frozenset({"fire"}))
+    result = pipeline.run(candidates=[t1])
+    assert len(result.promoted_recipes) == 0
+    assert result.report["filtered_families"] == 1

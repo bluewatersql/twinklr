@@ -18,6 +18,8 @@ PERIMETER), detail capability, and split membership (halves, thirds,
 odd/even).
 """
 
+from __future__ import annotations
+
 import argparse
 import asyncio
 import json
@@ -28,7 +30,9 @@ import sys
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import logging
+from typing import TYPE_CHECKING
 
+from twinklr.core.feature_engineering.loader import load_fe_artifacts
 from twinklr.core.pipeline import (
     ExecutionPattern,
     PipelineContext,
@@ -50,6 +54,7 @@ from twinklr.core.sequencer.templates.group.models.choreography import (
 from twinklr.core.sequencer.templates.group.models.display import (
     GroupPosition,
 )
+from twinklr.core.sequencer.templates.group.recipe_catalog import RecipeCatalog
 from twinklr.core.sequencer.vocabulary.choreography import ChoreoTag, SplitDimension
 from twinklr.core.sequencer.vocabulary.composition import LaneKind
 from twinklr.core.sequencer.vocabulary.display import (
@@ -67,6 +72,9 @@ from twinklr.core.sequencer.vocabulary.spatial import (
 from twinklr.core.session import TwinklrSession
 from twinklr.core.utils.formatting import clean_audio_filename
 from twinklr.core.utils.logging import configure_logging
+
+if TYPE_CHECKING:
+    from twinklr.core.feature_engineering.loader import FEArtifactBundle
 
 configure_logging(level="INFO")
 logger = logging.getLogger(__name__)
@@ -420,6 +428,12 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Force new session ID (invalidates cache). Default uses stable ID based on audio file.",
     )
+    parser.add_argument(
+        "--fe-data",
+        type=str,
+        default=None,
+        help="Path to FE output directory (loads recipe catalog + FE context fields).",
+    )
     return parser.parse_args()
 
 
@@ -474,6 +488,40 @@ async def main() -> None:
     load_builtin_group_templates()
     template_catalog = build_catalog_from_registry()
 
+    # Load FE artifacts and build unified recipe catalog (optional)
+    fe_bundle: FEArtifactBundle | None = None
+    recipe_catalog: RecipeCatalog | None = None
+    if args.fe_data:
+        fe_dir = Path(args.fe_data)
+        if fe_dir.exists():
+            fe_bundle = load_fe_artifacts(fe_dir)
+            from twinklr.core.sequencer.templates.group.library import (
+                REGISTRY as GROUP_REGISTRY,
+            )
+
+            all_builtins = [
+                GROUP_REGISTRY.get(info.template_id)
+                for info in GROUP_REGISTRY.list_all()
+            ]
+            recipe_catalog = RecipeCatalog.from_builtins_and_promoted(
+                builtins=all_builtins,
+                promoted=list(fe_bundle.recipe_catalog_entries),
+            )
+            print(f"FE data loaded from {fe_dir}")
+            print(
+                f"   Recipe catalog: {len(recipe_catalog.recipes)} recipes "
+                f"({len(fe_bundle.recipe_catalog_entries)} promoted + "
+                f"{len(all_builtins)} builtins)"
+            )
+            if fe_bundle.color_arc:
+                print("   Color arc: loaded")
+            if fe_bundle.propensity_index:
+                print("   Propensity index: loaded")
+            if fe_bundle.style_fingerprint:
+                print("   Style fingerprint: loaded")
+        else:
+            print(f"WARNING: FE data directory not found: {fe_dir}")
+
     print_subsection("1. Display Configuration")
     print(f"Choreography graph: {len(choreo_graph.groups)} groups")
 
@@ -515,6 +563,8 @@ async def main() -> None:
         choreo_graph=choreo_graph,
         template_catalog=template_catalog,
         display_groups=display_groups,
+        recipe_catalog=recipe_catalog,
+        fe_bundle=fe_bundle,
         song_name=song_name,
         max_iterations=session.job_config.agent.max_iterations,
         min_pass_score=session.job_config.agent.success_threshold / 10.0,

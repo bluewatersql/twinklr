@@ -422,8 +422,6 @@ def shape_planner_context(section_context: SectionPlanningContext) -> dict[str, 
         "color_arc": section_context.color_arc,
         "propensity_hints": section_context.propensity_hints,
         "style_constraints": section_context.style_constraints,
-        "transition_hints": section_context.transition_hints,
-        "layering_budget": section_context.layering_budget,
         # Recipe catalog (Phase 2, optional)
         "recipe_catalog": _shape_recipe_catalog(section_context),
     }

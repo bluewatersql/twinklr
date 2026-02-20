@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Demo script for the FE-to-Recipes pipeline.
 
-Exercises each phase of the recipe pipeline with synthetic data,
-printing human-readable summaries at each stage. Use --phase to
-run specific phases or 'all' for the complete pipeline.
+Exercises each phase of the recipe pipeline, printing human-readable
+summaries at each stage. By default uses synthetic data; pass
+``--load-fe-data`` to load real artifacts from a feature engineering run.
 
 Usage:
     uv run python scripts/demo_recipe_pipeline.py --phase all
@@ -11,11 +11,20 @@ Usage:
     uv run python scripts/demo_recipe_pipeline.py --phase 2a
     uv run python scripts/demo_recipe_pipeline.py --phase 2b
     uv run python scripts/demo_recipe_pipeline.py --phase 2c
+
+    # Load real FE data (default path):
+    uv run python scripts/demo_recipe_pipeline.py --load-fe-data --phase all
+
+    # Load real FE data (custom path):
+    uv run python scripts/demo_recipe_pipeline.py --load-fe-data data/features/my_run --phase 2a
 """
 
 from __future__ import annotations
 
 import argparse
+from dataclasses import dataclass
+from pathlib import Path
+import sys
 from typing import Any
 
 # ---------------------------------------------------------------------------
@@ -28,6 +37,7 @@ from twinklr.core.feature_engineering.models.color_arc import (
     SectionColorAssignment,
     SongColorArc,
 )
+from twinklr.core.feature_engineering.models.motifs import MotifCatalog
 from twinklr.core.feature_engineering.models.propensity import (
     EffectModelAffinity,
     PropensityIndex,
@@ -48,6 +58,9 @@ from twinklr.core.feature_engineering.models.style import (
 from twinklr.core.feature_engineering.models.templates import (
     MinedTemplate,
     TemplateKind,
+)
+from twinklr.core.feature_engineering.models.templates import (
+    TemplateCatalog as FETemplateCatalog,
 )
 from twinklr.core.feature_engineering.promotion import PromotionPipeline
 from twinklr.core.feature_engineering.style_transfer import (
@@ -99,6 +112,119 @@ def _subheader(title: str) -> None:
 
 def _kv(label: str, value: Any) -> None:
     print(f"  {label}: {value}")
+
+
+# ===================================================================
+# FE data loader
+# ===================================================================
+
+_DEFAULT_FE_DIR = Path("data/features/demo_feature_engineering")
+
+_FE_FILES = {
+    "color_arc": "color_arc.json",
+    "propensity": "propensity_index.json",
+    "style": "style_fingerprint.json",
+    "content_templates": "content_templates.json",
+}
+
+_FE_OPTIONAL_FILES = {
+    "motif_catalog": "motif_catalog.json",
+}
+
+
+@dataclass
+class FEData:
+    """Container for loaded (or synthetic) feature engineering artifacts."""
+
+    color_arc: SongColorArc
+    propensity: PropensityIndex
+    style: StyleFingerprint
+    mined_templates: list[MinedTemplate]
+    motif_catalog: MotifCatalog | None
+    source: str  # "synthetic" or the directory path
+
+
+def load_fe_data(fe_dir: Path) -> FEData:
+    """Load real FE artifacts from *fe_dir*.
+
+    Reads color_arc.json, propensity_index.json, style_fingerprint.json,
+    and content_templates.json, deserialising each via Pydantic
+    ``model_validate_json``.
+
+    Args:
+        fe_dir: Root directory of a feature engineering run.
+
+    Returns:
+        Populated FEData with real artifacts.
+
+    Raises:
+        SystemExit: If any required file is missing.
+    """
+    missing = [
+        name for name, fname in _FE_FILES.items() if not (fe_dir / fname).exists()
+    ]
+    if missing:
+        print(f"ERROR: Missing FE artifacts in {fe_dir}:")
+        for name in missing:
+            print(f"  - {_FE_FILES[name]}")
+        sys.exit(1)
+
+    _header(f"Loading FE data from {fe_dir}")
+
+    color_arc = SongColorArc.model_validate_json(
+        (fe_dir / _FE_FILES["color_arc"]).read_text(encoding="utf-8")
+    )
+    _kv("Color Arc palettes", len(color_arc.palette_library))
+    _kv("Color Arc sections", len(color_arc.section_assignments))
+
+    propensity = PropensityIndex.model_validate_json(
+        (fe_dir / _FE_FILES["propensity"]).read_text(encoding="utf-8")
+    )
+    _kv("Propensity affinities", len(propensity.affinities))
+
+    style = StyleFingerprint.model_validate_json(
+        (fe_dir / _FE_FILES["style"]).read_text(encoding="utf-8")
+    )
+    _kv("Style creator", style.creator_id)
+    _kv("Style corpus sequences", style.corpus_sequence_count)
+
+    catalog = FETemplateCatalog.model_validate_json(
+        (fe_dir / _FE_FILES["content_templates"]).read_text(encoding="utf-8")
+    )
+    _kv("Content templates", len(catalog.templates))
+    _kv("Assignment coverage", f"{catalog.assignment_coverage:.1%}")
+
+    motif_catalog: MotifCatalog | None = None
+    motif_path = fe_dir / _FE_OPTIONAL_FILES["motif_catalog"]
+    if motif_path.exists():
+        motif_catalog = MotifCatalog.model_validate_json(
+            motif_path.read_text(encoding="utf-8")
+        )
+        _kv("Motif catalog", f"{motif_catalog.total_motifs} motifs")
+    else:
+        _kv("Motif catalog", "not found (motif annotation will be skipped)")
+
+    print()
+    return FEData(
+        color_arc=color_arc,
+        propensity=propensity,
+        style=style,
+        mined_templates=list(catalog.templates),
+        motif_catalog=motif_catalog,
+        source=str(fe_dir),
+    )
+
+
+def _make_synthetic_data() -> FEData:
+    """Build the default synthetic FEData for demo purposes."""
+    return FEData(
+        color_arc=_make_color_arc(),
+        propensity=_make_propensity_index(),
+        style=_make_style_fingerprint(),
+        mined_templates=_make_mined_templates(),
+        motif_catalog=None,
+        source="synthetic",
+    )
 
 
 # ===================================================================
@@ -370,13 +496,13 @@ def _make_builtin_recipes() -> list[EffectRecipe]:
 # ===================================================================
 
 
-def demo_phase1() -> dict[str, Any]:
+def demo_phase1(fe: FEData) -> None:
     """Phase 1: Context Enrichment artifacts."""
-    _header("Phase 1: Context Enrichment")
+    _header(f"Phase 1: Context Enrichment  [source: {fe.source}]")
 
     # Color Arc
     _subheader("Color Arc Engine")
-    arc = _make_color_arc()
+    arc = fe.color_arc
     _kv("Palettes", len(arc.palette_library))
     for p in arc.palette_library:
         _kv(f"  {p.name}", f"{p.colors} ({p.temperature})")
@@ -401,7 +527,7 @@ def demo_phase1() -> dict[str, Any]:
 
     # Propensity
     _subheader("Propensity Miner")
-    prop = _make_propensity_index()
+    prop = fe.propensity
     _kv("Model affinities", len(prop.affinities))
     for a in prop.affinities:
         _kv(
@@ -411,7 +537,7 @@ def demo_phase1() -> dict[str, Any]:
 
     # Style Fingerprint
     _subheader("Style Fingerprint")
-    style = _make_style_fingerprint()
+    style = fe.style
     _kv("Creator", style.creator_id)
     _kv("Corpus sequences", style.corpus_sequence_count)
     _kv("Recipe preferences", dict(style.recipe_preferences))
@@ -423,33 +549,37 @@ def demo_phase1() -> dict[str, Any]:
     _kv("Color contrast pref", f"{style.color_tendencies.contrast_preference:.2f}")
 
     print("\nPhase 1 complete.")
-    return {"color_arc": arc, "propensity": prop, "style": style}
 
 
-def demo_phase2a() -> dict[str, Any]:
+def demo_phase2a(fe: FEData) -> RecipeCatalog:
     """Phase 2a: Recipe Foundation (promotion pipeline)."""
-    _header("Phase 2a: Recipe Foundation")
+    _header(f"Phase 2a: Recipe Foundation  [source: {fe.source}]")
 
-    mined = _make_mined_templates()
-    _subheader("Input: Mined Templates")
-    for t in mined:
+    mined = fe.mined_templates
+    _subheader(f"Input: Mined Templates ({len(mined)} total)")
+    for t in mined[:10]:
         _kv(
             f"  {t.template_id}",
             f"family={t.effect_family}, support={t.support_count}, stability={t.cross_pack_stability:.2f}",
         )
+    if len(mined) > 10:
+        _kv("  ...", f"({len(mined) - 10} more)")
 
     _subheader("Promotion Pipeline")
     result = PromotionPipeline().run(
         candidates=mined,
         min_support=5,
         min_stability=0.3,
+        motif_catalog=fe.motif_catalog,
     )
     _kv("Total candidates", result.report["total_candidates"])
+    _kv("Filtered (excluded families)", result.report.get("filtered_families", 0))
     _kv("Rejected (quality gate)", result.report["rejected_count"])
     _kv("Promoted", result.report["promoted_count"])
+    _kv("Motif-annotated", result.report.get("motifs_annotated", 0))
 
     _subheader("Promoted Recipes")
-    for r in result.promoted_recipes:
+    for r in result.promoted_recipes[:15]:
         _kv(
             f"  {r.recipe_id}",
             f"type={r.template_type.value}, layers={len(r.layers)}, source={r.provenance.source}",
@@ -459,6 +589,8 @@ def demo_phase2a() -> dict[str, Any]:
                 f"    L{layer.layer_index} {layer.layer_name}",
                 f"{layer.effect_type} ({layer.blend_mode.value}, mix={layer.mix})",
             )
+    if len(result.promoted_recipes) > 15:
+        _kv("  ...", f"({len(result.promoted_recipes) - 15} more)")
 
     _subheader("Recipe Catalog (merge builtins + promoted)")
     builtins = _make_builtin_recipes()
@@ -467,11 +599,13 @@ def demo_phase2a() -> dict[str, Any]:
     _kv("BASE lane", len(catalog.list_by_lane(LaneKind.BASE)))
     _kv("RHYTHM lane", len(catalog.list_by_lane(LaneKind.RHYTHM)))
     _kv("ACCENT lane", len(catalog.list_by_lane(LaneKind.ACCENT)))
-    for r in catalog.recipes:
+    for r in catalog.recipes[:20]:
         _kv(f"  {r.recipe_id}", f"{r.name} ({r.provenance.source})")
+    if len(catalog.recipes) > 20:
+        _kv("  ...", f"({len(catalog.recipes) - 20} more)")
 
     print("\nPhase 2a complete.")
-    return {"promoted": result.promoted_recipes, "catalog": catalog}
+    return catalog
 
 
 def demo_phase2b(catalog: RecipeCatalog | None = None) -> None:
@@ -513,15 +647,15 @@ def demo_phase2b(catalog: RecipeCatalog | None = None) -> None:
     print("\nPhase 2b complete.")
 
 
-def demo_phase2c(catalog: RecipeCatalog | None = None) -> None:
+def demo_phase2c(fe: FEData, catalog: RecipeCatalog | None = None) -> None:
     """Phase 2c: Style Transfer & Extensions."""
-    _header("Phase 2c: Style Transfer & Extensions")
+    _header(f"Phase 2c: Style Transfer & Extensions  [source: {fe.source}]")
 
     if catalog is None:
         builtins = _make_builtin_recipes()
         catalog = RecipeCatalog(recipes=builtins)
 
-    style = _make_style_fingerprint()
+    style = fe.style
 
     # Style-weighted retrieval
     _subheader("Style-Weighted Retrieval")
@@ -610,25 +744,42 @@ def main() -> None:
         default="all",
         help="Which phase to demo (default: all).",
     )
+    parser.add_argument(
+        "--load-fe-data",
+        nargs="?",
+        const=str(_DEFAULT_FE_DIR),
+        default=None,
+        metavar="DIR",
+        help=(
+            "Load real FE artifacts instead of synthetic data. "
+            f"Optional DIR argument (default: {_DEFAULT_FE_DIR})."
+        ),
+    )
     args = parser.parse_args()
+
+    if args.load_fe_data is not None:
+        fe = load_fe_data(Path(args.load_fe_data))
+    else:
+        fe = _make_synthetic_data()
 
     catalog = None
 
     if args.phase in ("1", "all"):
-        demo_phase1()
+        demo_phase1(fe)
 
     if args.phase in ("2a", "all"):
-        result = demo_phase2a()
-        catalog = result["catalog"]
+        catalog = demo_phase2a(fe)
 
     if args.phase in ("2b", "all"):
         demo_phase2b(catalog)
 
     if args.phase in ("2c", "all"):
-        demo_phase2c(catalog)
+        demo_phase2c(fe, catalog)
 
     if args.phase == "all":
         _header("ALL PHASES COMPLETE")
+        source_label = fe.source
+        print(f"  Data source: {source_label}")
         print("  The FE-to-Recipes pipeline is working end-to-end.")
         print("  Run individual phases with --phase 1/2a/2b/2c for detailed inspection.")
 

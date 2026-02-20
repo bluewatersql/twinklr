@@ -6,6 +6,7 @@ that best match a creator's aesthetic preferences.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 
 from twinklr.core.feature_engineering.models.style import (
@@ -19,6 +20,13 @@ from twinklr.core.feature_engineering.models.style import (
 )
 from twinklr.core.sequencer.templates.group.recipe import EffectRecipe
 from twinklr.core.sequencer.templates.group.recipe_catalog import RecipeCatalog
+
+_PASCAL_RE = re.compile(r"(?<=[a-z0-9])(?=[A-Z])")
+
+
+def _to_snake(name: str) -> str:
+    """Normalise PascalCase or camelCase to snake_case, idempotent on snake_case."""
+    return _PASCAL_RE.sub("_", name).lower()
 
 
 @dataclass(frozen=True)
@@ -85,18 +93,21 @@ class StyleWeightedRetrieval:
         return total, scores
 
     def _score_effect_family(self, recipe: EffectRecipe, style: StyleFingerprint) -> float:
-        """Score based on effect family preference match."""
+        """Score based on effect family preference match.
+
+        Both PascalCase effect_type values (e.g. ``SingleStrand``) and
+        snake_case recipe_preferences keys (e.g. ``single_strand``) are
+        normalised to snake_case before an **exact** comparison.
+        """
         if not style.recipe_preferences:
             return 0.5  # Neutral if no preferences
 
+        norm_prefs = {_to_snake(k): v for k, v in style.recipe_preferences.items()}
+
         matches: list[float] = []
         for layer in recipe.layers:
-            effect_key = layer.effect_type.lower()
-            best_match = 0.0
-            for pref_key, pref_weight in style.recipe_preferences.items():
-                if pref_key.lower() in effect_key or effect_key in pref_key.lower():
-                    best_match = max(best_match, pref_weight)
-            matches.append(best_match)
+            effect_key = _to_snake(layer.effect_type)
+            matches.append(norm_prefs.get(effect_key, 0.0))
         return sum(matches) / len(matches) if matches else 0.5
 
     def _score_layering(self, recipe: EffectRecipe, style: StyleFingerprint) -> float:

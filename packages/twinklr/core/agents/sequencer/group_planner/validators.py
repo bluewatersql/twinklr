@@ -21,6 +21,7 @@ from twinklr.core.sequencer.templates.group.catalog import TemplateCatalog
 from twinklr.core.sequencer.templates.group.models import GroupPlacement, PlacementWindow
 from twinklr.core.sequencer.templates.group.models.choreography import ChoreographyGraph
 from twinklr.core.sequencer.templates.group.models.coordination import CoordinationPlan, PlanTarget
+from twinklr.core.sequencer.templates.group.recipe_catalog import _TYPE_TO_LANE, RecipeCatalog
 from twinklr.core.sequencer.vocabulary import (
     CoordinationMode,
     EffectDuration,
@@ -76,6 +77,7 @@ class SectionPlanValidator:
         choreo_graph: ChoreographyGraph,
         template_catalog: TemplateCatalog,
         timing_context: TimingContext,
+        recipe_catalog: RecipeCatalog | None = None,
     ) -> None:
         """Initialize validator with context.
 
@@ -83,15 +85,43 @@ class SectionPlanValidator:
             choreo_graph: Choreography graph configuration
             template_catalog: Available templates
             timing_context: Timing information for TimeRef resolution
+            recipe_catalog: Optional unified recipe catalog for recipe ID validation
         """
         self.choreo_graph = choreo_graph
         self.template_catalog = template_catalog
         self.timing_context = timing_context
+        self.recipe_catalog = recipe_catalog
 
         # Build lookup sets for fast validation
         self._valid_group_ids = {g.id for g in choreo_graph.groups}
         self._valid_zone_ids = {tag.value for tag in ChoreoTag}
         self._valid_split_ids = {split.value for split in SplitDimension}
+
+    def _is_known_template(self, template_id: str) -> bool:
+        """Check if template_id exists in either template catalog or recipe catalog."""
+        if self.template_catalog.has_template(template_id):
+            return True
+        if self.recipe_catalog is not None and self.recipe_catalog.has_recipe(template_id):
+            return True
+        return False
+
+    def _is_lane_compatible(self, template_id: str, lane: LaneKind) -> bool | None:
+        """Check lane compatibility for a template or recipe ID.
+
+        Returns:
+            True if compatible, False if incompatible, None if ID not found.
+        """
+        entry = self.template_catalog.get_entry(template_id)
+        if entry is not None:
+            return lane in entry.compatible_lanes
+
+        if self.recipe_catalog is not None:
+            recipe = self.recipe_catalog.get_recipe(template_id)
+            if recipe is not None:
+                recipe_lane = _TYPE_TO_LANE.get(recipe.template_type)
+                return recipe_lane == lane
+
+        return None
 
     def _get_section_end_bar(self, section_end_ms: int) -> int:
         """Get the bar number for a given millisecond position.
@@ -185,6 +215,17 @@ class SectionPlanValidator:
                         )
                     )
 
+                # Determine if this is a window-based expansion mode
+                _window_modes = {
+                    CoordinationMode.SEQUENCED,
+                    CoordinationMode.CALL_RESPONSE,
+                    CoordinationMode.RIPPLE,
+                }
+                uses_window = (
+                    coord_plan.coordination_mode in _window_modes
+                    and coord_plan.window is not None
+                )
+
                 # Validate placements
                 placements = coord_plan.placements
                 placement_errors, placement_timings = self._validate_placements(
@@ -195,9 +236,12 @@ class SectionPlanValidator:
                 )
                 errors.extend(placement_errors)
 
-                # Accumulate timings by placement's target key
-                for target_key, timings in placement_timings.items():
-                    target_timings[target_key].extend(timings)
+                # For window-based modes, the window is the authoritative
+                # timing source.  Skip placement timings for overlap checks
+                # to avoid false positives when both are present.
+                if not uses_window:
+                    for target_key, timings in placement_timings.items():
+                        target_timings[target_key].extend(timings)
 
                 # Validate window (for sequenced modes)
                 if coord_plan.window:
@@ -564,7 +608,7 @@ class SectionPlanValidator:
                 for j in range(i + 1, len(sorted_timings)):
                     start_j, end_j, source_j = sorted_timings[j]
 
-                    overlap_ms = end_i - start_j
+                    overlap_ms = min(end_i, end_j) - start_j
                     overlap_tolerance_ms = 500  # ~1 beat
 
                     if start_j < end_i and overlap_ms > overlap_tolerance_ms:
@@ -629,22 +673,20 @@ class SectionPlanValidator:
         target_timings: dict[str, list[tuple[int, int, str]]] = defaultdict(list)
 
         for placement in placements:
-            # Check template exists
-            if not self.template_catalog.has_template(placement.template_id):
+            # Check template exists (unified: template catalog + recipe catalog)
+            if not self._is_known_template(placement.template_id):
                 errors.append(
                     ValidationIssue(
                         severity=ValidationSeverity.ERROR,
                         code="UNKNOWN_TEMPLATE",
                         message=f"Template '{placement.template_id}' not found in catalog",
                         field_path=f"placement[{placement.placement_id}].template_id",
-                        fix_hint="Use a valid template_id from TemplateCatalog",
+                        fix_hint="Use a valid template_id from TemplateCatalog or RecipeCatalog",
                     )
                 )
             else:
-                # Check template-lane compatibility using catalog metadata
-                entry = self.template_catalog.get_entry(placement.template_id)
-                if entry and lane not in entry.compatible_lanes:
-                    # Suggest valid alternatives from the same lane
+                compat = self._is_lane_compatible(placement.template_id, lane)
+                if compat is False:
                     lane_templates = self.template_catalog.list_by_lane(lane)
                     suggestions = [t.template_id for t in lane_templates[:5]]
                     errors.append(
@@ -653,8 +695,7 @@ class SectionPlanValidator:
                             code="TEMPLATE_LANE_MISMATCH",
                             message=(
                                 f"Template '{placement.template_id}' is not compatible "
-                                f"with {lane.value} lane (compatible: "
-                                f"{[lk.value for lk in entry.compatible_lanes]})"
+                                f"with {lane.value} lane"
                             ),
                             field_path=f"placement[{placement.placement_id}].template_id",
                             fix_hint=(
@@ -815,21 +856,20 @@ class SectionPlanValidator:
         errors: list[ValidationIssue] = []
         target_timings: dict[str, list[tuple[int, int, str]]] = defaultdict(list)
 
-        # Check template exists
-        if not self.template_catalog.has_template(window.template_id):
+        # Check template exists (unified: template catalog + recipe catalog)
+        if not self._is_known_template(window.template_id):
             errors.append(
                 ValidationIssue(
                     severity=ValidationSeverity.ERROR,
                     code="UNKNOWN_TEMPLATE",
                     message=f"Template '{window.template_id}' not found in catalog",
                     field_path=f"lane_plans[{lane.value}].window.template_id",
-                    fix_hint="Use a valid template_id from TemplateCatalog",
+                    fix_hint="Use a valid template_id from TemplateCatalog or RecipeCatalog",
                 )
             )
         else:
-            # Check template-lane compatibility using catalog metadata
-            entry = self.template_catalog.get_entry(window.template_id)
-            if entry and lane not in entry.compatible_lanes:
+            compat = self._is_lane_compatible(window.template_id, lane)
+            if compat is False:
                 lane_templates = self.template_catalog.list_by_lane(lane)
                 suggestions = [t.template_id for t in lane_templates[:5]]
                 errors.append(
@@ -838,8 +878,7 @@ class SectionPlanValidator:
                         code="TEMPLATE_LANE_MISMATCH",
                         message=(
                             f"Template '{window.template_id}' is not compatible "
-                            f"with {lane.value} lane (compatible: "
-                            f"{[lk.value for lk in entry.compatible_lanes]})"
+                            f"with {lane.value} lane"
                         ),
                         field_path=f"lane_plans[{lane.value}].window.template_id",
                         fix_hint=(

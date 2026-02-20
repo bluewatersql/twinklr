@@ -151,3 +151,99 @@ def test_empty_inputs_produce_empty_arc() -> None:
     assert isinstance(result, SongColorArc)
     assert len(result.palette_library) == 0
     assert len(result.section_assignments) == 0
+
+
+# --- Bug fixes: per-sequence energy, palette rotation, cross-row contrast ---
+
+
+def _make_phrase_for_seq(
+    *,
+    package_id: str,
+    sequence_file_id: str,
+    energy_class: EnergyClass = EnergyClass.MID,
+) -> EffectPhrase:
+    """Helper that creates a phrase with a specific sequence identity."""
+    return EffectPhrase(
+        schema_version="v1.0.0",
+        phrase_id=f"ph_{package_id}_{sequence_file_id}",
+        package_id=package_id,
+        sequence_file_id=sequence_file_id,
+        effect_event_id=f"evt_{package_id}",
+        effect_type="Bars",
+        effect_family="single_strand",
+        motion_class=MotionClass.SWEEP,
+        color_class=ColorClass.PALETTE,
+        energy_class=energy_class,
+        continuity_class=ContinuityClass.SUSTAINED,
+        spatial_class=SpatialClass.SINGLE_TARGET,
+        source=PhraseSource.EFFECT_TYPE_MAP,
+        map_confidence=0.9,
+        target_name="MegaTree",
+        layer_index=0,
+        start_ms=0,
+        end_ms=4000,
+        duration_ms=4000,
+        section_label="__none__",
+        param_signature="bars|sweep|palette",
+    )
+
+
+def _make_color_row_for_seq(
+    *,
+    package_id: str,
+    sequence_file_id: str,
+    dominant_color_class: str = "palette",
+) -> ColorNarrativeRow:
+    return ColorNarrativeRow(
+        schema_version="v1.8.0",
+        package_id=package_id,
+        sequence_file_id=sequence_file_id,
+        section_label="__none__",
+        section_index=0,
+        phrase_count=5,
+        dominant_color_class=dominant_color_class,
+        contrast_shift_from_prev=0.0,
+        hue_family_movement="section_start",
+    )
+
+
+def test_different_energy_per_sequence_produces_different_arc_values() -> None:
+    """Two sequences with same section_label but different energy must produce
+    different arc keyframe temperatures."""
+    phrases = (
+        _make_phrase_for_seq(
+            package_id="pkgA", sequence_file_id="seqA",
+            energy_class=EnergyClass.LOW,
+        ),
+        _make_phrase_for_seq(
+            package_id="pkgB", sequence_file_id="seqB",
+            energy_class=EnergyClass.BURST,
+        ),
+    )
+    rows = (
+        _make_color_row_for_seq(package_id="pkgA", sequence_file_id="seqA"),
+        _make_color_row_for_seq(package_id="pkgB", sequence_file_id="seqB"),
+    )
+    result = ColorArcExtractor().extract(phrases=phrases, color_narrative=rows)
+    assert len(result.arc_curve) == 2
+    assert result.arc_curve[0].temperature != result.arc_curve[1].temperature
+
+
+def test_palette_rotation_across_same_section_index() -> None:
+    """Three rows all with section_index=0 should still get different palettes
+    via rotation by global row position."""
+    rows = tuple(
+        _make_color_row_for_seq(
+            package_id=f"pkg{i}", sequence_file_id=f"seq{i}",
+        )
+        for i in range(3)
+    )
+    phrases = tuple(
+        _make_phrase_for_seq(package_id=f"pkg{i}", sequence_file_id=f"seq{i}")
+        for i in range(3)
+    )
+    result = ColorArcExtractor().extract(phrases=phrases, color_narrative=rows)
+    palette_ids = [a.palette_id for a in result.section_assignments]
+    assert len(set(palette_ids)) > 1, (
+        f"Expected palette variety but got {palette_ids}"
+    )

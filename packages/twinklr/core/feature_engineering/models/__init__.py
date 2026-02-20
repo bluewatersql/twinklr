@@ -51,6 +51,10 @@ from twinklr.core.feature_engineering.models.motifs import (
     MotifCatalog,
     MotifOccurrence,
 )
+from twinklr.core.feature_engineering.models.music_library import (
+    MusicLibraryEntry,
+    MusicLibraryIndex,
+)
 from twinklr.core.feature_engineering.models.phrases import (
     ColorClass,
     ContinuityClass,
@@ -147,6 +151,8 @@ __all__ = [
     "MotionClass",
     "MotifCatalog",
     "MotifOccurrence",
+    "MusicLibraryEntry",
+    "MusicLibraryIndex",
     "PhraseSource",
     "PhraseTaxonomyRecord",
     "PropensityIndex",

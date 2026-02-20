@@ -41,7 +41,7 @@ class AudioDiscoveryResult(BaseModel):
 
     audio_path: str | None
     audio_status: AudioStatus
-    match_confidence: float | None = Field(default=None, ge=0.0, le=3.0)
+    match_confidence: float | None = Field(default=None, ge=0.0, le=5.0)
     match_reason: str | None = None
     cache_hit: bool | None = None
     compute_ms: int | None = Field(default=None, ge=0)

@@ -39,6 +39,7 @@ from twinklr.core.feature_engineering.models import (
     EffectPhrase,
     FeatureBundle,
     LayeringFeatureRow,
+    MusicLibraryIndex,
     PhraseTaxonomyRecord,
     PlannerChangeMode,
     QualityReport,
@@ -48,8 +49,11 @@ from twinklr.core.feature_engineering.models import (
     TemplateRetrievalIndex,
     TransitionGraph,
 )
+from twinklr.core.feature_engineering.models.clustering import TemplateClusterCatalog
+from twinklr.core.feature_engineering.models.motifs import MotifCatalog
 from twinklr.core.feature_engineering.motifs import MotifMiner, MotifMinerOptions
 from twinklr.core.feature_engineering.phrase_encoder import PhraseEncoder
+from twinklr.core.feature_engineering.promotion import PromotionPipeline
 from twinklr.core.feature_engineering.propensity import PropensityMiner
 from twinklr.core.feature_engineering.retrieval import TemplateRetrievalRanker
 from twinklr.core.feature_engineering.style import StyleFingerprintExtractor
@@ -105,6 +109,9 @@ class FeatureEngineeringPipelineOptions:
     enable_propensity: bool = True
     enable_style_fingerprint: bool = True
     enable_quality_gates: bool = True
+    enable_recipe_promotion: bool = True
+    recipe_promotion_min_support: int = 5
+    recipe_promotion_min_stability: float = 0.3
     taxonomy_rules_path: Path | None = None
     template_min_instance_count: int = 2
     template_min_distinct_pack_count: int = 1
@@ -132,6 +139,7 @@ class FeatureEngineeringPipeline:
         options: FeatureEngineeringPipelineOptions | None = None,
         analyzer: AudioAnalyzerLike | None = None,
         writer: FeatureEngineeringWriter | None = None,
+        music_library_index: MusicLibraryIndex | None = None,
     ) -> None:
         self._options = options or FeatureEngineeringPipelineOptions()
         self._discovery = AudioDiscoveryService(
@@ -139,7 +147,8 @@ class FeatureEngineeringPipeline:
                 confidence_threshold=self._options.confidence_threshold,
                 extracted_search_roots=self._options.extracted_search_roots,
                 music_repo_roots=self._options.music_repo_roots,
-            )
+            ),
+            music_library_index=music_library_index,
         )
         self._analyzer = analyzer
         self._writer = writer or FeatureEngineeringWriter()
@@ -227,12 +236,15 @@ class FeatureEngineeringPipeline:
         metadata = self._read_json(profile_dir / "sequence_metadata.json")
         lineage = self._read_json(profile_dir / "lineage_index.json")
 
+        seq_duration_raw = metadata.get("sequence_duration_ms")
         discovery = self._discovery.discover_audio(
             AudioDiscoveryContext(
                 profile_dir=profile_dir,
                 media_file=str(metadata.get("media_file") or ""),
                 song=str(metadata.get("song") or ""),
+                artist=str(metadata.get("artist") or ""),
                 sequence_filename=str(lineage.get("sequence_file", {}).get("filename") or ""),
+                sequence_duration_ms=int(seq_duration_raw) if seq_duration_raw else None,
             )
         )
         discovery = self._discovery.run_audio_analysis(
@@ -578,6 +590,8 @@ class FeatureEngineeringPipeline:
             )
             manifest["unknown_diagnostics"] = str(path)
 
+        motif_catalog: MotifCatalog | None = None
+        cluster_catalog: TemplateClusterCatalog | None = None
         if template_catalogs is not None:
             manifest["content_templates"] = str(output_root / "content_templates.json")
             manifest["orchestration_templates"] = str(output_root / "orchestration_templates.json")
@@ -616,6 +630,17 @@ class FeatureEngineeringPipeline:
                 manifest["cluster_candidates"] = str(path)
                 queue_path = self._writer.write_cluster_review_queue(output_root, cluster_catalog)
                 manifest["cluster_review_queue"] = str(queue_path)
+
+        if self._options.enable_recipe_promotion and template_catalogs is not None:
+            recipe_path = self._run_recipe_promotion(
+                output_root=output_root,
+                template_catalogs=template_catalogs,
+                motif_catalog=motif_catalog,
+                cluster_catalog=cluster_catalog,
+            )
+            if recipe_path is not None:
+                manifest["recipe_catalog"] = str(recipe_path)
+
         if self._options.enable_v2_learned_taxonomy and phrases and taxonomy_rows:
             model, report = self._learned_taxonomy_trainer.train(
                 phrases=phrases,
@@ -650,6 +675,43 @@ class FeatureEngineeringPipeline:
             manifest["quality_passed"] = str(quality_report.passed)
 
         self._writer.write_feature_store_manifest(output_root, manifest)
+
+    def _run_recipe_promotion(
+        self,
+        *,
+        output_root: Path,
+        template_catalogs: tuple[TemplateCatalog, TemplateCatalog],
+        motif_catalog: MotifCatalog | None,
+        cluster_catalog: TemplateClusterCatalog | None,
+    ) -> Path | None:
+        """Run promotion pipeline and persist recipe catalog."""
+        candidates = list(template_catalogs[0].templates) + list(template_catalogs[1].templates)
+        if not candidates:
+            return None
+
+        clusters: list[dict[str, Any]] | None = None
+        if cluster_catalog is not None:
+            clusters = [
+                {
+                    "cluster_id": c.cluster_id,
+                    "member_ids": list(c.member_template_ids),
+                    "keep_id": c.member_template_ids[0] if c.member_template_ids else None,
+                }
+                for c in cluster_catalog.clusters
+            ]
+
+        pipeline = PromotionPipeline()
+        result = pipeline.run(
+            candidates,
+            min_support=self._options.recipe_promotion_min_support,
+            min_stability=self._options.recipe_promotion_min_stability,
+            clusters=clusters,
+            motif_catalog=motif_catalog,
+        )
+        if not result.promoted_recipes:
+            return None
+
+        return self._writer.write_recipe_catalog(output_root, result.promoted_recipes)
 
     def _build_adapter_payloads(
         self,

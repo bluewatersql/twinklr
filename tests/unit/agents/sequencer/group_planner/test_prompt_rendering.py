@@ -86,17 +86,7 @@ def section_context_with_fe() -> SectionPlanningContext:
             ],
         },
         style_constraints={
-            "timing": {"beat_alignment_strictness": 0.8, "density_preference": 0.5},
-            "layering": {"mean_layers": 2.0, "max_layers": 4},
-        },
-        transition_hints={
-            "preferred_gap_ms": 50.0,
-            "overlap_tendency": 0.3,
-            "variety_score": 0.7,
-        },
-        layering_budget={
-            "max_concurrent_layers": 4,
-            "blend_mode_preference": "screen",
+            "timing_style": {"beat_alignment_strictness": 0.8, "density_preference": 0.5},
         },
     )
 
@@ -160,8 +150,6 @@ def test_shape_planner_context_includes_fe_fields(
     assert variables["color_arc"]["palette_id"] == "pal_icy_blue"
     assert variables["propensity_hints"] is not None
     assert variables["style_constraints"] is not None
-    assert variables["transition_hints"] is not None
-    assert variables["layering_budget"] is not None
 
 
 def test_shape_planner_context_fe_fields_none_when_absent(
@@ -172,8 +160,6 @@ def test_shape_planner_context_fe_fields_none_when_absent(
     assert variables["color_arc"] is None
     assert variables["propensity_hints"] is None
     assert variables["style_constraints"] is None
-    assert variables["transition_hints"] is None
-    assert variables["layering_budget"] is None
 
 
 def test_prompt_renders_fe_blocks_when_populated(
@@ -198,8 +184,8 @@ def test_prompt_renders_fe_blocks_when_populated(
     assert "pal_icy_blue" in rendered
     assert "Propensity Hints" in rendered
     assert "Style Constraints" in rendered
-    assert "Transition Hints" in rendered
-    assert "Layering Budget" in rendered
+    assert "Transition Hints" not in rendered
+    assert "Layering Budget" not in rendered
 
 
 def test_prompt_omits_fe_blocks_when_absent(

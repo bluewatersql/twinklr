@@ -13,11 +13,11 @@ variables:
     - section_count
     - section_ids
     - display_graph
-    - template_catalog
     - response_schema
     - taxonomy
 
   optional:
+    - template_catalog
     - macro_plan_summary
     - global_theme_id
     - global_palette_id

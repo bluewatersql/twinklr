@@ -104,8 +104,8 @@ class ColorArcExtractor:
         assignments: list[SectionColorAssignment] = []
         energy_by_section = self._compute_section_energy(phrases)
 
-        for row in sorted_rows:
-            palette_id = self._palette_id_for(row)
+        for row_idx, row in enumerate(sorted_rows):
+            palette_id = self._palette_id_for(row, row_index=row_idx)
             if palette_id not in palettes:
                 palettes[palette_id] = self._build_palette(palette_id, row.dominant_color_class)
 
@@ -139,15 +139,22 @@ class ColorArcExtractor:
         )
 
     @staticmethod
-    def _palette_id_for(row: ColorNarrativeRow) -> str:
+    def _palette_id_for(row: ColorNarrativeRow, *, row_index: int = 0) -> str:
+        """Select palette template for a narrative row.
+
+        Args:
+            row: Color narrative row to select palette for.
+            row_index: Global position among all rows (used for rotation
+                when ``section_index`` is 0 for every row).
+        """
         dominant = (
             row.dominant_color_class
             if row.dominant_color_class in _PALETTE_TEMPLATES
             else "palette"
         )
         templates = _PALETTE_TEMPLATES[dominant]
-        # Rotate through available templates by section index.
-        template = templates[row.section_index % len(templates)]
+        rotation_key = row.section_index if row.section_index > 0 else row_index
+        template = templates[rotation_key % len(templates)]
         return f"pal_{template['suffix']}"
 
     @staticmethod
@@ -191,18 +198,24 @@ class ColorArcExtractor:
     @staticmethod
     def _compute_section_energy(
         phrases: tuple[EffectPhrase, ...],
-    ) -> dict[str, EnergyClass]:
+    ) -> dict[tuple[str, str, str], EnergyClass]:
+        """Compute dominant energy per (package_id, sequence_file_id, section_label).
+
+        Using a composite key ensures that different sequences sharing the
+        same ``section_label`` (e.g. ``"__none__"``) are not collapsed into
+        a single bucket.
+        """
         from collections import Counter
 
-        by_section: dict[str, list[EnergyClass]] = defaultdict(list)
+        by_key: dict[tuple[str, str, str], list[EnergyClass]] = defaultdict(list)
         for p in phrases:
             label = p.section_label or "__none__"
-            by_section[label].append(p.energy_class)
-        result: dict[str, EnergyClass] = {}
-        for section, energies in by_section.items():
+            by_key[(p.package_id, p.sequence_file_id, label)].append(p.energy_class)
+        result: dict[tuple[str, str, str], EnergyClass] = {}
+        for key, energies in by_key.items():
             counts = Counter(energies)
             dominant = max(counts, key=lambda e: (counts[e], e.value))
-            result[section] = dominant
+            result[key] = dominant
         return result
 
     @staticmethod
@@ -233,7 +246,7 @@ class ColorArcExtractor:
     @staticmethod
     def _build_arc_curve(
         sorted_rows: list[ColorNarrativeRow],
-        energy_by_section: dict[str, EnergyClass],
+        energy_by_section: dict[tuple[str, str, str], EnergyClass],
     ) -> tuple[ArcKeyframe, ...]:
         if not sorted_rows:
             return ()
@@ -241,9 +254,9 @@ class ColorArcExtractor:
         keyframes: list[ArcKeyframe] = []
         for i, row in enumerate(sorted_rows):
             position = i / max(n - 1, 1)
-            energy = energy_by_section.get(row.section_label, EnergyClass.MID)
+            key = (row.package_id, row.sequence_file_id, row.section_label)
+            energy = energy_by_section.get(key, EnergyClass.MID)
             temp = _ENERGY_TEMPERATURE.get(energy, 0.5)
-            # Saturation rises with energy, contrast from narrative.
             sat = min(1.0, 0.4 + temp * 0.6)
             keyframes.append(
                 ArcKeyframe(

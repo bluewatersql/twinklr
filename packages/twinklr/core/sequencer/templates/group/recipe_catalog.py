@@ -7,6 +7,8 @@ FE-promoted recipes.
 
 from __future__ import annotations
 
+from twinklr.core.sequencer.templates.group.converter import convert_builtin_to_recipe
+from twinklr.core.sequencer.templates.group.models.template import GroupPlanTemplate
 from twinklr.core.sequencer.templates.group.recipe import EffectRecipe
 from twinklr.core.sequencer.vocabulary import GroupTemplateType, LaneKind
 
@@ -68,3 +70,24 @@ class RecipeCatalog:
         merged = [b for b in builtins if b.recipe_id not in promoted_ids]
         merged.extend(promoted)
         return cls(recipes=merged)
+
+    @classmethod
+    def from_builtins_and_promoted(
+        cls,
+        builtins: list[GroupPlanTemplate],
+        promoted: list[EffectRecipe] | None = None,
+    ) -> RecipeCatalog:
+        """Build a unified catalog from builtin templates and optional promoted recipes.
+
+        Converts builtins to EffectRecipe via ``convert_builtin_to_recipe``,
+        then merges with promoted recipes (promoted take precedence on ID collision).
+
+        Args:
+            builtins: Builtin GroupPlanTemplate instances.
+            promoted: Optional FE-promoted EffectRecipe instances.
+
+        Returns:
+            Unified RecipeCatalog.
+        """
+        converted = [convert_builtin_to_recipe(t) for t in builtins]
+        return cls.merge(converted, promoted or [])

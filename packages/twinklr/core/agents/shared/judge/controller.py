@@ -267,6 +267,7 @@ class StandardIterationController(Generic[TPlan]):
         provider: LLMProvider,
         llm_logger: LLMCallLogger,
         prompt_base_path: Path | str = AGENTS_BASE_PATH,
+        judge_context_builder: Callable[[TPlan, int], dict[str, Any]] | None = None,
     ) -> IterationResult[TPlan]:
         """Run iteration loop until approval or termination.
 
@@ -278,6 +279,9 @@ class StandardIterationController(Generic[TPlan]):
             provider: LLM provider
             llm_logger: LLM call logger
             prompt_base_path: Base path for prompt packs (default: AGENTS_BASE_PATH)
+            judge_context_builder: Optional callback to build judge-specific
+                variables from (plan, iteration). When provided, these variables
+                are used instead of planner variables for the judge.
 
         Returns:
             IterationResult with final plan and metadata
@@ -392,8 +396,11 @@ class StandardIterationController(Generic[TPlan]):
             context.update_state(IterationState.JUDGING)
             self.logger.debug("Judging plan")
 
-            # Prepare judge variables
-            judge_vars = self._prepare_judge_variables(plan, initial_variables, iteration)
+            # Prepare judge variables (use domain-specific builder if provided)
+            if judge_context_builder is not None:
+                judge_vars = judge_context_builder(plan, iteration)
+            else:
+                judge_vars = self._prepare_judge_variables(plan, initial_variables, iteration)
 
             # Run judge
             judge_result = await runner.run(spec=judge_spec, variables=judge_vars)

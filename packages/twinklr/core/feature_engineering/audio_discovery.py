@@ -15,11 +15,35 @@ from twinklr.core.feature_engineering.models import (
     AudioCandidateOrigin,
     AudioDiscoveryResult,
     AudioStatus,
+    MusicLibraryIndex,
 )
 
 _AUDIO_EXT_PRIORITY: tuple[str, ...] = (".wav", ".flac", ".m4a", ".mp3", ".aac", ".ogg")
 _PUNCT_TRANSLATOR = str.maketrans(dict.fromkeys(string.punctuation, " "))
 _LOW_CONFIDENCE_FLOOR = 0.60
+
+_META_TITLE_WEIGHT = 1.50
+_META_ARTIST_WEIGHT = 0.50
+_META_DURATION_WEIGHT = 0.15
+_META_DURATION_TOLERANCE_S = 5.0
+
+
+def _normalize_text(text: str) -> str:
+    """Normalize text for comparison: strip accents, punctuation, lowercase."""
+    normalized = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode("ascii")
+    normalized = normalized.translate(_PUNCT_TRANSLATOR)
+    return " ".join(normalized.lower().split())
+
+
+def _token_similarity(left: str, right: str) -> float:
+    """Compute token-order-independent similarity between two normalized strings."""
+    if not left or not right:
+        return 0.0
+    left_tokens = sorted(token for token in left.split(" ") if token)
+    right_tokens = sorted(token for token in right.split(" ") if token)
+    if not left_tokens or not right_tokens:
+        return 0.0
+    return SequenceMatcher(a=" ".join(left_tokens), b=" ".join(right_tokens)).ratio()
 
 
 class AudioAnalyzerLike(Protocol):
@@ -46,15 +70,50 @@ class AudioDiscoveryContext:
     media_file: str
     song: str
     sequence_filename: str
+    artist: str = ""
+    sequence_duration_ms: int | None = None
+
+
+@dataclass(frozen=True)
+class _MetadataRecord:
+    """Normalized metadata from the music library index for a single file."""
+
+    title_norm: str
+    artist_norm: str
+    duration_s: float
+
+
+def _build_metadata_lookup(index: MusicLibraryIndex) -> dict[str, _MetadataRecord]:
+    """Build a path → metadata dict, keyed by resolved canonical path."""
+    lookup: dict[str, _MetadataRecord] = {}
+    for entry in index.entries:
+        try:
+            resolved = str(Path(entry.path).resolve())
+        except (OSError, ValueError):
+            resolved = entry.path
+        lookup[resolved] = _MetadataRecord(
+            title_norm=_normalize_text(entry.title),
+            artist_norm=_normalize_text(entry.artist),
+            duration_s=entry.duration_s,
+        )
+    return lookup
 
 
 class AudioDiscoveryService:
     """Rank and select audio files using deterministic scoring."""
 
-    def __init__(self, options: AudioDiscoveryOptions | None = None) -> None:
+    def __init__(
+        self,
+        options: AudioDiscoveryOptions | None = None,
+        *,
+        music_library_index: MusicLibraryIndex | None = None,
+    ) -> None:
         self._options = options or AudioDiscoveryOptions()
         self._ext_bonus: dict[str, float] = self._build_extension_bonus(
             self._options.audio_extensions
+        )
+        self._meta_by_path: dict[str, _MetadataRecord] = (
+            _build_metadata_lookup(music_library_index) if music_library_index else {}
         )
 
     @staticmethod
@@ -197,19 +256,28 @@ class AudioDiscoveryService:
         candidates: list[tuple[Path, AudioCandidateOrigin]],
         context: AudioDiscoveryContext,
     ) -> list[AudioCandidate]:
-        media_stem = self._normalize_text(Path(context.media_file).stem)
-        song_norm = self._normalize_text(context.song)
-        sequence_norm = self._normalize_text(Path(context.sequence_filename).stem)
+        media_stem = _normalize_text(Path(context.media_file).stem)
+        song_norm = _normalize_text(context.song)
+        sequence_norm = _normalize_text(Path(context.sequence_filename).stem)
+        artist_norm = _normalize_text(context.artist)
+        seq_duration_s = (
+            context.sequence_duration_ms / 1000.0 if context.sequence_duration_ms else None
+        )
 
         ranked: list[AudioCandidate] = []
         for path, origin in candidates:
+            resolved = str(path)
+            meta = self._meta_by_path.get(resolved)
             score, reason = self._score_candidate(
-                candidate_stem=self._normalize_text(path.stem),
+                candidate_stem=_normalize_text(path.stem),
                 candidate_ext=path.suffix.lower(),
                 origin=origin,
                 media_stem=media_stem,
                 song_norm=song_norm,
                 sequence_norm=sequence_norm,
+                artist_norm=artist_norm,
+                seq_duration_s=seq_duration_s,
+                meta=meta,
             )
             ranked.append(
                 AudioCandidate(
@@ -221,7 +289,7 @@ class AudioDiscoveryService:
             )
         ranked.sort(
             key=lambda c: (
-                0 if self._normalize_text(Path(c.path).stem) == media_stem and media_stem else 1,
+                0 if _normalize_text(Path(c.path).stem) == media_stem and media_stem else 1,
                 -c.score,
                 -self._ext_bonus.get(Path(c.path).suffix.lower(), 0.0),
                 0 if c.origin is AudioCandidateOrigin.PACK else 1,
@@ -239,21 +307,49 @@ class AudioDiscoveryService:
         media_stem: str,
         song_norm: str,
         sequence_norm: str,
+        artist_norm: str = "",
+        seq_duration_s: float | None = None,
+        meta: _MetadataRecord | None = None,
     ) -> tuple[float, str]:
         score = 0.0
         parts: list[str] = []
 
+        # --- Metadata signals (highest priority) ---
+        if meta is not None and meta.title_norm:
+            title_sim = _token_similarity(meta.title_norm, song_norm)
+            if title_sim > 0.0:
+                weighted = title_sim * _META_TITLE_WEIGHT
+                score += weighted
+                parts.append(f"metadata title {weighted:.3f}")
+
+            if meta.artist_norm and artist_norm:
+                artist_sim = _token_similarity(meta.artist_norm, artist_norm)
+                if artist_sim > 0.0:
+                    weighted = artist_sim * _META_ARTIST_WEIGHT
+                    score += weighted
+                    parts.append(f"metadata artist {weighted:.3f}")
+
+            if (
+                meta.duration_s > 0
+                and seq_duration_s is not None
+                and seq_duration_s > 0
+                and abs(meta.duration_s - seq_duration_s) <= _META_DURATION_TOLERANCE_S
+            ):
+                score += _META_DURATION_WEIGHT
+                parts.append(f"duration match {_META_DURATION_WEIGHT:.3f}")
+
+        # --- Filename signals (fallback / additive) ---
         if candidate_stem and media_stem and candidate_stem == media_stem:
             score += 1.0
             parts.append("exact media basename")
 
-        song_similarity = self._token_similarity(candidate_stem, song_norm)
+        song_similarity = _token_similarity(candidate_stem, song_norm)
         if song_similarity > 0.0:
             weighted = song_similarity * 0.90
             score += weighted
             parts.append(f"song similarity {weighted:.3f}")
 
-        seq_similarity = self._token_similarity(candidate_stem, sequence_norm)
+        seq_similarity = _token_similarity(candidate_stem, sequence_norm)
         if seq_similarity > 0.0:
             weighted = seq_similarity * 0.25
             score += weighted
@@ -272,21 +368,3 @@ class AudioDiscoveryService:
             parts.append("below low-confidence floor")
         return score, ", ".join(parts) if parts else "no strong match signals"
 
-    @staticmethod
-    def _token_similarity(left: str, right: str) -> float:
-        if not left or not right:
-            return 0.0
-        left_tokens = sorted(token for token in left.split(" ") if token)
-        right_tokens = sorted(token for token in right.split(" ") if token)
-        if not left_tokens or not right_tokens:
-            return 0.0
-        left_joined = " ".join(left_tokens)
-        right_joined = " ".join(right_tokens)
-        return SequenceMatcher(a=left_joined, b=right_joined).ratio()
-
-    @staticmethod
-    def _normalize_text(text: str) -> str:
-        normalized = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode("ascii")
-        normalized = normalized.translate(_PUNCT_TRANSLATOR)
-        normalized = " ".join(normalized.lower().split())
-        return normalized

@@ -99,6 +99,8 @@ class SectionPlanningContext(BaseModel):
     )
 
     # Feature Engineering enrichment (optional, from FE pipeline Phase 1)
+    # Only sequencer-relevant fields are exposed here.  DMX model-level
+    # metrics (layering_style, transition_style) are out of scope.
     color_arc: dict[str, Any] | None = Field(
         default=None,
         description="Section color assignment from Color Arc Engine (palette, shift timing, contrast).",
@@ -109,15 +111,7 @@ class SectionPlanningContext(BaseModel):
     )
     style_constraints: dict[str, Any] | None = Field(
         default=None,
-        description="Style fingerprint constraints (timing, layering, color preferences).",
-    )
-    transition_hints: dict[str, Any] | None = Field(
-        default=None,
-        description="Transition style hints (gap, overlap tendency, variety).",
-    )
-    layering_budget: dict[str, Any] | None = Field(
-        default=None,
-        description="Layering budget (max concurrent layers, blend mode preference).",
+        description="Timing style constraints (beat alignment, density).",
     )
 
     @property

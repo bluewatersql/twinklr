@@ -11,6 +11,7 @@ import shutil
 from typing import Any
 
 from twinklr.core.config.models import AppConfig, JobConfig
+from twinklr.core.feature_engineering.models import MusicLibraryIndex
 from twinklr.core.feature_engineering.pipeline import (
     FeatureEngineeringPipeline,
     FeatureEngineeringPipelineOptions,
@@ -18,6 +19,21 @@ from twinklr.core.feature_engineering.pipeline import (
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_OUTPUT_DIR = ROOT / "data" / "features" / "demo_feature_engineering"
+_MUSIC_INDEX_PATH = ROOT / "data" / "music" / "music_library_index.json"
+
+
+def _load_music_library_index() -> MusicLibraryIndex | None:
+    """Load the pre-built music library index if available."""
+    if not _MUSIC_INDEX_PATH.exists():
+        print(
+            f"  [info] No music library index at {_MUSIC_INDEX_PATH.relative_to(ROOT)}\n"
+            "         Run: uv run python scripts/build_music_library_index.py"
+        )
+        return None
+    index = MusicLibraryIndex.model_validate_json(_MUSIC_INDEX_PATH.read_text())
+    tagged = sum(1 for e in index.entries if e.title)
+    print(f"  [info] Loaded music library index: {len(index.entries)} files ({tagged} with metadata)")
+    return index
 
 
 def parse_args() -> argparse.Namespace:
@@ -618,6 +634,7 @@ def main() -> int:
 
             analyzer = AudioAnalyzer(AppConfig(), JobConfig())
 
+        music_index = _load_music_library_index()
         pipeline = FeatureEngineeringPipeline(
             options=FeatureEngineeringPipelineOptions(
                 template_min_instance_count=args.template_min_instance_count,
@@ -627,6 +644,7 @@ def main() -> int:
                 quality_max_single_unknown_effect_type_ratio=args.quality_max_single_unknown_effect_type_ratio,
             ),
             analyzer=analyzer,
+            music_library_index=music_index,
         )
         bundles = pipeline.run_corpus(args.corpus_dir.resolve(), output_dir)
         print(f"Built feature-engineering artifacts for {len(bundles)} sequences.")

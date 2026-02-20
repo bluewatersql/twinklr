@@ -197,7 +197,7 @@ This section has lyric/narrative context. Use it to produce `narrative_assets` d
 **TASK:** Based on the above narrative, produce `narrative_assets` with 1-10 directives declaring the figurative imagery this section needs. See system prompt for directive format and rules.
 {% endif %}
 
-{% if color_arc or propensity_hints or style_constraints or transition_hints or layering_budget %}
+{% if color_arc or propensity_hints or style_constraints %}
 ## Feature Engineering Context
 
 {% if color_arc %}
@@ -222,35 +222,10 @@ Use these affinities to prefer templates that match high-frequency effect-model 
 
 {% if style_constraints %}
 ### Style Constraints
-Creator style fingerprint constraints:
-{% if style_constraints.timing %}
-- Beat alignment strictness: {{ style_constraints.timing.beat_alignment_strictness | default('-') }}
-- Density preference: {{ style_constraints.timing.density_preference | default('-') }}
+{% if style_constraints.timing_style %}
+- Beat alignment strictness: {{ style_constraints.timing_style.beat_alignment_strictness | default('-') }}
+- Density preference: {{ style_constraints.timing_style.density_preference | default('-') }}
 {% endif %}
-{% if style_constraints.layering %}
-- Mean layers: {{ style_constraints.layering.mean_layers | default('-') }}
-- Max layers: {{ style_constraints.layering.max_layers | default('-') }}
-{% endif %}
-
-Respect these constraints when choosing template density and layering depth.
-{% endif %}
-
-{% if transition_hints %}
-### Transition Hints
-Corpus-derived transition preferences:
-- Preferred gap: {{ transition_hints.preferred_gap_ms | default('-') }}ms
-- Overlap tendency: {{ transition_hints.overlap_tendency | default('-') }} (0=sharp cuts, 1=heavy overlaps)
-- Variety score: {{ transition_hints.variety_score | default('-') }} (0=repetitive, 1=varied)
-
-Use these to guide transition timing between placements.
-{% endif %}
-
-{% if layering_budget %}
-### Layering Budget
-- Max concurrent layers: {{ layering_budget.max_concurrent_layers | default('-') }}
-- Blend mode preference: {{ layering_budget.blend_mode_preference | default('-') }}
-
-Do not exceed the max concurrent layers budget across all lanes.
 {% endif %}
 
 {% endif %}

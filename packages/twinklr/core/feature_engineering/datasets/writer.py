@@ -35,6 +35,7 @@ from twinklr.core.feature_engineering.models.template_diagnostics import (
 )
 from twinklr.core.feature_engineering.models.templates import TemplateCatalog
 from twinklr.core.feature_engineering.models.transitions import TransitionGraph
+from twinklr.core.sequencer.templates.group.recipe import EffectRecipe
 
 
 class FeatureEngineeringWriter:
@@ -261,6 +262,13 @@ class FeatureEngineeringWriter:
     def write_ann_retrieval_eval(self, output_root: Path, report: AnnRetrievalEvalReport) -> Path:
         output_path = output_root / "retrieval_eval_report.json"
         self._write_json(output_path, report.model_dump(mode="json"))
+        return output_path
+
+    def write_recipe_catalog(self, output_root: Path, recipes: list[EffectRecipe]) -> Path:
+        """Write promoted recipe catalog as JSON."""
+        output_path = output_root / "recipe_catalog.json"
+        payload = [r.model_dump(mode="json") for r in recipes]
+        self._write_json(output_path, {"schema_version": "1", "recipes": payload})
         return output_path
 
     def write_planner_adapter_payloads(

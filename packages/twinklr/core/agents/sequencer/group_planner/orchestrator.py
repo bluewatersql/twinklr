@@ -434,6 +434,7 @@ class GroupPlannerOrchestrator:
             choreo_graph=section_context.choreo_graph,
             template_catalog=section_context.template_catalog,
             timing_context=section_context.timing_context,
+            recipe_catalog=section_context.recipe_catalog,
         )
 
         def validate(plan: SectionCoordinationPlan) -> list[str]:

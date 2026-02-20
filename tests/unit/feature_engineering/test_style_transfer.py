@@ -218,3 +218,58 @@ class TestStyleWeightedRetrieval:
         result = retrieval.rank(catalog, style)
 
         assert result[0].breakdown["effect_family"] == 0.5
+
+    def test_pascal_case_effect_matches_snake_case_pref(self) -> None:
+        """PascalCase effect_type must match snake_case recipe_preferences keys."""
+        recipe = _make_recipe(effect_type="SingleStrand")
+        catalog = RecipeCatalog(recipes=[recipe])
+        style = _make_style(recipe_preferences={"single_strand": 0.8})
+        retrieval = StyleWeightedRetrieval()
+
+        result = retrieval.rank(catalog, style)
+
+        assert result[0].breakdown["effect_family"] == 0.8
+
+    def test_multi_word_pascal_case_match(self) -> None:
+        """Multi-word PascalCase names like ColorWash must match color_wash."""
+        recipe = _make_recipe(effect_type="ColorWash")
+        catalog = RecipeCatalog(recipes=[recipe])
+        style = _make_style(recipe_preferences={"color_wash": 0.7})
+        retrieval = StyleWeightedRetrieval()
+
+        result = retrieval.rank(catalog, style)
+
+        assert result[0].breakdown["effect_family"] == 0.7
+
+    def test_no_substring_false_positive(self) -> None:
+        """'wave' preference must NOT match 'Shockwave' effect."""
+        recipe = _make_recipe(effect_type="Shockwave")
+        catalog = RecipeCatalog(recipes=[recipe])
+        style = _make_style(recipe_preferences={"wave": 0.9})
+        retrieval = StyleWeightedRetrieval()
+
+        result = retrieval.rank(catalog, style)
+
+        assert result[0].breakdown["effect_family"] == 0.0
+
+    def test_exact_match_preferred_over_zero(self) -> None:
+        """Exact snake_case match should produce a non-zero score."""
+        recipe = _make_recipe(effect_type="Shockwave")
+        catalog = RecipeCatalog(recipes=[recipe])
+        style = _make_style(recipe_preferences={"shockwave": 0.6})
+        retrieval = StyleWeightedRetrieval()
+
+        result = retrieval.rank(catalog, style)
+
+        assert result[0].breakdown["effect_family"] == 0.6
+
+    def test_snake_case_effect_type_matches_directly(self) -> None:
+        """Already-snake_case effect_type should match preferences."""
+        recipe = _make_recipe(effect_type="snow_storm")
+        catalog = RecipeCatalog(recipes=[recipe])
+        style = _make_style(recipe_preferences={"snow_storm": 0.5})
+        retrieval = StyleWeightedRetrieval()
+
+        result = retrieval.rank(catalog, style)
+
+        assert result[0].breakdown["effect_family"] == 0.5

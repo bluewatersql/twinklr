@@ -82,8 +82,6 @@ def test_fe_fields_default_to_none(
     assert ctx.color_arc is None
     assert ctx.propensity_hints is None
     assert ctx.style_constraints is None
-    assert ctx.transition_hints is None
-    assert ctx.layering_budget is None
 
 
 def test_fe_fields_accept_dict_values(
@@ -103,17 +101,7 @@ def test_fe_fields_accept_dict_values(
             ],
         },
         "style_constraints": {
-            "timing": {"beat_alignment_strictness": 0.8, "density_preference": 0.5},
-            "layering": {"mean_layers": 2.0, "max_layers": 4},
-        },
-        "transition_hints": {
-            "preferred_gap_ms": 50.0,
-            "overlap_tendency": 0.3,
-            "variety_score": 0.7,
-        },
-        "layering_budget": {
-            "max_concurrent_layers": 4,
-            "blend_mode_preference": "screen",
+            "timing_style": {"beat_alignment_strictness": 0.8, "density_preference": 0.5},
         },
     }
     ctx = SectionPlanningContext(**fe_kwargs)
@@ -121,8 +109,6 @@ def test_fe_fields_accept_dict_values(
     assert ctx.color_arc["palette_id"] == "pal_icy_blue"
     assert ctx.propensity_hints is not None
     assert ctx.style_constraints is not None
-    assert ctx.transition_hints is not None
-    assert ctx.layering_budget is not None
 
 
 def test_existing_fields_unaffected(
