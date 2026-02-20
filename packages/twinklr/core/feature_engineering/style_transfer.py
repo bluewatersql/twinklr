@@ -8,7 +8,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from twinklr.core.feature_engineering.models.style import StyleFingerprint
+from twinklr.core.feature_engineering.models.style import (
+    ColorStyleProfile,
+    LayeringStyleProfile,
+    StyleBlend,
+    StyleFingerprint,
+    TimingStyleProfile,
+    TransitionStyleProfile,
+)
 from twinklr.core.sequencer.templates.group.recipe import EffectRecipe
 from twinklr.core.sequencer.templates.group.recipe_catalog import RecipeCatalog
 
@@ -123,3 +130,180 @@ class StyleWeightedRetrieval:
         ) / 2.0
         diff = abs(recipe.style_markers.complexity - style_complexity)
         return max(0.0, 1.0 - diff)
+
+
+class StyleBlendEvaluator:
+    """Evaluates a StyleBlend into a single blended StyleFingerprint.
+
+    Supports:
+    - Base + accent style mixing (linear interpolation by blend_ratio)
+    - Directional evolution (more_complex, simpler, warmer, cooler, etc.)
+
+    The resulting StyleFingerprint can be fed to StyleWeightedRetrieval
+    for recipe ranking.
+    """
+
+    # Evolution adjustment magnitude (applied at intensity=1.0)
+    _EVOLUTION_DELTA = 0.3
+
+    def evaluate(self, blend: StyleBlend) -> StyleFingerprint:
+        """Evaluate a StyleBlend into a single StyleFingerprint.
+
+        Args:
+            blend: StyleBlend with base, optional accent, and optional evolution.
+
+        Returns:
+            Blended and optionally evolved StyleFingerprint.
+        """
+        base = blend.base_style
+
+        if blend.accent_style is not None:
+            blended = self._interpolate(base, blend.accent_style, blend.blend_ratio)
+        else:
+            blended = base
+
+        if blend.evolution_params is not None:
+            blended = self._apply_evolution(blended, blend.evolution_params)
+
+        return blended
+
+    def _interpolate(
+        self,
+        a: StyleFingerprint,
+        b: StyleFingerprint,
+        ratio: float,
+    ) -> StyleFingerprint:
+        """Linear interpolation between two fingerprints."""
+        t = ratio  # 0 = pure a, 1 = pure b
+
+        def lerp(va: float, vb: float) -> float:
+            return va + t * (vb - va)
+
+        # Merge recipe_preferences (union of keys)
+        all_keys = set(a.recipe_preferences) | set(b.recipe_preferences)
+        merged_prefs = {
+            k: lerp(a.recipe_preferences.get(k, 0.0), b.recipe_preferences.get(k, 0.0))
+            for k in all_keys
+        }
+
+        return StyleFingerprint(
+            creator_id=f"{a.creator_id}+{b.creator_id}",
+            recipe_preferences=merged_prefs,
+            transition_style=TransitionStyleProfile(
+                preferred_gap_ms=lerp(
+                    a.transition_style.preferred_gap_ms,
+                    b.transition_style.preferred_gap_ms,
+                ),
+                overlap_tendency=lerp(
+                    a.transition_style.overlap_tendency,
+                    b.transition_style.overlap_tendency,
+                ),
+                variety_score=lerp(
+                    a.transition_style.variety_score,
+                    b.transition_style.variety_score,
+                ),
+            ),
+            color_tendencies=ColorStyleProfile(
+                palette_complexity=lerp(
+                    a.color_tendencies.palette_complexity,
+                    b.color_tendencies.palette_complexity,
+                ),
+                contrast_preference=lerp(
+                    a.color_tendencies.contrast_preference,
+                    b.color_tendencies.contrast_preference,
+                ),
+                temperature_preference=lerp(
+                    a.color_tendencies.temperature_preference,
+                    b.color_tendencies.temperature_preference,
+                ),
+            ),
+            timing_style=TimingStyleProfile(
+                beat_alignment_strictness=lerp(
+                    a.timing_style.beat_alignment_strictness,
+                    b.timing_style.beat_alignment_strictness,
+                ),
+                density_preference=lerp(
+                    a.timing_style.density_preference,
+                    b.timing_style.density_preference,
+                ),
+                section_change_aggression=lerp(
+                    a.timing_style.section_change_aggression,
+                    b.timing_style.section_change_aggression,
+                ),
+            ),
+            layering_style=LayeringStyleProfile(
+                mean_layers=lerp(
+                    a.layering_style.mean_layers,
+                    b.layering_style.mean_layers,
+                ),
+                max_layers=max(a.layering_style.max_layers, b.layering_style.max_layers),
+                blend_mode_preference=(
+                    a.layering_style.blend_mode_preference
+                    if t < 0.5
+                    else b.layering_style.blend_mode_preference
+                ),
+            ),
+            corpus_sequence_count=a.corpus_sequence_count + b.corpus_sequence_count,
+        )
+
+    def _apply_evolution(
+        self,
+        style: StyleFingerprint,
+        evolution: "StyleBlend.evolution_params",  # type: ignore[name-defined]
+    ) -> StyleFingerprint:
+        """Apply directional evolution to a fingerprint."""
+        from twinklr.core.feature_engineering.models.style import StyleEvolution
+
+        if not isinstance(evolution, StyleEvolution):
+            return style
+
+        delta = self._EVOLUTION_DELTA * evolution.intensity
+        direction = evolution.direction
+
+        # Start with current values
+        density = style.timing_style.density_preference
+        mean_layers = style.layering_style.mean_layers
+        temperature = style.color_tendencies.temperature_preference
+        palette_complexity = style.color_tendencies.palette_complexity
+        aggression = style.timing_style.section_change_aggression
+
+        if direction == "more_complex":
+            density = min(1.0, density + delta)
+            mean_layers = mean_layers + delta * 2
+            palette_complexity = min(1.0, palette_complexity + delta * 0.5)
+        elif direction == "simpler":
+            density = max(0.0, density - delta)
+            mean_layers = max(0.5, mean_layers - delta * 2)
+            palette_complexity = max(0.0, palette_complexity - delta * 0.5)
+        elif direction == "warmer":
+            temperature = min(1.0, temperature + delta)
+        elif direction == "cooler":
+            temperature = max(0.0, temperature - delta)
+        elif direction == "higher_energy":
+            density = min(1.0, density + delta)
+            aggression = min(1.0, aggression + delta)
+        elif direction == "calmer":
+            density = max(0.0, density - delta)
+            aggression = max(0.0, aggression - delta)
+
+        return StyleFingerprint(
+            creator_id=style.creator_id,
+            recipe_preferences=dict(style.recipe_preferences),
+            transition_style=style.transition_style,
+            color_tendencies=ColorStyleProfile(
+                palette_complexity=palette_complexity,
+                contrast_preference=style.color_tendencies.contrast_preference,
+                temperature_preference=temperature,
+            ),
+            timing_style=TimingStyleProfile(
+                beat_alignment_strictness=style.timing_style.beat_alignment_strictness,
+                density_preference=density,
+                section_change_aggression=aggression,
+            ),
+            layering_style=LayeringStyleProfile(
+                mean_layers=mean_layers,
+                max_layers=style.layering_style.max_layers,
+                blend_mode_preference=style.layering_style.blend_mode_preference,
+            ),
+            corpus_sequence_count=style.corpus_sequence_count,
+        )
