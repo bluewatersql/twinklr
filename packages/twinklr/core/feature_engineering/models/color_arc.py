@@ -75,9 +75,7 @@ class SongColorArc(BaseModel):
     section_assignments: tuple[SectionColorAssignment, ...] = Field(
         description="Per-section color assignments."
     )
-    arc_curve: tuple[ArcKeyframe, ...] = Field(
-        description="Song-level color arc keyframes."
-    )
+    arc_curve: tuple[ArcKeyframe, ...] = Field(description="Song-level color arc keyframes.")
     transition_rules: tuple[ColorTransitionRule, ...] = Field(
         default=(), description="Palette transition rules."
     )

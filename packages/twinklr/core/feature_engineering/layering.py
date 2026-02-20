@@ -86,4 +86,3 @@ class LayeringFeatureExtractor:
                     if left.target_name == right.target_name:
                         same_target_pairs += 1
         return overlap_pairs, same_target_pairs
-

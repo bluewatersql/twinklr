@@ -81,4 +81,3 @@ class TemplateCatalog(BaseModel):
 
     templates: tuple[MinedTemplate, ...] = ()
     assignments: tuple[TemplateAssignment, ...] = ()
-

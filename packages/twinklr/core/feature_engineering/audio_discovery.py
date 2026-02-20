@@ -53,17 +53,16 @@ class AudioDiscoveryService:
 
     def __init__(self, options: AudioDiscoveryOptions | None = None) -> None:
         self._options = options or AudioDiscoveryOptions()
-        self._ext_bonus: dict[str, float] = self._build_extension_bonus(self._options.audio_extensions)
+        self._ext_bonus: dict[str, float] = self._build_extension_bonus(
+            self._options.audio_extensions
+        )
 
     @staticmethod
     def _build_extension_bonus(ordered_exts: tuple[str, ...]) -> dict[str, float]:
         if not ordered_exts:
             return {}
         max_i = max(1, len(ordered_exts) - 1)
-        return {
-            ext: 0.05 * (1.0 - (idx / max_i))
-            for idx, ext in enumerate(ordered_exts)
-        }
+        return {ext: 0.05 * (1.0 - (idx / max_i)) for idx, ext in enumerate(ordered_exts)}
 
     def discover_audio(self, context: AudioDiscoveryContext) -> AudioDiscoveryResult:
         candidates = self._collect_candidates(context)
@@ -149,7 +148,9 @@ class AudioDiscoveryService:
             }
         )
 
-    def _collect_candidates(self, context: AudioDiscoveryContext) -> list[tuple[Path, AudioCandidateOrigin]]:
+    def _collect_candidates(
+        self, context: AudioDiscoveryContext
+    ) -> list[tuple[Path, AudioCandidateOrigin]]:
         pack_candidates = self._iter_pack_candidates(context)
         music_candidates = self._iter_music_repo_candidates()
         combined = [*pack_candidates, *music_candidates]

@@ -13,7 +13,6 @@ from __future__ import annotations
 from twinklr.core.feature_engineering.models.templates import MinedTemplate, TemplateKind
 from twinklr.core.feature_engineering.promotion import PromotionPipeline
 from twinklr.core.feature_engineering.style_transfer import (
-    StyleBlendEvaluator,
     StyleWeightedRetrieval,
 )
 from twinklr.core.sequencer.display.recipe_renderer import (
@@ -41,7 +40,6 @@ from twinklr.core.sequencer.vocabulary import (
     MotionVerb,
     VisualDepth,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -120,9 +118,7 @@ def test_mined_template_to_rendered_output() -> None:
     """
     # Stage 1: Promotion pipeline
     mined_good = _make_mined_template("tpl_shimmer_001", support_count=20)
-    mined_bad = _make_mined_template(
-        "tpl_weak_002", support_count=2, cross_pack_stability=0.1
-    )
+    mined_bad = _make_mined_template("tpl_weak_002", support_count=2, cross_pack_stability=0.1)
 
     result = PromotionPipeline().run(
         candidates=[mined_good, mined_bad],
@@ -183,9 +179,7 @@ def test_multi_layer_recipe_renders_all_layers() -> None:
         visual_intent=GroupVisualIntent.ABSTRACT,
         tags=["test"],
         timing=TimingHints(bars_min=4, bars_max=16),
-        palette_spec=PaletteSpec(
-            mode=ColorMode.DICHROME, palette_roles=["primary", "accent"]
-        ),
+        palette_spec=PaletteSpec(mode=ColorMode.DICHROME, palette_roles=["primary", "accent"]),
         layers=(
             RecipeLayer(
                 layer_index=0,
@@ -206,9 +200,7 @@ def test_multi_layer_recipe_renders_all_layers() -> None:
                 effect_type="Bars",
                 blend_mode=BlendMode.ADD,
                 mix=0.7,
-                params={
-                    "BarCount": ParamValue(expr="energy * 12", min_val=4, max_val=16)
-                },
+                params={"BarCount": ParamValue(expr="energy * 12", min_val=4, max_val=16)},
                 motion=[MotionVerb.SWEEP],
                 density=0.6,
                 color_source=ColorSource.PALETTE_ACCENT,

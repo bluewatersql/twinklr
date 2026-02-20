@@ -116,9 +116,7 @@ class FeatureEngineeringWriter:
         pq.write_table(table, output_path)
         return output_path
 
-    def write_target_roles(
-        self, output_dir: Path, rows: tuple[TargetRoleAssignment, ...]
-    ) -> Path:
+    def write_target_roles(self, output_dir: Path, rows: tuple[TargetRoleAssignment, ...]) -> Path:
         """Write target-role rows as parquet when available, else JSONL."""
         output_dir.mkdir(parents=True, exist_ok=True)
         payload = [row.model_dump(mode="json") for row in rows]
@@ -174,9 +172,7 @@ class FeatureEngineeringWriter:
         pq.write_table(table, output_path)
         return output_path
 
-    def write_color_narrative(
-        self, output_root: Path, rows: tuple[ColorNarrativeRow, ...]
-    ) -> Path:
+    def write_color_narrative(self, output_root: Path, rows: tuple[ColorNarrativeRow, ...]) -> Path:
         output_root.mkdir(parents=True, exist_ok=True)
         payload = [row.model_dump(mode="json") for row in rows]
         try:
@@ -234,7 +230,9 @@ class FeatureEngineeringWriter:
         self._write_json(output_path, catalog.model_dump(mode="json"))
         return output_path
 
-    def write_cluster_review_queue(self, output_root: Path, catalog: TemplateClusterCatalog) -> Path:
+    def write_cluster_review_queue(
+        self, output_root: Path, catalog: TemplateClusterCatalog
+    ) -> Path:
         output_path = output_root / "cluster_review_queue.jsonl"
         output_root.mkdir(parents=True, exist_ok=True)
         with output_path.open("w", encoding="utf-8") as handle:
@@ -243,9 +241,7 @@ class FeatureEngineeringWriter:
                 handle.write("\n")
         return output_path
 
-    def write_learned_taxonomy_model(
-        self, output_root: Path, model: LearnedTaxonomyModel
-    ) -> Path:
+    def write_learned_taxonomy_model(self, output_root: Path, model: LearnedTaxonomyModel) -> Path:
         output_path = output_root / "taxonomy_model_bundle.json"
         self._write_json(output_path, model.model_dump(mode="json"))
         return output_path
@@ -257,16 +253,12 @@ class FeatureEngineeringWriter:
         self._write_json(output_path, report.model_dump(mode="json"))
         return output_path
 
-    def write_ann_retrieval_index(
-        self, output_root: Path, index: AnnRetrievalIndex
-    ) -> Path:
+    def write_ann_retrieval_index(self, output_root: Path, index: AnnRetrievalIndex) -> Path:
         output_path = output_root / "retrieval_ann_index.json"
         self._write_json(output_path, index.model_dump(mode="json"))
         return output_path
 
-    def write_ann_retrieval_eval(
-        self, output_root: Path, report: AnnRetrievalEvalReport
-    ) -> Path:
+    def write_ann_retrieval_eval(self, output_root: Path, report: AnnRetrievalEvalReport) -> Path:
         output_path = output_root / "retrieval_eval_report.json"
         self._write_json(output_path, report.model_dump(mode="json"))
         return output_path

@@ -49,16 +49,21 @@ class TemplateRetrievalRanker:
                     in_counts.get(edge.target_template_id, 0) + edge.edge_count
                 )
 
-        max_flow = max((in_counts.get(row.template_id, 0) + out_counts.get(row.template_id, 0)) for row in templates) if templates else 0
+        max_flow = (
+            max(
+                (in_counts.get(row.template_id, 0) + out_counts.get(row.template_id, 0))
+                for row in templates
+            )
+            if templates
+            else 0
+        )
 
         rows: list[TemplateRecommendation] = []
         for template in templates:
             transition_in_count = in_counts.get(template.template_id, 0)
             transition_out_count = out_counts.get(template.template_id, 0)
             transition_flow_count = transition_in_count + transition_out_count
-            transition_flow_norm = (
-                transition_flow_count / max_flow if max_flow > 0 else 0.0
-            )
+            transition_flow_norm = transition_flow_count / max_flow if max_flow > 0 else 0.0
             score = self._score(template, transition_flow_norm)
             rows.append(
                 TemplateRecommendation(
@@ -94,9 +99,7 @@ class TemplateRetrievalRanker:
                 item.template_id,
             )
         )
-        ranked = tuple(
-            row.model_copy(update={"rank": idx + 1}) for idx, row in enumerate(rows)
-        )
+        ranked = tuple(row.model_copy(update={"rank": idx + 1}) for idx, row in enumerate(rows))
         return TemplateRetrievalIndex(
             schema_version=self._options.schema_version,
             ranker_version=self._options.ranker_version,
@@ -147,11 +150,7 @@ class TemplateRetrievalQueryEngine:
         index: TemplateRetrievalIndex,
         query: TemplateQuery,
     ) -> tuple[TemplateRecommendation, ...]:
-        rows = [
-            row
-            for row in index.recommendations
-            if self._passes_filters(row=row, query=query)
-        ]
+        rows = [row for row in index.recommendations if self._passes_filters(row=row, query=query)]
         rows.sort(
             key=lambda row: (
                 -self._query_score(row=row, query=query),

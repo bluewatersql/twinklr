@@ -16,7 +16,6 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import sys
 from typing import Any
 
 # ---------------------------------------------------------------------------
@@ -82,10 +81,10 @@ from twinklr.core.sequencer.vocabulary import (
     VisualDepth,
 )
 
-
 # ===================================================================
 # Helpers
 # ===================================================================
+
 
 def _header(title: str) -> None:
     bar = "=" * 60
@@ -105,6 +104,7 @@ def _kv(label: str, value: Any) -> None:
 # ===================================================================
 # Synthetic data factories
 # ===================================================================
+
 
 def _make_palettes() -> tuple[NamedPalette, ...]:
     return (
@@ -174,9 +174,27 @@ def _make_propensity_index() -> PropensityIndex:
     return PropensityIndex(
         schema_version="v1.0.0",
         affinities=(
-            EffectModelAffinity(effect_family="shimmer", model_type="MegaTree", frequency=0.85, exclusivity=0.6, corpus_support=25),
-            EffectModelAffinity(effect_family="color_wash", model_type="Arch", frequency=0.62, exclusivity=0.4, corpus_support=18),
-            EffectModelAffinity(effect_family="fire", model_type="Matrix", frequency=0.78, exclusivity=0.7, corpus_support=22),
+            EffectModelAffinity(
+                effect_family="shimmer",
+                model_type="MegaTree",
+                frequency=0.85,
+                exclusivity=0.6,
+                corpus_support=25,
+            ),
+            EffectModelAffinity(
+                effect_family="color_wash",
+                model_type="Arch",
+                frequency=0.62,
+                exclusivity=0.4,
+                corpus_support=18,
+            ),
+            EffectModelAffinity(
+                effect_family="fire",
+                model_type="Matrix",
+                frequency=0.78,
+                exclusivity=0.7,
+                corpus_support=22,
+            ),
         ),
     )
 
@@ -351,6 +369,7 @@ def _make_builtin_recipes() -> list[EffectRecipe]:
 # Phase demos
 # ===================================================================
 
+
 def demo_phase1() -> dict[str, Any]:
     """Phase 1: Context Enrichment artifacts."""
     _header("Phase 1: Context Enrichment")
@@ -363,20 +382,32 @@ def demo_phase1() -> dict[str, Any]:
         _kv(f"  {p.name}", f"{p.colors} ({p.temperature})")
     _kv("Section assignments", len(arc.section_assignments))
     for a in arc.section_assignments:
-        _kv(f"  [{a.section_index}] {a.section_label}", f"palette={a.palette_id}, contrast={a.contrast_target}")
+        _kv(
+            f"  [{a.section_index}] {a.section_label}",
+            f"palette={a.palette_id}, contrast={a.contrast_target}",
+        )
     _kv("Arc keyframes", len(arc.arc_curve))
     for k in arc.arc_curve:
-        _kv(f"  {k.position_pct:.0%}", f"temp={k.temperature}, sat={k.saturation}, contrast={k.contrast}")
+        _kv(
+            f"  {k.position_pct:.0%}",
+            f"temp={k.temperature}, sat={k.saturation}, contrast={k.contrast}",
+        )
     _kv("Transition rules", len(arc.transition_rules))
     for r in arc.transition_rules:
-        _kv(f"  {r.from_palette_id} -> {r.to_palette_id}", f"{r.transition_style} ({r.duration_bars} bars)")
+        _kv(
+            f"  {r.from_palette_id} -> {r.to_palette_id}",
+            f"{r.transition_style} ({r.duration_bars} bars)",
+        )
 
     # Propensity
     _subheader("Propensity Miner")
     prop = _make_propensity_index()
     _kv("Model affinities", len(prop.affinities))
     for a in prop.affinities:
-        _kv(f"  {a.model_type}", f"family={a.effect_family}, freq={a.frequency:.2f}, excl={a.exclusivity:.2f}")
+        _kv(
+            f"  {a.model_type}",
+            f"family={a.effect_family}, freq={a.frequency:.2f}, excl={a.exclusivity:.2f}",
+        )
 
     # Style Fingerprint
     _subheader("Style Fingerprint")
@@ -384,7 +415,10 @@ def demo_phase1() -> dict[str, Any]:
     _kv("Creator", style.creator_id)
     _kv("Corpus sequences", style.corpus_sequence_count)
     _kv("Recipe preferences", dict(style.recipe_preferences))
-    _kv("Layering", f"mean={style.layering_style.mean_layers}, max={style.layering_style.max_layers}")
+    _kv(
+        "Layering",
+        f"mean={style.layering_style.mean_layers}, max={style.layering_style.max_layers}",
+    )
     _kv("Timing density", f"{style.timing_style.density_preference:.2f}")
     _kv("Color contrast pref", f"{style.color_tendencies.contrast_preference:.2f}")
 
@@ -399,7 +433,10 @@ def demo_phase2a() -> dict[str, Any]:
     mined = _make_mined_templates()
     _subheader("Input: Mined Templates")
     for t in mined:
-        _kv(f"  {t.template_id}", f"family={t.effect_family}, support={t.support_count}, stability={t.cross_pack_stability:.2f}")
+        _kv(
+            f"  {t.template_id}",
+            f"family={t.effect_family}, support={t.support_count}, stability={t.cross_pack_stability:.2f}",
+        )
 
     _subheader("Promotion Pipeline")
     result = PromotionPipeline().run(
@@ -413,9 +450,15 @@ def demo_phase2a() -> dict[str, Any]:
 
     _subheader("Promoted Recipes")
     for r in result.promoted_recipes:
-        _kv(f"  {r.recipe_id}", f"type={r.template_type.value}, layers={len(r.layers)}, source={r.provenance.source}")
+        _kv(
+            f"  {r.recipe_id}",
+            f"type={r.template_type.value}, layers={len(r.layers)}, source={r.provenance.source}",
+        )
         for layer in r.layers:
-            _kv(f"    L{layer.layer_index} {layer.layer_name}", f"{layer.effect_type} ({layer.blend_mode.value}, mix={layer.mix})")
+            _kv(
+                f"    L{layer.layer_index} {layer.layer_name}",
+                f"{layer.effect_type} ({layer.blend_mode.value}, mix={layer.mix})",
+            )
 
     _subheader("Recipe Catalog (merge builtins + promoted)")
     builtins = _make_builtin_recipes()
@@ -532,7 +575,10 @@ def demo_phase2c(catalog: RecipeCatalog | None = None) -> None:
         evolution = StyleEvolution(direction=direction, intensity=0.5)
         evo_blend = StyleBlend(base_style=style, blend_ratio=0.0, evolution_params=evolution)
         evolved = evaluator.evaluate(evo_blend)
-        _kv(f"  {direction} (0.5)", f"temp={evolved.color_tendencies.temperature_preference:.2f}, complexity-proxy=layering_mean={evolved.layering_style.mean_layers:.2f}")
+        _kv(
+            f"  {direction} (0.5)",
+            f"temp={evolved.color_tendencies.temperature_preference:.2f}, complexity-proxy=layering_mean={evolved.layering_style.mean_layers:.2f}",
+        )
 
     # Motif compatibility
     _subheader("Motif Compatibility")
@@ -550,6 +596,7 @@ def demo_phase2c(catalog: RecipeCatalog | None = None) -> None:
 # ===================================================================
 # Main
 # ===================================================================
+
 
 def main() -> None:
     parser = argparse.ArgumentParser(

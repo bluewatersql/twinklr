@@ -148,9 +148,7 @@ class TemplateDiagnosticsBuilder:
                 taxonomy_label_counts[taxonomy.labels[0].value] += 1
 
         max_sequence_count = max(sequence_counts.values()) if sequence_counts else 0
-        concentration_ratio = (
-            max_sequence_count / support_count if support_count > 0 else 0.0
-        )
+        concentration_ratio = max_sequence_count / support_count if support_count > 0 else 0.0
 
         if taxonomy_label_counts:
             dominant_label = sorted(

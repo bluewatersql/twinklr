@@ -98,7 +98,9 @@ def test_unify_groups_by_schema_version(tmp_path: Path) -> None:
     _write_profile_dir(profiles_root, "structured", structured=True)
     _write_profile_dir(profiles_root, "legacy", structured=False)
 
-    builder = ProfileCorpusBuilder(CorpusBuildOptions(write_extent_mb=256, min_parse_success_ratio=0.5))
+    builder = ProfileCorpusBuilder(
+        CorpusBuildOptions(write_extent_mb=256, min_parse_success_ratio=0.5)
+    )
     results = builder.build(profiles_root=profiles_root, output_root=output_root)
 
     assert len(results) == 2
@@ -114,7 +116,9 @@ def test_unify_writes_manifest_and_quality(tmp_path: Path) -> None:
     _write_profile_dir(profiles_root, "structured-a", structured=True)
     _write_profile_dir(profiles_root, "structured-b", structured=True)
 
-    builder = ProfileCorpusBuilder(CorpusBuildOptions(write_extent_mb=256, min_parse_success_ratio=0.95))
+    builder = ProfileCorpusBuilder(
+        CorpusBuildOptions(write_extent_mb=256, min_parse_success_ratio=0.95)
+    )
     results = builder.build(profiles_root=profiles_root, output_root=output_root)
 
     result = next(r for r in results if r.schema_version == "v0_effectdb_structured_1")
@@ -135,7 +139,9 @@ def test_unify_deterministic_jsonl_and_manifest_order(tmp_path: Path) -> None:
     _write_profile_dir(profiles_root, "b-structured", structured=True)
     _write_profile_dir(profiles_root, "a-structured", structured=True)
 
-    builder = ProfileCorpusBuilder(CorpusBuildOptions(write_extent_mb=256, min_parse_success_ratio=0.95))
+    builder = ProfileCorpusBuilder(
+        CorpusBuildOptions(write_extent_mb=256, min_parse_success_ratio=0.95)
+    )
     builder.build(profiles_root=profiles_root, output_root=output_root_a)
     builder.build(profiles_root=profiles_root, output_root=output_root_b)
 

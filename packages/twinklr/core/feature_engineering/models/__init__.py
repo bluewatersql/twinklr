@@ -1,9 +1,5 @@
 """Public feature engineering model contracts."""
 
-from twinklr.core.feature_engineering.models.alignment import (
-    AlignedEffectEvent,
-    AlignmentStatus,
-)
 from twinklr.core.feature_engineering.models.adapters import (
     GroupPlannerAdapterPayload,
     MacroPlannerAdapterPayload,
@@ -14,6 +10,10 @@ from twinklr.core.feature_engineering.models.adapters import (
     SequencerAdapterScope,
     TemplateConstraint,
     TransitionConstraint,
+)
+from twinklr.core.feature_engineering.models.alignment import (
+    AlignedEffectEvent,
+    AlignmentStatus,
 )
 from twinklr.core.feature_engineering.models.ann_retrieval import (
     AnnIndexEntry,
@@ -42,20 +42,6 @@ from twinklr.core.feature_engineering.models.color_arc import (
 )
 from twinklr.core.feature_engineering.models.color_narrative import ColorNarrativeRow
 from twinklr.core.feature_engineering.models.layering import LayeringFeatureRow
-from twinklr.core.feature_engineering.models.propensity import (
-    EffectModelAffinity,
-    EffectModelAntiAffinity,
-    PropensityIndex,
-)
-from twinklr.core.feature_engineering.models.style import (
-    ColorStyleProfile,
-    LayeringStyleProfile,
-    StyleBlend,
-    StyleEvolution,
-    StyleFingerprint,
-    TimingStyleProfile,
-    TransitionStyleProfile,
-)
 from twinklr.core.feature_engineering.models.learned_taxonomy import (
     LearnedTaxonomyEvalReport,
     LearnedTaxonomyModel,
@@ -74,6 +60,11 @@ from twinklr.core.feature_engineering.models.phrases import (
     PhraseSource,
     SpatialClass,
 )
+from twinklr.core.feature_engineering.models.propensity import (
+    EffectModelAffinity,
+    EffectModelAntiAffinity,
+    PropensityIndex,
+)
 from twinklr.core.feature_engineering.models.quality import (
     QualityCheckResult,
     QualityReport,
@@ -81,6 +72,15 @@ from twinklr.core.feature_engineering.models.quality import (
 from twinklr.core.feature_engineering.models.retrieval import (
     TemplateRecommendation,
     TemplateRetrievalIndex,
+)
+from twinklr.core.feature_engineering.models.style import (
+    ColorStyleProfile,
+    LayeringStyleProfile,
+    StyleBlend,
+    StyleEvolution,
+    StyleFingerprint,
+    TimingStyleProfile,
+    TransitionStyleProfile,
 )
 from twinklr.core.feature_engineering.models.taxonomy import (
     PhraseTaxonomyRecord,

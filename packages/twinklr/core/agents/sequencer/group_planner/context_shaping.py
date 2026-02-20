@@ -345,9 +345,12 @@ def shape_planner_context(section_context: SectionPlanningContext) -> dict[str, 
     if multilane_allowed_groups:
         # Deduplicate while preserving order
         seen: set[str] = set()
-        multilane_allowed_groups = [
-            g for g in multilane_allowed_groups if not (g in seen or seen.add(g))
-        ]
+        deduped: list[str] = []
+        for g in multilane_allowed_groups:
+            if g not in seen:
+                seen.add(g)
+                deduped.append(g)
+        multilane_allowed_groups = deduped
 
     # Calculate section duration in bars/beats
     # This tells the LLM how much space it has to work with
@@ -460,8 +463,7 @@ def _shape_recipe_catalog(section_context: SectionPlanningContext) -> dict[str, 
             "effect_types": effect_types,
             "tags": recipe.tags,
             "model_affinities": [
-                {"model_type": a.model_type, "score": a.score}
-                for a in recipe.model_affinities
+                {"model_type": a.model_type, "score": a.score} for a in recipe.model_affinities
             ],
         }
         entries.append(entry)
@@ -610,9 +612,12 @@ def shape_section_judge_context(
                     multilane_allowed_groups.extend([str(g) for g in raw if g])
     if multilane_allowed_groups:
         seen: set[str] = set()
-        multilane_allowed_groups = [
-            g for g in multilane_allowed_groups if not (g in seen or seen.add(g))
-        ]
+        deduped: list[str] = []
+        for g in multilane_allowed_groups:
+            if g not in seen:
+                seen.add(g)
+                deduped.append(g)
+        multilane_allowed_groups = deduped
 
     return {
         # Section identity

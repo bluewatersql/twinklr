@@ -523,7 +523,9 @@ class GroupPlannerOrchestrator:
                         if normalized_id == ptarget.id
                         else ptarget.model_copy(update={"id": normalized_id})
                     )
-                    normalized_placements.append(placement.model_copy(update={"target": new_target}))
+                    normalized_placements.append(
+                        placement.model_copy(update={"target": new_target})
+                    )
                 coord_plan.placements = normalized_placements
 
     def _sanitize_same_target_spacing(

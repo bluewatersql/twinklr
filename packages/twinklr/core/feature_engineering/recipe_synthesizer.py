@@ -171,8 +171,7 @@ class RecipeSynthesizer:
             recipe_id=recipe_id,
             name=f"{effect_type} {mined.motion_class.title()}",
             description=(
-                f"Synthesized from mined template {mined.template_id} "
-                f"({mined.template_signature})"
+                f"Synthesized from mined template {mined.template_id} ({mined.template_signature})"
             ),
             recipe_version=recipe_version,
             template_type=template_type,

@@ -20,7 +20,7 @@ from twinklr.core.sequencer.planning import SectionCoordinationPlan
 from twinklr.core.sequencer.templates.group.catalog import TemplateCatalog
 from twinklr.core.sequencer.templates.group.models import GroupPlacement, PlacementWindow
 from twinklr.core.sequencer.templates.group.models.choreography import ChoreographyGraph
-from twinklr.core.sequencer.templates.group.models.coordination import PlanTarget
+from twinklr.core.sequencer.templates.group.models.coordination import CoordinationPlan, PlanTarget
 from twinklr.core.sequencer.vocabulary import (
     CoordinationMode,
     EffectDuration,

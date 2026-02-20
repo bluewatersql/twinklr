@@ -264,7 +264,7 @@ def test_developer_prompt_lists_enums(jinja_env: Environment):
     # Should list key enums
     assert "LayerRole" in output or "RHYTHM" in output
     assert "EnergyTarget" in output or "LOW" in output or "HIGH" in output
-    assert "TargetRole" in output or "OUTLINE" in output
+    assert "TargetType" in output or "group" in output or "zone" in output
 
 
 def test_pack_yaml_valid():

@@ -97,9 +97,7 @@ def _role(package_id: str, sequence_file_id: str, target_name: str) -> TargetRol
 
 
 def test_template_miner_builds_content_and_orchestration_catalogs() -> None:
-    miner = TemplateMiner(
-        TemplateMinerOptions(min_instance_count=2, min_distinct_pack_count=2)
-    )
+    miner = TemplateMiner(TemplateMinerOptions(min_instance_count=2, min_distinct_pack_count=2))
     phrases = (
         _phrase(
             "phrase-1",
@@ -142,9 +140,7 @@ def test_template_miner_builds_content_and_orchestration_catalogs() -> None:
 
 
 def test_template_miner_deterministic_output() -> None:
-    miner = TemplateMiner(
-        TemplateMinerOptions(min_instance_count=2, min_distinct_pack_count=1)
-    )
+    miner = TemplateMiner(TemplateMinerOptions(min_instance_count=2, min_distinct_pack_count=1))
     phrases = (
         _phrase(
             "phrase-a",
@@ -172,4 +168,3 @@ def test_template_miner_deterministic_output() -> None:
 
     assert left[0].model_dump(mode="json") == right[0].model_dump(mode="json")
     assert left[1].model_dump(mode="json") == right[1].model_dump(mode="json")
-

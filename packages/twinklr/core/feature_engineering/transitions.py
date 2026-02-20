@@ -33,9 +33,7 @@ class TransitionModeler:
         phrases: tuple[EffectPhrase, ...],
         orchestration_catalog: TemplateCatalog,
     ) -> TransitionGraph:
-        assignment = {
-            row.phrase_id: row.template_id for row in orchestration_catalog.assignments
-        }
+        assignment = {row.phrase_id: row.template_id for row in orchestration_catalog.assignments}
         by_sequence: dict[tuple[str, str], list[EffectPhrase]] = defaultdict(list)
         for phrase in phrases:
             if phrase.phrase_id in assignment:
@@ -69,7 +67,9 @@ class TransitionModeler:
                     from_end_ms=left.end_ms,
                     to_start_ms=right.start_ms,
                     gap_ms=gap_ms,
-                    transition_type=self._classify(abs(right.layer_index - left.layer_index), gap_ms),
+                    transition_type=self._classify(
+                        abs(right.layer_index - left.layer_index), gap_ms
+                    ),
                 )
                 transitions.append(record)
                 edges[(from_template, to_template)].append(record)
@@ -87,7 +87,9 @@ class TransitionModeler:
                     mean_gap_ms=round(sum(row.gap_ms for row in rows) / len(rows), 6),
                     transition_type_distribution={
                         transition_type: distribution[transition_type]
-                        for transition_type in sorted(distribution.keys(), key=lambda item: item.value)
+                        for transition_type in sorted(
+                            distribution.keys(), key=lambda item: item.value
+                        )
                     },
                 )
             )
@@ -120,7 +122,9 @@ class TransitionModeler:
         edges: list[TransitionEdge],
     ) -> tuple[TransitionAnomaly, ...]:
         nodes = {row.template_id for row in catalog.templates}
-        active_nodes = {row.source_template_id for row in edges} | {row.target_template_id for row in edges}
+        active_nodes = {row.source_template_id for row in edges} | {
+            row.target_template_id for row in edges
+        }
         orphan_nodes = sorted(nodes - active_nodes)
 
         rows: list[TransitionAnomaly] = []

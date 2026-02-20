@@ -148,4 +148,3 @@ def test_normalization_handles_punctuation_and_case(tmp_path: Path) -> None:
     assert result.audio_status is AudioStatus.FOUND_IN_MUSIC_DIR
     assert result.audio_path is not None
     assert result.audio_path.endswith("Childrens Christmas Mix.wav")
-

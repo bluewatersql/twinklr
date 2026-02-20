@@ -120,4 +120,3 @@ def test_template_retrieval_ranker_builds_ranked_index() -> None:
     assert len(index.recommendations) == 2
     assert index.recommendations[0].rank == 1
     assert index.recommendations[0].retrieval_score >= index.recommendations[1].retrieval_score
-

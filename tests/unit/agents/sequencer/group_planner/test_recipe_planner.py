@@ -6,10 +6,6 @@ and that shape_planner_context surfaces recipe metadata for the LLM.
 
 from __future__ import annotations
 
-from typing import Any
-
-import pytest
-
 from twinklr.core.agents.sequencer.group_planner.context import SectionPlanningContext
 from twinklr.core.agents.sequencer.group_planner.context_shaping import (
     shape_planner_context,

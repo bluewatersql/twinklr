@@ -86,4 +86,3 @@ class TargetRoleAssignment(BaseModel):
     target_semantic_tags: tuple[str, ...] = ()
 
     role_binding_key: str
-

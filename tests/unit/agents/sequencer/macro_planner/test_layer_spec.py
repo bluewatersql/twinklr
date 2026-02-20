@@ -20,10 +20,10 @@ def test_target_selector_multiple_roles():
     assert len(selector.roles) == 3
 
 
-def test_target_selector_invalid_role():
-    """Invalid role in TargetSelector rejected."""
-    with pytest.raises(ValidationError, match="Invalid role"):
-        TargetSelector(roles=["INVALID_ROLE"])
+def test_target_selector_empty_string_role():
+    """Empty string role in TargetSelector rejected."""
+    with pytest.raises(ValidationError, match="empty"):
+        TargetSelector(roles=[""])
 
 
 def test_target_selector_empty_roles():

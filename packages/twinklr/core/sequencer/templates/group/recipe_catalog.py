@@ -44,10 +44,7 @@ class RecipeCatalog:
 
     def list_by_lane(self, lane: LaneKind) -> list[EffectRecipe]:
         """List all recipes compatible with the given lane."""
-        return [
-            r for r in self._recipes
-            if _TYPE_TO_LANE.get(r.template_type) == lane
-        ]
+        return [r for r in self._recipes if _TYPE_TO_LANE.get(r.template_type) == lane]
 
     @classmethod
     def merge(

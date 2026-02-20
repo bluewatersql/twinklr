@@ -86,4 +86,3 @@ def test_transition_modeler_builds_edges() -> None:
     assert graph.total_transitions == 2
     assert graph.total_edges == 2
     assert len(graph.edges) == 2
-

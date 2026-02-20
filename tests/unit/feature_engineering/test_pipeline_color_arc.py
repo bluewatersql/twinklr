@@ -2,9 +2,7 @@
 
 import json
 from pathlib import Path
-from unittest.mock import MagicMock, patch
 
-from twinklr.core.feature_engineering.models.color_arc import SongColorArc
 from twinklr.core.feature_engineering.models.color_narrative import ColorNarrativeRow
 from twinklr.core.feature_engineering.models.phrases import (
     ColorClass,

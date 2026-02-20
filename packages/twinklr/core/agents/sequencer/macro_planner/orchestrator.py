@@ -303,17 +303,16 @@ class MacroPlannerOrchestrator:
             return
 
         expected = list(sections)
-        by_bounds: dict[tuple[int, int], object] = {
-            (int(s.start_ms), int(s.end_ms)): s for s in expected
-        }
+        by_bounds = {(int(s.start_ms), int(s.end_ms)): s for s in expected}
 
         # Pass 1: exact timing match
         for section_plan in plan.section_plans:
             key = (int(section_plan.section.start_ms), int(section_plan.section.end_ms))
             match = by_bounds.get(key)
             if match is not None:
-                section_plan.section.section_id = str(match.section_id)
-                section_plan.section.name = str(match.name)
+                section_plan.section = section_plan.section.model_copy(
+                    update={"section_id": str(match.section_id), "name": str(match.name)}
+                )
 
         # Pass 2: ordered fallback when section count matches
         if len(plan.section_plans) != len(expected):
@@ -328,5 +327,9 @@ class MacroPlannerOrchestrator:
                 abs(int(plan_section.section.start_ms) - int(expected_section.start_ms)) <= 1
                 and abs(int(plan_section.section.end_ms) - int(expected_section.end_ms)) <= 1
             ):
-                plan_section.section.section_id = str(expected_section.section_id)
-                plan_section.section.name = str(expected_section.name)
+                plan_section.section = plan_section.section.model_copy(
+                    update={
+                        "section_id": str(expected_section.section_id),
+                        "name": str(expected_section.name),
+                    }
+                )

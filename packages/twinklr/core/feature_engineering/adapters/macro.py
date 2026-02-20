@@ -68,7 +68,9 @@ class MacroAdapterBuilder:
             for row in self._select_templates(recommendations=recommendations, role_allowlist=roles)
         )
         transition_constraints = (
-            self._to_transition_constraints(transition_graph) if transition_graph is not None else ()
+            self._to_transition_constraints(transition_graph)
+            if transition_graph is not None
+            else ()
         )
         role_bindings = tuple(
             RoleBindingContext(
@@ -138,7 +140,9 @@ class MacroAdapterBuilder:
                 TransitionConstraint(
                     source_template_id=edge.source_template_id,
                     target_template_id=edge.target_template_id,
-                    transition_type=self._dominant_transition_type(edge.transition_type_distribution),
+                    transition_type=self._dominant_transition_type(
+                        edge.transition_type_distribution
+                    ),
                     edge_count=edge.edge_count,
                 )
             )

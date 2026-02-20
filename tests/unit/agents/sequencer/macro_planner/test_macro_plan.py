@@ -12,6 +12,7 @@ from twinklr.core.sequencer.planning import (
     MacroSectionPlan,
     TargetSelector,
 )
+from twinklr.core.sequencer.templates.group.models import PlanTarget
 from twinklr.core.sequencer.theming import ThemeRef, ThemeScope
 from twinklr.core.sequencer.vocabulary import (
     BlendMode,
@@ -19,6 +20,7 @@ from twinklr.core.sequencer.vocabulary import (
     EnergyTarget,
     LayerRole,
     MotionDensity,
+    TargetType,
     TimingDriver,
 )
 
@@ -60,7 +62,7 @@ def _create_section_plan(
         section=_create_section_ref(section_id, name, start_ms, end_ms),
         theme=_make_section_theme(),
         energy_target=energy,
-        primary_focus_targets=["OUTLINE"],
+        primary_focus_targets=[PlanTarget(type=TargetType.GROUP, id="OUTLINE")],
         choreography_style=ChoreographyStyle.ABSTRACT,
         motion_density=MotionDensity.MED,
         notes="Test section plan notes for validation testing",

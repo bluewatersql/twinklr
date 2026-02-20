@@ -219,7 +219,9 @@ class TargetRoleAssigner:
             active_duration_ms=int(row["active_duration_ms"]),
             pixel_count=pixel_count if isinstance(pixel_count, int) else None,
             target_layout_group=(
-                str(row["target_layout_group"]) if row.get("target_layout_group") is not None else None
+                str(row["target_layout_group"])
+                if row.get("target_layout_group") is not None
+                else None
             ),
             target_category=(
                 str(row["target_category"]) if row.get("target_category") is not None else None

@@ -78,4 +78,3 @@ def test_alignment_marks_no_audio_when_features_missing() -> None:
 
     assert len(rows) == 1
     assert rows[0].alignment_status is AlignmentStatus.NO_AUDIO
-

@@ -63,7 +63,10 @@ class FeatureQualityGates:
         )
 
         conf_values = [
-            conf for row in taxonomy_rows for conf in row.label_confidences if isinstance(conf, float)
+            conf
+            for row in taxonomy_rows
+            for conf in row.label_confidences
+            if isinstance(conf, float)
         ]
         conf_mean = (sum(conf_values) / len(conf_values)) if conf_values else 0.0
         checks.append(
@@ -91,9 +94,7 @@ class FeatureQualityGates:
         unknown_effect_family_count = sum(
             1 for phrase in phrases if phrase.effect_family == "unknown"
         )
-        unknown_effect_family_ratio = (
-            unknown_effect_family_count / len(phrases) if phrases else 0.0
-        )
+        unknown_effect_family_ratio = unknown_effect_family_count / len(phrases) if phrases else 0.0
         checks.append(
             QualityCheckResult(
                 check_id="unknown_effect_family_ratio",

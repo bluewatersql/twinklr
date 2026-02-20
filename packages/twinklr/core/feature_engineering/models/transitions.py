@@ -71,4 +71,3 @@ class TransitionGraph(BaseModel):
     edges: tuple[TransitionEdge, ...] = ()
     transitions: tuple[TransitionRecord, ...] = ()
     anomalies: tuple[TransitionAnomaly, ...] = ()
-

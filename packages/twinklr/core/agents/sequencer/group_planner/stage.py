@@ -280,7 +280,12 @@ class GroupPlannerStage:
 
         # Deduplicate, preserve order
         seen: set[str] = set()
-        return [gid for gid in resolved if not (gid in seen or seen.add(gid))]
+        result: list[str] = []
+        for gid in resolved:
+            if gid not in seen:
+                seen.add(gid)
+                result.append(gid)
+        return result
 
     def _build_timing_context(
         self,

@@ -46,7 +46,8 @@ class TemplateMiner:
     ) -> tuple[TemplateCatalog, TemplateCatalog]:
         taxonomy_by_phrase = {row.phrase_id: row for row in taxonomy_rows}
         role_by_target = {
-            (row.package_id, row.sequence_file_id, row.target_name): row.role.value for row in target_roles
+            (row.package_id, row.sequence_file_id, row.target_name): row.role.value
+            for row in target_roles
         }
         total_phrase_count = len(phrases)
         total_distinct_packs = max(1, len({phrase.package_id for phrase in phrases}))
@@ -59,7 +60,9 @@ class TemplateMiner:
         for phrase in phrases:
             taxonomy = taxonomy_by_phrase.get(phrase.phrase_id)
             labels = tuple(sorted(label.value for label in (taxonomy.labels if taxonomy else ())))
-            role = role_by_target.get((phrase.package_id, phrase.sequence_file_id, phrase.target_name), "fallback")
+            role = role_by_target.get(
+                (phrase.package_id, phrase.sequence_file_id, phrase.target_name), "fallback"
+            )
 
             content_sig = self._content_signature(phrase, labels)
             orchestration_sig = self._orchestration_signature(phrase, labels, role)
@@ -140,7 +143,7 @@ class TemplateMiner:
                 round(sum(onset_values) / len(onset_values), 6) if onset_values else None
             )
 
-            taxonomy_labels = set()
+            taxonomy_labels: set[str] = set()
             for row in rows:
                 tax = taxonomy_by_phrase.get(row.phrase_id)
                 if tax is not None:
@@ -225,7 +228,9 @@ class TemplateMiner:
             if phrase.phrase_id in assignment_map
         )
         assigned_phrase_count = len(assignments)
-        coverage = round(assigned_phrase_count / total_phrase_count, 6) if total_phrase_count else 0.0
+        coverage = (
+            round(assigned_phrase_count / total_phrase_count, 6) if total_phrase_count else 0.0
+        )
 
         return TemplateCatalog(
             schema_version=self._options.schema_version,

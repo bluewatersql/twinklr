@@ -38,7 +38,9 @@ def _template(template_id: str, kind: TemplateKind, support_count: int) -> Mined
     )
 
 
-def _assignment(template_id: str, phrase_id: str, *, package_id: str, sequence_file_id: str) -> TemplateAssignment:
+def _assignment(
+    template_id: str, phrase_id: str, *, package_id: str, sequence_file_id: str
+) -> TemplateAssignment:
     return TemplateAssignment(
         package_id=package_id,
         sequence_file_id=sequence_file_id,

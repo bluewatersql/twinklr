@@ -6,8 +6,6 @@ registry through to the curve generation pipeline.
 
 from __future__ import annotations
 
-import pytest
-
 from twinklr.core.sequencer.models.enum import Intensity
 from twinklr.core.sequencer.moving_heads.handlers.movement.default import (
     DefaultMovementHandler,
@@ -136,34 +134,3 @@ class TestMovementHandlerCategoricalParams:
         assert len(result.pan_curve) > 0
 
 
-class TestDimmerHandlerCategoricalParams:
-    """Tests for dimmer handler with categorical parameters."""
-
-    def test_dimmer_handler_uses_adapters(self):
-        """Test dimmer handler uses adapters for dimmer curves."""
-        # TODO: Implement when DefaultDimmerHandler is updated
-        pytest.skip("Dimmer handler integration pending")
-
-    def test_dimmer_intensity_progression(self):
-        """Test dimmer curves respond to intensity levels."""
-        # TODO: Implement when DefaultDimmerHandler is updated
-        pytest.skip("Dimmer handler integration pending")
-
-
-class TestEndToEndPipeline:
-    """End-to-end tests for full pipeline with categorical params."""
-
-    def test_template_to_curves_with_intensity(self):
-        """Test complete pipeline from template to DMX curves."""
-        # TODO: Implement when template compiler is updated
-        pytest.skip("Pipeline integration pending")
-
-    def test_template_overrides_intensity(self):
-        """Test template can override intensity parameters."""
-        # TODO: Implement when template compiler is updated
-        pytest.skip("Template override integration pending")
-
-    def test_segment_metadata_includes_categorical_params(self):
-        """Test segment metadata stores categorical parameters."""
-        # TODO: Implement when step compiler is updated
-        pytest.skip("Metadata integration pending")

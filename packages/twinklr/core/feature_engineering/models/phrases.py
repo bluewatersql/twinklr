@@ -83,4 +83,3 @@ class EffectPhrase(BaseModel):
     onset_sync_score: float | None = Field(default=None, ge=0.0, le=1.0)
 
     param_signature: str
-

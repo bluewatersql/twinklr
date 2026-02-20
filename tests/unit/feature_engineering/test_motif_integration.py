@@ -1,5 +1,9 @@
 """Tests for motif-aware recipe compatibility scoring."""
+
 from __future__ import annotations
+
+from pydantic import ValidationError
+import pytest
 
 from twinklr.core.sequencer.templates.group.models.template import TimingHints
 from twinklr.core.sequencer.templates.group.recipe import (
@@ -83,8 +87,7 @@ def test_recipe_without_motif_compatibility() -> None:
 def test_motif_compatibility_frozen() -> None:
     """MotifCompatibility is frozen."""
     mc = MotifCompatibility(motif_id="grid", score=0.9)
-    import pytest
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         mc.score = 0.5  # type: ignore[misc]
 
 

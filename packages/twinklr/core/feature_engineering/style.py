@@ -6,7 +6,7 @@ from collections import Counter, defaultdict
 
 from twinklr.core.feature_engineering.models.color_narrative import ColorNarrativeRow
 from twinklr.core.feature_engineering.models.layering import LayeringFeatureRow
-from twinklr.core.feature_engineering.models.phrases import ColorClass, EffectPhrase
+from twinklr.core.feature_engineering.models.phrases import EffectPhrase
 from twinklr.core.feature_engineering.models.style import (
     ColorStyleProfile,
     LayeringStyleProfile,
@@ -134,8 +134,7 @@ class StyleFingerprintExtractor:
         total = sum(color_counts.values())
         if total > 0:
             palette_complexity = sum(
-                _COLOR_COMPLEXITY.get(cc, 0.5) * count / total
-                for cc, count in color_counts.items()
+                _COLOR_COMPLEXITY.get(cc, 0.5) * count / total for cc, count in color_counts.items()
             )
             temperature = sum(
                 _COLOR_TEMPERATURE.get(cc, 0.5) * count / total

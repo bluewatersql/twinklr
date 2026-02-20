@@ -46,9 +46,7 @@ def _make_phrase(target_name: str, effect_family: str, idx: int) -> EffectPhrase
 
 def test_pipeline_writes_propensity_when_enabled(tmp_path: Path) -> None:
     """When enable_propensity=True, pipeline writes propensity_index.json."""
-    phrases = tuple(
-        _make_phrase("MegaTree", "single_strand", i) for i in range(10)
-    ) + tuple(
+    phrases = tuple(_make_phrase("MegaTree", "single_strand", i) for i in range(10)) + tuple(
         _make_phrase("Arch", "bars", i + 10) for i in range(5)
     )
 

@@ -56,8 +56,7 @@ def _taxonomy(event_id: str, *labels: TaxonomyLabel) -> PhraseTaxonomyRecord:
         label_confidences=tuple(0.9 for _ in labels),
         rule_hit_keys=("hit",),
         label_scores=tuple(
-            TaxonomyLabelScore(label=label, confidence=0.9, rule_hits=("hit",))
-            for label in labels
+            TaxonomyLabelScore(label=label, confidence=0.9, rule_hits=("hit",)) for label in labels
         ),
     )
 
@@ -141,4 +140,3 @@ def test_target_roles_assigner_fallback_when_weak_signal() -> None:
     assert len(rows) == 1
     assert rows[0].role is TargetRole.FALLBACK
     assert rows[0].reason_keys == ("fallback_default",)
-

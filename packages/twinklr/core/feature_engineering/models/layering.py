@@ -22,4 +22,3 @@ class LayeringFeatureRow(BaseModel):
     overlap_pairs: int = Field(ge=0)
     same_target_overlap_pairs: int = Field(ge=0)
     collision_score: float = Field(ge=0.0, le=1.0)
-

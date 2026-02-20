@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Any
-
 import pytest
 
 from twinklr.core.agents.sequencer.group_planner.context import SectionPlanningContext
@@ -182,8 +180,9 @@ def test_prompt_renders_fe_blocks_when_populated(
     section_context_with_fe: SectionPlanningContext,
 ) -> None:
     """FE context blocks render in user prompt when fields are populated."""
-    from jinja2 import Environment, FileSystemLoader
     from pathlib import Path
+
+    from jinja2 import Environment, FileSystemLoader
 
     prompts_dir = Path(__file__).resolve().parents[5] / (
         "packages/twinklr/core/agents/sequencer/group_planner/prompts/planner"
@@ -207,8 +206,9 @@ def test_prompt_omits_fe_blocks_when_absent(
     section_context_without_fe: SectionPlanningContext,
 ) -> None:
     """FE context blocks do NOT render when fields are None."""
-    from jinja2 import Environment, FileSystemLoader
     from pathlib import Path
+
+    from jinja2 import Environment, FileSystemLoader
 
     prompts_dir = Path(__file__).resolve().parents[5] / (
         "packages/twinklr/core/agents/sequencer/group_planner/prompts/planner"

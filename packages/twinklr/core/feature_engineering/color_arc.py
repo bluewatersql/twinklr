@@ -140,7 +140,11 @@ class ColorArcExtractor:
 
     @staticmethod
     def _palette_id_for(row: ColorNarrativeRow) -> str:
-        dominant = row.dominant_color_class if row.dominant_color_class in _PALETTE_TEMPLATES else "palette"
+        dominant = (
+            row.dominant_color_class
+            if row.dominant_color_class in _PALETTE_TEMPLATES
+            else "palette"
+        )
         templates = _PALETTE_TEMPLATES[dominant]
         # Rotate through available templates by section index.
         template = templates[row.section_index % len(templates)]
@@ -154,8 +158,8 @@ class ColorArcExtractor:
                 return NamedPalette(
                     palette_id=palette_id,
                     name=str(template["name"]),
-                    colors=tuple(str(c) for c in template["colors"]),  # type: ignore[union-attr]
-                    mood_tags=tuple(str(t) for t in template["mood_tags"]),  # type: ignore[union-attr]
+                    colors=tuple(str(c) for c in template["colors"]),  # type: ignore[attr-defined]
+                    mood_tags=tuple(str(t) for t in template["mood_tags"]),  # type: ignore[attr-defined]
                     temperature=template["temperature"],  # type: ignore[arg-type]
                 )
         # Fallback — shouldn't happen with correct _palette_id_for logic.

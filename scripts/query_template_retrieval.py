@@ -40,10 +40,18 @@ def parse_args() -> argparse.Namespace:
         help="Optional template kind filter",
     )
     parser.add_argument("--role", type=str, default=None, help="Optional role filter (e.g., lead)")
-    parser.add_argument("--effect-family", type=str, default=None, help="Optional effect-family filter")
-    parser.add_argument("--motion-class", type=str, default=None, help="Optional motion-class filter")
-    parser.add_argument("--energy-class", type=str, default=None, help="Optional energy-class filter")
-    parser.add_argument("--min-base-score", type=float, default=0.0, help="Minimum base retrieval score")
+    parser.add_argument(
+        "--effect-family", type=str, default=None, help="Optional effect-family filter"
+    )
+    parser.add_argument(
+        "--motion-class", type=str, default=None, help="Optional motion-class filter"
+    )
+    parser.add_argument(
+        "--energy-class", type=str, default=None, help="Optional energy-class filter"
+    )
+    parser.add_argument(
+        "--min-base-score", type=float, default=0.0, help="Minimum base retrieval score"
+    )
     parser.add_argument(
         "--min-transition-flow",
         type=float,
@@ -117,4 +125,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

@@ -147,7 +147,8 @@ class StyleMarkers(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     complexity: float = Field(
-        ge=0.0, le=1.0,
+        ge=0.0,
+        le=1.0,
         description="Recipe complexity (0=simple, 1=complex)",
     )
     energy_affinity: EnergyTarget = Field(

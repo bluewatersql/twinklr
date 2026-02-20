@@ -111,4 +111,3 @@ def test_template_query_sorts_by_query_relevance() -> None:
     )
     assert len(rows) == 2
     assert rows[0].template_id == "t2"
-

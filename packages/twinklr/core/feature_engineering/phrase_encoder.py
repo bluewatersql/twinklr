@@ -511,7 +511,9 @@ class PhraseEncoder:
         merged = dict(base)
         for key, value in payload.items():
             if isinstance(key, str) and isinstance(value, dict):
-                merged[PhraseEncoder._normalize_effect_key(key)] = {k: str(v) for k, v in value.items()}
+                merged[PhraseEncoder._normalize_effect_key(key)] = {
+                    k: str(v) for k, v in value.items()
+                }
         return merged
 
     @staticmethod
@@ -528,7 +530,9 @@ class PhraseEncoder:
         enriched_events: list[dict[str, Any]],
     ) -> tuple[EffectPhrase, ...]:
         enriched_by_id = {
-            str(event.get("effect_event_id")): event for event in enriched_events if isinstance(event, dict)
+            str(event.get("effect_event_id")): event
+            for event in enriched_events
+            if isinstance(event, dict)
         }
         phrases: list[EffectPhrase] = []
         for row in aligned_events:
@@ -538,7 +542,9 @@ class PhraseEncoder:
             phrases.append(
                 EffectPhrase(
                     schema_version=EFFECT_PHRASES_SCHEMA_VERSION,
-                    phrase_id=str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{package_id}:{row.effect_event_id}:v1.2")),
+                    phrase_id=str(
+                        uuid.uuid5(uuid.NAMESPACE_DNS, f"{package_id}:{row.effect_event_id}:v1.2")
+                    ),
                     package_id=package_id,
                     sequence_file_id=sequence_file_id,
                     effect_event_id=row.effect_event_id,

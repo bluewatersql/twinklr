@@ -130,8 +130,7 @@ class AnnTemplateRetrievalIndexer:
                 role_hits = {
                     candidate_id
                     for candidate_id, _score in ranked[:top_k]
-                    if (getattr(rec_by_id.get(candidate_id), "role", None) or "none")
-                    == query_role
+                    if (getattr(rec_by_id.get(candidate_id), "role", None) or "none") == query_role
                 }
                 role_slice_pairs.setdefault(query_role, []).append(1.0 if role_hits else 0.0)
 

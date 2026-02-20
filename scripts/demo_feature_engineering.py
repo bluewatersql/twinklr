@@ -366,12 +366,14 @@ def _write_markdown(
             for a in assignments:
                 if not isinstance(a, dict):
                     continue
-                arc_rows.append((
-                    str(a.get("section_label", "")),
-                    str(a.get("palette_id", "")),
-                    str(a.get("shift_timing", "")),
-                    str(a.get("contrast_target", "")),
-                ))
+                arc_rows.append(
+                    (
+                        str(a.get("section_label", "")),
+                        str(a.get("palette_id", "")),
+                        str(a.get("shift_timing", "")),
+                        str(a.get("contrast_target", "")),
+                    )
+                )
             if arc_rows:
                 lines.append("")
                 lines.append(
@@ -395,13 +397,15 @@ def _write_markdown(
                 key=lambda a: (-float(a.get("frequency", 0)), str(a.get("effect_family", ""))),
             )
             for a in sorted_aff[:20]:
-                prop_rows.append((
-                    str(a.get("effect_family", "")),
-                    str(a.get("model_type", "")),
-                    str(a.get("frequency", "")),
-                    str(a.get("exclusivity", "")),
-                    str(a.get("corpus_support", "")),
-                ))
+                prop_rows.append(
+                    (
+                        str(a.get("effect_family", "")),
+                        str(a.get("model_type", "")),
+                        str(a.get("frequency", "")),
+                        str(a.get("exclusivity", "")),
+                        str(a.get("corpus_support", "")),
+                    )
+                )
             if prop_rows:
                 lines.append("")
                 lines.append(
@@ -443,7 +447,10 @@ def _write_markdown(
                 ("color.temperature_preference", str(color.get("temperature_preference", ""))),
                 ("timing.beat_alignment", str(timing.get("beat_alignment_strictness", ""))),
                 ("timing.density_preference", str(timing.get("density_preference", ""))),
-                ("timing.section_change_aggression", str(timing.get("section_change_aggression", ""))),
+                (
+                    "timing.section_change_aggression",
+                    str(timing.get("section_change_aggression", "")),
+                ),
                 ("layering.mean_layers", str(layering.get("mean_layers", ""))),
                 ("layering.max_layers", str(layering.get("max_layers", ""))),
                 ("layering.blend_mode", str(layering.get("blend_mode_preference", ""))),
@@ -782,15 +789,17 @@ def main() -> int:
         print(f"Transitions  : {len(transitions)}")
         if isinstance(assignments, list) and assignments:
             arc_rows: list[tuple[str, str, str, str]] = []
-            for a in assignments[:args.top_n]:
+            for a in assignments[: args.top_n]:
                 if not isinstance(a, dict):
                     continue
-                arc_rows.append((
-                    str(a.get("section_label", "")),
-                    str(a.get("palette_id", "")),
-                    str(a.get("shift_timing", "")),
-                    str(a.get("contrast_target", "")),
-                ))
+                arc_rows.append(
+                    (
+                        str(a.get("section_label", "")),
+                        str(a.get("palette_id", "")),
+                        str(a.get("shift_timing", "")),
+                        str(a.get("contrast_target", "")),
+                    )
+                )
             if arc_rows:
                 print(
                     _render_table(
@@ -811,14 +820,16 @@ def main() -> int:
                 [a for a in affinities if isinstance(a, dict)],
                 key=lambda a: (-float(a.get("frequency", 0)), str(a.get("effect_family", ""))),
             )
-            for a in sorted_aff[:args.top_n]:
-                prop_rows.append((
-                    str(a.get("effect_family", "")),
-                    str(a.get("model_type", "")),
-                    str(a.get("frequency", "")),
-                    str(a.get("exclusivity", "")),
-                    str(a.get("corpus_support", "")),
-                ))
+            for a in sorted_aff[: args.top_n]:
+                prop_rows.append(
+                    (
+                        str(a.get("effect_family", "")),
+                        str(a.get("model_type", "")),
+                        str(a.get("frequency", "")),
+                        str(a.get("exclusivity", "")),
+                        str(a.get("corpus_support", "")),
+                    )
+                )
             if prop_rows:
                 print(
                     _render_table(
@@ -836,9 +847,7 @@ def main() -> int:
             style_pref_rows: list[tuple[str, str]] = []
             for family, weight in sorted(recipe_prefs.items(), key=lambda x: -float(x[1])):
                 style_pref_rows.append((str(family), str(weight)))
-            print(
-                _render_table(("effect_family", "weight"), style_pref_rows)
-            )
+            print(_render_table(("effect_family", "weight"), style_pref_rows))
         transition = style_fingerprint.get("transition_style", {})
         color_t = style_fingerprint.get("color_tendencies", {})
         timing = style_fingerprint.get("timing_style", {})

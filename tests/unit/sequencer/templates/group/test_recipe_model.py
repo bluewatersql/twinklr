@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+from pydantic import ValidationError
 import pytest
 
+from twinklr.core.sequencer.templates.group.models import TimingHints
 from twinklr.core.sequencer.templates.group.recipe import (
     ColorSource,
     EffectRecipe,
@@ -23,7 +25,6 @@ from twinklr.core.sequencer.vocabulary import (
     MotionVerb,
     VisualDepth,
 )
-from twinklr.core.sequencer.templates.group.models import TimingHints
 
 
 def test_single_layer_recipe() -> None:
@@ -70,23 +71,39 @@ def test_multi_layer_recipe_candy_cane() -> None:
         palette_spec=PaletteSpec(mode=ColorMode.DICHROME, palette_roles=["primary", "accent"]),
         layers=(
             RecipeLayer(
-                layer_index=0, layer_name="Base", layer_depth=VisualDepth.BACKGROUND,
-                effect_type="ColorWash", blend_mode=BlendMode.NORMAL, mix=1.0,
-                params={}, motion=[MotionVerb.FADE], density=0.8,
+                layer_index=0,
+                layer_name="Base",
+                layer_depth=VisualDepth.BACKGROUND,
+                effect_type="ColorWash",
+                blend_mode=BlendMode.NORMAL,
+                mix=1.0,
+                params={},
+                motion=[MotionVerb.FADE],
+                density=0.8,
                 color_source=ColorSource.PALETTE_PRIMARY,
             ),
             RecipeLayer(
-                layer_index=1, layer_name="Pattern", layer_depth=VisualDepth.MIDGROUND,
-                effect_type="Bars", blend_mode=BlendMode.ADD, mix=0.7,
+                layer_index=1,
+                layer_name="Pattern",
+                layer_depth=VisualDepth.MIDGROUND,
+                effect_type="Bars",
+                blend_mode=BlendMode.ADD,
+                mix=0.7,
                 params={"BarCount": ParamValue(value=8), "Direction": ParamValue(value="Diagonal")},
-                motion=[MotionVerb.SWEEP], density=0.6,
+                motion=[MotionVerb.SWEEP],
+                density=0.6,
                 color_source=ColorSource.PALETTE_PRIMARY,
             ),
             RecipeLayer(
-                layer_index=2, layer_name="Accents", layer_depth=VisualDepth.FOREGROUND,
-                effect_type="Sparkle", blend_mode=BlendMode.SCREEN, mix=0.45,
+                layer_index=2,
+                layer_name="Accents",
+                layer_depth=VisualDepth.FOREGROUND,
+                effect_type="Sparkle",
+                blend_mode=BlendMode.SCREEN,
+                mix=0.45,
                 params={"Density": ParamValue(value=30), "Size": ParamValue(value=2)},
-                motion=[MotionVerb.SPARKLE], density=0.3,
+                motion=[MotionVerb.SPARKLE],
+                density=0.3,
                 color_source=ColorSource.WHITE_ONLY,
             ),
         ),
@@ -141,15 +158,21 @@ def test_recipe_is_frozen() -> None:
         palette_spec=PaletteSpec(mode=ColorMode.MONOCHROME, palette_roles=["primary"]),
         layers=(
             RecipeLayer(
-                layer_index=0, layer_name="Base", layer_depth=VisualDepth.BACKGROUND,
-                effect_type="On", blend_mode=BlendMode.NORMAL, mix=1.0,
-                params={}, motion=[], density=0.5,
+                layer_index=0,
+                layer_name="Base",
+                layer_depth=VisualDepth.BACKGROUND,
+                effect_type="On",
+                blend_mode=BlendMode.NORMAL,
+                mix=1.0,
+                params={},
+                motion=[],
+                density=0.5,
                 color_source=ColorSource.PALETTE_PRIMARY,
             ),
         ),
         provenance=RecipeProvenance(source="builtin"),
     )
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         recipe.name = "Changed"  # type: ignore[misc]
 
 
@@ -166,10 +189,16 @@ def test_recipe_serialization_roundtrip() -> None:
         palette_spec=PaletteSpec(mode=ColorMode.DICHROME, palette_roles=["primary", "accent"]),
         layers=(
             RecipeLayer(
-                layer_index=0, layer_name="Base", layer_depth=VisualDepth.BACKGROUND,
-                effect_type="ColorWash", blend_mode=BlendMode.NORMAL, mix=1.0,
-                params={"Speed": ParamValue(value=5)}, motion=[MotionVerb.FADE],
-                density=0.7, color_source=ColorSource.PALETTE_PRIMARY,
+                layer_index=0,
+                layer_name="Base",
+                layer_depth=VisualDepth.BACKGROUND,
+                effect_type="ColorWash",
+                blend_mode=BlendMode.NORMAL,
+                mix=1.0,
+                params={"Speed": ParamValue(value=5)},
+                motion=[MotionVerb.FADE],
+                density=0.7,
+                color_source=ColorSource.PALETTE_PRIMARY,
             ),
         ),
         provenance=RecipeProvenance(source="builtin"),

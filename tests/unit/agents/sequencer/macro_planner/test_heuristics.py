@@ -13,6 +13,7 @@ from twinklr.core.sequencer.planning import (
     MacroSectionPlan,
     TargetSelector,
 )
+from twinklr.core.sequencer.templates.group.models import PlanTarget
 from twinklr.core.sequencer.theming import ThemeRef, ThemeScope
 from twinklr.core.sequencer.vocabulary import (
     BlendMode,
@@ -20,6 +21,7 @@ from twinklr.core.sequencer.vocabulary import (
     EnergyTarget,
     LayerRole,
     MotionDensity,
+    TargetType,
     TimingDriver,
 )
 
@@ -81,7 +83,7 @@ def _make_section_plan(
         ),
         theme=_make_section_theme(),
         energy_target=energy_target,
-        primary_focus_targets=["OUTLINE"],
+        primary_focus_targets=[PlanTarget(type=TargetType.GROUP, id="OUTLINE")],
         choreography_style=choreography_style,
         motion_density=motion_density,
         notes=notes,
@@ -275,7 +277,7 @@ def test_section_coverage_complete(simple_audio_profile: AudioProfileModel):
                 section=section,
                 theme=_make_section_theme(),
                 energy_target=EnergyTarget.MED,
-                primary_focus_targets=["OUTLINE"],
+                primary_focus_targets=[PlanTarget(type=TargetType.GROUP, id="OUTLINE")],
                 choreography_style=ChoreographyStyle.ABSTRACT,
                 motion_density=MotionDensity.MED,
                 notes="Section plan matching audio section properly",
@@ -318,7 +320,7 @@ def test_section_coverage_missing_sections(simple_audio_profile: AudioProfileMod
                 section=section,
                 theme=_make_section_theme(),
                 energy_target=EnergyTarget.MED,
-                primary_focus_targets=["OUTLINE"],
+                primary_focus_targets=[PlanTarget(type=TargetType.GROUP, id="OUTLINE")],
                 choreography_style=ChoreographyStyle.ABSTRACT,
                 motion_density=MotionDensity.MED,
                 notes="Partial coverage test matching section",
@@ -373,7 +375,7 @@ def test_section_coverage_extra_sections(simple_audio_profile: AudioProfileModel
                 section=section,
                 theme=_make_section_theme(),
                 energy_target=EnergyTarget.MED,
-                primary_focus_targets=["OUTLINE"],
+                primary_focus_targets=[PlanTarget(type=TargetType.GROUP, id="OUTLINE")],
                 choreography_style=ChoreographyStyle.ABSTRACT,
                 motion_density=MotionDensity.MED,
                 notes="Valid section plan matching audio section properly",
@@ -392,7 +394,7 @@ def test_section_coverage_extra_sections(simple_audio_profile: AudioProfileModel
             ),
             theme=_make_section_theme(),
             energy_target=EnergyTarget.HIGH,
-            primary_focus_targets=["HERO"],
+            primary_focus_targets=[PlanTarget(type=TargetType.GROUP, id="HERO")],
             choreography_style=ChoreographyStyle.IMAGERY,
             motion_density=MotionDensity.BUSY,
             notes="Extra section not in audio profile for testing purposes",
@@ -490,7 +492,7 @@ def test_layer_count_optimal(simple_audio_profile: AudioProfileModel):
                 section=simple_audio_profile.structure.sections[0],
                 theme=_make_section_theme(),
                 energy_target=EnergyTarget.MED,
-                primary_focus_targets=["OUTLINE"],
+                primary_focus_targets=[PlanTarget(type=TargetType.GROUP, id="OUTLINE")],
                 choreography_style=ChoreographyStyle.ABSTRACT,
                 motion_density=MotionDensity.MED,
                 notes="Test section plan for optimal layer count",
@@ -530,7 +532,7 @@ def test_layer_count_minimal_warning(simple_audio_profile: AudioProfileModel):
                 section=simple_audio_profile.structure.sections[0],
                 theme=_make_section_theme(),
                 energy_target=EnergyTarget.LOW,
-                primary_focus_targets=["OUTLINE"],
+                primary_focus_targets=[PlanTarget(type=TargetType.GROUP, id="OUTLINE")],
                 choreography_style=ChoreographyStyle.ABSTRACT,
                 motion_density=MotionDensity.SPARSE,
                 notes="Test section plan for minimal layer count",
@@ -607,7 +609,7 @@ def test_layer_count_maximum_warning(simple_audio_profile: AudioProfileModel):
                 section=simple_audio_profile.structure.sections[0],
                 theme=_make_section_theme(),
                 energy_target=EnergyTarget.HIGH,
-                primary_focus_targets=["OUTLINE", "MEGA_TREE"],
+                primary_focus_targets=[PlanTarget(type=TargetType.GROUP, id="OUTLINE"), PlanTarget(type=TargetType.GROUP, id="MEGA_TREE")],
                 choreography_style=ChoreographyStyle.HYBRID,
                 motion_density=MotionDensity.BUSY,
                 notes="Test section plan for maximum layer count",
@@ -651,8 +653,8 @@ def test_target_validity_always_passes(simple_audio_profile: AudioProfileModel):
                 section=simple_audio_profile.structure.sections[0],
                 theme=_make_section_theme(),
                 energy_target=EnergyTarget.MED,
-                primary_focus_targets=["HERO", "ARCHES"],
-                secondary_targets=["CUSTOM"],
+                primary_focus_targets=[PlanTarget(type=TargetType.GROUP, id="HERO"), PlanTarget(type=TargetType.GROUP, id="ARCHES")],
+                secondary_targets=[PlanTarget(type=TargetType.GROUP, id="CUSTOM")],
                 choreography_style=ChoreographyStyle.ABSTRACT,
                 motion_density=MotionDensity.MED,
                 notes="Test section with valid targets for validation",
@@ -661,9 +663,9 @@ def test_target_validity_always_passes(simple_audio_profile: AudioProfileModel):
         asset_requirements=[],
     )
 
-    issues = validator._validate_target_validity(plan)
+    issues = validator._validate_target_validity(plan, display_groups=None)
 
-    # Should always be empty because Pydantic validates
+    # Should always be empty because Pydantic validates and no display_groups provided
     assert len(issues) == 0
 
 
@@ -673,7 +675,12 @@ def test_focus_target_variety_good(simple_audio_profile: AudioProfileModel):
 
     # Create plan with varied targets across sections
     section_plans = []
-    targets = [["OUTLINE"], ["MEGA_TREE"], ["HERO"], ["ARCHES"]]
+    targets = [
+        [PlanTarget(type=TargetType.GROUP, id="OUTLINE")],
+        [PlanTarget(type=TargetType.GROUP, id="MEGA_TREE")],
+        [PlanTarget(type=TargetType.GROUP, id="HERO")],
+        [PlanTarget(type=TargetType.GROUP, id="ARCHES")],
+    ]
 
     for i, section in enumerate(simple_audio_profile.structure.sections[:4]):
         section_plans.append(
@@ -725,7 +732,7 @@ def test_focus_target_overused_warning(simple_audio_profile: AudioProfileModel):
                 section=section,
                 theme=_make_section_theme(),
                 energy_target=EnergyTarget.MED,
-                primary_focus_targets=["OUTLINE"],  # Always same target
+                primary_focus_targets=[PlanTarget(type=TargetType.GROUP, id="OUTLINE")],  # Always same target
                 choreography_style=ChoreographyStyle.ABSTRACT,
                 motion_density=MotionDensity.MED,
                 notes="Section with repetitive target for overuse testing",
@@ -791,7 +798,7 @@ def test_asset_types_valid(simple_audio_profile: AudioProfileModel):
                 section=simple_audio_profile.structure.sections[0],
                 theme=_make_section_theme(),
                 energy_target=EnergyTarget.MED,
-                primary_focus_targets=["OUTLINE"],
+                primary_focus_targets=[PlanTarget(type=TargetType.GROUP, id="OUTLINE")],
                 choreography_style=ChoreographyStyle.ABSTRACT,
                 motion_density=MotionDensity.MED,
                 notes="Test section plan for valid asset types",
@@ -830,7 +837,7 @@ def test_asset_types_invalid_extension(simple_audio_profile: AudioProfileModel):
                 section=simple_audio_profile.structure.sections[0],
                 theme=_make_section_theme(),
                 energy_target=EnergyTarget.MED,
-                primary_focus_targets=["OUTLINE"],
+                primary_focus_targets=[PlanTarget(type=TargetType.GROUP, id="OUTLINE")],
                 choreography_style=ChoreographyStyle.ABSTRACT,
                 motion_density=MotionDensity.MED,
                 notes="Test section plan for invalid asset types",
@@ -878,7 +885,7 @@ def test_asset_bloat_warning(simple_audio_profile: AudioProfileModel):
                 section=simple_audio_profile.structure.sections[0],
                 theme=_make_section_theme(),
                 energy_target=EnergyTarget.MED,
-                primary_focus_targets=["OUTLINE"],
+                primary_focus_targets=[PlanTarget(type=TargetType.GROUP, id="OUTLINE")],
                 choreography_style=ChoreographyStyle.ABSTRACT,
                 motion_density=MotionDensity.MED,
                 notes="Test section plan for asset bloat warning",
@@ -921,7 +928,7 @@ def test_asset_bloat_no_warning(simple_audio_profile: AudioProfileModel):
                 section=simple_audio_profile.structure.sections[0],
                 theme=_make_section_theme(),
                 energy_target=EnergyTarget.MED,
-                primary_focus_targets=["OUTLINE"],
+                primary_focus_targets=[PlanTarget(type=TargetType.GROUP, id="OUTLINE")],
                 choreography_style=ChoreographyStyle.ABSTRACT,
                 motion_density=MotionDensity.MED,
                 notes="Test section plan for reasonable asset count",
@@ -953,7 +960,7 @@ def test_contrast_good_variety(simple_audio_profile: AudioProfileModel):
             energy_target=EnergyTarget.LOW,
             motion_density=MotionDensity.SPARSE,
             choreography_style=ChoreographyStyle.ABSTRACT,
-            primary_focus_targets=["OUTLINE"],
+            primary_focus_targets=[PlanTarget(type=TargetType.GROUP, id="OUTLINE")],
             notes="Low energy sparse section for contrast testing",
         ),
         MacroSectionPlan(
@@ -962,7 +969,7 @@ def test_contrast_good_variety(simple_audio_profile: AudioProfileModel):
             energy_target=EnergyTarget.MED,
             motion_density=MotionDensity.MED,
             choreography_style=ChoreographyStyle.IMAGERY,
-            primary_focus_targets=["MEGA_TREE"],
+            primary_focus_targets=[PlanTarget(type=TargetType.GROUP, id="MEGA_TREE")],
             notes="Medium energy medium density for contrast test",
         ),
         MacroSectionPlan(
@@ -971,7 +978,7 @@ def test_contrast_good_variety(simple_audio_profile: AudioProfileModel):
             energy_target=EnergyTarget.HIGH,
             motion_density=MotionDensity.BUSY,
             choreography_style=ChoreographyStyle.HYBRID,
-            primary_focus_targets=["HERO"],
+            primary_focus_targets=[PlanTarget(type=TargetType.GROUP, id="HERO")],
             notes="High energy busy section for contrast testing",
         ),
     ]
@@ -1015,7 +1022,7 @@ def test_contrast_no_energy_variety(simple_audio_profile: AudioProfileModel):
                 energy_target=EnergyTarget.MED,  # All same
                 motion_density=MotionDensity.MED,
                 choreography_style=ChoreographyStyle.ABSTRACT,
-                primary_focus_targets=["OUTLINE"],
+                primary_focus_targets=[PlanTarget(type=TargetType.GROUP, id="OUTLINE")],
                 notes="All medium energy for no contrast testing",
             )
         )
@@ -1062,7 +1069,7 @@ def test_contrast_no_density_variety(simple_audio_profile: AudioProfileModel):
                 energy_target=EnergyTarget.MED if i % 2 == 0 else EnergyTarget.HIGH,  # Vary energy
                 motion_density=MotionDensity.MED,  # All same density
                 choreography_style=ChoreographyStyle.ABSTRACT,
-                primary_focus_targets=["OUTLINE"],
+                primary_focus_targets=[PlanTarget(type=TargetType.GROUP, id="OUTLINE")],
                 notes="All medium density for no contrast testing",
             )
         )
@@ -1110,7 +1117,7 @@ def test_contrast_single_style_nit(simple_audio_profile: AudioProfileModel):
                 if i % 2 == 0
                 else MotionDensity.BUSY,  # Vary density
                 choreography_style=ChoreographyStyle.ABSTRACT,  # All same style
-                primary_focus_targets=["OUTLINE"],
+                primary_focus_targets=[PlanTarget(type=TargetType.GROUP, id="OUTLINE")],
                 notes="All abstract style for style variety testing",
             )
         )

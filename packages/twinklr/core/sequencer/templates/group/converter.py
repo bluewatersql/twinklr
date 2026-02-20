@@ -19,7 +19,6 @@ from twinklr.core.sequencer.templates.group.recipe import (
 )
 from twinklr.core.sequencer.vocabulary import BlendMode, ColorMode
 
-
 # Map ColorMode to a default palette_roles list
 _COLOR_MODE_ROLES: dict[ColorMode, list[str]] = {
     ColorMode.MONOCHROME: ["primary"],
@@ -95,9 +94,7 @@ def convert_builtin_to_recipe(template: GroupPlanTemplate) -> EffectRecipe:
     Returns:
         An EffectRecipe wrapping the template's layers and metadata.
     """
-    layers = tuple(
-        _convert_layer(i, layer) for i, layer in enumerate(template.layer_recipe)
-    )
+    layers = tuple(_convert_layer(i, layer) for i, layer in enumerate(template.layer_recipe))
 
     palette_spec = _derive_palette_spec(template.layer_recipe)
 

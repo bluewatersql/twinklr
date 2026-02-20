@@ -75,9 +75,8 @@ class LearnedTaxonomyInference:
 
         max_probability = max(probabilities.values()) if probabilities else 0.0
         if (
-            (not selected or max_probability < self._options.fallback_probability_threshold)
-            and self._fallback is not None
-        ):
+            not selected or max_probability < self._options.fallback_probability_threshold
+        ) and self._fallback is not None:
             fallback_row = self._fallback.classify(
                 phrases=(phrase,),
                 package_id=package_id,

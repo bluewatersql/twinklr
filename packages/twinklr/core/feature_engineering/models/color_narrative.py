@@ -21,4 +21,3 @@ class ColorNarrativeRow(BaseModel):
     dominant_color_class: str
     contrast_shift_from_prev: float = Field(ge=0.0, le=1.0)
     hue_family_movement: str
-

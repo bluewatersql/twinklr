@@ -67,4 +67,3 @@ def test_taxonomy_classifier_deterministic() -> None:
     assert [row.model_dump(mode="json") for row in left] == [
         row.model_dump(mode="json") for row in right
     ]
-

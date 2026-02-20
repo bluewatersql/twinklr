@@ -384,7 +384,7 @@ class DisplayGraph(BaseModel):
         result: list[dict[str, object]] = []
         for g in self.groups:
             summary: dict[str, object] = {
-                "id": g.id,
+                "id": g.group_id,
                 "role_key": g.role,
                 "group_type": g.element_type.value,
                 "model_count": g.fixture_count,

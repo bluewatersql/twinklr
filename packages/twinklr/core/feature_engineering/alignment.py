@@ -35,12 +35,17 @@ class TemporalAlignmentEngine:
     ) -> tuple[AlignedEffectEvent, ...]:
         sorted_events = sorted(
             events,
-            key=lambda e: (int(e.get("start_ms", 0)), int(e.get("end_ms", 0)), str(e.get("effect_event_id"))),
+            key=lambda e: (
+                int(e.get("start_ms", 0)),
+                int(e.get("end_ms", 0)),
+                str(e.get("effect_event_id")),
+            ),
         )
 
         if audio_features is None:
             return tuple(
-                self._build_no_audio_row(package_id, sequence_file_id, event) for event in sorted_events
+                self._build_no_audio_row(package_id, sequence_file_id, event)
+                for event in sorted_events
             )
 
         beats = np.asarray(audio_features.get("beats_s", []), dtype=float)
@@ -52,7 +57,9 @@ class TemporalAlignmentEngine:
         energy_values = np.asarray(energy.get("rms_norm", []), dtype=float)
 
         duration_s = float(audio_features.get("duration_s", 0.0))
-        tension_curve = np.asarray(audio_features.get("tension", {}).get("tension_curve", []), dtype=float)
+        tension_curve = np.asarray(
+            audio_features.get("tension", {}).get("tension_curve", []), dtype=float
+        )
         tension_times = (
             np.linspace(0.0, duration_s, num=len(tension_curve), endpoint=False)
             if len(tension_curve) > 0 and duration_s > 0
@@ -102,7 +109,9 @@ class TemporalAlignmentEngine:
             section_index, section_label = self._section_at_time(start_s, sections)
             local_tempo = self._tempo_at_time(start_s, tempo_curve)
             silence_before_s = max(0.0, start_s - prev_end_s)
-            silence_before_beats = silence_before_s * (local_tempo / 60.0) if local_tempo > 0.0 else 0.0
+            silence_before_beats = (
+                silence_before_s * (local_tempo / 60.0) if local_tempo > 0.0 else 0.0
+            )
 
             aligned.append(
                 AlignedEffectEvent(
@@ -145,7 +154,9 @@ class TemporalAlignmentEngine:
         chords_obj = harmonic.get("chords", {})
         if isinstance(chords_obj, dict):
             return [c for c in chords_obj.get("chords", []) if isinstance(c, dict)]
-        return [c for c in chords_obj if isinstance(c, dict)] if isinstance(chords_obj, list) else []
+        return (
+            [c for c in chords_obj if isinstance(c, dict)] if isinstance(chords_obj, list) else []
+        )
 
     @staticmethod
     def _tempo_at_time(time_s: float, tempo_curve: list[dict[str, Any]]) -> float:
@@ -182,7 +193,9 @@ class TemporalAlignmentEngine:
         return float(idx) + float(frac)
 
     @staticmethod
-    def _section_at_time(time_s: float, sections: list[dict[str, Any]]) -> tuple[int | None, str | None]:
+    def _section_at_time(
+        time_s: float, sections: list[dict[str, Any]]
+    ) -> tuple[int | None, str | None]:
         for idx, section in enumerate(sections):
             start_s = float(section.get("start_s", 0.0))
             end_s = float(section.get("end_s", start_s))

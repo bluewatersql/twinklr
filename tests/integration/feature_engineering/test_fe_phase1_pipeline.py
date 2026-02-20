@@ -9,8 +9,6 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import pytest
-
 from twinklr.core.feature_engineering.pipeline import (
     FeatureEngineeringPipeline,
     FeatureEngineeringPipelineOptions,
@@ -34,9 +32,7 @@ class _FakeAnalyzer:
                         "times_s": [0.0, 1.0, 2.0, 3.0, 4.0],
                         "rms_norm": [0.2, 0.4, 0.8, 0.6, 0.3],
                     },
-                    "tempo_analysis": {
-                        "tempo_curve": [{"time_s": 0.0, "tempo_bpm": 120.0}]
-                    },
+                    "tempo_analysis": {"tempo_curve": [{"time_s": 0.0, "tempo_bpm": 120.0}]},
                     "tension": {"tension_curve": [0.3, 0.5, 0.7, 0.6]},
                     "structure": {
                         "sections": [
@@ -185,9 +181,7 @@ def test_phase1_manifest_entries(tmp_path: Path) -> None:
     )
     pipeline.run_corpus(corpus_dir, output_root)
 
-    manifest = json.loads(
-        (output_root / "feature_store_manifest.json").read_text(encoding="utf-8")
-    )
+    manifest = json.loads((output_root / "feature_store_manifest.json").read_text(encoding="utf-8"))
     assert "color_arc" in manifest, "manifest missing color_arc entry"
     assert "propensity_index" in manifest, "manifest missing propensity_index entry"
     assert "style_fingerprint" in manifest, "manifest missing style_fingerprint entry"
@@ -224,9 +218,7 @@ def test_phase1_propensity_content(tmp_path: Path) -> None:
     )
     pipeline.run_corpus(corpus_dir, output_root)
 
-    index = json.loads(
-        (output_root / "propensity_index.json").read_text(encoding="utf-8")
-    )
+    index = json.loads((output_root / "propensity_index.json").read_text(encoding="utf-8"))
     assert "affinities" in index
     assert isinstance(index["affinities"], list)
     # Each affinity should have required fields
@@ -248,9 +240,7 @@ def test_phase1_style_fingerprint_content(tmp_path: Path) -> None:
     )
     pipeline.run_corpus(corpus_dir, output_root)
 
-    fp = json.loads(
-        (output_root / "style_fingerprint.json").read_text(encoding="utf-8")
-    )
+    fp = json.loads((output_root / "style_fingerprint.json").read_text(encoding="utf-8"))
     assert "creator_id" in fp
     assert "recipe_preferences" in fp
     assert "transition_style" in fp
@@ -278,9 +268,7 @@ def test_phase1_disabled_stages_omit_artifacts(tmp_path: Path) -> None:
     assert not (output_root / "propensity_index.json").exists()
     assert not (output_root / "style_fingerprint.json").exists()
 
-    manifest = json.loads(
-        (output_root / "feature_store_manifest.json").read_text(encoding="utf-8")
-    )
+    manifest = json.loads((output_root / "feature_store_manifest.json").read_text(encoding="utf-8"))
     assert "color_arc" not in manifest
     assert "propensity_index" not in manifest
     assert "style_fingerprint" not in manifest

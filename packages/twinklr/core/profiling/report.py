@@ -178,9 +178,7 @@ def generate_layout_report_md(layout_profile: LayoutProfile) -> str:
         write("## Settings (Top 20)")
         setting_rows = [
             (key, str(value).replace("\n", " "))
-            for key, value in sorted(layout_profile.settings.items(), key=lambda item: item[0])[
-                :20
-            ]
+            for key, value in sorted(layout_profile.settings.items(), key=lambda item: item[0])[:20]
         ]
         _write_key_value_table(lines, setting_rows, headers=("Setting", "Value"))
         write("")

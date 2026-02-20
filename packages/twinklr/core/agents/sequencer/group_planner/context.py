@@ -261,7 +261,7 @@ class GroupPlanningContext(BaseModel):
             else:
                 ttype = getattr(target, "type", None)
                 tid = getattr(target, "id", None)
-                if hasattr(ttype, "value"):
+                if ttype is not None and hasattr(ttype, "value"):
                     ttype = ttype.value
             if not ttype or not tid:
                 continue
@@ -280,4 +280,9 @@ class GroupPlanningContext(BaseModel):
                         break
 
         seen: set[str] = set()
-        return [gid for gid in resolved if not (gid in seen or seen.add(gid))]
+        result: list[str] = []
+        for gid in resolved:
+            if gid not in seen:
+                seen.add(gid)
+                result.append(gid)
+        return result

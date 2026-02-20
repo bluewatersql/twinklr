@@ -153,4 +153,3 @@ class TaxonomyClassifier:
                 elif actual != allowed:
                     return False
         return True
-

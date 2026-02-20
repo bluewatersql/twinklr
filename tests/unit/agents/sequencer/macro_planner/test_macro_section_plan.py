@@ -1,12 +1,13 @@
 """Tests for MacroSectionPlan model."""
 
-from pydantic import ValidationError
 import pytest
+from pydantic import ValidationError
 
 from twinklr.core.agents.audio.profile.models import SongSectionRef
 from twinklr.core.sequencer.planning import MacroSectionPlan
+from twinklr.core.sequencer.templates.group.models import PlanTarget
 from twinklr.core.sequencer.theming import ThemeRef, ThemeScope
-from twinklr.core.sequencer.vocabulary import ChoreographyStyle, EnergyTarget, MotionDensity
+from twinklr.core.sequencer.vocabulary import ChoreographyStyle, EnergyTarget, MotionDensity, TargetType
 
 
 def _make_section_theme() -> ThemeRef:
@@ -18,6 +19,11 @@ def _make_section_theme() -> ThemeRef:
     )
 
 
+def _target(group_id: str) -> PlanTarget:
+    """Shorthand: create a GROUP PlanTarget."""
+    return PlanTarget(type=TargetType.GROUP, id=group_id)
+
+
 def test_macro_section_plan_valid():
     """Valid MacroSectionPlan passes."""
     plan = MacroSectionPlan(
@@ -26,7 +32,7 @@ def test_macro_section_plan_valid():
         ),
         theme=_make_section_theme(),
         energy_target=EnergyTarget.HIGH,
-        primary_focus_targets=["OUTLINE", "MEGA_TREE"],
+        primary_focus_targets=[_target("OUTLINE"), _target("MEGA_TREE")],
         choreography_style=ChoreographyStyle.IMAGERY,
         motion_density=MotionDensity.BUSY,
         notes="Big chorus, full display synchronized for maximum impact",
@@ -36,15 +42,16 @@ def test_macro_section_plan_valid():
     assert plan.motion_density == MotionDensity.BUSY
 
 
-def test_invalid_target_role():
-    """Invalid target role rejected."""
-    with pytest.raises(ValidationError, match="Invalid target role"):
+def test_duplicate_focus_target():
+    """Duplicate focus target rejected."""
+    with pytest.raises(ValidationError, match="Duplicate focus target"):
         MacroSectionPlan(
             section=SongSectionRef(
                 section_id="verse1", name="Verse 1", start_ms=10000, end_ms=25000
             ),
+            theme=_make_section_theme(),
             energy_target=EnergyTarget.MED,
-            primary_focus_targets=["INVALID_ROLE"],
+            primary_focus_targets=[_target("OUTLINE"), _target("OUTLINE")],
             choreography_style=ChoreographyStyle.ABSTRACT,
             motion_density=MotionDensity.MED,
             notes="Test notes that are long enough for validation",
@@ -58,6 +65,7 @@ def test_zero_focus_targets():
             section=SongSectionRef(
                 section_id="verse1", name="Verse 1", start_ms=10000, end_ms=25000
             ),
+            theme=_make_section_theme(),
             energy_target=EnergyTarget.MED,
             primary_focus_targets=[],
             choreography_style=ChoreographyStyle.ABSTRACT,
@@ -66,16 +74,17 @@ def test_zero_focus_targets():
         )
 
 
-def test_invalid_secondary_target():
-    """Invalid secondary target role rejected."""
-    with pytest.raises(ValidationError, match="Invalid target role"):
+def test_duplicate_secondary_target():
+    """Duplicate secondary target rejected."""
+    with pytest.raises(ValidationError, match="Duplicate focus target"):
         MacroSectionPlan(
             section=SongSectionRef(
                 section_id="verse1", name="Verse 1", start_ms=10000, end_ms=25000
             ),
+            theme=_make_section_theme(),
             energy_target=EnergyTarget.MED,
-            primary_focus_targets=["OUTLINE"],
-            secondary_targets=["INVALID_SECONDARY"],
+            primary_focus_targets=[_target("OUTLINE")],
+            secondary_targets=[_target("ARCHES"), _target("ARCHES")],
             choreography_style=ChoreographyStyle.ABSTRACT,
             motion_density=MotionDensity.MED,
             notes="Test notes that are long enough for validation",
@@ -89,8 +98,9 @@ def test_notes_too_short():
             section=SongSectionRef(
                 section_id="verse1", name="Verse 1", start_ms=10000, end_ms=25000
             ),
+            theme=_make_section_theme(),
             energy_target=EnergyTarget.MED,
-            primary_focus_targets=["OUTLINE"],
+            primary_focus_targets=[_target("OUTLINE")],
             choreography_style=ChoreographyStyle.ABSTRACT,
             motion_density=MotionDensity.MED,
             notes="Short",
@@ -103,7 +113,7 @@ def test_secondary_targets_optional():
         section=SongSectionRef(section_id="intro", name="Intro", start_ms=0, end_ms=10000),
         theme=_make_section_theme(),
         energy_target=EnergyTarget.LOW,
-        primary_focus_targets=["OUTLINE"],
+        primary_focus_targets=[_target("OUTLINE")],
         choreography_style=ChoreographyStyle.ABSTRACT,
         motion_density=MotionDensity.SPARSE,
         notes="Simple intro with outline only, building anticipation",
@@ -119,8 +129,8 @@ def test_macro_section_plan_with_secondary():
         ),
         theme=_make_section_theme(),
         energy_target=EnergyTarget.PEAK,
-        primary_focus_targets=["MEGA_TREE", "OUTLINE"],
-        secondary_targets=["CUSTOM", "FLOODS"],
+        primary_focus_targets=[_target("MEGA_TREE"), _target("OUTLINE")],
+        secondary_targets=[_target("CUSTOM"), _target("FLOODS")],
         choreography_style=ChoreographyStyle.HYBRID,
         motion_density=MotionDensity.BUSY,
         notes="Peak moment with all elements engaged for maximum wow factor",
@@ -135,8 +145,8 @@ def test_macro_section_plan_serialization():
         section=SongSectionRef(section_id="bridge", name="Bridge", start_ms=90000, end_ms=105000),
         theme=_make_section_theme(),
         energy_target=EnergyTarget.BUILD,
-        primary_focus_targets=["HERO"],
-        secondary_targets=["ARCHES"],
+        primary_focus_targets=[_target("HERO")],
+        secondary_targets=[_target("ARCHES")],
         choreography_style=ChoreographyStyle.IMAGERY,
         motion_density=MotionDensity.MED,
         notes="Building energy through bridge with hero element leading the charge",

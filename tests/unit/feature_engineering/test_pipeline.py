@@ -109,22 +109,18 @@ def test_pipeline_run_profile_writes_artifacts(tmp_path: Path) -> None:
     assert len(analyzer.calls) == 2
     assert (output_dir / "audio_discovery.json").exists()
     assert (output_dir / "feature_bundle.json").exists()
-    assert (
-        (output_dir / "aligned_events.parquet").exists()
-        or (output_dir / "aligned_events.jsonl").exists()
-    )
-    assert (
-        (output_dir / "effect_phrases.parquet").exists()
-        or (output_dir / "effect_phrases.jsonl").exists()
-    )
-    assert (
-        (output_dir / "phrase_taxonomy.parquet").exists()
-        or (output_dir / "phrase_taxonomy.jsonl").exists()
-    )
-    assert (
-        (output_dir / "target_roles.parquet").exists()
-        or (output_dir / "target_roles.jsonl").exists()
-    )
+    assert (output_dir / "aligned_events.parquet").exists() or (
+        output_dir / "aligned_events.jsonl"
+    ).exists()
+    assert (output_dir / "effect_phrases.parquet").exists() or (
+        output_dir / "effect_phrases.jsonl"
+    ).exists()
+    assert (output_dir / "phrase_taxonomy.parquet").exists() or (
+        output_dir / "phrase_taxonomy.jsonl"
+    ).exists()
+    assert (output_dir / "target_roles.parquet").exists() or (
+        output_dir / "target_roles.jsonl"
+    ).exists()
 
 
 def test_pipeline_run_profile_degraded_when_analyzer_fails(tmp_path: Path) -> None:
@@ -194,14 +190,12 @@ def test_pipeline_run_corpus_iterates_sequence_index(tmp_path: Path) -> None:
     assert (output_root / "content_templates.json").exists()
     assert (output_root / "orchestration_templates.json").exists()
     assert (output_root / "transition_graph.json").exists()
-    assert (
-        (output_root / "layering_features.parquet").exists()
-        or (output_root / "layering_features.jsonl").exists()
-    )
-    assert (
-        (output_root / "color_narrative.parquet").exists()
-        or (output_root / "color_narrative.jsonl").exists()
-    )
+    assert (output_root / "layering_features.parquet").exists() or (
+        output_root / "layering_features.jsonl"
+    ).exists()
+    assert (output_root / "color_narrative.parquet").exists() or (
+        output_root / "color_narrative.jsonl"
+    ).exists()
     assert (output_root / "quality_report.json").exists()
     assert (output_root / "unknown_diagnostics.json").exists()
     assert (output_root / "template_retrieval_index.json").exists()
@@ -231,7 +225,9 @@ def test_pipeline_run_corpus_iterates_sequence_index(tmp_path: Path) -> None:
     assert "planner_adapter_payloads" in manifest
     assert "planner_adapter_acceptance" in manifest
 
-    acceptance = json.loads((output_root / "planner_adapter_acceptance.json").read_text(encoding="utf-8"))
+    acceptance = json.loads(
+        (output_root / "planner_adapter_acceptance.json").read_text(encoding="utf-8")
+    )
     assert acceptance["planner_change_mode_enforced"] is True
     assert acceptance["planner_runtime_changes_applied"] is False
 

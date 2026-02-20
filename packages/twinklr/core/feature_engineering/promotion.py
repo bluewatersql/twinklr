@@ -7,7 +7,7 @@ with provenance tracking and quality reporting.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 from twinklr.core.feature_engineering.models.templates import MinedTemplate

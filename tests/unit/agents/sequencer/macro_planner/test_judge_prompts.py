@@ -16,6 +16,7 @@ from twinklr.core.sequencer.planning import (
     MacroSectionPlan,
     TargetSelector,
 )
+from twinklr.core.sequencer.templates.group.models import PlanTarget
 from twinklr.core.sequencer.theming import ThemeRef, ThemeScope
 from twinklr.core.sequencer.vocabulary import (
     BlendMode,
@@ -24,6 +25,7 @@ from twinklr.core.sequencer.vocabulary import (
     LayerRole,
     MotionDensity,
     TargetRole,
+    TargetType,
     TimingDriver,
 )
 
@@ -129,8 +131,8 @@ def valid_macro_plan(audio_profile: AudioProfileModel) -> MacroPlan:
                 energy_target=EnergyTarget.LOW if i == 0 else EnergyTarget.HIGH,
                 motion_density=MotionDensity.SPARSE if i == 0 else MotionDensity.BUSY,
                 choreography_style=ChoreographyStyle.ABSTRACT,
-                primary_focus_targets=[TargetRole.OUTLINE.value],
-                secondary_targets=[TargetRole.MEGA_TREE.value],
+                primary_focus_targets=[PlanTarget(type=TargetType.GROUP, id=TargetRole.OUTLINE.value)],
+                secondary_targets=[PlanTarget(type=TargetType.GROUP, id=TargetRole.MEGA_TREE.value)],
                 notes="This section should emphasize serene twinkling patterns with minimal motion for maximum impact.",
             )
             for i, sec in enumerate(sections)

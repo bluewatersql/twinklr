@@ -51,4 +51,3 @@ def test_layering_feature_extractor_outputs_metrics() -> None:
     assert row.max_concurrent_layers >= 1
     assert row.overlap_pairs >= 1
     assert row.same_target_overlap_pairs >= 1
-

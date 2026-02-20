@@ -26,8 +26,6 @@ from twinklr.core.feature_engineering.clustering import (
 )
 from twinklr.core.feature_engineering.color_arc import ColorArcExtractor
 from twinklr.core.feature_engineering.color_narrative import ColorNarrativeExtractor
-from twinklr.core.feature_engineering.propensity import PropensityMiner
-from twinklr.core.feature_engineering.style import StyleFingerprintExtractor
 from twinklr.core.feature_engineering.constants import FEATURE_BUNDLE_SCHEMA_VERSION
 from twinklr.core.feature_engineering.datasets.quality import (
     FeatureQualityGates,
@@ -38,7 +36,6 @@ from twinklr.core.feature_engineering.layering import LayeringFeatureExtractor
 from twinklr.core.feature_engineering.models import (
     AlignedEffectEvent,
     ColorNarrativeRow,
-    SongColorArc,
     EffectPhrase,
     FeatureBundle,
     LayeringFeatureRow,
@@ -46,7 +43,6 @@ from twinklr.core.feature_engineering.models import (
     PlannerChangeMode,
     QualityReport,
     SequencerAdapterBundle,
-    StyleFingerprint,
     TargetRoleAssignment,
     TemplateCatalog,
     TemplateRetrievalIndex,
@@ -54,7 +50,9 @@ from twinklr.core.feature_engineering.models import (
 )
 from twinklr.core.feature_engineering.motifs import MotifMiner, MotifMinerOptions
 from twinklr.core.feature_engineering.phrase_encoder import PhraseEncoder
+from twinklr.core.feature_engineering.propensity import PropensityMiner
 from twinklr.core.feature_engineering.retrieval import TemplateRetrievalRanker
+from twinklr.core.feature_engineering.style import StyleFingerprintExtractor
 from twinklr.core.feature_engineering.taxonomy import (
     LearnedTaxonomyTrainer,
     LearnedTaxonomyTrainerOptions,
@@ -780,7 +778,9 @@ class FeatureEngineeringPipeline:
         by_motion_family: dict[str, list[EffectPhrase]] = {}
         for row in unknown_motion_rows:
             by_motion_family.setdefault(row.effect_family, []).append(row)
-        for family, rows in sorted(by_motion_family.items(), key=lambda item: (-len(item[1]), item[0]))[:25]:
+        for family, rows in sorted(
+            by_motion_family.items(), key=lambda item: (-len(item[1]), item[0])
+        )[:25]:
             unknown_motion_by_effect_family.append(
                 {
                     "effect_family": family,

@@ -51,4 +51,3 @@ def test_color_narrative_extractor_outputs_section_rows() -> None:
     assert rows[0].section_label == "intro"
     assert rows[1].section_label == "verse"
     assert rows[1].contrast_shift_from_prev >= 0.0
-

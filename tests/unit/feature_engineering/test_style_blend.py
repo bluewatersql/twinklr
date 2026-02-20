@@ -241,10 +241,12 @@ def test_blend_used_for_retrieval() -> None:
     evaluator = StyleBlendEvaluator()
     blended = evaluator.evaluate(blend)
 
-    catalog = RecipeCatalog(recipes=[
-        _make_recipe(recipe_id="r1", effect_type="ColorWash", density=0.5),
-        _make_recipe(recipe_id="r2", effect_type="Sparkles", density=0.8),
-    ])
+    catalog = RecipeCatalog(
+        recipes=[
+            _make_recipe(recipe_id="r1", effect_type="ColorWash", density=0.5),
+            _make_recipe(recipe_id="r2", effect_type="Sparkles", density=0.8),
+        ]
+    )
     retrieval = StyleWeightedRetrieval()
     results = retrieval.rank(catalog, blended)
     assert len(results) == 2

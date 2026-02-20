@@ -1,6 +1,5 @@
 """Tests for PropensityMiner."""
 
-from twinklr.core.feature_engineering.models.propensity import PropensityIndex
 from twinklr.core.feature_engineering.models.phrases import (
     ColorClass,
     ContinuityClass,
@@ -10,6 +9,7 @@ from twinklr.core.feature_engineering.models.phrases import (
     PhraseSource,
     SpatialClass,
 )
+from twinklr.core.feature_engineering.models.propensity import PropensityIndex
 from twinklr.core.feature_engineering.propensity import PropensityMiner
 
 
@@ -48,10 +48,7 @@ def test_mine_produces_propensity_index() -> None:
     phrases = tuple(
         _make_phrase(effect_family="single_strand", target_name="MegaTree", idx=i)
         for i in range(10)
-    ) + tuple(
-        _make_phrase(effect_family="bars", target_name="Arch", idx=i + 10)
-        for i in range(5)
-    )
+    ) + tuple(_make_phrase(effect_family="bars", target_name="Arch", idx=i + 10) for i in range(5))
     result = PropensityMiner().mine(phrases=phrases)
     assert isinstance(result, PropensityIndex)
     assert len(result.affinities) >= 1
@@ -65,7 +62,8 @@ def test_high_frequency_affinity() -> None:
     )
     result = PropensityMiner().mine(phrases=phrases)
     megatree_aff = [
-        a for a in result.affinities
+        a
+        for a in result.affinities
         if a.model_type == "megatree" and a.effect_family == "single_strand"
     ]
     assert len(megatree_aff) == 1
@@ -76,8 +74,7 @@ def test_anti_affinity_for_absent_pair() -> None:
     # bars only on Arch, never on MegaTree. If we have enough diversity,
     # bars+megatree should be anti-affinity.
     phrases = tuple(
-        _make_phrase(effect_family="bars", target_name="Arch", idx=i)
-        for i in range(15)
+        _make_phrase(effect_family="bars", target_name="Arch", idx=i) for i in range(15)
     ) + tuple(
         _make_phrase(effect_family="single_strand", target_name="MegaTree", idx=i + 15)
         for i in range(15)
@@ -85,8 +82,7 @@ def test_anti_affinity_for_absent_pair() -> None:
     result = PropensityMiner().mine(phrases=phrases)
     # bars should have affinity with arch, not megatree
     bars_arch = [
-        a for a in result.affinities
-        if a.model_type == "arch" and a.effect_family == "bars"
+        a for a in result.affinities if a.model_type == "arch" and a.effect_family == "bars"
     ]
     assert len(bars_arch) == 1
     assert bars_arch[0].frequency >= 0.8

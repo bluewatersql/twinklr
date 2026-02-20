@@ -13,9 +13,7 @@ class TransitionStyleProfile(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     preferred_gap_ms: float = Field(ge=0.0, description="Preferred gap between effects in ms.")
-    overlap_tendency: float = Field(
-        ge=0.0, le=1.0, description="0=sharp cuts, 1=heavy overlaps."
-    )
+    overlap_tendency: float = Field(ge=0.0, le=1.0, description="0=sharp cuts, 1=heavy overlaps.")
     variety_score: float = Field(
         ge=0.0, le=1.0, description="0=repetitive transitions, 1=highly varied."
     )
@@ -26,15 +24,11 @@ class ColorStyleProfile(BaseModel):
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
-    palette_complexity: float = Field(
-        ge=0.0, le=1.0, description="0=monochrome, 1=full spectrum."
-    )
+    palette_complexity: float = Field(ge=0.0, le=1.0, description="0=monochrome, 1=full spectrum.")
     contrast_preference: float = Field(
         ge=0.0, le=1.0, description="Preferred contrast level between sections."
     )
-    temperature_preference: float = Field(
-        ge=0.0, le=1.0, description="0=cool tones, 1=warm tones."
-    )
+    temperature_preference: float = Field(ge=0.0, le=1.0, description="0=cool tones, 1=warm tones.")
 
 
 class TimingStyleProfile(BaseModel):
@@ -45,9 +39,7 @@ class TimingStyleProfile(BaseModel):
     beat_alignment_strictness: float = Field(
         ge=0.0, le=1.0, description="How strictly effects align to beats."
     )
-    density_preference: float = Field(
-        ge=0.0, le=1.0, description="0=sparse, 1=busy."
-    )
+    density_preference: float = Field(ge=0.0, le=1.0, description="0=sparse, 1=busy.")
     section_change_aggression: float = Field(
         ge=0.0, le=1.0, description="0=subtle section changes, 1=dramatic."
     )
@@ -109,9 +101,7 @@ class StyleBlend(BaseModel):
     accent_style: StyleFingerprint | None = Field(
         default=None, description="Secondary style to mix in."
     )
-    blend_ratio: float = Field(
-        ge=0.0, le=1.0, description="0.0=pure base, 1.0=pure accent."
-    )
+    blend_ratio: float = Field(ge=0.0, le=1.0, description="0.0=pure base, 1.0=pure accent.")
     evolution_params: StyleEvolution | None = Field(
         default=None, description="Optional directional evolution."
     )

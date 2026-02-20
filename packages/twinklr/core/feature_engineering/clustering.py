@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 import uuid
+from collections.abc import Mapping
 from dataclasses import dataclass
 
 from twinklr.core.feature_engineering.models.clustering import (
@@ -39,7 +40,8 @@ class TemplateClusterer:
     ) -> TemplateClusterCatalog:
         templates = tuple(content_catalog.templates) + tuple(orchestration_catalog.templates)
         retrieval_by_id = {
-            row.template_id: row for row in (retrieval_index.recommendations if retrieval_index else ())
+            row.template_id: row
+            for row in (retrieval_index.recommendations if retrieval_index else ())
         }
 
         template_by_id = {row.template_id: row for row in templates}
@@ -72,7 +74,9 @@ class TemplateClusterer:
             effect_counts: dict[str, int] = {}
             for row in ordered:
                 effect_counts[row.effect_family] = effect_counts.get(row.effect_family, 0) + 1
-            dominant_effect = sorted(effect_counts.items(), key=lambda item: (-item[1], item[0]))[0][0]
+            dominant_effect = sorted(effect_counts.items(), key=lambda item: (-item[1], item[0]))[
+                0
+            ][0]
 
             candidate = TemplateClusterCandidate(
                 cluster_id=cluster_id,
@@ -168,7 +172,7 @@ class TemplateClusterer:
     def _vectorize(
         self,
         template: MinedTemplate,
-        retrieval_by_id: dict[str, object],
+        retrieval_by_id: Mapping[str, object],
     ) -> tuple[float, ...]:
         retrieval = retrieval_by_id.get(template.template_id)
         retrieval_score = float(getattr(retrieval, "retrieval_score", 0.0))

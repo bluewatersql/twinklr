@@ -2,6 +2,11 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from twinklr.core.sequencer.templates.group.recipe import StyleMarkers
+
 from twinklr.core.feature_engineering.models.style import (
     ColorStyleProfile,
     LayeringStyleProfile,
@@ -20,13 +25,11 @@ from twinklr.core.sequencer.templates.group.recipe import (
     PaletteSpec,
     RecipeLayer,
     RecipeProvenance,
-    StyleMarkers,
 )
 from twinklr.core.sequencer.templates.group.recipe_catalog import RecipeCatalog
 from twinklr.core.sequencer.vocabulary import (
     BlendMode,
     ColorMode,
-    EnergyTarget,
     GroupTemplateType,
     GroupVisualIntent,
     MotionVerb,
@@ -150,9 +153,10 @@ class TestStyleWeightedRetrieval:
         result = retrieval.rank(catalog, style)
         scored_by_id = {sr.recipe.recipe_id: sr for sr in result}
 
-        assert scored_by_id["preferred"].breakdown["effect_family"] > scored_by_id[
-            "other"
-        ].breakdown["effect_family"]
+        assert (
+            scored_by_id["preferred"].breakdown["effect_family"]
+            > scored_by_id["other"].breakdown["effect_family"]
+        )
 
     def test_layering_match_scoring(self) -> None:
         """Recipe with layer count matching style preference should score higher."""
@@ -165,9 +169,10 @@ class TestStyleWeightedRetrieval:
         result = retrieval.rank(catalog, style)
         scored_by_id = {sr.recipe.recipe_id: sr for sr in result}
 
-        assert scored_by_id["match"].breakdown["layering"] > scored_by_id[
-            "mismatch"
-        ].breakdown["layering"]
+        assert (
+            scored_by_id["match"].breakdown["layering"]
+            > scored_by_id["mismatch"].breakdown["layering"]
+        )
 
     def test_density_match_scoring(self) -> None:
         """Recipe density close to style preference should score higher."""
@@ -180,9 +185,7 @@ class TestStyleWeightedRetrieval:
         result = retrieval.rank(catalog, style)
         scored_by_id = {sr.recipe.recipe_id: sr for sr in result}
 
-        assert scored_by_id["good"].breakdown["density"] > scored_by_id["bad"].breakdown[
-            "density"
-        ]
+        assert scored_by_id["good"].breakdown["density"] > scored_by_id["bad"].breakdown["density"]
 
     def test_score_breakdown_has_all_dimensions(self) -> None:
         """Breakdown dict should have all 4 scoring dimension keys."""

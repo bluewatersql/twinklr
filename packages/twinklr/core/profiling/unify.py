@@ -113,7 +113,9 @@ class ProfileCorpusBuilder:
 
     @staticmethod
     def _write_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
-        sorted_rows = sorted(rows, key=lambda row: json.dumps(row, sort_keys=True, ensure_ascii=False))
+        sorted_rows = sorted(
+            rows, key=lambda row: json.dumps(row, sort_keys=True, ensure_ascii=False)
+        )
         with path.open("w", encoding="utf-8") as f:
             for row in sorted_rows:
                 f.write(json.dumps(row, ensure_ascii=False))

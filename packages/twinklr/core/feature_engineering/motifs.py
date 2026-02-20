@@ -98,17 +98,15 @@ class MotifMiner:
 
         motifs: list[MinedMotif] = []
         for signature in sorted(signatures):
-            rows = signatures[signature]
-            if len(rows) < self._options.min_support_count:
+            sig_rows = signatures[signature]
+            if len(sig_rows) < self._options.min_support_count:
                 continue
 
-            occurrences = [row[0] for row in rows]
-            template_ids = sorted({item for row in rows for item in row[1]})
-            taxonomy_labels = sorted({item for row in rows for item in row[2]})
+            occurrences = [row[0] for row in sig_rows]
+            motif_template_ids: list[str] = sorted({item for row in sig_rows for item in row[1]})
+            motif_taxonomy_labels: list[str] = sorted({item for row in sig_rows for item in row[2]})
             distinct_packs = {(row.package_id) for row in occurrences}
-            distinct_sequences = {
-                (row.package_id, row.sequence_file_id) for row in occurrences
-            }
+            distinct_sequences = {(row.package_id, row.sequence_file_id) for row in occurrences}
             if len(distinct_packs) < self._options.min_distinct_pack_count:
                 continue
             if len(distinct_sequences) < self._options.min_distinct_sequence_count:
@@ -129,8 +127,8 @@ class MotifMiner:
                     support_count=len(occurrences),
                     distinct_pack_count=len(distinct_packs),
                     distinct_sequence_count=len(distinct_sequences),
-                    template_ids=tuple(template_ids),
-                    taxonomy_labels=tuple(taxonomy_labels),
+                    template_ids=tuple(motif_template_ids),
+                    taxonomy_labels=tuple(motif_taxonomy_labels),
                     occurrences=tuple(
                         sorted(
                             occurrences,

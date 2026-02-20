@@ -55,9 +55,7 @@ def _make_phrase(
     )
 
 
-def _make_layering_row(
-    mean_layers: float = 2.0, max_layers: int = 3
-) -> LayeringFeatureRow:
+def _make_layering_row(mean_layers: float = 2.0, max_layers: int = 3) -> LayeringFeatureRow:
     return LayeringFeatureRow(
         schema_version="v1.7.0",
         package_id="pkg-1",
@@ -149,9 +147,7 @@ def test_extract_produces_style_fingerprint() -> None:
 
 
 def test_recipe_preferences_from_effect_families() -> None:
-    phrases = tuple(
-        _make_phrase(effect_family="single_strand", idx=i) for i in range(8)
-    ) + tuple(
+    phrases = tuple(_make_phrase(effect_family="single_strand", idx=i) for i in range(8)) + tuple(
         _make_phrase(effect_family="bars", idx=i + 8) for i in range(2)
     )
     result = StyleFingerprintExtractor().extract(

@@ -7,8 +7,8 @@ import pytest
 from twinklr.core.sequencer.display.recipe_renderer import (
     RecipeRenderer,
     RecipeRenderResult,
-    RenderEnvironment,
     RenderedLayer,
+    RenderEnvironment,
 )
 from twinklr.core.sequencer.templates.group.models.template import TimingHints
 from twinklr.core.sequencer.templates.group.recipe import (

@@ -12,6 +12,7 @@ from twinklr.core.feature_engineering.models.style import (
     ColorStyleProfile,
     LayeringStyleProfile,
     StyleBlend,
+    StyleEvolution,
     StyleFingerprint,
     TimingStyleProfile,
     TransitionStyleProfile,
@@ -83,9 +84,7 @@ class StyleWeightedRetrieval:
         total = sum(scores.values()) / len(scores) if scores else 0.0
         return total, scores
 
-    def _score_effect_family(
-        self, recipe: EffectRecipe, style: StyleFingerprint
-    ) -> float:
+    def _score_effect_family(self, recipe: EffectRecipe, style: StyleFingerprint) -> float:
         """Score based on effect family preference match."""
         if not style.recipe_preferences:
             return 0.5  # Neutral if no preferences
@@ -118,9 +117,7 @@ class StyleWeightedRetrieval:
         diff = abs(avg_density - preferred)
         return max(0.0, 1.0 - diff)
 
-    def _score_complexity(
-        self, recipe: EffectRecipe, style: StyleFingerprint
-    ) -> float:
+    def _score_complexity(self, recipe: EffectRecipe, style: StyleFingerprint) -> float:
         """Score based on recipe complexity vs style complexity."""
         if recipe.style_markers is None:
             return 0.5  # Neutral if no markers
@@ -249,11 +246,9 @@ class StyleBlendEvaluator:
     def _apply_evolution(
         self,
         style: StyleFingerprint,
-        evolution: "StyleBlend.evolution_params",  # type: ignore[name-defined]
+        evolution: StyleEvolution | None,
     ) -> StyleFingerprint:
         """Apply directional evolution to a fingerprint."""
-        from twinklr.core.feature_engineering.models.style import StyleEvolution
-
         if not isinstance(evolution, StyleEvolution):
             return style
 

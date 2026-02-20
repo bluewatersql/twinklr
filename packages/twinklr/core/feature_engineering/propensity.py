@@ -66,7 +66,6 @@ class PropensityMiner:
         if not pair_counts:
             return PropensityIndex(affinities=(), anti_affinities=())
 
-        total = sum(pair_counts.values())
         all_families = set(family_counts.keys())
         all_models = set(model_counts.keys())
 

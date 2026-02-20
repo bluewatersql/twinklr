@@ -54,4 +54,3 @@ class AlignedEffectEvent(BaseModel):
     chord_at_onset: str | None = None
 
     alignment_status: AlignmentStatus
-

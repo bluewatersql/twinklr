@@ -71,4 +71,3 @@ class ColorNarrativeExtractor:
         if "unknown" in {left, right}:
             return "uncertain"
         return f"{left}_to_{right}"
-

@@ -69,7 +69,9 @@ def test_synthesize_shimmer_pulse() -> None:
 
 def test_synthesize_color_wash_static_base() -> None:
     mined = _make_mined(
-        effect_family="color_wash", motion_class="static", role="base_fill",
+        effect_family="color_wash",
+        motion_class="static",
+        role="base_fill",
         energy_class="low",
     )
     recipe = RecipeSynthesizer().synthesize(mined, recipe_id="synth_color_wash_static_v1")

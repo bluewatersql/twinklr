@@ -28,4 +28,3 @@ class QualityReport(BaseModel):
 
     checks: tuple[QualityCheckResult, ...] = ()
     metadata: dict[str, str] = Field(default_factory=dict)
-
