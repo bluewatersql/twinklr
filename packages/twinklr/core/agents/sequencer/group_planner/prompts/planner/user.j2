@@ -18,6 +18,11 @@ Refinement iterations (2+) use user_refinement.j2 instead.
 - Do NOT use SECTION duration (section is shorter than 1 bar)
 {% elif section_duration_bars < 2 %}
 ⚠️ **SHORT SECTION (< 2 bars):** Limited space. Use HIT/BURST durations only. Avoid PHRASE/EXTENDED/SECTION.
+{% elif section_duration_bars <= 5 %}
+⚠️ **BRIEF SECTION (≤ 5 bars):** Limited space. Keep it simple:
+- Prefer HIT/BURST durations — avoid PHRASE/EXTENDED/SECTION
+- **ONE placement per target per lane** to prevent overlaps
+- Do not stack multiple effects on the same target in the same lane
 {% endif %}
 
 ## MacroPlan Intent
@@ -103,7 +108,9 @@ Motif Catalog (summary for reference):
 
 ## Available Templates
 
-### BASE Lane Templates
+**CRITICAL:** Each template belongs to exactly ONE lane. Only use templates under the lane they are listed below. Using a template in the wrong lane (e.g., a `gtpl_rhythm_*` in ACCENT) causes a validation failure.
+
+### BASE Lane Templates (use ONLY in BASE lane)
 {% for entry in template_catalog.entries %}
 {% if "BASE" in entry.compatible_lanes %}
 - `{{ entry.template_id }}` - {{ entry.name }}
@@ -112,7 +119,7 @@ Motif Catalog (summary for reference):
 {% endif %}
 {% endfor %}
 
-### RHYTHM Lane Templates
+### RHYTHM Lane Templates (use ONLY in RHYTHM lane)
 {% for entry in template_catalog.entries %}
 {% if "RHYTHM" in entry.compatible_lanes %}
 - `{{ entry.template_id }}` - {{ entry.name }}
@@ -121,7 +128,7 @@ Motif Catalog (summary for reference):
 {% endif %}
 {% endfor %}
 
-### ACCENT Lane Templates
+### ACCENT Lane Templates (use ONLY in ACCENT lane)
 {% for entry in template_catalog.entries %}
 {% if "ACCENT" in entry.compatible_lanes %}
 - `{{ entry.template_id }}` - {{ entry.name }}

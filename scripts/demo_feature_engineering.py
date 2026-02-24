@@ -27,7 +27,7 @@ def _load_music_library_index() -> MusicLibraryIndex | None:
     if not _MUSIC_INDEX_PATH.exists():
         print(
             f"  [info] No music library index at {_MUSIC_INDEX_PATH.relative_to(ROOT)}\n"
-            "         Run: uv run python scripts/build_music_library_index.py"
+            "         Run: uv run python scripts/build/build_music_library_index.py"
         )
         return None
     index = MusicLibraryIndex.model_validate_json(_MUSIC_INDEX_PATH.read_text())

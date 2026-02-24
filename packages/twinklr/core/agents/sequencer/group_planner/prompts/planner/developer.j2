@@ -62,10 +62,10 @@ Match template complexity to group detail capability:
 
 | Constraint | Rule | Example Violation |
 |------------|------|-------------------|
-| Lane-Template Match | gtpl_base_* → BASE only | Using gtpl_rhythm_* in BASE lane |
+| Lane-Template Match | Each template type → its own lane ONLY: `gtpl_base_*` → BASE, `gtpl_rhythm_*` → RHYTHM, `gtpl_accent_*` → ACCENT | Using `gtpl_rhythm_*` in ACCENT lane, or `gtpl_accent_*` in RHYTHM lane |
 | Valid targets | Target type/id must be valid group, zone, or split | `{"type": "zone", "id": "INVALID"}` |
-| No Duplicate group_order | Each group once | ["ARCHES", "ARCHES", "CANDY_CANES"] |
-| Window for SEQUENCED | Must have window + config | SEQUENCED mode with only placements |
+| group_order ⊆ targets | Every `group_order` entry must be an ID from the same coordination plan's `targets`. No duplicates, no IDs from other lanes. | `targets: [ARCHES, CANDY_CANES]` but `group_order: ["MEGA_TREE", "ARCHES"]` |
+| Window+config for SEQUENCED/CALL_RESPONSE | Must have window + config + non-empty group_order | SEQUENCED or CALL_RESPONSE mode missing config.group_order |
 | Start within bounds | bar 1 to available_bars | bar 10 when section has 4 bars |
 | No invented template_ids | every `template_id` ∈ template catalog | placement uses `template_id` not present in the template catalog |
 | No same-target self-overlap | Same target (type+id) must be time-disjoint in a lane | Two zone:HOUSE placements overlap in RHYTHM lane |
@@ -89,7 +89,7 @@ Match template complexity to group detail capability:
 ```json
 {
   "coordination_mode": "SEQUENCED",
-  "targets": [{"type": "group", "id": "ARCHES"}],
+  "targets": [{"type": "group", "id": "ARCHES"}, {"type": "group", "id": "CANDY_CANES"}],
   "window": {
     "template_id": "gtpl_rhythm_chase_single",
     "start": {"bar": 1, "beat": 1},
@@ -97,6 +97,7 @@ Match template complexity to group detail capability:
     "intensity": "STRONG"
   },
   "config": {
+    "group_order": ["ARCHES", "CANDY_CANES"],
     "step_unit": "BEATS",
     "step_duration": 2
   }
@@ -104,6 +105,7 @@ Match template complexity to group detail capability:
 ```
 
 **Window sizing:** duration >= group_count × step_duration
+**REQUIRED:** `config.group_order` must be non-empty for SEQUENCED and CALL_RESPONSE modes.
 
 ## UNIFIED Mode (Placements) — Zone Target Example
 
@@ -158,6 +160,7 @@ The renderer expands `zone:HOUSE` to all HOUSE-tagged groups automatically.
     "intensity": "STRONG"
   },
   "config": {
+    "group_order": ["ODD", "EVEN"],
     "step_unit": "BEATS",
     "step_duration": 2
   }

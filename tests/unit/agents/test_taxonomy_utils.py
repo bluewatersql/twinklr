@@ -11,7 +11,6 @@ def test_get_supported_motif_ids():
     """Test that get_supported_motif_ids returns only motifs with template support."""
     supported = get_supported_motif_ids()
 
-    # Should return a set
     assert isinstance(supported, set)
 
     # Should have at least some motifs (we know templates have motif tags)

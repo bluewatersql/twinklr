@@ -171,6 +171,7 @@ def build_display_pipeline(
                 stage=DisplayRenderStage(
                     choreo_graph=choreo_graph,
                     xlights_mapping=xlights_mapping,
+                    recipe_catalog=recipe_catalog,
                 ),
                 inputs=["asset_resolution"],
                 input_type="GroupPlanSet",

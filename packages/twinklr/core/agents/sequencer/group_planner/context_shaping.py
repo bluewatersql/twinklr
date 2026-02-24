@@ -40,8 +40,9 @@ ENERGY_TEMPLATE_PATTERNS: dict[str, list[str]] = {
     "RELEASE": ["soft", "fade", "gentle", "warm", "ambient"],
 }
 
-# Minimum templates per lane (safety threshold)
-MIN_TEMPLATES_PER_LANE = 3
+# Minimum templates per lane — ensures enough variety per lane so the LLM
+# doesn't resort to picking templates from other lanes.
+MIN_TEMPLATES_PER_LANE = 5
 
 
 def filter_templates_by_intent(
@@ -81,7 +82,9 @@ def filter_templates_by_intent(
         logger.debug(f"No filter patterns for energy '{energy_target}', using full catalog")
         return list(catalog.entries)
 
-    # Filter templates by energy patterns AND motif affinity (when both specified)
+    # Filter templates by energy patterns OR motif affinity
+    # Using OR ensures sufficient variety per lane; AND was too aggressive
+    # and could leave lanes with only the safety minimum (3 templates).
     filtered = []
     filtered_ids = set()
     for entry in catalog.entries:
@@ -89,7 +92,6 @@ def filter_templates_by_intent(
         template_id_lower = entry.template_id.lower()
         tags_lower = [str(tag).lower() for tag in (entry.tags or [])]
 
-        # Check if template matches energy patterns (in name, ID, or tags)
         energy_match = patterns and any(
             pattern in name_lower
             or pattern in template_id_lower
@@ -97,23 +99,11 @@ def filter_templates_by_intent(
             for pattern in patterns
         )
 
-        # Check if template matches declared motifs (computed from tags)
         motif_match = bool(motif_list) and AffinityScorer.has_motif_affinity(
             entry, motif_ids=motif_list
         )
 
-        # Filtering logic:
-        # - If both patterns and motifs specified: require BOTH to match (AND)
-        # - If only patterns specified: require pattern match
-        # - If only motifs specified: require motif match
-        if patterns and motif_list:
-            include = energy_match and motif_match
-        elif patterns:
-            include = energy_match
-        elif motif_list:
-            include = motif_match
-        else:
-            include = False
+        include = energy_match or motif_match
 
         if include and entry.template_id not in filtered_ids:
             filtered.append(entry)

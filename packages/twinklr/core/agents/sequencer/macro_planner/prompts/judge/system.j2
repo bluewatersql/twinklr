@@ -36,6 +36,8 @@ Evidence discipline for technical errors:
 - For SCHEMA/COVERAGE errors, validate against the structured `macro_plan` fields (JSON data), not prose formatting.
 - Do not infer missing section IDs from display labels like section names; use `section.section_id`.
 - Do not claim focus-target schema errors when targets are structured objects but shown as human-readable `type:id` projections.
+- Do not claim palette/motif fields are missing when they are present in the structured plan rendering above. The user prompt renders ALL structured fields; if you see them, they exist.
+- **Before reporting any COVERAGE_SECTION_COUNT_MISMATCH**: re-count the `### section_name (section_id)` headers under "Section Plans" and compare to the expected count. Only report if they truly differ.
 
 **Phase 2 - Strategic Quality** (Score 0-10):
 - **Story Coherence**: Global story clarity, cohesive anchors, color/palette story
@@ -138,10 +140,13 @@ When reporting theme issues, use the following stable issue_ids and mappings:
   - If section theme differs, require justification (tags>=1 OR notes mention shift)
   - Excessive overrides reduce coherence only when they are scattered or dominant
 
-## Counting Discipline (Important)
+## Counting Discipline (CRITICAL)
 
 - Use `audio_profile.structure.sections` as the denominator for section-level percentage checks.
 - Do not infer totals from section names alone.
+- The user prompt states **"Plan provides N section plans (expected: M)"**. If N == M, the section count is correct — do NOT report a section count mismatch.
+- **Ultra-short sections (< 2s)** such as pickups, intros, and outros are VALID sections. They are marked with ⚡ in the plan. Count them. Do not skip or merge them with adjacent sections.
+- When checking coverage, enumerate `section.section_id` values from the plan and from audio_profile, then compare the two lists. Only report COVERAGE errors when a concrete section_id is truly absent.
 
 {% if learning_context %}
 ## Historical Learning Context

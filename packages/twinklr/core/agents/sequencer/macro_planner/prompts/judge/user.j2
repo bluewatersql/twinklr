@@ -24,7 +24,8 @@ Provides the MacroPlan to evaluate along with song context
 **Expected section count:** {{ audio_profile.structure.sections | length }}
 
 {% for section in audio_profile.structure.sections %}
-- **{{ section.name }}** ({{ section.section_id }}) - {{ (section.start_ms / 1000) | round(1) }}s to {{ (section.end_ms / 1000) | round(1) }}s
+- **{{ section.name }}** ({{ section.section_id }}) - {{ (section.start_ms / 1000) | round(1) }}s to {{ (section.end_ms / 1000) | round(1) }}s{% if (section.end_ms - section.start_ms) < 2000 %} ⚡ pickup{% endif %}
+
 {% endfor %}
 
 ## Display Layout
@@ -131,11 +132,13 @@ Focus targets must be typed objects using `type` in `group|zone|split` with IDs 
 
 ## Section Plans
 
+**Plan provides {{ macro_plan.section_plans | length }} section plans** (expected: {{ audio_profile.structure.sections | length }}).
+
 Use `section.section_id` as the canonical section identifier for coverage checks.
 Primary/Secondary Focus lines below are human-readable projections of typed target objects; schema validity must be judged from the structured plan data.
 
 {% for section in macro_plan.section_plans %}
-### {{ section.section.name }} ({{ section.section.section_id }}) ({{ (section.section.start_ms / 1000) | round(1) }}s - {{ (section.section.end_ms / 1000) | round(1) }}s)
+### {{ section.section.name }} ({{ section.section.section_id }}) ({{ (section.section.start_ms / 1000) | round(1) }}s - {{ (section.section.end_ms / 1000) | round(1) }}s){% if (section.section.end_ms - section.section.start_ms) < 2000 %} ⚡ PICKUP (< 2s){% endif %}
 
 - **Theme ID:** {{ section.theme.theme_id }}
 - **Theme Scope:** {{ section.theme.scope.value if section.theme.scope else 'MISSING' }}

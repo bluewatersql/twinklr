@@ -85,6 +85,7 @@ class RecipeCompiler:
             lane=context.lane,
             group_id=placement.target.id,
             template_id=placement.template_id,
+            placement_id=placement.placement_id,
             placement_index=context.placement_index,
         )
 

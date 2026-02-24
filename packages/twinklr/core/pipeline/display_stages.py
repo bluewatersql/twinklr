@@ -155,6 +155,7 @@ class DisplayRenderStage:
         beat_grid: BeatGrid | None = None,
         choreo_graph: ChoreographyGraph | None = None,
         xlights_mapping: XLightsMapping | None = None,
+        recipe_catalog: object | None = None,
     ) -> None:
         """Initialize the stage with optional pre-configured dependencies.
 
@@ -162,10 +163,13 @@ class DisplayRenderStage:
             beat_grid: Pre-configured beat grid (overrides context/input).
             choreo_graph: Choreographic display configuration.
             xlights_mapping: xLights element name resolution.
+            recipe_catalog: Pre-loaded RecipeCatalog (avoids re-loading
+                TemplateStore from disk on every render).
         """
         self._beat_grid = beat_grid
         self._choreo_graph = choreo_graph
         self._xlights_mapping = xlights_mapping
+        self._recipe_catalog = recipe_catalog
 
     @property
     def name(self) -> str:
@@ -248,18 +252,26 @@ class DisplayRenderStage:
             # Extract section boundaries from macro plan (audio-sourced timing)
             section_boundaries = self._extract_section_boundaries(context)
 
-            # Load template store from JSON index
             from twinklr.core.sequencer.display.composition.recipe_compiler import (
                 RecipeCompiler,
             )
             from twinklr.core.sequencer.templates.group.recipe_catalog import RecipeCatalog
-            from twinklr.core.sequencer.templates.group.store import TemplateStore
 
-            _root = Path(__file__).resolve().parent.parent.parent.parent.parent
-            templates_dir = _root / "data" / "templates"
-            template_store = TemplateStore.from_directory(templates_dir)
-            recipe_catalog = RecipeCatalog.from_store(template_store)
-            recipe_compiler = RecipeCompiler(catalog=recipe_catalog)
+            rc = self._recipe_catalog or context.get_state("recipe_catalog")
+            if rc is None:
+                from twinklr.core.sequencer.templates.group.store import TemplateStore
+
+                _root = Path(__file__).resolve().parent.parent.parent.parent.parent
+                templates_dir = _root / "data" / "templates"
+                template_store = TemplateStore.from_directory(templates_dir)
+                rc = RecipeCatalog.from_store(template_store)
+
+            if not isinstance(rc, RecipeCatalog):
+                return failure_result(
+                    "recipe_catalog must be a RecipeCatalog instance",
+                    stage_name=self.name,
+                )
+            recipe_compiler = RecipeCompiler(catalog=rc)
 
             # Create renderer and render
             renderer = DisplayRenderer(

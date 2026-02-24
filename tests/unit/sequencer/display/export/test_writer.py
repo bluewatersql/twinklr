@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from twinklr.core.sequencer.display.export.writer import XSQWriter
+from twinklr.core.sequencer.display.export.writer import WriteResult, XSQWriter
 from twinklr.core.sequencer.display.models.palette import (
     ResolvedPalette,
     TransitionSpec,
@@ -310,6 +310,49 @@ class TestApplyIntensityBrightness:
         assert result.sparkle_frequency == 50
         assert result.music_sparkles is True
         assert result.colors == ["#FF0000", "#00FF00"]
+
+
+class TestTraceMetadata:
+    """Tests for XSQWriter trace sidecar metadata helpers."""
+
+    def test_append_trace_entry_includes_placement_origin(self) -> None:
+        """Trace entries record placement/source and xLights placement context."""
+        event = RenderEvent(
+            event_id="evt_trace",
+            start_ms=100,
+            end_ms=400,
+            effect_type="Bars",
+            parameters={},
+            palette=_DEFAULT_PALETTE,
+            source=RenderEventSource(
+                section_id="intro",
+                lane=LaneKind.RHYTHM,
+                group_id="CANDY_STRIPES",
+                template_id="tmpl_bars",
+                placement_index=2,
+                placement_id="placement_1",
+            ),
+        )
+        result = WriteResult()
+
+        XSQWriter._append_trace_entry(
+            result=result,
+            event=event,
+            element_name="Candy Canes",
+            layer_index=1,
+            effect_name="Bars",
+        )
+
+        assert len(result.trace_entries) == 1
+        trace = result.trace_entries[0]
+        assert trace["placement_id"] == "placement_1"
+        assert trace["section_id"] == "intro"
+        assert trace["lane"] == "RHYTHM"
+        assert trace["group_id"] == "CANDY_STRIPES"
+        assert trace["element_name"] == "Candy Canes"
+        assert trace["layer_index"] == 1
+        assert trace["start_ms"] == 100
+        assert trace["end_ms"] == 400
 
     def test_works_for_all_non_on_effect_types(self) -> None:
         """Brightness is applied for every non-On effect type."""

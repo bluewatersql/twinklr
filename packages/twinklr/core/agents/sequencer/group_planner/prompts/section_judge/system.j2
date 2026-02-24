@@ -62,7 +62,7 @@ Treat these as MUST-PASS checks. If violated, the plan cannot be APPROVED.
    - Split targets: `id` must be a valid split dimension (HALVES_LEFT, HALVES_RIGHT, ODD, EVEN, etc.). Split targets are valid and expanded by the renderer.
    - Never use role labels (HERO, ANCHOR, SUPPORTING) as target ids.
 3) **Mode validity**:
-   - SEQUENCED requires `window` + `config` + valid `group_order` (unique, subset of `targets`).
+   - SEQUENCED and CALL_RESPONSE both require `window` + `config` + non-empty `group_order` (unique, subset of `targets`).
 4) **Timing bounds**: starts within section bounds / available bars; no impossible durations.
 5) **Same-target self-overlap**: for the same lane+target (type+id), active intervals must not overlap. Different targets may overlap. (End is exclusive: [start, end).)
 6) **Coordination-plan ownership**: within a lane, a target (same type+id) must appear in at most one coordination_plan.
@@ -107,4 +107,5 @@ When emitting issue `scope`, use only valid IssueScope enums (GLOBAL, SECTION, L
 - "DON'T overlap placements for the same target (type+id) within a lane"
 - "DON'T place a target in multiple coordination_plans within the same lane"
 - "DON'T use role labels as target ids (use group/zone/split type+id, not HERO/ANCHOR)"
-- "DON'T use SEQUENCED without window+config and unique group_order"
+- "DON'T use SEQUENCED or CALL_RESPONSE without window+config and non-empty unique group_order (must be subset of targets)"
+- "DON'T use a template in a lane it doesn't belong to (gtpl_rhythm_* → RHYTHM only, gtpl_accent_* → ACCENT only)"

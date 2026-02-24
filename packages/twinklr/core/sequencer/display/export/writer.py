@@ -9,6 +9,7 @@ via the existing XSQExporter.
 from __future__ import annotations
 
 import logging
+from typing import TypedDict
 
 from twinklr.core.formats.xlights.sequence.models.xsq import (
     ColorPalette,
@@ -38,6 +39,23 @@ from twinklr.core.sequencer.display.palette.registry import PaletteDBRegistry
 logger = logging.getLogger(__name__)
 
 
+class XSQTraceEntry(TypedDict):
+    """Per-effect trace record for display XSQ sidecar metadata."""
+
+    event_id: str
+    placement_id: str | None
+    placement_index: int
+    section_id: str
+    lane: str
+    group_id: str
+    template_id: str
+    element_name: str
+    layer_index: int
+    effect_name: str
+    start_ms: int
+    end_ms: int
+
+
 class WriteResult:
     """Result of writing a RenderPlan to an XSequence.
 
@@ -57,6 +75,7 @@ class WriteResult:
         self.palette_entries: int = 0
         self.warnings: list[str] = []
         self.missing_assets: list[str] = []
+        self.trace_entries: list[XSQTraceEntry] = []
 
 
 class XSQWriter:
@@ -236,6 +255,41 @@ class XSQWriter:
 
         sequence.add_effect(element_name, effect, layer_index=layer_index)
         result.effects_written += 1
+        self._append_trace_entry(
+            result=result,
+            event=event,
+            element_name=element_name,
+            layer_index=layer_index,
+            effect_name=settings.effect_name,
+        )
+
+    @staticmethod
+    def _append_trace_entry(
+        *,
+        result: WriteResult,
+        event: RenderEvent,
+        element_name: str,
+        layer_index: int,
+        effect_name: str,
+    ) -> None:
+        """Append a trace sidecar entry for a written effect."""
+        source = event.source
+        result.trace_entries.append(
+            {
+                "event_id": event.event_id,
+                "placement_id": source.placement_id,
+                "placement_index": source.placement_index,
+                "section_id": source.section_id,
+                "lane": source.lane.value,
+                "group_id": source.group_id,
+                "template_id": source.template_id,
+                "element_name": element_name,
+                "layer_index": layer_index,
+                "effect_name": effect_name,
+                "start_ms": event.start_ms,
+                "end_ms": event.end_ms,
+            }
+        )
 
     @staticmethod
     def _augment_settings(
@@ -371,5 +425,6 @@ class XSQWriter:
 
 __all__ = [
     "WriteResult",
+    "XSQTraceEntry",
     "XSQWriter",
 ]

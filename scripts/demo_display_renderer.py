@@ -480,6 +480,7 @@ def main() -> None:
 
     # 7. Run the display renderer
     from twinklr.core.sequencer.display.composition.recipe_compiler import RecipeCompiler
+    from twinklr.core.sequencer.display.renderer import write_display_xsq_trace_sidecar
     from twinklr.core.sequencer.templates.group.recipe_catalog import RecipeCatalog
     from twinklr.core.sequencer.templates.group.store import TemplateStore
 
@@ -512,9 +513,12 @@ def main() -> None:
     args.out.parent.mkdir(parents=True, exist_ok=True)
     exporter = XSQExporter()
     exporter.export(sequence, args.out)
+    trace_sidecar_path = write_display_xsq_trace_sidecar(args.out, result)
     logger.info("Exported .xsq to %s", args.out)
+    logger.info("Exported display XSQ trace sidecar to %s", trace_sidecar_path)
 
     print(f"\nOutput: {args.out}")
+    print(f"Trace sidecar: {trace_sidecar_path}")
     print("Open this file in xLights to validate the rendered sequence.")
 
 

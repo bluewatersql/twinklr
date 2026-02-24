@@ -8,8 +8,10 @@ This is the primary entry point for display (non-moving-head) rendering.
 
 from __future__ import annotations
 
+import json
 import logging
 from pathlib import Path
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -28,7 +30,7 @@ from twinklr.core.sequencer.display.effects.handlers import (
 )
 from twinklr.core.sequencer.display.effects.protocol import RenderContext
 from twinklr.core.sequencer.display.effects.registry import HandlerRegistry
-from twinklr.core.sequencer.display.export.writer import XSQWriter
+from twinklr.core.sequencer.display.export.writer import XSQTraceEntry, XSQWriter
 from twinklr.core.sequencer.display.models.config import (
     RenderConfig,
 )
@@ -56,6 +58,7 @@ class RenderResult(BaseModel):
         palette_entries: Number of palette entries.
         warnings: All warnings from composition and rendering.
         missing_assets: Asset paths that were not found.
+        xsq_trace_entries: Per-effect trace metadata for XSQ sidecar generation.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -67,6 +70,7 @@ class RenderResult(BaseModel):
     palette_entries: int = 0
     warnings: list[str] = Field(default_factory=list)
     missing_assets: list[str] = Field(default_factory=list)
+    xsq_trace_entries: list[XSQTraceEntry] = Field(default_factory=list)
 
 
 class DisplayRenderer:
@@ -209,6 +213,7 @@ class DisplayRenderer:
             palette_entries=write_result.palette_entries,
             warnings=all_warnings,
             missing_assets=write_result.missing_assets,
+            xsq_trace_entries=write_result.trace_entries,
         )
 
         logger.info(
@@ -221,7 +226,29 @@ class DisplayRenderer:
         return result
 
 
+def build_display_xsq_trace_sidecar_payload(render_result: RenderResult) -> dict[str, Any]:
+    """Build JSON-serializable sidecar payload for display XSQ trace metadata."""
+    return {
+        "schema_version": "display-xsq-trace.v1",
+        "entry_count": len(render_result.xsq_trace_entries),
+        "entries": render_result.xsq_trace_entries,
+    }
+
+
+def write_display_xsq_trace_sidecar(xsq_path: Path, render_result: RenderResult) -> Path:
+    """Write display XSQ trace sidecar next to an exported XSQ file."""
+    sidecar_path = Path(f"{xsq_path}.trace.json")
+    sidecar_path.parent.mkdir(parents=True, exist_ok=True)
+    sidecar_path.write_text(
+        json.dumps(build_display_xsq_trace_sidecar_payload(render_result), indent=2),
+        encoding="utf-8",
+    )
+    return sidecar_path
+
+
 __all__ = [
+    "build_display_xsq_trace_sidecar_payload",
+    "write_display_xsq_trace_sidecar",
     "DisplayRenderer",
     "RenderResult",
 ]

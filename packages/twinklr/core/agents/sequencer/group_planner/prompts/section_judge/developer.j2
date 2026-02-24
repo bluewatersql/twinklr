@@ -30,7 +30,7 @@ Before evaluating coordination quality, verify the plan is **technically sound**
 
 #### Template Validity
 - Every referenced `template_id` exists in the provided template catalog.
-- Each template is compatible with the lane where it is used (via catalog `compatible_lanes`).
+- Each template is compatible with the lane where it is used (via catalog `compatible_lanes`). Templates are strictly lane-exclusive: `gtpl_base_*` → BASE only, `gtpl_rhythm_*` → RHYTHM only, `gtpl_accent_*` → ACCENT only. Using a template in the wrong lane is a HARD_FAIL.
 
 #### Target Validity
 - Targets use the **typed PlanTarget** model: `{"type": "group"|"zone"|"split", "id": "..."}`.
@@ -55,8 +55,9 @@ Before evaluating coordination quality, verify the plan is **technically sound**
 - For modes that require expansion (e.g., SEQUENCED, CALL_RESPONSE, RIPPLE):
   - `window` is present
   - `config` is present
-  - `config.group_order` has no duplicates (optional; if present, must be valid)
+  - `config.group_order` must be non-empty, with no duplicates
   - every item in `config.group_order` is contained in `targets`
+  - CALL_RESPONSE specifically: group_order lists the alternating participant IDs (e.g., split IDs like ["ODD", "EVEN"])
 - For modes that do NOT require expansion (e.g., UNIFIED / direct placements):
   - placements are provided directly (non-empty unless explicitly justified)
 

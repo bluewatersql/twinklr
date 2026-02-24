@@ -25,6 +25,7 @@ class RenderEventSource(BaseModel):
         lane: Source lane (BASE/RHYTHM/ACCENT).
         group_id: Source group ID.
         template_id: Source template ID from the plan.
+        placement_id: Source placement ID from the plan (if available).
         placement_index: Index of the placement within the coordination plan.
     """
 
@@ -34,6 +35,7 @@ class RenderEventSource(BaseModel):
     lane: LaneKind
     group_id: str
     template_id: str
+    placement_id: str | None = None
     placement_index: int = 0
 
 

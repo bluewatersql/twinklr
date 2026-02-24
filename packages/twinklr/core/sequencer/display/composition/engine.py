@@ -888,6 +888,7 @@ class CompositionEngine:
                     lane=lane,
                     group_id=placement.target.id,
                     template_id=placement.template_id,
+                    placement_id=placement.placement_id,
                     placement_index=placement_index,
                 ),
             )

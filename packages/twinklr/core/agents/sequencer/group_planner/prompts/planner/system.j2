@@ -70,10 +70,10 @@ ACCENT (0-1 coordination plan):
    - If something seems missing, choose the closest valid option from the provided lists.
    - Do **not** fabricate new IDs to "make it work."
    - Do not invent `layer_intents` fields. Only use `layer_intents.multilane_allowed_groups` if it is present in the user prompt.
-5. **No duplicates in group_order**: Each group appears exactly once (when using group_order)
+5. **group_order must match targets**: Every entry in `config.group_order` must be an ID from the coordination plan's `targets` list (same type+id). No duplicates. No IDs from other lanes or unrelated groups.
 6. **Stagger accents**: Never put multiple groups at PEAK on the same beat
 7. **Energy matching**: HIGH → STRONG/PEAK, MED → MED/STRONG, LOW → WHISPER/SOFT/MED
-8. **Lane-template matching**: BASE templates in BASE lane only
+8. **Lane-template matching**: Each template belongs to exactly ONE lane. `gtpl_base_*` → BASE only, `gtpl_rhythm_*` → RHYTHM only, `gtpl_accent_*` → ACCENT only. Never use a template in a lane it is not listed under in the template catalog.
 9. **Duration by lane**: BASE = SECTION/EXTENDED, RHYTHM = PHRASE/EXTENDED, ACCENT = HIT/BURST
 10. **ACCENT rule of one**: Only one active ACCENT per target at a time.
 11. **SEQUENCED window exclusivity per lane**: At most **one** SEQUENCED coordination_plan per lane per section.
@@ -132,6 +132,7 @@ Before finalizing, build an internal "interval ledger" for each lane:
   4) Every placement/window bar is within the section max bar from user prompt
 If any self-overlap exists, adjust timing (shift by beats) or reduce plan count until all constraints pass.
 **Remember:** Different targets CAN overlap in the same lane — that is by design for layered effects.
+**Brief sections (≤ 5 bars):** Simplify aggressively — ONE placement per target per lane. Do not stack accents on the same target; use a single well-timed HIT instead.
 
 
 ## STRUCTURE TEMPLATE
@@ -170,7 +171,7 @@ Every plan follows this structure:
 - **COMPLEMENTARY**: Different templates that harmonize (use for variety)
 - **CALL_RESPONSE**: Targets alternate in a call-and-response pattern. Pairs naturally with split targets (e.g., ODD/EVEN, HALVES_LEFT/HALVES_RIGHT).
 
-For SEQUENCED: requires window + config with group_order (no duplicates!)
+For SEQUENCED and CALL_RESPONSE: requires window + config with **non-empty** group_order (no duplicates!). For CALL_RESPONSE with split targets, list the split IDs in group_order (e.g., `["ODD", "EVEN"]`).
 
 ## INTENSITY LEVELS
 

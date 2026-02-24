@@ -124,7 +124,6 @@ def get_supported_motif_ids() -> set[str]:
 
     from twinklr.core.sequencer.templates.group.store import TemplateStore
 
-    # Resolve to workspace root (packages/twinklr/core/agents -> 5 levels up)
     _root = Path(__file__).resolve().parent.parent.parent.parent.parent
     templates_dir = _root / "data" / "templates"
     if not templates_dir.exists():

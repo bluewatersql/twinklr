@@ -711,11 +711,14 @@ async def main() -> None:
 
         # Export .xsq file
         from twinklr.core.formats.xlights.sequence.exporter import XSQExporter
+        from twinklr.core.sequencer.display.renderer import write_display_xsq_trace_sidecar
 
         xsq_path = output_dir / f"{song_name}_display.xsq"
         exporter = XSQExporter()
         exporter.export(xsequence, xsq_path)
+        trace_sidecar_path = write_display_xsq_trace_sidecar(xsq_path, render_result)
         print(f"XSQ output: {xsq_path.name}")
+        print(f"Display XSQ trace: {trace_sidecar_path.name}")
         print(
             f"   Effects: {render_result.effects_written}, "
             f"Elements: {render_result.elements_created}, "

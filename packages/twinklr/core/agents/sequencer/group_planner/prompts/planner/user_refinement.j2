@@ -21,6 +21,8 @@ References existing conversation context (section, templates, groups).
 ⚠️ **VERY SHORT SECTION:** Only bar 1 beat 1 with HIT duration. Skip BASE/RHYTHM.
 {% elif section_duration_bars < 2 %}
 ⚠️ **SHORT SECTION:** Use HIT/BURST only. Avoid PHRASE/EXTENDED/SECTION.
+{% elif section_duration_bars <= 5 %}
+⚠️ **BRIEF SECTION:** HIT/BURST only. ONE placement per target per lane — no stacking.
 {% endif %}
 
 **Targeting:** Use typed targets: `{"type": "group", "id": "..."}`, `{"type": "zone", "id": "..."}`, or `{"type": "split", "id": "..."}`. Zone targets expand to all groups in that zone. Split targets expand to partition groups. The same target (same type+id) must not overlap itself within a lane.
@@ -122,6 +124,8 @@ References existing conversation context (section, templates, groups).
 - **Repeated templates**: Don't use identical template+params on 3+ groups for entire section
 - **Energy mismatch**: Don't use PEAK in LOW energy sections or WHISPER in HIGH energy sections
 - **Duration mismatch**: Don't use HIT/BURST for BASE lane (use SECTION/EXTENDED instead)
-- **Truncated window**: For SEQUENCED modes, window must span (group_count × step_duration) minimum
-- **Duplicate group_order**: Each group can only appear ONCE in group_order
+- **Truncated window**: For SEQUENCED/CALL_RESPONSE modes, window must span (group_count × step_duration) minimum
+- **group_order ⊆ targets**: Every `group_order` entry must be an ID from the same coordination plan's `targets`. Do NOT put group IDs from other lanes in group_order.
+- **Missing group_order**: SEQUENCED and CALL_RESPONSE modes BOTH require non-empty config.group_order
+- **Lane-template mismatch**: `gtpl_base_*` → BASE only, `gtpl_rhythm_*` → RHYTHM only, `gtpl_accent_*` → ACCENT only. Never cross lanes.
 - **Mixed window + placement**: Don't use SEQUENCED window for a group AND a separate placement for same group in same lane - choose ONE approach

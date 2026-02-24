@@ -11,12 +11,12 @@ This document is the single source of truth for running profiling corpus build +
 ## 1) Build Unified Profile Corpus
 
 Script:
-- `scripts/build_profile_corpus.py`
+- `scripts/build/build_profile_corpus.py`
 
 Example:
 
 ```bash
-python scripts/build_profile_corpus.py
+python scripts/build/build_profile_corpus.py
 ```
 
 Expected corpus artifacts:
@@ -27,18 +27,18 @@ Expected corpus artifacts:
 ## 2) Build Feature Engineering Artifacts
 
 Canonical script:
-- `scripts/build_feature_engineering.py`
+- `scripts/build/build_feature_engineering.py`
 
 Example:
 
 ```bash
-python scripts/build_feature_engineering.py
+python scripts/build/build_feature_engineering.py
 ```
 
 Optional audio analysis:
 
 ```bash
-python scripts/build_feature_engineering.py \
+python scripts/build/build_feature_engineering.py \
   --skip-audio-analysis
 ```
 

@@ -32,8 +32,8 @@ from twinklr.core.agents.sequencer.group_planner.holistic import (  # noqa: E402
     HolisticEvaluation,
 )
 from twinklr.core.agents.shared.judge.models import JudgeVerdict  # noqa: E402
-from twinklr.core.sequencer.planning import MacroPlan  # noqa: E402
-from twinklr.core.sequencer.templates.group.models import (  # noqa: E402
+from twinklr.core.sequencer.planning import (  # noqa: E402
+    MacroPlan,
     SectionCoordinationPlan,
 )
 
