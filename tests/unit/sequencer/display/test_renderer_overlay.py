@@ -6,6 +6,8 @@ to the CompositionEngine and produces Pictures overlay events.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from twinklr.core.agents.assets.models import (
     AssetCatalog,
     AssetCategory,
@@ -16,6 +18,9 @@ from twinklr.core.agents.assets.models import (
 from twinklr.core.formats.xlights.sequence.models.xsq import (
     SequenceHead,
     XSequence,
+)
+from twinklr.core.sequencer.display.composition.recipe_compiler import (
+    RecipeCompiler,
 )
 from twinklr.core.sequencer.display.renderer import DisplayRenderer
 from twinklr.core.sequencer.display.xlights_mapping import (
@@ -28,10 +33,6 @@ from twinklr.core.sequencer.planning.group_plan import (
     SectionCoordinationPlan,
 )
 from twinklr.core.sequencer.planning.models import PaletteRef
-from twinklr.core.sequencer.templates.group import (
-    REGISTRY,
-    load_builtin_group_templates,
-)
 from twinklr.core.sequencer.templates.group.models.choreography import (
     ChoreographyGraph,
     ChoreoGroup,
@@ -41,6 +42,10 @@ from twinklr.core.sequencer.templates.group.models.coordination import (
     GroupPlacement,
     PlanTarget,
 )
+from twinklr.core.sequencer.templates.group.recipe_catalog import (
+    RecipeCatalog,
+)
+from twinklr.core.sequencer.templates.group.store import TemplateStore
 from twinklr.core.sequencer.theming import ThemeRef
 from twinklr.core.sequencer.theming.enums import ThemeScope
 from twinklr.core.sequencer.timing.beat_grid import BeatGrid
@@ -54,8 +59,15 @@ from twinklr.core.sequencer.vocabulary import (
 )
 from twinklr.core.sequencer.vocabulary.choreography import TargetType
 
-# Ensure builtins are loaded once for all tests in this module
-load_builtin_group_templates()
+_TEMPLATES_DIR = Path(__file__).resolve().parent.parent.parent.parent.parent / "data" / "templates"
+
+
+def _load_recipe_compiler() -> RecipeCompiler:
+    """Create RecipeCompiler backed by data/templates."""
+    store = TemplateStore.from_directory(_TEMPLATES_DIR)
+    catalog = RecipeCatalog.from_store(store)
+    return RecipeCompiler(catalog=catalog)
+
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -183,7 +195,7 @@ class TestDisplayRendererOverlayWiring:
         renderer = DisplayRenderer(
             beat_grid=_make_beat_grid(),
             choreo_graph=_make_choreo_graph(),
-            template_registry=REGISTRY,
+            template_compiler=_load_recipe_compiler(),
             xlights_mapping=_make_xlights_mapping(),
         )
         plan_set = _make_plan_set(resolved_asset_ids=["asset_sparkles"])
@@ -200,7 +212,7 @@ class TestDisplayRendererOverlayWiring:
         renderer = DisplayRenderer(
             beat_grid=_make_beat_grid(),
             choreo_graph=_make_choreo_graph(),
-            template_registry=REGISTRY,
+            template_compiler=_load_recipe_compiler(),
             xlights_mapping=_make_xlights_mapping(),
         )
         plan_set = _make_plan_set(resolved_asset_ids=["asset_sparkles"])
@@ -226,7 +238,7 @@ class TestDisplayRendererOverlayWiring:
         renderer = DisplayRenderer(
             beat_grid=_make_beat_grid(),
             choreo_graph=_make_choreo_graph(),
-            template_registry=REGISTRY,
+            template_compiler=_load_recipe_compiler(),
             xlights_mapping=_make_xlights_mapping(),
         )
         plan_set = _make_plan_set(resolved_asset_ids=["asset_sparkles"])

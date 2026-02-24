@@ -479,12 +479,14 @@ def main() -> None:
     sequence = build_empty_sequence(int(duration_ms))
 
     # 7. Run the display renderer
-    from twinklr.core.sequencer.templates.group import (
-        REGISTRY,
-        load_builtin_group_templates,
-    )
+    from twinklr.core.sequencer.display.composition.recipe_compiler import RecipeCompiler
+    from twinklr.core.sequencer.templates.group.recipe_catalog import RecipeCatalog
+    from twinklr.core.sequencer.templates.group.store import TemplateStore
 
-    load_builtin_group_templates()
+    repo_root = Path(__file__).resolve().parent.parent
+    template_store = TemplateStore.from_directory(repo_root / "data" / "templates")
+    recipe_catalog = RecipeCatalog.from_store(template_store)
+    recipe_compiler = RecipeCompiler(catalog=recipe_catalog)
 
     config = RenderConfig()
     renderer = DisplayRenderer(
@@ -492,7 +494,7 @@ def main() -> None:
         choreo_graph=choreo_graph,
         xlights_mapping=xlights_mapping,
         config=config,
-        template_registry=REGISTRY,
+        template_compiler=recipe_compiler,
     )
 
     result = renderer.render(

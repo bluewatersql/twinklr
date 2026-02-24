@@ -16,8 +16,9 @@ from twinklr.core.sequencer.templates.group.recipe import (
     PaletteSpec,
     RecipeLayer,
     RecipeProvenance,
+    StyleMarkers,
 )
-from twinklr.core.sequencer.vocabulary import BlendMode, ColorMode
+from twinklr.core.sequencer.vocabulary import BlendMode, ColorMode, EnergyTarget, GroupTemplateType
 
 # Map ColorMode to a default palette_roles list
 _COLOR_MODE_ROLES: dict[ColorMode, list[str]] = {
@@ -85,6 +86,22 @@ def _derive_palette_spec(layers: list[LayerRecipe]) -> PaletteSpec:
     return PaletteSpec(mode=best_mode, palette_roles=roles)
 
 
+_TYPE_ENERGY_MAP: dict[GroupTemplateType, EnergyTarget] = {
+    GroupTemplateType.BASE: EnergyTarget.LOW,
+    GroupTemplateType.RHYTHM: EnergyTarget.MED,
+    GroupTemplateType.ACCENT: EnergyTarget.HIGH,
+    GroupTemplateType.TRANSITION: EnergyTarget.MED,
+    GroupTemplateType.SPECIAL: EnergyTarget.HIGH,
+}
+
+
+def _compute_style_markers(template_type: GroupTemplateType, layer_count: int) -> StyleMarkers:
+    """Compute style markers from template characteristics."""
+    complexity = min(layer_count / 3.0, 1.0)
+    energy = _TYPE_ENERGY_MAP.get(template_type, EnergyTarget.MED)
+    return StyleMarkers(complexity=complexity, energy_affinity=energy)
+
+
 def convert_builtin_to_recipe(template: GroupPlanTemplate) -> EffectRecipe:
     """Convert a builtin GroupPlanTemplate to an EffectRecipe.
 
@@ -97,6 +114,7 @@ def convert_builtin_to_recipe(template: GroupPlanTemplate) -> EffectRecipe:
     layers = tuple(_convert_layer(i, layer) for i, layer in enumerate(template.layer_recipe))
 
     palette_spec = _derive_palette_spec(template.layer_recipe)
+    style_markers = _compute_style_markers(template.template_type, len(layers))
 
     return EffectRecipe(
         recipe_id=template.template_id,
@@ -110,4 +128,5 @@ def convert_builtin_to_recipe(template: GroupPlanTemplate) -> EffectRecipe:
         palette_spec=palette_spec,
         layers=layers,
         provenance=RecipeProvenance(source="builtin"),
+        style_markers=style_markers,
     )

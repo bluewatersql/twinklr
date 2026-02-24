@@ -110,24 +110,35 @@ def get_taxonomy_dict() -> dict[str, list[str]]:
 
 
 def get_supported_motif_ids() -> set[str]:
-    """Get set of motif IDs that have at least one template with corresponding affinity_tag.
+    """Get set of motif IDs that have template support via tags.
+
+    Scans the JSON template store for template tags that correspond
+    to motif IDs. Tags are direct motif identifiers (e.g. "sparkles",
+    "dots", "wave_bands").
 
     Returns:
-        Set of motif IDs (without 'motif.' prefix) that are supported by templates.
+        Set of motif IDs supported by at least one template.
         Example: {"sparkles", "dots", "wave_bands", "radial_rays"}
     """
-    # Import templates (ensures builtins are loaded)
-    import twinklr.core.sequencer.templates.group.builtins  # noqa: F401
-    from twinklr.core.sequencer.templates.group.library import list_group_templates
+    from pathlib import Path
 
-    # Get all unique motif.* tags from template affinity_tags
-    motif_tags = set()
-    for template in list_group_templates():
-        for tag in template.affinity_tags:
-            if isinstance(tag, str) and tag.startswith("motif."):
-                # Extract motif ID (e.g., "motif.sparkles" -> "sparkles")
-                motif_id = tag[6:]  # Remove "motif." prefix
-                motif_tags.add(motif_id)
+    from twinklr.core.sequencer.templates.group.store import TemplateStore
+
+    # Resolve to workspace root (packages/twinklr/core/agents -> 5 levels up)
+    _root = Path(__file__).resolve().parent.parent.parent.parent.parent
+    templates_dir = _root / "data" / "templates"
+    if not templates_dir.exists():
+        return set()
+
+    from twinklr.core.sequencer.theming import MOTIF_REGISTRY
+
+    store = TemplateStore.from_directory(templates_dir)
+    valid_motif_ids = set(MOTIF_REGISTRY.list_ids())
+    motif_tags: set[str] = set()
+    for entry in store.entries:
+        for tag in entry.tags:
+            if tag in valid_motif_ids:
+                motif_tags.add(tag)
 
     return motif_tags
 

@@ -1,19 +1,20 @@
 """Tests for group template catalog builder."""
 
+import json
+from pathlib import Path
+
 import pytest
 
 from twinklr.core.sequencer.templates.group.catalog import (
     TemplateCatalog,
     TemplateInfo,
-    build_template_catalog,
+    build_template_catalog_from_store,
 )
-from twinklr.core.sequencer.templates.group.library import GroupTemplateRegistry
-from twinklr.core.sequencer.templates.group.models import GroupPlanTemplate, ProjectionSpec
+from twinklr.core.sequencer.templates.group.store import TemplateStore
 from twinklr.core.sequencer.vocabulary import (
     GroupTemplateType,
     GroupVisualIntent,
     LaneKind,
-    ProjectionIntent,
 )
 
 
@@ -44,8 +45,6 @@ class TestTemplateInfo:
             template_type=GroupTemplateType.BASE,
             visual_intent=GroupVisualIntent.ABSTRACT,
             tags=("starfield", "calm"),
-            affinity_tags=["gentle"],
-            avoid_tags=["intense"],
             description="Test description",
         )
         assert entry.compatible_lanes == [LaneKind.BASE]
@@ -202,122 +201,127 @@ class TestTemplateCatalog:
         assert rhythm_entries[0].template_id == "rhythm1"
 
 
-class TestBuildTemplateCatalog:
-    """Test build_template_catalog() function."""
+@pytest.fixture()
+def _store_dir(tmp_path: Path) -> Path:
+    """Create a minimal template store on disk."""
+    builtins = tmp_path / "builtins"
+    builtins.mkdir()
 
-    def test_build_catalog_empty_registry(self):
-        """Test building catalog from empty registry."""
-        # Create isolated registry
-        registry = GroupTemplateRegistry()
+    recipe_data = {
+        "recipe_id": "gtpl_base_wash_slow",
+        "name": "Wash Slow",
+        "description": "Slow wash",
+        "recipe_version": "1.0.0",
+        "template_type": "BASE",
+        "visual_intent": "ABSTRACT",
+        "tags": ["wash", "slow", "test"],
+        "timing": {"bars_min": 4, "bars_max": 64},
+        "palette_spec": {"mode": "MONOCHROME", "palette_roles": ["primary"]},
+        "layers": [],
+        "provenance": {"source": "builtin"},
+        "style_markers": {"complexity": 0.3, "energy_affinity": "LOW"},
+    }
+    (builtins / "gtpl_base_wash_slow.json").write_text(json.dumps(recipe_data), encoding="utf-8")
 
-        # Temporarily swap global registry
-        from twinklr.core.sequencer.templates.group import catalog
+    recipe_data2 = dict(recipe_data)
+    recipe_data2["recipe_id"] = "gtpl_rhythm_pulse_fast"
+    recipe_data2["name"] = "Pulse Fast"
+    recipe_data2["template_type"] = "RHYTHM"
+    recipe_data2["tags"] = ["pulse", "fast", "test"]
+    (builtins / "gtpl_rhythm_pulse_fast.json").write_text(
+        json.dumps(recipe_data2), encoding="utf-8"
+    )
 
-        original_registry = catalog.REGISTRY
-        catalog.REGISTRY = registry
+    recipe_data3 = dict(recipe_data)
+    recipe_data3["recipe_id"] = "gtpl_accent_sparkle"
+    recipe_data3["name"] = "Sparkle"
+    recipe_data3["template_type"] = "ACCENT"
+    recipe_data3["tags"] = ["sparkle", "test"]
+    (builtins / "gtpl_accent_sparkle.json").write_text(json.dumps(recipe_data3), encoding="utf-8")
 
-        try:
-            result = build_template_catalog()
-            assert isinstance(result, TemplateCatalog)
-            assert result.entries == []
-        finally:
-            catalog.REGISTRY = original_registry
+    index = {
+        "schema_version": "template-index.v1",
+        "total": 3,
+        "entries": [
+            {
+                "recipe_id": "gtpl_base_wash_slow",
+                "name": "Wash Slow",
+                "template_type": "BASE",
+                "visual_intent": "ABSTRACT",
+                "tags": ["wash", "slow", "test"],
+                "source": "builtin",
+                "file": "builtins/gtpl_base_wash_slow.json",
+            },
+            {
+                "recipe_id": "gtpl_rhythm_pulse_fast",
+                "name": "Pulse Fast",
+                "template_type": "RHYTHM",
+                "visual_intent": "ABSTRACT",
+                "tags": ["pulse", "fast", "test"],
+                "source": "builtin",
+                "file": "builtins/gtpl_rhythm_pulse_fast.json",
+            },
+            {
+                "recipe_id": "gtpl_accent_sparkle",
+                "name": "Sparkle",
+                "template_type": "ACCENT",
+                "visual_intent": "ABSTRACT",
+                "tags": ["sparkle", "test"],
+                "source": "builtin",
+                "file": "builtins/gtpl_accent_sparkle.json",
+            },
+        ],
+    }
+    (tmp_path / "index.json").write_text(json.dumps(index), encoding="utf-8")
+    return tmp_path
 
-    def test_build_catalog_with_templates(self):
-        """Test building catalog with registered templates."""
-        # Create isolated registry
-        registry = GroupTemplateRegistry()
 
-        # Register sample templates
-        def make_base():
-            return GroupPlanTemplate(
-                template_id="base_test",
-                name="Base Test",
-                template_type=GroupTemplateType.BASE,
-                visual_intent=GroupVisualIntent.ABSTRACT,
-                projection=ProjectionSpec(intent=ProjectionIntent.FLAT),
-                tags=["test", "base"],
-            )
+class TestBuildTemplateCatalogFromStore:
+    """Test build_template_catalog_from_store() function."""
 
-        def make_rhythm():
-            return GroupPlanTemplate(
-                template_id="rhythm_test",
-                name="Rhythm Test",
-                template_type=GroupTemplateType.RHYTHM,
-                visual_intent=GroupVisualIntent.GEOMETRIC,
-                projection=ProjectionSpec(intent=ProjectionIntent.FLAT),
-                tags=["test", "rhythm"],
-            )
+    def test_build_catalog_empty_store(self, tmp_path: Path) -> None:
+        """Test building catalog from empty store."""
+        (tmp_path / "index.json").write_text(
+            json.dumps({"schema_version": "template-index.v1", "total": 0, "entries": []}),
+            encoding="utf-8",
+        )
+        store = TemplateStore.from_directory(tmp_path)
+        result = build_template_catalog_from_store(store)
+        assert isinstance(result, TemplateCatalog)
+        assert result.entries == []
 
-        registry.register(make_base)
-        registry.register(make_rhythm)
+    def test_build_catalog_with_templates(self, _store_dir: Path) -> None:
+        """Test building catalog from store with templates."""
+        store = TemplateStore.from_directory(_store_dir)
+        result = build_template_catalog_from_store(store)
+        assert isinstance(result, TemplateCatalog)
+        assert len(result.entries) == 3
 
-        # Temporarily swap global registry
-        from twinklr.core.sequencer.templates.group import catalog
+        base_entry = result.get_entry("gtpl_base_wash_slow")
+        assert base_entry is not None
+        assert base_entry.name == "Wash Slow"
+        assert base_entry.compatible_lanes == [LaneKind.BASE]
+        assert "wash" in base_entry.tags
+        assert "test" in base_entry.tags
 
-        original_registry = catalog.REGISTRY
-        catalog.REGISTRY = registry
+        rhythm_entry = result.get_entry("gtpl_rhythm_pulse_fast")
+        assert rhythm_entry is not None
+        assert rhythm_entry.name == "Pulse Fast"
+        assert rhythm_entry.compatible_lanes == [LaneKind.RHYTHM]
 
-        try:
-            result = build_template_catalog()
-            assert isinstance(result, TemplateCatalog)
-            assert len(result.entries) == 2
-
-            # Verify BASE template
-            base_entry = result.get_entry("base_test")
-            assert base_entry is not None
-            assert base_entry.name == "Base Test"
-            assert base_entry.compatible_lanes == [LaneKind.BASE]
-            assert "test" in base_entry.tags
-            assert "base" in base_entry.tags
-
-            # Verify RHYTHM template
-            rhythm_entry = result.get_entry("rhythm_test")
-            assert rhythm_entry is not None
-            assert rhythm_entry.name == "Rhythm Test"
-            assert rhythm_entry.compatible_lanes == [LaneKind.RHYTHM]
-        finally:
-            catalog.REGISTRY = original_registry
-
-    def test_template_type_to_lane_mapping(self):
+    def test_template_type_to_lane_mapping(self, _store_dir: Path) -> None:
         """Test template_type maps correctly to LaneKind."""
-        registry = GroupTemplateRegistry()
+        store = TemplateStore.from_directory(_store_dir)
+        result = build_template_catalog_from_store(store)
 
-        # Test all template types
-        for template_type, _ in [
-            (GroupTemplateType.BASE, LaneKind.BASE),
-            (GroupTemplateType.RHYTHM, LaneKind.RHYTHM),
-            (GroupTemplateType.ACCENT, LaneKind.ACCENT),
-        ]:
+        base_entry = result.get_entry("gtpl_base_wash_slow")
+        assert base_entry is not None
+        assert base_entry.compatible_lanes == [LaneKind.BASE]
 
-            def make_template(tt=template_type):
-                return GroupPlanTemplate(
-                    template_id=f"test_{tt.value.lower()}",
-                    name=f"Test {tt.value}",
-                    template_type=tt,
-                    visual_intent=GroupVisualIntent.ABSTRACT,
-                    projection=ProjectionSpec(intent=ProjectionIntent.FLAT),
-                )
+        rhythm_entry = result.get_entry("gtpl_rhythm_pulse_fast")
+        assert rhythm_entry is not None
+        assert rhythm_entry.compatible_lanes == [LaneKind.RHYTHM]
 
-            registry.register(make_template)
-
-        # Temporarily swap global registry
-        from twinklr.core.sequencer.templates.group import catalog
-
-        original_registry = catalog.REGISTRY
-        catalog.REGISTRY = registry
-
-        try:
-            result = build_template_catalog()
-
-            # Verify each mapping
-            base_entry = result.get_entry("test_base")
-            assert base_entry.compatible_lanes == [LaneKind.BASE]
-
-            rhythm_entry = result.get_entry("test_rhythm")
-            assert rhythm_entry.compatible_lanes == [LaneKind.RHYTHM]
-
-            accent_entry = result.get_entry("test_accent")
-            assert accent_entry.compatible_lanes == [LaneKind.ACCENT]
-        finally:
-            catalog.REGISTRY = original_registry
+        accent_entry = result.get_entry("gtpl_accent_sparkle")
+        assert accent_entry is not None
+        assert accent_entry.compatible_lanes == [LaneKind.ACCENT]

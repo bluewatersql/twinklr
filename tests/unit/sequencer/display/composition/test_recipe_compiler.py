@@ -1,14 +1,11 @@
-"""Tests for RecipeCompiler and HybridTemplateCompiler."""
+"""Tests for RecipeCompiler."""
 
 from __future__ import annotations
 
 import pytest
 
-from twinklr.core.sequencer.display.composition.hybrid_compiler import (
-    HybridTemplateCompiler,
-)
-from twinklr.core.sequencer.display.composition.recipe_compiler import RecipeCompiler
 from twinklr.core.sequencer.display.composition.models import TemplateCompileError
+from twinklr.core.sequencer.display.composition.recipe_compiler import RecipeCompiler
 from twinklr.core.sequencer.display.composition.template_compiler import (
     TemplateCompileContext,
 )
@@ -22,6 +19,7 @@ from twinklr.core.sequencer.templates.group.recipe import (
     PaletteSpec,
     RecipeLayer,
     RecipeProvenance,
+    StyleMarkers,
 )
 from twinklr.core.sequencer.templates.group.recipe_catalog import RecipeCatalog
 from twinklr.core.sequencer.vocabulary import (
@@ -36,6 +34,7 @@ from twinklr.core.sequencer.vocabulary import (
     TargetType,
     VisualDepth,
 )
+from twinklr.core.sequencer.vocabulary import EnergyTarget as _EnergyTarget
 from twinklr.core.sequencer.vocabulary.planning import PlanningTimeRef
 
 
@@ -64,6 +63,7 @@ def _make_recipe(recipe_id: str = "recipe_wash") -> EffectRecipe:
             ),
         ),
         provenance=RecipeProvenance(source="mined"),
+        style_markers=StyleMarkers(complexity=0.33, energy_affinity=_EnergyTarget.LOW),
     )
 
 
@@ -170,6 +170,7 @@ def test_recipe_compiler_multi_layer() -> None:
             ),
         ),
         provenance=RecipeProvenance(source="mined"),
+        style_markers=StyleMarkers(complexity=0.67, energy_affinity=_EnergyTarget.MED),
     )
     catalog = RecipeCatalog(recipes=[recipe])
     compiler = RecipeCompiler(catalog=catalog)
@@ -178,68 +179,3 @@ def test_recipe_compiler_multi_layer() -> None:
     assert len(effects) == 2
     assert effects[0].visual_depth == VisualDepth.BACKGROUND
     assert effects[1].visual_depth == VisualDepth.FOREGROUND
-
-
-def test_hybrid_compiler_routes_to_recipe() -> None:
-    """HybridTemplateCompiler delegates to RecipeCompiler for known recipes."""
-    recipe = _make_recipe()
-    catalog = RecipeCatalog(recipes=[recipe])
-    recipe_compiler = RecipeCompiler(catalog=catalog)
-
-    # Mock default compiler that should not be called
-    class FailCompiler:
-        def compile(self, placement, context):  # noqa: ANN001, ANN201, ARG002
-            raise AssertionError("Should not be called for recipe IDs")
-
-    hybrid = HybridTemplateCompiler(
-        recipe_compiler=recipe_compiler,
-        default_compiler=FailCompiler(),  # type: ignore[arg-type]
-    )
-
-    effects = hybrid.compile(_make_placement(), _make_context())
-    assert len(effects) == 1
-    assert effects[0].event.effect_type == "Color Wash"
-
-
-def test_hybrid_compiler_falls_back_to_default() -> None:
-    """HybridTemplateCompiler falls back to DefaultCompiler for unknown recipe IDs."""
-    catalog = RecipeCatalog(recipes=[])
-    recipe_compiler = RecipeCompiler(catalog=catalog)
-
-    class StubDefaultCompiler:
-        def compile(self, placement, context):  # noqa: ANN001, ANN201, ARG002
-            from twinklr.core.sequencer.display.composition.models import CompiledEffect
-            from twinklr.core.sequencer.display.models.render_event import (
-                RenderEvent,
-                RenderEventSource,
-            )
-
-            from twinklr.core.sequencer.display.models.palette import ResolvedPalette
-
-            return [
-                CompiledEffect(
-                    event=RenderEvent(
-                        event_id="stub",
-                        start_ms=0,
-                        end_ms=1000,
-                        effect_type="Stub",
-                        palette=ResolvedPalette(colors=["#FFFFFF"], active_slots=[1]),
-                        source=RenderEventSource(
-                            section_id="s1",
-                            lane=LaneKind.BASE,
-                            group_id="g1",
-                            template_id="gtpl_stub",
-                        ),
-                    ),
-                    visual_depth=VisualDepth.BACKGROUND,
-                )
-            ]
-
-    hybrid = HybridTemplateCompiler(
-        recipe_compiler=recipe_compiler,
-        default_compiler=StubDefaultCompiler(),  # type: ignore[arg-type]
-    )
-
-    effects = hybrid.compile(_make_placement("gtpl_stub"), _make_context())
-    assert len(effects) == 1
-    assert effects[0].event.effect_type == "Stub"

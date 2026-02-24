@@ -1,25 +1,23 @@
-"""Tests for RecipeCatalog merging builtins and promoted recipes."""
+"""Tests for RecipeCatalog."""
 
 from __future__ import annotations
 
-from twinklr.core.sequencer.templates.group.models.template import TimingHints
+from twinklr.core.sequencer.templates.group.models.template import (
+    TimingHints,
+)
 from twinklr.core.sequencer.templates.group.recipe import (
     ColorSource,
     EffectRecipe,
     PaletteSpec,
     RecipeLayer,
     RecipeProvenance,
-)
-from twinklr.core.sequencer.templates.group.models.template import (
-    GroupPlanTemplate,
-    LayerRecipe,
-    ProjectionSpec,
+    StyleMarkers,
 )
 from twinklr.core.sequencer.templates.group.recipe_catalog import RecipeCatalog
 from twinklr.core.sequencer.vocabulary import (
-    ProjectionIntent,
     BlendMode,
     ColorMode,
+    EnergyTarget,
     GroupTemplateType,
     GroupVisualIntent,
     LaneKind,
@@ -60,6 +58,7 @@ def _make_recipe(
             ),
         ),
         provenance=RecipeProvenance(source=source),
+        style_markers=StyleMarkers(complexity=0.33, energy_affinity=EnergyTarget.MED),
     )
 
 
@@ -126,50 +125,3 @@ def test_recipe_catalog_recipe_count() -> None:
     assert len(catalog.recipes) == 5
 
 
-def _make_builtin_template(template_id: str = "gtpl_warm_glow") -> GroupPlanTemplate:
-    return GroupPlanTemplate(
-        template_id=template_id,
-        name="Warm Glow",
-        description="Ambient glow",
-        template_type=GroupTemplateType.BASE,
-        visual_intent=GroupVisualIntent.ABSTRACT,
-        tags=["warm"],
-        projection=ProjectionSpec(intent=ProjectionIntent.FLAT),
-        timing=TimingHints(bars_min=4, bars_max=64),
-        layer_recipe=[
-            LayerRecipe(
-                layer=VisualDepth.BACKGROUND,
-                motifs=["glow"],
-                visual_intent=GroupVisualIntent.ABSTRACT,
-                motion=[MotionVerb.FADE],
-                density=0.5,
-                contrast=0.3,
-                color_mode=ColorMode.MONOCHROME,
-            ),
-        ],
-        template_version="1.0.0",
-    )
-
-
-def test_from_builtins_and_promoted() -> None:
-    """Factory builds unified catalog from builtins + promoted."""
-    builtin = _make_builtin_template("gtpl_warm_glow")
-    promoted = _make_recipe(recipe_id="mined_sparkle", source="mined")
-
-    catalog = RecipeCatalog.from_builtins_and_promoted(
-        builtins=[builtin],
-        promoted=[promoted],
-    )
-    assert catalog.has_recipe("gtpl_warm_glow")
-    assert catalog.has_recipe("mined_sparkle")
-    assert len(catalog.recipes) == 2
-    assert catalog.get_recipe("gtpl_warm_glow").provenance.source == "builtin"
-    assert catalog.get_recipe("mined_sparkle").provenance.source == "mined"
-
-
-def test_from_builtins_only() -> None:
-    """Factory works with builtins only (no promoted)."""
-    builtin = _make_builtin_template()
-    catalog = RecipeCatalog.from_builtins_and_promoted(builtins=[builtin])
-    assert len(catalog.recipes) == 1
-    assert catalog.has_recipe("gtpl_warm_glow")

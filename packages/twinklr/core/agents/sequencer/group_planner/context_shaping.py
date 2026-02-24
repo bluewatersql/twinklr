@@ -14,6 +14,7 @@ from typing import Any
 from twinklr.core.agents.sequencer.group_planner.context import SectionPlanningContext
 from twinklr.core.agents.taxonomy_utils import get_theming_catalog_dict, get_theming_ids
 from twinklr.core.sequencer.planning import GroupPlanSet
+from twinklr.core.sequencer.templates.group.affinity import AffinityScorer
 from twinklr.core.sequencer.templates.group.catalog import TemplateCatalog
 from twinklr.core.sequencer.templates.group.library import TemplateInfo
 from twinklr.core.sequencer.templates.group.models.choreography import (
@@ -70,25 +71,22 @@ def filter_templates_by_intent(
         logger.debug("Template catalog is empty, returning empty list")
         return []
 
-    # Build motif affinity tags to match (e.g., ["motif.grid", "motif.light_trails"])
-    motif_tags = {f"motif.{mid}" for mid in (motif_ids or [])}
+    motif_list = motif_ids or []
 
     # Get patterns for this energy target
     patterns = ENERGY_TEMPLATE_PATTERNS.get(energy_target.upper(), [])
 
     # If no patterns for this energy and no motifs, use all templates
-    if not patterns and not motif_tags:
+    if not patterns and not motif_list:
         logger.debug(f"No filter patterns for energy '{energy_target}', using full catalog")
         return list(catalog.entries)
 
-    # Filter templates by energy patterns AND motif affinity tags (when both specified)
-    # This provides tighter filtering than OR logic, ensuring templates match section intent
+    # Filter templates by energy patterns AND motif affinity (when both specified)
     filtered = []
     filtered_ids = set()
     for entry in catalog.entries:
         name_lower = entry.name.lower()
         template_id_lower = entry.template_id.lower()
-        # Also check template tags for energy patterns (e.g., "ambient", "drive", "burst")
         tags_lower = [str(tag).lower() for tag in (entry.tags or [])]
 
         # Check if template matches energy patterns (in name, ID, or tags)
@@ -99,21 +97,20 @@ def filter_templates_by_intent(
             for pattern in patterns
         )
 
-        # Check if template matches declared motifs
-        motif_match = motif_tags and any(tag in motif_tags for tag in entry.affinity_tags)
+        # Check if template matches declared motifs (computed from tags)
+        motif_match = bool(motif_list) and AffinityScorer.has_motif_affinity(
+            entry, motif_ids=motif_list
+        )
 
         # Filtering logic:
         # - If both patterns and motifs specified: require BOTH to match (AND)
         # - If only patterns specified: require pattern match
         # - If only motifs specified: require motif match
-        if patterns and motif_tags:
-            # Both specified - use AND logic for tighter filtering
+        if patterns and motif_list:
             include = energy_match and motif_match
         elif patterns:
-            # Only energy patterns - use energy match
             include = energy_match
-        elif motif_tags:
-            # Only motifs - use motif match
+        elif motif_list:
             include = motif_match
         else:
             include = False
@@ -235,10 +232,8 @@ def shape_planner_context(section_context: SectionPlanningContext) -> dict[str, 
                 "template_id": entry.template_id,
                 "name": entry.name,
                 "compatible_lanes": entry.compatible_lanes,
-                "affinity_tags": entry.affinity_tags,
-                "avoid_tags": entry.avoid_tags,
-                "tags": entry.tags,  # Template characteristics (e.g., "sweep", "static")
-                # Drop: description, presets, category (save ~35% tokens)
+                "affinity_tags": AffinityScorer.derive_affinity_tags(entry),
+                "tags": entry.tags,
             }
             for entry in filtered_entries
         ],
@@ -250,8 +245,7 @@ def shape_planner_context(section_context: SectionPlanningContext) -> dict[str, 
                 "template_id": entry.template_id,
                 "name": entry.name,
                 "compatible_lanes": entry.compatible_lanes,
-                "affinity_tags": entry.affinity_tags,
-                "avoid_tags": entry.avoid_tags,
+                "affinity_tags": AffinityScorer.derive_affinity_tags(entry),
                 "tags": entry.tags,
             }
             for entry in section_context.template_catalog.entries
@@ -570,8 +564,8 @@ def shape_section_judge_context(
                 "template_id": entry.template_id,
                 "name": entry.name,
                 "compatible_lanes": entry.compatible_lanes,
-                "affinity_tags": entry.affinity_tags,
-                "avoid_tags": entry.avoid_tags,
+                "affinity_tags": AffinityScorer.derive_affinity_tags(entry),
+                "tags": entry.tags,
             }
             for entry in section_context.template_catalog.entries
         ],

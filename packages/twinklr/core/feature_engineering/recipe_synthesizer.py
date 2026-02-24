@@ -161,20 +161,34 @@ _ENERGY_DENSITY_MAP: dict[str, float] = {
 }
 
 # Effect families that are inherently sparkle/overlay types (skip sparkle overlay)
-_SPARKLE_FAMILIES: frozenset[str] = frozenset({
-    "sparkle", "twinkle", "shimmer", "snowflakes", "candle", "fireworks",
-})
+_SPARKLE_FAMILIES: frozenset[str] = frozenset(
+    {
+        "sparkle",
+        "twinkle",
+        "shimmer",
+        "snowflakes",
+        "candle",
+        "fireworks",
+    }
+)
 
 # Ambient/wash-like families where a ColorWash underlay would be redundant
-_WASH_LIKE_FAMILIES: frozenset[str] = frozenset({
-    "color_wash", "fill", "on", "morph",
-})
+_WASH_LIKE_FAMILIES: frozenset[str] = frozenset(
+    {
+        "color_wash",
+        "fill",
+        "on",
+        "morph",
+    }
+)
 
 # Non-visual families that should never receive layering (underlay or overlay).
 # These are utility/device effects without meaningful visual rendering.
-_NON_VISUAL_FAMILIES: frozenset[str] = frozenset({
-    "off",
-})
+_NON_VISUAL_FAMILIES: frozenset[str] = frozenset(
+    {
+        "off",
+    }
+)
 
 # energy_class → EnergyTarget for StyleMarkers
 _ENERGY_TARGET_MAP: dict[str, EnergyTarget] = {
@@ -294,10 +308,7 @@ class RecipeSynthesizer:
             timing=timing,
             palette_spec=PaletteSpec(mode=color_mode, palette_roles=palette_roles),
             layers=tuple(layers),
-            provenance=RecipeProvenance(
-                source="mined",
-                mined_template_ids=[mined.template_id],
-            ),
+            provenance=RecipeProvenance(source="mined"),
             style_markers=StyleMarkers(
                 complexity=complexity,
                 energy_affinity=energy_target,
@@ -339,50 +350,54 @@ class RecipeSynthesizer:
         )
 
         if want_underlay:
-            layers.append(RecipeLayer(
-                layer_index=idx,
-                layer_name="Wash",
-                layer_depth=VisualDepth.BACKGROUND,
-                effect_type="ColorWash",
-                blend_mode=BlendMode.NORMAL,
-                mix=1.0,
-                params={"Speed": ParamValue(value=0)},
-                motion=[MotionVerb.FADE],
-                density=0.9,
-                color_source=ColorSource.PALETTE_PRIMARY,
-            ))
+            layers.append(
+                RecipeLayer(
+                    layer_index=idx,
+                    layer_name="Wash",
+                    layer_depth=VisualDepth.BACKGROUND,
+                    effect_type="ColorWash",
+                    blend_mode=BlendMode.NORMAL,
+                    mix=1.0,
+                    params={"Speed": ParamValue(value=0)},
+                    motion=[MotionVerb.FADE],
+                    density=0.9,
+                    color_source=ColorSource.PALETTE_PRIMARY,
+                )
+            )
             idx += 1
 
-        layers.append(RecipeLayer(
-            layer_index=idx,
-            layer_name=effect_type,
-            layer_depth=(
-                VisualDepth.MIDGROUND if want_underlay else VisualDepth.BACKGROUND
-            ),
-            effect_type=effect_type,
-            blend_mode=BlendMode.ADD if want_underlay else BlendMode.NORMAL,
-            mix=0.8 if want_underlay else 1.0,
-            params={},
-            motion=motion,
-            density=density,
-            color_source=ColorSource.PALETTE_PRIMARY,
-        ))
+        layers.append(
+            RecipeLayer(
+                layer_index=idx,
+                layer_name=effect_type,
+                layer_depth=(VisualDepth.MIDGROUND if want_underlay else VisualDepth.BACKGROUND),
+                effect_type=effect_type,
+                blend_mode=BlendMode.ADD if want_underlay else BlendMode.NORMAL,
+                mix=0.8 if want_underlay else 1.0,
+                params={},
+                motion=motion,
+                density=density,
+                color_source=ColorSource.PALETTE_PRIMARY,
+            )
+        )
         idx += 1
 
         if want_overlay:
-            layers.append(RecipeLayer(
-                layer_index=idx,
-                layer_name="Sparkle",
-                layer_depth=VisualDepth.FOREGROUND,
-                effect_type="Twinkle",
-                blend_mode=BlendMode.SCREEN,
-                mix=0.3,
-                params={
-                    "Count": ParamValue(expr="energy * 40", min_val=5, max_val=50),
-                },
-                motion=[MotionVerb.SPARKLE],
-                density=0.2,
-                color_source=ColorSource.WHITE_ONLY,
-            ))
+            layers.append(
+                RecipeLayer(
+                    layer_index=idx,
+                    layer_name="Sparkle",
+                    layer_depth=VisualDepth.FOREGROUND,
+                    effect_type="Twinkle",
+                    blend_mode=BlendMode.SCREEN,
+                    mix=0.3,
+                    params={
+                        "Count": ParamValue(expr="energy * 40", min_val=5, max_val=50),
+                    },
+                    motion=[MotionVerb.SPARKLE],
+                    density=0.2,
+                    color_source=ColorSource.WHITE_ONLY,
+                )
+            )
 
         return layers

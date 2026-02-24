@@ -367,4 +367,3 @@ class AudioDiscoveryService:
         if score < _LOW_CONFIDENCE_FLOOR:
             parts.append("below low-confidence floor")
         return score, ", ".join(parts) if parts else "no strong match signals"
-

@@ -2,10 +2,7 @@
 
 from __future__ import annotations
 
-import tempfile
-
 import numpy as np
-import pytest
 
 from twinklr.core.audio.analyzer import AudioAnalyzer
 

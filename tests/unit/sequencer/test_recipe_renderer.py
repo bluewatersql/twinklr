@@ -18,10 +18,12 @@ from twinklr.core.sequencer.templates.group.recipe import (
     ParamValue,
     RecipeLayer,
     RecipeProvenance,
+    StyleMarkers,
 )
 from twinklr.core.sequencer.vocabulary import (
     BlendMode,
     ColorMode,
+    EnergyTarget,
     GroupTemplateType,
     GroupVisualIntent,
     MotionVerb,
@@ -70,6 +72,7 @@ def _make_recipe(layers: tuple[RecipeLayer, ...] | None = None) -> EffectRecipe:
         palette_spec=PaletteSpec(mode=ColorMode.DICHROME, palette_roles=["primary", "accent"]),
         layers=layers,
         provenance=RecipeProvenance(source="builtin"),
+        style_markers=StyleMarkers(complexity=0.33, energy_affinity=EnergyTarget.LOW),
     )
 
 

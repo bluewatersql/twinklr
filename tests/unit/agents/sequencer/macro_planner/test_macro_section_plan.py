@@ -1,13 +1,18 @@
 """Tests for MacroSectionPlan model."""
 
-import pytest
 from pydantic import ValidationError
+import pytest
 
 from twinklr.core.agents.audio.profile.models import SongSectionRef
 from twinklr.core.sequencer.planning import MacroSectionPlan
 from twinklr.core.sequencer.templates.group.models import PlanTarget
 from twinklr.core.sequencer.theming import ThemeRef, ThemeScope
-from twinklr.core.sequencer.vocabulary import ChoreographyStyle, EnergyTarget, MotionDensity, TargetType
+from twinklr.core.sequencer.vocabulary import (
+    ChoreographyStyle,
+    EnergyTarget,
+    MotionDensity,
+    TargetType,
+)
 
 
 def _make_section_theme() -> ThemeRef:

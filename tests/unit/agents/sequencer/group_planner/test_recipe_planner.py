@@ -24,11 +24,13 @@ from twinklr.core.sequencer.templates.group.recipe import (
     PaletteSpec,
     RecipeLayer,
     RecipeProvenance,
+    StyleMarkers,
 )
 from twinklr.core.sequencer.templates.group.recipe_catalog import RecipeCatalog
 from twinklr.core.sequencer.vocabulary import (
     BlendMode,
     ColorMode,
+    EnergyTarget,
     GroupTemplateType,
     GroupVisualIntent,
     LaneKind,
@@ -42,7 +44,6 @@ def _make_recipe(
     recipe_id: str = "test_recipe",
     template_type: GroupTemplateType = GroupTemplateType.RHYTHM,
     effect_type: str = "ColorWash",
-    model_affinities: list[ModelAffinity] | None = None,
     num_layers: int = 1,
 ) -> EffectRecipe:
     """Helper to create test EffectRecipe."""
@@ -73,7 +74,9 @@ def _make_recipe(
         palette_spec=PaletteSpec(mode=ColorMode.DICHROME, palette_roles=["primary", "accent"]),
         layers=layers,
         provenance=RecipeProvenance(source="mined"),
-        model_affinities=model_affinities or [],
+        style_markers=StyleMarkers(
+            complexity=min(num_layers / 3.0, 1.0), energy_affinity=EnergyTarget.MED
+        ),
     )
 
 
@@ -169,7 +172,10 @@ def test_shape_planner_context_includes_recipe_catalog() -> None:
         template_type=GroupTemplateType.RHYTHM,
         effect_type="Sparkles",
         num_layers=2,
-        model_affinities=[ModelAffinity(model_type="megatree", score=0.9)],
+    ).model_copy(
+        update={
+            "model_affinities": [ModelAffinity(model_type="megatree", score=0.9)],
+        }
     )
     catalog = RecipeCatalog(recipes=[r1])
     ctx = _make_section_context(recipe_catalog=catalog)

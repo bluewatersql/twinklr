@@ -43,10 +43,7 @@ from twinklr.core.sequencer.display.xlights_mapping import (
     XLightsGroupMapping,
     XLightsMapping,
 )
-from twinklr.core.sequencer.templates.group import load_builtin_group_templates
-from twinklr.core.sequencer.templates.group.catalog import (
-    build_template_catalog as build_catalog_from_registry,
-)
+from twinklr.core.sequencer.templates.group.catalog import build_template_catalog_from_store
 from twinklr.core.sequencer.templates.group.models.choreography import (
     ChoreographyGraph,
     ChoreoGroup,
@@ -55,6 +52,7 @@ from twinklr.core.sequencer.templates.group.models.display import (
     GroupPosition,
 )
 from twinklr.core.sequencer.templates.group.recipe_catalog import RecipeCatalog
+from twinklr.core.sequencer.templates.group.store import TemplateStore
 from twinklr.core.sequencer.vocabulary.choreography import ChoreoTag, SplitDimension
 from twinklr.core.sequencer.vocabulary.composition import LaneKind
 from twinklr.core.sequencer.vocabulary.display import (
@@ -484,34 +482,29 @@ async def main() -> None:
     choreo_graph, xlights_mapping = build_display_graph()
     display_groups = choreo_graph.to_planner_summary()
 
-    # Build catalog from registry
-    load_builtin_group_templates()
-    template_catalog = build_catalog_from_registry()
+    # Build catalog from JSON template store
+    template_store = TemplateStore.from_directory(repo_root / "data" / "templates")
+    template_catalog = build_template_catalog_from_store(template_store)
 
-    # Load FE artifacts and build unified recipe catalog (optional)
+    # Build recipe catalog from store (always available now)
+    recipe_catalog: RecipeCatalog | None = RecipeCatalog.from_store(template_store)
+    print(f"Template store: {len(template_store.all_recipe_ids())} recipes loaded from JSON")
+
+    # Load FE artifacts for promoted recipes (optional)
     fe_bundle: FEArtifactBundle | None = None
-    recipe_catalog: RecipeCatalog | None = None
     if args.fe_data:
         fe_dir = Path(args.fe_data)
         if fe_dir.exists():
             fe_bundle = load_fe_artifacts(fe_dir)
-            from twinklr.core.sequencer.templates.group.library import (
-                REGISTRY as GROUP_REGISTRY,
-            )
-
-            all_builtins = [
-                GROUP_REGISTRY.get(info.template_id)
-                for info in GROUP_REGISTRY.list_all()
-            ]
-            recipe_catalog = RecipeCatalog.from_builtins_and_promoted(
-                builtins=all_builtins,
+            recipe_catalog = RecipeCatalog.from_store(
+                template_store,
                 promoted=list(fe_bundle.recipe_catalog_entries),
             )
             print(f"FE data loaded from {fe_dir}")
             print(
                 f"   Recipe catalog: {len(recipe_catalog.recipes)} recipes "
                 f"({len(fe_bundle.recipe_catalog_entries)} promoted + "
-                f"{len(all_builtins)} builtins)"
+                f"{len(template_store.all_recipe_ids())} builtins)"
             )
             if fe_bundle.color_arc:
                 print("   Color arc: loaded")

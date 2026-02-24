@@ -212,11 +212,13 @@ def test_different_energy_per_sequence_produces_different_arc_values() -> None:
     different arc keyframe temperatures."""
     phrases = (
         _make_phrase_for_seq(
-            package_id="pkgA", sequence_file_id="seqA",
+            package_id="pkgA",
+            sequence_file_id="seqA",
             energy_class=EnergyClass.LOW,
         ),
         _make_phrase_for_seq(
-            package_id="pkgB", sequence_file_id="seqB",
+            package_id="pkgB",
+            sequence_file_id="seqB",
             energy_class=EnergyClass.BURST,
         ),
     )
@@ -234,16 +236,14 @@ def test_palette_rotation_across_same_section_index() -> None:
     via rotation by global row position."""
     rows = tuple(
         _make_color_row_for_seq(
-            package_id=f"pkg{i}", sequence_file_id=f"seq{i}",
+            package_id=f"pkg{i}",
+            sequence_file_id=f"seq{i}",
         )
         for i in range(3)
     )
     phrases = tuple(
-        _make_phrase_for_seq(package_id=f"pkg{i}", sequence_file_id=f"seq{i}")
-        for i in range(3)
+        _make_phrase_for_seq(package_id=f"pkg{i}", sequence_file_id=f"seq{i}") for i in range(3)
     )
     result = ColorArcExtractor().extract(phrases=phrases, color_narrative=rows)
     palette_ids = [a.palette_id for a in result.section_assignments]
-    assert len(set(palette_ids)) > 1, (
-        f"Expected palette variety but got {palette_ids}"
-    )
+    assert len(set(palette_ids)) > 1, f"Expected palette variety but got {palette_ids}"

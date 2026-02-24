@@ -1,16 +1,21 @@
-"""RecipeCatalog — unified catalog merging builtins and promoted recipes.
+"""RecipeCatalog — unified catalog of EffectRecipe objects.
 
-Provides the same lookup interface as TemplateCatalog but backed by
-EffectRecipe objects. Supports merging auto-converted builtins with
-FE-promoted recipes.
+Provides lookup by recipe_id and filtering by lane, matching the
+interface pattern of TemplateCatalog. Loaded from TemplateStore.
 """
 
 from __future__ import annotations
 
-from twinklr.core.sequencer.templates.group.converter import convert_builtin_to_recipe
-from twinklr.core.sequencer.templates.group.models.template import GroupPlanTemplate
+import logging
+from typing import TYPE_CHECKING
+
 from twinklr.core.sequencer.templates.group.recipe import EffectRecipe
 from twinklr.core.sequencer.vocabulary import GroupTemplateType, LaneKind
+
+if TYPE_CHECKING:
+    from twinklr.core.sequencer.templates.group.store import TemplateStore
+
+logger = logging.getLogger(__name__)
 
 # Template type to lane mapping (matches TemplateInfo.compatible_lanes logic)
 _TYPE_TO_LANE: dict[GroupTemplateType, LaneKind] = {
@@ -72,22 +77,28 @@ class RecipeCatalog:
         return cls(recipes=merged)
 
     @classmethod
-    def from_builtins_and_promoted(
+    def from_store(
         cls,
-        builtins: list[GroupPlanTemplate],
+        store: TemplateStore,
         promoted: list[EffectRecipe] | None = None,
     ) -> RecipeCatalog:
-        """Build a unified catalog from builtin templates and optional promoted recipes.
+        """Build a unified catalog from a TemplateStore.
 
-        Converts builtins to EffectRecipe via ``convert_builtin_to_recipe``,
-        then merges with promoted recipes (promoted take precedence on ID collision).
+        Loads all recipes from the JSON-backed store and merges with
+        optional promoted recipes.
 
         Args:
-            builtins: Builtin GroupPlanTemplate instances.
+            store: TemplateStore with JSON-backed recipes.
             promoted: Optional FE-promoted EffectRecipe instances.
 
         Returns:
             Unified RecipeCatalog.
         """
-        converted = [convert_builtin_to_recipe(t) for t in builtins]
-        return cls.merge(converted, promoted or [])
+        builtins: list[EffectRecipe] = []
+        for recipe_id in store.all_recipe_ids():
+            recipe = store.get_recipe(recipe_id)
+            if recipe is not None:
+                builtins.append(recipe)
+            else:
+                logger.warning(f"Failed to load recipe {recipe_id} from store")
+        return cls.merge(builtins, promoted or [])

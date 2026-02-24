@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 from twinklr.core.sequencer.display.composition.engine import (
@@ -9,6 +10,9 @@ from twinklr.core.sequencer.display.composition.engine import (
 )
 from twinklr.core.sequencer.display.composition.palette_resolver import (
     PaletteResolver,
+)
+from twinklr.core.sequencer.display.composition.recipe_compiler import (
+    RecipeCompiler,
 )
 from twinklr.core.sequencer.display.models.palette import (
     ResolvedPalette,
@@ -24,10 +28,6 @@ from twinklr.core.sequencer.planning.group_plan import (
     SectionCoordinationPlan,
 )
 from twinklr.core.sequencer.planning.models import PaletteRef
-from twinklr.core.sequencer.templates.group import (
-    REGISTRY,
-    load_builtin_group_templates,
-)
 from twinklr.core.sequencer.templates.group.models.choreography import (
     ChoreographyGraph,
     ChoreoGroup,
@@ -37,6 +37,10 @@ from twinklr.core.sequencer.templates.group.models.coordination import (
     GroupPlacement,
     PlanTarget,
 )
+from twinklr.core.sequencer.templates.group.recipe_catalog import (
+    RecipeCatalog,
+)
+from twinklr.core.sequencer.templates.group.store import TemplateStore
 from twinklr.core.sequencer.theming import PALETTE_REGISTRY, ThemeRef
 from twinklr.core.sequencer.theming.enums import ThemeScope
 from twinklr.core.sequencer.timing.beat_grid import BeatGrid
@@ -49,8 +53,16 @@ from twinklr.core.sequencer.vocabulary import (
 )
 from twinklr.core.sequencer.vocabulary.choreography import TargetType
 
-# Ensure builtins are loaded once for all tests in this module
-load_builtin_group_templates()
+_TEMPLATES_DIR = (
+    Path(__file__).resolve().parent.parent.parent.parent.parent.parent / "data" / "templates"
+)
+
+
+def _load_recipe_compiler() -> RecipeCompiler:
+    """Create RecipeCompiler backed by data/templates."""
+    store = TemplateStore.from_directory(_TEMPLATES_DIR)
+    catalog = RecipeCatalog.from_store(store)
+    return RecipeCompiler(catalog=catalog)
 
 
 def _make_beat_grid() -> BeatGrid:
@@ -108,13 +120,13 @@ def _make_engine(**kwargs: Any) -> CompositionEngine:
     """Create a CompositionEngine with sensible defaults.
 
     Accepts the same kwargs as ``CompositionEngine.__init__``.
-    Always includes the builtin template registry.
+    Always includes the RecipeCompiler from data/templates.
     """
     defaults: dict[str, Any] = {
         "beat_grid": _make_beat_grid(),
         "choreo_graph": _make_choreo_graph(),
         "palette_resolver": _make_palette_resolver(),
-        "template_registry": REGISTRY,
+        "template_compiler": _load_recipe_compiler(),
         "xlights_mapping": _make_xlights_mapping(),
     }
     defaults.update(kwargs)

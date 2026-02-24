@@ -70,7 +70,6 @@ def test_synthesize_single_strand_sweep() -> None:
     assert primary.effect_type == "SingleStrand"
     assert MotionVerb.SWEEP in primary.motion
     assert recipe.provenance.source == "mined"
-    assert "uuid-test-1" in recipe.provenance.mined_template_ids
 
 
 def test_synthesize_shimmer_pulse() -> None:
@@ -98,7 +97,6 @@ def test_synthesize_preserves_provenance() -> None:
     mined = _make_mined()
     recipe = RecipeSynthesizer().synthesize(mined, recipe_id="test_prov")
     assert recipe.provenance.source == "mined"
-    assert recipe.provenance.mined_template_ids == ["uuid-test-1"]
 
 
 def test_synthesize_maps_color_class_to_palette_spec() -> None:
@@ -198,14 +196,54 @@ def test_real_families_all_mapped() -> None:
     from twinklr.core.feature_engineering.recipe_synthesizer import _EFFECT_TYPE_MAP
 
     real_families = [
-        "bars", "butterfly", "candle", "circles", "color_wash", "curtain",
-        "dmx", "faces", "fan", "fill", "fire", "fireworks", "galaxy",
-        "garlands", "kaleidoscope", "lightning", "lines", "liquid", "marquee",
-        "meteors", "morph", "moving_head", "off", "on", "pictures", "pinwheel",
-        "plasma", "ripple", "shader", "shape", "shimmer", "shockwave",
-        "single_strand", "sketch", "snow_storm", "snowflakes", "spirals",
-        "spirograph", "state", "strobe", "tendrils", "text", "tree", "twinkle",
-        "video", "vu_meter", "warp", "wave",
+        "bars",
+        "butterfly",
+        "candle",
+        "circles",
+        "color_wash",
+        "curtain",
+        "dmx",
+        "faces",
+        "fan",
+        "fill",
+        "fire",
+        "fireworks",
+        "galaxy",
+        "garlands",
+        "kaleidoscope",
+        "lightning",
+        "lines",
+        "liquid",
+        "marquee",
+        "meteors",
+        "morph",
+        "moving_head",
+        "off",
+        "on",
+        "pictures",
+        "pinwheel",
+        "plasma",
+        "ripple",
+        "shader",
+        "shape",
+        "shimmer",
+        "shockwave",
+        "single_strand",
+        "sketch",
+        "snow_storm",
+        "snowflakes",
+        "spirals",
+        "spirograph",
+        "state",
+        "strobe",
+        "tendrils",
+        "text",
+        "tree",
+        "twinkle",
+        "video",
+        "vu_meter",
+        "warp",
+        "wave",
     ]
     for family in real_families:
         assert family in _EFFECT_TYPE_MAP, f"{family} missing from _EFFECT_TYPE_MAP"
@@ -263,8 +301,10 @@ def test_style_markers_populated() -> None:
 def test_color_wash_rhythm_skips_underlay() -> None:
     """ColorWash in RHYTHM lane should NOT get a redundant wash underlay."""
     mined = _make_mined(
-        effect_family="color_wash", motion_class="fade",
-        role="rhythm_driver", energy_class="mid",
+        effect_family="color_wash",
+        motion_class="fade",
+        role="rhythm_driver",
+        energy_class="mid",
     )
     recipe = RecipeSynthesizer().synthesize(mined, recipe_id="test_wash_no_underlay")
     assert recipe.layers[0].effect_type == "ColorWash"
@@ -275,8 +315,10 @@ def test_color_wash_rhythm_skips_underlay() -> None:
 def test_fill_accent_skips_underlay() -> None:
     """Fill in ACCENT lane should NOT get a redundant wash underlay."""
     mined = _make_mined(
-        effect_family="fill", motion_class="static",
-        role="accent_hit", energy_class="mid",
+        effect_family="fill",
+        motion_class="static",
+        role="accent_hit",
+        energy_class="mid",
     )
     recipe = RecipeSynthesizer().synthesize(mined, recipe_id="test_fill_no_underlay")
     assert recipe.layers[0].effect_type == "Fill"
@@ -286,8 +328,10 @@ def test_fill_accent_skips_underlay() -> None:
 def test_on_rhythm_skips_underlay() -> None:
     """On in RHYTHM lane should NOT get a wash underlay."""
     mined = _make_mined(
-        effect_family="on", motion_class="static",
-        role="rhythm_driver", energy_class="mid",
+        effect_family="on",
+        motion_class="static",
+        role="rhythm_driver",
+        energy_class="mid",
     )
     recipe = RecipeSynthesizer().synthesize(mined, recipe_id="test_on_no_underlay")
     assert recipe.layers[0].layer_name != "Wash"
@@ -299,8 +343,10 @@ def test_on_rhythm_skips_underlay() -> None:
 def test_off_effect_single_layer() -> None:
     """Off effect should be a single layer regardless of lane or energy."""
     mined = _make_mined(
-        effect_family="off", motion_class="static",
-        role="accent_hit", energy_class="burst",
+        effect_family="off",
+        motion_class="static",
+        role="accent_hit",
+        energy_class="burst",
     )
     recipe = RecipeSynthesizer().synthesize(mined, recipe_id="test_off_single")
     assert len(recipe.layers) == 1

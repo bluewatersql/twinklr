@@ -1021,23 +1021,18 @@ def test_filter_templates_by_intent_ensures_minimum_per_lane() -> None:
     assert accent_count >= 2  # Both match HIGH
 
 
-def test_template_simplification_includes_affinity_and_avoid_tags(section_context):
-    """Verify that affinity_tags and avoid_tags are included in simplified catalog."""
+def test_template_simplification_includes_computed_affinity_tags(section_context):
+    """Verify that computed affinity_tags are included in simplified catalog."""
     shaped = shape_planner_context(section_context)
 
-    # Check that simplified catalog entries include affinity_tags and avoid_tags
     assert "template_catalog" in shaped
     assert "entries" in shaped["template_catalog"]
 
     if shaped["template_catalog"]["entries"]:
-        # Check first entry has the new fields
         entry = shaped["template_catalog"]["entries"][0]
         assert "template_id" in entry
         assert "name" in entry
         assert "compatible_lanes" in entry
-        assert "affinity_tags" in entry  # NEW: Should be present
-        assert "avoid_tags" in entry  # NEW: Should be present
-
-        # Verify they are lists (even if empty)
+        assert "affinity_tags" in entry
         assert isinstance(entry["affinity_tags"], list)
-        assert isinstance(entry["avoid_tags"], list)
+        assert len(entry["affinity_tags"]) > 0

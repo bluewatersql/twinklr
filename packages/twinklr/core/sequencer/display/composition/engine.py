@@ -37,7 +37,6 @@ from twinklr.core.sequencer.display.composition.target_resolver import (
     TargetResolver,
 )
 from twinklr.core.sequencer.display.composition.template_compiler import (
-    DefaultTemplateCompiler,
     TemplateCompileContext,
     TemplateCompiler,
 )
@@ -65,9 +64,6 @@ from twinklr.core.sequencer.planning.group_plan import (
     SectionCoordinationPlan,
 )
 from twinklr.core.sequencer.planning.models import PaletteRef
-from twinklr.core.sequencer.templates.group.library import (
-    GroupTemplateRegistry,
-)
 from twinklr.core.sequencer.templates.group.models.choreography import (
     ChoreographyGraph,
 )
@@ -148,12 +144,7 @@ class CompositionEngine:
             for resolving asset file paths during overlay rendering.
         template_compiler: Optional ``TemplateCompiler`` for multi-layer
             template rendering.  Uses the compiler to produce
-            ``CompiledEffect``s from ``GroupPlanTemplate`` layer recipes.
-        template_registry: Optional ``GroupTemplateRegistry`` used to
-            build a ``DefaultTemplateCompiler`` when ``template_compiler``
-            is not provided.  Either ``template_compiler`` or
-            ``template_registry`` must be supplied; a ``RuntimeError``
-            is raised at composition time if neither is configured.
+            ``CompiledEffect``s from template layer definitions.
         xlights_mapping: Mapping for resolving choreography IDs to
             xLights element names.  If None, creates an empty mapping
             (IDs fall back to themselves as element names).
@@ -168,7 +159,6 @@ class CompositionEngine:
         config: CompositionConfig | None = None,
         catalog_index: dict[str, object] | None = None,
         template_compiler: TemplateCompiler | None = None,
-        template_registry: GroupTemplateRegistry | None = None,
         xlights_mapping: XLightsMapping | None = None,
     ) -> None:
         self._beat_grid = beat_grid
@@ -180,20 +170,11 @@ class CompositionEngine:
         self._timing_resolver = TimingResolver(beat_grid)
         self._palette_resolver = palette_resolver
         self._catalog_index: dict[str, object] = catalog_index or {}
-        # Tracks blend mode per (element_name, layer_index) tuple
         self._layer_blend_modes: dict[tuple[str, int], str] = {}
-        # Section → bar range mapping (built from audio section boundaries)
         self._section_map: dict[str, SectionBarRange] = (
             build_section_bar_map(section_boundaries, beat_grid) if section_boundaries else {}
         )
-        # Template compiler — when provided, enables multi-layer rendering.
-        # When a registry is given but no explicit compiler, construct the default.
-        if template_compiler is not None:
-            self._template_compiler: TemplateCompiler | None = template_compiler
-        elif template_registry is not None:
-            self._template_compiler = DefaultTemplateCompiler(template_registry)
-        else:
-            self._template_compiler = None
+        self._template_compiler: TemplateCompiler | None = template_compiler
 
     def compose(self, plan_set: GroupPlanSet) -> RenderPlan:
         """Compose a GroupPlanSet into a RenderPlan.
@@ -330,10 +311,8 @@ class CompositionEngine:
         """
         if self._template_compiler is None:
             raise RuntimeError(
-                "CompositionEngine requires a TemplateCompiler (or "
-                "GroupTemplateRegistry) for rendering.  Pass "
-                "template_registry to DisplayRenderer or "
-                "template_compiler to CompositionEngine."
+                "CompositionEngine requires a TemplateCompiler for rendering. "
+                "Pass template_compiler to DisplayRenderer or CompositionEngine."
             )
         # Expand SEQUENCED/CALL_RESPONSE/RIPPLE windows into placements
         placements = list(coord_plan.placements)

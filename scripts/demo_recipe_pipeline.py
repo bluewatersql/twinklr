@@ -160,9 +160,7 @@ def load_fe_data(fe_dir: Path) -> FEData:
     Raises:
         SystemExit: If any required file is missing.
     """
-    missing = [
-        name for name, fname in _FE_FILES.items() if not (fe_dir / fname).exists()
-    ]
+    missing = [name for name, fname in _FE_FILES.items() if not (fe_dir / fname).exists()]
     if missing:
         print(f"ERROR: Missing FE artifacts in {fe_dir}:")
         for name in missing:
@@ -197,9 +195,7 @@ def load_fe_data(fe_dir: Path) -> FEData:
     motif_catalog: MotifCatalog | None = None
     motif_path = fe_dir / _FE_OPTIONAL_FILES["motif_catalog"]
     if motif_path.exists():
-        motif_catalog = MotifCatalog.model_validate_json(
-            motif_path.read_text(encoding="utf-8")
-        )
+        motif_catalog = MotifCatalog.model_validate_json(motif_path.read_text(encoding="utf-8"))
         _kv("Motif catalog", f"{motif_catalog.total_motifs} motifs")
     else:
         _kv("Motif catalog", "not found (motif annotation will be skipped)")

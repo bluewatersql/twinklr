@@ -22,6 +22,7 @@ from twinklr.core.sequencer.display.recipe_renderer import (
     RenderedLayer,
     RenderEnvironment,
 )
+from twinklr.core.sequencer.display.templates.effect_map import resolve_effect_type
 from twinklr.core.sequencer.templates.group.models import GroupPlacement
 from twinklr.core.sequencer.templates.group.recipe_catalog import RecipeCatalog
 
@@ -112,18 +113,23 @@ class RecipeCompiler:
         source: RenderEventSource,
     ) -> CompiledEffect:
         """Convert a RenderedLayer into a CompiledEffect."""
-        params: dict[str, Any] = dict(layer.resolved_params)
-        params["blend_mode"] = layer.blend_mode.value
-        params["mix"] = layer.mix
-
+        resolved = resolve_effect_type(source.template_id)
+        params: dict[str, Any] = {
+            **resolved.defaults,
+            **dict(layer.resolved_params),
+            "blend_mode": layer.blend_mode.value,
+            "mix": layer.mix,
+        }
         event = RenderEvent(
             event_id=f"recipe_{source.template_id}_{layer.layer_index}_{uuid.uuid4().hex[:8]}",
             start_ms=context.start_ms,
             end_ms=context.end_ms,
-            effect_type=layer.effect_type,
+            effect_type=resolved.effect_type,
             parameters=params,
             palette=context.palette,
             intensity=context.intensity,
+            transition_in=context.transition_in,
+            transition_out=context.transition_out,
             source=source,
         )
 

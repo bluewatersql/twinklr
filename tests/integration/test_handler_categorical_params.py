@@ -132,5 +132,3 @@ class TestMovementHandlerCategoricalParams:
 
         assert result.pan_curve is not None
         assert len(result.pan_curve) > 0
-
-

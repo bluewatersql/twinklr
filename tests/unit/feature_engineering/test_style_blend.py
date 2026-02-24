@@ -24,11 +24,13 @@ from twinklr.core.sequencer.templates.group.recipe import (
     PaletteSpec,
     RecipeLayer,
     RecipeProvenance,
+    StyleMarkers,
 )
 from twinklr.core.sequencer.templates.group.recipe_catalog import RecipeCatalog
 from twinklr.core.sequencer.vocabulary import (
     BlendMode,
     ColorMode,
+    EnergyTarget,
     GroupTemplateType,
     GroupVisualIntent,
     MotionVerb,
@@ -101,6 +103,7 @@ def _make_recipe(
             ),
         ),
         provenance=RecipeProvenance(source="mined"),
+        style_markers=StyleMarkers(complexity=0.33, energy_affinity=EnergyTarget.MED),
     )
 
 

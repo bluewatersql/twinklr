@@ -127,10 +127,6 @@ class RecipeProvenance(BaseModel):
     source: Literal["builtin", "mined", "curated", "generated"] = Field(
         description="Origin of this recipe"
     )
-    mined_template_ids: list[str] = Field(
-        default_factory=list,
-        description="FE template UUIDs this recipe was derived from",
-    )
     curator_notes: str | None = Field(
         default=None,
         description="Notes from human curation",
@@ -203,14 +199,13 @@ class EffectRecipe(BaseModel):
     # Provenance
     provenance: RecipeProvenance = Field(description="Origin and curation history")
 
-    # Optional enrichment
+    # Style (required for all templates)
+    style_markers: StyleMarkers = Field(description="Style metadata for matching")
+
+    # Optional enrichment (populated by FE pipeline, empty for builtins)
     model_affinities: list[ModelAffinity] = Field(
         default_factory=list,
         description="Model type affinity scores",
-    )
-    style_markers: StyleMarkers | None = Field(
-        default=None,
-        description="Style metadata for matching",
     )
     motif_compatibility: list[MotifCompatibility] = Field(
         default_factory=list,

@@ -51,7 +51,7 @@ def test_promotion_filters_low_support() -> None:
     )
     assert isinstance(result, PromotionResult)
     assert len(result.promoted_recipes) == 1
-    assert result.promoted_recipes[0].provenance.mined_template_ids == ["high"]
+    assert result.promoted_recipes[0].provenance.source == "mined"
     assert result.report["rejected_count"] == 1
 
 
@@ -94,8 +94,7 @@ def test_promotion_cluster_dedup() -> None:
     )
     assert len(result.promoted_recipes) == 1
     recipe = result.promoted_recipes[0]
-    assert "a" in recipe.provenance.mined_template_ids
-    assert "b" in recipe.provenance.mined_template_ids
+    assert recipe.provenance.source == "mined"
 
 
 def test_promotion_produces_valid_recipes() -> None:
@@ -121,7 +120,7 @@ def test_promotion_filters_excluded_families() -> None:
     result = PromotionPipeline().run(candidates=[included, *excluded])
     assert len(result.promoted_recipes) == 1
     assert result.report["filtered_families"] == 6
-    assert result.promoted_recipes[0].provenance.mined_template_ids == ["ok"]
+    assert result.promoted_recipes[0].provenance.source == "mined"
 
 
 def test_promotion_excluded_families_constant() -> None:

@@ -6,10 +6,21 @@ Uses TemplateInfo directly (no duplication).
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from pydantic import BaseModel, ConfigDict, Field
 
-from twinklr.core.sequencer.templates.group.library import REGISTRY, TemplateInfo
+from twinklr.core.sequencer.templates.group.library import TemplateInfo
 from twinklr.core.sequencer.vocabulary import GroupTemplateType, LaneKind
+
+if TYPE_CHECKING:
+    from twinklr.core.sequencer.templates.group.store import TemplateStore
+
+_LANE_ASSIGNED_TYPES = {
+    GroupTemplateType.BASE,
+    GroupTemplateType.RHYTHM,
+    GroupTemplateType.ACCENT,
+}
 
 
 class TemplateCatalog(BaseModel):
@@ -62,34 +73,30 @@ class TemplateCatalog(BaseModel):
         return [e for e in self.entries if lane in e.compatible_lanes]
 
 
-def build_template_catalog() -> TemplateCatalog:
-    """Build TemplateCatalog from GroupTemplateRegistry.
+def build_template_catalog_from_store(store: TemplateStore) -> TemplateCatalog:
+    """Build TemplateCatalog from a TemplateStore.
 
-    Filters registry templates to only include those with lane assignments
-    (BASE, RHYTHM, ACCENT). Uses TemplateInfo directly without duplication.
+    Converts TemplateStoreEntry instances to TemplateInfo for compatibility
+    with existing planner/agent infrastructure.
 
-    Note: TRANSITION and SPECIAL templates are currently excluded from the catalog
-    as they are not assigned to standard lanes in the GroupPlanner v3.3 spec.
+    Args:
+        store: TemplateStore loaded from JSON index.
 
     Returns:
-        TemplateCatalog with all BASE, RHYTHM, and ACCENT templates.
-
-    Example:
-        >>> from twinklr.core.sequencer.templates.group import load_builtin_group_templates
-        >>> load_builtin_group_templates()
-        >>> catalog = build_template_catalog()
-        >>> len(catalog.entries)
-        61  # BASE (14) + RHYTHM (26) + ACCENT (21)
+        TemplateCatalog with lane-assigned templates (BASE, RHYTHM, ACCENT).
     """
-    infos = REGISTRY.list_all()
-
-    # Filter to only templates with lane assignments
-    lane_assigned_types = {
-        GroupTemplateType.BASE,
-        GroupTemplateType.RHYTHM,
-        GroupTemplateType.ACCENT,
-    }
-
-    entries = [info for info in infos if info.template_type in lane_assigned_types]
-
+    entries: list[TemplateInfo] = []
+    for e in store.entries:
+        if e.template_type not in _LANE_ASSIGNED_TYPES:
+            continue
+        entries.append(
+            TemplateInfo(
+                template_id=e.recipe_id,
+                version="1.0.0",
+                name=e.name,
+                template_type=e.template_type,
+                visual_intent=e.visual_intent,
+                tags=e.tags,
+            )
+        )
     return TemplateCatalog(entries=entries)

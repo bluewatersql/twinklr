@@ -72,6 +72,7 @@ def fe_output_dir(tmp_path: Path) -> Path:
                 "timing": {"bars_min": 2, "bars_max": 8},
                 "palette_spec": {"mode": "MONOCHROME", "palette_roles": ["primary"]},
                 "provenance": {"source": "mined"},
+                "style_markers": {"complexity": 0.33, "energy_affinity": "LOW"},
                 "layers": [
                     {
                         "layer_index": 0,

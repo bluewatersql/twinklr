@@ -20,6 +20,9 @@ from twinklr.core.sequencer.display.composition.engine import (
 from twinklr.core.sequencer.display.composition.palette_resolver import (
     PaletteResolver,
 )
+from twinklr.core.sequencer.display.composition.template_compiler import (
+    TemplateCompiler,
+)
 from twinklr.core.sequencer.display.effects.handlers import (
     load_builtin_handlers,
 )
@@ -33,9 +36,6 @@ from twinklr.core.sequencer.display.models.palette import ResolvedPalette
 from twinklr.core.sequencer.display.models.render_plan import RenderPlan
 from twinklr.core.sequencer.display.xlights_mapping import XLightsMapping
 from twinklr.core.sequencer.planning.group_plan import GroupPlanSet
-from twinklr.core.sequencer.templates.group.library import (
-    GroupTemplateRegistry,
-)
 from twinklr.core.sequencer.templates.group.models.choreography import (
     ChoreographyGraph,
 )
@@ -93,7 +93,7 @@ class DisplayRenderer:
         palette_catalog: PaletteCatalog | None = None,
         config: RenderConfig | None = None,
         handler_registry: HandlerRegistry | None = None,
-        template_registry: GroupTemplateRegistry | None = None,
+        template_compiler: TemplateCompiler | None = None,
         xlights_mapping: XLightsMapping | None = None,
     ) -> None:
         """Initialize the display renderer.
@@ -106,12 +106,8 @@ class DisplayRenderer:
             config: Render configuration. Defaults to sensible defaults.
             handler_registry: Custom handler registry. If None, loads
                 builtin handlers (On, Color Wash, Chase, Spirals, Pictures).
-            template_registry: Group template registry for the template
-                compiler.  Enables multi-layer rendering via
-                TemplateCompiler (motif-primary effect resolution,
-                value curves, multi-depth layers).  Required for
-                production rendering; raises ``RuntimeError`` if
-                omitted and rendering is attempted.
+            template_compiler: TemplateCompiler (e.g. RecipeCompiler) for
+                multi-layer rendering.  Required for production rendering.
             xlights_mapping: xLights element name resolution.  If None,
                 creates an empty mapping (IDs used as element names).
         """
@@ -120,7 +116,7 @@ class DisplayRenderer:
         self._xlights_mapping = xlights_mapping or XLightsMapping()
         self._config = config or RenderConfig()
         self._handlers = handler_registry or load_builtin_handlers()
-        self._template_registry = template_registry
+        self._template_compiler = template_compiler
 
         # Build palette resolver from catalog
         if palette_catalog is None:
@@ -182,7 +178,7 @@ class DisplayRenderer:
             section_boundaries=section_boundaries,
             config=composition_config,
             catalog_index=catalog_index,
-            template_registry=self._template_registry,
+            template_compiler=self._template_compiler,
             xlights_mapping=self._xlights_mapping,
         )
         render_plan = engine.compose(plan_set)

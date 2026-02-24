@@ -609,7 +609,10 @@ def test_layer_count_maximum_warning(simple_audio_profile: AudioProfileModel):
                 section=simple_audio_profile.structure.sections[0],
                 theme=_make_section_theme(),
                 energy_target=EnergyTarget.HIGH,
-                primary_focus_targets=[PlanTarget(type=TargetType.GROUP, id="OUTLINE"), PlanTarget(type=TargetType.GROUP, id="MEGA_TREE")],
+                primary_focus_targets=[
+                    PlanTarget(type=TargetType.GROUP, id="OUTLINE"),
+                    PlanTarget(type=TargetType.GROUP, id="MEGA_TREE"),
+                ],
                 choreography_style=ChoreographyStyle.HYBRID,
                 motion_density=MotionDensity.BUSY,
                 notes="Test section plan for maximum layer count",
@@ -653,7 +656,10 @@ def test_target_validity_always_passes(simple_audio_profile: AudioProfileModel):
                 section=simple_audio_profile.structure.sections[0],
                 theme=_make_section_theme(),
                 energy_target=EnergyTarget.MED,
-                primary_focus_targets=[PlanTarget(type=TargetType.GROUP, id="HERO"), PlanTarget(type=TargetType.GROUP, id="ARCHES")],
+                primary_focus_targets=[
+                    PlanTarget(type=TargetType.GROUP, id="HERO"),
+                    PlanTarget(type=TargetType.GROUP, id="ARCHES"),
+                ],
                 secondary_targets=[PlanTarget(type=TargetType.GROUP, id="CUSTOM")],
                 choreography_style=ChoreographyStyle.ABSTRACT,
                 motion_density=MotionDensity.MED,
@@ -732,7 +738,9 @@ def test_focus_target_overused_warning(simple_audio_profile: AudioProfileModel):
                 section=section,
                 theme=_make_section_theme(),
                 energy_target=EnergyTarget.MED,
-                primary_focus_targets=[PlanTarget(type=TargetType.GROUP, id="OUTLINE")],  # Always same target
+                primary_focus_targets=[
+                    PlanTarget(type=TargetType.GROUP, id="OUTLINE")
+                ],  # Always same target
                 choreography_style=ChoreographyStyle.ABSTRACT,
                 motion_density=MotionDensity.MED,
                 notes="Section with repetitive target for overuse testing",

@@ -2,11 +2,6 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from twinklr.core.sequencer.templates.group.recipe import StyleMarkers
-
 from twinklr.core.feature_engineering.models.style import (
     ColorStyleProfile,
     LayeringStyleProfile,
@@ -25,11 +20,13 @@ from twinklr.core.sequencer.templates.group.recipe import (
     PaletteSpec,
     RecipeLayer,
     RecipeProvenance,
+    StyleMarkers,
 )
 from twinklr.core.sequencer.templates.group.recipe_catalog import RecipeCatalog
 from twinklr.core.sequencer.vocabulary import (
     BlendMode,
     ColorMode,
+    EnergyTarget,
     GroupTemplateType,
     GroupVisualIntent,
     MotionVerb,
@@ -73,6 +70,8 @@ def _make_recipe(
     num_layers: int = 1,
     style_markers: StyleMarkers | None = None,
 ) -> EffectRecipe:
+    if style_markers is None:
+        style_markers = StyleMarkers(complexity=0.33, energy_affinity=EnergyTarget.MED)
     layers = tuple(
         RecipeLayer(
             layer_index=i,

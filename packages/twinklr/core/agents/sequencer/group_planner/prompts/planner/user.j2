@@ -108,7 +108,6 @@ Motif Catalog (summary for reference):
 {% if "BASE" in entry.compatible_lanes %}
 - `{{ entry.template_id }}` - {{ entry.name }}
   {% if entry.affinity_tags %}- Affinity: {{ entry.affinity_tags | join(", ") }}{% endif %}
-  {% if entry.avoid_tags %}- Avoid: {{ entry.avoid_tags | join(", ") }}{% endif %}
   {% if entry.tags %}- Tags: {{ entry.tags | join(", ") }}{% endif %}
 {% endif %}
 {% endfor %}
@@ -118,7 +117,6 @@ Motif Catalog (summary for reference):
 {% if "RHYTHM" in entry.compatible_lanes %}
 - `{{ entry.template_id }}` - {{ entry.name }}
   {% if entry.affinity_tags %}- Affinity: {{ entry.affinity_tags | join(", ") }}{% endif %}
-  {% if entry.avoid_tags %}- Avoid: {{ entry.avoid_tags | join(", ") }}{% endif %}
   {% if entry.tags %}- Tags: {{ entry.tags | join(", ") }}{% endif %}
 {% endif %}
 {% endfor %}
@@ -128,7 +126,6 @@ Motif Catalog (summary for reference):
 {% if "ACCENT" in entry.compatible_lanes %}
 - `{{ entry.template_id }}` - {{ entry.name }}
   {% if entry.affinity_tags %}- Affinity: {{ entry.affinity_tags | join(", ") }}{% endif %}
-  {% if entry.avoid_tags %}- Avoid: {{ entry.avoid_tags | join(", ") }}{% endif %}
   {% if entry.tags %}- Tags: {{ entry.tags | join(", ") }}{% endif %}
 {% endif %}
 {% endfor %}

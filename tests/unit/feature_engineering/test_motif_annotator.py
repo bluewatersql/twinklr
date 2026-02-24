@@ -1,4 +1,4 @@
-"""Tests for MotifAnnotator (recipe ↔ motif compatibility scoring)."""
+"""Tests for MotifAnnotator (recipe - motif compatibility scoring)."""
 
 from __future__ import annotations
 
@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 
 
 def _make_recipe(*, recipe_id: str, template_ids: list[str]) -> EffectRecipe:
-    """Build a minimal synthesized recipe with given provenance template IDs."""
+    """Build a minimal synthesized recipe."""
     mined = MinedTemplate(
         template_id=template_ids[0],
         template_kind=TemplateKind.CONTENT,
@@ -39,19 +39,12 @@ def _make_recipe(*, recipe_id: str, template_ids: list[str]) -> EffectRecipe:
         continuity_class="rhythmic",
         spatial_class="single_target",
     )
-    recipe = RecipeSynthesizer().synthesize(mined, recipe_id=recipe_id)
-    if len(template_ids) > 1:
-        from twinklr.core.sequencer.templates.group.recipe import RecipeProvenance
+    return RecipeSynthesizer().synthesize(mined, recipe_id=recipe_id)
 
-        recipe = recipe.model_copy(
-            update={
-                "provenance": RecipeProvenance(
-                    source="mined",
-                    mined_template_ids=template_ids,
-                ),
-            },
-        )
-    return recipe
+
+def _make_source_map(recipe_id: str, template_ids: list[str]) -> dict[str, list[str]]:
+    """Build source_template_map for a single recipe."""
+    return {recipe_id: template_ids}
 
 
 def _make_motif(
@@ -96,7 +89,7 @@ def _make_catalog(motifs: list[MinedMotif]) -> MotifCatalog:
     )
 
 
-# ── Basic scoring ──────────────────────────────────────────────────────────
+# -- Basic scoring --
 
 
 def test_single_template_exact_match() -> None:
@@ -104,8 +97,9 @@ def test_single_template_exact_match() -> None:
     recipe = _make_recipe(recipe_id="r1", template_ids=["tpl_A"])
     motif = _make_motif(motif_id="m1", template_ids=("tpl_A", "tpl_B"))
     catalog = _make_catalog([motif])
+    src_map = _make_source_map("r1", ["tpl_A"])
 
-    annotated = MotifAnnotator().annotate([recipe], catalog)
+    annotated = MotifAnnotator().annotate([recipe], catalog, source_template_map=src_map)
     assert len(annotated) == 1
     assert len(annotated[0].motif_compatibility) == 1
     mc = annotated[0].motif_compatibility[0]
@@ -119,8 +113,9 @@ def test_no_overlap_produces_no_compatibility() -> None:
     recipe = _make_recipe(recipe_id="r1", template_ids=["tpl_X"])
     motif = _make_motif(motif_id="m1", template_ids=("tpl_A", "tpl_B"))
     catalog = _make_catalog([motif])
+    src_map = _make_source_map("r1", ["tpl_X"])
 
-    annotated = MotifAnnotator().annotate([recipe], catalog)
+    annotated = MotifAnnotator().annotate([recipe], catalog, source_template_map=src_map)
     assert len(annotated[0].motif_compatibility) == 0
 
 
@@ -130,8 +125,11 @@ def test_full_overlap_scores_higher_than_partial() -> None:
     recipe_partial = _make_recipe(recipe_id="r_partial", template_ids=["tpl_A"])
     motif = _make_motif(motif_id="m1", template_ids=("tpl_A", "tpl_B"))
     catalog = _make_catalog([motif])
+    src_map = {"r_full": ["tpl_A", "tpl_B"], "r_partial": ["tpl_A"]}
 
-    annotated = MotifAnnotator().annotate([recipe_full, recipe_partial], catalog)
+    annotated = MotifAnnotator().annotate(
+        [recipe_full, recipe_partial], catalog, source_template_map=src_map
+    )
     full_score = annotated[0].motif_compatibility[0].score
     partial_score = annotated[1].motif_compatibility[0].score
     assert full_score > partial_score
@@ -143,8 +141,9 @@ def test_multiple_motifs_matched() -> None:
     m1 = _make_motif(motif_id="m1", template_ids=("tpl_A", "tpl_B"))
     m2 = _make_motif(motif_id="m2", template_ids=("tpl_A", "tpl_C", "tpl_D"))
     catalog = _make_catalog([m1, m2])
+    src_map = _make_source_map("r1", ["tpl_A"])
 
-    annotated = MotifAnnotator().annotate([recipe], catalog)
+    annotated = MotifAnnotator().annotate([recipe], catalog, source_template_map=src_map)
     assert len(annotated[0].motif_compatibility) == 2
     motif_ids = {mc.motif_id for mc in annotated[0].motif_compatibility}
     assert motif_ids == {"m1", "m2"}
@@ -173,8 +172,9 @@ def test_preserves_existing_compatibility() -> None:
     )
     motif = _make_motif(motif_id="m1", template_ids=("tpl_A",))
     catalog = _make_catalog([motif])
+    src_map = _make_source_map("r1", ["tpl_A"])
 
-    annotated = MotifAnnotator().annotate([recipe], catalog)
+    annotated = MotifAnnotator().annotate([recipe], catalog, source_template_map=src_map)
     motif_ids = {mc.motif_id for mc in annotated[0].motif_compatibility}
     assert "builtin_m" in motif_ids
     assert "m1" in motif_ids
@@ -185,8 +185,19 @@ def test_reason_includes_overlap_info() -> None:
     recipe = _make_recipe(recipe_id="r1", template_ids=["tpl_A", "tpl_B"])
     motif = _make_motif(motif_id="m1", template_ids=("tpl_A", "tpl_B", "tpl_C"))
     catalog = _make_catalog([motif])
+    src_map = _make_source_map("r1", ["tpl_A", "tpl_B"])
 
-    annotated = MotifAnnotator().annotate([recipe], catalog)
+    annotated = MotifAnnotator().annotate([recipe], catalog, source_template_map=src_map)
     reason = annotated[0].motif_compatibility[0].reason
     assert "2" in reason
     assert "3" in reason
+
+
+def test_no_source_map_skips_scoring() -> None:
+    """Without source_template_map, recipes get no new motif entries."""
+    recipe = _make_recipe(recipe_id="r1", template_ids=["tpl_A"])
+    motif = _make_motif(motif_id="m1", template_ids=("tpl_A",))
+    catalog = _make_catalog([motif])
+
+    annotated = MotifAnnotator().annotate([recipe], catalog)
+    assert len(annotated[0].motif_compatibility) == 0

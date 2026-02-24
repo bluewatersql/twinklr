@@ -131,8 +131,12 @@ def valid_macro_plan(audio_profile: AudioProfileModel) -> MacroPlan:
                 energy_target=EnergyTarget.LOW if i == 0 else EnergyTarget.HIGH,
                 motion_density=MotionDensity.SPARSE if i == 0 else MotionDensity.BUSY,
                 choreography_style=ChoreographyStyle.ABSTRACT,
-                primary_focus_targets=[PlanTarget(type=TargetType.GROUP, id=TargetRole.OUTLINE.value)],
-                secondary_targets=[PlanTarget(type=TargetType.GROUP, id=TargetRole.MEGA_TREE.value)],
+                primary_focus_targets=[
+                    PlanTarget(type=TargetType.GROUP, id=TargetRole.OUTLINE.value)
+                ],
+                secondary_targets=[
+                    PlanTarget(type=TargetType.GROUP, id=TargetRole.MEGA_TREE.value)
+                ],
                 notes="This section should emphasize serene twinkling patterns with minimal motion for maximum impact.",
             )
             for i, sec in enumerate(sections)

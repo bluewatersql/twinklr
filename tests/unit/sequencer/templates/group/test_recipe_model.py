@@ -9,7 +9,6 @@ from twinklr.core.sequencer.templates.group.models import TimingHints
 from twinklr.core.sequencer.templates.group.recipe import (
     ColorSource,
     EffectRecipe,
-    ModelAffinity,
     PaletteSpec,
     ParamValue,
     RecipeLayer,
@@ -53,6 +52,7 @@ def test_single_layer_recipe() -> None:
             ),
         ),
         provenance=RecipeProvenance(source="builtin"),
+        style_markers=StyleMarkers(complexity=0.33, energy_affinity=EnergyTarget.LOW),
     )
     assert recipe.recipe_id == "candy_cane_stack_v1"
     assert len(recipe.layers) == 1
@@ -108,6 +108,7 @@ def test_multi_layer_recipe_candy_cane() -> None:
             ),
         ),
         provenance=RecipeProvenance(source="builtin"),
+        style_markers=StyleMarkers(complexity=1.0, energy_affinity=EnergyTarget.LOW),
     )
     assert len(recipe.layers) == 3
     assert recipe.layers[1].blend_mode == BlendMode.ADD
@@ -123,11 +124,10 @@ def test_dynamic_param_value() -> None:
 def test_recipe_provenance_mined() -> None:
     p = RecipeProvenance(
         source="mined",
-        mined_template_ids=["uuid-1", "uuid-2"],
         curator_notes="Merged from two similar patterns",
     )
     assert p.source == "mined"
-    assert len(p.mined_template_ids) == 2
+    assert p.curator_notes == "Merged from two similar patterns"
 
 
 def test_style_markers() -> None:
@@ -137,12 +137,6 @@ def test_style_markers() -> None:
     )
     assert m.complexity == 0.6
     assert m.energy_affinity == EnergyTarget.HIGH
-
-
-def test_model_affinity() -> None:
-    a = ModelAffinity(model_type="megatree", score=0.9)
-    assert a.model_type == "megatree"
-    assert a.score == 0.9
 
 
 def test_recipe_is_frozen() -> None:
@@ -171,6 +165,7 @@ def test_recipe_is_frozen() -> None:
             ),
         ),
         provenance=RecipeProvenance(source="builtin"),
+        style_markers=StyleMarkers(complexity=0.33, energy_affinity=EnergyTarget.LOW),
     )
     with pytest.raises(ValidationError):
         recipe.name = "Changed"  # type: ignore[misc]
@@ -202,7 +197,6 @@ def test_recipe_serialization_roundtrip() -> None:
             ),
         ),
         provenance=RecipeProvenance(source="builtin"),
-        model_affinities=[ModelAffinity(model_type="arch", score=0.8)],
         style_markers=StyleMarkers(complexity=0.3, energy_affinity=EnergyTarget.MED),
     )
     data = recipe.model_dump()

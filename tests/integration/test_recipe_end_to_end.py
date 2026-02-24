@@ -100,6 +100,7 @@ def _make_builtin_recipe() -> EffectRecipe:
             ),
         ),
         provenance=RecipeProvenance(source="builtin"),
+        style_markers=StyleMarkers(complexity=0.33, energy_affinity=EnergyTarget.LOW),
     )
 
 
@@ -130,7 +131,6 @@ def test_mined_template_to_rendered_output() -> None:
     promoted_recipe = result.promoted_recipes[0]
     assert isinstance(promoted_recipe, EffectRecipe)
     assert promoted_recipe.provenance.source == "mined"
-    assert "tpl_shimmer_001" in promoted_recipe.provenance.mined_template_ids
 
     # Stage 2: Catalog assembly (merge builtins + promoted)
     builtin = _make_builtin_recipe()
@@ -219,6 +219,7 @@ def test_multi_layer_recipe_renders_all_layers() -> None:
             ),
         ),
         provenance=RecipeProvenance(source="builtin"),
+        style_markers=StyleMarkers(complexity=1.0, energy_affinity=EnergyTarget.MED),
     )
 
     env = RenderEnvironment(
@@ -242,8 +243,8 @@ def test_multi_layer_recipe_renders_all_layers() -> None:
     assert sparkle_density == 30
 
 
-def test_promotion_cluster_dedup_merges_provenance() -> None:
-    """Cluster dedup merges provenance from multiple mined templates."""
+def test_promotion_cluster_dedup_keeps_one() -> None:
+    """Cluster dedup keeps only the designated template."""
     tpl_a = _make_mined_template("tpl_a")
     tpl_b = _make_mined_template("tpl_b")
 
@@ -254,12 +255,9 @@ def test_promotion_cluster_dedup_merges_provenance() -> None:
         clusters=clusters,
     )
 
-    # Only one recipe produced (tpl_b merged into tpl_a)
     assert len(result.promoted_recipes) == 1
     recipe = result.promoted_recipes[0]
-    # Provenance should include both template IDs
-    assert "tpl_a" in recipe.provenance.mined_template_ids
-    assert "tpl_b" in recipe.provenance.mined_template_ids
+    assert recipe.provenance.source == "mined"
 
 
 def test_catalog_lane_filtering() -> None:
@@ -292,6 +290,7 @@ def test_catalog_lane_filtering() -> None:
             ),
         ),
         provenance=RecipeProvenance(source="builtin"),
+        style_markers=StyleMarkers(complexity=0.33, energy_affinity=EnergyTarget.MED),
     )
 
     catalog = RecipeCatalog(recipes=[base_recipe, rhythm_recipe])
@@ -336,6 +335,7 @@ def test_motif_compatibility_on_recipe() -> None:
             ),
         ),
         provenance=RecipeProvenance(source="builtin"),
+        style_markers=StyleMarkers(complexity=0.33, energy_affinity=EnergyTarget.LOW),
         motif_compatibility=[
             MotifCompatibility(motif_id="grid", score=0.9, reason="Grid pattern match"),
             MotifCompatibility(motif_id="wave", score=0.4, reason="Weak wave match"),

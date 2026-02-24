@@ -248,19 +248,24 @@ class DisplayRenderStage:
             # Extract section boundaries from macro plan (audio-sourced timing)
             section_boundaries = self._extract_section_boundaries(context)
 
-            # Load the group template registry for multi-layer rendering
-            from twinklr.core.sequencer.templates.group import (
-                REGISTRY,
-                load_builtin_group_templates,
+            # Load template store from JSON index
+            from twinklr.core.sequencer.display.composition.recipe_compiler import (
+                RecipeCompiler,
             )
+            from twinklr.core.sequencer.templates.group.recipe_catalog import RecipeCatalog
+            from twinklr.core.sequencer.templates.group.store import TemplateStore
 
-            load_builtin_group_templates()
+            _root = Path(__file__).resolve().parent.parent.parent.parent.parent
+            templates_dir = _root / "data" / "templates"
+            template_store = TemplateStore.from_directory(templates_dir)
+            recipe_catalog = RecipeCatalog.from_store(template_store)
+            recipe_compiler = RecipeCompiler(catalog=recipe_catalog)
 
             # Create renderer and render
             renderer = DisplayRenderer(
                 beat_grid=beat_grid,
                 choreo_graph=choreo_graph,
-                template_registry=REGISTRY,
+                template_compiler=recipe_compiler,
                 xlights_mapping=xlights_mapping,
             )
 

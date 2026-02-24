@@ -32,7 +32,9 @@ def _load_music_library_index() -> MusicLibraryIndex | None:
         return None
     index = MusicLibraryIndex.model_validate_json(_MUSIC_INDEX_PATH.read_text())
     tagged = sum(1 for e in index.entries if e.title)
-    print(f"  [info] Loaded music library index: {len(index.entries)} files ({tagged} with metadata)")
+    print(
+        f"  [info] Loaded music library index: {len(index.entries)} files ({tagged} with metadata)"
+    )
     return index
 
 

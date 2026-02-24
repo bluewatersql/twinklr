@@ -19,14 +19,16 @@ from twinklr.core.sequencer.templates.group.recipe import EffectRecipe
 # Families handled by dedicated pipelines or not renderable as group effects.
 # MH/DMX → MovingHeadManager; servo/glediator → device-specific;
 # state/duplicate → xLights utility effects with no visual output.
-EXCLUDED_FAMILIES: frozenset[str] = frozenset({
-    "dmx",
-    "moving_head",
-    "servo",
-    "glediator",
-    "state",
-    "duplicate",
-})
+EXCLUDED_FAMILIES: frozenset[str] = frozenset(
+    {
+        "dmx",
+        "moving_head",
+        "servo",
+        "glediator",
+        "state",
+        "duplicate",
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -101,31 +103,23 @@ class PromotionPipeline:
         if clusters:
             passed = self._apply_cluster_dedup(passed, clusters)
 
-        # Stage 3: Recipe synthesis
+        # Stage 3: Recipe synthesis + build source template map for motif annotation
         promoted: list[EffectRecipe] = []
+        source_template_map: dict[str, list[str]] = {}
         for t in passed:
             recipe_id = f"synth_{t.effect_family}_{t.motion_class}_{t.template_id}"
-            # Check if this template has cluster provenance
-            extra_ids = self._get_cluster_member_ids(t.template_id, clusters)
             recipe = self._synthesizer.synthesize(t, recipe_id=recipe_id)
-            if extra_ids:
-                # Rebuild with merged provenance
-                from twinklr.core.sequencer.templates.group.recipe import RecipeProvenance
-
-                merged_prov = RecipeProvenance(
-                    source="mined",
-                    mined_template_ids=[t.template_id] + extra_ids,
-                )
-                recipe = recipe.model_copy(update={"provenance": merged_prov})
             promoted.append(recipe)
+            source_ids = [t.template_id] + self._get_cluster_member_ids(t.template_id, clusters)
+            source_template_map[recipe_id] = source_ids
 
         # Stage 4: Motif annotation
         motifs_annotated = 0
         if motif_catalog is not None:
-            promoted = self._annotator.annotate(promoted, motif_catalog)
-            motifs_annotated = sum(
-                1 for r in promoted if r.motif_compatibility
+            promoted = self._annotator.annotate(
+                promoted, motif_catalog, source_template_map=source_template_map
             )
+            motifs_annotated = sum(1 for r in promoted if r.motif_compatibility)
 
         report = {
             "total_candidates": len(candidates),
@@ -137,6 +131,21 @@ class PromotionPipeline:
         }
 
         return PromotionResult(promoted_recipes=promoted, report=report)
+
+    def _get_cluster_member_ids(
+        self,
+        template_id: str,
+        clusters: list[dict[str, Any]] | None,
+    ) -> list[str]:
+        """Get other member IDs from the cluster this template belongs to."""
+        if not clusters:
+            return []
+        for cluster in clusters:
+            keep_id = cluster.get("keep_id")
+            member_ids = cluster.get("member_ids", [])
+            if keep_id == template_id and len(member_ids) > 1:
+                return [mid for mid in member_ids if mid != template_id]
+        return []
 
     def _apply_cluster_dedup(
         self,
@@ -154,18 +163,3 @@ class PromotionPipeline:
                     remove_ids.add(mid)
 
         return [t for t in templates if t.template_id not in remove_ids]
-
-    def _get_cluster_member_ids(
-        self,
-        template_id: str,
-        clusters: list[dict[str, Any]] | None,
-    ) -> list[str]:
-        """Get other member IDs from the cluster this template belongs to."""
-        if not clusters:
-            return []
-        for cluster in clusters:
-            keep_id = cluster.get("keep_id")
-            member_ids = cluster.get("member_ids", [])
-            if keep_id == template_id and len(member_ids) > 1:
-                return [mid for mid in member_ids if mid != template_id]
-        return []

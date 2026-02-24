@@ -130,16 +130,3 @@ def test_convert_multi_layer_blend_modes() -> None:
     # First layer: NORMAL, subsequent layers: ADD
     assert recipe.layers[0].blend_mode == BlendMode.NORMAL
     assert recipe.layers[1].blend_mode == BlendMode.ADD
-
-
-def test_all_builtins_convert_without_error() -> None:
-    from twinklr.core.sequencer.templates.group import load_builtin_group_templates
-    from twinklr.core.sequencer.templates.group.library import REGISTRY
-
-    load_builtin_group_templates()
-    for info in REGISTRY.list_all():
-        template = REGISTRY.get(info.template_id)
-        recipe = convert_builtin_to_recipe(template)
-        assert recipe.recipe_id == template.template_id
-        assert recipe.provenance.source == "builtin"
-        assert len(recipe.layers) == len(template.layer_recipe)

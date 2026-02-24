@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from twinklr.core.feature_engineering.models import MusicLibraryEntry, MusicLibraryIndex
+from twinklr.core.feature_engineering.models import MusicLibraryIndex
 from twinklr.core.feature_engineering.music_library_indexer import build_music_library_index
 
 

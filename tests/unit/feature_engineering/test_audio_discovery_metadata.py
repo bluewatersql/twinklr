@@ -21,7 +21,9 @@ def _write_audio(path: Path) -> None:
     path.write_bytes(b"audio")
 
 
-def _make_index(entries: list[MusicLibraryEntry], source_dirs: tuple[str, ...] = ()) -> MusicLibraryIndex:
+def _make_index(
+    entries: list[MusicLibraryEntry], source_dirs: tuple[str, ...] = ()
+) -> MusicLibraryIndex:
     return MusicLibraryIndex(entries=tuple(entries), source_dirs=source_dirs)
 
 
@@ -31,15 +33,17 @@ def test_metadata_title_match_beats_filename_mismatch(tmp_path: Path) -> None:
     music_root = tmp_path / "music"
     _write_audio(music_root / "Polar Express Medley_FINAL.mp3")
 
-    index = _make_index([
-        MusicLibraryEntry(
-            path=str(music_root / "Polar Express Medley_FINAL.mp3"),
-            title="Rockin' on Top of the World",
-            artist="Steven Tyler",
-            album="",
-            duration_s=294.0,
-        ),
-    ])
+    index = _make_index(
+        [
+            MusicLibraryEntry(
+                path=str(music_root / "Polar Express Medley_FINAL.mp3"),
+                title="Rockin' on Top of the World",
+                artist="Steven Tyler",
+                album="",
+                duration_s=294.0,
+            ),
+        ]
+    )
 
     service = AudioDiscoveryService(
         options=AudioDiscoveryOptions(
@@ -70,18 +74,20 @@ def test_metadata_artist_confirmation_boosts_score(tmp_path: Path) -> None:
     _write_audio(music_root / "trackA.mp3")
     _write_audio(music_root / "trackB.mp3")
 
-    index = _make_index([
-        MusicLibraryEntry(
-            path=str(music_root / "trackA.mp3"),
-            title="Jingle Bells",
-            artist="Wrong Artist",
-        ),
-        MusicLibraryEntry(
-            path=str(music_root / "trackB.mp3"),
-            title="Jingle Bells",
-            artist="Burl Ives",
-        ),
-    ])
+    index = _make_index(
+        [
+            MusicLibraryEntry(
+                path=str(music_root / "trackA.mp3"),
+                title="Jingle Bells",
+                artist="Wrong Artist",
+            ),
+            MusicLibraryEntry(
+                path=str(music_root / "trackB.mp3"),
+                title="Jingle Bells",
+                artist="Burl Ives",
+            ),
+        ]
+    )
 
     service = AudioDiscoveryService(
         options=AudioDiscoveryOptions(
@@ -137,13 +143,15 @@ def test_metadata_match_overrides_low_filename_score(tmp_path: Path) -> None:
     music_root = tmp_path / "music"
     _write_audio(music_root / "Christmas Remix.mp3")
 
-    index = _make_index([
-        MusicLibraryEntry(
-            path=str(music_root / "Christmas Remix.mp3"),
-            title="Mix by audio-joiner.com",
-            artist="TopHits",
-        ),
-    ])
+    index = _make_index(
+        [
+            MusicLibraryEntry(
+                path=str(music_root / "Christmas Remix.mp3"),
+                title="Mix by audio-joiner.com",
+                artist="TopHits",
+            ),
+        ]
+    )
 
     service = AudioDiscoveryService(
         options=AudioDiscoveryOptions(
@@ -173,13 +181,15 @@ def test_duration_close_match_provides_bonus(tmp_path: Path) -> None:
     music_root = tmp_path / "music"
     _write_audio(music_root / "track.mp3")
 
-    index = _make_index([
-        MusicLibraryEntry(
-            path=str(music_root / "track.mp3"),
-            title="Holiday Song",
-            duration_s=180.0,
-        ),
-    ])
+    index = _make_index(
+        [
+            MusicLibraryEntry(
+                path=str(music_root / "track.mp3"),
+                title="Holiday Song",
+                duration_s=180.0,
+            ),
+        ]
+    )
 
     service = AudioDiscoveryService(
         options=AudioDiscoveryOptions(
