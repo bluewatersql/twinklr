@@ -47,9 +47,17 @@ class SectionPlanningContext(BaseModel):
     primary_focus_targets: list[str] = Field(
         description="Primary concrete group IDs resolved from macro targets"
     )
+    primary_focus_targets_typed: list[dict[str, Any]] = Field(
+        default_factory=list,
+        description="Primary macro focus targets in typed form (group/zone/split)",
+    )
     secondary_targets: list[str] = Field(
         default_factory=list,
         description="Secondary concrete group IDs resolved from macro targets",
+    )
+    secondary_targets_typed: list[dict[str, Any]] = Field(
+        default_factory=list,
+        description="Secondary macro focus targets in typed form (group/zone/split)",
     )
     notes: str | None = Field(default=None, description="Section-specific notes from MacroPlan")
 

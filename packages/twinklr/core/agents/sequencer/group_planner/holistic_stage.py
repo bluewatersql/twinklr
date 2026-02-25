@@ -9,7 +9,9 @@ GroupPlanSet through to downstream stages unchanged.
 
 from __future__ import annotations
 
+import json
 import logging
+from pathlib import Path
 
 from twinklr.core.agents.sequencer.group_planner.holistic import (
     HolisticEvaluation,
@@ -99,6 +101,7 @@ class HolisticEvaluatorStage:
             macro_plan_summary = _extract_macro_plan_summary(macro_plan)
 
             lyric_context = context.get_state("lyric_context")
+            pipeline_run_id = context.get_state("pipeline_run_id")
 
             evaluator = HolisticEvaluator(
                 provider=context.provider,
@@ -116,6 +119,7 @@ class HolisticEvaluatorStage:
                     template_catalog=self.template_catalog,
                     macro_plan_summary=macro_plan_summary,
                     lyric_context=lyric_context,
+                    run_id=pipeline_run_id,
                 ),
                 result_extractor=lambda _: input,
                 result_type=HolisticEvaluation,
@@ -139,6 +143,67 @@ class HolisticEvaluatorStage:
         context.add_metric("holistic_score", result.score)
         context.add_metric("holistic_status", result.status.value)
         context.add_metric("holistic_issues_count", len(result.cross_section_issues))
+        self._write_group_planner_run_summary(context)
+
+    def _write_group_planner_run_summary(self, context: PipelineContext) -> None:
+        """Write an auditable summary of group planner iteration outcomes for this run."""
+        output_dir = context.output_dir
+        if output_dir is None:
+            return
+
+        sections: list[dict[str, object]] = []
+        for key, value in sorted(context.state.items()):
+            if not key.startswith("group_planner_") or not key.endswith("_result"):
+                continue
+            section_id = key[len("group_planner_") : -len("_result")]
+            result_obj = value
+            result_ctx = getattr(result_obj, "context", None)
+            final_verdict = getattr(result_ctx, "final_verdict", None) if result_ctx else None
+            verdicts = list(getattr(result_ctx, "verdicts", []) or []) if result_ctx else []
+            first_verdict = verdicts[0] if verdicts else None
+            cache_meta = context.get_state(f"group_planner_{section_id}_cache_meta", {})
+
+            sections.append(
+                {
+                    "section_id": section_id,
+                    "cache": cache_meta,
+                    "success": getattr(result_obj, "success", None),
+                    "iterations": getattr(result_ctx, "current_iteration", None)
+                    if result_ctx
+                    else None,
+                    "tokens": getattr(result_ctx, "total_tokens_used", None) if result_ctx else None,
+                    "first_pass": {
+                        "status": getattr(first_verdict, "status", None).value
+                        if getattr(first_verdict, "status", None) is not None
+                        else None,
+                        "score": getattr(first_verdict, "score", None) if first_verdict else None,
+                    },
+                    "final": {
+                        "status": getattr(final_verdict, "status", None).value
+                        if getattr(final_verdict, "status", None) is not None
+                        else None,
+                        "score": getattr(final_verdict, "score", None) if final_verdict else None,
+                    },
+                }
+            )
+
+        if not sections:
+            return
+
+        summary = {
+            "pipeline_run_id": context.get_state("pipeline_run_id"),
+            "session_id": context.session.session_id,
+            "section_count": len(sections),
+            "first_pass_approvals": sum(1 for s in sections if s["first_pass"]["status"] == "APPROVE"),
+            "final_approvals": sum(1 for s in sections if s["final"]["status"] == "APPROVE"),
+            "sections": sections,
+        }
+
+        try:
+            path = Path(output_dir) / "group_planner_run_summary.json"
+            path.write_text(json.dumps(summary, indent=2, default=str))
+        except Exception as e:
+            logger.warning("Failed to write group planner run summary: %s", e)
 
 
 def _extract_macro_plan_summary(

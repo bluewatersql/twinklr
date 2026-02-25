@@ -226,6 +226,93 @@ class AsyncAgentRunner:
 
         return messages
 
+    def _build_logging_context(
+        self,
+        variables: dict[str, Any],
+        prompts: dict[str, Any],
+        spec: AgentSpec,
+    ) -> dict[str, Any]:
+        """Build a compact, useful context summary for LLM call logging.
+
+        Many agents pass flat variables (not nested under ``context``), so logging only
+        ``variables['context']`` produces misleading "No context provided" summaries.
+        This method extracts stable identifiers and payload-size indicators without
+        dumping large prompt inputs.
+        """
+        summary: dict[str, Any] = {
+            "agent": spec.name,
+            "mode": spec.mode.value,
+        }
+
+        for key in (
+            "run_id",
+            "section_id",
+            "section_name",
+            "plan_set_id",
+            "iteration",
+            "energy_target",
+            "motion_density",
+            "choreography_style",
+        ):
+            if key in variables and variables[key] is not None:
+                summary[key] = variables[key]
+
+        # Prompt payload size indicators (chars)
+        summary["prompt_sizes"] = {
+            "system_chars": len(prompts.get("system") or ""),
+            "developer_chars": len(prompts.get("developer") or ""),
+            "user_chars": len(prompts.get("user") or ""),
+            "examples_count": len(prompts.get("examples") or []),
+        }
+
+        # Common context counts used for optimization/debugging
+        if isinstance(variables.get("display_graph"), dict):
+            dg = variables["display_graph"]
+            groups = dg.get("groups")
+            if isinstance(groups, list):
+                summary["display_groups"] = len(groups)
+            gbr = dg.get("groups_by_role")
+            if isinstance(gbr, dict):
+                summary["display_roles"] = len(gbr)
+
+        if isinstance(variables.get("template_catalog"), dict):
+            entries = variables["template_catalog"].get("entries")
+            if isinstance(entries, list):
+                summary["templates"] = len(entries)
+        if isinstance(variables.get("template_catalog_full"), dict):
+            entries = variables["template_catalog_full"].get("entries")
+            if isinstance(entries, list):
+                summary["templates_full"] = len(entries)
+
+        if isinstance(variables.get("motif_ids"), list):
+            summary["motifs"] = len(variables["motif_ids"])
+        if isinstance(variables.get("primary_focus_targets"), list):
+            summary["primary_focus_targets"] = len(variables["primary_focus_targets"])
+        if isinstance(variables.get("secondary_targets"), list):
+            summary["secondary_targets"] = len(variables["secondary_targets"])
+        if isinstance(variables.get("multilane_allowed_groups"), list):
+            summary["multilane_allowed_groups"] = len(variables["multilane_allowed_groups"])
+
+        # Plan payload size for judge calls
+        if "plan" in variables:
+            try:
+                import json
+
+                summary["plan_json_chars"] = len(json.dumps(variables["plan"], default=str))
+            except Exception:
+                summary["plan_json_chars"] = -1
+        if "group_plan_set" in variables:
+            try:
+                import json
+
+                summary["group_plan_set_json_chars"] = len(
+                    json.dumps(variables["group_plan_set"], default=str)
+                )
+            except Exception:
+                summary["group_plan_set_json_chars"] = -1
+
+        return summary
+
     async def _execute_with_repair_async(
         self,
         spec: AgentSpec,
@@ -363,7 +450,6 @@ class AsyncAgentRunner:
                 )
             if any(m["role"] == "system" for m in messages):
                 system_parts.append(next(m["content"] for m in messages if m["role"] == "system"))
-
             system_prompt = "\n\n".join(system_parts) if system_parts else None
 
         # Get user message (last message should be user)
@@ -417,7 +503,7 @@ class AsyncAgentRunner:
                 model=spec.model,
                 temperature=spec.temperature,
                 prompts=prompts,
-                context=variables.get("context", {}),
+                context=self._build_logging_context(variables, prompts, spec),
                 conversation_id=state.conversation_id if state else None,
                 run_id=variables.get("run_id"),
                 provider=self.provider.provider_type.value,

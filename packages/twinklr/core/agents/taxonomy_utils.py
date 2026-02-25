@@ -4,6 +4,7 @@ Ensures prompts always use the source-of-truth enum values from vocabulary,
 theming catalogs, and issues modules.
 """
 
+from functools import lru_cache
 from typing import Any
 
 
@@ -109,16 +110,12 @@ def get_taxonomy_dict() -> dict[str, list[str]]:
     return taxonomy
 
 
-def get_supported_motif_ids() -> set[str]:
-    """Get set of motif IDs that have template support via tags.
+@lru_cache(maxsize=1)
+def _get_supported_motif_ids_cached() -> frozenset[str]:
+    """Cached motif support scan from the template store.
 
-    Scans the JSON template store for template tags that correspond
-    to motif IDs. Tags are direct motif identifiers (e.g. "sparkles",
-    "dots", "wave_bands").
-
-    Returns:
-        Set of motif IDs supported by at least one template.
-        Example: {"sparkles", "dots", "wave_bands", "radial_rays"}
+    The template store JSON index is static for a given process/run and scanning it
+    repeatedly during prompt/context shaping is expensive and noisy in logs.
     """
     from pathlib import Path
 
@@ -127,7 +124,7 @@ def get_supported_motif_ids() -> set[str]:
     _root = Path(__file__).resolve().parent.parent.parent.parent.parent
     templates_dir = _root / "data" / "templates"
     if not templates_dir.exists():
-        return set()
+        return frozenset()
 
     from twinklr.core.sequencer.theming import MOTIF_REGISTRY
 
@@ -139,7 +136,21 @@ def get_supported_motif_ids() -> set[str]:
             if tag in valid_motif_ids:
                 motif_tags.add(tag)
 
-    return motif_tags
+    return frozenset(motif_tags)
+
+
+def get_supported_motif_ids() -> set[str]:
+    """Get set of motif IDs that have template support via tags.
+
+    Scans the JSON template store for template tags that correspond
+    to motif IDs. Tags are direct motif identifiers (e.g. "sparkles",
+    "dots", "wave_bands").
+
+    Returns:
+        Set of motif IDs supported by at least one template.
+        Example: {"sparkles", "dots", "wave_bands", "radial_rays"}
+    """
+    return set(_get_supported_motif_ids_cached())
 
 
 def get_theming_catalog_dict() -> dict[str, list[dict[str, str]]]:

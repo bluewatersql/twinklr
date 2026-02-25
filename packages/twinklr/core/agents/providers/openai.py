@@ -303,10 +303,20 @@ class OpenAIProvider:
             # Extract token usage
             token_usage = TokenUsage()
             if hasattr(response, "usage") and response.usage:
+                prompt_tokens = getattr(response.usage, "prompt_tokens", None)
+                completion_tokens = getattr(response.usage, "completion_tokens", None)
+                total_tokens = getattr(response.usage, "total_tokens", None)
+                # Responses API variants may expose input/output token names instead.
+                if prompt_tokens in (None, 0):
+                    prompt_tokens = getattr(response.usage, "input_tokens", 0)
+                if completion_tokens in (None, 0):
+                    completion_tokens = getattr(response.usage, "output_tokens", 0)
+                if total_tokens in (None, 0):
+                    total_tokens = (prompt_tokens or 0) + (completion_tokens or 0)
                 token_usage = TokenUsage(
-                    prompt_tokens=getattr(response.usage, "prompt_tokens", 0),
-                    completion_tokens=getattr(response.usage, "completion_tokens", 0),
-                    total_tokens=getattr(response.usage, "total_tokens", 0),
+                    prompt_tokens=prompt_tokens or 0,
+                    completion_tokens=completion_tokens or 0,
+                    total_tokens=total_tokens or 0,
                 )
                 self._update_token_usage(
                     prompt_tokens=token_usage.prompt_tokens,

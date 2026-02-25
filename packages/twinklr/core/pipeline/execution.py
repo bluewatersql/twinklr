@@ -10,6 +10,8 @@ Provides execute_step() helper that reduces stage boilerplate by handling:
 from __future__ import annotations
 
 import logging
+import time
+from uuid import uuid4
 from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING, TypeVar
 
@@ -99,6 +101,12 @@ async def execute_step(
     from_cache = False
     result = None
     cache_key: CacheKey | None = None
+    cache_status = "disabled"
+    cache_error: str | None = None
+
+    # Create a pipeline-scoped run_id once for this execution context.
+    if "pipeline_run_id" not in context.state:
+        context.set_state("pipeline_run_id", f"run_{int(time.time())}_{uuid4().hex[:8]}")
 
     # Check cache if enabled
     if cache_key_fn and context.cache:
@@ -118,10 +126,14 @@ async def execute_step(
                 logger.info(f"✓ Cache hit: {stage_name}")
                 result = cached_result
                 from_cache = True
+                cache_status = "hit"
             else:
                 logger.info(f"Cache miss: {stage_name}")
+                cache_status = "miss"
         except Exception as e:
             logger.warning(f"Cache check failed for {stage_name}: {e}")
+            cache_status = "error"
+            cache_error = str(e)
             cache_key = None  # Ensure cache_key is None on failure
 
     # Execute orchestrator if not cached
@@ -153,6 +165,7 @@ async def execute_step(
                 logger.debug(f"Cached {stage_name}")
             except Exception as e:
                 logger.warning(f"Cache store failed for {stage_name}: {e}")
+                cache_error = str(e)
 
     # Ensure result is not None (for type checker)
     if result is None:
@@ -192,6 +205,26 @@ async def execute_step(
 
     # CACHE HIT METRIC
     context.add_metric(f"{stage_name}_from_cache", from_cache)
+    context.add_metric(f"{stage_name}_cache_status", cache_status)
+    if cache_key is not None:
+        context.add_metric(f"{stage_name}_cache_domain", cache_key.domain)
+        context.add_metric(f"{stage_name}_cache_key", cache_key.input_fingerprint[:16])
+    if cache_error:
+        context.add_metric(f"{stage_name}_cache_error", cache_error)
+    context.set_state(
+        f"{stage_name}_cache_meta",
+        {
+            "status": cache_status,
+            "from_cache": from_cache,
+            "domain": cache_key.domain if cache_key is not None else None,
+            "input_fingerprint": (
+                cache_key.input_fingerprint if cache_key is not None else None
+            ),
+            "step_version": cache_key.step_version if cache_key is not None else None,
+            "error": cache_error,
+            "pipeline_run_id": context.get_state("pipeline_run_id"),
+        },
+    )
 
     # CUSTOM STATE HANDLER (extends defaults)
     if state_handler:

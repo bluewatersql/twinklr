@@ -216,6 +216,7 @@ class HolisticEvaluator:
         template_catalog: TemplateCatalog,
         macro_plan_summary: dict[str, Any] | None = None,
         lyric_context: Any | None = None,
+        run_id: str | None = None,
     ) -> HolisticEvaluation:
         """Evaluate GroupPlanSet for cross-section quality.
 
@@ -247,6 +248,7 @@ class HolisticEvaluator:
             template_catalog=template_catalog,
             macro_plan_summary=macro_plan_summary,
             lyric_context=lyric_context,
+            run_id=run_id,
         )
 
         # Create runner and execute
@@ -288,6 +290,7 @@ class HolisticEvaluator:
         template_catalog: TemplateCatalog,
         macro_plan_summary: dict[str, Any] | None,
         lyric_context: Any | None = None,
+        run_id: str | None = None,
     ) -> dict[str, Any]:
         """Build variables for holistic judge prompt.
 
@@ -317,5 +320,7 @@ class HolisticEvaluator:
         # Note: Holistic judge doesn't use IterationController, so we set it manually
         if "learning_context" not in variables:
             variables["learning_context"] = ""
+        if run_id:
+            variables["run_id"] = run_id
 
         return variables

@@ -146,6 +146,7 @@ class GroupPlannerStage:
                 min_pass_score=self.min_pass_score,
                 llm_logger=context.llm_logger,
             )
+            pipeline_run_id = context.get_state("pipeline_run_id")
 
             def extract_plan(
                 r: IterationResult[SectionCoordinationPlan],
@@ -174,7 +175,7 @@ class GroupPlannerStage:
             return await execute_step(
                 stage_name=f"{self.name}_{section_id}",
                 context=context,
-                compute=lambda: orchestrator.run(section_context),
+                compute=lambda: orchestrator.run(section_context, run_id=pipeline_run_id),
                 result_extractor=extract_plan,
                 result_type=IterationResult,
                 cache_key_fn=lambda: orchestrator.get_cache_key(section_context),
@@ -235,6 +236,8 @@ class GroupPlannerStage:
         # Build SectionPlanningContext from MacroSectionPlan + constructor args
         resolved_primary_targets = self._resolve_focus_targets(input.primary_focus_targets)
         resolved_secondary_targets = self._resolve_focus_targets(input.secondary_targets)
+        typed_primary_targets = self._serialize_focus_targets(input.primary_focus_targets)
+        typed_secondary_targets = self._serialize_focus_targets(input.secondary_targets)
 
         fe_fields = self._extract_fe_fields(section_id=input.section.section_id)
 
@@ -247,7 +250,9 @@ class GroupPlannerStage:
             motion_density=input.motion_density.value,
             choreography_style=input.choreography_style.value,
             primary_focus_targets=resolved_primary_targets,
+            primary_focus_targets_typed=typed_primary_targets,
             secondary_targets=resolved_secondary_targets,
+            secondary_targets_typed=typed_secondary_targets,
             notes=input.notes,
             choreo_graph=self.choreo_graph,
             template_catalog=self.template_catalog,
@@ -359,6 +364,22 @@ class GroupPlannerStage:
                 seen.add(gid)
                 result.append(gid)
         return result
+
+    def _serialize_focus_targets(self, targets: list[Any]) -> list[dict[str, str]]:
+        """Serialize typed macro focus targets for prompt/debug context."""
+        serialized: list[dict[str, str]] = []
+        for target in targets:
+            if isinstance(target, dict):
+                ttype = target.get("type")
+                tid = target.get("id")
+            else:
+                ttype = getattr(target, "type", None)
+                tid = getattr(target, "id", None)
+                if hasattr(ttype, "value"):
+                    ttype = ttype.value
+            if ttype and tid:
+                serialized.append({"type": str(ttype), "id": str(tid)})
+        return serialized
 
     def _build_timing_context(
         self,

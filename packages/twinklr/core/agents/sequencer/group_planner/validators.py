@@ -22,6 +22,7 @@ from twinklr.core.sequencer.templates.group.models import GroupPlacement, Placem
 from twinklr.core.sequencer.templates.group.models.choreography import ChoreographyGraph
 from twinklr.core.sequencer.templates.group.models.coordination import CoordinationPlan, PlanTarget
 from twinklr.core.sequencer.templates.group.recipe_catalog import _TYPE_TO_LANE, RecipeCatalog
+from twinklr.core.sequencer.templates.group.target_expander import TargetExpander
 from twinklr.core.sequencer.vocabulary import (
     CoordinationMode,
     EffectDuration,
@@ -78,6 +79,7 @@ class SectionPlanValidator:
         template_catalog: TemplateCatalog,
         timing_context: TimingContext,
         recipe_catalog: RecipeCatalog | None = None,
+        multilane_allowed_groups: set[str] | None = None,
     ) -> None:
         """Initialize validator with context.
 
@@ -91,6 +93,8 @@ class SectionPlanValidator:
         self.template_catalog = template_catalog
         self.timing_context = timing_context
         self.recipe_catalog = recipe_catalog
+        self.multilane_allowed_groups = multilane_allowed_groups or set()
+        self.target_expander = TargetExpander(choreo_graph)
 
         # Build lookup sets for fast validation
         self._valid_group_ids = {g.id for g in choreo_graph.groups}
@@ -183,11 +187,13 @@ class SectionPlanValidator:
             section_end_ms = self.timing_context.resolve_to_ms(section_bounds.end)
 
         # Validate each lane plan
+        lane_owned_groups: dict[LaneKind, set[str]] = defaultdict(set)
         for lane_plan in plan.lane_plans:
             # Track timings by target key (type:id) for self-overlap detection
             target_timings: dict[str, list[tuple[int, int, str]]] = defaultdict(list)
+            coord_plan_ownership: list[tuple[int, set[str]]] = []
 
-            for coord_plan in lane_plan.coordination_plans:
+            for coord_idx, coord_plan in enumerate(lane_plan.coordination_plans):
                 # Validate coordination-mode-specific required fields
                 errors.extend(
                     self._validate_coordination_requirements(
@@ -195,6 +201,11 @@ class SectionPlanValidator:
                         lane_plan.lane,
                     )
                 )
+
+                expanded_groups = self._expand_coordination_plan_groups(coord_plan)
+                if expanded_groups:
+                    coord_plan_ownership.append((coord_idx, expanded_groups))
+                    lane_owned_groups[lane_plan.lane].update(expanded_groups)
 
                 # Validate targets
                 coord_target_keys: list[str] = []
@@ -264,13 +275,125 @@ class SectionPlanValidator:
             )
             errors.extend(overlap_errors)
             warnings.extend(overlap_warnings)
+            # Temporarily disabled: expansion-aware lane ownership conflicts were added
+            # as a pre-judge hard gate, but they are currently consuming iteration
+            # budget and regressing planner approval rates in production runs.
+            # Keep implementation available for later re-enable after calibration.
 
         # Add warning checks for common soft-fail patterns
         warnings.extend(self._check_identical_accent_on_primaries(plan))
         warnings.extend(self._check_timing_driver_mismatch(plan))
+        # Temporarily disabled: see note above. Cross-lane ownership enforcement
+        # remains in judge prompts/validation flow until deterministic checks are
+        # recalibrated.
+        # errors.extend(self._check_cross_lane_reuse_policy(lane_owned_groups))
 
         is_valid = len(errors) == 0
         return ValidationResult(is_valid=is_valid, errors=errors, warnings=warnings)
+
+    def _expand_target_groups_safe(self, target: PlanTarget) -> set[str]:
+        """Expand a target to concrete group IDs, suppressing duplicate unknown-target errors."""
+        try:
+            return set(self.target_expander.expand_target(target))
+        except Exception:
+            return set()
+
+    def _expand_coordination_plan_groups(self, coord_plan: CoordinationPlan) -> set[str]:
+        """Collect concrete group ownership for a coordination plan (targets + placement targets)."""
+        groups: set[str] = set()
+        for target in coord_plan.targets:
+            groups.update(self._expand_target_groups_safe(target))
+        for placement in coord_plan.placements:
+            groups.update(self._expand_target_groups_safe(placement.target))
+        return groups
+
+    def _check_lane_coordination_plan_ownership_conflicts(
+        self,
+        lane: LaneKind,
+        coord_plan_ownership: list[tuple[int, set[str]]],
+    ) -> list[ValidationIssue]:
+        """Within a lane, concrete groups should be owned by at most one coordination plan.
+
+        This is expansion-aware, so zone/split targets are compared after resolution.
+        """
+        errors: list[ValidationIssue] = []
+        for i in range(len(coord_plan_ownership)):
+            idx_a, groups_a = coord_plan_ownership[i]
+            if not groups_a:
+                continue
+            for j in range(i + 1, len(coord_plan_ownership)):
+                idx_b, groups_b = coord_plan_ownership[j]
+                overlap = sorted(groups_a & groups_b)
+                if not overlap:
+                    continue
+                preview = ", ".join(overlap[:5])
+                more = f" (+{len(overlap)-5} more)" if len(overlap) > 5 else ""
+                errors.append(
+                    ValidationIssue(
+                        severity=ValidationSeverity.ERROR,
+                        code="TARGET_IN_MULTIPLE_COORDINATION_PLANS_IN_LANE",
+                        message=(
+                            f"{lane.value} lane coordination_plans[{idx_a}] and "
+                            f"coordination_plans[{idx_b}] both control the same concrete groups "
+                            f"after target expansion: {preview}{more}"
+                        ),
+                        field_path=f"lane_plans[{lane.value}].coordination_plans",
+                        fix_hint=(
+                            "Consolidate each concrete group into a single coordination_plan "
+                            "within the lane, or make target sets disjoint after zone/split expansion."
+                        ),
+                    )
+                )
+        return errors
+
+    def _check_cross_lane_reuse_policy(
+        self,
+        lane_owned_groups: dict[LaneKind, set[str]],
+    ) -> list[ValidationIssue]:
+        """Check expansion-aware cross-lane reuse policy (BASE exclusive; RHYTHM+ACCENT allowlist)."""
+        errors: list[ValidationIssue] = []
+
+        base_groups = lane_owned_groups.get(LaneKind.BASE, set())
+        rhythm_groups = lane_owned_groups.get(LaneKind.RHYTHM, set())
+        accent_groups = lane_owned_groups.get(LaneKind.ACCENT, set())
+
+        base_conflicts = sorted(base_groups & (rhythm_groups | accent_groups))
+        for gid in base_conflicts:
+            errors.append(
+                ValidationIssue(
+                    severity=ValidationSeverity.ERROR,
+                    code="CROSS_LANE_BASE_REUSE",
+                    message=(
+                        f"Group '{gid}' is owned by BASE and another lane after target expansion. "
+                        "Cross-lane reuse involving BASE is forbidden."
+                    ),
+                    field_path="lane_plans",
+                    fix_hint=(
+                        "Remove the group from BASE or the other lane, or change zone/split targets "
+                        "so expanded concrete groups are disjoint from BASE."
+                    ),
+                )
+            )
+
+        rhythm_accent_conflicts = sorted((rhythm_groups & accent_groups) - self.multilane_allowed_groups)
+        for gid in rhythm_accent_conflicts:
+            errors.append(
+                ValidationIssue(
+                    severity=ValidationSeverity.ERROR,
+                    code="CROSS_LANE_REUSE_GROUP",
+                    message=(
+                        f"Group '{gid}' is owned by both RHYTHM and ACCENT after target expansion "
+                        "but is not allowlisted for multilane override."
+                    ),
+                    field_path="lane_plans",
+                    fix_hint=(
+                        "Make RHYTHM and ACCENT ownership disjoint for this group, or add the group "
+                        "to layer_intents.multilane_allowed_groups if upstream intent explicitly permits it."
+                    ),
+                )
+            )
+
+        return errors
 
     def _validate_coordination_requirements(
         self,

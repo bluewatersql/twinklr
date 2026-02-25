@@ -222,6 +222,8 @@ class GroupPlannerOrchestrator:
     async def run(
         self,
         section_context: SectionPlanningContext,
+        *,
+        run_id: str | None = None,
     ) -> IterationResult[SectionCoordinationPlan]:
         """Run GroupPlanner for a single section with iterative refinement.
 
@@ -260,9 +262,9 @@ class GroupPlannerOrchestrator:
                 f"⚡ Section {section_context.section_id} is ultra-short "
                 f"({section_context.duration_ms}ms) — using heuristic-only approval"
             )
-            result = await self._run_heuristic_only(section_context)
+            result = await self._run_heuristic_only(section_context, run_id=run_id)
         else:
-            result = await self._run_full_iteration(section_context)
+            result = await self._run_full_iteration(section_context, run_id=run_id)
 
         if result.success:
             logger.debug(
@@ -284,6 +286,8 @@ class GroupPlannerOrchestrator:
     async def _run_full_iteration(
         self,
         section_context: SectionPlanningContext,
+        *,
+        run_id: str | None = None,
     ) -> IterationResult[SectionCoordinationPlan]:
         """Run full planner → heuristic → judge iteration loop.
 
@@ -298,7 +302,7 @@ class GroupPlannerOrchestrator:
             config=self.config,
             feedback_manager=feedback_manager,
         )
-        initial_variables = self._build_planner_variables(section_context)
+        initial_variables = self._build_planner_variables(section_context, run_id=run_id)
         validator = self._build_validator(section_context)
 
         return await controller.run(
@@ -313,6 +317,8 @@ class GroupPlannerOrchestrator:
     async def _run_heuristic_only(
         self,
         section_context: SectionPlanningContext,
+        *,
+        run_id: str | None = None,
     ) -> IterationResult[SectionCoordinationPlan]:
         """Run planner with heuristic-only validation (no LLM judge).
 
@@ -339,7 +345,7 @@ class GroupPlannerOrchestrator:
             llm_logger=self.llm_logger,
         )
 
-        initial_variables = self._build_planner_variables(section_context)
+        initial_variables = self._build_planner_variables(section_context, run_id=run_id)
         validator = self._build_validator(section_context)
         context = IterationContext()
 
@@ -398,6 +404,8 @@ class GroupPlannerOrchestrator:
     def _build_planner_variables(
         self,
         section_context: SectionPlanningContext,
+        *,
+        run_id: str | None = None,
     ) -> dict[str, Any]:
         """Build variables for planner prompt.
 
@@ -414,6 +422,8 @@ class GroupPlannerOrchestrator:
         # Get shaped context (filtered/simplified for tokens)
         # Note: Taxonomy enums are injected automatically by async_runner via taxonomy_utils
         variables = shape_planner_context(section_context)
+        if run_id:
+            variables["run_id"] = run_id
 
         return variables
 
@@ -435,6 +445,7 @@ class GroupPlannerOrchestrator:
             template_catalog=section_context.template_catalog,
             timing_context=section_context.timing_context,
             recipe_catalog=section_context.recipe_catalog,
+            multilane_allowed_groups=self._extract_multilane_allowed_groups(section_context),
         )
 
         def validate(plan: SectionCoordinationPlan) -> list[str]:
@@ -458,6 +469,19 @@ class GroupPlannerOrchestrator:
             return errors
 
         return validate
+
+    def _extract_multilane_allowed_groups(
+        self,
+        section_context: SectionPlanningContext,
+    ) -> set[str]:
+        """Extract explicit RHYTHM+ACCENT multilane allowlist from raw layer intents."""
+        allowed: set[str] = set()
+        for layer in section_context.layer_intents or []:
+            if isinstance(layer, dict):
+                raw = layer.get("multilane_allowed_groups")
+                if isinstance(raw, list):
+                    allowed.update(str(g) for g in raw if g)
+        return allowed
 
     def _normalize_group_target_ids(
         self,

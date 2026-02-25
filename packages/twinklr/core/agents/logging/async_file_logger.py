@@ -7,6 +7,7 @@ import asyncio
 import hashlib
 import json
 import uuid
+import re
 from pathlib import Path
 from typing import Any
 
@@ -243,7 +244,11 @@ class AsyncFileLogger:
 
         # Generate filename
         ext = self.format
-        filename = f"iter_{iteration or 0:02d}_call_{call_num:03d}.{ext}"
+        run_id_suffix = ""
+        if log_entry.run_id:
+            safe_run_id = re.sub(r"[^A-Za-z0-9_.-]+", "_", str(log_entry.run_id))[:48]
+            run_id_suffix = f"_run_{safe_run_id}"
+        filename = f"iter_{iteration or 0:02d}_call_{call_num:03d}{run_id_suffix}.{ext}"
         filepath = agent_dir / filename
 
         # Convert to dict

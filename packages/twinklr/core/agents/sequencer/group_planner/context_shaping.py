@@ -379,7 +379,9 @@ def shape_planner_context(section_context: SectionPlanningContext) -> dict[str, 
         "motion_density": section_context.motion_density,
         "choreography_style": section_context.choreography_style,
         "primary_focus_targets": section_context.primary_focus_targets,
+        "primary_focus_targets_typed": section_context.primary_focus_targets_typed,
         "secondary_targets": section_context.secondary_targets,
+        "secondary_targets_typed": section_context.secondary_targets_typed,
         "priority_roles": all_target_roles,
         "notes": section_context.notes,
         # Section-scoped shared context (FILTERED + SIMPLIFIED)
@@ -613,7 +615,9 @@ def shape_section_judge_context(
         "motion_density": section_context.motion_density,
         "choreography_style": section_context.choreography_style,
         "primary_focus_targets": section_context.primary_focus_targets,
+        "primary_focus_targets_typed": section_context.primary_focus_targets_typed,
         "secondary_targets": section_context.secondary_targets,
+        "secondary_targets_typed": section_context.secondary_targets_typed,
         "priority_roles": all_target_roles,
         # Section-scoped shared context
         "display_graph": {
