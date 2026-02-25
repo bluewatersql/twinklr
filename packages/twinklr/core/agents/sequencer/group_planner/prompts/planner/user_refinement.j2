@@ -1,7 +1,7 @@
 {#
 GroupPlanner User Prompt - REFINEMENT ONLY
 Used for iteration 2+ to avoid resending full context.
-References existing conversation context (section, templates, groups).
+References system prompt rules and existing conversation context.
 #}
 # Refinement Request: {{ section_name }} ({{ section_id }})
 
@@ -9,33 +9,30 @@ References existing conversation context (section, templates, groups).
 
 {{ feedback }}
 
-## Key Reminders (from initial context)
+## Key Reminders
 
 - **Section:** {{ section_name }} ({{ (start_ms / 1000) | round(1) }}s to {{ (end_ms / 1000) | round(1) }}s)
-- **Musical Length:** {{ section_duration_bars }} bars ({{ section_duration_beats }} beats) - bars 1-{{ available_bars }} available
-- **Hard Bar Limit:** `section_max_bar = {{ section_max_bar }}` (all starts and window ends must be <= this bar)
+- **Musical Length:** {{ section_duration_bars }} bars ({{ section_duration_beats }} beats) — bars 1-{{ available_bars }}
+- **Hard Bar Limit:** bar {{ section_max_bar }}
 - **Energy Target:** {{ energy_target }}
-- **Motion Density:** {{ motion_density }}
 - **Primary Targets:** {{ primary_focus_targets | join(", ") }}
 {% if section_duration_bars < 1 %}
 ⚠️ **VERY SHORT SECTION:** Only bar 1 beat 1 with HIT duration. Skip BASE/RHYTHM.
 {% elif section_duration_bars < 2 %}
-⚠️ **SHORT SECTION:** Use HIT/BURST only. Avoid PHRASE/EXTENDED/SECTION.
+⚠️ **SHORT SECTION:** Use HIT/BURST only.
 {% elif section_duration_bars <= 5 %}
-⚠️ **BRIEF SECTION:** HIT/BURST only. ONE placement per target per lane — no stacking.
+⚠️ **BRIEF SECTION:** ONE placement per target per lane — no stacking.
 {% endif %}
 
-**Targeting:** Use typed targets: `{"type": "group", "id": "..."}`, `{"type": "zone", "id": "..."}`, or `{"type": "split", "id": "..."}`. Zone targets expand to all groups in that zone. Split targets expand to partition groups. The same target (same type+id) must not overlap itself within a lane.
-
-**Cross-lane reuse policy reminder:**
+**Cross-lane reuse:**
 {% if multilane_allowed_groups %}
-- Allowlisted RHYTHM+ACCENT groups only: {{ multilane_allowed_groups | join(", ") }}
+- Allowlisted for RHYTHM+ACCENT: {{ multilane_allowed_groups | join(", ") }}
 {% else %}
-- No allowlist present: do NOT reuse any target across lanes.
+- No allowlist — each target in exactly one lane.
 {% endif %}
-- BASE may not share targets with any other lane.
+- BASE never shares targets with other lanes.
 
-**REQUIRED FIELDS (Copy to response):**
+**Required fields (copy to response):**
 {% if theme_ref %}
 - **Theme:** {{ theme_ref.theme_id }}{% if theme_ref.tags %} (tags: {{ theme_ref.tags | join(", ") }}){% endif %}, scope={{ theme_ref.scope }}
 {% endif %}
@@ -45,38 +42,6 @@ References existing conversation context (section, templates, groups).
 {% if motif_ids %}
 - **Motifs:** {{ motif_ids | join(", ") }}
 {% endif %}
-
-**CRITICAL:**
-- Include these exact theme, palette, and motif_ids values in your revised plan
-- When selecting templates, prefer those with matching `motif.*` affinity tags for better variety and alignment
-- Do not use placeholders
-
-## Intensity Levels (use categorical, not numeric)
-
-| Level | Description | Typical Use |
-|-------|-------------|-------------|
-| WHISPER | Barely visible | Background ambience |
-| SOFT | Gentle | Supporting layers |
-| MED | Balanced | Default, general |
-| STRONG | Prominent | Primary groups |
-| PEAK | Maximum | Climax moments |
-
-**For {{ energy_target }} energy:** {% if energy_target == "LOW" %}prefer WHISPER, SOFT, MED{% elif energy_target == "HIGH" %}prefer MED, STRONG, PEAK{% else %}prefer SOFT, MED, STRONG{% endif %}
-
-## Effect Durations
-
-| Duration | Length | Use |
-|----------|--------|-----|
-| HIT | 1-2 beats | Quick accent |
-| BURST | 1 bar | Short emphasis |
-| PHRASE | 2-4 bars | Melodic phrase |
-| EXTENDED | 4-8 bars | Build/transition |
-| SECTION | Full | Continuous base |
-
-**Duration by Lane (CRITICAL):**
-- BASE → SECTION or EXTENDED (never HIT/BURST)
-- RHYTHM → PHRASE or EXTENDED
-- ACCENT → HIT or BURST
 
 {% if revision_request %}
 ## Revision Priority: {{ revision_request.priority }}
@@ -106,26 +71,6 @@ References existing conversation context (section, templates, groups).
 ## Instructions
 
 1. Address ALL ERROR severity issues first
-2. If any cross-lane reuse errors are present, make lane target sets disjoint before other edits
-3. Keep every placement start and window end within bars 1..{{ section_max_bar }}
-3a. For repeated placements on the same target: keep starts >=2 beats apart; if any placement is BURST, keep same-target starts >=1 full bar apart
-4. Keep structure that worked - only fix flagged issues
-5. Use categorical intensity levels (WHISPER to PEAK), not numeric values
-6. Use categorical durations (HIT, BURST, PHRASE, EXTENDED, SECTION)
-7. Do not change theme_id unless feedback explicitly requests it
-8. Keep palette/motif_ids consistent with MacroPlan (do not invent)
-9. Timing: use bar and beat integers for start, duration category for length
-10. Return the complete revised SectionCoordinationPlan
-
-## Common Patterns to Avoid (Don't introduce while fixing)
-
-- **Identical accents**: Don't give all primary targets the same template/timing/intensity
-- **Peak overuse**: Don't use PEAK on more than 1-2 groups per accent moment
-- **Repeated templates**: Don't use identical template+params on 3+ groups for entire section
-- **Energy mismatch**: Don't use PEAK in LOW energy sections or WHISPER in HIGH energy sections
-- **Duration mismatch**: Don't use HIT/BURST for BASE lane (use SECTION/EXTENDED instead)
-- **Truncated window**: For SEQUENCED/CALL_RESPONSE modes, window must span (group_count × step_duration) minimum
-- **group_order ⊆ targets**: Every `group_order` entry must be an ID from the same coordination plan's `targets`. Do NOT put group IDs from other lanes in group_order.
-- **Missing group_order**: SEQUENCED and CALL_RESPONSE modes BOTH require non-empty config.group_order
-- **Lane-template mismatch**: `gtpl_base_*` → BASE only, `gtpl_rhythm_*` → RHYTHM only, `gtpl_accent_*` → ACCENT only. Never cross lanes.
-- **Mixed window + placement**: Don't use SEQUENCED window for a group AND a separate placement for same group in same lane - choose ONE approach
+2. Make lane target sets disjoint before other edits (see system prompt Rule #2)
+3. Keep working structure — only fix flagged issues
+4. Return the complete revised SectionCoordinationPlan

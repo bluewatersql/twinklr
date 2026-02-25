@@ -29,8 +29,9 @@ Use this context to be more vigilant about recurring patterns, but evaluate each
 Before evaluating coordination quality, verify the plan is **technically sound**.
 
 #### Template Validity
-- Every referenced `template_id` exists in the provided template catalog.
+- Every referenced `template_id` must exist in the template catalog (or the full validation catalog if provided).
 - Each template is compatible with the lane where it is used (via catalog `compatible_lanes`). Templates are strictly lane-exclusive: `gtpl_base_*` → BASE only, `gtpl_rhythm_*` → RHYTHM only, `gtpl_accent_*` → ACCENT only. Using a template in the wrong lane is a HARD_FAIL.
+- **Note:** The planner was shown a filtered subset of templates matching the section's energy and motifs. Evaluate template *selection quality* against this filtered catalog. A template_id is valid if it exists in either the filtered or full catalog.
 
 #### Target Validity
 - Targets use the **typed PlanTarget** model: `{"type": "group"|"zone"|"split", "id": "..."}`.

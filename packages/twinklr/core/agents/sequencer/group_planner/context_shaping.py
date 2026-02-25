@@ -215,31 +215,29 @@ def shape_planner_context(section_context: SectionPlanningContext) -> dict[str, 
         motif_ids=section_context.motif_ids,
     )
 
+    def _simplify_entries(entries: list[TemplateInfo]) -> list[dict[str, Any]]:
+        return [
+            {
+                "template_id": entry.template_id,
+                "name": entry.name,
+                "compatible_lanes": entry.compatible_lanes,
+                "affinity_tags": AffinityScorer.derive_affinity_tags(entry),
+                "tags": entry.tags,
+            }
+            for entry in entries
+        ]
+
     simplified_catalog = {
         "schema_version": section_context.template_catalog.schema_version,
-        "entries": [
-            {
-                "template_id": entry.template_id,
-                "name": entry.name,
-                "compatible_lanes": entry.compatible_lanes,
-                "affinity_tags": AffinityScorer.derive_affinity_tags(entry),
-                "tags": entry.tags,
-            }
-            for entry in filtered_entries
-        ],
+        "entries": _simplify_entries(filtered_entries),
     }
-    full_catalog_for_judge = {
+
+    # Store the full catalog in simplified form for the section judge.
+    # The judge evaluates against the same filtered set the planner sees,
+    # plus the full catalog for ID-existence validation.
+    full_catalog_simplified = {
         "schema_version": section_context.template_catalog.schema_version,
-        "entries": [
-            {
-                "template_id": entry.template_id,
-                "name": entry.name,
-                "compatible_lanes": entry.compatible_lanes,
-                "affinity_tags": AffinityScorer.derive_affinity_tags(entry),
-                "tags": entry.tags,
-            }
-            for entry in section_context.template_catalog.entries
-        ],
+        "entries": _simplify_entries(list(section_context.template_catalog.entries)),
     }
 
     logger.debug(
@@ -386,8 +384,8 @@ def shape_planner_context(section_context: SectionPlanningContext) -> dict[str, 
         "notes": section_context.notes,
         # Section-scoped shared context (FILTERED + SIMPLIFIED)
         "display_graph": section_choreo_graph,
-        "template_catalog": simplified_catalog,  # Planner-focused filtered catalog
-        "template_catalog_full": full_catalog_for_judge,  # Judge fallback catalog
+        "template_catalog": simplified_catalog,  # Filtered catalog (planner + judge)
+        "template_catalog_full": full_catalog_simplified,  # Full catalog for ID validation
         "layer_intents": filtered_layer_intents,  # Only relevant layers
         # Spatial planning context
         "display_graph_zones": display_graph_zones,
@@ -414,21 +412,22 @@ def shape_planner_context(section_context: SectionPlanningContext) -> dict[str, 
 
 
 # ---------------------------------------------------------------------------
-# Recipe catalog shaping (Phase 2)
+# Recipe catalog shaping
 # ---------------------------------------------------------------------------
 
 
 def _shape_recipe_catalog(section_context: SectionPlanningContext) -> dict[str, Any] | None:
-    """Shape recipe catalog for planner prompt.
+    """Shape recipe entries for the planner prompt.
 
-    Produces a compact representation with layer count, effect types,
-    and model affinities — enough for the LLM to make informed selections.
+    Recipes are multi-layer composite templates from feature engineering.
+    Their IDs are valid ``template_id`` values — the renderer handles
+    multi-layer composition transparently.
 
     Args:
         section_context: Section planning context with optional recipe_catalog.
 
     Returns:
-        Shaped recipe catalog dict, or None if no recipe catalog.
+        Shaped recipe catalog dict, or None if no recipes available.
     """
     if section_context.recipe_catalog is None:
         return None
@@ -520,36 +519,33 @@ def _build_split_summary(groups: list[ChoreoGroup]) -> dict[str, list[str]]:
 
 def shape_section_judge_context(
     section_context: SectionPlanningContext,
+    *,
+    planner_template_catalog: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Shape context for SectionJudge agent (per-section evaluation).
 
     **SECTION-FOCUSED**: Includes full display graph validity context and section intent.
-    Templates kept minimal (IDs only for validation).
-    Theme context included for drift/tag validation.
-
-    Analyzed from section_judge/user.j2:
-    - Uses: start_ms, end_ms (for bounds checking)
-    - Uses: energy_target, motion_density, choreography_style
-    - Uses: primary_focus_targets, secondary_targets
-    - Uses: choreo_graph.groups_by_role (full graph for ID validation)
-    - Uses: template_catalog (simplified to IDs only)
-    - Uses: plan.theme (for validation)
-    - Does NOT use: timing_context
+    The judge receives two template catalogs:
+    - ``template_catalog``: The same filtered catalog the planner was shown (for fair
+      quality evaluation — don't penalize for not using templates that weren't available).
+    - ``template_catalog_full``: The full catalog for ID-existence validation (a template_id
+      is valid if it exists in either catalog).
 
     Note: The plan itself is added by the controller.
 
     Args:
         section_context: Complete section planning context
+        planner_template_catalog: Optional pre-built filtered catalog from planner context.
+            If None, falls back to the full catalog simplified.
 
     Returns:
         Shaped context dict for section judge (excluding plan)
     """
-    # Keep full role map so judge can validate IDs against the full display graph.
     all_target_roles = section_context.primary_focus_targets + section_context.secondary_targets
     groups_by_role = dict(section_context.choreo_graph.groups_by_role)
 
-    # Simplify template catalog to just IDs and names (judge only needs to validate existence)
-    simplified_catalog = {
+    # Full catalog simplified for ID validation
+    full_catalog_simplified = {
         "schema_version": section_context.template_catalog.schema_version,
         "entries": [
             {
@@ -562,6 +558,9 @@ def shape_section_judge_context(
             for entry in section_context.template_catalog.entries
         ],
     }
+
+    # Use the same filtered catalog the planner saw if available
+    judge_template_catalog = planner_template_catalog or full_catalog_simplified
 
     # Prepare theme context for validation
     theme_definition_dict: dict[str, Any] | None = None
@@ -630,7 +629,8 @@ def shape_section_judge_context(
                 for split, ids in section_context.choreo_graph.groups_by_split.items()
             },
         },
-        "template_catalog": simplified_catalog,
+        "template_catalog": judge_template_catalog,  # Same filtered catalog planner saw
+        "template_catalog_full": full_catalog_simplified,  # Full catalog for ID validation
         # Theme context for validation
         "theme_definition": theme_definition_dict,
         "theming_ids": theming_ids,  # For validating theme_id, tags, palette_id

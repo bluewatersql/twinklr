@@ -67,10 +67,11 @@ class SectionPlanValidator:
     """Deterministic validator for SectionCoordinationPlan.
 
     Validates:
-    - Template existence in catalog
+    - Template existence in unified catalog
     - Group existence in ChoreographyGraph
     - Timing bounds (placements within section)
-    - No within-lane overlaps on same group
+    - No within-lane self-overlaps on same target
+    - Cross-lane reuse policy (BASE exclusive; RHYTHM+ACCENT allowlist)
     """
 
     def __init__(
@@ -87,7 +88,8 @@ class SectionPlanValidator:
             choreo_graph: Choreography graph configuration
             template_catalog: Available templates
             timing_context: Timing information for TimeRef resolution
-            recipe_catalog: Optional unified recipe catalog for recipe ID validation
+            recipe_catalog: Optional recipe catalog (legacy; IDs are valid template_ids)
+            multilane_allowed_groups: Groups allowed in both RHYTHM and ACCENT
         """
         self.choreo_graph = choreo_graph
         self.template_catalog = template_catalog
@@ -102,7 +104,7 @@ class SectionPlanValidator:
         self._valid_split_ids = {split.value for split in SplitDimension}
 
     def _is_known_template(self, template_id: str) -> bool:
-        """Check if template_id exists in either template catalog or recipe catalog."""
+        """Check if template_id exists in the unified template catalog."""
         if self.template_catalog.has_template(template_id):
             return True
         if self.recipe_catalog is not None and self.recipe_catalog.has_recipe(template_id):
@@ -275,18 +277,13 @@ class SectionPlanValidator:
             )
             errors.extend(overlap_errors)
             warnings.extend(overlap_warnings)
-            # Temporarily disabled: expansion-aware lane ownership conflicts were added
-            # as a pre-judge hard gate, but they are currently consuming iteration
-            # budget and regressing planner approval rates in production runs.
-            # Keep implementation available for later re-enable after calibration.
 
         # Add warning checks for common soft-fail patterns
         warnings.extend(self._check_identical_accent_on_primaries(plan))
         warnings.extend(self._check_timing_driver_mismatch(plan))
-        # Temporarily disabled: see note above. Cross-lane ownership enforcement
-        # remains in judge prompts/validation flow until deterministic checks are
-        # recalibrated.
-        # errors.extend(self._check_cross_lane_reuse_policy(lane_owned_groups))
+        # Cross-lane reuse policy (expansion-aware). Catches violations before
+        # the LLM judge, saving iteration budget and tokens.
+        errors.extend(self._check_cross_lane_reuse_policy(lane_owned_groups))
 
         is_valid = len(errors) == 0
         return ValidationResult(is_valid=is_valid, errors=errors, warnings=warnings)
@@ -350,45 +347,75 @@ class SectionPlanValidator:
         self,
         lane_owned_groups: dict[LaneKind, set[str]],
     ) -> list[ValidationIssue]:
-        """Check expansion-aware cross-lane reuse policy (BASE exclusive; RHYTHM+ACCENT allowlist)."""
+        """Check expansion-aware cross-lane reuse policy.
+
+        Enforces Rule #2 from the planner system prompt:
+        - BASE cannot share targets with any other lane.
+        - RHYTHM+ACCENT overlap only for explicitly allowlisted groups.
+
+        Zone/split targets are expanded to concrete groups before checking,
+        so ``zone:HOUSE`` in BASE and ``group:OUTLINE`` in RHYTHM will be
+        caught if OUTLINE is a member of zone HOUSE.
+        """
         errors: list[ValidationIssue] = []
 
         base_groups = lane_owned_groups.get(LaneKind.BASE, set())
         rhythm_groups = lane_owned_groups.get(LaneKind.RHYTHM, set())
         accent_groups = lane_owned_groups.get(LaneKind.ACCENT, set())
 
+        # BASE cannot share with any lane
         base_conflicts = sorted(base_groups & (rhythm_groups | accent_groups))
-        for gid in base_conflicts:
+        if base_conflicts:
+            other_lanes: list[str] = []
+            for gid in base_conflicts:
+                if gid in rhythm_groups:
+                    other_lanes.append("RHYTHM")
+                if gid in accent_groups:
+                    other_lanes.append("ACCENT")
+            conflict_preview = ", ".join(base_conflicts[:5])
+            more = f" (+{len(base_conflicts)-5} more)" if len(base_conflicts) > 5 else ""
             errors.append(
                 ValidationIssue(
                     severity=ValidationSeverity.ERROR,
                     code="CROSS_LANE_BASE_REUSE",
                     message=(
-                        f"Group '{gid}' is owned by BASE and another lane after target expansion. "
-                        "Cross-lane reuse involving BASE is forbidden."
+                        f"Groups [{conflict_preview}{more}] appear in BASE and another lane "
+                        f"after zone/split expansion. BASE cannot share targets with "
+                        f"any other lane (Rule #2). This often happens when a zone target "
+                        f"(e.g., zone:HOUSE) in BASE expands to groups also used in RHYTHM/ACCENT."
                     ),
                     field_path="lane_plans",
                     fix_hint=(
-                        "Remove the group from BASE or the other lane, or change zone/split targets "
-                        "so expanded concrete groups are disjoint from BASE."
+                        f"Move {conflict_preview} out of BASE, or use individual group targets "
+                        f"in BASE instead of zone targets to avoid overlap. Alternatively, move "
+                        f"the conflicting groups out of the other lane."
                     ),
                 )
             )
 
+        # RHYTHM+ACCENT overlap only for allowlisted groups
         rhythm_accent_conflicts = sorted((rhythm_groups & accent_groups) - self.multilane_allowed_groups)
-        for gid in rhythm_accent_conflicts:
+        if rhythm_accent_conflicts:
+            conflict_preview = ", ".join(rhythm_accent_conflicts[:5])
+            more = (
+                f" (+{len(rhythm_accent_conflicts)-5} more)"
+                if len(rhythm_accent_conflicts) > 5
+                else ""
+            )
             errors.append(
                 ValidationIssue(
                     severity=ValidationSeverity.ERROR,
                     code="CROSS_LANE_REUSE_GROUP",
                     message=(
-                        f"Group '{gid}' is owned by both RHYTHM and ACCENT after target expansion "
-                        "but is not allowlisted for multilane override."
+                        f"Groups [{conflict_preview}{more}] appear in both RHYTHM and ACCENT "
+                        f"after zone/split expansion but are not in the multi-lane allowlist "
+                        f"(Rule #2). Only allowlisted groups may appear in both lanes."
                     ),
                     field_path="lane_plans",
                     fix_hint=(
-                        "Make RHYTHM and ACCENT ownership disjoint for this group, or add the group "
-                        "to layer_intents.multilane_allowed_groups if upstream intent explicitly permits it."
+                        f"Make RHYTHM and ACCENT targets disjoint for [{conflict_preview}]. "
+                        f"Keep the group in whichever lane is more important for the section, "
+                        f"and choose a different group for the other lane."
                     ),
                 )
             )
@@ -795,7 +822,6 @@ class SectionPlanValidator:
         target_timings: dict[str, list[tuple[int, int, str]]] = defaultdict(list)
 
         for placement in placements:
-            # Check template exists (unified: template catalog + recipe catalog)
             if not self._is_known_template(placement.template_id):
                 errors.append(
                     ValidationIssue(
@@ -803,7 +829,7 @@ class SectionPlanValidator:
                         code="UNKNOWN_TEMPLATE",
                         message=f"Template '{placement.template_id}' not found in catalog",
                         field_path=f"placement[{placement.placement_id}].template_id",
-                        fix_hint="Use a valid template_id from TemplateCatalog or RecipeCatalog",
+                        fix_hint="Use a valid template_id from the template catalog",
                     )
                 )
             else:
@@ -978,7 +1004,6 @@ class SectionPlanValidator:
         errors: list[ValidationIssue] = []
         target_timings: dict[str, list[tuple[int, int, str]]] = defaultdict(list)
 
-        # Check template exists (unified: template catalog + recipe catalog)
         if not self._is_known_template(window.template_id):
             errors.append(
                 ValidationIssue(
@@ -986,7 +1011,7 @@ class SectionPlanValidator:
                     code="UNKNOWN_TEMPLATE",
                     message=f"Template '{window.template_id}' not found in catalog",
                     field_path=f"lane_plans[{lane.value}].window.template_id",
-                    fix_hint="Use a valid template_id from TemplateCatalog or RecipeCatalog",
+                    fix_hint="Use a valid template_id from the template catalog",
                 )
             )
         else:

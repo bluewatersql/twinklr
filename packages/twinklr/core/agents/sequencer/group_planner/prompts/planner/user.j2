@@ -1,7 +1,8 @@
 {#
 GroupPlanner User Prompt - INITIAL PLANNING
-Provides full section context for iteration 1.
+Provides section-specific context for iteration 1.
 Refinement iterations (2+) use user_refinement.j2 instead.
+Rules and energy recipes live in system.j2 — NOT restated here.
 #}
 
 # Section Information
@@ -9,8 +10,8 @@ Refinement iterations (2+) use user_refinement.j2 instead.
 **Section ID:** {{ section_id }}
 **Section Name:** {{ section_name }}
 **Timing:** {{ (start_ms / 1000) | round(1) }}s to {{ (end_ms / 1000) | round(1) }}s ({{ ((end_ms - start_ms) / 1000) | round(1) }}s duration)
-**Musical Length:** {{ section_duration_bars }} bars ({{ section_duration_beats }} beats) - you have bars 1 through {{ available_bars }} to work with
-**Hard Bar Limit:** `section_max_bar = {{ section_max_bar }}` (all placement starts and all window ends must be <= this bar)
+**Musical Length:** {{ section_duration_bars }} bars ({{ section_duration_beats }} beats) — bars 1 through {{ available_bars }}
+**Hard Bar Limit:** `section_max_bar = {{ section_max_bar }}` (all starts and window ends must be <= this bar)
 {% if section_duration_bars < 1 %}
 ⚠️ **VERY SHORT SECTION (< 1 bar):** This is a pickup/transition. Use minimal placements:
 - ONE accent HIT on primary target at bar 1, beat 1
@@ -19,10 +20,7 @@ Refinement iterations (2+) use user_refinement.j2 instead.
 {% elif section_duration_bars < 2 %}
 ⚠️ **SHORT SECTION (< 2 bars):** Limited space. Use HIT/BURST durations only. Avoid PHRASE/EXTENDED/SECTION.
 {% elif section_duration_bars <= 5 %}
-⚠️ **BRIEF SECTION (≤ 5 bars):** Limited space. Keep it simple:
-- Prefer HIT/BURST durations — avoid PHRASE/EXTENDED/SECTION
-- **ONE placement per target per lane** to prevent overlaps
-- Do not stack multiple effects on the same target in the same lane
+⚠️ **BRIEF SECTION (≤ 5 bars):** Keep it simple — ONE placement per target per lane. HIT/BURST preferred.
 {% endif %}
 
 ## MacroPlan Intent
@@ -40,33 +38,32 @@ Refinement iterations (2+) use user_refinement.j2 instead.
 **Section Notes:** {{ notes }}
 {% endif %}
 
-## MacroPlan Palette + Motifs (REQUIRED - Copy to Your Response)
+## Theme + Palette + Motifs (REQUIRED — Copy Exactly to Response)
+
+{% if theme_ref_json %}
+**ThemeRef:**
+{{ theme_ref_json }}
+{% else %}
+**ERROR:** Theme information missing from MacroPlan
+{% endif %}
 
 {% if palette_ref_json %}
-**Resolved Palette for This Section** (COPY THIS EXACTLY to your response):
+**Palette:**
 {{ palette_ref_json }}
 {% else %}
 **ERROR:** Palette information missing from MacroPlan
 {% endif %}
 
 {% if motif_ids %}
-**Motif IDs for This Section** (COPY THIS EXACTLY to your response):
-{{ motif_ids | join(", ") }}
+**Motif IDs:** {{ motif_ids | join(", ") }}
 
-**Template Selection with Motif Alignment:**
-These motifs represent visual themes for this section. Prefer templates with matching affinity tags to enhance variety and thematic coherence:
-{% for motif_id in motif_ids %}
-- Templates with `motif.{{ motif_id }}` for "{{ motif_id }}"
-{% endfor %}
-
-You don't need to match ALL motifs, but aim for good alignment between templates and motifs where it fits the section's energy and intent.
-
+Prefer templates with matching `motif.*` affinity tags to enhance variety and thematic coherence.
 {% else %}
 **ERROR:** Motif IDs missing from MacroPlan
 {% endif %}
 
 {% if motif_catalog_summary %}
-Motif Catalog (summary for reference):
+Motif Catalog (reference):
 {{ motif_catalog_summary }}
 {% endif %}
 
@@ -108,7 +105,7 @@ Motif Catalog (summary for reference):
 
 ## Available Templates
 
-**CRITICAL:** Each template belongs to exactly ONE lane. Only use templates under the lane they are listed below. Using a template in the wrong lane (e.g., a `gtpl_rhythm_*` in ACCENT) causes a validation failure.
+**CRITICAL:** Each template belongs to exactly ONE lane. Only use templates under the lane they are listed below.
 
 ### BASE Lane Templates (use ONLY in BASE lane)
 {% for entry in template_catalog.entries %}
@@ -153,31 +150,17 @@ Motif Catalog (summary for reference):
 {% endfor %}
 {% endif %}
 
-## Multi-Lane Reuse Allowlist (RHYTHM+ACCENT only)
+## Multi-Lane Reuse Allowlist
 
 {% if multilane_allowed_groups %}
-Only these groups may appear in both RHYTHM and ACCENT: {{ multilane_allowed_groups | join(", ") }}
+These groups may appear in both RHYTHM and ACCENT: {{ multilane_allowed_groups | join(", ") }}
+(See system prompt Rule #2 for override semantics.)
 {% else %}
-No allowlist provided. Treat multi-lane reuse as NOT allowed.
+No allowlist — each target must appear in exactly one lane.
 {% endif %}
-
-## Theme Context (from MacroPlan)
-
-**ThemeRef for This Section** (COPY THIS EXACTLY to your response):
-{{ theme_ref_json }}
-
-**CRITICAL:** You MUST include this exact theme, palette, and motif_ids in your SectionCoordinationPlan response. Do not use placeholders like "MISSING" or leave these fields empty.
-
-Theme defaults (for reference only):
-- default_tags: {{ theme_definition.default_tags | join(", ") }}
-- style_tags: {{ theme_definition.style_tags | join(", ") }}
-- avoid_tags: {{ theme_definition.avoid_tags | join(", ") }}
-- default_palette_id: {{ theme_definition.default_palette_id }}
 
 {% if lyric_context %}
 ## Narrative Context (from Lyrics Analysis)
-
-This section has lyric/narrative context. Use it to produce `narrative_assets` directives — concrete figurative imagery that tells the song's story visually.
 
 {% if lyric_context.has_narrative %}**This song has a clear narrative.** Characters: {{ lyric_context.characters | join(", ") }}{% endif %}
 **Themes:** {{ lyric_context.themes | join(", ") }}
@@ -197,8 +180,6 @@ This section has lyric/narrative context. Use it to produce `narrative_assets` d
 - "{{ phrase.text }}" [{{ phrase.emphasis }}] — {{ phrase.visual_hint }}
 {% endfor %}
 {% endif %}
-
-**TASK:** Based on the above narrative, produce `narrative_assets` with 1-10 directives declaring the figurative imagery this section needs. See system prompt for directive format and rules.
 {% endif %}
 
 {% if color_arc or propensity_hints or style_constraints %}
@@ -206,64 +187,39 @@ This section has lyric/narrative context. Use it to produce `narrative_assets` d
 
 {% if color_arc %}
 ### Color Arc
-This section has a color assignment from the Feature Engineering pipeline:
 - **Palette:** {{ color_arc.palette_id | default('-') }}
 - **Shift Timing:** {{ color_arc.shift_timing | default('-') }}
 - **Contrast Target:** {{ color_arc.contrast_target | default('-') }}
-
-Use this to guide color choices — prefer templates and palettes that align with the assigned palette and contrast level.
 {% endif %}
 
 {% if propensity_hints %}
 ### Propensity Hints
-Effect-model affinity data from corpus analysis:
 {% for aff in propensity_hints.affinities[:5] %}
 - **{{ aff.effect_family }}** on {{ aff.model_type }}: frequency={{ aff.frequency }}
 {% endfor %}
-
-Use these affinities to prefer templates that match high-frequency effect-model pairings for the target groups.
 {% endif %}
 
 {% if style_constraints %}
 ### Style Constraints
 {% if style_constraints.timing_style %}
-- Beat alignment strictness: {{ style_constraints.timing_style.beat_alignment_strictness | default('-') }}
-- Density preference: {{ style_constraints.timing_style.density_preference | default('-') }}
+- Beat alignment: {{ style_constraints.timing_style.beat_alignment_strictness | default('-') }}
+- Density: {{ style_constraints.timing_style.density_preference | default('-') }}
 {% endif %}
 {% endif %}
 
 {% endif %}
+
 # Your Task
 
 Create a SectionCoordinationPlan for **{{ section_name }} ({{ section_id }})**.
 
-**Follow the {{ energy_target }} ENERGY RECIPE from the system prompt:**
-{% if energy_target == "HIGH" %}
-- BASE: SOFT intensity, SECTION duration (OUTLINE + WINDOWS)
-- RHYTHM: SEQUENCED mode, STRONG intensity (ARCHES or similar)
-- ACCENT: PEAK on 1 HERO, STRONG on others, HIT/BURST duration, stagger timing
-{% elif energy_target == "LOW" %}
-- BASE: WHISPER-SOFT intensity, SECTION duration
-- RHYTHM: Optional, SOFT intensity if used
-- ACCENT: Optional, MED intensity maximum, HIT only
-{% else %}
-- BASE: SOFT intensity, SECTION duration
-- RHYTHM: MED-STRONG intensity, PHRASE duration
-- ACCENT: STRONG intensity (not PEAK), BURST duration, stagger by 2+ beats
-{% endif %}
-
-**COPY THESE EXACTLY to your response:**
-- theme: (from ThemeRef above)
-- palette: (from Palette above)
-- motif_ids: [{{ motif_ids | join(", ") }}]
-
+**Follow the {{ energy_target }} ENERGY RECIPE from the system prompt.**
+**Copy theme, palette, and motif_ids exactly from above.**
 **Primary targets for ACCENT:** {{ primary_focus_targets | join(", ") }}
-**Available bars:** 1 to {{ available_bars }}
-**Do not exceed bar {{ section_max_bar }} for any start or window end.**
-**Same-target timing safety:** If ACCENT uses repeated hits on the same target, keep starts at least 2 beats apart; if any placement is BURST, keep same-target starts at least 1 full bar apart.
+**Available bars:** 1 to {{ available_bars }} (hard limit: bar {{ section_max_bar }})
 
 {% if lyric_context %}
-**NARRATIVE ASSETS:** Include `narrative_assets` with 1-10 figurative imagery directives based on the narrative context above. These must be concrete visual subjects (characters, objects, scenes), not abstract patterns.
+**NARRATIVE ASSETS:** Include `narrative_assets` with 1-10 figurative imagery directives based on the narrative context above.
 {% else %}
-**NARRATIVE ASSETS:** No lyric context available — set `narrative_assets` to `[]`.
+**NARRATIVE ASSETS:** No lyric context — set `narrative_assets` to `[]`.
 {% endif %}

@@ -78,12 +78,16 @@ Allowlisted groups: {{ multilane_allowed_groups | join(", ") }}
 No allowlist provided. Default cross-lane reuse prohibition applies.
 {% endif %}
 
-## Available Templates
+## Available Templates (Filtered — Same Set Shown to Planner)
 
 {% for entry in template_catalog.entries %}
 - `{{ entry.template_id }}` ({{ entry.compatible_lanes | map(attribute="value") | join(", ") }}) - {{ entry.name }}
   {% if entry.affinity_tags %}affinity: {{ entry.affinity_tags | join(", ") }}{% endif %}
 {% endfor %}
+
+{% if template_catalog_full and template_catalog_full.entries | length > template_catalog.entries | length %}
+*({{ template_catalog_full.entries | length }} templates exist in total; {{ template_catalog.entries | length }} were shown to the planner for this section's energy/motifs. A template_id is valid if it appears in either catalog.)*
+{% endif %}
 
 ---
 
