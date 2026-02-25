@@ -39,13 +39,8 @@ Before evaluating coordination quality, verify the plan is **technically sound**
 - **Zone targets** (`type: "zone"`): `id` must be a valid zone name (e.g., `HOUSE`, `YARD`, `ROOF`, `PERIMETER`). Zone targets are expanded by the renderer to all groups in that zone. These are **valid targets** — do NOT reject them.
 - **Split targets** (`type: "split"`): `id` must be a valid split dimension (e.g., `HALVES_LEFT`, `ODD`, `EVEN`). Split targets are expanded by the renderer. These are **valid targets** — do NOT reject them.
 - Never use role labels (`HERO`, `ANCHOR`, `SUPPORTING`) as target ids.
-- Within a single lane: do not schedule the **same target** (same type+id) in overlapping time ranges. Different targets may overlap (even if they resolve to overlapping groups — the renderer handles blending).
-- Cross-lane reuse is **NOT allowed by default** (a target should appear in only one lane).
-- **Exception (allowlisted multi-lane targets):** A target may appear in both **RHYTHM + ACCENT** only if it is explicitly allowlisted by `layer_intents.multilane_allowed_groups` in the input.
-  - If `multilane_allowed_groups` is provided in prompt context, treat it as the authoritative allowlist.
-  - For allowlisted groups, overlap across lanes is allowed and is interpreted with **ACCENT override semantics** (ACCENT is higher priority during its intervals).
-- Cross-lane reuse involving **BASE** is never allowed (BASE+RHYTHM or BASE+ACCENT).
-- Within a lane, a target (same type+id) must appear in **at most one coordination_plan** (no splitting a target across multiple coordination_plans in the same lane).
+- Within a single lane: do not schedule the **same target** (same type+id) in overlapping time ranges. A SEQUENCED window counts as an active interval for all targets in its group_order. Different targets may overlap (the renderer handles blending).
+- Targets may appear in multiple lanes for layered effects. The renderer blends layers automatically.
 
 #### Timing Validity
 - All placement `start` times are within the section bounds (bar range).
@@ -84,10 +79,7 @@ If technically invalid, return **HARD_FAIL** with Issues in categories like:
 SCHEMA, TIMING, TEMPLATES, CONSTRAINT, LOGIC.
 
 Automatic HARD_FAIL examples:
-- Cross-lane reuse without allowlisting (or any reuse involving BASE)
-- Using an allowlisted group in both lanes but violating override semantics expectations (e.g., claiming allowlist when none provided)
-- Any within-lane overlap for the same target (type+id) in ACCENT
-- A target (same type+id) appears in multiple coordination_plans within the same lane
+- Any within-lane overlap for the same target (type+id) — includes SEQUENCED window overlap with separate placements
 
 ---
 
@@ -163,11 +155,17 @@ For each identified issue, create an `Issue` matching the shared schema.
 - `suggested_action` must be one of:
   PATCH | REPLAN_SECTION | REPLAN_GLOBAL | IGNORE | RETRY
 
-Do NOT invent additional fields or enum values.
+### Structured Fix Actions (targeted_actions)
 
-When reporting cross-lane reuse issues, use rules like:
-- "DON'T reuse a group across lanes unless allowlisted for RHYTHM+ACCENT override"
-- "DON'T reuse a group across BASE and any other lane"
+When the fix for an issue can be expressed as a specific plan mutation, include one or more `targeted_actions` on the Issue. Each is a `TargetedAction` object with:
+- `action_type`: ADD_TARGET | REMOVE_TARGET | ADD_PLACEMENT | REMOVE_PLACEMENT | SWAP_TEMPLATE | CHANGE_PALETTE | CHANGE_THEME | ADD_MOTIF | REMOVE_MOTIF | ADJUST_TIMING | REORDER_GROUPS | OTHER
+- `section_id`: this section's id (required)
+- `description`: human-readable explanation (required)
+- Plus optional fields: `lane`, `target`, `template_id`, `replacement_template_id`, `palette_id`, `bar`, `beat`, `bar_end`
+
+Use `targeted_actions` when the fix is concrete (specific template, target, lane, timing). Use `fix_hint` alone when the fix is general guidance.
+
+Do NOT invent additional fields or enum values.
 
 ---
 

@@ -70,14 +70,6 @@ CATEGORICAL PLANNING VERSION
 {% endfor %}
 {% endif %}
 
-## Multi-Lane Reuse Allowlist (RHYTHM+ACCENT only)
-
-{% if multilane_allowed_groups %}
-Allowlisted groups: {{ multilane_allowed_groups | join(", ") }}
-{% else %}
-No allowlist provided. Default cross-lane reuse prohibition applies.
-{% endif %}
-
 ## Available Templates (Filtered — Same Set Shown to Planner)
 
 {% for entry in template_catalog.entries %}

@@ -243,8 +243,13 @@ class RevisionRequest(BaseModel):
         if not focus_areas:
             focus_areas = ["Quality improvement"]
 
-        # Extract specific fixes from issues
-        specific_fixes = [issue.fix_hint for issue in verdict.issues[:8] if issue.fix_hint]
+        # Extract specific fixes — prefer structured actions over free-text hints
+        specific_fixes: list[str] = []
+        for issue in verdict.issues[:8]:
+            if issue.targeted_actions:
+                specific_fixes.extend(action.description for action in issue.targeted_actions)
+            elif issue.fix_hint:
+                specific_fixes.append(issue.fix_hint)
 
         # Prepend validation errors if provided
         if validation_errors:

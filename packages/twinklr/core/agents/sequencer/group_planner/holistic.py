@@ -13,7 +13,16 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field
 
 from twinklr.core.agents._paths import AGENTS_BASE_PATH
-from twinklr.core.agents.issues import IssueSeverity
+from twinklr.core.agents.issues import (
+    Issue,
+    IssueCategory,
+    IssueEffort,
+    IssueLocation,
+    IssueScope,
+    IssueSeverity,
+    SuggestedAction,
+    TargetedAction,
+)
 from twinklr.core.agents.logging import LLMCallLogger, NullLLMCallLogger
 from twinklr.core.agents.providers.base import LLMProvider
 from twinklr.core.agents.shared.judge.models import VerdictStatus
@@ -43,12 +52,12 @@ class CrossSectionIssue(BaseModel):
     )
     description: str = Field(description="Clear description of the issue")
     recommendation: str = Field(description="High-level recommendation summary")
-    targeted_actions: list[str] = Field(
+    targeted_actions: list[TargetedAction] = Field(
         default_factory=list,
         description=(
-            "Specific, directly actionable changes referencing concrete "
-            "section_ids, targets (type+id), template_ids, palette_ids, and/or lanes. "
-            "Each action should be a single instruction that can be applied to "
+            "Structured fix actions referencing concrete section_ids, "
+            "targets (type+id), template_ids, palette_ids, and/or lanes. "
+            "Each action is a single mutation that can be applied to "
             "a specific group plan without further interpretation."
         ),
     )
@@ -101,6 +110,9 @@ def get_holistic_judge_spec(
     - Group utilization balance
     - Alignment with MacroPlan global story
 
+    Uses gpt-5.2 for nuanced cross-section evaluation where scoring
+    consistency is critical for downstream pipeline decisions.
+
     Args:
         model: LLM model to use (default: gpt-5.2 for nuanced evaluation)
         temperature: Sampling temperature (default: 0.3 for consistent judgment)
@@ -124,6 +136,10 @@ def get_holistic_judge_spec(
 
 # Convenience constant
 HOLISTIC_JUDGE_SPEC = get_holistic_judge_spec()
+
+# Resolve forward reference: GroupPlanSet.holistic_evaluation uses HolisticEvaluation
+# which is under TYPE_CHECKING in group_plan.py to avoid circular imports.
+GroupPlanSet.model_rebuild(_types_namespace={"HolisticEvaluation": HolisticEvaluation})
 
 
 class HolisticEvaluator:
@@ -324,3 +340,65 @@ class HolisticEvaluator:
             variables["run_id"] = run_id
 
         return variables
+
+
+def cross_section_issues_to_issues(
+    cross_section_issues: list[CrossSectionIssue],
+) -> list[Issue]:
+    """Convert CrossSectionIssues to Issue models for IssueRepository.
+
+    Creates one Issue per CrossSectionIssue, mapping the first affected
+    section to IssueLocation.section_id. The cross-section nature is
+    preserved via the issue_id and message fields.
+
+    Args:
+        cross_section_issues: Holistic evaluation issues
+
+    Returns:
+        List of Issue models compatible with IssueRepository
+    """
+    issues: list[Issue] = []
+    for csi in cross_section_issues:
+        location = IssueLocation(
+            section_id=csi.affected_sections[0] if csi.affected_sections else None,
+        )
+
+        issue = Issue(
+            issue_id=csi.issue_id,
+            category=_infer_category(csi.issue_id),
+            severity=csi.severity,
+            estimated_effort=IssueEffort.MEDIUM,
+            scope=IssueScope.GLOBAL,
+            location=location,
+            rule=f"DON'T allow {csi.issue_id.replace('_', ' ')} across sections",
+            message=f"{csi.description} (affects: {', '.join(csi.affected_sections)})",
+            fix_hint=csi.recommendation,
+            acceptance_test=f"Issue {csi.issue_id} is resolved across affected sections",
+            suggested_action=SuggestedAction.PATCH,
+            targeted_actions=list(csi.targeted_actions),
+        )
+        issues.append(issue)
+
+    return issues
+
+
+def _infer_category(issue_id: str) -> IssueCategory:
+    """Infer IssueCategory from holistic issue_id pattern."""
+    issue_lower = issue_id.lower()
+    if "energy" in issue_lower or "arc" in issue_lower:
+        return IssueCategory.CONTRAST_DYNAMICS
+    if "variety" in issue_lower or "repetit" in issue_lower or "monoton" in issue_lower:
+        return IssueCategory.VARIETY
+    if "palette" in issue_lower or "color" in issue_lower:
+        return IssueCategory.PALETTE
+    if "motif" in issue_lower or "cohes" in issue_lower:
+        return IssueCategory.MOTIF_COHESION
+    if "layer" in issue_lower or "lane" in issue_lower or "reuse" in issue_lower:
+        return IssueCategory.LAYERING
+    if "transition" in issue_lower:
+        return IssueCategory.COORDINATION
+    if "coverage" in issue_lower or "utiliz" in issue_lower:
+        return IssueCategory.COVERAGE
+    if "theme" in issue_lower or "story" in issue_lower:
+        return IssueCategory.STYLE
+    return IssueCategory.COORDINATION

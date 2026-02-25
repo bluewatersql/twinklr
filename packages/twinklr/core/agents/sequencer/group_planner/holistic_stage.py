@@ -33,36 +33,40 @@ class HolisticEvaluatorStage:
     Evaluates the complete GroupPlanSet for cross-section coherence,
     energy arc, template variety, and MacroPlan alignment.
 
-    This is an informational pass-through stage: the evaluation is stored
-    in context state (``holistic_evaluator_result``) and metrics, but the
-    original GroupPlanSet is returned as output so downstream stages
-    receive the plan unchanged.
+    The evaluation is stored in context state (``holistic_evaluator_result``),
+    metrics, and on the ``GroupPlanSet.holistic_evaluation`` field so
+    downstream stages can access it directly from the plan.
 
     Input: GroupPlanSet (from aggregator stage)
-    Output: GroupPlanSet (pass-through; evaluation in state/metrics)
+    Output: GroupPlanSet (with holistic_evaluation attached)
 
     Example:
         >>> stage = HolisticEvaluatorStage(choreo_graph, template_catalog)
         >>> result = await stage.execute(group_plan_set, context)
         >>> if result.success:
-        ...     plan = result.output  # GroupPlanSet (unchanged)
-        ...     eval = context.get_state("holistic_evaluator_result")
-        ...     print(f"Score: {eval.score}, Approved: {eval.is_approved}")
+        ...     plan = result.output
+        ...     print(f"Score: {plan.holistic_evaluation.score}")
+        ...     print(f"Approved: {plan.holistic_evaluation.is_approved}")
     """
 
     def __init__(
         self,
         choreo_graph: ChoreographyGraph,
         template_catalog: TemplateCatalog,
+        *,
+        fail_on_hard_fail: bool = False,
     ) -> None:
         """Initialize holistic evaluator stage.
 
         Args:
             choreo_graph: Choreography graph configuration
             template_catalog: Available templates
+            fail_on_hard_fail: If True, return failure_result on HARD_FAIL
+                status, preventing downstream stages from running.
         """
         self.choreo_graph = choreo_graph
         self.template_catalog = template_catalog
+        self.fail_on_hard_fail = fail_on_hard_fail
 
     @property
     def name(self) -> str:
@@ -76,17 +80,17 @@ class HolisticEvaluatorStage:
     ) -> StageResult[GroupPlanSet]:
         """Run holistic evaluation on GroupPlanSet.
 
-        The evaluation is stored in context state and metrics. The
-        original GroupPlanSet is returned as output (pass-through) so
-        downstream stages (e.g. asset resolution) receive the plan
-        unchanged.
+        The evaluation is stored in context state, metrics, and on the
+        ``GroupPlanSet.holistic_evaluation`` field. If ``fail_on_hard_fail``
+        is True and the evaluation returns ``HARD_FAIL``, a failure result
+        is returned to prevent downstream stages from running.
 
         Args:
             input: GroupPlanSet from aggregator stage
             context: Pipeline context with state (macro_plan, etc.)
 
         Returns:
-            StageResult containing the original GroupPlanSet
+            StageResult containing the GroupPlanSet with holistic_evaluation attached
 
         Side Effects:
             - Stores HolisticEvaluation in context state as ``holistic_evaluator_result``
@@ -108,9 +112,7 @@ class HolisticEvaluatorStage:
                 llm_logger=context.llm_logger,
             )
 
-            # Pass-through: evaluate() produces HolisticEvaluation (stored in
-            # state by execute_step), but we return the original GroupPlanSet.
-            return await execute_step(
+            result = await execute_step(
                 stage_name=self.name,
                 context=context,
                 compute=lambda: evaluator.evaluate(
@@ -121,7 +123,9 @@ class HolisticEvaluatorStage:
                     lyric_context=lyric_context,
                     run_id=pipeline_run_id,
                 ),
-                result_extractor=lambda _: input,
+                result_extractor=lambda eval_result: input.model_copy(
+                    update={"holistic_evaluation": eval_result}
+                ),
                 result_type=HolisticEvaluation,
                 cache_key_fn=lambda: evaluator.get_cache_key(
                     group_plan_set=input,
@@ -130,20 +134,74 @@ class HolisticEvaluatorStage:
                     macro_plan_summary=macro_plan_summary,
                     lyric_context=lyric_context,
                 ),
-                cache_version="2",
+                cache_version="4",
                 metrics_handler=self._handle_metrics,
             )
+
+            if not result.success:
+                return result
+
+            evaluation = context.get_state("holistic_evaluator_result")
+            if self.fail_on_hard_fail and evaluation is not None:
+                from twinklr.core.agents.shared.judge.models import VerdictStatus as VS
+
+                status = (
+                    evaluation.status
+                    if hasattr(evaluation, "status")
+                    else VS(evaluation.get("status"))
+                    if isinstance(evaluation, dict)
+                    else None
+                )
+                if status == VS.HARD_FAIL:
+                    logger.warning(
+                        "Holistic evaluation HARD_FAIL (score=%.1f) — blocking pipeline",
+                        evaluation.score if hasattr(evaluation, "score") else 0.0,
+                    )
+                    return failure_result(
+                        f"Holistic evaluation HARD_FAIL: "
+                        f"{getattr(evaluation, 'summary', 'Critical quality issues')}",
+                        stage_name=self.name,
+                    )
+
+            return result
 
         except Exception as e:
             logger.exception("Holistic evaluation failed", exc_info=e)
             return failure_result(str(e), stage_name=self.name)
 
     def _handle_metrics(self, result: HolisticEvaluation, context: PipelineContext) -> None:
-        """Track holistic evaluation metrics (extends defaults)."""
+        """Track holistic evaluation metrics and record issues for learning."""
+        import time
+
         context.add_metric("holistic_score", result.score)
         context.add_metric("holistic_status", result.status.value)
         context.add_metric("holistic_issues_count", len(result.cross_section_issues))
         self._write_group_planner_run_summary(context)
+
+        # Record cross-section issues to IssueRepository for cross-run learning
+        if result.cross_section_issues:
+            issue_repository = context.get_state("issue_repository", None)
+            if issue_repository is not None:
+                from twinklr.core.agents.sequencer.group_planner.holistic import (
+                    cross_section_issues_to_issues,
+                )
+
+                issues = cross_section_issues_to_issues(result.cross_section_issues)
+                try:
+                    issue_repository.record_issues(
+                        issues=issues,
+                        agent_name="holistic_judge",
+                        job_id=context.get_state("pipeline_run_id", "unknown"),
+                        iteration=0,
+                        verdict_score=result.score,
+                        timestamp=time.time(),
+                    )
+                    logger.debug(
+                        "Recorded %d holistic issues to IssueRepository",
+                        len(issues),
+                    )
+                except Exception as e:
+                    logger.warning("Failed to record holistic issues: %s", e)
 
     def _write_group_planner_run_summary(self, context: PipelineContext) -> None:
         """Write an auditable summary of group planner iteration outcomes for this run."""
@@ -171,7 +229,9 @@ class HolisticEvaluatorStage:
                     "iterations": getattr(result_ctx, "current_iteration", None)
                     if result_ctx
                     else None,
-                    "tokens": getattr(result_ctx, "total_tokens_used", None) if result_ctx else None,
+                    "tokens": getattr(result_ctx, "total_tokens_used", None)
+                    if result_ctx
+                    else None,
                     "first_pass": {
                         "status": getattr(first_verdict, "status", None).value
                         if getattr(first_verdict, "status", None) is not None
@@ -194,7 +254,9 @@ class HolisticEvaluatorStage:
             "pipeline_run_id": context.get_state("pipeline_run_id"),
             "session_id": context.session.session_id,
             "section_count": len(sections),
-            "first_pass_approvals": sum(1 for s in sections if s["first_pass"]["status"] == "APPROVE"),
+            "first_pass_approvals": sum(
+                1 for s in sections if s["first_pass"]["status"] == "APPROVE"
+            ),
             "final_approvals": sum(1 for s in sections if s["final"]["status"] == "APPROVE"),
             "sections": sections,
         }

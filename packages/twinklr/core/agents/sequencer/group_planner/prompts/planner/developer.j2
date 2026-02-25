@@ -3,6 +3,14 @@ GroupPlanner Developer Prompt - SCHEMA & TECHNICAL FORMAT ONLY
 Rules live in system.j2. This prompt covers response format, enum values,
 targeting mechanics, and mode examples.
 #}
+{% if learning_context %}
+## Common Patterns to Watch
+
+{{ learning_context }}
+
+---
+{% endif %}
+
 ## Response Schema
 
 Return a `SectionCoordinationPlan` matching this schema:

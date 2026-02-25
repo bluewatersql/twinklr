@@ -286,8 +286,9 @@ class TestBuildDisplayPipeline:
         assert "asset_creation" in stage_ids
 
         # asset_resolution should depend on both plan source and asset catalog producer
+        # With holistic corrector enabled (default), input comes from "holistic_corrector"
         asset_res = next(s for s in pipeline.stages if s.id == "asset_resolution")
-        assert "holistic" in asset_res.inputs
+        assert "holistic_corrector" in asset_res.inputs or "holistic" in asset_res.inputs
         assert "asset_creation" in asset_res.inputs
 
         errors = pipeline.validate_pipeline()

@@ -301,8 +301,14 @@ def test_normalize_display_target_alias_map_accepts_strings_and_lists() -> None:
     )
 
     assert module.normalize_display_name("MEGA_TREE") in normalized
-    assert module.normalize_display_name("Mega Tree") in normalized[module.normalize_display_name("MEGA_TREE")]
-    assert module.normalize_display_name("Arches") in normalized[module.normalize_display_name("CANDY_STRIPES")]
+    assert (
+        module.normalize_display_name("Mega Tree")
+        in normalized[module.normalize_display_name("MEGA_TREE")]
+    )
+    assert (
+        module.normalize_display_name("Arches")
+        in normalized[module.normalize_display_name("CANDY_STRIPES")]
+    )
 
 
 def test_validate_display_plan_structure_flags_bad_start_shape_and_duration_type() -> None:

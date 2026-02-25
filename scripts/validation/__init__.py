@@ -1,2 +1,1 @@
 """Validation script package."""
-

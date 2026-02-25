@@ -150,15 +150,6 @@ Motif Catalog (reference):
 {% endfor %}
 {% endif %}
 
-## Multi-Lane Reuse Allowlist
-
-{% if multilane_allowed_groups %}
-These groups may appear in both RHYTHM and ACCENT: {{ multilane_allowed_groups | join(", ") }}
-(See system prompt Rule #2 for override semantics.)
-{% else %}
-No allowlist — each target must appear in exactly one lane.
-{% endif %}
-
 {% if lyric_context %}
 ## Narrative Context (from Lyrics Analysis)
 

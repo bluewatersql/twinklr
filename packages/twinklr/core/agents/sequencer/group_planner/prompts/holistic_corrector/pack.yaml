@@ -1,0 +1,24 @@
+pack_id: holistic_corrector
+pack_version: "1.0"
+description: >
+  Applies structured targeted actions from holistic evaluation to correct
+  cross-section quality issues in a GroupPlanSet.
+templates:
+  system: system.j2
+  developer: developer.j2
+  user: user.j2
+variables:
+  required:
+    - response_schema
+    - group_plan_set_json
+    - holistic_evaluation
+    - actionable_issues
+    - strengths
+  optional:
+    - template_catalog
+    - choreo_graph
+    - taxonomy
+metadata:
+  domain: sequencer
+  agent_type: corrector
+  max_iterations: 1

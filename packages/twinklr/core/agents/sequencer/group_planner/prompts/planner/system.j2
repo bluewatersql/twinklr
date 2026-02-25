@@ -81,41 +81,36 @@ ACCENT (1 coordination plan):
 
 Violations of these rules result in rejection. They are grouped by theme.
 
-### Lane Ownership (Rules 1-3)
+### Lane Ownership (Rules 1-2)
 
 1. **Typed targets required**: Each `coordination_plan.targets` is a list of `{"type": ..., "id": ...}`. Each placement must have a matching `target` field.
-2. **Cross-lane exclusivity (default = NO reuse)**:
-   - A target may appear in **exactly one lane** per section.
-   - **BASE**: BACKGROUND roles only (OUTLINE, WINDOWS, HOUSE_WASH).
-   - **RHYTHM**: MID roles only (ARCHES, MEGA_TREE, SPINNERS, MINI_TREES).
-   - **ACCENT**: HERO roles only (use `primary_focus_targets`; MID-role groups listed there are treated as HERO for ACCENT).
-   - **Exception**: A target may appear in both RHYTHM **and** ACCENT **only if** explicitly allowlisted by `layer_intents.multilane_allowed_groups`. ACCENT is the higher-priority override during its intervals.
-   - **Never**: Cross-lane reuse involving BASE is always forbidden.
-3. **Lane-template matching**: `gtpl_base_*` → BASE only, `gtpl_rhythm_*` → RHYTHM only, `gtpl_accent_*` → ACCENT only. Never cross lanes.
+2. **Lane-template matching**: `gtpl_base_*` → BASE only, `gtpl_rhythm_*` → RHYTHM only, `gtpl_accent_*` → ACCENT only. Never cross lanes.
 
-### Timing & Spacing (Rules 4-6)
+Targets may appear in multiple lanes for layered effects. The renderer blends layers automatically. Use lane-appropriate templates for each.
 
-4. **Section bar bounds are hard limits**: Every placement `start.bar` and every window `start.bar`/`end.bar` must be within `1..section_max_bar` (provided in user prompt). Never exceed it.
-5. **No same-target self-overlap**: The same target (type+id) must not overlap itself within a lane. Different targets CAN overlap — the renderer blends them.
-6. **ACCENT same-target spacing**:
+### Timing & Spacing (Rules 3-5)
+
+3. **Section bar bounds are hard limits**: Every placement `start.bar` and every window `start.bar`/`end.bar` must be within `1..section_max_bar` (provided in user prompt). Never exceed it.
+4. **No same-target self-overlap**: The same target (type+id) must not overlap itself within a lane. A SEQUENCED window occupies ALL its targets for the window's full duration — a separate placement on a target already inside a SEQUENCED window in the same lane will cause overlap. Different targets CAN overlap — the renderer blends them.
+5. **ACCENT same-target spacing**:
    - Default: starts >= 2 beats apart.
    - If either placement is BURST: starts >= 1 full bar apart.
    - Single-HERO target: at most 1 ACCENT placement per bar; prefer HIT.
 
-### ID Integrity (Rules 7-8)
+### ID Integrity (Rules 6-7)
 
-7. **Never invent IDs**: Every target `id` and `template_id` must come from the lists in the user prompt. If something seems missing, pick the closest valid option — do not fabricate.
-8. **group_order ⊆ targets**: Every entry in `config.group_order` must be an ID from the same coordination plan's `targets` list. No duplicates. No IDs from other lanes.
+6. **Never invent IDs**: Every target `id` and `template_id` must come from the lists in the user prompt. If something seems missing, pick the closest valid option — do not fabricate.
+7. **group_order ⊆ targets**: Every entry in `config.group_order` must be an ID from the same coordination plan's `targets` list. No duplicates. No IDs from other lanes.
 
-### Coordination Config (Rules 9-10)
+### Coordination Config (Rules 8-9)
 
-9. **SEQUENCED/CALL_RESPONSE require window+config**: Both modes need `window` + `config` with non-empty `group_order`. Window sizing: duration >= group_count × step_duration.
-10. **One SEQUENCED per lane**: At most one SEQUENCED coordination_plan per lane per section. Additional plans must be UNIFIED or COMPLEMENTARY with disjoint targets.
+8. **SEQUENCED/CALL_RESPONSE require window+config**: Both modes need `window` + `config` with non-empty `group_order`. Window sizing: duration >= group_count × step_duration.
+9. **One SEQUENCED per lane**: At most one SEQUENCED coordination_plan per lane per section. Additional plans must be UNIFIED or COMPLEMENTARY.
 
-### Structural (Rules 11-12)
+### Structural (Rules 10-11)
 
-11. **target_roles required**: Each `lane_plans[*].target_roles` must be non-empty. BASE→`[BACKGROUND]`, RHYTHM→`[MID]`, ACCENT→`[HERO]`.
-12. **Duration by lane**: BASE = SECTION/EXTENDED, RHYTHM = PHRASE/EXTENDED, ACCENT = HIT/BURST.
+10. **target_roles required**: Each `lane_plans[*].target_roles` must be non-empty. BASE→`[BACKGROUND]`, RHYTHM→`[MID]`, ACCENT→`[HERO]`.
+11. **Duration by lane**: BASE = SECTION/EXTENDED, RHYTHM = PHRASE/EXTENDED, ACCENT = HIT/BURST.
 
 ---
 
@@ -133,11 +128,10 @@ You MUST copy these EXACTLY from the user prompt:
 ## REQUIRED FINAL CHECK
 
 Before finalizing, verify internally:
-1. No self-overlaps for same target (type+id) within any lane.
-2. Cross-lane check: each target in only one lane (unless allowlisted for RHYTHM+ACCENT).
-3. Each `lane_plan.target_roles` populated and lane-consistent.
-4. Every bar value within `1..section_max_bar`.
-5. Different targets CAN overlap — that is by design for layered effects.
+1. No self-overlaps for same target (type+id) within any lane. If a target is in a SEQUENCED window, do not also place it separately in the same lane.
+2. Each `lane_plan.target_roles` populated and lane-consistent.
+3. Every bar value within `1..section_max_bar`.
+4. Different targets CAN overlap — the renderer blends them.
 
 **Brief sections (≤ 5 bars):** ONE placement per target per lane. No stacking.
 

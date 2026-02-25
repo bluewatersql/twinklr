@@ -290,9 +290,6 @@ class AsyncAgentRunner:
             summary["primary_focus_targets"] = len(variables["primary_focus_targets"])
         if isinstance(variables.get("secondary_targets"), list):
             summary["secondary_targets"] = len(variables["secondary_targets"])
-        if isinstance(variables.get("multilane_allowed_groups"), list):
-            summary["multilane_allowed_groups"] = len(variables["multilane_allowed_groups"])
-
         # Plan payload size for judge calls
         if "plan" in variables:
             try:

@@ -1,6 +1,7 @@
 """Tests for shared judge feedback manager."""
 
 from twinklr.core.agents.issues import (
+    ActionType,
     Issue,
     IssueCategory,
     IssueEffort,
@@ -8,6 +9,7 @@ from twinklr.core.agents.issues import (
     IssueScope,
     IssueSeverity,
     SuggestedAction,
+    TargetedAction,
 )
 from twinklr.core.agents.shared.judge.feedback import (
     FeedbackManager,
@@ -216,3 +218,74 @@ class TestFeedbackManagerBackwardCompatibility:
         assert "Iteration 1" in formatted
         assert "Improve variety" in formatted
         assert "judge_soft_failure" in formatted
+
+
+class TestFeedbackManagerTargetedActions:
+    """Tests for FeedbackManager with targeted_actions."""
+
+    def test_format_feedback_with_targeted_actions(self):
+        """When issues have targeted_actions, formatted output includes action details."""
+        targeted_action = TargetedAction(
+            action_type=ActionType.ADD_TARGET,
+            section_id="chorus_1",
+            lane="RHYTHM",
+            target="group:ARCHES",
+            description="Add ARCHES to RHYTHM lane",
+        )
+        issue = Issue(
+            issue_id="GROUP_UNDERUTILIZED",
+            category=IssueCategory.COVERAGE,
+            severity=IssueSeverity.WARN,
+            estimated_effort=IssueEffort.LOW,
+            scope=IssueScope.SECTION,
+            location=IssueLocation(section_id="chorus_1"),
+            rule="DON'T underutilize groups",
+            message="ARCHES group absent in chorus",
+            fix_hint="Add ARCHES to sections",
+            acceptance_test="ARCHES used in chorus",
+            suggested_action=SuggestedAction.PATCH,
+            targeted_actions=[targeted_action],
+        )
+        manager = FeedbackManager(max_entries=10)
+        manager.add_judge_soft_failure(
+            message="Needs improvement",
+            iteration=1,
+            score=6.0,
+            issues=[issue],
+        )
+
+        formatted = manager.format_feedback_for_prompt()
+
+        assert "ADD_TARGET" in formatted
+        assert "section=chorus_1" in formatted
+        assert "lane=RHYTHM" in formatted
+        assert "target=group:ARCHES" in formatted
+        assert "Add ARCHES to RHYTHM lane" in formatted
+
+    def test_format_feedback_without_targeted_actions(self):
+        """When targeted_actions is empty, falls back to fix_hint."""
+        issue = Issue(
+            issue_id="VARIETY_LOW",
+            category=IssueCategory.VARIETY,
+            severity=IssueSeverity.WARN,
+            estimated_effort=IssueEffort.LOW,
+            scope=IssueScope.SECTION,
+            location=IssueLocation(section_id="verse_1"),
+            rule="DON'T lack variety",
+            message="Same template repeated",
+            fix_hint="Use different geometry types for variety",
+            acceptance_test="Variety improved",
+            suggested_action=SuggestedAction.PATCH,
+            targeted_actions=[],
+        )
+        manager = FeedbackManager(max_entries=10)
+        manager.add_judge_soft_failure(
+            message="Needs work",
+            iteration=1,
+            score=6.0,
+            issues=[issue],
+        )
+
+        formatted = manager.format_feedback_for_prompt()
+
+        assert "Use different geometry types for variety" in formatted

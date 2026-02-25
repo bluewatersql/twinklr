@@ -11,9 +11,9 @@ from __future__ import annotations
 
 import logging
 import time
-from uuid import uuid4
 from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING, TypeVar
+from uuid import uuid4
 
 from pydantic import BaseModel
 
@@ -217,9 +217,7 @@ async def execute_step(
             "status": cache_status,
             "from_cache": from_cache,
             "domain": cache_key.domain if cache_key is not None else None,
-            "input_fingerprint": (
-                cache_key.input_fingerprint if cache_key is not None else None
-            ),
+            "input_fingerprint": (cache_key.input_fingerprint if cache_key is not None else None),
             "step_version": cache_key.step_version if cache_key is not None else None,
             "error": cache_error,
             "pipeline_run_id": context.get_state("pipeline_run_id"),

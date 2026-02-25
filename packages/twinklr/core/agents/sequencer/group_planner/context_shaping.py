@@ -9,7 +9,7 @@ in its prompt. This allows independent tuning per agent.
 
 import json
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from twinklr.core.agents.sequencer.group_planner.context import SectionPlanningContext
 from twinklr.core.agents.taxonomy_utils import get_theming_catalog_dict, get_theming_ids
@@ -23,6 +23,11 @@ from twinklr.core.sequencer.templates.group.models.choreography import (
 )
 from twinklr.core.sequencer.theming import get_theme
 from twinklr.core.sequencer.vocabulary import LaneKind
+
+if TYPE_CHECKING:
+    from twinklr.core.agents.sequencer.group_planner.holistic import (
+        HolisticEvaluation,
+    )
 
 logger = logging.getLogger(__name__)
 
@@ -147,7 +152,7 @@ def shape_planner_context(section_context: SectionPlanningContext) -> dict[str, 
     """Shape context for GroupPlanner agent (per-section coordination planning).
 
     **SECTION-FOCUSED + TOKEN-OPTIMIZED**:
-    - Groups: Full display graph (avoids forcing cross-lane reuse from target scarcity)
+    - Groups: Full display graph (ensures sufficient targets for all lanes)
     - Templates: Simplified to {ID, name, lanes} (descriptions dropped, saves ~40% tokens)
     - Layer intents: Filtered to only layers targeting these roles
 
@@ -175,8 +180,8 @@ def shape_planner_context(section_context: SectionPlanningContext) -> dict[str, 
     # Keep this list explicit even though the full display graph is provided.
     all_target_roles = section_context.primary_focus_targets + section_context.secondary_targets
 
-    # Keep full display graph for planning so lane ownership can be made disjoint
-    # without forcing the model to reuse the same few groups across lanes.
+    # Keep full display graph for planning so the model has sufficient targets
+    # for all lanes without artificial scarcity.
     planner_groups = list(section_context.choreo_graph.groups)
     planner_groups_by_role = dict(section_context.choreo_graph.groups_by_role)
 
@@ -315,25 +320,6 @@ def shape_planner_context(section_context: SectionPlanningContext) -> dict[str, 
             motif_lines.append(line)
         motif_catalog_summary = "\n".join(motif_lines)
 
-    # Extract explicit multi-lane allowlist (if provided by upstream layer intents)
-    # This is optional and defaults to empty.
-    multilane_allowed_groups: list[str] = []
-    for layer in filtered_layer_intents:
-        if isinstance(layer, dict):
-            raw = layer.get("multilane_allowed_groups")
-            if isinstance(raw, list):
-                multilane_allowed_groups.extend([str(g) for g in raw if g])
-
-    if multilane_allowed_groups:
-        # Deduplicate while preserving order
-        seen: set[str] = set()
-        deduped: list[str] = []
-        for g in multilane_allowed_groups:
-            if g not in seen:
-                seen.add(g)
-                deduped.append(g)
-        multilane_allowed_groups = deduped
-
     # Calculate section duration in bars/beats
     # This tells the LLM how much space it has to work with
     section_duration_ms = section_context.end_ms - section_context.start_ms
@@ -345,8 +331,15 @@ def shape_planner_context(section_context: SectionPlanningContext) -> dict[str, 
         beat_duration_ms = bar_duration_ms / timing_ctx.beats_per_bar
         section_bars = section_duration_ms / bar_duration_ms
         section_beats = section_duration_ms / beat_duration_ms
-        # Hard bar limit should match the section-relative timing context
-        section_max_bar = max(timing_ctx.bar_map.keys())
+        # Hard bar limit: last bar whose start_ms is within section bounds.
+        # The bar_map may include bars past section end due to rounding;
+        # using those would cause PLACEMENT_OUTSIDE_SECTION errors.
+        valid_bars = [
+            bar
+            for bar, info in timing_ctx.bar_map.items()
+            if info.start_ms < section_context.end_ms
+        ]
+        section_max_bar = max(valid_bars) if valid_bars else max(timing_ctx.bar_map.keys())
         available_bars = section_max_bar
     else:
         # Fallback estimate
@@ -399,7 +392,6 @@ def shape_planner_context(section_context: SectionPlanningContext) -> dict[str, 
         "motif_ids": section_context.motif_ids,  # Motifs for this section
         "motif_catalog_summary": motif_catalog_summary,  # Motif reference guide
         "tag_catalog": tag_catalog,  # For tag validation
-        "multilane_allowed_groups": multilane_allowed_groups,
         # Lyric/narrative context (section-scoped) for narrative asset directives
         "lyric_context": section_context.lyric_context,
         # Feature Engineering enrichment (Phase 1 context, all optional)
@@ -408,6 +400,10 @@ def shape_planner_context(section_context: SectionPlanningContext) -> dict[str, 
         "style_constraints": section_context.style_constraints,
         # Recipe catalog (Phase 2, optional)
         "recipe_catalog": _shape_recipe_catalog(section_context),
+        # Historical learning context (populated by StandardIterationController
+        # when IssueRepository is available; defaults to empty so templates
+        # using {% if learning_context %} render without error)
+        "learning_context": "",
     }
 
 
@@ -585,23 +581,6 @@ def shape_section_judge_context(
 
     theming_catalog = get_theming_catalog_dict()
 
-    # Extract explicit multi-lane allowlist (if provided upstream)
-    multilane_allowed_groups: list[str] = []
-    if section_context.layer_intents:
-        for layer in section_context.layer_intents:
-            if isinstance(layer, dict):
-                raw = layer.get("multilane_allowed_groups")
-                if isinstance(raw, list):
-                    multilane_allowed_groups.extend([str(g) for g in raw if g])
-    if multilane_allowed_groups:
-        seen: set[str] = set()
-        deduped: list[str] = []
-        for g in multilane_allowed_groups:
-            if g not in seen:
-                seen.add(g)
-                deduped.append(g)
-        multilane_allowed_groups = deduped
-
     return {
         # Section identity
         "section_id": section_context.section_id,
@@ -637,7 +616,6 @@ def shape_section_judge_context(
         "motif_catalog": theming_catalog[
             "motifs"
         ],  # For validating motif_ids and checking template support
-        "multilane_allowed_groups": multilane_allowed_groups,
         # Excluded: timing_context, layer_intents, notes
     }
 
@@ -666,6 +644,52 @@ def _shape_lyric_context_summary(lyric_context: Any | None) -> dict[str, Any] | 
         "genre_markers": getattr(lyric_context, "genre_markers", None) or [],
         "recommended_visual_themes": getattr(lyric_context, "recommended_visual_themes", None)
         or [],
+    }
+
+
+def _compute_completeness_check(
+    section_ids: list[str],
+    expected_section_ids: list[str],
+) -> dict[str, Any]:
+    """Deterministic completeness check for holistic judge.
+
+    Compares actual section IDs against expected IDs from the MacroPlan.
+    This prevents LLM hallucination when counting sections in large JSON payloads.
+
+    Args:
+        section_ids: Section IDs present in the GroupPlanSet.
+        expected_section_ids: Section IDs expected by the MacroPlan.
+
+    Returns:
+        Dict with status, counts, and any missing/extra section IDs.
+    """
+    if not expected_section_ids:
+        return {
+            "status": "SKIPPED",
+            "reason": "No expected section list provided by MacroPlan",
+        }
+
+    present_set = set(section_ids)
+    expected_set = set(expected_section_ids)
+
+    missing = sorted(expected_set - present_set)
+    extra = sorted(present_set - expected_set)
+
+    if not missing and not extra:
+        return {
+            "status": "PASSED",
+            "present_count": len(section_ids),
+            "expected_count": len(expected_section_ids),
+            "missing": [],
+            "extra": [],
+        }
+
+    return {
+        "status": "FAILED",
+        "present_count": len(section_ids),
+        "expected_count": len(expected_section_ids),
+        "missing": missing,
+        "extra": extra,
     }
 
 
@@ -754,6 +778,10 @@ def shape_holistic_judge_context(
     if macro_plan_summary:
         expected_section_ids = list(macro_plan_summary.get("expected_section_ids", []))
 
+    # Deterministic completeness check (prevents LLM hallucination on large JSON)
+    section_ids = [sp.section_id for sp in group_plan_set.section_plans]
+    completeness_check = _compute_completeness_check(section_ids, expected_section_ids)
+
     # ChoreographyGraph has no hierarchy (ChoreoGroup has no parent_group_id)
     group_hierarchy: dict[str, list[str]] = {}
 
@@ -768,8 +796,9 @@ def shape_holistic_judge_context(
         },
         "group_hierarchy": group_hierarchy,
         "section_count": len(group_plan_set.section_plans),
-        "section_ids": [sp.section_id for sp in group_plan_set.section_plans],
+        "section_ids": section_ids,
         "expected_section_ids": expected_section_ids,
+        "completeness_check": completeness_check,
         "macro_plan_summary": macro_plan_summary or {},
         # Explicitly extracted theme/palette context for holistic evaluation
         "global_theme_id": global_theme_id,
@@ -783,3 +812,102 @@ def shape_holistic_judge_context(
         "lyric_context": _shape_lyric_context_summary(lyric_context),
         # template_catalog excluded (not used in prompt)
     }
+
+
+def shape_holistic_corrector_context(
+    group_plan_set: GroupPlanSet,
+    holistic_evaluation: "HolisticEvaluation",
+    choreo_graph: ChoreographyGraph | None = None,
+    template_catalog: TemplateCatalog | None = None,
+) -> dict[str, Any]:
+    """Build variables for holistic corrector prompt.
+
+    Scopes context to keep token usage feasible:
+    - Affected sections (referenced by targeted actions) at full detail
+    - Non-affected sections as compact summaries for cross-section awareness
+    - Template catalog filtered to referenced templates only
+
+    Args:
+        group_plan_set: Complete plan set to correct
+        holistic_evaluation: Evaluation with issues and targeted actions
+        choreo_graph: Optional display graph for target validation
+        template_catalog: Optional template catalog for template validation
+
+    Returns:
+        Variables dict for corrector prompt
+    """
+    from twinklr.core.agents.issues import IssueSeverity
+
+    actionable_issues = [
+        issue
+        for issue in holistic_evaluation.cross_section_issues
+        if issue.severity in (IssueSeverity.ERROR, IssueSeverity.WARN) and issue.targeted_actions
+    ]
+
+    # Deduplicate affected section IDs from all targeted actions
+    affected_section_ids: set[str] = set()
+    for issue in actionable_issues:
+        affected_section_ids.update(issue.affected_sections)
+        for action in issue.targeted_actions:
+            affected_section_ids.add(action.section_id)
+
+    # Partition sections: affected get full detail, others get summary
+    affected_sections_data: list[dict[str, Any]] = []
+    section_summaries: list[dict[str, Any]] = []
+
+    for section in group_plan_set.section_plans:
+        if section.section_id in affected_section_ids:
+            affected_sections_data.append(
+                section.model_dump(exclude={"start_ms", "end_ms", "narrative_assets"})
+            )
+        else:
+            template_ids_by_lane: dict[str, list[str]] = {}
+            for lp in section.lane_plans:
+                tids = []
+                for cp in lp.coordination_plans:
+                    for p in cp.placements:
+                        if p.template_id not in tids:
+                            tids.append(p.template_id)
+                    if cp.window and cp.window.template_id not in tids:
+                        tids.append(cp.window.template_id)
+                template_ids_by_lane[lp.lane.value] = tids
+
+            section_summaries.append({
+                "section_id": section.section_id,
+                "theme": section.theme.model_dump() if section.theme else None,
+                "palette": section.palette.model_dump() if section.palette else None,
+                "motif_ids": section.motif_ids,
+                "template_ids_by_lane": template_ids_by_lane,
+            })
+
+    variables: dict[str, Any] = {
+        "affected_sections_json": json.dumps(affected_sections_data, indent=2, default=str),
+        "affected_section_ids": sorted(affected_section_ids),
+        "section_summaries": section_summaries,
+        "holistic_evaluation": holistic_evaluation.model_dump(),
+        "actionable_issues": [issue.model_dump() for issue in actionable_issues],
+        "strengths": holistic_evaluation.strengths,
+    }
+
+    if choreo_graph is not None:
+        variables["choreo_graph"] = choreo_graph.model_dump()
+
+    if template_catalog is not None:
+        referenced_template_ids: set[str] = set()
+        for issue in actionable_issues:
+            for action in issue.targeted_actions:
+                if action.template_id:
+                    referenced_template_ids.add(action.template_id)
+                if action.replacement_template_id:
+                    referenced_template_ids.add(action.replacement_template_id)
+
+        if referenced_template_ids:
+            catalog_data = template_catalog.model_dump()
+            filtered_entries = [
+                e
+                for e in catalog_data.get("entries", [])
+                if e.get("template_id") in referenced_template_ids
+            ]
+            variables["template_catalog"] = {"entries": filtered_entries}
+
+    return variables

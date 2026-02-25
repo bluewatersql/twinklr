@@ -19,6 +19,8 @@ variables:
   optional:
     - template_catalog
     - macro_plan_summary
+    - expected_section_ids
+    - completeness_check
     - global_theme_id
     - global_palette_id
     - global_theme_tags
@@ -27,6 +29,8 @@ variables:
     - story_notes
     - section_theme_summary
     - learning_context
+    - lyric_context
+    - group_hierarchy
 
     # optional deterministic id validation
     - motif_catalog

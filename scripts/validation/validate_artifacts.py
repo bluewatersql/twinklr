@@ -190,7 +190,9 @@ def validate_display_plan_structure(plan_set: dict[str, Any]) -> list[str]:
                         issues.append(f"❌ Section '{section_id}' placement missing 'placement_id'")
                     elif isinstance(placement_id, str):
                         if placement_id in seen_placement_ids:
-                            issues.append(f"⚠️  Duplicate placement_id '{placement_id}' in display plan")
+                            issues.append(
+                                f"⚠️  Duplicate placement_id '{placement_id}' in display plan"
+                            )
                         seen_placement_ids.add(placement_id)
                     for required_key in ("template_id", "target", "start", "duration"):
                         if required_key not in placement:
@@ -208,7 +210,9 @@ def validate_display_plan_structure(plan_set: dict[str, Any]) -> list[str]:
                         else:
                             bar_value = placement_start.get("bar")
                             beat_value = placement_start.get("beat")
-                            if (bar_value is not None and not isinstance(bar_value, (int, float))) or (
+                            if (
+                                bar_value is not None and not isinstance(bar_value, (int, float))
+                            ) or (
                                 beat_value is not None and not isinstance(beat_value, (int, float))
                             ):
                                 issues.append(
@@ -481,7 +485,9 @@ def normalize_display_target_alias_map(
     return normalized
 
 
-def _extract_display_section_targets(plan_set: dict[str, Any]) -> list[tuple[str, int, int, set[str]]]:
+def _extract_display_section_targets(
+    plan_set: dict[str, Any],
+) -> list[tuple[str, int, int, set[str]]]:
     """Extract per-section target group ids referenced by display placements."""
     extracted: list[tuple[str, int, int, set[str]]] = []
     section_plans = plan_set.get("section_plans", [])
@@ -608,7 +614,9 @@ def validate_display_xsq_target_coverage(
             for effect in effects
             if not (effect.end_ms <= start_ms or effect.start_ms >= end_ms)
         ]
-        overlapping_norms = {normalize_display_name(effect.element_name) for effect in overlapping_effects}
+        overlapping_norms = {
+            normalize_display_name(effect.element_name) for effect in overlapping_effects
+        }
         missing_targets: list[str] = []
         for target_id in sorted(target_ids):
             normalized_target = normalize_display_name(target_id)
@@ -676,7 +684,11 @@ def validate_display_xsq_trace_placement_coverage(
 
         template_id = entry.get("template_id")
         expected_template_id = plan_meta["template_id"]
-        if isinstance(template_id, str) and expected_template_id and template_id != expected_template_id:
+        if (
+            isinstance(template_id, str)
+            and expected_template_id
+            and template_id != expected_template_id
+        ):
             issues.append(
                 f"⚠️  Display XSQ trace placement '{placement_id}' template mismatch: "
                 f"{template_id} != {expected_template_id}"
@@ -770,7 +782,10 @@ def validate_display_xsq(
         end_ms = section.get("end_ms")
         if not isinstance(start_ms, int) or not isinstance(end_ms, int):
             continue
-        covered = any(not (window_end <= start_ms or window_start >= end_ms) for window_start, window_end in effect_windows)
+        covered = any(
+            not (window_end <= start_ms or window_start >= end_ms)
+            for window_start, window_end in effect_windows
+        )
         if not covered:
             issues.append(f"⚠️  No XSQ effects overlap display section '{section_id}'")
 
@@ -909,7 +924,9 @@ def _run_display_xsq_mode(
     if display_target_map_path is not None and display_target_map_path.exists():
         alias_map_payload = load_json(display_target_map_path)
     trace_payload: dict[str, Any] | None = None
-    effective_trace_path = display_xsq_trace_path or _default_display_xsq_trace_path(effective_xsq_path)
+    effective_trace_path = display_xsq_trace_path or _default_display_xsq_trace_path(
+        effective_xsq_path
+    )
     trace_payload = load_optional_display_xsq_trace(effective_trace_path)
 
     issues = validate_display_xsq(
@@ -1041,7 +1058,9 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         help="Optional display XSQ trace sidecar JSON (defaults to <xsq>.trace.json)",
     )
-    parser.add_argument("--quality-only", action="store_true", help="Skip deeper plan-vs-XSQ checks")
+    parser.add_argument(
+        "--quality-only", action="store_true", help="Skip deeper plan-vs-XSQ checks"
+    )
     parser.add_argument("--output-json", type=Path, help="MH XSQ issue JSON output path")
     return parser.parse_args()
 

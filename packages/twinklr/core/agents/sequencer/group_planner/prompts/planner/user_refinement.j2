@@ -24,14 +24,6 @@ References system prompt rules and existing conversation context.
 ⚠️ **BRIEF SECTION:** ONE placement per target per lane — no stacking.
 {% endif %}
 
-**Cross-lane reuse:**
-{% if multilane_allowed_groups %}
-- Allowlisted for RHYTHM+ACCENT: {{ multilane_allowed_groups | join(", ") }}
-{% else %}
-- No allowlist — each target in exactly one lane.
-{% endif %}
-- BASE never shares targets with other lanes.
-
 **Required fields (copy to response):**
 {% if theme_ref %}
 - **Theme:** {{ theme_ref.theme_id }}{% if theme_ref.tags %} (tags: {{ theme_ref.tags | join(", ") }}){% endif %}, scope={{ theme_ref.scope }}
@@ -71,6 +63,8 @@ References system prompt rules and existing conversation context.
 ## Instructions
 
 1. Address ALL ERROR severity issues first
-2. Make lane target sets disjoint before other edits (see system prompt Rule #2)
-3. Keep working structure — only fix flagged issues
+2. Keep working structure — only fix flagged issues
+{% if revision_request and revision_request.specific_fixes %}
+3. Apply the specific fixes listed above directly where they reference exact template/target/lane changes
+{% endif %}
 4. Return the complete revised SectionCoordinationPlan

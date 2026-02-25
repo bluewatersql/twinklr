@@ -14,6 +14,9 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from twinklr.core.agents.assets.stage import AssetCreationStage
+from twinklr.core.agents.sequencer.group_planner.corrector_stage import (
+    HolisticCorrectorStage,
+)
 from twinklr.core.agents.sequencer.group_planner.holistic_stage import (
     HolisticEvaluatorStage,
 )
@@ -47,8 +50,9 @@ def build_display_pipeline(
     fe_bundle: FEArtifactBundle | None = None,
     song_name: str = "sequence",
     max_iterations: int = 3,
-    min_pass_score: float = 0.7,
+    min_pass_score: float = 0.6,
     enable_holistic: bool = True,
+    enable_holistic_corrector: bool = True,
     enable_assets: bool = False,
     xlights_mapping: XLightsMapping | None = None,
 ) -> PipelineDefinition:
@@ -76,6 +80,7 @@ def build_display_pipeline(
         max_iterations: Maximum GroupPlanner iteration cycles.
         min_pass_score: Minimum score for section plan approval (0.0-1.0).
         enable_holistic: Include the holistic evaluation stage.
+        enable_holistic_corrector: Include the holistic corrector stage (requires enable_holistic).
         enable_assets: Include the asset creation stage (extract → enrich → generate).
         xlights_mapping: xLights element name resolution.
 
@@ -139,6 +144,23 @@ def build_display_pipeline(
             )
         )
         aggregate_output_id = "holistic"
+
+    # Holistic correction (applies targeted fixes from holistic evaluation)
+    if enable_holistic and enable_holistic_corrector:
+        display_stages.append(
+            StageDefinition(
+                id="holistic_corrector",
+                stage=HolisticCorrectorStage(
+                    choreo_graph=choreo_graph,
+                    template_catalog=template_catalog,
+                ),
+                inputs=[aggregate_output_id],
+                input_type="GroupPlanSet",
+                output_type="GroupPlanSet",
+                description="Apply holistic corrections to flagged sections",
+            )
+        )
+        aggregate_output_id = "holistic_corrector"
 
     # Asset creation (if enabled) — extract, enrich, and generate assets
     resolution_inputs = [aggregate_output_id]

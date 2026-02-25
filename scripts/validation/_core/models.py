@@ -46,4 +46,3 @@ class ValidationResult:
     def extend(self, issues: list[ValidationIssue]) -> None:
         """Append multiple issues."""
         self.issues.extend(issues)
-

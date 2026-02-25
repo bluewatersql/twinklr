@@ -65,4 +65,3 @@ def test_validate_dmx_data_presence_flags_all_zero_effects() -> None:
     issues = validate_dmx_data_presence(effects_by_model)
 
     assert any("ALL ZERO values" in issue for issue in issues)
-

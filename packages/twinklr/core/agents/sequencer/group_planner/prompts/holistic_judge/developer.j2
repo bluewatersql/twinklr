@@ -27,14 +27,13 @@ This context helps you be more vigilant about recurring patterns, but evaluate e
 
 Before evaluating holistic quality, verify the plan set is **technically sound**:
 
-**Completeness**
-- If "Expected Sections from MacroPlan" is provided, compare the GroupPlanSet's section_ids against the expected list. Only flag missing/extra sections if the two lists differ.
-- If no expected section list is provided, skip the completeness check — do NOT guess which sections should exist.
-- Each section has a valid SectionCoordinationPlan
-
-**Cross-Section Coverage**
-- Sections cover full song timeline
-- No gaps or overlaps between sections
+**Completeness (PRE-VERIFIED)**
+- Section completeness has been verified deterministically before this evaluation.
+- The "Section Completeness (Pre-Verified)" block in the input shows the result.
+- **Trust this result.** Do NOT re-count or re-compare sections against the JSON payload.
+- If status is PASSED: all expected sections are present — move on.
+- If status is FAILED: use the reported missing/extra sections as-is.
+- If status is SKIPPED: no expected list was provided — do not guess.
 
 **Resource Consistency**
 - All target IDs used across sections are valid (use `targets` list)
@@ -44,15 +43,6 @@ Before evaluating holistic quality, verify the plan set is **technically sound**
 - Palette/motif ids are present where required:
   - Every SectionCoordinationPlan has plan.palette.palette_id
   - Every SectionCoordinationPlan has plan.motif_ids (>=1)
-
-**Multi-lane reuse policy consistency (NEW)**
-- Overlap rules apply only to **same-target self-overlap** (same type+id). Different targets CAN overlap.
-- Default: within a section, a target (type+id) should appear in only one lane.
-- Exception: a target may appear in both RHYTHM + ACCENT only if allowlisted via `layer_intents.multilane_allowed_groups` in the plan inputs for that section.
-- Cross-lane reuse involving BASE (BASE+RHYTHM or BASE+ACCENT) is never allowed.
-- If the plan set violates these rules in any section, treat as technical invalid:
-  - Return `HARD_FAIL` immediately with critical cross_section_issues
-- Do NOT flag RHYTHM+ACCENT overlap for allowlisted groups as an error; interpret it as intended ACCENT override behavior.
 
 **If technically invalid**
 - Return status `HARD_FAIL` immediately with critical cross_section_issues
@@ -72,8 +62,6 @@ Evaluate **cross-section quality** across these dimensions:
 5. **resource_utilization** (15%): balanced group usage; focus targets shine.
    - **Important (Narrative protagonist):** If the Song Narrative Context shows `has_narrative: true` with named characters, a single hero prop dominating multiple sections is narrative intent, not a planning failure. Evaluate whether *supporting* groups still receive meaningful moments across the show — not whether all groups are equally represented. A hero prop appearing in 5–7 of 10+ sections is acceptable when it represents the song’s protagonist; only score below 6.0 if non-hero groups receive zero attention across the entire show.
    - **Important (Hierarchy):** If a "Group Hierarchy" is provided, a parent group implicitly covers all its children. Do NOT flag a child group as absent/underutilized when its parent group is used in that section.
-   - **Important (Multi-lane reuse):** If `layer_intents.multilane_allowed_groups` allowlists a group for RHYTHM+ACCENT, do NOT penalize reuse itself. Instead, evaluate whether ACCENT hits are used sparingly and strategically (avoid "always-on accent mud").
-
 Populate `score_breakdown` with exactly these keys:
 - story_coherence
 - energy_arc
@@ -123,11 +111,6 @@ Evaluate themes, palettes, and motifs across ALL sections to ensure the plan mai
 
 For each cross-section issue, provide a `CrossSectionIssue`:
 
-Common cross-section issue_id patterns to use when relevant:
-- multilane_reuse_without_allowlist
-- base_cross_lane_reuse_forbidden
-- multilane_overuse_muddy_accents
-
 Required fields:
 - `issue_id`: stable snake_case identifier (e.g., energy_arc_weak, theme_thrash, palette_overrides_excessive)
 - `severity`: {{ taxonomy.IssueSeverity | join(' | ') }}
@@ -136,19 +119,35 @@ Required fields:
 - `recommendation`: 1–2 sentence high-level summary of what should change
 - `targeted_actions`: list of **specific, directly actionable** instructions (required for ERROR and WARN severity). Each action must reference concrete identifiers from the GroupPlanSet.
 
-### Targeted Actions Format
+### Targeted Actions Format (Structured)
 
-Each `targeted_action` must be a single, executable instruction that can be applied to a specific group plan without further interpretation. Reference actual `section_id`, target (type+id, e.g. group:ARCHES or zone:HOUSE), `template_id`, `palette_id`, and/or `lane` values from the GroupPlanSet.
+Each `targeted_action` is a structured `TargetedAction` object — NOT a free-text string. Every action must include:
 
-**Good examples:**
-- "In section chorus_2, add target group:ARCHES to RHYTHM lane with gtpl_rhythm_sparkle_beat (bars 5-8)"
-- "In section break_1, change palette from core.mono_cool to core.christmas_traditional for transition continuity"
-- "In sections verse_3 and verse_4, replace gtpl_accent_burst_big on target group:MEGA_TREE with gtpl_accent_bell_double for variety"
-- "In section instrumental, add target zone:HOUSE to BASE lane with gtpl_base_candy_stripes to cover all house elements"
+- `action_type`: one of ADD_TARGET, REMOVE_TARGET, ADD_PLACEMENT, REMOVE_PLACEMENT, SWAP_TEMPLATE, CHANGE_PALETTE, CHANGE_THEME, ADD_MOTIF, REMOVE_MOTIF, ADJUST_TIMING, REORDER_GROUPS, OTHER
+- `section_id`: which section to modify (required)
+- `description`: human-readable explanation (required)
 
-**Bad examples (too vague):**
-- "Add more variety to templates" (which section? which group? which template?)
-- "Smooth the palette transitions" (between which sections? change to what?)
-- "Rebalance group utilization" (add which groups to which sections/lanes?)
+Optional fields (populate when relevant to the action_type):
+- `lane`: BASE, RHYTHM, ACCENT, or BURST
+- `target`: target reference e.g. "group:ARCHES", "zone:HOUSE", "split:ODD"
+- `template_id`: template to add or swap from
+- `replacement_template_id`: for SWAP_TEMPLATE, the new template
+- `palette_id`: palette reference e.g. "core.peppermint"
+- `bar`, `beat`: timing position
+- `bar_end`: end bar for range-based actions
+
+**Required fields per action_type:**
+- ADD_TARGET / REMOVE_TARGET: `lane` + `target` required
+- SWAP_TEMPLATE: `template_id` + `replacement_template_id` required
+- CHANGE_PALETTE: `palette_id` required
+- ADD_PLACEMENT: `lane` + `target` + `template_id` recommended
+- OTHER: only `description` required
+
+**Examples:**
+```json
+{"action_type": "ADD_TARGET", "section_id": "chorus_1", "lane": "ACCENT", "target": "group:STARS", "template_id": "gtpl_accent_motif_radial_rays_hit_small", "bar": 12, "beat": 1, "description": "Add STARS accent at chorus beacon reveal for sky glint"}
+{"action_type": "CHANGE_PALETTE", "section_id": "instrumental", "palette_id": "core.peppermint", "description": "Keep instrumental in peppermint palette to preserve show identity"}
+{"action_type": "SWAP_TEMPLATE", "section_id": "verse_4", "lane": "RHYTHM", "target": "group:ARCHES", "template_id": "gtpl_rhythm_sparkle_beat", "replacement_template_id": "gtpl_rhythm_wave_cascade", "description": "Replace sparkle beat with wave cascade for variety before finale"}
+```
 
 Do NOT invent additional fields or enum values.

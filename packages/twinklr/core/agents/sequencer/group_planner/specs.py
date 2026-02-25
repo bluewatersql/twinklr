@@ -81,6 +81,42 @@ def get_section_judge_spec(
     )
 
 
+def get_holistic_corrector_spec(
+    model: str = "gpt-5.2",
+    temperature: float = 0.3,
+    token_budget: int | None = None,
+) -> AgentSpec:
+    """Get HolisticCorrector agent specification.
+
+    The HolisticCorrector applies structured targeted actions from holistic
+    evaluation to correct cross-section quality issues.  It returns only the
+    modified sections (CorrectionResult) rather than the entire GroupPlanSet,
+    keeping both input and output within feasible token budgets.
+
+    Args:
+        model: LLM model to use (default: gpt-5.2 for complex plan modification)
+        temperature: Sampling temperature (default: 0.3 for precise corrections)
+        token_budget: Optional token budget
+
+    Returns:
+        HolisticCorrector agent spec
+    """
+    from twinklr.core.sequencer.planning import CorrectionResult
+
+    return AgentSpec(
+        name="holistic_corrector",
+        prompt_pack="sequencer/group_planner/prompts/holistic_corrector",
+        response_model=CorrectionResult,
+        mode=AgentMode.ONESHOT,
+        model=model,
+        temperature=temperature,
+        max_schema_repair_attempts=3,
+        token_budget=token_budget,
+        default_variables={"taxonomy": get_taxonomy_dict()},
+    )
+
+
 # Convenience constants for default specs
 GROUP_PLANNER_SPEC = get_planner_spec()
 SECTION_JUDGE_SPEC = get_section_judge_spec()
+HOLISTIC_CORRECTOR_SPEC = get_holistic_corrector_spec()

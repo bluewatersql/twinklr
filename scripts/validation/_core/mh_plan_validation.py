@@ -60,18 +60,28 @@ def validate_channel_specifications(raw_plan: dict[str, Any]) -> list[Validation
         channels = section.get("channels")
         if channels is None:
             issues.append(
-                _issue("WARNING", "RAW_PLAN_CHANNELS", f"Section '{section_name}': No channel specifications")
+                _issue(
+                    "WARNING",
+                    "RAW_PLAN_CHANNELS",
+                    f"Section '{section_name}': No channel specifications",
+                )
             )
             continue
         if isinstance(channels, dict):
             sections_with_channels += 1
         else:
             issues.append(
-                _issue("ERROR", "RAW_PLAN_CHANNELS", f"Section '{section_name}': channels is not an object")
+                _issue(
+                    "ERROR",
+                    "RAW_PLAN_CHANNELS",
+                    f"Section '{section_name}': channels is not an object",
+                )
             )
 
     if sections and sections_with_channels == 0:
-        issues.append(_issue("ERROR", "RAW_PLAN_CHANNELS", "No sections have channel specifications"))
+        issues.append(
+            _issue("ERROR", "RAW_PLAN_CHANNELS", "No sections have channel specifications")
+        )
     return issues
 
 
@@ -86,7 +96,11 @@ def validate_raw_plan_timing(raw_plan: dict[str, Any]) -> list[ValidationIssue]:
         end_bar = section.get("end_bar")
         if start_bar is None or end_bar is None:
             issues.append(
-                _issue("ERROR", "RAW_PLAN_TIMING", f"Section '{section_name}': Missing start_bar or end_bar")
+                _issue(
+                    "ERROR",
+                    "RAW_PLAN_TIMING",
+                    f"Section '{section_name}': Missing start_bar or end_bar",
+                )
             )
             continue
         if not isinstance(start_bar, (int, float)) or not isinstance(end_bar, (int, float)):
@@ -111,15 +125,23 @@ def validate_implementation_structure(implementation: dict[str, Any]) -> list[Va
     if sections is None:
         return [_issue("ERROR", "IMPLEMENTATION_STRUCTURE", "No 'sections' key in implementation")]
     if not isinstance(sections, list):
-        return [_issue("ERROR", "IMPLEMENTATION_STRUCTURE", "'sections' is not a list in implementation")]
+        return [
+            _issue(
+                "ERROR", "IMPLEMENTATION_STRUCTURE", "'sections' is not a list in implementation"
+            )
+        ]
     if not sections:
-        return [_issue("ERROR", "IMPLEMENTATION_STRUCTURE", "Empty sections list in implementation")]
+        return [
+            _issue("ERROR", "IMPLEMENTATION_STRUCTURE", "Empty sections list in implementation")
+        ]
 
     issues: list[ValidationIssue] = []
     required_fields = ("name", "start_ms", "end_ms", "template_id")
     for index, section in enumerate(sections):
         if not isinstance(section, dict):
-            issues.append(_issue("ERROR", "IMPLEMENTATION_STRUCTURE", f"Section {index} is not an object"))
+            issues.append(
+                _issue("ERROR", "IMPLEMENTATION_STRUCTURE", f"Section {index} is not an object")
+            )
             continue
         section_name = str(section.get("name", f"Section {index + 1}"))
         for field in required_fields:
@@ -269,7 +291,9 @@ def validate_evaluation_structure(evaluation: dict[str, Any]) -> list[Validation
     issues: list[ValidationIssue] = []
     for field in ("overall_score", "pass_threshold", "channel_scoring"):
         if field not in evaluation:
-            issues.append(_issue("ERROR", "EVALUATION_STRUCTURE", f"Missing '{field}' in evaluation"))
+            issues.append(
+                _issue("ERROR", "EVALUATION_STRUCTURE", f"Missing '{field}' in evaluation")
+            )
 
     overall_score = evaluation.get("overall_score")
     if overall_score is not None and (
@@ -286,7 +310,11 @@ def validate_evaluation_structure(evaluation: dict[str, Any]) -> list[Validation
     channel_scoring = evaluation.get("channel_scoring")
     if channel_scoring is None:
         issues.append(
-            _issue("ERROR", "EVALUATION_STRUCTURE", "channel_scoring is null (should contain channel evaluation)")
+            _issue(
+                "ERROR",
+                "EVALUATION_STRUCTURE",
+                "channel_scoring is null (should contain channel evaluation)",
+            )
         )
         return issues
 
@@ -303,7 +331,9 @@ def validate_evaluation_structure(evaluation: dict[str, Any]) -> list[Validation
     for field in channel_fields:
         score = channel_scoring.get(field)
         if score is None:
-            issues.append(_issue("WARNING", "EVALUATION_STRUCTURE", f"Missing channel_scoring.{field}"))
+            issues.append(
+                _issue("WARNING", "EVALUATION_STRUCTURE", f"Missing channel_scoring.{field}")
+            )
             continue
         if field == "gobo_appropriateness" and score == 0:
             continue
@@ -343,7 +373,9 @@ def cross_validate_plans(
         impl_names = {str(s.get("name", "")) for s in impl_sections if isinstance(s, dict)}
         missing_sections = []
         for raw_name in raw_names:
-            if raw_name not in impl_names and not any(name.startswith(raw_name) for name in impl_names):
+            if raw_name not in impl_names and not any(
+                name.startswith(raw_name) for name in impl_names
+            ):
                 missing_sections.append(raw_name)
         if missing_sections:
             issues.append(
@@ -366,7 +398,12 @@ def run_mh_plan_validation(paths: MHPlanValidationPaths) -> ValidationResult:
 
     if not paths.raw_plan_path.exists():
         result.issues.append(
-            _issue("ERROR", "FILE_MISSING", f"Raw plan not found: {paths.raw_plan_path}", artifact="raw_plan")
+            _issue(
+                "ERROR",
+                "FILE_MISSING",
+                f"Raw plan not found: {paths.raw_plan_path}",
+                artifact="raw_plan",
+            )
         )
     else:
         raw_plan = load_json(paths.raw_plan_path)

@@ -24,4 +24,3 @@ def test_result_to_json_dict_includes_summary_categories_and_issues() -> None:
     assert payload["artifacts_checked"] == ["/tmp/a.json"]
     assert payload["stats"] == {"total_effects": 42}
     assert len(payload["issues"]) == 3
-

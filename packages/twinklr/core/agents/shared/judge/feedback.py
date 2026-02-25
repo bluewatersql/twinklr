@@ -380,7 +380,25 @@ class FeedbackManager:
                     for issue in errors:
                         lines.append(f"- **{issue.issue_id}** ({issue.category.value})")
                         lines.append(f"  Problem: {issue.message}")
-                        lines.append(f"  Fix: {issue.fix_hint}")
+                        if issue.targeted_actions:
+                            lines.append("  Actions:")
+                            for action in issue.targeted_actions:
+                                parts = [f"[{action.action_type.value}]"]
+                                parts.append(f"section={action.section_id}")
+                                if action.lane:
+                                    parts.append(f"lane={action.lane}")
+                                if action.target:
+                                    parts.append(f"target={action.target}")
+                                if action.template_id:
+                                    parts.append(f"template={action.template_id}")
+                                if action.replacement_template_id:
+                                    parts.append(f"-> {action.replacement_template_id}")
+                                if action.palette_id:
+                                    parts.append(f"palette={action.palette_id}")
+                                lines.append(f"    - {', '.join(parts)}")
+                                lines.append(f"      {action.description}")
+                        else:
+                            lines.append(f"  Fix: {issue.fix_hint}")
                         lines.append(f"  Success criteria: {issue.acceptance_test}")
                         lines.append("")
 
@@ -390,7 +408,25 @@ class FeedbackManager:
                     for issue in warnings:
                         lines.append(f"- **{issue.issue_id}** ({issue.category.value})")
                         lines.append(f"  Problem: {issue.message}")
-                        lines.append(f"  Fix: {issue.fix_hint}")
+                        if issue.targeted_actions:
+                            lines.append("  Actions:")
+                            for action in issue.targeted_actions:
+                                parts = [f"[{action.action_type.value}]"]
+                                parts.append(f"section={action.section_id}")
+                                if action.lane:
+                                    parts.append(f"lane={action.lane}")
+                                if action.target:
+                                    parts.append(f"target={action.target}")
+                                if action.template_id:
+                                    parts.append(f"template={action.template_id}")
+                                if action.replacement_template_id:
+                                    parts.append(f"-> {action.replacement_template_id}")
+                                if action.palette_id:
+                                    parts.append(f"palette={action.palette_id}")
+                                lines.append(f"    - {', '.join(parts)}")
+                                lines.append(f"      {action.description}")
+                        else:
+                            lines.append(f"  Fix: {issue.fix_hint}")
                         lines.append("")
 
                 if nits:

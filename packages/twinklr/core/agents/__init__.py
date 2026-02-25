@@ -11,6 +11,7 @@ from twinklr.core.agents.context import (
     TokenEstimator,
 )
 from twinklr.core.agents.issues import (
+    ActionType,
     Issue,
     IssueCategory,
     IssueEffort,
@@ -18,6 +19,7 @@ from twinklr.core.agents.issues import (
     IssueScope,
     IssueSeverity,
     SuggestedAction,
+    TargetedAction,
 )
 
 # Phase 0: Async Infrastructure + LLM Logging
@@ -71,6 +73,7 @@ __all__ = [
     "FeedbackEntry",
     "FeedbackType",
     # Issues
+    "ActionType",
     "Issue",
     "IssueCategory",
     "IssueSeverity",
@@ -78,6 +81,7 @@ __all__ = [
     "IssueScope",
     "IssueLocation",
     "SuggestedAction",
+    "TargetedAction",
     # Context
     "ContextShaper",
     "BaseContextShaper",

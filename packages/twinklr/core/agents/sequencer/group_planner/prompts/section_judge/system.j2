@@ -28,21 +28,6 @@ Plans now use **categorical values** instead of numeric precision:
 - Renderer calculates end times from start + duration category
 - Focus on whether duration matches the musical intent
 
-## Multi-lane Reuse Policy
-
-Default: A target (typed: group/zone/split with id) should appear in **only one lane** (BASE or RHYTHM or ACCENT) for a section.
-
-**Explicit exception (allowlisted multi-lane targets):**
-- A target may appear in **both RHYTHM and ACCENT** only if it is explicitly allowlisted in the input via `layer_intents.multilane_allowed_groups`.
-- When this exception is used, interpret it with **override semantics**:
-  - Overlap across lanes for the allowlisted group is allowed.
-  - ACCENT is the higher-priority override for that group during its ACCENT intervals.
-
-**Still forbidden:**
-- Cross-lane reuse involving BASE (BASE+RHYTHM, BASE+ACCENT) is never allowed.
-- Multi-lane reuse without allowlisting is a plan defect (consistency failure).
-- **Same-target self-overlap** within a lane is always invalid (same type+id in overlapping intervals; different targets may overlap).
-
 ## Evaluation Philosophy
 
 **Two-phase approach**:
@@ -64,11 +49,7 @@ Treat these as MUST-PASS checks. If violated, the plan cannot be APPROVED.
 3) **Mode validity**:
    - SEQUENCED and CALL_RESPONSE both require `window` + `config` + non-empty `group_order` (unique, subset of `targets`).
 4) **Timing bounds**: starts within section bounds / available bars; no impossible durations.
-5) **Same-target self-overlap**: for the same lane+target (type+id), active intervals must not overlap. Different targets may overlap. (End is exclusive: [start, end).)
-6) **Coordination-plan ownership**: within a lane, a target (same type+id) must appear in at most one coordination_plan.
-7) **Cross-lane reuse policy**:
-   - If `layer_intents.multilane_allowed_groups` is missing/empty: each target appears in only one lane.
-   - If allowlisted: only allowlisted groups may appear in both RHYTHM+ACCENT, and overlap across lanes is allowed only for those groups (ACCENT override semantics).
+5) **Same-target self-overlap**: for the same lane+target (type+id), active intervals must not overlap. Different targets may overlap. A SEQUENCED window counts as an active interval for all targets in its group_order. (End is exclusive: [start, end).)
 
 
 ## Scoring and Decisions
@@ -84,8 +65,6 @@ Calibration guardrail:
 
 **Automatic HARD_FAIL conditions (non-negotiable):**
 - Any MUST-PASS Technical Soundness Check fails
-- Internal consistency conflicts (e.g., violates stated cross-lane reuse policy, or uses multi-lane reuse without allowlisting)
-- Any same-target self-overlap for ACCENT placements (same type+id)
 
 Be calibrated: 7.0 is "good enough", 8.5+ is "excellent", <5.0 is "significant work".
 
@@ -103,9 +82,7 @@ When emitting issue `scope`, use only valid IssueScope enums (GLOBAL, SECTION, L
 
 ### Common reusable rules (examples)
 
-- "DON'T reuse a group across lanes unless allowlisted for RHYTHM+ACCENT override"
-- "DON'T overlap placements for the same target (type+id) within a lane"
-- "DON'T place a target in multiple coordination_plans within the same lane"
+- "DON'T overlap placements for the same target (type+id) within a lane — includes SEQUENCED windows"
 - "DON'T use role labels as target ids (use group/zone/split type+id, not HERO/ANCHOR)"
 - "DON'T use SEQUENCED or CALL_RESPONSE without window+config and non-empty unique group_order (must be subset of targets)"
 - "DON'T use a template in a lane it doesn't belong to (gtpl_rhythm_* → RHYTHM only, gtpl_accent_* → ACCENT only)"

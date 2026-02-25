@@ -189,7 +189,7 @@ def check_missing_refs(
 
 
 def check_overlaps_within_layer(
-    effects_by_model: dict[str, list[MHXSQEffect]]
+    effects_by_model: dict[str, list[MHXSQEffect]],
 ) -> list[ValidationIssue]:
     issues: list[ValidationIssue] = []
     for element_name, effects in effects_by_model.items():
@@ -442,7 +442,11 @@ def validate_channel_usage_vs_plan(
             if model_name not in dmx_mapping_by_fixture:
                 continue
             dmx_map = dmx_mapping_by_fixture[model_name]
-            section_effects = [effect for effect in effects if not (effect.end_ms <= start_ms or effect.start_ms >= end_ms)]
+            section_effects = [
+                effect
+                for effect in effects
+                if not (effect.end_ms <= start_ms or effect.start_ms >= end_ms)
+            ]
             if not section_effects:
                 continue
             for channel_name in ("shutter", "color", "gobo"):
@@ -513,7 +517,9 @@ def run_mh_xsq_validation(
     result.extend([_to_core_issue(issue) for issue in quality_issues])
 
     for issue in validate_dmx_data_presence(effects_by_model):
-        severity = "ERROR" if issue.startswith("❌") else "WARNING" if issue.startswith("⚠️") else "INFO"
+        severity = (
+            "ERROR" if issue.startswith("❌") else "WARNING" if issue.startswith("⚠️") else "INFO"
+        )
         result.issues.append(CoreIssue(severity=severity, category="DMX_DATA", message=issue))
 
     implementation: dict[str, Any] | None = None
@@ -521,33 +527,58 @@ def run_mh_xsq_validation(
         implementation = load_json(paths.implementation_path)
         result.artifacts_checked.append(str(paths.implementation_path))
         for issue in validate_value_curves(effects_by_model, implementation):
-            severity = "ERROR" if issue.startswith("❌") else "WARNING" if issue.startswith("⚠️") else "INFO"
-            result.issues.append(CoreIssue(severity=severity, category="VALUE_CURVES", message=issue))
+            severity = (
+                "ERROR"
+                if issue.startswith("❌")
+                else "WARNING"
+                if issue.startswith("⚠️")
+                else "INFO"
+            )
+            result.issues.append(
+                CoreIssue(severity=severity, category="VALUE_CURVES", message=issue)
+            )
 
     raw_plan: dict[str, Any] | None = None
     if not quality_only and paths.raw_plan_path and paths.raw_plan_path.exists():
         raw_plan = load_json(paths.raw_plan_path)
         result.artifacts_checked.append(str(paths.raw_plan_path))
 
-    if (
-        not quality_only
-        and implementation is not None
-        and raw_plan is not None
-        and fixture_config
-    ):
-        configured_models = {fixture["xlights_model_name"] for fixture in fixture_config.get("fixtures", [])}
+    if not quality_only and implementation is not None and raw_plan is not None and fixture_config:
+        configured_models = {
+            fixture["xlights_model_name"] for fixture in fixture_config.get("fixtures", [])
+        }
         group_models: set[str] = set()
         if fixture_config.get("xlights_group"):
             group_models.add(fixture_config["xlights_group"])
         for group_name in fixture_config.get("xlights_semantic_groups", {}).values():
             group_models.add(group_name)
 
-        for issue in validate_section_coverage(implementation, effects_by_model, configured_models, group_models):
-            severity = "ERROR" if issue.startswith("❌") else "WARNING" if issue.startswith("⚠️") else "INFO"
-            result.issues.append(CoreIssue(severity=severity, category="SECTION_COVERAGE", message=issue))
-        for issue in validate_channel_usage_vs_plan(raw_plan, implementation, effects_by_model, fixture_config):
-            severity = "ERROR" if issue.startswith("❌") else "WARNING" if issue.startswith("⚠️") else "INFO"
-            result.issues.append(CoreIssue(severity=severity, category="CHANNEL_USAGE", message=issue))
+        for issue in validate_section_coverage(
+            implementation, effects_by_model, configured_models, group_models
+        ):
+            severity = (
+                "ERROR"
+                if issue.startswith("❌")
+                else "WARNING"
+                if issue.startswith("⚠️")
+                else "INFO"
+            )
+            result.issues.append(
+                CoreIssue(severity=severity, category="SECTION_COVERAGE", message=issue)
+            )
+        for issue in validate_channel_usage_vs_plan(
+            raw_plan, implementation, effects_by_model, fixture_config
+        ):
+            severity = (
+                "ERROR"
+                if issue.startswith("❌")
+                else "WARNING"
+                if issue.startswith("⚠️")
+                else "INFO"
+            )
+            result.issues.append(
+                CoreIssue(severity=severity, category="CHANNEL_USAGE", message=issue)
+            )
 
     result.stats["models_with_effects"] = len(effects_by_model)
     result.stats["total_effects"] = sum(len(effects) for effects in effects_by_model.values())

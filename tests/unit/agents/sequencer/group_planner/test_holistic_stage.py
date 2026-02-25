@@ -279,7 +279,9 @@ class TestHolisticEvaluatorStage:
             result = await stage.execute(sample_group_plan_set, mock_context)
 
         assert result.success is True
-        assert result.output is sample_group_plan_set
+        assert result.output.plan_set_id == sample_group_plan_set.plan_set_id
+        assert result.output.holistic_evaluation is not None
+        assert result.output.holistic_evaluation.status == VerdictStatus.APPROVE
 
     @pytest.mark.asyncio
     async def test_execute_stores_evaluation_in_state(

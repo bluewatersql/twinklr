@@ -4,6 +4,7 @@ Models for macro-level and group-level choreography planning.
 """
 
 from twinklr.core.sequencer.planning.group_plan import (
+    CorrectionResult,
     Deviation,
     GroupPlanSet,
     LanePlan,
@@ -27,6 +28,7 @@ __all__ = [
     "MacroSectionPlan",
     "TargetSelector",
     # Group planning output models
+    "CorrectionResult",
     "Deviation",
     "GroupPlanSet",
     "LanePlan",

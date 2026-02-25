@@ -7,12 +7,17 @@ what the GroupPlanner agent produces, not template definitions.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from pydantic import BaseModel, ConfigDict, Field
 
 from twinklr.core.sequencer.planning.models import PaletteRef
 from twinklr.core.sequencer.templates.group.models.coordination import CoordinationPlan
 from twinklr.core.sequencer.theming import ThemeRef
 from twinklr.core.sequencer.vocabulary import GPBlendMode, GPTimingDriver, LaneKind
+
+if TYPE_CHECKING:
+    from twinklr.core.agents.sequencer.group_planner.holistic import HolisticEvaluation
 
 
 class NarrativeAssetDirective(BaseModel):
@@ -147,6 +152,23 @@ class SectionCoordinationPlan(BaseModel):
     )
 
 
+class CorrectionResult(BaseModel):
+    """Result of holistic correction -- only modified sections.
+
+    The corrector returns ONLY the sections it changed, not the entire
+    plan set.  The corrector stage splices these back into the original
+    GroupPlanSet by matching ``section_id``.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    corrected_sections: list[SectionCoordinationPlan] = Field(min_length=1)
+    correction_notes: str | None = Field(
+        default=None,
+        description="Optional notes on what was changed and why",
+    )
+
+
 class GroupPlanSet(BaseModel):
     """Aggregated coordination plans for all sections.
 
@@ -163,11 +185,14 @@ class GroupPlanSet(BaseModel):
     # Aggregated + deduplicated narrative asset directives across all sections
     narrative_assets: list[NarrativeAssetDirective] = Field(default_factory=list)
 
-    # Holistic evaluation result (populated after holistic judge)
-    # holistic_evaluation: HolisticEvaluation | None = None  # Added in Phase 3
+    holistic_evaluation: HolisticEvaluation | None = Field(
+        default=None,
+        description="Cross-section quality evaluation (populated by holistic stage)",
+    )
 
 
 __all__ = [
+    "CorrectionResult",
     "Deviation",
     "GroupPlanSet",
     "LanePlan",

@@ -13,14 +13,21 @@ Provides complete GroupPlanSet for holistic evaluation
 {{ loop.index }}. {{ section_id }}
 {% endfor %}
 
-{% if expected_section_ids %}
-## Expected Sections from MacroPlan
+{% if completeness_check %}
+## Section Completeness (Pre-Verified)
 
-The MacroPlan defines **{{ expected_section_ids | length }}** sections. Compare this canonical list against the sections present in the GroupPlanSet above.
+**Status: {{ completeness_check.status }}**
+{% if completeness_check.status == "PASSED" %}
+All {{ completeness_check.expected_count }} expected sections are present in the GroupPlanSet. No missing or extra sections.
+{% elif completeness_check.status == "FAILED" %}
+Expected {{ completeness_check.expected_count }} sections, found {{ completeness_check.present_count }}.
+{% if completeness_check.missing %}Missing: {{ completeness_check.missing | join(", ") }}{% endif %}
+{% if completeness_check.extra %}Extra: {{ completeness_check.extra | join(", ") }}{% endif %}
+{% elif completeness_check.status == "SKIPPED" %}
+{{ completeness_check.reason }}
+{% endif %}
 
-{% for section_id in expected_section_ids %}
-{{ loop.index }}. {{ section_id }}
-{% endfor %}
+*This check was performed deterministically before evaluation. Trust this result — do not re-count sections in the JSON.*
 {% endif %}
 
 ## Available Display Groups

@@ -30,4 +30,3 @@ def test_validation_result_exit_code_only_fails_on_errors() -> None:
 
     assert warning_only.exit_code == 0
     assert error_result.exit_code == 1
-

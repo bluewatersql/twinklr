@@ -48,4 +48,3 @@ def test_cross_validate_plans_detects_missing_raw_section() -> None:
 
     assert any(issue.category == "CROSS_VALIDATION" for issue in issues)
     assert any("Verse" in issue.message for issue in issues)
-

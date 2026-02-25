@@ -1,6 +1,7 @@
 """Unit tests for shared judge models."""
 
 from twinklr.core.agents.issues import (
+    ActionType,
     Issue,
     IssueCategory,
     IssueEffort,
@@ -8,6 +9,7 @@ from twinklr.core.agents.issues import (
     IssueScope,
     IssueSeverity,
     SuggestedAction,
+    TargetedAction,
 )
 from twinklr.core.agents.shared.judge.models import (
     IterationState,
@@ -328,6 +330,74 @@ class TestRevisionRequest:
         # Should preserve up to 3 strengths
         assert len(request.avoid) <= 3
         assert all("Keep:" in item for item in request.avoid)
+
+    def test_from_verdict_prefers_targeted_actions_over_fix_hint(self):
+        """When an issue has targeted_actions, their descriptions appear in specific_fixes."""
+        targeted_action = TargetedAction(
+            action_type=ActionType.OTHER,
+            section_id="verse_1",
+            description="Add ARCHES to RHYTHM lane in verse_1",
+        )
+        issue = Issue(
+            issue_id="VARIETY_001",
+            category=IssueCategory.VARIETY,
+            severity=IssueSeverity.WARN,
+            estimated_effort=IssueEffort.LOW,
+            scope=IssueScope.SECTION,
+            location=IssueLocation(section_id="verse_1"),
+            rule="DON'T lack variety",
+            message="Need more variety",
+            fix_hint="Use different templates",
+            acceptance_test="Variety improved",
+            suggested_action=SuggestedAction.PATCH,
+            targeted_actions=[targeted_action],
+        )
+        verdict = JudgeVerdict(
+            status=VerdictStatus.SOFT_FAIL,
+            score=6.0,
+            confidence=0.9,
+            strengths=["Good energy"],
+            issues=[issue],
+            overall_assessment="Needs refinement",
+            feedback_for_planner="Add variety",
+            iteration=1,
+        )
+
+        request = RevisionRequest.from_verdict(verdict)
+
+        assert "Add ARCHES to RHYTHM lane in verse_1" in request.specific_fixes
+        assert "Use different templates" not in request.specific_fixes
+
+    def test_from_verdict_falls_back_to_fix_hint(self):
+        """When targeted_actions is empty, fix_hint is used."""
+        issue = Issue(
+            issue_id="TIMING_001",
+            category=IssueCategory.TIMING,
+            severity=IssueSeverity.ERROR,
+            estimated_effort=IssueEffort.MEDIUM,
+            scope=IssueScope.SECTION,
+            location=IssueLocation(section_id="chorus_1"),
+            rule="DON'T overlap sections",
+            message="Section overlap detected",
+            fix_hint="Adjust bar boundaries to prevent overlap",
+            acceptance_test="No overlap",
+            suggested_action=SuggestedAction.REPLAN_SECTION,
+            targeted_actions=[],
+        )
+        verdict = JudgeVerdict(
+            status=VerdictStatus.HARD_FAIL,
+            score=4.0,
+            confidence=0.9,
+            strengths=[],
+            issues=[issue],
+            overall_assessment="Major issues",
+            feedback_for_planner="Fix timing",
+            iteration=1,
+        )
+
+        request = RevisionRequest.from_verdict(verdict)
+
+        assert "Adjust bar boundaries to prevent overlap" in request.specific_fixes
 
 
 class TestIterationState:

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from enum import Enum
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class IssueCategory(str, Enum):
@@ -88,6 +88,83 @@ class SuggestedAction(str, Enum):
     RETRY = "RETRY"  # Retry with same approach (transient error)
 
 
+class ActionType(str, Enum):
+    """Type of targeted fix action.
+
+    Categorizes plan mutations for structured feedback.
+    """
+
+    ADD_TARGET = "ADD_TARGET"
+    REMOVE_TARGET = "REMOVE_TARGET"
+    ADD_PLACEMENT = "ADD_PLACEMENT"
+    REMOVE_PLACEMENT = "REMOVE_PLACEMENT"
+    SWAP_TEMPLATE = "SWAP_TEMPLATE"
+    CHANGE_PALETTE = "CHANGE_PALETTE"
+    CHANGE_THEME = "CHANGE_THEME"
+    ADD_MOTIF = "ADD_MOTIF"
+    REMOVE_MOTIF = "REMOVE_MOTIF"
+    ADJUST_TIMING = "ADJUST_TIMING"
+    REORDER_GROUPS = "REORDER_GROUPS"
+    OTHER = "OTHER"
+
+
+class TargetedAction(BaseModel):
+    """A specific, directly actionable fix instruction.
+
+    Shared by section judge (Issue) and holistic judge (CrossSectionIssue).
+    Each action is a single mutation that can be applied to a
+    SectionCoordinationPlan without further interpretation.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    action_type: ActionType = Field(description="What kind of mutation to apply")
+    section_id: str = Field(description="Target section")
+    lane: str | None = Field(
+        default=None,
+        description="Lane kind (BASE, RHYTHM, ACCENT, BURST) if applicable",
+    )
+    target: str | None = Field(
+        default=None,
+        description="Target reference (e.g. 'group:ARCHES', 'zone:HOUSE')",
+    )
+    template_id: str | None = Field(
+        default=None,
+        description="Template to add, swap to, or remove",
+    )
+    replacement_template_id: str | None = Field(
+        default=None,
+        description="For SWAP_TEMPLATE: the template to replace with",
+    )
+    palette_id: str | None = Field(
+        default=None,
+        description="Palette reference (e.g. 'core.peppermint')",
+    )
+    bar: int | None = Field(default=None, ge=1, description="Bar number if applicable")
+    beat: int | None = Field(default=None, ge=1, description="Beat number if applicable")
+    bar_end: int | None = Field(default=None, ge=1, description="End bar for range-based actions")
+    description: str = Field(
+        description="Human-readable explanation of the action",
+    )
+
+    @model_validator(mode="after")
+    def validate_fields_for_action_type(self) -> TargetedAction:
+        """Ensure required fields are populated per action_type.
+
+        Validation is intentionally lenient for fields that may be omitted
+        when the action expresses removal intent (e.g. CHANGE_PALETTE
+        without palette_id means "remove the current override").
+        """
+        at = self.action_type
+        if at == ActionType.SWAP_TEMPLATE:
+            if not self.template_id or not self.replacement_template_id:
+                raise ValueError("SWAP_TEMPLATE requires template_id and replacement_template_id")
+        elif at in (ActionType.ADD_TARGET, ActionType.REMOVE_TARGET):
+            if not self.lane or not self.target:
+                raise ValueError(f"{at.value} requires lane and target")
+        return self
+
+
 class IssueLocation(BaseModel):
     """Location of identified issue.
 
@@ -155,6 +232,13 @@ class Issue(BaseModel):
             "Should be abstract/pattern-based to avoid biasing future judgments. "
             "Good: 'Repeated template usage without variation in high-energy sections' "
             "Bad: 'Section chorus_1 uses sweep_fan 3 times' (too specific)"
+        ),
+    )
+    targeted_actions: list[TargetedAction] = Field(
+        default_factory=list,
+        description=(
+            "Structured fix actions (preferred over fix_hint when non-empty). "
+            "Each action is a single mutation referencing concrete identifiers."
         ),
     )
 

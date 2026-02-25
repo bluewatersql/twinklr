@@ -1,0 +1,70 @@
+{#
+HolisticCorrector User Prompt
+Presents affected sections + evaluation for correction.
+#}
+# Holistic Correction Request
+
+## Evaluation Summary
+
+Score: {{ holistic_evaluation.score }} ({{ holistic_evaluation.status }})
+
+{{ holistic_evaluation.summary }}
+
+## Strengths to Preserve
+
+{% for s in strengths %}
+- {{ s }}
+{% endfor %}
+
+## Issues to Address
+
+{% for issue in actionable_issues %}
+### {{ issue.issue_id }} ({{ issue.severity }})
+
+{{ issue.description }}
+
+**Recommendation:** {{ issue.recommendation }}
+
+**Targeted Actions:**
+{% for action in issue.targeted_actions %}
+- [{{ action.action_type }}] section={{ action.section_id }}
+  {%- if action.lane %}, lane={{ action.lane }}{% endif %}
+  {%- if action.target %}, target={{ action.target }}{% endif %}
+  {%- if action.template_id %}, template={{ action.template_id }}{% endif %}
+  {%- if action.replacement_template_id %} → {{ action.replacement_template_id }}{% endif %}
+  {%- if action.palette_id %}, palette={{ action.palette_id }}{% endif %}
+  {%- if action.bar %}, bar={{ action.bar }}{% endif %}
+  {%- if action.beat %}, beat={{ action.beat }}{% endif %}
+
+  {{ action.description }}
+{% endfor %}
+
+{% endfor %}
+
+## Affected Sections (full detail)
+
+These are the sections you need to modify. Return corrected versions of ONLY
+the sections you change.
+
+```json
+{{ affected_sections_json }}
+```
+
+{% if section_summaries %}
+## Other Sections (summaries for context)
+
+These sections are NOT flagged — do not modify them. They are provided so you
+can see what templates and palettes are used elsewhere.
+
+{% for s in section_summaries %}
+- **{{ s.section_id }}**: theme={{ s.theme.theme_id if s.theme else "none" }}, palette={{ s.palette.palette_id if s.palette else "global" }}, motifs={{ s.motif_ids | join(', ') }}
+  {%- for lane, tids in s.template_ids_by_lane.items() %}, {{ lane }}=[{{ tids | join(', ') }}]{% endfor %}
+{% endfor %}
+{% endif %}
+
+## Instructions
+
+1. Apply ALL targeted actions from the issues above
+2. Return ONLY the modified sections in a CorrectionResult
+3. Do NOT include unmodified sections in the output
+4. Ensure all modified sections remain structurally valid

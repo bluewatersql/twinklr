@@ -283,16 +283,18 @@ class IssueRepository:
     def format_learning_context(
         self,
         agent_name: str,
-        top_n: int = 5,
+        top_n: int = 3,
         include_resolution_rate: bool = True,
     ) -> str:
         """Format learning context for injection into developer.j2 prompt.
 
-        Generates a concise summary of common issues for the agent to reference.
+        Produces a short, category-level summary of the top-N recurring
+        issue categories.  Each category gets one generic guidance line
+        (no specific examples that could prime violations).
 
         Args:
             agent_name: Agent/judge name
-            top_n: Number of top issues to include
+            top_n: Number of top issue categories to include (default: 3)
             include_resolution_rate: Whether to include resolution stats
 
         Returns:
@@ -301,28 +303,30 @@ class IssueRepository:
         if not self.enabled:
             return ""
 
-        top_issues = self.get_top_issues(agent_name, top_n=top_n)
+        top_issues = self.get_top_issues(agent_name, top_n=top_n, min_occurrences=3)
 
         if not top_issues:
             return ""
 
-        lines = ["# Historical Learning Context", ""]
-        lines.append(f"Based on {sum(count for _, count, _ in top_issues)} recent issues:")
-        lines.append("")
+        category_guidance: dict[str, str] = {
+            "COVERAGE": "Ensure all declared groups have placements — check secondary targets.",
+            "VARIETY": "Vary templates across phrases — avoid repeating the same template back-to-back.",
+            "MUSICALITY": "Match lane intensities to the section's energy target.",
+            "CONSTRAINT": "Respect lane-template compatibility and avoid rendering conflicts.",
+            "COORDINATION": "Stagger accent hits across groups — avoid synchronized bursts.",
+            "LAYERING": "Balance lane density — don't overload one lane.",
+            "PALETTE": "Limit palette overrides to ACCENT lanes where possible.",
+            "MOTIF_COHESION": "Use declared motif_ids consistently across lanes.",
+            "CONTRAST_DYNAMICS": "Scale intensity with the energy arc.",
+            "STYLE": "Keep theme overrides justified by the narrative.",
+        }
 
-        for category, _, examples in top_issues:
-            lines.append(f"**{category.value}**:")
-
-            # Add generic examples if available
-            if examples:
-                for example in examples[:5]:  # Max 5 examples per category
-                    lines.append(f"  - Example: {example}")
-            lines.append("")
-
-        lines.append(
-            "Use this context to be more vigilant about these recurring patterns, "
-            "but evaluate each plan on its own merits."
-        )
+        lines: list[str] = []
+        for category, count, _examples in top_issues:
+            guidance = category_guidance.get(
+                category.value, f"Watch for recurring {category.value} issues."
+            )
+            lines.append(f"- **{category.value}** ({count}x): {guidance}")
 
         return "\n".join(lines)
 

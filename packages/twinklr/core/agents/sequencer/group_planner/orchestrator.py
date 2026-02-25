@@ -34,7 +34,7 @@ from twinklr.core.agents.shared.judge.feedback import FeedbackManager
 from twinklr.core.agents.shared.judge.models import IterationState
 from twinklr.core.agents.spec import AgentSpec
 from twinklr.core.sequencer.planning import SectionCoordinationPlan
-from twinklr.core.sequencer.vocabulary import EffectDuration, LaneKind
+from twinklr.core.sequencer.vocabulary import CoordinationMode, EffectDuration, LaneKind
 
 logger = logging.getLogger(__name__)
 
@@ -445,7 +445,6 @@ class GroupPlannerOrchestrator:
             template_catalog=section_context.template_catalog,
             timing_context=section_context.timing_context,
             recipe_catalog=section_context.recipe_catalog,
-            multilane_allowed_groups=self._extract_multilane_allowed_groups(section_context),
         )
 
         def validate(plan: SectionCoordinationPlan) -> list[str]:
@@ -453,6 +452,19 @@ class GroupPlannerOrchestrator:
             # Deterministic ID normalization to recover common alias drift
             # (e.g., MATRICES -> MATRIX) without spending an iteration.
             self._normalize_group_target_ids(plan, section_context)
+
+            # Snap all timing to section bounds: drop out-of-range placements
+            # and clamp window ends.  Prevents PLACEMENT_OUTSIDE_SECTION and
+            # TIMING_START_OUT_OF_BOUNDS without burning an iteration.
+            self._snap_to_section_bounds(plan, section_context)
+
+            # Drop coordination plans that have no usable content (empty
+            # UNIFIED plans, plans left empty after other sanitizers, etc.).
+            self._drop_empty_coordination_plans(plan, section_context)
+
+            # Drop placements that duplicate targets already covered by a
+            # SEQUENCED window in the same lane (prevents TARGET_SELF_OVERLAP).
+            self._drop_sequenced_window_conflicts(plan, section_context)
 
             # Deterministic safety pass to reduce avoidable first-iteration failures.
             # This removes same-target placements that are too tightly packed for
@@ -469,19 +481,6 @@ class GroupPlannerOrchestrator:
             return errors
 
         return validate
-
-    def _extract_multilane_allowed_groups(
-        self,
-        section_context: SectionPlanningContext,
-    ) -> set[str]:
-        """Extract explicit RHYTHM+ACCENT multilane allowlist from raw layer intents."""
-        allowed: set[str] = set()
-        for layer in section_context.layer_intents or []:
-            if isinstance(layer, dict):
-                raw = layer.get("multilane_allowed_groups")
-                if isinstance(raw, list):
-                    allowed.update(str(g) for g in raw if g)
-        return allowed
 
     def _normalize_group_target_ids(
         self,
@@ -602,3 +601,161 @@ class GroupPlannerOrchestrator:
                         last_kept[target_key] = (start_beat, placement.duration)
 
                 coordination_plan.placements = kept
+
+    def _drop_empty_coordination_plans(
+        self,
+        plan: SectionCoordinationPlan,
+        section_context: SectionPlanningContext,
+    ) -> None:
+        """Drop coordination plans that have no usable content.
+
+        A UNIFIED/COMPLEMENTARY plan with no placements does nothing.
+        A SEQUENCED/CALL_RESPONSE/RIPPLE plan with no window does nothing.
+        Leaving them in causes the judge to flag UNIFIED_EMPTY_PLACEMENTS
+        errors that the LLM fails to self-correct.
+        """
+        for lane_plan in plan.lane_plans:
+            original_count = len(lane_plan.coordination_plans)
+            kept = []
+            for coord_plan in lane_plan.coordination_plans:
+                has_placements = bool(coord_plan.placements)
+                has_window = coord_plan.window is not None
+                if has_placements or has_window:
+                    kept.append(coord_plan)
+            lane_plan.coordination_plans = kept
+            dropped = original_count - len(kept)
+            if dropped:
+                logger.debug(
+                    "Dropped %d empty coordination plan(s) in %s/%s",
+                    dropped,
+                    section_context.section_id,
+                    lane_plan.lane.value,
+                )
+
+    def _drop_sequenced_window_conflicts(
+        self,
+        plan: SectionCoordinationPlan,
+        section_context: SectionPlanningContext,
+    ) -> None:
+        """Drop placements on targets already covered by a SEQUENCED window.
+
+        A SEQUENCED window occupies ALL its targets for the full window
+        duration.  A separate placement on the same target in the same
+        lane causes TARGET_SELF_OVERLAP.  Rather than burning an
+        iteration, remove the redundant placement deterministically.
+        """
+        for lane_plan in plan.lane_plans:
+            # Collect target IDs covered by any SEQUENCED/CALL_RESPONSE/RIPPLE window
+            window_target_ids: set[str] = set()
+            for coord_plan in lane_plan.coordination_plans:
+                if coord_plan.window is not None and coord_plan.coordination_mode in (
+                    CoordinationMode.SEQUENCED,
+                    CoordinationMode.CALL_RESPONSE,
+                    CoordinationMode.RIPPLE,
+                ):
+                    for target in coord_plan.targets:
+                        window_target_ids.add(
+                            f"{target.type.value}:{target.id}"
+                        )
+
+            if not window_target_ids:
+                continue
+
+            # Remove conflicting placements from ALL coord plans in this lane
+            for coord_plan in lane_plan.coordination_plans:
+                if not coord_plan.placements:
+                    continue
+                original_count = len(coord_plan.placements)
+                coord_plan.placements = [
+                    p
+                    for p in coord_plan.placements
+                    if f"{p.target.type.value}:{p.target.id}" not in window_target_ids
+                ]
+                dropped = original_count - len(coord_plan.placements)
+                if dropped:
+                    logger.debug(
+                        "Dropped %d SEQUENCED-window conflict(s) in %s/%s "
+                        "(targets already in window: %s)",
+                        dropped,
+                        section_context.section_id,
+                        lane_plan.lane.value,
+                        window_target_ids,
+                    )
+
+    def _compute_max_valid_bar(
+        self,
+        section_context: SectionPlanningContext,
+    ) -> int:
+        """Compute the last bar whose start falls within section bounds."""
+        timing_ctx = section_context.timing_context
+        section_end_ms = section_context.end_ms
+        return max(
+            (
+                bar
+                for bar, info in timing_ctx.bar_map.items()
+                if info.start_ms < section_end_ms
+            ),
+            default=max(timing_ctx.bar_map.keys()),
+        )
+
+    def _snap_to_section_bounds(
+        self,
+        plan: SectionCoordinationPlan,
+        section_context: SectionPlanningContext,
+    ) -> None:
+        """Snap all timing references to valid section bounds.
+
+        Handles two recurring LLM planning errors deterministically:
+        1. Placements whose resolved start_ms >= section_end_ms → dropped
+        2. SEQUENCED window ends past section end → clamped
+
+        Uses millisecond resolution (not just bar numbers) to catch
+        beat-level overflows where bar N is valid but beat 2+ of bar N
+        resolves past section_end_ms.
+        """
+        from twinklr.core.sequencer.vocabulary.planning import PlanningTimeRef
+
+        timing_ctx = section_context.timing_context
+        section_end_ms = section_context.end_ms
+        max_valid_bar = self._compute_max_valid_bar(section_context)
+
+        for lane_plan in plan.lane_plans:
+            for coord_plan in lane_plan.coordination_plans:
+                # 1. Drop placements whose resolved start_ms is out of bounds
+                if coord_plan.placements:
+                    original_count = len(coord_plan.placements)
+                    kept: list[Any] = []
+                    for p in coord_plan.placements:
+                        try:
+                            start_ms = timing_ctx.resolve_planning_time_ref(p.start)
+                        except (ValueError, KeyError):
+                            kept.append(p)
+                            continue
+                        if start_ms < section_end_ms:
+                            kept.append(p)
+                    coord_plan.placements = kept
+                    dropped = original_count - len(kept)
+                    if dropped:
+                        logger.debug(
+                            "Dropped %d out-of-bounds placement(s) in %s/%s "
+                            "(section_end=%dms)",
+                            dropped,
+                            section_context.section_id,
+                            lane_plan.lane.value,
+                            section_end_ms,
+                        )
+
+                # 2. Clamp window end to max_valid_bar
+                if coord_plan.window and coord_plan.window.end.bar > max_valid_bar:
+                    old_end = coord_plan.window.end.bar
+                    clamped_end = PlanningTimeRef(bar=max_valid_bar, beat=1)
+                    coord_plan.window = coord_plan.window.model_copy(
+                        update={"end": clamped_end}
+                    )
+                    logger.debug(
+                        "Clamped window end bar %d→%d in %s/%s",
+                        old_end,
+                        max_valid_bar,
+                        section_context.section_id,
+                        lane_plan.lane.value,
+                    )

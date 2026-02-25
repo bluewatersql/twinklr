@@ -6,11 +6,12 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from twinklr.core.agents.issues import ActionType, IssueCategory, IssueSeverity, TargetedAction
 from twinklr.core.agents.sequencer.group_planner.holistic import (
     CrossSectionIssue,
     HolisticEvaluation,
     HolisticEvaluator,
-    IssueSeverity,
+    cross_section_issues_to_issues,
 )
 from twinklr.core.agents.shared.judge.models import VerdictStatus
 from twinklr.core.sequencer.planning import (
@@ -140,14 +141,28 @@ class TestCrossSectionIssue:
             description="ARCHES group is absent in key sections",
             recommendation="Add ARCHES to high-energy sections",
             targeted_actions=[
-                "In section chorus_1, add ARCHES to RHYTHM lane with gtpl_rhythm_sparkle_beat",
-                "In section instrumental, add ARCHES to BASE lane with gtpl_base_candy_stripes",
+                TargetedAction(
+                    action_type=ActionType.ADD_TARGET,
+                    section_id="chorus_1",
+                    lane="RHYTHM",
+                    target="group:ARCHES",
+                    template_id="gtpl_rhythm_sparkle_beat",
+                    description="Add ARCHES to RHYTHM lane with gtpl_rhythm_sparkle_beat",
+                ),
+                TargetedAction(
+                    action_type=ActionType.ADD_TARGET,
+                    section_id="instrumental",
+                    lane="BASE",
+                    target="group:ARCHES",
+                    template_id="gtpl_base_candy_stripes",
+                    description="Add ARCHES to BASE lane with gtpl_base_candy_stripes",
+                ),
             ],
         )
 
         assert len(issue.targeted_actions) == 2
-        assert "chorus_1" in issue.targeted_actions[0]
-        assert "ARCHES" in issue.targeted_actions[0]
+        assert issue.targeted_actions[0].section_id == "chorus_1"
+        assert "ARCHES" in (issue.targeted_actions[0].target or "")
 
     def test_cross_section_issue_targeted_actions_default_empty(self) -> None:
         """Targeted actions default to empty list when not provided."""
@@ -160,6 +175,85 @@ class TestCrossSectionIssue:
         )
 
         assert issue.targeted_actions == []
+
+
+class TestCrossSectionIssuesToIssues:
+    """Tests for cross_section_issues_to_issues function."""
+
+    def test_cross_section_issues_to_issues_basic(self) -> None:
+        """Converts a CrossSectionIssue to Issue with correct fields."""
+        csi = CrossSectionIssue(
+            issue_id="ENERGY_FLAT",
+            severity=IssueSeverity.WARN,
+            affected_sections=["verse_1", "verse_2"],
+            description="Energy stays constant across sections",
+            recommendation="Increase energy in chorus",
+        )
+        issues = cross_section_issues_to_issues([csi])
+
+        assert len(issues) == 1
+        assert issues[0].issue_id == "ENERGY_FLAT"
+        assert issues[0].severity == IssueSeverity.WARN
+        assert issues[0].message == (
+            "Energy stays constant across sections (affects: verse_1, verse_2)"
+        )
+        assert issues[0].fix_hint == "Increase energy in chorus"
+        assert issues[0].location.section_id == "verse_1"
+        assert issues[0].scope.value == "GLOBAL"
+
+    def test_cross_section_issues_to_issues_preserves_targeted_actions(self) -> None:
+        """TargetedAction list is carried over from CrossSectionIssue to Issue."""
+        action = TargetedAction(
+            action_type=ActionType.ADD_TARGET,
+            section_id="chorus_1",
+            lane="RHYTHM",
+            target="group:ARCHES",
+            description="Add ARCHES to RHYTHM lane",
+        )
+        csi = CrossSectionIssue(
+            issue_id="GROUP_UNDERUTILIZED",
+            severity=IssueSeverity.WARN,
+            affected_sections=["chorus_1", "instrumental"],
+            description="ARCHES group absent",
+            recommendation="Add ARCHES to sections",
+            targeted_actions=[action],
+        )
+        issues = cross_section_issues_to_issues([csi])
+
+        assert len(issues) == 1
+        assert len(issues[0].targeted_actions) == 1
+        assert issues[0].targeted_actions[0].action_type == ActionType.ADD_TARGET
+        assert issues[0].targeted_actions[0].target == "group:ARCHES"
+
+    def test_cross_section_issues_to_issues_infers_category(self) -> None:
+        """energy -> CONTRAST_DYNAMICS, variety -> VARIETY, etc."""
+        cases = [
+            ("ENERGY_FLAT", IssueCategory.CONTRAST_DYNAMICS),
+            ("LOW_ENERGY_ARC", IssueCategory.CONTRAST_DYNAMICS),
+            ("VARIETY_LOW", IssueCategory.VARIETY),
+            ("TEMPLATE_REPETITION", IssueCategory.VARIETY),
+            ("MONOTONY_CHORUS", IssueCategory.VARIETY),
+            ("PALETTE_OVERUSE", IssueCategory.PALETTE),
+            ("COLOR_MISMATCH", IssueCategory.PALETTE),
+            ("MOTIF_INCONSISTENCY", IssueCategory.MOTIF_COHESION),
+            ("LAYERING_IMBALANCE", IssueCategory.LAYERING),
+            ("TRANSITION_ABRUPT", IssueCategory.COORDINATION),
+            ("COVERAGE_GAP", IssueCategory.COVERAGE),
+            ("THEME_MISMATCH", IssueCategory.STYLE),
+        ]
+        for issue_id, expected_category in cases:
+            csi = CrossSectionIssue(
+                issue_id=issue_id,
+                severity=IssueSeverity.WARN,
+                affected_sections=["verse_1"],
+                description="Test",
+                recommendation="Fix it",
+            )
+            issues = cross_section_issues_to_issues([csi])
+            assert len(issues) == 1
+            assert issues[0].category == expected_category, (
+                f"issue_id={issue_id} expected {expected_category} got {issues[0].category}"
+            )
 
 
 @pytest.fixture

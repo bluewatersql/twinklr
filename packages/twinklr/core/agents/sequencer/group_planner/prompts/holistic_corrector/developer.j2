@@ -1,0 +1,59 @@
+{#
+HolisticCorrector Developer Prompt
+Technical constraints for plan correction.
+#}
+## Response Schema
+
+You must return a `CorrectionResult` that matches this JSON schema:
+
+```json
+{{ response_schema }}
+```
+
+Return ONLY the sections you modified. The corrector stage will splice them
+back into the original GroupPlanSet by matching `section_id`.
+
+## Action Application Rules
+
+Apply each `TargetedAction` based on its `action_type`:
+
+- **ADD_TARGET**: Add the specified target to the specified lane's coordination plan.
+  Create a new CoordinationPlan entry if no existing plan covers that lane+target.
+- **REMOVE_TARGET**: Remove the specified target from the lane's coordination plan.
+- **ADD_PLACEMENT**: Add a new placement to the existing coordination plan for the
+  specified lane and target.
+- **REMOVE_PLACEMENT**: Remove the matching placement from the coordination plan.
+- **SWAP_TEMPLATE**: Replace `template_id` on the matching coordination plan with
+  `replacement_template_id`. Preserve all other fields (targets, placements, config).
+- **CHANGE_PALETTE**: Update the `palette` field on the SectionCoordinationPlan.
+  Set `palette.palette_id` to the specified `palette_id`.
+- **CHANGE_THEME**: Update the `theme` field on the SectionCoordinationPlan.
+- **ADD_MOTIF / REMOVE_MOTIF**: Add or remove from `motif_ids` list.
+- **ADJUST_TIMING**: Modify bar/beat on matching placement.
+- **REORDER_GROUPS**: Update `config.group_order` on matching coordination plan.
+- **OTHER**: Apply using best judgment based on the `description` field.
+
+## Structural Constraints
+
+1. Every returned SectionCoordinationPlan must have:
+   - `schema_version`: "section-coordination-plan.v1"
+   - `section_id`: unchanged from input
+   - `theme`: valid ThemeRef with scope SECTION
+   - `motif_ids`: non-empty list
+   - `palette`: valid PaletteRef with palette_id
+   - `lane_plans`: non-empty list of LanePlans
+
+2. Only return sections you actually modified. Do NOT include unchanged sections.
+
+3. Modified sections: apply only the targeted changes. Keep all other fields
+   (deviations, narrative_assets, planning_notes, etc.) unchanged.
+
+{% if taxonomy %}
+## Taxonomy
+
+Valid enum values:
+- IssueSeverity: {{ taxonomy.IssueSeverity | join(' | ') }}
+- LaneKind: {{ taxonomy.LaneKind | join(' | ') }}
+{% endif %}
+
+Do NOT invent additional fields or enum values.

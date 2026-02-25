@@ -22,7 +22,6 @@ from twinklr.core.sequencer.templates.group.models import GroupPlacement, Placem
 from twinklr.core.sequencer.templates.group.models.choreography import ChoreographyGraph
 from twinklr.core.sequencer.templates.group.models.coordination import CoordinationPlan, PlanTarget
 from twinklr.core.sequencer.templates.group.recipe_catalog import _TYPE_TO_LANE, RecipeCatalog
-from twinklr.core.sequencer.templates.group.target_expander import TargetExpander
 from twinklr.core.sequencer.vocabulary import (
     CoordinationMode,
     EffectDuration,
@@ -66,12 +65,8 @@ class ValidationResult(BaseModel):
 class SectionPlanValidator:
     """Deterministic validator for SectionCoordinationPlan.
 
-    Validates:
-    - Template existence in unified catalog
-    - Group existence in ChoreographyGraph
-    - Timing bounds (placements within section)
-    - No within-lane self-overlaps on same target
-    - Cross-lane reuse policy (BASE exclusive; RHYTHM+ACCENT allowlist)
+    Validates schema integrity (IDs, enums, required fields), timing bounds,
+    and same-target self-overlap within a lane (0% in real-world profiles).
     """
 
     def __init__(
@@ -80,7 +75,6 @@ class SectionPlanValidator:
         template_catalog: TemplateCatalog,
         timing_context: TimingContext,
         recipe_catalog: RecipeCatalog | None = None,
-        multilane_allowed_groups: set[str] | None = None,
     ) -> None:
         """Initialize validator with context.
 
@@ -89,14 +83,11 @@ class SectionPlanValidator:
             template_catalog: Available templates
             timing_context: Timing information for TimeRef resolution
             recipe_catalog: Optional recipe catalog (legacy; IDs are valid template_ids)
-            multilane_allowed_groups: Groups allowed in both RHYTHM and ACCENT
         """
         self.choreo_graph = choreo_graph
         self.template_catalog = template_catalog
         self.timing_context = timing_context
         self.recipe_catalog = recipe_catalog
-        self.multilane_allowed_groups = multilane_allowed_groups or set()
-        self.target_expander = TargetExpander(choreo_graph)
 
         # Build lookup sets for fast validation
         self._valid_group_ids = {g.id for g in choreo_graph.groups}
@@ -189,13 +180,10 @@ class SectionPlanValidator:
             section_end_ms = self.timing_context.resolve_to_ms(section_bounds.end)
 
         # Validate each lane plan
-        lane_owned_groups: dict[LaneKind, set[str]] = defaultdict(set)
         for lane_plan in plan.lane_plans:
-            # Track timings by target key (type:id) for self-overlap detection
             target_timings: dict[str, list[tuple[int, int, str]]] = defaultdict(list)
-            coord_plan_ownership: list[tuple[int, set[str]]] = []
 
-            for coord_idx, coord_plan in enumerate(lane_plan.coordination_plans):
+            for coord_plan in lane_plan.coordination_plans:
                 # Validate coordination-mode-specific required fields
                 errors.extend(
                     self._validate_coordination_requirements(
@@ -204,21 +192,13 @@ class SectionPlanValidator:
                     )
                 )
 
-                expanded_groups = self._expand_coordination_plan_groups(coord_plan)
-                if expanded_groups:
-                    coord_plan_ownership.append((coord_idx, expanded_groups))
-                    lane_owned_groups[lane_plan.lane].update(expanded_groups)
-
                 # Validate targets
-                coord_target_keys: list[str] = []
                 for target in coord_plan.targets:
                     target_errors = self._validate_target(target, lane_plan.lane.value)
                     errors.extend(target_errors)
-                    coord_target_keys.append(f"{target.type.value}:{target.id}")
 
                 # Validate config for sequenced modes
                 if coord_plan.config and coord_plan.config.group_order:
-                    # Collect target IDs for group_order validation
                     target_ids = [t.id for t in coord_plan.targets]
                     errors.extend(
                         self._validate_group_order(
@@ -235,7 +215,8 @@ class SectionPlanValidator:
                     CoordinationMode.RIPPLE,
                 }
                 uses_window = (
-                    coord_plan.coordination_mode in _window_modes and coord_plan.window is not None
+                    coord_plan.coordination_mode in _window_modes
+                    and coord_plan.window is not None
                 )
 
                 # Validate placements
@@ -248,9 +229,6 @@ class SectionPlanValidator:
                 )
                 errors.extend(placement_errors)
 
-                # For window-based modes, the window is the authoritative
-                # timing source.  Skip placement timings for overlap checks
-                # to avoid false positives when both are present.
                 if not uses_window:
                     for target_key, timings in placement_timings.items():
                         target_timings[target_key].extend(timings)
@@ -267,11 +245,10 @@ class SectionPlanValidator:
                     )
                     errors.extend(window_errors)
 
-                    # Accumulate window timings — already keyed per target
                     for target_key, timings in window_timings.items():
                         target_timings[target_key].extend(timings)
 
-            # Check for self-overlap of same target within same lane
+            # Self-overlap check (real-world validated: 0% in 14 profiles)
             overlap_errors, overlap_warnings = self._check_target_self_overlaps(
                 target_timings, lane_plan.lane
             )
@@ -281,146 +258,9 @@ class SectionPlanValidator:
         # Add warning checks for common soft-fail patterns
         warnings.extend(self._check_identical_accent_on_primaries(plan))
         warnings.extend(self._check_timing_driver_mismatch(plan))
-        # Cross-lane reuse policy (expansion-aware). Catches violations before
-        # the LLM judge, saving iteration budget and tokens.
-        errors.extend(self._check_cross_lane_reuse_policy(lane_owned_groups))
 
         is_valid = len(errors) == 0
         return ValidationResult(is_valid=is_valid, errors=errors, warnings=warnings)
-
-    def _expand_target_groups_safe(self, target: PlanTarget) -> set[str]:
-        """Expand a target to concrete group IDs, suppressing duplicate unknown-target errors."""
-        try:
-            return set(self.target_expander.expand_target(target))
-        except Exception:
-            return set()
-
-    def _expand_coordination_plan_groups(self, coord_plan: CoordinationPlan) -> set[str]:
-        """Collect concrete group ownership for a coordination plan (targets + placement targets)."""
-        groups: set[str] = set()
-        for target in coord_plan.targets:
-            groups.update(self._expand_target_groups_safe(target))
-        for placement in coord_plan.placements:
-            groups.update(self._expand_target_groups_safe(placement.target))
-        return groups
-
-    def _check_lane_coordination_plan_ownership_conflicts(
-        self,
-        lane: LaneKind,
-        coord_plan_ownership: list[tuple[int, set[str]]],
-    ) -> list[ValidationIssue]:
-        """Within a lane, concrete groups should be owned by at most one coordination plan.
-
-        This is expansion-aware, so zone/split targets are compared after resolution.
-        """
-        errors: list[ValidationIssue] = []
-        for i in range(len(coord_plan_ownership)):
-            idx_a, groups_a = coord_plan_ownership[i]
-            if not groups_a:
-                continue
-            for j in range(i + 1, len(coord_plan_ownership)):
-                idx_b, groups_b = coord_plan_ownership[j]
-                overlap = sorted(groups_a & groups_b)
-                if not overlap:
-                    continue
-                preview = ", ".join(overlap[:5])
-                more = f" (+{len(overlap)-5} more)" if len(overlap) > 5 else ""
-                errors.append(
-                    ValidationIssue(
-                        severity=ValidationSeverity.ERROR,
-                        code="TARGET_IN_MULTIPLE_COORDINATION_PLANS_IN_LANE",
-                        message=(
-                            f"{lane.value} lane coordination_plans[{idx_a}] and "
-                            f"coordination_plans[{idx_b}] both control the same concrete groups "
-                            f"after target expansion: {preview}{more}"
-                        ),
-                        field_path=f"lane_plans[{lane.value}].coordination_plans",
-                        fix_hint=(
-                            "Consolidate each concrete group into a single coordination_plan "
-                            "within the lane, or make target sets disjoint after zone/split expansion."
-                        ),
-                    )
-                )
-        return errors
-
-    def _check_cross_lane_reuse_policy(
-        self,
-        lane_owned_groups: dict[LaneKind, set[str]],
-    ) -> list[ValidationIssue]:
-        """Check expansion-aware cross-lane reuse policy.
-
-        Enforces Rule #2 from the planner system prompt:
-        - BASE cannot share targets with any other lane.
-        - RHYTHM+ACCENT overlap only for explicitly allowlisted groups.
-
-        Zone/split targets are expanded to concrete groups before checking,
-        so ``zone:HOUSE`` in BASE and ``group:OUTLINE`` in RHYTHM will be
-        caught if OUTLINE is a member of zone HOUSE.
-        """
-        errors: list[ValidationIssue] = []
-
-        base_groups = lane_owned_groups.get(LaneKind.BASE, set())
-        rhythm_groups = lane_owned_groups.get(LaneKind.RHYTHM, set())
-        accent_groups = lane_owned_groups.get(LaneKind.ACCENT, set())
-
-        # BASE cannot share with any lane
-        base_conflicts = sorted(base_groups & (rhythm_groups | accent_groups))
-        if base_conflicts:
-            other_lanes: list[str] = []
-            for gid in base_conflicts:
-                if gid in rhythm_groups:
-                    other_lanes.append("RHYTHM")
-                if gid in accent_groups:
-                    other_lanes.append("ACCENT")
-            conflict_preview = ", ".join(base_conflicts[:5])
-            more = f" (+{len(base_conflicts)-5} more)" if len(base_conflicts) > 5 else ""
-            errors.append(
-                ValidationIssue(
-                    severity=ValidationSeverity.ERROR,
-                    code="CROSS_LANE_BASE_REUSE",
-                    message=(
-                        f"Groups [{conflict_preview}{more}] appear in BASE and another lane "
-                        f"after zone/split expansion. BASE cannot share targets with "
-                        f"any other lane (Rule #2). This often happens when a zone target "
-                        f"(e.g., zone:HOUSE) in BASE expands to groups also used in RHYTHM/ACCENT."
-                    ),
-                    field_path="lane_plans",
-                    fix_hint=(
-                        f"Move {conflict_preview} out of BASE, or use individual group targets "
-                        f"in BASE instead of zone targets to avoid overlap. Alternatively, move "
-                        f"the conflicting groups out of the other lane."
-                    ),
-                )
-            )
-
-        # RHYTHM+ACCENT overlap only for allowlisted groups
-        rhythm_accent_conflicts = sorted((rhythm_groups & accent_groups) - self.multilane_allowed_groups)
-        if rhythm_accent_conflicts:
-            conflict_preview = ", ".join(rhythm_accent_conflicts[:5])
-            more = (
-                f" (+{len(rhythm_accent_conflicts)-5} more)"
-                if len(rhythm_accent_conflicts) > 5
-                else ""
-            )
-            errors.append(
-                ValidationIssue(
-                    severity=ValidationSeverity.ERROR,
-                    code="CROSS_LANE_REUSE_GROUP",
-                    message=(
-                        f"Groups [{conflict_preview}{more}] appear in both RHYTHM and ACCENT "
-                        f"after zone/split expansion but are not in the multi-lane allowlist "
-                        f"(Rule #2). Only allowlisted groups may appear in both lanes."
-                    ),
-                    field_path="lane_plans",
-                    fix_hint=(
-                        f"Make RHYTHM and ACCENT targets disjoint for [{conflict_preview}]. "
-                        f"Keep the group in whichever lane is more important for the section, "
-                        f"and choose a different group for the other lane."
-                    ),
-                )
-            )
-
-        return errors
 
     def _validate_coordination_requirements(
         self,

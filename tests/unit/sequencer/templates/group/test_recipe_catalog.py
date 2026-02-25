@@ -123,5 +123,3 @@ def test_recipe_catalog_recipe_count() -> None:
     recipes = [_make_recipe(recipe_id=f"r{i}") for i in range(5)]
     catalog = RecipeCatalog(recipes=recipes)
     assert len(catalog.recipes) == 5
-
-

@@ -87,9 +87,9 @@ class IterationConfig(BaseModel):
     )
     top_n_historical_issues: int = Field(
         ge=1,
-        le=20,
-        default=5,
-        description="Number of top historical issues to include in learning context",
+        le=10,
+        default=3,
+        description="Number of top issue categories to include in learning context",
     )
 
     model_config = ConfigDict(frozen=True, extra="forbid", validate_assignment=True)
