@@ -1,0 +1,80 @@
+[
+  {
+    "name": "idx_phrases_target",
+    "table": "phrases",
+    "columns": ["package_id", "sequence_file_id", "target_name"],
+    "unique": false
+  },
+  {
+    "name": "idx_phrases_family",
+    "table": "phrases",
+    "columns": ["effect_family"],
+    "unique": false
+  },
+  {
+    "name": "idx_templates_family_stability",
+    "table": "templates",
+    "columns": ["effect_family", "cross_pack_stability DESC"],
+    "unique": false
+  },
+  {
+    "name": "idx_templates_support",
+    "table": "templates",
+    "columns": ["support_count DESC"],
+    "unique": false
+  },
+  {
+    "name": "idx_templates_kind",
+    "table": "templates",
+    "columns": ["template_kind"],
+    "unique": false
+  },
+  {
+    "name": "idx_stacks_target",
+    "table": "stacks",
+    "columns": ["package_id", "sequence_file_id", "target_name"],
+    "unique": false
+  },
+  {
+    "name": "idx_stacks_signature",
+    "table": "stacks",
+    "columns": ["stack_signature"],
+    "unique": false
+  },
+  {
+    "name": "idx_transitions_source",
+    "table": "transitions",
+    "columns": ["source_template_id"],
+    "unique": false
+  },
+  {
+    "name": "idx_transitions_target",
+    "table": "transitions",
+    "columns": ["target_template_id"],
+    "unique": false
+  },
+  {
+    "name": "idx_recipes_type",
+    "table": "recipes",
+    "columns": ["template_type"],
+    "unique": false
+  },
+  {
+    "name": "idx_recipes_intent",
+    "table": "recipes",
+    "columns": ["visual_intent"],
+    "unique": false
+  },
+  {
+    "name": "idx_taxonomy_package_seq",
+    "table": "taxonomy",
+    "columns": ["package_id", "sequence_file_id"],
+    "unique": false
+  },
+  {
+    "name": "idx_propensity_family",
+    "table": "propensity",
+    "columns": ["effect_family"],
+    "unique": false
+  }
+]

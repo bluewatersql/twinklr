@@ -1,0 +1,106 @@
+[
+  {
+    "name": "schema_info",
+    "columns": [
+      "key TEXT PRIMARY KEY",
+      "value TEXT NOT NULL"
+    ]
+  },
+  {
+    "name": "phrases",
+    "columns": [
+      "phrase_id TEXT PRIMARY KEY",
+      "package_id TEXT NOT NULL",
+      "sequence_file_id TEXT NOT NULL",
+      "effect_family TEXT NOT NULL",
+      "target_name TEXT NOT NULL",
+      "data_json TEXT NOT NULL"
+    ]
+  },
+  {
+    "name": "templates",
+    "columns": [
+      "template_id TEXT PRIMARY KEY",
+      "template_kind TEXT NOT NULL",
+      "effect_family TEXT NOT NULL",
+      "support_count INTEGER NOT NULL",
+      "cross_pack_stability REAL NOT NULL",
+      "data_json TEXT NOT NULL"
+    ]
+  },
+  {
+    "name": "template_assignments",
+    "columns": [
+      "package_id TEXT NOT NULL",
+      "sequence_file_id TEXT NOT NULL",
+      "phrase_id TEXT NOT NULL",
+      "template_id TEXT NOT NULL",
+      "data_json TEXT NOT NULL"
+    ],
+    "primary_key": ["package_id", "sequence_file_id", "phrase_id"]
+  },
+  {
+    "name": "stacks",
+    "columns": [
+      "stack_id TEXT PRIMARY KEY",
+      "package_id TEXT NOT NULL",
+      "sequence_file_id TEXT NOT NULL",
+      "target_name TEXT NOT NULL",
+      "stack_signature TEXT NOT NULL",
+      "data_json TEXT NOT NULL"
+    ]
+  },
+  {
+    "name": "transitions",
+    "columns": [
+      "source_template_id TEXT NOT NULL",
+      "target_template_id TEXT NOT NULL",
+      "data_json TEXT NOT NULL"
+    ],
+    "primary_key": ["source_template_id", "target_template_id"]
+  },
+  {
+    "name": "recipes",
+    "columns": [
+      "recipe_id TEXT PRIMARY KEY",
+      "template_type TEXT NOT NULL",
+      "visual_intent TEXT NOT NULL",
+      "data_json TEXT NOT NULL"
+    ]
+  },
+  {
+    "name": "taxonomy",
+    "columns": [
+      "phrase_id TEXT PRIMARY KEY",
+      "package_id TEXT NOT NULL",
+      "sequence_file_id TEXT NOT NULL",
+      "data_json TEXT NOT NULL"
+    ]
+  },
+  {
+    "name": "propensity",
+    "columns": [
+      "effect_family TEXT NOT NULL",
+      "model_type TEXT NOT NULL",
+      "data_json TEXT NOT NULL"
+    ],
+    "primary_key": ["effect_family", "model_type"]
+  },
+  {
+    "name": "corpus_metadata",
+    "columns": [
+      "corpus_id TEXT PRIMARY KEY",
+      "metadata_json TEXT NOT NULL",
+      "updated_at TEXT NOT NULL DEFAULT (datetime('now'))"
+    ]
+  },
+  {
+    "name": "reference_data",
+    "columns": [
+      "data_key TEXT PRIMARY KEY",
+      "data_json TEXT NOT NULL",
+      "version TEXT NOT NULL DEFAULT ''",
+      "updated_at TEXT NOT NULL DEFAULT (datetime('now'))"
+    ]
+  }
+]

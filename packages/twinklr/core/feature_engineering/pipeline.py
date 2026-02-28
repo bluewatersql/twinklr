@@ -71,6 +71,8 @@ from twinklr.core.feature_engineering.template_diagnostics import (
 )
 from twinklr.core.feature_engineering.templates import TemplateMiner, TemplateMinerOptions
 from twinklr.core.feature_engineering.transitions import TransitionModeler
+from twinklr.core.feature_store.models import FeatureStoreConfig
+from twinklr.core.feature_store.protocols import FeatureStoreProviderSync
 
 
 @dataclass(frozen=True)
@@ -119,6 +121,7 @@ class FeatureEngineeringPipelineOptions:
     recipe_promotion_adaptive_stability: bool = False
     recipe_promotion_param_profiles: dict[str, dict[str, object]] | None = None
     taxonomy_rules_path: Path | None = None
+    feature_store_config: FeatureStoreConfig | None = None
     template_min_instance_count: int = 2
     template_min_distinct_pack_count: int = 1
     quality_min_template_coverage: float = 0.80
@@ -148,6 +151,17 @@ class FeatureEngineeringPipeline:
         music_library_index: MusicLibraryIndex | None = None,
     ) -> None:
         self._options = options or FeatureEngineeringPipelineOptions()
+
+        from twinklr.core.feature_store.backends.null import NullFeatureStore
+        from twinklr.core.feature_store.factory import create_feature_store
+
+        if self._options.feature_store_config is not None:
+            self._store: FeatureStoreProviderSync = create_feature_store(
+                self._options.feature_store_config
+            )
+        else:
+            self._store = NullFeatureStore()
+
         self._discovery = AudioDiscoveryService(
             AudioDiscoveryOptions(
                 confidence_threshold=self._options.confidence_threshold,
@@ -236,8 +250,12 @@ class FeatureEngineeringPipeline:
         return rows
 
     def run_profile(self, profile_dir: Path, output_dir: Path) -> FeatureBundle:
-        outputs = self._run_profile_internal(profile_dir, output_dir)
-        return outputs.bundle
+        self._store.initialize()
+        try:
+            outputs = self._run_profile_internal(profile_dir, output_dir)
+            return outputs.bundle
+        finally:
+            self._store.close()
 
     def _run_profile_internal(self, profile_dir: Path, output_dir: Path) -> _ProfileOutputs:
         metadata = self._read_json(profile_dir / "sequence_metadata.json")
@@ -312,36 +330,43 @@ class FeatureEngineeringPipeline:
         )
 
     def run_corpus(self, corpus_dir: Path, output_root: Path) -> list[FeatureBundle]:
-        rows = self._read_jsonl(corpus_dir / "sequence_index.jsonl")
-        bundles: list[FeatureBundle] = []
-        corpus_phrases: list[EffectPhrase] = []
-        corpus_taxonomy: list[PhraseTaxonomyRecord] = []
-        corpus_target_roles: list[TargetRoleAssignment] = []
-        for row in rows:
-            profile_dir = Path(str(row.get("profile_path")))
-            package_id = str(row.get("package_id"))
-            sequence_file_id = str(row.get("sequence_file_id"))
-            output_dir = output_root / package_id / sequence_file_id
-            outputs = self._run_profile_internal(profile_dir, output_dir)
-            bundles.append(outputs.bundle)
-            corpus_phrases.extend(outputs.phrases)
-            corpus_taxonomy.extend(outputs.taxonomy_rows)
-            corpus_target_roles.extend(outputs.target_roles)
-        template_catalogs = self._write_template_catalogs(
-            output_root=output_root,
-            phrases=tuple(corpus_phrases),
-            taxonomy_rows=tuple(corpus_taxonomy),
-            target_roles=tuple(corpus_target_roles),
-        )
-        self._write_v1_tail_artifacts(
-            output_root=output_root,
-            bundles=tuple(bundles),
-            phrases=tuple(corpus_phrases),
-            taxonomy_rows=tuple(corpus_taxonomy),
-            target_roles=tuple(corpus_target_roles),
-            template_catalogs=template_catalogs,
-        )
-        return bundles
+        self._store.initialize()
+        try:
+            rows = self._read_jsonl(corpus_dir / "sequence_index.jsonl")
+            bundles: list[FeatureBundle] = []
+            corpus_phrases: list[EffectPhrase] = []
+            corpus_taxonomy: list[PhraseTaxonomyRecord] = []
+            corpus_target_roles: list[TargetRoleAssignment] = []
+            for row in rows:
+                profile_dir = Path(str(row.get("profile_path")))
+                package_id = str(row.get("package_id"))
+                sequence_file_id = str(row.get("sequence_file_id"))
+                output_dir = output_root / package_id / sequence_file_id
+                outputs = self._run_profile_internal(profile_dir, output_dir)
+                bundles.append(outputs.bundle)
+                corpus_phrases.extend(outputs.phrases)
+                corpus_taxonomy.extend(outputs.taxonomy_rows)
+                corpus_target_roles.extend(outputs.target_roles)
+            template_catalogs = self._write_template_catalogs(
+                output_root=output_root,
+                phrases=tuple(corpus_phrases),
+                taxonomy_rows=tuple(corpus_taxonomy),
+                target_roles=tuple(corpus_target_roles),
+            )
+            self._write_v1_tail_artifacts(
+                output_root=output_root,
+                bundles=tuple(bundles),
+                phrases=tuple(corpus_phrases),
+                taxonomy_rows=tuple(corpus_taxonomy),
+                target_roles=tuple(corpus_target_roles),
+                template_catalogs=template_catalogs,
+            )
+            corpus_id = corpus_dir.name
+            metadata = {"sequence_count": len(bundles), "corpus_dir": str(corpus_dir)}
+            self._store.upsert_corpus_metadata(corpus_id, json.dumps(metadata))
+            return bundles
+        finally:
+            self._store.close()
 
     def _write_aligned_events(
         self,
@@ -407,6 +432,7 @@ class FeatureEngineeringPipeline:
             enriched_events=enriched_events,
         )
         self._writer.write_effect_phrases(output_dir, phrases)
+        self._store.upsert_phrases(phrases)
         return phrases
 
     def _write_phrase_taxonomy(
@@ -425,6 +451,7 @@ class FeatureEngineeringPipeline:
             sequence_file_id=sequence_file_id,
         )
         self._writer.write_phrase_taxonomy(output_dir, rows)
+        self._store.upsert_taxonomy(rows)
         return rows
 
     def _write_target_roles(
@@ -447,6 +474,7 @@ class FeatureEngineeringPipeline:
             taxonomy_rows=taxonomy_rows,
         )
         self._writer.write_target_roles(output_dir, rows)
+        # target_roles not persisted to feature store — no protocol method in Phase 2C
         return rows
 
     def _write_color_arc(
@@ -510,6 +538,7 @@ class FeatureEngineeringPipeline:
         if not self._options.enable_template_mining or not phrases:
             return None
 
+        stacks = None
         if self._options.enable_stack_detection:
             stacks = self._stack_detector.detect(phrases=phrases)
             self._writer.write_stack_catalog(output_root, stacks)
@@ -526,6 +555,12 @@ class FeatureEngineeringPipeline:
             )
         self._writer.write_content_templates(output_root, content_catalog)
         self._writer.write_orchestration_templates(output_root, orchestration_catalog)
+        self._store.upsert_templates(content_catalog.templates + orchestration_catalog.templates)
+        self._store.upsert_template_assignments(
+            content_catalog.assignments + orchestration_catalog.assignments
+        )
+        if stacks is not None:
+            self._store.upsert_stacks(stacks)
         return content_catalog, orchestration_catalog
 
     def _write_v1_tail_artifacts(
@@ -549,6 +584,7 @@ class FeatureEngineeringPipeline:
             )
             path = self._writer.write_transition_graph(output_root, transition_graph)
             manifest["transition_graph"] = str(path)
+            self._store.upsert_transitions(transition_graph.edges)
 
         layering_rows: tuple[LayeringFeatureRow, ...] = ()
         if self._options.enable_layering_features and phrases:
@@ -573,6 +609,8 @@ class FeatureEngineeringPipeline:
         )
         if propensity_path is not None:
             manifest["propensity_index"] = str(propensity_path)
+        if propensity_index is not None:
+            self._store.upsert_propensity(propensity_index.affinities)
 
         # Derive a creator_id from the first bundle's package_id for corpus-level fingerprint.
         creator_id = bundles[0].package_id if bundles else "unknown"
@@ -737,6 +775,7 @@ class FeatureEngineeringPipeline:
         if not result.promoted_recipes:
             return None
 
+        self._store.upsert_recipes(tuple(result.promoted_recipes))
         return self._writer.write_recipe_catalog(output_root, result.promoted_recipes)
 
     def _build_adapter_payloads(

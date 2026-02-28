@@ -88,6 +88,18 @@ def parse_args() -> argparse.Namespace:
         help="Maximum ratio allowed for any one unknown effect type.",
     )
     parser.add_argument("--top-n", type=int, default=10, help="Top-N rows to show in summaries.")
+    parser.add_argument(
+        "--feature-store-db",
+        type=Path,
+        default=None,
+        help="SQLite feature store path (enables store).",
+    )
+    parser.add_argument(
+        "--feature-store-backend",
+        type=str,
+        default=None,
+        help="Feature store backend (default: sqlite when --feature-store-db set).",
+    )
     return parser.parse_args()
 
 
@@ -636,6 +648,15 @@ def main() -> int:
 
             analyzer = AudioAnalyzer(AppConfig(), JobConfig())
 
+        from twinklr.core.feature_store.models import FeatureStoreConfig
+
+        feature_store_config = None
+        if args.feature_store_db is not None:
+            feature_store_config = FeatureStoreConfig(
+                backend=args.feature_store_backend or "sqlite",
+                db_path=args.feature_store_db,
+            )
+
         music_index = _load_music_library_index()
         pipeline = FeatureEngineeringPipeline(
             options=FeatureEngineeringPipelineOptions(
@@ -644,6 +665,7 @@ def main() -> int:
                 quality_max_unknown_effect_family_ratio=args.quality_max_unknown_effect_family_ratio,
                 quality_max_unknown_motion_ratio=args.quality_max_unknown_motion_ratio,
                 quality_max_single_unknown_effect_type_ratio=args.quality_max_single_unknown_effect_type_ratio,
+                feature_store_config=feature_store_config,
             ),
             analyzer=analyzer,
             music_library_index=music_index,
