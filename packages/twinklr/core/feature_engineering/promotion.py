@@ -9,6 +9,8 @@ with provenance tracking and quality reporting.
 
 from __future__ import annotations
 
+import math
+import statistics
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any
@@ -35,6 +37,36 @@ EXCLUDED_FAMILIES: frozenset[str] = frozenset(
 )
 
 
+def _adaptive_stability(
+    median_distinct_pack_count: float,
+    *,
+    lower_bound: float = 0.3,
+    upper_bound: float = 0.9,
+) -> float:
+    """Compute effective min_stability threshold from corpus diversity.
+
+    Uses a logarithmic scaling of the median distinct_pack_count to produce
+    a threshold that is lower for sparse corpora and higher for diverse ones.
+
+    The result is deterministic and clamped between ``lower_bound`` and
+    ``upper_bound``.
+
+    Args:
+        median_distinct_pack_count: Median distinct_pack_count across candidates.
+        lower_bound: Hard minimum for the returned threshold.
+        upper_bound: Hard maximum for the returned threshold.
+
+    Returns:
+        Effective min_stability threshold.
+    """
+    # Scale: log2(1 + x) / log2(1 + 20) maps [0, 20+] → roughly [0, 1]
+    # At pack_count=0 → 0, pack_count=4 → ~0.48, pack_count=10 → ~0.77, 20 → 1.0
+    denominator = math.log2(1.0 + 20.0)
+    raw = math.log2(1.0 + max(0.0, median_distinct_pack_count)) / denominator
+    scaled = lower_bound + raw * (upper_bound - lower_bound)
+    return max(lower_bound, min(upper_bound, scaled))
+
+
 @dataclass(frozen=True)
 class PromotionResult:
     """Result of running the promotion pipeline."""
@@ -58,8 +90,9 @@ class PromotionPipeline:
         self,
         *,
         excluded_families: frozenset[str] = EXCLUDED_FAMILIES,
+        param_profiles: dict[str, dict[str, object]] | None = None,
     ) -> None:
-        self._synthesizer = RecipeSynthesizer()
+        self._synthesizer = RecipeSynthesizer(param_profiles=param_profiles)
         self._annotator = MotifAnnotator()
         self._excluded_families = excluded_families
 
@@ -73,6 +106,7 @@ class PromotionPipeline:
         motif_catalog: MotifCatalog | None = None,
         propensity_index: PropensityIndex | None = None,
         use_stack_synthesis: bool = False,
+        adaptive_stability: bool = False,
     ) -> PromotionResult:
         """Run the promotion pipeline.
 
@@ -85,6 +119,8 @@ class PromotionPipeline:
             motif_catalog: Optional motif catalog for compatibility annotation.
             propensity_index: Optional propensity index for model affinity enrichment.
             use_stack_synthesis: Use stack-aware synthesis path (V2).
+            adaptive_stability: When True, compute effective min_stability from
+                corpus diversity rather than using the static value.
 
         Returns:
             PromotionResult with promoted recipes and a quality report.
@@ -98,11 +134,17 @@ class PromotionPipeline:
             else:
                 eligible.append(t)
 
-        # Stage 1: Quality gate
+        # Stage 1: Quality gate (with optional adaptive stability)
+        effective_stability = min_stability
+        if adaptive_stability and eligible:
+            pack_counts = [t.distinct_pack_count for t in eligible]
+            median_pack = float(statistics.median(pack_counts))
+            effective_stability = _adaptive_stability(median_pack)
+
         passed: list[MinedTemplate] = []
         rejected_count = 0
         for t in eligible:
-            if t.support_count >= min_support and t.cross_pack_stability >= min_stability:
+            if t.support_count >= min_support and t.cross_pack_stability >= effective_stability:
                 passed.append(t)
             else:
                 rejected_count += 1
@@ -114,10 +156,12 @@ class PromotionPipeline:
         # Stage 3: Recipe synthesis + build source template map for motif annotation
         promoted: list[EffectRecipe] = []
         source_template_map: dict[str, list[str]] = {}
+        stack_promoted_count = 0
         for t in passed:
             recipe_id = f"synth_{t.effect_family}_{t.motion_class}_{t.template_id}"
             if use_stack_synthesis and t.stack_composition:
                 recipe = self._synthesizer.synthesize_from_stack(t, recipe_id=recipe_id)
+                stack_promoted_count += 1
             else:
                 recipe = self._synthesizer.synthesize(t, recipe_id=recipe_id)
             promoted.append(recipe)
@@ -139,7 +183,7 @@ class PromotionPipeline:
             )
             motifs_annotated = sum(1 for r in promoted if r.motif_compatibility)
 
-        report = {
+        report: dict[str, Any] = {
             "total_candidates": len(candidates),
             "filtered_families": filtered_count,
             "passed_quality_gate": len(passed),
@@ -147,6 +191,8 @@ class PromotionPipeline:
             "promoted_count": len(promoted),
             "affinities_enriched": affinities_enriched,
             "motifs_annotated": motifs_annotated,
+            "stack_promoted_count": stack_promoted_count,
+            "effective_min_stability": effective_stability,
         }
 
         return PromotionResult(promoted_recipes=promoted, report=report)

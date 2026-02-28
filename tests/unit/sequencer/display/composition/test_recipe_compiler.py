@@ -179,3 +179,86 @@ def test_recipe_compiler_multi_layer() -> None:
     assert len(effects) == 2
     assert effects[0].visual_depth == VisualDepth.BACKGROUND
     assert effects[1].visual_depth == VisualDepth.FOREGROUND
+
+
+def test_recipe_compiler_uses_layer_effect_type() -> None:
+    """Compiler uses the layer's own effect_type when it is a real xLights effect."""
+    recipe = EffectRecipe(
+        recipe_id="gtpl_base_motif_abstract_ambient",
+        name="Enriched Recipe",
+        description="Layer has enriched effect_type",
+        recipe_version="1.0.0",
+        template_type=GroupTemplateType.BASE,
+        visual_intent=GroupVisualIntent.ABSTRACT,
+        timing=TimingHints(bars_min=2, bars_max=8),
+        palette_spec=PaletteSpec(mode=ColorMode.DICHROME, palette_roles=["primary", "accent"]),
+        layers=(
+            RecipeLayer(
+                layer_index=0,
+                layer_name="Base",
+                layer_depth=VisualDepth.BACKGROUND,
+                effect_type="Twinkle",
+                blend_mode=BlendMode.NORMAL,
+                mix=1.0,
+                params={},
+                motion=[MotionVerb.FADE],
+                density=0.5,
+                color_source=ColorSource.PALETTE_PRIMARY,
+            ),
+        ),
+        provenance=RecipeProvenance(source="builtin"),
+        style_markers=StyleMarkers(complexity=0.33, energy_affinity=_EnergyTarget.LOW),
+    )
+    catalog = RecipeCatalog(recipes=[recipe])
+    compiler = RecipeCompiler(catalog=catalog)
+
+    effects = compiler.compile(
+        _make_placement("gtpl_base_motif_abstract_ambient"),
+        _make_context(),
+    )
+
+    assert len(effects) == 1
+    # Should use layer's own effect_type "Twinkle", NOT the template-level
+    # resolved type "Color Wash" from effect_map
+    assert effects[0].event.effect_type == "Twinkle"
+
+
+def test_recipe_compiler_falls_back_for_placeholder_effect_type() -> None:
+    """Compiler falls back to resolve_effect_type when layer has a placeholder."""
+    recipe = EffectRecipe(
+        recipe_id="gtpl_base_motif_abstract_ambient",
+        name="Unenriched Recipe",
+        description="Layer still has placeholder effect_type",
+        recipe_version="1.0.0",
+        template_type=GroupTemplateType.BASE,
+        visual_intent=GroupVisualIntent.ABSTRACT,
+        timing=TimingHints(bars_min=2, bars_max=8),
+        palette_spec=PaletteSpec(mode=ColorMode.DICHROME, palette_roles=["primary", "accent"]),
+        layers=(
+            RecipeLayer(
+                layer_index=0,
+                layer_name="Base",
+                layer_depth=VisualDepth.BACKGROUND,
+                effect_type="ABSTRACT",
+                blend_mode=BlendMode.NORMAL,
+                mix=1.0,
+                params={},
+                motion=[MotionVerb.FADE],
+                density=0.5,
+                color_source=ColorSource.PALETTE_PRIMARY,
+            ),
+        ),
+        provenance=RecipeProvenance(source="builtin"),
+        style_markers=StyleMarkers(complexity=0.33, energy_affinity=_EnergyTarget.LOW),
+    )
+    catalog = RecipeCatalog(recipes=[recipe])
+    compiler = RecipeCompiler(catalog=catalog)
+
+    effects = compiler.compile(
+        _make_placement("gtpl_base_motif_abstract_ambient"),
+        _make_context(),
+    )
+
+    assert len(effects) == 1
+    # Should fall back to resolve_effect_type which maps this to "Color Wash"
+    assert effects[0].event.effect_type == "Color Wash"

@@ -107,16 +107,38 @@ class RecipeCompiler:
             palette_colors=palette_colors,
         )
 
+    # Placeholder effect_type values that require fallback to resolve_effect_type
+    _PLACEHOLDER_EFFECT_TYPES = frozenset(
+        {"ABSTRACT", "GEOMETRIC", "IMAGERY", "TEXTURE", "HYBRID", "ORGANIC", "PLACEHOLDER"}
+    )
+
     @staticmethod
     def _layer_to_compiled_effect(
         layer: RenderedLayer,
         context: TemplateCompileContext,
         source: RenderEventSource,
     ) -> CompiledEffect:
-        """Convert a RenderedLayer into a CompiledEffect."""
-        resolved = resolve_effect_type(source.template_id)
+        """Convert a RenderedLayer into a CompiledEffect.
+
+        Uses the layer's own effect_type when it contains a real xLights
+        effect name.  Falls back to resolve_effect_type() only when the
+        layer still carries a placeholder value (pre-enrichment templates).
+        """
+        layer_effect = layer.effect_type
+        is_placeholder = (
+            not layer_effect or layer_effect in RecipeCompiler._PLACEHOLDER_EFFECT_TYPES
+        )
+
+        if is_placeholder:
+            resolved = resolve_effect_type(source.template_id)
+            effect_type = resolved.effect_type
+            base_params = resolved.defaults
+        else:
+            effect_type = layer_effect
+            base_params: dict[str, Any] = {}
+
         params: dict[str, Any] = {
-            **resolved.defaults,
+            **base_params,
             **dict(layer.resolved_params),
             "blend_mode": layer.blend_mode.value,
             "mix": layer.mix,
@@ -125,7 +147,7 @@ class RecipeCompiler:
             event_id=f"recipe_{source.template_id}_{layer.layer_index}_{uuid.uuid4().hex[:8]}",
             start_ms=context.start_ms,
             end_ms=context.end_ms,
-            effect_type=resolved.effect_type,
+            effect_type=effect_type,
             parameters=params,
             palette=context.palette,
             intensity=context.intensity,

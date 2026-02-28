@@ -116,6 +116,8 @@ class FeatureEngineeringPipelineOptions:
     enable_recipe_promotion: bool = True
     recipe_promotion_min_support: int = 5
     recipe_promotion_min_stability: float = 0.3
+    recipe_promotion_adaptive_stability: bool = False
+    recipe_promotion_param_profiles: dict[str, dict[str, object]] | None = None
     taxonomy_rules_path: Path | None = None
     template_min_instance_count: int = 2
     template_min_distinct_pack_count: int = 1
@@ -720,7 +722,8 @@ class FeatureEngineeringPipeline:
             ]
 
         use_stack = self._options.enable_stack_detection
-        pipeline = PromotionPipeline()
+        param_profiles = self._options.recipe_promotion_param_profiles
+        pipeline = PromotionPipeline(param_profiles=param_profiles)
         result = pipeline.run(
             candidates,
             min_support=self._options.recipe_promotion_min_support,
@@ -729,6 +732,7 @@ class FeatureEngineeringPipeline:
             motif_catalog=motif_catalog,
             propensity_index=propensity_index,
             use_stack_synthesis=use_stack,
+            adaptive_stability=self._options.recipe_promotion_adaptive_stability,
         )
         if not result.promoted_recipes:
             return None

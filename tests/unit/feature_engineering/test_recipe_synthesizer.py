@@ -355,3 +355,100 @@ def test_off_effect_single_layer() -> None:
     sparkle_layers = [ly for ly in recipe.layers if ly.layer_name == "Sparkle"]
     assert len(wash_layers) == 0
     assert len(sparkle_layers) == 0
+
+
+# ── Param profile propagation ─────────────────────────────────────────────
+
+
+class TestParamProfilePropagation:
+    """RecipeSynthesizer populates params from effect metadata profiles."""
+
+    @staticmethod
+    def _make_stack_mined(
+        *,
+        effect_family: str = "color_wash",
+        stack_composition: tuple[str, ...] = ("color_wash", "bars", "sparkle"),
+    ) -> MinedTemplate:
+        sig = "+".join(stack_composition) + "|sweep|palette|high|sustained|multi_target"
+        return MinedTemplate(
+            template_id="uuid-stack-1",
+            template_kind=TemplateKind.CONTENT,
+            template_signature=sig,
+            support_count=20,
+            distinct_pack_count=5,
+            support_ratio=0.35,
+            cross_pack_stability=0.65,
+            effect_family=effect_family,
+            motion_class="sweep",
+            color_class="palette",
+            energy_class="high",
+            continuity_class="sustained",
+            spatial_class="multi_target",
+            layer_count=len(stack_composition),
+            stack_composition=stack_composition,
+            layer_blend_modes=("NORMAL", "ADD", "SCREEN")[: len(stack_composition)],
+            layer_mixes=(1.0, 0.7, 0.45)[: len(stack_composition)],
+        )
+
+    def test_params_populated_from_profile(self) -> None:
+        """When param_profiles are provided, layer params are populated."""
+        mined = self._make_stack_mined()
+        profiles: dict[str, dict[str, object]] = {
+            "bars": {"BarCount": 8, "Direction": "Diagonal"},
+            "sparkle": {"Density": 30},
+        }
+        synth = RecipeSynthesizer(param_profiles=profiles)
+        recipe = synth.synthesize_from_stack(mined, recipe_id="test_profiles")
+        # The bars layer should have params populated
+        bars_layer = next(ly for ly in recipe.layers if ly.effect_type == "Bars")
+        assert "BarCount" in bars_layer.params
+        assert bars_layer.params["BarCount"].value == 8
+
+    def test_fallback_when_no_profiles(self) -> None:
+        """Without param_profiles, existing deterministic mapping is used."""
+        mined = self._make_stack_mined()
+        synth = RecipeSynthesizer()
+        recipe = synth.synthesize_from_stack(mined, recipe_id="test_no_profiles")
+        # Should still produce a valid recipe with empty params on data layers
+        assert isinstance(recipe, EffectRecipe)
+        assert len(recipe.layers) == 3
+
+    def test_profile_partial_coverage(self) -> None:
+        """Profile only covers some families; others get empty params."""
+        mined = self._make_stack_mined()
+        profiles: dict[str, dict[str, object]] = {
+            "bars": {"BarCount": 12},
+            # No entry for color_wash or sparkle
+        }
+        synth = RecipeSynthesizer(param_profiles=profiles)
+        recipe = synth.synthesize_from_stack(mined, recipe_id="test_partial")
+        bars_layer = next(ly for ly in recipe.layers if ly.effect_type == "Bars")
+        assert "BarCount" in bars_layer.params
+        wash_layer = next(ly for ly in recipe.layers if ly.effect_type == "ColorWash")
+        # wash should have no profile-derived params (empty dict)
+        assert len(wash_layer.params) == 0
+
+    def test_profile_used_in_single_effect_synthesis(self) -> None:
+        """Param profiles also apply in single-effect (non-stack) synthesis."""
+        mined = _make_mined(effect_family="bars", role="rhythm_driver", energy_class="mid")
+        profiles: dict[str, dict[str, object]] = {
+            "bars": {"BarCount": 10},
+        }
+        synth = RecipeSynthesizer(param_profiles=profiles)
+        recipe = synth.synthesize(mined, recipe_id="test_single_profile")
+        primary = _primary_layer(recipe)
+        assert "BarCount" in primary.params
+        assert primary.params["BarCount"].value == 10
+
+    def test_profile_does_not_override_wash_underlay_params(self) -> None:
+        """Profile params only apply to primary/data layers, not synthetic wash."""
+        mined = _make_mined(effect_family="bars", role="rhythm_driver", energy_class="mid")
+        profiles: dict[str, dict[str, object]] = {
+            "color_wash": {"Speed": 999},
+            "bars": {"BarCount": 6},
+        }
+        synth = RecipeSynthesizer(param_profiles=profiles)
+        recipe = synth.synthesize(mined, recipe_id="test_wash_no_override")
+        wash = recipe.layers[0]
+        # The synthetic wash underlay params should be unchanged (Speed=0)
+        assert wash.params["Speed"].value == 0

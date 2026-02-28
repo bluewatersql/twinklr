@@ -244,7 +244,19 @@ class RecipeSynthesizer:
     Two synthesis modes:
     - ``synthesize()`` (legacy): heuristic layering from single-effect templates.
     - ``synthesize_from_stack()`` (V2): data-driven layering from stack metadata.
+
+    Optional ``param_profiles`` provide effect-family-level modal parameter
+    values (from Cycle 0 effect metadata analysis).  When provided, layer
+    params are populated from the profile.  When absent, existing
+    deterministic mapping rules are used unchanged.
     """
+
+    def __init__(
+        self,
+        *,
+        param_profiles: dict[str, dict[str, object]] | None = None,
+    ) -> None:
+        self._param_profiles = param_profiles or {}
 
     def synthesize_from_stack(
         self,
@@ -355,6 +367,8 @@ class RecipeSynthesizer:
                 motion = [MotionVerb.SPARKLE]
                 density = 0.2
 
+            params = self._resolve_profile_params(family)
+
             layers.append(
                 RecipeLayer(
                     layer_index=idx,
@@ -363,7 +377,7 @@ class RecipeSynthesizer:
                     effect_type=effect_type,
                     blend_mode=blend,
                     mix=mix,
-                    params={},
+                    params=params,
                     motion=motion,
                     density=density,
                     color_source=color_src,
@@ -371,6 +385,18 @@ class RecipeSynthesizer:
             )
 
         return layers
+
+    def _resolve_profile_params(self, effect_family: str) -> dict[str, ParamValue]:
+        """Resolve params from profile for a given effect family.
+
+        Returns a dict of ParamValue instances built from the profile's
+        modal values for the family.  Returns an empty dict if no profile
+        entry exists.
+        """
+        profile = self._param_profiles.get(effect_family)
+        if not profile:
+            return {}
+        return {name: ParamValue(value=val) for name, val in profile.items()}
 
     def synthesize(
         self,
@@ -504,6 +530,9 @@ class RecipeSynthesizer:
             )
             idx += 1
 
+        # Primary effect layer — use profile params if available
+        primary_params = self._resolve_profile_params(effect_family)
+
         layers.append(
             RecipeLayer(
                 layer_index=idx,
@@ -512,7 +541,7 @@ class RecipeSynthesizer:
                 effect_type=effect_type,
                 blend_mode=BlendMode.ADD if want_underlay else BlendMode.NORMAL,
                 mix=0.8 if want_underlay else 1.0,
-                params={},
+                params=primary_params,
                 motion=motion,
                 density=density,
                 color_source=ColorSource.PALETTE_PRIMARY,
