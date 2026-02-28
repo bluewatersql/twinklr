@@ -539,6 +539,7 @@ class PhraseEncoder:
             enriched = enriched_by_id.get(row.effect_event_id, {})
             mapping, source, confidence = self._map_effect(row.effect_type)
             energy_class = self._derive_energy_class(row, mapping)
+            preserved, blend_mode_raw, mix_raw = self._extract_preserved_params(enriched)
             phrases.append(
                 EffectPhrase(
                     schema_version=EFFECT_PHRASES_SCHEMA_VERSION,
@@ -567,6 +568,9 @@ class PhraseEncoder:
                     section_label=row.section_label,
                     onset_sync_score=row.onset_sync_score,
                     param_signature=self._param_signature(row, enriched),
+                    preserved_params=preserved,
+                    blend_mode=blend_mode_raw,
+                    mix=mix_raw,
                 )
             )
         return tuple(phrases)
@@ -622,6 +626,53 @@ class PhraseEncoder:
         if "group" in row.target_name.lower():
             return SpatialClass.GROUP
         return SpatialClass.SINGLE_TARGET
+
+    @staticmethod
+    def _extract_preserved_params(
+        enriched: dict[str, Any],
+    ) -> tuple[dict[str, Any], str | None, float | None]:
+        """Extract structured params, blend_mode, and mix from enriched event.
+
+        Args:
+            enriched: Enriched event dict from profiling.
+
+        Returns:
+            Tuple of (preserved_params dict, blend_mode string, mix float).
+        """
+        preserved: dict[str, Any] = {}
+        blend_mode: str | None = None
+        mix: float | None = None
+
+        params = enriched.get("effectdb_params", [])
+        if isinstance(params, list):
+            for param in params:
+                if not isinstance(param, dict):
+                    continue
+                name = str(param.get("param_name_normalized", ""))
+                if not name:
+                    continue
+                value = (
+                    param.get("value_string")
+                    or param.get("value_float")
+                    or param.get("value_int")
+                    or param.get("value_bool")
+                )
+                if value is not None:
+                    preserved[name] = value
+
+        raw_blend = enriched.get("blend_mode")
+        if isinstance(raw_blend, str) and raw_blend:
+            blend_mode = raw_blend
+
+        raw_mix = enriched.get("mix")
+        if raw_mix is not None:
+            try:
+                mix = float(raw_mix)
+                mix = max(0.0, min(1.0, mix))
+            except (ValueError, TypeError):
+                pass
+
+        return preserved, blend_mode, mix
 
     @staticmethod
     def _param_signature(row: AlignedEffectEvent, enriched: dict[str, Any]) -> str:

@@ -11,10 +11,10 @@ Design rules under test:
 
 from __future__ import annotations
 
-import json
-import sys
 from collections import defaultdict
+import json
 from pathlib import Path
+import sys
 
 
 def load_events(profile_dir: Path) -> list[dict]:
@@ -88,13 +88,15 @@ def analyze_profile(profile_dir: Path) -> dict:
         layers = sorted(target_layers[name])
         kind = target_kinds[name]
         overlaps = simultaneous_cross_layer[name]
-        multi_layer_details.append({
-            "target": name,
-            "kind": kind,
-            "layers": layers,
-            "layer_count": len(layers),
-            "simultaneous_overlaps": overlaps,
-        })
+        multi_layer_details.append(
+            {
+                "target": name,
+                "kind": kind,
+                "layers": layers,
+                "layer_count": len(layers),
+                "simultaneous_overlaps": overlaps,
+            }
+        )
 
     return {
         "name": profile_dir.name,
@@ -102,11 +104,13 @@ def analyze_profile(profile_dir: Path) -> dict:
         "total_targets": total_targets,
         "single_layer_targets": single_layer_targets,
         "multi_layer_targets": multi_layer_targets,
-        "multi_layer_pct": round(multi_layer_targets / total_targets * 100, 1) if total_targets else 0,
+        "multi_layer_pct": round(multi_layer_targets / total_targets * 100, 1)
+        if total_targets
+        else 0,
         "targets_with_simultaneous_cross_layer": len(simultaneous_cross_layer),
-        "simultaneous_pct": round(
-            len(simultaneous_cross_layer) / total_targets * 100, 1
-        ) if total_targets else 0,
+        "simultaneous_pct": round(len(simultaneous_cross_layer) / total_targets * 100, 1)
+        if total_targets
+        else 0,
         "group_targets": len(group_targets),
         "group_multi_layer": len(group_multi_layer),
         "group_simultaneous": len(group_simultaneous),
@@ -141,9 +145,11 @@ def main():
         all_results.append(result)
 
     # Summary table
-    print(f"{'Profile':<14} {'Events':>7} {'Targets':>8} {'Multi-L':>8} {'%':>6} "
-          f"{'Simul':>6} {'%':>6} | {'Grp':>4} {'G-ML':>5} {'G-Sim':>6} | "
-          f"{'Mdl':>4} {'M-ML':>5} {'M-Sim':>6}")
+    print(
+        f"{'Profile':<14} {'Events':>7} {'Targets':>8} {'Multi-L':>8} {'%':>6} "
+        f"{'Simul':>6} {'%':>6} | {'Grp':>4} {'G-ML':>5} {'G-Sim':>6} | "
+        f"{'Mdl':>4} {'M-ML':>5} {'M-Sim':>6}"
+    )
     print("-" * 110)
 
     totals = defaultdict(int)
@@ -161,10 +167,16 @@ def main():
         )
 
         for key in [
-            "total_events", "total_targets", "multi_layer_targets",
+            "total_events",
+            "total_targets",
+            "multi_layer_targets",
             "targets_with_simultaneous_cross_layer",
-            "group_targets", "group_multi_layer", "group_simultaneous",
-            "model_targets", "model_multi_layer", "model_simultaneous",
+            "group_targets",
+            "group_multi_layer",
+            "group_simultaneous",
+            "model_targets",
+            "model_multi_layer",
+            "model_simultaneous",
         ]:
             totals[key] += r[key]
 
@@ -211,12 +223,18 @@ def main():
     multi_pct = (totals["multi_layer_targets"] / total_t * 100) if total_t else 0
     simul_pct = (totals["targets_with_simultaneous_cross_layer"] / total_t * 100) if total_t else 0
     grp_simul_pct = (
-        totals["group_simultaneous"] / totals["group_targets"] * 100
-    ) if totals["group_targets"] else 0
+        (totals["group_simultaneous"] / totals["group_targets"] * 100)
+        if totals["group_targets"]
+        else 0
+    )
 
     print(f"  Multi-layer target rate:       {multi_pct:.1f}% of targets appear on >1 layer")
-    print(f"  Simultaneous cross-layer rate:  {simul_pct:.1f}% of targets have temporal overlap across layers")
-    print(f"  Group-level simultaneous rate:  {grp_simul_pct:.1f}% of group targets overlap across layers")
+    print(
+        f"  Simultaneous cross-layer rate:  {simul_pct:.1f}% of targets have temporal overlap across layers"
+    )
+    print(
+        f"  Group-level simultaneous rate:  {grp_simul_pct:.1f}% of group targets overlap across layers"
+    )
     print()
 
     if grp_simul_pct > 30:

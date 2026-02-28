@@ -26,6 +26,7 @@ from twinklr.core.feature_engineering.models.learned_taxonomy import (
 from twinklr.core.feature_engineering.models.motifs import MotifCatalog
 from twinklr.core.feature_engineering.models.quality import QualityReport
 from twinklr.core.feature_engineering.models.retrieval import TemplateRetrievalIndex
+from twinklr.core.feature_engineering.models.stacks import EffectStack, EffectStackCatalog
 from twinklr.core.feature_engineering.models.taxonomy import (
     PhraseTaxonomyRecord,
     TargetRoleAssignment,
@@ -34,6 +35,7 @@ from twinklr.core.feature_engineering.models.template_diagnostics import (
     TemplateDiagnosticsReport,
 )
 from twinklr.core.feature_engineering.models.templates import TemplateCatalog
+from twinklr.core.feature_engineering.models.temporal_motifs import TemporalMotifCatalog
 from twinklr.core.feature_engineering.models.transitions import TransitionGraph
 from twinklr.core.sequencer.templates.group.recipe import EffectRecipe
 
@@ -226,6 +228,14 @@ class FeatureEngineeringWriter:
         self._write_json(output_path, catalog.model_dump(mode="json"))
         return output_path
 
+    def write_temporal_motif_catalog(
+        self, output_root: Path, catalog: TemporalMotifCatalog
+    ) -> None:
+        self._write_json(
+            output_root / "temporal_motif_catalog.json",
+            catalog.model_dump(mode="json"),
+        )
+
     def write_cluster_catalog(self, output_root: Path, catalog: TemplateClusterCatalog) -> Path:
         output_path = output_root / "cluster_candidates.json"
         self._write_json(output_path, catalog.model_dump(mode="json"))
@@ -262,6 +272,23 @@ class FeatureEngineeringWriter:
     def write_ann_retrieval_eval(self, output_root: Path, report: AnnRetrievalEvalReport) -> Path:
         output_path = output_root / "retrieval_eval_report.json"
         self._write_json(output_path, report.model_dump(mode="json"))
+        return output_path
+
+    def write_stack_catalog(self, output_root: Path, stacks: tuple[EffectStack, ...]) -> Path:
+        """Write detected stack catalog as JSON."""
+        output_path = output_root / "stack_catalog.json"
+        single_count = sum(1 for s in stacks if s.layer_count == 1)
+        multi_count = sum(1 for s in stacks if s.layer_count > 1)
+        max_layers = max((s.layer_count for s in stacks), default=0)
+        catalog = EffectStackCatalog(
+            total_phrase_count=sum(s.layer_count for s in stacks),
+            total_stack_count=len(stacks),
+            single_layer_count=single_count,
+            multi_layer_count=multi_count,
+            max_layer_count=max_layers,
+            stacks=stacks,
+        )
+        self._write_json(output_path, catalog.model_dump(mode="json"))
         return output_path
 
     def write_recipe_catalog(self, output_root: Path, recipes: list[EffectRecipe]) -> Path:

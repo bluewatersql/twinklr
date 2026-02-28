@@ -47,6 +47,9 @@ ml = [
     "torchaudio==2.4.0",     # Audio processing (WhisperX compatible version)
     "pyannote-audio>=3.1.0", # Speaker diarization
 ]
+fe = [
+    "sqlite-vec>=0.1.6",    # C-optimized vector search extension for SQLite
+]
 
 [build-system]
 requires = ["setuptools>=61.0", "wheel"]

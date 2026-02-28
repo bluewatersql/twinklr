@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
+from typing import Any
 
 from twinklr.core.agents.sequencer.group_planner.holistic import (
     HolisticEvaluation,
@@ -155,7 +156,7 @@ class HolisticEvaluatorStage:
                 if status == VS.HARD_FAIL:
                     logger.warning(
                         "Holistic evaluation HARD_FAIL (score=%.1f) — blocking pipeline",
-                        evaluation.score if hasattr(evaluation, "score") else 0.0,
+                        getattr(evaluation, "score", 0.0),
                     )
                     return failure_result(
                         f"Holistic evaluation HARD_FAIL: "
@@ -209,7 +210,7 @@ class HolisticEvaluatorStage:
         if output_dir is None:
             return
 
-        sections: list[dict[str, object]] = []
+        sections: list[dict[str, Any]] = []
         for key, value in sorted(context.state.items()):
             if not key.startswith("group_planner_") or not key.endswith("_result"):
                 continue
@@ -220,6 +221,9 @@ class HolisticEvaluatorStage:
             verdicts = list(getattr(result_ctx, "verdicts", []) or []) if result_ctx else []
             first_verdict = verdicts[0] if verdicts else None
             cache_meta = context.get_state(f"group_planner_{section_id}_cache_meta", {})
+
+            first_status = getattr(first_verdict, "status", None) if first_verdict else None
+            final_status = getattr(final_verdict, "status", None) if final_verdict else None
 
             sections.append(
                 {
@@ -233,15 +237,11 @@ class HolisticEvaluatorStage:
                     if result_ctx
                     else None,
                     "first_pass": {
-                        "status": getattr(first_verdict, "status", None).value
-                        if getattr(first_verdict, "status", None) is not None
-                        else None,
+                        "status": first_status.value if first_status is not None else None,
                         "score": getattr(first_verdict, "score", None) if first_verdict else None,
                     },
                     "final": {
-                        "status": getattr(final_verdict, "status", None).value
-                        if getattr(final_verdict, "status", None) is not None
-                        else None,
+                        "status": final_status.value if final_status is not None else None,
                         "score": getattr(final_verdict, "score", None) if final_verdict else None,
                     },
                 }

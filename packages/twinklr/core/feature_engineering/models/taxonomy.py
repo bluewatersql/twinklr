@@ -10,12 +10,20 @@ from pydantic import BaseModel, ConfigDict, Field
 class TaxonomyLabel(str, Enum):
     """Deterministic effect-function taxonomy labels."""
 
+    # V1 labels
     RHYTHM_DRIVER = "rhythm_driver"
     ACCENT_HIT = "accent_hit"
     SUSTAINER = "sustainer"
     TRANSITION = "transition"
     TEXTURE_BED = "texture_bed"
     MOTION_DRIVER = "motion_driver"
+    # V2 additions
+    FILL_WASH = "fill_wash"
+    SPARKLE_OVERLAY = "sparkle_overlay"
+    CHASE_PATTERN = "chase_pattern"
+    BURST_IMPACT = "burst_impact"
+    LAYER_BASE = "layer_base"
+    LAYER_ACCENT = "layer_accent"
 
 
 class TaxonomyLabelScore(BaseModel):

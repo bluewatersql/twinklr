@@ -1,4 +1,9 @@
-"""Deterministic support-based template miner (V1.5)."""
+"""Deterministic support-based template miner (V1.5).
+
+Supports both phrase-level mining (legacy) and stack-level mining (V2).
+Stack-level mining treats EffectStack as the atomic unit, producing
+MinedTemplate records with layer_count > 1 and populated stack_composition.
+"""
 
 from __future__ import annotations
 
@@ -7,6 +12,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 
 from twinklr.core.feature_engineering.models import EffectPhrase
+from twinklr.core.feature_engineering.models.stacks import EffectStack
 from twinklr.core.feature_engineering.models.taxonomy import (
     PhraseTaxonomyRecord,
     TargetRoleAssignment,
@@ -101,6 +107,254 @@ class TemplateMiner:
             total_phrase_count=total_phrase_count,
         )
         return content_catalog, orchestration_catalog
+
+    def mine_stacks(
+        self,
+        *,
+        stacks: tuple[EffectStack, ...],
+        taxonomy_rows: tuple[PhraseTaxonomyRecord, ...],
+        target_roles: tuple[TargetRoleAssignment, ...],
+    ) -> tuple[TemplateCatalog, TemplateCatalog]:
+        """Mine templates from effect stacks (V2 stack-aware mining).
+
+        Uses the stack_signature as the primary grouping key for content
+        templates, and enriches it with role/section for orchestration.
+
+        Args:
+            stacks: Detected effect stacks from EffectStackDetector.
+            taxonomy_rows: Taxonomy classification records for phrases.
+            target_roles: Target role assignments from discovery.
+
+        Returns:
+            Tuple of (content_catalog, orchestration_catalog).
+        """
+        taxonomy_by_phrase = {row.phrase_id: row for row in taxonomy_rows}
+        role_by_target = {
+            (row.package_id, row.sequence_file_id, row.target_name): row.role.value
+            for row in target_roles
+        }
+
+        all_phrases: list[EffectPhrase] = []
+        for stack in stacks:
+            for layer in stack.layers:
+                all_phrases.append(layer.phrase)
+
+        total_phrase_count = len(all_phrases)
+        total_distinct_packs = max(1, len({s.package_id for s in stacks}))
+
+        content_groups: dict[str, list[EffectPhrase]] = defaultdict(list)
+        orchestration_groups: dict[str, list[EffectPhrase]] = defaultdict(list)
+        stack_meta: dict[str, EffectStack] = {}
+
+        for stack in stacks:
+            content_sig = self._stack_content_signature(stack, taxonomy_by_phrase)
+            role = role_by_target.get(
+                (stack.package_id, stack.sequence_file_id, stack.target_name), "fallback"
+            )
+            orch_sig = self._stack_orchestration_signature(stack, taxonomy_by_phrase, role)
+
+            primary_phrase = stack.layers[0].phrase
+            content_groups[content_sig].append(primary_phrase)
+            orchestration_groups[orch_sig].append(primary_phrase)
+            stack_meta[content_sig] = stack
+            stack_meta[orch_sig] = stack
+
+        content_templates, content_assignment = self._finalize_stack_groups(
+            groups=content_groups,
+            stack_meta=stack_meta,
+            taxonomy_by_phrase=taxonomy_by_phrase,
+            role_by_target=role_by_target,
+            template_kind=TemplateKind.CONTENT,
+            total_phrase_count=total_phrase_count,
+            total_distinct_packs=total_distinct_packs,
+        )
+        orchestration_templates, orchestration_assignment = self._finalize_stack_groups(
+            groups=orchestration_groups,
+            stack_meta=stack_meta,
+            taxonomy_by_phrase=taxonomy_by_phrase,
+            role_by_target=role_by_target,
+            template_kind=TemplateKind.ORCHESTRATION,
+            total_phrase_count=total_phrase_count,
+            total_distinct_packs=total_distinct_packs,
+        )
+
+        phrase_tuple = tuple(all_phrases)
+        content_catalog = self._build_catalog(
+            template_kind=TemplateKind.CONTENT,
+            phrases=phrase_tuple,
+            templates=content_templates,
+            assignment_map=content_assignment,
+            total_phrase_count=total_phrase_count,
+        )
+        orchestration_catalog = self._build_catalog(
+            template_kind=TemplateKind.ORCHESTRATION,
+            phrases=phrase_tuple,
+            templates=orchestration_templates,
+            assignment_map=orchestration_assignment,
+            total_phrase_count=total_phrase_count,
+        )
+        return content_catalog, orchestration_catalog
+
+    def _finalize_stack_groups(
+        self,
+        *,
+        groups: dict[str, list[EffectPhrase]],
+        stack_meta: dict[str, EffectStack],
+        taxonomy_by_phrase: dict[str, PhraseTaxonomyRecord],
+        role_by_target: dict[tuple[str, str, str], str],
+        template_kind: TemplateKind,
+        total_phrase_count: int,
+        total_distinct_packs: int,
+    ) -> tuple[tuple[MinedTemplate, ...], dict[str, str]]:
+        """Finalize stack-grouped templates with stack metadata."""
+        templates: list[MinedTemplate] = []
+        assignments: dict[str, str] = {}
+
+        for signature in sorted(groups.keys()):
+            rows = groups[signature]
+            if len(rows) < self._options.min_instance_count:
+                continue
+
+            distinct_packs = {row.package_id for row in rows}
+            if len(distinct_packs) < self._options.min_distinct_pack_count:
+                continue
+
+            template_id = str(
+                uuid.uuid5(
+                    uuid.NAMESPACE_DNS,
+                    f"{template_kind.value}:stack:{signature}:{self._options.miner_version}",
+                )
+            )
+            for row in rows:
+                assignments[row.phrase_id] = template_id
+
+            first = rows[0]
+            onset_values = [
+                row.onset_sync_score
+                for row in rows
+                if row.onset_sync_score is not None and 0.0 <= row.onset_sync_score <= 1.0
+            ]
+            onset_sync_mean = (
+                round(sum(onset_values) / len(onset_values), 6) if onset_values else None
+            )
+
+            taxonomy_labels: set[str] = set()
+            for row in rows:
+                tax = taxonomy_by_phrase.get(row.phrase_id)
+                if tax is not None:
+                    taxonomy_labels.update(label.value for label in tax.labels)
+
+            role: str | None = None
+            if template_kind is TemplateKind.ORCHESTRATION:
+                role_counts: dict[str, int] = defaultdict(int)
+                for row in rows:
+                    key = (row.package_id, row.sequence_file_id, row.target_name)
+                    role_counts[role_by_target.get(key, "fallback")] += 1
+                ranked_roles = sorted(role_counts.items(), key=lambda item: (-item[1], item[0]))
+                role = ranked_roles[0][0] if ranked_roles else "fallback"
+
+            support_count = len(rows)
+            support_ratio = round(support_count / max(1, total_phrase_count), 6)
+            cross_pack_stability = round(len(distinct_packs) / max(1, total_distinct_packs), 6)
+
+            provenance = tuple(
+                TemplateProvenance(
+                    package_id=row.package_id,
+                    sequence_file_id=row.sequence_file_id,
+                    phrase_id=row.phrase_id,
+                    effect_event_id=row.effect_event_id,
+                )
+                for row in sorted(
+                    rows,
+                    key=lambda item: (item.package_id, item.sequence_file_id, item.phrase_id),
+                )[: self._options.max_provenance_per_template]
+            )
+
+            ref_stack = stack_meta.get(signature)
+            layer_count = ref_stack.layer_count if ref_stack else 1
+            stack_composition = (
+                tuple(ly.phrase.effect_family for ly in ref_stack.layers) if ref_stack else ()
+            )
+            layer_blend_modes = (
+                tuple(ly.blend_mode.value for ly in ref_stack.layers) if ref_stack else ()
+            )
+            layer_mixes = tuple(ly.mix for ly in ref_stack.layers) if ref_stack else ()
+
+            templates.append(
+                MinedTemplate(
+                    template_id=template_id,
+                    template_kind=template_kind,
+                    template_signature=signature,
+                    support_count=support_count,
+                    distinct_pack_count=len(distinct_packs),
+                    support_ratio=support_ratio,
+                    cross_pack_stability=cross_pack_stability,
+                    onset_sync_mean=onset_sync_mean,
+                    role=role,
+                    taxonomy_labels=tuple(sorted(taxonomy_labels)),
+                    effect_family=first.effect_family,
+                    motion_class=first.motion_class.value,
+                    color_class=first.color_class.value,
+                    energy_class=first.energy_class.value,
+                    continuity_class=first.continuity_class.value,
+                    spatial_class=first.spatial_class.value,
+                    provenance=provenance,
+                    layer_count=layer_count,
+                    stack_composition=stack_composition,
+                    layer_blend_modes=layer_blend_modes,
+                    layer_mixes=layer_mixes,
+                )
+            )
+
+        templates.sort(key=lambda row: row.template_id)
+        return tuple(templates), assignments
+
+    @staticmethod
+    def _stack_content_signature(
+        stack: EffectStack,
+        taxonomy_by_phrase: dict[str, PhraseTaxonomyRecord],
+    ) -> str:
+        """Build a content signature from a full stack.
+
+        Format: ``family@blend|family@blend|...::motion::color::energy::cont::spatial::labels``
+        """
+        layer_parts: list[str] = []
+        for layer in stack.layers:
+            blend = layer.blend_mode.value.lower()
+            layer_parts.append(f"{layer.phrase.effect_family}@{blend}")
+
+        primary = stack.layers[0].phrase
+        tax = taxonomy_by_phrase.get(primary.phrase_id)
+        labels = tuple(sorted(label.value for label in (tax.labels if tax else ())))
+
+        return "|".join(
+            (
+                "+".join(layer_parts),
+                primary.motion_class.value,
+                primary.color_class.value,
+                primary.energy_class.value,
+                primary.continuity_class.value,
+                primary.spatial_class.value,
+                ",".join(labels),
+            )
+        )
+
+    @staticmethod
+    def _stack_orchestration_signature(
+        stack: EffectStack,
+        taxonomy_by_phrase: dict[str, PhraseTaxonomyRecord],
+        role: str,
+    ) -> str:
+        """Build orchestration signature from a full stack."""
+        content_sig = TemplateMiner._stack_content_signature(stack, taxonomy_by_phrase)
+        return "|".join(
+            (
+                content_sig,
+                role,
+                str(stack.layers[0].phrase.layer_index),
+                stack.section_label or "",
+            )
+        )
 
     def _finalize_groups(
         self,

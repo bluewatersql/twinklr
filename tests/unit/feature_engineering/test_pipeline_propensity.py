@@ -67,6 +67,7 @@ def test_pipeline_skips_propensity_when_disabled(tmp_path: Path) -> None:
     options = FeatureEngineeringPipelineOptions(enable_propensity=False)
     pipeline = FeatureEngineeringPipeline(options=options)
 
-    result = pipeline._write_propensity(output_root=tmp_path, phrases=())
-    assert result is None
+    path, index = pipeline._write_propensity(output_root=tmp_path, phrases=())
+    assert path is None
+    assert index is None
     assert not (tmp_path / "propensity_index.json").exists()

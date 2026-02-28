@@ -46,6 +46,15 @@ from twinklr.core.feature_engineering.models.learned_taxonomy import (
     LearnedTaxonomyEvalReport,
     LearnedTaxonomyModel,
 )
+from twinklr.core.feature_engineering.models.metadata import (
+    DurationDistribution,
+    EffectMetadataProfile,
+    EffectMetadataProfiles,
+    LayeringBehavior,
+    ParamFrequency,
+    ParamProfile,
+    SectionPlacement,
+)
 from twinklr.core.feature_engineering.models.motifs import (
     MinedMotif,
     MotifCatalog,
@@ -77,6 +86,11 @@ from twinklr.core.feature_engineering.models.retrieval import (
     TemplateRecommendation,
     TemplateRetrievalIndex,
 )
+from twinklr.core.feature_engineering.models.stacks import (
+    EffectStack,
+    EffectStackCatalog,
+    EffectStackLayer,
+)
 from twinklr.core.feature_engineering.models.style import (
     ColorStyleProfile,
     LayeringStyleProfile,
@@ -106,12 +120,22 @@ from twinklr.core.feature_engineering.models.templates import (
     TemplateKind,
     TemplateProvenance,
 )
+from twinklr.core.feature_engineering.models.temporal_motifs import (
+    TemporalMotif,
+    TemporalMotifCatalog,
+    TemporalMotifStep,
+)
 from twinklr.core.feature_engineering.models.transitions import (
     TransitionAnomaly,
     TransitionEdge,
     TransitionGraph,
     TransitionRecord,
     TransitionType,
+)
+from twinklr.core.feature_engineering.models.vocabulary import (
+    CompoundEnergyTerm,
+    CompoundMotionTerm,
+    VocabularyExtensions,
 )
 
 __all__ = [
@@ -192,4 +216,23 @@ __all__ = [
     "TemplateDiagnosticRow",
     "TemplateDiagnosticsReport",
     "TemplateDiagnosticThresholds",
+    "EffectStack",
+    "EffectStackCatalog",
+    "EffectStackLayer",
+    # temporal motifs
+    "TemporalMotif",
+    "TemporalMotifCatalog",
+    "TemporalMotifStep",
+    # metadata profiles
+    "DurationDistribution",
+    "EffectMetadataProfile",
+    "EffectMetadataProfiles",
+    "LayeringBehavior",
+    "ParamFrequency",
+    "ParamProfile",
+    "SectionPlacement",
+    # vocabulary extensions
+    "CompoundEnergyTerm",
+    "CompoundMotionTerm",
+    "VocabularyExtensions",
 ]

@@ -5,6 +5,21 @@ from __future__ import annotations
 from pydantic import BaseModel, ConfigDict, Field
 
 
+class TargetLayerProfile(BaseModel):
+    """Per-target layering profile within a sequence."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    target_name: str
+    phrase_count: int = Field(ge=0)
+    max_concurrent_layers: int = Field(ge=0)
+    mean_concurrent_layers: float = Field(ge=0.0)
+    dominant_layer_count: int = Field(
+        ge=1,
+        description="Most common number of concurrent layers on this target",
+    )
+
+
 class LayeringFeatureRow(BaseModel):
     """Sequence-level layering feature summary."""
 
@@ -22,3 +37,8 @@ class LayeringFeatureRow(BaseModel):
     overlap_pairs: int = Field(ge=0)
     same_target_overlap_pairs: int = Field(ge=0)
     collision_score: float = Field(ge=0.0, le=1.0)
+
+    target_layer_profiles: tuple[TargetLayerProfile, ...] = Field(
+        default=(),
+        description="Per-target stack profiling (populated by V1.8+)",
+    )

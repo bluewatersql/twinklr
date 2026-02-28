@@ -13,11 +13,11 @@ Rules are categorized as:
 
 from __future__ import annotations
 
-import json
-import sys
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
+import json
 from pathlib import Path
+import sys
 
 
 @dataclass
@@ -255,38 +255,186 @@ def main():
 
     rules = [
         # Schema rules (clearly valid)
-        RuleResult("UNKNOWN_GROUP", "SCHEMA", "Target group ID must exist in ChoreographyGraph", False, "N/A", "Data integrity — always valid"),
-        RuleResult("UNKNOWN_ZONE", "SCHEMA", "Zone target must be valid ChoreoTag", False, "N/A", "Data integrity — always valid"),
-        RuleResult("UNKNOWN_SPLIT", "SCHEMA", "Split target must be valid SplitDimension", False, "N/A", "Data integrity — always valid"),
-        RuleResult("UNKNOWN_TEMPLATE", "SCHEMA", "Template must exist in catalog", False, "N/A", "Data integrity — always valid"),
-        RuleResult("TEMPLATE_LANE_MISMATCH", "SCHEMA", "Template must be compatible with lane", False, "N/A", "Data integrity — always valid"),
-        RuleResult("INVALID_INTENSITY_LEVEL", "SCHEMA", "Intensity must be valid enum", False, "N/A", "Data integrity — always valid"),
-        RuleResult("INVALID_DURATION", "SCHEMA", "Duration must be valid enum", False, "N/A", "Data integrity — always valid"),
-        RuleResult("INVALID_PLANNING_TIMEREF", "SCHEMA", "Time ref must be resolvable", False, "N/A", "Data integrity — always valid"),
-        RuleResult("SEQUENCED_MISSING_WINDOW_CONFIG", "SCHEMA", "SEQUENCED mode requires window+config", False, "N/A", "Structural requirement — always valid"),
-        RuleResult("CALL_RESPONSE_MISSING_GROUP_ORDER", "SCHEMA", "CALL_RESPONSE requires group_order", False, "N/A", "Structural requirement — always valid"),
-        RuleResult("DUPLICATE_GROUP_ORDER", "SCHEMA", "No duplicates in group_order", False, "N/A", "Data integrity — always valid"),
-        RuleResult("SEQUENCED_CONFIG_GROUP_MISMATCH", "SCHEMA", "group_order entries must be in targets", False, "N/A", "Data integrity — always valid"),
+        RuleResult(
+            "UNKNOWN_GROUP",
+            "SCHEMA",
+            "Target group ID must exist in ChoreographyGraph",
+            False,
+            "N/A",
+            "Data integrity — always valid",
+        ),
+        RuleResult(
+            "UNKNOWN_ZONE",
+            "SCHEMA",
+            "Zone target must be valid ChoreoTag",
+            False,
+            "N/A",
+            "Data integrity — always valid",
+        ),
+        RuleResult(
+            "UNKNOWN_SPLIT",
+            "SCHEMA",
+            "Split target must be valid SplitDimension",
+            False,
+            "N/A",
+            "Data integrity — always valid",
+        ),
+        RuleResult(
+            "UNKNOWN_TEMPLATE",
+            "SCHEMA",
+            "Template must exist in catalog",
+            False,
+            "N/A",
+            "Data integrity — always valid",
+        ),
+        RuleResult(
+            "TEMPLATE_LANE_MISMATCH",
+            "SCHEMA",
+            "Template must be compatible with lane",
+            False,
+            "N/A",
+            "Data integrity — always valid",
+        ),
+        RuleResult(
+            "INVALID_INTENSITY_LEVEL",
+            "SCHEMA",
+            "Intensity must be valid enum",
+            False,
+            "N/A",
+            "Data integrity — always valid",
+        ),
+        RuleResult(
+            "INVALID_DURATION",
+            "SCHEMA",
+            "Duration must be valid enum",
+            False,
+            "N/A",
+            "Data integrity — always valid",
+        ),
+        RuleResult(
+            "INVALID_PLANNING_TIMEREF",
+            "SCHEMA",
+            "Time ref must be resolvable",
+            False,
+            "N/A",
+            "Data integrity — always valid",
+        ),
+        RuleResult(
+            "SEQUENCED_MISSING_WINDOW_CONFIG",
+            "SCHEMA",
+            "SEQUENCED mode requires window+config",
+            False,
+            "N/A",
+            "Structural requirement — always valid",
+        ),
+        RuleResult(
+            "CALL_RESPONSE_MISSING_GROUP_ORDER",
+            "SCHEMA",
+            "CALL_RESPONSE requires group_order",
+            False,
+            "N/A",
+            "Structural requirement — always valid",
+        ),
+        RuleResult(
+            "DUPLICATE_GROUP_ORDER",
+            "SCHEMA",
+            "No duplicates in group_order",
+            False,
+            "N/A",
+            "Data integrity — always valid",
+        ),
+        RuleResult(
+            "SEQUENCED_CONFIG_GROUP_MISMATCH",
+            "SCHEMA",
+            "group_order entries must be in targets",
+            False,
+            "N/A",
+            "Data integrity — always valid",
+        ),
         # Timing rules (clearly valid)
-        RuleResult("PLACEMENT_OUTSIDE_SECTION", "TIMING", "Placement start must be within section bounds", False, "N/A", "Physical constraint — always valid"),
-        RuleResult("WINDOW_OUTSIDE_SECTION", "TIMING", "Window start must be within section bounds", False, "N/A", "Physical constraint — always valid"),
+        RuleResult(
+            "PLACEMENT_OUTSIDE_SECTION",
+            "TIMING",
+            "Placement start must be within section bounds",
+            False,
+            "N/A",
+            "Physical constraint — always valid",
+        ),
+        RuleResult(
+            "WINDOW_OUTSIDE_SECTION",
+            "TIMING",
+            "Window start must be within section bounds",
+            False,
+            "N/A",
+            "Physical constraint — always valid",
+        ),
         # Overlap rules (NEED CHECK)
-        RuleResult("TARGET_SELF_OVERLAP", "OVERLAP", "Same target must not overlap itself within same lane", True),
-        RuleResult("TARGET_SELF_OVERLAP_MINOR", "OVERLAP", "Minor same-target overlap within lane (warning)", True),
-        RuleResult("WITHIN_COORDINATION_OVERLAP", "OVERLAP", "Same target must not overlap within same coordination plan", True),
+        RuleResult(
+            "TARGET_SELF_OVERLAP",
+            "OVERLAP",
+            "Same target must not overlap itself within same lane",
+            True,
+        ),
+        RuleResult(
+            "TARGET_SELF_OVERLAP_MINOR",
+            "OVERLAP",
+            "Minor same-target overlap within lane (warning)",
+            True,
+        ),
+        RuleResult(
+            "WITHIN_COORDINATION_OVERLAP",
+            "OVERLAP",
+            "Same target must not overlap within same coordination plan",
+            True,
+        ),
         # Ownership rules (NEED CHECK)
-        RuleResult("TARGET_IN_MULTIPLE_COORDINATION_PLANS_IN_LANE", "OWNERSHIP", "Same target must be in only one coordination plan per lane", True),
+        RuleResult(
+            "TARGET_IN_MULTIPLE_COORDINATION_PLANS_IN_LANE",
+            "OWNERSHIP",
+            "Same target must be in only one coordination plan per lane",
+            True,
+        ),
         # Diversity rules (NEED CHECK)
-        RuleResult("INSUFFICIENT_UNIQUE_TEMPLATES", "DIVERSITY", "Minimum unique templates per lane", True),
+        RuleResult(
+            "INSUFFICIENT_UNIQUE_TEMPLATES", "DIVERSITY", "Minimum unique templates per lane", True
+        ),
         RuleResult("TEMPLATE_OVERUSED", "DIVERSITY", "Maximum uses per template", True),
-        RuleResult("CONSECUTIVE_REUSE_VIOLATION", "DIVERSITY", "No consecutive same template", True),
-        RuleResult("TOP_HEAVY_DISTRIBUTION", "DIVERSITY", "Top 2 templates can't dominate (warning)", True),
+        RuleResult(
+            "CONSECUTIVE_REUSE_VIOLATION", "DIVERSITY", "No consecutive same template", True
+        ),
+        RuleResult(
+            "TOP_HEAVY_DISTRIBUTION", "DIVERSITY", "Top 2 templates can't dominate (warning)", True
+        ),
         # Judge-only rules (NEED CHECK)
-        RuleResult("JUDGE:ACCENT_SELF_OVERLAP_HARD_FAIL", "OVERLAP", "Section judge: ACCENT same-target overlap is automatic HARD_FAIL", True),
-        RuleResult("JUDGE:COORD_PLAN_OWNERSHIP_HARD_FAIL", "OWNERSHIP", "Section judge: target in multiple coord plans same lane is HARD_FAIL", True),
+        RuleResult(
+            "JUDGE:ACCENT_SELF_OVERLAP_HARD_FAIL",
+            "OVERLAP",
+            "Section judge: ACCENT same-target overlap is automatic HARD_FAIL",
+            True,
+        ),
+        RuleResult(
+            "JUDGE:COORD_PLAN_OWNERSHIP_HARD_FAIL",
+            "OWNERSHIP",
+            "Section judge: target in multiple coord plans same lane is HARD_FAIL",
+            True,
+        ),
         # Warnings (already advisory)
-        RuleResult("IDENTICAL_ACCENT_ON_PRIMARIES", "QUALITY", "All primaries with identical accent (warning)", False, "N/A", "Advisory only — already a warning"),
-        RuleResult("TIMING_DRIVER_MISMATCH", "QUALITY", "timing_driver doesn't match placements (warning)", False, "N/A", "Advisory only — already a warning"),
+        RuleResult(
+            "IDENTICAL_ACCENT_ON_PRIMARIES",
+            "QUALITY",
+            "All primaries with identical accent (warning)",
+            False,
+            "N/A",
+            "Advisory only — already a warning",
+        ),
+        RuleResult(
+            "TIMING_DRIVER_MISMATCH",
+            "QUALITY",
+            "timing_driver doesn't match placements (warning)",
+            False,
+            "N/A",
+            "Advisory only — already a warning",
+        ),
     ]
 
     for r in rules:
@@ -350,7 +498,9 @@ def main():
 
     overlap_pct = round(total_overlap_tl / total_tl * 100, 1) if total_tl else 0
     print("  " + "-" * 60)
-    print(f"  {'TOTAL':<14} {total_tl:>13} {total_overlap_tl:>12} {overlap_pct:>6.1f}% {total_overlaps:>9}")
+    print(
+        f"  {'TOTAL':<14} {total_tl:>13} {total_overlap_tl:>12} {overlap_pct:>6.1f}% {total_overlaps:>9}"
+    )
     print()
     if overlap_pct > 10:
         print(f"  >> VERDICT: Same-layer self-overlap is COMMON ({overlap_pct}%).")
@@ -411,8 +561,10 @@ def main():
     print("TEST: DIVERSITY RULES (INSUFFICIENT_UNIQUE_TEMPLATES, TEMPLATE_OVERUSED,")
     print("      CONSECUTIVE_REUSE_VIOLATION, TOP_HEAVY_DISTRIBUTION)")
     print("-" * 100)
-    print(f"  {'Profile':<14} {'Effects':>8} {'Unique':>7} {'MaxUse':>7} {'Max%':>6} "
-          f"{'Top2%':>6} {'MaxConsec':>10}")
+    print(
+        f"  {'Profile':<14} {'Effects':>8} {'Unique':>7} {'MaxUse':>7} {'Max%':>6} "
+        f"{'Top2%':>6} {'MaxConsec':>10}"
+    )
     print("  " + "-" * 65)
 
     for r in all_diversity:
@@ -433,20 +585,22 @@ def main():
 
     # Aggregate diversity stats
     if all_diversity:
-        avg_unique = sum(r.get("unique_effects", 0) for r in all_diversity if r.get("total_effects")) / len(
-            [r for r in all_diversity if r.get("total_effects")]
+        avg_unique = sum(
+            r.get("unique_effects", 0) for r in all_diversity if r.get("total_effects")
+        ) / len([r for r in all_diversity if r.get("total_effects")])
+        avg_max = sum(
+            r.get("max_uses_single", 0) for r in all_diversity if r.get("total_effects")
+        ) / len([r for r in all_diversity if r.get("total_effects")])
+        avg_top2 = sum(
+            r.get("top2_share", 0) for r in all_diversity if r.get("total_effects")
+        ) / len([r for r in all_diversity if r.get("total_effects")])
+        avg_consec = sum(
+            r.get("max_consecutive_same", 0) for r in all_diversity if r.get("total_effects")
+        ) / len([r for r in all_diversity if r.get("total_effects")])
+        print(
+            f"  Averages: unique={avg_unique:.0f}, max_uses={avg_max:.0f}, "
+            f"top2={avg_top2:.1f}%, max_consecutive={avg_consec:.1f}"
         )
-        avg_max = sum(r.get("max_uses_single", 0) for r in all_diversity if r.get("total_effects")) / len(
-            [r for r in all_diversity if r.get("total_effects")]
-        )
-        avg_top2 = sum(r.get("top2_share", 0) for r in all_diversity if r.get("total_effects")) / len(
-            [r for r in all_diversity if r.get("total_effects")]
-        )
-        avg_consec = sum(r.get("max_consecutive_same", 0) for r in all_diversity if r.get("total_effects")) / len(
-            [r for r in all_diversity if r.get("total_effects")]
-        )
-        print(f"  Averages: unique={avg_unique:.0f}, max_uses={avg_max:.0f}, "
-              f"top2={avg_top2:.1f}%, max_consecutive={avg_consec:.1f}")
 
     # --- Cross-layer (recap) ---
     print()

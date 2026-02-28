@@ -51,11 +51,13 @@ from twinklr.core.feature_engineering.models import (
 )
 from twinklr.core.feature_engineering.models.clustering import TemplateClusterCatalog
 from twinklr.core.feature_engineering.models.motifs import MotifCatalog
+from twinklr.core.feature_engineering.models.propensity import PropensityIndex
 from twinklr.core.feature_engineering.motifs import MotifMiner, MotifMinerOptions
 from twinklr.core.feature_engineering.phrase_encoder import PhraseEncoder
 from twinklr.core.feature_engineering.promotion import PromotionPipeline
 from twinklr.core.feature_engineering.propensity import PropensityMiner
 from twinklr.core.feature_engineering.retrieval import TemplateRetrievalRanker
+from twinklr.core.feature_engineering.stack_detector import EffectStackDetector
 from twinklr.core.feature_engineering.style import StyleFingerprintExtractor
 from twinklr.core.feature_engineering.taxonomy import (
     LearnedTaxonomyTrainer,
@@ -90,6 +92,7 @@ class FeatureEngineeringPipelineOptions:
     enable_template_retrieval_ranking: bool = True
     enable_template_diagnostics: bool = True
     enable_v2_motif_mining: bool = True
+    enable_v2_temporal_motif_mining: bool = True
     enable_v2_clustering: bool = True
     enable_v2_learned_taxonomy: bool = True
     enable_v2_ann_retrieval: bool = True
@@ -108,6 +111,7 @@ class FeatureEngineeringPipelineOptions:
     enable_color_arc: bool = True
     enable_propensity: bool = True
     enable_style_fingerprint: bool = True
+    enable_stack_detection: bool = True
     enable_quality_gates: bool = True
     enable_recipe_promotion: bool = True
     recipe_promotion_min_support: int = 5
@@ -192,6 +196,7 @@ class FeatureEngineeringPipeline:
                 max_avg_query_latency_ms=self._options.v2_retrieval_max_avg_latency_ms,
             )
         )
+        self._stack_detector = EffectStackDetector()
         self._macro_adapter_builder = MacroAdapterBuilder()
         self._group_adapter_builder = GroupAdapterBuilder()
         self._layering = LayeringFeatureExtractor()
@@ -461,13 +466,13 @@ class FeatureEngineeringPipeline:
         *,
         output_root: Path,
         phrases: tuple[EffectPhrase, ...],
-    ) -> Path | None:
+    ) -> tuple[Path | None, PropensityIndex | None]:
         if not self._options.enable_propensity or not phrases:
-            return None
+            return None, None
         index = self._propensity_miner.mine(phrases=phrases)
         output_path = output_root / "propensity_index.json"
         self._writer._write_json(output_path, index.model_dump(mode="json"))
-        return output_path
+        return output_path, index
 
     def _write_style_fingerprint(
         self,
@@ -502,11 +507,21 @@ class FeatureEngineeringPipeline:
     ) -> tuple[TemplateCatalog, TemplateCatalog] | None:
         if not self._options.enable_template_mining or not phrases:
             return None
-        content_catalog, orchestration_catalog = self._template_miner.mine(
-            phrases=phrases,
-            taxonomy_rows=taxonomy_rows,
-            target_roles=target_roles,
-        )
+
+        if self._options.enable_stack_detection:
+            stacks = self._stack_detector.detect(phrases=phrases)
+            self._writer.write_stack_catalog(output_root, stacks)
+            content_catalog, orchestration_catalog = self._template_miner.mine_stacks(
+                stacks=stacks,
+                taxonomy_rows=taxonomy_rows,
+                target_roles=target_roles,
+            )
+        else:
+            content_catalog, orchestration_catalog = self._template_miner.mine(
+                phrases=phrases,
+                taxonomy_rows=taxonomy_rows,
+                target_roles=target_roles,
+            )
         self._writer.write_content_templates(output_root, content_catalog)
         self._writer.write_orchestration_templates(output_root, orchestration_catalog)
         return content_catalog, orchestration_catalog
@@ -551,7 +566,9 @@ class FeatureEngineeringPipeline:
         if color_arc_path is not None:
             manifest["color_arc"] = str(color_arc_path)
 
-        propensity_path = self._write_propensity(output_root=output_root, phrases=phrases)
+        propensity_path, propensity_index = self._write_propensity(
+            output_root=output_root, phrases=phrases
+        )
         if propensity_path is not None:
             manifest["propensity_index"] = str(propensity_path)
 
@@ -637,6 +654,7 @@ class FeatureEngineeringPipeline:
                 template_catalogs=template_catalogs,
                 motif_catalog=motif_catalog,
                 cluster_catalog=cluster_catalog,
+                propensity_index=propensity_index,
             )
             if recipe_path is not None:
                 manifest["recipe_catalog"] = str(recipe_path)
@@ -683,6 +701,7 @@ class FeatureEngineeringPipeline:
         template_catalogs: tuple[TemplateCatalog, TemplateCatalog],
         motif_catalog: MotifCatalog | None,
         cluster_catalog: TemplateClusterCatalog | None,
+        propensity_index: PropensityIndex | None = None,
     ) -> Path | None:
         """Run promotion pipeline and persist recipe catalog."""
         candidates = list(template_catalogs[0].templates) + list(template_catalogs[1].templates)
@@ -700,6 +719,7 @@ class FeatureEngineeringPipeline:
                 for c in cluster_catalog.clusters
             ]
 
+        use_stack = self._options.enable_stack_detection
         pipeline = PromotionPipeline()
         result = pipeline.run(
             candidates,
@@ -707,6 +727,8 @@ class FeatureEngineeringPipeline:
             min_stability=self._options.recipe_promotion_min_stability,
             clusters=clusters,
             motif_catalog=motif_catalog,
+            propensity_index=propensity_index,
+            use_stack_synthesis=use_stack,
         )
         if not result.promoted_recipes:
             return None

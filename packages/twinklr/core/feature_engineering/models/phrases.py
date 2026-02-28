@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from enum import Enum
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -83,3 +84,20 @@ class EffectPhrase(BaseModel):
     onset_sync_score: float | None = Field(default=None, ge=0.0, le=1.0)
 
     param_signature: str
+
+    # Structured parameters preserved from effectdb for stack construction.
+    # Optional for backward compatibility — populated by PhraseEncoder V1.3+.
+    preserved_params: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Structured effect parameters from effectdb",
+    )
+    blend_mode: str | None = Field(
+        default=None,
+        description="Blend mode from source XSQ layer",
+    )
+    mix: float | None = Field(
+        default=None,
+        ge=0.0,
+        le=1.0,
+        description="Mix level from source XSQ layer",
+    )

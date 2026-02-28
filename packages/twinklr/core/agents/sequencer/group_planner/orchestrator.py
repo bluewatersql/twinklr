@@ -654,9 +654,7 @@ class GroupPlannerOrchestrator:
                     CoordinationMode.RIPPLE,
                 ):
                     for target in coord_plan.targets:
-                        window_target_ids.add(
-                            f"{target.type.value}:{target.id}"
-                        )
+                        window_target_ids.add(f"{target.type.value}:{target.id}")
 
             if not window_target_ids:
                 continue
@@ -690,11 +688,7 @@ class GroupPlannerOrchestrator:
         timing_ctx = section_context.timing_context
         section_end_ms = section_context.end_ms
         return max(
-            (
-                bar
-                for bar, info in timing_ctx.bar_map.items()
-                if info.start_ms < section_end_ms
-            ),
+            (bar for bar, info in timing_ctx.bar_map.items() if info.start_ms < section_end_ms),
             default=max(timing_ctx.bar_map.keys()),
         )
 
@@ -737,8 +731,7 @@ class GroupPlannerOrchestrator:
                     dropped = original_count - len(kept)
                     if dropped:
                         logger.debug(
-                            "Dropped %d out-of-bounds placement(s) in %s/%s "
-                            "(section_end=%dms)",
+                            "Dropped %d out-of-bounds placement(s) in %s/%s (section_end=%dms)",
                             dropped,
                             section_context.section_id,
                             lane_plan.lane.value,
@@ -749,9 +742,7 @@ class GroupPlannerOrchestrator:
                 if coord_plan.window and coord_plan.window.end.bar > max_valid_bar:
                     old_end = coord_plan.window.end.bar
                     clamped_end = PlanningTimeRef(bar=max_valid_bar, beat=1)
-                    coord_plan.window = coord_plan.window.model_copy(
-                        update={"end": clamped_end}
-                    )
+                    coord_plan.window = coord_plan.window.model_copy(update={"end": clamped_end})
                     logger.debug(
                         "Clamped window end bar %d→%d in %s/%s",
                         old_end,

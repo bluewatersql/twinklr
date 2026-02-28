@@ -419,6 +419,10 @@ def _shape_recipe_catalog(section_context: SectionPlanningContext) -> dict[str, 
     Their IDs are valid ``template_id`` values — the renderer handles
     multi-layer composition transparently.
 
+    Surfaces per-layer composition detail so the LLM understands
+    each recipe's visual structure (e.g. "ColorWash(bg) + Bars(mid,add@70%)
+    + Sparkle(fg,screen@45%)").
+
     Args:
         section_context: Section planning context with optional recipe_catalog.
 
@@ -430,8 +434,21 @@ def _shape_recipe_catalog(section_context: SectionPlanningContext) -> dict[str, 
 
     entries = []
     for recipe in section_context.recipe_catalog.recipes:
-        # Collect unique effect types across layers
-        effect_types = list(dict.fromkeys(layer.effect_type for layer in recipe.layers))
+        layer_details: list[dict[str, Any]] = []
+        for layer in recipe.layers:
+            layer_info: dict[str, Any] = {
+                "effect_type": layer.effect_type,
+                "depth": layer.layer_depth.value,
+                "blend_mode": layer.blend_mode.value,
+                "mix": layer.mix,
+            }
+            layer_details.append(layer_info)
+
+        composition_summary = " + ".join(
+            f"{ld['effect_type']}({ld['depth'][:3].lower()}"
+            f",{ld['blend_mode'].lower()}@{int(ld['mix'] * 100)}%)"
+            for ld in layer_details
+        )
 
         entry: dict[str, Any] = {
             "recipe_id": recipe.recipe_id,
@@ -439,7 +456,8 @@ def _shape_recipe_catalog(section_context: SectionPlanningContext) -> dict[str, 
             "template_type": recipe.template_type.value,
             "visual_intent": recipe.visual_intent.value,
             "layer_count": len(recipe.layers),
-            "effect_types": effect_types,
+            "composition": composition_summary,
+            "layers": layer_details,
             "tags": recipe.tags,
             "model_affinities": [
                 {"model_type": a.model_type, "score": a.score} for a in recipe.model_affinities
@@ -872,13 +890,15 @@ def shape_holistic_corrector_context(
                         tids.append(cp.window.template_id)
                 template_ids_by_lane[lp.lane.value] = tids
 
-            section_summaries.append({
-                "section_id": section.section_id,
-                "theme": section.theme.model_dump() if section.theme else None,
-                "palette": section.palette.model_dump() if section.palette else None,
-                "motif_ids": section.motif_ids,
-                "template_ids_by_lane": template_ids_by_lane,
-            })
+            section_summaries.append(
+                {
+                    "section_id": section.section_id,
+                    "theme": section.theme.model_dump() if section.theme else None,
+                    "palette": section.palette.model_dump() if section.palette else None,
+                    "motif_ids": section.motif_ids,
+                    "template_ids_by_lane": template_ids_by_lane,
+                }
+            )
 
     variables: dict[str, Any] = {
         "affected_sections_json": json.dumps(affected_sections_data, indent=2, default=str),

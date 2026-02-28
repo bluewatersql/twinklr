@@ -215,8 +215,7 @@ class SectionPlanValidator:
                     CoordinationMode.RIPPLE,
                 }
                 uses_window = (
-                    coord_plan.coordination_mode in _window_modes
-                    and coord_plan.window is not None
+                    coord_plan.coordination_mode in _window_modes and coord_plan.window is not None
                 )
 
                 # Validate placements

@@ -63,6 +63,21 @@ class MinedTemplate(BaseModel):
 
     provenance: tuple[TemplateProvenance, ...] = ()
 
+    # Stack-level metadata (populated by stack-aware miner V2+).
+    layer_count: int = Field(default=1, ge=1, description="Layers in the stack unit")
+    stack_composition: tuple[str, ...] = Field(
+        default=(),
+        description="Ordered effect families in the stack (e.g. ('color_wash', 'bars', 'sparkle'))",
+    )
+    layer_blend_modes: tuple[str, ...] = Field(
+        default=(),
+        description="Blend modes per layer in order",
+    )
+    layer_mixes: tuple[float, ...] = Field(
+        default=(),
+        description="Mix levels per layer in order",
+    )
+
 
 class TemplateCatalog(BaseModel):
     """Serialized template catalog artifact."""

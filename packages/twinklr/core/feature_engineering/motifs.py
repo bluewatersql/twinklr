@@ -14,6 +14,11 @@ from twinklr.core.feature_engineering.models.motifs import (
 from twinklr.core.feature_engineering.models.phrases import EffectPhrase
 from twinklr.core.feature_engineering.models.taxonomy import PhraseTaxonomyRecord
 from twinklr.core.feature_engineering.models.templates import TemplateCatalog
+from twinklr.core.feature_engineering.models.temporal_motifs import (
+    TemporalMotif,
+    TemporalMotifCatalog,
+    TemporalMotifStep,
+)
 
 
 @dataclass(frozen=True)
@@ -192,3 +197,221 @@ class MotifMiner:
 
         signature = "|".join((f"span={span}", ",".join(tokens)))
         return signature, template_ids, taxonomy_labels
+
+    # ------------------------------------------------------------------
+    # Temporal (ordered) motif mining — Spec 03
+    # ------------------------------------------------------------------
+
+    def mine_temporal(
+        self,
+        *,
+        phrases: tuple[EffectPhrase, ...],
+        content_catalog: TemplateCatalog,
+        orchestration_catalog: TemplateCatalog,
+    ) -> TemporalMotifCatalog:
+        """Mine ordered n-gram motifs from per-target template streams."""
+        template_by_phrase: dict[str, str] = {}
+        for assignment in content_catalog.assignments:
+            template_by_phrase[assignment.phrase_id] = assignment.template_id
+        for assignment in orchestration_catalog.assignments:
+            template_by_phrase[assignment.phrase_id] = assignment.template_id
+
+        # Step 1: build per-target template streams keyed by
+        # (package_id, sequence_file_id, target_name).
+        stream_key = tuple[str, str, str]
+        by_stream: dict[stream_key, list[EffectPhrase]] = defaultdict(list)
+        for phrase in phrases:
+            key: stream_key = (
+                phrase.package_id,
+                phrase.sequence_file_id,
+                phrase.target_name,
+            )
+            by_stream[key].append(phrase)
+
+        # Deduplicate sequences for counting.
+        all_sequences: set[tuple[str, str]] = {
+            (phrase.package_id, phrase.sequence_file_id) for phrase in phrases
+        }
+
+        # Step 2-3: extract n-grams and build temporal signatures.
+        _SigData = tuple[
+            MotifOccurrence,
+            tuple[TemporalMotifStep, ...],
+        ]
+        signatures: dict[str, list[_SigData]] = defaultdict(list)
+
+        for (pkg, seq, _target), stream_phrases in by_stream.items():
+            ordered = sorted(
+                stream_phrases,
+                key=lambda p: (p.start_ms, p.phrase_id),
+            )
+            if len(ordered) < 2:
+                continue
+
+            for n in range(2, min(len(ordered) + 1, 6)):  # n=2..5
+                for i in range(len(ordered) - n + 1):
+                    window = ordered[i : i + n]
+                    sig, steps = self._build_temporal_signature(
+                        window=window,
+                        template_by_phrase=template_by_phrase,
+                    )
+                    occ = MotifOccurrence(
+                        package_id=pkg,
+                        sequence_file_id=seq,
+                        start_bar_index=0,
+                        end_bar_index=0,
+                        start_ms=window[0].start_ms,
+                        end_ms=window[-1].end_ms,
+                        phrase_count=len(window),
+                    )
+                    signatures[sig].append((occ, steps))
+
+        # Step 4: count support and filter.
+        motifs: list[TemporalMotif] = []
+        for sig in sorted(signatures):
+            sig_rows = signatures[sig]
+            if len(sig_rows) < self._options.min_support_count:
+                continue
+
+            occurrences = [row[0] for row in sig_rows]
+            distinct_packs = {occ.package_id for occ in occurrences}
+            distinct_seqs = {(occ.package_id, occ.sequence_file_id) for occ in occurrences}
+            if len(distinct_packs) < self._options.min_distinct_pack_count:
+                continue
+            if len(distinct_seqs) < self._options.min_distinct_sequence_count:
+                continue
+
+            steps = sig_rows[0][1]
+            energy_seq = [s.energy_class for s in steps]
+            pattern_name = self._classify_energy_pattern(energy_seq)
+
+            motif_id = str(
+                uuid.uuid5(
+                    uuid.NAMESPACE_DNS,
+                    f"temporal_motif_v1:{sig}",
+                )
+            )
+            sorted_occs = sorted(
+                occurrences,
+                key=lambda o: (
+                    o.package_id,
+                    o.sequence_file_id,
+                    o.start_ms,
+                ),
+            )[: self._options.max_occurrences_per_motif]
+
+            motifs.append(
+                TemporalMotif(
+                    motif_id=motif_id,
+                    temporal_signature=sig,
+                    pattern_name=pattern_name,
+                    sequence_length=len(steps),
+                    steps=steps,
+                    support_count=len(occurrences),
+                    distinct_pack_count=len(distinct_packs),
+                    distinct_sequence_count=len(distinct_seqs),
+                    occurrences=tuple(sorted_occs),
+                )
+            )
+
+        motifs.sort(key=lambda m: m.motif_id)
+        return TemporalMotifCatalog(
+            total_sequences=len(all_sequences),
+            total_temporal_motifs=len(motifs),
+            motifs=tuple(motifs),
+        )
+
+    @staticmethod
+    def _gap_bucket(gap_ms: int) -> str:
+        """Classify inter-phrase gap into a named bucket."""
+        if gap_ms < 100:
+            return "immediate"
+        if gap_ms < 500:
+            return "short"
+        if gap_ms <= 2000:
+            return "medium"
+        return "long"
+
+    @classmethod
+    def _build_temporal_signature(
+        cls,
+        *,
+        window: list[EffectPhrase],
+        template_by_phrase: dict[str, str],
+    ) -> tuple[str, tuple[TemporalMotifStep, ...]]:
+        """Build an ordered temporal signature and steps for an n-gram."""
+        parts: list[str] = []
+        steps: list[TemporalMotifStep] = []
+
+        for idx, phrase in enumerate(window):
+            family = phrase.effect_family
+            energy = phrase.energy_class.value
+            motion = phrase.motion_class.value
+
+            token = f"{family}:{energy}"
+            if idx == 0:
+                gap_ms: int | None = None
+                parts.append(token)
+            else:
+                prev = window[idx - 1]
+                raw_gap = phrase.start_ms - prev.end_ms
+                gap_ms = max(raw_gap, 0)
+                bucket = cls._gap_bucket(gap_ms)
+                parts.append(f"{bucket}")
+                parts.append(token)
+
+            steps.append(
+                TemporalMotifStep(
+                    position=idx,
+                    effect_family=family,
+                    energy_class=energy,
+                    motion_class=motion,
+                    gap_from_previous_ms=gap_ms,
+                )
+            )
+
+        sig = "ordered|" + "\u2192".join(parts)
+        return sig, tuple(steps)
+
+    @staticmethod
+    def _classify_energy_pattern(energy_seq: list[str]) -> str:
+        """Name a pattern based on energy trajectory."""
+        _ORDER = {"low": 0, "mid": 1, "high": 2, "burst": 3, "unknown": 1}
+
+        if len(energy_seq) < 2:
+            return "other"
+
+        vals = [_ORDER.get(e, 1) for e in energy_seq]
+
+        # Check strictly increasing -> build
+        if all(vals[i] < vals[i + 1] for i in range(len(vals) - 1)):
+            return "build"
+
+        # Check strictly decreasing -> drop
+        if all(vals[i] > vals[i + 1] for i in range(len(vals) - 1)):
+            return "drop"
+
+        # Check all same -> repetition
+        if all(e == energy_seq[0] for e in energy_seq):
+            return "repetition"
+
+        # high -> low -> high = dip (length 3+)
+        if len(vals) >= 3:
+            if vals[0] > vals[1] and vals[-1] >= vals[0]:
+                return "dip"
+
+        # burst -> non-burst -> burst = call_and_response
+        if len(energy_seq) >= 3:
+            if (
+                energy_seq[0] == "burst"
+                and energy_seq[-1] == "burst"
+                and any(e != "burst" for e in energy_seq[1:-1])
+            ):
+                return "call_and_response"
+
+        # sweep motion followed by burst energy = build_and_burst
+        # (checked at caller level via motion, but simplified here)
+        if len(energy_seq) >= 2 and vals[-1] > vals[-2] and energy_seq[-1] == "burst":
+            return "build_and_burst"
+
+        return "other"

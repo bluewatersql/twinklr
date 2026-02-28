@@ -226,13 +226,151 @@ def _infer_lane(mined: MinedTemplate) -> GroupTemplateType:
     return GroupTemplateType.RHYTHM
 
 
+# layer_role → VisualDepth mapping
+_ROLE_DEPTH_MAP: dict[str, VisualDepth] = {
+    "BASE": VisualDepth.BACKGROUND,
+    "RHYTHM": VisualDepth.MIDGROUND,
+    "ACCENT": VisualDepth.FOREGROUND,
+    "HIGHLIGHT": VisualDepth.ACCENT,
+    "FILL": VisualDepth.BACKGROUND,
+    "TEXTURE": VisualDepth.TEXTURE,
+    "CUSTOM": VisualDepth.MIDGROUND,
+}
+
+
 class RecipeSynthesizer:
     """Converts MinedTemplate instances to EffectRecipe specifications.
 
-    Produces multi-layer recipes:
-    - RHYTHM/ACCENT templates get a subtle color wash underlay
-    - High-energy templates (not already sparkle-type) get a sparkle overlay
+    Two synthesis modes:
+    - ``synthesize()`` (legacy): heuristic layering from single-effect templates.
+    - ``synthesize_from_stack()`` (V2): data-driven layering from stack metadata.
     """
+
+    def synthesize_from_stack(
+        self,
+        mined: MinedTemplate,
+        *,
+        recipe_id: str,
+        recipe_version: str = "1.0.0",
+    ) -> EffectRecipe:
+        """Synthesize an EffectRecipe using stack composition data.
+
+        When the MinedTemplate has stack_composition populated (from stack
+        mining), layers are built directly from the discovered data rather
+        than heuristic rules.
+
+        Falls back to ``synthesize()`` if stack_composition is empty.
+
+        Args:
+            mined: The mined template (with stack metadata).
+            recipe_id: Human-readable recipe ID for the output.
+            recipe_version: Semantic version for the recipe.
+
+        Returns:
+            A renderable EffectRecipe with layers matching the stack.
+        """
+        if not mined.stack_composition:
+            return self.synthesize(mined, recipe_id=recipe_id, recipe_version=recipe_version)
+
+        template_type = _infer_lane(mined)
+        color_mode = _COLOR_MODE_MAP.get(mined.color_class, ColorMode.DICHROME)
+        energy_target = _ENERGY_TARGET_MAP.get(mined.energy_class, EnergyTarget.MED)
+
+        if color_mode == ColorMode.MONOCHROME:
+            palette_roles = ["primary"]
+        elif color_mode == ColorMode.TRIAD:
+            palette_roles = ["primary", "accent", "tertiary"]
+        else:
+            palette_roles = ["primary", "accent"]
+
+        layers = self._build_stack_layers(mined)
+
+        if template_type == GroupTemplateType.BASE:
+            timing = TimingHints(bars_min=4, bars_max=64)
+        elif template_type == GroupTemplateType.ACCENT:
+            timing = TimingHints(bars_min=1, bars_max=4)
+        else:
+            timing = TimingHints(bars_min=2, bars_max=16)
+
+        tags = list(mined.stack_composition) + [
+            mined.motion_class,
+            mined.color_class,
+            mined.energy_class,
+        ]
+        if mined.role:
+            tags.append(mined.role)
+        tags.extend(mined.taxonomy_labels)
+
+        name_parts = [_EFFECT_TYPE_MAP.get(f, f.title()) for f in mined.stack_composition]
+        name = " + ".join(name_parts)
+
+        complexity = min(1.0, mined.layer_count / 4.0)
+
+        return EffectRecipe(
+            recipe_id=recipe_id,
+            name=name,
+            description=(
+                f"Stack recipe from {mined.layer_count}-layer template {mined.template_id}"
+            ),
+            recipe_version=recipe_version,
+            template_type=template_type,
+            visual_intent=GroupVisualIntent.ABSTRACT,
+            tags=tags,
+            timing=timing,
+            palette_spec=PaletteSpec(mode=color_mode, palette_roles=palette_roles),
+            layers=tuple(layers),
+            provenance=RecipeProvenance(source="mined"),
+            style_markers=StyleMarkers(
+                complexity=complexity,
+                energy_affinity=energy_target,
+            ),
+        )
+
+    def _build_stack_layers(self, mined: MinedTemplate) -> list[RecipeLayer]:
+        """Build recipe layers directly from stack composition data."""
+        layers: list[RecipeLayer] = []
+        blend_modes = mined.layer_blend_modes or ()
+        mixes = mined.layer_mixes or ()
+
+        # Positional depth mapping
+        depth_sequence = [VisualDepth.BACKGROUND, VisualDepth.MIDGROUND, VisualDepth.FOREGROUND]
+
+        for idx, family in enumerate(mined.stack_composition):
+            effect_type = _EFFECT_TYPE_MAP.get(family, family.title())
+            motion = _MOTION_MAP.get(mined.motion_class, [MotionVerb.NONE])
+            density = _ENERGY_DENSITY_MAP.get(mined.energy_class, 0.5)
+
+            raw_blend = blend_modes[idx] if idx < len(blend_modes) else "NORMAL"
+            try:
+                blend = BlendMode(raw_blend)
+            except ValueError:
+                blend = BlendMode.NORMAL
+            mix = mixes[idx] if idx < len(mixes) else 1.0
+
+            depth = depth_sequence[min(idx, len(depth_sequence) - 1)]
+
+            color_src = ColorSource.PALETTE_PRIMARY
+            if family in _SPARKLE_FAMILIES:
+                color_src = ColorSource.WHITE_ONLY
+                motion = [MotionVerb.SPARKLE]
+                density = 0.2
+
+            layers.append(
+                RecipeLayer(
+                    layer_index=idx,
+                    layer_name=effect_type,
+                    layer_depth=depth,
+                    effect_type=effect_type,
+                    blend_mode=blend,
+                    mix=mix,
+                    params={},
+                    motion=motion,
+                    density=density,
+                    color_source=color_src,
+                )
+            )
+
+        return layers
 
     def synthesize(
         self,

@@ -172,19 +172,23 @@ def sample_template_catalog() -> TemplateCatalog:
 
 @pytest.fixture
 def mock_context() -> PipelineContext:
-    app_config = AppConfig.model_validate({
-        "cache": {"base_dir": "cache", "enabled": False},
-        "logging": {"level": "INFO", "format": "json"},
-    })
-    job_config = JobConfig.model_validate({
-        "agent": {
-            "max_iterations": 3,
-            "plan_agent": {"model": "gpt-5.2"},
-            "validate_agent": {"model": "gpt-5.2"},
-            "judge_agent": {"model": "gpt-5.2"},
-            "llm_logging": {"enabled": False},
+    app_config = AppConfig.model_validate(
+        {
+            "cache": {"base_dir": "cache", "enabled": False},
+            "logging": {"level": "INFO", "format": "json"},
         }
-    })
+    )
+    job_config = JobConfig.model_validate(
+        {
+            "agent": {
+                "max_iterations": 3,
+                "plan_agent": {"model": "gpt-5.2"},
+                "validate_agent": {"model": "gpt-5.2"},
+                "judge_agent": {"model": "gpt-5.2"},
+                "llm_logging": {"enabled": False},
+            }
+        }
+    )
     mock_session = MagicMock()
     mock_session.app_config = app_config
     mock_session.job_config = job_config
@@ -372,9 +376,7 @@ class TestCorrectorStageValidation:
             template_catalog=sample_template_catalog,
         )
 
-        assert stage._validate_corrected_plan(
-            three_section_plan_set, ["chorus_1"], mock_context
-        )
+        assert stage._validate_corrected_plan(three_section_plan_set, ["chorus_1"], mock_context)
 
     def test_validate_fails_for_empty_targets(
         self,

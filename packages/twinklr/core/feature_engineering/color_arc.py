@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import json
 from collections import defaultdict
+from pathlib import Path
 from typing import Literal
 
 from twinklr.core.feature_engineering.models.color_arc import (
@@ -82,6 +84,26 @@ _CONTRAST_THRESHOLD = 0.3
 
 class ColorArcExtractor:
     """Transform ColorNarrativeRow + EffectPhrase data into a SongColorArc."""
+
+    def __init__(self, *, palette_library_path: Path | None = None) -> None:
+        self._palette_library: tuple[NamedPalette, ...] | None = None
+        if palette_library_path is not None:
+            self._palette_library = self._load_palette_library(palette_library_path)
+
+    @staticmethod
+    def _load_palette_library(path: Path) -> tuple[NamedPalette, ...]:
+        """Load a palette library from a JSON file."""
+        data = json.loads(path.read_text(encoding="utf-8"))
+        return tuple(
+            NamedPalette(
+                palette_id=p["palette_id"],
+                name=p["name"],
+                colors=tuple(p["colors"]),
+                mood_tags=tuple(p.get("mood_tags", ())),
+                temperature=p["temperature"],
+            )
+            for p in data.get("palettes", ())
+        )
 
     def extract(
         self,

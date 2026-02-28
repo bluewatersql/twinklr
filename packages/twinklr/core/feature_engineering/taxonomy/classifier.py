@@ -14,7 +14,7 @@ from twinklr.core.feature_engineering.models.taxonomy import (
     TaxonomyLabelScore,
 )
 
-_DEFAULT_CONFIG = Path(__file__).resolve().parent / "config" / "effect_function_v1.json"
+_DEFAULT_CONFIG = Path(__file__).resolve().parent / "config" / "effect_function_v2.json"
 
 
 @dataclass(frozen=True)

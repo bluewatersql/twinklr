@@ -1,0 +1,115 @@
+{
+  "schema_version": "v2.0.0",
+  "classifier_version": "effect_function_v2",
+  "labels": {
+    "accent_hit": {
+      "base": 0.0,
+      "min_confidence": 0.35,
+      "rules": [
+        {"id": "accent_duration_short", "weight": 0.45, "when": {"duration_ms": {"max": 450}}},
+        {"id": "accent_energy_burst", "weight": 0.35, "when": {"energy_class": ["burst", "high"]}},
+        {"id": "accent_sync_high", "weight": 0.20, "when": {"onset_sync_score": {"min": 0.85}}}
+      ]
+    },
+    "motion_driver": {
+      "base": 0.0,
+      "min_confidence": 0.35,
+      "rules": [
+        {"id": "motion_class_sweep", "weight": 0.35, "when": {"motion_class": ["sweep"]}},
+        {"id": "motion_class_sparkle", "weight": 0.25, "when": {"motion_class": ["sparkle"]}},
+        {"id": "motion_multi_target", "weight": 0.20, "when": {"spatial_class": ["multi_target", "group"]}}
+      ]
+    },
+    "rhythm_driver": {
+      "base": 0.0,
+      "min_confidence": 0.35,
+      "rules": [
+        {"id": "rhythm_continuity_rhythmic", "weight": 0.40, "when": {"continuity_class": ["rhythmic"]}},
+        {"id": "rhythm_sync_good", "weight": 0.25, "when": {"onset_sync_score": {"min": 0.65}}},
+        {"id": "rhythm_duration_compact", "weight": 0.20, "when": {"duration_ms": {"max": 1600}}}
+      ]
+    },
+    "sustainer": {
+      "base": 0.0,
+      "min_confidence": 0.35,
+      "rules": [
+        {"id": "sustain_continuity", "weight": 0.40, "when": {"continuity_class": ["sustained"]}},
+        {"id": "sustain_duration_long", "weight": 0.25, "when": {"duration_ms": {"min": 1800}}},
+        {"id": "sustain_energy_low_mid", "weight": 0.20, "when": {"energy_class": ["low", "mid"]}}
+      ]
+    },
+    "texture_bed": {
+      "base": 0.0,
+      "min_confidence": 0.35,
+      "rules": [
+        {"id": "texture_color_multi", "weight": 0.20, "when": {"color_class": ["palette", "multi"]}},
+        {"id": "texture_low_energy", "weight": 0.25, "when": {"energy_class": ["low", "mid"]}},
+        {"id": "texture_spatial_wide", "weight": 0.25, "when": {"spatial_class": ["multi_target", "group"]}},
+        {"id": "texture_duration_long", "weight": 0.20, "when": {"duration_ms": {"min": 1800}}}
+      ]
+    },
+    "transition": {
+      "base": 0.0,
+      "min_confidence": 0.35,
+      "rules": [
+        {"id": "transition_continuity", "weight": 0.45, "when": {"continuity_class": ["transitional"]}},
+        {"id": "transition_sync", "weight": 0.20, "when": {"onset_sync_score": {"min": 0.60}}},
+        {"id": "transition_motion", "weight": 0.20, "when": {"motion_class": ["sweep", "pulse"]}}
+      ]
+    },
+    "fill_wash": {
+      "base": 0.0,
+      "min_confidence": 0.35,
+      "rules": [
+        {"id": "fill_family", "weight": 0.40, "when": {"effect_family": ["color_wash", "fill", "on"]}},
+        {"id": "fill_static", "weight": 0.30, "when": {"motion_class": ["static"]}},
+        {"id": "fill_wide", "weight": 0.20, "when": {"spatial_class": ["multi_target", "group"]}}
+      ]
+    },
+    "sparkle_overlay": {
+      "base": 0.0,
+      "min_confidence": 0.35,
+      "rules": [
+        {"id": "sparkle_family", "weight": 0.40, "when": {"effect_family": ["twinkle", "shimmer", "sparkle", "snowflakes", "candle"]}},
+        {"id": "sparkle_motion", "weight": 0.35, "when": {"motion_class": ["sparkle"]}},
+        {"id": "sparkle_low_energy", "weight": 0.15, "when": {"energy_class": ["low", "mid"]}}
+      ]
+    },
+    "chase_pattern": {
+      "base": 0.0,
+      "min_confidence": 0.35,
+      "rules": [
+        {"id": "chase_family", "weight": 0.40, "when": {"effect_family": ["single_strand", "bars", "marquee"]}},
+        {"id": "chase_sweep", "weight": 0.35, "when": {"motion_class": ["sweep"]}},
+        {"id": "chase_rhythmic", "weight": 0.15, "when": {"continuity_class": ["rhythmic"]}}
+      ]
+    },
+    "burst_impact": {
+      "base": 0.0,
+      "min_confidence": 0.35,
+      "rules": [
+        {"id": "burst_energy", "weight": 0.45, "when": {"energy_class": ["burst"]}},
+        {"id": "burst_short", "weight": 0.35, "when": {"duration_ms": {"max": 300}}},
+        {"id": "burst_rhythmic", "weight": 0.10, "when": {"continuity_class": ["rhythmic"]}}
+      ]
+    },
+    "layer_base": {
+      "base": 0.0,
+      "min_confidence": 0.35,
+      "rules": [
+        {"id": "base_layer_zero", "weight": 0.45, "when": {"layer_index": {"max": 0}}},
+        {"id": "base_sustained", "weight": 0.20, "when": {"continuity_class": ["sustained"]}},
+        {"id": "base_low_energy", "weight": 0.20, "when": {"energy_class": ["low", "mid"]}}
+      ]
+    },
+    "layer_accent": {
+      "base": 0.0,
+      "min_confidence": 0.35,
+      "rules": [
+        {"id": "accent_layer_upper", "weight": 0.45, "when": {"layer_index": {"min": 1}}},
+        {"id": "accent_overlay_energy", "weight": 0.20, "when": {"energy_class": ["mid", "high"]}},
+        {"id": "accent_sustained", "weight": 0.20, "when": {"continuity_class": ["sustained", "rhythmic"]}}
+      ]
+    }
+  }
+}

@@ -43,7 +43,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--corpus-dir",
         type=Path,
-        default=Path("data/profiles_corpus/v0_effectdb_structured_1"),
+        default=Path("data/profiles/corpus/v0_effectdb_structured_1"),
         help="Unified profile corpus dir (required unless --skip-build).",
     )
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)

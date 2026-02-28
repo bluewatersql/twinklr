@@ -138,14 +138,15 @@ Use typed targets to specify what each coordination plan affects:
 **No extra fields:** Do not output keys not present in the response schema. Specifically: `lane_plans[*]` must NOT include `planning_notes`.
 
 {% if recipe_catalog and recipe_catalog.entries %}
-## Template Catalog (Includes Recipes)
+## Multi-Layer Effect Recipes
 
-Some entries in the template catalog are multi-layer composite recipes from feature engineering analysis. Prefer recipes with high model affinity for the target groups.
+These are pre-analyzed multi-layer composite effects discovered from real xLights sequences. Each recipe defines a complete visual stack (background + mid + foreground layers) with blend modes. Prefer recipes with high model affinity for the target groups.
 
-| recipe_id | name | type | layers | effect_types | model_affinities |
-|-----------|------|------|--------|--------------|------------------|
 {% for r in recipe_catalog.entries -%}
-| {{ r.recipe_id }} | {{ r.name }} | {{ r.template_type }} | {{ r.layer_count }} | {{ r.effect_types | join(', ') }} | {% for a in r.model_affinities %}{{ a.model_type }}={{ a.score }}{% if not loop.last %}, {% endif %}{% endfor %} |
+- **{{ r.recipe_id }}** — {{ r.name }} ({{ r.template_type }}, {{ r.layer_count }} layers)
+  Composition: `{{ r.composition }}`
+{% if r.model_affinities %}  Affinity: {% for a in r.model_affinities %}{{ a.model_type }}={{ a.score }}{% if not loop.last %}, {% endif %}{% endfor %}
+{% endif %}
 {% endfor %}
-Recipe IDs are valid `template_id` values. The renderer handles multi-layer composition.
+Recipe IDs are valid `template_id` values. The renderer handles multi-layer composition and blend modes automatically.
 {% endif %}

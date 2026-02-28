@@ -27,6 +27,8 @@ from pathlib import Path
 import sys
 from typing import Any
 
+from twinklr.core.feature_engineering.models.clustering import TemplateClusterCatalog
+
 # ---------------------------------------------------------------------------
 # Phase 1 imports
 # ---------------------------------------------------------------------------
@@ -114,11 +116,62 @@ def _kv(label: str, value: Any) -> None:
     print(f"  {label}: {value}")
 
 
+def _scope_clusters_to_candidates(
+    cluster_catalog: TemplateClusterCatalog | None,
+    candidates: list[MinedTemplate],
+) -> list[dict[str, Any]] | None:
+    """Build same-family cluster dedup specs scoped to *candidates*.
+
+    The raw cluster catalog merges templates across effect families
+    (the vectorization hashes family names into float buckets that
+    can collide).  For recipe promotion we only want to deduplicate
+    within the same ``effect_family`` — e.g. two ``single_strand``
+    variants are genuine duplicates, but ``spirals`` and ``bars``
+    are not.
+
+    Algorithm:
+      1. Scope each cluster's members to only IDs in *candidates*.
+      2. Sub-partition the scoped members by ``effect_family``.
+      3. Emit one dedup spec per sub-group with 2+ members,
+         keeping the highest-support member as representative.
+    """
+    if cluster_catalog is None:
+        return None
+
+    candidate_by_id = {t.template_id: t for t in candidates}
+    scoped: list[dict[str, Any]] = []
+
+    for c in cluster_catalog.clusters:
+        members_in_scope = [
+            candidate_by_id[mid] for mid in c.member_template_ids if mid in candidate_by_id
+        ]
+        if len(members_in_scope) < 2:
+            continue
+
+        by_family: dict[str, list[MinedTemplate]] = {}
+        for t in members_in_scope:
+            by_family.setdefault(t.effect_family, []).append(t)
+
+        for family, group in by_family.items():
+            if len(group) < 2:
+                continue
+            ranked = sorted(group, key=lambda t: -t.support_count)
+            scoped.append(
+                {
+                    "cluster_id": f"{c.cluster_id}:{family}",
+                    "member_ids": [t.template_id for t in ranked],
+                    "keep_id": ranked[0].template_id,
+                }
+            )
+
+    return scoped if scoped else None
+
+
 # ===================================================================
 # FE data loader
 # ===================================================================
 
-_DEFAULT_FE_DIR = Path("data/features/demo_feature_engineering")
+_DEFAULT_FE_DIR = Path("data/features/feature_engineering")
 
 _FE_FILES = {
     "color_arc": "color_arc.json",
@@ -129,6 +182,7 @@ _FE_FILES = {
 
 _FE_OPTIONAL_FILES = {
     "motif_catalog": "motif_catalog.json",
+    "cluster_candidates": "cluster_candidates.json",
 }
 
 
@@ -141,6 +195,7 @@ class FEData:
     style: StyleFingerprint
     mined_templates: list[MinedTemplate]
     motif_catalog: MotifCatalog | None
+    cluster_catalog: TemplateClusterCatalog | None
     source: str  # "synthetic" or the directory path
 
 
@@ -200,6 +255,21 @@ def load_fe_data(fe_dir: Path) -> FEData:
     else:
         _kv("Motif catalog", "not found (motif annotation will be skipped)")
 
+    cluster_catalog: TemplateClusterCatalog | None = None
+    cluster_path = fe_dir / _FE_OPTIONAL_FILES["cluster_candidates"]
+    if cluster_path.exists():
+        cluster_catalog = TemplateClusterCatalog.model_validate_json(
+            cluster_path.read_text(encoding="utf-8")
+        )
+        _kv(
+            "Cluster catalog",
+            f"{cluster_catalog.total_clusters} clusters "
+            f"({cluster_catalog.total_templates} templates, "
+            f"threshold={cluster_catalog.similarity_threshold})",
+        )
+    else:
+        _kv("Cluster catalog", "not found (cluster dedup will be skipped)")
+
     print()
     return FEData(
         color_arc=color_arc,
@@ -207,6 +277,7 @@ def load_fe_data(fe_dir: Path) -> FEData:
         style=style,
         mined_templates=list(catalog.templates),
         motif_catalog=motif_catalog,
+        cluster_catalog=cluster_catalog,
         source=str(fe_dir),
     )
 
@@ -219,6 +290,7 @@ def _make_synthetic_data() -> FEData:
         style=_make_style_fingerprint(),
         mined_templates=_make_mined_templates(),
         motif_catalog=None,
+        cluster_catalog=None,
         source="synthetic",
     )
 
@@ -396,6 +468,26 @@ def _make_mined_templates() -> list[MinedTemplate]:
             continuity_class="sustained",
             spatial_class="single_target",
         ),
+        # Multi-layer stack template (discovered from xLights sequence analysis)
+        MinedTemplate(
+            template_id="tpl_candy_cane_stack_004",
+            template_kind=TemplateKind.CONTENT,
+            template_signature="color_wash@normal+bars@add+sparkle@screen|sweep|palette|high|sustained|multi_target|",
+            support_count=15,
+            distinct_pack_count=4,
+            support_ratio=0.30,
+            cross_pack_stability=0.60,
+            effect_family="color_wash",
+            motion_class="sweep",
+            color_class="palette",
+            energy_class="high",
+            continuity_class="sustained",
+            spatial_class="multi_target",
+            layer_count=3,
+            stack_composition=("color_wash", "bars", "sparkle"),
+            layer_blend_modes=("NORMAL", "ADD", "SCREEN"),
+            layer_mixes=(1.0, 0.7, 0.45),
+        ),
     ]
 
 
@@ -426,6 +518,7 @@ def _make_builtin_recipes() -> list[EffectRecipe]:
                 ),
             ),
             provenance=RecipeProvenance(source="builtin"),
+            style_markers=StyleMarkers(complexity=0.2, energy_affinity=EnergyTarget.LOW),
         ),
         EffectRecipe(
             recipe_id="builtin_candy_cane_v1",
@@ -561,18 +654,34 @@ def demo_phase2a(fe: FEData) -> RecipeCatalog:
     if len(mined) > 10:
         _kv("  ...", f"({len(mined) - 10} more)")
 
-    _subheader("Promotion Pipeline")
+    clusters = _scope_clusters_to_candidates(fe.cluster_catalog, mined)
+    if clusters is not None:
+        dedup_removals = sum(len(c["member_ids"]) - 1 for c in clusters)
+        _subheader(f"Cluster Dedup ({len(clusters)} clusters scoped to {len(mined)} candidates)")
+        _kv("Effective clusters", len(clusters))
+        _kv("Duplicate members to remove", dedup_removals)
+    else:
+        _subheader("Cluster Dedup (skipped — no cluster catalog)")
+
+    _subheader("Promotion Pipeline (stack-aware)")
+    has_stacks = any(t.stack_composition for t in mined)
     result = PromotionPipeline().run(
         candidates=mined,
         min_support=5,
         min_stability=0.3,
+        clusters=clusters,
         motif_catalog=fe.motif_catalog,
+        propensity_index=fe.propensity,
+        use_stack_synthesis=has_stacks,
     )
     _kv("Total candidates", result.report["total_candidates"])
     _kv("Filtered (excluded families)", result.report.get("filtered_families", 0))
     _kv("Rejected (quality gate)", result.report["rejected_count"])
+    _kv("Cluster deduped", f"yes ({len(clusters)} clusters)" if clusters else "no")
     _kv("Promoted", result.report["promoted_count"])
+    _kv("Affinities enriched", result.report.get("affinities_enriched", 0))
     _kv("Motif-annotated", result.report.get("motifs_annotated", 0))
+    _kv("Stack-aware synthesis", "yes" if has_stacks else "no (legacy)")
 
     _subheader("Promoted Recipes")
     for r in result.promoted_recipes[:15]:

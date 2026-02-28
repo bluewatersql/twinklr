@@ -282,8 +282,7 @@ class HolisticCorrectorStage:
                 return None
             if section.section_id not in original_by_id:
                 logger.error(
-                    "Corrector returned unknown section_id '%s' — "
-                    "rejecting entire correction",
+                    "Corrector returned unknown section_id '%s' — rejecting entire correction",
                     section.section_id,
                 )
                 return None
@@ -367,8 +366,7 @@ class HolisticCorrectorStage:
                 for coord in lane_plan.coordination_plans:
                     if not coord.targets:
                         logger.error(
-                            "Modified section %s lane %s has coordination_plan "
-                            "with empty targets",
+                            "Modified section %s lane %s has coordination_plan with empty targets",
                             section.section_id,
                             lane_plan.lane,
                         )
