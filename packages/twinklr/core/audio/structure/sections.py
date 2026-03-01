@@ -56,6 +56,9 @@ def detect_song_sections(
     vocal_segments: list[dict[str, Any]] | None = None,
     chords: list[dict[str, Any]] | None = None,
     genre: str | None = None,
+    onset_env: np.ndarray | None = None,
+    stft_mag: np.ndarray | None = None,
+    y_harm: np.ndarray | None = None,
 ) -> dict[str, Any]:
     """Detect song sections using hybrid Foote novelty + baseline grid approach.
 
@@ -73,6 +76,9 @@ def detect_song_sections(
         vocal_segments: Vocal segments (optional)
         chords: Chord detections (optional)
         genre: Genre hint for preset selection (optional)
+        onset_env: Pre-computed onset strength envelope (optional)
+        stft_mag: Pre-computed STFT magnitude spectrogram (optional)
+        y_harm: Pre-computed harmonic component from HPSS (optional)
 
     Returns:
         Dictionary with sections, boundary_times_s, and meta information
@@ -92,6 +98,9 @@ def detect_song_sections(
         vocal_segments=vocal_segments,
         chords=chords,
         genre=genre,
+        onset_env=onset_env,
+        stft_mag=stft_mag,
+        y_harm=y_harm,
     )
 
 
@@ -226,6 +235,9 @@ class SongSectionDetector:
         vocal_segments: list[dict[str, Any]] | None = None,
         chords: list[dict[str, Any]] | None = None,
         genre: str | None = None,
+        onset_env: np.ndarray | None = None,
+        stft_mag: np.ndarray | None = None,
+        y_harm: np.ndarray | None = None,
     ) -> dict[str, Any]:
         """Run section detection pipeline.
 
@@ -243,6 +255,9 @@ class SongSectionDetector:
             vocal_segments: Vocal segments (optional)
             chords: Chord detections (optional)
             genre: Genre hint (optional)
+            onset_env: Pre-computed onset strength envelope (optional)
+            stft_mag: Pre-computed STFT magnitude spectrogram (optional)
+            y_harm: Pre-computed harmonic component from HPSS (optional)
 
         Returns:
             Detection result dictionary
@@ -271,6 +286,8 @@ class SongSectionDetector:
             )
 
             # Stage 3: Extract features
+            # Only pass pre-computed arrays when no trimming offset (they match y_work)
+            _pass_precomputed = start_offset_s == 0.0
             X_normalized = features.extract_beat_sync_features(
                 y=y_work,
                 sr=sr,
@@ -279,7 +296,10 @@ class SongSectionDetector:
                     int(librosa.time_to_frames(t, sr=sr, hop_length=hop_length)) for t in beat_times
                 ],
                 num_beats=len(beat_times),
-                chroma_cqt=chroma_cqt if start_offset_s == 0.0 else None,
+                chroma_cqt=chroma_cqt if _pass_precomputed else None,
+                onset_env=onset_env if _pass_precomputed else None,
+                stft_mag=stft_mag if _pass_precomputed else None,
+                y_harm=y_harm if _pass_precomputed else None,
             )
 
             # Stage 4: Compute SSM + novelty

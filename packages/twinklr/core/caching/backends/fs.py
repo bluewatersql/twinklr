@@ -11,6 +11,7 @@ from pydantic import BaseModel, ValidationError
 
 from twinklr.core.caching.models import CacheKey, CacheMeta
 from twinklr.core.io import AbsolutePath, FileSystem
+from twinklr.core.io.sync_adapter import SyncAdapter
 from twinklr.core.io.utils import sanitize_path_component
 
 T = TypeVar("T", bound=BaseModel)
@@ -232,13 +233,14 @@ class FSCache:
             await self.fs.rmdir(entry_dir, recursive=True)
 
 
-class FSCacheSync:
-    """
-    Synchronous wrapper around FSCache.
+class FSCacheSync(SyncAdapter):
+    """Synchronous wrapper around FSCache.
 
+    Delegates all method calls to an FSCache instance via SyncAdapter.
     Uses asyncio.run() to execute async operations in blocking mode.
     Cache initializes lazily on first use.
     TTL is configured at initialization time.
+    Maintains full backward compatibility: class name and public API are unchanged.
     """
 
     def __init__(
@@ -247,37 +249,11 @@ class FSCacheSync:
         root: AbsolutePath,
         ttl_seconds: float | None = None,
     ) -> None:
-        """
-        Initialize sync cache wrapper.
+        """Initialize sync cache wrapper.
 
         Args:
             fs: Async filesystem implementation
             root: Absolute path to cache root directory
             ttl_seconds: Optional TTL in seconds for cache expiration
         """
-        self._async_cache = FSCache(fs, root, ttl_seconds)
-
-    def exists(self, key: CacheKey) -> bool:
-        """Check if entry exists and not expired (blocking)."""
-        return asyncio.run(self._async_cache.exists(key))
-
-    def load(self, key: CacheKey, model_cls: type[T]) -> T | None:
-        """Load artifact, None if missing/expired (blocking)."""
-        return asyncio.run(self._async_cache.load(key, model_cls))
-
-    def store(
-        self,
-        key: CacheKey,
-        artifact: BaseModel,
-        compute_ms: float | None = None,
-    ) -> None:
-        """Store artifact (blocking)."""
-        asyncio.run(self._async_cache.store(key, artifact, compute_ms))
-
-    def invalidate(self, key: CacheKey) -> None:
-        """Invalidate entry (blocking)."""
-        asyncio.run(self._async_cache.invalidate(key))
-
-    def initialize(self) -> None:
-        """Initialize cache (blocking)."""
-        asyncio.run(self._async_cache.initialize())
+        super().__init__(FSCache(fs, root, ttl_seconds))

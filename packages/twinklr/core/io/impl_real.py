@@ -14,6 +14,7 @@ import aiofiles
 import aiofiles.os
 
 from twinklr.core.io.models import AbsolutePath, WriteResult
+from twinklr.core.io.sync_adapter import SyncAdapter
 
 
 class RealFileSystem:
@@ -134,58 +135,15 @@ class RealFileSystem:
             await aiofiles.os.rmdir(path)
 
 
-class RealFileSystemSync:
-    """
-    Synchronous wrapper around RealFileSystem.
+class RealFileSystemSync(SyncAdapter):
+    """Synchronous wrapper around RealFileSystem.
 
+    Delegates all method calls to a RealFileSystem instance via SyncAdapter.
     Uses asyncio.run() to execute async operations in blocking mode.
     Suitable for simple scripts, tests, and non-async contexts.
+    Maintains full backward compatibility: class name and public API are unchanged.
     """
 
     def __init__(self) -> None:
-        self._async_fs = RealFileSystem()
-
-    def join(self, base: AbsolutePath, *parts: str) -> AbsolutePath:
-        """Join paths (sync - no I/O)."""
-        return self._async_fs.join(base, *parts)
-
-    def exists(self, path: AbsolutePath) -> bool:
-        """Check existence (blocking)."""
-        return asyncio.run(self._async_fs.exists(path))
-
-    def is_file(self, path: AbsolutePath) -> bool:
-        """Check if file (blocking)."""
-        return asyncio.run(self._async_fs.is_file(path))
-
-    def is_dir(self, path: AbsolutePath) -> bool:
-        """Check if directory (blocking)."""
-        return asyncio.run(self._async_fs.is_dir(path))
-
-    def read_text(self, path: AbsolutePath, encoding: str = "utf-8") -> str:
-        """Read text file (blocking)."""
-        return asyncio.run(self._async_fs.read_text(path, encoding))
-
-    def write_text(
-        self,
-        path: AbsolutePath,
-        content: str,
-        encoding: str = "utf-8",
-    ) -> WriteResult:
-        """Write text file atomically (blocking)."""
-        return asyncio.run(self._async_fs.write_text(path, content, encoding))
-
-    def mkdirs(self, path: AbsolutePath, exist_ok: bool = True) -> None:
-        """Create directory and parents (blocking)."""
-        asyncio.run(self._async_fs.mkdirs(path, exist_ok))
-
-    def listdir(self, path: AbsolutePath) -> list[str]:
-        """List directory contents (blocking)."""
-        return asyncio.run(self._async_fs.listdir(path))
-
-    def remove(self, path: AbsolutePath) -> None:
-        """Remove file (blocking)."""
-        asyncio.run(self._async_fs.remove(path))
-
-    def rmdir(self, path: AbsolutePath, recursive: bool = False) -> None:
-        """Remove directory (blocking)."""
-        asyncio.run(self._async_fs.rmdir(path, recursive))
+        """Initialize with a RealFileSystem instance."""
+        super().__init__(RealFileSystem())

@@ -2,6 +2,7 @@
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from openai import APIConnectionError, APIError, APITimeoutError, RateLimitError
 import pytest
 
 from twinklr.core.agents.providers.base import ProviderType, TokenUsage
@@ -75,14 +76,17 @@ def test_generate_json_success(mock_openai_client):
 
 
 def test_generate_json_error(mock_openai_client):
-    """Test error handling in generate_json."""
+    """Test error handling in generate_json wraps OpenAI API errors."""
     with patch(
         "twinklr.core.agents.providers.openai.OpenAIClient", return_value=mock_openai_client
     ):
         provider = OpenAIProvider(api_key="test-key")
 
-        # Make client raise error
-        mock_openai_client.generate_json.side_effect = Exception("API Error")
+        # Make client raise an OpenAI APIError (which IS caught and wrapped)
+        mock_request = MagicMock()
+        mock_openai_client.generate_json.side_effect = APIError(
+            "API Error", request=mock_request, body=None
+        )
 
         messages = [{"role": "user", "content": "test"}]
 
@@ -326,8 +330,9 @@ async def test_generate_json_async_passes_supported_kwargs() -> None:
 
 @pytest.mark.asyncio
 async def test_generate_json_async_retries_transient_errors() -> None:
-    """Async path should retry transient provider errors before succeeding."""
-    first_error = RuntimeError("connection reset")
+    """Async path should retry transient OpenAI API errors before succeeding."""
+    mock_request = MagicMock()
+    first_error = APIConnectionError(request=mock_request)
     response = MagicMock()
     response.output_text = '{"ok": true}'
     response.id = "resp_2"
@@ -349,3 +354,238 @@ async def test_generate_json_async_retries_transient_errors() -> None:
 
     assert result.content["ok"] is True
     assert mock_client.responses.create.await_count == 2
+
+
+# =========================================================================
+# PERF-10: Conversation Windowing Tests
+# =========================================================================
+
+
+class TestWindowMessages:
+    """Tests for OpenAIProvider._window_messages sliding window."""
+
+    def _make_provider(self) -> OpenAIProvider:
+        """Create an OpenAIProvider with mocked clients."""
+        with (
+            patch("twinklr.core.agents.providers.openai.OpenAIClient"),
+            patch("twinklr.core.agents.providers.openai.AsyncOpenAI"),
+        ):
+            return OpenAIProvider(api_key="test-key")
+
+    def test_short_conversation_all_messages_kept(self) -> None:
+        """Short conversation (within window) keeps all messages."""
+        provider = self._make_provider()
+        messages = [
+            {"role": "developer", "content": "System prompt"},
+            {"role": "user", "content": "Hello"},
+            {"role": "assistant", "content": "Hi there"},
+        ]
+
+        result = provider._window_messages(messages, window_size=2)
+
+        # All messages should be preserved (1 system + 2 conversation = 3)
+        assert len(result) == 3
+        assert result[0]["role"] == "developer"
+        assert result[1]["role"] == "user"
+        assert result[2]["role"] == "assistant"
+
+    def test_long_conversation_only_last_n_pairs_plus_system(self) -> None:
+        """Long conversation trims to last N exchange pairs, keeping system."""
+        provider = self._make_provider()
+        messages = [
+            {"role": "developer", "content": "System prompt"},
+            {"role": "user", "content": "Message 1"},
+            {"role": "assistant", "content": "Response 1"},
+            {"role": "user", "content": "Message 2"},
+            {"role": "assistant", "content": "Response 2"},
+            {"role": "user", "content": "Message 3"},
+            {"role": "assistant", "content": "Response 3"},
+        ]
+
+        result = provider._window_messages(messages, window_size=2)
+
+        # Should keep: developer + last 2 pairs (4 conversation msgs)
+        assert len(result) == 5
+        assert result[0]["role"] == "developer"
+        assert result[0]["content"] == "System prompt"
+        assert result[1]["content"] == "Message 2"
+        assert result[2]["content"] == "Response 2"
+        assert result[3]["content"] == "Message 3"
+        assert result[4]["content"] == "Response 3"
+
+    def test_system_message_always_preserved(self) -> None:
+        """System and developer messages are never dropped regardless of window."""
+        provider = self._make_provider()
+        messages = [
+            {"role": "system", "content": "System message"},
+            {"role": "developer", "content": "Developer message"},
+            {"role": "user", "content": "Msg 1"},
+            {"role": "assistant", "content": "Reply 1"},
+            {"role": "user", "content": "Msg 2"},
+            {"role": "assistant", "content": "Reply 2"},
+            {"role": "user", "content": "Msg 3"},
+            {"role": "assistant", "content": "Reply 3"},
+        ]
+
+        result = provider._window_messages(messages, window_size=1)
+
+        # Should keep: system + developer + last 1 pair (2 conversation msgs)
+        assert len(result) == 4
+        assert result[0]["role"] == "system"
+        assert result[0]["content"] == "System message"
+        assert result[1]["role"] == "developer"
+        assert result[1]["content"] == "Developer message"
+        assert result[2]["content"] == "Msg 3"
+        assert result[3]["content"] == "Reply 3"
+
+    def test_window_size_one_keeps_most_recent_exchange(self) -> None:
+        """Window size=1 keeps only the most recent user-assistant pair."""
+        provider = self._make_provider()
+        messages = [
+            {"role": "developer", "content": "System"},
+            {"role": "user", "content": "Old question"},
+            {"role": "assistant", "content": "Old answer"},
+            {"role": "user", "content": "New question"},
+            {"role": "assistant", "content": "New answer"},
+        ]
+
+        result = provider._window_messages(messages, window_size=1)
+
+        # developer + last 1 pair
+        assert len(result) == 3
+        assert result[0]["role"] == "developer"
+        assert result[1]["content"] == "New question"
+        assert result[2]["content"] == "New answer"
+
+    def test_empty_conversation_returns_system_only(self) -> None:
+        """Empty conversation (no user/assistant) returns only system messages."""
+        provider = self._make_provider()
+        messages = [
+            {"role": "developer", "content": "System prompt"},
+            {"role": "system", "content": "Additional system"},
+        ]
+
+        result = provider._window_messages(messages, window_size=2)
+
+        # Only system messages, no conversation
+        assert len(result) == 2
+        assert result[0]["role"] == "developer"
+        assert result[1]["role"] == "system"
+
+
+# =========================================================================
+# CQ-05: Exception Handling Tests
+# =========================================================================
+
+
+class TestShouldRetryAsyncError:
+    """Tests for _should_retry_async_error() — CQ-05 narrow exception handling."""
+
+    def test_runtime_error_is_not_retried(self) -> None:
+        """RuntimeError must NOT be retried (it is a programming/internal error)."""
+        error = RuntimeError("internal error")
+        result = OpenAIProvider._should_retry_async_error(error, attempt=0, max_attempts=3)
+        assert result is False
+
+    def test_rate_limit_error_is_retried(self) -> None:
+        """RateLimitError must be retried on first attempts."""
+        mock_response = MagicMock()
+        mock_response.status_code = 429
+        error = RateLimitError("rate limited", response=mock_response, body=None)
+        result = OpenAIProvider._should_retry_async_error(error, attempt=0, max_attempts=3)
+        assert result is True
+
+    def test_api_error_is_retried(self) -> None:
+        """APIError must be retried on first attempts."""
+        mock_request = MagicMock()
+        error = APIError("server error", request=mock_request, body=None)
+        result = OpenAIProvider._should_retry_async_error(error, attempt=0, max_attempts=3)
+        assert result is True
+
+    def test_api_timeout_error_is_retried(self) -> None:
+        """APITimeoutError must be retried on first attempts."""
+        mock_request = MagicMock()
+        error = APITimeoutError(request=mock_request)
+        result = OpenAIProvider._should_retry_async_error(error, attempt=0, max_attempts=3)
+        assert result is True
+
+    def test_api_connection_error_is_retried(self) -> None:
+        """APIConnectionError must be retried on first attempts."""
+        mock_request = MagicMock()
+        error = APIConnectionError(request=mock_request)
+        result = OpenAIProvider._should_retry_async_error(error, attempt=0, max_attempts=3)
+        assert result is True
+
+    def test_value_error_is_not_retried(self) -> None:
+        """ValueError (programming error) must NOT be caught or retried."""
+        error = ValueError("bad argument")
+        result = OpenAIProvider._should_retry_async_error(error, attempt=0, max_attempts=3)
+        assert result is False
+
+    def test_no_retry_on_last_attempt(self) -> None:
+        """Retryable errors must not be retried when max attempts are exhausted."""
+        mock_request = MagicMock()
+        error = APIConnectionError(request=mock_request)
+        # attempt == max_attempts - 1 means we are on the last attempt
+        result = OpenAIProvider._should_retry_async_error(error, attempt=2, max_attempts=3)
+        assert result is False
+
+
+class TestGenerateJsonExceptionNarrowing:
+    """Tests that generate_json and generate_json_with_conversation propagate
+    non-OpenAI errors (e.g. ValueError) without wrapping them in LLMProviderError.
+    """
+
+    def _make_provider(self, mock_client: MagicMock) -> OpenAIProvider:
+        with patch("twinklr.core.agents.providers.openai.OpenAIClient", return_value=mock_client):
+            return OpenAIProvider(api_key="test-key")
+
+    def test_generate_json_propagates_value_error(self) -> None:
+        """ValueError from the sync client must propagate, not be wrapped."""
+        mock_client = MagicMock()
+        mock_client.generate_json.side_effect = ValueError("bad input")
+        provider = self._make_provider(mock_client)
+
+        with pytest.raises(ValueError, match="bad input"):
+            provider.generate_json(messages=[{"role": "user", "content": "test"}], model="gpt-4")
+
+    def test_generate_json_wraps_api_error(self) -> None:
+        """OpenAI APIError from the sync client must be wrapped in LLMProviderError."""
+        mock_client = MagicMock()
+        mock_request = MagicMock()
+        mock_client.generate_json.side_effect = APIError(
+            "server error", request=mock_request, body=None
+        )
+        provider = self._make_provider(mock_client)
+
+        with pytest.raises(LLMProviderError):
+            provider.generate_json(messages=[{"role": "user", "content": "test"}], model="gpt-4")
+
+    def test_generate_json_with_conversation_propagates_value_error(self) -> None:
+        """ValueError must propagate out of generate_json_with_conversation."""
+        mock_client = MagicMock()
+        mock_client.generate_json.side_effect = ValueError("bad input")
+        provider = self._make_provider(mock_client)
+
+        with pytest.raises(ValueError, match="bad input"):
+            provider.generate_json_with_conversation(
+                user_message="hello",
+                conversation_id="conv-1",
+                model="gpt-4",
+            )
+
+    def test_generate_json_with_conversation_wraps_api_error(self) -> None:
+        """OpenAI APIError must be wrapped in LLMProviderError."""
+        mock_client = MagicMock()
+        mock_request = MagicMock()
+        mock_client.generate_json.side_effect = APIError(
+            "server error", request=mock_request, body=None
+        )
+        provider = self._make_provider(mock_client)
+
+        with pytest.raises(LLMProviderError):
+            provider.generate_json_with_conversation(
+                user_message="hello",
+                conversation_id="conv-1",
+                model="gpt-4",
+            )

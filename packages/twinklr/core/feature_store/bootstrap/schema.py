@@ -126,7 +126,7 @@ class SchemaBootstrapper:
             Parsed JSON list.
         """
         path = self._schema_dir / filename
-        return json.loads(path.read_text(encoding="utf-8"))
+        return list(json.loads(path.read_text(encoding="utf-8")))
 
     @staticmethod
     def _build_table_ddl(table: dict[str, Any]) -> str:

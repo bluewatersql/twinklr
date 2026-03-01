@@ -31,14 +31,17 @@ def compute_foote_novelty(ssm: np.ndarray, kernel_size: int) -> np.ndarray:
     """Compute Foote novelty curve from self-similarity matrix.
 
     Uses checkerboard kernel to detect transitions between similar regions.
+    Vectorized implementation using scipy.signal.fftconvolve for performance.
 
     Args:
-        ssm: Self-similarity matrix (frames × frames)
+        ssm: Self-similarity matrix (frames x frames)
         kernel_size: Half-size of checkerboard kernel (in frames)
 
     Returns:
         Novelty curve (one value per frame), normalized to [0, 1]
     """
+    from scipy.signal import fftconvolve
+
     n = int(ssm.shape[0])
     L = int(max(2, kernel_size))
 
@@ -52,17 +55,22 @@ def compute_foote_novelty(ssm: np.ndarray, kernel_size: int) -> np.ndarray:
     kernel[:L, L:] = -1.0
     kernel[L:, :L] = -1.0
 
-    # Convolve kernel with SSM
+    # Vectorized: 2D convolution of SSM with checkerboard kernel, then
+    # extract the diagonal. The novelty at time t equals the sum of
+    # ssm[t-L:t+L, t-L:t+L] * kernel, which is the (t, t) element of
+    # the full 2D convolution (in 'same' mode).
+    conv = fftconvolve(ssm, kernel, mode="same")
+    novelty_raw = np.diag(conv).astype(np.float32)
+
+    # Zero out edges that the original loop did not compute
     novelty = np.zeros(n, dtype=np.float32)
-    for t in range(L, n - L):
-        patch = ssm[t - L : t + L, t - L : t + L]
-        novelty[t] = float(np.sum(patch * kernel))
+    novelty[L : n - L] = novelty_raw[L : n - L]
 
     # Normalize to [0, 1]
-    if float(np.max(novelty)) > float(np.min(novelty)):
-        novelty = (novelty - float(np.min(novelty))) / (
-            float(np.max(novelty)) - float(np.min(novelty)) + 1e-8
-        )
+    nmax = float(np.max(novelty))
+    nmin = float(np.min(novelty))
+    if nmax > nmin:
+        novelty = (novelty - nmin) / (nmax - nmin + 1e-8)
 
     return novelty.astype(np.float32)
 

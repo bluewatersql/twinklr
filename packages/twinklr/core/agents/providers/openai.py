@@ -46,6 +46,8 @@ class OpenAIProvider:
     - Thread-safe token tracking
     """
 
+    _DEFAULT_WINDOW_SIZE: int = 2  # Keep last 2 exchanges
+
     def __init__(
         self,
         *,
@@ -124,8 +126,8 @@ class OpenAIProvider:
                 ),
             )
 
-        except Exception as e:
-            logger.error(f"OpenAI provider error: {e}")
+        except (APIError, RateLimitError, APIConnectionError, APITimeoutError, APIStatusError) as e:
+            logger.error(f"OpenAI API error: {e}")
             raise LLMProviderError(f"Provider error: {e}") from e
 
     def generate_json_with_conversation(
@@ -151,8 +153,9 @@ class OpenAIProvider:
                 conversation = Conversation(id=conversation_id, messages=messages)
                 self._conversations[conversation_id] = conversation
 
+            windowed = self._window_messages(conversation.messages)
             response_data = self._sync_client.generate_json(
-                messages=conversation.messages, model=model, temperature=temperature, **kwargs
+                messages=windowed, model=model, temperature=temperature, **kwargs
             )
 
             conversation.messages.append(
@@ -179,8 +182,8 @@ class OpenAIProvider:
 
             return LLMResponse(content=response_data, metadata=response_metadata)
 
-        except Exception as e:
-            logger.error(f"OpenAI provider error: {e}")
+        except (APIError, RateLimitError, APIConnectionError, APITimeoutError, APIStatusError) as e:
+            logger.error(f"OpenAI API error: {e}")
             raise LLMProviderError(f"Provider error: {e}") from e
 
     def add_message_to_conversation(self, conversation_id: str, role: str, content: str) -> None:
@@ -218,6 +221,37 @@ class OpenAIProvider:
                 completion_tokens=self._total_tokens.completion_tokens + completion_tokens,
                 total_tokens=self._total_tokens.total_tokens + total_tokens,
             )
+
+    def _window_messages(
+        self,
+        messages: list[dict[str, str]],
+        window_size: int | None = None,
+    ) -> list[dict[str, str]]:
+        """Apply sliding window to conversation messages.
+
+        Keeps system/developer messages and the last ``window_size``
+        user-assistant exchange pairs.  This prevents quadratic token
+        growth in planner-judge-retry loops.
+
+        Args:
+            messages: Full conversation history.
+            window_size: Number of recent exchange pairs to keep.
+                Defaults to ``_DEFAULT_WINDOW_SIZE``.
+
+        Returns:
+            Windowed message list with system messages preserved.
+        """
+        if window_size is None:
+            window_size = self._DEFAULT_WINDOW_SIZE
+
+        system_msgs = [m for m in messages if m["role"] in ("system", "developer")]
+        conversation = [m for m in messages if m["role"] in ("user", "assistant")]
+
+        max_msgs = window_size * 2
+        if len(conversation) > max_msgs:
+            conversation = conversation[-max_msgs:]
+
+        return system_msgs + conversation
 
     # =========================================================================
     # Async Methods (Phase 0 - Primary Implementation)
@@ -359,7 +393,6 @@ class OpenAIProvider:
             APIError,
             TimeoutError,
             ConnectionError,
-            RuntimeError,
         )
         return isinstance(error, retryable_types)
 
@@ -401,9 +434,12 @@ class OpenAIProvider:
                 conversation = Conversation(id=conversation_id, messages=messages)
                 self._conversations[conversation_id] = conversation
 
+            # Apply sliding window to limit token growth
+            windowed = self._window_messages(conversation.messages)
+
             # Use async method
             response = await self.generate_json_async(
-                messages=conversation.messages,
+                messages=windowed,
                 model=model,
                 temperature=temperature,
                 **kwargs,

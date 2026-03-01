@@ -10,6 +10,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+from simpleeval import simple_eval
+
 from twinklr.core.sequencer.templates.group.recipe import (
     ColorSource,
     EffectRecipe,
@@ -107,8 +109,15 @@ class RecipeRenderer:
             return pv.value
         if pv.expr is not None:
             allowed_vars = {"energy": env.energy, "density": env.density}
+            allowed_funcs = {"min": min, "max": max, "abs": abs, "round": round}
             try:
-                result = float(eval(pv.expr, {"__builtins__": {}}, allowed_vars))  # noqa: S307
+                result = float(
+                    simple_eval(
+                        pv.expr,
+                        names=allowed_vars,
+                        functions=allowed_funcs,
+                    )
+                )
             except Exception:
                 return pv.min_val or 0.0
             if pv.min_val is not None:

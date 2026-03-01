@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from twinklr.core.agents.logging import LLMCallLogger, NullLLMCallLogger
+from twinklr.core.agents.prompts.sanitize import sanitize_metadata_field
 from twinklr.core.agents.providers.base import LLMProvider
 from twinklr.core.agents.sequencer.moving_heads.context import MovingHeadPlanningContext
 from twinklr.core.agents.sequencer.moving_heads.heuristic_validator import (
@@ -63,8 +64,8 @@ def build_planner_variables(
         # Iteration state
         "iteration": iteration,
         # Song metadata
-        "song_title": context.song_title,
-        "song_artist": context.song_artist,
+        "song_title": sanitize_metadata_field(context.song_title),
+        "song_artist": sanitize_metadata_field(context.song_artist),
         "genre": None,  # Not available in current context model
         # Beat grid
         "tempo": context.tempo,

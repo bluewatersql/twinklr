@@ -6,6 +6,7 @@ Uses aiofiles for non-blocking file I/O.
 import asyncio
 import hashlib
 import json
+import logging
 import re
 import uuid
 from pathlib import Path
@@ -16,6 +17,15 @@ import yaml
 
 from twinklr.core.agents.logging.models import AgentCallSummary, CallSummary, LLMCallLog
 from twinklr.core.logging.sanitize import sanitize_dict
+
+# ---------------------------------------------------------------------------
+# TRACE level — below DEBUG (10), never emitted to log aggregators by default.
+# Register once at module import time.
+# ---------------------------------------------------------------------------
+TRACE: int = 5
+logging.addLevelName(TRACE, "TRACE")
+
+_logger = logging.getLogger(__name__)
 
 
 class AsyncFileLogger:
@@ -46,6 +56,7 @@ class AsyncFileLogger:
         log_level: str = "standard",
         format: str = "yaml",
         sanitize: bool = True,
+        log_full_prompts: bool = False,
     ):
         """Initialize async file logger.
 
@@ -55,6 +66,9 @@ class AsyncFileLogger:
             log_level: Log level ("minimal", "standard", "full")
             format: Output format ("yaml", "json")
             sanitize: Whether to sanitize sensitive data
+            log_full_prompts: If True, log full prompt content at DEBUG level.
+                Defaults to False — full content is only emitted at TRACE level
+                to avoid exposing proprietary prompt engineering to log aggregators.
         """
         self.output_dir = Path(output_dir)
         self.session_id = session_id or "default"
@@ -62,6 +76,7 @@ class AsyncFileLogger:
         self.log_level = log_level
         self.format = format
         self.sanitize_enabled = sanitize
+        self.log_full_prompts = log_full_prompts
 
         # Log directory - base path for all agent logs
         # Structure: <output_dir>/<agent>/<session_id>/<step_iteration>.json
@@ -108,6 +123,33 @@ class AsyncFileLogger:
         """
         # Generate call ID
         call_id = f"{agent_name}_iter{iteration or 0}_{uuid.uuid4().hex[:8]}"
+
+        # SEC-08: Log prompt metadata at DEBUG — never full content at DEBUG or higher.
+        # Full content only at TRACE (level 5) or when log_full_prompts=True.
+        user_prompt = prompts.get("user", "")
+        dev_prompt = prompts.get("developer", "")
+        context_tokens = self._estimate_tokens(context)
+        _logger.debug(
+            "LLM call start: agent=%s model=%s iter=%s "
+            "user_prompt_chars=%d dev_prompt_chars=%d context_tokens=%d",
+            agent_name,
+            model,
+            iteration,
+            len(user_prompt) if isinstance(user_prompt, str) else 0,
+            len(dev_prompt) if isinstance(dev_prompt, str) else 0,
+            context_tokens,
+        )
+        # System prompts are never logged at DEBUG or higher — TRACE only.
+        _logger.log(TRACE, "LLM call prompts (full): %s", prompts)
+
+        if self.log_full_prompts:
+            # Explicit opt-in: emit full non-system prompt content at DEBUG.
+            # System prompt is still excluded even with this flag.
+            _logger.debug(
+                "LLM call prompt content (log_full_prompts=True): user=%r developer=%r",
+                user_prompt,
+                dev_prompt,
+            )
 
         # Increment counter
         async with self._lock:

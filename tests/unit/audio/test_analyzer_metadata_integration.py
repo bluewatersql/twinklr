@@ -5,6 +5,7 @@ Tests the integration of the metadata pipeline into AudioAnalyzer.
 
 from unittest.mock import AsyncMock
 
+from pydantic import SecretStr
 import pytest
 
 from twinklr.core.audio.analyzer import AudioAnalyzer
@@ -77,7 +78,7 @@ class TestAudioAnalyzerMetadataIntegration:
     async def test_metadata_with_acoustid_enabled(self, app_config, job_config):
         """Metadata extraction with AcoustID enabled."""
         app_config.audio_processing.enhancements.enable_acoustid = True
-        app_config.audio_processing.enhancements.acoustid_api_key = "test-key"
+        app_config.audio_processing.enhancements.acoustid_api_key = SecretStr("test-key")
         analyzer = AudioAnalyzer(app_config, job_config)
 
         # Mock the pipeline
@@ -105,7 +106,7 @@ class TestAudioAnalyzerMetadataIntegration:
         """Metadata extraction with both providers enabled."""
         app_config.audio_processing.enhancements.enable_acoustid = True
         app_config.audio_processing.enhancements.enable_musicbrainz = True
-        app_config.audio_processing.enhancements.acoustid_api_key = "test-key"
+        app_config.audio_processing.enhancements.acoustid_api_key = SecretStr("test-key")
         analyzer = AudioAnalyzer(app_config, job_config)
 
         # Mock the pipeline
@@ -146,7 +147,7 @@ class TestAudioAnalyzerMetadataIntegration:
         """API clients are initialized when providers are enabled via factory."""
         app_config.audio_processing.enhancements.enable_acoustid = True
         app_config.audio_processing.enhancements.enable_musicbrainz = True
-        app_config.audio_processing.enhancements.acoustid_api_key = "test-key"
+        app_config.audio_processing.enhancements.acoustid_api_key = SecretStr("test-key")
 
         # Test that factory creates pipeline with clients
         factory = EnhancementServiceFactory()

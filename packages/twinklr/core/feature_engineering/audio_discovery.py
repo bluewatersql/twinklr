@@ -49,7 +49,7 @@ def _token_similarity(left: str, right: str) -> float:
 class AudioAnalyzerLike(Protocol):
     """Protocol wrapper for sync analyzer usage."""
 
-    def analyze_sync(self, audio_path: str, *, force_reprocess: bool = False): ...  # noqa: ANN201
+    def analyze_sync(self, audio_path: str, *, force_reprocess: bool = False) -> object: ...
 
 
 @dataclass(frozen=True)

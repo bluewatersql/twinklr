@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import numpy as np
+import pytest
 
 from twinklr.core.audio.harmonic.key import detect_musical_key, extract_chroma
 
@@ -129,6 +130,58 @@ class TestDetectMusicalKey:
         # Should return some result without error
         assert "key" in result
         assert "mode" in result
+
+    def test_backward_compat_without_chroma(
+        self,
+        sine_wave_440hz: np.ndarray,
+        sample_rate: int,
+        hop_length: int,
+    ) -> None:
+        """PERF-01: Function works without chroma param (backward compat)."""
+        result = detect_musical_key(
+            sine_wave_440hz,
+            sample_rate,
+            hop_length=hop_length,
+        )
+        assert "key" in result
+        assert "mode" in result
+        assert "confidence" in result
+
+    def test_with_precomputed_chroma(
+        self,
+        sine_wave_440hz: np.ndarray,
+        sample_rate: int,
+        hop_length: int,
+    ) -> None:
+        """PERF-01: Pre-computed chroma produces same result."""
+        # Compute chroma externally
+        chroma = extract_chroma(sine_wave_440hz, sample_rate, hop_length=hop_length)
+
+        # Without pre-computed chroma
+        result_without = detect_musical_key(sine_wave_440hz, sample_rate, hop_length=hop_length)
+        # With pre-computed chroma
+        result_with = detect_musical_key(
+            sine_wave_440hz, sample_rate, hop_length=hop_length, chroma=chroma
+        )
+
+        assert result_with["key"] == result_without["key"]
+        assert result_with["mode"] == result_without["mode"]
+        assert result_with["confidence"] == pytest.approx(result_without["confidence"], abs=1e-5)
+
+    def test_chroma_param_skips_internal_computation(
+        self,
+        sine_wave_440hz: np.ndarray,
+        sample_rate: int,
+        hop_length: int,
+    ) -> None:
+        """PERF-01: When chroma provided, librosa.feature.chroma_cqt not called."""
+        from unittest.mock import patch
+
+        chroma = extract_chroma(sine_wave_440hz, sample_rate, hop_length=hop_length)
+
+        with patch("twinklr.core.audio.harmonic.key.librosa.feature.chroma_cqt") as mock_chroma:
+            detect_musical_key(sine_wave_440hz, sample_rate, hop_length=hop_length, chroma=chroma)
+            mock_chroma.assert_not_called()
 
 
 class TestExtractChroma:

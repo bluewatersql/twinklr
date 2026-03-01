@@ -17,6 +17,8 @@ def extract_dynamic_features(
     hop_length: int,
     frame_length: int,
     rms_precomputed: np.ndarray | None = None,
+    onset_env: np.ndarray | None = None,
+    stft_mag: np.ndarray | None = None,
 ) -> dict[str, Any]:
     """Extract frequency band energies, motion/flux, and transient information.
 
@@ -26,12 +28,19 @@ def extract_dynamic_features(
         hop_length: Hop length
         frame_length: Frame length
         rms_precomputed: Optional pre-computed RMS for optimization
+        onset_env: Pre-computed onset strength envelope (optional). If provided,
+            skips internal onset_strength computation for efficiency.
+        stft_mag: Pre-computed STFT magnitude spectrogram (optional). If provided,
+            skips internal librosa.stft computation for efficiency.
 
     Returns:
         Dict with bass_energy, mid_energy, high_energy, motion, transients
     """
-    stft = librosa.stft(y, n_fft=frame_length, hop_length=hop_length)
-    mag = np.abs(stft).astype(np.float32)
+    if stft_mag is not None:
+        mag = stft_mag
+    else:
+        stft = librosa.stft(y, n_fft=frame_length, hop_length=hop_length)
+        mag = np.abs(stft).astype(np.float32)
     freqs = librosa.fft_frequencies(sr=sr, n_fft=frame_length)
 
     bass_idx = np.where((freqs >= 20) & (freqs < 250))[0]
@@ -57,7 +66,10 @@ def extract_dynamic_features(
         y=y, sr=sr, hop_length=hop_length, backtrack=True, units="frames"
     ).astype(int)
     onset_times = frames_to_time(onset_frames, sr=sr, hop_length=hop_length)
-    onset_env = librosa.onset.onset_strength(y=y, sr=sr, hop_length=hop_length).astype(np.float32)
+    if onset_env is None:
+        onset_env = librosa.onset.onset_strength(y=y, sr=sr, hop_length=hop_length).astype(
+            np.float32
+        )
     onset_strengths = (
         onset_env[np.clip(onset_frames, 0, len(onset_env) - 1)]
         if onset_frames.size

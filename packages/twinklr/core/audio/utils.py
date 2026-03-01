@@ -65,14 +65,18 @@ def time_to_frames(times_s: np.ndarray, *, sr: int, hop_length: int, n_frames: i
 def as_float_list(x: np.ndarray, ndigits: int = 3) -> list[float]:
     """Convert array to rounded float list for JSON serialization.
 
+    Uses float64 to avoid precision issues with float32 rounding, then
+    ``.tolist()`` returns native Python floats directly — avoiding the
+    overhead of wrapping each element with ``float()``.
+
     Args:
         x: Input array
         ndigits: Number of decimal places
 
     Returns:
-        List of rounded floats
+        List of rounded Python floats
     """
-    return [float(v) for v in np.round(np.asarray(x, dtype=np.float32), ndigits).tolist()]
+    return np.round(np.asarray(x, dtype=np.float64), ndigits).tolist()  # type: ignore[no-any-return]
 
 
 def safe_divide(a: np.ndarray, b: np.ndarray, default: float = 0.0) -> np.ndarray:

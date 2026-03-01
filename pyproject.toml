@@ -129,6 +129,16 @@ exclude = [
     "data/blog/content_manager/",
 ]
 
+[[tool.mypy.overrides]]
+module = [
+    "twinklr.core.feature_store.*",
+    "twinklr.core.feature_engineering.*",
+    "twinklr.core.agents.providers.anthropic",
+    "twinklr.core.io.sync_adapter",
+]
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+
 [tool.pydantic-mypy]
 init_forbid_extra = true
 init_typed = true

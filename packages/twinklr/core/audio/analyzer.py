@@ -513,12 +513,26 @@ class AudioAnalyzer:
         builds = builds_drops["builds"]
         drops = builds_drops["drops"]
 
+        # Pre-compute STFT magnitude and RMS once for reuse (PERF-03, PERF-04)
+        stft_mag = np.abs(librosa.stft(y, n_fft=frame_length, hop_length=hop_length)).astype(
+            np.float32
+        )
+        rms = librosa.feature.rms(y=y, frame_length=frame_length, hop_length=hop_length)[0].astype(
+            np.float32
+        )
+
         # Spectral analysis
         spectral_features = extract_spectral_features(
             y, sr, hop_length=hop_length, frame_length=frame_length
         )
         dynamic_features = extract_dynamic_features(
-            y, sr, hop_length=hop_length, frame_length=frame_length
+            y,
+            sr,
+            hop_length=hop_length,
+            frame_length=frame_length,
+            rms_precomputed=rms,
+            onset_env=onset_env,
+            stft_mag=stft_mag,
         )
 
         # Extract numpy arrays for vocals detection before removing _np dict
@@ -539,7 +553,7 @@ class AudioAnalyzer:
         vocal_regions = vocal_result["vocal_segments"]
 
         # Harmonic analysis (chroma already computed above for downbeat detection)
-        key_result = detect_musical_key(y, sr, hop_length=hop_length)
+        key_result = detect_musical_key(y, sr, hop_length=hop_length, chroma=chroma)
         chords = detect_chords(
             chroma_cqt=chroma,
             beat_frames=beat_frames,
@@ -549,6 +563,10 @@ class AudioAnalyzer:
         pitch = extract_pitch_tracking(y, sr, hop_length=hop_length)
 
         # Structure analysis - pass context for improved detection
+        # Compute STFT with n_fft=2048 for section detection (separate from dynamic features STFT)
+        stft_mag_2048 = np.abs(librosa.stft(y, n_fft=2048, hop_length=hop_length)).astype(
+            np.float32
+        )
         sections = detect_song_sections(
             y,
             sr,
@@ -562,6 +580,9 @@ class AudioAnalyzer:
             drops=drops,
             vocal_segments=vocal_regions,
             chords=chords["chords"],  # Extract chord list from result dict
+            onset_env=onset_env,
+            stft_mag=stft_mag_2048,
+            y_harm=harmonic,
         )
         tempo_changes = detect_tempo_changes(y, sr, hop_length=hop_length)
 
@@ -599,6 +620,9 @@ class AudioAnalyzer:
             y_harm=harmonic,
             y_perc=percussive,
         )
+
+        # Reclaim memory: y, harmonic, percussive no longer needed (PERF-18)
+        del y, harmonic, percussive
 
         # Assemble results
         features = {

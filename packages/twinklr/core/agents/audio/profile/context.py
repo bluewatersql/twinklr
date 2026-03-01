@@ -13,6 +13,7 @@ Key transformations:
 
 from typing import Any
 
+from twinklr.core.agents.prompts.sanitize import sanitize_metadata_field
 from twinklr.core.audio.models import SongBundle
 
 
@@ -56,9 +57,9 @@ def shape_context(bundle: SongBundle) -> dict[str, Any]:
     """
     features = bundle.features
 
-    # Extract essential metadata
+    # Extract essential metadata (sanitize user-controlled fields for prompt safety)
     context: dict[str, Any] = {
-        "audio_path": bundle.audio_path,
+        "audio_path": sanitize_metadata_field(bundle.audio_path),
         "duration_ms": features.get("duration_ms", bundle.timing.duration_ms),
     }
 

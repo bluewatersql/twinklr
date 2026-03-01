@@ -386,11 +386,11 @@ class AsyncAgentRunner:
                         f"Schema validation failed after {repair_attempts} attempts: {e}"
                     ) from e
 
-                # Add repair feedback to messages
+                # Add repair feedback to messages (errors only; schema is in system prompt)
                 repair_message = (
-                    f"Schema validation failed. Error:\n{error_details}\n\n"
-                    f"Expected schema:\n{get_json_schema_example(spec.response_model)}\n\n"
-                    f"Please fix the response to match the schema exactly."
+                    f"Schema validation failed. Fix these errors:\n{error_details}\n\n"
+                    f"The expected schema is in the system prompt. "
+                    f"Return a corrected JSON response."
                 )
 
                 messages.append({"role": "user", "content": repair_message})

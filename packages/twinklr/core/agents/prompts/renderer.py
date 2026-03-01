@@ -26,11 +26,17 @@ class PromptRenderer:
     def __init__(self) -> None:
         """Initialize prompt renderer."""
         try:
-            from jinja2 import Environment, StrictUndefined
+            from jinja2 import StrictUndefined
+            from jinja2.sandbox import SandboxedEnvironment
 
-            self.env = Environment(undefined=StrictUndefined, trim_blocks=True, lstrip_blocks=True)
+            self.env = SandboxedEnvironment(
+                undefined=StrictUndefined,
+                trim_blocks=True,
+                lstrip_blocks=True,
+                autoescape=False,  # Prompts are plaintext, not HTML
+            )
             self.use_jinja2 = True
-            logger.debug("PromptRenderer initialized with Jinja2")
+            logger.debug("PromptRenderer initialized with Jinja2 SandboxedEnvironment")
 
         except ImportError:
             logger.warning("Jinja2 not available, using simple renderer")

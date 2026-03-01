@@ -66,7 +66,7 @@ class EnhancementServiceFactory:
                 acoustid_api_key = config.audio_processing.enhancements.acoustid_api_key
                 if acoustid_api_key:
                     acoustid_client = AcoustIDClient(
-                        api_key=acoustid_api_key,
+                        api_key=acoustid_api_key.get_secret_value(),
                         http_client=http_client,
                     )
                 else:
@@ -123,7 +123,7 @@ class EnhancementServiceFactory:
             if genius_token:
                 providers["genius"] = GeniusClient(
                     http_client=http_client,
-                    access_token=genius_token,
+                    access_token=genius_token.get_secret_value(),
                 )
             else:
                 logger.debug("Genius provider skipped (no GENIUS_ACCESS_TOKEN provided)")

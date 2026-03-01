@@ -8,14 +8,34 @@ from twinklr.core.config.models import AppConfig
 
 
 def create_llm_provider(app_config: AppConfig, session_id: str) -> LLMProvider:
-    """Create configured LLM provider for the session."""
+    """Create a configured LLM provider for the session.
+
+    Args:
+        app_config: Application configuration containing provider name and
+            API key.
+        session_id: Session identifier forwarded to the provider.
+
+    Returns:
+        An object that satisfies the ``LLMProvider`` protocol.
+
+    Raises:
+        ValueError: If the configured provider name is not recognised.
+    """
     provider_name = app_config.llm_provider.lower().strip()
 
     if provider_name == "openai":
         return OpenAIProvider(
-            api_key=app_config.llm_api_key,
+            api_key=app_config.llm_api_key.get_secret_value(),
             session_id=session_id,
             base_url=app_config.llm_base_url,
+        )
+
+    if provider_name == "anthropic":
+        from twinklr.core.agents.providers.anthropic import AnthropicProvider
+
+        return AnthropicProvider(
+            api_key=app_config.llm_api_key.get_secret_value(),
+            session_id=session_id,
         )
 
     raise ValueError(f"Unknown LLM provider configured: {app_config.llm_provider}")

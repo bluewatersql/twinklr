@@ -23,6 +23,11 @@ from openai.types.shared_params import Reasoning
 
 logger = logging.getLogger(__name__)
 
+# SEC-08: TRACE level (5) for full response content — below DEBUG, never forwarded
+# to log aggregators by default.
+_TRACE: int = 5
+logging.addLevelName(_TRACE, "TRACE")
+
 
 class ReasoningEffort(str, Enum):
     """Reasoning effort levels for API requests"""
@@ -365,8 +370,14 @@ class OpenAIClient:
             try:
                 response_data = json.loads(content)
             except json.JSONDecodeError as e:
-                logger.error(f"Failed to parse JSON response: {e}")
-                logger.error(f"Response content: {content[:500]}...")  # Log first 500 chars
+                logger.error(
+                    "Failed to parse JSON response: %s (response_id=%s, content_chars=%d)",
+                    e,
+                    metadata.response_id,
+                    len(content),
+                )
+                # SEC-08: full response content at TRACE only
+                logger.log(_TRACE, "Unparseable response content: %s", content)
                 raise OpenAIResponseParseError(f"Failed to parse JSON response: {e}") from e
 
             # Optional validation
@@ -374,10 +385,12 @@ class OpenAIClient:
                 raise OpenAIResponseParseError("Response JSON failed validation")
 
             logger.debug(
-                f"Successfully parsed JSON response. "
-                f"Response ID: {metadata.response_id}, "
-                f"Tokens: {metadata.token_usage}"
+                "Successfully parsed JSON response. Response ID: %s, Tokens: %s",
+                metadata.response_id,
+                metadata.token_usage,
             )
+            # SEC-08: full response content at TRACE only
+            logger.log(_TRACE, "JSON response content: %s", content)
             return response_data, metadata
 
         result, metadata = self._retry_with_backoff(_make_request, "JSON generation")
@@ -591,8 +604,14 @@ class OpenAIClient:
             try:
                 response_data = json.loads(content)
             except json.JSONDecodeError as e:
-                logger.error(f"Failed to parse JSON response: {e}")
-                logger.error(f"Response content: {content[:500]}...")
+                logger.error(
+                    "Failed to parse JSON response: %s (response_id=%s, content_chars=%d)",
+                    e,
+                    metadata.response_id,
+                    len(content),
+                )
+                # SEC-08: full response content at TRACE only
+                logger.log(_TRACE, "Unparseable response content: %s", content)
                 raise OpenAIResponseParseError(f"Failed to parse JSON response: {e}") from e
 
             # Optional validation
@@ -604,10 +623,12 @@ class OpenAIClient:
                 self.add_to_conversation("assistant", content)
 
             logger.debug(
-                f"Successfully parsed JSON response. "
-                f"Response ID: {metadata.response_id}, "
-                f"Tokens: {metadata.token_usage}"
+                "Successfully parsed JSON response. Response ID: %s, Tokens: %s",
+                metadata.response_id,
+                metadata.token_usage,
             )
+            # SEC-08: full response content at TRACE only
+            logger.log(_TRACE, "JSON response content: %s", content)
 
             return response_data, metadata
 
@@ -679,10 +700,13 @@ class OpenAIClient:
                 raise OpenAIClientError("Empty response from OpenAI API")
 
             logger.debug(
-                f"Successfully received text response ({len(content)} chars). "
-                f"Response ID: {metadata.response_id}, "
-                f"Tokens: {metadata.token_usage}"
+                "Successfully received text response. content_chars=%d Response ID: %s, Tokens: %s",
+                len(content),
+                metadata.response_id,
+                metadata.token_usage,
             )
+            # SEC-08: full response content at TRACE only
+            logger.log(_TRACE, "Text response content: %s", content)
             return content, metadata
 
         result, metadata = self._retry_with_backoff(_make_request, "Text generation")

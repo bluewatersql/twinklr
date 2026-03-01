@@ -132,10 +132,10 @@ class RecipeCompiler:
         if is_placeholder:
             resolved = resolve_effect_type(source.template_id)
             effect_type = resolved.effect_type
-            base_params = resolved.defaults
+            base_params: dict[str, Any] = resolved.defaults
         else:
             effect_type = layer_effect
-            base_params: dict[str, Any] = {}
+            base_params = {}
 
         params: dict[str, Any] = {
             **base_params,

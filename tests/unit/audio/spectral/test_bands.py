@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from unittest.mock import patch
+
+import librosa
 import numpy as np
 
 from twinklr.core.audio.spectral.bands import extract_dynamic_features
@@ -222,3 +225,124 @@ class TestExtractDynamicFeatures:
         assert "_np" in result
         assert "motion_norm" in result["_np"]
         assert isinstance(result["_np"]["motion_norm"], np.ndarray)
+
+    def test_onset_env_backward_compat(
+        self,
+        sine_wave_440hz: np.ndarray,
+        sample_rate: int,
+        hop_length: int,
+        frame_length: int,
+    ) -> None:
+        """PERF-02: Function works without onset_env param (backward compat)."""
+        result = extract_dynamic_features(
+            sine_wave_440hz,
+            sample_rate,
+            hop_length=hop_length,
+            frame_length=frame_length,
+        )
+        assert "statistics" in result
+        assert "transients" in result
+
+    def test_onset_env_precomputed_used(
+        self,
+        sine_wave_440hz: np.ndarray,
+        sample_rate: int,
+        hop_length: int,
+        frame_length: int,
+    ) -> None:
+        """PERF-02: Pre-computed onset_env is used when provided.
+
+        Verifies the function completes successfully with a pre-computed
+        onset envelope. We cannot easily mock onset_strength because
+        onset_detect also calls it internally, so we verify by providing
+        a known onset_env and checking the function accepts it.
+        """
+        onset_env = librosa.onset.onset_strength(
+            y=sine_wave_440hz, sr=sample_rate, hop_length=hop_length
+        ).astype(np.float32)
+
+        # With pre-computed onset_env, should produce valid output
+        result = extract_dynamic_features(
+            sine_wave_440hz,
+            sample_rate,
+            hop_length=hop_length,
+            frame_length=frame_length,
+            onset_env=onset_env,
+        )
+        assert "statistics" in result
+        assert "transients" in result
+
+        # Verify the parameter was actually used by providing a synthetic
+        # all-zeros onset_env -- onset strengths at detected frames should be 0
+        zero_env = np.zeros_like(onset_env)
+        result_zero = extract_dynamic_features(
+            sine_wave_440hz,
+            sample_rate,
+            hop_length=hop_length,
+            frame_length=frame_length,
+            onset_env=zero_env,
+        )
+        # If onset_env was used, all transient strengths should be 0
+        for t in result_zero["transients"]:
+            assert t["strength"] == 0.0
+
+    def test_stft_mag_backward_compat(
+        self,
+        sine_wave_440hz: np.ndarray,
+        sample_rate: int,
+        hop_length: int,
+        frame_length: int,
+    ) -> None:
+        """PERF-03: Function works without stft_mag param (backward compat)."""
+        result = extract_dynamic_features(
+            sine_wave_440hz,
+            sample_rate,
+            hop_length=hop_length,
+            frame_length=frame_length,
+        )
+        assert "bass_energy" in result
+        assert "mid_energy" in result
+
+    def test_stft_mag_precomputed_used(
+        self,
+        sine_wave_440hz: np.ndarray,
+        sample_rate: int,
+        hop_length: int,
+        frame_length: int,
+    ) -> None:
+        """PERF-03: Pre-computed stft_mag is used when provided."""
+        stft_mag = np.abs(
+            librosa.stft(sine_wave_440hz, n_fft=frame_length, hop_length=hop_length)
+        ).astype(np.float32)
+
+        with patch("twinklr.core.audio.spectral.bands.librosa.stft") as mock_stft:
+            extract_dynamic_features(
+                sine_wave_440hz,
+                sample_rate,
+                hop_length=hop_length,
+                frame_length=frame_length,
+                stft_mag=stft_mag,
+            )
+            mock_stft.assert_not_called()
+
+    def test_rms_precomputed_skips_internal(
+        self,
+        sine_wave_440hz: np.ndarray,
+        sample_rate: int,
+        hop_length: int,
+        frame_length: int,
+    ) -> None:
+        """PERF-04: Pre-computed RMS skips internal librosa.feature.rms call."""
+        rms = librosa.feature.rms(
+            y=sine_wave_440hz, frame_length=frame_length, hop_length=hop_length
+        )[0].astype(np.float32)
+
+        with patch("twinklr.core.audio.spectral.bands.librosa.feature.rms") as mock_rms:
+            extract_dynamic_features(
+                sine_wave_440hz,
+                sample_rate,
+                hop_length=hop_length,
+                frame_length=frame_length,
+                rms_precomputed=rms,
+            )
+            mock_rms.assert_not_called()

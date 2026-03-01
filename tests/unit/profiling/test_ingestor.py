@@ -7,6 +7,7 @@ from zipfile import ZipFile
 
 from twinklr.core.profiling.models.enums import FileKind
 from twinklr.core.profiling.pack.ingestor import (
+    _validate_zip_entry,
     extract_zip_flat,
     ingest_zip,
     is_zip_like,
@@ -122,3 +123,60 @@ def test_ingest_zip_ignores_appledouble_sequence_file(tmp_path: Path) -> None:
     manifest, extracted = ingest_zip(zip_path)
     assert manifest.sequence_file_id is not None
     assert not (extracted / "._Broken.xsq").exists()
+
+
+# ---------------------------------------------------------------------------
+# SEC-03: Zip path traversal validation tests
+# ---------------------------------------------------------------------------
+
+
+def test_validate_zip_entry_safe_path(tmp_path: Path) -> None:
+    """A normal zip entry resolves within the target directory."""
+    target = _validate_zip_entry("safe_file.xsq", tmp_path)
+    assert target == (tmp_path / "safe_file.xsq").resolve()
+
+
+def test_validate_zip_entry_nested_safe_path(tmp_path: Path) -> None:
+    """A nested entry (basename only used) resolves safely."""
+    target = _validate_zip_entry("subdir/safe_file.xsq", tmp_path)
+    # Path navigation stays inside tmp_path
+    assert str(target).startswith(str(tmp_path.resolve()))
+
+
+def test_validate_zip_entry_path_traversal_raises(tmp_path: Path) -> None:
+    """A zip entry with path traversal (../../) raises ValueError."""
+    import pytest
+
+    with pytest.raises(ValueError, match="would extract outside target directory"):
+        _validate_zip_entry("../../etc/passwd", tmp_path)
+
+
+def test_validate_zip_entry_absolute_path_raises(tmp_path: Path) -> None:
+    """A zip entry with an absolute path raises ValueError."""
+    import pytest
+
+    with pytest.raises(ValueError, match="would extract outside target directory"):
+        _validate_zip_entry("/etc/passwd", tmp_path)
+
+
+def test_validate_zip_entry_deep_traversal_raises(tmp_path: Path) -> None:
+    """A deeply nested path traversal attempt raises ValueError."""
+    import pytest
+
+    with pytest.raises(ValueError, match="would extract outside target directory"):
+        _validate_zip_entry("a/b/c/../../../../../../../../etc/shadow", tmp_path)
+
+
+def test_extract_zip_flat_traversal_entry_raises(tmp_path: Path) -> None:
+    """Zip archive containing a path-traversal entry raises ValueError during extraction."""
+    import pytest
+
+    zip_path = tmp_path / "evil.zip"
+    out_dir = tmp_path / "out"
+
+    # Manually craft a zip with a traversal entry
+    with ZipFile(zip_path, "w") as archive:
+        archive.writestr("../../etc/passwd", b"root:x:0:0:root:/root:/bin/bash")
+
+    with pytest.raises(ValueError, match="would extract outside target directory"):
+        extract_zip_flat(zip_path, out_dir)

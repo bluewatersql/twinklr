@@ -5,9 +5,10 @@ from __future__ import annotations
 import hashlib
 import shutil
 import uuid
-import xml.etree.ElementTree as ET
 from pathlib import Path
 from zipfile import ZipFile
+
+import defusedxml.ElementTree as defused_ET  # safe parsing — blocks XXE and billion-laughs
 
 from twinklr.core.profiling.models.enums import FileKind
 from twinklr.core.profiling.models.pack import FileEntry, PackageManifest
@@ -23,6 +24,25 @@ _AUDIO_EXTS = {".mp3", ".wav", ".flac", ".m4a", ".aac", ".ogg"}
 _VIDEO_EXTS = {".mp4", ".mov", ".avi", ".mkv", ".webm"}
 _IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp"}
 _IGNORED_FILENAMES = {".ds_store"}
+
+
+def _validate_zip_entry(entry_name: str, target_dir: Path) -> Path:
+    """Validate a zip entry resolves within the target directory.
+
+    Args:
+        entry_name: The filename from the zip entry.
+        target_dir: The intended extraction directory.
+
+    Returns:
+        The validated resolved path.
+
+    Raises:
+        ValueError: If the path would escape the target directory.
+    """
+    target = (target_dir / entry_name).resolve()
+    if not target.is_relative_to(target_dir.resolve()):
+        raise ValueError(f"Zip entry {entry_name!r} would extract outside target directory")
+    return target
 
 
 def _is_ignored_filename(filename: str) -> bool:
@@ -93,6 +113,9 @@ def extract_zip_flat(
             basename = Path(info.filename).name
             if _is_ignored_filename(basename):
                 continue
+            # SEC-03: validate entry does not escape the target directory.
+            # Return value intentionally unused — flat extraction uses basename only.
+            _validate_zip_entry(info.filename, out_dir)
             dest = out_dir / basename
             data = archive.read(info.filename)
             if dest.exists() and dest.read_bytes() != data:
@@ -106,8 +129,8 @@ def extract_zip_flat(
 def _sniff_xsequence(path: Path) -> bool:
     """Return True if XML root tag is `xsequence` (case-insensitive)."""
     try:
-        for _event, elem in ET.iterparse(path, events=["start"]):
-            return elem.tag.lower() == "xsequence"
+        for _event, elem in defused_ET.iterparse(path, events=["start"]):
+            return elem.tag.lower() == "xsequence"  # type: ignore[no-any-return]
     except Exception:  # noqa: BLE001
         return False
     return False

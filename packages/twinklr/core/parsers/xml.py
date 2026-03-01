@@ -6,8 +6,10 @@ ElementTree with consistent error handling and validation.
 
 from __future__ import annotations
 
-import xml.etree.ElementTree as ET
+import xml.etree.ElementTree as ET  # used only for type annotations and ElementTree wrapper
 from pathlib import Path
+
+import defusedxml.ElementTree as defused_ET  # safe parsing — blocks XXE and billion-laughs
 
 from twinklr.core.utils.logging import get_logger
 
@@ -59,7 +61,7 @@ class XMLParser:
 
         try:
             logger.debug(f"Parsing XML file: {path}")
-            tree: ET.ElementTree[ET.Element[str]] = ET.parse(path)
+            tree: ET.ElementTree[ET.Element[str]] = defused_ET.parse(path)
             logger.debug(f"Successfully parsed XML file: {path}")
             return tree
         except ET.ParseError as e:
@@ -84,6 +86,6 @@ class XMLParser:
             Value
         """
         try:
-            return ET.fromstring(xml_str)
+            return defused_ET.fromstring(xml_str)  # type: ignore[no-any-return]
         except ET.ParseError as e:
             raise ValueError(f"Malformed XML string: {e}") from e

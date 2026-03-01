@@ -21,6 +21,7 @@ Usage::
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 from pathlib import Path
 from typing import Any
@@ -40,6 +41,25 @@ from twinklr.core.feature_store.models import (
     ProfileRecord,
 )
 from twinklr.core.sequencer.templates.group.recipe import EffectRecipe
+
+_VALID_IDENTIFIER_RE = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
+
+
+def _validate_identifier(name: str) -> str:
+    """Validate a SQL identifier against allowlist pattern.
+
+    Args:
+        name: The identifier to validate.
+
+    Returns:
+        The validated identifier.
+
+    Raises:
+        ValueError: If the identifier contains invalid characters.
+    """
+    if not _VALID_IDENTIFIER_RE.match(name):
+        raise ValueError(f"Invalid SQL identifier: {name!r}")
+    return name
 
 
 class SQLiteFeatureStore:
@@ -124,7 +144,7 @@ class SQLiteFeatureStore:
                 p.sequence_file_id,
                 p.effect_family,
                 p.target_name,
-                json.dumps(p.model_dump(mode="json")),
+                p.model_dump_json(),
             )
             for p in phrases
         ]
@@ -155,7 +175,7 @@ class SQLiteFeatureStore:
                 t.effect_family,
                 t.support_count,
                 t.cross_pack_stability,
-                json.dumps(t.model_dump(mode="json")),
+                t.model_dump_json(),
             )
             for t in templates
         ]
@@ -185,7 +205,7 @@ class SQLiteFeatureStore:
                 a.sequence_file_id,
                 a.phrase_id,
                 a.template_id,
-                json.dumps(a.model_dump(mode="json")),
+                a.model_dump_json(),
             )
             for a in assignments
         ]
@@ -216,7 +236,7 @@ class SQLiteFeatureStore:
                 s.sequence_file_id,
                 s.target_name,
                 s.stack_signature,
-                json.dumps(s.model_dump(mode="json")),
+                s.model_dump_json(),
             )
             for s in stacks
         ]
@@ -244,7 +264,7 @@ class SQLiteFeatureStore:
             (
                 e.source_template_id,
                 e.target_template_id,
-                json.dumps(e.model_dump(mode="json")),
+                e.model_dump_json(),
             )
             for e in edges
         ]
@@ -272,7 +292,7 @@ class SQLiteFeatureStore:
                 r.recipe_id,
                 r.template_type.value,
                 r.visual_intent.value,
-                json.dumps(r.model_dump(mode="json")),
+                r.model_dump_json(),
             )
             for r in recipes
         ]
@@ -300,7 +320,7 @@ class SQLiteFeatureStore:
                 r.phrase_id,
                 r.package_id,
                 r.sequence_file_id,
-                json.dumps(r.model_dump(mode="json")),
+                r.model_dump_json(),
             )
             for r in records
         ]
@@ -327,7 +347,7 @@ class SQLiteFeatureStore:
             (
                 e.effect_family,
                 e.model_type,
-                json.dumps(e.model_dump(mode="json")),
+                e.model_dump_json(),
             )
             for e in entries
         ]
@@ -664,10 +684,12 @@ class SQLiteFeatureStore:
         Returns:
             A ``CorpusStats`` instance with counts from each table.
         """
-        conn = self._conn  # type: ignore[union-attr]
+        if self._conn is None:
+            raise RuntimeError("Database connection is not open")
+        conn = self._conn
 
         def _count(table: str) -> int:
-            row = conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()
+            row = conn.execute(f"SELECT COUNT(*) FROM {_validate_identifier(table)}").fetchone()
             return int(row[0])
 
         return CorpusStats(

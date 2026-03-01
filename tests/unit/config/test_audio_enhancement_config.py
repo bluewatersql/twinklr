@@ -57,7 +57,7 @@ class TestAudioEnhancementConfigDefaults:
         assert config.enable_acoustid is True
         assert config.enable_musicbrainz is True
         assert config.enable_lyrics_lookup is True
-        assert config.acoustid_api_key == "test_key_123"
+        assert config.acoustid_api_key.get_secret_value() == "test_key_123"
 
     def test_whisperx_with_gpu(self):
         """WhisperX configuration for GPU acceleration."""
@@ -100,7 +100,7 @@ class TestAudioProcessingConfigWithEnhancements:
 
         assert config.hop_length == 512
         assert config.enhancements.enable_acoustid is True
-        assert config.enhancements.acoustid_api_key == "test_key"
+        assert config.enhancements.acoustid_api_key.get_secret_value() == "test_key"
 
     def test_load_from_dict_with_enhancements(self):
         """Load AudioProcessingConfig from dict with enhancements."""
@@ -121,7 +121,7 @@ class TestAudioProcessingConfigWithEnhancements:
 
         assert config.hop_length == 512
         assert config.enhancements.enable_acoustid is True
-        assert config.enhancements.acoustid_api_key == "test_key"
+        assert config.enhancements.acoustid_api_key.get_secret_value() == "test_key"
         assert config.enhancements.whisperx_model == "small"
 
     def test_load_from_dict_without_enhancements(self):

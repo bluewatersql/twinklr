@@ -11,19 +11,30 @@ import numpy as np
 logger = logging.getLogger(__name__)
 
 
-def detect_musical_key(y: np.ndarray, sr: int, *, hop_length: int) -> dict[str, Any]:
+def detect_musical_key(
+    y: np.ndarray,
+    sr: int,
+    *,
+    hop_length: int,
+    chroma: np.ndarray | None = None,
+) -> dict[str, Any]:
     """Krumhansl-Schmuckler key estimation.
 
     Args:
         y: Audio time series
         sr: Sample rate
         hop_length: Hop length
+        chroma: Pre-computed chroma features (optional). If provided, skips
+            internal chroma_cqt computation for efficiency.
 
     Returns:
         Dict with key, mode, confidence, alternative
     """
     try:
-        chroma = librosa.feature.chroma_cqt(y=y, sr=sr, hop_length=hop_length).astype(np.float32)
+        if chroma is None:
+            chroma = librosa.feature.chroma_cqt(y=y, sr=sr, hop_length=hop_length).astype(
+                np.float32
+            )
         chroma_avg = np.mean(chroma, axis=1)
 
         # Krumhansl-Kessler profiles (C major/minor as reference)

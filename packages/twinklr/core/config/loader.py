@@ -247,7 +247,9 @@ def _load_env_vars_into_config(config: AppConfig) -> None:
         acoustid_key = os.getenv("ACOUSTID_API_KEY")
         if acoustid_key:
             logger.debug("Loaded ACOUSTID_API_KEY from environment")
-            updates["acoustid_api_key"] = acoustid_key
+            from pydantic import SecretStr
+
+            updates["acoustid_api_key"] = SecretStr(acoustid_key)
 
     # Load Genius access token from environment if not in config
     # Support both GENIUS_ACCESS_TOKEN (preferred) and GENIUS_CLIENT_TOKEN (legacy)
@@ -262,7 +264,9 @@ def _load_env_vars_into_config(config: AppConfig) -> None:
                 logger.warning(
                     "Using deprecated GENIUS_CLIENT_TOKEN. Please rename to GENIUS_ACCESS_TOKEN in your .env file"
                 )
-            updates["genius_access_token"] = genius_token
+            from pydantic import SecretStr
+
+            updates["genius_access_token"] = SecretStr(genius_token)
 
     # Apply updates if any
     if updates:

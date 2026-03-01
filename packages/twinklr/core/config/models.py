@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 from typing import Self
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, SecretStr
 
 from twinklr.core.config.poses import PoseConfig
 from twinklr.core.curves.library import CurveLibrary
@@ -305,10 +305,10 @@ class AudioEnhancementConfig(BaseModel):
     viseme_mapping_version: str = Field(default="1.0", description="Viseme mapping table version")
 
     # Provider configuration
-    acoustid_api_key: str | None = Field(
+    acoustid_api_key: SecretStr | None = Field(
         default=None, description="AcoustID API key (load from env: ACOUSTID_API_KEY)"
     )
-    genius_access_token: str | None = Field(
+    genius_access_token: SecretStr | None = Field(
         default=None,
         description="Genius API access token (load from env: GENIUS_ACCESS_TOKEN or GENIUS_CLIENT_TOKEN)",
     )
@@ -427,8 +427,8 @@ class AppConfig(ConfigBase):
     planning: PlanningContextConfig = PlanningContextConfig()
     logging: LoggingConfig = LoggingConfig()
 
-    llm_api_key: str = Field(
-        default_factory=lambda: os.getenv("OPENAI_API_KEY", ""),
+    llm_api_key: SecretStr = Field(
+        default_factory=lambda: SecretStr(os.getenv("OPENAI_API_KEY", "")),
         description="LLM API key to use for API calls",
     )
     llm_provider: str = Field(default="openai", description="LLM provider to use for API calls")

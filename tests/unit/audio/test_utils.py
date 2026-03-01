@@ -7,6 +7,7 @@ import pytest
 
 from twinklr.core.audio.utils import (
     align_to_length,
+    as_float_list,
     frames_to_time,
     normalize_to_0_1,
     safe_divide,
@@ -71,3 +72,58 @@ class TestNormalizeTo01:
         assert len(result) == 5
         assert result[3] == 3.0  # Edge padding
         assert result[4] == 3.0
+
+
+class TestAsFloatList:
+    """Tests for as_float_list function (PERF-13)."""
+
+    def test_output_equivalence_with_original(self) -> None:
+        """Optimized implementation produces values consistent with rounding.
+
+        The original implementation used float32 intermediate precision, which
+        could introduce small rounding artifacts. The new float64 path is
+        *more* precise. We verify that each output value equals ``round(x, 3)``
+        computed at full float64 precision.
+        """
+        rng = np.random.default_rng(42)
+        x = rng.standard_normal(1000).astype(np.float64) * 100
+
+        optimized = as_float_list(x, ndigits=3)
+        expected = [round(float(v), 3) for v in x]
+
+        assert len(optimized) == len(expected)
+        for exp, opt in zip(expected, optimized, strict=True):
+            assert opt == pytest.approx(exp, abs=1e-9)
+
+    def test_output_is_list_of_python_floats(self) -> None:
+        """Result is a plain list of native Python float objects."""
+        x = np.array([1.1234, 2.5678, 3.9012], dtype=np.float64)
+        result = as_float_list(x)
+
+        assert isinstance(result, list)
+        assert all(isinstance(v, float) for v in result)
+
+    def test_rounding_default_3_decimal_places(self) -> None:
+        """Default ndigits=3 rounds to 3 decimal places."""
+        x = np.array([1.23456, 2.78901, 0.00049])
+        result = as_float_list(x)
+
+        assert result[0] == pytest.approx(1.235)
+        assert result[1] == pytest.approx(2.789)
+        assert result[2] == pytest.approx(0.0)
+
+    def test_rounding_custom_ndigits(self) -> None:
+        """Custom ndigits parameter is respected."""
+        x = np.array([1.23456, 2.78901])
+        result = as_float_list(x, ndigits=1)
+
+        assert result[0] == pytest.approx(1.2)
+        assert result[1] == pytest.approx(2.8)
+
+    def test_empty_array(self) -> None:
+        """Empty input returns empty list."""
+        x = np.array([], dtype=np.float64)
+        result = as_float_list(x)
+
+        assert result == []
+        assert isinstance(result, list)

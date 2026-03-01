@@ -375,7 +375,7 @@ class GroupPlannerStage:
             else:
                 ttype = getattr(target, "type", None)
                 tid = getattr(target, "id", None)
-                if hasattr(ttype, "value"):
+                if ttype is not None and hasattr(ttype, "value"):
                     ttype = ttype.value
             if ttype and tid:
                 serialized.append({"type": str(ttype), "id": str(tid)})
