@@ -4,6 +4,10 @@ V0 implementation is intentionally minimal:
 - schema-isolated corpus outputs
 - streaming/chunked processing by default
 - deterministic dedup
+
+.. deprecated::
+    The corpus build step is deprecated. Use
+    FeatureEngineeringPipeline.run() with store-driven profiles instead.
 """
 
 from __future__ import annotations

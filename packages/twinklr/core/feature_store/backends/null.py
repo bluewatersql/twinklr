@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from twinklr.core.feature_store.models import CorpusStats
+from twinklr.core.feature_store.models import CorpusStats, ProfileRecord
 
 if TYPE_CHECKING:
     from twinklr.core.feature_engineering.models.phrases import EffectPhrase
@@ -78,6 +78,31 @@ class NullFeatureStore:
     def upsert_corpus_metadata(self, corpus_id: str, metadata_json: str) -> int:
         """Discard corpus metadata and return 0."""
         return 0
+
+    # ------------------------------------------------------------------
+    # Profile methods
+    # ------------------------------------------------------------------
+
+    def upsert_profile(self, profile: ProfileRecord) -> int:
+        """Discard profile and return 0."""
+        return 0
+
+    def query_profiles(self, fe_status: str | None = None) -> tuple[ProfileRecord, ...]:
+        """Return an empty tuple — no profiles stored."""
+        return ()
+
+    def query_profile_by_sha(self, sequence_sha256: str) -> ProfileRecord | None:
+        """Return None — no profiles stored."""
+        return None
+
+    def mark_fe_complete(self, profile_id: str) -> None:
+        """No-op — null backend does not track profile status."""
+
+    def mark_fe_error(self, profile_id: str, error: str) -> None:
+        """No-op — null backend does not track profile status."""
+
+    def reset_all_fe_status(self) -> None:
+        """No-op — null backend does not track profile status."""
 
     # ------------------------------------------------------------------
     # Read methods

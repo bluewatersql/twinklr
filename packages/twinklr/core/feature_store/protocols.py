@@ -18,7 +18,7 @@ if TYPE_CHECKING:
     from twinklr.core.feature_engineering.models.transitions import TransitionEdge
     from twinklr.core.sequencer.templates.group.recipe import EffectRecipe
 
-from twinklr.core.feature_store.models import CorpusStats
+from twinklr.core.feature_store.models import CorpusStats, ProfileRecord
 
 
 @runtime_checkable
@@ -151,6 +151,72 @@ class FeatureStoreProviderSync(Protocol):
 
         Returns:
             Number of rows inserted or updated.
+        """
+        ...
+
+    # ------------------------------------------------------------------
+    # Profile methods
+    # ------------------------------------------------------------------
+
+    def upsert_profile(self, profile: ProfileRecord) -> int:
+        """Persist a profile record, inserting or updating by profile_id.
+
+        Args:
+            profile: ProfileRecord to upsert. Uses INSERT OR REPLACE semantics.
+
+        Returns:
+            Number of rows inserted or updated (always 1 on success).
+        """
+        ...
+
+    def query_profiles(self, fe_status: str | None = None) -> tuple[ProfileRecord, ...]:
+        """Return profiles matching optional fe_status filter.
+
+        Args:
+            fe_status: Restrict to profiles with this status ('pending', 'complete',
+                'error'). If None, return all profiles.
+
+        Returns:
+            Tuple of matching ProfileRecord instances.
+        """
+        ...
+
+    def query_profile_by_sha(self, sequence_sha256: str) -> ProfileRecord | None:
+        """Return the profile with matching sequence_sha256, or None if not found.
+
+        Args:
+            sequence_sha256: SHA256 hash of the sequence content.
+
+        Returns:
+            ProfileRecord if found, None otherwise.
+        """
+        ...
+
+    def mark_fe_complete(self, profile_id: str) -> None:
+        """Mark a profile as feature-engineering complete.
+
+        Sets fe_status='complete' and fe_completed_at=datetime('now').
+
+        Args:
+            profile_id: Primary key of the profile to update.
+        """
+        ...
+
+    def mark_fe_error(self, profile_id: str, error: str) -> None:
+        """Mark a profile as feature-engineering error.
+
+        Sets fe_status='error' and fe_error to the provided message.
+
+        Args:
+            profile_id: Primary key of the profile to update.
+            error: Error message to store.
+        """
+        ...
+
+    def reset_all_fe_status(self) -> None:
+        """Reset all profiles to fe_status='pending' for force reprocessing.
+
+        Clears fe_error and fe_completed_at on all profiles.
         """
         ...
 

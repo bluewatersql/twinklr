@@ -76,5 +76,23 @@
     "table": "propensity",
     "columns": ["effect_family"],
     "unique": false
+  },
+  {
+    "name": "idx_profiles_status",
+    "table": "profiles",
+    "columns": ["fe_status"],
+    "unique": false
+  },
+  {
+    "name": "idx_profiles_sha",
+    "table": "profiles",
+    "columns": ["sequence_sha256"],
+    "unique": false
+  },
+  {
+    "name": "idx_profiles_package",
+    "table": "profiles",
+    "columns": ["package_id", "sequence_file_id"],
+    "unique": true
   }
 ]

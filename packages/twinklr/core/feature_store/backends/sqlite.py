@@ -37,6 +37,7 @@ from twinklr.core.feature_store.models import (
     CorpusStats,
     FeatureStoreConfig,
     FeatureStoreSchemaError,
+    ProfileRecord,
 )
 from twinklr.core.sequencer.templates.group.recipe import EffectRecipe
 
@@ -356,6 +357,148 @@ class SQLiteFeatureStore:
         return 1
 
     # ------------------------------------------------------------------
+    # Profile methods
+    # ------------------------------------------------------------------
+
+    def upsert_profile(self, profile: ProfileRecord) -> int:
+        """Persist a profile record, inserting or updating by profile_id.
+
+        Args:
+            profile: ProfileRecord to upsert.
+
+        Returns:
+            Number of rows inserted or updated (always 1).
+        """
+        with self._conn:  # type: ignore[union-attr]
+            self._conn.execute(  # type: ignore[union-attr]
+                "INSERT OR REPLACE INTO profiles "
+                "(profile_id, package_id, sequence_file_id, profile_path, "
+                "zip_sha256, sequence_sha256, song, artist, duration_ms, "
+                "effect_total_events, schema_version, fe_status, fe_error, "
+                "profiled_at, fe_completed_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    profile.profile_id,
+                    profile.package_id,
+                    profile.sequence_file_id,
+                    profile.profile_path,
+                    profile.zip_sha256,
+                    profile.sequence_sha256,
+                    profile.song,
+                    profile.artist,
+                    profile.duration_ms,
+                    profile.effect_total_events,
+                    profile.schema_version,
+                    profile.fe_status,
+                    profile.fe_error,
+                    profile.profiled_at,
+                    profile.fe_completed_at,
+                ),
+            )
+        return 1
+
+    def query_profiles(self, fe_status: str | None = None) -> tuple[ProfileRecord, ...]:
+        """Return profiles matching optional fe_status filter.
+
+        Args:
+            fe_status: Restrict to profiles with this status. If None, return all.
+
+        Returns:
+            Tuple of matching ProfileRecord instances.
+        """
+        if fe_status is not None:
+            rows = self._conn.execute(  # type: ignore[union-attr]
+                "SELECT * FROM profiles WHERE fe_status = ?",
+                (fe_status,),
+            ).fetchall()
+        else:
+            rows = self._conn.execute(  # type: ignore[union-attr]
+                "SELECT * FROM profiles"
+            ).fetchall()
+        return tuple(self._row_to_profile(r) for r in rows)
+
+    def query_profile_by_sha(self, sequence_sha256: str) -> ProfileRecord | None:
+        """Return the profile with matching sequence_sha256, or None.
+
+        Args:
+            sequence_sha256: SHA256 hash of the sequence content.
+
+        Returns:
+            ProfileRecord if found, None otherwise.
+        """
+        row = self._conn.execute(  # type: ignore[union-attr]
+            "SELECT * FROM profiles WHERE sequence_sha256 = ? LIMIT 1",
+            (sequence_sha256,),
+        ).fetchone()
+        if row is None:
+            return None
+        return self._row_to_profile(row)
+
+    def mark_fe_complete(self, profile_id: str) -> None:
+        """Mark a profile as feature-engineering complete.
+
+        Args:
+            profile_id: Primary key of the profile to update.
+        """
+        with self._conn:  # type: ignore[union-attr]
+            self._conn.execute(  # type: ignore[union-attr]
+                "UPDATE profiles SET fe_status='complete', "
+                "fe_completed_at=datetime('now') WHERE profile_id=?",
+                (profile_id,),
+            )
+
+    def mark_fe_error(self, profile_id: str, error: str) -> None:
+        """Mark a profile as feature-engineering error.
+
+        Args:
+            profile_id: Primary key of the profile to update.
+            error: Error message to store.
+        """
+        with self._conn:  # type: ignore[union-attr]
+            self._conn.execute(  # type: ignore[union-attr]
+                "UPDATE profiles SET fe_status='error', fe_error=? WHERE profile_id=?",
+                (error, profile_id),
+            )
+
+    def reset_all_fe_status(self) -> None:
+        """Reset all profiles to fe_status='pending' for force reprocessing.
+
+        Clears fe_error and fe_completed_at on all profiles.
+        """
+        with self._conn:  # type: ignore[union-attr]
+            self._conn.execute(  # type: ignore[union-attr]
+                "UPDATE profiles SET fe_status='pending', fe_error=NULL, fe_completed_at=NULL"
+            )
+
+    @staticmethod
+    def _row_to_profile(row: sqlite3.Row) -> ProfileRecord:
+        """Convert a sqlite3.Row to a ProfileRecord.
+
+        Args:
+            row: Database row with profile columns.
+
+        Returns:
+            ProfileRecord instance.
+        """
+        return ProfileRecord(
+            profile_id=row["profile_id"],
+            package_id=row["package_id"],
+            sequence_file_id=row["sequence_file_id"],
+            profile_path=row["profile_path"],
+            zip_sha256=row["zip_sha256"],
+            sequence_sha256=row["sequence_sha256"],
+            song=row["song"],
+            artist=row["artist"],
+            duration_ms=row["duration_ms"],
+            effect_total_events=row["effect_total_events"],
+            schema_version=row["schema_version"],
+            fe_status=row["fe_status"],
+            fe_error=row["fe_error"],
+            profiled_at=row["profiled_at"],
+            fe_completed_at=row["fe_completed_at"],
+        )
+
+    # ------------------------------------------------------------------
     # Read methods
     # ------------------------------------------------------------------
 
@@ -535,6 +678,7 @@ class SQLiteFeatureStore:
             recipe_count=_count("recipes"),
             taxonomy_count=_count("taxonomy"),
             propensity_count=_count("propensity"),
+            profile_count=_count("profiles"),
         )
 
     def get_schema_version(self) -> str:

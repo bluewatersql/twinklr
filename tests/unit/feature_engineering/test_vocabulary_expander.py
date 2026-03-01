@@ -12,10 +12,8 @@ Covers all 6 test cases from the spec:
 from __future__ import annotations
 
 import json
-import uuid
 from pathlib import Path
-
-import pytest
+import uuid
 
 from twinklr.core.feature_engineering.models.phrases import (
     ColorClass,
@@ -32,13 +30,10 @@ from twinklr.core.feature_engineering.models.stacks import (
     EffectStackLayer,
 )
 from twinklr.core.feature_engineering.models.vocabulary import (
-    CompoundEnergyTerm,
-    CompoundMotionTerm,
     VocabularyExtensions,
 )
 from twinklr.core.feature_engineering.vocabulary_expander import VocabularyExpander
 from twinklr.core.sequencer.vocabulary import BlendMode, LayerRole
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -213,9 +208,7 @@ class TestCompoundMotionDiscovery:
 
     def test_dual_chase(self) -> None:
         """single_strand@b + single_strand@a -> dual_chase (sweep + sweep)."""
-        stacks = _stack(
-            families=("single_strand", "single_strand"), roles=("b", "a"), count=15
-        )
+        stacks = _stack(families=("single_strand", "single_strand"), roles=("b", "a"), count=15)
         catalog = _catalog(stacks)
         expander = VocabularyExpander()
         result = expander.expand(stack_catalog=catalog)

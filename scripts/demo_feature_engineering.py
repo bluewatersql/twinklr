@@ -16,6 +16,7 @@ from twinklr.core.feature_engineering.pipeline import (
     FeatureEngineeringPipeline,
     FeatureEngineeringPipelineOptions,
 )
+from twinklr.core.profiling.unify import CorpusBuildOptions, ProfileCorpusBuilder
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_OUTPUT_DIR = ROOT / "data" / "features" / "demo_feature_engineering"
@@ -36,6 +37,42 @@ def _load_music_library_index() -> MusicLibraryIndex | None:
         f"  [info] Loaded music library index: {len(index.entries)} files ({tagged} with metadata)"
     )
     return index
+
+
+def _ensure_corpus(corpus_dir: Path) -> Path:
+    """Build the profile corpus if sequence_index.jsonl is missing.
+
+    Returns the resolved corpus directory (which may differ from *corpus_dir*
+    when the builder auto-detects a schema version).
+    """
+    index_path = corpus_dir / "sequence_index.jsonl"
+    if index_path.exists():
+        return corpus_dir
+
+    profiles_root = ROOT / "data" / "profiles"
+    if not profiles_root.exists():
+        raise FileNotFoundError(
+            f"Neither corpus ({corpus_dir}) nor profiles root ({profiles_root}) exist. "
+            "Run sequence profiling first: python scripts/demo_profiling.py"
+        )
+
+    print(f"  [auto] Corpus index missing at {corpus_dir.relative_to(ROOT)}")
+    print(f"  [auto] Building corpus from {profiles_root.relative_to(ROOT)} ...")
+    builder = ProfileCorpusBuilder(CorpusBuildOptions())
+    corpus_output_root = profiles_root / "corpus"
+    results = builder.build(profiles_root=profiles_root, output_root=corpus_output_root)
+    if not results:
+        raise RuntimeError("Corpus build produced no results — check data/profiles/ for profiles.")
+    for result in results:
+        print(
+            f"  [auto] Built corpus: {result.schema_version} "
+            f"({result.sequence_count} sequences) → {result.output_dir}"
+        )
+    best = results[0]
+    if corpus_dir.name in {r.schema_version for r in results}:
+        return corpus_dir
+    print(f"  [auto] Using corpus: {best.output_dir.relative_to(ROOT)}")
+    return best.output_dir
 
 
 def parse_args() -> argparse.Namespace:
@@ -642,6 +679,7 @@ def main() -> int:
         if args.corpus_dir is None:
             print("ERROR: --corpus-dir is required unless --skip-build is set.")
             return 2
+        corpus_dir = _ensure_corpus(args.corpus_dir.resolve())
         analyzer = None
         if args.run_audio_analysis:
             from twinklr.core.audio.analyzer import AudioAnalyzer
@@ -670,7 +708,7 @@ def main() -> int:
             analyzer=analyzer,
             music_library_index=music_index,
         )
-        bundles = pipeline.run_corpus(args.corpus_dir.resolve(), output_dir)
+        bundles = pipeline.run_corpus(corpus_dir, output_dir)
         print(f"Built feature-engineering artifacts for {len(bundles)} sequences.")
 
     sequence_dirs = _collect_sequence_dirs(output_dir)

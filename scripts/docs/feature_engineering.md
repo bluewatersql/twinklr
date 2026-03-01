@@ -2,13 +2,64 @@
 
 This document is the single source of truth for running profiling corpus build + feature engineering.
 
+## 0) Unified Pipeline (Recommended)
+
+The unified build pipeline runs the complete workflow in a single command:
+discover vendor packages → profile → feature-engineer → report.
+
+Script:
+- `scripts/build/build_pipeline.py`
+
+### Quick Start
+
+```bash
+# Full run with defaults (zero arguments required)
+python scripts/build/build_pipeline.py
+```
+
+### Common Options
+
+```bash
+# Force full reprocessing (delete store, reprofile, re-run FE)
+python scripts/build/build_pipeline.py --force
+
+# Skip profiling (use existing profiles only)
+python scripts/build/build_pipeline.py --skip-profiling
+
+# Skip audio analysis (faster)
+python scripts/build/build_pipeline.py --skip-audio
+```
+
+### How It Works
+
+1. **Discover**: Finds `*.zip` and `*.xsqz` packages under `data/vendor_packages`
+2. **Profile**: Runs `SequencePackProfiler` on each package (skips if profile already exists)
+3. **Feature Engineer**: Builds unified corpus, then runs `FeatureEngineeringPipeline` with store-driven incremental processing
+4. **Report**: Prints summary of processed sequences
+
+State is tracked in a SQLite feature store (`data/features/twinklr.db` by default). Running the pipeline twice skips all work. Adding a new vendor package processes only that package.
+
+### Default Paths
+
+| Setting | Default |
+|---------|---------|
+| Vendor packages | `data/vendor_packages` |
+| Profile output | `data/profiles` |
+| FE output | `data/features/feature_engineering` |
+| Feature store | `data/features/twinklr.db` |
+
 ## Canonical CLI Flow
 
+**Recommended**: Use `scripts/build/build_pipeline.py` (Section 0) for the full workflow.
+
+The steps below describe the individual scripts for advanced use cases:
 1. Build unified profile corpus from `data/profiles`.
 2. Build feature-engineering artifacts from that corpus.
 3. Optionally run the demo report over the feature output.
 
 ## 1) Build Unified Profile Corpus
+
+> **Note**: For end-to-end workflows, prefer `scripts/build/build_pipeline.py` which handles corpus building internally. Use this script only for standalone corpus builds.
 
 Script:
 - `scripts/build/build_profile_corpus.py`
@@ -25,6 +76,8 @@ Expected corpus artifacts:
 - `quality_report.json`
 
 ## 2) Build Feature Engineering Artifacts
+
+> **Note**: For end-to-end workflows, prefer `scripts/build/build_pipeline.py` which handles profiling and corpus building before FE. Use this script when starting from an existing corpus.
 
 Canonical script:
 - `scripts/build/build_feature_engineering.py`

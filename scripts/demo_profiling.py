@@ -7,9 +7,16 @@ import argparse
 import json
 from pathlib import Path
 import sys
+from typing import TYPE_CHECKING
 
+from twinklr.core.feature_store.backends.null import NullFeatureStore
+from twinklr.core.feature_store.factory import create_feature_store
+from twinklr.core.feature_store.models import FeatureStoreConfig
 from twinklr.core.profiling.profiler import SequencePackProfiler
 from twinklr.core.profiling.report import generate_layout_report_md
+
+if TYPE_CHECKING:
+    from twinklr.core.feature_store.protocols import FeatureStoreProviderSync
 
 ROOT = Path(__file__).resolve().parents[1]
 VENDOR_DIR = ROOT / "data" / "vendor_packages"
@@ -40,7 +47,16 @@ def _print_summary(rows: list[dict[str, str]]) -> None:
         print("No inputs processed.")
         return
 
-    headers = ("source", "song", "duration_ms", "events", "models", "groups", "source_ext")
+    headers = (
+        "status",
+        "source",
+        "song",
+        "duration_ms",
+        "events",
+        "models",
+        "groups",
+        "source_ext",
+    )
     widths = {header: len(header) for header in headers}
     for row in rows:
         for header in headers:
@@ -67,6 +83,7 @@ def _profile_layout_only(
         generate_layout_report_md(layout), encoding="utf-8"
     )
     return {
+        "status": "NEW",
         "source": input_path.name,
         "song": "-",
         "duration_ms": "-",
@@ -78,11 +95,28 @@ def _profile_layout_only(
 
 
 def _profile_archive(
-    profiler: SequencePackProfiler, input_path: Path, output_dir: Path
+    profiler: SequencePackProfiler,
+    input_path: Path,
+    output_dir: Path,
+    *,
+    force: bool = False,
+    prev_profile_count: int = 0,
+    store,
 ) -> dict[str, str]:
-    profile = profiler.profile(input_path, output_dir)
+    profile = profiler.profile(input_path, output_dir, force=force)
     source_ext = sorted(profile.manifest.source_extensions)
+
+    # Detect skip vs. new by comparing store profile count
+    new_count = len(store.query_profiles()) if not isinstance(store, NullFeatureStore) else None
+    if new_count is not None:
+        status = "NEW" if new_count > prev_profile_count else "SKIP"
+    else:
+        # NullFeatureStore: check if sequence_metadata.json existed before profiling
+        metadata_path = output_dir / "sequence_metadata.json"
+        status = "SKIP" if metadata_path.exists() and not force else "NEW"
+
     return {
+        "status": status,
         "source": input_path.name,
         "song": profile.sequence_metadata.song,
         "duration_ms": str(profile.sequence_metadata.sequence_duration_ms),
@@ -97,6 +131,7 @@ def _profile_archive(
 
 def _error_row(input_path: Path, error: Exception) -> dict[str, str]:
     return {
+        "status": "ERROR",
         "source": input_path.name,
         "song": f"ERROR: {type(error).__name__}",
         "duration_ms": "-",
@@ -113,30 +148,73 @@ def main() -> int:
         "--input", type=Path, help="Input .zip/.xsqz package or xlights_rgbeffects.xml file."
     )
     parser.add_argument("--output-dir", type=Path, help="Output directory for profiling artifacts.")
+    parser.add_argument(
+        "--feature-store-db",
+        type=Path,
+        default=None,
+        help="Path to SQLite feature store DB. If omitted, uses in-memory null store.",
+    )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        default=False,
+        help="Force full profiling even if a cached result exists.",
+    )
     args = parser.parse_args()
 
-    profiler = SequencePackProfiler()
+    # Build store
+    store: FeatureStoreProviderSync = NullFeatureStore()
+    if args.feature_store_db is not None:
+        cfg = FeatureStoreConfig(backend="sqlite", db_path=Path(args.feature_store_db))
+        store = create_feature_store(cfg)
+    store.initialize()
+
     rows: list[dict[str, str]] = []
 
-    if args.input is not None:
-        input_path = args.input.resolve()
-        output_dir = (
-            args.output_dir.resolve() if args.output_dir else _default_output_dir(input_path)
-        )
-        if input_path.suffix.lower() == ".xml":
-            rows.append(_profile_layout_only(profiler, input_path, output_dir))
-        else:
-            rows.append(_profile_archive(profiler, input_path, output_dir))
-        _print_summary(rows)
-        return 0
+    try:
+        profiler = SequencePackProfiler(store=store)
 
-    for input_path in _find_default_inputs():
-        output_dir = _default_output_dir(input_path)
-        try:
-            rows.append(_profile_archive(profiler, input_path, output_dir))
-        except Exception as exc:
-            print(f"Failed to profile {input_path.name}: {exc}", file=sys.stderr)
-            rows.append(_error_row(input_path, exc))
+        if args.input is not None:
+            input_path = args.input.resolve()
+            output_dir = (
+                args.output_dir.resolve() if args.output_dir else _default_output_dir(input_path)
+            )
+            if input_path.suffix.lower() == ".xml":
+                rows.append(_profile_layout_only(profiler, input_path, output_dir))
+            else:
+                prev_count = len(store.query_profiles())
+                rows.append(
+                    _profile_archive(
+                        profiler,
+                        input_path,
+                        output_dir,
+                        force=args.force,
+                        prev_profile_count=prev_count,
+                        store=store,
+                    )
+                )
+            _print_summary(rows)
+            return 0
+
+        for input_path in _find_default_inputs():
+            output_dir = _default_output_dir(input_path)
+            try:
+                prev_count = len(store.query_profiles())
+                rows.append(
+                    _profile_archive(
+                        profiler,
+                        input_path,
+                        output_dir,
+                        force=args.force,
+                        prev_profile_count=prev_count,
+                        store=store,
+                    )
+                )
+            except Exception as exc:
+                print(f"Failed to profile {input_path.name}: {exc}", file=sys.stderr)
+                rows.append(_error_row(input_path, exc))
+    finally:
+        store.close()
 
     _print_summary(rows)
     return 0

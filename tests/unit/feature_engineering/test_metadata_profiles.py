@@ -18,13 +18,8 @@ from twinklr.core.feature_engineering.metadata_profiles import (
     EffectMetadataProfileBuilder,
 )
 from twinklr.core.feature_engineering.models.metadata import (
-    DurationDistribution,
     EffectMetadataProfile,
     EffectMetadataProfiles,
-    LayeringBehavior,
-    ParamFrequency,
-    ParamProfile,
-    SectionPlacement,
 )
 from twinklr.core.feature_engineering.models.phrases import (
     ColorClass,
@@ -120,9 +115,7 @@ def _make_stack(
     )
 
 
-def _get_profile(
-    profiles: EffectMetadataProfiles, family: str
-) -> EffectMetadataProfile:
+def _get_profile(profiles: EffectMetadataProfiles, family: str) -> EffectMetadataProfile:
     """Extract a single family profile from the collection."""
     for p in profiles.profiles:
         if p.effect_family == family:
@@ -138,8 +131,7 @@ class TestDurationDistribution:
         """10 phrases with known durations produce correct p10, p50, p90."""
         # Durations: 100, 200, 300, ..., 1000
         phrases = tuple(
-            _make_phrase(effect_family="bars", duration_ms=(i + 1) * 100, idx=i)
-            for i in range(10)
+            _make_phrase(effect_family="bars", duration_ms=(i + 1) * 100, idx=i) for i in range(10)
         )
         builder = EffectMetadataProfileBuilder()
         result = builder.build(phrases=phrases)
@@ -197,24 +189,18 @@ class TestParameterProfiles:
 
     def test_top_param_values_extracted(self) -> None:
         """4x Left-Right + 1x Bounce -> top value Left-Right freq 0.8."""
-        phrases_lr = tuple(
-            _make_phrase(effect_family="bars", idx=i) for i in range(4)
-        )
+        phrases_lr = tuple(_make_phrase(effect_family="bars", idx=i) for i in range(4))
         phrase_bounce = _make_phrase(effect_family="bars", idx=4)
 
         stacks_lr = tuple(
             _make_stack(
-                layers=(
-                    (p, LayerRole.BASE, {"chase_type1": "Left-Right"}),
-                ),
+                layers=((p, LayerRole.BASE, {"chase_type1": "Left-Right"}),),
                 stack_idx=i,
             )
             for i, p in enumerate(phrases_lr)
         )
         stack_bounce = _make_stack(
-            layers=(
-                (phrase_bounce, LayerRole.BASE, {"chase_type1": "Bounce"}),
-            ),
+            layers=((phrase_bounce, LayerRole.BASE, {"chase_type1": "Bounce"}),),
             stack_idx=4,
         )
 
@@ -233,9 +219,7 @@ class TestParameterProfiles:
 
         profile = _get_profile(result, "bars")
         assert len(profile.top_params) >= 1
-        chase_param = next(
-            p for p in profile.top_params if p.param_name == "chase_type1"
-        )
+        chase_param = next(p for p in profile.top_params if p.param_name == "chase_type1")
         assert chase_param.distinct_value_count == 2
         top = chase_param.top_values[0]
         assert top.value == "Left-Right"
@@ -248,12 +232,9 @@ class TestLayeringBehavior:
 
     def test_role_distribution_and_partners(self) -> None:
         """7 BASE + 3 ACCENT stacks, with color_wash partner in 6."""
-        bars_phrases = tuple(
-            _make_phrase(effect_family="bars", idx=i) for i in range(10)
-        )
+        bars_phrases = tuple(_make_phrase(effect_family="bars", idx=i) for i in range(10))
         wash_phrases = tuple(
-            _make_phrase(effect_family="color_wash", idx=100 + i)
-            for i in range(6)
+            _make_phrase(effect_family="color_wash", idx=100 + i) for i in range(6)
         )
 
         # 7 stacks where bars is BASE (single layer)
@@ -306,20 +287,15 @@ class TestLayeringBehavior:
 
         # bars appears in 13 stacks total: 10 as BASE + 3 as ACCENT
         assert layering.typical_layer_role == "BASE"
-        assert layering.role_distribution["BASE"] > layering.role_distribution.get(
-            "ACCENT", 0.0
-        )
+        assert layering.role_distribution["BASE"] > layering.role_distribution.get("ACCENT", 0.0)
         # common_partners should include color_wash
         assert "color_wash" in layering.common_partners
 
     def test_solo_ratio_correct(self) -> None:
         """7 single-layer stacks + 3 multi-layer -> solo_ratio = 0.7."""
-        bars_phrases = tuple(
-            _make_phrase(effect_family="bars", idx=i) for i in range(10)
-        )
+        bars_phrases = tuple(_make_phrase(effect_family="bars", idx=i) for i in range(10))
         wash_phrases = tuple(
-            _make_phrase(effect_family="color_wash", idx=100 + i)
-            for i in range(3)
+            _make_phrase(effect_family="color_wash", idx=100 + i) for i in range(3)
         )
 
         single_stacks = tuple(
@@ -350,9 +326,7 @@ class TestLayeringBehavior:
             stacks=single_stacks + multi_stacks,
         )
         builder = EffectMetadataProfileBuilder()
-        result = builder.build(
-            phrases=bars_phrases + wash_phrases, stacks=catalog
-        )
+        result = builder.build(phrases=bars_phrases + wash_phrases, stacks=catalog)
         bars_profile = _get_profile(result, "bars")
         # 7 solo out of 10 stacks containing bars = 0.7
         assert bars_profile.layering.solo_ratio == 0.7
@@ -392,9 +366,7 @@ class TestModelAffinities:
 
     def test_affinities_sorted_by_frequency(self) -> None:
         """PropensityIndex affinities are sorted by frequency in profile."""
-        phrases = tuple(
-            _make_phrase(effect_family="bars", idx=i) for i in range(5)
-        )
+        phrases = tuple(_make_phrase(effect_family="bars", idx=i) for i in range(5))
         propensity = PropensityIndex(
             schema_version="v1.0.0",
             affinities=(
@@ -442,9 +414,7 @@ class TestEdgeCases:
 
     def test_zero_stacks_solo_ratio_one(self) -> None:
         """Family with 0 stacks -> solo_ratio = 1.0."""
-        phrases = tuple(
-            _make_phrase(effect_family="bars", idx=i) for i in range(3)
-        )
+        phrases = tuple(_make_phrase(effect_family="bars", idx=i) for i in range(3))
         builder = EffectMetadataProfileBuilder()
         result = builder.build(phrases=phrases)
 
@@ -457,10 +427,7 @@ class TestEdgeCases:
     def test_no_section_label_empty_distribution(self) -> None:
         """Phrases with no section_label -> empty section_distribution."""
         phrases = tuple(
-            _make_phrase(
-                effect_family="bars", section_label=None, idx=i
-            )
-            for i in range(3)
+            _make_phrase(effect_family="bars", section_label=None, idx=i) for i in range(3)
         )
         builder = EffectMetadataProfileBuilder()
         result = builder.build(phrases=phrases)
@@ -471,9 +438,7 @@ class TestEdgeCases:
 
     def test_no_preserved_params_empty_top_params(self) -> None:
         """Stacks with no preserved_params -> empty top_params."""
-        phrases = tuple(
-            _make_phrase(effect_family="bars", idx=i) for i in range(3)
-        )
+        phrases = tuple(_make_phrase(effect_family="bars", idx=i) for i in range(3))
         stacks = tuple(
             _make_stack(
                 layers=((p, LayerRole.BASE, {}),),
@@ -515,9 +480,7 @@ class TestEdgeCases:
 
     def test_multiple_families_independent(self) -> None:
         """Multiple families produce independent profiles."""
-        bars = tuple(
-            _make_phrase(effect_family="bars", idx=i) for i in range(3)
-        )
+        bars = tuple(_make_phrase(effect_family="bars", idx=i) for i in range(3))
         twinkle = tuple(
             _make_phrase(
                 effect_family="twinkle",
@@ -538,9 +501,7 @@ class TestEdgeCases:
 
     def test_no_propensity_empty_affinities(self) -> None:
         """No PropensityIndex provided -> empty model_affinities."""
-        phrases = tuple(
-            _make_phrase(effect_family="bars", idx=i) for i in range(3)
-        )
+        phrases = tuple(_make_phrase(effect_family="bars", idx=i) for i in range(3))
         builder = EffectMetadataProfileBuilder()
         result = builder.build(phrases=phrases)
 

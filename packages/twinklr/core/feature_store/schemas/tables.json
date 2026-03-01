@@ -102,5 +102,25 @@
       "version TEXT NOT NULL DEFAULT ''",
       "updated_at TEXT NOT NULL DEFAULT (datetime('now'))"
     ]
+  },
+  {
+    "name": "profiles",
+    "columns": [
+      "profile_id TEXT PRIMARY KEY",
+      "package_id TEXT NOT NULL",
+      "sequence_file_id TEXT NOT NULL",
+      "profile_path TEXT NOT NULL",
+      "zip_sha256 TEXT",
+      "sequence_sha256 TEXT",
+      "song TEXT",
+      "artist TEXT",
+      "duration_ms INTEGER",
+      "effect_total_events INTEGER",
+      "schema_version TEXT NOT NULL DEFAULT ''",
+      "fe_status TEXT NOT NULL DEFAULT 'pending'",
+      "fe_error TEXT",
+      "profiled_at TEXT NOT NULL DEFAULT (datetime('now'))",
+      "fe_completed_at TEXT"
+    ]
   }
 ]

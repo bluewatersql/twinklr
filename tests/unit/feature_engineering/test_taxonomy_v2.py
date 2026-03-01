@@ -59,9 +59,7 @@ _ALL_V2_LABELS = {
     "layer_accent",
 }
 
-_EFFECT_PHRASE_FIELDS = {
-    name for name in EffectPhrase.model_fields
-}
+_EFFECT_PHRASE_FIELDS = {name for name in EffectPhrase.model_fields}
 
 
 def _phrase(
@@ -153,8 +151,7 @@ class TestV2RulesSchema:
             for rule in spec["rules"]:
                 for field_name in rule["when"]:
                     assert field_name in _EFFECT_PHRASE_FIELDS, (
-                        f"{label_name} rule '{rule['id']}' references "
-                        f"unknown field '{field_name}'"
+                        f"{label_name} rule '{rule['id']}' references unknown field '{field_name}'"
                     )
 
     def test_schema_version_is_v2(self) -> None:
@@ -166,9 +163,7 @@ class TestV2RulesSchema:
         config = json.loads(_V2_RULES.read_text(encoding="utf-8"))
         enum_values = {member.value for member in TaxonomyLabel}
         for label_name in config["labels"]:
-            assert label_name in enum_values, (
-                f"Label '{label_name}' not in TaxonomyLabel enum"
-            )
+            assert label_name in enum_values, f"Label '{label_name}' not in TaxonomyLabel enum"
 
 
 # ---------------------------------------------------------------------------
@@ -256,9 +251,7 @@ class TestV1LabelsIdentical:
 
     def test_v1_labels_match_with_v2_rules(self) -> None:
         """V1 test fixtures produce the same V1-label results under both configs."""
-        v1_classifier = TaxonomyClassifier(
-            TaxonomyClassifierOptions(rules_path=_V1_RULES)
-        )
+        v1_classifier = TaxonomyClassifier(TaxonomyClassifierOptions(rules_path=_V1_RULES))
         v2_classifier = TaxonomyClassifier()
 
         v1_label_values = {
@@ -306,15 +299,11 @@ class TestV1LabelsIdentical:
                 label for label in v2_result.labels if label.value in v1_label_values
             )
             v2_v1_scores = tuple(
-                score
-                for score in v2_result.label_scores
-                if score.label.value in v1_label_values
+                score for score in v2_result.label_scores if score.label.value in v1_label_values
             )
 
             assert v1_result.labels == v2_v1_labels
-            for v1_score, v2_score in zip(
-                v1_result.label_scores, v2_v1_scores, strict=True
-            ):
+            for v1_score, v2_score in zip(v1_result.label_scores, v2_v1_scores, strict=True):
                 assert v1_score.label == v2_score.label
                 assert v1_score.confidence == pytest.approx(v2_score.confidence)
                 assert v1_score.rule_hits == v2_score.rule_hits
@@ -366,9 +355,7 @@ class TestBackwardCompatibility:
     """V1 rules path still works when explicitly specified."""
 
     def test_v1_rules_path_still_works(self) -> None:
-        classifier = TaxonomyClassifier(
-            TaxonomyClassifierOptions(rules_path=_V1_RULES)
-        )
+        classifier = TaxonomyClassifier(TaxonomyClassifierOptions(rules_path=_V1_RULES))
         phrase = _phrase(
             duration_ms=300,
             continuity_class=ContinuityClass.RHYTHMIC,
@@ -394,9 +381,7 @@ class TestBackwardCompatibility:
             "texture_bed",
             "motion_driver",
         }
-        classifier = TaxonomyClassifier(
-            TaxonomyClassifierOptions(rules_path=_V1_RULES)
-        )
+        classifier = TaxonomyClassifier(TaxonomyClassifierOptions(rules_path=_V1_RULES))
         phrase = _phrase(
             duration_ms=2400,
             continuity_class=ContinuityClass.SUSTAINED,

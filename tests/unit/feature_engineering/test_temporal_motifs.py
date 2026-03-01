@@ -17,12 +17,9 @@ from twinklr.core.feature_engineering.models.templates import (
     TemplateKind,
 )
 from twinklr.core.feature_engineering.models.temporal_motifs import (
-    TemporalMotif,
     TemporalMotifCatalog,
-    TemporalMotifStep,
 )
 from twinklr.core.feature_engineering.motifs import MotifMiner, MotifMinerOptions
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -170,9 +167,7 @@ def test_trigram_discovery() -> None:
         ):
             pid = f"p{i * 3 + j}"
             start = j * 600
-            phrases_list.append(
-                _phrase(pid, pkg, seq, "Tree", start, start + 500, fam)
-            )
+            phrases_list.append(_phrase(pid, pkg, seq, "Tree", start, start + 500, fam))
             assignments_list.append(_assignment(pkg, seq, pid, tmpl))
 
     phrases = tuple(phrases_list)
@@ -244,26 +239,32 @@ def test_gap_bucketing() -> None:
         phrases = (
             _phrase("p1", "pkg-a", "seq-1", "Tree", 0, 100, "color_wash"),
             _phrase(
-                "p2", "pkg-a", "seq-1", "Tree",
-                100 + gap_ms, 100 + gap_ms + 500, "bars",
+                "p2",
+                "pkg-a",
+                "seq-1",
+                "Tree",
+                100 + gap_ms,
+                100 + gap_ms + 500,
+                "bars",
             ),
             _phrase("p3", "pkg-b", "seq-2", "Tree", 0, 100, "color_wash"),
             _phrase(
-                "p4", "pkg-b", "seq-2", "Tree",
-                100 + gap_ms, 100 + gap_ms + 500, "bars",
+                "p4",
+                "pkg-b",
+                "seq-2",
+                "Tree",
+                100 + gap_ms,
+                100 + gap_ms + 500,
+                "bars",
             ),
         )
         assignments = tuple(
-            _assignment(
-                p.package_id, p.sequence_file_id, p.phrase_id, f"t-{p.effect_family}"
-            )
+            _assignment(p.package_id, p.sequence_file_id, p.phrase_id, f"t-{p.effect_family}")
             for p in phrases
         )
         content, orch = _catalogs(assignments, len(phrases))
 
-        miner = MotifMiner(
-            MotifMinerOptions(min_support_count=2, min_distinct_sequence_count=2)
-        )
+        miner = MotifMiner(MotifMinerOptions(min_support_count=2, min_distinct_sequence_count=2))
         catalog = miner.mine_temporal(
             phrases=phrases,
             content_catalog=content,
@@ -273,8 +274,7 @@ def test_gap_bucketing() -> None:
         assert len(bigrams) >= 1, f"No bigrams for gap={gap_ms}ms"
         sig = bigrams[0].temporal_signature
         assert expected_bucket in sig, (
-            f"Expected '{expected_bucket}' in signature for gap={gap_ms}ms, "
-            f"got: {sig}"
+            f"Expected '{expected_bucket}' in signature for gap={gap_ms}ms, got: {sig}"
         )
 
 
@@ -288,33 +288,53 @@ def test_pattern_naming() -> None:
     # Build pattern: low -> high
     build_phrases = (
         _phrase(
-            "p1", "pkg-a", "seq-1", "Tree", 0, 500, "color_wash",
+            "p1",
+            "pkg-a",
+            "seq-1",
+            "Tree",
+            0,
+            500,
+            "color_wash",
             energy_class=EnergyClass.LOW,
         ),
         _phrase(
-            "p2", "pkg-a", "seq-1", "Tree", 550, 1050, "bars",
+            "p2",
+            "pkg-a",
+            "seq-1",
+            "Tree",
+            550,
+            1050,
+            "bars",
             energy_class=EnergyClass.HIGH,
         ),
         _phrase(
-            "p3", "pkg-b", "seq-2", "Tree", 0, 500, "color_wash",
+            "p3",
+            "pkg-b",
+            "seq-2",
+            "Tree",
+            0,
+            500,
+            "color_wash",
             energy_class=EnergyClass.LOW,
         ),
         _phrase(
-            "p4", "pkg-b", "seq-2", "Tree", 550, 1050, "bars",
+            "p4",
+            "pkg-b",
+            "seq-2",
+            "Tree",
+            550,
+            1050,
+            "bars",
             energy_class=EnergyClass.HIGH,
         ),
     )
     build_assignments = tuple(
-        _assignment(
-            p.package_id, p.sequence_file_id, p.phrase_id, f"t-{p.effect_family}"
-        )
+        _assignment(p.package_id, p.sequence_file_id, p.phrase_id, f"t-{p.effect_family}")
         for p in build_phrases
     )
     content, orch = _catalogs(build_assignments, len(build_phrases))
 
-    miner = MotifMiner(
-        MotifMinerOptions(min_support_count=2, min_distinct_sequence_count=2)
-    )
+    miner = MotifMiner(MotifMinerOptions(min_support_count=2, min_distinct_sequence_count=2))
     catalog = miner.mine_temporal(
         phrases=build_phrases,
         content_catalog=content,
@@ -328,26 +348,48 @@ def test_pattern_naming() -> None:
     # Drop pattern: high -> low
     drop_phrases = (
         _phrase(
-            "p5", "pkg-c", "seq-3", "Tree", 0, 500, "bars",
+            "p5",
+            "pkg-c",
+            "seq-3",
+            "Tree",
+            0,
+            500,
+            "bars",
             energy_class=EnergyClass.HIGH,
         ),
         _phrase(
-            "p6", "pkg-c", "seq-3", "Tree", 550, 1050, "color_wash",
+            "p6",
+            "pkg-c",
+            "seq-3",
+            "Tree",
+            550,
+            1050,
+            "color_wash",
             energy_class=EnergyClass.LOW,
         ),
         _phrase(
-            "p7", "pkg-d", "seq-4", "Tree", 0, 500, "bars",
+            "p7",
+            "pkg-d",
+            "seq-4",
+            "Tree",
+            0,
+            500,
+            "bars",
             energy_class=EnergyClass.HIGH,
         ),
         _phrase(
-            "p8", "pkg-d", "seq-4", "Tree", 550, 1050, "color_wash",
+            "p8",
+            "pkg-d",
+            "seq-4",
+            "Tree",
+            550,
+            1050,
+            "color_wash",
             energy_class=EnergyClass.LOW,
         ),
     )
     drop_assignments = tuple(
-        _assignment(
-            p.package_id, p.sequence_file_id, p.phrase_id, f"t-{p.effect_family}"
-        )
+        _assignment(p.package_id, p.sequence_file_id, p.phrase_id, f"t-{p.effect_family}")
         for p in drop_phrases
     )
     content2, orch2 = _catalogs(drop_assignments, len(drop_phrases))
@@ -376,16 +418,12 @@ def test_support_filtering() -> None:
         _phrase("p2", "pkg-a", "seq-1", "Tree", 550, 1050, "bars"),
     )
     assignments = tuple(
-        _assignment(
-            p.package_id, p.sequence_file_id, p.phrase_id, f"t-{p.effect_family}"
-        )
+        _assignment(p.package_id, p.sequence_file_id, p.phrase_id, f"t-{p.effect_family}")
         for p in phrases
     )
     content, orch = _catalogs(assignments, len(phrases))
 
-    miner = MotifMiner(
-        MotifMinerOptions(min_support_count=2, min_distinct_sequence_count=2)
-    )
+    miner = MotifMiner(MotifMinerOptions(min_support_count=2, min_distinct_sequence_count=2))
     catalog = miner.mine_temporal(
         phrases=phrases,
         content_catalog=content,
@@ -407,16 +445,12 @@ def test_single_phrase_stream_no_motifs() -> None:
         _phrase("p2", "pkg-b", "seq-2", "Tree", 0, 500, "bars"),
     )
     assignments = tuple(
-        _assignment(
-            p.package_id, p.sequence_file_id, p.phrase_id, f"t-{p.effect_family}"
-        )
+        _assignment(p.package_id, p.sequence_file_id, p.phrase_id, f"t-{p.effect_family}")
         for p in phrases
     )
     content, orch = _catalogs(assignments, len(phrases))
 
-    miner = MotifMiner(
-        MotifMinerOptions(min_support_count=1, min_distinct_sequence_count=1)
-    )
+    miner = MotifMiner(MotifMinerOptions(min_support_count=1, min_distinct_sequence_count=1))
     catalog = miner.mine_temporal(
         phrases=phrases,
         content_catalog=content,

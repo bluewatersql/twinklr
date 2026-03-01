@@ -49,6 +49,47 @@ class CorpusStats(BaseModel):
     recipe_count: int = 0
     taxonomy_count: int = 0
     propensity_count: int = 0
+    profile_count: int = 0
+
+
+class ProfileRecord(BaseModel):
+    """Profile of a profiled sequence and its FE processing status.
+
+    Args:
+        profile_id: Composite primary key ``{package_id}/{sequence_file_id}``.
+        package_id: Vendor package identifier.
+        sequence_file_id: Sequence file identifier within the package.
+        profile_path: Filesystem path to the profile JSON.
+        zip_sha256: SHA-256 hash of the source ZIP archive.
+        sequence_sha256: SHA-256 hash of the sequence content.
+        song: Song title from profile metadata.
+        artist: Artist name from profile metadata.
+        duration_ms: Song duration in milliseconds.
+        effect_total_events: Total effect event count in the sequence.
+        schema_version: Profile schema version string.
+        fe_status: Feature-engineering status (``pending``, ``complete``, ``error``).
+        fe_error: Error message when ``fe_status`` is ``error``.
+        profiled_at: ISO timestamp when the profile was created.
+        fe_completed_at: ISO timestamp when FE completed.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    profile_id: str
+    package_id: str
+    sequence_file_id: str
+    profile_path: str
+    zip_sha256: str | None = None
+    sequence_sha256: str | None = None
+    song: str | None = None
+    artist: str | None = None
+    duration_ms: int | None = None
+    effect_total_events: int | None = None
+    schema_version: str = ""
+    fe_status: str = "pending"
+    fe_error: str | None = None
+    profiled_at: str | None = None
+    fe_completed_at: str | None = None
 
 
 # ---------------------------------------------------------------------------

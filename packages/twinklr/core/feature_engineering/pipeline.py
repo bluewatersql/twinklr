@@ -71,7 +71,7 @@ from twinklr.core.feature_engineering.template_diagnostics import (
 )
 from twinklr.core.feature_engineering.templates import TemplateMiner, TemplateMinerOptions
 from twinklr.core.feature_engineering.transitions import TransitionModeler
-from twinklr.core.feature_store.models import FeatureStoreConfig
+from twinklr.core.feature_store.models import FeatureStoreConfig, ProfileRecord
 from twinklr.core.feature_store.protocols import FeatureStoreProviderSync
 
 
@@ -122,6 +122,7 @@ class FeatureEngineeringPipelineOptions:
     recipe_promotion_param_profiles: dict[str, dict[str, object]] | None = None
     taxonomy_rules_path: Path | None = None
     feature_store_config: FeatureStoreConfig | None = None
+    fail_fast: bool = True
     template_min_instance_count: int = 2
     template_min_distinct_pack_count: int = 1
     quality_min_template_coverage: float = 0.80
@@ -329,42 +330,203 @@ class FeatureEngineeringPipeline:
             target_roles=target_roles,
         )
 
-    def run_corpus(self, corpus_dir: Path, output_root: Path) -> list[FeatureBundle]:
+    def run(
+        self,
+        output_root: Path,
+        *,
+        force: bool = False,
+        corpus_id: str | None = None,
+    ) -> list[FeatureBundle]:
+        """Store-driven incremental FE run — the primary entry point.
+
+        Queries the store for pending/complete profiles, loads cached bundles
+        for complete ones, processes pending ones, and runs corpus tail
+        artifacts when any new profiles were processed.
+
+        Args:
+            output_root: Root directory for feature engineering output files.
+            force: If True, reset all profiles to pending before processing.
+            corpus_id: Optional corpus identifier for metadata upsert.
+
+        Returns:
+            List of FeatureBundle instances (cached + newly processed).
+        """
         self._store.initialize()
         try:
-            rows = self._read_jsonl(corpus_dir / "sequence_index.jsonl")
-            bundles: list[FeatureBundle] = []
-            corpus_phrases: list[EffectPhrase] = []
-            corpus_taxonomy: list[PhraseTaxonomyRecord] = []
-            corpus_target_roles: list[TargetRoleAssignment] = []
+            if force:
+                self._reset_all_fe_status()
+
+            completed = self._store.query_profiles(fe_status="complete")
+            pending = self._store.query_profiles(fe_status="pending")
+
+            all_bundles: list[FeatureBundle] = self._load_existing_bundles(completed, output_root)
+
+            new_phrases: list[EffectPhrase] = []
+            new_taxonomy: list[PhraseTaxonomyRecord] = []
+            new_target_roles: list[TargetRoleAssignment] = []
+            new_bundles: list[FeatureBundle] = []
+
+            for profile in pending:
+                output_dir = output_root / profile.package_id / profile.sequence_file_id
+                try:
+                    outputs = self._run_profile_internal(Path(profile.profile_path), output_dir)
+                except Exception as exc:
+                    self._store.mark_fe_error(profile.profile_id, str(exc))
+                    if self._options.fail_fast:
+                        raise
+                    continue
+
+                self._store.mark_fe_complete(profile.profile_id)
+                new_bundles.append(outputs.bundle)
+                new_phrases.extend(outputs.phrases)
+                new_taxonomy.extend(outputs.taxonomy_rows)
+                new_target_roles.extend(outputs.target_roles)
+
+            all_bundles.extend(new_bundles)
+
+            if new_bundles:
+                template_catalogs = self._write_template_catalogs(
+                    output_root=output_root,
+                    phrases=tuple(new_phrases),
+                    taxonomy_rows=tuple(new_taxonomy),
+                    target_roles=tuple(new_target_roles),
+                )
+                self._write_v1_tail_artifacts(
+                    output_root=output_root,
+                    bundles=tuple(all_bundles),
+                    phrases=tuple(new_phrases),
+                    taxonomy_rows=tuple(new_taxonomy),
+                    target_roles=tuple(new_target_roles),
+                    template_catalogs=template_catalogs,
+                )
+                meta_corpus_id = corpus_id or output_root.name
+                metadata = {
+                    "sequence_count": len(all_bundles),
+                    "output_root": str(output_root),
+                }
+                self._store.upsert_corpus_metadata(meta_corpus_id, json.dumps(metadata))
+
+            return all_bundles
+        finally:
+            self._store.close()
+
+    def _load_existing_bundles(
+        self,
+        profiles: tuple[ProfileRecord, ...],
+        output_root: Path,
+    ) -> list[FeatureBundle]:
+        """Load FeatureBundle instances from disk for completed profiles.
+
+        Args:
+            profiles: Tuple of completed ProfileRecord instances.
+            output_root: Root directory where feature bundles were written.
+
+        Returns:
+            List of successfully loaded FeatureBundle instances. Profiles
+            whose feature_bundle.json is missing are skipped silently.
+        """
+        bundles: list[FeatureBundle] = []
+        for profile in profiles:
+            bundle_path = (
+                output_root / profile.package_id / profile.sequence_file_id / "feature_bundle.json"
+            )
+            if not bundle_path.exists():
+                continue
+            try:
+                data = json.loads(bundle_path.read_text(encoding="utf-8"))
+                bundles.append(FeatureBundle.model_validate(data))
+            except Exception:
+                continue
+        return bundles
+
+    def _reset_all_fe_status(self) -> None:
+        """Reset all profiles to fe_status='pending' for force reprocessing."""
+        self._store.reset_all_fe_status()
+
+    def run_corpus(self, corpus_dir: Path, output_root: Path) -> list[FeatureBundle]:
+        """Run FE over profiles listed in sequence_index.jsonl (legacy entry point).
+
+        Reads sequence_index.jsonl, registers each row as a profile in the
+        store, processes each profile inline, and writes corpus-level tail
+        artifacts. Preserved for backward compatibility.
+
+        Args:
+            corpus_dir: Directory containing ``sequence_index.jsonl``.
+            output_root: Root directory for feature engineering output files.
+
+        Returns:
+            List of FeatureBundle instances for all processed sequences.
+
+        Raises:
+            FileNotFoundError: If ``sequence_index.jsonl`` is not found in
+                ``corpus_dir``.
+        """
+        self._store.initialize()
+        try:
+            index_path = corpus_dir / "sequence_index.jsonl"
+            if not index_path.exists():
+                raise FileNotFoundError(
+                    f"Corpus index not found: {index_path}\n"
+                    "Build the corpus first:\n"
+                    "  python scripts/build/build_profile_corpus.py\n"
+                    "Or use a script that auto-builds (demo_feature_engineering.py, "
+                    "build_feature_engineering.py)."
+                )
+            rows = self._read_jsonl(index_path)
+
+            all_bundles: list[FeatureBundle] = []
+            all_phrases: list[EffectPhrase] = []
+            all_taxonomy: list[PhraseTaxonomyRecord] = []
+            all_target_roles: list[TargetRoleAssignment] = []
+
             for row in rows:
-                profile_dir = Path(str(row.get("profile_path")))
-                package_id = str(row.get("package_id"))
-                sequence_file_id = str(row.get("sequence_file_id"))
-                output_dir = output_root / package_id / sequence_file_id
-                outputs = self._run_profile_internal(profile_dir, output_dir)
-                bundles.append(outputs.bundle)
-                corpus_phrases.extend(outputs.phrases)
-                corpus_taxonomy.extend(outputs.taxonomy_rows)
-                corpus_target_roles.extend(outputs.target_roles)
-            template_catalogs = self._write_template_catalogs(
-                output_root=output_root,
-                phrases=tuple(corpus_phrases),
-                taxonomy_rows=tuple(corpus_taxonomy),
-                target_roles=tuple(corpus_target_roles),
-            )
-            self._write_v1_tail_artifacts(
-                output_root=output_root,
-                bundles=tuple(bundles),
-                phrases=tuple(corpus_phrases),
-                taxonomy_rows=tuple(corpus_taxonomy),
-                target_roles=tuple(corpus_target_roles),
-                template_catalogs=template_catalogs,
-            )
-            corpus_id = corpus_dir.name
-            metadata = {"sequence_count": len(bundles), "corpus_dir": str(corpus_dir)}
-            self._store.upsert_corpus_metadata(corpus_id, json.dumps(metadata))
-            return bundles
+                pkg_id = str(row.get("package_id", ""))
+                seq_id = str(row.get("sequence_file_id", ""))
+                profile_path = Path(str(row.get("profile_path", "")))
+                output_dir = output_root / pkg_id / seq_id
+
+                self._store.upsert_profile(
+                    ProfileRecord(
+                        profile_id=f"{pkg_id}/{seq_id}",
+                        package_id=pkg_id,
+                        sequence_file_id=seq_id,
+                        profile_path=str(profile_path),
+                        fe_status="pending",
+                    )
+                )
+
+                try:
+                    outputs = self._run_profile_internal(profile_path, output_dir)
+                except Exception as exc:
+                    self._store.mark_fe_error(f"{pkg_id}/{seq_id}", str(exc))
+                    raise
+                all_bundles.append(outputs.bundle)
+                all_phrases.extend(outputs.phrases)
+                all_taxonomy.extend(outputs.taxonomy_rows)
+                all_target_roles.extend(outputs.target_roles)
+
+            if all_bundles:
+                template_catalogs = self._write_template_catalogs(
+                    output_root=output_root,
+                    phrases=tuple(all_phrases),
+                    taxonomy_rows=tuple(all_taxonomy),
+                    target_roles=tuple(all_target_roles),
+                )
+                self._write_v1_tail_artifacts(
+                    output_root=output_root,
+                    bundles=tuple(all_bundles),
+                    phrases=tuple(all_phrases),
+                    taxonomy_rows=tuple(all_taxonomy),
+                    target_roles=tuple(all_target_roles),
+                    template_catalogs=template_catalogs,
+                )
+                metadata = {
+                    "sequence_count": len(all_bundles),
+                    "output_root": str(output_root),
+                }
+                self._store.upsert_corpus_metadata(corpus_dir.name, json.dumps(metadata))
+
+            return all_bundles
         finally:
             self._store.close()
 

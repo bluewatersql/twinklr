@@ -5,9 +5,7 @@ from __future__ import annotations
 from twinklr.core.feature_engineering.color_discovery import (
     ColorFamilyDiscoverer,
     DiscoveredPalette,
-    HueBin,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -160,9 +158,7 @@ class TestHueClustering:
 
     def test_multiple_colors_cluster_correctly(self) -> None:
         """Multiple reds should consolidate into one red bin."""
-        result = ColorFamilyDiscoverer._cluster_by_hue(
-            ["#FF0000", "#FF3333", "#CC0000"]
-        )
+        result = ColorFamilyDiscoverer._cluster_by_hue(["#FF0000", "#FF3333", "#CC0000"])
         assert len(result) == 1
         assert result[0].bin_name == "red"
         assert len(result[0].colors) == 3

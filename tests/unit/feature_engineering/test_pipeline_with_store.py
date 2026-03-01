@@ -171,11 +171,14 @@ def test_store_close_on_exception(tmp_path: Path) -> None:
     pipeline = FeatureEngineeringPipeline()
     pipeline._store = mock_store
 
-    with patch.object(
-        pipeline,
-        "_run_profile_internal",
-        side_effect=RuntimeError("boom"),
-    ), pytest.raises(RuntimeError, match="boom"):
+    with (
+        patch.object(
+            pipeline,
+            "_run_profile_internal",
+            side_effect=RuntimeError("boom"),
+        ),
+        pytest.raises(RuntimeError, match="boom"),
+    ):
         pipeline.run_profile(profile_dir, output_dir)
 
     mock_store.initialize.assert_called_once()
@@ -200,11 +203,14 @@ def test_store_close_on_corpus_exception(tmp_path: Path) -> None:
     pipeline = FeatureEngineeringPipeline()
     pipeline._store = mock_store
 
-    with patch.object(
-        pipeline,
-        "_run_profile_internal",
-        side_effect=RuntimeError("corpus-boom"),
-    ), pytest.raises(RuntimeError, match="corpus-boom"):
+    with (
+        patch.object(
+            pipeline,
+            "_run_profile_internal",
+            side_effect=RuntimeError("corpus-boom"),
+        ),
+        pytest.raises(RuntimeError, match="corpus-boom"),
+    ):
         pipeline.run_corpus(corpus_dir, output_root)
 
     mock_store.initialize.assert_called_once()
