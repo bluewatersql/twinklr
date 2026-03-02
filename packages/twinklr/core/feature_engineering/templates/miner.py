@@ -10,6 +10,7 @@ from __future__ import annotations
 import uuid
 from collections import defaultdict
 from dataclasses import dataclass
+from typing import Literal
 
 from twinklr.core.feature_engineering.models import EffectPhrase
 from twinklr.core.feature_engineering.models.stacks import EffectStack
@@ -35,6 +36,7 @@ class TemplateMinerOptions:
     min_instance_count: int = 2
     min_distinct_pack_count: int = 1
     max_provenance_per_template: int = 100
+    stack_signature_mode: Literal["strict", "relaxed"] = "relaxed"
 
 
 class TemplateMiner:
@@ -147,7 +149,10 @@ class TemplateMiner:
         stack_meta: dict[str, EffectStack] = {}
 
         for stack in stacks:
-            content_sig = self._stack_content_signature(stack, taxonomy_by_phrase)
+            if self._options.stack_signature_mode == "relaxed":
+                content_sig = self._relaxed_stack_content_signature(stack, taxonomy_by_phrase)
+            else:
+                content_sig = self._stack_content_signature(stack, taxonomy_by_phrase)
             role = role_by_target.get(
                 (stack.package_id, stack.sequence_file_id, stack.target_name), "fallback"
             )
@@ -156,8 +161,8 @@ class TemplateMiner:
             primary_phrase = stack.layers[0].phrase
             content_groups[content_sig].append(primary_phrase)
             orchestration_groups[orch_sig].append(primary_phrase)
-            stack_meta[content_sig] = stack
-            stack_meta[orch_sig] = stack
+            stack_meta.setdefault(content_sig, stack)
+            stack_meta.setdefault(orch_sig, stack)
 
         content_templates, content_assignment = self._finalize_stack_groups(
             groups=content_groups,
@@ -308,6 +313,37 @@ class TemplateMiner:
 
         templates.sort(key=lambda row: row.template_id)
         return tuple(templates), assignments
+
+    @staticmethod
+    def _relaxed_stack_content_signature(
+        stack: EffectStack,
+        taxonomy_by_phrase: dict[str, PhraseTaxonomyRecord],
+    ) -> str:
+        """Build a relaxed content signature from a stack.
+
+        Relaxed mode drops blend modes, sorts layers alphabetically,
+        and uses only motion + energy from the primary phrase. This
+        produces broader groups with higher support counts for multi-
+        layer stacks.
+
+        Format: ``family+family+...|motion|energy``
+
+        Args:
+            stack: The effect stack to signature.
+            taxonomy_by_phrase: Taxonomy lookup (unused in relaxed mode).
+
+        Returns:
+            Relaxed signature string.
+        """
+        families = sorted(layer.phrase.effect_family for layer in stack.layers)
+        primary = stack.layers[0].phrase
+        return "|".join(
+            (
+                "+".join(families),
+                primary.motion_class.value,
+                primary.energy_class.value,
+            )
+        )
 
     @staticmethod
     def _stack_content_signature(

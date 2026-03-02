@@ -23,7 +23,11 @@ _More developer docs coming soon — implementation roadmap, architecture decisi
 
 ## User Docs
 
-_Coming soon — setup guides, configuration reference, and usage tutorials._
+### [Pipeline Guide](pipeline_guide.md)
+
+> End-to-end reference for the unified build pipeline (profiling → feature engineering → report), the sequencer pipeline, feature store, recipe promotion, template/taxonomy flow, configuration, resetting & clean runs, and troubleshooting.
+
+**Sections:** Quick start, FE stages, feature store, recipe pipeline, template & taxonomy flow, DAG architecture, sequencer pipeline, configuration, reset/clean, troubleshooting, testing.
 
 ### [Inside the Template Engine: How Moving Heads Learn to Dance](mh_templates/)
 

@@ -1,6 +1,7 @@
 # Feature Engineering
 
-This document is the single source of truth for running profiling corpus build + feature engineering.
+> **Canonical guide**: See [`docs/pipeline_guide.md`](../../docs/pipeline_guide.md) for the
+> comprehensive pipeline reference. This file is a quick-reference summary.
 
 ## 0) Unified Pipeline (Recommended)
 
@@ -32,7 +33,7 @@ python scripts/build/build_pipeline.py --skip-audio
 
 ### How It Works
 
-1. **Discover**: Finds `*.zip` and `*.xsqz` packages under `data/vendor_packages`
+1. **Discover**: Finds `*.zip` and `*.xsqz` packages under `data/vendor_sequences`
 2. **Profile**: Runs `SequencePackProfiler` on each package (skips if profile already exists)
 3. **Feature Engineer**: Builds unified corpus, then runs `FeatureEngineeringPipeline` with store-driven incremental processing
 4. **Report**: Prints summary of processed sequences
@@ -43,7 +44,7 @@ State is tracked in a SQLite feature store (`data/features/twinklr.db` by defaul
 
 | Setting | Default |
 |---------|---------|
-| Vendor packages | `data/vendor_packages` |
+| Vendor packages | `data/vendor_sequences` |
 | Profile output | `data/profiles` |
 | FE output | `data/features/feature_engineering` |
 | Feature store | `data/features/twinklr.db` |

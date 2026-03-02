@@ -20,13 +20,12 @@ from twinklr.core.feature_engineering.models.ann_retrieval import (
 )
 from twinklr.core.feature_engineering.models.clustering import TemplateClusterCatalog
 from twinklr.core.feature_engineering.models.color_narrative import ColorNarrativeRow
-from twinklr.core.feature_engineering.models.metadata import EffectMetadataProfiles
-from twinklr.core.feature_engineering.models.vocabulary import VocabularyExtensions
 from twinklr.core.feature_engineering.models.layering import LayeringFeatureRow
 from twinklr.core.feature_engineering.models.learned_taxonomy import (
     LearnedTaxonomyEvalReport,
     LearnedTaxonomyModel,
 )
+from twinklr.core.feature_engineering.models.metadata import EffectMetadataProfiles
 from twinklr.core.feature_engineering.models.motifs import MotifCatalog
 from twinklr.core.feature_engineering.models.promotion import PromotionReport
 from twinklr.core.feature_engineering.models.quality import QualityReport
@@ -42,6 +41,7 @@ from twinklr.core.feature_engineering.models.template_diagnostics import (
 from twinklr.core.feature_engineering.models.templates import TemplateCatalog
 from twinklr.core.feature_engineering.models.temporal_motifs import TemporalMotifCatalog
 from twinklr.core.feature_engineering.models.transitions import TransitionGraph
+from twinklr.core.feature_engineering.models.vocabulary import VocabularyExtensions
 from twinklr.core.sequencer.templates.group.recipe import EffectRecipe
 
 if TYPE_CHECKING:
@@ -544,8 +544,7 @@ class FeatureEngineeringWriter:
                     "temperature": "neutral",
                     "scope_key": list(p.scope_key),
                     "hue_bins": [
-                        {"bin_name": b.bin_name, "colors": list(b.colors)}
-                        for b in p.hue_bins
+                        {"bin_name": b.bin_name, "colors": list(b.colors)} for b in p.hue_bins
                     ],
                 }
                 for p in palettes
@@ -554,9 +553,7 @@ class FeatureEngineeringWriter:
         self._write_json(output_path, payload)
         return output_path
 
-    def write_effect_metadata(
-        self, output_root: Path, profiles: EffectMetadataProfiles
-    ) -> Path:
+    def write_effect_metadata(self, output_root: Path, profiles: EffectMetadataProfiles) -> Path:
         """Write effect metadata profiles as JSON.
 
         Args:

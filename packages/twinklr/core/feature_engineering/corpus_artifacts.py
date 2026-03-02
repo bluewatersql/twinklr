@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from twinklr.core.feature_engineering.artifact_writer import ArtifactWriter
+from twinklr.core.feature_engineering.color_arc import ColorArcExtractor
 from twinklr.core.feature_engineering.component_factory import ComponentFactory
 from twinklr.core.feature_engineering.config import FeatureEngineeringPipelineOptions
 from twinklr.core.feature_engineering.datasets.writer import FeatureEngineeringWriter
@@ -28,14 +29,11 @@ from twinklr.core.feature_engineering.models import (
     TemplateRetrievalIndex,
     TransitionGraph,
 )
-from twinklr.core.feature_engineering.color_arc import ColorArcExtractor
 from twinklr.core.feature_engineering.models.clustering import TemplateClusterCatalog
-from twinklr.core.feature_engineering.models.metadata import EffectMetadataProfiles
 from twinklr.core.feature_engineering.models.motifs import MotifCatalog
 from twinklr.core.feature_engineering.models.promotion import PromotionReport
 from twinklr.core.feature_engineering.models.propensity import PropensityIndex
 from twinklr.core.feature_engineering.models.stacks import EffectStack, EffectStackCatalog
-from twinklr.core.feature_engineering.models.vocabulary import VocabularyExtensions
 from twinklr.core.feature_engineering.promotion import PromotionPipeline
 from twinklr.core.feature_store.protocols import FeatureStoreProviderSync
 
@@ -388,6 +386,8 @@ def run_recipe_promotion(
         use_stack_synthesis=o.enable_stack_detection,
         adaptive_stability=o.recipe_promotion_adaptive_stability,
         max_per_family=o.recipe_promotion_max_per_family,
+        multi_layer_min_support=o.recipe_promotion_multi_layer_min_support,
+        multi_layer_min_stability=o.recipe_promotion_multi_layer_min_stability,
     )
     # Write promotion report regardless of whether recipes were promoted
     report = PromotionReport(

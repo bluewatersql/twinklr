@@ -108,6 +108,8 @@ class PromotionPipeline:
         use_stack_synthesis: bool = False,
         adaptive_stability: bool = False,
         max_per_family: int = 0,
+        multi_layer_min_support: int = 2,
+        multi_layer_min_stability: float = 0.02,
     ) -> PromotionResult:
         """Run the promotion pipeline.
 
@@ -123,6 +125,8 @@ class PromotionPipeline:
             adaptive_stability: When True, compute effective min_stability from
                 corpus diversity rather than using the static value.
             max_per_family: Maximum recipes per effect family (0 = no cap).
+            multi_layer_min_support: Minimum support for multi-layer templates.
+            multi_layer_min_stability: Minimum stability for multi-layer templates.
 
         Returns:
             PromotionResult with promoted recipes and a quality report.
@@ -136,17 +140,26 @@ class PromotionPipeline:
             else:
                 eligible.append(t)
 
-        # Stage 1: Quality gate (with optional adaptive stability)
+        # Stage 1: Quality gate (with optional adaptive stability + multi-layer)
         effective_stability = min_stability
         if adaptive_stability and eligible:
             pack_counts = [t.distinct_pack_count for t in eligible]
             median_pack = float(statistics.median(pack_counts))
-            effective_stability = _adaptive_stability(median_pack)
+            effective_stability = min(min_stability, _adaptive_stability(median_pack))
+
+        multi_layer_candidates = sum(1 for t in eligible if t.layer_count >= 2)
 
         passed: list[MinedTemplate] = []
         rejected_count = 0
         for t in eligible:
-            if t.support_count >= min_support and t.cross_pack_stability >= effective_stability:
+            if t.layer_count >= 2:
+                eff_support = multi_layer_min_support
+                eff_stability = multi_layer_min_stability
+            else:
+                eff_support = min_support
+                eff_stability = effective_stability
+
+            if t.support_count >= eff_support and t.cross_pack_stability >= eff_stability:
                 passed.append(t)
             else:
                 rejected_count += 1
@@ -159,6 +172,8 @@ class PromotionPipeline:
         promoted: list[EffectRecipe] = []
         source_template_map: dict[str, list[str]] = {}
         recipe_support: dict[str, int] = {}
+        recipe_layer_count: dict[str, int] = {}
+        recipe_source_family: dict[str, str] = {}
         stack_promoted_count = 0
         for t in passed:
             recipe_id = f"synth_{t.effect_family}_{t.motion_class}_{t.template_id}"
@@ -169,6 +184,8 @@ class PromotionPipeline:
                 recipe = self._synthesizer.synthesize(t, recipe_id=recipe_id)
             promoted.append(recipe)
             recipe_support[recipe_id] = t.support_count
+            recipe_layer_count[recipe_id] = t.layer_count
+            recipe_source_family[recipe_id] = t.effect_family
             source_ids = [t.template_id] + self._get_cluster_member_ids(t.template_id, clusters)
             source_template_map[recipe_id] = source_ids
 
@@ -217,6 +234,22 @@ class PromotionPipeline:
 
         avg_layers = total_layers / len(promoted) if promoted else 0.0
 
+        # Multi-layer metrics (tracked via source template layer_count)
+        ml_layer_counts = [
+            recipe_layer_count.get(r.recipe_id, 1)
+            for r in promoted
+            if recipe_layer_count.get(r.recipe_id, 1) >= 2
+        ]
+        multi_layer_promoted_count = len(ml_layer_counts)
+        avg_layers_ml = sum(ml_layer_counts) / len(ml_layer_counts) if ml_layer_counts else 0.0
+        max_layers_prom = max(ml_layer_counts) if ml_layer_counts else 0
+        ml_family_dist: dict[str, int] = {}
+        for recipe in promoted:
+            lc = recipe_layer_count.get(recipe.recipe_id, 1)
+            if lc >= 2:
+                fam = recipe_source_family.get(recipe.recipe_id, "unknown")
+                ml_family_dist[fam] = ml_family_dist.get(fam, 0) + 1
+
         report: dict[str, Any] = {
             "total_candidates": len(candidates),
             "filtered_families": filtered_count,
@@ -235,6 +268,11 @@ class PromotionPipeline:
             "family_distribution": family_dist,
             "lane_distribution": lane_dist,
             "avg_layers_per_recipe": round(avg_layers, 2),
+            "multi_layer_candidates": multi_layer_candidates,
+            "multi_layer_promoted": multi_layer_promoted_count,
+            "avg_layers_multi_layer": round(avg_layers_ml, 2),
+            "max_layers_promoted": max_layers_prom,
+            "multi_layer_family_distribution": ml_family_dist,
         }
 
         return PromotionResult(promoted_recipes=promoted, report=report)

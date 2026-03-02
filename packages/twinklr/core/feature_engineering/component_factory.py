@@ -143,6 +143,7 @@ class ComponentFactory:
             TemplateMinerOptions(
                 min_instance_count=self._options.template_min_instance_count,
                 min_distinct_pack_count=self._options.template_min_distinct_pack_count,
+                stack_signature_mode=self._options.stack_signature_mode,
             )
         )
 
@@ -280,9 +281,7 @@ class ComponentFactory:
         Returns:
             A ``ColorArcExtractor`` instance.
         """
-        return ColorArcExtractor(
-            palette_library_path=self._options.color_palette_library_path
-        )
+        return ColorArcExtractor(palette_library_path=self._options.color_palette_library_path)
 
     @cached_property
     def propensity_miner(self) -> PropensityMiner:

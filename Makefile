@@ -1,4 +1,4 @@
-.PHONY: help install install-dev sync clean lint format type-check test test-cov test-watch run-demo build verify-install check-all pre-commit validate coverage coverage-detailed
+.PHONY: help install install-dev sync clean lint format type-check test test-cov test-watch run-demo build verify-install check-all pre-commit validate coverage coverage-detailed reset
 
 # Default target
 .DEFAULT_GOAL := help
@@ -216,13 +216,25 @@ clean: ## Clean build artifacts and caches
 	find . -type d -name ".ipynb_checkpoints" -exec rm -rf {} + 2>/dev/null || true
 	@echo "$(GREEN)✓ Cleanup complete$(NC)"
 
-clean-cache: ## Clean application caches (audio, step cache, etc)
+clean-cache: ## Clean application caches (audio, step cache, logs, etc)
 	@echo "$(BLUE)→ Cleaning application caches...$(NC)"
 	@echo "$(YELLOW)  Removing audio cache...$(NC)"
 	@rm -rf data/audio_cache/* 2>/dev/null || true
 	@echo "$(YELLOW)  Removing step result cache...$(NC)"
 	@rm -rf .cache/* 2>/dev/null || true
+	@echo "$(YELLOW)  Removing logs...$(NC)"
+	@rm -rf data/logging/* 2>/dev/null || true
 	@echo "$(GREEN)✓ Application caches cleaned$(NC)"
+
+reset: clean-cache ## Reset app state (caches, feature store, profiles, FE output)
+	@echo "$(BLUE)→ Resetting application state...$(NC)"
+	@echo "$(YELLOW)  Removing feature store DB...$(NC)"
+	@rm -f data/features/twinklr.db 2>/dev/null || true
+	@echo "$(YELLOW)  Removing profiling output...$(NC)"
+	@rm -rf data/profiles/* 2>/dev/null || true
+	@echo "$(YELLOW)  Removing feature engineering output...$(NC)"
+	@rm -rf data/features/feature_engineering/* 2>/dev/null || true
+	@echo "$(GREEN)✓ App reset complete$(NC)"
 
 clean-all: clean clean-cache ## Clean everything including caches
 	@echo "$(GREEN)✓ Full cleanup complete$(NC)"

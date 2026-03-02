@@ -6,7 +6,7 @@ persisted as ``promotion_report.json`` alongside the recipe catalog.
 
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class PromotionReport(BaseModel):
@@ -52,3 +52,8 @@ class PromotionReport(BaseModel):
     family_distribution: dict[str, int]
     lane_distribution: dict[str, int]
     avg_layers_per_recipe: float
+    multi_layer_candidates: int = 0
+    multi_layer_promoted: int = 0
+    avg_layers_multi_layer: float = 0.0
+    max_layers_promoted: int = 0
+    multi_layer_family_distribution: dict[str, int] = Field(default_factory=dict)
