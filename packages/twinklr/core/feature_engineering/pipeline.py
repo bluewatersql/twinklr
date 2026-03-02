@@ -124,13 +124,15 @@ class FeatureEngineeringPipeline:
         progress_fn: Callable[[str], None] | None = None,
     ) -> None:
         ph, tx, ro = tuple(phrases), tuple(taxonomy), tuple(roles)
-        tc = self._write_template_catalogs(
+        result = self._write_template_catalogs(
             output_root=output_root,
             phrases=ph,
             taxonomy_rows=tx,
             target_roles=ro,
             progress_fn=progress_fn,
         )
+        tc = result[0] if result else None
+        stacks = result[1] if result else None
         _ca.write_v1_tail_artifacts(
             output_root=output_root,
             bundles=tuple(bundles),
@@ -138,6 +140,7 @@ class FeatureEngineeringPipeline:
             taxonomy_rows=tx,
             target_roles=ro,
             template_catalogs=tc,
+            stacks=stacks,
             options=self._options,
             writer=self._writer,
             artifact_writer=self._artifact_writer,
@@ -145,9 +148,8 @@ class FeatureEngineeringPipeline:
             store=self._store,
             progress_fn=progress_fn,
         )
-        self._store.upsert_corpus_metadata(
-            corpus_id, json.dumps({"sequence_count": len(bundles), "output_root": str(output_root)})
-        )
+        stats = self._store.get_corpus_stats()
+        self._store.upsert_corpus_metadata(corpus_id, stats.model_dump_json())
 
     def run(
         self, output_root: Path, *, force: bool = False, corpus_id: str | None = None
@@ -249,6 +251,8 @@ class FeatureEngineeringPipeline:
                 self._store.mark_fe_error(f"{pk}/{sq}", str(exc))
                 if self._options.fail_fast:
                     raise
+                continue
+            self._store.mark_fe_complete(f"{pk}/{sq}")
         return self._collect(results)
 
     def _corpus_parallel(
@@ -261,7 +265,7 @@ class FeatureEngineeringPipeline:
         def _proc(row: dict[str, Any]) -> _ProfileOutputs | None:
             pk, sq = str(row.get("package_id", "")), str(row.get("sequence_file_id", ""))
             try:
-                return self._run_profile_internal(
+                result = self._run_profile_internal(
                     Path(str(row.get("profile_path", ""))), output_root / pk / sq
                 )
             except Exception as exc:
@@ -270,6 +274,9 @@ class FeatureEngineeringPipeline:
                 if self._options.fail_fast:
                     raise
                 return None
+            with self._store_lock:
+                self._store.mark_fe_complete(f"{pk}/{sq}")
+            return result
 
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             futs = {executor.submit(_proc, r): r for r in rows}
@@ -416,7 +423,7 @@ class FeatureEngineeringPipeline:
         taxonomy_rows: tuple[PhraseTaxonomyRecord, ...],
         target_roles: tuple[TargetRoleAssignment, ...],
         progress_fn: Callable[[str], None] | None = None,
-    ) -> tuple[TemplateCatalog, TemplateCatalog] | None:
+    ) -> tuple[tuple[TemplateCatalog, TemplateCatalog], tuple[Any, ...] | None] | None:
         return _ca.write_template_catalogs(
             output_root=output_root,
             phrases=phrases,

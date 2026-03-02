@@ -40,7 +40,7 @@ EXCLUDED_FAMILIES: frozenset[str] = frozenset(
 def _adaptive_stability(
     median_distinct_pack_count: float,
     *,
-    lower_bound: float = 0.3,
+    lower_bound: float = 0.03,
     upper_bound: float = 0.9,
 ) -> float:
     """Compute effective min_stability threshold from corpus diversity.
@@ -107,6 +107,7 @@ class PromotionPipeline:
         propensity_index: PropensityIndex | None = None,
         use_stack_synthesis: bool = False,
         adaptive_stability: bool = False,
+        max_per_family: int = 0,
     ) -> PromotionResult:
         """Run the promotion pipeline.
 
@@ -121,6 +122,7 @@ class PromotionPipeline:
             use_stack_synthesis: Use stack-aware synthesis path (V2).
             adaptive_stability: When True, compute effective min_stability from
                 corpus diversity rather than using the static value.
+            max_per_family: Maximum recipes per effect family (0 = no cap).
 
         Returns:
             PromotionResult with promoted recipes and a quality report.
@@ -156,6 +158,7 @@ class PromotionPipeline:
         # Stage 3: Recipe synthesis + build source template map for motif annotation
         promoted: list[EffectRecipe] = []
         source_template_map: dict[str, list[str]] = {}
+        recipe_support: dict[str, int] = {}
         stack_promoted_count = 0
         for t in passed:
             recipe_id = f"synth_{t.effect_family}_{t.motion_class}_{t.template_id}"
@@ -165,17 +168,35 @@ class PromotionPipeline:
             else:
                 recipe = self._synthesizer.synthesize(t, recipe_id=recipe_id)
             promoted.append(recipe)
+            recipe_support[recipe_id] = t.support_count
             source_ids = [t.template_id] + self._get_cluster_member_ids(t.template_id, clusters)
             source_template_map[recipe_id] = source_ids
 
-        # Stage 4: Model affinity enrichment
+        # Stage 4: Per-family cap
+        capped_count = 0
+        if max_per_family > 0:
+            # Sort by support_count descending so highest-quality survive the cap
+            promoted.sort(key=lambda r: -recipe_support.get(r.recipe_id, 0))
+            family_counts: dict[str, int] = {}
+            capped: list[EffectRecipe] = []
+            for recipe in promoted:
+                family = recipe.layers[0].effect_type.lower() if recipe.layers else "unknown"
+                count = family_counts.get(family, 0)
+                if count < max_per_family:
+                    capped.append(recipe)
+                    family_counts[family] = count + 1
+                else:
+                    capped_count += 1
+            promoted = capped
+
+        # Stage 5: Model affinity enrichment
         affinities_enriched = 0
         if propensity_index is not None:
             promoted, affinities_enriched = self._enrich_model_affinities(
                 promoted, propensity_index
             )
 
-        # Stage 5: Motif annotation
+        # Stage 6: Motif annotation
         motifs_annotated = 0
         if motif_catalog is not None:
             promoted = self._annotator.annotate(
@@ -183,16 +204,37 @@ class PromotionPipeline:
             )
             motifs_annotated = sum(1 for r in promoted if r.motif_compatibility)
 
+        # Compute distributions for the report
+        family_dist: dict[str, int] = {}
+        lane_dist: dict[str, int] = {}
+        total_layers = 0
+        for recipe in promoted:
+            family = recipe.layers[0].effect_type.lower() if recipe.layers else "unknown"
+            family_dist[family] = family_dist.get(family, 0) + 1
+            lane = recipe.template_type if hasattr(recipe, "template_type") else "UNKNOWN"
+            lane_dist[lane] = lane_dist.get(lane, 0) + 1
+            total_layers += len(recipe.layers)
+
+        avg_layers = total_layers / len(promoted) if promoted else 0.0
+
         report: dict[str, Any] = {
             "total_candidates": len(candidates),
             "filtered_families": filtered_count,
+            "eligible_count": len(eligible),
             "passed_quality_gate": len(passed),
             "rejected_count": rejected_count,
+            "after_cluster_dedup": len(passed),
             "promoted_count": len(promoted),
+            "capped_count": capped_count,
             "affinities_enriched": affinities_enriched,
             "motifs_annotated": motifs_annotated,
             "stack_promoted_count": stack_promoted_count,
             "effective_min_stability": effective_stability,
+            "effective_min_support": min_support,
+            "adaptive_stability_used": adaptive_stability,
+            "family_distribution": family_dist,
+            "lane_distribution": lane_dist,
+            "avg_layers_per_recipe": round(avg_layers, 2),
         }
 
         return PromotionResult(promoted_recipes=promoted, report=report)

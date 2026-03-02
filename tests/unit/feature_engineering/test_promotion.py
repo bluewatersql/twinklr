@@ -161,11 +161,11 @@ class TestAdaptiveStability:
         assert val_15 > val_5
 
     def test_clamps_at_lower_bound(self) -> None:
-        """Result never goes below the hard lower bound (0.3)."""
+        """Result never goes below the hard lower bound (0.03)."""
         from twinklr.core.feature_engineering.promotion import _adaptive_stability
 
         result = _adaptive_stability(median_distinct_pack_count=0)
-        assert result >= 0.3
+        assert result >= 0.03
 
     def test_clamps_at_upper_bound(self) -> None:
         """Result never exceeds the hard upper bound (0.9)."""

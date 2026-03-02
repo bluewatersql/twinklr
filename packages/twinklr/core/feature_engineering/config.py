@@ -59,9 +59,14 @@ class FeatureEngineeringPipelineOptions:
         enable_stack_detection: Run effect-stack detection.
         enable_quality_gates: Evaluate quality gates.
         enable_recipe_promotion: Run recipe promotion pipeline.
+        enable_color_discovery: Run corpus color palette discovery.
+        enable_effect_metadata: Build per-family effect metadata profiles.
+        enable_vocabulary_expansion: Run compound vocabulary expansion.
+        color_palette_library_path: Path to pre-existing color palette library.
         recipe_promotion_min_support: Minimum support count for recipe promotion.
         recipe_promotion_min_stability: Minimum stability score for recipes.
         recipe_promotion_adaptive_stability: Use adaptive stability thresholds.
+        recipe_promotion_max_per_family: Maximum recipes promoted per effect family.
         recipe_promotion_param_profiles: Named parameter profiles for promotion.
         taxonomy_rules_path: Path to custom taxonomy rules file.
         feature_store_config: Configuration for the feature store backend.
@@ -112,9 +117,14 @@ class FeatureEngineeringPipelineOptions:
     enable_stack_detection: bool = True
     enable_quality_gates: bool = True
     enable_recipe_promotion: bool = True
+    enable_color_discovery: bool = True
+    enable_effect_metadata: bool = True
+    enable_vocabulary_expansion: bool = True
+    color_palette_library_path: Path | None = None
     recipe_promotion_min_support: int = 5
-    recipe_promotion_min_stability: float = 0.3
-    recipe_promotion_adaptive_stability: bool = False
+    recipe_promotion_min_stability: float = 0.05
+    recipe_promotion_adaptive_stability: bool = True
+    recipe_promotion_max_per_family: int = 10
     recipe_promotion_param_profiles: dict[str, dict[str, object]] | None = None
     taxonomy_rules_path: Path | None = None
     feature_store_config: FeatureStoreConfig | None = None

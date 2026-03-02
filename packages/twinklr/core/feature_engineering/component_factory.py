@@ -20,6 +20,7 @@ from twinklr.core.feature_engineering.clustering import (
     TemplateClustererOptions,
 )
 from twinklr.core.feature_engineering.color_arc import ColorArcExtractor
+from twinklr.core.feature_engineering.color_discovery import ColorFamilyDiscoverer
 from twinklr.core.feature_engineering.color_narrative import ColorNarrativeExtractor
 from twinklr.core.feature_engineering.config import FeatureEngineeringPipelineOptions
 from twinklr.core.feature_engineering.datasets.quality import (
@@ -27,6 +28,7 @@ from twinklr.core.feature_engineering.datasets.quality import (
     QualityGateOptions,
 )
 from twinklr.core.feature_engineering.layering import LayeringFeatureExtractor
+from twinklr.core.feature_engineering.metadata_profiles import EffectMetadataProfileBuilder
 from twinklr.core.feature_engineering.motifs import MotifMiner, MotifMinerOptions
 from twinklr.core.feature_engineering.phrase_encoder import PhraseEncoder
 from twinklr.core.feature_engineering.propensity import PropensityMiner
@@ -43,6 +45,7 @@ from twinklr.core.feature_engineering.taxonomy import (
 from twinklr.core.feature_engineering.template_diagnostics import TemplateDiagnosticsBuilder
 from twinklr.core.feature_engineering.templates import TemplateMiner, TemplateMinerOptions
 from twinklr.core.feature_engineering.transitions import TransitionModeler
+from twinklr.core.feature_engineering.vocabulary_expander import VocabularyExpander
 
 
 class ComponentFactory:
@@ -277,7 +280,9 @@ class ComponentFactory:
         Returns:
             A ``ColorArcExtractor`` instance.
         """
-        return ColorArcExtractor()
+        return ColorArcExtractor(
+            palette_library_path=self._options.color_palette_library_path
+        )
 
     @cached_property
     def propensity_miner(self) -> PropensityMiner:
@@ -313,6 +318,37 @@ class ComponentFactory:
                 max_single_unknown_effect_type_ratio=self._options.quality_max_single_unknown_effect_type_ratio,
             )
         )
+
+    # ------------------------------------------------------------------
+    # Enrichment components
+    # ------------------------------------------------------------------
+
+    @cached_property
+    def color_family_discoverer(self) -> ColorFamilyDiscoverer:
+        """Color family discoverer (lazy).
+
+        Returns:
+            A ``ColorFamilyDiscoverer`` instance.
+        """
+        return ColorFamilyDiscoverer()
+
+    @cached_property
+    def effect_metadata_builder(self) -> EffectMetadataProfileBuilder:
+        """Effect metadata profile builder (lazy).
+
+        Returns:
+            An ``EffectMetadataProfileBuilder`` instance.
+        """
+        return EffectMetadataProfileBuilder()
+
+    @cached_property
+    def vocabulary_expander(self) -> VocabularyExpander:
+        """Vocabulary expander (lazy).
+
+        Returns:
+            A ``VocabularyExpander`` instance.
+        """
+        return VocabularyExpander()
 
 
 __all__ = ["ComponentFactory"]

@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from twinklr.core.feature_engineering.color_discovery import DiscoveredPalette
 from twinklr.core.feature_engineering.models import (
     AlignedEffectEvent,
     AudioDiscoveryResult,
@@ -19,12 +20,15 @@ from twinklr.core.feature_engineering.models.ann_retrieval import (
 )
 from twinklr.core.feature_engineering.models.clustering import TemplateClusterCatalog
 from twinklr.core.feature_engineering.models.color_narrative import ColorNarrativeRow
+from twinklr.core.feature_engineering.models.metadata import EffectMetadataProfiles
+from twinklr.core.feature_engineering.models.vocabulary import VocabularyExtensions
 from twinklr.core.feature_engineering.models.layering import LayeringFeatureRow
 from twinklr.core.feature_engineering.models.learned_taxonomy import (
     LearnedTaxonomyEvalReport,
     LearnedTaxonomyModel,
 )
 from twinklr.core.feature_engineering.models.motifs import MotifCatalog
+from twinklr.core.feature_engineering.models.promotion import PromotionReport
 from twinklr.core.feature_engineering.models.quality import QualityReport
 from twinklr.core.feature_engineering.models.retrieval import TemplateRetrievalIndex
 from twinklr.core.feature_engineering.models.stacks import EffectStack, EffectStackCatalog
@@ -449,6 +453,20 @@ class FeatureEngineeringWriter:
         self._write_json(output_path, catalog.model_dump(mode="json"))
         return output_path
 
+    def write_promotion_report(self, output_root: Path, report: PromotionReport) -> Path:
+        """Write promotion pipeline report as JSON.
+
+        Args:
+            output_root: Directory for the output file.
+            report: PromotionReport to serialise.
+
+        Returns:
+            Path to the written file.
+        """
+        output_path = output_root / "promotion_report.json"
+        self._write_json(output_path, report.model_dump(mode="json"))
+        return output_path
+
     def write_recipe_catalog(self, output_root: Path, recipes: list[EffectRecipe]) -> Path:
         """Write promoted recipe catalog as JSON.
 
@@ -499,4 +517,71 @@ class FeatureEngineeringWriter:
         """
         output_path = output_root / "planner_adapter_acceptance.json"
         self._write_json(output_path, payload)
+        return output_path
+
+    def write_color_palette_library(
+        self, output_root: Path, palettes: list[DiscoveredPalette]
+    ) -> Path:
+        """Write discovered color palette library as JSON.
+
+        Args:
+            output_root: Directory for the output file.
+            palettes: Discovered palettes to serialise.
+
+        Returns:
+            Path to the written file.
+        """
+        output_path = output_root / "color_palette_library.json"
+        payload = {
+            "schema_version": "v1.0.0",
+            "palette_count": len(palettes),
+            "palettes": [
+                {
+                    "palette_id": f"{p.scope_key[0]}_{p.scope_key[1]}_{p.scope_key[2]}",
+                    "name": p.name,
+                    "colors": list(p.colors),
+                    "mood_tags": [],
+                    "temperature": "neutral",
+                    "scope_key": list(p.scope_key),
+                    "hue_bins": [
+                        {"bin_name": b.bin_name, "colors": list(b.colors)}
+                        for b in p.hue_bins
+                    ],
+                }
+                for p in palettes
+            ],
+        }
+        self._write_json(output_path, payload)
+        return output_path
+
+    def write_effect_metadata(
+        self, output_root: Path, profiles: EffectMetadataProfiles
+    ) -> Path:
+        """Write effect metadata profiles as JSON.
+
+        Args:
+            output_root: Directory for the output file.
+            profiles: Effect metadata profiles to serialise.
+
+        Returns:
+            Path to the written file.
+        """
+        output_path = output_root / "effect_metadata.json"
+        self._write_json(output_path, profiles.model_dump(mode="json"))
+        return output_path
+
+    def write_vocabulary_extensions(
+        self, output_root: Path, extensions: VocabularyExtensions
+    ) -> Path:
+        """Write vocabulary extensions as JSON.
+
+        Args:
+            output_root: Directory for the output file.
+            extensions: Vocabulary extensions to serialise.
+
+        Returns:
+            Path to the written file.
+        """
+        output_path = output_root / "vocabulary_extensions.json"
+        self._write_json(output_path, extensions.model_dump(mode="json"))
         return output_path

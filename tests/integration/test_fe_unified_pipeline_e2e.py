@@ -40,7 +40,7 @@ from twinklr.core.feature_engineering.promotion import PromotionPipeline
 from twinklr.core.feature_engineering.style_transfer import StyleWeightedRetrieval
 from twinklr.core.feature_store.backends.null import NullFeatureStore
 from twinklr.core.feature_store.factory import create_feature_store
-from twinklr.core.feature_store.models import FeatureStoreConfig
+from twinklr.core.feature_store.models import CorpusStats, FeatureStoreConfig
 from twinklr.core.pipeline.context import PipelineContext
 from twinklr.core.pipeline.definition import (
     ExecutionPattern,
@@ -528,6 +528,16 @@ class TestFeatureStoreLifecycle:
         corpus_dir, output_root, extracted_root = _setup_corpus(tmp_path)
 
         mock_store = MagicMock()
+        mock_store.get_corpus_stats.return_value = CorpusStats(
+            phrase_count=0,
+            template_count=0,
+            stack_count=0,
+            transition_count=0,
+            recipe_count=0,
+            taxonomy_count=0,
+            propensity_count=0,
+            profile_count=1,
+        )
         pipeline = FeatureEngineeringPipeline(
             options=FeatureEngineeringPipelineOptions(
                 extracted_search_roots=(extracted_root,),
@@ -542,7 +552,7 @@ class TestFeatureStoreLifecycle:
         corpus_id, metadata_json = mock_store.upsert_corpus_metadata.call_args[0]
         assert isinstance(corpus_id, str) and len(corpus_id) > 0
         parsed = json.loads(metadata_json)
-        assert "sequence_count" in parsed
+        assert "profile_count" in parsed
 
 
 # ============================================================================

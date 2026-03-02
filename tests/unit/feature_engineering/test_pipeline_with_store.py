@@ -13,7 +13,7 @@ from twinklr.core.feature_engineering.pipeline import (
     FeatureEngineeringPipelineOptions,
 )
 from twinklr.core.feature_store.backends.null import NullFeatureStore
-from twinklr.core.feature_store.models import FeatureStoreConfig
+from twinklr.core.feature_store.models import CorpusStats, FeatureStoreConfig
 
 # ---------------------------------------------------------------------------
 # Shared test helpers (mirrored from test_pipeline.py)
@@ -280,6 +280,16 @@ def test_store_receives_corpus_metadata_upsert(tmp_path: Path) -> None:
     _write_corpus_index(corpus_dir, profile_dir)
 
     mock_store = MagicMock()
+    mock_store.get_corpus_stats.return_value = CorpusStats(
+        phrase_count=0,
+        template_count=0,
+        stack_count=0,
+        transition_count=0,
+        recipe_count=0,
+        taxonomy_count=0,
+        propensity_count=0,
+        profile_count=1,
+    )
 
     pipeline = FeatureEngineeringPipeline()
     pipeline._store = mock_store
@@ -290,9 +300,9 @@ def test_store_receives_corpus_metadata_upsert(tmp_path: Path) -> None:
     corpus_id_arg, metadata_json_arg = mock_store.upsert_corpus_metadata.call_args[0]
     assert isinstance(corpus_id_arg, str)
     assert len(corpus_id_arg) > 0
-    # metadata_json should be valid JSON
+    # metadata_json should be valid JSON with CorpusStats fields
     parsed = json.loads(metadata_json_arg)
-    assert "sequence_count" in parsed
+    assert "profile_count" in parsed
 
 
 # ---------------------------------------------------------------------------
