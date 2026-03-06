@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
+import zipfile
 from pathlib import Path
 
 from twinklr.core.feature_store.backends.null import NullFeatureStore
@@ -198,9 +200,8 @@ class SequencePackProfiler:
         """
         # Store check (non-Null store)
         if not isinstance(self._store, NullFeatureStore):
-            zip_sha = self._compute_zip_sha(zip_path)
-            records = self._store.query_profiles()
-            record = next((r for r in records if r.zip_sha256 == zip_sha), None)
+            seq_sha = self._compute_sequence_sha(zip_path)
+            record = self._store.query_profile_by_sha(seq_sha)
             if record is not None:
                 profile_dir = Path(record.profile_path)
                 if profile_dir.exists():
@@ -309,6 +310,32 @@ class SequencePackProfiler:
             enriched_events=enriched_events,
             lineage=lineage,
         )
+
+    @staticmethod
+    def _compute_sequence_sha(zip_path: Path) -> str:
+        """Return SHA-256 hex digest of the sequence file (.xsq) inside the archive.
+
+        Extracts the first .xsq (or .seq) file from the zip and hashes its raw
+        bytes.  Falls back to hashing the zip itself when no sequence file is
+        found, preserving backward compatibility.
+
+        Args:
+            zip_path: Path to the zip/xsqz archive.
+
+        Returns:
+            Hex-encoded SHA-256 digest string of the sequence file content, or
+            of the zip file when no sequence file is present.
+        """
+        try:
+            with zipfile.ZipFile(zip_path) as archive:
+                for name in archive.namelist():
+                    if Path(name).suffix.lower() in {".xsq", ".seq"}:
+                        data = archive.read(name)
+                        return hashlib.sha256(data).hexdigest()
+        except Exception:  # noqa: BLE001
+            pass
+        # Fallback: hash the zip itself (backward compat)
+        return sha256_file(zip_path)
 
     def _compute_zip_sha(self, zip_path: Path) -> str:
         """Return SHA-256 hex digest of the source archive.

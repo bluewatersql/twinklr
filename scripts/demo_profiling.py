@@ -103,6 +103,8 @@ def _profile_archive(
     prev_profile_count: int = 0,
     store,
 ) -> dict[str, str]:
+    # Capture pre-run existence for NullFeatureStore status detection
+    pre_exists = (output_dir / "sequence_metadata.json").exists()
     profile = profiler.profile(input_path, output_dir, force=force)
     source_ext = sorted(profile.manifest.source_extensions)
 
@@ -111,9 +113,8 @@ def _profile_archive(
     if new_count is not None:
         status = "NEW" if new_count > prev_profile_count else "SKIP"
     else:
-        # NullFeatureStore: check if sequence_metadata.json existed before profiling
-        metadata_path = output_dir / "sequence_metadata.json"
-        status = "SKIP" if metadata_path.exists() and not force else "NEW"
+        # NullFeatureStore: use pre-run existence to determine status
+        status = "SKIP" if pre_exists and not force else "NEW"
 
     return {
         "status": status,

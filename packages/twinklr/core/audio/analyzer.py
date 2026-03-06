@@ -150,6 +150,25 @@ class AudioAnalyzer:
         if not force_reprocess:
             cached_bundle = await load_audio_features_async(audio_path, self.cache, SongBundle)
             if cached_bundle:
+                # If lyrics were skipped when the cache was populated but are now enabled,
+                # extract them and refresh the cache so has_lyrics is correct downstream.
+                if (
+                    self.lyrics_pipeline is not None
+                    and cached_bundle.lyrics is not None
+                    and cached_bundle.lyrics.stage_status == StageStatus.SKIPPED
+                ):
+                    logger.debug(
+                        "Cached bundle has SKIPPED lyrics but lyrics pipeline is enabled — "
+                        "extracting lyrics and refreshing cache"
+                    )
+                    lyrics_bundle = await self._extract_lyrics_if_enabled(
+                        audio_path,
+                        cached_bundle.timing.duration_ms,
+                        cached_bundle.metadata,
+                    )
+                    cached_bundle = cached_bundle.model_copy(update={"lyrics": lyrics_bundle})
+                    await save_audio_features_async(audio_path, self.cache, cached_bundle)
+
                 logger.debug("Using cached SongBundle")
                 return cached_bundle
 

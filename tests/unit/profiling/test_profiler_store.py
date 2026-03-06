@@ -216,10 +216,15 @@ def test_profile_registers_in_store(monkeypatch, tmp_path: Path, tmp_sqlite_stor
 
 
 def test_profile_skip_sha_match(monkeypatch, tmp_path: Path, tmp_sqlite_store) -> None:
-    """Second call with same zip SHA skips full pipeline (no re-ingest)."""
+    """Second call with same sequence SHA skips full pipeline (no re-ingest)."""
     calls = _make_fake_pipeline(monkeypatch, tmp_path)
-    # sha256_file must return the same value as the manifest's zip_sha256 ("zipsha")
-    monkeypatch.setattr("twinklr.core.profiling.profiler.sha256_file", lambda p: "zipsha")
+    # Patch _compute_sequence_sha to return "seqsha" — matching the fake pipeline's
+    # registered sequence_sha256 value ("seqsha" from BaseEffectEventsFile).
+    monkeypatch.setattr(
+        SequencePackProfiler,
+        "_compute_sequence_sha",
+        staticmethod(lambda p: "seqsha"),
+    )
     writer = MagicMock()
     output_dir = tmp_path / "out"
 
@@ -239,7 +244,7 @@ def test_profile_skip_sha_match(monkeypatch, tmp_path: Path, tmp_sqlite_store) -
     # Writer is mocked, so write all artifacts manually.
     _write_minimal_artifacts(output_dir)
 
-    # Second call — should skip because SHA matches and profile_dir exists
+    # Second call — should skip because sequence SHA matches and profile_dir exists
     profiler.profile(tmp_path / "pack.zip", output_dir)
     assert calls.count("ingest") == 1  # ingest was NOT called again
 
@@ -414,6 +419,165 @@ def test_profile_skip_with_missing_dir(monkeypatch, tmp_path: Path, tmp_sqlite_s
     # Second call — record exists in store but dir missing → must re-profile
     profiler.profile(tmp_path / "pack.zip", output_dir)
     assert calls.count("ingest") == 2
+
+
+# ---------------------------------------------------------------------------
+# DEDUP-01: sequence_sha256-based dedup tests
+# ---------------------------------------------------------------------------
+
+
+def test_dedup_uses_sequence_sha(monkeypatch, tmp_path: Path) -> None:
+    """_check_existing calls query_profile_by_sha (not query_profiles) for dedup."""
+    calls = _make_fake_pipeline(monkeypatch, tmp_path)
+    writer = MagicMock()
+
+    mock_store = MagicMock()
+    mock_store.__class__ = object  # not NullFeatureStore
+    mock_store.query_profile_by_sha.return_value = None
+
+    profiler = SequencePackProfiler(
+        layout_profiler=_make_layout_profiler(),
+        xsq_parser=_make_xsq_parser(),
+        artifact_writer=writer,
+        store=mock_store,
+    )
+
+    # Build a real zip with an .xsq file so _compute_sequence_sha can read it
+    zip_path = tmp_path / "pack.zip"
+    xsq_content = b"<xsequence></xsequence>"
+    with zipfile.ZipFile(zip_path, "w") as zf:
+        zf.writestr("sequence.xsq", xsq_content)
+
+    profiler.profile(zip_path, tmp_path / "out")
+
+    # Must use query_profile_by_sha, never query_profiles
+    mock_store.query_profile_by_sha.assert_called_once()
+    mock_store.query_profiles.assert_not_called()
+    assert "ingest" in calls
+
+
+def test_same_sequence_different_zips_deduplicates(
+    monkeypatch, tmp_path: Path, tmp_sqlite_store
+) -> None:
+    """Same .xsq content in two different zip archives → skip on second profiling run."""
+    import hashlib as _hashlib
+
+    xsq_content = b"<xsequence version='2025.1'><head><mediafile/><sequenceduration>60000</sequenceduration></head><models/><effects/></xsequence>"
+    # The sequence SHA that _compute_sequence_sha will derive from the real zip.
+    real_seq_sha = _hashlib.sha256(xsq_content).hexdigest()
+
+    zip_a = tmp_path / "pack_a.zip"
+    zip_b = tmp_path / "pack_b.zip"
+    for zip_path in (zip_a, zip_b):
+        with zipfile.ZipFile(zip_path, "w") as zf:
+            zf.writestr("sequence.xsq", xsq_content)
+            zf.writestr("xlights_rgbeffects.xml", "<xrgb/>")
+
+    # Patch fake pipeline to register the real sequence SHA so store lookup matches.
+    calls: list[str] = []
+
+    def _manifest_with_real_sha(zip_sha: str = "zipsha") -> PackageManifest:
+        return PackageManifest(
+            package_id="pkg",
+            zip_sha256=zip_sha,
+            source_extensions=frozenset({".zip"}),
+            files=(
+                FileEntry(
+                    file_id="seq",
+                    filename="sequence.xsq",
+                    ext=".xsq",
+                    size=len(xsq_content),
+                    sha256=real_seq_sha,  # match what _compute_sequence_sha returns
+                    kind=FileKind.SEQUENCE,
+                ),
+            ),
+            sequence_file_id="seq",
+            rgb_effects_file_id=None,
+        )
+
+    def fake_ingest_zip(_path: Path):
+        calls.append("ingest")
+        extracted = tmp_path / "extracted"
+        extracted.mkdir(exist_ok=True)
+        (extracted / "sequence.xsq").write_bytes(xsq_content)
+        (extracted / "xlights_rgbeffects.xml").write_text("<xrgb></xrgb>", encoding="utf-8")
+        return _manifest_with_real_sha("zipsha"), extracted
+
+    def fake_extract_effect_events(*_args, **_kwargs):
+        calls.append("extract")
+        return BaseEffectEventsFile(
+            package_id="pkg",
+            sequence_file_id="seq",
+            sequence_sha256=real_seq_sha,
+            events=(),
+        )
+
+    def fake_enrich_events(*_args, **_kwargs):
+        calls.append("enrich")
+        return ()
+
+    monkeypatch.setattr("twinklr.core.profiling.profiler.ingest_zip", fake_ingest_zip)
+    monkeypatch.setattr(
+        "twinklr.core.profiling.profiler.extract_effect_events", fake_extract_effect_events
+    )
+    monkeypatch.setattr("twinklr.core.profiling.profiler.enrich_events", fake_enrich_events)
+
+    writer = MagicMock()
+    output_dir = tmp_path / "out"
+
+    profiler = SequencePackProfiler(
+        layout_profiler=_make_layout_profiler(),
+        xsq_parser=_make_xsq_parser(),
+        artifact_writer=writer,
+        store=tmp_sqlite_store,
+    )
+
+    # First call with zip_a — full pipeline
+    profiler.profile(zip_a, output_dir)
+    assert calls.count("ingest") == 1
+
+    # Write artifacts to disk so profile_dir.exists() is True on second call
+    _write_minimal_artifacts(output_dir)
+
+    # Second call with zip_b (same sequence content, different zip) — should skip
+    profiler.profile(zip_b, output_dir)
+    assert calls.count("ingest") == 1  # NOT called again
+
+
+def test_different_sequence_content_processes(
+    monkeypatch, tmp_path: Path, tmp_sqlite_store
+) -> None:
+    """Different .xsq content → new sequence SHA → full profiling runs for second zip."""
+    xsq_a = b"<xsequence version='2025.1'><head><mediafile/><sequenceduration>60000</sequenceduration></head><models/><effects/></xsequence>"
+    xsq_b = b"<xsequence version='2025.1'><head><mediafile>other.mp3</mediafile><sequenceduration>90000</sequenceduration></head><models/><effects/></xsequence>"
+
+    zip_a = tmp_path / "pack_a.zip"
+    with zipfile.ZipFile(zip_a, "w") as zf:
+        zf.writestr("sequence.xsq", xsq_a)
+
+    zip_b = tmp_path / "pack_b.zip"
+    with zipfile.ZipFile(zip_b, "w") as zf:
+        zf.writestr("sequence.xsq", xsq_b)
+
+    calls = _make_fake_pipeline(monkeypatch, tmp_path)
+    writer = MagicMock()
+
+    profiler = SequencePackProfiler(
+        layout_profiler=_make_layout_profiler(),
+        xsq_parser=_make_xsq_parser(),
+        artifact_writer=writer,
+        store=tmp_sqlite_store,
+    )
+
+    # First call — registers xsq_a's SHA
+    out_a = tmp_path / "out_a"
+    profiler.profile(zip_a, out_a)
+    assert calls.count("ingest") == 1
+
+    # Second call with different xsq content → different SHA → new profiling
+    out_b = tmp_path / "out_b"
+    profiler.profile(zip_b, out_b)
+    assert calls.count("ingest") == 2  # ran again for new sequence
 
 
 # ---------------------------------------------------------------------------

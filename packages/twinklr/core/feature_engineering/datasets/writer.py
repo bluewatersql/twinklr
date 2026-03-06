@@ -30,7 +30,7 @@ from twinklr.core.feature_engineering.models.motifs import MotifCatalog
 from twinklr.core.feature_engineering.models.promotion import PromotionReport
 from twinklr.core.feature_engineering.models.quality import QualityReport
 from twinklr.core.feature_engineering.models.retrieval import TemplateRetrievalIndex
-from twinklr.core.feature_engineering.models.stacks import EffectStack, EffectStackCatalog
+from twinklr.core.feature_engineering.models.stacks import EffectStack
 from twinklr.core.feature_engineering.models.taxonomy import (
     PhraseTaxonomyRecord,
     TargetRoleAssignment,
@@ -262,6 +262,35 @@ class FeatureEngineeringWriter:
         self._write_json(output_path, payload)
         return output_path
 
+    def write_review_batch(self, output_root: Path, payload: dict[str, object]) -> Path:
+        """Write active-learning review batch as JSON.
+
+        Args:
+            output_root: Directory for the output file.
+            payload: Serialised review batch data.
+
+        Returns:
+            Path to the written file.
+        """
+        output_path = output_root / "review_batch.json"
+        self._write_json(output_path, payload)
+        return output_path
+
+    def write_transition_model_v2(self, output_root: Path, model_path: Path) -> Path:
+        """Record the transition model V2 artifact path.
+
+        The model is already saved by :class:`MarkovTransitionModel.save`;
+        this method returns the canonical path for manifest registration.
+
+        Args:
+            output_root: Directory for the output file.
+            model_path: Path where the model was saved.
+
+        Returns:
+            The model path (pass-through for manifest).
+        """
+        return model_path
+
     def write_template_retrieval_index(
         self, output_root: Path, index: TemplateRetrievalIndex
     ) -> Path:
@@ -431,6 +460,12 @@ class FeatureEngineeringWriter:
     def write_stack_catalog(self, output_root: Path, stacks: tuple[EffectStack, ...]) -> Path:
         """Write detected stack catalog as JSON.
 
+        Layers are written with ``phrase_id`` references rather than the full
+        ``EffectPhrase`` payload.  Embedding full phrases into the catalog
+        produces files in the hundreds-of-MB range for large corpora and causes
+        ``model_dump`` to run for several minutes — phrase data is already
+        persisted in per-sequence ``effect_phrases.jsonl`` files.
+
         Args:
             output_root: Directory for the output file.
             stacks: Effect stacks to include in the catalog.
@@ -442,15 +477,43 @@ class FeatureEngineeringWriter:
         single_count = sum(1 for s in stacks if s.layer_count == 1)
         multi_count = sum(1 for s in stacks if s.layer_count > 1)
         max_layers = max((s.layer_count for s in stacks), default=0)
-        catalog = EffectStackCatalog(
-            total_phrase_count=sum(s.layer_count for s in stacks),
-            total_stack_count=len(stacks),
-            single_layer_count=single_count,
-            multi_layer_count=multi_count,
-            max_layer_count=max_layers,
-            stacks=stacks,
+        stack_records = [
+            {
+                "stack_id": s.stack_id,
+                "package_id": s.package_id,
+                "sequence_file_id": s.sequence_file_id,
+                "target_name": s.target_name,
+                "model_type": s.model_type,
+                "start_ms": s.start_ms,
+                "end_ms": s.end_ms,
+                "duration_ms": s.duration_ms,
+                "section_label": s.section_label,
+                "layer_count": s.layer_count,
+                "stack_signature": s.stack_signature,
+                "layers": [
+                    {
+                        "phrase_id": layer.phrase.phrase_id,
+                        "layer_role": layer.layer_role.value,
+                        "blend_mode": layer.blend_mode.value,
+                        "mix": layer.mix,
+                    }
+                    for layer in s.layers
+                ],
+            }
+            for s in stacks
+        ]
+        self._write_json(
+            output_path,
+            {
+                "schema_version": "v1.0.0",
+                "total_phrase_count": sum(s.layer_count for s in stacks),
+                "total_stack_count": len(stacks),
+                "single_layer_count": single_count,
+                "multi_layer_count": multi_count,
+                "max_layer_count": max_layers,
+                "stacks": stack_records,
+            },
         )
-        self._write_json(output_path, catalog.model_dump(mode="json"))
         return output_path
 
     def write_promotion_report(self, output_root: Path, report: PromotionReport) -> Path:

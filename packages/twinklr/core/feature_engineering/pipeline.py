@@ -159,9 +159,22 @@ class FeatureEngineeringPipeline:
         try:
             if force:
                 self._store.reset_all_fe_status()
-            all_b = self._load_existing_bundles(
-                self._store.query_profiles(fe_status="complete"), output_root
-            )
+            completed = self._store.query_profiles(fe_status="complete")
+            all_b = self._load_existing_bundles(completed, output_root)
+
+            # STAB-02: Load artifacts from completed profiles for full corpus recompute
+            cached_phrases: list[EffectPhrase] = []
+            cached_taxonomy: list[PhraseTaxonomyRecord] = []
+            cached_roles: list[TargetRoleAssignment] = []
+            for prof in completed:
+                arts = self._load_profile_artifacts(
+                    output_root / prof.package_id / prof.sequence_file_id
+                )
+                if arts is not None:
+                    cached_phrases.extend(arts[0])
+                    cached_taxonomy.extend(arts[1])
+                    cached_roles.extend(arts[2])
+
             results: list[_ProfileOutputs] = []
             for prof in self._store.query_profiles(fe_status="pending"):
                 try:
@@ -180,7 +193,18 @@ class FeatureEngineeringPipeline:
             nb, np, nt, nr = self._collect(results)
             all_b.extend(nb)
             if nb:
-                self._finalize_corpus(output_root, corpus_id or output_root.name, all_b, np, nt, nr)
+                # Merge cached + new artifacts for full corpus recompute
+                all_phrases = cached_phrases + np
+                all_taxonomy = cached_taxonomy + nt
+                all_roles = cached_roles + nr
+                self._finalize_corpus(
+                    output_root,
+                    corpus_id or output_root.name,
+                    all_b,
+                    all_phrases,
+                    all_taxonomy,
+                    all_roles,
+                )
             return all_b
         finally:
             self._store.close()
@@ -487,6 +511,52 @@ class FeatureEngineeringPipeline:
             writer=self._writer,
             components=self._components,
         )
+
+    def _load_profile_artifacts(
+        self, output_dir: Path
+    ) -> (
+        tuple[
+            tuple[EffectPhrase, ...],
+            tuple[PhraseTaxonomyRecord, ...],
+            tuple[TargetRoleAssignment, ...],
+        ]
+        | None
+    ):
+        """Load cached FE artifacts from a completed profile's output directory.
+
+        Args:
+            output_dir: Profile output directory containing artifact files.
+
+        Returns:
+            Tuple of (phrases, taxonomy_rows, target_roles) or None if all missing.
+        """
+
+        from pydantic import BaseModel as _BM
+
+        def _read_models(stem: str, model_cls: type[_BM]) -> tuple[Any, ...] | None:
+            for ext in (".parquet", ".jsonl"):
+                p = output_dir / f"{stem}{ext}"
+                if not p.exists():
+                    continue
+                if ext == ".parquet":
+                    try:
+                        import pyarrow.parquet as pq
+
+                        table = pq.read_table(p)
+                        return tuple(model_cls.model_validate(row) for row in table.to_pylist())
+                    except (ImportError, Exception):
+                        continue
+                else:
+                    rows = self._read_jsonl(p)
+                    return tuple(model_cls.model_validate(r) for r in rows)
+            return None
+
+        phrases = _read_models("effect_phrases", EffectPhrase)
+        taxonomy = _read_models("phrase_taxonomy", PhraseTaxonomyRecord)
+        roles = _read_models("target_roles", TargetRoleAssignment)
+        if phrases is None and taxonomy is None and roles is None:
+            return None
+        return (phrases or (), taxonomy or (), roles or ())
 
     def _load_existing_bundles(
         self, profiles: tuple[ProfileRecord, ...], output_root: Path

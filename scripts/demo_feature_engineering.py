@@ -8,6 +8,7 @@ from collections import Counter
 import json
 from pathlib import Path
 import shutil
+import time
 from typing import Any
 
 from twinklr.core.config.models import AppConfig, JobConfig
@@ -708,8 +709,18 @@ def main() -> int:
             analyzer=analyzer,
             music_library_index=music_index,
         )
-        bundles = pipeline.run_corpus(corpus_dir, output_dir)
-        print(f"Built feature-engineering artifacts for {len(bundles)} sequences.")
+        build_start = time.perf_counter()
+
+        def _progress(msg: str) -> None:
+            elapsed = time.perf_counter() - build_start
+            print(f"  [{elapsed:5.1f}s] {msg}")
+
+        bundles = pipeline.run_corpus(corpus_dir, output_dir, progress_fn=_progress)
+        build_elapsed = time.perf_counter() - build_start
+        print(
+            f"  Built feature-engineering artifacts for {len(bundles)} sequences"
+            f" in {build_elapsed:.1f}s."
+        )
 
     sequence_dirs = _collect_sequence_dirs(output_dir)
     if not sequence_dirs:

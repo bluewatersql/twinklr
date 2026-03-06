@@ -35,6 +35,7 @@ from twinklr.core.feature_engineering.models.promotion import PromotionReport
 from twinklr.core.feature_engineering.models.propensity import PropensityIndex
 from twinklr.core.feature_engineering.models.stacks import EffectStack, EffectStackCatalog
 from twinklr.core.feature_engineering.promotion import PromotionPipeline
+from twinklr.core.feature_engineering.transitions_v2.markov import MarkovTransitionModel
 from twinklr.core.feature_store.protocols import FeatureStoreProviderSync
 
 _ProgressFn = Any  # Callable[[str], None] | None
@@ -83,12 +84,21 @@ def write_v1_tail_artifacts(
     tg: TransitionGraph | None = None
     if o.enable_transition_modeling and template_catalogs is not None:
         if progress_fn:
-            progress_fn("transition modeling")
+            label = "transition modeling"
+            if o.enable_transition_v2:
+                label += " + markov"
+            progress_fn(label)
         tg = c.transition_modeler.build_graph(
             phrases=phrases, orchestration_catalog=template_catalogs[1]
         )
         m["transition_graph"] = str(w.write_transition_graph(output_root, tg))
         s.upsert_transitions(tg.edges)
+        if o.enable_transition_v2 and tg.edges:
+            markov = MarkovTransitionModel()
+            markov.fit(tg.edges, phrases)
+            markov_path = output_root / "transition_model_v2.json"
+            markov.save(markov_path)
+            m["transition_model_v2"] = str(markov_path)
     lr: tuple[LayeringFeatureRow, ...] = ()
     if o.enable_layering_features and phrases:
         if progress_fn:
@@ -180,6 +190,26 @@ def write_v1_tail_artifacts(
                 output_root, artifact_writer.build_unknown_diagnostics(phrases)
             )
         )
+    # ── Active learning: uncertainty sampling for taxonomy review ──
+    if o.enable_active_learning and phrases and taxonomy_rows:
+        if progress_fn:
+            progress_fn("active learning sampling")
+        from twinklr.core.feature_engineering.active_learning.models import (
+            UncertaintySamplerOptions,
+        )
+        from twinklr.core.feature_engineering.active_learning.sampler import (
+            UncertaintySampler,
+        )
+
+        sampler = UncertaintySampler(UncertaintySamplerOptions())
+        candidates = sampler.sample(phrases, taxonomy_rows)
+        if candidates:
+            batch_data: dict[str, object] = {
+                "schema_version": "1.0.0",
+                "total_candidates": len(candidates),
+                "candidates": [c.model_dump(mode="json") for c in candidates],
+            }
+            m["review_batch"] = str(w.write_review_batch(output_root, batch_data))
     mc: MotifCatalog | None = None
     clc: TemplateClusterCatalog | None = None
     if template_catalogs is not None:

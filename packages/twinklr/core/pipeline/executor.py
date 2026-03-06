@@ -129,7 +129,11 @@ class PipelineExecutor:
 
                 if result.success:
                     outputs[stage_id] = result.output
-                    logger.info(f"  ✓ {stage_id} completed")
+                    if result.metadata.get("skipped"):
+                        skip_reason = result.metadata.get("skip_reason", "condition not met")
+                        logger.info(f"  ⏭  {stage_id} skipped ({skip_reason})")
+                    else:
+                        logger.info(f"  ✓ {stage_id} completed")
                 else:
                     failed_stages.append(stage_id)
                     logger.error(f"  ✗ {stage_id} failed: {result.error}")

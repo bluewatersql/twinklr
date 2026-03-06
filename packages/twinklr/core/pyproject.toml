@@ -54,6 +54,10 @@ ml = [
 fe = [
     "sqlite-vec>=0.1.6",    # C-optimized vector search extension for SQLite
 ]
+normalization = [
+    "sentence-transformers>=3.0",  # Effect name embedding
+    "scikit-learn>=1.4",           # Optional clustering backends
+]
 
 [build-system]
 requires = ["setuptools>=61.0", "wheel"]

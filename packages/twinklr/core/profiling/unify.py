@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import uuid
+import warnings
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -72,6 +73,12 @@ class ProfileCorpusBuilder:
         exclude_glob: str | None = None,
         schema_version_filter: str | None = None,
     ) -> list[CorpusBuildResult]:
+        warnings.warn(
+            "ProfileCorpusBuilder is deprecated. Use FeatureEngineeringPipeline.run() "
+            "with store-driven profiles instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         profile_dirs = self._discover_profiles(profiles_root, include_glob, exclude_glob)
         grouped: dict[str, list[Path]] = {}
         for profile_dir in profile_dirs:

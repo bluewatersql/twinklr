@@ -63,6 +63,8 @@ class FeatureEngineeringPipelineOptions:
         enable_color_discovery: Run corpus color palette discovery.
         enable_effect_metadata: Build per-family effect metadata profiles.
         enable_vocabulary_expansion: Run compound vocabulary expansion.
+        enable_active_learning: Run active learning uncertainty sampling.
+        enable_transition_v2: Fit duration-conditioned Markov transition model.
         color_palette_library_path: Path to pre-existing color palette library.
         recipe_promotion_min_support: Minimum support count for recipe promotion.
         recipe_promotion_min_stability: Minimum stability score for recipes.
@@ -121,6 +123,8 @@ class FeatureEngineeringPipelineOptions:
     enable_color_discovery: bool = True
     enable_effect_metadata: bool = True
     enable_vocabulary_expansion: bool = True
+    enable_active_learning: bool = False
+    enable_transition_v2: bool = True
     color_palette_library_path: Path | None = None
     recipe_promotion_min_support: int = 3
     recipe_promotion_min_stability: float = 0.03

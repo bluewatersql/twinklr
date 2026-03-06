@@ -79,8 +79,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "audio_file",
         nargs="?",
-        default="data/music/Need A Favor.mp3",
-        help="Path to audio file (default: data/music/Need A Favor.mp3)",
+        default="data/music/11 - Need A Favor.mp3",
+        help="Path to audio file",
     )
     parser.add_argument(
         "--new-session",
@@ -149,10 +149,16 @@ async def main() -> None:
         print(f"   ... and {len(available_templates) - 5} more")
 
     # Build display groups (for MacroPlanner coordination)
+    # Each group requires a concrete 'id' field for the macro planner to reference it.
     display_groups: list[dict[str, object]] = [
-        {"role_key": "MOVING_HEADS", "model_count": args.fixtures, "group_type": "moving_head"},
-        {"role_key": "OUTLINE", "model_count": 10, "group_type": "string"},
-        {"role_key": "MEGA_TREE", "model_count": 1, "group_type": "tree"},
+        {
+            "id": "MOVING_HEADS",
+            "role_key": "MOVING_HEADS",
+            "model_count": args.fixtures,
+            "group_type": "moving_head",
+        },
+        {"id": "OUTLINE", "role_key": "OUTLINE", "model_count": 10, "group_type": "string"},
+        {"id": "MEGA_TREE", "role_key": "MEGA_TREE", "model_count": 1, "group_type": "tree"},
     ]
 
     # Resolve paths
@@ -262,8 +268,8 @@ async def main() -> None:
         )
         print(f"📄 Audio profile: {profile_path.stem}")
 
-    # Lyrics context
-    if "lyrics" in result.outputs:
+    # Lyrics context (conditional stage - may be None if no lyrics detected)
+    if result.outputs.get("lyrics") is not None:
         lyrics = result.outputs["lyrics"]
         lyrics_path = save_artifact(
             lyrics.model_dump(),

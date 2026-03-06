@@ -9,6 +9,7 @@ from pathlib import Path
 from pydantic import BaseModel, ConfigDict
 
 from twinklr.core.feature_engineering.color_discovery import DiscoveredPalette, HueBin
+from twinklr.core.feature_engineering.embeddings.models import SimilarityLink
 from twinklr.core.feature_engineering.models.adapters import SequencerAdapterBundle
 from twinklr.core.feature_engineering.models.color_arc import SongColorArc
 from twinklr.core.feature_engineering.models.color_narrative import ColorNarrativeRow
@@ -37,6 +38,9 @@ class FEArtifactBundle(BaseModel):
     vocabulary_extensions: VocabularyExtensions | None = None
     color_palette_library: tuple[DiscoveredPalette, ...] = ()
     color_narrative: tuple[ColorNarrativeRow, ...] = ()
+    similarity_links: tuple[SimilarityLink, ...] = ()
+    sequence_embedding: tuple[float, ...] | None = None
+    transition_model_v2_path: str | None = None
 
 
 def _read_json(path: Path) -> dict:
@@ -98,6 +102,9 @@ def load_fe_artifacts(fe_output_dir: Path) -> FEArtifactBundle:
     palettes = _load_discovered_palettes(manifest, fe_output_dir)
     narrative = _load_color_narrative(manifest, fe_output_dir)
 
+    # Transition model V2 path (written by MarkovTransitionModel.save)
+    transition_v2_path = manifest.get("transition_model_v2")
+
     return FEArtifactBundle(
         recipe_catalog_entries=tuple(recipes),
         color_arc=color_arc,  # type: ignore[arg-type]
@@ -109,6 +116,7 @@ def load_fe_artifacts(fe_output_dir: Path) -> FEArtifactBundle:
         vocabulary_extensions=vocabulary_extensions,  # type: ignore[arg-type]
         color_palette_library=palettes,
         color_narrative=narrative,
+        transition_model_v2_path=transition_v2_path,
     )
 
 
