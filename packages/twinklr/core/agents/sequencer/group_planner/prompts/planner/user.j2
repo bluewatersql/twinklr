@@ -173,7 +173,7 @@ Motif Catalog (reference):
 {% endif %}
 {% endif %}
 
-{% if color_arc or propensity_hints or style_constraints %}
+{% if color_arc or propensity_hints or style_constraints or color_narrative_row or arc_keyframe %}
 ## Feature Engineering Context
 
 {% if color_arc %}
@@ -193,9 +193,34 @@ Motif Catalog (reference):
 {% if style_constraints %}
 ### Style Constraints
 {% if style_constraints.timing_style %}
-- Beat alignment: {{ style_constraints.timing_style.beat_alignment_strictness | default('-') }}
-- Density: {{ style_constraints.timing_style.density_preference | default('-') }}
+- **Timing:** Beat alignment={{ style_constraints.timing_style.beat_alignment_strictness | default('-') }}, Density={{ style_constraints.timing_style.density_preference | default('-') }}
 {% endif %}
+{% if style_constraints.transition_style %}
+- **Transitions:** preferred_gap_ms={{ style_constraints.transition_style.preferred_gap_ms | default('-') }}, overlap_tendency={{ style_constraints.transition_style.overlap_tendency | default('-') }}, variety={{ style_constraints.transition_style.variety_score | default('-') }}
+{% endif %}
+{% if style_constraints.layering_style %}
+- **Layering:** mean_layers={{ style_constraints.layering_style.mean_layers | default('-') }}, max_layers={{ style_constraints.layering_style.max_layers | default('-') }}, blend_preference={{ style_constraints.layering_style.blend_mode_preference | default('-') }}
+{% endif %}
+{% if style_constraints.recipe_preferences %}
+- **Recipe preferences:** {% for k, v in style_constraints.recipe_preferences.items() %}{{ k }}={{ "%.2f"|format(v) }}{% if not loop.last %}, {% endif %}{% endfor %}
+{% endif %}
+{% if style_constraints.color_tendencies %}
+- **Color tendencies:** palette_complexity={{ style_constraints.color_tendencies.palette_complexity | default('-') }}, contrast={{ style_constraints.color_tendencies.contrast_preference | default('-') }}, temperature={{ style_constraints.color_tendencies.temperature_preference | default('-') }}
+{% endif %}
+{% endif %}
+
+{% if color_narrative_row %}
+### Color Narrative
+- Dominant class: {{ color_narrative_row.dominant_color_class | default('-') }}
+- Contrast shift: {{ color_narrative_row.contrast_shift_from_prev | default('-') }}
+- Hue movement: {{ color_narrative_row.hue_family_movement | default('-') }}
+{% endif %}
+
+{% if arc_keyframe %}
+### Arc Position
+- Temperature: {{ arc_keyframe.temperature | default('-') }}
+- Saturation: {{ arc_keyframe.saturation | default('-') }}
+- Contrast: {{ arc_keyframe.contrast | default('-') }}
 {% endif %}
 
 {% endif %}

@@ -25,6 +25,14 @@ from twinklr.core.sequencer.display.recipe_renderer import (
 from twinklr.core.sequencer.display.templates.effect_map import resolve_effect_type
 from twinklr.core.sequencer.templates.group.models import GroupPlacement
 from twinklr.core.sequencer.templates.group.recipe_catalog import RecipeCatalog
+from twinklr.core.sequencer.vocabulary import BlendMode
+
+RECIPE_BLEND_TO_LAYER_METHOD: dict[BlendMode, str] = {
+    BlendMode.NORMAL: "Normal",
+    BlendMode.ADD: "Max",
+    BlendMode.SCREEN: "Normal",
+    BlendMode.MASK: "1 reveals 2",
+}
 
 
 class RecipeCompiler:
@@ -140,8 +148,7 @@ class RecipeCompiler:
         params: dict[str, Any] = {
             **base_params,
             **dict(layer.resolved_params),
-            "blend_mode": layer.blend_mode.value,
-            "mix": layer.mix,
+            "E_SLIDER_Mix": int(layer.mix * 100),
         }
         event = RenderEvent(
             event_id=f"recipe_{source.template_id}_{layer.layer_index}_{uuid.uuid4().hex[:8]}",
@@ -155,8 +162,9 @@ class RecipeCompiler:
             transition_out=context.transition_out,
             source=source,
         )
-
+        xlights_blend = RECIPE_BLEND_TO_LAYER_METHOD.get(layer.blend_mode, "Normal")
         return CompiledEffect(
             event=event,
             visual_depth=layer.layer_depth,
+            layer_blend_mode=xlights_blend,
         )

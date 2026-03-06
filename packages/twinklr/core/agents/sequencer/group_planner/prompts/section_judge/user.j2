@@ -45,6 +45,10 @@ CATEGORICAL PLANNING VERSION
 **Start:** {{ (start_ms / 1000) | round(1) }}s
 **End:** {{ (end_ms / 1000) | round(1) }}s
 **Duration:** {{ ((end_ms - start_ms) / 1000) | round(1) }}s
+**Musical Length:** {{ section_duration_bars }} bars ({{ section_duration_beats }} beats)
+**Valid Bar Range:** 1 to {{ available_bars }} (section_max_bar = {{ section_max_bar }})
+
+⚠️ **Bar range is authoritative.** The section tempo determines bar count — do NOT infer bar limits from duration in seconds. A placement at bar {{ section_max_bar }} is valid.
 
 ## Available Groups (by role)
 
@@ -107,7 +111,7 @@ This plan uses **categorical values**:
 1) **Technical Validation**
 - template_ids exist and are lane-compatible
 - targets are valid: group ids exist in display graph, zone ids are valid zones (see above), split ids are valid splits (see above)
-- start timing within section bounds
+- start.bar within 1..{{ section_max_bar }} (bar range is authoritative — do NOT infer from duration seconds)
 - duration is valid enum (HIT, BURST, PHRASE, EXTENDED, SECTION)
 - intensity is valid enum (WHISPER, SOFT, MED, STRONG, PEAK)
 - no same-target self-overlap within a lane (same type+id; different targets may overlap)

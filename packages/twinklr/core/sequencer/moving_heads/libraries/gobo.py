@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field
 
 
-class GoboCategory(str, Enum):
+class GoboCategory(StrEnum):
     """Valid gobo categories."""
 
     BASIC = "basic"
@@ -16,7 +16,7 @@ class GoboCategory(str, Enum):
     SPECIAL = "special"
 
 
-class GoboPattern(str, Enum):
+class GoboPattern(StrEnum):
     """Predefined gobo pattern identifiers."""
 
     OPEN = "open"

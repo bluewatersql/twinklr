@@ -12,7 +12,11 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 from twinklr.core.agents.sequencer.group_planner.context import SectionPlanningContext
-from twinklr.core.agents.taxonomy_utils import get_theming_catalog_dict, get_theming_ids
+from twinklr.core.agents.taxonomy_utils import (
+    get_taxonomy_dict,
+    get_theming_catalog_dict,
+    get_theming_ids,
+)
 from twinklr.core.sequencer.planning import GroupPlanSet
 from twinklr.core.sequencer.templates.group.affinity import AffinityScorer
 from twinklr.core.sequencer.templates.group.catalog import TemplateCatalog
@@ -301,6 +305,16 @@ def shape_planner_context(section_context: SectionPlanningContext) -> dict[str, 
         # Use macro global primary palette as default
         palette_ref_json = json.dumps({"palette_id": section_context.global_palette_id}, indent=2)
 
+    # Build taxonomy dict, enriched with FE compound terms if available
+    base_taxonomy = get_taxonomy_dict()
+    if section_context.vocabulary_extensions:
+        vx = section_context.vocabulary_extensions
+        base_taxonomy = {**base_taxonomy}
+        if vx.compound_motion_terms:
+            base_taxonomy["CompoundMotionTerm"] = [t.term for t in vx.compound_motion_terms]
+        if vx.compound_energy_terms:
+            base_taxonomy["CompoundEnergyTerm"] = [t.term for t in vx.compound_energy_terms]
+
     # Get tag catalog and motif catalog for validation
     theming_catalog = get_theming_catalog_dict()
     tag_catalog = theming_catalog["tags"]
@@ -398,12 +412,16 @@ def shape_planner_context(section_context: SectionPlanningContext) -> dict[str, 
         "color_arc": section_context.color_arc,
         "propensity_hints": section_context.propensity_hints,
         "style_constraints": section_context.style_constraints,
+        "color_narrative_row": section_context.color_narrative_row,
+        "arc_keyframe": section_context.arc_keyframe,
         # Recipe catalog (Phase 2, optional)
         "recipe_catalog": _shape_recipe_catalog(section_context),
         # Historical learning context (populated by StandardIterationController
         # when IssueRepository is available; defaults to empty so templates
         # using {% if learning_context %} render without error)
         "learning_context": "",
+        # Taxonomy dict (enriched with FE compound terms if available)
+        "taxonomy": base_taxonomy,
     }
 
 
@@ -599,6 +617,28 @@ def shape_section_judge_context(
 
     theming_catalog = get_theming_catalog_dict()
 
+    # Compute bar timing for judge (same logic as planner context)
+    section_duration_ms = section_context.end_ms - section_context.start_ms
+    timing_ctx = section_context.timing_context
+    if timing_ctx.bar_map:
+        first_bar = next(iter(timing_ctx.bar_map.values()))
+        bar_duration_ms = first_bar.duration_ms
+        beat_duration_ms = bar_duration_ms / timing_ctx.beats_per_bar
+        section_bars = section_duration_ms / bar_duration_ms
+        section_beats = section_duration_ms / beat_duration_ms
+        valid_bars = [
+            bar
+            for bar, info in timing_ctx.bar_map.items()
+            if info.start_ms < section_context.end_ms
+        ]
+        section_max_bar = max(valid_bars) if valid_bars else max(timing_ctx.bar_map.keys())
+        available_bars = section_max_bar
+    else:
+        available_bars = 4
+        section_max_bar = available_bars
+        section_bars = 4.0
+        section_beats = 16.0
+
     return {
         # Section identity
         "section_id": section_context.section_id,
@@ -606,6 +646,11 @@ def shape_section_judge_context(
         # Timing (for bounds validation)
         "start_ms": section_context.start_ms,
         "end_ms": section_context.end_ms,
+        # Musical timing (CRITICAL for bar-range validation)
+        "section_duration_bars": round(section_bars, 1),
+        "section_duration_beats": round(section_beats, 1),
+        "available_bars": available_bars,
+        "section_max_bar": section_max_bar,
         # Intent (for quality assessment)
         "energy_target": section_context.energy_target,
         "motion_density": section_context.motion_density,
@@ -634,7 +679,7 @@ def shape_section_judge_context(
         "motif_catalog": theming_catalog[
             "motifs"
         ],  # For validating motif_ids and checking template support
-        # Excluded: timing_context, layer_intents, notes
+        # Excluded: layer_intents, notes
     }
 
 

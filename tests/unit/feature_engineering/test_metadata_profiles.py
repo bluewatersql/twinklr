@@ -12,15 +12,17 @@ Covers all 7 test cases from the spec:
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from twinklr.core.feature_engineering.metadata_profiles import (
     EffectMetadataProfileBuilder,
 )
-from twinklr.core.feature_engineering.models.metadata import (
-    EffectMetadataProfile,
-    EffectMetadataProfiles,
-)
+
+if TYPE_CHECKING:
+    from twinklr.core.feature_engineering.models.metadata import (
+        EffectMetadataProfile,
+        EffectMetadataProfiles,
+    )
 from twinklr.core.feature_engineering.models.phrases import (
     ColorClass,
     ContinuityClass,
@@ -111,7 +113,7 @@ def _make_stack(
         section_label=first.section_label,
         layers=stack_layers,
         layer_count=len(stack_layers),
-        stack_signature="|".join(l[0].effect_family for l in layers),
+        stack_signature="|".join(layer[0].effect_family for layer in layers),
     )
 
 
@@ -204,7 +206,7 @@ class TestParameterProfiles:
             stack_idx=4,
         )
 
-        all_phrases = phrases_lr + (phrase_bounce,)
+        all_phrases = (*phrases_lr, phrase_bounce)
         catalog = EffectStackCatalog(
             schema_version="v1.0.0",
             total_phrase_count=5,
@@ -212,7 +214,7 @@ class TestParameterProfiles:
             single_layer_count=5,
             multi_layer_count=0,
             max_layer_count=1,
-            stacks=stacks_lr + (stack_bounce,),
+            stacks=(*stacks_lr, stack_bounce),
         )
         builder = EffectMetadataProfileBuilder()
         result = builder.build(phrases=all_phrases, stacks=catalog)

@@ -357,6 +357,9 @@ class CompositionEngine:
 
             for ce in compiled_effects:
                 sub_layer = self._layer_allocator.allocate_sub_layer(lane, ce.visual_depth)
+                blend_key = (element_name, sub_layer)
+                if blend_key not in self._layer_blend_modes:
+                    self._layer_blend_modes[blend_key] = ce.layer_blend_mode
                 if element_name not in element_layers:
                     element_layers[element_name] = {}
                 if sub_layer not in element_layers[element_name]:

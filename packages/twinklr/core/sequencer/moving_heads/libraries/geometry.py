@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -16,7 +16,7 @@ class GeometryDefinition(BaseModel):
     description: str = Field(default="")
 
 
-class GeometryType(str, Enum):
+class GeometryType(StrEnum):
     """All available geometry transform identifiers."""
 
     # Core geometries

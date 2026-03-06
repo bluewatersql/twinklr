@@ -187,7 +187,8 @@ def test_shape_planner_context_includes_recipe_catalog() -> None:
     entry = rc["entries"][0]
     assert entry["recipe_id"] == "synth_sparkle_sweep_1"
     assert entry["layer_count"] == 2
-    assert "Sparkles" in entry["effect_types"]
+    layer_effect_types = [layer["effect_type"] for layer in entry["layers"]]
+    assert "Sparkles" in layer_effect_types
     assert len(entry["model_affinities"]) == 1
     assert entry["model_affinities"][0]["model_type"] == "megatree"
 
@@ -210,7 +211,8 @@ def test_shape_planner_context_recipe_effect_types_unique() -> None:
     ctx = _make_section_context(recipe_catalog=catalog)
     shaped = shape_planner_context(ctx)
     entry = shaped["recipe_catalog"]["entries"][0]
-    # ColorWash + Sparkles (deduplicated)
-    assert len(entry["effect_types"]) == 2
-    assert "ColorWash" in entry["effect_types"]
-    assert "Sparkles" in entry["effect_types"]
+    # ColorWash + Sparkles (deduplicated via layers)
+    layer_effect_types = list({layer["effect_type"] for layer in entry["layers"]})
+    assert len(layer_effect_types) == 2
+    assert "ColorWash" in layer_effect_types
+    assert "Sparkles" in layer_effect_types

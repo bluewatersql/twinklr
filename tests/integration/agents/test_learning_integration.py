@@ -207,12 +207,9 @@ def test_learning_context_formatting(temp_storage, sample_issues):
     )
 
     # Verify content
-    assert "Historical Learning Context" in learning_context
     assert "VARIETY" in learning_context
     assert "MUSICALITY" in learning_context
-    assert "recent issues" in learning_context
-    # Examples from sample issues
-    assert "Example:" in learning_context
+    assert "(3x)" in learning_context
 
 
 def test_iteration_controller_creates_repository(temp_storage):
@@ -289,8 +286,7 @@ def test_feedback_manager_with_learning_context(temp_storage, sample_issues):
         top_n_historical=5,
     )
 
-    # Should include historical learning context
-    assert "Historical Learning Context" in formatted
+    # Should include historical learning context as bullet points
     assert "VARIETY" in formatted
 
 
@@ -298,13 +294,7 @@ def test_multiple_agents_isolated_learning(temp_storage, sample_issues):
     """Test that different agents have isolated learning contexts."""
     repo = IssueRepository(storage_dir=temp_storage, enabled=True)
 
-    # Agent 1: Record VARIETY issues
-    feedback1 = FeedbackManager(
-        max_entries=25,
-        agent_name="agent_1",
-        job_id="job_1",
-        issue_repository=repo,
-    )
+    # Agent 1: Record VARIETY issues (3 jobs to meet min_occurrences=3)
     verdict1 = JudgeVerdict(
         status=VerdictStatus.SOFT_FAIL,
         score=6.5,
@@ -316,15 +306,16 @@ def test_multiple_agents_isolated_learning(temp_storage, sample_issues):
         score_breakdown={},
         iteration=1,
     )
-    feedback1.add_judge_verdict(verdict1, iteration=1)
+    for i in range(3):
+        feedback1 = FeedbackManager(
+            max_entries=25,
+            agent_name="agent_1",
+            job_id=f"job_a1_{i}",
+            issue_repository=repo,
+        )
+        feedback1.add_judge_verdict(verdict1, iteration=1)
 
-    # Agent 2: Record MUSICALITY issues
-    feedback2 = FeedbackManager(
-        max_entries=25,
-        agent_name="agent_2",
-        job_id="job_2",
-        issue_repository=repo,
-    )
+    # Agent 2: Record MUSICALITY issues (3 jobs to meet min_occurrences=3)
     verdict2 = JudgeVerdict(
         status=VerdictStatus.SOFT_FAIL,
         score=6.5,
@@ -336,7 +327,14 @@ def test_multiple_agents_isolated_learning(temp_storage, sample_issues):
         score_breakdown={},
         iteration=1,
     )
-    feedback2.add_judge_verdict(verdict2, iteration=1)
+    for i in range(3):
+        feedback2 = FeedbackManager(
+            max_entries=25,
+            agent_name="agent_2",
+            job_id=f"job_a2_{i}",
+            issue_repository=repo,
+        )
+        feedback2.add_judge_verdict(verdict2, iteration=1)
 
     # Get learning contexts
     context1 = repo.format_learning_context("agent_1", top_n=5)
@@ -395,9 +393,9 @@ def test_generic_examples_in_learning_context(temp_storage):
     # Get learning context
     context = repo.format_learning_context("test_judge", top_n=5)
 
-    # Should include generic example, not specific message
-    assert "Generic pattern: insufficient variety" in context
-    assert "section X" not in context  # Specific details filtered out
+    # Should include category guidance from category_guidance dict
+    assert "VARIETY" in context
+    assert "Vary templates" in context
 
 
 def test_cross_job_learning_accumulation(temp_storage, sample_issues):

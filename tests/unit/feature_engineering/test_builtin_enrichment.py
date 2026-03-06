@@ -68,6 +68,7 @@ class TestBuiltinEnrichmentPlaceholders:
             "Pictures",
             "Ripple",
             "Fire",
+            "Pinwheel",
         }
         unknown: list[str] = []
         for stem, data in _load_all_builtins():

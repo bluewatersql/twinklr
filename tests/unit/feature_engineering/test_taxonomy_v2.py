@@ -59,7 +59,7 @@ _ALL_V2_LABELS = {
     "layer_accent",
 }
 
-_EFFECT_PHRASE_FIELDS = {name for name in EffectPhrase.model_fields}
+_EFFECT_PHRASE_FIELDS = set(EffectPhrase.model_fields)
 
 
 def _phrase(

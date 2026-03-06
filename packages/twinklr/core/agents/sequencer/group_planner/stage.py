@@ -293,12 +293,51 @@ class GroupPlannerStage:
             result["propensity_hints"] = self.fe_bundle.propensity_index.model_dump(mode="json")
         if self.fe_bundle.style_fingerprint is not None:
             fp = self.fe_bundle.style_fingerprint
-            # Only expose timing_style (sequencer-level).
-            # layering_style and transition_style are DMX model-level
-            # metrics and out of scope for the sequencer/planner.
             result["style_constraints"] = {
                 "timing_style": fp.timing_style.model_dump(mode="json"),
             }
+            if hasattr(fp, "transition_style") and fp.transition_style is not None:
+                result["style_constraints"]["transition_style"] = fp.transition_style.model_dump(
+                    mode="json"
+                )
+            if hasattr(fp, "layering_style") and fp.layering_style is not None:
+                result["style_constraints"]["layering_style"] = fp.layering_style.model_dump(
+                    mode="json"
+                )
+            if hasattr(fp, "recipe_preferences") and fp.recipe_preferences:
+                result["style_constraints"]["recipe_preferences"] = dict(fp.recipe_preferences)
+            if hasattr(fp, "color_tendencies") and fp.color_tendencies is not None:
+                result["style_constraints"]["color_tendencies"] = fp.color_tendencies.model_dump(
+                    mode="json"
+                )
+        if self.fe_bundle.vocabulary_extensions is not None:
+            result["vocabulary_extensions"] = self.fe_bundle.vocabulary_extensions
+
+        # Color narrative row for this section.
+        if self.fe_bundle.color_narrative:
+            for cnr in self.fe_bundle.color_narrative:
+                if cnr.section_label == section_id or section_id.startswith(cnr.section_label):
+                    result["color_narrative_row"] = cnr.model_dump(mode="json")
+                    break
+
+        # Arc keyframe nearest to this section's position in the song.
+        if self.fe_bundle.color_arc is not None and self.fe_bundle.color_arc.arc_curve:
+            arc_curve = self.fe_bundle.color_arc.arc_curve
+            if self.fe_bundle.color_narrative:
+                total_sections = len(self.fe_bundle.color_narrative)
+                matching_idx = 0
+                for idx, cnr in enumerate(self.fe_bundle.color_narrative):
+                    if cnr.section_label == section_id or section_id.startswith(cnr.section_label):
+                        matching_idx = idx
+                        break
+                position_pct = (
+                    matching_idx / max(total_sections - 1, 1) if total_sections > 1 else 0.0
+                )
+            else:
+                position_pct = 0.0
+            nearest = min(arc_curve, key=lambda kf: abs(kf.position_pct - position_pct))
+            result["arc_keyframe"] = nearest.model_dump(mode="json")
+
         return result
 
     @staticmethod

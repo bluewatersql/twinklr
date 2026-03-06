@@ -124,7 +124,7 @@ def _stack(
 
     layers: list[EffectStackLayer] = []
     sig_parts: list[str] = []
-    for i, (fam, role_abbrev, blend_str) in enumerate(zip(families, roles, blends)):
+    for i, (fam, role_abbrev, blend_str) in enumerate(zip(families, roles, blends, strict=False)):
         axes = _family_axes.get(fam, {"motion_class": "unknown", "energy_class": "unknown"})
         p = _phrase(
             effect_family=fam,
@@ -309,7 +309,7 @@ class TestSignatureParsing:
             blends=("normal", "add", "screen"),
             count=20,
         )
-        catalog = _catalog(stacks)
+        _catalog(stacks)
         expander = VocabularyExpander()
 
         # Verify the signature format is correct

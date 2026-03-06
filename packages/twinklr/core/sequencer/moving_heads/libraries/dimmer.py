@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field
 from twinklr.core.curves.library import CurveLibrary
@@ -38,7 +38,7 @@ DEFAULT_DIMMER_PARAMS = {
 }
 
 
-class DimmerType(str, Enum):
+class DimmerType(StrEnum):
     FADE_IN = "fade_in"
     FADE_OUT = "fade_out"
     BLACKOUT = "blackout"

@@ -33,6 +33,10 @@ class CompiledEffect(BaseModel):
     visual_depth: VisualDepth = Field(
         description="Target visual depth for layer allocation",
     )
+    layer_blend_mode: str = Field(
+        default="Normal",
+        description="xLights T_CHOICE_LayerMethod value for this sub-layer",
+    )
 
 
 class TemplateCompileError(Exception):

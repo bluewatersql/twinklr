@@ -6,6 +6,7 @@ by dropping blend modes, sorting families, and keeping only motion+energy.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
 import uuid
 
 from twinklr.core.feature_engineering.models.phrases import (
@@ -21,15 +22,17 @@ from twinklr.core.feature_engineering.models.stacks import (
     EffectStack,
     EffectStackLayer,
 )
-from twinklr.core.feature_engineering.models.taxonomy import (
-    PhraseTaxonomyRecord,
-    TargetRoleAssignment,
-)
 from twinklr.core.feature_engineering.templates.miner import (
     TemplateMiner,
     TemplateMinerOptions,
 )
 from twinklr.core.sequencer.vocabulary import BlendMode, LayerRole
+
+if TYPE_CHECKING:
+    from twinklr.core.feature_engineering.models.taxonomy import (
+        PhraseTaxonomyRecord,
+        TargetRoleAssignment,
+    )
 
 
 def _make_phrase(

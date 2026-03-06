@@ -154,7 +154,7 @@ class TestMineStacksSingleLayer:
             _stack("s2", (layer2,), package_id="pkg2"),
         )
         miner = TemplateMiner(options=TemplateMinerOptions(min_instance_count=2))
-        content, orch = miner.mine_stacks(
+        content, _orch = miner.mine_stacks(
             stacks=stacks,
             taxonomy_rows=(_taxonomy("p1"), _taxonomy("p2")),
             target_roles=(_target_role(), _target_role(package_id="pkg2")),

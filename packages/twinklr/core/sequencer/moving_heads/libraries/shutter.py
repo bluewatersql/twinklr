@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field
 
 
-class ShutterPattern(str, Enum):
+class ShutterPattern(StrEnum):
     """Predefined shutter pattern identifiers.
 
     Provides type-safe pattern IDs with IDE autocomplete.

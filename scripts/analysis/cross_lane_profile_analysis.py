@@ -22,7 +22,7 @@ def load_events(profile_dir: Path) -> list[dict]:
     path = profile_dir / "enriched_effect_events.json"
     if not path.exists():
         return []
-    with open(path) as f:
+    with path.open() as f:
         return json.load(f)
 
 
@@ -62,8 +62,8 @@ def analyze_profile(profile_dir: Path) -> dict:
 
         for i in range(len(sorted_t)):
             for j in range(i + 1, len(sorted_t)):
-                s_i, e_i, l_i = sorted_t[i]
-                s_j, e_j, l_j = sorted_t[j]
+                _s_i, e_i, l_i = sorted_t[i]
+                s_j, _e_j, l_j = sorted_t[j]
                 if s_j >= e_i:
                     break
                 if l_i != l_j:

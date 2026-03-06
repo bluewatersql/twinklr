@@ -88,6 +88,9 @@ def mock_context() -> MagicMock:
     # Provide proper session with session_id string for cache key generation
     ctx.session = MagicMock()
     ctx.session.session_id = "test_session_123"
+    # Use a real dict so "pipeline_run_id" not in context.state works correctly
+    ctx.state = {}
+    ctx.get_state = MagicMock(return_value=None)
     return ctx
 
 
@@ -149,7 +152,7 @@ async def test_execute_step_cache_hit(
     mock_context.add_metric.assert_any_call("test_stage_score", 8.5)
 
     # Verify state stored
-    mock_context.set_state.assert_called_once_with("test_stage_result", mock_orchestration_result)
+    mock_context.set_state.assert_any_call("test_stage_result", mock_orchestration_result)
 
 
 @pytest.mark.asyncio
@@ -275,7 +278,7 @@ async def test_execute_step_default_state(
     assert result.success is True
 
     # Verify default state stored
-    mock_context.set_state.assert_called_once_with("my_stage_result", mock_orchestration_result)
+    mock_context.set_state.assert_any_call("my_stage_result", mock_orchestration_result)
 
 
 @pytest.mark.asyncio
@@ -304,8 +307,8 @@ async def test_execute_step_custom_state_handler(
     assert result.success is True
     assert custom_state_called is True
 
-    # Verify BOTH default and custom state stored
-    assert mock_context.set_state.call_count == 2
+    # Verify BOTH default and custom state stored (plus pipeline_run_id and cache_meta)
+    assert mock_context.set_state.call_count == 4
     mock_context.set_state.assert_any_call("my_stage_result", mock_orchestration_result)
     mock_context.set_state.assert_any_call("custom_key", mock_orchestration_result.plan)
 

@@ -96,6 +96,16 @@ class TestLoadBuiltinHandlers:
             "Ripple",
             "Fire",
             "Pinwheel",
+            # P3: Tier 1 expansion handlers
+            "Bars",
+            "Butterfly",
+            "Circles",
+            "Lightning",
+            "Morph",
+            "Shimmer",
+            "Wave",
+            "Warp",
+            "Fireworks",
         }
         assert set(reg.registered_types) == expected
 

@@ -159,10 +159,12 @@ data/features/feature_engineering/
 ├── cluster_catalog.json          # Template clusters
 ├── retrieval_index.json          # ANN search index
 ├── layering_features.json        # Layering depth/density
-├── color_narrative.json          # Colour usage patterns
+├── color_narrative.json          # Colour usage patterns (section-level dominant colour/contrast)
+├── color_palette_library.json    # Corpus-discovered palette clusters (per-song)
 ├── color_arc.json                # Palette library + section assignments
 ├── propensity_index.json         # Effect-family affinities
 ├── style_fingerprint.json        # Creator style profile
+├── vocabulary_extensions.json    # Compound motion/energy terms mined from corpus
 ├── quality_report.json           # Quality gate results
 ├── recipe_catalog.json           # Promoted recipes
 └── adapter_payloads/             # Sequencer adapter files
@@ -498,8 +500,8 @@ Two template sources merge at planner time:
 Built-in templates are hand-authored `EffectRecipe` definitions. FE-mined
 templates are discovered by `TemplateMiner` from corpus phrases, then
 promoted into recipes via `PromotionPipeline` (see [Section 5](#5-recipe-pipeline)).
-Promoted recipes are the **only** FE output that currently feeds into
-the planner.
+Promoted recipes are one of several FE outputs that feed into the planner — see
+[FE Artifact Planner Consumption](#what-fe-artifacts-feed-the-planner) below.
 
 ### Taxonomy Injection
 
@@ -516,31 +518,32 @@ as constrained value sets.
 **Important:** `taxonomy_utils.py` reads only from Python enums and
 theming registries. It does not load anything from FE output files.
 
-### What FE Taxonomy Output Does — and Doesn't — Feed Back
+### What FE Artifacts Feed the Planner
 
-The FE pipeline produces several taxonomy-related artifacts. Their
-current usage is:
+All `FEArtifactBundle` fields are loaded once per pipeline run by
+`load_fe_artifacts()` and injected into every section's planning context
+via `GroupPlannerStage._extract_fe_fields()`. The table below shows the
+current consumption status of each artifact:
 
-| FE Artifact | Produced By | Consumed By Planner? |
-|-------------|-------------|----------------------|
-| `recipe_catalog.json` (promoted recipes) | `PromotionPipeline` | **Yes** — merged into `RecipeCatalog` |
-| `color_arc.json` | `ColorArcBuilder` | **Yes** — injected into section context |
-| `propensity_index.json` | `PropensityMiner` | **Yes** — injected as `propensity_hints` |
-| `style_fingerprint.json` | `StyleFingerprintBuilder` | **Yes** — injected as `style_constraints` |
-| `transition_graph.json` | `TransitionModeler` | **Yes** — loaded into `FEArtifactBundle` |
-| `vocabulary_extensions.json` | `VocabularyExpander` | **No** — written to disk, not loaded by planner |
-| `taxonomy_model_bundle.json` | `LearnedTaxonomyTrainer` | **No** — used only within FE pipeline |
-| `effect_metadata.json` | `EffectMetadataProfileBuilder` | **No** — written to disk, not loaded |
-| `phrase_taxonomy.json` | Per-profile taxonomy stage | **No** — FE-internal use only |
+| FE Artifact | Produced By | Planner Usage |
+|-------------|-------------|---------------|
+| `recipe_catalog.json` | `PromotionPipeline` | **Yes** — merged into `RecipeCatalog`; rendered in `developer.j2` |
+| `color_arc.json` | `ColorArcBuilder` | **Yes** — section assignment injected as `color_arc`; nearest `arc_keyframe` injected as `arc_keyframe` |
+| `color_palette_library.json` | `ColorArcBuilder` | **Yes** — consumed by `ColorArcExtractor` to select corpus-derived palettes |
+| `color_narrative.json` | `ColorNarrativeBuilder` | **Yes** — section-matched row injected as `color_narrative_row` |
+| `propensity_index.json` | `PropensityMiner` | **Yes** — injected as `propensity_hints` (song-level) |
+| `style_fingerprint.json` | `StyleFingerprintBuilder` | **Yes** — all sub-fields injected as `style_constraints` (timing, transition, layering, recipes, colour tendencies) |
+| `vocabulary_extensions.json` | `VocabularyExpander` | **Yes** — compound motion/energy terms injected into taxonomy dict for `developer.j2` |
+| `transition_graph.json` | `TransitionModeler` | Loaded into `FEArtifactBundle`; available but not yet forwarded to prompt |
+| `taxonomy_model_bundle.json` | `LearnedTaxonomyTrainer` | FE-internal use only |
+| `effect_metadata.json` | `EffectMetadataProfileBuilder` | Written to disk; not loaded by planner |
+| `phrase_taxonomy.json` | Per-profile taxonomy stage | FE-internal use only |
 
-The FE-discovered taxonomy and vocabulary (`vocabulary_extensions`,
-`taxonomy_model_bundle`, `phrase_taxonomy`) are **one-way**: they inform
-the FE mining process but do not flow back to update the planner's
-vocabulary or prompt context. The planner's taxonomy is controlled
-entirely by the Python enums in `sequencer/vocabulary/`.
-
-This is a known gap — see `changes/fe/future.md` for planned work on
-closing the feedback loop.
+The planner's base taxonomy (enum value lists rendered in `developer.j2`)
+is controlled by Python enums in `sequencer/vocabulary/` and is enriched
+at runtime with corpus-derived compound terms when `vocabulary_extensions`
+is present. `taxonomy_utils.py` reads only from Python enums; the compound
+term injection happens in `context_shaping.py`.
 
 ### Context Shaping
 
@@ -553,15 +556,28 @@ via `_build_section_context()`:
    `{template_id, name, compatible_lanes, affinity_tags, tags}`
 3. **Recipe shaping** — Recipes are rendered as
    `{recipe_id, name, composition, layers, model_affinities}`
-4. **FE context** — `color_arc`, `propensity_hints`, and
-   `style_constraints` from the `FEArtifactBundle` are added
+4. **FE context** — `_extract_fe_fields(section_id)` extracts six fields
+   from `FEArtifactBundle` into the section context:
+   - `color_arc` — section colour assignment (palette, spatial mapping, shift timing, contrast target)
+   - `arc_keyframe` — nearest arc keyframe to this section's song position (temperature, saturation, contrast)
+   - `color_narrative_row` — section-matched narrative row (dominant colour class, contrast shift, hue movement)
+   - `propensity_hints` — full `PropensityIndex` dump (song-level effect-family affinities)
+   - `style_constraints` — all `StyleFingerprint` sub-fields (timing, transition, layering, recipe preferences, colour tendencies)
+   - `vocabulary_extensions` — `VocabularyExtensions` object held as a live Pydantic model for `shape_planner_context()` to consume
+
+`shape_planner_context()` then transforms the `SectionPlanningContext` into
+a flat prompt variables dict: it enriches the base taxonomy dict with
+compound motion/energy terms when `vocabulary_extensions` is present, and
+passes `color_arc`, `propensity_hints`, and `style_constraints` through
+directly. `color_narrative_row` and `arc_keyframe` are also available on
+the context and rendered by `user.j2`.
 
 ### Prompt Injection Points
 
 | Prompt | What's Injected |
 |--------|-----------------|
-| `user.j2` | Template catalog entries by lane (BASE, RHYTHM, ACCENT); FE context (color arc, propensity, style) |
-| `developer.j2` | Taxonomy enum values; recipe catalog with composition and layer details |
+| `user.j2` | Template catalog entries by lane (BASE, RHYTHM, ACCENT); Feature Engineering Context block: color arc (palette, spatial mapping, shift timing), propensity hints (top affinities), style constraints (timing, transition, layering, recipe preferences, colour tendencies), color narrative (dominant class, contrast shift, hue movement), arc position (temperature, saturation, contrast) |
+| `developer.j2` | Taxonomy enum values; optional compound motion/energy term vocabulary (corpus-derived, when `vocabulary_extensions` present); recipe catalog with composition and layer details |
 
 ### Key Files
 

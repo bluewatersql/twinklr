@@ -48,7 +48,7 @@ Treat these as MUST-PASS checks. If violated, the plan cannot be APPROVED.
    - Never use role labels (HERO, ANCHOR, SUPPORTING) as target ids.
 3) **Mode validity**:
    - SEQUENCED and CALL_RESPONSE both require `window` + `config` + non-empty `group_order` (unique, subset of `targets`).
-4) **Timing bounds**: starts within section bounds / available bars; no impossible durations.
+4) **Timing bounds**: starts within `1..section_max_bar` (provided in user prompt). The bar range is computed from tempo — do NOT estimate bars from duration in seconds.
 5) **Same-target self-overlap**: for the same lane+target (type+id), active intervals must not overlap. Different targets may overlap. A SEQUENCED window counts as an active interval for all targets in its group_order. (End is exclusive: [start, end).)
 
 

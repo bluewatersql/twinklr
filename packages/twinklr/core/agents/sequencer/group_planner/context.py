@@ -10,6 +10,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field
 
 from twinklr.core.agents.sequencer.group_planner.timing import TimingContext
+from twinklr.core.feature_engineering.models.vocabulary import VocabularyExtensions
 from twinklr.core.sequencer.templates.group.catalog import (
     TemplateCatalog,
     TemplateInfo,
@@ -120,6 +121,18 @@ class SectionPlanningContext(BaseModel):
     style_constraints: dict[str, Any] | None = Field(
         default=None,
         description="Timing style constraints (beat alignment, density).",
+    )
+    vocabulary_extensions: VocabularyExtensions | None = Field(
+        default=None,
+        description="Corpus-derived compound motion/energy terms from FE.",
+    )
+    color_narrative_row: dict[str, Any] | None = Field(
+        default=None,
+        description="Section color narrative row from FE (dominant class, contrast, hue movement).",
+    )
+    arc_keyframe: dict[str, Any] | None = Field(
+        default=None,
+        description="Arc keyframe nearest to this section's position in the song-level color arc.",
     )
 
     @property

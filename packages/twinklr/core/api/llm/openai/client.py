@@ -7,7 +7,7 @@ import logging
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Any, cast
 
 from openai import (
@@ -29,7 +29,7 @@ _TRACE: int = 5
 logging.addLevelName(_TRACE, "TRACE")
 
 
-class ReasoningEffort(str, Enum):
+class ReasoningEffort(StrEnum):
     """Reasoning effort levels for API requests"""
 
     LOW = "low"
@@ -37,7 +37,7 @@ class ReasoningEffort(str, Enum):
     HIGH = "high"
 
 
-class Verbosity(str, Enum):
+class Verbosity(StrEnum):
     """Response verbosity levels"""
 
     LOW = "low"

@@ -43,7 +43,7 @@ Before evaluating coordination quality, verify the plan is **technically sound**
 - Targets may appear in multiple lanes for layered effects. The renderer blends layers automatically.
 
 #### Timing Validity
-- All placement `start` times are within the section bounds (bar range).
+- All placement `start.bar` values must be within `1..section_max_bar` (provided in user prompt). The bar range is computed from tempo — do NOT estimate bar count from duration in seconds.
 - Duration categories are valid enum values (HIT, BURST, PHRASE, EXTENDED, SECTION).
 - Window start/end must be valid if using window expansion.
 

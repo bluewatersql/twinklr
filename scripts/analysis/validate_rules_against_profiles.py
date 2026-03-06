@@ -54,7 +54,7 @@ def load_events(profile_dir: Path) -> list[dict]:
     path = profile_dir / "enriched_effect_events.json"
     if not path.exists():
         return []
-    with open(path) as f:
+    with path.open() as f:
         return json.load(f)
 
 
@@ -125,7 +125,7 @@ def analyze_multi_effect_groups_same_layer(events: list[dict]) -> dict:
     multi_block_count = 0
     total_target_layers = len(by_target_layer)
 
-    for key, timings in by_target_layer.items():
+    for timings in by_target_layer.values():
         if len(timings) < 2:
             continue
         sorted_t = sorted(timings, key=lambda x: x[0])
@@ -161,7 +161,7 @@ def analyze_effect_diversity(events: list[dict]) -> dict:
         by_target[e["target_name"]].append(e.get("effect_name", "unknown"))
 
     all_effects: list[str] = []
-    for target, effects in by_target.items():
+    for effects in by_target.values():
         all_effects.extend(effects)
 
     if not all_effects:
@@ -215,8 +215,8 @@ def analyze_cross_layer(events: list[dict]) -> dict:
         sorted_t = sorted(timings, key=lambda x: x[0])
         for i in range(len(sorted_t)):
             for j in range(i + 1, len(sorted_t)):
-                si, ei, li = sorted_t[i]
-                sj, ej, lj = sorted_t[j]
+                _si, ei, li = sorted_t[i]
+                sj, _ej, lj = sorted_t[j]
                 if sj >= ei:
                     break
                 if li != lj:

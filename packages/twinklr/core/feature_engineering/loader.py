@@ -8,12 +8,15 @@ from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict
 
+from twinklr.core.feature_engineering.color_discovery import DiscoveredPalette, HueBin
 from twinklr.core.feature_engineering.models.adapters import SequencerAdapterBundle
 from twinklr.core.feature_engineering.models.color_arc import SongColorArc
+from twinklr.core.feature_engineering.models.color_narrative import ColorNarrativeRow
 from twinklr.core.feature_engineering.models.motifs import MotifCatalog
 from twinklr.core.feature_engineering.models.propensity import PropensityIndex
 from twinklr.core.feature_engineering.models.style import StyleFingerprint
 from twinklr.core.feature_engineering.models.transitions import TransitionGraph
+from twinklr.core.feature_engineering.models.vocabulary import VocabularyExtensions
 from twinklr.core.sequencer.templates.group.recipe import EffectRecipe
 
 logger = logging.getLogger(__name__)
@@ -31,6 +34,9 @@ class FEArtifactBundle(BaseModel):
     transition_graph: TransitionGraph | None = None
     motif_catalog: MotifCatalog | None = None
     adapter_payloads: tuple[SequencerAdapterBundle, ...] = ()
+    vocabulary_extensions: VocabularyExtensions | None = None
+    color_palette_library: tuple[DiscoveredPalette, ...] = ()
+    color_narrative: tuple[ColorNarrativeRow, ...] = ()
 
 
 def _read_json(path: Path) -> dict:
@@ -86,6 +92,11 @@ def load_fe_artifacts(fe_output_dir: Path) -> FEArtifactBundle:
 
     recipes = _load_recipe_catalog(manifest, fe_output_dir)
     adapters = _load_adapter_payloads(manifest, fe_output_dir)
+    vocabulary_extensions = _load_optional_model(
+        manifest, "vocabulary_extensions", VocabularyExtensions, fe_output_dir
+    )
+    palettes = _load_discovered_palettes(manifest, fe_output_dir)
+    narrative = _load_color_narrative(manifest, fe_output_dir)
 
     return FEArtifactBundle(
         recipe_catalog_entries=tuple(recipes),
@@ -95,7 +106,86 @@ def load_fe_artifacts(fe_output_dir: Path) -> FEArtifactBundle:
         transition_graph=transition,  # type: ignore[arg-type]
         motif_catalog=motif,  # type: ignore[arg-type]
         adapter_payloads=tuple(adapters),
+        vocabulary_extensions=vocabulary_extensions,  # type: ignore[arg-type]
+        color_palette_library=palettes,
+        color_narrative=narrative,
     )
+
+
+def _load_discovered_palettes(
+    manifest: dict[str, str],
+    fe_dir: Path,
+) -> tuple[DiscoveredPalette, ...]:
+    """Load color palettes from the palette library artifact.
+
+    Args:
+        manifest: Parsed feature_store_manifest.json dict.
+        fe_dir: Root FE output directory for resolving relative paths.
+
+    Returns:
+        Tuple of DiscoveredPalette instances, or empty tuple if absent/missing.
+    """
+    rel_path = manifest.get("color_palette_library")
+    if not rel_path:
+        return ()
+    full = Path(rel_path)
+    if not full.is_absolute():
+        full = fe_dir / rel_path
+    if not full.exists():
+        logger.warning("color_palette_library listed in manifest but missing: %s", full)
+        return ()
+    data = _read_json(full)
+    palettes: list[DiscoveredPalette] = []
+    for p in data.get("palettes", []):
+        hue_bins = tuple(
+            HueBin(bin_name=hb["bin_name"], colors=tuple(hb["colors"]))
+            for hb in p.get("hue_bins", [])
+        )
+        palettes.append(
+            DiscoveredPalette(
+                scope_key=tuple(p["scope_key"]),
+                colors=tuple(p["colors"]),
+                name=p["name"],
+                hue_bins=hue_bins,
+            )
+        )
+    return tuple(palettes)
+
+
+def _load_color_narrative(
+    manifest: dict[str, str],
+    fe_dir: Path,
+) -> tuple[ColorNarrativeRow, ...]:
+    """Load color narrative rows from the color narrative artifact.
+
+    Args:
+        manifest: Parsed feature_store_manifest.json dict.
+        fe_dir: Root FE output directory for resolving relative paths.
+
+    Returns:
+        Tuple of ColorNarrativeRow instances, or empty tuple if absent/missing.
+    """
+    rel_path = manifest.get("color_narrative")
+    if not rel_path:
+        return ()
+    full = Path(rel_path)
+    if not full.is_absolute():
+        full = fe_dir / rel_path
+    if not full.exists():
+        logger.warning("color_narrative listed in manifest but missing: %s", full)
+        return ()
+    # Support both JSON (single doc / array) and JSONL (one object per line)
+    if full.suffix == ".jsonl":
+        rows: list[dict] = []
+        with full.open(encoding="utf-8") as fh:
+            for line in fh:
+                line = line.strip()
+                if line:
+                    rows.append(json.loads(line))
+    else:
+        data = _read_json(full)
+        rows = data if isinstance(data, list) else data.get("rows", [])
+    return tuple(ColorNarrativeRow.model_validate(r) for r in rows)
 
 
 def _load_recipe_catalog(

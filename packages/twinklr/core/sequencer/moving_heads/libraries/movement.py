@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import math
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field
 from twinklr.core.curves.library import CurveLibrary
@@ -208,7 +208,7 @@ def get_curve_categorical_params(
     return DEFAULT_MOVEMENT_PARAMS[intensity]
 
 
-class MovementType(str, Enum):
+class MovementType(StrEnum):
     """All available movement pattern identifiers."""
 
     # Core patterns

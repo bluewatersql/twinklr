@@ -244,7 +244,7 @@ def main() -> int:
     validate_enrichment_artifacts()
 
     # Summary
-    passed_count = sum(1 for _, p, _ in checks if p)
+    _passed_count = sum(1 for _, p, _ in checks if p)
     failed_count = sum(1 for _, p, _ in checks if not p)
     total = len(checks)
 

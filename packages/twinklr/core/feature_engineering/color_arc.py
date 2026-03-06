@@ -160,27 +160,46 @@ class ColorArcExtractor:
             transition_rules=tuple(transition_rules),
         )
 
-    @staticmethod
-    def _palette_id_for(row: ColorNarrativeRow, *, row_index: int = 0) -> str:
-        """Select palette template for a narrative row.
+    def _palette_id_for(self, row: ColorNarrativeRow, *, row_index: int = 0) -> str:
+        """Select palette ID for a narrative row, preferring discovered palettes.
+
+        When ``self._palette_library`` is non-empty, a palette is selected by
+        rotating through the library.  Falls back to ``_PALETTE_TEMPLATES`` when
+        the library is absent or empty.
 
         Args:
             row: Color narrative row to select palette for.
             row_index: Global position among all rows (used for rotation
                 when ``section_index`` is 0 for every row).
         """
+        rotation_key = row.section_index if row.section_index > 0 else row_index
+        # Prefer discovered palettes when available.
+        if self._palette_library:
+            palette = self._palette_library[rotation_key % len(self._palette_library)]
+            return palette.palette_id
+        # Fall back to hardcoded templates.
         dominant = (
             row.dominant_color_class
             if row.dominant_color_class in _PALETTE_TEMPLATES
             else "palette"
         )
         templates = _PALETTE_TEMPLATES[dominant]
-        rotation_key = row.section_index if row.section_index > 0 else row_index
         template = templates[rotation_key % len(templates)]
         return f"pal_{template['suffix']}"
 
-    @staticmethod
-    def _build_palette(palette_id: str, dominant_color_class: str) -> NamedPalette:
+    def _build_palette(self, palette_id: str, dominant_color_class: str) -> NamedPalette:
+        """Build a NamedPalette from a palette_id, checking library first.
+
+        Args:
+            palette_id: ID of the palette to build.
+            dominant_color_class: Dominant color class for template fallback lookup.
+        """
+        # Check discovered library first.
+        if self._palette_library:
+            for p in self._palette_library:
+                if p.palette_id == palette_id:
+                    return p
+        # Fall back to hardcoded templates.
         dominant = dominant_color_class if dominant_color_class in _PALETTE_TEMPLATES else "palette"
         for template in _PALETTE_TEMPLATES[dominant]:
             if palette_id == f"pal_{template['suffix']}":

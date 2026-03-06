@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field
 
 
-class ColorCategory(str, Enum):
+class ColorCategory(StrEnum):
     """Valid color categories."""
 
     PRIMARY = "primary"
@@ -15,7 +15,7 @@ class ColorCategory(str, Enum):
     SPECIAL = "special"
 
 
-class ColorMood(str, Enum):
+class ColorMood(StrEnum):
     """Valid color moods."""
 
     WARM = "warm"
@@ -23,7 +23,7 @@ class ColorMood(str, Enum):
     NEUTRAL = "neutral"
 
 
-class ColorPreset(str, Enum):
+class ColorPreset(StrEnum):
     """Predefined color preset identifiers."""
 
     RED = "red"

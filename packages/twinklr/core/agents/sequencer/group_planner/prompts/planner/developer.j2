@@ -41,6 +41,16 @@ Return a `SectionCoordinationPlan` matching this schema:
 - **DetailCapability:** LOW, MEDIUM, HIGH
 {% endif %}
 
+{% if taxonomy.CompoundMotionTerm is defined and taxonomy.CompoundMotionTerm %}
+### Compound Motion Vocabulary (corpus-derived)
+
+- **CompoundMotionTerm:** {{ taxonomy.CompoundMotionTerm | join(', ') }}
+- **CompoundEnergyTerm:** {{ taxonomy.CompoundEnergyTerm | join(', ') }}
+
+These terms represent multi-layer motion patterns observed in the corpus. Use them
+to express layered intent (e.g. "dual_chase" = two sweep-motion layers).
+{% endif %}
+
 **IMPORTANT:** Valid group target IDs are the exact `ChoreoGroup.id` values listed in the display graph (user prompt), NOT role names. Zone IDs are ChoreoTag values. Split IDs are SplitDimension values above.
 
 ## Targeting System
