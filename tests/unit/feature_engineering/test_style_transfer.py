@@ -92,6 +92,7 @@ def _make_recipe(
         name=f"Test {recipe_id}",
         description="Test recipe",
         recipe_version="1.0.0",
+        effect_family="color_wash",
         template_type=GroupTemplateType.RHYTHM,
         visual_intent=GroupVisualIntent.ABSTRACT,
         tags=[],

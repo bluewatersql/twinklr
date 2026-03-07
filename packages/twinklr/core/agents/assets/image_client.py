@@ -182,8 +182,8 @@ class OpenAIImageClient:
                     prompt=prompt,
                     n=1,
                     size=api_size,  # type: ignore[call-overload]
-                    output_format="png",  # type: ignore[call-overload]
-                    background=bg,  # type: ignore[call-overload]
+                    output_format="png",
+                    background=bg,
                 )
 
                 # gpt-image-1 returns base64 by default in data[0].b64_json

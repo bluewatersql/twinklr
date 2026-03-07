@@ -2,3 +2,5 @@
 
 This module provides phoneme-to-grapheme conversion and viseme mapping for lip-sync.
 """
+
+__all__: list[str] = []

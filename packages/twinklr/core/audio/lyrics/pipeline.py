@@ -83,6 +83,7 @@ class LyricsPipeline:
         duration_ms: int,
         artist: str | None = None,
         title: str | None = None,
+        vocal_segments: list[dict[str, float]] | None = None,
     ) -> LyricsBundle:
         """Resolve lyrics through stage gating (async).
 
@@ -91,6 +92,8 @@ class LyricsPipeline:
             duration_ms: Song duration in milliseconds
             artist: Artist name for provider lookup
             title: Track title for provider lookup
+            vocal_segments: Optional vocal detector segments for vocal_presence_pct computation.
+                           Format: [{"start_s": float, "end_s": float, ...}, ...]
 
         Returns:
             LyricsBundle with resolved lyrics and status
@@ -111,6 +114,7 @@ class LyricsPipeline:
                 duration_ms=duration_ms,
                 warnings=warnings,
                 provider="embedded",
+                vocal_segments=vocal_segments,
             )
 
         # Stage 2: Try synced lookup (if metadata available)
@@ -121,6 +125,7 @@ class LyricsPipeline:
                 title=title,
                 duration_ms=duration_ms,
                 warnings=warnings,
+                vocal_segments=vocal_segments,
             )
             if synced_bundle:
                 logger.debug(f"Found synced lyrics from {synced_bundle.source}")
@@ -133,6 +138,7 @@ class LyricsPipeline:
                 title=title,
                 duration_ms=duration_ms,
                 warnings=warnings,
+                vocal_segments=vocal_segments,
             )
             if plain_bundle:
                 logger.debug(f"Found plain lyrics from {plain_bundle.source}")
@@ -145,6 +151,7 @@ class LyricsPipeline:
                             lyrics_text=plain_bundle.text or "",
                             duration_ms=duration_ms,
                             warnings=warnings,
+                            vocal_segments=vocal_segments,
                         )
                         if align_bundle:
                             return align_bundle
@@ -157,6 +164,7 @@ class LyricsPipeline:
                 audio_path=audio_path,
                 duration_ms=duration_ms,
                 warnings=warnings,
+                vocal_segments=vocal_segments,
             )
             if transcribe_bundle:
                 return transcribe_bundle
@@ -179,6 +187,7 @@ class LyricsPipeline:
         title: str | None,
         duration_ms: int,
         warnings: list[str],
+        vocal_segments: list[dict[str, float]] | None = None,
     ) -> LyricsBundle | None:
         """Try to get synced lyrics from providers (async).
 
@@ -187,6 +196,7 @@ class LyricsPipeline:
             title: Track title
             duration_ms: Song duration
             warnings: List to append warnings to
+            vocal_segments: Optional vocal detector segments
 
         Returns:
             LyricsBundle if found, None otherwise
@@ -220,6 +230,7 @@ class LyricsPipeline:
                 warnings=warnings,
                 provider=best.provider,
                 provider_id=best.provider_id,
+                vocal_segments=vocal_segments,
             )
 
         except Exception as e:
@@ -234,6 +245,7 @@ class LyricsPipeline:
         title: str | None,
         duration_ms: int,
         warnings: list[str],
+        vocal_segments: list[dict[str, float]] | None = None,
     ) -> LyricsBundle | None:
         """Try to get plain lyrics from providers (async).
 
@@ -242,6 +254,7 @@ class LyricsPipeline:
             title: Track title
             duration_ms: Song duration
             warnings: List to append warnings to
+            vocal_segments: Optional vocal detector segments
 
         Returns:
             LyricsBundle if found, None otherwise
@@ -274,6 +287,7 @@ class LyricsPipeline:
                 warnings=warnings,
                 provider=best.provider,
                 provider_id=best.provider_id,
+                vocal_segments=vocal_segments,
             )
 
         except Exception as e:
@@ -296,6 +310,7 @@ class LyricsPipeline:
         warnings: list[str],
         provider: str,
         provider_id: str | None = None,
+        vocal_segments: list[dict[str, float]] | None = None,
     ) -> LyricsBundle:
         """Finalize bundle with quality metrics and confidence scoring.
 
@@ -309,14 +324,17 @@ class LyricsPipeline:
             warnings: Warnings list
             provider: Provider name (if external)
             provider_id: Provider ID (if external)
+            vocal_segments: Optional vocal detector segments for vocal_presence_pct
 
         Returns:
             Finalized LyricsBundle
         """
-        # Compute quality metrics (only if we have words)
+        # Compute quality metrics (words and/or vocal_segments)
         quality = None
-        if words:
-            quality = compute_quality_metrics(words=words, duration_ms=duration_ms)
+        if words or vocal_segments:
+            quality = compute_quality_metrics(
+                words=words, duration_ms=duration_ms, vocal_segments=vocal_segments
+            )
 
         # Compute confidence with penalties
         base_conf = self.BASE_CONFIDENCE.get(source_kind, 0.5)
@@ -324,10 +342,10 @@ class LyricsPipeline:
         # Start with provider confidence if available, otherwise base
         confidence = provider_confidence if provider_confidence is not None else base_conf
 
-        # Apply quality penalties (if quality available)
-        if quality:
+        # Apply quality penalties (if quality available and we have word timing)
+        if quality and words:
             # Penalty for low coverage
-            if quality.coverage_pct < self.config.min_coverage_pct:
+            if quality.timed_word_coverage_pct < self.config.min_coverage_pct:
                 confidence -= 0.10
 
             # Penalty for overlap violations (cap at -0.20)
@@ -360,7 +378,7 @@ class LyricsPipeline:
             # Need timed words with good coverage
             if not words:
                 is_sufficient = False
-            elif quality and quality.coverage_pct < self.config.min_coverage_pct:
+            elif quality and quality.timed_word_coverage_pct < self.config.min_coverage_pct:
                 is_sufficient = False
 
         # Determine stage status
@@ -387,6 +405,7 @@ class LyricsPipeline:
         lyrics_text: str,
         duration_ms: int,
         warnings: list[str],
+        vocal_segments: list[dict[str, float]] | None = None,
     ) -> LyricsBundle | None:
         """Try WhisperX align-only (add timing to existing lyrics).
 
@@ -395,6 +414,7 @@ class LyricsPipeline:
             lyrics_text: Reference lyrics text
             duration_ms: Song duration
             warnings: List to append warnings to
+            vocal_segments: Optional vocal detector segments
 
         Returns:
             LyricsBundle if successful, None otherwise
@@ -418,7 +438,9 @@ class LyricsPipeline:
                 )
 
             # Compute quality metrics
-            quality = compute_quality_metrics(words=result.words, duration_ms=duration_ms)
+            quality = compute_quality_metrics(
+                words=result.words, duration_ms=duration_ms, vocal_segments=vocal_segments
+            )
 
             # Compute confidence with penalties
             base_conf = self.BASE_CONFIDENCE[LyricsSourceKind.WHISPERX_ALIGN]
@@ -429,7 +451,7 @@ class LyricsPipeline:
                 confidence -= 0.10
 
             # Quality penalties
-            if quality.coverage_pct < self.config.min_coverage_pct:
+            if quality.timed_word_coverage_pct < self.config.min_coverage_pct:
                 confidence -= 0.10
             overlap_penalty = min(quality.overlap_violations * 0.05, 0.20)
             confidence -= overlap_penalty
@@ -452,7 +474,7 @@ class LyricsPipeline:
             if self.config.require_timed_words:
                 if not result.words:
                     is_sufficient = False
-                elif quality.coverage_pct < self.config.min_coverage_pct:
+                elif quality.timed_word_coverage_pct < self.config.min_coverage_pct:
                     is_sufficient = False
 
             if not is_sufficient:
@@ -480,6 +502,7 @@ class LyricsPipeline:
         audio_path: str,
         duration_ms: int,
         warnings: list[str],
+        vocal_segments: list[dict[str, float]] | None = None,
     ) -> LyricsBundle | None:
         """Try WhisperX transcribe (generate lyrics from audio).
 
@@ -487,6 +510,7 @@ class LyricsPipeline:
             audio_path: Path to audio file
             duration_ms: Song duration
             warnings: List to append warnings to
+            vocal_segments: Optional vocal detector segments
 
         Returns:
             LyricsBundle if successful, None otherwise
@@ -503,16 +527,18 @@ class LyricsPipeline:
 
             # Compute quality metrics
             quality = None
-            if result.words:
-                quality = compute_quality_metrics(words=result.words, duration_ms=duration_ms)
+            if result.words or vocal_segments:
+                quality = compute_quality_metrics(
+                    words=result.words, duration_ms=duration_ms, vocal_segments=vocal_segments
+                )
 
             # Compute confidence with penalties
             base_conf = self.BASE_CONFIDENCE[LyricsSourceKind.WHISPERX_TRANSCRIBE]
             confidence = base_conf
 
-            # Quality penalties (if available)
-            if quality:
-                if quality.coverage_pct < self.config.min_coverage_pct:
+            # Quality penalties (if available and we have word timing)
+            if quality and result.words:
+                if quality.timed_word_coverage_pct < self.config.min_coverage_pct:
                     confidence -= 0.10
                 overlap_penalty = min(quality.overlap_violations * 0.05, 0.20)
                 confidence -= overlap_penalty
@@ -535,7 +561,7 @@ class LyricsPipeline:
             if self.config.require_timed_words:
                 if not result.words:
                     is_sufficient = False
-                elif quality and quality.coverage_pct < self.config.min_coverage_pct:
+                elif quality and quality.timed_word_coverage_pct < self.config.min_coverage_pct:
                     is_sufficient = False
 
             if not is_sufficient:

@@ -10,6 +10,7 @@ from twinklr.core.feature_engineering.models.transitions import (
     TransitionAnomaly,
     TransitionEdge,
     TransitionGraph,
+    TransitionNode,
     TransitionRecord,
     TransitionType,
 )
@@ -95,6 +96,7 @@ class TransitionModeler:
             )
 
         anomalies = self._anomalies(orchestration_catalog, edge_rows)
+        nodes = self._build_nodes(orchestration_catalog, edge_rows)
         return TransitionGraph(
             schema_version=self._options.schema_version,
             graph_version=self._options.graph_version,
@@ -104,6 +106,7 @@ class TransitionModeler:
             edges=tuple(edge_rows),
             transitions=tuple(transitions),
             anomalies=anomalies,
+            nodes=nodes,
         )
 
     @staticmethod
@@ -115,6 +118,37 @@ class TransitionModeler:
         if 0 <= gap_ms <= 250:
             return TransitionType.CROSSFADE
         return TransitionType.TIMED_GAP
+
+    @staticmethod
+    def _build_nodes(
+        catalog: TemplateCatalog,
+        edges: list[TransitionEdge],
+    ) -> tuple[TransitionNode, ...]:
+        """Build node metadata from catalog templates and edge degree counts."""
+        out_degree: dict[str, int] = defaultdict(int)
+        in_degree: dict[str, int] = defaultdict(int)
+        for edge in edges:
+            out_degree[edge.source_template_id] += edge.edge_count
+            in_degree[edge.target_template_id] += edge.edge_count
+
+        template_meta = {t.template_id: t for t in catalog.templates}
+
+        # Include all catalog templates plus any edge-only IDs
+        all_ids = set(template_meta.keys()) | set(out_degree.keys()) | set(in_degree.keys())
+
+        nodes: list[TransitionNode] = []
+        for tid in sorted(all_ids):
+            tmpl = template_meta.get(tid)
+            nodes.append(
+                TransitionNode(
+                    template_id=tid,
+                    effect_family=tmpl.effect_family if tmpl else "unknown",
+                    template_kind=tmpl.template_kind.value if tmpl else "orchestration",
+                    out_degree=out_degree.get(tid, 0),
+                    in_degree=in_degree.get(tid, 0),
+                )
+            )
+        return tuple(nodes)
 
     @staticmethod
     def _anomalies(

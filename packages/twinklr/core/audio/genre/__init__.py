@@ -21,4 +21,7 @@ Example:
 
 from twinklr.core.audio.genre.classifier import GenreClassifier, GenreFamily, GenreResult
 
-__all__ = ["GenreClassifier", "GenreFamily", "GenreResult"]
+# Alias used in specs and external documentation.
+Genre = GenreFamily
+
+__all__ = ["Genre", "GenreClassifier", "GenreFamily", "GenreResult"]

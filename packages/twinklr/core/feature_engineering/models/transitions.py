@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field
 
 
-class TransitionType(str, Enum):
+class TransitionType(StrEnum):
     """Deterministic transition class labels."""
 
     HARD_CUT = "hard_cut"
@@ -56,6 +56,18 @@ class TransitionAnomaly(BaseModel):
     message: str
 
 
+class TransitionNode(BaseModel):
+    """Metadata for a single template node in the transition graph."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    template_id: str
+    effect_family: str = "unknown"
+    template_kind: str = "orchestration"
+    out_degree: int = Field(ge=0, default=0)
+    in_degree: int = Field(ge=0, default=0)
+
+
 class TransitionGraph(BaseModel):
     """Serialized transition graph artifact."""
 
@@ -71,3 +83,4 @@ class TransitionGraph(BaseModel):
     edges: tuple[TransitionEdge, ...] = ()
     transitions: tuple[TransitionRecord, ...] = ()
     anomalies: tuple[TransitionAnomaly, ...] = ()
+    nodes: tuple[TransitionNode, ...] = ()

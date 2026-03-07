@@ -10,7 +10,7 @@ Models for lyrics resolution pipeline:
 
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, computed_field
 
 from twinklr.core.audio.models.enums import StageStatus
 
@@ -85,13 +85,18 @@ class LyricsQuality(BaseModel):
 
     Computed from word-level timing to assess lyrics quality.
 
-    Coverage is calculated as the percentage of song duration with vocals,
-    computed by merging word intervals with small gaps (250ms tolerance).
-    This represents "time with vocal phrases" rather than just summing
-    individual word durations.
+    timed_word_coverage_pct is calculated as the percentage of song duration
+    covered by timed words, computed by merging word intervals with small gaps
+    (250ms tolerance). This represents "time with vocal phrases" rather than
+    just summing individual word durations.
+
+    vocal_presence_pct is independently derived from the vocal detector
+    (spectral/onset-based) — it measures how much of the song contains vocals
+    regardless of whether words are timed.
 
     Args:
-        coverage_pct: Percentage of song duration with vocals (0-1, merged intervals)
+        timed_word_coverage_pct: Fraction of song duration covered by timed words (0-1)
+        vocal_presence_pct: Fraction of song duration with detected vocals (0-1), or None
         monotonicity_violations: Count of timestamps going backward
         overlap_violations: Count of overlapping words
         out_of_bounds_violations: Count of timestamps outside song bounds
@@ -102,7 +107,12 @@ class LyricsQuality(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    coverage_pct: float = Field(default=0.0, ge=0.0, le=1.0, description="Coverage percentage")
+    timed_word_coverage_pct: float = Field(
+        default=0.0, ge=0.0, le=1.0, description="Fraction of song covered by timed words"
+    )
+    vocal_presence_pct: float | None = Field(
+        default=None, ge=0.0, le=1.0, description="Fraction of song with detected vocals"
+    )
     monotonicity_violations: int = Field(default=0, ge=0, description="Backward timestamps")
     overlap_violations: int = Field(default=0, ge=0, description="Overlapping words")
     out_of_bounds_violations: int = Field(default=0, ge=0, description="Out-of-bounds timestamps")
@@ -113,6 +123,12 @@ class LyricsQuality(BaseModel):
     min_word_duration_ms: float | None = Field(
         default=None, description="Minimum word duration (ms)"
     )
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def coverage_pct(self) -> float:
+        """Deprecated alias for timed_word_coverage_pct."""
+        return self.timed_word_coverage_pct
 
 
 class LyricsBundle(BaseModel):

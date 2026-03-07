@@ -14,8 +14,10 @@ Analyze the following song lyrics and produce a complete LyricContextModel.
 ## Quality Metrics
 
 {% if quality %}
-- **Coverage:** {{ (quality.coverage_pct * 100) | round(1) }}% of song has vocals
-- **Source Confidence:** {{ (quality.source_confidence * 100) | round(0) }}%
+- **Timed Word Coverage:** {{ (quality.timed_word_coverage_pct * 100) | round(1) }}% of song has word-level timing data
+- **Vocal Presence:** {% if quality.vocal_presence_pct is not none %}{{ (quality.vocal_presence_pct * 100) | round(1) }}% of song has detected vocals (spectral analysis){% else %}not available (untimed source){% endif %}
+
+- **Source Confidence:** {{ (quality.source_confidence * 100) | round(0) }}%{% if quality.source_kind %} ({{ quality.source_kind }}){% endif %}
 {% endif %}
 
 ## Song Structure
@@ -145,8 +147,10 @@ Analyze vocal patterns:
   - MED: 100-150 words/minute (typical pop song)
   - DENSE: > 150 words/minute (rapid-fire lyrics, minimal gaps)
 
-- **vocal_coverage_pct**: 0.0-1.0 (from quality metrics above)
-  - This represents how much of the song has vocals
+- **vocal_coverage_pct**: 0.0-1.0
+  - Use **Vocal Presence** from quality metrics above as primary source (spectral detection)
+  - Fall back to **Timed Word Coverage** when Vocal Presence is not available
+  - This represents how much of the song has singing/vocals
 
 - **silent_sections**: Identify instrumental breaks
   - Only include sections > 5 seconds without vocals

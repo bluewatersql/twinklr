@@ -81,6 +81,7 @@ def _make_recipe(
         name="Test",
         description="Test template",
         recipe_version="1.0.0",
+        effect_family="spirals",
         template_type=template_type,
         visual_intent=GroupVisualIntent.ABSTRACT,
         tags=tags if tags is not None else ["test"],

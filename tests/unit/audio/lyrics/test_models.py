@@ -131,7 +131,7 @@ class TestLyricsQuality:
     def test_quality_with_metrics(self):
         """Quality with computed metrics."""
         quality = LyricsQuality(
-            coverage_pct=0.85,
+            timed_word_coverage_pct=0.85,
             monotonicity_violations=0,
             overlap_violations=0,
             out_of_bounds_violations=0,
@@ -141,6 +141,7 @@ class TestLyricsQuality:
         )
 
         assert quality.coverage_pct == 0.85
+        assert quality.timed_word_coverage_pct == 0.85
         assert quality.large_gaps_count == 2
         assert quality.avg_word_duration_ms == 350.5
 
@@ -202,7 +203,7 @@ class TestLyricsBundle:
                 confidence=0.85,
             ),
             quality=LyricsQuality(
-                coverage_pct=0.90,
+                timed_word_coverage_pct=0.90,
                 avg_word_duration_ms=400.0,
             ),
         )

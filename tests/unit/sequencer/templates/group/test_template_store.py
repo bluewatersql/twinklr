@@ -28,6 +28,7 @@ def store_dir(tmp_path: Path) -> Path:
         "name": "Wash Slow",
         "description": "Slow wash",
         "recipe_version": "1.0.0",
+        "effect_family": "color_wash",
         "template_type": "BASE",
         "visual_intent": "ABSTRACT",
         "tags": ["wash", "slow"],

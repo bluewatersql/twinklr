@@ -3,6 +3,10 @@
 import json
 from pathlib import Path
 
+from twinklr.core.feature_engineering import corpus_artifacts as _ca
+from twinklr.core.feature_engineering.component_factory import ComponentFactory
+from twinklr.core.feature_engineering.config import FeatureEngineeringPipelineOptions
+from twinklr.core.feature_engineering.datasets.writer import FeatureEngineeringWriter
 from twinklr.core.feature_engineering.models.phrases import (
     ColorClass,
     ContinuityClass,
@@ -11,10 +15,6 @@ from twinklr.core.feature_engineering.models.phrases import (
     MotionClass,
     PhraseSource,
     SpatialClass,
-)
-from twinklr.core.feature_engineering.pipeline import (
-    FeatureEngineeringPipeline,
-    FeatureEngineeringPipelineOptions,
 )
 
 
@@ -51,9 +51,14 @@ def test_pipeline_writes_propensity_when_enabled(tmp_path: Path) -> None:
     )
 
     options = FeatureEngineeringPipelineOptions(enable_propensity=True)
-    pipeline = FeatureEngineeringPipeline(options=options)
 
-    pipeline._write_propensity(output_root=tmp_path, phrases=phrases)
+    _ca.write_propensity(
+        output_root=tmp_path,
+        phrases=phrases,
+        options=options,
+        writer=FeatureEngineeringWriter(),
+        components=ComponentFactory(options),
+    )
 
     output_path = tmp_path / "propensity_index.json"
     assert output_path.exists()
@@ -65,9 +70,14 @@ def test_pipeline_writes_propensity_when_enabled(tmp_path: Path) -> None:
 def test_pipeline_skips_propensity_when_disabled(tmp_path: Path) -> None:
     """When enable_propensity=False, pipeline does not write propensity_index.json."""
     options = FeatureEngineeringPipelineOptions(enable_propensity=False)
-    pipeline = FeatureEngineeringPipeline(options=options)
 
-    path, index = pipeline._write_propensity(output_root=tmp_path, phrases=())
+    path, index = _ca.write_propensity(
+        output_root=tmp_path,
+        phrases=(),
+        options=options,
+        writer=FeatureEngineeringWriter(),
+        components=ComponentFactory(options),
+    )
     assert path is None
     assert index is None
     assert not (tmp_path / "propensity_index.json").exists()

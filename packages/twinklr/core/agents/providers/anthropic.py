@@ -21,8 +21,8 @@ from twinklr.core.agents.providers.errors import LLMProviderError
 try:
     from anthropic import Anthropic, AsyncAnthropic
 except ImportError:  # pragma: no cover
-    Anthropic = None  # type: ignore[assignment,misc]
-    AsyncAnthropic = None  # type: ignore[assignment,misc]
+    Anthropic = None
+    AsyncAnthropic = None
 
 logger = logging.getLogger(__name__)
 

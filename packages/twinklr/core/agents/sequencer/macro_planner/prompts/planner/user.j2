@@ -122,7 +122,7 @@ Notable examples:
 **Recommended Visual Themes:** {{ lyric_context.recommended_visual_themes | join(", ") }}
 
 **Lyric Density:** {{ lyric_context.lyric_density }}
-**Vocal Coverage:** {{ (lyric_context.vocal_coverage_pct * 100) | round(0) }}%
+**Vocal Coverage:** {{ (lyric_context.vocal_coverage_pct * 100) | round(0) }}%{% if lyric_context.timed_word_coverage_pct is defined and lyric_context.timed_word_coverage_pct is not none %} (timed words: {{ (lyric_context.timed_word_coverage_pct * 100) | round(0) }}%){% endif %}
 
 {% if lyric_context.silent_sections %}
 **Silent/Instrumental Sections:** {{ lyric_context.silent_sections | length }}

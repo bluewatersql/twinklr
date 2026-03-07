@@ -72,6 +72,7 @@ def _make_recipe(
         name="Test Recipe",
         description="Test",
         recipe_version="1.0.0",
+        effect_family="bars",
         template_type=template_type,
         visual_intent=GroupVisualIntent.ABSTRACT,
         tags=tags if tags is not None else ["test"],

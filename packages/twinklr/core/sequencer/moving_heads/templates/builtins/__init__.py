@@ -64,3 +64,5 @@ from twinklr.core.sequencer.moving_heads.templates.builtins.wave_scattered_fade_
 from twinklr.core.sequencer.moving_heads.templates.builtins.wave_scattered_fade_out import (
     make_template as _wave_scattered_fade_out,  # noqa: F401
 )
+
+__all__: list[str] = []

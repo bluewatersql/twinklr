@@ -113,6 +113,7 @@ strict = true
 python_version = "3.12"
 warn_return_any = true
 warn_unused_configs = true
+warn_unused_ignores = true
 disallow_untyped_defs = false
 disallow_incomplete_defs = false
 check_untyped_defs = true

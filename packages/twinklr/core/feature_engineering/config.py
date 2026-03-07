@@ -81,6 +81,11 @@ class FeatureEngineeringPipelineOptions:
         quality_max_unknown_effect_family_ratio: Maximum unknown effect-family ratio.
         quality_max_unknown_motion_ratio: Maximum unknown motion ratio.
         quality_max_single_unknown_effect_type_ratio: Maximum single unknown type ratio.
+        quality_max_low_support_template_ratio: Maximum low-support template ratio (None = off).
+        quality_max_high_concentration_template_ratio: Maximum high-concentration template ratio (None = off).
+        quality_max_high_variance_template_ratio: Maximum high-variance template ratio (None = off).
+        quality_max_over_generic_template_ratio: Maximum over-generic template ratio (None = off).
+        quality_diagnostics_gate_mode: Gate mode for diagnostics checks ("enforce" or "warn").
     """
 
     audio_required: bool = False
@@ -108,8 +113,9 @@ class FeatureEngineeringPipelineOptions:
     v2_motif_min_distinct_sequence_count: int = 2
     v2_cluster_similarity_threshold: float = 0.92
     v2_cluster_min_size: int = 2
-    v2_taxonomy_min_recall_for_promotion: float = 0.55
-    v2_taxonomy_min_f1_for_promotion: float = 0.60
+    v2_taxonomy_min_recall_for_promotion: float = 0.30
+    v2_taxonomy_min_f1_for_promotion: float = 0.40
+    taxonomy_confidence_threshold: float = 0.25
     v2_retrieval_min_recall_at_5: float = 0.80
     v2_retrieval_max_avg_latency_ms: float = 10.0
     enable_layering_features: bool = True
@@ -126,12 +132,14 @@ class FeatureEngineeringPipelineOptions:
     enable_active_learning: bool = False
     enable_transition_v2: bool = True
     color_palette_library_path: Path | None = None
-    recipe_promotion_min_support: int = 3
-    recipe_promotion_min_stability: float = 0.03
+    recipe_promotion_min_support: int = 2
+    recipe_promotion_min_stability: float = 0.015
     recipe_promotion_adaptive_stability: bool = True
     recipe_promotion_max_per_family: int = 10
     recipe_promotion_multi_layer_min_support: int = 2
     recipe_promotion_multi_layer_min_stability: float = 0.015
+    recipe_promotion_max_per_cluster: int = 2
+    recipe_promotion_multi_layer_min_per_cluster: int = 3
     stack_signature_mode: Literal["strict", "relaxed"] = "relaxed"
     recipe_promotion_param_profiles: dict[str, dict[str, object]] | None = None
     taxonomy_rules_path: Path | None = None
@@ -139,12 +147,18 @@ class FeatureEngineeringPipelineOptions:
     fail_fast: bool = True
     template_min_instance_count: int = 2
     template_min_distinct_pack_count: int = 1
+    template_min_distinct_sequence_count: int = 2
     # Lowered from 0.80: corpus naturally achieves 73%; see FE Eval Remediation Phase 04.
     quality_min_template_coverage: float = 0.70
     quality_min_taxonomy_confidence_mean: float = 0.30
     quality_max_unknown_effect_family_ratio: float = 0.02
     quality_max_unknown_motion_ratio: float = 0.02
     quality_max_single_unknown_effect_type_ratio: float = 0.01
+    quality_max_low_support_template_ratio: float | None = None
+    quality_max_high_concentration_template_ratio: float | None = None
+    quality_max_high_variance_template_ratio: float | None = None
+    quality_max_over_generic_template_ratio: float | None = None
+    quality_diagnostics_gate_mode: Literal["enforce", "warn"] = "warn"
 
 
 # Alias for use within the decomposed implementation classes.

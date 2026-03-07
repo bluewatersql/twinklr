@@ -242,7 +242,7 @@ class HeuristicValidator:
 
         # 4) single-template section
         if has_single:
-            template_id = section.template_id  # type: ignore[assignment]
+            template_id = section.template_id
             if template_id not in self.available_templates:
                 errors.append(
                     f"Section '{section.section_name}': template '{template_id}' not in library"
@@ -268,7 +268,7 @@ class HeuristicValidator:
             return units
 
         # 5) segmented section
-        segs = list(section.segments or [])  # type: ignore[arg-type]
+        segs = list(section.segments or [])
         if not (1 <= len(segs) <= 3):
             errors.append(
                 f"Section '{section.section_name}': segments must be 1–3 items (got {len(segs)})"

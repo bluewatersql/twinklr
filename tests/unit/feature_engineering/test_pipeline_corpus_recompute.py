@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+from twinklr.core.feature_engineering import corpus_artifacts as _ca
 from twinklr.core.feature_engineering.models import (
     EffectPhrase,
     PhraseTaxonomyRecord,
@@ -97,8 +98,7 @@ class TestLoadProfileArtifacts:
             [role.model_dump(mode="json")],
         )
 
-        pipeline = FeatureEngineeringPipeline()
-        result = pipeline._load_profile_artifacts(tmp_path)
+        result = _ca.load_profile_artifacts(tmp_path)
 
         assert result is not None
         phrases, tax_rows, roles = result
@@ -111,8 +111,7 @@ class TestLoadProfileArtifacts:
 
     def test_missing_files_returns_none(self, tmp_path: Path) -> None:
         """Returns None when artifact files are absent."""
-        pipeline = FeatureEngineeringPipeline()
-        result = pipeline._load_profile_artifacts(tmp_path)
+        result = _ca.load_profile_artifacts(tmp_path)
         assert result is None
 
     def test_partial_files_returns_available(self, tmp_path: Path) -> None:
@@ -123,8 +122,7 @@ class TestLoadProfileArtifacts:
             [phrase.model_dump(mode="json")],
         )
 
-        pipeline = FeatureEngineeringPipeline()
-        result = pipeline._load_profile_artifacts(tmp_path)
+        result = _ca.load_profile_artifacts(tmp_path)
 
         assert result is not None
         phrases, tax_rows, roles = result

@@ -57,7 +57,7 @@ logger = logging.getLogger(__name__)
     default="INFO",
     help="Logging level",
 )
-def eval_report_cli(  # type: ignore[misc]
+def eval_report_cli(
     checkpoint: Path,
     audio: Path,
     fixture: Path,

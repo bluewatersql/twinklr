@@ -178,6 +178,7 @@ def _make_recipe(recipe_id: str = "r1") -> EffectRecipe:
         name="Test Recipe",
         description="A test recipe",
         recipe_version="1.0.0",
+        effect_family="color_wash",
         template_type=GroupTemplateType.BASE,
         visual_intent=GroupVisualIntent.ABSTRACT,
         timing=TimingHints(bars_min=2, bars_max=8),

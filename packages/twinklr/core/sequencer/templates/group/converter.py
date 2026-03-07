@@ -116,11 +116,18 @@ def convert_builtin_to_recipe(template: GroupPlanTemplate) -> EffectRecipe:
     palette_spec = _derive_palette_spec(template.layer_recipe)
     style_markers = _compute_style_markers(template.template_type, len(layers))
 
+    # Derive effect_family from the first layer's effect_type (snake_case)
+    first_effect = layers[0].effect_type if layers else "Unknown"
+    effect_family = "".join(
+        f"_{c.lower()}" if c.isupper() and i > 0 else c.lower() for i, c in enumerate(first_effect)
+    ).lstrip("_")
+
     return EffectRecipe(
         recipe_id=template.template_id,
         name=template.name,
         description=template.description,
         recipe_version=template.template_version,
+        effect_family=effect_family,
         template_type=template.template_type,
         visual_intent=template.visual_intent,
         tags=list(template.tags),

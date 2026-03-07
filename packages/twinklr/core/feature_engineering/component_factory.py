@@ -123,6 +123,7 @@ class ComponentFactory:
         """
         return LearnedTaxonomyTrainer(
             LearnedTaxonomyTrainerOptions(
+                min_label_probability=self._options.taxonomy_confidence_threshold,
                 min_recall_for_promotion=self._options.v2_taxonomy_min_recall_for_promotion,
                 min_f1_for_promotion=self._options.v2_taxonomy_min_f1_for_promotion,
             )
@@ -143,6 +144,7 @@ class ComponentFactory:
             TemplateMinerOptions(
                 min_instance_count=self._options.template_min_instance_count,
                 min_distinct_pack_count=self._options.template_min_distinct_pack_count,
+                min_distinct_sequence_count=self._options.template_min_distinct_sequence_count,
                 stack_signature_mode=self._options.stack_signature_mode,
             )
         )
@@ -315,6 +317,11 @@ class ComponentFactory:
                 max_unknown_effect_family_ratio=self._options.quality_max_unknown_effect_family_ratio,
                 max_unknown_motion_ratio=self._options.quality_max_unknown_motion_ratio,
                 max_single_unknown_effect_type_ratio=self._options.quality_max_single_unknown_effect_type_ratio,
+                max_low_support_template_ratio=self._options.quality_max_low_support_template_ratio,
+                max_high_concentration_template_ratio=self._options.quality_max_high_concentration_template_ratio,
+                max_high_variance_template_ratio=self._options.quality_max_high_variance_template_ratio,
+                max_over_generic_template_ratio=self._options.quality_max_over_generic_template_ratio,
+                diagnostics_gate_mode=self._options.quality_diagnostics_gate_mode,
             )
         )
 

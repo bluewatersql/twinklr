@@ -7,6 +7,7 @@ ruff formatting.
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any
 
@@ -30,6 +31,7 @@ from twinklr.core.feature_engineering.models import (
     TransitionGraph,
 )
 from twinklr.core.feature_engineering.models.clustering import TemplateClusterCatalog
+from twinklr.core.feature_engineering.models.metadata import EffectMetadataProfiles
 from twinklr.core.feature_engineering.models.motifs import MotifCatalog
 from twinklr.core.feature_engineering.models.promotion import PromotionReport
 from twinklr.core.feature_engineering.models.propensity import PropensityIndex
@@ -95,7 +97,7 @@ def write_v1_tail_artifacts(
         s.upsert_transitions(tg.edges)
         if o.enable_transition_v2 and tg.edges:
             markov = MarkovTransitionModel()
-            markov.fit(tg.edges, phrases)
+            markov.fit(tg.edges, phrases, records=list(tg.transitions))
             markov_path = output_root / "transition_model_v2.json"
             markov.save(markov_path)
             m["transition_model_v2"] = str(markov_path)
@@ -141,8 +143,10 @@ def write_v1_tail_artifacts(
         s.upsert_propensity(pi.affinities)
     # ── Effect metadata profiles ─────────────────────────────────────
     stack_catalog: EffectStackCatalog | None = None
+    metadata_profiles: EffectMetadataProfiles | None = None
     if stacks is not None:
         stack_catalog = _build_stack_catalog(stacks)
+        m["stack_catalog"] = str(output_root / "stack_catalog.json")
     if o.enable_effect_metadata and phrases:
         if progress_fn:
             progress_fn("effect metadata profiles")
@@ -173,6 +177,28 @@ def write_v1_tail_artifacts(
     )
     if sp is not None:
         m["style_fingerprint"] = str(sp)
+    mc: MotifCatalog | None = None
+    clc: TemplateClusterCatalog | None = None
+    diag = None
+    if template_catalogs is not None:
+        m["content_templates"] = str(output_root / "content_templates.json")
+        m["orchestration_templates"] = str(output_root / "orchestration_templates.json")
+        if o.enable_template_retrieval_ranking:
+            if progress_fn:
+                progress_fn("template retrieval ranking")
+            ri = c.template_retrieval_ranker.build_index(
+                content_catalog=template_catalogs[0],
+                orchestration_catalog=template_catalogs[1],
+                transition_graph=tg,
+            )
+            m["template_retrieval_index"] = str(w.write_template_retrieval_index(output_root, ri))
+        if o.enable_template_diagnostics:
+            diag = c.template_diagnostics.build(
+                content_catalog=template_catalogs[0],
+                orchestration_catalog=template_catalogs[1],
+                taxonomy_rows=taxonomy_rows,
+            )
+            m["template_diagnostics"] = str(w.write_template_diagnostics(output_root, diag))
     qr: QualityReport | None = None
     if o.enable_quality_gates and tg is not None and template_catalogs is not None:
         if progress_fn:
@@ -182,6 +208,7 @@ def write_v1_tail_artifacts(
             taxonomy_rows=taxonomy_rows,
             orchestration_catalog=template_catalogs[1],
             transition_graph=tg,
+            diagnostics=diag,
         )
         m["quality_report"] = str(w.write_quality_report(output_root, qr))
     if phrases:
@@ -210,27 +237,7 @@ def write_v1_tail_artifacts(
                 "candidates": [c.model_dump(mode="json") for c in candidates],
             }
             m["review_batch"] = str(w.write_review_batch(output_root, batch_data))
-    mc: MotifCatalog | None = None
-    clc: TemplateClusterCatalog | None = None
     if template_catalogs is not None:
-        m["content_templates"] = str(output_root / "content_templates.json")
-        m["orchestration_templates"] = str(output_root / "orchestration_templates.json")
-        if o.enable_template_retrieval_ranking:
-            if progress_fn:
-                progress_fn("template retrieval ranking")
-            ri = c.template_retrieval_ranker.build_index(
-                content_catalog=template_catalogs[0],
-                orchestration_catalog=template_catalogs[1],
-                transition_graph=tg,
-            )
-            m["template_retrieval_index"] = str(w.write_template_retrieval_index(output_root, ri))
-        if o.enable_template_diagnostics:
-            diag = c.template_diagnostics.build(
-                content_catalog=template_catalogs[0],
-                orchestration_catalog=template_catalogs[1],
-                taxonomy_rows=taxonomy_rows,
-            )
-            m["template_diagnostics"] = str(w.write_template_diagnostics(output_root, diag))
         if o.enable_v2_motif_mining:
             if progress_fn:
                 progress_fn("motif mining")
@@ -271,6 +278,7 @@ def write_v1_tail_artifacts(
             motif_catalog=mc,
             cluster_catalog=clc,
             propensity_index=pi,
+            metadata_profiles=metadata_profiles,
             options=o,
             writer=w,
             store=s,
@@ -371,6 +379,7 @@ def run_recipe_promotion(
     motif_catalog: MotifCatalog | None,
     cluster_catalog: TemplateClusterCatalog | None,
     propensity_index: PropensityIndex | None = None,
+    metadata_profiles: EffectMetadataProfiles | None = None,
     options: FeatureEngineeringPipelineOptions,
     writer: FeatureEngineeringWriter,
     store: FeatureStoreProviderSync,
@@ -406,7 +415,11 @@ def run_recipe_promotion(
         else None
     )
     o = options
-    res = PromotionPipeline(param_profiles=o.recipe_promotion_param_profiles).run(
+    # Build param_profiles from metadata if available, with explicit config taking precedence
+    param_profiles = _extract_param_profiles(metadata_profiles)
+    if o.recipe_promotion_param_profiles:
+        param_profiles.update(o.recipe_promotion_param_profiles)
+    res = PromotionPipeline(param_profiles=param_profiles or None).run(
         cands,
         min_support=o.recipe_promotion_min_support,
         min_stability=o.recipe_promotion_min_stability,
@@ -418,6 +431,8 @@ def run_recipe_promotion(
         max_per_family=o.recipe_promotion_max_per_family,
         multi_layer_min_support=o.recipe_promotion_multi_layer_min_support,
         multi_layer_min_stability=o.recipe_promotion_multi_layer_min_stability,
+        max_per_cluster=o.recipe_promotion_max_per_cluster,
+        multi_layer_min_per_cluster=o.recipe_promotion_multi_layer_min_per_cluster,
     )
     # Write promotion report regardless of whether recipes were promoted
     report = PromotionReport(
@@ -598,6 +613,30 @@ def write_style_fingerprint(
     return p
 
 
+def _extract_param_profiles(
+    metadata: EffectMetadataProfiles | None,
+) -> dict[str, dict[str, object]]:
+    """Extract param_profiles from effect metadata for recipe synthesis.
+
+    Converts the top parameter modal values from each family's metadata
+    profile into the ``{family: {param: value}}`` format expected by
+    ``RecipeSynthesizer``.
+    """
+    if metadata is None:
+        return {}
+    result: dict[str, dict[str, object]] = {}
+    for profile in metadata.profiles:
+        if not profile.top_params:
+            continue
+        family_params: dict[str, object] = {}
+        for param in profile.top_params:
+            if param.top_values:
+                family_params[param.param_name] = param.top_values[0].value
+        if family_params:
+            result[profile.effect_family] = family_params
+    return result
+
+
 def _build_stack_catalog(stacks: tuple[EffectStack, ...]) -> EffectStackCatalog:
     """Build an ``EffectStackCatalog`` from a raw stacks tuple.
 
@@ -620,8 +659,67 @@ def _build_stack_catalog(stacks: tuple[EffectStack, ...]) -> EffectStackCatalog:
     )
 
 
+def _read_jsonl(path: Path) -> list[dict[str, Any]]:
+    """Read a JSONL file into a list of dicts."""
+    rows: list[dict[str, Any]] = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if line.strip():
+            val = json.loads(line)
+            if not isinstance(val, dict):
+                raise ValueError(f"Expected JSON object line in {path}")
+            rows.append(val)
+    return rows
+
+
+def load_profile_artifacts(
+    output_dir: Path,
+) -> (
+    tuple[
+        tuple[EffectPhrase, ...],
+        tuple[PhraseTaxonomyRecord, ...],
+        tuple[TargetRoleAssignment, ...],
+    ]
+    | None
+):
+    """Load cached FE artifacts from a completed profile's output directory.
+
+    Args:
+        output_dir: Profile output directory containing artifact files.
+
+    Returns:
+        Tuple of (phrases, taxonomy_rows, target_roles) or None if all missing.
+    """
+    from pydantic import BaseModel as _BM
+
+    def _read_models(stem: str, model_cls: type[_BM]) -> tuple[Any, ...] | None:
+        for ext in (".parquet", ".jsonl"):
+            p = output_dir / f"{stem}{ext}"
+            if not p.exists():
+                continue
+            if ext == ".parquet":
+                try:
+                    import pyarrow.parquet as pq
+
+                    table = pq.read_table(p)
+                    return tuple(model_cls.model_validate(row) for row in table.to_pylist())
+                except (ImportError, Exception):
+                    continue
+            else:
+                rows = _read_jsonl(p)
+                return tuple(model_cls.model_validate(r) for r in rows)
+        return None
+
+    phrases = _read_models("effect_phrases", EffectPhrase)
+    taxonomy = _read_models("phrase_taxonomy", PhraseTaxonomyRecord)
+    roles = _read_models("target_roles", TargetRoleAssignment)
+    if phrases is None and taxonomy is None and roles is None:
+        return None
+    return (phrases or (), taxonomy or (), roles or ())
+
+
 __all__ = [
     "build_adapter_payloads",
+    "load_profile_artifacts",
     "run_recipe_promotion",
     "write_color_arc",
     "write_propensity",

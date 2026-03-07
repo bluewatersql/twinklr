@@ -81,15 +81,15 @@ def check_physics_constraints(
         )
 
     # Normalize DMX to 0-1, then scale to degrees
-    normalized = dmx_values / 255.0  # type: ignore[operator]
+    normalized = dmx_values / 255.0
     position_deg = normalized * range_deg
 
     # Compute velocity (degrees/second)
-    velocity = np.diff(position_deg) / dt_sec  # type: ignore[operator]
+    velocity = np.diff(position_deg) / dt_sec
     max_speed = float(np.max(np.abs(velocity)))
 
     # Compute acceleration (degrees/second²)
-    acceleration = np.diff(velocity) / dt_sec  # type: ignore[operator]
+    acceleration = np.diff(velocity) / dt_sec
     max_accel = float(np.max(np.abs(acceleration))) if len(acceleration) > 0 else 0.0
 
     # Check constraints

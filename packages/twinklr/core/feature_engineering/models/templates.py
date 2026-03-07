@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field
 
 
-class TemplateKind(str, Enum):
+class TemplateKind(StrEnum):
     """Template catalog split by semantic scope."""
 
     CONTENT = "content"
@@ -93,6 +93,7 @@ class TemplateCatalog(BaseModel):
     assignment_coverage: float = Field(ge=0.0, le=1.0)
     min_instance_count: int = Field(ge=1)
     min_distinct_pack_count: int = Field(ge=1)
+    min_distinct_sequence_count: int = Field(ge=1, default=1)
 
     templates: tuple[MinedTemplate, ...] = ()
     assignments: tuple[TemplateAssignment, ...] = ()

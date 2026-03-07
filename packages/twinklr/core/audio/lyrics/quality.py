@@ -27,8 +27,12 @@ def compute_quality_metrics(
     Returns:
         LyricsQuality with computed metrics
     """
+    vocal_presence_pct: float | None = None
+    if vocal_segments:
+        vocal_presence_pct = _compute_vocal_presence_pct(vocal_segments, duration_ms)
+
     if not words:
-        return LyricsQuality()
+        return LyricsQuality(vocal_presence_pct=vocal_presence_pct)
 
     # Compute coverage with gap merging (vocal time, not individual word time)
     # Merge word intervals with small gaps to represent continuous vocal phrases
@@ -56,30 +60,7 @@ def compute_quality_metrics(
     total_coverage_ms = sum(end - start for start, end in merged)
     coverage_pct = total_coverage_ms / duration_ms if duration_ms > 0 else 0.0
 
-    # Optional: Validate against vocal segments if provided
-    # This can help detect if word timing is significantly off from actual vocals
-    if vocal_segments:
-        # Convert vocal segments to ms intervals
-        vocal_intervals = [
-            (int(seg["start_s"] * 1000), int(seg["end_s"] * 1000)) for seg in vocal_segments
-        ]
-
-        # Compute overlap between word intervals and vocal segments
-        total_overlap_ms = 0
-        for word_start, word_end in merged:
-            for vocal_start, vocal_end in vocal_intervals:
-                # Compute intersection
-                overlap_start = max(word_start, vocal_start)
-                overlap_end = min(word_end, vocal_end)
-                if overlap_start < overlap_end:
-                    total_overlap_ms += overlap_end - overlap_start
-
-        # If word coverage significantly exceeds vocal segments, may indicate timing issues
-        # (But this is normal if vocal detector misses some vocals, so just informational)
-        # vocal_total_ms = sum(end - start for start, end in vocal_intervals)  # Reserved for future use
-
-        # Store as metadata for debugging (could add to model if needed)
-        # For now, just use word-based coverage as the primary metric
+    # vocal_presence_pct is already computed above from vocal_segments (if provided)
 
     # Detect violations
     monotonicity_violations = 0
@@ -116,7 +97,8 @@ def compute_quality_metrics(
     min_word_duration_ms = min(durations) if durations else None
 
     return LyricsQuality(
-        coverage_pct=coverage_pct,
+        timed_word_coverage_pct=coverage_pct,
+        vocal_presence_pct=vocal_presence_pct,
         monotonicity_violations=monotonicity_violations,
         overlap_violations=overlap_violations,
         out_of_bounds_violations=out_of_bounds_violations,
@@ -124,3 +106,38 @@ def compute_quality_metrics(
         avg_word_duration_ms=avg_word_duration_ms,
         min_word_duration_ms=min_word_duration_ms,
     )
+
+
+def _compute_vocal_presence_pct(
+    vocal_segments: list[dict[str, float]],
+    duration_ms: int,
+) -> float | None:
+    """Compute vocal presence percentage from vocal detector segments.
+
+    Merges overlapping segments then divides by song duration.
+
+    Args:
+        vocal_segments: List of dicts with 'start_s' and 'end_s' keys
+        duration_ms: Song duration in milliseconds
+
+    Returns:
+        Vocal presence fraction [0, 1], or None if duration_ms is 0
+    """
+    if duration_ms <= 0:
+        return None
+
+    # Convert to ms intervals and sort
+    intervals: list[tuple[int, int]] = sorted(
+        (int(seg["start_s"] * 1000), int(seg["end_s"] * 1000)) for seg in vocal_segments
+    )
+
+    # Merge overlapping intervals
+    merged: list[tuple[int, int]] = []
+    for start, end in intervals:
+        if merged and start <= merged[-1][1]:
+            merged[-1] = (merged[-1][0], max(merged[-1][1], end))
+        else:
+            merged.append((start, end))
+
+    total_vocal_ms = sum(end - start for start, end in merged)
+    return min(1.0, total_vocal_ms / duration_ms)

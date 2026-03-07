@@ -16,7 +16,7 @@ Provides the MacroPlan to evaluate along with song context
 - **Mood Arc:** {{ lyric_context.mood_arc }}
 - **Has Narrative:** {{ "Yes" if lyric_context.has_narrative else "No" }}
 - **Key Phrases:** {{ lyric_context.key_phrases | length }} identified
-- **Vocal Coverage:** {{ (lyric_context.vocal_coverage_pct * 100) | round(0) }}%
+- **Vocal Coverage:** {{ (lyric_context.vocal_coverage_pct * 100) | round(0) }}%{% if lyric_context.timed_word_coverage_pct is defined and lyric_context.timed_word_coverage_pct is not none %} (timed words: {{ (lyric_context.timed_word_coverage_pct * 100) | round(0) }}%){% endif %}
 {% endif %}
 
 ## Song Structure

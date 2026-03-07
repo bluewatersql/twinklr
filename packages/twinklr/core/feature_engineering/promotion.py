@@ -110,6 +110,8 @@ class PromotionPipeline:
         max_per_family: int = 0,
         multi_layer_min_support: int = 2,
         multi_layer_min_stability: float = 0.02,
+        max_per_cluster: int = 1,
+        multi_layer_min_per_cluster: int = 1,
     ) -> PromotionResult:
         """Run the promotion pipeline.
 
@@ -164,9 +166,17 @@ class PromotionPipeline:
             else:
                 rejected_count += 1
 
+        # Record pre-dedup count for accurate reporting.
+        passed_before_dedup = len(passed)
+
         # Stage 2: Cluster dedup
         if clusters:
-            passed = self._apply_cluster_dedup(passed, clusters)
+            passed = self._apply_cluster_dedup(
+                passed,
+                clusters,
+                max_per_cluster=max_per_cluster,
+                multi_layer_min_per_cluster=multi_layer_min_per_cluster,
+            )
 
         # Stage 3: Recipe synthesis + build source template map for motif annotation
         promoted: list[EffectRecipe] = []
@@ -226,7 +236,7 @@ class PromotionPipeline:
         lane_dist: dict[str, int] = {}
         total_layers = 0
         for recipe in promoted:
-            family = recipe.layers[0].effect_type.lower() if recipe.layers else "unknown"
+            family = recipe.effect_family
             family_dist[family] = family_dist.get(family, 0) + 1
             lane = recipe.template_type if hasattr(recipe, "template_type") else "UNKNOWN"
             lane_dist[lane] = lane_dist.get(lane, 0) + 1
@@ -254,7 +264,7 @@ class PromotionPipeline:
             "total_candidates": len(candidates),
             "filtered_families": filtered_count,
             "eligible_count": len(eligible),
-            "passed_quality_gate": len(passed),
+            "passed_quality_gate": passed_before_dedup,
             "rejected_count": rejected_count,
             "after_cluster_dedup": len(passed),
             "promoted_count": len(promoted),
@@ -342,15 +352,53 @@ class PromotionPipeline:
         self,
         templates: list[MinedTemplate],
         clusters: list[dict[str, Any]],
+        *,
+        max_per_cluster: int = 1,
+        multi_layer_min_per_cluster: int = 1,
     ) -> list[MinedTemplate]:
-        """Remove cluster duplicates, keeping only the designated template."""
-        # Build set of template IDs to remove (cluster members that aren't the keeper)
-        remove_ids: set[str] = set()
+        """Remove cluster duplicates, keeping top N per cluster by support.
+
+        For each cluster the ``max_per_cluster`` templates with the highest
+        ``support_count`` survive.  Additionally, at least
+        ``multi_layer_min_per_cluster`` multi-layer templates (layer_count >= 2)
+        are guaranteed per cluster when available, even if they fall outside
+        the overall top-N.  Templates not belonging to any cluster pass
+        through unconditionally.
+        """
+        template_by_id = {t.template_id: t for t in templates}
+        keep_ids: set[str] = set()
+        clustered_ids: set[str] = set()
+
         for cluster in clusters:
             member_ids = cluster.get("member_ids", [])
-            keep_id = cluster.get("keep_id")
-            for mid in member_ids:
-                if mid != keep_id:
-                    remove_ids.add(mid)
+            cluster_templates = [template_by_id[mid] for mid in member_ids if mid in template_by_id]
+            if not cluster_templates:
+                continue
+            clustered_ids.update(t.template_id for t in cluster_templates)
 
-        return [t for t in templates if t.template_id not in remove_ids]
+            # Top N overall by support
+            cluster_templates.sort(key=lambda t: -t.support_count)
+            selected: list[MinedTemplate] = list(cluster_templates[:max_per_cluster])
+
+            # Guarantee multi-layer representation, favouring higher layer counts
+            # so that 3+ layer stacks are promoted ahead of 2-layer ones.
+            ml_selected = sum(1 for t in selected if t.layer_count >= 2)
+            if ml_selected < multi_layer_min_per_cluster:
+                selected_ids = {t.template_id for t in selected}
+                ml_remaining = sorted(
+                    (
+                        t
+                        for t in cluster_templates
+                        if t.layer_count >= 2 and t.template_id not in selected_ids
+                    ),
+                    key=lambda t: (-t.layer_count, -t.support_count),
+                )
+                for t in ml_remaining[: multi_layer_min_per_cluster - ml_selected]:
+                    selected.append(t)
+
+            for t in selected:
+                keep_ids.add(t.template_id)
+
+        return [
+            t for t in templates if t.template_id not in clustered_ids or t.template_id in keep_ids
+        ]

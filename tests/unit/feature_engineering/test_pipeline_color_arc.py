@@ -3,6 +3,10 @@
 import json
 from pathlib import Path
 
+from twinklr.core.feature_engineering import corpus_artifacts as _ca
+from twinklr.core.feature_engineering.component_factory import ComponentFactory
+from twinklr.core.feature_engineering.config import FeatureEngineeringPipelineOptions
+from twinklr.core.feature_engineering.datasets.writer import FeatureEngineeringWriter
 from twinklr.core.feature_engineering.models.color_narrative import ColorNarrativeRow
 from twinklr.core.feature_engineering.models.phrases import (
     ColorClass,
@@ -12,10 +16,6 @@ from twinklr.core.feature_engineering.models.phrases import (
     MotionClass,
     PhraseSource,
     SpatialClass,
-)
-from twinklr.core.feature_engineering.pipeline import (
-    FeatureEngineeringPipeline,
-    FeatureEngineeringPipelineOptions,
 )
 
 
@@ -65,13 +65,14 @@ def test_pipeline_writes_color_arc_when_enabled(tmp_path: Path) -> None:
     color_rows = tuple(_make_color_row(s, i) for i, s in enumerate(["intro", "verse"]))
 
     options = FeatureEngineeringPipelineOptions(enable_color_arc=True)
-    pipeline = FeatureEngineeringPipeline(options=options)
 
-    # Directly call the color arc writer method.
-    pipeline._write_color_arc(
+    _ca.write_color_arc(
         output_root=tmp_path,
         phrases=phrases,
         color_rows=color_rows,
+        options=options,
+        writer=FeatureEngineeringWriter(),
+        components=ComponentFactory(options),
     )
 
     output_path = tmp_path / "color_arc.json"
@@ -85,12 +86,14 @@ def test_pipeline_writes_color_arc_when_enabled(tmp_path: Path) -> None:
 def test_pipeline_skips_color_arc_when_disabled(tmp_path: Path) -> None:
     """When enable_color_arc=False, pipeline does not write color_arc.json."""
     options = FeatureEngineeringPipelineOptions(enable_color_arc=False)
-    pipeline = FeatureEngineeringPipeline(options=options)
 
-    result = pipeline._write_color_arc(
+    result = _ca.write_color_arc(
         output_root=tmp_path,
         phrases=(),
         color_rows=(),
+        options=options,
+        writer=FeatureEngineeringWriter(),
+        components=ComponentFactory(options),
     )
 
     assert result is None

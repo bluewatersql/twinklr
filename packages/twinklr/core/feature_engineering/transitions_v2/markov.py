@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from twinklr.core.feature_engineering.models.phrases import EffectPhrase
-from twinklr.core.feature_engineering.models.transitions import TransitionEdge
+from twinklr.core.feature_engineering.models.transitions import TransitionEdge, TransitionRecord
 from twinklr.core.feature_engineering.transitions_v2.models import TransitionPrediction
 
 # Duration bucket boundaries in milliseconds.
@@ -122,6 +122,7 @@ class MarkovTransitionModel:
         self,
         transitions: list[TransitionEdge] | tuple[TransitionEdge, ...],
         phrases: list[EffectPhrase] | tuple[EffectPhrase, ...],
+        records: list[TransitionRecord] | tuple[TransitionRecord, ...] | None = None,
     ) -> None:
         """Build sparse transition counts from observed edges and phrases.
 
@@ -129,40 +130,68 @@ class MarkovTransitionModel:
         duration-conditioned models (``"short"``, ``"medium"``, ``"long"``).
         Only observed (source, target) pairs are stored.
 
+        When ``records`` are provided, duration conditioning uses individual
+        ``TransitionRecord`` observations joined with ``phrases`` by
+        ``phrase_id`` for accurate per-transition durations.  Falls back to
+        aggregated-edge conditioning when ``records`` is ``None``.
+
         Args:
             transitions: Aggregated ``TransitionEdge`` objects; ``edge_count``
-                is used as the observation weight.
+                is used as the observation weight for unconditional counts.
             phrases: ``EffectPhrase`` objects providing ``duration_ms`` values
-                for duration conditioning, keyed by ``param_signature``.
+                for duration conditioning.
+            records: Optional raw ``TransitionRecord`` objects for per-
+                transition duration conditioning (preferred path).
         """
-        # Build template_id → median duration from phrases via param_signature.
-        template_phrase_durations: dict[str, list[int]] = {}
-        for phrase in phrases:
-            tid = phrase.param_signature
-            template_phrase_durations.setdefault(tid, []).append(phrase.duration_ms)
+        # Build phrase lookup by phrase_id for duration conditioning.
+        phrase_by_id: dict[str, EffectPhrase] = {p.phrase_id: p for p in phrases}
 
         counts: dict[str, dict[str, int]] = {}
         bucket_counts: dict[str, dict[str, dict[str, int]]] = {b: {} for b in self._BUCKETS}
 
+        # Unconditional counts from aggregated edges.
         for edge in transitions:
             src = edge.source_template_id
             tgt = edge.target_template_id
             w = edge.edge_count
-
-            # Unconditional.
             counts.setdefault(src, {})[tgt] = counts.get(src, {}).get(tgt, 0) + w
 
-            # Duration-conditioned.
-            durations = template_phrase_durations.get(src, [])
-            if durations:
-                median_dur = sorted(durations)[len(durations) // 2]
-                bucket = _duration_bucket(median_dur)
-                row = bucket_counts[bucket].setdefault(src, {})
-                row[tgt] = row.get(tgt, 0) + w
-            else:
-                for b in self._BUCKETS:
-                    row = bucket_counts[b].setdefault(src, {})
+        # Duration-conditioned counts from individual records (preferred).
+        if records:
+            for rec in records:
+                src = rec.from_template_id
+                tgt = rec.to_template_id
+                phrase = phrase_by_id.get(rec.from_phrase_id)
+                if phrase is not None:
+                    bucket = _duration_bucket(phrase.duration_ms)
+                    row = bucket_counts[bucket].setdefault(src, {})
+                    row[tgt] = row.get(tgt, 0) + 1
+                else:
+                    # No phrase match — spread across all buckets.
+                    for b in self._BUCKETS:
+                        row = bucket_counts[b].setdefault(src, {})
+                        row[tgt] = row.get(tgt, 0) + 1
+        else:
+            # Legacy fallback: aggregate-level duration from edge counts.
+            template_phrase_durations: dict[str, list[int]] = {}
+            for phrase in phrases:
+                tid = phrase.param_signature
+                template_phrase_durations.setdefault(tid, []).append(phrase.duration_ms)
+
+            for edge in transitions:
+                src = edge.source_template_id
+                tgt = edge.target_template_id
+                w = edge.edge_count
+                durations = template_phrase_durations.get(src, [])
+                if durations:
+                    median_dur = sorted(durations)[len(durations) // 2]
+                    bucket = _duration_bucket(median_dur)
+                    row = bucket_counts[bucket].setdefault(src, {})
                     row[tgt] = row.get(tgt, 0) + w
+                else:
+                    for b in self._BUCKETS:
+                        row = bucket_counts[b].setdefault(src, {})
+                        row[tgt] = row.get(tgt, 0) + w
 
         self._counts = counts
         self._bucket_counts = bucket_counts

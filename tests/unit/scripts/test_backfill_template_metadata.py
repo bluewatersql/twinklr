@@ -149,6 +149,7 @@ def _make_recipe(
         name="Test Recipe",
         description="Test",
         recipe_version="1.0.0",
+        effect_family="spirals",
         template_type=GroupTemplateType.BASE,
         visual_intent=GroupVisualIntent.ABSTRACT,
         tags=tags or ["test"],

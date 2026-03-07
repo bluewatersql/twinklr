@@ -164,7 +164,7 @@ class WhisperXImpl(WhisperXService):
             RuntimeError: If alignment fails
         """
         try:
-            import whisperx  # type: ignore
+            import whisperx
         except ImportError as e:
             raise ImportError("whisperx not installed. Install with: uv sync --extra ml") from e
 
@@ -249,7 +249,7 @@ class WhisperXImpl(WhisperXService):
         stdlib_logging.getLogger("torio._extension.utils").setLevel(stdlib_logging.ERROR)
 
         try:
-            import whisperx  # type: ignore
+            import whisperx
         except ImportError as e:
             raise ImportError("whisperx not installed. Install with: uv sync --extra ml") from e
 

@@ -325,6 +325,7 @@ class RecipeSynthesizer:
                 f"Stack recipe from {mined.layer_count}-layer template {mined.template_id}"
             ),
             recipe_version=recipe_version,
+            effect_family=mined.effect_family,
             template_type=template_type,
             visual_intent=GroupVisualIntent.ABSTRACT,
             tags=tags,
@@ -466,6 +467,7 @@ class RecipeSynthesizer:
                 f"Synthesized from mined template {mined.template_id} ({mined.template_signature})"
             ),
             recipe_version=recipe_version,
+            effect_family=mined.effect_family,
             template_type=template_type,
             visual_intent=visual_intent,
             tags=tags,

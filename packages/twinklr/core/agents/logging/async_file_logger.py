@@ -12,7 +12,7 @@ import uuid
 from pathlib import Path
 from typing import Any
 
-import aiofiles  # type: ignore[import-untyped]
+import aiofiles
 import yaml
 
 from twinklr.core.agents.logging.models import AgentCallSummary, CallSummary, LLMCallLog

@@ -6,6 +6,8 @@ import math
 import time
 from dataclasses import dataclass
 
+import numpy as np
+
 from twinklr.core.feature_engineering.models.ann_retrieval import (
     AnnIndexEntry,
     AnnRetrievalCheck,
@@ -192,11 +194,37 @@ class AnnTemplateRetrievalIndexer:
         top_k: int,
         exclude_template_id: str | None = None,
     ) -> list[tuple[str, float]]:
-        scored: list[tuple[str, float]] = []
-        for row in index.entries:
-            if exclude_template_id is not None and row.template_id == exclude_template_id:
-                continue
-            scored.append((row.template_id, self._cosine(query_vector, row.vector)))
+        # Filter candidates, preserving template_ids for output
+        if exclude_template_id is not None:
+            candidates = [row for row in index.entries if row.template_id != exclude_template_id]
+        else:
+            candidates = list(index.entries)
+
+        if not candidates:
+            return []
+
+        # Build matrix once (could be cached, but for now build on each call)
+        vectors = np.array([row.vector for row in candidates], dtype=np.float32)
+        query = np.array(query_vector, dtype=np.float32)
+
+        # Compute norms
+        norms = np.linalg.norm(vectors, axis=1)
+        query_norm = np.linalg.norm(query)
+
+        # Cosine similarity via dot product
+        if query_norm > 0:
+            similarities = vectors @ query / (norms * query_norm)
+            similarities = np.clip(similarities, 0.0, 1.0)
+        else:
+            similarities = np.zeros(len(candidates), dtype=np.float32)
+
+        # Zero out entries where candidate norm is zero
+        similarities[norms == 0] = 0.0
+
+        # Build scored list and sort by (-similarity, template_id)
+        scored = [
+            (candidates[i].template_id, float(similarities[i])) for i in range(len(candidates))
+        ]
         scored.sort(key=lambda item: (-item[1], item[0]))
         return scored[:top_k]
 

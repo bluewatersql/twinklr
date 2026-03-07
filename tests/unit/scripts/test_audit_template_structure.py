@@ -66,6 +66,7 @@ def _make_recipe(layers: list[RecipeLayer], effect_type: str = "On") -> EffectRe
         name="Test Recipe",
         description="Test",
         recipe_version="1.0.0",
+        effect_family="bars",
         template_type=GroupTemplateType.BASE,
         visual_intent=GroupVisualIntent.ABSTRACT,
         tags=["test"],

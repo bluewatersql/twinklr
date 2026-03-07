@@ -49,8 +49,8 @@ if TYPE_CHECKING:
     import pyarrow.parquet as pq
 
 try:
-    import pyarrow as pa  # type: ignore[assignment]
-    import pyarrow.parquet as pq  # type: ignore[assignment]
+    import pyarrow as pa
+    import pyarrow.parquet as pq
 
     _HAS_PYARROW = True
 except ImportError:

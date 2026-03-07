@@ -43,7 +43,7 @@ def create_feature_store(config: FeatureStoreConfig) -> FeatureStoreProviderSync
         # Lazy import so that the sqlite3 / bootstrap dependencies are only
         # pulled in when the SQLite backend is actually requested.
         from twinklr.core.feature_store.backends.sqlite import (
-            SQLiteFeatureStore,  # type: ignore[import]
+            SQLiteFeatureStore,
         )
 
         return SQLiteFeatureStore(config)

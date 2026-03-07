@@ -356,7 +356,7 @@ class PipelineExecutor:
                     logger.warning(f"{stage_name} failed with non-retryable error: {result.error}")
                     return result
 
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 last_error = f"Stage timeout after {stage_def.timeout_ms}ms"
                 logger.warning(f"{stage_name} timed out (attempt {attempt + 1}/{max_attempts})")
             except Exception as e:

@@ -85,7 +85,7 @@ def _extract_entry(path: Path) -> MusicLibraryEntry:
     )
 
 
-def _first_tag(tags: mutagen.FileType, key: str) -> str:  # type: ignore[type-arg]
+def _first_tag(tags: mutagen.FileType, key: str) -> str:
     """Safely extract the first value of a tag key."""
     val = tags.get(key)
     if val and isinstance(val, list) and len(val) > 0:

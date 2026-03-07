@@ -23,7 +23,7 @@ from twinklr.core.feature_engineering.models.templates import (
 class TemplateDiagnosticsOptions:
     schema_version: str = "v1.0.0"
     diagnostics_version: str = "template_diagnostics_v1"
-    low_support_max_count: int = 3
+    low_support_max_count: int = 5
     high_concentration_min_ratio: float = 0.8
     high_variance_min_score: float = 0.65
     over_generic_min_support_count: int = 50

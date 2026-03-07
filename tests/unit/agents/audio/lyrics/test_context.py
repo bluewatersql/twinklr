@@ -53,17 +53,48 @@ class TestShapeLyricsContext:
             "end_ms": 120000,
         }
 
-        # Check quality metrics
-        assert context["quality"]["coverage_pct"] == 0.8
+        # Check quality metrics (new split fields)
+        assert context["quality"]["timed_word_coverage_pct"] == 0.8
+        assert context["quality"]["vocal_presence_pct"] is None
         assert context["quality"]["source_confidence"] == 0.95
+        assert context["quality"]["source_kind"] == "WHISPERX_TRANSCRIBE"
 
     def test_shape_context_without_quality_metrics(self, bundle_no_quality):
         """Test shaping context when quality metrics are missing."""
         context = shape_lyrics_context(bundle_no_quality)
 
         assert context["has_lyrics"] is True
-        assert context["quality"]["coverage_pct"] == 0.0
+        assert context["quality"]["timed_word_coverage_pct"] == 0.0
+        assert context["quality"]["vocal_presence_pct"] is None
         assert context["quality"]["source_confidence"] == 0.0
+        assert context["quality"]["source_kind"] is None
+
+    def test_shape_context_with_timed_lyrics_both_fields_populated(
+        self, bundle_with_vocal_presence
+    ):
+        """Test shape_lyrics_context with timed lyrics — both coverage fields populated."""
+        context = shape_lyrics_context(bundle_with_vocal_presence)
+
+        assert context["has_lyrics"] is True
+        assert context["quality"]["timed_word_coverage_pct"] == 0.75
+        assert context["quality"]["vocal_presence_pct"] == 0.90
+        assert context["quality"]["source_kind"] == "WHISPERX_ALIGN"
+
+    def test_shape_context_with_untimed_lyrics(self, bundle_with_untimed_lyrics):
+        """Test shape_lyrics_context with untimed (plain) lyrics — word_coverage=0, vocal_presence from spectral."""
+        context = shape_lyrics_context(bundle_with_untimed_lyrics)
+
+        assert context["has_lyrics"] is True
+        assert context["quality"]["timed_word_coverage_pct"] == 0.0
+        assert context["quality"]["vocal_presence_pct"] == 0.65
+        assert context["quality"]["source_kind"] == "LOOKUP_PLAIN"
+
+    def test_shape_context_no_lyrics_has_lyrics_false(self, minimal_bundle_no_lyrics):
+        """Test shape_lyrics_context with no lyrics returns has_lyrics=False."""
+        context = shape_lyrics_context(minimal_bundle_no_lyrics)
+
+        assert context["has_lyrics"] is False
+        assert "quality" not in context
 
     def test_section_ids_use_per_type_counters(self, bundle_multi_sections):
         """Section IDs use per-type counters matching audio profile convention."""
@@ -144,7 +175,7 @@ def full_bundle_with_lyrics():
     source = LyricsSource(kind="WHISPERX_TRANSCRIBE", provider="whisperx", confidence=0.95)
 
     quality = LyricsQuality(
-        coverage_pct=0.8,
+        timed_word_coverage_pct=0.8,
         monotonicity_violations=0,
         overlap_violations=0,
         out_of_bounds_violations=0,
@@ -226,7 +257,7 @@ def bundle_no_sections():
         phrases=[LyricPhrase(text="Test lyrics", start_ms=1000, end_ms=3000)],
         source=LyricsSource(kind="LOOKUP_PLAIN", provider="test", confidence=0.9),
         quality=LyricsQuality(
-            coverage_pct=1.0,
+            timed_word_coverage_pct=1.0,
             monotonicity_violations=0,
             overlap_violations=0,
             out_of_bounds_violations=0,
@@ -257,7 +288,7 @@ def bundle_empty_words():
         phrases=[],
         source=LyricsSource(kind="LOOKUP_PLAIN", provider="test", confidence=0.9),
         quality=LyricsQuality(
-            coverage_pct=1.0,
+            timed_word_coverage_pct=1.0,
             monotonicity_violations=0,
             overlap_violations=0,
             out_of_bounds_violations=0,
@@ -284,6 +315,72 @@ def bundle_empty_words():
 
 
 @pytest.fixture
+def bundle_with_vocal_presence():
+    """Bundle with timed lyrics and vocal_presence_pct populated."""
+    from twinklr.core.audio.models.enums import StageStatus
+
+    quality = LyricsQuality(
+        timed_word_coverage_pct=0.75,
+        vocal_presence_pct=0.90,
+        monotonicity_violations=0,
+        overlap_violations=0,
+        out_of_bounds_violations=0,
+        large_gaps_count=0,
+    )
+    source = LyricsSource(kind="WHISPERX_ALIGN", provider="whisperx", confidence=0.92)
+    lyrics = LyricsBundle(
+        schema_version="3.0.0",
+        stage_status=StageStatus.OK,
+        text="Test timed lyrics",
+        words=[LyricWord(text="Test", start_ms=1000, end_ms=2000)],
+        phrases=[LyricPhrase(text="Test timed lyrics", start_ms=1000, end_ms=3000)],
+        source=source,
+        quality=quality,
+    )
+    return SongBundle(
+        schema_version="3.0",
+        audio_path="/fake/path.mp3",
+        recording_id="test-rec-vp",
+        timing=SongTiming(sr=44100, hop_length=512, duration_s=180.0, duration_ms=180000),
+        lyrics=lyrics,
+        features={"structure": {"sections": [{"label": "verse", "start_s": 0.0, "end_s": 60.0}]}},
+    )
+
+
+@pytest.fixture
+def bundle_with_untimed_lyrics():
+    """Bundle with plain (untimed) lyrics — timed_word_coverage_pct=0, vocal_presence_pct from spectral."""
+    from twinklr.core.audio.models.enums import StageStatus
+
+    quality = LyricsQuality(
+        timed_word_coverage_pct=0.0,
+        vocal_presence_pct=0.65,
+        monotonicity_violations=0,
+        overlap_violations=0,
+        out_of_bounds_violations=0,
+        large_gaps_count=0,
+    )
+    source = LyricsSource(kind="LOOKUP_PLAIN", provider="genius", confidence=0.7)
+    lyrics = LyricsBundle(
+        schema_version="3.0.0",
+        stage_status=StageStatus.OK,
+        text="Plain lyrics without timing",
+        words=[],
+        phrases=[],
+        source=source,
+        quality=quality,
+    )
+    return SongBundle(
+        schema_version="3.0",
+        audio_path="/fake/path.mp3",
+        recording_id="test-rec-plain",
+        timing=SongTiming(sr=44100, hop_length=512, duration_s=180.0, duration_ms=180000),
+        lyrics=lyrics,
+        features={"structure": {"sections": [{"label": "verse", "start_s": 0.0, "end_s": 60.0}]}},
+    )
+
+
+@pytest.fixture
 def bundle_multi_sections():
     """Bundle with repeated section types to test per-type counter IDs."""
     from twinklr.core.audio.models.enums import StageStatus
@@ -296,7 +393,7 @@ def bundle_multi_sections():
         phrases=[LyricPhrase(text="Test lyrics", start_ms=1000, end_ms=3000)],
         source=LyricsSource(kind="LOOKUP_PLAIN", provider="test", confidence=0.9),
         quality=LyricsQuality(
-            coverage_pct=0.8,
+            timed_word_coverage_pct=0.8,
             monotonicity_violations=0,
             overlap_violations=0,
             out_of_bounds_violations=0,

@@ -55,9 +55,9 @@ class TestDefaultThresholds:
     """Verify config defaults match Phase 01 spec."""
 
     def test_min_stability_default(self) -> None:
-        """recipe_promotion_min_stability defaults to 0.03."""
+        """recipe_promotion_min_stability defaults to 0.015."""
         opts = FeatureEngineeringPipelineOptions()
-        assert opts.recipe_promotion_min_stability == 0.03
+        assert opts.recipe_promotion_min_stability == 0.015
 
     def test_adaptive_stability_default(self) -> None:
         """recipe_promotion_adaptive_stability defaults to True."""

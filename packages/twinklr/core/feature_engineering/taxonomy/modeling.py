@@ -19,10 +19,10 @@ from twinklr.core.feature_engineering.models.taxonomy import PhraseTaxonomyRecor
 class LearnedTaxonomyTrainerOptions:
     schema_version: str = "v2.2.0"
     model_version: str = "learned_taxonomy_v1"
-    min_label_probability: float = 0.40
+    min_label_probability: float = 0.25
     eval_split_modulus: int = 5
-    min_recall_for_promotion: float = 0.55
-    min_f1_for_promotion: float = 0.60
+    min_recall_for_promotion: float = 0.30
+    min_f1_for_promotion: float = 0.40
 
 
 class LearnedTaxonomyTrainer:

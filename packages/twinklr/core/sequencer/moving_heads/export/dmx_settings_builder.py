@@ -190,7 +190,7 @@ class DmxSettingsBuilder:
             if isinstance(ch, int):
                 return ch
             if hasattr(ch, "channel"):
-                return int(ch.channel)  # type: ignore
+                return int(ch.channel)
             return None
 
         # Map logical channels to DMX channels with inversion flags

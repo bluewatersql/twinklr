@@ -65,6 +65,7 @@ def _make_recipe(layers: tuple[RecipeLayer, ...] | None = None) -> EffectRecipe:
         name="Test Recipe",
         description="A test recipe",
         recipe_version="1.0.0",
+        effect_family="color_wash",
         template_type=GroupTemplateType.BASE,
         visual_intent=GroupVisualIntent.ABSTRACT,
         tags=[],

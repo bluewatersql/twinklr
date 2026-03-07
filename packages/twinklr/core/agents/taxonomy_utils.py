@@ -105,7 +105,7 @@ def get_taxonomy_dict() -> dict[str, list[str]]:
 
     all_enums = choreography_enums + group_planner_enums + issue_enums
     for enum_class in all_enums:
-        taxonomy[enum_class.__name__] = [e.value for e in enum_class]  # type: ignore[misc]
+        taxonomy[enum_class.__name__] = [e.value for e in enum_class]
 
     return taxonomy
 

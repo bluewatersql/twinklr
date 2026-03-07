@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Literal
 
 from twinklr.core.feature_engineering.models import (
     EffectPhrase,
@@ -10,6 +11,7 @@ from twinklr.core.feature_engineering.models import (
     TemplateCatalog,
 )
 from twinklr.core.feature_engineering.models.quality import QualityCheckResult, QualityReport
+from twinklr.core.feature_engineering.models.template_diagnostics import TemplateDiagnosticsReport
 from twinklr.core.feature_engineering.models.transitions import TransitionGraph
 
 
@@ -22,6 +24,11 @@ class QualityGateOptions:
     max_unknown_effect_family_ratio: float = 0.02
     max_unknown_motion_ratio: float = 0.02
     max_single_unknown_effect_type_ratio: float = 0.01
+    max_low_support_template_ratio: float | None = None
+    max_high_concentration_template_ratio: float | None = None
+    max_high_variance_template_ratio: float | None = None
+    max_over_generic_template_ratio: float | None = None
+    diagnostics_gate_mode: Literal["enforce", "warn"] = "warn"
 
 
 class FeatureQualityGates:
@@ -37,6 +44,7 @@ class FeatureQualityGates:
         taxonomy_rows: tuple[PhraseTaxonomyRecord, ...],
         orchestration_catalog: TemplateCatalog,
         transition_graph: TransitionGraph,
+        diagnostics: TemplateDiagnosticsReport | None = None,
     ) -> QualityReport:
         checks: list[QualityCheckResult] = []
 
@@ -152,7 +160,59 @@ class FeatureQualityGates:
             )
         )
 
-        passed = all(row.passed for row in checks)
+        if diagnostics is not None:
+            total = diagnostics.total_templates
+            diag_mode = self._options.diagnostics_gate_mode
+            if self._options.max_low_support_template_ratio is not None:
+                ratio = len(diagnostics.low_support_templates) / total if total > 0 else 0.0
+                checks.append(
+                    QualityCheckResult(
+                        check_id="low_support_template_ratio",
+                        passed=ratio <= self._options.max_low_support_template_ratio,
+                        value=round(ratio, 6),
+                        threshold=self._options.max_low_support_template_ratio,
+                        message="Low-support template ratio should remain under threshold.",
+                        mode=diag_mode,
+                    )
+                )
+            if self._options.max_high_concentration_template_ratio is not None:
+                ratio = len(diagnostics.high_concentration_templates) / total if total > 0 else 0.0
+                checks.append(
+                    QualityCheckResult(
+                        check_id="high_concentration_template_ratio",
+                        passed=ratio <= self._options.max_high_concentration_template_ratio,
+                        value=round(ratio, 6),
+                        threshold=self._options.max_high_concentration_template_ratio,
+                        message="High-concentration template ratio should remain under threshold.",
+                        mode=diag_mode,
+                    )
+                )
+            if self._options.max_high_variance_template_ratio is not None:
+                ratio = len(diagnostics.high_variance_templates) / total if total > 0 else 0.0
+                checks.append(
+                    QualityCheckResult(
+                        check_id="high_variance_template_ratio",
+                        passed=ratio <= self._options.max_high_variance_template_ratio,
+                        value=round(ratio, 6),
+                        threshold=self._options.max_high_variance_template_ratio,
+                        message="High-variance template ratio should remain under threshold.",
+                        mode=diag_mode,
+                    )
+                )
+            if self._options.max_over_generic_template_ratio is not None:
+                ratio = len(diagnostics.over_generic_templates) / total if total > 0 else 0.0
+                checks.append(
+                    QualityCheckResult(
+                        check_id="over_generic_template_ratio",
+                        passed=ratio <= self._options.max_over_generic_template_ratio,
+                        value=round(ratio, 6),
+                        threshold=self._options.max_over_generic_template_ratio,
+                        message="Over-generic template ratio should remain under threshold.",
+                        mode=diag_mode,
+                    )
+                )
+
+        passed = all(row.passed for row in checks if row.mode == "enforce")
         return QualityReport(
             schema_version="v1.9.0",
             report_version="quality_v1",

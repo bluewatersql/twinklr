@@ -183,6 +183,9 @@ class EffectRecipe(BaseModel):
     recipe_version: str = Field(description="Semantic version")
 
     # Classification
+    effect_family: str = Field(
+        default="unknown", description="Canonical snake_case effect family name"
+    )
     template_type: GroupTemplateType = Field(description="Template type (BASE, RHYTHM, ACCENT)")
     visual_intent: GroupVisualIntent = Field(description="Visual intent classification")
     tags: list[str] = Field(default_factory=list, description="Searchable tags")

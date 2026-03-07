@@ -17,8 +17,8 @@ from twinklr.core.feature_engineering.taxonomy.modeling import LearnedTaxonomyTr
 
 @dataclass(frozen=True)
 class LearnedTaxonomyInferenceOptions:
-    min_label_probability: float = 0.40
-    fallback_probability_threshold: float = 0.35
+    min_label_probability: float = 0.25
+    fallback_probability_threshold: float = 0.20
 
 
 class LearnedTaxonomyInference:

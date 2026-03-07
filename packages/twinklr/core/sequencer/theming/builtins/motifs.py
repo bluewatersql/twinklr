@@ -216,7 +216,7 @@ def _register_motifs() -> None:
                 # Additive: merge with base tags
                 motif_data["tags"] = sorted(set(motif_data["tags"]) | set(v))
             elif k in motif_data:
-                motif_data[k] = v  # type: ignore[literal-required]
+                motif_data[k] = v
 
         # Create and register motif definition
         motif = MotifDefinition(**motif_data)  # type: ignore[arg-type]

@@ -61,8 +61,14 @@ def shape_lyrics_context(bundle: SongBundle) -> dict[str, Any]:
             for i, s in enumerate(sections)
         ],
         "quality": {
-            "coverage_pct": bundle.lyrics.quality.coverage_pct if bundle.lyrics.quality else 0.0,
+            "timed_word_coverage_pct": (
+                bundle.lyrics.quality.timed_word_coverage_pct if bundle.lyrics.quality else 0.0
+            ),
+            "vocal_presence_pct": (
+                bundle.lyrics.quality.vocal_presence_pct if bundle.lyrics.quality else None
+            ),
             "source_confidence": (bundle.lyrics.source.confidence if bundle.lyrics.source else 0.0),
+            "source_kind": (bundle.lyrics.source.kind if bundle.lyrics.source else None),
         },
         "duration_ms": bundle.timing.duration_ms,
     }

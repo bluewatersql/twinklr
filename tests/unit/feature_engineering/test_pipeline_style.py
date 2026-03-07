@@ -3,6 +3,10 @@
 import json
 from pathlib import Path
 
+from twinklr.core.feature_engineering import corpus_artifacts as _ca
+from twinklr.core.feature_engineering.component_factory import ComponentFactory
+from twinklr.core.feature_engineering.config import FeatureEngineeringPipelineOptions
+from twinklr.core.feature_engineering.datasets.writer import FeatureEngineeringWriter
 from twinklr.core.feature_engineering.models.color_narrative import ColorNarrativeRow
 from twinklr.core.feature_engineering.models.layering import LayeringFeatureRow
 from twinklr.core.feature_engineering.models.phrases import (
@@ -18,10 +22,6 @@ from twinklr.core.feature_engineering.models.transitions import (
     TransitionGraph,
     TransitionRecord,
     TransitionType,
-)
-from twinklr.core.feature_engineering.pipeline import (
-    FeatureEngineeringPipeline,
-    FeatureEngineeringPipelineOptions,
 )
 
 
@@ -109,15 +109,17 @@ def test_pipeline_writes_style_fingerprint_when_enabled(tmp_path: Path) -> None:
     )
 
     options = FeatureEngineeringPipelineOptions(enable_style_fingerprint=True)
-    pipeline = FeatureEngineeringPipeline(options=options)
 
-    result = pipeline._write_style_fingerprint(
+    result = _ca.write_style_fingerprint(
         output_root=tmp_path,
         creator_id="creator-1",
         phrases=phrases,
         layering_rows=layering_rows,
         color_rows=color_rows,
         transition_graph=transition_graph,
+        options=options,
+        writer=FeatureEngineeringWriter(),
+        components=ComponentFactory(options),
     )
 
     assert result is not None
@@ -136,15 +138,17 @@ def test_pipeline_writes_style_fingerprint_when_enabled(tmp_path: Path) -> None:
 def test_pipeline_skips_style_fingerprint_when_disabled(tmp_path: Path) -> None:
     """When enable_style_fingerprint=False, pipeline does not write style_fingerprint.json."""
     options = FeatureEngineeringPipelineOptions(enable_style_fingerprint=False)
-    pipeline = FeatureEngineeringPipeline(options=options)
 
-    result = pipeline._write_style_fingerprint(
+    result = _ca.write_style_fingerprint(
         output_root=tmp_path,
         creator_id="creator-1",
         phrases=(),
         layering_rows=(),
         color_rows=(),
         transition_graph=None,
+        options=options,
+        writer=FeatureEngineeringWriter(),
+        components=ComponentFactory(options),
     )
     assert result is None
     assert not (tmp_path / "style_fingerprint.json").exists()

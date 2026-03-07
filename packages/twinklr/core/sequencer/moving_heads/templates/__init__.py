@@ -7,7 +7,7 @@ from twinklr.core.sequencer.moving_heads.templates.library import (
     list_templates,
 )
 
-all = [REGISTRY, get_template, list_templates]
+__all__ = ["REGISTRY", "get_template", "list_templates", "load_builtin_templates"]
 
 _loaded = False
 

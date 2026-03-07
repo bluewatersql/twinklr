@@ -95,11 +95,11 @@ class TwinklrSession:
             ValidationError: If config is invalid
         """
         if value is None:
-            return config_cls.load_or_default()  # type: ignore[return-value]
+            return config_cls.load_or_default()
         elif isinstance(value, (Path, str)):
-            return config_cls.load_or_default(Path(value))  # type: ignore[return-value]
+            return config_cls.load_or_default(Path(value))
         elif isinstance(value, config_cls):
-            return value  # type: ignore[return-value]
+            return value
         else:
             raise TypeError(
                 f"Expected {config_cls.__name__}, Path, str, or None; got {type(value).__name__}"

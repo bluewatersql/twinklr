@@ -195,6 +195,7 @@ class TestRelaxedSignatures:
             TemplateMinerOptions(
                 min_instance_count=1,
                 min_distinct_pack_count=1,
+                min_distinct_sequence_count=1,
                 stack_signature_mode="relaxed",
             )
         )
@@ -202,6 +203,7 @@ class TestRelaxedSignatures:
             TemplateMinerOptions(
                 min_instance_count=1,
                 min_distinct_pack_count=1,
+                min_distinct_sequence_count=1,
                 stack_signature_mode="strict",
             )
         )

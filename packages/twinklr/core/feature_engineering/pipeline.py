@@ -24,17 +24,13 @@ from twinklr.core.feature_engineering.constants import FEATURE_BUNDLE_SCHEMA_VER
 from twinklr.core.feature_engineering.datasets.writer import FeatureEngineeringWriter
 from twinklr.core.feature_engineering.models import (
     AlignedEffectEvent,
-    ColorNarrativeRow,
     EffectPhrase,
     FeatureBundle,
-    LayeringFeatureRow,
     MusicLibraryIndex,
     PhraseTaxonomyRecord,
     TargetRoleAssignment,
     TemplateCatalog,
-    TransitionGraph,
 )
-from twinklr.core.feature_engineering.models.propensity import PropensityIndex
 from twinklr.core.feature_store.models import ProfileRecord
 from twinklr.core.feature_store.protocols import FeatureStoreProviderSync
 
@@ -94,17 +90,6 @@ class FeatureEngineeringPipeline:
         if not isinstance(data, dict):
             raise ValueError(f"Expected JSON object at {path}")
         return data
-
-    @staticmethod
-    def _read_jsonl(path: Path) -> list[dict[str, Any]]:
-        rows: list[dict[str, Any]] = []
-        for line in path.read_text(encoding="utf-8").splitlines():
-            if line.strip():
-                val = json.loads(line)
-                if not isinstance(val, dict):
-                    raise ValueError(f"Expected JSON object line in {path}")
-                rows.append(val)
-        return rows
 
     def run_profile(self, profile_dir: Path, output_dir: Path) -> FeatureBundle:
         self._store.initialize()
@@ -167,7 +152,7 @@ class FeatureEngineeringPipeline:
             cached_taxonomy: list[PhraseTaxonomyRecord] = []
             cached_roles: list[TargetRoleAssignment] = []
             for prof in completed:
-                arts = self._load_profile_artifacts(
+                arts = _ca.load_profile_artifacts(
                     output_root / prof.package_id / prof.sequence_file_id
                 )
                 if arts is not None:
@@ -223,7 +208,7 @@ class FeatureEngineeringPipeline:
             idx = corpus_dir / "sequence_index.jsonl"
             if not idx.exists():
                 raise FileNotFoundError(f"Corpus index not found: {idx}")
-            rows = self._read_jsonl(idx)
+            rows = _ca._read_jsonl(idx)
             for row in rows:
                 pk, sq = str(row.get("package_id", "")), str(row.get("sequence_file_id", ""))
                 self._store.upsert_profile(
@@ -459,104 +444,6 @@ class FeatureEngineeringPipeline:
             store=self._store,
             progress_fn=progress_fn,
         )
-
-    def _write_color_arc(
-        self,
-        *,
-        output_root: Path,
-        phrases: tuple[EffectPhrase, ...],
-        color_rows: tuple[ColorNarrativeRow, ...],
-    ) -> Path | None:
-        return _ca.write_color_arc(
-            output_root=output_root,
-            phrases=phrases,
-            color_rows=color_rows,
-            options=self._options,
-            writer=self._writer,
-            components=self._components,
-        )
-
-    def _write_propensity(
-        self,
-        *,
-        output_root: Path,
-        phrases: tuple[EffectPhrase, ...],
-    ) -> tuple[Path | None, PropensityIndex | None]:
-        return _ca.write_propensity(
-            output_root=output_root,
-            phrases=phrases,
-            options=self._options,
-            writer=self._writer,
-            components=self._components,
-        )
-
-    def _write_style_fingerprint(
-        self,
-        *,
-        output_root: Path,
-        creator_id: str,
-        phrases: tuple[EffectPhrase, ...],
-        layering_rows: tuple[LayeringFeatureRow, ...],
-        color_rows: tuple[ColorNarrativeRow, ...],
-        transition_graph: TransitionGraph | None,
-    ) -> Path | None:
-        return _ca.write_style_fingerprint(
-            output_root=output_root,
-            creator_id=creator_id,
-            phrases=phrases,
-            layering_rows=layering_rows,
-            color_rows=color_rows,
-            transition_graph=transition_graph,
-            options=self._options,
-            writer=self._writer,
-            components=self._components,
-        )
-
-    def _load_profile_artifacts(
-        self, output_dir: Path
-    ) -> (
-        tuple[
-            tuple[EffectPhrase, ...],
-            tuple[PhraseTaxonomyRecord, ...],
-            tuple[TargetRoleAssignment, ...],
-        ]
-        | None
-    ):
-        """Load cached FE artifacts from a completed profile's output directory.
-
-        Args:
-            output_dir: Profile output directory containing artifact files.
-
-        Returns:
-            Tuple of (phrases, taxonomy_rows, target_roles) or None if all missing.
-        """
-
-        from pydantic import BaseModel as _BM
-
-        def _read_models(stem: str, model_cls: type[_BM]) -> tuple[Any, ...] | None:
-            for ext in (".parquet", ".jsonl"):
-                p = output_dir / f"{stem}{ext}"
-                if not p.exists():
-                    continue
-                if ext == ".parquet":
-                    try:
-                        import pyarrow.parquet as pq
-
-                        table = pq.read_table(p)
-                        return tuple(model_cls.model_validate(row) for row in table.to_pylist())
-                    except (ImportError, Exception):
-                        continue
-                else:
-                    rows = self._read_jsonl(p)
-                    return tuple(model_cls.model_validate(r) for r in rows)
-            return None
-
-        phrases = _read_models("effect_phrases", EffectPhrase)
-        taxonomy = _read_models("phrase_taxonomy", PhraseTaxonomyRecord)
-        roles = _read_models("target_roles", TargetRoleAssignment)
-        if phrases is None and taxonomy is None and roles is None:
-            return None
-        return (phrases or (), taxonomy or (), roles or ())
 
     def _load_existing_bundles(
         self, profiles: tuple[ProfileRecord, ...], output_root: Path

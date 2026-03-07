@@ -125,6 +125,36 @@ def parse_args() -> argparse.Namespace:
         default=0.01,
         help="Maximum ratio allowed for any one unknown effect type.",
     )
+    parser.add_argument(
+        "--quality-max-low-support-template-ratio",
+        type=float,
+        default=None,
+        help="Maximum low-support template ratio quality threshold (None = off).",
+    )
+    parser.add_argument(
+        "--quality-max-high-concentration-template-ratio",
+        type=float,
+        default=None,
+        help="Maximum high-concentration template ratio quality threshold (None = off).",
+    )
+    parser.add_argument(
+        "--quality-max-high-variance-template-ratio",
+        type=float,
+        default=None,
+        help="Maximum high-variance template ratio quality threshold (None = off).",
+    )
+    parser.add_argument(
+        "--quality-max-over-generic-template-ratio",
+        type=float,
+        default=None,
+        help="Maximum over-generic template ratio quality threshold (None = off).",
+    )
+    parser.add_argument(
+        "--quality-diagnostics-gate-mode",
+        choices=["enforce", "warn"],
+        default="warn",
+        help="Gate mode for diagnostics-based quality checks (default: warn).",
+    )
     parser.add_argument("--top-n", type=int, default=10, help="Top-N rows to show in summaries.")
     parser.add_argument(
         "--feature-store-db",
@@ -704,6 +734,11 @@ def main() -> int:
                 quality_max_unknown_effect_family_ratio=args.quality_max_unknown_effect_family_ratio,
                 quality_max_unknown_motion_ratio=args.quality_max_unknown_motion_ratio,
                 quality_max_single_unknown_effect_type_ratio=args.quality_max_single_unknown_effect_type_ratio,
+                quality_max_low_support_template_ratio=args.quality_max_low_support_template_ratio,
+                quality_max_high_concentration_template_ratio=args.quality_max_high_concentration_template_ratio,
+                quality_max_high_variance_template_ratio=args.quality_max_high_variance_template_ratio,
+                quality_max_over_generic_template_ratio=args.quality_max_over_generic_template_ratio,
+                quality_diagnostics_gate_mode=args.quality_diagnostics_gate_mode,
                 feature_store_config=feature_store_config,
             ),
             analyzer=analyzer,

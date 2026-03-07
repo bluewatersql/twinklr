@@ -21,3 +21,5 @@ from twinklr.core.sequencer.templates.assets.builtins import (  # noqa: F401  # 
     tiles_edge_plaid,
     tiles_sparkle_confetti,
 )
+
+__all__: list[str] = []

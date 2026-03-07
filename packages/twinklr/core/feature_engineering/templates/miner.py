@@ -35,6 +35,7 @@ class TemplateMinerOptions:
     miner_version: str = "template_miner_v1"
     min_instance_count: int = 2
     min_distinct_pack_count: int = 1
+    min_distinct_sequence_count: int = 2
     max_provenance_per_template: int = 100
     stack_signature_mode: Literal["strict", "relaxed"] = "relaxed"
 
@@ -222,6 +223,10 @@ class TemplateMiner:
 
             distinct_packs = {row.package_id for row in rows}
             if len(distinct_packs) < self._options.min_distinct_pack_count:
+                continue
+
+            distinct_sequences = {f"{row.package_id}:{row.sequence_file_id}" for row in rows}
+            if len(distinct_sequences) < self._options.min_distinct_sequence_count:
                 continue
 
             template_id = str(
@@ -414,6 +419,10 @@ class TemplateMiner:
             if len(distinct_packs) < self._options.min_distinct_pack_count:
                 continue
 
+            distinct_sequences = {f"{row.package_id}:{row.sequence_file_id}" for row in rows}
+            if len(distinct_sequences) < self._options.min_distinct_sequence_count:
+                continue
+
             template_id = str(
                 uuid.uuid5(
                     uuid.NAMESPACE_DNS,
@@ -531,6 +540,7 @@ class TemplateMiner:
             assignment_coverage=coverage,
             min_instance_count=self._options.min_instance_count,
             min_distinct_pack_count=self._options.min_distinct_pack_count,
+            min_distinct_sequence_count=self._options.min_distinct_sequence_count,
             templates=templates,
             assignments=assignments,
         )

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -15,6 +17,7 @@ class QualityCheckResult(BaseModel):
     value: float | int | str | None = None
     threshold: float | int | str | None = None
     message: str
+    mode: Literal["enforce", "warn"] = "enforce"
 
 
 class QualityReport(BaseModel):

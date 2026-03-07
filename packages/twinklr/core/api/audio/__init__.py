@@ -4,3 +4,5 @@ API clients for metadata providers:
 - AcoustID (audio fingerprinting)
 - MusicBrainz (music metadata database)
 """
+
+__all__: list[str] = []

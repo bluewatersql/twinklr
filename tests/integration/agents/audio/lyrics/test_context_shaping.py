@@ -122,7 +122,7 @@ def test_shaped_lyrics_context_includes_quality():
 
     assert "quality" in shaped
     assert isinstance(shaped["quality"], dict)
-    assert "coverage_pct" in shaped["quality"]
+    assert "timed_word_coverage_pct" in shaped["quality"]
     assert "source_confidence" in shaped["quality"]
 
 

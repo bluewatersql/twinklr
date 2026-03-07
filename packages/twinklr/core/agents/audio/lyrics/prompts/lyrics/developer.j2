@@ -55,7 +55,14 @@ You must respond with valid JSON matching this exact schema:
     - SPARSE: Long instrumental passages, minimal vocals
     - MED: Typical balance of vocals and music
     - DENSE: Rapid-fire lyrics, minimal gaps
-- **vocal_coverage_pct**: 0.0-1.0 (from quality metrics)
+- **vocal_coverage_pct**: 0.0-1.0
+  - Use `vocal_presence_pct` from quality metrics as primary source when available
+    (this is derived from spectral vocal detection — the most accurate measure of actual singing)
+  - Fall back to `timed_word_coverage_pct` when `vocal_presence_pct` is not available
+    (timed word coverage may undercount vocals if lyrics are untimed or partially aligned)
+  - The two metrics measure different things:
+    - `timed_word_coverage_pct`: fraction of song duration covered by word-level timing data
+    - `vocal_presence_pct`: fraction of song duration with detected vocals (from audio analysis)
 - **silent_sections**: List of instrumental breaks > 5 seconds
   - Each section: `start_ms`, `end_ms`, `duration_ms` (must match: duration_ms = end_ms - start_ms)
   - `section_id`: optional, should match provided structure

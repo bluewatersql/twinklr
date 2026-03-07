@@ -408,7 +408,7 @@ def full_song_bundle():
         phrases=[LyricPhrase(text="Test lyrics", start_ms=1000, end_ms=3000)],
         source=LyricsSource(kind="WHISPERX_TRANSCRIBE", provider="whisperx", confidence=0.95),
         quality=LyricsQuality(
-            coverage_pct=0.8,
+            timed_word_coverage_pct=0.8,
             monotonicity_violations=0,
             overlap_violations=0,
             out_of_bounds_violations=0,

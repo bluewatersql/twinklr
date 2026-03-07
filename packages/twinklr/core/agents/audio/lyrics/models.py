@@ -1,12 +1,12 @@
 """Pydantic models for Lyrics agent."""
 
 from datetime import UTC, datetime
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
-class Severity(str, Enum):
+class Severity(StrEnum):
     """Issue severity levels."""
 
     INFO = "INFO"
@@ -223,7 +223,21 @@ class LyricContextModel(BaseModel):
     )
 
     vocal_coverage_pct: float = Field(
-        ge=0.0, le=1.0, description="Percentage of song with vocals (0.0-1.0)"
+        ge=0.0, le=1.0, description="Percentage of song with detected vocals (0.0-1.0)"
+    )
+
+    timed_word_coverage_pct: float | None = Field(
+        default=None,
+        ge=0.0,
+        le=1.0,
+        description="Fraction of song duration covered by timed words (0.0-1.0)",
+    )
+
+    vocal_presence_pct: float | None = Field(
+        default=None,
+        ge=0.0,
+        le=1.0,
+        description="Fraction of song duration with detected vocals from spectral analysis (0.0-1.0)",
     )
 
     silent_sections: list[SilentSection] = Field(

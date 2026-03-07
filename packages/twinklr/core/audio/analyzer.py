@@ -268,11 +268,14 @@ class AudioAnalyzer:
         fingerprint = f"{audio_path}:{sr}:{hop_length}"
         recording_id = hashlib.sha256(fingerprint.encode()).hexdigest()[:16]
 
+        # Extract vocal segments for passing to lyrics pipeline
+        vocal_segments: list[dict] = features.get("vocals", [])
+
         # Extract metadata and lyrics in parallel (async)
         # Pass embedded_metadata to avoid re-extracting
         metadata_bundle, lyrics_bundle = await asyncio.gather(
             self._extract_metadata_if_enabled(audio_path, embedded_metadata),
-            self._extract_lyrics_if_enabled(audio_path, duration_ms, None),
+            self._extract_lyrics_if_enabled(audio_path, duration_ms, None, vocal_segments),
         )
 
         # If lyrics needs metadata, re-extract with metadata context
@@ -281,7 +284,7 @@ class AudioAnalyzer:
             and metadata_bundle.stage_status != StageStatus.SKIPPED
         ):
             lyrics_bundle = await self._extract_lyrics_if_enabled(
-                audio_path, duration_ms, metadata_bundle
+                audio_path, duration_ms, metadata_bundle, vocal_segments
             )
 
         # Extract phonemes from timed words (depends on lyrics)
@@ -348,6 +351,7 @@ class AudioAnalyzer:
         audio_path: str,
         duration_ms: int,
         metadata_bundle: MetadataBundle | None,
+        vocal_segments: list[dict] | None = None,
     ) -> LyricsBundle:
         """Extract lyrics if feature is enabled (async).
 
@@ -357,6 +361,7 @@ class AudioAnalyzer:
             audio_path: Path to audio file
             duration_ms: Song duration in milliseconds
             metadata_bundle: Resolved metadata (for artist/title)
+            vocal_segments: Optional vocal detector segments for vocal_presence_pct
 
         Returns:
             LyricsBundle (with SKIPPED status if disabled)
@@ -399,6 +404,7 @@ class AudioAnalyzer:
                 duration_ms=duration_ms,
                 artist=artist,
                 title=title,
+                vocal_segments=vocal_segments or [],
             )
             return bundle
 
@@ -672,6 +678,7 @@ class AudioAnalyzer:
             "spectral": spectral_features,
             "dynamics": dynamic_features,
             "vocals": vocal_regions,
+            "vocals_statistics": vocal_result["statistics"],
             "harmonic": {
                 "chroma": chroma.tolist() if isinstance(chroma, np.ndarray) else chroma,
                 "key": key_result,

@@ -326,13 +326,13 @@ class OpenAIClient:
             # Build text parameter with format and verbosity
             text_param: ResponseTextConfigParam = {
                 "format": {"type": "json_object"},
-                "verbosity": verbosity.value,  # type: ignore[typeddict-item]
+                "verbosity": verbosity.value,
             }
 
             # Build request parameters
             request_params: dict[str, Any] = {
                 "model": model,
-                "input": openai_messages,  # type: ignore[arg-type]
+                "input": openai_messages,
                 "text": text_param,
             }
 
@@ -504,7 +504,7 @@ class OpenAIClient:
         """
         message: ResponseInputItemParam = {  # type: ignore[assignment,misc]
             "type": "message",
-            "role": role,  # type: ignore[typeddict-item]
+            "role": role,
             "content": content,
         }
         self._conversation_history.append(message)
@@ -576,7 +576,7 @@ class OpenAIClient:
             # Build request parameters
             request_params: dict[str, Any] = {
                 "model": model,
-                "input": messages,  # type: ignore[arg-type]
+                "input": messages,
                 "reasoning": reasoning_param,
                 "text": text_param,
             }
@@ -633,7 +633,7 @@ class OpenAIClient:
             return response_data, metadata
 
         result, metadata = self._retry_with_backoff(_make_request, "Conversational JSON generation")
-        return result, metadata  # type: ignore[no-any-return]
+        return result, metadata
 
     def generate_text(
         self,
@@ -681,7 +681,7 @@ class OpenAIClient:
 
             response = self.client.responses.create(
                 model=model,
-                input=openai_messages,  # type: ignore[arg-type]
+                input=openai_messages,
                 reasoning=reasoning_param,
                 text=text_param,
             )
@@ -712,7 +712,7 @@ class OpenAIClient:
         result, metadata = self._retry_with_backoff(_make_request, "Text generation")
 
         if return_metadata:
-            return result, metadata  # type: ignore[no-any-return]
+            return result, metadata
         return result  # type: ignore[no-any-return]
 
 
