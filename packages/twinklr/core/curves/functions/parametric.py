@@ -1,6 +1,7 @@
 """Parametric curve generators."""
 
 import math
+from typing import Any
 
 import bezier
 import numpy as np
@@ -54,6 +55,7 @@ def generate_lissajous(
     delta: float = math.pi / 2,
     amplitude: float = DEFAULT_CURVE_INTENSITY_PARAMS["amplitude"],
     frequency: float = DEFAULT_CURVE_INTENSITY_PARAMS["frequency"],
+    **kwargs: Any,
 ) -> list[CurvePoint]:
     """Generate a Lissajous curve with intensity support using the y-component.
 
@@ -67,6 +69,7 @@ def generate_lissajous(
         delta: Phase offset in radians (default: π/2).
         amplitude: Amplitude scaling factor [0, 1] (default: 1.0 = full amplitude).
         frequency: Frequency multiplier applied to time (default: 1.0 = no change).
+        **kwargs: Ignored parameters (for compatibility with movement handler).
 
     Returns:
         List of CurvePoints forming a Lissajous curve in normalized [0, 1] space.

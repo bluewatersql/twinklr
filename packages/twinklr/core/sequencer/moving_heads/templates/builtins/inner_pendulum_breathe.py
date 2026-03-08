@@ -4,6 +4,7 @@ from twinklr.core.config.poses import TiltPose
 from twinklr.core.sequencer.models.enum import (
     Intensity,
     QuantizeMode,
+    SemanticGroupType,
     TemplateCategory,
     TimingMode,
 )
@@ -36,7 +37,7 @@ def make_template() -> TemplateDoc:
     return TemplateDoc(
         template=Template(
             template_id="inner_pendulum_breathe",
-            version=1,
+            version=2,
             name="Inner Pendulum Breathe",
             category=TemplateCategory.LOW_ENERGY,
             roles=TemplateRoleHelper.IN_OUT_LEFT_RIGHT,
@@ -51,6 +52,7 @@ def make_template() -> TemplateDoc:
             steps=[
                 TemplateStep(
                     step_id="main",
+                    target=SemanticGroupType.INNER,
                     timing=StepTiming(
                         base_timing=BaseTiming(
                             mode=TimingMode.MUSICAL,
@@ -79,7 +81,7 @@ def make_template() -> TemplateDoc:
                 )
             ],
             metadata=TemplateMetadata(
-                description="INNER group only targeting for subtle movement.",
+                description="Inner fixtures only: subtle pendulum sway with breathing dimmer.",
                 recommended_sections=["verse"],
                 energy_range=(15, 40),
                 tags=["group_target", "inner", "pendulum"],

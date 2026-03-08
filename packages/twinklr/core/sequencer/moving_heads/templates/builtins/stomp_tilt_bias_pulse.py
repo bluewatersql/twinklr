@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from twinklr.core.config.poses import TiltPose
 from twinklr.core.sequencer.models.enum import (
+    ChaseOrder,
     Intensity,
     QuantizeMode,
     TemplateCategory,
@@ -9,9 +9,7 @@ from twinklr.core.sequencer.models.enum import (
 )
 from twinklr.core.sequencer.models.template import (
     BaseTiming,
-    ChaseOrder,
     Dimmer,
-    Distribution,
     Geometry,
     Movement,
     PhaseOffset,
@@ -29,19 +27,17 @@ from twinklr.core.sequencer.moving_heads.libraries.dimmer import DimmerType
 from twinklr.core.sequencer.moving_heads.libraries.geometry import GeometryType
 from twinklr.core.sequencer.moving_heads.libraries.movement import MovementType
 from twinklr.core.sequencer.moving_heads.templates.library import register_template
-from twinklr.core.sequencer.moving_heads.templates.utils import (
-    TemplateRoleHelper,
-)
+from twinklr.core.sequencer.moving_heads.templates.utils import TemplateRoleHelper
 
 
-@register_template(aliases=["Lean Right Scan", "lean right scan"])
+@register_template(aliases=["Stomp Tilt Bias Pulse", "stomp tilt bias pulse"])
 def make_template() -> TemplateDoc:
     return TemplateDoc(
         template=Template(
-            template_id="lean_right_scan",
+            template_id="stomp_tilt_bias_pulse",
             version=1,
-            name="Lean Right Scan",
-            category=TemplateCategory.LOW_ENERGY,
+            name="Stomp Tilt Bias Pulse",
+            category=TemplateCategory.HIGH_ENERGY,
             roles=TemplateRoleHelper.IN_OUT_LEFT_RIGHT,
             repeat=RepeatContract(
                 repeatable=True,
@@ -57,41 +53,38 @@ def make_template() -> TemplateDoc:
                     timing=StepTiming(
                         base_timing=BaseTiming(
                             mode=TimingMode.MUSICAL,
-                            start_offset_bars=0.0,
-                            duration_bars=4.0,
                             quantize_type=QuantizeMode.DOWNBEAT,
+                            duration_bars=4.0,
+                            start_offset_bars=0.0,
                         ),
                         phase_offset=PhaseOffset(
                             mode=PhaseOffsetMode.GROUP_ORDER,
-                            order=ChaseOrder.LEFT_TO_RIGHT,
-                            spread_bars=1.0,
-                            distribution=Distribution.LINEAR,
-                            wrap=True,
+                            order=ChaseOrder.ODD_EVEN,
+                            spread_bars=0.25,
                         ),
                     ),
                     geometry=Geometry(
-                        geometry_type=GeometryType.AUDIENCE_SCAN_ASYM,
-                        tilt_pose=TiltPose.HORIZON,
+                        geometry_type=GeometryType.TILT_BIAS_BY_GROUP,
                     ),
                     movement=Movement(
-                        movement_type=MovementType.HOLD,
-                        intensity=Intensity.SMOOTH,
-                        cycles=1.0,
+                        movement_type=MovementType.STOMP,
+                        intensity=Intensity.INTENSE,
+                        cycles=4.0,
                     ),
                     dimmer=Dimmer(
-                        dimmer_type=DimmerType.HOLD,
-                        intensity=Intensity.SMOOTH,
-                        min_norm=0.80,
+                        dimmer_type=DimmerType.PULSE,
+                        intensity=Intensity.INTENSE,
+                        min_norm=0.10,
                         max_norm=1.00,
-                        cycles=1.0,
+                        cycles=4.0,
                     ),
                 )
             ],
             metadata=TemplateMetadata(
-                description="Asymmetric right-leaning audience scan.",
-                recommended_sections=["verse", "groove"],
-                energy_range=(10, 40),
-                tags=["audience_scan", "asymmetric"],
+                description="Heavy vertical stomp hits with inner/outer tilt differentiation.",
+                recommended_sections=["drop", "peak"],
+                energy_range=(75, 95),
+                tags=["stomp", "tilt_bias", "hit"],
             ),
-        ),
+        )
     )

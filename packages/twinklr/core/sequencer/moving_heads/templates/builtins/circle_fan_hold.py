@@ -15,10 +15,12 @@ from twinklr.core.sequencer.models.template import (
     RemainderPolicy,
     RepeatContract,
     RepeatMode,
+    StepPatch,
     StepTiming,
     Template,
     TemplateDoc,
     TemplateMetadata,
+    TemplatePreset,
     TemplateStep,
 )
 from twinklr.core.sequencer.moving_heads.libraries.dimmer import DimmerType
@@ -85,4 +87,26 @@ def make_template() -> TemplateDoc:
                 tags=["circle", "fan", "hold"],
             ),
         ),
+        presets=[
+            TemplatePreset(
+                preset_id="gentle",
+                name="Gentle",
+                step_patches={
+                    "main": StepPatch(
+                        movement={"intensity": "SMOOTH", "cycles": 0.5},
+                        dimmer={"dimmer_type": "pulse", "cycles": 1.0},
+                    ),
+                },
+            ),
+            TemplatePreset(
+                preset_id="intense",
+                name="Intense",
+                step_patches={
+                    "main": StepPatch(
+                        movement={"intensity": "INTENSE", "cycles": 2.0},
+                        dimmer={"dimmer_type": "pulse", "cycles": 4.0},
+                    ),
+                },
+            ),
+        ],
     )

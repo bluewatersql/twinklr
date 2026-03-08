@@ -37,8 +37,7 @@ def load_templates():
 def test_all_templates_load():
     templates = list_templates()
 
-    # We migrated 25 templates from POC
-    assert len(templates) >= 18, f"Expected at least 19 templates, got {len(templates)}"
+    assert len(templates) >= 35, f"Expected at least 35 templates, got {len(templates)}"
 
     # Each template info should have required fields
     for info in templates:
@@ -254,3 +253,80 @@ def test_all_migrated_templates_present():
         assert expected_id in template_ids, (
             f"Migrated template '{expected_id}' not found in registry"
         )
+
+
+# ============================================================================
+# Energy Category Balance Tests
+# ============================================================================
+
+
+def test_energy_category_balance():
+    """Verify each energy category has sufficient template coverage."""
+    templates = list_templates()
+    category_counts: dict[TemplateCategory, int] = {}
+
+    for info in templates:
+        doc = get_template(info.template_id)
+        cat = doc.template.category
+        category_counts[cat] = category_counts.get(cat, 0) + 1
+
+    for cat in TemplateCategory:
+        count = category_counts.get(cat, 0)
+        assert count >= 3, (
+            f"Category {cat.value} has only {count} templates, need at least 3"
+        )
+
+
+# ============================================================================
+# Feature Coverage Tests
+# ============================================================================
+
+
+def test_group_targeting_exists():
+    """Verify at least one template uses non-ALL SemanticGroupType targeting."""
+    templates = list_templates()
+    found_non_all = False
+
+    for info in templates:
+        doc = get_template(info.template_id)
+        for step in doc.template.steps:
+            if step.target != SemanticGroupType.ALL:
+                found_non_all = True
+                break
+        if found_non_all:
+            break
+
+    assert found_non_all, "No template uses non-ALL group targeting"
+
+
+def test_templates_with_presets():
+    """Verify preset system is exercised across multiple templates."""
+    templates = list_templates()
+    preset_count = 0
+
+    for info in templates:
+        doc = get_template(info.template_id)
+        if doc.presets and len(doc.presets) > 0:
+            preset_count += 1
+            for preset in doc.presets:
+                assert preset.preset_id, f"Preset in {info.template_id} missing preset_id"
+                assert preset.name, f"Preset in {info.template_id} missing name"
+
+    assert preset_count >= 4, (
+        f"Only {preset_count} templates have presets, expected at least 4"
+    )
+
+
+def test_multi_step_templates_exist():
+    """Verify at least one enabled template has multiple steps."""
+    templates = list_templates()
+    multi_step_count = 0
+
+    for info in templates:
+        doc = get_template(info.template_id)
+        if len(doc.template.steps) > 1:
+            multi_step_count += 1
+
+    assert multi_step_count >= 3, (
+        f"Only {multi_step_count} multi-step templates found, expected at least 3"
+    )

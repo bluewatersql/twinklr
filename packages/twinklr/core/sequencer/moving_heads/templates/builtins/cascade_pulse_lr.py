@@ -19,10 +19,12 @@ from twinklr.core.sequencer.models.template import (
     RemainderPolicy,
     RepeatContract,
     RepeatMode,
+    StepPatch,
     StepTiming,
     Template,
     TemplateDoc,
     TemplateMetadata,
+    TemplatePreset,
     TemplateStep,
     Transition,
 )
@@ -95,5 +97,25 @@ def make_template() -> TemplateDoc:
                 energy_range=(45, 80),
                 tags=["phase_offset", "cascade", "pulse"],
             ),
-        )
+        ),
+        presets=[
+            TemplatePreset(
+                preset_id="gentle",
+                name="Gentle",
+                step_patches={
+                    "main": StepPatch(
+                        dimmer={"cycles": 2.0, "intensity": "SMOOTH", "min_norm": 0.30},
+                    ),
+                },
+            ),
+            TemplatePreset(
+                preset_id="intense",
+                name="Intense",
+                step_patches={
+                    "main": StepPatch(
+                        dimmer={"cycles": 8.0, "intensity": "INTENSE", "min_norm": 0.05},
+                    ),
+                },
+            ),
+        ],
     )

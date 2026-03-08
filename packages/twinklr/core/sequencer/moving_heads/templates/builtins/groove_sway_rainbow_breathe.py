@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from twinklr.core.config.poses import PanPose, TiltPose
 from twinklr.core.sequencer.models.enum import (
     Intensity,
     QuantizeMode,
@@ -19,32 +18,27 @@ from twinklr.core.sequencer.models.template import (
     RemainderPolicy,
     RepeatContract,
     RepeatMode,
-    StepPatch,
     StepTiming,
     Template,
     TemplateDoc,
     TemplateMetadata,
-    TemplatePreset,
     TemplateStep,
 )
 from twinklr.core.sequencer.moving_heads.libraries.dimmer import DimmerType
 from twinklr.core.sequencer.moving_heads.libraries.geometry import GeometryType
 from twinklr.core.sequencer.moving_heads.libraries.movement import MovementType
 from twinklr.core.sequencer.moving_heads.templates.library import register_template
-from twinklr.core.sequencer.moving_heads.templates.utils import (
-    PoseByRoleHelper,
-    TemplateRoleHelper,
-)
+from twinklr.core.sequencer.moving_heads.templates.utils import TemplateRoleHelper
 
 
-@register_template(aliases=["Sweep LR Chevron Breathe", "sweep lr chevron breathe"])
+@register_template(aliases=["Groove Sway Rainbow Breathe", "groove sway rainbow breathe"])
 def make_template() -> TemplateDoc:
     return TemplateDoc(
         template=Template(
-            template_id="sweep_lr_chevron_breathe",
+            template_id="groove_sway_rainbow_breathe",
             version=1,
-            name="Sweep LR Chevron Breathe",
-            category=TemplateCategory.MEDIUM_ENERGY,
+            name="Groove Sway Rainbow Breathe",
+            category=TemplateCategory.LOW_ENERGY,
             roles=TemplateRoleHelper.IN_OUT_LEFT_RIGHT,
             repeat=RepeatContract(
                 repeatable=True,
@@ -72,58 +66,26 @@ def make_template() -> TemplateDoc:
                             wrap=True,
                         ),
                     ),
-                    geometry=Geometry(
-                        geometry_type=GeometryType.CHEVRON_V,
-                        params={
-                            "pan_start_dmx": PanPose.WIDE_LEFT.value,
-                            "pan_end_dmx": PanPose.WIDE_RIGHT.value,
-                            "tilt_base_dmx": TiltPose.CEILING.value,
-                            "tilt_inner_bias_dmx": 18,
-                            "tilt_outer_bias_dmx": 0,
-                        },
-                        pan_pose_by_role=PoseByRoleHelper.FAN_POSE_WIDE,
-                    ),
+                    geometry=Geometry(geometry_type=GeometryType.RAINBOW_ARC),
                     movement=Movement(
-                        movement_type=MovementType.SWEEP_LR,
-                        intensity=Intensity.SMOOTH,
+                        movement_type=MovementType.GROOVE_SWAY,
+                        intensity=Intensity.SLOW,
                         cycles=1.0,
                     ),
                     dimmer=Dimmer(
                         dimmer_type=DimmerType.PULSE,
                         intensity=Intensity.SMOOTH,
-                        min_norm=0.25,
-                        max_norm=1.00,
+                        min_norm=0.30,
+                        max_norm=0.90,
                         cycles=1.0,
                     ),
                 )
             ],
             metadata=TemplateMetadata(
-                description="Chevron sweep with breathing dimmer effect.",
-                recommended_sections=["verse", "chorus"],
-                energy_range=(40, 70),
-                tags=["sweep_lr", "chevron", "breathe"],
+                description="Gentle groove sway in rainbow arc formation with breathing dimmer.",
+                recommended_sections=["verse", "intro"],
+                energy_range=(15, 40),
+                tags=["groove_sway", "rainbow", "breathe", "gentle"],
             ),
         ),
-        presets=[
-            TemplatePreset(
-                preset_id="gentle",
-                name="Gentle",
-                step_patches={
-                    "main": StepPatch(
-                        movement={"intensity": "SLOW", "cycles": 0.5},
-                        dimmer={"min_norm": 0.50, "max_norm": 0.90},
-                    ),
-                },
-            ),
-            TemplatePreset(
-                preset_id="intense",
-                name="Intense",
-                step_patches={
-                    "main": StepPatch(
-                        movement={"intensity": "DRAMATIC", "cycles": 2.0},
-                        dimmer={"min_norm": 0.05, "max_norm": 1.00, "cycles": 4.0},
-                    ),
-                },
-            ),
-        ],
     )

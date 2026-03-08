@@ -1,18 +1,21 @@
 from __future__ import annotations
 
-from twinklr.core.config.poses import TiltPose
+from twinklr.core.config.poses import PanPose, TiltPose
 from twinklr.core.sequencer.models.enum import (
+    ChaseOrder,
     Intensity,
     QuantizeMode,
-    SemanticGroupType,
     TemplateCategory,
     TimingMode,
+    TransitionMode,
 )
 from twinklr.core.sequencer.models.template import (
     BaseTiming,
     Dimmer,
     Geometry,
     Movement,
+    PhaseOffset,
+    PhaseOffsetMode,
     RemainderPolicy,
     RepeatContract,
     RepeatMode,
@@ -21,6 +24,7 @@ from twinklr.core.sequencer.models.template import (
     TemplateDoc,
     TemplateMetadata,
     TemplateStep,
+    Transition,
 )
 from twinklr.core.sequencer.moving_heads.libraries.dimmer import DimmerType
 from twinklr.core.sequencer.moving_heads.libraries.geometry import GeometryType
@@ -35,10 +39,9 @@ from twinklr.core.sequencer.moving_heads.templates.utils import (
 @register_template(aliases=["Crossfade Between Steps", "crossfade between steps"])
 def make_template() -> TemplateDoc:
     return TemplateDoc(
-        enabled=False,
         template=Template(
             template_id="crossfade_between_steps",
-            version=1,
+            version=2,
             name="Crossfade Between Steps",
             category=TemplateCategory.MEDIUM_ENERGY,
             roles=TemplateRoleHelper.IN_OUT_LEFT_RIGHT,
@@ -59,15 +62,20 @@ def make_template() -> TemplateDoc:
                             start_offset_bars=0.0,
                             duration_bars=2.0,
                             quantize_type=QuantizeMode.DOWNBEAT,
-                        )
+                        ),
+                        phase_offset=PhaseOffset(
+                            mode=PhaseOffsetMode.GROUP_ORDER,
+                            order=ChaseOrder.LEFT_TO_RIGHT,
+                            spread_bars=0.5,
+                        ),
                     ),
                     geometry=Geometry(
-                        geometry_type=GeometryType.ROLE_POSE,
+                        geometry_type=GeometryType.FAN,
                         pan_pose_by_role=PoseByRoleHelper.FAN_POSE_WIDE,
                         tilt_pose=TiltPose.HORIZON,
                     ),
                     movement=Movement(
-                        movement_type=MovementType.HOLD,
+                        movement_type=MovementType.SWEEP_LR,
                         intensity=Intensity.SMOOTH,
                         cycles=1.0,
                     ),
@@ -78,42 +86,59 @@ def make_template() -> TemplateDoc:
                         max_norm=1.00,
                         cycles=2.0,
                     ),
+                    exit_transition=Transition(
+                        mode=TransitionMode.CROSSFADE,
+                        duration_bars=0.25,
+                    ),
                 ),
                 TemplateStep(
                     step_id="b",
-                    target=SemanticGroupType.ALL,
                     timing=StepTiming(
                         base_timing=BaseTiming(
                             mode=TimingMode.MUSICAL,
                             start_offset_bars=2.0,
                             duration_bars=2.0,
                             quantize_type=QuantizeMode.DOWNBEAT,
-                        )
+                        ),
+                        phase_offset=PhaseOffset(
+                            mode=PhaseOffsetMode.GROUP_ORDER,
+                            order=ChaseOrder.RIGHT_TO_LEFT,
+                            spread_bars=0.5,
+                        ),
                     ),
                     geometry=Geometry(
-                        geometry_type=GeometryType.ROLE_POSE,
-                        pan_pose_by_role=PoseByRoleHelper.FAN_POSE_WIDE,
-                        tilt_pose=TiltPose.HORIZON,
+                        geometry_type=GeometryType.CHEVRON_V,
+                        params={
+                            "pan_start_dmx": PanPose.WIDE_LEFT.value,
+                            "pan_end_dmx": PanPose.WIDE_RIGHT.value,
+                            "tilt_base_dmx": TiltPose.CEILING.value,
+                            "tilt_inner_bias_dmx": 18,
+                            "tilt_outer_bias_dmx": 0,
+                        },
                     ),
                     movement=Movement(
-                        movement_type=MovementType.HOLD,
+                        movement_type=MovementType.PENDULUM,
                         intensity=Intensity.SMOOTH,
                         cycles=1.0,
                     ),
                     dimmer=Dimmer(
                         dimmer_type=DimmerType.HOLD,
                         intensity=Intensity.SMOOTH,
-                        min_norm=0.10,
+                        min_norm=0.70,
                         max_norm=1.00,
                         cycles=1.0,
+                    ),
+                    entry_transition=Transition(
+                        mode=TransitionMode.CROSSFADE,
+                        duration_bars=0.25,
                     ),
                 ),
             ],
             metadata=TemplateMetadata(
-                description="Two-step sequence with overlapping dimmer crossfades.",
+                description="Two-step crossfade: fan sweep morphs into chevron pendulum.",
                 recommended_sections=["build", "chorus"],
                 energy_range=(40, 75),
-                tags=["transition", "crossfade"],
+                tags=["transition", "crossfade", "multi_step"],
             ),
         ),
     )

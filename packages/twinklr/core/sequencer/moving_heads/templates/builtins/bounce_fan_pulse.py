@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from twinklr.core.config.poses import TiltPose
 from twinklr.core.sequencer.models.enum import (
+    ChaseOrder,
     Intensity,
     QuantizeMode,
     TemplateCategory,
@@ -12,6 +13,9 @@ from twinklr.core.sequencer.models.template import (
     Dimmer,
     Geometry,
     Movement,
+    PhaseOffset,
+    PhaseOffsetMode,
+    RemainderPolicy,
     RepeatContract,
     RepeatMode,
     StepTiming,
@@ -35,16 +39,18 @@ def make_template() -> TemplateDoc:
     return TemplateDoc(
         template=Template(
             template_id="bounce_fan_pulse",
-            version=1,
+            version=2,
             name="Bounce Fan Pulse",
-            category=TemplateCategory.MEDIUM_ENERGY,
+            category=TemplateCategory.HIGH_ENERGY,
             roles=TemplateRoleHelper.IN_OUT_LEFT_RIGHT,
             repeat=RepeatContract(
                 repeatable=True,
                 mode=RepeatMode.PING_PONG,
                 cycle_bars=4.0,
                 loop_step_ids=["main"],
+                remainder_policy=RemainderPolicy.HOLD_LAST_POSE,
             ),
+            defaults={"dimmer_floor_dmx": 60, "dimmer_ceiling_dmx": 255},
             steps=[
                 TemplateStep(
                     step_id="main",
@@ -54,7 +60,12 @@ def make_template() -> TemplateDoc:
                             quantize_type=QuantizeMode.DOWNBEAT,
                             duration_bars=4.0,
                             start_offset_bars=0.0,
-                        )
+                        ),
+                        phase_offset=PhaseOffset(
+                            mode=PhaseOffsetMode.GROUP_ORDER,
+                            order=ChaseOrder.ODD_EVEN,
+                            spread_bars=0.5,
+                        ),
                     ),
                     geometry=Geometry(
                         pan_pose_by_role=PoseByRoleHelper.FAN_POSE_WIDE,
@@ -76,10 +87,10 @@ def make_template() -> TemplateDoc:
                 )
             ],
             metadata=TemplateMetadata(
-                description="Fan bounce with pulsing dimmer hits.",
+                description="Fan bounce with staggered odd/even pulsing dimmer hits.",
                 recommended_sections=["chorus", "drop"],
                 energy_range=(55, 85),
-                tags=["bounce", "fan", "pulse"],
+                tags=["bounce", "fan", "pulse", "phase_offset"],
             ),
         )
     )

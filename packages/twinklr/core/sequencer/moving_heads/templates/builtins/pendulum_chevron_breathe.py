@@ -19,10 +19,12 @@ from twinklr.core.sequencer.models.template import (
     RemainderPolicy,
     RepeatContract,
     RepeatMode,
+    StepPatch,
     StepTiming,
     Template,
     TemplateDoc,
     TemplateMetadata,
+    TemplatePreset,
     TemplateStep,
 )
 from twinklr.core.sequencer.moving_heads.libraries.dimmer import DimmerType
@@ -100,4 +102,26 @@ def make_template() -> TemplateDoc:
                 tags=["pendulum", "chevron", "breathe"],
             ),
         ),
+        presets=[
+            TemplatePreset(
+                preset_id="gentle",
+                name="Gentle",
+                step_patches={
+                    "main": StepPatch(
+                        movement={"intensity": "SLOW", "cycles": 0.5},
+                        dimmer={"min_norm": 0.50, "max_norm": 0.90},
+                    ),
+                },
+            ),
+            TemplatePreset(
+                preset_id="intense",
+                name="Intense",
+                step_patches={
+                    "main": StepPatch(
+                        movement={"intensity": "DRAMATIC", "cycles": 2.0},
+                        dimmer={"min_norm": 0.10, "max_norm": 1.00, "cycles": 2.0},
+                    ),
+                },
+            ),
+        ],
     )
