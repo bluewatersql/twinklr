@@ -866,8 +866,9 @@ _KEYWORD_RULES: list[tuple[list[str], str]] = [
     (["glow", "vignette"], "Color Wash"),
     (["starfield"], "Twinkle"),
     (["ambient"], "Color Wash"),
-    # Accent hits → On (quick flash)
-    (["hit", "bell", "cut_to"], "On"),
+    # Accent hits → Strobe (quick flash)
+    (["hit", "cut_to"], "Strobe"),
+    (["bell"], "Twinkle"),
 ]
 
 
@@ -881,7 +882,7 @@ def resolve_effect_type(template_id: str) -> EffectMapping:
     3. Fall back to On effect.
 
     Args:
-        template_id: Group template ID (e.g., 'gtpl_base_wash_soft').
+        template_id: Group template ID (e.g., 'gtpl_base_wash_split').
 
     Returns:
         EffectMapping with the resolved xLights effect type and defaults.
@@ -937,14 +938,6 @@ _EXPLICIT_MAP: dict[str, EffectMapping] = {
     # -----------------------------------------------------------------
     # BASE — gentle ambient fills
     # -----------------------------------------------------------------
-    "gtpl_base_motif_abstract_ambient": EffectMapping(
-        effect_type="Color Wash",
-        defaults=_COLOR_WASH_PRESETS["ambient"],
-    ),
-    "gtpl_base_motif_bokeh_ambient": EffectMapping(
-        effect_type="Color Wash",
-        defaults={**_COLOR_WASH_PRESETS["ambient"], "vertical_fade": True},
-    ),
     "gtpl_base_motif_candy_stripes_ambient": EffectMapping(
         effect_type="Spirals",
         defaults=_SPIRALS_PRESETS["ambient"],
@@ -956,10 +949,6 @@ _EXPLICIT_MAP: dict[str, EffectMapping] = {
     "gtpl_base_motif_radial_rays_ambient": EffectMapping(
         effect_type="Fan",
         defaults=_FAN_PRESETS["ambient"],
-    ),
-    "gtpl_base_motif_wave_bands_ambient": EffectMapping(
-        effect_type="Color Wash",
-        defaults={**_COLOR_WASH_PRESETS["ambient"], "vertical_fade": True, "speed": 25},
     ),
     "gtpl_base_motif_light_trails_ambient": EffectMapping(
         effect_type="Meteors",
@@ -984,21 +973,9 @@ _EXPLICIT_MAP: dict[str, EffectMapping] = {
         effect_type="Twinkle",
         defaults=_TWINKLE_PRESETS["drive"],
     ),
-    "gtpl_rhythm_motif_abstract_drive": EffectMapping(
-        effect_type="Color Wash",
-        defaults=_COLOR_WASH_PRESETS["drive"],
-    ),
-    "gtpl_rhythm_motif_wave_bands_drive": EffectMapping(
-        effect_type="Color Wash",
-        defaults={**_COLOR_WASH_PRESETS["drive"], "vertical_fade": True},
-    ),
     "gtpl_rhythm_motif_light_trails_drive": EffectMapping(
         effect_type="Meteors",
         defaults=_METEORS_PRESETS["drive"],
-    ),
-    "gtpl_rhythm_motif_bokeh_drive": EffectMapping(
-        effect_type="Color Wash",
-        defaults={**_COLOR_WASH_PRESETS["drive"], "vertical_fade": True},
     ),
     "gtpl_rhythm_candy_stripe_scroll": EffectMapping(
         effect_type="Marquee",
@@ -1029,12 +1006,12 @@ _EXPLICIT_MAP: dict[str, EffectMapping] = {
     # ACCENT — punchy hits and bursts
     # -----------------------------------------------------------------
     "gtpl_accent_bell_single": EffectMapping(
-        effect_type="On",
-        defaults=_ON_PRESETS["hit_small"],
+        effect_type="Twinkle",
+        defaults={**_TWINKLE_PRESETS["hit_small"], "count": 8, "steps": 60, "strobe": False},
     ),
     "gtpl_accent_bell_double": EffectMapping(
-        effect_type="On",
-        defaults=_ON_PRESETS["hit_big"],
+        effect_type="Twinkle",
+        defaults={**_TWINKLE_PRESETS["hit_big"], "count": 10, "steps": 50, "strobe": False},
     ),
     "gtpl_accent_burst_small": EffectMapping(
         effect_type="Shockwave",

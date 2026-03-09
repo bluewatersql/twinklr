@@ -37,6 +37,25 @@ V2 Migration: Uses iteration number from IterationContext
 - **Motion Density**: {{ audio_profile.creative_guidance.recommended_motion_density }}
 - **Visual Contrast**: {{ audio_profile.creative_guidance.recommended_contrast }}
 {% endif %}
+
+{% if audio_profile.planner_hints is defined and audio_profile.planner_hints %}
+{% if audio_profile.planner_hints.avoid_patterns is defined and audio_profile.planner_hints.avoid_patterns %}
+**Avoid Patterns**:
+{% for pattern in audio_profile.planner_hints.avoid_patterns %}
+- {{ pattern[:200] }}
+{% endfor %}
+{% endif %}
+{% endif %}
+{% endif %}
+
+{% if macro_plan is defined and macro_plan %}
+### Macro Strategy Targets
+
+| Section | Energy | Motion | Style | Palette | Motifs |
+|---------|--------|--------|-------|---------|--------|
+{% for mp in macro_plan %}
+| {{ mp.section_id }} | {{ mp.energy_target }} | {{ mp.motion_density }} | {{ mp.choreography_style }} | {{ mp.palette_id | default('-') }} | {{ mp.motif_ids | join(', ') if mp.motif_ids else '-' }} |
+{% endfor %}
 {% endif %}
 
 ## Available Templates
@@ -88,11 +107,12 @@ First verify the plan is technically sound:
 ### Phase 2: Creative Quality (if technically valid)
 
 Score the plan 0-10 across these dimensions:
-1. **Musical Synchronization** (30%): Does choreography match song energy?
-2. **Visual Interest** (25%): Appropriate variety? Avoids monotony?
-3. **Flow and Transitions** (20%): Smooth transitions between sections?
-4. **Creative Template Use** (15%): Templates used effectively?
-5. **Energy Arc** (10%): Energy builds appropriately?
+1. **Musical Synchronization** (25%): Does choreography match song energy and dynamics?
+2. **Visual Interest** (20%): Appropriate variety? Avoids monotony?
+3. **Flow and Transitions** (15%): Smooth transitions between sections?
+4. **Creative Template Use** (15%): Templates used effectively and appropriately?
+5. **Energy Arc** (10%): Energy builds appropriately across the song?
+6. **Macro Strategy Alignment** (15%): Do template selections honor macro plan energy targets, motion density, choreography style, and palette/motif guidance?
 
 ### Decision
 

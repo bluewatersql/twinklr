@@ -9,7 +9,10 @@ Demonstrates the Moving Head choreography flow:
 5. Rendering to XSQ
 
 Uses the native pipeline definition factory for declarative execution.
+Aligned with demo_sequencer_pipeline.py patterns (FE loading, metadata persistence).
 """
+
+from __future__ import annotations
 
 import argparse
 import asyncio
@@ -17,6 +20,7 @@ import hashlib
 import json
 from pathlib import Path
 import sys
+from typing import TYPE_CHECKING
 
 # Add parent to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -34,6 +38,9 @@ from twinklr.core.sequencer.moving_heads.templates.library import list_templates
 from twinklr.core.session import TwinklrSession
 from twinklr.core.utils.formatting import clean_audio_filename
 from twinklr.core.utils.logging import configure_logging
+
+if TYPE_CHECKING:
+    from twinklr.core.feature_engineering.loader import FEArtifactBundle
 
 configure_logging(level="INFO")
 logger = logging.getLogger(__name__)
@@ -105,6 +112,12 @@ def parse_args() -> argparse.Namespace:
         default=4,
         help="Number of moving head fixtures (default: 4)",
     )
+    parser.add_argument(
+        "--fe-data",
+        type=str,
+        default=None,
+        help="Path to FE output directory (loads style fingerprint, transition model, etc.).",
+    )
     return parser.parse_args()
 
 
@@ -119,22 +132,22 @@ async def main() -> None:
     audio_path = Path(args.audio_file)
 
     if not audio_path.exists():
-        print(f"❌ ERROR: Audio file not found: {audio_path}")
+        print(f"ERROR: Audio file not found: {audio_path}")
         sys.exit(1)
 
     song_name = clean_audio_filename(audio_path.stem)
     output_dir = repo_root / "artifacts" / song_name
 
     output_dir.mkdir(parents=True, exist_ok=True)
-    print(f"📁 Output directory: {output_dir}")
+    print(f"Output directory: {output_dir}")
 
     # Generate session ID - stable by default for cache reuse
     if args.new_session:
         session_id = None
-        print("🔄 New session: cache will not be reused")
+        print("New session: cache will not be reused")
     else:
         session_id = generate_stable_session_id(audio_path)
-        print(f"📦 Session ID: {session_id} (use --new-session to invalidate cache)")
+        print(f"Session ID: {session_id} (use --new-session to invalidate cache)")
 
     session = TwinklrSession.from_directory(repo_root, session_id=session_id)
 
@@ -142,11 +155,31 @@ async def main() -> None:
     print_subsection("1. Loading Templates")
     load_builtin_templates()
     available_templates = [t.template_id for t in list_templates()]
-    print(f"📚 Available templates: {len(available_templates)}")
+    print(f"Available templates: {len(available_templates)}")
     for t in available_templates[:5]:
         print(f"   - {t}")
     if len(available_templates) > 5:
         print(f"   ... and {len(available_templates) - 5} more")
+
+    # Load FE artifacts (optional, aligns with display pipeline)
+    fe_bundle: FEArtifactBundle | None = None
+    if args.fe_data:
+        from twinklr.core.feature_engineering.loader import load_fe_artifacts
+
+        fe_dir = Path(args.fe_data)
+        if fe_dir.exists():
+            fe_bundle = load_fe_artifacts(fe_dir)
+            print(f"FE data loaded from {fe_dir}")
+            if fe_bundle.style_fingerprint:
+                print("   Style fingerprint: loaded")
+            if fe_bundle.transition_graph:
+                print("   Transition graph: loaded")
+            if fe_bundle.motif_catalog:
+                print("   Motif catalog: loaded")
+            if fe_bundle.color_arc:
+                print("   Color arc: loaded")
+        else:
+            print(f"WARNING: FE data directory not found: {fe_dir}")
 
     # Build display groups (for MacroPlanner coordination)
     # Each group requires a concrete 'id' field for the macro planner to reference it.
@@ -185,10 +218,10 @@ async def main() -> None:
     # Validate pipeline
     errors = pipeline.validate_pipeline()
     if errors:
-        print(f"❌ Pipeline validation failed: {errors}")
+        print(f"Pipeline validation failed: {errors}")
         sys.exit(1)
 
-    print(f"✅ Pipeline '{pipeline.name}' validated")
+    print(f"Pipeline '{pipeline.name}' validated")
     print(f"   Stages: {len(pipeline.stages)}")
     for stage in pipeline.stages:
         deps = f" (inputs: {stage.inputs})" if stage.inputs else ""
@@ -207,8 +240,8 @@ async def main() -> None:
         output_dir=output_dir,
     )
 
-    print(f"🎵 Input: {audio_path.name}")
-    print("🚀 Starting pipeline execution...")
+    print(f"Input: {audio_path.name}")
+    print("Starting pipeline execution...")
 
     # ========================================================================
     # Execute Pipeline
@@ -225,12 +258,12 @@ async def main() -> None:
     # ========================================================================
     print_section("4. Pipeline Results", "=")
 
-    print(f"Overall Success: {'✅' if result.success else '❌'}")
+    print(f"Overall Success: {'YES' if result.success else 'NO'}")
     print(f"Duration: {result.total_duration_ms:.0f}ms ({result.total_duration_ms / 1000:.1f}s)")
     print(f"Stages Completed: {len(result.outputs)}/{len(pipeline.stages)}")
 
     if result.failed_stages:
-        print(f"\n❌ Failed stages: {result.failed_stages}")
+        print(f"\nFailed stages: {result.failed_stages}")
         for stage_id in result.failed_stages:
             stage_result = result.stage_results.get(stage_id)
             if stage_result:
@@ -255,7 +288,7 @@ async def main() -> None:
             "audio_bundle_summary.json",
             output_dir,
         )
-        print(f"📄 Audio bundle: {bundle_path.stem}")
+        print(f"Audio bundle: {bundle_path.stem}")
 
     # Audio profile
     if "profile" in result.outputs:
@@ -266,7 +299,7 @@ async def main() -> None:
             "audio_profile.json",
             output_dir,
         )
-        print(f"📄 Audio profile: {profile_path.stem}")
+        print(f"Audio profile: {profile_path.stem}")
 
     # Lyrics context (conditional stage - may be None if no lyrics detected)
     if result.outputs.get("lyrics") is not None:
@@ -277,7 +310,7 @@ async def main() -> None:
             "lyric_context.json",
             output_dir,
         )
-        print(f"📄 Lyric context: {lyrics_path.stem}")
+        print(f"Lyric context: {lyrics_path.stem}")
 
     # Macro plan (output is list[MacroSectionPlan])
     if "macro" in result.outputs:
@@ -288,7 +321,7 @@ async def main() -> None:
             "macro_sections.json",
             output_dir,
         )
-        print(f"📄 Macro sections: {macro_path.stem}")
+        print(f"Macro sections: {macro_path.stem}")
 
     # Choreography plan
     if "moving_heads" in result.outputs:
@@ -299,12 +332,12 @@ async def main() -> None:
             "choreography_plan.json",
             output_dir,
         )
-        print(f"📄 Choreography plan: {plan_path.stem}")
+        print(f"Choreography plan: {plan_path.stem}")
 
     # XSQ output
     if "render" in result.outputs:
         xsq_path = result.outputs["render"]
-        print(f"📄 XSQ output: {xsq_path}")
+        print(f"XSQ output: {xsq_path}")
 
     # Metrics summary
     print_subsection("Pipeline Metrics")
@@ -316,8 +349,32 @@ async def main() -> None:
     # ========================================================================
     print_section("Pipeline Complete!", "=")
 
+    # Save pipeline metadata (aligns with display pipeline pattern)
+    import datetime
+
+    pipeline_metadata = {
+        "pipeline": "moving_heads_pipeline",
+        "timestamp": datetime.datetime.now(tz=datetime.UTC).isoformat(),
+        "audio_file": str(audio_path),
+        "song_name": song_name,
+        "session_id": session_id,
+        "fixture_count": args.fixtures,
+        "template_count": len(available_templates),
+        "fe_data": args.fe_data,
+        "success": result.success,
+        "duration_ms": result.total_duration_ms,
+        "stages_completed": len(result.outputs),
+        "stages_total": len(pipeline.stages),
+        "failed_stages": list(result.failed_stages) if result.failed_stages else [],
+        "metrics": dict(pipeline_context.metrics),
+    }
+    metadata_path = save_artifact(
+        pipeline_metadata, song_name, "pipeline_metadata.json", output_dir
+    )
+    print(f"Pipeline metadata: {metadata_path.stem}")
+
     if result.success:
-        print("✅ Full pipeline completed successfully!")
+        print("Full pipeline completed successfully!")
         print("\nStages executed:")
         print("  1. Audio Analysis")
         print("  2. Audio Profile + Lyrics (parallel)")
@@ -327,7 +384,7 @@ async def main() -> None:
 
         if "moving_heads" in result.outputs:
             plan = result.outputs["moving_heads"]
-            print("\n🎯 Choreography Plan:")
+            print("\nChoreography Plan:")
             print(f"   Sections: {len(plan.sections)}")
             print(f"   Strategy: {plan.overall_strategy[:80]}...")
 
@@ -341,14 +398,14 @@ async def main() -> None:
 
         if "render" in result.outputs:
             xsq_path = result.outputs["render"]
-            print(f"\n🎄 XSQ Output: {xsq_path}")
+            print(f"\nXSQ Output: {xsq_path}")
             segment_count = pipeline_context.metrics.get("mh_render_segments", 0)
             print(f"   Segments rendered: {segment_count}")
 
     else:
-        print("❌ Pipeline failed. Check logs for details.")
+        print("Pipeline failed. Check logs for details.")
 
-    print(f"\n📁 All artifacts saved to: {output_dir}")
+    print(f"\nAll artifacts saved to: {output_dir}")
 
 
 if __name__ == "__main__":

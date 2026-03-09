@@ -143,7 +143,7 @@ def _make_plan_set(
             GroupPlacement(
                 placement_id="p1",
                 target=PlanTarget(type=TargetType.GROUP, id="OUTLINE_1"),
-                template_id="gtpl_base_wash_soft",
+                template_id="gtpl_base_wash_split",
                 start=PlanningTimeRef(bar=1, beat=1),
                 duration=EffectDuration.PHRASE,
                 intensity=IntensityLevel.MED,
@@ -195,7 +195,7 @@ class TestCompositionEngine:
         render_plan = engine.compose(plan_set)
 
         event = render_plan.groups[0].layers[0].events[0]
-        # gtpl_base_wash_soft → "Color Wash" via keyword heuristic
+        # gtpl_base_wash_split → "Color Wash" via wash keyword
         assert event.effect_type == "Color Wash"
 
     def test_timing_resolved(self) -> None:
@@ -223,7 +223,7 @@ class TestCompositionEngine:
         base_placement = GroupPlacement(
             placement_id="p_base",
             target=PlanTarget(type=TargetType.GROUP, id="OUTLINE_1"),
-            template_id="gtpl_base_wash_soft",
+            template_id="gtpl_base_wash_split",
             start=PlanningTimeRef(bar=1, beat=1),
             duration=EffectDuration.SECTION,
         )
@@ -288,7 +288,7 @@ class TestCompositionEngine:
         p1 = GroupPlacement(
             placement_id="p1",
             target=PlanTarget(type=TargetType.GROUP, id="OUTLINE_1"),
-            template_id="gtpl_base_wash_soft",
+            template_id="gtpl_base_wash_split",
             start=PlanningTimeRef(bar=1, beat=1),
             duration=EffectDuration.PHRASE,  # ~8000ms
         )
@@ -330,7 +330,7 @@ class TestCompositionEngine:
         event = render_plan.groups[0].layers[0].events[0]
         assert event.source.section_id == "intro"
         assert event.source.lane == LaneKind.BASE
-        assert event.source.template_id == "gtpl_base_wash_soft"
+        assert event.source.template_id == "gtpl_base_wash_split"
 
     def test_diagnostics_on_zero_duration(self) -> None:
         """Zero-duration placements produce a diagnostic."""
@@ -365,7 +365,7 @@ class TestSectionBoundaryClamping:
         p = GroupPlacement(
             placement_id="p1",
             target=PlanTarget(type=TargetType.GROUP, id="OUTLINE_1"),
-            template_id="gtpl_base_wash_soft",
+            template_id="gtpl_base_wash_split",
             start=PlanningTimeRef(bar=1, beat=1),
             duration=EffectDuration.PHRASE,
             intensity=IntensityLevel.MED,
@@ -412,7 +412,7 @@ class TestSectionBoundaryClamping:
         p = GroupPlacement(
             placement_id="p1",
             target=PlanTarget(type=TargetType.GROUP, id="OUTLINE_1"),
-            template_id="gtpl_base_wash_soft",
+            template_id="gtpl_base_wash_split",
             start=PlanningTimeRef(bar=1, beat=1),
             duration=EffectDuration.SECTION,
             intensity=IntensityLevel.MED,
@@ -460,7 +460,7 @@ class TestSectionBoundaryClamping:
                 GroupPlacement(
                     placement_id="p1",
                     target=PlanTarget(type=TargetType.GROUP, id="OUTLINE_1"),
-                    template_id="gtpl_base_wash_soft",
+                    template_id="gtpl_base_wash_split",
                     start=PlanningTimeRef(bar=1, beat=1),
                     duration=EffectDuration.SECTION,
                     intensity=IntensityLevel.MED,
@@ -558,7 +558,7 @@ class TestBlendModeAssignment:
         base_p = GroupPlacement(
             placement_id="p_base",
             target=PlanTarget(type=TargetType.GROUP, id="OUTLINE_1"),
-            template_id="gtpl_base_wash_soft",
+            template_id="gtpl_base_wash_split",
             start=PlanningTimeRef(bar=1, beat=1),
             duration=EffectDuration.SECTION,
             intensity=IntensityLevel.MED,
@@ -650,7 +650,7 @@ class TestAssetOverlayRendering:
         placement = GroupPlacement(
             placement_id="p_asset",
             target=PlanTarget(type=TargetType.GROUP, id="OUTLINE_1"),
-            template_id="gtpl_base_wash_soft",
+            template_id="gtpl_base_wash_split",
             start=PlanningTimeRef(bar=1, beat=1),
             duration=EffectDuration.PHRASE,
             resolved_asset_ids=["asset_abc"],
@@ -681,7 +681,7 @@ class TestAssetOverlayRendering:
         placement = GroupPlacement(
             placement_id="p_asset",
             target=PlanTarget(type=TargetType.GROUP, id="OUTLINE_1"),
-            template_id="gtpl_base_wash_soft",
+            template_id="gtpl_base_wash_split",
             start=PlanningTimeRef(bar=1, beat=1),
             duration=EffectDuration.PHRASE,
             resolved_asset_ids=["asset_001"],
@@ -713,7 +713,7 @@ class TestAssetOverlayRendering:
         placement = GroupPlacement(
             placement_id="p_timing",
             target=PlanTarget(type=TargetType.GROUP, id="OUTLINE_1"),
-            template_id="gtpl_base_wash_soft",
+            template_id="gtpl_base_wash_split",
             start=PlanningTimeRef(bar=3, beat=1),
             duration=EffectDuration.PHRASE,
             resolved_asset_ids=["asset_002"],
@@ -738,7 +738,7 @@ class TestAssetOverlayRendering:
         placement = GroupPlacement(
             placement_id="p_multi",
             target=PlanTarget(type=TargetType.GROUP, id="OUTLINE_1"),
-            template_id="gtpl_base_wash_soft",
+            template_id="gtpl_base_wash_split",
             start=PlanningTimeRef(bar=1, beat=1),
             duration=EffectDuration.PHRASE,
             resolved_asset_ids=["a1", "a2"],
@@ -762,7 +762,7 @@ class TestAssetOverlayRendering:
         placement = GroupPlacement(
             placement_id="p_skip",
             target=PlanTarget(type=TargetType.GROUP, id="OUTLINE_1"),
-            template_id="gtpl_base_wash_soft",
+            template_id="gtpl_base_wash_split",
             start=PlanningTimeRef(bar=1, beat=1),
             duration=EffectDuration.PHRASE,
             resolved_asset_ids=["missing", "exists"],
@@ -783,7 +783,7 @@ class TestAssetOverlayRendering:
         placement = GroupPlacement(
             placement_id="p_all_missing",
             target=PlanTarget(type=TargetType.GROUP, id="OUTLINE_1"),
-            template_id="gtpl_base_wash_soft",
+            template_id="gtpl_base_wash_split",
             start=PlanningTimeRef(bar=1, beat=1),
             duration=EffectDuration.PHRASE,
             resolved_asset_ids=["ghost_1", "ghost_2"],
@@ -804,7 +804,7 @@ class TestAssetOverlayRendering:
         placement = GroupPlacement(
             placement_id="p_trace",
             target=PlanTarget(type=TargetType.GROUP, id="OUTLINE_1"),
-            template_id="gtpl_base_wash_soft",
+            template_id="gtpl_base_wash_split",
             start=PlanningTimeRef(bar=1, beat=1),
             duration=EffectDuration.PHRASE,
             resolved_asset_ids=["trace_id"],
@@ -818,7 +818,7 @@ class TestAssetOverlayRendering:
         ).events[0]
         assert overlay_event.source.section_id == "intro"
         assert overlay_event.source.lane == LaneKind.BASE
-        assert overlay_event.source.template_id == "gtpl_base_wash_soft"
+        assert overlay_event.source.template_id == "gtpl_base_wash_split"
 
     def test_rhythm_lane_overlay_on_correct_layer(self) -> None:
         """RHYTHM lane overlays go to layer 11 (RHYTHM overlay in sub-layer scheme)."""

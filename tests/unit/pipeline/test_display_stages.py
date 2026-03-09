@@ -91,7 +91,7 @@ def _make_xlights_mapping() -> XLightsMapping:
 
 
 def _make_plan_set(
-    template_id: str = "gtpl_base_wash_soft",
+    template_id: str = "gtpl_base_wash_split",
     resolved_asset_ids: list[str] | None = None,
 ) -> GroupPlanSet:
     placement = GroupPlacement(

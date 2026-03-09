@@ -155,7 +155,7 @@ def _make_plan_set(
     placement = GroupPlacement(
         placement_id="p1",
         target=PlanTarget(type=TargetType.GROUP, id="OUTLINE_1"),
-        template_id="gtpl_base_wash_soft",
+        template_id="gtpl_base_wash_split",
         start=PlanningTimeRef(bar=1, beat=1),
         duration=EffectDuration.PHRASE,
         intensity=IntensityLevel.MED,

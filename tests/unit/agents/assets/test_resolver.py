@@ -78,7 +78,7 @@ class TestExtractMotifId:
 
     def test_non_motif_template_returns_none(self) -> None:
         """Non-motif templates return None."""
-        assert extract_motif_id("gtpl_base_wash_soft") is None
+        assert extract_motif_id("gtpl_base_wash_split") is None
         assert extract_motif_id("gtpl_accent_burst_big") is None
         assert extract_motif_id("gtpl_rhythm_sparkle_fast") is None
 
@@ -91,12 +91,12 @@ class TestExtractMotifId:
         assert extract_motif_id("") is None
 
     def test_base_motif_abstract(self) -> None:
-        """Extracts abstract motif."""
-        assert extract_motif_id("gtpl_base_motif_abstract_ambient") == "abstract"
+        """Extracts motif from base_motif pattern (valid motif)."""
+        assert extract_motif_id("gtpl_base_motif_fire_ambient") == "fire"
 
     def test_base_motif_bokeh(self) -> None:
-        """Extracts bokeh motif."""
-        assert extract_motif_id("gtpl_base_motif_bokeh_ambient") == "bokeh"
+        """Extracts motif from base_motif pattern (valid motif)."""
+        assert extract_motif_id("gtpl_base_motif_sparkles_ambient") == "sparkles"
 
 
 # ---------------------------------------------------------------------------
@@ -220,7 +220,7 @@ class TestResolvePlanAssets:
     def test_non_motif_template_stays_empty(self) -> None:
         """Non-motif template should have empty resolved_asset_ids."""
         placement = _make_placement(
-            template_id="gtpl_base_wash_soft",
+            template_id="gtpl_base_wash_split",
         )
         plan_set = _make_plan_set([placement])
         catalog = AssetCatalog(
@@ -243,7 +243,7 @@ class TestResolvePlanAssets:
     def test_no_catalog_match_stays_empty(self) -> None:
         """Motif template with no matching catalog entry stays empty."""
         placement = _make_placement(
-            template_id="gtpl_base_motif_abstract_ambient",
+            template_id="gtpl_base_motif_fire_ambient",
         )
         plan_set = _make_plan_set([placement])
         catalog = AssetCatalog(
@@ -397,7 +397,7 @@ class TestResolvePlanAssets:
         )
         p2 = _make_placement(
             placement_id="p2",
-            template_id="gtpl_base_motif_bokeh_ambient",
+            template_id="gtpl_base_motif_fire_ambient",
         )
         plan_set = _make_plan_set([p1, p2])
         catalog = AssetCatalog(
@@ -408,9 +408,9 @@ class TestResolvePlanAssets:
                     motif_id="sparkles",
                 ),
                 _make_catalog_entry(
-                    asset_id="asset_image_cutout_bokeh",
-                    motif_id="bokeh",
-                    file_path="/data/assets/images/cutouts/bokeh.png",
+                    asset_id="asset_image_cutout_fire",
+                    motif_id="fire",
+                    file_path="/data/assets/images/cutouts/fire.png",
                 ),
             ],
         )
@@ -419,7 +419,7 @@ class TestResolvePlanAssets:
 
         placements = resolved.section_plans[0].lane_plans[0].coordination_plans[0].placements
         assert placements[0].resolved_asset_ids == ["asset_image_cutout_sparkles"]
-        assert placements[1].resolved_asset_ids == ["asset_image_cutout_bokeh"]
+        assert placements[1].resolved_asset_ids == ["asset_image_cutout_fire"]
 
 
 class TestRoleCategoryPreference:

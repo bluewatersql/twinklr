@@ -42,9 +42,15 @@ V2 Migration: Uses structured context from MovingHeadPlanningContext
 {% endif %}
 
 **Template Library** ({{ available_templates | length }} templates):
+{% if template_descriptions is defined and template_descriptions %}
+{% for td in template_descriptions %}
+- `{{ td.template_id }}`: {{ td.description | default(td.name) }}{% if td.energy_range %} Energy: {{ td.energy_range[0] }}-{{ td.energy_range[1] }}{% endif %}{% if td.tags %} [{{ td.tags | join(', ') }}]{% endif %}
+{% endfor %}
+{% else %}
 {% for template in available_templates %}
 - `{{ template }}`
 {% endfor %}
+{% endif %}
 
 {% if audio_profile is defined and audio_profile %}
 ## Audio Profile
@@ -64,6 +70,31 @@ V2 Migration: Uses structured context from MovingHeadPlanningContext
 {% for caution in audio_profile.creative_guidance.cautions[:3] %}
 - {{ caution }}
 {% endfor %}
+{% endif %}
+{% endif %}
+
+{% if audio_profile.planner_hints is defined and audio_profile.planner_hints %}
+### Section Planning Directives
+
+{% if audio_profile.planner_hints.section_objectives is defined and audio_profile.planner_hints.section_objectives %}
+{% for section_id, objectives in audio_profile.planner_hints.section_objectives.items() %}
+**{{ section_id }}**:
+{% for obj in objectives[:2] %}
+- {{ obj[:250] }}
+{% endfor %}
+{% endfor %}
+{% endif %}
+
+{% if audio_profile.planner_hints.avoid_patterns is defined and audio_profile.planner_hints.avoid_patterns %}
+### Patterns to Avoid
+{% for pattern in audio_profile.planner_hints.avoid_patterns %}
+- {{ pattern[:250] }}
+{% endfor %}
+{% endif %}
+
+{% if audio_profile.planner_hints.emphasize_groups is defined and audio_profile.planner_hints.emphasize_groups %}
+### Emphasize Groups
+{{ audio_profile.planner_hints.emphasize_groups | join(', ') }}
 {% endif %}
 {% endif %}
 {% endif %}
@@ -88,16 +119,22 @@ V2 Migration: Uses structured context from MovingHeadPlanningContext
 
 The MacroPlanner has defined the following strategic guidance for each section. **Align your template selections with these targets:**
 
-| Section | Energy Target | Motion Density | Style | Notes |
-|---------|---------------|----------------|-------|-------|
+| Section | Energy | Motion | Style | Palette | Motifs |
+|---------|--------|--------|-------|---------|--------|
 {% for mp in macro_plan %}
-| {{ mp.section_id }} | {{ mp.energy_target }} | {{ mp.motion_density }} | {{ mp.choreography_style }} | {{ mp.notes[:50] }}{% if mp.notes | length > 50 %}...{% endif %} |
+| {{ mp.section_id }} | {{ mp.energy_target }} | {{ mp.motion_density }} | {{ mp.choreography_style }} | {{ mp.palette_id | default('-') }} | {{ mp.motif_ids | join(', ') if mp.motif_ids else '-' }} |
+{% endfor %}
+
+{% for mp in macro_plan %}
+- **{{ mp.section_id }}**: {{ mp.notes }}
 {% endfor %}
 
 **IMPORTANT:** Your template selections should support these macro-level directives:
-- **Energy targets** indicate intensity levels (HIGH = aggressive/dramatic, MEDIUM = balanced, LOW = subtle/ambient)
-- **Motion density** guides activity level (BUSY = fast/complex, MODERATE = balanced, SPARSE = slow/simple)
+- **Energy targets** indicate intensity levels (HIGH/PEAK = aggressive/dramatic, MED/BUILD = balanced/rising, LOW/RELEASE = subtle/ambient)
+- **Motion density** guides activity level (BUSY = fast/complex, MED = balanced, SPARSE = slow/simple)
 - **Choreography style** indicates visual approach (IMAGERY = narrative, ABSTRACT = patterns, HYBRID = mixed)
+- **Palette** indicates color theme override for the section (if specified, choose templates that complement this mood)
+- **Motifs** indicate visual patterns emphasized in this section (use to inform template geometry/movement choices)
 {% endif %}
 
 ## Your Task

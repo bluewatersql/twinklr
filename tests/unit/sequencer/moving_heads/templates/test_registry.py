@@ -272,9 +272,7 @@ def test_energy_category_balance():
 
     for cat in TemplateCategory:
         count = category_counts.get(cat, 0)
-        assert count >= 3, (
-            f"Category {cat.value} has only {count} templates, need at least 3"
-        )
+        assert count >= 3, f"Category {cat.value} has only {count} templates, need at least 3"
 
 
 # ============================================================================
@@ -312,9 +310,7 @@ def test_templates_with_presets():
                 assert preset.preset_id, f"Preset in {info.template_id} missing preset_id"
                 assert preset.name, f"Preset in {info.template_id} missing name"
 
-    assert preset_count >= 4, (
-        f"Only {preset_count} templates have presets, expected at least 4"
-    )
+    assert preset_count >= 4, f"Only {preset_count} templates have presets, expected at least 4"
 
 
 def test_multi_step_templates_exist():

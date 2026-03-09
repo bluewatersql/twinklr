@@ -17,7 +17,7 @@ class TestResolveEffectType:
 
     # Explicit map entries
     def test_explicit_base_wash(self) -> None:
-        m = resolve_effect_type("gtpl_base_motif_abstract_ambient")
+        m = resolve_effect_type("gtpl_base_wash_split")
         assert m.effect_type == "Color Wash"
 
     def test_explicit_rhythm_chase(self) -> None:
@@ -46,7 +46,7 @@ class TestResolveEffectType:
         assert m.effect_type == "SingleStrand"
 
     def test_keyword_wash(self) -> None:
-        m = resolve_effect_type("gtpl_base_wash_soft")
+        m = resolve_effect_type("gtpl_base_wash_split")
         assert m.effect_type == "Color Wash"
 
     def test_keyword_snow(self) -> None:
@@ -67,7 +67,7 @@ class TestResolveEffectType:
 
     def test_keyword_hit_fallback(self) -> None:
         m = resolve_effect_type("gtpl_accent_hit_color")
-        assert m.effect_type == "On"
+        assert m.effect_type == "Strobe"
 
     # Fallback
     def test_unknown_template_fallback(self) -> None:
@@ -108,8 +108,8 @@ class TestEffectParameterDefaults:
 
     def test_color_wash_ambient_vs_drive_differ(self) -> None:
         """Drive washes should be faster than ambient."""
-        ambient = resolve_effect_type("gtpl_base_motif_abstract_ambient")
-        drive = resolve_effect_type("gtpl_rhythm_motif_abstract_drive")
+        ambient = resolve_effect_type("gtpl_base_wash_split")
+        drive = resolve_effect_type("gtpl_rhythm_pulse_fast")
 
         assert ambient.effect_type == "Color Wash"
         assert drive.effect_type == "Color Wash"
@@ -163,7 +163,7 @@ class TestEffectParameterDefaults:
     @pytest.mark.parametrize(
         ("template_id", "expected_type"),
         [
-            ("gtpl_base_wash_soft", "Color Wash"),
+            ("gtpl_base_wash_split", "Color Wash"),
             ("gtpl_rhythm_sparkle_fast", "Twinkle"),
             ("gtpl_accent_fan_wide", "Fan"),
         ],
@@ -179,13 +179,12 @@ class TestEffectParameterDefaults:
     # -- Rudolph plan coverage -----------------------------------------
 
     RUDOLPH_TEMPLATES: ClassVar[list[str]] = [
-        "gtpl_base_motif_abstract_ambient",
-        "gtpl_base_motif_bokeh_ambient",
+        "gtpl_base_motif_fire_ambient",
         "gtpl_base_motif_sparkles_ambient",
         "gtpl_base_motif_radial_rays_ambient",
         "gtpl_rhythm_motif_candy_stripes_drive",
         "gtpl_rhythm_motif_sparkles_drive",
-        "gtpl_rhythm_motif_abstract_drive",
+        "gtpl_rhythm_motif_fire_drive",
         "gtpl_rhythm_sparkle_offbeat",
         "gtpl_accent_bell_single",
         "gtpl_accent_bell_double",

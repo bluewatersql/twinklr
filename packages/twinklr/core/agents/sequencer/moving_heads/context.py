@@ -33,6 +33,19 @@ class FixtureContext(BaseModel):
     )
 
 
+class TemplateDescription(BaseModel):
+    """Brief description of a template for prompt injection."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    template_id: str
+    name: str
+    description: str | None = None
+    tags: list[str] = Field(default_factory=list)
+    energy_range: tuple[int, int] | None = None
+    recommended_sections: list[str] = Field(default_factory=list)
+
+
 class MovingHeadPlanningContext(BaseModel):
     """Complete context for moving head planning.
 
@@ -72,6 +85,12 @@ class MovingHeadPlanningContext(BaseModel):
     macro_plan: list[MacroSectionPlan] | None = Field(
         default=None,
         description="MacroPlan section outputs for coordination (energy targets, motion density, style per section)",
+    )
+
+    # Template descriptions for prompt enrichment (optional)
+    template_descriptions: list[TemplateDescription] | None = Field(
+        default=None,
+        description="Brief descriptions of available templates (energy, tags, recommended sections)",
     )
 
     # Convenience properties
@@ -201,10 +220,17 @@ class MovingHeadPlanningContext(BaseModel):
                     "choreography_style": sp.choreography_style.value
                     if hasattr(sp.choreography_style, "value")
                     else str(sp.choreography_style),
+                    "palette_id": (sp.palette.palette_id if sp.palette else None),
+                    "motif_ids": sp.motif_ids,
                     "notes": sp.notes,
                 }
                 for sp in self.macro_plan
             ]
+
+        # Template descriptions for prompt enrichment
+        template_descs = None
+        if self.template_descriptions:
+            template_descs = [td.model_dump() for td in self.template_descriptions]
 
         return {
             "audio_profile": self.audio_profile,
@@ -213,6 +239,7 @@ class MovingHeadPlanningContext(BaseModel):
             "beat_grid": beat_grid,
             "fixtures": fixtures,
             "available_templates": self.available_templates,
+            "template_descriptions": template_descs,
             "macro_plan": macro_guidance,
         }
 

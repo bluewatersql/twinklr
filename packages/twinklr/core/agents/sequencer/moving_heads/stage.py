@@ -58,6 +58,7 @@ class MovingHeadStage:
         fixture_groups: list[dict[str, Any]] | None = None,
         max_iterations: int = 3,
         min_pass_score: float = 7.0,
+        include_template_metadata: bool = True,
     ) -> None:
         """Initialize moving head planner stage.
 
@@ -67,12 +68,14 @@ class MovingHeadStage:
             fixture_groups: Optional fixture group configurations
             max_iterations: Maximum refinement iterations (default: 3)
             min_pass_score: Minimum score for approval (default: 7.0)
+            include_template_metadata: Load template descriptions from registry (default: True)
         """
         self.fixture_count = fixture_count
         self.available_templates = available_templates
         self.fixture_groups = fixture_groups or []
         self.max_iterations = max_iterations
         self.min_pass_score = min_pass_score
+        self.include_template_metadata = include_template_metadata
 
     @property
     def name(self) -> str:
@@ -143,13 +146,19 @@ class MovingHeadStage:
                 groups=self.fixture_groups,
             )
 
+            # Build template descriptions from registry metadata
+            template_descriptions = (
+                self._build_template_descriptions() if self.include_template_metadata else None
+            )
+
             # Build planning context with macro plan coordination
             planning_context = MovingHeadPlanningContext(
                 audio_profile=audio_profile,
                 lyric_context=lyric_context,
                 fixtures=fixture_context,
                 available_templates=self.available_templates,
-                macro_plan=macro_plan,  # Coordinate with overall show strategy
+                macro_plan=macro_plan,
+                template_descriptions=template_descriptions,
             )
 
             # Store planning context for debugging
@@ -200,6 +209,44 @@ class MovingHeadStage:
         except Exception as e:
             logger.exception("Moving head planning failed", exc_info=e)
             return failure_result(str(e), stage_name=self.name)
+
+    def _build_template_descriptions(self) -> list[Any] | None:
+        """Load template metadata from the registry for prompt enrichment.
+
+        Returns:
+            List of TemplateDescription objects, or None if registry not available.
+        """
+        from twinklr.core.agents.sequencer.moving_heads.context import TemplateDescription
+
+        try:
+            from twinklr.core.sequencer.moving_heads.templates.library import REGISTRY
+
+            descriptions: list[TemplateDescription] = []
+            for tid in self.available_templates:
+                try:
+                    doc = REGISTRY.get(tid, deep_copy=False)
+                    tmpl = doc.template
+                    meta = tmpl.metadata
+
+                    descriptions.append(
+                        TemplateDescription(
+                            template_id=tid,
+                            name=tmpl.name,
+                            description=meta.description if meta else None,
+                            tags=list(meta.tags) if meta and meta.tags else [],
+                            energy_range=meta.energy_range if meta else None,
+                            recommended_sections=list(meta.recommended_sections)
+                            if meta and meta.recommended_sections
+                            else [],
+                        )
+                    )
+                except Exception:
+                    descriptions.append(TemplateDescription(template_id=tid, name=tid))
+
+            return descriptions if descriptions else None
+        except Exception:
+            logger.debug("Template registry not available for metadata extraction")
+            return None
 
     def _handle_state(self, result: Any, context: PipelineContext) -> None:
         """Store choreography plan in state for downstream stages."""

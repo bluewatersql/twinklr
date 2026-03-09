@@ -76,6 +76,8 @@ def build_planner_variables(
         "fixture_groups": context.fixtures.groups,
         # Templates
         "available_templates": context.available_templates,
+        # Template descriptions (enriched metadata for informed selection)
+        "template_descriptions": prompt_context.get("template_descriptions"),
         # Sections (with bar positions)
         "sections": prompt_context["song_structure"]["sections"],
         # Audio profile (for initial iteration)
@@ -127,9 +129,9 @@ def build_judge_variables(
         "iteration": iteration,
         "previous_feedback": previous_feedback or [],
         "previous_issues": previous_issues or [],
-        # Audio profile (for context)
+        # Audio profile (for context, including planner_hints)
         "audio_profile": context.audio_profile,
-        # Macro plan guidance (for coordination validation)
+        # Macro plan guidance (enriched with palette/motifs for alignment validation)
         "macro_plan": prompt_context["macro_plan"],
     }
 

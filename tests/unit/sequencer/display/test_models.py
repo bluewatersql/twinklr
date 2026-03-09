@@ -82,7 +82,7 @@ def _make_source() -> RenderEventSource:
         section_id="intro",
         lane=LaneKind.BASE,
         group_id="OUTLINE_1",
-        template_id="gtpl_base_wash_soft",
+        template_id="gtpl_base_wash_split",
     )
 
 

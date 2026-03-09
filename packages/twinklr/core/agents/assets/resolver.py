@@ -88,7 +88,7 @@ def extract_motif_id(template_id: str) -> str | None:
         'sparkles'
         >>> extract_motif_id("gtpl_rhythm_motif_candy_stripes_drive")
         'candy_stripes'
-        >>> extract_motif_id("gtpl_base_wash_soft")
+        >>> extract_motif_id("gtpl_base_wash_split")
         None
     """
     if not template_id:
