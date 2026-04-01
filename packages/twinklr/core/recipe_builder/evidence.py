@@ -3,6 +3,8 @@
 Loads the existing recipe catalog, analyzes distributions across every
 dimension, and identifies specific creative opportunities where new
 recipes would add the most value.
+
+Optionally loads FE artifacts when available to enrich the evidence base.
 """
 
 from __future__ import annotations
@@ -12,6 +14,7 @@ import uuid
 from collections import Counter
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 from twinklr.core.recipe_builder.models import (
     CatalogAnalysis,
@@ -58,6 +61,73 @@ ALL_EFFECT_TYPES = frozenset(
 )
 
 DEFAULT_TEMPLATES_DIR = Path(__file__).resolve().parents[4] / "data" / "templates"
+DEFAULT_FE_DIR = Path(__file__).resolve().parents[4] / "data" / "features" / "feature_engineering"
+
+
+# ---------------------------------------------------------------------------
+# FE evidence loading
+# ---------------------------------------------------------------------------
+
+
+def load_fe_evidence(
+    fe_dir: Path | None = None,
+    *,
+    synthetic_fallback: bool = False,
+) -> dict[str, Any]:
+    """Load FE artifacts for evidence enrichment.
+
+    Attempts to load the FE artifact bundle from the given directory.
+    If no FE artifacts are available, returns a fallback marker so
+    the pipeline can proceed without FE data.
+
+    Args:
+        fe_dir: Path to FE output directory. Defaults to
+            ``data/features/feature_engineering``.
+        synthetic_fallback: If True, return a synthetic evidence stub
+            when real FE artifacts are missing.
+
+    Returns:
+        Dict with evidence metadata.  ``source`` key indicates
+        ``"fe_artifacts"``, ``"synthetic"``, or ``"none"``.
+    """
+    directory = fe_dir or DEFAULT_FE_DIR
+    manifest_path = directory / "feature_store_manifest.json"
+
+    if manifest_path.exists():
+        try:
+            from twinklr.core.feature_engineering.loader import load_fe_artifacts
+
+            bundle = load_fe_artifacts(directory)
+            logger.info(
+                "Loaded FE artifacts from %s (%d recipes, style=%s)",
+                directory,
+                len(bundle.recipe_catalog_entries),
+                bundle.style_fingerprint is not None,
+            )
+            return {
+                "source": "fe_artifacts",
+                "fe_dir": str(directory),
+                "recipe_count": len(bundle.recipe_catalog_entries),
+                "has_style_fingerprint": bundle.style_fingerprint is not None,
+                "has_propensity_index": bundle.propensity_index is not None,
+                "has_motif_catalog": bundle.motif_catalog is not None,
+            }
+        except Exception as exc:
+            logger.warning("Failed to load FE artifacts from %s: %s", directory, exc)
+
+    if synthetic_fallback:
+        logger.info("Using synthetic FE evidence fallback")
+        return {
+            "source": "synthetic",
+            "fe_dir": str(directory),
+            "recipe_count": 0,
+            "has_style_fingerprint": False,
+            "has_propensity_index": False,
+            "has_motif_catalog": False,
+        }
+
+    logger.info("No FE artifacts available at %s", directory)
+    return {"source": "none", "fe_dir": str(directory)}
 
 
 # ---------------------------------------------------------------------------

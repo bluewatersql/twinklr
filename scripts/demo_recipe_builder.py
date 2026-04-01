@@ -3,13 +3,17 @@
 
 Analyzes the real template catalog, identifies creative opportunities,
 and generates new recipe candidates using an LLM (or deterministic
-fallback with --dry-run).
+fallback with --dry-run).  Exercises the same reusable pipeline modules
+as the production build with a demo configuration.
 
 Usage:
     uv run python scripts/demo_recipe_builder.py
     uv run python scripts/demo_recipe_builder.py --dry-run
     uv run python scripts/demo_recipe_builder.py --max-opportunities 5
     uv run python scripts/demo_recipe_builder.py --model gpt-4.1-mini --temperature 1.0
+    uv run python scripts/demo_recipe_builder.py --phase analysis
+    uv run python scripts/demo_recipe_builder.py --no-bootstrap --enrich
+    uv run python scripts/demo_recipe_builder.py --synthetic-fallback
 """
 
 from __future__ import annotations
@@ -53,9 +57,58 @@ def parse_args() -> argparse.Namespace:
         help="Template catalog directory. Defaults to data/templates/.",
     )
     parser.add_argument(
+        "--fe-dir",
+        type=Path,
+        default=None,
+        help="FE artifact directory. Defaults to data/features/feature_engineering/.",
+    )
+    parser.add_argument(
         "--dry-run",
         action="store_true",
         help="Skip LLM calls; use deterministic fallback generation.",
+    )
+    parser.add_argument(
+        "--synthetic-fallback",
+        action="store_true",
+        help="Allow synthetic inputs when FE artifacts are missing.",
+    )
+
+    boot_group = parser.add_mutually_exclusive_group()
+    boot_group.add_argument(
+        "--bootstrap",
+        dest="enable_bootstrap",
+        action="store_true",
+        default=True,
+        help="Enable new recipe generation.",
+    )
+    boot_group.add_argument(
+        "--no-bootstrap",
+        dest="enable_bootstrap",
+        action="store_false",
+        help="Disable new recipe generation.",
+    )
+
+    enrich_group = parser.add_mutually_exclusive_group()
+    enrich_group.add_argument(
+        "--enrich",
+        dest="enable_enrich",
+        action="store_true",
+        default=True,
+        help="Enable metadata-only enrichment.",
+    )
+    enrich_group.add_argument(
+        "--no-enrich",
+        dest="enable_enrich",
+        action="store_false",
+        help="Disable metadata-only enrichment.",
+    )
+
+    parser.add_argument(
+        "--phase",
+        type=str,
+        default="all",
+        choices=["all", "analysis", "generation", "enrichment", "validation", "admission"],
+        help="Run a specific phase or 'all'.",
     )
     parser.add_argument(
         "--max-opportunities",
@@ -115,7 +168,12 @@ def main() -> int:
     print(f"  run_name          : {args.run_name}")
     print(f"  output_dir        : {args.output_dir}")
     print(f"  templates_dir     : {args.templates_dir or 'default (data/templates/)'}")
+    print(f"  fe_dir            : {args.fe_dir or 'default'}")
     print(f"  dry_run           : {args.dry_run}")
+    print(f"  bootstrap         : {args.enable_bootstrap}")
+    print(f"  enrich            : {args.enable_enrich}")
+    print(f"  synthetic_fallback: {args.synthetic_fallback}")
+    print(f"  phase             : {args.phase}")
     print(f"  max_opportunities : {args.max_opportunities}")
     print(f"  model             : {args.model}")
     print(f"  temperature       : {args.temperature}")
@@ -133,17 +191,24 @@ def main() -> int:
             llm_client = create_client(api_key=api_key)
             print(f"  LLM client        : OpenAI ({args.model})")
 
-    from twinklr.core.recipe_builder.pipeline import PipelineConfig, run_pipeline
+    from twinklr.core.recipe_builder.pipeline import ALL_PHASES, PipelineConfig, run_pipeline
+
+    phases: tuple[str, ...] = ALL_PHASES if args.phase == "all" else (args.phase,)
 
     config = PipelineConfig(
         run_name=args.run_name,
         output_dir=args.output_dir.resolve(),
         templates_dir=args.templates_dir.resolve() if args.templates_dir else None,
+        fe_dir=args.fe_dir.resolve() if args.fe_dir else None,
+        enable_bootstrap=args.enable_bootstrap,
+        enable_enrich=args.enable_enrich,
+        synthetic_fallback=args.synthetic_fallback,
         dry_run=args.dry_run,
         llm_client=llm_client,
         llm_model=args.model,
         llm_temperature=args.temperature,
         max_opportunities=args.max_opportunities,
+        phases=phases,
     )
 
     manifest = run_pipeline(config)

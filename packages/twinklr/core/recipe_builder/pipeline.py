@@ -3,6 +3,8 @@
 Loads the recipe catalog, analyzes it for gaps and opportunities,
 generates new recipe candidates (via LLM or deterministic fallback),
 enriches existing metadata, validates, and stages outputs for review.
+
+Optionally loads FE artifacts to enrich evidence when available.
 """
 
 from __future__ import annotations
@@ -20,6 +22,7 @@ from twinklr.core.recipe_builder.evidence import (
     analyze_catalog,
     identify_opportunities,
     load_catalog,
+    load_fe_evidence,
 )
 from twinklr.core.recipe_builder.generation import generate_candidates
 from twinklr.core.recipe_builder.models import (
@@ -50,6 +53,10 @@ class PipelineConfig:
     run_name: str
     output_dir: Path
     templates_dir: Path | None = None
+    fe_dir: Path | None = None
+    enable_bootstrap: bool = True
+    enable_enrich: bool = True
+    synthetic_fallback: bool = False
     dry_run: bool = False
     llm_client: Any | None = None
     llm_model: str = "gpt-4.1"
@@ -102,6 +109,13 @@ def _print_summary(manifest: RunManifest) -> None:
         err_note = f"  [{ps.error}]" if ps.error else ""
         lines.append(f"  [{icon}] {ps.phase}{err_note}")
     lines.append("=" * 60)
+    lines.append("")
+    lines.append(
+        "  NOTE: All outputs are staged only — not merged into the live library."
+    )
+    lines.append(
+        "  Review staged artifacts before promoting to the template catalog."
+    )
     logger.info("\n".join(lines))
 
 
@@ -137,6 +151,7 @@ def run_pipeline(config: PipelineConfig) -> RunManifest:
 
     # State carried between phases
     catalog_recipes: list[EffectRecipe] = []
+    fe_evidence: dict[str, Any] | None = None
     analysis: CatalogAnalysis | None = None
     opportunities: list[Opportunity] = []
     recipe_candidates: list[RecipeCandidate] = []
@@ -148,6 +163,12 @@ def run_pipeline(config: PipelineConfig) -> RunManifest:
     if "analysis" in active_phases:
         try:
             catalog_recipes = load_catalog(config.templates_dir)
+
+            fe_evidence = load_fe_evidence(
+                fe_dir=config.fe_dir,
+                synthetic_fallback=config.synthetic_fallback,
+            )
+
             analysis = analyze_catalog(catalog_recipes)
             opportunities = identify_opportunities(
                 analysis,
@@ -160,11 +181,41 @@ def run_pipeline(config: PipelineConfig) -> RunManifest:
                 {"opportunities": [o.model_dump() for o in opportunities]},
             )
 
+            # Write library_gap_report.json combining analysis + opportunities
+            gap_report = {
+                "schema_version": "2.0.0",
+                "generated_at": analysis.generated_at.isoformat(),
+                "total_recipes": analysis.total_recipes,
+                "underutilized_effects": analysis.underutilized_effects,
+                "underutilized_motions": analysis.underutilized_motions,
+                "missing_energy_combos": analysis.missing_energy_combos,
+                "opportunities": [o.model_dump() for o in opportunities],
+                "fe_source": fe_evidence.get("source", "none") if fe_evidence else "none",
+                "summary": analysis.summary,
+            }
+            _write_json(run_dir / "library_gap_report.json", gap_report)
+
+            # Write evidence_packets.jsonl (one JSON object per line)
+            evidence_path = run_dir / "evidence_packets.jsonl"
+            with evidence_path.open("w", encoding="utf-8") as fh:
+                for opp in opportunities:
+                    packet = {
+                        "opportunity_id": opp.opportunity_id,
+                        "category": opp.category,
+                        "priority": opp.priority,
+                        "description": opp.description,
+                        "target_effect_type": opp.target_effect_type,
+                        "target_energy": opp.target_energy,
+                        "fe_source": fe_evidence.get("source", "none") if fe_evidence else "none",
+                    }
+                    fh.write(json.dumps(packet, default=str) + "\n")
+
             phase_statuses.append(PhaseStatus(phase="analysis", status="completed"))
             logger.info(
-                "Analysis: %d recipes, %d opportunities identified",
+                "Analysis: %d recipes, %d opportunities identified (FE: %s)",
                 len(catalog_recipes),
                 len(opportunities),
+                fe_evidence.get("source", "none") if fe_evidence else "none",
             )
         except Exception as exc:
             logger.exception("Analysis phase failed")
@@ -175,7 +226,8 @@ def run_pipeline(config: PipelineConfig) -> RunManifest:
         phase_statuses.append(PhaseStatus(phase="analysis", status="skipped"))
 
     # ---- generation ----
-    if "generation" in active_phases and analysis is not None:
+    generation_enabled = config.enable_bootstrap and "generation" in active_phases
+    if generation_enabled and analysis is not None:
         try:
             recipe_candidates = generate_candidates(
                 opportunities=opportunities,
@@ -200,7 +252,7 @@ def run_pipeline(config: PipelineConfig) -> RunManifest:
             phase_statuses.append(
                 PhaseStatus(phase="generation", status="failed", error=str(exc)),
             )
-    elif "generation" in active_phases:
+    elif generation_enabled:
         phase_statuses.append(
             PhaseStatus(
                 phase="generation",
@@ -209,10 +261,16 @@ def run_pipeline(config: PipelineConfig) -> RunManifest:
             ),
         )
     else:
-        phase_statuses.append(PhaseStatus(phase="generation", status="skipped"))
+        skip_reason = None
+        if not config.enable_bootstrap:
+            skip_reason = "bootstrap disabled"
+        phase_statuses.append(
+            PhaseStatus(phase="generation", status="skipped", error=skip_reason),
+        )
 
     # ---- enrichment ----
-    if "enrichment" in active_phases:
+    enrichment_enabled = config.enable_enrich and "enrichment" in active_phases
+    if enrichment_enabled:
         try:
             metadata_candidates = generate_enrichments(catalog_recipes)
 
@@ -233,7 +291,12 @@ def run_pipeline(config: PipelineConfig) -> RunManifest:
                 PhaseStatus(phase="enrichment", status="failed", error=str(exc)),
             )
     else:
-        phase_statuses.append(PhaseStatus(phase="enrichment", status="skipped"))
+        skip_reason = None
+        if not config.enable_enrich:
+            skip_reason = "enrichment disabled"
+        phase_statuses.append(
+            PhaseStatus(phase="enrichment", status="skipped", error=skip_reason),
+        )
 
     # ---- validation ----
     if "validation" in active_phases:
@@ -315,13 +378,19 @@ def run_pipeline(config: PipelineConfig) -> RunManifest:
         input_paths={
             "output_dir": str(config.output_dir),
             "templates_dir": str(config.templates_dir or "default"),
+            "fe_dir": str(config.fe_dir or "none"),
             "dry_run": str(config.dry_run),
+            "enable_bootstrap": str(config.enable_bootstrap),
+            "enable_enrich": str(config.enable_enrich),
+            "synthetic_fallback": str(config.synthetic_fallback),
             "llm_model": config.llm_model,
             "max_opportunities": str(config.max_opportunities),
         },
         artifact_paths={
             "run_dir": str(run_dir),
             "catalog_analysis": str(run_dir / "catalog_analysis.json"),
+            "library_gap_report": str(run_dir / "library_gap_report.json"),
+            "evidence_packets": str(run_dir / "evidence_packets.jsonl"),
             "opportunities": str(run_dir / "opportunities.json"),
             "generated_recipe_candidates": str(
                 run_dir / "generated_recipe_candidates.json",
