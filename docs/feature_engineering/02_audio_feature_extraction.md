@@ -57,7 +57,7 @@ And if Part 1 was about turning sequence files into something trustworthy, this 
 
 ## AudioAnalyzer: The Assembly Line for Musical Clues
 
-The center of the whole thing is `AudioAnalyzer` in `packages/twinklr/core/audio/analyzer.py`.
+The center of the whole thing is `AudioAnalyzer`.
 
 At a high level, `AudioAnalyzer._process_audio()` is less "one clever algorithm" and more "a suspiciously busy assembly line." We load the audio, split it into better task-specific representations, extract a bunch of feature families, validate the outputs, and package the result into a single object that downstream systems can consume without playing scavenger hunt across twelve JSON blobs.
 
@@ -121,7 +121,7 @@ A song is a mess of overlapping information. Drums, vocals, pads, bass, strings,
 
 So we use HPSS — harmonic/percussive source separation.
 
-In `packages/twinklr/core/audio/harmonic/hpss.py`, `compute_hpss()` splits the waveform into two views:
+In `compute_hpss()` splits the waveform into two views:
 
 - **percussive**: transient-heavy content like drums and attacks
 - **harmonic**: sustained pitched content like chords, vocals, pads
@@ -164,7 +164,7 @@ Without a shared musical timebase, downstream logic turns into a swamp of millis
 
 So rhythm analysis does more than estimate BPM. It builds the canonical ruler we use everywhere else.
 
-In `packages/twinklr/core/audio/analyzer.py`, the rhythm stage pulls together:
+In `analyzer.py`, the rhythm stage pulls together:
 
 - beat tracking
 - tempo estimation
@@ -227,7 +227,7 @@ But it correlates with perceived loudness well enough to be incredibly useful.
 
 In practice, energy is the feature family we reach for constantly. If the planner knows where the song is quiet, rising, sustained, peaking, or collapsing, it can make a shocking number of decent decisions before it even looks at harmony or structure.
 
-The implementation lives in `packages/twinklr/core/audio/energy/multiscale.py`, and the key function is `extract_smoothed_energy()`.
+The implementation lives in `multiscale`, and the key function is `extract_smoothed_energy()`.
 
 ```python
 def extract_smoothed_energy(
@@ -292,11 +292,6 @@ And a lot of Christmas light choreography is really just that question asked ove
 ## Builds, Drops, and the Reason Static Thresholds Humiliated Us
 
 Once we had energy curves, the obvious next step was labeling the interesting parts: where the song is building, where it peaks, where it drops, and what kind of dynamic behavior it has overall.
-
-This lives across two files:
-
-- `packages/twinklr/core/audio/energy/profiling.py`
-- `packages/twinklr/core/audio/energy/builds_drops.py`
 
 The first job is classifying the song's overall energy personality with `classify_song_energy_profile()`. The second is using that profile to adapt build/drop detection so one set of thresholds doesn't embarrass us across wildly different songs.
 
@@ -369,12 +364,7 @@ Which is good. We want the planner making choreography decisions, not reenacting
 
 Energy tells us intensity. Spectral features tell us texture.
 
-This is where the pipeline starts answering squishier questions like: is the sound bright or dark? smooth or noisy? bass-heavy or top-heavy? stable or in motion? Those aren't direct effect mappings, but they matter a lot for visual feel.
-
-The core spectral extraction lives in:
-
-- `packages/twinklr/core/audio/spectral/basic.py`
-- `packages/twinklr/core/audio/spectral/bands.py`
+This is where the pipeline starts answering squishier questions like: is the sound bright or dark? smooth or noisy? bass-heavy or top-heavy? stable or in motion? Those aren't direct effect mappings, but they matter a lot for visual feel and are handled by core spectral extraction.
 
 The `basic` side computes four useful broad features:
 
@@ -446,12 +436,7 @@ That lasted about twelve minutes.
 
 If you want the system to react differently to stable harmony versus tension, or major warmth versus minor darkness, or a chorus that lifts because the harmonic center changes, you need at least a basic harmonic model. Not a conservatory degree. Just enough encoded theory to stop treating all pitched sound as interchangeable.
 
-The harmonic stack lives in:
-
-- `packages/twinklr/core/audio/harmonic/key.py`
-- `packages/twinklr/core/audio/harmonic/chords.py`
-
-The first step is chroma extraction: reduce the spectrum to 12 pitch classes over time. C, C#, D, and so on, independent of octave. That's a nice compact representation for tonal content.
+The first step of harmonic stack is chroma extraction: reduce the spectrum to 12 pitch classes over time. C, C#, D, and so on, independent of octave. That's a nice compact representation for tonal content.
 
 From there, key detection uses a Krumhansl-Schmuckler-style approach: correlate the song's pitch-class distribution against major and minor key profiles and pick the best match.
 
@@ -494,13 +479,6 @@ In theory, it's elegant. Songs repeat themselves. Verses resemble other verses. 
 And they do.
 
 Sometimes.
-
-The relevant code lives across:
-
-- `packages/twinklr/core/audio/structure/features.py`
-- `packages/twinklr/core/audio/structure/segmentation.py`
-- `packages/twinklr/core/audio/structure/sections.py`
-- `packages/twinklr/core/audio/structure/presets.py`
 
 The pipeline starts by summarizing features on the beat grid, because structure works better when you're comparing musically aligned slices than arbitrary frame windows. Then we build a self-similarity matrix, or SSM: a square matrix where each cell says how similar beat `i` is to beat `j`.
 
@@ -549,7 +527,7 @@ The causes were boring and deadly:
 
 So we added presets.
 
-`packages/twinklr/core/audio/structure/presets.py` lets us tune segmentation behavior for the kind of material we actually care about. Christmas songs are weirdly broad: quiet carols, pop remixes, orchestral versions, choir-heavy recordings, novelty tracks with sleigh bells weaponized to the point of absurdity. But they still benefit from different kernel sizes, minimum section lengths, and peak-picking thresholds than generic defaults.
+Presets lets us tune segmentation behavior for the kind of material we actually care about. Christmas songs are weirdly broad: quiet carols, pop remixes, orchestral versions, choir-heavy recordings, novelty tracks with sleigh bells weaponized to the point of absurdity. But they still benefit from different kernel sizes, minimum section lengths, and peak-picking thresholds than generic defaults.
 
 The adaptive part matters too. We don't just ask `is this novelty spike high?` We ask whether it's high relative to the track's novelty distribution, separated enough from neighboring peaks, and musically plausible given minimum phrase or section duration constraints.
 
@@ -567,7 +545,7 @@ At some point we realized we had a small zoo of useful signals and no humane way
 
 Energy says one thing. Onset density says another. Spectral flatness adds texture. Harmonic deviation from the key adds instability. All useful. Also all annoying to juggle separately if what you really want is a rough sense of dramatic pressure over time.
 
-So we built a composite tension curve in `packages/twinklr/core/audio/advanced/tension.py`.
+So we built a composite tension curve.
 
 The ingredients are simple enough:
 
@@ -619,8 +597,6 @@ Because once you have a profiled sequence corpus from Part 1 and a musically str
 That's Part 3: *Two Timelines Walk Into a Bar: Alignment, Phrases, and Finally Some Signal*.
 
 Which is where the audio features stop being descriptive and start becoming operational.
-
-![Thumbnail-style waveform turning into beats, chords, sections, and energy curves](assets/illustrations/ILL-02-08.png)
 
 ---
 

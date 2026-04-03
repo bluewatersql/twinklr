@@ -101,7 +101,7 @@ It’s also the difference between a corpus you can reason about and a folder of
 
 Once we stopped pretending a pack was “just a sequence file,” the orchestration got much clearer. We needed one top-level thing whose whole job was: ingest the ZIP, extract the bits we care about, join them with layout context, compute a few practical summaries, and persist artifacts so a crash doesn’t send us back to the start like some cruel roguelike.
 
-That’s `SequencePackProfiler` in `packages/twinklr/core/profiling/profiler.py`.
+That’s `SequencePackProfiler`.
 
 Its constructor tells the story pretty well:
 
@@ -193,7 +193,7 @@ Because the event has to carry enough baggage that later stages can mine it with
 
 ![Timeline illustration showing layered effect events across multiple models with callouts for effect type, start/end times, layer index, target, and settings](assets/illustrations/ILL-01-03.png)
 
-The base record lives in `packages/twinklr/core/profiling/models/events.py`, and the enriched version shows up in `packages/twinklr/core/profiling/models/profile.py`. The fields that actually matter look roughly like this:
+The base record lives in `events`, and the enriched version shows up in `profile`. The fields that actually matter look roughly like this:
 
 ```python
 class EffectEventRecord(BaseModel):
@@ -262,7 +262,7 @@ Same label. Different visual semantics. Same problem shows up with `Bars`, `On`,
 
 So we needed layout-aware enrichment to bridge that semantic gap. That’s where `LayoutProfiler` and `enrich_events()` earn their keep.
 
-`LayoutProfiler` in `packages/twinklr/core/profiling/layout/profiler.py` parses the layout XML, classifies model categories, extracts groups, and computes spatial statistics. It doesn’t just say “there are models.” It says things like: these are arches, those are matrices, these fixtures are DMX moving heads, this group spans the roofline, these models form a chain, and these targets sit in these approximate positions.
+`LayoutProfiler` parses the layout XML, classifies model categories, extracts groups, and computes spatial statistics. It doesn’t just say “there are models.” It says things like: these are arches, those are matrices, these fixtures are DMX moving heads, this group spans the roofline, these models form a chain, and these targets sit in these approximate positions.
 
 Then `enrich_events()` joins event records with that context. It attaches target kind, category, semantic tags, group membership, and simple spatial bounds so later stages can ask better questions than “how many Chases are there?”
 
@@ -286,7 +286,7 @@ It’s just leaving out the part you actually needed.
 
 One of the more practical things we built wasn’t fancy at all. It was just a cheap structural summary of a sequence so we could answer basic triage questions before running heavier processing.
 
-That’s `SequenceAnalyzer.fingerprint()` in `packages/twinklr/core/sequencer/analyzer.py`.
+That’s `SequenceAnalyzer.fingerprint()`.
 
 I have a soft spot for this one because it embodies a very healthy engineering instinct: don’t spend real money answering a question a $5 summary could have answered first.
 
@@ -346,7 +346,7 @@ At some point every data pipeline has to choose between being incremental or bei
 
 We chose incremental.
 
-Once a pack is profiled, we persist both the rich artifacts and a compact tracking record in the feature store. The shared model for that lives in `packages/twinklr/core/feature_store/models.py` as `ProfileRecord`.
+Once a pack is profiled, we persist both the rich artifacts and a compact tracking record in the feature store. The shared model for that lives in `ProfileRecord`.
 
 The fields are exactly the sort of thing you want when a batch job fails at 2 AM and you need to know what happened without becoming a forensic archaeologist:
 

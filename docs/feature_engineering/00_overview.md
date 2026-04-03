@@ -46,7 +46,7 @@ Those are different jobs, so they need different kinds of feature engineering.
 
 Audio analysis is mostly about turning a raw waveform into a timeline with structure. Sequence analysis is about turning XML and effect placements into evidence of human intent. One side tells us what the music is doing. The other tells us how experienced humans responded to it.
 
-The pipeline in `packages/twinklr/core/feature_engineering/pipeline.py` exists to bridge those worlds.
+The pipeline exists to bridge those worlds.
 
 Not just "process inputs." Bridge them.
 
@@ -79,11 +79,11 @@ A lot of the pipeline lives on a spectrum:
 
 That mix matters. Some things are just math. Some things need domain rules. Some things are fuzzy enough that an LLM is actually helpful, provided you don't let it freestyle too close to production.
 
-The codebase reflects that philosophy pretty directly. On the audio side, `packages/twinklr/core/audio/analyzer.py` orchestrates a stack that includes beat detection, section detection, harmonic analysis, energy curves, spectral features, and timeline exports. Some of those are straight DSP. Some are adaptive heuristics. For example, energy isn't just one curve; `extract_smoothed_energy()` in `packages/twinklr/core/audio/energy/multiscale.py` computes beat-level, phrase-level, and section-level views because the same song behaves differently depending on the time scale you're asking about.
+The codebase reflects that philosophy pretty directly. On the audio side, the `analyzer` orchestrates a stack that includes beat detection, section detection, harmonic analysis, energy curves, spectral features, and timeline exports. Some of those are straight DSP. Some are adaptive heuristics. For example, energy isn't just one curve; `extract_smoothed_energy()` computes beat-level, phrase-level, and section-level views because the same song behaves differently depending on the time scale you're asking about.
 
-And the detectors got annoyingly context-aware because the naive versions were bad. `detect_builds_and_drops()` in `packages/twinklr/core/audio/energy/builds_drops.py` first classifies the song's energy profile before deciding what even counts as a build. Which sounds fancy until you realize it was born from a humiliating bug class: ballads kept getting analyzed like they were EDM, and the resulting "drop detection" had all the musical sensitivity of a falling cinder block.
+And the detectors got annoyingly context-aware because the naive versions were bad. `detect_builds_and_drops()` first classifies the song's energy profile before deciding what even counts as a build. Which sounds fancy until you realize it was born from a humiliating bug class: ballads kept getting analyzed like they were EDM, and the resulting "drop detection" had all the musical sensitivity of a falling cinder block.
 
-On the sequence side, we lean hard on explicit structure. `SequencePackProfiler` in `packages/twinklr/core/profiling/profiler.py` ingests zip packs, parses xLights sequences, extracts effect events, computes statistics, profiles layouts, and writes artifacts. Then `enrich_events()` in `packages/twinklr/core/profiling/enrich.py` joins those events with layout context so "effect on target X" becomes something more like "movement effect on a left-roof moving head group with this spatial footprint."
+On the sequence side, we lean hard on explicit structure. `SequencePackProfiler` ingests zip packs, parses xLights sequences, extracts effect events, computes statistics, profiles layouts, and writes artifacts. Then `enrich_events()` joins those events with layout context so "effect on target X" becomes something more like "movement effect on a left-roof moving head group with this spatial footprint."
 
 That last step is huge. Because choreography isn't just *when* something happened. It's *what* moved, *where* it lived in the display, and *how* it related to everything around it.
 
@@ -239,8 +239,6 @@ That's the goal, anyway.
 We *think* we figured out enough of the reading problem to make planning possible.
 
 But I should be honest: several of these stages only exist because the earlier versions failed in entertaining ways. Which is great news for the rest of the series, because nothing improves a technical explanation quite like a backlog full of bad ideas with timestamps.
-
-![Thumbnail-style concept of an xLights XML file cracked open with beats and light patterns spilling out](assets/illustrations/ILL-00-05.png)
 
 ---
 

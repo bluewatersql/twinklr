@@ -52,7 +52,7 @@ The important thing about these artifacts is that they shape planner decisions w
 
 That distinction mattered a lot once we started wiring this into the sequencer, because the planner still needs room to react to the song, the fixture layout, and the current state of the show. If we over-constrain it, the result gets weirdly rigid. If we under-constrain it, it starts making choices with the confidence of a raccoon opening your trash can.
 
-The glue code for this lives in `packages/twinklr/core/agents/sequencer/group_planner/context_shaping.py`. That module takes the mined knowledge we’ve been building across the series and turns it into planner-facing context: what recipes are relevant, what styles are plausible, what transitions are common, what color motion tends to cohere, and what vocabulary the planner is even allowed to speak.
+The glue code for this lives in `context_shaping`. That module takes the mined knowledge we’ve been building across the series and turns it into planner-facing context: what recipes are relevant, what styles are plausible, what transitions are common, what color motion tends to cohere, and what vocabulary the planner is even allowed to speak.
 
 At a high level, the planner context ends up looking something like this:
 
@@ -101,13 +101,13 @@ That’s simplified, but it captures the real intent: we’re not handing the pl
 
 ### Recipes are the obvious part
 
-Recipes from `packages/twinklr/core/feature_engineering/recipes/promotion.py` are the clearest artifact because they’re executable. A promoted recipe already survived mining, synthesis, and quality gates. So if the current phrase looks like a strong match for “alternating sweep on grouped roofline movers during medium-high energy chorus,” that recipe goes into the candidate set with a decent prior.
+Recipes are the clearest artifact because they’re executable. A promoted recipe already survived mining, synthesis, and quality gates. So if the current phrase looks like a strong match for “alternating sweep on grouped roofline movers during medium-high energy chorus,” that recipe goes into the candidate set with a decent prior.
 
 But even there, the planner isn’t forced to use it. Layout compatibility matters. Section context matters. Current visual state matters. A recipe that was great after a gradual build can look ridiculous after a quiet vocal moment.
 
 ### Transition guidance is the less glamorous, more important part
 
-The transition model in `packages/twinklr/core/feature_engineering/transitions_v2/markov.py` turned out to be one of those things that sounds boring until you remove it.
+The transition model in `markov` turned out to be one of those things that sounds boring until you remove it.
 
 Without transition guidance, the planner can still pick locally reasonable effects. It just has a bad habit of sequencing them like a person shuffling a playlist while blindfolded. Every moment is individually defensible. The whole thing is nonsense.
 

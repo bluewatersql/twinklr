@@ -31,7 +31,7 @@ Here's the trick that took us longer than it should have to admit: sequence even
 
 The sequence side is literal. Start time. End time. Target fixture. Effect type. Layer. Maybe some parsed settings if the xLights gods are feeling generous.
 
-The audio side is contextual. Beat positions. Bar numbers. Section labels. Chord spans. Energy sampled at multiple resolutions. Tension curves. Downbeats. The whole “what is the song doing right now?” stack from `packages/twinklr/core/audio/analyzer.py`.
+The audio side is contextual. Beat positions. Bar numbers. Section labels. Chord spans. Energy sampled at multiple resolutions. Tension curves. Downbeats. The whole “what is the song doing right now?” stack.
 
 So yes, both sides know what happened around 45.23 seconds. But only one side knows whether that moment is the third beat of a chorus with rising phrase energy and a harmonic change landing under it.
 
@@ -89,7 +89,7 @@ But this is the part where the dataset stops being merely organized and starts b
 
 ## Inside `TemporalAlignmentEngine.align_events()`
 
-The alignment engine lives in `packages/twinklr/core/feature_engineering/alignment/engine.py`, and its job is gloriously unsexy: take extracted sequence events, take analyzed song features, and join them without making a mess.
+The alignment engine's job is gloriously unsexy: take extracted sequence events, take analyzed song features, and join them without making a mess.
 
 That's important, because this stage is **not** trying to do deep inference. It's not “understanding choreography.” It's doing careful temporal bookkeeping so later stages can pretend we were smart all along.
 
@@ -157,7 +157,7 @@ class TemporalAlignmentEngine:
 
 The interesting part isn't the code volume. It's the annotation layers.
 
-Beat and bar assignment come from the timing data produced by the audio stack in `packages/twinklr/core/audio/analyzer.py`. Energy isn't one number; we usually care about at least beat-scale and phrase-scale energy from `extract_smoothed_energy()` in `packages/twinklr/core/audio/energy/multiscale.py`. Tension comes from the higher-level harmonic and dynamic analysis. Chords come from harmonic spans. Sections come from structure detection.
+Beat and bar assignment come from the timing data produced by the audio stack. Energy isn't one number; we usually care about at least beat-scale and phrase-scale energy from `extract_smoothed_energy()`. Tension comes from the higher-level harmonic and dynamic analysis. Chords come from harmonic spans. Sections come from structure detection.
 
 So one tiny XML event gets wrapped in several overlapping views of the song:
 - **rhythmic context**: beat, bar, beat-in-bar, downbeat proximity
@@ -248,9 +248,7 @@ Which is what we wanted all along, even if it took us three posts to admit it.
 
 ## PhraseEncoder: Turning Stacks of Effects Into Choreographic Sentences
 
-The phrase logic lives in `packages/twinklr/core/feature_engineering/phrases/encoder.py`, plus a few helper modules in `packages/twinklr/core/feature_engineering/phrases/`.
-
-This is where aligned events stop being isolated annotations and start becoming compositional units.
+The phrase logic lives plus a few helper modules is where aligned events stop being isolated annotations and start becoming compositional units.
 
 The grouping rules are intentionally conservative. We don't try to infer some grand hidden grammar of Christmas lights from first principles. We mostly ask a practical question:
 
@@ -410,8 +408,6 @@ If we get this layer wrong, the mining stage learns bad phrases, the style stage
 If we get it mostly right, the corpus starts to speak.
 
 And for the first time in this pipeline, it says something worth listening to.
-
-![Diagram showing corpus transformation from package profile artifacts and song bundle into aligned events and then effect phrases ready for mining](assets/illustrations/ILL-03-05.png)
 
 ---
 

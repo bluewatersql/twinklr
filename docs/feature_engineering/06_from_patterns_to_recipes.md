@@ -51,7 +51,7 @@ The promotion step is basically our way of saying: congratulations, you are no l
 
 ## Inside the Promotion Pipeline
 
-The code that makes this judgment call lives in `packages/twinklr/core/feature_engineering/recipes/promotion.py`, and the main character is, very sensibly, `PromotionPipeline`.
+The code that makes this judgment call lives in `promotion`, and the main character is, very sensibly, `PromotionPipeline`.
 
 The shape of the thing is straightforward: feed it mined template candidates plus their corpus-level metadata, and it decides which ones get promoted, which ones get rejected, and why. The "why" mattered a lot more than I expected. A reject list with reasons turned out to be absurdly useful for debugging thresholds and for revisiting old candidates after the corpus grew.
 
@@ -149,7 +149,7 @@ That "yet" matters. As the corpus grows, support rises. Cross-pack coverage impr
 
 Once a pattern survives promotion, we still have a problem: mined templates are descriptive. The planner needs prescriptive objects.
 
-This is where `packages/twinklr/core/feature_engineering/recipes/recipe_synthesizer.py` comes in. The star of that file is `RecipeSynthesizer`, whose job is to take a cluster of observed instances and collapse it into an `EffectRecipe` the sequencer can actually use.
+This is where `recipe_synthesizer` comes in. The star of that file is `RecipeSynthesizer`, whose job is to take a cluster of observed instances and collapse it into an `EffectRecipe` the sequencer can actually use.
 
 That means deciding what the recipe *is*, not just what it tended to look like in aggregate.
 
@@ -288,7 +288,7 @@ We did *not* replace the hand-authored recipe catalog with promoted recipes.
 
 That would've been very funny for about six minutes.
 
-The merged catalog lives on the sequencer side in `packages/twinklr/core/sequencer/templates/group/recipe_catalog.py`, and the operating principle is simple: builtins are the trusted base vocabulary, promoted recipes extend it.
+The merged catalog lives on the sequencer side in `recipe_catalog`, and the operating principle is simple: builtins are the trusted base vocabulary, promoted recipes extend it.
 
 That's the peace treaty.
 
@@ -326,9 +326,6 @@ Feature engineering produces rich, messy, corpus-shaped artifacts. Sequencing wa
 So we put adapters in the middle.
 
 The relevant code lives in:
-
-- `packages/twinklr/core/feature_engineering/adapters/group_adapter.py`
-- `packages/twinklr/core/feature_engineering/adapters/macro_adapter.py`
 
 And the key builders are `GroupAdapterBuilder` and `MacroAdapterBuilder`.
 
@@ -412,7 +409,7 @@ Taxonomy labels are descriptive. Planning roles are operational.
 
 A template might be categorized as a sweep, fan, pulse accent, or texture layer. That's useful, but the planner still needs to know whether that thing should behave like a **base**, **rhythm**, **accent**, or supporting layer inside a section plan.
 
-That's what `packages/twinklr/core/feature_engineering/roles/assigner.py` is for. The `TargetRolesAssigner` bridges corpus vocabulary to planner role slots.
+The `TargetRolesAssigner` bridges corpus vocabulary to planner role slots.
 
 Conceptually it looks like this:
 
@@ -447,7 +444,7 @@ So let's zoom out, because we've now spent six parts building a machine whose wh
 
 The arc looks like this:
 
-- **Profiling** gave us structured artifacts from xLights packs: layouts, events, palettes, inventories, metadata. That's the `SequencePackProfiler` layer back in `packages/twinklr/core/profiling/profiler.py`.
+- **Profiling** gave us structured artifacts from xLights packs: layouts, events, palettes, inventories, metadata. That's the `SequencePackProfiler` layer.
 - **Audio analysis** gave us beat grids, sections, energy curves, harmony, and dynamic features from the music itself. That's the `AudioAnalyzer` side and all the DSP trouble we lovingly documented in Part 2.
 - **Alignment** joined those worlds so effect events stopped being lonely timestamps and started living inside musical context.
 - **Phrase extraction and mining** gave us recurring templates and motif families from real human-authored sequences.
@@ -472,8 +469,6 @@ That's Part 7.
 And honestly, it's the only question that really matters.
 
 ![Full pipeline arc from raw data through promotion to planner-ready outputs](assets/illustrations/ILL-00-01.png)
-
-![Thumbnail-style funnel of mined templates with a few stamped recipe cards emerging](assets/illustrations/ILL-06-06.png)
 
 ---
 

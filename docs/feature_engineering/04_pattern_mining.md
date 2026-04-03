@@ -51,7 +51,7 @@ That's the framing for this post: discovery, not verdict. We're mining candidate
 
 ## Template Mining: If Enough Designers Do the Same Thing, It's Probably Not an Accident
 
-The first serious pass at this lives in `packages/twinklr/core/feature_engineering/templates/miner.py`, inside `TemplateMiner`.
+The first serious pass at this lives inside `TemplateMiner`.
 
 The basic premise is gloriously unromantic: if many independent phrase instances reduce to the same structural signature, maybe that's a real template. Not always. But maybe. And "maybe" is a lot better than "we vibe-coded a choreography ontology at 2 a.m."
 
@@ -176,7 +176,7 @@ And honestly, this metric saved us from building a very sophisticated machine fo
 
 Individual templates are useful, but they aren't the whole story. Designers don't usually think in isolated one-bar moves. They think in little chains. Build something. Hit an accent. Release the tension. Reset. Repeat with variation.
 
-That's what `packages/twinklr/core/feature_engineering/motifs/miner.py` is for.
+That's what `miner.py` is for.
 
 `MotifMiner` works one level up from template mining. Instead of asking, "what recurring phrase shape do we see?" it asks, "what recurring *sequence of templates* do we see?" That's a much better way to capture flow.
 
@@ -238,7 +238,7 @@ Once we had mined templates, the next temptation was to force them all into clea
 
 That instinct was wrong.
 
-The code for clustering lives in `packages/twinklr/core/feature_engineering/templates/clusterer.py`, and the key choice there was using DBSCAN instead of k-means.
+The code for clustering lives in the `clusterer`, and the key choice there was using DBSCAN instead of k-means.
 
 Why? Because k-means assumes the world politely consists of roughly spherical clusters and that every point deserves a cluster assignment. Our corpus did not get that memo.
 
@@ -312,7 +312,7 @@ Then we hit a less glamorous problem: naming.
 
 Different designers, packs, and extraction paths often describe very similar patterns with different labels. Sometimes the names are helpful. Sometimes they're inherited from xLights effect metadata. Sometimes they're basically "blue sweep fast 2," and you just have to respect the chaos.
 
-Before we could build a useful taxonomy, we had to normalize aliases in `packages/twinklr/core/feature_engineering/normalization/clustering.py`.
+Before we could build a useful taxonomy, we had to normalize aliases.
 
 Conceptually, it works like this:
 
@@ -357,7 +357,7 @@ At some point, vectors and clusters stop being enough. Downstream systems need w
 
 Not poetic words. Useful words.
 
-This is where `packages/twinklr/core/feature_engineering/taxonomy/classifier.py` comes in. The job of `TaxonomyClassifier` is to map mined templates into a shared hierarchical vocabulary the rest of the stack can actually reason about.
+This is where `classifier` comes in. The job of `TaxonomyClassifier` is to map mined templates into a shared hierarchical vocabulary the rest of the stack can actually reason about.
 
 Because a planner cannot sensibly ask for "the nearest 128-dimensional vector with medium onset-aligned accent energy and moderate spread symmetry." I mean, technically it can. But that way lies suffering. It's much better if it can ask for something like `accent/pulse`, `build/ramp`, or `transition/release/fanout`.
 
@@ -442,7 +442,7 @@ Until then, the taxonomy is basically the corpus learning how to talk about itse
 
 Once the template catalog gets big enough, brute-force similarity search starts feeling adorable in the worst possible way.
 
-That's why we added `AnnTemplateRetrievalIndexer` in `packages/twinklr/core/feature_engineering/retrieval/ann_indexer.py`.
+That's why we added `AnnTemplateRetrievalIndexer`.
 
 The use case is straightforward: the planner has some current musical and orchestration context and needs a few contextually similar templates *fast*. Not after scanning the whole catalog, sorting everything, and making the CPU file a complaint with HR.
 
@@ -512,8 +512,6 @@ And honestly, this was the point where the project started feeling less like fea
 
 We love Steve. We just don't want the entire planner turning into Steve.
 
-![Thumbnail-style miner map made of phrase blocks, clusters, and taxonomy labels](assets/illustrations/ILL-04-07.png)
-
 ---
 
 ## About twinklr
@@ -526,169 +524,5 @@ Here's the honest disclaimer: we're not professional lighting designers. We're d
 This blog is the running log of our journey: the wins, the faceplants, the weird breakthroughs, and the lessons learned the hard way (often repeatedly). We'll share what we're building, what breaks, and why certain architectural decisions matter — especially when the goal is to turn "song" into "show" without the lights looking like they're having an existential crisis.
 
 If you want to learn alongside us — or jump in and contribute — come say hi on GitHub: https://github.com/bluewatersql/twinklr/tree/main
+
 ---
-
-## Illustration Manifest (for this part)
-
-[
-  {
-    "id": "ILL-04-00",
-    "title": "Banner — Mining the Phrase Corpus",
-    "post_part": 4,
-    "file": "part_04/ILL-04-00.png",
-    "placement": "top_of_post",
-    "alt": "Banner showing aligned phrase blocks being mined into templates, motifs, clusters, and taxonomy labels",
-    "prompt": "VIEW: A wide banner of thousands of aligned phrase cards flowing through a discovery pipeline and emerging as templates, motifs, clusters, and taxonomy labels.\nComposition approach: OVERHEAD VIEW like a treasure map spread across a table.\nShow phrase blocks, cluster circles, motif chains, taxonomy tags, and a few false leads crossed out.\nAdd subtle holiday context with a small house display blueprint and festive palette chips. No concert imagery.",
-    "style_profile": "twinklr_sketch_light_v2",
-    "model": "gpt-image-1.5",
-    "size": "1536x1024",
-    "type": "banner",
-    "variants": 2,
-    "needs_time": false,
-    "needs_labels": true,
-    "background": "opaque",
-    "output_format": "png",
-    "quality": "high",
-    "composition_approach": "OVERHEAD VIEW"
-  },
-  {
-    "id": "ILL-04-01",
-    "title": "Template Mining Pipeline",
-    "post_part": 4,
-    "file": "part_04/ILL-04-01.png",
-    "placement": "after_section:Template Mining: If Enough Designers Do the Same Thing, It's Probably Not an Accident",
-    "alt": "Phrases flowing through signature extraction and threshold filters into mined templates",
-    "prompt": "VIEW: A mining pipeline where many phrase instances are distilled into recurring templates through signature extraction and support filters.\nComposition approach: SEQUENCE STRIP with 5 panels.\nPanel 1: many aligned phrase cards from different packs.\nPanel 2: content signatures and orchestration signatures extracted.\nPanel 3: support thresholds and distinct-pack filters.\nPanel 4: surviving recurring patterns grouped.\nPanel 5: MinedTemplate cards with support and stability badges.\nUse small designer-pack badges to show multi-pack recurrence. Keep the setting tied to residential holiday displays.",
-    "style_profile": "twinklr_sketch_light_v2",
-    "model": "gpt-image-1.5",
-    "size": "1024x1024",
-    "type": "diagram",
-    "variants": 2,
-    "needs_time": false,
-    "needs_labels": true,
-    "background": "opaque",
-    "output_format": "png",
-    "quality": "high",
-    "composition_approach": "SEQUENCE STRIP"
-  },
-  {
-    "id": "ILL-04-02",
-    "title": "Cross-Pack Stability Comparison",
-    "post_part": 4,
-    "file": "part_04/ILL-04-02.png",
-    "placement": "after_section:Cross-Pack Stability: The Metric That Saved Us From Learning One Person's Weird Habits",
-    "alt": "Comparison of a pattern concentrated in one designer corpus versus one distributed across many packs",
-    "prompt": "VIEW: A side-by-side comparison of two patterns with similar raw counts but very different cross-pack stability.\nComposition approach: SPLIT PANEL.\nLeft panel: one pattern repeated 50 times but concentrated in 2 packs from one designer, shown as a lopsided distribution.\nRight panel: another pattern repeated 20 times across 15 packs and many designers, shown as a broad stable distribution.\nAdd support count and cross-pack stability badges to each. Use a careful TF-IDF-like visual metaphor without text overload.\nInclude tiny house icons for packs and designer badges for sources.",
-    "style_profile": "twinklr_sketch_light_v2",
-    "model": "gpt-image-1.5",
-    "size": "1024x1024",
-    "type": "micro",
-    "variants": 2,
-    "needs_time": false,
-    "needs_labels": true,
-    "background": "opaque",
-    "output_format": "png",
-    "quality": "high",
-    "composition_approach": "SPLIT PANEL"
-  },
-  {
-    "id": "ILL-04-03",
-    "title": "Motif Chains Across Songs",
-    "post_part": 4,
-    "file": "part_04/ILL-04-03.png",
-    "placement": "after_section:Motifs: Because Designers Don't Speak in Single Templates",
-    "alt": "Repeating template chains across multiple songs with matching temporal spacing",
-    "prompt": "VIEW: Several songs shown as short template timelines, with repeating multi-template chains highlighted as motifs.\nComposition approach: TIMELINE AXIS.\nShow 3 or 4 song strips, each with template blocks labeled by family.\nHighlight a recurring chain such as build -> accent burst -> release pattern with matching spacing across songs.\nUse arrows and brackets to show higher-order composition beyond single templates. Small festive display icons can sit beside each song strip.",
-    "style_profile": "twinklr_sketch_light_v2",
-    "model": "gpt-image-1.5",
-    "size": "1024x1024",
-    "type": "diagram",
-    "variants": 2,
-    "needs_time": true,
-    "needs_labels": true,
-    "background": "opaque",
-    "output_format": "png",
-    "quality": "high",
-    "composition_approach": "TIMELINE AXIS"
-  },
-  {
-    "id": "ILL-04-04",
-    "title": "DBSCAN Clusters and Noise",
-    "post_part": 4,
-    "file": "part_04/ILL-04-04.png",
-    "placement": "after_section:DBSCAN and the Art of Letting Outliers Be Weird",
-    "alt": "Scatter plot style illustration of template vectors with DBSCAN clusters and noise points",
-    "prompt": "VIEW: A scatter-plot style feature space of template vectors, with dense clusters highlighted and outliers intentionally left as noise.\nComposition approach: GHOSTED POSITIONS.\nShow several colored clusters with soft boundaries, plus isolated points labeled noise.\nAdd small callouts for effect distribution, duration, energy context, and fixture context as the axes or feature ingredients.\nInclude a note that forcing every point into a cluster made the output worse. Keep the visual playful but technically clear.",
-    "style_profile": "twinklr_sketch_light_v2",
-    "model": "gpt-image-1.5",
-    "size": "1024x1024",
-    "type": "micro",
-    "variants": 2,
-    "needs_time": false,
-    "needs_labels": true,
-    "background": "opaque",
-    "output_format": "png",
-    "quality": "high",
-    "composition_approach": "GHOSTED POSITIONS"
-  },
-  {
-    "id": "ILL-04-05",
-    "title": "Taxonomy Tree",
-    "post_part": 4,
-    "file": "part_04/ILL-04-05.png",
-    "placement": "after_section:Taxonomy: Giving the Corpus a Vocabulary It Can Actually Share",
-    "alt": "Hierarchical taxonomy tree with example templates attached at leaves",
-    "prompt": "VIEW: A hierarchical taxonomy tree that turns raw mined patterns into a shared vocabulary the planner can use.\nComposition approach: CUTAWAY/EXPLODED.\nShow root categories branching into mid-level families and leaf labels such as accent, pulse, sweep, build, release, texture.\nAttach small example template cards at several leaves.\nUse a planner vocabulary card at the side to show why names beat raw vectors. Add subtle holiday motifs and a tiny house display icon.",
-    "style_profile": "twinklr_sketch_light_v2",
-    "model": "gpt-image-1.5",
-    "size": "1024x1024",
-    "type": "diagram",
-    "variants": 2,
-    "needs_time": false,
-    "needs_labels": true,
-    "background": "opaque",
-    "output_format": "png",
-    "quality": "high",
-    "composition_approach": "CUTAWAY/EXPLODED"
-  },
-  {
-    "id": "ILL-04-06",
-    "title": "ANN Retrieval Concept",
-    "post_part": 4,
-    "file": "part_04/ILL-04-06.png",
-    "placement": "after_section:ANN Retrieval: Because 'Just Scan the Whole Catalog' Stops Being Cute at Scale",
-    "alt": "Query context vector pulling nearest templates from a large catalog cloud",
-    "prompt": "VIEW: A query context vector reaching into a large cloud of template embeddings and pulling back the nearest useful templates.\nComposition approach: FRAME STRIP with 3 panels.\nPanel 1: planner query context card with musical and fixture constraints.\nPanel 2: large embedding cloud of template candidates.\nPanel 3: nearest templates retrieved quickly, grouped by similarity and taxonomy.\nUse small festive template cards and a residential display silhouette to keep the domain grounded.",
-    "style_profile": "twinklr_sketch_light_v2",
-    "model": "gpt-image-1.5",
-    "size": "1024x1024",
-    "type": "diagram",
-    "variants": 2,
-    "needs_time": false,
-    "needs_labels": true,
-    "background": "opaque",
-    "output_format": "png",
-    "quality": "high",
-    "composition_approach": "FRAME STRIP"
-  },
-  {
-    "id": "ILL-04-07",
-    "title": "Index Card — Choreography Gold Mine",
-    "post_part": 4,
-    "file": "part_04/ILL-04-07.png",
-    "placement": "end_of_post",
-    "alt": "Thumbnail-style miner map made of phrase blocks, clusters, and taxonomy labels",
-    "prompt": "VIEW: A bold square thumbnail of a treasure map made from phrase blocks, cluster circles, and taxonomy tags, with one or two false leads crossed out.\nComposition approach: FOCAL ZOOM with the mined template card and cluster map large and central.\nInclude a tiny festive house display icon to anchor the domain.",
-    "style_profile": "twinklr_sketch_light_v2",
-    "model": "gpt-image-1.5",
-    "size": "1024x1024",
-    "type": "index_card",
-    "variants": 2,
-    "needs_time": false,
-    "needs_labels": true,
-    "background": "opaque",
-    "output_format": "png",
-    "quality": "high",
-    "composition_approach": "FOCAL ZOOM"
-  }
-]
