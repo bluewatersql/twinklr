@@ -610,4 +610,5 @@ Here's the honest disclaimer: we're not professional lighting designers. We're d
 This blog is the running log of our journey: the wins, the faceplants, the weird breakthroughs, and the lessons learned the hard way, often repeatedly. We'll share what we're building, what breaks, and why certain architectural decisions matter — especially when the goal is to turn `song` into `show` without the lights looking like they're having an existential crisis.
 
 If you want to learn alongside us — or jump in and contribute — come say hi on GitHub: https://github.com/bluewatersql/twinklr/tree/main
+
 ---
