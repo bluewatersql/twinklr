@@ -7,12 +7,66 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import nltk.data
 import pytest
 
 from twinklr.core.config.fixtures.instances import FixtureInstance
 from twinklr.core.config.poses import PanPose, TiltPose
 from twinklr.core.sequencer.models.enum import TemplateRole
 from twinklr.core.sequencer.timing.beat_grid import BeatGrid
+
+# ============================================================================
+# Vendored NLTK resources — offline test data
+# ============================================================================
+# g2p_en (used by twinklr.core.audio.phonemes.g2p_service) needs NLTK's
+# averaged_perceptron_tagger_eng POS tagger. Rather than requiring a live
+# `nltk.download()` during test collection/execution (network-hostile), the
+# extracted resource is vendored under tests/vendor/nltk_data/ and prepended
+# to NLTK's search path here, before any test imports g2p_en. This makes
+# tests/unit/audio/phonemes/test_g2p_service.py and test_bundle.py pass with
+# no network access at test-run time. Production code (audio/phonemes/*) is
+# untouched — this only affects where NLTK looks for data during pytest.
+_VENDORED_NLTK_DATA = Path(__file__).resolve().parent / "vendor" / "nltk_data"
+if _VENDORED_NLTK_DATA.is_dir() and str(_VENDORED_NLTK_DATA) not in nltk.data.path:
+    nltk.data.path.insert(0, str(_VENDORED_NLTK_DATA))
+
+# ============================================================================
+# requires_template_data marker — fixture-presence skip
+# ============================================================================
+# A handful of tests (and the production code paths they exercise) still
+# hardcode the legacy, gitignored `data/templates/index.json` path rather
+# than the tracked `catalog/templates/` seed set (see
+# `catalog/templates/README.md` and `build/specs/phase-0-foundation/
+# P0-T2-structural-test-repair.md`). Repointing those production call sites
+# is P1K-T3's job, not this one. Until that lands, tests marked
+# `requires_template_data` skip cleanly instead of failing when the legacy
+# path is absent — same pattern as
+# `tests/integration/profiling/test_profiler_integration.py`'s
+# `pytest.skip()` on absent vendor fixtures.
+
+_LEGACY_TEMPLATES_INDEX = Path(__file__).resolve().parent.parent / "data" / "templates" / "index.json"
+
+
+def _legacy_template_data_available() -> bool:
+    return _LEGACY_TEMPLATES_INDEX.exists()
+
+
+def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
+    """Skip `requires_template_data`-marked tests when the legacy data is absent."""
+    if _legacy_template_data_available():
+        return
+    skip_reason = pytest.mark.skip(
+        reason=(
+            "data/templates/index.json not present; this test depends on a production "
+            "code path not yet repointed to catalog/templates/ (see P1K-T3). Run the "
+            "recipe_builder promotion pipeline to populate data/templates/ locally, or "
+            "wait for P1K-T3's repoint."
+        )
+    )
+    for item in items:
+        if "requires_template_data" in item.keywords:
+            item.add_marker(skip_reason)
+
 
 # ============================================================================
 # Path Fixtures

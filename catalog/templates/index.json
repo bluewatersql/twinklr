@@ -1,0 +1,69 @@
+{
+  "entries": [
+    {
+      "recipe_id": "gtpl_base_wash_split",
+      "name": "Base Wash Split",
+      "template_type": "BASE",
+      "visual_intent": "ABSTRACT",
+      "tags": [
+        "wash",
+        "ambient",
+        "seed"
+      ],
+      "source": "builtin",
+      "file": "builtins/gtpl_base_wash_split.json"
+    },
+    {
+      "recipe_id": "gtpl_rhythm_chase_single",
+      "name": "Rhythm Chase Single",
+      "template_type": "RHYTHM",
+      "visual_intent": "ABSTRACT",
+      "tags": [
+        "chase",
+        "drive",
+        "seed"
+      ],
+      "source": "builtin",
+      "file": "builtins/gtpl_rhythm_chase_single.json"
+    },
+    {
+      "recipe_id": "gtpl_rhythm_alternate_ab",
+      "name": "Rhythm Alternate A/B",
+      "template_type": "RHYTHM",
+      "visual_intent": "ABSTRACT",
+      "tags": [
+        "alternate",
+        "drive",
+        "seed"
+      ],
+      "source": "builtin",
+      "file": "builtins/gtpl_rhythm_alternate_ab.json"
+    },
+    {
+      "recipe_id": "gtpl_accent_hit_color",
+      "name": "Accent Hit Color",
+      "template_type": "ACCENT",
+      "visual_intent": "ABSTRACT",
+      "tags": [
+        "hit",
+        "accent",
+        "seed"
+      ],
+      "source": "builtin",
+      "file": "builtins/gtpl_accent_hit_color.json"
+    },
+    {
+      "recipe_id": "gtpl_accent_hit_white",
+      "name": "Accent Hit White",
+      "template_type": "ACCENT",
+      "visual_intent": "ABSTRACT",
+      "tags": [
+        "hit",
+        "accent",
+        "seed"
+      ],
+      "source": "builtin",
+      "file": "builtins/gtpl_accent_hit_white.json"
+    }
+  ]
+}

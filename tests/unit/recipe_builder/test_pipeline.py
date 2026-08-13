@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from twinklr.core.recipe_builder.pipeline import PipelineConfig, run_pipeline
 
 
@@ -61,6 +63,7 @@ class TestPipelineIntegration:
         manifest = self._run(tmp_path)
         assert manifest.summary_metrics.opportunities_identified > 0
 
+    @pytest.mark.requires_template_data
     def test_catalog_loaded(self, tmp_path: Path):
         manifest = self._run(tmp_path)
         assert manifest.summary_metrics.total_recipes_in_catalog > 0

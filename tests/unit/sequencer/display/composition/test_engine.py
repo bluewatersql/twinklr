@@ -54,12 +54,12 @@ from twinklr.core.sequencer.vocabulary import (
 from twinklr.core.sequencer.vocabulary.choreography import TargetType
 
 _TEMPLATES_DIR = (
-    Path(__file__).resolve().parent.parent.parent.parent.parent.parent / "data" / "templates"
+    Path(__file__).resolve().parent.parent.parent.parent.parent.parent / "catalog" / "templates"
 )
 
 
 def _load_recipe_compiler() -> RecipeCompiler:
-    """Create RecipeCompiler backed by data/templates."""
+    """Create RecipeCompiler backed by the tracked catalog/templates seed set."""
     store = TemplateStore.from_directory(_TEMPLATES_DIR)
     catalog = RecipeCatalog.from_store(store)
     return RecipeCompiler(catalog=catalog)
@@ -120,7 +120,7 @@ def _make_engine(**kwargs: Any) -> CompositionEngine:
     """Create a CompositionEngine with sensible defaults.
 
     Accepts the same kwargs as ``CompositionEngine.__init__``.
-    Always includes the RecipeCompiler from data/templates.
+    Always includes the RecipeCompiler from catalog/templates.
     """
     defaults: dict[str, Any] = {
         "beat_grid": _make_beat_grid(),

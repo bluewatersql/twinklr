@@ -1,0 +1,54 @@
+{
+  "recipe_id": "gtpl_accent_hit_color",
+  "name": "Accent Hit Color",
+  "description": "Punchy color strobe hit for the ACCENT lane; seed fixture covering the 'hit' keyword heuristic and multi-lane blend mode assignment.",
+  "recipe_version": "1.0.0",
+  "effect_family": "strobe",
+  "template_type": "ACCENT",
+  "visual_intent": "ABSTRACT",
+  "tags": [
+    "hit",
+    "accent",
+    "seed"
+  ],
+  "timing": {
+    "bars_min": 1,
+    "bars_max": 2,
+    "beats_per_bar": 4,
+    "loop_len_ms": null,
+    "emphasize_downbeats": true
+  },
+  "palette_spec": {
+    "mode": "DICHROME",
+    "palette_roles": [
+      "accent"
+    ]
+  },
+  "layers": [
+    {
+      "layer_index": 0,
+      "layer_name": "hit_color",
+      "layer_depth": "ACCENT",
+      "effect_type": "PLACEHOLDER",
+      "blend_mode": "SCREEN",
+      "mix": 1.0,
+      "params": {},
+      "motion": [
+        "STROBE"
+      ],
+      "density": 0.8,
+      "color_source": "palette_accent",
+      "timing_offset_beats": null
+    }
+  ],
+  "provenance": {
+    "source": "builtin",
+    "curator_notes": null
+  },
+  "style_markers": {
+    "complexity": 0.2,
+    "energy_affinity": "PEAK"
+  },
+  "model_affinities": [],
+  "motif_compatibility": []
+}

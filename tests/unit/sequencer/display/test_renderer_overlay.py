@@ -59,11 +59,13 @@ from twinklr.core.sequencer.vocabulary import (
 )
 from twinklr.core.sequencer.vocabulary.choreography import TargetType
 
-_TEMPLATES_DIR = Path(__file__).resolve().parent.parent.parent.parent.parent / "data" / "templates"
+_TEMPLATES_DIR = (
+    Path(__file__).resolve().parent.parent.parent.parent.parent / "catalog" / "templates"
+)
 
 
 def _load_recipe_compiler() -> RecipeCompiler:
-    """Create RecipeCompiler backed by data/templates."""
+    """Create RecipeCompiler backed by the tracked catalog/templates seed set."""
     store = TemplateStore.from_directory(_TEMPLATES_DIR)
     catalog = RecipeCatalog.from_store(store)
     return RecipeCompiler(catalog=catalog)

@@ -54,6 +54,9 @@ artifacts/
 .archive/
 .dev/
 
+# catalog/templates/ is tracked (P1K-T3), but its FE-computed sidecar cache is not
+catalog/templates/.enrichment/
+
 # === Local configuration (create from documented schemas; see context/engineering/conventions.md) ===
 config.json
 fixture_config.json

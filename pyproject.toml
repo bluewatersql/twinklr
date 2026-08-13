@@ -154,6 +154,7 @@ asyncio_mode = "auto"
 markers = [
     "integration: marks tests as integration tests (deselect with '-m \"not integration\"')",
     "slow: marks tests as slow running (deselect with '-m \"not slow\"')",
+    "requires_template_data: test needs data/templates/index.json (skips if absent, always-present subset covered by tracked fixtures in catalog/templates/)",
 ]
 filterwarnings = [
     "ignore::DeprecationWarning:audioread.*",

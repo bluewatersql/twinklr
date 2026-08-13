@@ -1,0 +1,62 @@
+{
+  "recipe_id": "gtpl_base_wash_split",
+  "name": "Base Wash Split",
+  "description": "Gentle full-coverage color wash for the BASE lane; seed fixture covering the ambient/background code path.",
+  "recipe_version": "1.0.0",
+  "effect_family": "color_wash",
+  "template_type": "BASE",
+  "visual_intent": "ABSTRACT",
+  "tags": [
+    "wash",
+    "ambient",
+    "seed"
+  ],
+  "timing": {
+    "bars_min": 1,
+    "bars_max": 16,
+    "beats_per_bar": 4,
+    "loop_len_ms": null,
+    "emphasize_downbeats": true
+  },
+  "palette_spec": {
+    "mode": "DICHROME",
+    "palette_roles": [
+      "primary",
+      "accent"
+    ]
+  },
+  "layers": [
+    {
+      "layer_index": 0,
+      "layer_name": "wash_base",
+      "layer_depth": "BACKGROUND",
+      "effect_type": "PLACEHOLDER",
+      "blend_mode": "NORMAL",
+      "mix": 1.0,
+      "params": {
+        "cycles": {
+          "value": 1.0,
+          "expr": null,
+          "min_val": null,
+          "max_val": null
+        }
+      },
+      "motion": [
+        "WAVE"
+      ],
+      "density": 0.6,
+      "color_source": "palette_primary",
+      "timing_offset_beats": null
+    }
+  ],
+  "provenance": {
+    "source": "builtin",
+    "curator_notes": null
+  },
+  "style_markers": {
+    "complexity": 0.2,
+    "energy_affinity": "MED"
+  },
+  "model_affinities": [],
+  "motif_compatibility": []
+}

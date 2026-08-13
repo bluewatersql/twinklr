@@ -1,0 +1,55 @@
+{
+  "recipe_id": "gtpl_rhythm_alternate_ab",
+  "name": "Rhythm Alternate A/B",
+  "description": "Alternating single-strand pattern for the RHYTHM lane; seed fixture with an explicit effect_map.py mapping (SingleStrand).",
+  "recipe_version": "1.0.0",
+  "effect_family": "single_strand",
+  "template_type": "RHYTHM",
+  "visual_intent": "ABSTRACT",
+  "tags": [
+    "alternate",
+    "drive",
+    "seed"
+  ],
+  "timing": {
+    "bars_min": 1,
+    "bars_max": 8,
+    "beats_per_bar": 4,
+    "loop_len_ms": null,
+    "emphasize_downbeats": true
+  },
+  "palette_spec": {
+    "mode": "DICHROME",
+    "palette_roles": [
+      "primary",
+      "accent"
+    ]
+  },
+  "layers": [
+    {
+      "layer_index": 0,
+      "layer_name": "alternate_base",
+      "layer_depth": "BACKGROUND",
+      "effect_type": "PLACEHOLDER",
+      "blend_mode": "NORMAL",
+      "mix": 1.0,
+      "params": {},
+      "motion": [
+        "CHASE"
+      ],
+      "density": 0.5,
+      "color_source": "palette_primary",
+      "timing_offset_beats": null
+    }
+  ],
+  "provenance": {
+    "source": "builtin",
+    "curator_notes": null
+  },
+  "style_markers": {
+    "complexity": 0.3,
+    "energy_affinity": "HIGH"
+  },
+  "model_affinities": [],
+  "motif_compatibility": []
+}

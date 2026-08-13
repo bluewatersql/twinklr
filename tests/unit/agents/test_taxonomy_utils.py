@@ -1,5 +1,7 @@
 """Tests for taxonomy utils."""
 
+import pytest
+
 from twinklr.core.agents.taxonomy_utils import (
     get_supported_motif_ids,
     get_theming_catalog_dict,
@@ -7,6 +9,7 @@ from twinklr.core.agents.taxonomy_utils import (
 )
 
 
+@pytest.mark.requires_template_data
 def test_get_supported_motif_ids():
     """Test that get_supported_motif_ids returns only motifs with template support."""
     supported = get_supported_motif_ids()
