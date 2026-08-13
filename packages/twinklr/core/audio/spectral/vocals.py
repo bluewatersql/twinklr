@@ -142,10 +142,8 @@ def detect_vocals(
             # - Short segments (< 2s) likely individual phrases: allow 2s gaps
             # - Longer segments (>= 2s) likely verses/choruses: allow 3s gaps
             # - Very high probability segments: be more lenient
-            if current["duration_s"] < 2.0 and next_seg["duration_s"] < 2.0:
-                max_gap = 2.0  # Brief phrases separated by pauses
-            else:
-                max_gap = 3.0  # Longer vocal sections
+            # 2.0 for brief phrases separated by pauses, 3.0 for longer vocal sections
+            max_gap = 2.0 if current["duration_s"] < 2.0 and next_seg["duration_s"] < 2.0 else 3.0
 
             # Be more lenient if both segments have high vocal probability
             if current["avg_probability"] > 0.85 and next_seg["avg_probability"] > 0.85:

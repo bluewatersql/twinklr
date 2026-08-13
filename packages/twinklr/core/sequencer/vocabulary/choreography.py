@@ -12,10 +12,10 @@ Using enums (not free-form strings) enables deterministic bidirectional
 resolution between the choreography model and xLights mapping.
 """
 
-from enum import Enum
+from enum import StrEnum
 
 
-class ChoreoTag(str, Enum):
+class ChoreoTag(StrEnum):
     """Zone membership tags for choreographic grouping.
 
     Tags describe which logical zone of the display a group belongs to.
@@ -37,7 +37,7 @@ class ChoreoTag(str, Enum):
     PERIMETER = "PERIMETER"
 
 
-class SplitDimension(str, Enum):
+class SplitDimension(StrEnum):
     """Partition values for display group splitting.
 
     Each value names one side/slice of a partition.  Groups declare
@@ -76,7 +76,7 @@ class SplitDimension(str, Enum):
     EVEN = "EVEN"
 
 
-class TargetType(str, Enum):
+class TargetType(StrEnum):
     """Type discriminator for choreography plan targets.
 
     Used in :class:`PlanTarget` to unambiguously specify whether a

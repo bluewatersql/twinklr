@@ -6,10 +6,10 @@ between profiling components.
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 
 
-class FileKind(str, Enum):
+class FileKind(StrEnum):
     """Classified file kind in a sequence package."""
 
     SEQUENCE = "sequence"
@@ -19,7 +19,7 @@ class FileKind(str, Enum):
     OTHER = "other"
 
 
-class StartChannelFormat(str, Enum):
+class StartChannelFormat(StrEnum):
     """Start-channel format parsed from xLights layout models."""
 
     UNIVERSE_CHANNEL = "universe:channel"
@@ -27,7 +27,7 @@ class StartChannelFormat(str, Enum):
     ABSOLUTE = "absolute"
 
 
-class ModelCategory(str, Enum):
+class ModelCategory(StrEnum):
     """Top-level category for a layout model."""
 
     DISPLAY = "display"
@@ -36,14 +36,14 @@ class ModelCategory(str, Enum):
     INACTIVE = "inactive"
 
 
-class SemanticSize(str, Enum):
+class SemanticSize(StrEnum):
     """Coarse semantic size classification for display models."""
 
     MEGA = "mega"
     MINI = "mini"
 
 
-class ParameterValueType(str, Enum):
+class ParameterValueType(StrEnum):
     """Inferred scalar type for an EffectDB parameter value."""
 
     INT = "int"
@@ -53,7 +53,7 @@ class ParameterValueType(str, Enum):
     EMPTY = "empty"
 
 
-class TargetKind(str, Enum):
+class TargetKind(StrEnum):
     """Join result kind when mapping effect targets to layout entries."""
 
     MODEL = "model"
@@ -61,7 +61,7 @@ class TargetKind(str, Enum):
     UNKNOWN = "unknown"
 
 
-class EffectDbNamespace(str, Enum):
+class EffectDbNamespace(StrEnum):
     """Namespace prefix of an EffectDB parameter key."""
 
     E = "E"
@@ -70,7 +70,7 @@ class EffectDbNamespace(str, Enum):
     UNKNOWN = "UNKNOWN"
 
 
-class EffectDbControlType(str, Enum):
+class EffectDbControlType(StrEnum):
     """Control type segment of an EffectDB parameter key."""
 
     SLIDER = "SLIDER"
@@ -81,7 +81,7 @@ class EffectDbControlType(str, Enum):
     UNKNOWN = "UNKNOWN"
 
 
-class EffectDbParseStatus(str, Enum):
+class EffectDbParseStatus(StrEnum):
     """Parse status for an EffectDB settings payload."""
 
     PARSED = "parsed"

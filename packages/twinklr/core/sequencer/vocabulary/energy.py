@@ -3,10 +3,10 @@
 Defines energy targets, motion density, and choreography styles.
 """
 
-from enum import Enum
+from enum import StrEnum
 
 
-class EnergyTarget(str, Enum):
+class EnergyTarget(StrEnum):
     """Target energy level for a section.
 
     Defines the overall energy character of a section.
@@ -28,7 +28,7 @@ class EnergyTarget(str, Enum):
     PEAK = "PEAK"
 
 
-class MotionDensity(str, Enum):
+class MotionDensity(StrEnum):
     """Overall activity level in a section.
 
     Defines how busy/active the choreography should be.
@@ -44,7 +44,7 @@ class MotionDensity(str, Enum):
     BUSY = "BUSY"
 
 
-class ChoreographyStyle(str, Enum):
+class ChoreographyStyle(StrEnum):
     """Visual approach for choreography.
 
     Defines the overall visual style strategy.

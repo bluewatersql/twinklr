@@ -144,16 +144,16 @@ class HolisticEvaluatorStage:
 
             evaluation = context.get_state("holistic_evaluator_result")
             if self.fail_on_hard_fail and evaluation is not None:
-                from twinklr.core.agents.shared.judge.models import VerdictStatus as VS
+                from twinklr.core.agents.shared.judge.models import VerdictStatus
 
                 status = (
                     evaluation.status
                     if hasattr(evaluation, "status")
-                    else VS(evaluation.get("status"))
+                    else VerdictStatus(evaluation.get("status", ""))
                     if isinstance(evaluation, dict)
                     else None
                 )
-                if status == VS.HARD_FAIL:
+                if status == VerdictStatus.HARD_FAIL:
                     logger.warning(
                         "Holistic evaluation HARD_FAIL (score=%.1f) — blocking pipeline",
                         getattr(evaluation, "score", 0.0),

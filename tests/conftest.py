@@ -44,7 +44,9 @@ if _VENDORED_NLTK_DATA.is_dir() and str(_VENDORED_NLTK_DATA) not in nltk.data.pa
 # `tests/integration/profiling/test_profiler_integration.py`'s
 # `pytest.skip()` on absent vendor fixtures.
 
-_LEGACY_TEMPLATES_INDEX = Path(__file__).resolve().parent.parent / "data" / "templates" / "index.json"
+_LEGACY_TEMPLATES_INDEX = (
+    Path(__file__).resolve().parent.parent / "data" / "templates" / "index.json"
+)
 
 
 def _legacy_template_data_available() -> bool:

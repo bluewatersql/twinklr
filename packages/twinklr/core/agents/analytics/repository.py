@@ -6,9 +6,9 @@ multiple job runs, enabling agents to learn from common mistakes.
 
 from __future__ import annotations
 
+from collections import Counter
 import json
 import logging
-from collections import Counter
 from pathlib import Path
 from typing import Any
 

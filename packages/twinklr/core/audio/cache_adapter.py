@@ -60,7 +60,7 @@ async def compute_audio_file_hash(audio_path: str) -> str:
     return hasher.hexdigest()
 
 
-async def load_audio_features_async(
+async def load_audio_features_async[T: BaseModel](
     audio_path: str,
     cache: FSCache,
     model_cls: type[T],

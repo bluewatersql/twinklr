@@ -99,7 +99,7 @@ class FakeFileSystem:
 
         # Find immediate children
         children = []
-        for file_path in self._files.keys():
+        for file_path in self._files:
             if Path(file_path).parent == Path(path_str):
                 children.append(Path(file_path).name)
         for dir_path in self._dirs:
@@ -123,7 +123,7 @@ class FakeFileSystem:
 
         if recursive:
             # Remove all children
-            to_remove_files = [p for p in self._files.keys() if p.startswith(path_str + "/")]
+            to_remove_files = [p for p in self._files if p.startswith(path_str + "/")]
             to_remove_dirs = [p for p in self._dirs if p.startswith(path_str + "/")]
             for p in to_remove_files:
                 del self._files[p]

@@ -17,7 +17,13 @@ from twinklr.core.sequencer.theming import ThemeRef
 from twinklr.core.sequencer.vocabulary import GPBlendMode, GPTimingDriver, LaneKind
 
 if TYPE_CHECKING:
-    from twinklr.core.agents.sequencer.group_planner.holistic import HolisticEvaluation
+    # Runtime import would create a circular dependency: holistic.py imports
+    # GroupPlanSet from this module. Deferred here; model_rebuild() resolves the
+    # forward reference (see P0-T3 escalation — a bulk TC004 fix broke this at
+    # import time).
+    from twinklr.core.agents.sequencer.group_planner.holistic import (  # noqa: TC004
+        HolisticEvaluation,
+    )
 
 
 class NarrativeAssetDirective(BaseModel):

@@ -5,10 +5,10 @@ eliminating start+end calculation issues. The renderer resolves these
 to exact beat counts based on context.
 """
 
-from enum import Enum
+from enum import StrEnum
 
 
-class EffectDuration(str, Enum):
+class EffectDuration(StrEnum):
     """Categorical effect duration for planning.
 
     LLM selects duration intent; renderer calculates exact end time
@@ -53,7 +53,7 @@ def resolve_duration_beats(duration: EffectDuration) -> tuple[int | None, int | 
 
 
 __all__ = [
-    "EffectDuration",
     "DURATION_BEATS",
+    "EffectDuration",
     "resolve_duration_beats",
 ]

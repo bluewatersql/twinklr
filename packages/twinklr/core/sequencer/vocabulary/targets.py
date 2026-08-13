@@ -3,10 +3,10 @@
 Defines abstract roles for residential display props.
 """
 
-from enum import Enum
+from enum import StrEnum
 
 
-class TargetRole(str, Enum):
+class TargetRole(StrEnum):
     """Abstract roles for residential display props.
 
     Defines logical groupings of display elements by physical prop type.

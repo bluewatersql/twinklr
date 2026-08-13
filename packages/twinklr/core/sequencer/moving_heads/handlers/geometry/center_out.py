@@ -1,6 +1,6 @@
 """Center-outward geometry handler - radiating from center."""
 
-from typing import Any
+from typing import Any, ClassVar
 
 from twinklr.core.sequencer.moving_heads.handlers.protocols import GeometryResult
 
@@ -28,11 +28,11 @@ class CenterOutHandler:
     handler_id: str = "center_out"
 
     # Center roles (innermost)
-    CENTER_ROLES = ["CENTER", "CENTER_LEFT", "CENTER_RIGHT"]
+    CENTER_ROLES: ClassVar[list[str]] = ["CENTER", "CENTER_LEFT", "CENTER_RIGHT"]
     # Inner roles (middle distance)
-    INNER_ROLES = ["INNER_LEFT", "INNER_RIGHT"]
+    INNER_ROLES: ClassVar[list[str]] = ["INNER_LEFT", "INNER_RIGHT"]
     # Outer roles (furthest from center)
-    OUTER_ROLES = ["OUTER_LEFT", "OUTER_RIGHT", "FAR_LEFT", "FAR_RIGHT"]
+    OUTER_ROLES: ClassVar[list[str]] = ["OUTER_LEFT", "OUTER_RIGHT", "FAR_LEFT", "FAR_RIGHT"]
 
     def resolve(
         self,

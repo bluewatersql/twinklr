@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-import string
-import time
-import unicodedata
 from dataclasses import dataclass
 from difflib import SequenceMatcher
 from pathlib import Path
+import string
+import time
 from typing import Protocol
+import unicodedata
 
 from twinklr.core.feature_engineering.models import (
     AudioCandidate,
@@ -184,7 +184,7 @@ class AudioDiscoveryService:
         start = time.perf_counter()
         try:
             analyzer.analyze_sync(result.audio_path, force_reprocess=force_reprocess)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             if audio_required:
                 raise
             return result.model_copy(

@@ -8,7 +8,7 @@ This module defines all template-related models:
 These models define how choreography is structured and executed.
 """
 
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -32,23 +32,23 @@ from twinklr.core.sequencer.moving_heads.libraries.geometry import GeometryType
 from twinklr.core.sequencer.moving_heads.libraries.movement import MovementType
 
 
-class RepeatMode(str, Enum):
+class RepeatMode(StrEnum):
     PING_PONG = "PING_PONG"
     JOINER = "JOINER"
 
 
-class RemainderPolicy(str, Enum):
+class RemainderPolicy(StrEnum):
     HOLD_LAST_POSE = "HOLD_LAST_POSE"
     FADE_OUT = "FADE_OUT"
     TRUNCATE = "TRUNCATE"
 
 
-class PhaseOffsetMode(str, Enum):
+class PhaseOffsetMode(StrEnum):
     NONE = "NONE"
     GROUP_ORDER = "GROUP_ORDER"
 
 
-class Distribution(str, Enum):
+class Distribution(StrEnum):
     LINEAR = "LINEAR"
 
 

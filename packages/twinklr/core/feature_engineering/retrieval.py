@@ -177,9 +177,7 @@ class TemplateRetrievalQueryEngine:
             return False
         if row.transition_flow_norm < query.min_transition_flow:
             return False
-        if row.taxonomy_label_count < query.min_taxonomy_label_count:
-            return False
-        return True
+        return not row.taxonomy_label_count < query.min_taxonomy_label_count
 
     @staticmethod
     def _query_score(*, row: TemplateRecommendation, query: TemplateQuery) -> float:

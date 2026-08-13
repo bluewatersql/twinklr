@@ -281,7 +281,7 @@ class SongSectionDetector:
             y_work, start_offset_s, duration_work = self._trim_audio(y, sr, duration_orig)
 
             # Stage 2: Build beat grid
-            beats_work, bars_work, beat_times, tempo_bpm = orchestration.build_beat_grid(
+            _beats_work, bars_work, beat_times, tempo_bpm = orchestration.build_beat_grid(
                 y_work, sr, hop_length, duration_work, beats_s, bars_s, start_offset_s
             )
 
@@ -305,7 +305,7 @@ class SongSectionDetector:
             # Stage 4: Compute SSM + novelty
             ssm = segmentation.compute_self_similarity_matrix(X_normalized)
             novelty = segmentation.compute_foote_novelty(
-                ssm, kernel_size=int(preset.novelty_L_beats)
+                ssm, kernel_size=int(preset.novelty_l_beats)
             )
             prominence = segmentation.compute_boundary_prominence(
                 novelty, window_size=int(max(preset.pre_avg, preset.post_avg))
@@ -551,7 +551,7 @@ class SongSectionDetector:
         baseline_times = [float(_snap_to_nearest_beat(t)) for t in baseline_times]
 
         # Union
-        times_work = sorted(set([0.0, float(duration_work)] + novelty_times + baseline_times))
+        times_work = sorted({0.0, float(duration_work), *novelty_times, *baseline_times})
 
         # Fade detection
         if rms_for_energy is None:
@@ -563,7 +563,7 @@ class SongSectionDetector:
             rms_work, sr=sr, hop_length=hop_length, duration_s=duration_work
         )
         if fade_start_work is not None:
-            times_work = sorted(set(times_work + [float(fade_start_work)]))
+            times_work = sorted({*times_work, float(fade_start_work)})
 
         # Merge short sections
         cleaned_work = segmentation.merge_short_sections(
@@ -587,7 +587,7 @@ class SongSectionDetector:
         """Map boundaries from work timeline back to original timeline."""
         cleaned = [float(t + start_offset_s) for t in boundaries_work]
         cleaned = [float(np.clip(t, 0.0, duration_orig)) for t in cleaned]
-        cleaned = sorted(set([0.0, duration_orig] + cleaned))
+        cleaned = sorted({0.0, duration_orig, *cleaned})
 
         # Suppress micro edge boundaries
         cleaned = segmentation.suppress_micro_edge_boundaries(
@@ -598,7 +598,7 @@ class SongSectionDetector:
 
     def _compute_section_descriptors(
         self,
-        X_normalized: np.ndarray,
+        X_normalized: np.ndarray,  # noqa: N803 — numpy/sklearn feature-matrix convention (matches N806 exemption)
         beat_times: np.ndarray,
         boundaries_work: list[float],
         boundaries_orig: list[float],
@@ -758,10 +758,10 @@ class SongSectionDetector:
                 builds=builds,
                 drops=drops,
                 vocal_segments=vocal_segments,
-                energy_rank=cast(float, section["energy_rank"]),
-                repeat_count=cast(int, section["repeat_count"]),
-                max_similarity=cast(float, section["similarity"]),
-                relative_pos=cast(float, section["start_s"]) / duration_orig
+                energy_rank=cast("float", section["energy_rank"]),
+                repeat_count=cast("int", section["repeat_count"]),
+                max_similarity=cast("float", section["similarity"]),
+                relative_pos=cast("float", section["start_s"]) / duration_orig
                 if duration_orig > 0
                 else 0.0,
                 duration=duration_orig,
@@ -816,7 +816,7 @@ class SongSectionDetector:
                     "min_sections": int(preset.min_sections),
                     "max_sections": int(preset.max_sections),
                     "min_len_beats": int(preset.min_len_beats),
-                    "novelty_L_beats": int(preset.novelty_L_beats),
+                    "novelty_l_beats": int(preset.novelty_l_beats),
                     "peak_delta": float(preset.peak_delta),
                     "pre_avg": int(preset.pre_avg),
                     "post_avg": int(preset.post_avg),
@@ -837,7 +837,7 @@ class SongSectionDetector:
         novelty: np.ndarray,
         prominence: np.ndarray,
         ssm: np.ndarray,
-        X_normalized: np.ndarray,
+        X_normalized: np.ndarray,  # noqa: N803 — numpy/sklearn feature-matrix convention (matches N806 exemption)
     ) -> dict[str, Any]:
         """Build diagnostic information."""
         num_beats = len(beat_times)

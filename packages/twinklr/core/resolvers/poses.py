@@ -11,6 +11,7 @@ Range validation and fixture orientation will be enhanced in future phases.
 
 from __future__ import annotations
 
+import contextlib
 import logging
 
 from twinklr.core.config.poses import STANDARD_POSES, Pose, PoseConfig, PoseLibrary
@@ -86,11 +87,9 @@ class PoseResolver:
         # Convert string to PoseID if needed
         if isinstance(pose_id, str):
             # Check if it's a standard pose
-            try:
+            # Custom pose (string key) if not a standard pose
+            with contextlib.suppress(ValueError):
                 pose_id = PoseLibrary(pose_id.lower())
-            except ValueError:
-                # Custom pose (string key)
-                pass
 
         # Get pose definition
         pose = self.poses.get(pose_id)
@@ -159,10 +158,8 @@ class PoseResolver:
             KeyError: If pose not found
         """
         if isinstance(pose_id, str):
-            try:
+            with contextlib.suppress(ValueError):
                 pose_id = PoseLibrary(pose_id.lower())
-            except ValueError:
-                pass
 
         pose = self.poses.get(pose_id)
         if pose is None:
@@ -175,7 +172,7 @@ class PoseResolver:
         Returns:
             List of pose ID strings
         """
-        return [p.value if isinstance(p, PoseLibrary) else p for p in self.poses.keys()]
+        return [p.value if isinstance(p, PoseLibrary) else p for p in self.poses]
 
     # ========================================================================
     # Private Methods
@@ -183,11 +180,8 @@ class PoseResolver:
 
     def _build_pose_library(self) -> dict[str | PoseLibrary, Pose]:
         """Build complete pose library (standard + overrides + custom)."""
-        poses: dict[str | PoseLibrary, Pose] = {}
-
         # Start with standard poses (cast to correct type)
-        for pose_id, pose in STANDARD_POSES.items():
-            poses[pose_id] = pose
+        poses: dict[str | PoseLibrary, Pose] = dict(STANDARD_POSES.items())
 
         # Apply overrides
         for pose_id, override_pose in self.pose_config.pose_overrides.items():

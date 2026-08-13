@@ -84,68 +84,68 @@ from twinklr.core.sequencer.vocabulary.visual import (
 )
 
 __all__ = [
-    # Composition
-    "BlendMode",
-    "GPBlendMode",
-    "LaneKind",
-    "LayerRole",
-    # Display (physical metadata)
-    "DetailCapability",
-    "DisplayElementKind",
-    "DisplayProminence",
-    "GroupArrangement",
-    "PixelDensity",
-    # Coordination
-    "CoordinationMode",
-    "SnapRule",
-    "SpatialIntent",
-    "SpillPolicy",
-    "StepUnit",
     # Duration (categorical planning)
     "DURATION_BEATS",
-    "EffectDuration",
-    "resolve_duration_beats",
-    # Energy
-    "ChoreographyStyle",
-    "EnergyTarget",
-    "MotionDensity",
     # Intensity (categorical planning)
     "INTENSITY_MAP",
-    "IntensityLevel",
-    "resolve_intensity",
-    # Motion
-    "MotionVerb",
-    # Spatial (categorical position)
-    "DepthZone",
-    "DisplayZone",
-    "HorizontalZone",
-    "VerticalZone",
-    # Planning (categorical timing)
-    "PlanningTimeRef",
-    "TimingHint",
-    # Choreographic tags & splits
-    "ChoreoTag",
-    "SplitDimension",
-    "TargetType",
-    # Targets
-    "TargetRole",
     # Templates
     "AssetSlotType",
     "AssetTemplateType",
     "BackgroundMode",
-    "GroupTemplateType",
-    "MatrixAspect",
-    "TemplateProjectionHint",
-    # Timing
-    "GPTimingDriver",
-    "QuantizeMode",
-    "SnapMode",
-    "TimeRefKind",
-    "TimingDriver",
+    # Composition
+    "BlendMode",
+    # Choreographic tags & splits
+    "ChoreoTag",
+    # Energy
+    "ChoreographyStyle",
     # Visual
     "ColorMode",
+    # Coordination
+    "CoordinationMode",
+    # Spatial (categorical position)
+    "DepthZone",
+    # Display (physical metadata)
+    "DetailCapability",
+    "DisplayElementKind",
+    "DisplayProminence",
+    "DisplayZone",
+    "EffectDuration",
+    "EnergyTarget",
+    "GPBlendMode",
+    # Timing
+    "GPTimingDriver",
+    "GroupArrangement",
+    "GroupTemplateType",
     "GroupVisualIntent",
+    "HorizontalZone",
+    "IntensityLevel",
+    "LaneKind",
+    "LayerRole",
+    "MatrixAspect",
+    "MotionDensity",
+    # Motion
+    "MotionVerb",
+    "PixelDensity",
+    # Planning (categorical timing)
+    "PlanningTimeRef",
     "ProjectionIntent",
+    "QuantizeMode",
+    "SnapMode",
+    "SnapRule",
+    "SpatialIntent",
+    "SpillPolicy",
+    "SplitDimension",
+    "StepUnit",
+    # Targets
+    "TargetRole",
+    "TargetType",
+    "TemplateProjectionHint",
+    "TimeRefKind",
+    "TimingDriver",
+    "TimingHint",
+    "VerticalZone",
     "VisualDepth",
     "WarpHint",
+    "resolve_duration_beats",
+    "resolve_intensity",
 ]

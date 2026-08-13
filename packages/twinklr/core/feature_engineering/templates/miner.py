@@ -7,10 +7,10 @@ MinedTemplate records with layer_count > 1 and populated stack_composition.
 
 from __future__ import annotations
 
-import uuid
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import Literal
+import uuid
 
 from twinklr.core.feature_engineering.models import EffectPhrase
 from twinklr.core.feature_engineering.models.stacks import EffectStack

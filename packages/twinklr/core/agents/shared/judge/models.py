@@ -4,14 +4,14 @@ This module provides standardized models for judge evaluation, revision requests
 and iteration state management across all V2 agents.
 """
 
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from twinklr.core.agents.issues import Issue, IssueSeverity
 
 
-class VerdictStatus(str, Enum):
+class VerdictStatus(StrEnum):
     """Judge verdict status.
 
     Determines whether plan is accepted or requires revision.
@@ -164,7 +164,7 @@ class JudgeVerdict(BaseModel):
         return len(self.critical_issues) > 0
 
 
-class RevisionPriority(str, Enum):
+class RevisionPriority(StrEnum):
     """Revision priority level.
 
     - CRITICAL: Must fix (blocks APPROVE)
@@ -271,7 +271,7 @@ class RevisionRequest(BaseModel):
         )
 
 
-class IterationState(str, Enum):
+class IterationState(StrEnum):
     """State of iteration loop.
 
     Tracks progression through judge iteration cycle.

@@ -15,20 +15,25 @@ from __future__ import annotations
 import asyncio
 import base64
 import hashlib
-import logging
 from io import BytesIO
+import logging
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from openai import (
     APIConnectionError,
     APITimeoutError,
-    AsyncOpenAI,
     RateLimitError,
 )
 from PIL import Image
 
 from twinklr.core.agents.assets.models import ImageResult
 from twinklr.core.sequencer.vocabulary import BackgroundMode
+
+if TYPE_CHECKING:
+    from openai import (
+        AsyncOpenAI,
+    )
 
 logger = logging.getLogger(__name__)
 

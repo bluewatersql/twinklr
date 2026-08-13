@@ -6,11 +6,11 @@ judge evaluation using the StandardIterationController.
 
 from __future__ import annotations
 
+from collections.abc import Callable
+from difflib import get_close_matches
 import hashlib
 import json
 import logging
-from collections.abc import Callable
-from difflib import get_close_matches
 from typing import Any
 
 from twinklr.core.agents.logging import LLMCallLogger, NullLLMCallLogger
@@ -372,7 +372,7 @@ class GroupPlannerOrchestrator:
                 error_message=context.termination_reason,
             )
 
-        plan = cast(SectionCoordinationPlan, plan_result.data)
+        plan = cast("SectionCoordinationPlan", plan_result.data)
 
         # Heuristic validation only
         context.update_state(IterationState.VALIDATING)
@@ -588,10 +588,7 @@ class GroupPlannerOrchestrator:
                     if prev is not None:
                         prev_start, prev_duration = prev
                         min_gap = beats_per_bar if lane_plan.lane == LaneKind.ACCENT else 1
-                        if (
-                            prev_duration == EffectDuration.BURST
-                            or placement.duration == EffectDuration.BURST
-                        ):
+                        if EffectDuration.BURST in (prev_duration, placement.duration):
                             min_gap = beats_per_bar
                         if start_beat - prev_start < min_gap:
                             keep = False

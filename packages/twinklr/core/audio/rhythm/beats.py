@@ -89,10 +89,7 @@ def detect_time_signature(
     # Also compute autocorrelation as secondary signal
     x = strengths_norm
     ac = np.correlate(x, x, mode="full")[len(x) - 1 :]
-    if ac.size > 0 and float(ac[0]) > 1e-9:
-        ac = ac / ac[0]
-    else:
-        ac = np.zeros_like(x)
+    ac = ac / ac[0] if ac.size > 0 and float(ac[0]) > 1e-09 else np.zeros_like(x)
 
     def ac_at(i: int) -> float:
         return float(ac[i]) if i < len(ac) else 0.0

@@ -14,7 +14,7 @@ import pytest
 
 from twinklr.core.api.llm.openai.client import (
     OpenAIClient,
-    OpenAIRetryExhausted,
+    OpenAIRetryExhaustedError,
     ReasoningEffort,
     RetryConfig,
     Verbosity,
@@ -82,7 +82,7 @@ class TestRetryIntegration:
 
             client = OpenAIClient(api_key="test-key", retry_config=fast_retry_config)
 
-            with pytest.raises(OpenAIRetryExhausted) as exc_info:
+            with pytest.raises(OpenAIRetryExhaustedError) as exc_info:
                 client.generate_json(
                     messages=[{"role": "user", "content": "test"}],
                     model="gpt-5.2",
@@ -450,7 +450,7 @@ class TestValidationIntegration:
                 return "required_field" in data
 
             # This should fail on first attempt, succeed on retry
-            with pytest.raises(OpenAIRetryExhausted):
+            with pytest.raises(OpenAIRetryExhaustedError):
                 # Note: validation failure isn't automatically retried by the
                 # retry mechanism - it raises immediately
                 client.generate_json(

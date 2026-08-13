@@ -9,9 +9,9 @@ from twinklr.core.agents.context.identity import IdentityContextShaper
 from twinklr.core.agents.context.token_estimator import TokenEstimator
 
 __all__ = [
-    "ContextShaper",
     "BaseContextShaper",
+    "ContextShaper",
+    "IdentityContextShaper",
     "ShapedContext",
     "TokenEstimator",
-    "IdentityContextShaper",
 ]

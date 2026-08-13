@@ -59,7 +59,7 @@ class RenderContext(BaseModel):
 
     sequence_duration_ms: int = Field(ge=0, description="Sequence duration in ms")
     asset_base_path: Path = Field(
-        default=Path("."),
+        default=Path(),
         description="Base directory for assets",
     )
     default_buffer_style: str = Field(

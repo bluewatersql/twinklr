@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from enum import StrEnum
+from typing import ClassVar
 
 from pydantic import BaseModel, ConfigDict, Field
+
 from twinklr.core.curves.library import CurveLibrary
 from twinklr.core.sequencer.models.enum import Intensity
 
@@ -50,7 +52,7 @@ class DimmerType(StrEnum):
 class DimmerLibrary:
     """Library of predefined dimmer patterns."""
 
-    PATTERNS: dict[DimmerType, DimmerPattern] = {
+    PATTERNS: ClassVar[dict[DimmerType, DimmerPattern]] = {
         DimmerType.FADE_IN: DimmerPattern(
             id="fade_in",
             name="Fade In",

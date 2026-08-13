@@ -5,12 +5,12 @@ Defines composition policies, render configuration, and related enums.
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field
 
 
-class OverlapPolicy(str, Enum):
+class OverlapPolicy(StrEnum):
     """Policy for resolving overlapping effects within a single layer.
 
     Attributes:
@@ -24,7 +24,7 @@ class OverlapPolicy(str, Enum):
     ERROR = "ERROR"
 
 
-class GapPolicy(str, Enum):
+class GapPolicy(StrEnum):
     """Policy for handling gaps between effects.
 
     Attributes:
@@ -36,7 +36,7 @@ class GapPolicy(str, Enum):
     FILL_OFF = "FILL_OFF"
 
 
-class TransitionPolicy(str, Enum):
+class TransitionPolicy(StrEnum):
     """Policy for transitions between effects.
 
     Attributes:

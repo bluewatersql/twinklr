@@ -6,10 +6,10 @@ These enable informed choreography decisions without requiring the
 planner to guess from role names alone.
 """
 
-from enum import Enum
+from enum import StrEnum
 
 
-class DisplayElementKind(str, Enum):
+class DisplayElementKind(StrEnum):
     """Physical type of display element.
 
     Tells the planner what kind of thing this group represents so it
@@ -66,7 +66,7 @@ class DisplayElementKind(str, Enum):
     WREATH = "WREATH"
 
 
-class GroupArrangement(str, Enum):
+class GroupArrangement(StrEnum):
     """Physical arrangement of models within a group.
 
     Determines which spatial coordination patterns make sense.  For
@@ -90,7 +90,7 @@ class GroupArrangement(str, Enum):
     SINGLE = "SINGLE"
 
 
-class PixelDensity(str, Enum):
+class PixelDensity(StrEnum):
     """Pixel density category.
 
     Determines which effects look good on the element.  High-density
@@ -109,7 +109,7 @@ class PixelDensity(str, Enum):
     HIGH = "HIGH"
 
 
-class DetailCapability(str, Enum):
+class DetailCapability(StrEnum):
     """Visual detail capability based on pixel density.
 
     Guides template selection — high-detail groups can render
@@ -130,7 +130,7 @@ class DetailCapability(str, Enum):
     HIGH = "HIGH"
 
 
-class DisplayProminence(str, Enum):
+class DisplayProminence(StrEnum):
     """Visual weight / prominence in the overall display.
 
     Guides the planner on how to allocate visual budget.  ``HERO``

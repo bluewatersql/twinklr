@@ -214,12 +214,8 @@ def apply_min_hold(
         start_ms = max(event.start_ms, current_time)
         duration = event.end_ms - event.start_ms
 
-        if duration < min_hold_ms:
-            # Extend to min hold
-            end_ms = start_ms + min_hold_ms
-        else:
-            # Keep original duration from adjusted start
-            end_ms = start_ms + duration
+        # Extend to min hold, or keep original duration from adjusted start
+        end_ms = start_ms + min_hold_ms if duration < min_hold_ms else start_ms + duration
 
         result.append(
             VisemeEvent(

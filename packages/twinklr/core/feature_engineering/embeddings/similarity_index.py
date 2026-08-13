@@ -103,9 +103,10 @@ class SimilarityIndex:
         links: list[SimilarityLink] = []
         for emb in embeddings:
             for link in self.query(emb, k=self._n_neighbors):
-                if link.source_package_id != link.target_package_id:
-                    if link.similarity >= min_similarity:
-                        links.append(link)
+                if link.source_package_id != link.target_package_id and (
+                    link.similarity >= min_similarity
+                ):
+                    links.append(link)
         return tuple(links)
 
     def save(self, path: Path) -> None:

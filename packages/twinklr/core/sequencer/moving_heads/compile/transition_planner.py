@@ -7,7 +7,6 @@ calculating overlap timing and determining per-channel strategies.
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
 
 from twinklr.core.config.models import TransitionConfig
 from twinklr.core.sequencer.models.enum import ChannelName, TransitionMode
@@ -18,9 +17,6 @@ from twinklr.core.sequencer.models.transition import (
     TransitionStrategy,
 )
 from twinklr.core.sequencer.timing.beat_grid import BeatGrid
-
-if TYPE_CHECKING:
-    pass
 
 logger = logging.getLogger(__name__)
 

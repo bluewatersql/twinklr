@@ -1,6 +1,6 @@
 """Audience scan geometry handlers - spreads fixtures across audience."""
 
-from typing import Any
+from typing import Any, ClassVar
 
 from twinklr.core.sequencer.moving_heads.handlers.protocols import GeometryResult
 
@@ -18,7 +18,7 @@ class AudienceScanHandler:
     handler_id: str = "audience_scan"
 
     # Role ordering from left to right
-    ROLE_ORDER = [
+    ROLE_ORDER: ClassVar[list[str]] = [
         "FAR_LEFT",
         "OUTER_LEFT",
         "INNER_LEFT",
@@ -94,7 +94,7 @@ class AudienceScanAsymHandler:
     handler_id: str = "audience_scan_asym"
 
     # Role ordering from left to right
-    ROLE_ORDER = [
+    ROLE_ORDER: ClassVar[list[str]] = [
         "FAR_LEFT",
         "OUTER_LEFT",
         "INNER_LEFT",

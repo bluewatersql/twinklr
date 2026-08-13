@@ -8,12 +8,10 @@ or pipeline entrypoints.
 from __future__ import annotations
 
 import importlib
-import sys
 from pathlib import Path
-from typing import Any
+import sys
 
 import pytest
-
 
 RECIPE_BUILDER_ROOT = "twinklr.core.recipe_builder"
 
@@ -72,13 +70,9 @@ class TestRuntimeDoesNotImportRecipeBuilder:
     """Runtime modules must not depend on recipe_builder."""
 
     @pytest.mark.parametrize("rb_module", RECIPE_BUILDER_MODULES)
-    def test_runtime_renderer_does_not_import_recipe_builder(
-        self, rb_module: str
-    ) -> None:
+    def test_runtime_renderer_does_not_import_recipe_builder(self, rb_module: str) -> None:
         """The display renderer must not import recipe_builder."""
-        imported = _collect_transitive_imports(
-            "twinklr.core.sequencer.display.renderer"
-        )
+        imported = _collect_transitive_imports("twinklr.core.sequencer.display.renderer")
         assert rb_module not in imported, (
             f"Display renderer imports recipe_builder module {rb_module}"
         )
@@ -128,9 +122,7 @@ class TestOfflineOnlyBehavior:
 
         assert sentinel.read_text() == "untouched"
         contents = list(templates_dir.iterdir())
-        assert contents == [sentinel], (
-            f"Templates dir was modified: {contents}"
-        )
+        assert contents == [sentinel], f"Templates dir was modified: {contents}"
 
     def test_manifest_records_fe_source(self, tmp_path: Path) -> None:
         """Manifest must record the FE source used for the run."""
@@ -183,9 +175,7 @@ class TestOfflineOnlyBehavior:
             dry_run=True,
         )
         manifest = run_pipeline(config)
-        gen_status = next(
-            ps for ps in manifest.phase_status if ps.phase == "generation"
-        )
+        gen_status = next(ps for ps in manifest.phase_status if ps.phase == "generation")
         assert gen_status.status == "skipped"
         assert manifest.summary_metrics.recipe_candidates_generated == 0
 
@@ -200,8 +190,6 @@ class TestOfflineOnlyBehavior:
             dry_run=True,
         )
         manifest = run_pipeline(config)
-        enrich_status = next(
-            ps for ps in manifest.phase_status if ps.phase == "enrichment"
-        )
+        enrich_status = next(ps for ps in manifest.phase_status if ps.phase == "enrichment")
         assert enrich_status.status == "skipped"
         assert manifest.summary_metrics.metadata_candidates_generated == 0

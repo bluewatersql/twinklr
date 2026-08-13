@@ -80,8 +80,7 @@ def build_section_bar_map(
         end_bar = _find_nearest_bar_index(beat_grid.bar_boundaries, float(raw_end_ms))
 
         # Guarantee end_bar >= start_bar
-        if end_bar < start_bar:
-            end_bar = start_bar
+        end_bar = max(end_bar, start_bar)
 
         start_ms = beat_grid.bar_boundaries[start_bar]
         end_ms = beat_grid.bar_boundaries[end_bar]

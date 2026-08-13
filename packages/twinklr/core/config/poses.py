@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 from typing import TypeGuard
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
-class PoseLibrary(str, Enum):
+class PoseLibrary(StrEnum):
     """Standard pose identifiers.
 
     All enum values should have corresponding definitions in ``STANDARD_POSES``.
@@ -99,7 +99,7 @@ class PoseConfig(BaseModel):
     )
 
 
-class PanPose(str, Enum):
+class PanPose(StrEnum):
     """Normalized pan pose positions.
 
     This is a *collection* (subset) of :class:`PoseLibrary` for horizontal positioning helpers.
@@ -138,7 +138,7 @@ class PanPose(str, Enum):
         return values[self]
 
 
-class TiltPose(str, Enum):
+class TiltPose(StrEnum):
     """Normalized tilt pose positions.
 
     This is a *collection* (subset) of :class:`PoseLibrary` for vertical positioning helpers.

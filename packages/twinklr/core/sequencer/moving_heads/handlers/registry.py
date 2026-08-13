@@ -7,7 +7,7 @@ Each handler type (geometry, movement, dimmer) has its own registry
 with type-specific error messages.
 """
 
-from typing import Any, Generic, Protocol, TypeVar
+from typing import Any, Protocol, TypeVar
 
 from twinklr.core.sequencer.models.enum import Intensity
 from twinklr.core.sequencer.moving_heads.handlers.protocols import (
@@ -61,7 +61,7 @@ class HandlerNotFoundError(Exception):
         super().__init__(message)
 
 
-class HandlerRegistry(Generic[T]):
+class HandlerRegistry[T: HasHandlerId]:
     """Generic registry for handlers.
 
     Provides registration, lookup, and listing of handlers.

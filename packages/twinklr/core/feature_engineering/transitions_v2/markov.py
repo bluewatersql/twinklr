@@ -26,7 +26,7 @@ _LONG_MS = 5000
 _Z = 1.96
 
 # Laplace smoothing alpha — applied lazily only over observed transitions per row,
-# not over every possible (n × n) cell.
+# not over every possible (n x n) cell.
 _ALPHA = 1.0
 
 
@@ -341,7 +341,7 @@ class MarkovTransitionModel:
                     if val > 0:
                         tgt = idx_to_tid.get(j, str(j))
                         # Convert probability back to pseudo-count for sparse storage.
-                        model._counts.setdefault(src, {})[tgt] = int(round(val * 1000))
+                        model._counts.setdefault(src, {})[tgt] = round(val * 1000)
                 model._row_counts[src] = row_counts_list[i] if i < len(row_counts_list) else 0
 
             for b, bmat in bucket_matrices.items():
@@ -351,9 +351,7 @@ class MarkovTransitionModel:
                     for j, val in enumerate(row):
                         if val > 0:
                             tgt = idx_to_tid.get(j, str(j))
-                            model._bucket_counts[b].setdefault(src, {})[tgt] = int(
-                                round(val * 1000)
-                            )
+                            model._bucket_counts[b].setdefault(src, {})[tgt] = round(val * 1000)
                     model._bucket_row_counts[b][src] = brc[i] if i < len(brc) else 0
 
             model._fitted = state.get("fitted", False)

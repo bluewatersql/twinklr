@@ -10,12 +10,12 @@ Provides centralized logging configuration with:
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 import functools
 import json
 import logging
 import sys
 import time
-from datetime import UTC, datetime
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -97,9 +97,13 @@ class StructuredJSONFormatter(logging.Formatter):
                 "exc_text",
                 "stack_info",
             }
-            for key, value in record.__dict__.items():
-                if key not in standard_attrs and not key.startswith("_"):
-                    context[key] = value
+            context.update(
+                {
+                    key: value
+                    for key, value in record.__dict__.items()
+                    if key not in standard_attrs and not key.startswith("_")
+                }
+            )
 
         # Build log entry in LogEntry format
         log_entry = {
@@ -194,13 +198,10 @@ def configure_logging(
     # Create handlers list
     handlers: list[logging.Handler] = []
 
-    handler: logging.Handler
-    if filename:
-        # Log to file
-        handler = logging.FileHandler(filename)
-    else:
-        # Log to stdout
-        handler = logging.StreamHandler(sys.stdout)
+    # Log to file if given, otherwise stdout
+    handler: logging.Handler = (
+        logging.FileHandler(filename) if filename else logging.StreamHandler(sys.stdout)
+    )
 
     # Apply formatter based on structured flag
     formatter: logging.Formatter

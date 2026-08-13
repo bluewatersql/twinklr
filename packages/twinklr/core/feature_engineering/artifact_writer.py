@@ -7,8 +7,8 @@ parameters; it has no dependency on pipeline state.
 
 from __future__ import annotations
 
-import re
 from pathlib import Path
+import re
 from typing import Any
 
 from twinklr.core.feature_engineering.datasets.writer import FeatureEngineeringWriter

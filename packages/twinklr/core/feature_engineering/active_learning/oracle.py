@@ -215,7 +215,7 @@ class TaxonomyReviewOracle:
             ]
             try:
                 raw = self._client.complete(messages)
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 logger.error(
                     "LLM client raised an exception for %s: %s",
                     item.candidate.effect_type,

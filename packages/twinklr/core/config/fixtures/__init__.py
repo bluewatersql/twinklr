@@ -58,28 +58,28 @@ from twinklr.core.config.fixtures.physical import (
 )
 
 __all__ = [
+    # Groups
+    "BaseFixtureConfig",
     # DMX
     "ChannelInversions",
     "ChannelWithConfig",
     "DmxChannelConfig",
     "DmxMapping",
-    "ShutterMap",
-    # Physical
-    "MovementLimits",
-    "Orientation",
-    "PanTiltRange",
-    "RestingPosition",
     # Capabilities
     "FixtureCapabilities",
-    "MovementSpeed",
     # Instances
     "FixtureConfig",
-    "FixtureInstance",
-    "FixturePosition",
-    "Pose",
-    # Groups
-    "BaseFixtureConfig",
     "FixtureGroup",
     "FixtureGroupBuilder",
+    "FixtureInstance",
+    "FixturePosition",
+    # Physical
+    "MovementLimits",
+    "MovementSpeed",
+    "Orientation",
+    "PanTiltRange",
+    "Pose",
+    "RestingPosition",
+    "ShutterMap",
     "SimplifiedFixtureInstance",
 ]

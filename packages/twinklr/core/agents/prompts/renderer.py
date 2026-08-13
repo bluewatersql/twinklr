@@ -11,8 +11,6 @@ logger = logging.getLogger(__name__)
 class RenderError(Exception):
     """Raised when template rendering fails."""
 
-    pass
-
 
 class PromptRenderer:
     """Renders prompt templates using Jinja2.

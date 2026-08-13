@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-import json
-import logging
-import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import StrEnum
-from typing import Any, cast
+import json
+import logging
+import time
+from typing import TYPE_CHECKING, Any, cast
 
 from openai import (
     APIConnectionError,
@@ -18,8 +18,10 @@ from openai import (
     OpenAI,
     RateLimitError,
 )
-from openai.types.responses import ResponseInputItemParam, ResponseTextConfigParam
-from openai.types.shared_params import Reasoning
+
+if TYPE_CHECKING:
+    from openai.types.responses import ResponseInputItemParam, ResponseTextConfigParam
+    from openai.types.shared_params import Reasoning
 
 logger = logging.getLogger(__name__)
 
@@ -105,19 +107,13 @@ class RetryConfig:
 class OpenAIClientError(Exception):
     """Base exception for OpenAI client errors"""
 
-    pass
 
-
-class OpenAIRetryExhausted(OpenAIClientError):
+class OpenAIRetryExhaustedError(OpenAIClientError):
     """Raised when all retry attempts are exhausted"""
-
-    pass
 
 
 class OpenAIResponseParseError(OpenAIClientError):
     """Raised when response cannot be parsed"""
-
-    pass
 
 
 class OpenAIClient:
@@ -238,7 +234,7 @@ class OpenAIClient:
             Result from func
 
         Raises:
-            OpenAIRetryExhausted: When all retries are exhausted
+            OpenAIRetryExhaustedError: When all retries are exhausted
         """
         last_exception = None
 
@@ -260,7 +256,7 @@ class OpenAIClient:
 
                 if not should_retry:
                     logger.error(f"{operation_name} failed: {reason}")
-                    raise OpenAIRetryExhausted(
+                    raise OpenAIRetryExhaustedError(
                         f"{operation_name} failed after retries: {reason}"
                     ) from e
 
@@ -271,7 +267,9 @@ class OpenAIClient:
                 time.sleep(delay)
 
         # Should never reach here, but just in case
-        raise OpenAIRetryExhausted(f"{operation_name} failed after all retries") from last_exception
+        raise OpenAIRetryExhaustedError(
+            f"{operation_name} failed after all retries"
+        ) from last_exception
 
     def generate_json(
         self,
@@ -300,7 +298,7 @@ class OpenAIClient:
             Parsed JSON response, or tuple of (parsed_json, metadata) if return_metadata=True
 
         Raises:
-            OpenAIRetryExhausted: When all retries are exhausted
+            OpenAIRetryExhaustedError: When all retries are exhausted
             OpenAIResponseParseError: When response cannot be parsed or validated
             ValueError: When parameter validation fails
         """
@@ -469,7 +467,7 @@ class OpenAIClient:
             content = m.get("content", "")
 
             # Cast to ResponseInputItemParam to satisfy type checker
-            message = cast(ResponseInputItemParam, {"role": role, "content": content})
+            message = cast("ResponseInputItemParam", {"role": role, "content": content})
             messages.append(message)
 
         return messages
@@ -480,12 +478,8 @@ class OpenAIClient:
         for m in messages:
             role = str(m.get("role", ""))
             content = m.get("content", "")
-            # Convert content to string if it's not already
-            if isinstance(content, str):
-                content_str = content
-            else:
-                # Handle list/iterable content types
-                content_str = str(content) if content else ""
+            # Convert content to string if it's not already (handles list/iterable content types)
+            content_str = content if isinstance(content, str) else str(content) if content else ""
             simple_messages.append({"role": role, "content": content_str})
 
         return simple_messages
@@ -657,7 +651,7 @@ class OpenAIClient:
             Text response, or tuple of (text, metadata) if return_metadata=True
 
         Raises:
-            OpenAIRetryExhausted: When all retries are exhausted
+            OpenAIRetryExhaustedError: When all retries are exhausted
         """
         # Convert enums to strings if needed
         effort_str = (

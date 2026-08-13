@@ -73,7 +73,7 @@ def _validate_timestamps(lyric_context: LyricContextModel, duration_ms: int) -> 
     # Validate story beat timestamps
     if lyric_context.story_beats:
         for beat in lyric_context.story_beats:
-            start_ms, end_ms = beat.timestamp_range
+            _start_ms, end_ms = beat.timestamp_range
             if end_ms > duration_ms:
                 issues.append(
                     Issue(

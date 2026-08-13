@@ -45,8 +45,7 @@ def test_generate_deterministic_uses_target_effect(sample_opportunity: Opportuni
     candidates = generate_deterministic([sample_opportunity])
     recipe = candidates[0].recipe
     assert any(
-        layer.effect_type == sample_opportunity.target_effect_type
-        for layer in recipe.layers
+        layer.effect_type == sample_opportunity.target_effect_type for layer in recipe.layers
     )
 
 

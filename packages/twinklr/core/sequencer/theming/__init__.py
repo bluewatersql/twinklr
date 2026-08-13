@@ -65,33 +65,33 @@ from twinklr.core.sequencer.theming.models import (
 )
 
 __all__ = [
-    # Enums
-    "TagCategory",
-    "ThemeScope",
-    # Models
-    "ColorStop",
-    "MotifDefinition",
-    "PaletteDefinition",
-    "TagDefinition",
-    "ThemeCatalog",
-    "ThemeDefinition",
-    "ThemeRef",
-    # Catalog classes
-    "MotifCatalog",
-    "PaletteCatalog",
-    "TagCatalog",
-    "ThemeCatalogRegistry",
-    "ItemNotFoundError",
-    # Info types
-    "MotifInfo",
-    "PaletteInfo",
-    "TagInfo",
-    "ThemeInfo",
     # Global registries
     "MOTIF_REGISTRY",
     "PALETTE_REGISTRY",
     "TAG_REGISTRY",
     "THEME_REGISTRY",
+    # Models
+    "ColorStop",
+    "ItemNotFoundError",
+    # Catalog classes
+    "MotifCatalog",
+    "MotifDefinition",
+    # Info types
+    "MotifInfo",
+    "PaletteCatalog",
+    "PaletteDefinition",
+    "PaletteInfo",
+    "TagCatalog",
+    # Enums
+    "TagCategory",
+    "TagDefinition",
+    "TagInfo",
+    "ThemeCatalog",
+    "ThemeCatalogRegistry",
+    "ThemeDefinition",
+    "ThemeInfo",
+    "ThemeRef",
+    "ThemeScope",
     # Convenience functions
     "get_motif",
     "get_palette",

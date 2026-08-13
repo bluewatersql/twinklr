@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from twinklr.core.feature_engineering.models.templates import TemplateKind
 
 
-class TemplateDiagnosticFlag(str, Enum):
+class TemplateDiagnosticFlag(StrEnum):
     """Flags indicating a potentially low-value template."""
 
     LOW_SUPPORT = "low_support"

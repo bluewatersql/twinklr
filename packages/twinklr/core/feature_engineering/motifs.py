@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-import uuid
 from collections import defaultdict
 from dataclasses import dataclass
+import uuid
 
 from twinklr.core.feature_engineering.models.motifs import (
     MinedMotif,
@@ -396,18 +396,16 @@ class MotifMiner:
             return "repetition"
 
         # high -> low -> high = dip (length 3+)
-        if len(vals) >= 3:
-            if vals[0] > vals[1] and vals[-1] >= vals[0]:
-                return "dip"
+        if len(vals) >= 3 and vals[0] > vals[1] and vals[-1] >= vals[0]:
+            return "dip"
 
         # burst -> non-burst -> burst = call_and_response
-        if len(energy_seq) >= 3:
-            if (
-                energy_seq[0] == "burst"
-                and energy_seq[-1] == "burst"
-                and any(e != "burst" for e in energy_seq[1:-1])
-            ):
-                return "call_and_response"
+        if len(energy_seq) >= 3 and (
+            energy_seq[0] == "burst"
+            and energy_seq[-1] == "burst"
+            and any(e != "burst" for e in energy_seq[1:-1])
+        ):
+            return "call_and_response"
 
         # sweep motion followed by burst energy = build_and_burst
         # (checked at caller level via motion, but simplified here)

@@ -3,10 +3,10 @@
 Defines template types for group and asset templates.
 """
 
-from enum import Enum
+from enum import StrEnum
 
 
-class GroupTemplateType(str, Enum):
+class GroupTemplateType(StrEnum):
     """Template type by lane.
 
     Defines which lane a template belongs to in the choreography system.
@@ -26,7 +26,7 @@ class GroupTemplateType(str, Enum):
     SPECIAL = "SPECIAL"
 
 
-class AssetSlotType(str, Enum):
+class AssetSlotType(StrEnum):
     """Asset slot types for template requirements.
 
     Defines the type of visual asset required by a template.
@@ -44,7 +44,7 @@ class AssetSlotType(str, Enum):
     GIF_OVERLAY = "GIF_OVERLAY"
 
 
-class AssetTemplateType(str, Enum):
+class AssetTemplateType(StrEnum):
     """Asset template type classification.
 
     Defines the output format and usage for asset generation.
@@ -62,7 +62,7 @@ class AssetTemplateType(str, Enum):
     GIF_OVERLAY = "GIF_OVERLAY"
 
 
-class BackgroundMode(str, Enum):
+class BackgroundMode(StrEnum):
     """Background mode for asset generation.
 
     Defines whether the asset has a transparent or opaque background.
@@ -76,7 +76,7 @@ class BackgroundMode(str, Enum):
     OPAQUE = "opaque"
 
 
-class MatrixAspect(str, Enum):
+class MatrixAspect(StrEnum):
     """Asset aspect ratio for matrix displays.
 
     Defines the width:height ratio for generated assets.
@@ -96,7 +96,7 @@ class MatrixAspect(str, Enum):
     STANDARD = "4:3"
 
 
-class TemplateProjectionHint(str, Enum):
+class TemplateProjectionHint(StrEnum):
     """Projection hint for asset templates.
 
     Suggests the intended projection mapping for the asset.

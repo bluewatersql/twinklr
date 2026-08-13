@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from enum import StrEnum
+from typing import ClassVar
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -43,7 +44,7 @@ class GeometryType(StrEnum):
 class GeometryLibrary:
     """Library of predefined geometry patterns."""
 
-    PATTERNS: dict[GeometryType, GeometryDefinition] = {
+    PATTERNS: ClassVar[dict[GeometryType, GeometryDefinition]] = {
         GeometryType.AUDIENCE_SCAN_ASYM: GeometryDefinition(
             id="audience_scan_asym",
             name="Audience Scan (Asymmetric)",

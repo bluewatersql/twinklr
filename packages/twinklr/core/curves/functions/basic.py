@@ -176,10 +176,7 @@ def generate_triangle(
     for t in t_grid:
         cycle_pos = (t * effective_cycles) % 1.0
 
-        if cycle_pos < 0.5:
-            v = cycle_pos * 2.0
-        else:
-            v = 2.0 - cycle_pos * 2.0
+        v = cycle_pos * 2.0 if cycle_pos < 0.5 else 2.0 - cycle_pos * 2.0
 
         # Scale by amplitude (centered at 0.5)
         v = 0.5 + (v - 0.5) * amplitude

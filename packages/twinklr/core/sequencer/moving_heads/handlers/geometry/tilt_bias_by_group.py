@@ -1,6 +1,6 @@
 """Tilt bias by group geometry handler - constant pan with group tilt offsets."""
 
-from typing import Any
+from typing import Any, ClassVar
 
 from twinklr.core.sequencer.moving_heads.handlers.protocols import GeometryResult
 
@@ -27,9 +27,9 @@ class TiltBiasByGroupHandler:
     handler_id: str = "tilt_bias_by_group"
 
     # Group assignments for tilt bias (3 groups: inner, middle, outer)
-    INNER_ROLES = ["CENTER", "CENTER_LEFT", "CENTER_RIGHT"]
-    MIDDLE_ROLES = ["INNER_LEFT", "INNER_RIGHT"]
-    OUTER_ROLES = ["OUTER_LEFT", "OUTER_RIGHT", "FAR_LEFT", "FAR_RIGHT"]
+    INNER_ROLES: ClassVar[list[str]] = ["CENTER", "CENTER_LEFT", "CENTER_RIGHT"]
+    MIDDLE_ROLES: ClassVar[list[str]] = ["INNER_LEFT", "INNER_RIGHT"]
+    OUTER_ROLES: ClassVar[list[str]] = ["OUTER_LEFT", "OUTER_RIGHT", "FAR_LEFT", "FAR_RIGHT"]
 
     def resolve(
         self,

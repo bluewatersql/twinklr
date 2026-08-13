@@ -7,15 +7,11 @@ channel values, creating smooth transitions between choreography sections.
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
 
 from twinklr.core.sequencer.models.enum import ChannelName
 from twinklr.core.sequencer.models.transition import TransitionPlan
 from twinklr.core.sequencer.moving_heads.channels.state import ChannelValue, FixtureSegment
 from twinklr.core.sequencer.moving_heads.compile.channel_blender import ChannelBlender
-
-if TYPE_CHECKING:
-    pass
 
 logger = logging.getLogger(__name__)
 

@@ -1,7 +1,7 @@
 """Wave left-right geometry handler - progressive wave pattern."""
 
 import math
-from typing import Any
+from typing import Any, ClassVar
 
 from twinklr.core.sequencer.moving_heads.handlers.protocols import GeometryResult
 
@@ -28,7 +28,7 @@ class WaveLRHandler:
     handler_id: str = "wave_lr"
 
     # Role ordering from left to right
-    ROLE_ORDER = [
+    ROLE_ORDER: ClassVar[list[str]] = [
         "FAR_LEFT",
         "OUTER_LEFT",
         "INNER_LEFT",

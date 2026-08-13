@@ -3,10 +3,10 @@
 Defines visual intents, color modes, projection, and warp hints.
 """
 
-from enum import Enum
+from enum import StrEnum
 
 
-class GroupVisualIntent(str, Enum):
+class GroupVisualIntent(StrEnum):
     """Visual intent classification for templates.
 
     Describes the visual character and style of the template output.
@@ -28,7 +28,7 @@ class GroupVisualIntent(str, Enum):
     ORGANIC = "ORGANIC"
 
 
-class VisualDepth(str, Enum):
+class VisualDepth(StrEnum):
     """Visual depth layer in composition.
 
     Defines the depth/ordering role of a layer in the final composite.
@@ -48,7 +48,7 @@ class VisualDepth(str, Enum):
     TEXTURE = "TEXTURE"
 
 
-class ColorMode(str, Enum):
+class ColorMode(StrEnum):
     """Color strategy for templates.
 
     Defines the color palette approach for template output.
@@ -68,7 +68,7 @@ class ColorMode(str, Enum):
     FULL_SPECTRUM = "FULL_SPECTRUM"
 
 
-class PaletteRole(str, Enum):
+class PaletteRole(StrEnum):
     """Palette role for templates.
 
     Defines the role of a palette in the template output.
@@ -88,7 +88,7 @@ class PaletteRole(str, Enum):
     NEUTRAL = "NEUTRAL"
 
 
-class ProjectionIntent(str, Enum):
+class ProjectionIntent(StrEnum):
     """Projection mapping intent for templates.
 
     Describes how visual content maps onto physical display geometry.
@@ -108,7 +108,7 @@ class ProjectionIntent(str, Enum):
     SPHERICAL = "SPHERICAL"
 
 
-class WarpHint(str, Enum):
+class WarpHint(StrEnum):
     """Projection warp hints for templates.
 
     Provides hints about special projection requirements.

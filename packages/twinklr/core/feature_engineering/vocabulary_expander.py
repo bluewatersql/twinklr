@@ -75,7 +75,7 @@ def _build_family_to_axes() -> dict[str, dict[str, str]]:
         Dict mapping effect_family to its axis classification dict.
     """
     result: dict[str, dict[str, str]] = {}
-    for _key, axes in _DEFAULT_MAP.items():
+    for axes in _DEFAULT_MAP.values():
         family = axes.get("effect_family", "")
         if family and family not in result:
             result[family] = dict(axes)

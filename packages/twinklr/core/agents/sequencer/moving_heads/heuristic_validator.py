@@ -12,9 +12,10 @@ V2 Migration:
 
 from __future__ import annotations
 
-import logging
 from collections.abc import Callable
 from dataclasses import dataclass
+import itertools
+import logging
 from typing import TYPE_CHECKING, Any, NamedTuple
 
 from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan, PlanSection
@@ -85,7 +86,7 @@ class HeuristicValidator:
     - Template existence in library
     - Timing validity (bar ranges, no overlaps)
     - Section coverage (no large gaps)
-    - Segmentation validity (1–3 segments, contiguous, full coverage)
+    - Segmentation validity (1-3 segments, contiguous, full coverage)
     - Basic parameter validation
     - Bar numbering (1-indexed)
 
@@ -332,7 +333,7 @@ class HeuristicValidator:
                 f"got {last.end_bar}"
             )
 
-        for prev, nxt in zip(segs_sorted, segs_sorted[1:], strict=False):
+        for prev, nxt in itertools.pairwise(segs_sorted):
             if prev.end_bar + 1 != nxt.start_bar:
                 errors.append(
                     f"Section '{section.section_name}': segments must be contiguous and non-overlapping; "

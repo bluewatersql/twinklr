@@ -389,10 +389,9 @@ def _find_local_extrema(curve: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
     for i in range(1, len(curve) - 1):
         # Local maximum
-        if energies[i] > energies[i - 1] and energies[i] > energies[i + 1]:
-            extrema.append(curve[i])
-        # Local minimum
-        elif energies[i] < energies[i - 1] and energies[i] < energies[i + 1]:
+        if (energies[i] > energies[i - 1] and energies[i] > energies[i + 1]) or (
+            energies[i] < energies[i - 1] and energies[i] < energies[i + 1]
+        ):
             extrema.append(curve[i])
 
     return extrema
@@ -448,10 +447,7 @@ def _has_sharp_drop(energies: list[float], threshold: float = 0.2) -> bool:
     """Check if energies have a sharp drop."""
     if len(energies) < 2:
         return False
-    for i in range(1, len(energies)):
-        if energies[i - 1] - energies[i] >= threshold:
-            return True
-    return False
+    return any(energies[i - 1] - energies[i] >= threshold for i in range(1, len(energies)))
 
 
 def _is_sustained(energies: list[float], threshold: float = 0.1) -> bool:

@@ -5,10 +5,10 @@ eliminating numeric precision issues. The renderer resolves these
 to lane-appropriate numeric values.
 """
 
-from enum import Enum
+from enum import StrEnum
 
 
-class IntensityLevel(str, Enum):
+class IntensityLevel(StrEnum):
     """Categorical intensity level for planning.
 
     LLM selects intent; renderer maps to lane-appropriate numeric values.
@@ -58,7 +58,7 @@ def resolve_intensity(level: IntensityLevel, lane: str) -> float:
 
 
 __all__ = [
-    "IntensityLevel",
     "INTENSITY_MAP",
+    "IntensityLevel",
     "resolve_intensity",
 ]

@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-import math
 from collections import defaultdict
 from dataclasses import dataclass
+import math
 from typing import cast
 
 from twinklr.core.feature_engineering.models.learned_taxonomy import (
@@ -93,12 +93,12 @@ class LearnedTaxonomyTrainer:
         )
 
         metrics = self._evaluate(eval_pairs=eval_pairs, model=model)
-        precision_micro = cast(float, metrics["precision_micro"])
-        recall_micro = cast(float, metrics["recall_micro"])
-        f1_micro = cast(float, metrics["f1_micro"])
-        prediction_coverage = cast(float, metrics["prediction_coverage"])
+        precision_micro = cast("float", metrics["precision_micro"])
+        recall_micro = cast("float", metrics["recall_micro"])
+        f1_micro = cast("float", metrics["f1_micro"])
+        prediction_coverage = cast("float", metrics["prediction_coverage"])
         notes_raw = metrics["notes"]
-        notes = tuple(cast(list[str], notes_raw)) if isinstance(notes_raw, list) else ()
+        notes = tuple(cast("list[str]", notes_raw)) if isinstance(notes_raw, list) else ()
         report = LearnedTaxonomyEvalReport(
             schema_version=self._options.schema_version,
             model_version=self._options.model_version,

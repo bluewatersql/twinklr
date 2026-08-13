@@ -71,11 +71,8 @@ def resolve_semantic_group(
         explicit = [
             r for r in ordered if r.value.startswith("OUTER_") or r.value.startswith("FAR_")
         ]
-        if explicit:
-            resolved = explicit
-        else:
-            # Fallback: outermost fixtures by position
-            resolved = [ordered[0], ordered[-1]] if len(ordered) >= 2 else [ordered[0]]
+        # Fallback: outermost fixtures by position
+        resolved = explicit or ([ordered[0], ordered[-1]] if len(ordered) >= 2 else [ordered[0]])
 
     elif group is SemanticGroupType.INNER:
         explicit = [r for r in ordered if r.value.startswith("INNER_")]

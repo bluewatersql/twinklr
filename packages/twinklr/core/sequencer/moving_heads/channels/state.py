@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+from enum import Enum
 import json
 import logging
-from enum import Enum
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, ClassVar
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+
 from twinklr.core.curves.models import BaseCurve, CurvePoint
 from twinklr.core.sequencer.models.enum import BlendMode, ChannelName
 from twinklr.core.utils.math import clamp
@@ -223,7 +224,7 @@ class ChannelState:
     - Curve point tracking
     """
 
-    _CHANNEL_ATTR = {
+    _CHANNEL_ATTR: ClassVar[dict[ChannelName, str]] = {
         ChannelName.PAN: "pan_channel",
         ChannelName.TILT: "tilt_channel",
         ChannelName.DIMMER: "dimmer_channel",

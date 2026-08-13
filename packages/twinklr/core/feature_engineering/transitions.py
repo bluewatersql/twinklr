@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections import Counter, defaultdict
 from dataclasses import dataclass
+import itertools
 
 from twinklr.core.feature_engineering.models import EffectPhrase, TemplateCatalog
 from twinklr.core.feature_engineering.models.transitions import (
@@ -52,7 +53,7 @@ class TransitionModeler:
                     row.phrase_id,
                 ),
             )
-            for left, right in zip(ordered, ordered[1:], strict=False):
+            for left, right in itertools.pairwise(ordered):
                 from_template = assignment[left.phrase_id]
                 to_template = assignment[right.phrase_id]
                 if from_template == to_template:

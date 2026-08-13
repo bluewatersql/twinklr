@@ -14,8 +14,8 @@ always returned a single effect type.
 
 from __future__ import annotations
 
-import logging
 from dataclasses import dataclass, field
+import logging
 from typing import Any
 
 from twinklr.core.curves.library import CurveLibrary
@@ -475,7 +475,7 @@ def _apply_density(
         return
     param_name, lo, hi = spec
     scaled = lo + (hi - lo) * density
-    params[param_name] = int(round(scaled)) if isinstance(lo, int) else round(scaled, 2)
+    params[param_name] = round(scaled) if isinstance(lo, int) else round(scaled, 2)
 
 
 def _apply_contrast(
@@ -493,7 +493,7 @@ def _apply_contrast(
     param_name, lo, hi = spec
     scaled = lo + (hi - lo) * contrast
     if isinstance(lo, int) and isinstance(hi, int):
-        params[param_name] = int(round(scaled))
+        params[param_name] = round(scaled)
     else:
         params[param_name] = round(float(scaled), 2)
 

@@ -9,8 +9,8 @@ bootstrap check performed here).
 from __future__ import annotations
 
 import json
-import sqlite3
 from pathlib import Path
+import sqlite3
 from typing import Any
 
 # Default schema directory: schemas/ alongside the feature_store package root.

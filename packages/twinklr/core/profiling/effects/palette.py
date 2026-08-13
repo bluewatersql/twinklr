@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import re
 from collections import defaultdict
+import re
 
 from twinklr.core.formats.xlights.sequence.models.xsq import XSequence
 from twinklr.core.profiling.models.palette import (

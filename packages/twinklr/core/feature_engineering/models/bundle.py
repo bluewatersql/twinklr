@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field
 
 
-class AudioStatus(str, Enum):
+class AudioStatus(StrEnum):
     """Audio discovery status for a sequence."""
 
     FOUND_IN_PACK = "found_in_pack"
@@ -16,7 +16,7 @@ class AudioStatus(str, Enum):
     MISSING = "missing"
 
 
-class AudioCandidateOrigin(str, Enum):
+class AudioCandidateOrigin(StrEnum):
     """Source where an audio candidate was found."""
 
     PACK = "pack"

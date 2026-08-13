@@ -95,12 +95,15 @@ def _make_metadata_candidate(
 
 def _make_clean_result(candidate_id: str) -> CandidateValidationResult:
     return CandidateValidationResult(
-        candidate_id=candidate_id, issues=[], passed=True,
+        candidate_id=candidate_id,
+        issues=[],
+        passed=True,
     )
 
 
 def _make_error_result(
-    candidate_id: str, message: str = "Something failed",
+    candidate_id: str,
+    message: str = "Something failed",
 ) -> CandidateValidationResult:
     return CandidateValidationResult(
         candidate_id=candidate_id,
@@ -117,7 +120,8 @@ def _make_error_result(
 
 
 def _make_warning_result(
-    candidate_id: str, message: str = "Something suspicious",
+    candidate_id: str,
+    message: str = "Something suspicious",
 ) -> CandidateValidationResult:
     return CandidateValidationResult(
         candidate_id=candidate_id,
@@ -169,12 +173,16 @@ class TestClassifyDecision:
             candidate_id="cand_004",
             issues=[
                 ValidationIssue(
-                    severity="warning", check_name="w",
-                    message="warn msg", subject_id="cand_004",
+                    severity="warning",
+                    check_name="w",
+                    message="warn msg",
+                    subject_id="cand_004",
                 ),
                 ValidationIssue(
-                    severity="error", check_name="e",
-                    message="err msg", subject_id="cand_004",
+                    severity="error",
+                    check_name="e",
+                    message="err msg",
+                    subject_id="cand_004",
                 ),
             ],
             passed=False,
@@ -189,8 +197,10 @@ class TestClassifyDecision:
             candidate_id="cand_006",
             issues=[
                 ValidationIssue(
-                    severity="info", check_name="i",
-                    message="info msg", subject_id="cand_006",
+                    severity="info",
+                    check_name="i",
+                    message="info msg",
+                    subject_id="cand_006",
                 ),
             ],
             passed=True,
@@ -209,7 +219,9 @@ class TestGetDecisionFor:
 
     def test_found(self):
         d = AdmissionDecision(
-            subject_id="cand_001", decision="accepted_to_stage", reasons=[],
+            subject_id="cand_001",
+            decision="accepted_to_stage",
+            reasons=[],
         )
         report = self._make_report([d])
         result = _get_decision_for("cand_001", report)
@@ -271,10 +283,13 @@ class TestAdmitCandidates:
 
 class TestWriteStagedOutputs:
     def _make_report_with_decisions(
-        self, decisions: list[AdmissionDecision],
+        self,
+        decisions: list[AdmissionDecision],
     ) -> AdmissionReport:
         counts: dict[str, int] = {
-            "accepted_to_stage": 0, "review_required": 0, "rejected": 0,
+            "accepted_to_stage": 0,
+            "review_required": 0,
+            "rejected": 0,
         }
         for d in decisions:
             counts[d.decision] += 1
@@ -287,7 +302,9 @@ class TestWriteStagedOutputs:
     def test_accepted_recipe_written(self, tmp_path: Path):
         candidate = _make_recipe_candidate("c1")
         decision = AdmissionDecision(
-            subject_id="c1", decision="accepted_to_stage", reasons=[],
+            subject_id="c1",
+            decision="accepted_to_stage",
+            reasons=[],
         )
         report = self._make_report_with_decisions([decision])
         write_staged_outputs(tmp_path, report, [candidate], [])
@@ -300,7 +317,9 @@ class TestWriteStagedOutputs:
     def test_rejected_recipe_not_written(self, tmp_path: Path):
         candidate = _make_recipe_candidate("c3")
         decision = AdmissionDecision(
-            subject_id="c3", decision="rejected", reasons=["bad"],
+            subject_id="c3",
+            decision="rejected",
+            reasons=["bad"],
         )
         report = self._make_report_with_decisions([decision])
         write_staged_outputs(tmp_path, report, [candidate], [])
@@ -309,7 +328,9 @@ class TestWriteStagedOutputs:
     def test_metadata_patch_collection_written(self, tmp_path: Path):
         meta = _make_metadata_candidate("enr_001")
         decision = AdmissionDecision(
-            subject_id="enr_001", decision="accepted_to_stage", reasons=[],
+            subject_id="enr_001",
+            decision="accepted_to_stage",
+            reasons=[],
         )
         report = self._make_report_with_decisions([decision])
         write_staged_outputs(tmp_path, report, [], [meta])

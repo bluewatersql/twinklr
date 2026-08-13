@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from twinklr.core.feature_engineering.artifact_writer import ArtifactWriter
 from twinklr.core.feature_engineering.color_arc import ColorArcExtractor
@@ -39,6 +39,9 @@ from twinklr.core.feature_engineering.models.stacks import EffectStack, EffectSt
 from twinklr.core.feature_engineering.promotion import PromotionPipeline
 from twinklr.core.feature_engineering.transitions_v2.markov import MarkovTransitionModel
 from twinklr.core.feature_store.protocols import FeatureStoreProviderSync
+
+if TYPE_CHECKING:
+    from pydantic import BaseModel as _BaseModel
 
 _ProgressFn = Any  # Callable[[str], None] | None
 
@@ -689,9 +692,8 @@ def load_profile_artifacts(
     Returns:
         Tuple of (phrases, taxonomy_rows, target_roles) or None if all missing.
     """
-    from pydantic import BaseModel as _BM
 
-    def _read_models(stem: str, model_cls: type[_BM]) -> tuple[Any, ...] | None:
+    def _read_models(stem: str, model_cls: type[_BaseModel]) -> tuple[Any, ...] | None:
         for ext in (".parquet", ".jsonl"):
             p = output_dir / f"{stem}{ext}"
             if not p.exists():

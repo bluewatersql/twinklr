@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import logging
 from datetime import UTC, datetime
+import logging
 from pathlib import Path
 
 from twinklr.core.recipe_builder.models import (
@@ -66,7 +66,9 @@ def admit_candidates(
     for candidate in recipe_candidates:
         result = result_by_id.get(candidate.candidate_id)
         if result is None:
-            result = CandidateValidationResult(candidate_id=candidate.candidate_id, issues=[], passed=True)
+            result = CandidateValidationResult(
+                candidate_id=candidate.candidate_id, issues=[], passed=True
+            )
         decisions.append(_classify_decision(result))
 
     for metadata_candidate in metadata_candidates:

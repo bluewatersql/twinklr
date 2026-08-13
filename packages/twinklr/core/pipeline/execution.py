@@ -9,9 +9,9 @@ Provides execute_step() helper that reduces stage boilerplate by handling:
 
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
 import logging
 import time
-from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING, TypeVar
 from uuid import uuid4
 

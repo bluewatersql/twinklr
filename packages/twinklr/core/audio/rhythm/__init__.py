@@ -9,7 +9,7 @@ from twinklr.core.audio.rhythm.beats import (
 
 __all__ = [
     "compute_beats",
-    "detect_time_signature",
     "detect_downbeats_phase_aligned",
     "detect_tempo_changes",
+    "detect_time_signature",
 ]

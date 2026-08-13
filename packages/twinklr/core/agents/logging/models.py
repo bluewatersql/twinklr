@@ -1,6 +1,6 @@
 """Data models for LLM call logging."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -15,7 +15,7 @@ class LLMCallLog(BaseModel):
 
     # Call identification
     call_id: str
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     # Agent information
     agent_name: str
@@ -85,7 +85,7 @@ class CallSummary(BaseModel):
 
     # Run identification
     run_id: str
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
     status: str = "succeeded"  # succeeded, failed, partial
 
     # High-level metrics

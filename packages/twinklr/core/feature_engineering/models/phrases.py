@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
 
-class MotionClass(str, Enum):
+class MotionClass(StrEnum):
     STATIC = "static"
     SWEEP = "sweep"
     PULSE = "pulse"
@@ -17,14 +17,14 @@ class MotionClass(str, Enum):
     UNKNOWN = "unknown"
 
 
-class ColorClass(str, Enum):
+class ColorClass(StrEnum):
     MONO = "mono"
     PALETTE = "palette"
     MULTI = "multi"
     UNKNOWN = "unknown"
 
 
-class EnergyClass(str, Enum):
+class EnergyClass(StrEnum):
     LOW = "low"
     MID = "mid"
     HIGH = "high"
@@ -32,21 +32,21 @@ class EnergyClass(str, Enum):
     UNKNOWN = "unknown"
 
 
-class ContinuityClass(str, Enum):
+class ContinuityClass(StrEnum):
     SUSTAINED = "sustained"
     RHYTHMIC = "rhythmic"
     TRANSITIONAL = "transitional"
     UNKNOWN = "unknown"
 
 
-class SpatialClass(str, Enum):
+class SpatialClass(StrEnum):
     SINGLE_TARGET = "single_target"
     MULTI_TARGET = "multi_target"
     GROUP = "group"
     UNKNOWN = "unknown"
 
 
-class PhraseSource(str, Enum):
+class PhraseSource(StrEnum):
     EFFECT_TYPE_MAP = "effect_type_map"
     FALLBACK = "fallback"
 

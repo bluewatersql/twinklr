@@ -152,7 +152,7 @@ class SectioningPreset(BaseModel):
         ...     min_sections=12,
         ...     max_sections=18,
         ...     min_len_beats=16,
-        ...     novelty_L_beats=16,
+        ...     novelty_l_beats=16,
         ...     peak_delta=0.07,
         ... )
     """
@@ -169,7 +169,7 @@ class SectioningPreset(BaseModel):
     )
 
     # Novelty detection parameters
-    novelty_L_beats: int = Field(
+    novelty_l_beats: int = Field(
         ..., ge=2, description="Half-kernel size for Foote novelty (larger = macro structure)"
     )
     peak_delta: float = Field(

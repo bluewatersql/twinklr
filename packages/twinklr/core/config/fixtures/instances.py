@@ -240,10 +240,7 @@ class FixtureConfig(BaseModel):
             return False
 
         # Check backward pointing if avoided
-        if self.limits.avoid_backward and abs(pose.pan_deg) > 90:
-            return False
-
-        return True
+        return not (self.limits.avoid_backward and abs(pose.pan_deg) > 90)
 
     def clamp_pan(self, value: int) -> int:
         """Clamp pan DMX value to movement limits.
@@ -347,7 +344,7 @@ class FixtureConfig(BaseModel):
         Returns:
             DMX delta value (can be negative, not clamped)
         """
-        return int(round((deg / self.pan_tilt_range.pan_range_deg) * 255.0))
+        return round((deg / self.pan_tilt_range.pan_range_deg) * 255.0)
 
     def tilt_deg_to_dmx_delta(self, deg: float) -> int:
         """Convert tilt degrees to DMX delta (offset) without clamping.
@@ -361,7 +358,7 @@ class FixtureConfig(BaseModel):
         Returns:
             DMX delta value (can be negative, not clamped)
         """
-        return int(round((deg / self.pan_tilt_range.tilt_range_deg) * 255.0))
+        return round((deg / self.pan_tilt_range.tilt_range_deg) * 255.0)
 
 
 class FixtureInstance(BaseModel):

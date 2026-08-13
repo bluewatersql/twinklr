@@ -17,12 +17,12 @@ Example:
     ... )
 """
 
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field
 
 
-class PhonemeSource(str, Enum):
+class PhonemeSource(StrEnum):
     """Source of phoneme data.
 
     Values:

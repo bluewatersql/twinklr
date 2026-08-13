@@ -132,11 +132,11 @@ def cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
 
 
 __all__ = [
-    "normalize_to_0_1",
-    "frames_to_time",
-    "time_to_frames",
-    "as_float_list",
-    "safe_divide",
     "align_to_length",
+    "as_float_list",
     "cosine_similarity",
+    "frames_to_time",
+    "normalize_to_0_1",
+    "safe_divide",
+    "time_to_frames",
 ]

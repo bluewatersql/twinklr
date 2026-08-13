@@ -9,10 +9,10 @@ with provenance tracking and quality reporting.
 
 from __future__ import annotations
 
-import math
-import statistics
 from collections import defaultdict
 from dataclasses import dataclass
+import math
+import statistics
 from typing import Any
 
 from twinklr.core.feature_engineering.models.motifs import MotifCatalog
@@ -196,7 +196,7 @@ class PromotionPipeline:
             recipe_support[recipe_id] = t.support_count
             recipe_layer_count[recipe_id] = t.layer_count
             recipe_source_family[recipe_id] = t.effect_family
-            source_ids = [t.template_id] + self._get_cluster_member_ids(t.template_id, clusters)
+            source_ids = [t.template_id, *self._get_cluster_member_ids(t.template_id, clusters)]
             source_template_map[recipe_id] = source_ids
 
         # Stage 4: Per-family cap
@@ -393,8 +393,7 @@ class PromotionPipeline:
                     ),
                     key=lambda t: (-t.layer_count, -t.support_count),
                 )
-                for t in ml_remaining[: multi_layer_min_per_cluster - ml_selected]:
-                    selected.append(t)
+                selected.extend(ml_remaining[: multi_layer_min_per_cluster - ml_selected])
 
             for t in selected:
                 keep_ids.add(t.template_id)

@@ -1,13 +1,13 @@
 """Pydantic models for AudioProfile agent."""
 
 from datetime import UTC, datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
-class Severity(str, Enum):
+class Severity(StrEnum):
     """Issue severity levels."""
 
     INFO = "INFO"
@@ -135,7 +135,7 @@ class Structure(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
-class MacroEnergy(str, Enum):
+class MacroEnergy(StrEnum):
     """Overall energy level of song."""
 
     LOW = "LOW"
@@ -260,7 +260,7 @@ class LyricProfile(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
-class Contrast(str, Enum):
+class Contrast(StrEnum):
     """Visual contrast level."""
 
     LOW = "LOW"
@@ -268,7 +268,7 @@ class Contrast(str, Enum):
     HIGH = "HIGH"
 
 
-class MotionDensity(str, Enum):
+class MotionDensity(StrEnum):
     """Motion density level."""
 
     SPARSE = "SPARSE"
@@ -276,7 +276,7 @@ class MotionDensity(str, Enum):
     BUSY = "BUSY"
 
 
-class AssetUsage(str, Enum):
+class AssetUsage(StrEnum):
     """Asset usage recommendation."""
 
     NONE = "NONE"

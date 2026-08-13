@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field
 
 
-class AlignmentStatus(str, Enum):
+class AlignmentStatus(StrEnum):
     """Alignment result status for an event."""
 
     ALIGNED = "aligned"

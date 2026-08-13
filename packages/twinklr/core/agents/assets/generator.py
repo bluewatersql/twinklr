@@ -8,8 +8,8 @@ builds catalog entries.
 from __future__ import annotations
 
 import asyncio
+from datetime import UTC, datetime
 import logging
-from datetime import datetime, timezone
 from pathlib import Path
 
 from PIL import Image
@@ -141,7 +141,7 @@ async def generate_asset(
     """
     output_path = _build_output_path(spec, assets_dir)
     prompt_hash = compute_prompt_hash(spec)
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
 
     try:
         if spec.category.is_image():

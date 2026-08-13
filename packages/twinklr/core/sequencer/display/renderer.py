@@ -247,8 +247,8 @@ def write_display_xsq_trace_sidecar(xsq_path: Path, render_result: RenderResult)
 
 
 __all__ = [
-    "build_display_xsq_trace_sidecar_payload",
-    "write_display_xsq_trace_sidecar",
     "DisplayRenderer",
     "RenderResult",
+    "build_display_xsq_trace_sidecar_payload",
+    "write_display_xsq_trace_sidecar",
 ]

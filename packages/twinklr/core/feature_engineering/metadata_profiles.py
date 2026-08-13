@@ -341,13 +341,13 @@ class _FamilyStackData:
     """
 
     __slots__ = (
-        "total_stacks",
-        "solo_count",
-        "role_counter",
+        "param_layer_counts",
+        "param_values",
         "partner_counter",
         "position_sum",
-        "param_values",
-        "param_layer_counts",
+        "role_counter",
+        "solo_count",
+        "total_stacks",
     )
 
     def __init__(self) -> None:

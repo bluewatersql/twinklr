@@ -1,6 +1,6 @@
 """Spotlight cluster geometry handler - converging beams to focal point."""
 
-from typing import Any
+from typing import Any, ClassVar
 
 from twinklr.core.sequencer.moving_heads.handlers.protocols import GeometryResult
 
@@ -27,7 +27,7 @@ class SpotlightClusterHandler:
     handler_id: str = "spotlight_cluster"
 
     # Role ordering for determining fixture position
-    ROLE_ORDER = [
+    ROLE_ORDER: ClassVar[list[str]] = [
         "FAR_LEFT",
         "OUTER_LEFT",
         "INNER_LEFT",

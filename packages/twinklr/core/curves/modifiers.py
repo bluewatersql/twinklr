@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 
 from twinklr.core.curves.models import CurvePoint
 
 
-class CurveModifier(str, Enum):
+class CurveModifier(StrEnum):
     """Curve transformation modifiers.
 
     Applied to base curves to create variations without defining new curve types.

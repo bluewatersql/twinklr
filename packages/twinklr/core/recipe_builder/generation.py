@@ -10,8 +10,8 @@ from __future__ import annotations
 import json
 import logging
 import random
-import uuid
 from typing import Any
+import uuid
 
 from pydantic import ValidationError
 
@@ -168,20 +168,14 @@ def _build_user_prompt(
     constraints: list[str] = []
     if opportunity.target_effect_type:
         constraints.append(
-            f"- Primary effect_type in at least one layer MUST be: \"{opportunity.target_effect_type}\""
+            f'- Primary effect_type in at least one layer MUST be: "{opportunity.target_effect_type}"'
         )
     if opportunity.target_energy:
-        constraints.append(
-            f"- energy_affinity MUST be: \"{opportunity.target_energy}\""
-        )
+        constraints.append(f'- energy_affinity MUST be: "{opportunity.target_energy}"')
     if opportunity.target_template_type:
-        constraints.append(
-            f"- template_type MUST be: \"{opportunity.target_template_type}\""
-        )
+        constraints.append(f'- template_type MUST be: "{opportunity.target_template_type}"')
     if opportunity.target_motions:
-        constraints.append(
-            f"- At least one layer MUST use motion: {opportunity.target_motions}"
-        )
+        constraints.append(f"- At least one layer MUST use motion: {opportunity.target_motions}")
     if constraints:
         parts.append("## Constraints")
         parts.extend(constraints)
@@ -204,13 +198,13 @@ def _build_user_prompt(
     # Final instructions
     parts.append("## Instructions")
     parts.append("Generate ONE creative, original EffectRecipe JSON for this opportunity.")
-    parts.append("- recipe_id format: \"rb_{effect_family}_{short_descriptor}_v1\"")
+    parts.append('- recipe_id format: "rb_{effect_family}_{short_descriptor}_v1"')
     parts.append("- effect_type in layers MUST be one of the valid xLights effects listed above")
     parts.append("- Be creative with layer composition, motion verbs, and parameters")
     parts.append("- Use 1-3 layers for visual depth — prefer 2+ layers")
-    parts.append("- params values should use {\"value\": <static_value>} format")
+    parts.append('- params values should use {"value": <static_value>} format')
     parts.append("- complexity (0.0-1.0) should reflect the recipe's visual complexity")
-    parts.append("- provenance.source must be \"generated\"")
+    parts.append('- provenance.source must be "generated"')
 
     return "\n".join(parts)
 
@@ -288,10 +282,7 @@ def _select_diverse_examples(
         energy = recipe.style_markers.energy_affinity.value
 
         # Skip if too similar to target
-        if (
-            opportunity.target_effect_type
-            and primary_effect == opportunity.target_effect_type
-        ):
+        if opportunity.target_effect_type and primary_effect == opportunity.target_effect_type:
             continue
 
         # Prefer diversity
@@ -471,7 +462,11 @@ _EFFECT_DEFAULTS: dict[str, dict[str, Any]] = {
         "depth": VisualDepth.ACCENT,
         "density": 0.5,
         "motion": [MotionVerb.RIPPLE],
-        "params": {"start_radius": {"value": 1}, "end_radius": {"value": 200}, "accel": {"value": 3}},
+        "params": {
+            "start_radius": {"value": 1},
+            "end_radius": {"value": 200},
+            "accel": {"value": 3},
+        },
     },
     "Ripple": {
         "blend": BlendMode.SCREEN,

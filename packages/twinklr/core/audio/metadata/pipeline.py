@@ -12,6 +12,7 @@ import asyncio
 import datetime
 import hashlib
 import logging
+from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict
@@ -116,7 +117,7 @@ class MetadataPipeline:
         warnings: list[str] = []
         provenance: dict[str, Any] = {
             "pipeline_version": "4.0.0",  # Phase 8: async
-            "extracted_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            "extracted_at": datetime.datetime.now(datetime.UTC).isoformat(),
         }
 
         # Stage 1: Extract embedded metadata (or reuse if provided)
@@ -133,7 +134,7 @@ class MetadataPipeline:
                 logger.warning(f"Embedded metadata extraction failed: {e}")
                 embedded = EmbeddedMetadata()
                 stage_status = StageStatus.FAILED
-                warnings.append(f"Embedded metadata extraction failed: {str(e)}")
+                warnings.append(f"Embedded metadata extraction failed: {e!s}")
 
         # Stage 2: Compute fingerprint
         fingerprint = self._compute_fingerprint(audio_path, warnings)
@@ -163,16 +164,15 @@ class MetadataPipeline:
                 mb_tasks = [self._query_musicbrainz(mbid, warnings) for mbid in mbids_to_query]
                 mb_results = await asyncio.gather(*mb_tasks)
 
-                # Add successful results
+                # Add successful results, avoiding duplicate MusicBrainz entries
+                # (but allowing MB + AcoustID with the same MBID)
                 for mb_candidate in mb_results:
-                    if mb_candidate:
-                        # Avoid duplicate MusicBrainz entries (but allow MB + AcoustID with same MBID)
-                        if not any(
-                            c.provider == "musicbrainz"
-                            and c.mbids.recording_mbid == mb_candidate.mbids.recording_mbid
-                            for c in candidates
-                        ):
-                            candidates.append(mb_candidate)
+                    if mb_candidate and not any(
+                        c.provider == "musicbrainz"
+                        and c.mbids.recording_mbid == mb_candidate.mbids.recording_mbid
+                        for c in candidates
+                    ):
+                        candidates.append(mb_candidate)
 
         # Stage 4: Merge metadata
         resolved = self._merge_metadata(embedded, candidates, warnings)
@@ -208,7 +208,7 @@ class MetadataPipeline:
             audio_fingerprint = compute_file_hash(audio_path)
         except Exception as e:
             logger.warning(f"File hash computation failed: {e}")
-            warnings.append(f"Fingerprint computation failed: {str(e)}")
+            warnings.append(f"Fingerprint computation failed: {e!s}")
             return None
 
         # Compute chromaprint (only if AcoustID is enabled)
@@ -226,10 +226,10 @@ class MetadataPipeline:
                 chromaprint_duration_bucket = round(duration, 1)  # Bucket to 0.1s
             except ChromaprintError as e:
                 logger.warning(f"Chromaprint fingerprint failed: {e}")
-                warnings.append(f"Chromaprint fingerprint failed: {str(e)}")
+                warnings.append(f"Chromaprint fingerprint failed: {e!s}")
             except Exception as e:
                 logger.warning(f"Chromaprint fingerprint failed: {e}")
-                warnings.append(f"Chromaprint fingerprint failed: {str(e)}")
+                warnings.append(f"Chromaprint fingerprint failed: {e!s}")
 
         return FingerprintInfo(
             audio_fingerprint=audio_fingerprint,
@@ -279,7 +279,7 @@ class MetadataPipeline:
 
         except Exception as e:
             logger.warning(f"AcoustID lookup failed: {e}")
-            warnings.append(f"AcoustID lookup failed: {str(e)}")
+            warnings.append(f"AcoustID lookup failed: {e!s}")
             return []
 
     async def _query_musicbrainz(self, mbid: str, warnings: list[str]) -> MetadataCandidate | None:
@@ -323,7 +323,7 @@ class MetadataPipeline:
 
         except Exception as e:
             logger.warning(f"MusicBrainz lookup failed for {mbid}: {e}")
-            warnings.append(f"MusicBrainz lookup failed: {str(e)}")
+            warnings.append(f"MusicBrainz lookup failed: {e!s}")
             return None
 
     def _merge_metadata(
@@ -357,7 +357,7 @@ class MetadataPipeline:
 
         except Exception as e:
             logger.warning(f"Metadata merge failed: {e}")
-            warnings.append(f"Metadata merge failed: {str(e)}")
+            warnings.append(f"Metadata merge failed: {e!s}")
 
             # Fallback to embedded as resolved
             from twinklr.core.audio.metadata.merge import MergeConfig
@@ -376,7 +376,7 @@ def compute_file_hash(file_path: str) -> str:
         Hex-encoded SHA256 hash
     """
     sha256 = hashlib.sha256()
-    with open(file_path, "rb") as f:
+    with Path(file_path).open("rb") as f:
         for chunk in iter(lambda: f.read(8192), b""):
             sha256.update(chunk)
     return sha256.hexdigest()

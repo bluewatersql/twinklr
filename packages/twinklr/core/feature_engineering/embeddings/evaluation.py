@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 import math
 import time
-from collections.abc import Callable
 
 from twinklr.core.feature_engineering.embeddings.models import (
     RetrievalQualityReport,

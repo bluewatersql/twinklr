@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass
+import json
 from pathlib import Path
 from typing import Any
 
@@ -146,10 +146,9 @@ class TaxonomyClassifier:
                     return False
                 if "max" in allowed and actual > float(allowed["max"]):
                     return False
-            else:
-                if isinstance(actual, str) and isinstance(allowed, str):
-                    if actual.lower() != allowed.lower():
-                        return False
-                elif actual != allowed:
+            elif isinstance(actual, str) and isinstance(allowed, str):
+                if actual.lower() != allowed.lower():
                     return False
+            elif actual != allowed:
+                return False
         return True

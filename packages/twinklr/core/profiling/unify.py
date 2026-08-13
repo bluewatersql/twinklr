@@ -12,13 +12,13 @@ V0 implementation is intentionally minimal:
 
 from __future__ import annotations
 
-import json
-import uuid
-import warnings
 from dataclasses import dataclass
 from datetime import UTC, datetime
+import json
 from pathlib import Path
 from typing import Any
+import uuid
+import warnings
 
 from twinklr.core.profiling.constants import (
     CORPUS_MANIFEST_SCHEMA_VERSION,

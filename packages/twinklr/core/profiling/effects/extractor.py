@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import hashlib
 import json
-import uuid
 from typing import Any
+import uuid
 
 from twinklr.core.formats.xlights.sequence.models.xsq import Effect, XSequence
 from twinklr.core.profiling.constants import EFFECTDB_PARSER_VERSION

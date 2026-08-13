@@ -11,8 +11,8 @@ Provides:
 from __future__ import annotations
 
 import asyncio
-import time
 from collections.abc import Mapping, Sequence
+import time
 from typing import Any, TypeVar
 
 import httpx
@@ -241,19 +241,18 @@ class ApiClient:
                             request_id=req_id,
                             body_snippet_limit=self.config.max_response_body_for_error,
                         )
-                else:
-                    if resp.status_code >= 400:
-                        exc_cls = _categorize_http_error(resp.status_code)
-                        raise _build_api_error(
-                            exc_type=exc_cls,
-                            message="HTTP error response",
-                            method=method_u,
-                            url=url,
-                            status_code=resp.status_code,
-                            response=resp,
-                            request_id=req_id,
-                            body_snippet_limit=self.config.max_response_body_for_error,
-                        )
+                elif resp.status_code >= 400:
+                    exc_cls = _categorize_http_error(resp.status_code)
+                    raise _build_api_error(
+                        exc_type=exc_cls,
+                        message="HTTP error response",
+                        method=method_u,
+                        url=url,
+                        status_code=resp.status_code,
+                        response=resp,
+                        request_id=req_id,
+                        body_snippet_limit=self.config.max_response_body_for_error,
+                    )
 
                 return resp
 
@@ -540,19 +539,18 @@ class AsyncApiClient:
                             request_id=req_id,
                             body_snippet_limit=self.config.max_response_body_for_error,
                         )
-                else:
-                    if resp.status_code >= 400:
-                        exc_cls = _categorize_http_error(resp.status_code)
-                        raise _build_api_error(
-                            exc_type=exc_cls,
-                            message="HTTP error response",
-                            method=method_u,
-                            url=url,
-                            status_code=resp.status_code,
-                            response=resp,
-                            request_id=req_id,
-                            body_snippet_limit=self.config.max_response_body_for_error,
-                        )
+                elif resp.status_code >= 400:
+                    exc_cls = _categorize_http_error(resp.status_code)
+                    raise _build_api_error(
+                        exc_type=exc_cls,
+                        message="HTTP error response",
+                        method=method_u,
+                        url=url,
+                        status_code=resp.status_code,
+                        response=resp,
+                        request_id=req_id,
+                        body_snippet_limit=self.config.max_response_body_for_error,
+                    )
 
                 return resp
 

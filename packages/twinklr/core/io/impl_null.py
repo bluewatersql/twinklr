@@ -53,7 +53,6 @@ class NullFileSystem:
 
     async def mkdirs(self, path: AbsolutePath, exist_ok: bool = True) -> None:
         """No-op (async)."""
-        pass
 
     async def listdir(self, path: AbsolutePath) -> list[str]:
         """Always returns empty list (async)."""
@@ -61,11 +60,9 @@ class NullFileSystem:
 
     async def remove(self, path: AbsolutePath) -> None:
         """No-op (async)."""
-        pass
 
     async def rmdir(self, path: AbsolutePath, recursive: bool = False) -> None:
         """No-op (async)."""
-        pass
 
 
 class NullFileSystemSync(SyncAdapter):

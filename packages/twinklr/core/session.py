@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import Any, TypeVar
 from uuid import uuid4
 
 from twinklr.core.agents.logging import LLMCallLogger, NullLLMCallLogger, create_llm_logger
@@ -30,8 +30,6 @@ from twinklr.core.io import RealFileSystem, absolute_path
 
 T = TypeVar("T", bound=ConfigBase)
 
-if TYPE_CHECKING:
-    from twinklr.core.audio.analyzer import AudioAnalyzer
 
 logger = logging.getLogger(__name__)
 

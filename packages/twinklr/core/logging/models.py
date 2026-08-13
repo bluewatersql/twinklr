@@ -1,13 +1,13 @@
 """Data models for structured logging."""
 
-from datetime import datetime, timezone
-from enum import Enum
+from datetime import UTC, datetime
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, Field
 
 
-class LogLevel(str, Enum):
+class LogLevel(StrEnum):
     """Log level enumeration."""
 
     DEBUG = "DEBUG"
@@ -31,7 +31,7 @@ class LogContext(BaseModel):
     iteration: int | None = None
 
     # Timing
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
     duration_ms: float | None = None
 
     # Performance
@@ -56,6 +56,6 @@ class LogEntry(BaseModel):
     level: LogLevel
     message: str
     context: LogContext
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     model_config = {"frozen": True}

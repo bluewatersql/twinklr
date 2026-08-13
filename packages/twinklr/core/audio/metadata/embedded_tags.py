@@ -110,7 +110,7 @@ def extract_embedded_metadata(audio_path: str | Path) -> EmbeddedMetadata:
         return EmbeddedMetadata(warnings=warnings)
     except Exception as e:
         logger.warning(f"Error extracting tags from {audio_path}: {e}")
-        warnings.append(f"Tag extraction error: {str(e)}")
+        warnings.append(f"Tag extraction error: {e!s}")
         return EmbeddedMetadata(warnings=warnings)
 
 
@@ -279,7 +279,7 @@ def _extract_artwork_info(audio_file: Any) -> dict[str, Any]:
 
         # Try tags for embedded images (ID3 APIC)
         if hasattr(audio_file, "tags") and audio_file.tags:
-            for key in audio_file.tags.keys():
+            for key in audio_file.tags:
                 if key.startswith("APIC"):
                     apic = audio_file.tags[key]
                     artwork_data = apic.data

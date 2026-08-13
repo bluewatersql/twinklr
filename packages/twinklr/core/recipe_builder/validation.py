@@ -72,9 +72,7 @@ def validate_all(
     library_recipes: list[EffectRecipe],
 ) -> ValidationReport:
     """Run all checks on all candidates and return an aggregated report."""
-    recipe_results = [
-        validate_recipe_candidate(c, library_recipes) for c in recipe_candidates
-    ]
+    recipe_results = [validate_recipe_candidate(c, library_recipes) for c in recipe_candidates]
     metadata_results = [
         validate_metadata_candidate(c, library_recipes) for c in metadata_candidates
     ]
@@ -122,8 +120,7 @@ def validate_recipe_candidate(
                     severity="warning",
                     check_name="effect_handler_compatibility",
                     message=(
-                        f"Layer '{layer.layer_name}' uses unknown effect_type "
-                        f"'{layer.effect_type}'"
+                        f"Layer '{layer.layer_name}' uses unknown effect_type '{layer.effect_type}'"
                     ),
                     subject_id=subject,
                 )
@@ -141,19 +138,21 @@ def validate_recipe_candidate(
         )
 
     # Timing sanity
-    if recipe.timing.bars_min is not None and recipe.timing.bars_max is not None:
-        if recipe.timing.bars_min > recipe.timing.bars_max:
-            issues.append(
-                ValidationIssue(
-                    severity="error",
-                    check_name="timing_sanity",
-                    message=(
-                        f"bars_min ({recipe.timing.bars_min}) > "
-                        f"bars_max ({recipe.timing.bars_max})"
-                    ),
-                    subject_id=subject,
-                )
+    if (
+        recipe.timing.bars_min is not None
+        and recipe.timing.bars_max is not None
+        and recipe.timing.bars_min > recipe.timing.bars_max
+    ):
+        issues.append(
+            ValidationIssue(
+                severity="error",
+                check_name="timing_sanity",
+                message=(
+                    f"bars_min ({recipe.timing.bars_min}) > bars_max ({recipe.timing.bars_max})"
+                ),
+                subject_id=subject,
             )
+        )
 
     # Duplicate check against library
     library_ids = {r.recipe_id for r in library_recipes}
@@ -171,7 +170,8 @@ def validate_recipe_candidate(
             if (
                 lib_recipe.effect_family == recipe.effect_family
                 and lib_recipe.style_markers.energy_affinity == recipe.style_markers.energy_affinity
-                and abs(lib_recipe.style_markers.complexity - recipe.style_markers.complexity) <= 0.1
+                and abs(lib_recipe.style_markers.complexity - recipe.style_markers.complexity)
+                <= 0.1
             ):
                 issues.append(
                     ValidationIssue(
@@ -252,8 +252,7 @@ def validate_metadata_candidate(
                 severity="error",
                 check_name="target_exists",
                 message=(
-                    f"target_recipe_id '{candidate.target_recipe_id}' "
-                    f"does not exist in library"
+                    f"target_recipe_id '{candidate.target_recipe_id}' does not exist in library"
                 ),
                 subject_id=subject,
             )

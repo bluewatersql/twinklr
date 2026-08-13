@@ -72,7 +72,7 @@ class PipelineStage(Protocol):
         ...
 
 
-def resolve_typed_input(
+def resolve_typed_input[T](
     input: Any,
     model_type: type[T],
     dict_key: str | None = None,

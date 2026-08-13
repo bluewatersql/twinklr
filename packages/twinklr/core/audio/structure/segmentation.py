@@ -15,10 +15,10 @@ def compute_self_similarity_matrix(features: np.ndarray) -> np.ndarray:
     """Compute self-similarity matrix via dot product of normalized features.
 
     Args:
-        features: Normalized feature matrix (features × frames)
+        features: Normalized feature matrix (features x frames)
 
     Returns:
-        Self-similarity matrix (frames × frames) with values in [-1, 1]
+        Self-similarity matrix (frames x frames) with values in [-1, 1]
     """
     with np.errstate(invalid="ignore", divide="ignore", over="ignore"):
         ssm = (features.T @ features).astype(np.float32)
@@ -227,7 +227,7 @@ def merge_short_sections(times: list[float], min_s: float, duration: float) -> l
 
     times_sorted = sorted({float(t) for t in times})
     if times_sorted[0] != 0.0:
-        times_sorted = [0.0] + times_sorted
+        times_sorted = [0.0, *times_sorted]
     if times_sorted[-1] != float(duration):
         times_sorted.append(float(duration))
 
@@ -237,9 +237,7 @@ def merge_short_sections(times: list[float], min_s: float, duration: float) -> l
         nxt = float(times_sorted[i + 1])
 
         # Keep if section meets minimum OR would create overly long section
-        if cur - result[-1] >= min_s:
-            result.append(cur)
-        elif nxt - result[-1] > min_s * 3:
+        if cur - result[-1] >= min_s or nxt - result[-1] > min_s * 3:
             result.append(cur)
 
     # Always end at duration
@@ -251,7 +249,7 @@ def merge_short_sections(times: list[float], min_s: float, duration: float) -> l
 
     out = sorted(set(result))
     if out[0] != 0.0:
-        out = [0.0] + out
+        out = [0.0, *out]
     if out[-1] != float(duration):
         out.append(float(duration))
 
@@ -279,11 +277,11 @@ def suppress_micro_edge_boundaries(
 
     # Remove boundary creating tiny first segment [0, b1]
     if len(b) >= 3 and (b[1] - b[0]) < pickup_s:
-        b = [b[0]] + b[2:]
+        b = [b[0], *b[2:]]
 
     # Remove boundary creating tiny last segment [b[-2], b[-1]]
     if len(b) >= 3 and (b[-1] - b[-2]) < tailtick_s:
-        b = b[:-2] + [b[-1]]
+        b = [*b[:-2], b[-1]]
 
     return sorted(set(b))
 

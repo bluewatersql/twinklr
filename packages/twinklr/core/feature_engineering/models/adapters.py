@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -11,14 +11,14 @@ from twinklr.core.feature_engineering.models.templates import TemplateKind
 from twinklr.core.feature_engineering.models.transitions import TransitionType
 
 
-class SequencerAdapterScope(str, Enum):
+class SequencerAdapterScope(StrEnum):
     """Supported sequencer adapter scopes for V2.4."""
 
     MACRO = "macro"
     GROUP = "group"
 
 
-class PlannerChangeMode(str, Enum):
+class PlannerChangeMode(StrEnum):
     """Planner behavior change mode for adapter payload consumption."""
 
     CONTRACT_ONLY = "contract_only"

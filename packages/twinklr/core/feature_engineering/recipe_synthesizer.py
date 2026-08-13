@@ -304,7 +304,8 @@ class RecipeSynthesizer:
         else:
             timing = TimingHints(bars_min=2, bars_max=16)
 
-        tags = list(mined.stack_composition) + [
+        tags = [
+            *list(mined.stack_composition),
             mined.motion_class,
             mined.color_class,
             mined.energy_class,

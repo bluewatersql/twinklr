@@ -11,7 +11,7 @@ from __future__ import annotations
 from collections import defaultdict
 from dataclasses import dataclass
 from difflib import get_close_matches
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -33,7 +33,7 @@ from twinklr.core.sequencer.vocabulary import (
 from twinklr.core.sequencer.vocabulary.choreography import ChoreoTag
 
 
-class ValidationSeverity(str, Enum):
+class ValidationSeverity(StrEnum):
     """Severity of validation issue."""
 
     ERROR = "ERROR"  # Blocks progression
@@ -98,9 +98,7 @@ class SectionPlanValidator:
         """Check if template_id exists in the unified template catalog."""
         if self.template_catalog.has_template(template_id):
             return True
-        if self.recipe_catalog is not None and self.recipe_catalog.has_recipe(template_id):
-            return True
-        return False
+        return bool(self.recipe_catalog is not None and self.recipe_catalog.has_recipe(template_id))
 
     def _is_lane_compatible(self, template_id: str, lane: LaneKind) -> bool | None:
         """Check lane compatibility for a template or recipe ID.
@@ -275,42 +273,43 @@ class SectionPlanValidator:
             CoordinationMode.CALL_RESPONSE,
             CoordinationMode.RIPPLE,
         }
-        if mode in requires_window_config:
-            if coord_plan.window is None or coord_plan.config is None:
-                errors.append(
-                    ValidationIssue(
-                        severity=ValidationSeverity.ERROR,
-                        code=f"{mode.value}_MISSING_WINDOW_CONFIG",
-                        message=(
-                            f"{mode.value} mode in {lane.value} lane requires both "
-                            "window and config."
-                        ),
-                        field_path=f"lane_plans[{lane.value}].coordination_plans",
-                        fix_hint=(
-                            f"Add both window and config for {mode.value} mode, "
-                            "or switch to UNIFIED/COMPLEMENTARY with placements."
-                        ),
-                    )
+        if mode in requires_window_config and (
+            coord_plan.window is None or coord_plan.config is None
+        ):
+            errors.append(
+                ValidationIssue(
+                    severity=ValidationSeverity.ERROR,
+                    code=f"{mode.value}_MISSING_WINDOW_CONFIG",
+                    message=(
+                        f"{mode.value} mode in {lane.value} lane requires both window and config."
+                    ),
+                    field_path=f"lane_plans[{lane.value}].coordination_plans",
+                    fix_hint=(
+                        f"Add both window and config for {mode.value} mode, "
+                        "or switch to UNIFIED/COMPLEMENTARY with placements."
+                    ),
                 )
-                return errors
+            )
+            return errors
 
-        if mode == CoordinationMode.CALL_RESPONSE:
-            if coord_plan.config is None or not coord_plan.config.group_order:
-                errors.append(
-                    ValidationIssue(
-                        severity=ValidationSeverity.ERROR,
-                        code="CALL_RESPONSE_MISSING_GROUP_ORDER",
-                        message=(
-                            f"CALL_RESPONSE mode in {lane.value} lane requires "
-                            "a non-empty config.group_order."
-                        ),
-                        field_path=f"lane_plans[{lane.value}].coordination_plans.config.group_order",
-                        fix_hint=(
-                            "Populate config.group_order with the alternating call/response "
-                            "participant IDs in execution order."
-                        ),
-                    )
+        if mode == CoordinationMode.CALL_RESPONSE and (
+            coord_plan.config is None or not coord_plan.config.group_order
+        ):
+            errors.append(
+                ValidationIssue(
+                    severity=ValidationSeverity.ERROR,
+                    code="CALL_RESPONSE_MISSING_GROUP_ORDER",
+                    message=(
+                        f"CALL_RESPONSE mode in {lane.value} lane requires "
+                        "a non-empty config.group_order."
+                    ),
+                    field_path=f"lane_plans[{lane.value}].coordination_plans.config.group_order",
+                    fix_hint=(
+                        "Populate config.group_order with the alternating call/response "
+                        "participant IDs in execution order."
+                    ),
                 )
+            )
 
         return errors
 
@@ -361,21 +360,20 @@ class SectionPlanValidator:
                         fix_hint="Use a valid ChoreoTag zone value",
                     )
                 )
-        elif target.type == TargetType.SPLIT:
-            if target.id not in self._valid_split_ids:
-                errors.append(
-                    ValidationIssue(
-                        severity=ValidationSeverity.ERROR,
-                        code="UNKNOWN_SPLIT",
-                        message=(
-                            f"Split target '{target.id}' is not a valid "
-                            f"SplitDimension. Valid splits: "
-                            f"{sorted(self._valid_split_ids)}"
-                        ),
-                        field_path=f"lane_plans[{lane_name}].targets",
-                        fix_hint="Use a valid SplitDimension value",
-                    )
+        elif target.type == TargetType.SPLIT and target.id not in self._valid_split_ids:
+            errors.append(
+                ValidationIssue(
+                    severity=ValidationSeverity.ERROR,
+                    code="UNKNOWN_SPLIT",
+                    message=(
+                        f"Split target '{target.id}' is not a valid "
+                        f"SplitDimension. Valid splits: "
+                        f"{sorted(self._valid_split_ids)}"
+                    ),
+                    field_path=f"lane_plans[{lane_name}].targets",
+                    fix_hint="Use a valid SplitDimension value",
                 )
+            )
         return errors
 
     def _check_identical_accent_on_primaries(
@@ -430,9 +428,7 @@ class SectionPlanValidator:
             for (template_id, intensity), groups in template_intensity_counts.items():
                 if len(groups) >= 3:
                     # Check if these are primary targets (HERO, MEGA_TREE)
-                    primary_groups = [
-                        g for g in groups if g.startswith("HERO") or g.startswith("MEGA_TREE")
-                    ]
+                    primary_groups = [g for g in groups if g.startswith(("HERO", "MEGA_TREE"))]
                     if len(primary_groups) >= 3:
                         warnings.append(
                             ValidationIssue(
@@ -772,22 +768,25 @@ class SectionPlanValidator:
             # Check timing within section bounds
             # With categorical planning, renderer will clamp durations that extend
             # past section end. Only error if start is outside section.
-            if section_start_ms is not None and section_end_ms is not None:
-                # Critical: start must be within section bounds
-                if start_ms < section_start_ms or start_ms >= section_end_ms:
-                    errors.append(
-                        ValidationIssue(
-                            severity=ValidationSeverity.ERROR,
-                            code="PLACEMENT_OUTSIDE_SECTION",
-                            message=(
-                                f"Placement '{placement.placement_id}' "
-                                f"starts at {start_ms}ms which is outside section bounds "
-                                f"({section_start_ms}ms-{section_end_ms}ms)"
-                            ),
-                            field_path=f"placement[{placement.placement_id}].start",
-                            fix_hint="Adjust placement start to be within section bounds",
-                        )
+            # Critical: start must be within section bounds
+            if (
+                section_start_ms is not None
+                and section_end_ms is not None
+                and (start_ms < section_start_ms or start_ms >= section_end_ms)
+            ):
+                errors.append(
+                    ValidationIssue(
+                        severity=ValidationSeverity.ERROR,
+                        code="PLACEMENT_OUTSIDE_SECTION",
+                        message=(
+                            f"Placement '{placement.placement_id}' "
+                            f"starts at {start_ms}ms which is outside section bounds "
+                            f"({section_start_ms}ms-{section_end_ms}ms)"
+                        ),
+                        field_path=f"placement[{placement.placement_id}].start",
+                        fix_hint="Adjust placement start to be within section bounds",
                     )
+                )
 
             # Track for overlap detection using target key
             target_key = f"{placement.target.type.value}:{placement.target.id}"
@@ -910,20 +909,23 @@ class SectionPlanValidator:
         # Check timing within section bounds
         # With categorical planning, renderer will clamp windows that extend
         # past section end. Only error if start is outside section.
-        if section_start_ms is not None and section_end_ms is not None:
-            if start_ms < section_start_ms or start_ms >= section_end_ms:
-                errors.append(
-                    ValidationIssue(
-                        severity=ValidationSeverity.ERROR,
-                        code="WINDOW_OUTSIDE_SECTION",
-                        message=(
-                            f"Window starts at {start_ms}ms which is outside section bounds "
-                            f"({section_start_ms}ms-{section_end_ms}ms)"
-                        ),
-                        field_path=f"lane_plans[{lane.value}].window.start",
-                        fix_hint="Adjust window start to be within section bounds",
-                    )
+        if (
+            section_start_ms is not None
+            and section_end_ms is not None
+            and (start_ms < section_start_ms or start_ms >= section_end_ms)
+        ):
+            errors.append(
+                ValidationIssue(
+                    severity=ValidationSeverity.ERROR,
+                    code="WINDOW_OUTSIDE_SECTION",
+                    message=(
+                        f"Window starts at {start_ms}ms which is outside section bounds "
+                        f"({section_start_ms}ms-{section_end_ms}ms)"
+                    ),
+                    field_path=f"lane_plans[{lane.value}].window.start",
+                    fix_hint="Adjust window start to be within section bounds",
                 )
+            )
 
         # Track window timing for all targets in this coordination_plan
         for target in targets:

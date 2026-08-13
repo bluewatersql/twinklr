@@ -23,7 +23,6 @@ class NullCache:
 
     def __init__(self, ttl_seconds: float | None = None) -> None:
         """Initialize null cache. TTL is ignored."""
-        pass
 
     async def exists(self, key: CacheKey) -> bool:
         """Always returns False (async)."""
@@ -40,15 +39,12 @@ class NullCache:
         compute_ms: float | None = None,
     ) -> None:
         """Discard (async)."""
-        pass
 
     async def invalidate(self, key: CacheKey) -> None:
         """No-op (async)."""
-        pass
 
     async def initialize(self) -> None:
         """No-op (async)."""
-        pass
 
 
 class NullCacheSync:

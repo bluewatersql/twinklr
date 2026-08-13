@@ -119,9 +119,7 @@ def test_promoted_recipe_keeps_provenance(tmp_path: Path) -> None:
 
     promote_staged_recipes(staged_dir=staged_dir, templates_dir=templates_dir)
 
-    promoted = json.loads(
-        (templates_dir / "builtins" / "gen_fire_v1.json").read_text()
-    )
+    promoted = json.loads((templates_dir / "builtins" / "gen_fire_v1.json").read_text())
     assert promoted["provenance"]["source"] == "generated"
 
 
@@ -151,8 +149,13 @@ def test_adds_entry_to_index(tmp_path: Path) -> None:
 def test_index_entry_metadata(tmp_path: Path) -> None:
     """Index entry must carry recipe_id, name, template_type, visual_intent, tags, source, file."""
     staged_dir, templates_dir, _ = _setup_dirs(tmp_path)
-    _write_staged(staged_dir, "gen_spirals_v1", name="Generated Spirals",
-                  effect_type="Spirals", template_type="ACCENT")
+    _write_staged(
+        staged_dir,
+        "gen_spirals_v1",
+        name="Generated Spirals",
+        effect_type="Spirals",
+        template_type="ACCENT",
+    )
 
     promote_staged_recipes(staged_dir=staged_dir, templates_dir=templates_dir)
 

@@ -9,12 +9,12 @@ Optionally loads FE artifacts when available to enrich the evidence base.
 
 from __future__ import annotations
 
-import logging
-import uuid
 from collections import Counter
 from datetime import UTC, datetime
+import logging
 from pathlib import Path
 from typing import Any
+import uuid
 
 from twinklr.core.recipe_builder.models import (
     CatalogAnalysis,
@@ -227,7 +227,7 @@ def analyze_catalog(recipes: list[EffectRecipe]) -> CatalogAnalysis:
     layer_counts: Counter[str] = Counter()
     effect_families: Counter[str] = Counter()
 
-    # Track effect_type × energy combinations
+    # Track effect_type x energy combinations
     effect_energy_combos: set[tuple[str, str]] = set()
 
     for recipe in recipes:
@@ -248,16 +248,16 @@ def analyze_catalog(recipes: list[EffectRecipe]) -> CatalogAnalysis:
 
     # Identify underutilized
     all_motions = [mv.value for mv in MotionVerb if mv != MotionVerb.NONE]
-    underutilized_motions = [
-        m for m in all_motions if motion_verbs.get(m, 0) <= 2
-    ]
+    underutilized_motions = [m for m in all_motions if motion_verbs.get(m, 0) <= 2]
 
-    underutilized_effects = [
-        e for e in ALL_EFFECT_TYPES if effect_types.get(e, 0) <= 1
-    ]
+    underutilized_effects = [e for e in ALL_EFFECT_TYPES if effect_types.get(e, 0) <= 1]
 
-    # Missing effect × energy combos (for effects that exist in catalog)
-    all_energy_vals = [e.value for e in EnergyTarget if e in (EnergyTarget.LOW, EnergyTarget.MED, EnergyTarget.HIGH)]
+    # Missing effect x energy combos (for effects that exist in catalog)
+    all_energy_vals = [
+        e.value
+        for e in EnergyTarget
+        if e in (EnergyTarget.LOW, EnergyTarget.MED, EnergyTarget.HIGH)
+    ]
     used_effects = {et for et in effect_types if effect_types[et] >= 2}
     missing_combos: list[str] = []
     for effect in sorted(used_effects):
@@ -367,7 +367,7 @@ def identify_opportunities(
             ),
         )
 
-    # 2. Missing effect × energy combinations
+    # 2. Missing effect x energy combinations
     for combo in analysis.missing_energy_combos[:8]:
         parts = combo.split(" × ")
         if len(parts) == 2:
@@ -443,9 +443,7 @@ def identify_opportunities(
 
     # 6. Layer composition diversity
     multi_layer_count = sum(
-        e.count
-        for e in analysis.layer_count_distribution
-        if e.name not in ("0", "1")
+        e.count for e in analysis.layer_count_distribution if e.name not in ("0", "1")
     )
     single_layer_count = next(
         (e.count for e in analysis.layer_count_distribution if e.name == "1"),
@@ -522,14 +520,20 @@ def format_analysis_for_prompt(analysis: CatalogAnalysis) -> str:
 
     if analysis.underutilized_effects:
         lines.append("")
-        lines.append(f"Underutilized effects (≤1 recipe): {', '.join(analysis.underutilized_effects)}")
+        lines.append(
+            f"Underutilized effects (≤1 recipe): {', '.join(analysis.underutilized_effects)}"
+        )
 
     if analysis.underutilized_motions:
         lines.append("")
-        lines.append(f"Underutilized motions (≤2 uses): {', '.join(analysis.underutilized_motions)}")
+        lines.append(
+            f"Underutilized motions (≤2 uses): {', '.join(analysis.underutilized_motions)}"
+        )
 
     if analysis.missing_energy_combos:
         lines.append("")
-        lines.append(f"Missing effect×energy combos: {', '.join(analysis.missing_energy_combos[:8])}")
+        lines.append(
+            f"Missing effect×energy combos: {', '.join(analysis.missing_energy_combos[:8])}"
+        )
 
     return "\n".join(lines)

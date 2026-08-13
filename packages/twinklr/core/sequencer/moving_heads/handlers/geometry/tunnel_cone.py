@@ -1,7 +1,7 @@
 """Tunnel/cone geometry handler - circular overhead pattern."""
 
 import math
-from typing import Any
+from typing import Any, ClassVar
 
 from twinklr.core.sequencer.moving_heads.handlers.protocols import GeometryResult
 
@@ -28,7 +28,7 @@ class TunnelConeHandler:
     handler_id: str = "tunnel_cone"
 
     # Role ordering for circular positioning (clockwise from left)
-    ROLE_ORDER = [
+    ROLE_ORDER: ClassVar[list[str]] = [
         "FAR_LEFT",
         "OUTER_LEFT",
         "INNER_LEFT",

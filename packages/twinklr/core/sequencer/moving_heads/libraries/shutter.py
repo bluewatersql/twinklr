@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from enum import StrEnum
+from typing import ClassVar
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -56,7 +57,7 @@ class ShutterLibrary:
     DMX_STROBE_MEDIUM = 200
     DMX_STROBE_FAST = 250
 
-    PATTERNS: dict[ShutterPattern, ShutterPatternDefinition] = {
+    PATTERNS: ClassVar[dict[ShutterPattern, ShutterPatternDefinition]] = {
         ShutterPattern.OPEN: ShutterPatternDefinition(
             pattern_id="open",
             name="Open",

@@ -15,8 +15,6 @@ logger = logging.getLogger(__name__)
 class LoadError(Exception):
     """Raised when prompt pack loading fails."""
 
-    pass
-
 
 class PromptPackLoader:
     """Loads prompt packs from filesystem.

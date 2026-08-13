@@ -5,10 +5,11 @@ Async-first with high-performance non-blocking I/O.
 """
 
 import asyncio
+import contextlib
 import os
-import time
 from pathlib import Path
 from tempfile import NamedTemporaryFile
+import time
 
 import aiofiles
 import aiofiles.os
@@ -74,15 +75,13 @@ class RealFileSystem:
         loop = asyncio.get_event_loop()
 
         def create_temp_file() -> str:
-            tmp = NamedTemporaryFile(
+            with NamedTemporaryFile(
                 mode="w",
                 encoding=encoding,
                 dir=path_obj.parent,
                 delete=False,
-            )
-            tmp_path = tmp.name
-            tmp.close()
-            return tmp_path
+            ) as tmp:
+                return tmp.name
 
         tmp_path = await loop.run_in_executor(None, create_temp_file)
 
@@ -95,10 +94,8 @@ class RealFileSystem:
             await loop.run_in_executor(None, os.replace, tmp_path, str(path))
         except Exception:
             # Clean up temp on failure
-            try:
+            with contextlib.suppress(Exception):
                 await aiofiles.os.unlink(tmp_path)
-            except Exception:
-                pass
             raise
 
         duration = (time.perf_counter() - start) * 1000

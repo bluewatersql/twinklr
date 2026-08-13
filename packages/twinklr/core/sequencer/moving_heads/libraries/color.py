@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from enum import StrEnum
+from typing import ClassVar
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -71,7 +72,7 @@ class ColorLibrary:
     Note: These are typical values, actual values are fixture-specific.
     """
 
-    PRESETS: dict[ColorPreset, ColorPresetDefinition] = {
+    PRESETS: ClassVar[dict[ColorPreset, ColorPresetDefinition]] = {
         # Primary colors
         ColorPreset.RED: ColorPresetDefinition(
             color_id="red",

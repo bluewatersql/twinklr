@@ -269,3 +269,60 @@ misorder against P0-T5 (packaging) if both touch `packages/twinklr/core/pyprojec
 concurrently — check for T5's changes before editing that file, and rebase rather than
 overwrite if there's a conflict; (3) scope creep — do not use this task to fix unrelated
 pre-existing code smells beyond what ruff's ruleset flags.
+
+## Descope record (post-execution, 2026-08-13)
+
+Executed against the tree at `e1b3b71` (T1/T2/T5/T6 already landed). Two findings
+materially changed this task's actual scope versus the estimate above; both are
+recorded here per the plan's "record the expected new-violation count ... BEFORE the
+fix commit" requirement, extended to cover the correction below.
+
+**1. The evidence section's 94/237 counts were measured with a stale `.ruff_cache` and
+were a significant undercount.** `.ruff_cache` is gitignored and not invalidated
+reliably across a `[tool.ruff]` table relocation (core's own table being deleted so its
+files fall through to the root table) combined with unrelated file edits from
+concurrent tasks. Re-measuring with `ruff check --no-cache` (the only trustworthy mode —
+**any lint run in this repo, local or CI, should pass `--no-cache` or start from a
+clean `.ruff_cache`, otherwise the reported count is not honest**; flagged separately to
+the P0-T4 CI spec since CI's fresh runner sidesteps this but local `make lint` does not):
+
+| | today's (weak) config | unified (strict) config |
+|---|---|---|
+| `packages/twinklr/core` only | 147 | 1130 |
+| repo-wide total | 155 | 1138 |
+
+Net-new from unification: **983**, not 94. Dominant rule: `TC001`
+(typing-only-first-party-import), 621 of the 1138.
+
+**2. `TC001` interacts with Pydantic runtime model resolution.** A blind
+`ruff check --fix --unsafe-fixes --select TC001` moved imports required by
+`pydantic.BaseModel` field resolution into `TYPE_CHECKING` blocks, breaking
+`model_rebuild()` for ~270 tests (`PydanticUserError: ... not fully defined`). Fix:
+added `runtime-evaluated-base-classes = ["pydantic.BaseModel"]` to
+`[tool.ruff.lint.flake8-type-checking]` (root `pyproject.toml`) — this is ruff's
+documented mechanism for exactly this class of false positive and dropped the count
+from 621 to 522. 522 is still far above a hand-triageable-in-one-pass size (the
+per-team-lead threshold was ≤100), and a second bulk-fix attempt on the remainder
+independently broke a circular-import-avoidance pattern
+(`packages/twinklr/core/sequencer/planning/group_plan.py` ↔
+`agents/sequencer/group_planner/holistic.py`, resolved via a deferred
+`TYPE_CHECKING` + `# noqa: TC004` import, not TC001) — confirming this rule family
+carries real, not just theoretical, runtime risk in this codebase and should not be
+force-fixed at volume without per-import review.
+
+**Descoped**: `TC001` added to the root `[tool.ruff.lint.ignore]` list with an inline
+justification comment (not silent — see `pyproject.toml`). All other rule families
+unified and reached zero violations by direct fix (RUF012 → `ClassVar` annotations,
+N801/N814/N815/N817/N818/N803 → renamed where internal-only or `# noqa` with
+justification where mirroring an external contract — xLights XML attribute names in
+`formats/xlights/layout/models/rgb_effects.py`, setuptools' own `build_py` command
+name, numpy/sklearn's `X` matrix convention already exempted for `N806` — and the
+SIM/PERF/PTH families fixed mechanically per ruff's suggested rewrite). Final gates:
+`ruff format --check .` clean, `ruff check . --no-cache` clean (0 errors, `TC001`
+excluded), `mypy .` clean (670 files), `pytest tests/` 4089 passed / 26 skipped / 0
+failed.
+
+**Follow-up task recorded**: a proper `TC001` remediation (move each of the 522
+first-party typing-only imports into `TYPE_CHECKING`, verifying per-file whether the
+import feeds Pydantic field resolution, a circular-import-avoidance shim, or is
+genuinely type-only) belongs in the Phase 4 debt wave, not this task.

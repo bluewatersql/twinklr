@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 import hashlib
 import json
-import re
-import uuid
-from dataclasses import dataclass
 from pathlib import Path
+import re
 from typing import Any
+import uuid
 
 from twinklr.core.feature_engineering.constants import EFFECT_PHRASES_SCHEMA_VERSION
 from twinklr.core.feature_engineering.models import (

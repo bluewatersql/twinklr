@@ -16,8 +16,6 @@ logger = logging.getLogger(__name__)
 class AcoustIDError(RuntimeError):
     """AcoustID API error."""
 
-    pass
-
 
 class AcoustIDClient:
     """AcoustID API client (async).

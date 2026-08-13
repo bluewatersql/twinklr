@@ -36,31 +36,31 @@ from twinklr.core.audio.models.phonemes import (
 from twinklr.core.audio.models.song_bundle import SongBundle, SongTiming
 
 __all__ = [
-    # Enums
-    "StageStatus",
-    "LyricsSourcePath",
+    # Metadata (Phase 2)
+    "EmbeddedMetadata",
+    # Metadata (Phase 3)
+    "FingerprintInfo",
     "G2PSource",
+    "LyricPhrase",
+    "LyricWord",
+    # Lyrics (Phase 4)
+    "LyricsBundle",
+    "LyricsQuality",
+    "LyricsSource",
+    "LyricsSourceKind",
+    "LyricsSourcePath",
+    "MetadataBundle",
+    "MetadataCandidate",
+    # Phonemes (Phase 6)
+    "Phoneme",
+    "PhonemeBundle",
     "PhonemeSource",
+    "ResolvedMBIDs",
+    "ResolvedMetadata",
     # Song bundle
     "SongBundle",
     "SongTiming",
-    # Metadata (Phase 2)
-    "EmbeddedMetadata",
-    "MetadataBundle",
-    # Metadata (Phase 3)
-    "FingerprintInfo",
-    "ResolvedMBIDs",
-    "ResolvedMetadata",
-    "MetadataCandidate",
-    # Lyrics (Phase 4)
-    "LyricsBundle",
-    "LyricWord",
-    "LyricPhrase",
-    "LyricsSource",
-    "LyricsSourceKind",
-    "LyricsQuality",
-    # Phonemes (Phase 6)
-    "Phoneme",
+    # Enums
+    "StageStatus",
     "VisemeEvent",
-    "PhonemeBundle",
 ]

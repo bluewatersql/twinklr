@@ -410,8 +410,8 @@ def build_unified_song_map(
 
 
 __all__ = [
-    "build_unified_song_map",
+    "_filter_meaningful_timing_events",
     "_find_section_for_time",
     "_sample_timeline_at_time",
-    "_filter_meaningful_timing_events",
+    "build_unified_song_map",
 ]

@@ -1,6 +1,6 @@
 """Fan geometry handler - spreads fixtures in a fan pattern."""
 
-from typing import Any
+from typing import Any, ClassVar
 
 from twinklr.core.sequencer.moving_heads.handlers.protocols import GeometryResult
 
@@ -27,7 +27,7 @@ class FanHandler:
     handler_id: str = "fan"
 
     # Role ordering from left to right
-    ROLE_ORDER = [
+    ROLE_ORDER: ClassVar[list[str]] = [
         "FAR_LEFT",
         "OUTER_LEFT",
         "INNER_LEFT",

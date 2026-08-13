@@ -9,9 +9,9 @@ since theming items are immutable frozen models.
 
 from __future__ import annotations
 
-import logging
 from collections.abc import Iterable
 from dataclasses import dataclass
+import logging
 
 from twinklr.core.sequencer.theming.enums import TagCategory
 from twinklr.core.sequencer.theming.models import (
@@ -31,8 +31,6 @@ def normalize_key(s: str) -> str:
 
 class ItemNotFoundError(KeyError):
     """Raised when a catalog item is not found."""
-
-    pass
 
 
 @dataclass(frozen=True)
@@ -522,32 +520,32 @@ def list_motifs() -> list[MotifInfo]:
 
 
 __all__ = [
-    # Catalog classes
-    "PaletteCatalog",
-    "TagCatalog",
-    "ThemeCatalog",
-    "MotifCatalog",
-    # Info types
-    "PaletteInfo",
-    "TagInfo",
-    "ThemeInfo",
-    "MotifInfo",
-    # Errors
-    "ItemNotFoundError",
+    "MOTIF_REGISTRY",
     # Global registries
     "PALETTE_REGISTRY",
     "TAG_REGISTRY",
     "THEME_REGISTRY",
-    "MOTIF_REGISTRY",
+    # Errors
+    "ItemNotFoundError",
+    "MotifCatalog",
+    "MotifInfo",
+    # Catalog classes
+    "PaletteCatalog",
+    # Info types
+    "PaletteInfo",
+    "TagCatalog",
+    "TagInfo",
+    "ThemeCatalog",
+    "ThemeInfo",
+    "get_motif",
     # Convenience functions
     "get_palette",
     "get_tag",
     "get_theme",
-    "get_motif",
+    "list_motifs",
     "list_palettes",
     "list_tags",
     "list_themes",
-    "list_motifs",
     # Utilities
     "normalize_key",
 ]

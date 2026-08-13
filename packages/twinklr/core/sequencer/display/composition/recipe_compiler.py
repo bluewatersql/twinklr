@@ -6,8 +6,8 @@ CompositionEngine's TemplateCompiler protocol (placement → CompiledEffects).
 
 from __future__ import annotations
 
-import uuid
 from typing import Any
+import uuid
 
 from twinklr.core.sequencer.display.composition.models import CompiledEffect, TemplateCompileError
 from twinklr.core.sequencer.display.composition.template_compiler import (

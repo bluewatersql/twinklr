@@ -6,5 +6,3 @@ class LLMProviderError(Exception):
 
     Raised when provider exhausts retries or encounters unrecoverable errors.
     """
-
-    pass

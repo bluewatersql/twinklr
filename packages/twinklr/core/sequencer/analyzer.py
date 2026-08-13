@@ -66,7 +66,7 @@ class SequenceAnalyzer:
             duration_s = max((p.end_ms for p in placements), default=0) / 1000.0
 
         # Build activity proxy (effect count per time bin)
-        n_bins = max(1, int(math.ceil(duration_s / bin_s)))
+        n_bins = max(1, math.ceil(duration_s / bin_s))
         bins = [0] * n_bins
 
         for p in placements:

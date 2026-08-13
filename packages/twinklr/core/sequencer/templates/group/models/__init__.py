@@ -61,46 +61,46 @@ from twinklr.core.sequencer.vocabulary import (
 from twinklr.core.sequencer.vocabulary.timing import TimeRefKind
 
 __all__ = [
+    # Re-exported from assets
+    "AssetRequest",
     # Template models
     "AssetSlot",
     "AssetSlotDefaults",
-    "GroupConstraints",
-    "GroupPlanTemplate",
-    "LayerRecipe",
-    "ProjectionParams",
-    "ProjectionSpec",
-    "TimingHints",
     # Choreography models
     "ChoreoGroup",
     "ChoreographyGraph",
+    # Theming models
+    "ColorStop",
+    # Coordination models
+    "CoordinationConfig",
+    # Enums (re-exported for convenience)
+    "CoordinationMode",
+    "CoordinationPlan",
     # Display models (legacy — being replaced by ChoreographyGraph)
     "DisplayGraph",
     "DisplayGroup",
     "ElementType",
-    "GroupPosition",
-    # Coordination models
-    "CoordinationConfig",
-    "CoordinationPlan",
-    "GroupPlacement",
-    "PlacementWindow",
-    "PlanTarget",
-    "ThemeRef",
-    "TimeRef",
-    "TimeRefKind",
-    # Enums (re-exported for convenience)
-    "CoordinationMode",
     "GPBlendMode",
     "GPTimingDriver",
+    "GroupConstraints",
+    "GroupPlacement",
+    "GroupPlanTemplate",
+    "GroupPosition",
     "LaneKind",
+    "LayerRecipe",
+    "PaletteDefinition",
+    "PlacementWindow",
+    "PlanTarget",
+    "ProjectionParams",
+    "ProjectionSpec",
     "SnapRule",
     "SpatialIntent",
     "SpillPolicy",
     "StepUnit",
-    # Theming models
-    "ColorStop",
-    "PaletteDefinition",
     "TagDefinition",
     "ThemeDefinition",
-    # Re-exported from assets
-    "AssetRequest",
+    "ThemeRef",
+    "TimeRef",
+    "TimeRefKind",
+    "TimingHints",
 ]

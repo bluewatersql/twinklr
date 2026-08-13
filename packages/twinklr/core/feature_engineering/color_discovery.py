@@ -9,11 +9,11 @@ This module provides corpus-level color family discovery by:
 
 from __future__ import annotations
 
-import colorsys
-import re
 from collections import defaultdict
 from collections.abc import Sequence
+import colorsys
 from dataclasses import dataclass
+import re
 from typing import Any
 
 # Hex color pattern: # followed by exactly 6 hex digits.
@@ -340,9 +340,7 @@ def _is_color_param_name(name: str) -> bool:
         return True
     if name.startswith(_COLOR_PARAM_PREFIX):
         return True
-    if name.endswith(_COLOR_PARAM_SUFFIX):
-        return True
-    return False
+    return bool(name.endswith(_COLOR_PARAM_SUFFIX))
 
 
 def _hex_to_hsv(hex_color: str) -> tuple[float, float, float]:

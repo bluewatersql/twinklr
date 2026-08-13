@@ -52,12 +52,8 @@ def apply_phase_shift_samples(
     for t in t_grid:
         t_shifted = t + offset_norm
 
-        if wrap:
-            # Wrap to [0, 1) using modulo
-            t_shifted = t_shifted % 1.0
-        else:
-            # Clamp to [0, 1]
-            t_shifted = max(0.0, min(1.0, t_shifted))
+        # Wrap to [0, 1) using modulo, or clamp to [0, 1]
+        t_shifted = t_shifted % 1.0 if wrap else max(0.0, min(1.0, t_shifted))
 
         v = interpolate_linear(points, t_shifted)
         shifted_points.append(CurvePoint(t=t, v=v))

@@ -12,7 +12,7 @@ Defines the core data models for the asset creation pipeline:
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -20,7 +20,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from twinklr.core.sequencer.vocabulary import BackgroundMode
 
 
-class AssetCategory(str, Enum):
+class AssetCategory(StrEnum):
     """Classification of generated assets.
 
     Determines the generation backend and output format.
@@ -62,7 +62,7 @@ class AssetCategory(str, Enum):
         return self in {AssetCategory.TEXT_BANNER, AssetCategory.TEXT_LYRIC}
 
 
-class AssetStatus(str, Enum):
+class AssetStatus(StrEnum):
     """Generation outcome for an asset.
 
     Attributes:

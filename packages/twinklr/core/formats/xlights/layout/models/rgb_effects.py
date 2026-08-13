@@ -1,6 +1,7 @@
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
 from twinklr.core.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -138,7 +139,7 @@ class Models(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     model: list[Model] = Field(default_factory=list)
-    subModel: list[SubModel] = Field(default_factory=list)
+    subModel: list[SubModel] = Field(default_factory=list)  # noqa: N815 — xLights XML attribute name
 
 
 class ModelGroup(BaseModel):
@@ -165,7 +166,7 @@ class ModelGroups(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    modelGroup: list[ModelGroup] = Field(default_factory=list)
+    modelGroup: list[ModelGroup] = Field(default_factory=list)  # noqa: N815 — xLights XML attribute name
 
 
 class Settings(BaseModel):
@@ -173,10 +174,10 @@ class Settings(BaseModel):
 
     model_config = ConfigDict(extra="allow")
 
-    backgroundImage: str | None = None
-    backgroundBrightness: str | None = None
-    previewWidth: str | None = None
-    previewHeight: str | None = None
+    backgroundImage: str | None = None  # noqa: N815 — xLights XML attribute name
+    backgroundBrightness: str | None = None  # noqa: N815 — xLights XML attribute name
+    previewWidth: str | None = None  # noqa: N815 — xLights XML attribute name
+    previewHeight: str | None = None  # noqa: N815 — xLights XML attribute name
 
     @field_validator("*", mode="before")
     @classmethod
@@ -218,6 +219,6 @@ class Layout(BaseModel):
 
     # Only parse what we have models for
     models: Models | None = None
-    modelGroups: ModelGroups | None = None
+    modelGroups: ModelGroups | None = None  # noqa: N815 — xLights XML attribute name
     settings: Settings | None = None
     viewpoints: Viewpoints | None = Field(default=None, alias="Viewpoints")

@@ -1,7 +1,7 @@
 """Rainbow arc geometry handler - smooth arc formations."""
 
 import math
-from typing import Any
+from typing import Any, ClassVar
 
 from twinklr.core.sequencer.moving_heads.handlers.protocols import GeometryResult
 
@@ -28,7 +28,7 @@ class RainbowArcHandler:
     handler_id: str = "rainbow_arc"
 
     # Role ordering from left to right
-    ROLE_ORDER = [
+    ROLE_ORDER: ClassVar[list[str]] = [
         "FAR_LEFT",
         "OUTER_LEFT",
         "INNER_LEFT",

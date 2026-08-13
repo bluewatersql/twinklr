@@ -7,8 +7,8 @@ table.  Missing or empty directories are handled gracefully (returns 0).
 from __future__ import annotations
 
 import json
-import sqlite3
 from pathlib import Path
+import sqlite3
 
 
 class ReferenceDataLoader:

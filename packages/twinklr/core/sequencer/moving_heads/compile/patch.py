@@ -95,6 +95,6 @@ def merge_with_provenance(
         New PatchResult with merged data and updated provenance.
     """
     merged_data = deep_merge(base.data, patch)
-    new_provenance = list(base.provenance) + [source]
+    new_provenance = [*list(base.provenance), source]
 
     return PatchResult(data=merged_data, provenance=new_provenance)

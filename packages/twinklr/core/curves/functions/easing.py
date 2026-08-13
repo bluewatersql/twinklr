@@ -58,7 +58,7 @@ def _make_easing(easing_cls: type[Any], **kwargs: Any) -> EasingFn:
 
     if not callable(obj):
         raise TypeError(f"{type(obj).__name__} is not callable and has no .ease(t)")
-    return cast(EasingFn, obj)
+    return cast("EasingFn", obj)
 
 
 def _evaluate_easing(easing: EasingFn, t: float) -> float:

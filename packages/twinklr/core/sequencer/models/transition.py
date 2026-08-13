@@ -10,7 +10,7 @@ This module defines all transition-related models:
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -19,7 +19,7 @@ from twinklr.core.curves.library import CurveLibrary
 from twinklr.core.sequencer.models.enum import ChannelName, TransitionMode
 
 
-class TransitionStrategy(str, Enum):
+class TransitionStrategy(StrEnum):
     """Strategy for transitioning a specific channel.
 
     Different channels may require different transition strategies:
@@ -111,7 +111,7 @@ class TransitionHint(BaseModel):
         return self.mode == TransitionMode.SNAP or self.duration_bars == 0.0
 
 
-class BoundaryType(str, Enum):
+class BoundaryType(StrEnum):
     """Type of transition boundary."""
 
     SECTION_BOUNDARY = "section"  # Between plan sections
@@ -272,9 +272,6 @@ class TransitionRegistry(BaseModel):
         """
         result = []
         for transition in self.transitions:
-            if (
-                transition.boundary.source_id == section_name
-                or transition.boundary.target_id == section_name
-            ):
+            if section_name in (transition.boundary.source_id, transition.boundary.target_id):
                 result.append(transition)
         return result

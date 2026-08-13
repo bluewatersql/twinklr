@@ -7,7 +7,7 @@ with the global registries.
 # Import modules to trigger registration
 # IMPORTANT: Order matters - tags must be registered before motifs
 from twinklr.core.sequencer.theming.builtins import (
-    motifs as _motifs,  # pyright: ignore[reportUnusedImport]  # noqa: F401
+    motifs as _motifs,  # pyright: ignore[reportUnusedImport]
 )
 from twinklr.core.sequencer.theming.builtins import (
     palettes as _palettes,  # pyright: ignore[reportUnusedImport]  # noqa: F401

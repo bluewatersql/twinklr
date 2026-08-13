@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-import contextlib
-import statistics
 from collections import Counter, defaultdict
 from collections.abc import Sequence
+import contextlib
+import statistics
 
 from twinklr.core.profiling.models.effects import (
     CategoricalValueProfile,

@@ -14,11 +14,11 @@ Example:
     [('HH', 0, 100), ('EH', 100, 200), ('L', 200, 300), ('OW', 300, 400)]
 """
 
+from enum import StrEnum
 import math
-from enum import Enum
 
 
-class PhonemeType(str, Enum):
+class PhonemeType(StrEnum):
     """Phoneme type classification.
 
     Values:
@@ -202,13 +202,9 @@ def distribute_phonemes_uniform(
     current_time = start_ms
 
     for i, phoneme in enumerate(phonemes):
-        # Calculate phoneme end time
-        if i == len(phonemes) - 1:
-            # Last phoneme: ensure it ends exactly at word end
-            phoneme_end = end_ms
-        else:
-            # Round to nearest millisecond
-            phoneme_end = int(current_time + duration_per_phoneme)
+        # Calculate phoneme end time: last phoneme ends exactly at word end,
+        # otherwise round to nearest millisecond
+        phoneme_end = end_ms if i == len(phonemes) - 1 else int(current_time + duration_per_phoneme)
 
         result.append((phoneme, int(current_time), phoneme_end))
         current_time = phoneme_end

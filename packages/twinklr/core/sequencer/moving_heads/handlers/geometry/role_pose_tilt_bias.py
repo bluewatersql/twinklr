@@ -1,6 +1,6 @@
 """Role pose with tilt bias geometry handler - role-based pan with group tilt offsets."""
 
-from typing import Any
+from typing import Any, ClassVar
 
 from twinklr.core.sequencer.moving_heads.handlers.protocols import GeometryResult
 
@@ -27,7 +27,7 @@ class RolePoseTiltBiasHandler:
     handler_id: str = "role_pose_tilt_bias"
 
     # Role ordering from left to right for pan positioning
-    ROLE_ORDER = [
+    ROLE_ORDER: ClassVar[list[str]] = [
         "FAR_LEFT",
         "OUTER_LEFT",
         "INNER_LEFT",
@@ -40,8 +40,14 @@ class RolePoseTiltBiasHandler:
     ]
 
     # Group assignments for tilt bias (inner vs outer)
-    INNER_ROLES = ["INNER_LEFT", "CENTER_LEFT", "CENTER", "CENTER_RIGHT", "INNER_RIGHT"]
-    OUTER_ROLES = ["FAR_LEFT", "OUTER_LEFT", "OUTER_RIGHT", "FAR_RIGHT"]
+    INNER_ROLES: ClassVar[list[str]] = [
+        "INNER_LEFT",
+        "CENTER_LEFT",
+        "CENTER",
+        "CENTER_RIGHT",
+        "INNER_RIGHT",
+    ]
+    OUTER_ROLES: ClassVar[list[str]] = ["FAR_LEFT", "OUTER_LEFT", "OUTER_RIGHT", "FAR_RIGHT"]
 
     def resolve(
         self,

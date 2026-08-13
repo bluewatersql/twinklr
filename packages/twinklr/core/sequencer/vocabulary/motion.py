@@ -3,10 +3,10 @@
 Defines motion primitives for choreography.
 """
 
-from enum import Enum
+from enum import StrEnum
 
 
-class MotionVerb(str, Enum):
+class MotionVerb(StrEnum):
     """Motion primitives for choreography.
 
     Describes the type of motion applied to display elements.

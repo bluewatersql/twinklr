@@ -9,8 +9,8 @@ from __future__ import annotations
 
 import json
 import logging
-import shutil
 from pathlib import Path
+import shutil
 from typing import Any
 
 from twinklr.core.recipe_builder.models import PromotionResult
@@ -102,7 +102,8 @@ def promote_staged_recipes(
 
         if recipe.recipe_id in existing_ids:
             logger.info(
-                "Skipping %s — already in index", recipe.recipe_id,
+                "Skipping %s — already in index",
+                recipe.recipe_id,
             )
             skipped_ids.append(recipe.recipe_id)
             continue

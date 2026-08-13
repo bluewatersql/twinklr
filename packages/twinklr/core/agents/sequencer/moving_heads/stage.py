@@ -252,10 +252,7 @@ class MovingHeadStage:
         """Store choreography plan in state for downstream stages."""
         from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan
 
-        if isinstance(result, dict):
-            plan = result.get("plan")
-        else:
-            plan = getattr(result, "plan", None)
+        plan = result.get("plan") if isinstance(result, dict) else getattr(result, "plan", None)
         if plan:
             context.set_state("choreography_plan", ChoreographyPlan.model_validate(plan))
 

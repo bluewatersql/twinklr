@@ -6,11 +6,11 @@ refinement loops across all agents.
 
 from __future__ import annotations
 
-import logging
-import uuid
 from collections.abc import Callable
+import logging
 from pathlib import Path
-from typing import Any, Generic, TypeVar, cast
+from typing import Any, TypeVar, cast
+import uuid
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -184,7 +184,7 @@ class IterationContext(BaseModel):
         return self.state == IterationState.COMPLETE
 
 
-class IterationResult(BaseModel, Generic[TPlan]):
+class IterationResult[TPlan](BaseModel):
     """Result of iteration loop.
 
     Contains final plan, context, and success status.
@@ -204,7 +204,7 @@ class IterationResult(BaseModel, Generic[TPlan]):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
 
-class StandardIterationController(Generic[TPlan]):
+class StandardIterationController[TPlan]:
     """Standard implementation of iteration controller.
 
     Manages judge-based refinement loop with feedback and validation.
@@ -342,7 +342,7 @@ class StandardIterationController(Generic[TPlan]):
             if not plan_result.success:
                 return self._handle_planner_failure(context, plan_result)
 
-            plan = cast(TPlan, plan_result.data)
+            plan = cast("TPlan", plan_result.data)
             assert plan is not None, "Planner succeeded but returned None data"
 
             # === VALIDATION STAGE ===
@@ -409,7 +409,7 @@ class StandardIterationController(Generic[TPlan]):
             if not judge_result.success:
                 return self._handle_judge_failure(context, plan, judge_result)
 
-            verdict = cast(JudgeVerdict, judge_result.data)
+            verdict = cast("JudgeVerdict", judge_result.data)
             assert isinstance(verdict, JudgeVerdict), "Judge succeeded but returned invalid data"
             context.add_verdict(verdict)
 

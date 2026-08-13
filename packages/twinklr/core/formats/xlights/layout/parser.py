@@ -27,8 +27,11 @@ class LayoutParser:
         >>> # Everything else (colors, perspectives, etc.) is ignored
     """
 
-    # Define which XML elements map to which Pydantic models
-    KNOWN_TYPES = {
+    # Define which XML elements map to which Pydantic models. Deliberately NOT
+    # ClassVar: LayoutProfiler overrides this per-instance (profiling/layout/profiler.py)
+    # to restrict which sections get parsed — a shadowing instance attribute, not a
+    # shared-mutable-state bug (see P0-T3 escalation).
+    KNOWN_TYPES = {  # noqa: RUF012
         "models": Models,
         "modelGroups": ModelGroups,
         "settings": Settings,

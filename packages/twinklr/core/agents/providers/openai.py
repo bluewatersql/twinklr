@@ -303,9 +303,9 @@ class OpenAIProvider:
             if temperature is not None and not is_mini_model:
                 request_params["temperature"] = temperature
 
-            for key, value in kwargs.items():
-                if key in allowed_request_kwargs:
-                    request_params[key] = value
+            request_params.update(
+                {key: value for key, value in kwargs.items() if key in allowed_request_kwargs}
+            )
 
             # Make async API call with transient retry handling
             response = None

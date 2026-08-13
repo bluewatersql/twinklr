@@ -980,13 +980,10 @@ def is_stub_motif(recipe_id: str) -> bool:
     if "_motif_" not in recipe_id:
         return False
     parts = recipe_id.split("_motif_")[1]
-    motif = parts.split("_")[0]
+    parts.split("_")[0]
     if len(parts.split("_")) > 2:
-        motif = "_".join(parts.split("_")[:2])
-    for real in REAL_MOTIFS:
-        if parts.startswith(real):
-            return False
-    return True
+        "_".join(parts.split("_")[:2])
+    return all(not parts.startswith(real) for real in REAL_MOTIFS)
 
 
 def derive_effect_family(template: dict) -> str:
@@ -1013,7 +1010,7 @@ def main() -> None:
     DEPRECATED_DIR.mkdir(exist_ok=True)
 
     index = json.loads(INDEX_FILE.read_text())
-    entries = index["entries"]
+    index["entries"]
 
     deleted_ids: set[str] = set()
     modified_ids: set[str] = set()
@@ -1090,7 +1087,7 @@ def main() -> None:
     # ── 5. Integrate orphaned pinwheel templates ────────────────────
 
     print("\n=== Phase 5: Integrate pinwheel templates ===")
-    for old_name, new_id, ttype in [
+    for old_name, new_id, _ttype in [
         ("pinwheel_base_001.json", "gtpl_base_pinwheel_wash", "BASE"),
         ("pinwheel_rhythm_001.json", "gtpl_rhythm_pinwheel_twinkle", "RHYTHM"),
     ]:
@@ -1117,7 +1114,7 @@ def main() -> None:
         if rid in deleted_ids:
             continue
         old_family = tpl.get("effect_family", "unknown")
-        if old_family == "unknown" or old_family == "":
+        if old_family in {"unknown", ""}:
             new_family = derive_effect_family(tpl)
             tpl["effect_family"] = new_family
             f.write_text(json.dumps(tpl, indent=2) + "\n")

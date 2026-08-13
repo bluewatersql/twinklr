@@ -1,6 +1,6 @@
 """Left/Right mirror geometry handler - symmetric formations."""
 
-from typing import Any
+from typing import Any, ClassVar
 
 from twinklr.core.sequencer.moving_heads.handlers.protocols import GeometryResult
 
@@ -27,7 +27,7 @@ class MirrorLRHandler:
     handler_id: str = "mirror_lr"
 
     # Left side roles (with mirror pairs)
-    LEFT_ROLES = {
+    LEFT_ROLES: ClassVar[dict[str, float]] = {
         "FAR_LEFT": 1.0,  # Furthest from center
         "OUTER_LEFT": 0.75,  # Outer position
         "INNER_LEFT": 0.5,  # Inner position
@@ -35,7 +35,7 @@ class MirrorLRHandler:
     }
 
     # Right side roles (mirrors of left)
-    RIGHT_ROLES = {
+    RIGHT_ROLES: ClassVar[dict[str, float]] = {
         "FAR_RIGHT": 1.0,
         "OUTER_RIGHT": 0.75,
         "INNER_RIGHT": 0.5,

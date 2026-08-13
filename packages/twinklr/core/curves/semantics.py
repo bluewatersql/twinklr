@@ -5,12 +5,12 @@ Provides helpers for offset-centered movement curves and loop readiness.
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 
 from twinklr.core.curves.models import CurvePoint
 
 
-class CurveKind(str, Enum):
+class CurveKind(StrEnum):
     """Semantic kind for normalized curves."""
 
     MOVEMENT_OFFSET = "movement_offset"

@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
-class NativeCurveType(str, Enum):
+class NativeCurveType(StrEnum):
     """Native curve identifiers compatible with xLights value curves."""
 
     FLAT = "flat"
@@ -20,7 +20,7 @@ class NativeCurveType(str, Enum):
     SAW_TOOTH = "saw tooth"
 
 
-class xLightsNativeCurve(BaseModel):
+class xLightsNativeCurve(BaseModel):  # noqa: N801 — intentional xLights-branded name, used widely
     """Specification for native parametric curves."""
 
     model_config = ConfigDict(frozen=False)

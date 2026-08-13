@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field
 
 
-class TaxonomyLabel(str, Enum):
+class TaxonomyLabel(StrEnum):
     """Deterministic effect-function taxonomy labels."""
 
     # V1 labels
@@ -55,7 +55,7 @@ class PhraseTaxonomyRecord(BaseModel):
     label_scores: tuple[TaxonomyLabelScore, ...] = ()
 
 
-class TargetRole(str, Enum):
+class TargetRole(StrEnum):
     """Semantic target roles used by planners."""
 
     LEAD = "lead"

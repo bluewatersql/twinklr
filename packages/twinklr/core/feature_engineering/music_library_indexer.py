@@ -73,7 +73,7 @@ def _extract_entry(path: Path) -> MusicLibraryEntry:
             album = _first_tag(tags, "album")
             if hasattr(tags, "info") and hasattr(tags.info, "length"):
                 duration_s = float(tags.info.length)
-    except Exception:  # noqa: BLE001
+    except Exception:
         logger.debug("Could not read tags from %s", path, exc_info=True)
 
     return MusicLibraryEntry(

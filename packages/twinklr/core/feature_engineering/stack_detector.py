@@ -11,9 +11,9 @@ downstream template mining.
 
 from __future__ import annotations
 
-import uuid
 from collections import defaultdict
 from dataclasses import dataclass
+import uuid
 
 from twinklr.core.feature_engineering.models.phrases import EffectPhrase
 from twinklr.core.feature_engineering.models.stacks import (

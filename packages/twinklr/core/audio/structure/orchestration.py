@@ -85,7 +85,7 @@ def build_beat_grid(
 
 
 def compute_section_descriptors(
-    X_normalized: np.ndarray,
+    X_normalized: np.ndarray,  # noqa: N803 — numpy/sklearn feature-matrix convention (matches N806 exemption)
     beat_times: np.ndarray,
     boundaries_work: list[float],
     boundaries_orig: list[float],
@@ -165,12 +165,9 @@ def compute_section_descriptors(
         end_s = float(boundaries_orig[i + 1])
 
         # Boundary strength - use work boundaries if available, else map from original
-        # boundaries_work may be shorter than boundaries_orig due to trimming
-        if i < len(boundaries_work):
-            start_work = boundaries_work[i]
-        else:
-            # Fallback: map original to work timeline (assuming parallel timing)
-            start_work = float(boundaries_orig[i])
+        # (boundaries_work may be shorter than boundaries_orig due to trimming; fallback
+        # maps original to work timeline assuming parallel timing)
+        start_work = boundaries_work[i] if i < len(boundaries_work) else float(boundaries_orig[i])
 
         if i + 1 < len(boundaries_work):
             end_work = boundaries_work[i + 1]
@@ -264,7 +261,7 @@ def build_diagnostics(
     novelty: np.ndarray,
     prominence: np.ndarray,
     ssm: np.ndarray,
-    X_normalized: np.ndarray,
+    X_normalized: np.ndarray,  # noqa: N803 — numpy/sklearn feature-matrix convention (matches N806 exemption)
 ) -> dict[str, Any]:
     """Build diagnostic information.
 

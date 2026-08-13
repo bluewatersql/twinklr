@@ -3,10 +3,10 @@
 Defines layer roles, lanes, and blending modes for choreography composition.
 """
 
-from enum import Enum
+from enum import StrEnum
 
 
-class LaneKind(str, Enum):
+class LaneKind(StrEnum):
     """Lane (track) types for choreography.
 
     Defines the three primary lanes in group planning.
@@ -22,7 +22,7 @@ class LaneKind(str, Enum):
     ACCENT = "ACCENT"
 
 
-class LayerRole(str, Enum):
+class LayerRole(StrEnum):
     """Layer role in choreography composition.
 
     Used by macro planner to define layer hierarchy.
@@ -46,7 +46,7 @@ class LayerRole(str, Enum):
     CUSTOM = "CUSTOM"
 
 
-class BlendMode(str, Enum):
+class BlendMode(StrEnum):
     """Layer blending strategy.
 
     Defines how layers combine in composition.
@@ -64,7 +64,7 @@ class BlendMode(str, Enum):
     MASK = "MASK"
 
 
-class GPBlendMode(str, Enum):
+class GPBlendMode(StrEnum):
     """Blend mode for GroupPlanner lanes.
 
     More granular blend modes for group planning.

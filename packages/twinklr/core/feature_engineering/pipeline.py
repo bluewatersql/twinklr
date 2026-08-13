@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-import json
-import threading
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import contextlib
 from dataclasses import dataclass
+import json
 from pathlib import Path
+import threading
 from typing import Any
 
 from twinklr.core.feature_engineering import corpus_artifacts as _ca
@@ -452,8 +453,6 @@ class FeatureEngineeringPipeline:
         for p in profiles:
             bp = output_root / p.package_id / p.sequence_file_id / "feature_bundle.json"
             if bp.exists():
-                try:
+                with contextlib.suppress(Exception):
                     out.append(FeatureBundle.model_validate(json.loads(bp.read_text("utf-8"))))
-                except Exception:
-                    pass
         return out

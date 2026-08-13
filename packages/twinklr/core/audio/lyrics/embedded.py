@@ -13,8 +13,8 @@ LRC format support:
 """
 
 import logging
-import re
 from pathlib import Path
+import re
 
 from twinklr.core.audio.models.lyrics import LyricPhrase, LyricWord
 
@@ -192,7 +192,7 @@ def extract_embedded_lyrics(
         audio_file = mutagen.File(audio_path)
         if audio_file and audio_file.tags:
             # Look for SYLT frames (ID3v2)
-            sylt_keys = [k for k in audio_file.tags.keys() if k.startswith("SYLT")]
+            sylt_keys = [k for k in audio_file.tags if k.startswith("SYLT")]
             if sylt_keys:
                 sylt_frame = audio_file.tags[sylt_keys[0]]
                 if hasattr(sylt_frame, "text") and sylt_frame.text:
@@ -224,7 +224,7 @@ def extract_embedded_lyrics(
                     return text, phrases, [], warnings
 
             # Try 3: USLT tag (unsynced lyrics)
-            uslt_keys = [k for k in audio_file.tags.keys() if k.startswith("USLT")]
+            uslt_keys = [k for k in audio_file.tags if k.startswith("USLT")]
             if uslt_keys:
                 uslt_frame = audio_file.tags[uslt_keys[0]]
                 if hasattr(uslt_frame, "text") and uslt_frame.text:

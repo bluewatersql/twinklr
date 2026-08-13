@@ -10,8 +10,8 @@ No LLM involved — purely deterministic.
 
 from __future__ import annotations
 
-import logging
 from dataclasses import dataclass, field
+import logging
 
 from twinklr.core.agents.assets.models import AssetCategory, AssetSpec
 from twinklr.core.agents.audio.lyrics.models import LyricContextModel
@@ -146,7 +146,7 @@ def _enrich_with_lyric_context(
         plan_set: Plan for section time-range lookups.
     """
     # Build section_id set per motif for quick lookup
-    for _motif_id, ctx in contexts.items():
+    for ctx in contexts.values():
         # Add relevant key phrases
         if lyric_context.key_phrases:
             for phrase in lyric_context.key_phrases:

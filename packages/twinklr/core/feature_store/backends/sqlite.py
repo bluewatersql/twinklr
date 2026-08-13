@@ -21,9 +21,9 @@ Usage::
 from __future__ import annotations
 
 import json
+from pathlib import Path
 import re
 import sqlite3
-from pathlib import Path
 from typing import Any
 
 from twinklr.core.feature_engineering.models.phrases import EffectPhrase

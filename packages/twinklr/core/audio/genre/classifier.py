@@ -93,10 +93,7 @@ def _in_range(value: float, lo: float, hi: float) -> float:
     if lo <= value <= hi:
         return 1.0
     span = max(hi - lo, 1.0)
-    if value < lo:
-        overshoot = (lo - value) / span
-    else:
-        overshoot = (value - hi) / span
+    overshoot = (lo - value) / span if value < lo else (value - hi) / span
     return _clamp(1.0 - overshoot)
 
 

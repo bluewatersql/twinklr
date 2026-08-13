@@ -9,10 +9,10 @@ Optionally loads FE artifacts to enrich evidence when available.
 
 from __future__ import annotations
 
-import json
-import logging
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+import json
+import logging
 from pathlib import Path
 from typing import Any
 
@@ -110,12 +110,8 @@ def _print_summary(manifest: RunManifest) -> None:
         lines.append(f"  [{icon}] {ps.phase}{err_note}")
     lines.append("=" * 60)
     lines.append("")
-    lines.append(
-        "  NOTE: All outputs are staged only — not merged into the live library."
-    )
-    lines.append(
-        "  Review staged artifacts before promoting to the template catalog."
-    )
+    lines.append("  NOTE: All outputs are staged only — not merged into the live library.")
+    lines.append("  Review staged artifacts before promoting to the template catalog.")
     logger.info("\n".join(lines))
 
 

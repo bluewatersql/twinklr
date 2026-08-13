@@ -460,38 +460,37 @@ def _process_section(
                     and seg.t0_ms < end_ms  # Segment starts before section ends
                     and seg.t1_ms > start_ms  # Segment ends after section starts
                 )
-                if seg_overlaps:
-                    if channel_name in seg.channels:
-                        # Extract channel-specific metadata based on channel type
-                        # channel_name is lowercase string like "pan", "tilt", "dimmer"
-                        if channel_name.lower() == "pan":
-                            curve_type = seg.metadata.get("pan_curve_type")
-                            handler = seg.metadata.get("movement_handler")
-                            base_position = seg.metadata.get("base_pan_norm")
-                            static_dmx = seg.metadata.get("pan_static_dmx")
-                        elif channel_name.lower() == "tilt":
-                            curve_type = seg.metadata.get("tilt_curve_type")
-                            handler = seg.metadata.get("movement_handler")
-                            base_position = seg.metadata.get("base_tilt_norm")
-                            static_dmx = seg.metadata.get("tilt_static_dmx")
-                        elif channel_name.lower() == "dimmer":
-                            curve_type = seg.metadata.get("dimmer_curve_type")
-                            handler = seg.metadata.get("dimmer_handler")
-                            static_dmx = seg.metadata.get("dimmer_static_dmx")
+                if seg_overlaps and channel_name in seg.channels:
+                    # Extract channel-specific metadata based on channel type
+                    # channel_name is lowercase string like "pan", "tilt", "dimmer"
+                    if channel_name.lower() == "pan":
+                        curve_type = seg.metadata.get("pan_curve_type")
+                        handler = seg.metadata.get("movement_handler")
+                        base_position = seg.metadata.get("base_pan_norm")
+                        static_dmx = seg.metadata.get("pan_static_dmx")
+                    elif channel_name.lower() == "tilt":
+                        curve_type = seg.metadata.get("tilt_curve_type")
+                        handler = seg.metadata.get("movement_handler")
+                        base_position = seg.metadata.get("base_tilt_norm")
+                        static_dmx = seg.metadata.get("tilt_static_dmx")
+                    elif channel_name.lower() == "dimmer":
+                        curve_type = seg.metadata.get("dimmer_curve_type")
+                        handler = seg.metadata.get("dimmer_handler")
+                        static_dmx = seg.metadata.get("dimmer_static_dmx")
 
-                        # Convert string values to proper types
-                        if base_position and isinstance(base_position, str):
-                            try:
-                                base_position = float(base_position)
-                            except ValueError:
-                                base_position = None
-                        if static_dmx and isinstance(static_dmx, str):
-                            try:
-                                static_dmx = int(static_dmx) if static_dmx != "None" else None
-                            except ValueError:
-                                static_dmx = None
+                    # Convert string values to proper types
+                    if base_position and isinstance(base_position, str):
+                        try:
+                            base_position = float(base_position)
+                        except ValueError:
+                            base_position = None
+                    if static_dmx and isinstance(static_dmx, str):
+                        try:
+                            static_dmx = int(static_dmx) if static_dmx != "None" else None
+                        except ValueError:
+                            static_dmx = None
 
-                        break
+                    break
 
             # Analyze
             stats, flags = analyze_curve(samples, config, curve_type=curve_type)

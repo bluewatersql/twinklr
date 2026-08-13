@@ -252,11 +252,8 @@ class MovingHeadPlanningContext(BaseModel):
         Returns:
             Bar number (1-indexed, minimum 1)
         """
-        if not self.tempo or self.tempo <= 0:
-            # Fallback: assume 120 BPM
-            tempo = 120.0
-        else:
-            tempo = self.tempo
+        # Fallback: assume 120 BPM
+        tempo = 120.0 if not self.tempo or self.tempo <= 0 else self.tempo
 
         beats_per_bar = 4
         if self.time_signature:

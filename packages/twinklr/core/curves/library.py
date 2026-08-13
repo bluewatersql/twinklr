@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from twinklr.core.curves.defaults import (
@@ -55,7 +55,7 @@ from twinklr.core.curves.registry import CurveDefinition, CurveRegistry
 from twinklr.core.curves.semantics import CurveKind
 
 
-class CurveLibrary(str, Enum):
+class CurveLibrary(StrEnum):
     """Identifiers for built-in curves."""
 
     # Basic Waves

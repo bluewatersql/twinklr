@@ -5,14 +5,14 @@ Provides immutable result types with success/failure semantics.
 
 from __future__ import annotations
 
-from typing import Any, Generic, TypeVar
+from typing import Any, TypeVar
 
 from pydantic import BaseModel, ConfigDict, Field
 
 TOutput = TypeVar("TOutput")
 
 
-class StageResult(BaseModel, Generic[TOutput]):
+class StageResult[TOutput](BaseModel):
     """Result from a single stage execution.
 
     Immutable result type with success/failure semantics.
@@ -53,7 +53,7 @@ class StageResult(BaseModel, Generic[TOutput]):
 # Helper functions to create results (avoids Pydantic classmethod issues)
 
 
-def success_result(
+def success_result[TOutput](
     output: TOutput,
     stage_name: str = "unknown",
     metadata: dict[str, Any] | None = None,

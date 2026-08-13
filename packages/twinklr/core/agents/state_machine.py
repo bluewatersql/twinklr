@@ -2,16 +2,16 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+from enum import StrEnum
 import logging
 import time
-from dataclasses import dataclass
-from enum import Enum
-from typing import Any
+from typing import Any, ClassVar
 
 logger = logging.getLogger(__name__)
 
 
-class OrchestrationState(str, Enum):
+class OrchestrationState(StrEnum):
     """Orchestration state machine states.
 
     Pipeline: PLANNING -> JUDGING (with code-based heuristic validation in between).
@@ -58,8 +58,6 @@ class StateMetrics:
 class InvalidTransitionError(Exception):
     """Raised when invalid state transition is attempted."""
 
-    pass
-
 
 class OrchestrationStateMachine:
     """State machine for orchestration flow with observability.
@@ -71,7 +69,7 @@ class OrchestrationStateMachine:
     - Checkpointing support
     """
 
-    VALID_TRANSITIONS: dict[OrchestrationState, list[OrchestrationState]] = {
+    VALID_TRANSITIONS: ClassVar[dict[OrchestrationState, list[OrchestrationState]]] = {
         OrchestrationState.INITIALIZED: [
             OrchestrationState.PLANNING,
             OrchestrationState.FAILED,
@@ -91,7 +89,7 @@ class OrchestrationStateMachine:
     }
 
     # Terminal states (no transitions out)
-    TERMINAL_STATES = {
+    TERMINAL_STATES: ClassVar[set[OrchestrationState]] = {
         OrchestrationState.SUCCEEDED,
         OrchestrationState.FAILED,
         OrchestrationState.BUDGET_EXHAUSTED,

@@ -1,9 +1,9 @@
 """Enums for audio enhancement models (v3.0)."""
 
-from enum import Enum
+from enum import StrEnum
 
 
-class StageStatus(str, Enum):
+class StageStatus(StrEnum):
     """Status of a processing stage."""
 
     OK = "OK"
@@ -11,7 +11,7 @@ class StageStatus(str, Enum):
     FAILED = "FAILED"
 
 
-class LyricsSourcePath(str, Enum):
+class LyricsSourcePath(StrEnum):
     """Path taken to resolve lyrics."""
 
     EMBEDDED = "EMBEDDED"
@@ -21,7 +21,7 @@ class LyricsSourcePath(str, Enum):
     WHISPERX_TRANSCRIBE = "WHISPERX_TRANSCRIBE"
 
 
-class G2PSource(str, Enum):
+class G2PSource(StrEnum):
     """Source of grapheme-to-phoneme conversion."""
 
     CMUDICT = "CMUDICT"

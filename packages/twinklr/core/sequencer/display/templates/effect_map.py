@@ -44,7 +44,7 @@ class EffectMapping(BaseModel):
 
 
 # ===================================================================
-# Preset profiles — per effect type × energy level
+# Preset profiles — per effect type x energy level
 # ===================================================================
 # Keys match the parameter names handlers read via params.get().
 
@@ -702,11 +702,8 @@ def _is_valid_param_value(effect_type: str, key: str, value: Any) -> bool:
     # (planning uses 0.0-1.0 scale; xLights uses integer ranges like 1-50)
     if isinstance(value, str):
         return False
-    if isinstance(value, float) and 0.0 < value < 1.0:
-        # Likely a planning-level normalized value, not an xLights integer
-        return False
-
-    return True
+    # Likely a planning-level normalized value, not an xLights integer
+    return not (isinstance(value, float) and 0.0 < value < 1.0)
 
 
 # Choice parameter constraints — valid option values

@@ -20,17 +20,17 @@ from twinklr.core.sequencer.planning.models import (
 )
 
 __all__ = [
-    # Macro planning models
-    "GlobalStory",
-    "LayeringPlan",
-    "LayerSpec",
-    "MacroPlan",
-    "MacroSectionPlan",
-    "TargetSelector",
     # Group planning output models
     "CorrectionResult",
     "Deviation",
+    # Macro planning models
+    "GlobalStory",
     "GroupPlanSet",
     "LanePlan",
+    "LayerSpec",
+    "LayeringPlan",
+    "MacroPlan",
+    "MacroSectionPlan",
     "SectionCoordinationPlan",
+    "TargetSelector",
 ]

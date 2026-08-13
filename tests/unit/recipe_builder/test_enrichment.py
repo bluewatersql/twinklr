@@ -41,8 +41,13 @@ def test_generate_enrichments_candidate_id_format(sample_recipes):
 
 def test_generate_enrichments_no_structural_fields(sample_recipes):
     structural = {
-        "layers", "palette_spec", "timing", "template_type",
-        "visual_intent", "recipe_version", "recipe_id",
+        "layers",
+        "palette_spec",
+        "timing",
+        "template_type",
+        "visual_intent",
+        "recipe_version",
+        "recipe_id",
     }
     candidates = generate_enrichments(sample_recipes)
     for c in candidates:

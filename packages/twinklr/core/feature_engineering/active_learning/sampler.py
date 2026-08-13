@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import hashlib
 from collections import Counter, defaultdict
+import hashlib
 
 from twinklr.core.feature_engineering.active_learning.models import (
     UncertaintyCandidate,
@@ -42,7 +42,7 @@ class UncertaintySampler:
     def sample(
         self,
         phrases: tuple[EffectPhrase, ...],
-        taxonomy: tuple[PhraseTaxonomyRecord, ...],  # noqa: ARG002 — reserved for future use
+        taxonomy: tuple[PhraseTaxonomyRecord, ...],
     ) -> tuple[UncertaintyCandidate, ...]:
         """Select uncertain phrases and return deduplicated candidates.
 
@@ -100,7 +100,7 @@ class UncertaintySampler:
             if not reasons:
                 continue
 
-            candidate_id = hashlib.sha1(normalized_key.encode()).hexdigest()[:16]  # noqa: S324
+            candidate_id = hashlib.sha1(normalized_key.encode()).hexdigest()[:16]
             uncertainty_score = round(1.0 - min_confidence, 10)
             sample_ids = tuple(p.phrase_id for p in group_phrases[:5])
 

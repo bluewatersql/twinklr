@@ -8,16 +8,12 @@ source and target states.
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
 
 from twinklr.core.curves.generator import CurveGenerator
 from twinklr.core.curves.library import CurveLibrary
 from twinklr.core.sequencer.models.enum import ChannelName
 from twinklr.core.sequencer.models.transition import TransitionPlan, TransitionStrategy
 from twinklr.core.sequencer.moving_heads.channels.state import ChannelValue
-
-if TYPE_CHECKING:
-    pass
 
 logger = logging.getLogger(__name__)
 
@@ -185,7 +181,7 @@ class ChannelBlender:
         # Interpolate between source and target
         blended = source_value + curve_value * (target_value - source_value)
 
-        return self._clamp_dmx(int(round(blended)))
+        return self._clamp_dmx(round(blended))
 
     def _blend_crossfade(self, source_value: int, target_value: int, t: float) -> int:
         """CROSSFADE strategy: linear crossfade with constant power.
@@ -255,14 +251,14 @@ class ChannelBlender:
         if t < 0.33:
             # Close: fade to zero
             fade = 1.0 - (t / 0.33)
-            return self._clamp_dmx(int(round(source_value * fade)))
+            return self._clamp_dmx(round(source_value * fade))
         elif t < 0.66:
             # Hold closed
             return 0
         else:
             # Open: fade from zero to target
             fade = (t - 0.66) / 0.34
-            return self._clamp_dmx(int(round(target_value * fade)))
+            return self._clamp_dmx(round(target_value * fade))
 
     def _clamp_dmx(self, value: int) -> int:
         """Clamp value to valid DMX range (0-255).

@@ -4,10 +4,10 @@ Defines coordination modes, spatial intents, and timing rules
 for cross-group choreography.
 """
 
-from enum import Enum
+from enum import StrEnum
 
 
-class CoordinationMode(str, Enum):
+class CoordinationMode(StrEnum):
     """Coordination mode for cross-group choreography.
 
     Defines how multiple groups work together.
@@ -27,7 +27,7 @@ class CoordinationMode(str, Enum):
     RIPPLE = "RIPPLE"
 
 
-class StepUnit(str, Enum):
+class StepUnit(StrEnum):
     """Step unit for sequenced coordination.
 
     Defines the time unit for sequential steps.
@@ -43,7 +43,7 @@ class StepUnit(str, Enum):
     PHRASE = "PHRASE"
 
 
-class SpillPolicy(str, Enum):
+class SpillPolicy(StrEnum):
     """Policy for handling placements that spill outside section bounds.
 
     Attributes:
@@ -57,7 +57,7 @@ class SpillPolicy(str, Enum):
     WRAP = "WRAP"
 
 
-class SnapRule(str, Enum):
+class SnapRule(StrEnum):
     """Snap rule for time alignment.
 
     Defines how placements snap to musical boundaries.
@@ -75,7 +75,7 @@ class SnapRule(str, Enum):
     NONE = "NONE"
 
 
-class SpatialIntent(str, Enum):
+class SpatialIntent(StrEnum):
     """Spatial direction intent for coordination.
 
     Defines the spatial pattern for cross-group effects.

@@ -6,7 +6,7 @@ from setuptools.command.build_py import build_py as _build_py
 subpackages = find_packages(where=".")
 
 
-class build_py(_build_py):
+class build_py(_build_py):  # noqa: N801 — mirrors setuptools' own command name
     def find_package_modules(self, package, package_dir):
         return [
             (pkg, module, path)

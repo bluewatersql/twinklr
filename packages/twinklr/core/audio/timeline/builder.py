@@ -65,7 +65,7 @@ def build_timeline_export(
     flatness_norm = np.asarray(flatness_norm, dtype=np.float32)
     motion_norm = np.asarray(motion_norm, dtype=np.float32)
 
-    n_frames = int(len(rms_norm))
+    n_frames = len(rms_norm)
     if n_frames == 0:
         return {"timeline": {}, "composites": {"show_intensity": []}}
 

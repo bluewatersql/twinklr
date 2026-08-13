@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import re
 from collections import defaultdict
+import re
 
 from twinklr.core.feature_engineering.models.phrases import EffectPhrase
 from twinklr.core.feature_engineering.models.propensity import (

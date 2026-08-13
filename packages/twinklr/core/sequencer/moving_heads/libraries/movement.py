@@ -1,9 +1,11 @@
 from __future__ import annotations
 
-import math
 from enum import StrEnum
+import math
+from typing import ClassVar
 
 from pydantic import BaseModel, ConfigDict, Field
+
 from twinklr.core.curves.library import CurveLibrary
 from twinklr.core.sequencer.models.enum import Intensity
 from twinklr.core.sequencer.moving_heads.libraries.geometry import GeometryType
@@ -254,7 +256,7 @@ class MovementType(StrEnum):
 class MovementLibrary:
     """Library of predefined movement patterns."""
 
-    PATTERNS: dict[MovementType, MovementPattern] = {
+    PATTERNS: ClassVar[dict[MovementType, MovementPattern]] = {
         # ============================================================================
         # Core Patterns
         # ============================================================================

@@ -196,9 +196,8 @@ class GeniusClient:
         result_artist = result.get("primary_artist", {}).get("name", "").lower()
         query_artist = (query.artist or "").lower()
 
-        if query_artist and result_artist:
-            if result_artist == query_artist:
-                confidence += 0.05  # Exact artist match
+        if query_artist and result_artist and result_artist == query_artist:
+            confidence += 0.05  # Exact artist match
 
         # Clamp to 0-1
         return min(1.0, max(0.0, confidence))

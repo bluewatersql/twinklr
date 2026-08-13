@@ -6,8 +6,8 @@ that best match a creator's aesthetic preferences.
 
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass, field
+import re
 
 from twinklr.core.feature_engineering.models.style import (
     ColorStyleProfile,

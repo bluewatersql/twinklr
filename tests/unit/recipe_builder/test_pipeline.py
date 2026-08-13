@@ -26,9 +26,7 @@ class TestPipelineIntegration:
         manifest = self._run(tmp_path)
         statuses = {ps.phase: ps.status for ps in manifest.phase_status}
         for phase in ("analysis", "generation", "enrichment", "validation", "admission"):
-            assert statuses[phase] == "completed", (
-                f"Phase {phase} not completed: {statuses[phase]}"
-            )
+            assert statuses[phase] == "completed", f"Phase {phase} not completed: {statuses[phase]}"
 
     def test_run_dir_created(self, tmp_path: Path):
         self._run(tmp_path)
@@ -95,9 +93,7 @@ class TestPipelineIntegration:
     def test_summary_metrics_consistent(self, tmp_path: Path):
         manifest = self._run(tmp_path)
         m = manifest.summary_metrics
-        total_candidates = (
-            m.recipe_candidates_generated + m.metadata_candidates_generated
-        )
+        total_candidates = m.recipe_candidates_generated + m.metadata_candidates_generated
         admitted = m.accepted_to_stage + m.review_required + m.rejected
         assert admitted == total_candidates
 

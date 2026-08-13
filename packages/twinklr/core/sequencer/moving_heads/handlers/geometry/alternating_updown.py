@@ -1,6 +1,6 @@
 """Alternating up/down geometry handler - vertical contrast pattern."""
 
-from typing import Any
+from typing import Any, ClassVar
 
 from twinklr.core.sequencer.moving_heads.handlers.protocols import GeometryResult
 
@@ -18,9 +18,14 @@ class AlternatingUpDownHandler:
     handler_id: str = "alternating_updown"
 
     # Roles that tilt UP
-    UP_ROLES = ["FAR_LEFT", "INNER_LEFT", "CENTER", "INNER_RIGHT", "FAR_RIGHT"]
+    UP_ROLES: ClassVar[list[str]] = ["FAR_LEFT", "INNER_LEFT", "CENTER", "INNER_RIGHT", "FAR_RIGHT"]
     # Roles that stay at HORIZON (alternates with UP roles)
-    HORIZON_ROLES = ["OUTER_LEFT", "CENTER_LEFT", "CENTER_RIGHT", "OUTER_RIGHT"]
+    HORIZON_ROLES: ClassVar[list[str]] = [
+        "OUTER_LEFT",
+        "CENTER_LEFT",
+        "CENTER_RIGHT",
+        "OUTER_RIGHT",
+    ]
 
     def resolve(
         self,

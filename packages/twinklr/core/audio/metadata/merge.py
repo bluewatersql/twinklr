@@ -126,10 +126,7 @@ def is_generic_title(title: str | None) -> bool:
     # Check for patterns: "track \\d+" or "audio \\d+"
     if re.match(r"^track\s+\d+$", norm):
         return True
-    if re.match(r"^audio\s+\d+$", norm):
-        return True
-
-    return False
+    return bool(re.match(r"^audio\s+\d+$", norm))
 
 
 def is_generic_artist(artist: str | None) -> bool:
@@ -147,10 +144,7 @@ def is_generic_artist(artist: str | None) -> bool:
     norm = normalize_text(artist)
 
     # Check for exact matches
-    if norm in ("unknown", "unknown artist"):
-        return True
-
-    return False
+    return norm in ("unknown", "unknown artist")
 
 
 def score_candidate(

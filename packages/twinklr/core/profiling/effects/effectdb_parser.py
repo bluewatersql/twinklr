@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass
+import re
 
 from twinklr.core.profiling.models.effectdb import EffectDbParam
 from twinklr.core.profiling.models.enums import (

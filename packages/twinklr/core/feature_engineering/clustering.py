@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-import math
-import uuid
 from collections.abc import Mapping
 from dataclasses import dataclass
+import math
+import uuid
 
 from twinklr.core.feature_engineering.models.clustering import (
     ClusterMember,

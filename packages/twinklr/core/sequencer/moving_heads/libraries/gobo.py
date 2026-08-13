@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from enum import StrEnum
+from typing import ClassVar
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -63,7 +64,7 @@ class GoboLibrary:
     Note: These are typical values, actual values are fixture-specific.
     """
 
-    PATTERNS: dict[GoboPattern, GoboPatternDefinition] = {
+    PATTERNS: ClassVar[dict[GoboPattern, GoboPatternDefinition]] = {
         # Basic
         GoboPattern.OPEN: GoboPatternDefinition(
             gobo_id="open",

@@ -5,10 +5,10 @@ Each axis has an ordering that the composition engine uses to sort groups
 for spatial coordination (e.g., L2R sweeps use HorizontalZone ordering).
 """
 
-from enum import Enum
+from enum import StrEnum
 
 
-class HorizontalZone(str, Enum):
+class HorizontalZone(StrEnum):
     """Horizontal position in the display, ordered left-to-right.
 
     The composition engine uses ``sort_key()`` to order groups when a
@@ -58,7 +58,7 @@ _HORIZONTAL_SORT: dict[HorizontalZone, int] = {
 }
 
 
-class VerticalZone(str, Enum):
+class VerticalZone(StrEnum):
     """Vertical position in the display, ordered bottom-to-top.
 
     Attributes:
@@ -98,7 +98,7 @@ _VERTICAL_SORT: dict[VerticalZone, int] = {
 }
 
 
-class DepthZone(str, Enum):
+class DepthZone(StrEnum):
     """Depth position (front-to-back), ordered near-to-far.
 
     Relevant for 3-D layouts where elements are placed at different
@@ -130,7 +130,7 @@ _DEPTH_SORT: dict[DepthZone, int] = {
 }
 
 
-class DisplayZone(str, Enum):
+class DisplayZone(StrEnum):
     """Logical zone of the display.
 
     Groups the display into meaningful areas that the planner can

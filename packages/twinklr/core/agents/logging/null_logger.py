@@ -3,8 +3,8 @@
 Use for testing or when logging is disabled.
 """
 
-import uuid
 from typing import Any
+import uuid
 
 
 class NullLLMCallLogger:

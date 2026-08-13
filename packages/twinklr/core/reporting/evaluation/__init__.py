@@ -27,14 +27,17 @@ from twinklr.core.reporting.evaluation.models import (
 )
 
 __all__ = [
-    # Generator
-    "generate_evaluation_report",
-    "EvalConfig",
+    # Phase 2 Models
+    "ComparisonMetrics",
+    "ComparisonReport",
     # Core Models
     "ContinuityCheck",
     "CurveAnalysis",
     "CurveStats",
+    "EvalConfig",
     "EvaluationReport",
+    "ModifierCompliance",
+    "PhysicsCheck",
     "ReportFlag",
     "ReportFlagLevel",
     "ReportSummary",
@@ -44,13 +47,10 @@ __all__ = [
     "SongMetadata",
     "StepConfig",
     "TargetResolution",
-    "TemplateSelection",
-    # Phase 2 Models
-    "ComparisonMetrics",
-    "ComparisonReport",
-    "ModifierCompliance",
-    "PhysicsCheck",
     "TemplateCompliance",
+    "TemplateSelection",
     "TransitionAnalysis",
     "ValidationResult",
+    # Generator
+    "generate_evaluation_report",
 ]

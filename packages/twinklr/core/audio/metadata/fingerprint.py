@@ -13,8 +13,6 @@ logger = logging.getLogger(__name__)
 class ChromaprintError(RuntimeError):
     """Chromaprint computation failed."""
 
-    pass
-
 
 def compute_chromaprint_fingerprint(audio_path: str, *, timeout_s: float) -> tuple[str, float]:
     """Compute chromaprint fingerprint using fpcalc binary.

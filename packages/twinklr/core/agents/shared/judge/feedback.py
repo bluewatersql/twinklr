@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+from enum import StrEnum
 import logging
 import time
-from enum import Enum
 from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class FeedbackType(str, Enum):
+class FeedbackType(StrEnum):
     """Type of feedback."""
 
     VALIDATION_FAILURE = "validation_failure"
@@ -305,10 +305,7 @@ class FeedbackManager:
             Formatted rules string
         """
         # Filter if requested
-        if filter_type:
-            entries = self.get_by_type(filter_type)
-        else:
-            entries = self.entries
+        entries = self.get_by_type(filter_type) if filter_type else self.entries
 
         if not entries:
             return ""
@@ -349,10 +346,7 @@ class FeedbackManager:
             Formatted feedback string
         """
         # Filter if requested
-        if filter_type:
-            entries = self.get_by_type(filter_type)
-        else:
-            entries = self.entries
+        entries = self.get_by_type(filter_type) if filter_type else self.entries
 
         if not entries:
             return "No feedback available."

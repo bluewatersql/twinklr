@@ -117,12 +117,12 @@ def simplify_rdp(
         if max_dist > epsilon:
             left = rdp_recursive(start_idx, max_idx)
             right = rdp_recursive(max_idx, end_idx)
-            return left + [max_idx] + right
+            return [*left, max_idx, *right]
         else:
             return []
 
     # Get indices to keep
-    keep_indices = [0] + rdp_recursive(0, len(points) - 1) + [len(points) - 1]
+    keep_indices = [0, *rdp_recursive(0, len(points) - 1), len(points) - 1]
     keep_indices = sorted(set(keep_indices))
 
     return [points[i] for i in keep_indices]

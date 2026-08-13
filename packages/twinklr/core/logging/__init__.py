@@ -12,19 +12,19 @@ from .sanitize import add_custom_pattern, add_sensitive_key, sanitize_dict, sani
 from .yaml_logger import YAMLLogger
 
 __all__ = [
-    # Protocol
-    "StructuredLogger",
     # Implementations
     "JSONLogger",
-    "YAMLLogger",
-    "NullLogger",
-    # Models
-    "LogLevel",
     "LogContext",
     "LogEntry",
-    # Sanitization
-    "sanitize_string",
-    "sanitize_dict",
+    # Models
+    "LogLevel",
+    "NullLogger",
+    # Protocol
+    "StructuredLogger",
+    "YAMLLogger",
     "add_custom_pattern",
     "add_sensitive_key",
+    "sanitize_dict",
+    # Sanitization
+    "sanitize_string",
 ]

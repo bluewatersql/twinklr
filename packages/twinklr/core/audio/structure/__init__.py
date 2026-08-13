@@ -18,16 +18,16 @@ from twinklr.core.audio.structure.sections import (
 )
 
 __all__ = [
-    "detect_song_sections",
-    "merge_short_sections",
-    "label_section",
+    # Presets
+    "PRESETS",
     # Models
     "Section",
     "SectionDiagnostics",
-    "SectioningPreset",
     "SectionLabel",
-    # Presets
-    "PRESETS",
+    "SectioningPreset",
+    "detect_song_sections",
     "get_preset",
     "get_preset_or_default",
+    "label_section",
+    "merge_short_sections",
 ]

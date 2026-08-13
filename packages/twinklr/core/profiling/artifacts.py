@@ -17,10 +17,7 @@ class ProfileArtifactWriter:
 
     def _write_json(self, path: Path, obj: BaseModel | dict | list) -> None:
         data: Any
-        if isinstance(obj, BaseModel):
-            data = obj.model_dump(mode="json", exclude_none=True)
-        else:
-            data = obj
+        data = obj.model_dump(mode="json", exclude_none=True) if isinstance(obj, BaseModel) else obj
         path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
 
     def write_json_bundle(self, output_dir: Path, profile: SequencePackProfile) -> None:

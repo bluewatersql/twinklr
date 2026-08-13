@@ -9,9 +9,9 @@ Each get() call materializes a fresh instance from the factory.
 
 from __future__ import annotations
 
-import logging
 from collections.abc import Callable, Iterable
-from typing import Generic, Protocol, TypeVar, runtime_checkable
+import logging
+from typing import Protocol, TypeVar, runtime_checkable
 
 from pydantic import BaseModel, ConfigDict
 
@@ -32,8 +32,6 @@ def normalize_key(s: str) -> str:
 
 class TemplateNotFoundError(KeyError):
     """Raised when a template is not found in the registry."""
-
-    pass
 
 
 @runtime_checkable
@@ -78,7 +76,7 @@ class BaseTemplateInfo(BaseModel):
     tags: tuple[str, ...]
 
 
-class TemplateRegistry(Generic[T, TInfo]):
+class TemplateRegistry[T: TemplateProtocol, TInfo: "BaseTemplateInfo"]:
     """Generic factory-based template registry.
 
     Pattern: Factory-based registration prevents shared state bugs.

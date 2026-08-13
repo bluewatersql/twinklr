@@ -6,8 +6,8 @@ ElementTree with consistent error handling and validation.
 
 from __future__ import annotations
 
-import xml.etree.ElementTree as ET  # used only for type annotations and ElementTree wrapper
 from pathlib import Path
+import xml.etree.ElementTree as ET  # used only for type annotations and ElementTree wrapper
 
 import defusedxml.ElementTree as defused_ET  # safe parsing — blocks XXE and billion-laughs
 

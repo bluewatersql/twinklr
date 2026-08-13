@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -15,7 +15,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from twinklr.core.pipeline.context import PipelineContext
 
 
-class ExecutionPattern(str, Enum):
+class ExecutionPattern(StrEnum):
     """Execution pattern for stage.
 
     Defines how stage should be executed relative to inputs.
@@ -248,7 +248,7 @@ class PipelineDefinition(BaseModel):
 
         def dfs(node: str, path: list[str]) -> None:
             if color[node] == GRAY:
-                cycle = " -> ".join(path + [node])
+                cycle = " -> ".join([*path, node])
                 raise ValueError(f"Circular dependency detected: {cycle}")
 
             if color[node] == BLACK:
@@ -256,7 +256,7 @@ class PipelineDefinition(BaseModel):
 
             color[node] = GRAY
             for neighbor in graph[node]:
-                dfs(neighbor, path + [node])
+                dfs(neighbor, [*path, node])
             color[node] = BLACK
 
         for stage_id in graph:

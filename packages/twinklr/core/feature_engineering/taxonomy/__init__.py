@@ -22,8 +22,8 @@ __all__ = [
     "LearnedTaxonomyInferenceOptions",
     "LearnedTaxonomyTrainer",
     "LearnedTaxonomyTrainerOptions",
-    "TaxonomyClassifier",
-    "TaxonomyClassifierOptions",
     "TargetRoleAssigner",
     "TargetRoleAssignerOptions",
+    "TaxonomyClassifier",
+    "TaxonomyClassifierOptions",
 ]

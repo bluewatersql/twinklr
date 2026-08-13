@@ -23,8 +23,8 @@ to the xLights ``display_name``.
 
 from __future__ import annotations
 
+from enum import StrEnum
 import random
-from enum import Enum
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field, model_validator
 
@@ -43,7 +43,7 @@ from twinklr.core.sequencer.vocabulary.spatial import (
 )
 
 
-class ElementType(str, Enum):
+class ElementType(StrEnum):
     """xLights element targeting type.
 
     Determines how effects are placed in the sequence:

@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import logging
-import time
 from pathlib import Path
+import time
 from typing import Any
 
 from pydantic import ValidationError
@@ -25,8 +25,6 @@ logger = logging.getLogger(__name__)
 
 class RunError(Exception):
     """Raised when agent execution fails."""
-
-    pass
 
 
 class AsyncAgentRunner:

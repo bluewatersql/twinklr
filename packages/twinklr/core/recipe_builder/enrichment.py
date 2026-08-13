@@ -99,7 +99,10 @@ def _build_metadata_patch(recipe: EffectRecipe) -> dict[str, Any]:
     if missing_tags and recipe.tags:
         patch["tags"] = list(recipe.tags) + sorted(missing_tags)
     elif not recipe.tags:
-        patch["tags"] = sorted(expected_tags | {"generated" if recipe.provenance.source == "generated" else recipe.provenance.source})
+        patch["tags"] = sorted(
+            expected_tags
+            | {"generated" if recipe.provenance.source == "generated" else recipe.provenance.source}
+        )
 
     # Effect family: fix "unknown"
     if recipe.effect_family == "unknown" and recipe.layers:

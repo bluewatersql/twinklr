@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
 
-class AgentMode(str, Enum):
+class AgentMode(StrEnum):
     """Agent execution mode."""
 
     ONESHOT = "oneshot"  # Single request/response

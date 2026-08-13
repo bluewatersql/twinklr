@@ -101,7 +101,7 @@ def extract_dynamic_features(
         "statistics": {
             "dynamic_range": loudness_range,
             "dynamic_contrast": dynamic_contrast,
-            "transient_count": int(len(onset_times)),
+            "transient_count": len(onset_times),
             "transient_density": float(len(onset_times) / duration_s),
         },
         "_np": {"motion_norm": normalize_to_0_1(flux)},

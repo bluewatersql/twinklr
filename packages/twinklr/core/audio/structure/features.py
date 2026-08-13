@@ -19,7 +19,7 @@ def standardize_block(x: np.ndarray, eps: float = 1e-8) -> np.ndarray:
     """Standardize feature block (mean=0, std=1) per feature dimension.
 
     Args:
-        x: Feature matrix (features × frames)
+        x: Feature matrix (features x frames)
         eps: Small constant to avoid division by zero
 
     Returns:
@@ -69,7 +69,7 @@ def extract_beat_sync_features(
             skips internal librosa.effects.harmonic call for efficiency.
 
     Returns:
-        Feature matrix (features × beats) with normalized, weighted features
+        Feature matrix (features x beats) with normalized, weighted features
     """
     # STFT for basic spectral features
     if stft_mag is not None:

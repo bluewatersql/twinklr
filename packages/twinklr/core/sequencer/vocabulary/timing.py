@@ -3,10 +3,10 @@
 Defines timing drivers, time reference kinds, and quantization modes.
 """
 
-from enum import Enum
+from enum import StrEnum
 
 
-class TimingDriver(str, Enum):
+class TimingDriver(StrEnum):
     """Musical timing that drives layer choreography.
 
     Defines which musical element drives the timing.
@@ -28,7 +28,7 @@ class TimingDriver(str, Enum):
     LYRICS = "LYRICS"
 
 
-class GPTimingDriver(str, Enum):
+class GPTimingDriver(StrEnum):
     """Timing driver for GroupPlanner lanes.
 
     Simplified timing drivers for group planning.
@@ -46,7 +46,7 @@ class GPTimingDriver(str, Enum):
     LYRICS = "LYRICS"
 
 
-class TimeRefKind(str, Enum):
+class TimeRefKind(StrEnum):
     """Kind of time reference.
 
     Defines the type of time reference.
@@ -60,7 +60,7 @@ class TimeRefKind(str, Enum):
     MS = "MS"
 
 
-class SnapMode(str, Enum):
+class SnapMode(StrEnum):
     """Snap behavior for time alignment.
 
     Defines how times snap to boundaries.
@@ -80,7 +80,7 @@ class SnapMode(str, Enum):
     STRETCH = "stretch"
 
 
-class QuantizeMode(str, Enum):
+class QuantizeMode(StrEnum):
     """Quantization modes for time alignment.
 
     Defines the granularity of time quantization.

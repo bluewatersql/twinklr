@@ -62,7 +62,7 @@ class CorrectionApplier:
         - ``mean_confidence_after``: average ``correction_confidence`` across
           approved corrections.  Falls back to ``mean_confidence_before`` when
           there are no approved corrections.
-        - ``confidence_uplift``: after − before.
+        - ``confidence_uplift``: after - before.
         - ``unknown_ratio_before``: unknown ratio of ``taxonomy_rules`` **before**
           any changes are applied.
         - ``unknown_ratio_after``: unknown ratio **after** all changes are applied.

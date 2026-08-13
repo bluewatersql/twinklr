@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-import statistics
 from collections import Counter
 from pathlib import Path
+import statistics
 
 from twinklr.core.formats.xlights.layout.models.rgb_effects import (
     Layout,
@@ -315,9 +315,7 @@ class LayoutProfiler:
             "WorldPosZ": model.WorldPosZ or "",
         }
         extra = model.model_extra or {}
-        for key, value in extra.items():
-            if isinstance(value, str):
-                attrs[key] = value
+        attrs.update({key: value for key, value in extra.items() if isinstance(value, str)})
         return attrs
 
     def _profile_model(self, model: Model) -> ModelProfile:

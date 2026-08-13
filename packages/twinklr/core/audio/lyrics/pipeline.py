@@ -4,7 +4,7 @@ Orchestrates stage gating: embedded → synced → plain → whisperx_align → 
 """
 
 import logging
-from typing import Any
+from typing import Any, ClassVar
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -50,7 +50,7 @@ class LyricsPipeline:
     """
 
     # Base confidence by source (from spec)
-    BASE_CONFIDENCE = {
+    BASE_CONFIDENCE: ClassVar[dict[str, float]] = {
         LyricsSourceKind.EMBEDDED: 0.70,
         LyricsSourceKind.LOOKUP_SYNCED: 0.80,
         LyricsSourceKind.LOOKUP_PLAIN: 0.75,
@@ -143,18 +143,21 @@ class LyricsPipeline:
             if plain_bundle:
                 logger.debug(f"Found plain lyrics from {plain_bundle.source}")
                 # Check if we need word timing but don't have it
-                if self.config.require_timed_words and not plain_bundle.words:
-                    # Stage 4: Try WhisperX align to add timing to plain text
-                    if self.whisperx_service:
-                        align_bundle = self._try_whisperx_align(
-                            audio_path=audio_path,
-                            lyrics_text=plain_bundle.text or "",
-                            duration_ms=duration_ms,
-                            warnings=warnings,
-                            vocal_segments=vocal_segments,
-                        )
-                        if align_bundle:
-                            return align_bundle
+                # Stage 4: Try WhisperX align to add timing to plain text
+                if (
+                    self.config.require_timed_words
+                    and not plain_bundle.words
+                    and self.whisperx_service
+                ):
+                    align_bundle = self._try_whisperx_align(
+                        audio_path=audio_path,
+                        lyrics_text=plain_bundle.text or "",
+                        duration_ms=duration_ms,
+                        warnings=warnings,
+                        vocal_segments=vocal_segments,
+                    )
+                    if align_bundle:
+                        return align_bundle
                 # Plain text is sufficient (or align failed)
                 return plain_bundle
 
@@ -374,12 +377,12 @@ class LyricsPipeline:
         # Determine sufficiency
         is_sufficient = True
 
-        if self.config.require_timed_words:
-            # Need timed words with good coverage
-            if not words:
-                is_sufficient = False
-            elif quality and quality.timed_word_coverage_pct < self.config.min_coverage_pct:
-                is_sufficient = False
+        # Need timed words with good coverage
+        if self.config.require_timed_words and (
+            not words
+            or (quality and quality.timed_word_coverage_pct < self.config.min_coverage_pct)
+        ):
+            is_sufficient = False
 
         # Determine stage status
         # Use OK for success, even if insufficient (but add warnings)
@@ -471,11 +474,10 @@ class LyricsPipeline:
 
             # Determine sufficiency
             is_sufficient = True
-            if self.config.require_timed_words:
-                if not result.words:
-                    is_sufficient = False
-                elif quality.timed_word_coverage_pct < self.config.min_coverage_pct:
-                    is_sufficient = False
+            if self.config.require_timed_words and (
+                not result.words or quality.timed_word_coverage_pct < self.config.min_coverage_pct
+            ):
+                is_sufficient = False
 
             if not is_sufficient:
                 warnings.append("WhisperX align result does not meet sufficiency requirements")
@@ -558,11 +560,11 @@ class LyricsPipeline:
 
             # Determine sufficiency
             is_sufficient = True
-            if self.config.require_timed_words:
-                if not result.words:
-                    is_sufficient = False
-                elif quality and quality.timed_word_coverage_pct < self.config.min_coverage_pct:
-                    is_sufficient = False
+            if self.config.require_timed_words and (
+                not result.words
+                or (quality and quality.timed_word_coverage_pct < self.config.min_coverage_pct)
+            ):
+                is_sufficient = False
 
             if not is_sufficient:
                 warnings.append("WhisperX transcribe result does not meet sufficiency requirements")

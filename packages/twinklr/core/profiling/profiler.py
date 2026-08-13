@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import hashlib
 import json
-import zipfile
 from pathlib import Path
+import zipfile
 
 from twinklr.core.feature_store.backends.null import NullFeatureStore
 from twinklr.core.feature_store.models import ProfileRecord
@@ -332,7 +332,7 @@ class SequencePackProfiler:
                     if Path(name).suffix.lower() in {".xsq", ".seq"}:
                         data = archive.read(name)
                         return hashlib.sha256(data).hexdigest()
-        except Exception:  # noqa: BLE001
+        except Exception:
             pass
         # Fallback: hash the zip itself (backward compat)
         return sha256_file(zip_path)

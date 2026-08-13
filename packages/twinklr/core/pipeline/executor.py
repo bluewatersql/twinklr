@@ -47,7 +47,6 @@ class PipelineExecutor:
 
     def __init__(self) -> None:
         """Initialize pipeline executor."""
-        pass
 
     async def execute(
         self,

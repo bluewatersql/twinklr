@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import statistics
 from collections import Counter
+import statistics
 
 from twinklr.core.feature_engineering.embeddings.models import SequenceFeatureVector
 from twinklr.core.feature_engineering.models.bundle import FeatureBundle

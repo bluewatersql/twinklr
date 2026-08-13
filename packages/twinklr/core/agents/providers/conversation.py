@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 import time
 import uuid
-from dataclasses import dataclass, field
 
 
 def generate_conversation_id(agent_name: str, iteration: int) -> str:

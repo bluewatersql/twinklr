@@ -247,10 +247,10 @@ class DmxSettingsBuilder:
         max_channel = 16  # Minimum sensible channel count
 
         # Check all channels with values or curves
-        for ch in channel_values.keys():
+        for ch in channel_values:
             max_channel = max(max_channel, ch)
 
-        for ch in channel_curves.keys():
+        for ch in channel_curves:
             max_channel = max(max_channel, ch)
 
         # Round up to nearest 16 (DMX convention)

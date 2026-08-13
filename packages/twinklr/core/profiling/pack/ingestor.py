@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import hashlib
+from pathlib import Path
 import shutil
 import uuid
-from pathlib import Path
 from zipfile import ZipFile
 
 import defusedxml.ElementTree as defused_ET  # safe parsing — blocks XXE and billion-laughs
@@ -131,7 +131,7 @@ def _sniff_xsequence(path: Path) -> bool:
     try:
         for _event, elem in defused_ET.iterparse(path, events=["start"]):
             return elem.tag.lower() == "xsequence"  # type: ignore[no-any-return]
-    except Exception:  # noqa: BLE001
+    except Exception:
         return False
     return False
 

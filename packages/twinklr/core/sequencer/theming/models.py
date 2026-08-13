@@ -190,10 +190,10 @@ class MotifDefinition(BaseModel):
 
 __all__ = [
     "ColorStop",
+    "MotifDefinition",
     "PaletteDefinition",
     "TagDefinition",
     "ThemeCatalog",
     "ThemeDefinition",
     "ThemeRef",
-    "MotifDefinition",
 ]

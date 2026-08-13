@@ -10,7 +10,7 @@ import pytest
 
 from twinklr.core.api.llm.openai.client import (
     OpenAIClient,
-    OpenAIRetryExhausted,
+    OpenAIRetryExhaustedError,
     ReasoningEffort,
     ResponseMetadata,
     RetryConfig,
@@ -222,13 +222,13 @@ class TestRetryWithBackoff:
         assert attempt_count["count"] == 2
 
     def test_raises_after_exhausted(self, client: OpenAIClient) -> None:
-        """Test raises OpenAIRetryExhausted after all retries."""
+        """Test raises OpenAIRetryExhaustedError after all retries."""
         request = MagicMock()
 
         def always_fail() -> None:
             raise APIConnectionError(request=request)
 
-        with pytest.raises(OpenAIRetryExhausted) as exc_info:
+        with pytest.raises(OpenAIRetryExhaustedError) as exc_info:
             client._retry_with_backoff(always_fail, "test operation")
 
         assert "test operation" in str(exc_info.value)
@@ -348,7 +348,7 @@ class TestGenerateJson:
         def failing_validator(data: dict[str, Any]) -> bool:
             return False
 
-        with pytest.raises(OpenAIRetryExhausted):
+        with pytest.raises(OpenAIRetryExhaustedError):
             client_with_mock.generate_json(
                 messages=messages,
                 model="gpt-5.2",
@@ -370,7 +370,7 @@ class TestGenerateJson:
             client = OpenAIClient(api_key="test-key")
             messages = [{"role": "user", "content": "Test"}]
 
-            with pytest.raises(OpenAIRetryExhausted):
+            with pytest.raises(OpenAIRetryExhaustedError):
                 client.generate_json(messages=messages, model="gpt-5.2")
 
     def test_generate_json_invalid_json(self) -> None:
@@ -388,7 +388,7 @@ class TestGenerateJson:
             client = OpenAIClient(api_key="test-key")
             messages = [{"role": "user", "content": "Test"}]
 
-            with pytest.raises(OpenAIRetryExhausted):
+            with pytest.raises(OpenAIRetryExhaustedError):
                 client.generate_json(messages=messages, model="gpt-5.2")
 
     def test_generate_json_mini_model_skips_temperature(self) -> None:
@@ -473,7 +473,7 @@ class TestGenerateText:
             client = OpenAIClient(api_key="test-key")
             messages = [{"role": "user", "content": "Test"}]
 
-            with pytest.raises(OpenAIRetryExhausted):
+            with pytest.raises(OpenAIRetryExhaustedError):
                 client.generate_text(messages=messages, model="gpt-5.2")
 
 

@@ -7,12 +7,12 @@ iterative improvement.
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
-class IssueCategory(str, Enum):
+class IssueCategory(StrEnum):
     """Category of identified issue.
 
     Categorizes issues by domain for better organization and filtering.
@@ -37,7 +37,7 @@ class IssueCategory(str, Enum):
     CONSTRAINT = "CONSTRAINT"  # Constraint violation issues
 
 
-class IssueSeverity(str, Enum):
+class IssueSeverity(StrEnum):
     """Severity level of identified issue.
 
     Determines urgency and whether issue blocks progression.
@@ -48,7 +48,7 @@ class IssueSeverity(str, Enum):
     NIT = "NIT"  # Nice to fix (minor improvement)
 
 
-class IssueEffort(str, Enum):
+class IssueEffort(StrEnum):
     """Estimated effort to fix issue.
 
     Helps prioritize fixes and set expectations.
@@ -59,7 +59,7 @@ class IssueEffort(str, Enum):
     HIGH = "HIGH"  # Significant revision (major rework)
 
 
-class IssueScope(str, Enum):
+class IssueScope(StrEnum):
     """Scope of identified issue.
 
     Indicates how localized or widespread the issue is.
@@ -75,7 +75,7 @@ class IssueScope(str, Enum):
     FIELD = "FIELD"  # Affects specific field or value
 
 
-class SuggestedAction(str, Enum):
+class SuggestedAction(StrEnum):
     """Suggested action to resolve issue.
 
     Guides the agent on how to address the issue in next iteration.
@@ -88,7 +88,7 @@ class SuggestedAction(str, Enum):
     RETRY = "RETRY"  # Retry with same approach (transient error)
 
 
-class ActionType(str, Enum):
+class ActionType(StrEnum):
     """Type of targeted fix action.
 
     Categorizes plan mutations for structured feedback.
@@ -156,12 +156,14 @@ class TargetedAction(BaseModel):
         without palette_id means "remove the current override").
         """
         at = self.action_type
-        if at == ActionType.SWAP_TEMPLATE:
-            if not self.template_id or not self.replacement_template_id:
-                raise ValueError("SWAP_TEMPLATE requires template_id and replacement_template_id")
-        elif at in (ActionType.ADD_TARGET, ActionType.REMOVE_TARGET):
-            if not self.lane or not self.target:
-                raise ValueError(f"{at.value} requires lane and target")
+        if at == ActionType.SWAP_TEMPLATE and (
+            not self.template_id or not self.replacement_template_id
+        ):
+            raise ValueError("SWAP_TEMPLATE requires template_id and replacement_template_id")
+        elif at in (ActionType.ADD_TARGET, ActionType.REMOVE_TARGET) and (
+            not self.lane or not self.target
+        ):
+            raise ValueError(f"{at.value} requires lane and target")
         return self
 
 
@@ -257,8 +259,9 @@ class Issue(BaseModel):
         if section_id and self.location.section_id != section_id:
             return False
 
-        if bar and self.location.bar_start and self.location.bar_end:
-            if not (self.location.bar_start <= bar <= self.location.bar_end):
-                return False
-
-        return True
+        return not (
+            bar
+            and self.location.bar_start
+            and self.location.bar_end
+            and not (self.location.bar_start <= bar <= self.location.bar_end)
+        )

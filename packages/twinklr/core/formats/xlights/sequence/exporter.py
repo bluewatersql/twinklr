@@ -6,8 +6,9 @@ xLights .xsq (XML Sequence) files with proper formatting.
 
 from __future__ import annotations
 
-import xml.etree.ElementTree as ET
+import contextlib
 from pathlib import Path
+import xml.etree.ElementTree as ET
 
 from twinklr.core.formats.xlights.sequence.models.xsq import (
     Effect,
@@ -54,11 +55,9 @@ class XSQExporter:
 
         # Pretty print if requested
         if pretty:
-            try:
+            # Fallback for Python < 3.9
+            with contextlib.suppress(AttributeError):
                 ET.indent(tree, space="  ", level=0)
-            except AttributeError:
-                # Fallback for Python < 3.9
-                pass
 
         # Write to file
         tree.write(str(file_path), encoding="UTF-8", xml_declaration=True)
@@ -233,12 +232,10 @@ class XSQExporter:
             layer: EffectLayer element
             marker: TimeMarker model
         """
-        # Timing markers are stored as effects with start/end times
-        # Use end_time_ms if provided, otherwise default to start + 1ms
-        if marker.end_time_ms is not None:
-            end_time = marker.end_time_ms
-        else:
-            end_time = marker.time_ms + 1  # 1ms duration for point markers
+        # Timing markers are stored as effects with start/end times.
+        # Use end_time_ms if provided, otherwise default to start + 1ms duration
+        # for point markers.
+        end_time = marker.end_time_ms if marker.end_time_ms is not None else marker.time_ms + 1
 
         attribs = {
             "label": marker.name,

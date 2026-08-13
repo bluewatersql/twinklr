@@ -22,10 +22,10 @@ from twinklr.core.caching.protocols import Cache, CacheSync
 __all__ = [
     # Core
     "Cache",
-    "CacheSync",
     "CacheKey",
     "CacheMeta",
     "CacheOptions",
+    "CacheSync",
     # Backends
     "FSCache",
     "FSCacheSync",

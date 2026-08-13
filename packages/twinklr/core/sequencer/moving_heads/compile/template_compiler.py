@@ -404,18 +404,17 @@ def _clip_curve_points(points: list[CurvePoint], keep_fraction: float) -> list[C
             # Rescale t to [0, 1] over the clipped duration
             new_t = point.t / keep_fraction if keep_fraction > 0 else 0.0
             clipped.append(CurvePoint(t=new_t, v=point.v))
-        else:
-            # Interpolate the final point at exactly keep_fraction
-            if clipped and point.t > keep_fraction:
-                # Find the previous point
-                prev_point = clipped[-1]
-                # Linear interpolation to get value at keep_fraction
-                t_range = point.t - prev_point.t * keep_fraction
-                if t_range > 0:
-                    alpha = (keep_fraction - prev_point.t * keep_fraction) / t_range
-                    interpolated_v = prev_point.v + alpha * (point.v - prev_point.v)
-                    clipped.append(CurvePoint(t=1.0, v=interpolated_v))
-                break
+        # Interpolate the final point at exactly keep_fraction
+        elif clipped and point.t > keep_fraction:
+            # Find the previous point
+            prev_point = clipped[-1]
+            # Linear interpolation to get value at keep_fraction
+            t_range = point.t - prev_point.t * keep_fraction
+            if t_range > 0:
+                alpha = (keep_fraction - prev_point.t * keep_fraction) / t_range
+                interpolated_v = prev_point.v + alpha * (point.v - prev_point.v)
+                clipped.append(CurvePoint(t=1.0, v=interpolated_v))
+            break
 
     # Ensure we have at least 2 points for a valid curve
     if len(clipped) < 2 and points:

@@ -6,9 +6,9 @@ into type-safe Pydantic models for manipulation and validation.
 
 from __future__ import annotations
 
-import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any
+import xml.etree.ElementTree as ET
 
 from twinklr.core.formats.xlights.sequence.models.xsq import (
     ColorPalette,
@@ -485,9 +485,6 @@ class XSQParser:
             "label",
         }
 
-        parameters = {}
-        for key, value in effect_elem.attrib.items():
-            if key not in standard_attrs:
-                parameters[key] = value
-
-        return parameters
+        return {
+            key: value for key, value in effect_elem.attrib.items() if key not in standard_attrs
+        }

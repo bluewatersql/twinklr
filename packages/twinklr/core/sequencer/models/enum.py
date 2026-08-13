@@ -1,14 +1,14 @@
-from enum import Enum
+from enum import StrEnum
 
 
-class TimingMode(str, Enum):
+class TimingMode(StrEnum):
     """Timing reference mode."""
 
     MUSICAL = "musical"  # Bars/beats (tempo-aware)
     ABSOLUTE_MS = "absolute_ms"  # Milliseconds (fixed)
 
 
-class QuantizeMode(str, Enum):
+class QuantizeMode(StrEnum):
     """Beat quantization options for timing alignment."""
 
     NONE = "none"  # No quantization (use exact timing)
@@ -20,7 +20,7 @@ class QuantizeMode(str, Enum):
     SIXTEENTH_BAR = "sixteenth_bar"  # Snap to sixteenth-bar positions
 
 
-class TransitionMode(str, Enum):
+class TransitionMode(StrEnum):
     """Transition mode between segments."""
 
     SNAP = "snap"  # Instant change (no blend)
@@ -30,7 +30,7 @@ class TransitionMode(str, Enum):
     SWEEP = "sweep"  # Sweeping motion (advanced)
 
 
-class BlendMode(str, Enum):
+class BlendMode(StrEnum):
     OVERRIDE = "override"
     ADD = "add"
     SUBTRACT = "subtract"
@@ -38,13 +38,13 @@ class BlendMode(str, Enum):
     DIVIDE = "divide"
 
 
-class TemplateCategory(str, Enum):
+class TemplateCategory(StrEnum):
     LOW_ENERGY = "low_energy"
     MEDIUM_ENERGY = "medium_energy"
     HIGH_ENERGY = "high_energy"
 
 
-class SemanticGroupType(str, Enum):
+class SemanticGroupType(StrEnum):
     ALL = "ALL"
     LEFT = "LEFT"
     RIGHT = "RIGHT"
@@ -54,7 +54,7 @@ class SemanticGroupType(str, Enum):
     EVEN = "EVEN"
 
 
-class ChaseOrder(str, Enum):
+class ChaseOrder(StrEnum):
     """Order for phase offset spreading.
 
     Defines the order in which fixtures in a group receive phase offsets
@@ -74,7 +74,7 @@ class ChaseOrder(str, Enum):
     ODD_EVEN = "ODD_EVEN"
 
 
-class TemplateRole(str, Enum):
+class TemplateRole(StrEnum):
     OUTER_LEFT = "OUTER_LEFT"
     INNER_LEFT = "INNER_LEFT"
     INNER_RIGHT = "INNER_RIGHT"
@@ -90,7 +90,7 @@ class TemplateRole(str, Enum):
     RIGHT = "RIGHT"
 
 
-class AimZone(str, Enum):
+class AimZone(StrEnum):
     """Predefined aim targets.
 
     Defines standard aim zones for geometry handlers to position fixtures.
@@ -108,7 +108,7 @@ class AimZone(str, Enum):
     STAGE = "STAGE"
 
 
-class Intensity(str, Enum):
+class Intensity(StrEnum):
     """Movement intensity levels.
 
     Maps intensity names to amplitude values.
@@ -145,7 +145,7 @@ class Intensity(str, Enum):
         return amplitudes[self]
 
 
-class ChannelName(str, Enum):
+class ChannelName(StrEnum):
     """DMX channel names for moving head fixtures.
 
     These represent the primary controllable channels on a moving head fixture.

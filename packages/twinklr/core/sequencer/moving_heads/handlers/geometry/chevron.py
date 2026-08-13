@@ -1,6 +1,6 @@
 """Chevron geometry handler - arranges fixtures in V-shape."""
 
-from typing import Any
+from typing import Any, ClassVar
 
 from twinklr.core.config.poses import STANDARD_POSES, PoseLibrary
 from twinklr.core.sequencer.moving_heads.handlers.protocols import GeometryResult
@@ -29,9 +29,9 @@ class ChevronVHandler:
     handler_id: str = "chevron_v"
 
     # Left side roles (ordered outward)
-    LEFT_ROLES = ["FAR_LEFT", "OUTER_LEFT", "INNER_LEFT", "CENTER_LEFT"]
+    LEFT_ROLES: ClassVar[list[str]] = ["FAR_LEFT", "OUTER_LEFT", "INNER_LEFT", "CENTER_LEFT"]
     # Right side roles (ordered outward)
-    RIGHT_ROLES = ["CENTER_RIGHT", "INNER_RIGHT", "OUTER_RIGHT", "FAR_RIGHT"]
+    RIGHT_ROLES: ClassVar[list[str]] = ["CENTER_RIGHT", "INNER_RIGHT", "OUTER_RIGHT", "FAR_RIGHT"]
 
     def resolve(
         self,

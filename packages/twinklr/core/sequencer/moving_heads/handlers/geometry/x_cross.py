@@ -1,6 +1,6 @@
 """X-cross geometry handler - diagonal crossing pattern."""
 
-from typing import Any
+from typing import Any, ClassVar
 
 from twinklr.core.sequencer.moving_heads.handlers.protocols import GeometryResult
 
@@ -27,9 +27,9 @@ class XCrossHandler:
     handler_id: str = "x_cross"
 
     # Left side roles (will aim right/down)
-    LEFT_ROLES = ["FAR_LEFT", "OUTER_LEFT", "INNER_LEFT", "CENTER_LEFT"]
+    LEFT_ROLES: ClassVar[list[str]] = ["FAR_LEFT", "OUTER_LEFT", "INNER_LEFT", "CENTER_LEFT"]
     # Right side roles (will aim left/down)
-    RIGHT_ROLES = ["CENTER_RIGHT", "INNER_RIGHT", "OUTER_RIGHT", "FAR_RIGHT"]
+    RIGHT_ROLES: ClassVar[list[str]] = ["CENTER_RIGHT", "INNER_RIGHT", "OUTER_RIGHT", "FAR_RIGHT"]
 
     def resolve(
         self,

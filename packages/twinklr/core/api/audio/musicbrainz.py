@@ -21,8 +21,6 @@ logger = logging.getLogger(__name__)
 class MusicBrainzError(RuntimeError):
     """MusicBrainz API error."""
 
-    pass
-
 
 class MusicBrainzClient:
     """MusicBrainz API client (async).

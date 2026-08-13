@@ -3,10 +3,10 @@
 Enums specific to the theming domain.
 """
 
-from enum import Enum
+from enum import StrEnum
 
 
-class TagCategory(str, Enum):
+class TagCategory(StrEnum):
     """Category classification for tags.
 
     Used for organizing and filtering tags in catalogs.
@@ -24,7 +24,7 @@ class TagCategory(str, Enum):
     CONSTRAINT = "constraint"
 
 
-class ThemeScope(str, Enum):
+class ThemeScope(StrEnum):
     """Scope of theme application.
 
     Defines how broadly a theme should be applied.

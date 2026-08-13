@@ -4,12 +4,12 @@ Provides simplified timing models for LLM planning that eliminate
 precision issues with beat_frac and offset_ms.
 """
 
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field
 
 
-class TimingHint(str, Enum):
+class TimingHint(StrEnum):
     """Optional timing hint for subtle variations.
 
     These are optional micro-adjustments the renderer applies.

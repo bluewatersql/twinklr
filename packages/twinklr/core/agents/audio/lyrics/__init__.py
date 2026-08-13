@@ -12,11 +12,11 @@ from twinklr.core.agents.audio.lyrics.spec import get_lyrics_spec
 from twinklr.core.agents.audio.lyrics.validation import validate_lyrics
 
 __all__ = [
+    "KeyPhrase",
     "LyricContextModel",
     "LyricsOrchestrator",
-    "StoryBeat",
-    "KeyPhrase",
     "SilentSection",
+    "StoryBeat",
     "get_lyrics_spec",
     "shape_lyrics_context",
     "validate_lyrics",

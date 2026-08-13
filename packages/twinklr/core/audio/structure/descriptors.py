@@ -65,7 +65,7 @@ def compute_section_centroids(
     """Compute mean feature vector (centroid) for each section.
 
     Args:
-        features: Normalized feature matrix (features × beats)
+        features: Normalized feature matrix (features x beats)
         beat_times: Beat times in seconds
         boundaries: Section boundary times
 
@@ -103,7 +103,7 @@ def compute_similarity_matrix(centroids: list[np.ndarray]) -> np.ndarray:
         centroids: List of section centroid vectors
 
     Returns:
-        Similarity matrix (n_sections × n_sections)
+        Similarity matrix (n_sections x n_sections)
     """
     n = len(centroids)
     sim_mat = np.zeros((n, n), dtype=np.float32)
