@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from twinklr.core.agents.logging import LLMCallLogger, NullLLMCallLogger
+from twinklr.core.agents.prompts import spec_prompt_hash
 from twinklr.core.agents.prompts.sanitize import sanitize_metadata_field
 from twinklr.core.agents.providers.base import LLMProvider
 from twinklr.core.agents.sequencer.moving_heads.context import MovingHeadPlanningContext
@@ -221,6 +222,7 @@ class MovingHeadPlannerOrchestrator:
         - Lyric context (narrative/themes, if present)
         - Fixture configuration
         - Model configuration
+        - Planner and judge prompt-pack content
 
         Args:
             context: Planning context for this run
@@ -242,6 +244,9 @@ class MovingHeadPlannerOrchestrator:
             },
             "planner_model": self.planner_spec.model,
             "judge_model": self.judge_spec.model,
+            "prompt_packs": spec_prompt_hash(
+                self.prompt_base_path, self.planner_spec, self.judge_spec
+            ),
         }
 
         # Canonical JSON encoding for stable hashing

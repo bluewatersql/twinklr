@@ -33,7 +33,19 @@ class AgentResult(BaseModel):
 
     tokens_used: int = Field(
         ge=0,
-        description="Tokens consumed",
+        description="Tokens consumed by this agent's own requests",
+    )
+
+    prompt_tokens: int = Field(
+        default=0,
+        ge=0,
+        description="Input tokens consumed, summed across repair attempts",
+    )
+
+    completion_tokens: int = Field(
+        default=0,
+        ge=0,
+        description="Output tokens consumed, summed across repair attempts",
     )
 
     conversation_id: str | None = Field(

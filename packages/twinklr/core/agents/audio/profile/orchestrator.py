@@ -13,7 +13,9 @@ import logging
 from pathlib import Path
 
 from twinklr.core.agents.audio.profile.models import AudioProfileModel
+from twinklr.core.agents.audio.profile.spec import get_audio_profile_spec
 from twinklr.core.agents.logging import LLMCallLogger, NullLLMCallLogger
+from twinklr.core.agents.prompts import spec_prompt_hash
 from twinklr.core.agents.providers.base import LLMProvider
 from twinklr.core.audio.models import SongBundle
 
@@ -66,6 +68,12 @@ class AudioProfileOrchestrator:
             f"AudioProfileOrchestrator initialized (model={model}, temperature={temperature})"
         )
 
+    def _resolved_prompt_base(self) -> Path:
+        """Directory the agent's prompt pack resolves against."""
+        if self.prompt_base_path is not None:
+            return Path(self.prompt_base_path)
+        return Path(__file__).parent / "prompts"
+
     async def get_cache_key(self, song_bundle: SongBundle) -> str:
         """Generate cache key for deterministic caching.
 
@@ -73,6 +81,7 @@ class AudioProfileOrchestrator:
         - Song bundle (audio analysis results)
         - Model configuration
         - Temperature setting
+        - Prompt pack content (so editing a prompt invalidates cached plans)
 
         Args:
             song_bundle: Full SongBundle from AudioAnalyzer
@@ -80,10 +89,16 @@ class AudioProfileOrchestrator:
         Returns:
             SHA256 hash of canonical inputs
         """
+        spec = get_audio_profile_spec(
+            model=self.model,
+            temperature=self.temperature,
+            token_budget=self.token_budget,
+        )
         key_data = {
             "song_bundle": song_bundle.model_dump(),
             "model": self.model,
             "temperature": self.temperature,
+            "prompt_pack": spec_prompt_hash(self._resolved_prompt_base(), spec),
         }
 
         # Canonical JSON encoding for stable hashing
@@ -115,7 +130,6 @@ class AudioProfileOrchestrator:
         from twinklr.core.agents.async_runner import AsyncAgentRunner
         from twinklr.core.agents.audio.profile.context import shape_context
         from twinklr.core.agents.audio.profile.models import Provenance
-        from twinklr.core.agents.audio.profile.spec import get_audio_profile_spec
         from twinklr.core.agents.audio.profile.validation import validate_audio_profile
 
         try:
@@ -130,10 +144,7 @@ class AudioProfileOrchestrator:
                 token_budget=self.token_budget,
             )
 
-            # Determine prompt base path
-            prompt_base = self.prompt_base_path
-            if prompt_base is None:
-                prompt_base = Path(__file__).parent / "prompts"
+            prompt_base = self._resolved_prompt_base()
 
             # Create runner
             runner = AsyncAgentRunner(

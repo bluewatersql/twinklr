@@ -321,3 +321,8 @@ making the check a gate. Third risk: the VLM judge itself being uncalibrated —
 mitigated by P2P-T6's calibration protocol being an acceptance criterion there, and by
 the human spot-checks here; if the harness disagrees with the owner's blind ranking,
 that disagreement is itself the headline finding and must be reported, not smoothed.
+
+## Backlog addition (P1P-T9 verification, 2026-08-13)
+Planner temperature is NOT in the planner cache keys (only profile/lyrics key it)
+and every call site uses the hardcoded spec default — if any arm varies sampling
+temperature, key it first or cached plans will confound the arms.

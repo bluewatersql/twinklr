@@ -17,6 +17,11 @@ def absolute_path(path: str | Path) -> AbsolutePath:
     """
     Validate and construct an absolute path.
 
+    Relative input is rejected: silently anchoring it to the process working
+    directory makes callers (notably the cache root) resolve differently
+    depending on where the process was launched. Use :func:`anchored_path` to
+    resolve a possibly-relative path against an explicit base.
+
     Args:
         path: String or Path object
 
@@ -30,10 +35,42 @@ def absolute_path(path: str | Path) -> AbsolutePath:
         >>> p = absolute_path("/tmp/cache")
         >>> assert Path(p).is_absolute()
     """
-    p = Path(path).resolve()
+    p = Path(path)
     if not p.is_absolute():
         raise ValueError(f"Path must be absolute: {path}")
-    return AbsolutePath(p)
+    return AbsolutePath(p.resolve())
+
+
+def anchored_path(path: str | Path, root: str | Path) -> AbsolutePath:
+    """
+    Resolve a possibly-relative path against an explicit root.
+
+    Absolute input is returned normalized and unchanged; relative input is
+    anchored to ``root`` so the result never depends on the process working
+    directory.
+
+    Args:
+        path: String or Path object (absolute or relative)
+        root: Absolute base directory relative paths resolve against
+
+    Returns:
+        AbsolutePath instance
+
+    Raises:
+        ValueError: If ``root`` is not absolute
+
+    Example:
+        >>> p = anchored_path("data/cache", "/projects/twinklr")
+        >>> assert str(p) == "/projects/twinklr/data/cache"
+    """
+    root_path = Path(root)
+    if not root_path.is_absolute():
+        raise ValueError(f"Anchor root must be absolute: {root}")
+
+    p = Path(path)
+    if p.is_absolute():
+        return AbsolutePath(p.resolve())
+    return AbsolutePath((root_path / p).resolve())
 
 
 def relative_path(path: str | Path) -> RelativePath:

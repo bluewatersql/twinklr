@@ -24,6 +24,7 @@ from twinklr.core.agents.issues import (
     TargetedAction,
 )
 from twinklr.core.agents.logging import LLMCallLogger, NullLLMCallLogger
+from twinklr.core.agents.prompts import spec_prompt_hash
 from twinklr.core.agents.providers.base import LLMProvider
 from twinklr.core.agents.shared.judge.models import VerdictStatus
 from twinklr.core.agents.spec import AgentMode, AgentSpec
@@ -190,6 +191,7 @@ class HolisticEvaluator:
         - Macro plan summary
         - Lyric context (narrative calibration)
         - Model configuration
+        - Holistic-judge prompt-pack content
 
         Args:
             group_plan_set: Complete set of section plans
@@ -212,6 +214,7 @@ class HolisticEvaluator:
             "macro_plan_summary": macro_plan_summary or {},
             "lyric_context": _shape_lyric_context_summary(lyric_context),
             "model": self.holistic_judge_spec.model,
+            "prompt_packs": spec_prompt_hash(AGENTS_BASE_PATH, self.holistic_judge_spec),
         }
 
         # Canonical JSON encoding for stable hashing

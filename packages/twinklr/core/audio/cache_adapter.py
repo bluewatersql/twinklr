@@ -12,7 +12,7 @@ Example:
     >>> from twinklr.core.io import RealFileSystem, absolute_path
     >>>
     >>> fs = RealFileSystem()
-    >>> cache = FSCache(fs, absolute_path("data/cache"))
+    >>> cache = FSCache(fs, anchored_path(project_root, "data/cache"))
     >>> await cache.initialize()
     >>>
     >>> features = await load_audio_features_async("song.mp3", cache, SongBundle)

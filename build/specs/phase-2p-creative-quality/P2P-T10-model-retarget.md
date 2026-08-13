@@ -284,3 +284,8 @@ parametrized test. Second risk: the "mini" temperature hack changing three agent
 sampling behavior invisibly — mitigated by making it an explicit decision with a test.
 Third risk: touching the assets client tempts flipping `enable_assets`; it stays off,
 gated behind P3-F28b.
+
+## Backlog addition (P1P-T9 verification, 2026-08-13)
+Reasoning tokens are unseparated inside output token counts; when setting explicit
+reasoning.effort here, split reasoning vs completion tokens in TokenUsage so cost
+instrumentation stays honest on 5.6-class models.

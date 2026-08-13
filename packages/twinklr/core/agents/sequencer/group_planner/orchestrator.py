@@ -13,7 +13,9 @@ import json
 import logging
 from typing import Any
 
+from twinklr.core.agents._paths import AGENTS_BASE_PATH
 from twinklr.core.agents.logging import LLMCallLogger, NullLLMCallLogger
+from twinklr.core.agents.prompts import spec_prompt_hash
 from twinklr.core.agents.providers.base import LLMProvider
 from twinklr.core.agents.sequencer.group_planner.context import SectionPlanningContext
 from twinklr.core.agents.sequencer.group_planner.specs import (
@@ -104,6 +106,7 @@ class GroupPlannerOrchestrator:
         - Max iterations
         - Min pass score
         - Model configuration
+        - Planner and section-judge prompt-pack content
 
         Note: timing_context is excluded from cache key because it contains
         song-level data (all bars, all section bounds) that would cause cache
@@ -136,6 +139,9 @@ class GroupPlannerOrchestrator:
             "min_pass_score": self.config.approval_score_threshold,
             "planner_model": self.planner_spec.model,
             "judge_model": self.section_judge_spec.model,
+            "prompt_packs": spec_prompt_hash(
+                AGENTS_BASE_PATH, self.planner_spec, self.section_judge_spec
+            ),
         }
 
         # Canonical JSON encoding for stable hashing
@@ -335,7 +341,6 @@ class GroupPlannerOrchestrator:
         from pathlib import Path
         from typing import cast
 
-        from twinklr.core.agents._paths import AGENTS_BASE_PATH
         from twinklr.core.agents.async_runner import AsyncAgentRunner
         from twinklr.core.agents.state import AgentState
 

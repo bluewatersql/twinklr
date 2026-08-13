@@ -11,7 +11,7 @@ from pydantic import ValidationError
 
 from twinklr.core.agents.logging import LLMCallLogger, NullLLMCallLogger
 from twinklr.core.agents.prompts import PromptPackLoader
-from twinklr.core.agents.providers.base import LLMProvider
+from twinklr.core.agents.providers.base import LLMProvider, TokenUsage
 from twinklr.core.agents.providers.conversation import generate_conversation_id
 from twinklr.core.agents.providers.errors import LLMProviderError
 from twinklr.core.agents.result import AgentResult
@@ -21,6 +21,22 @@ from twinklr.core.agents.state import AgentState
 from twinklr.core.agents.taxonomy_utils import inject_taxonomy
 
 logger = logging.getLogger(__name__)
+
+
+def sum_token_usage(usages: list[TokenUsage]) -> TokenUsage:
+    """Add up the per-call usage figures reported by the provider.
+
+    Args:
+        usages: One entry per provider call (including repair attempts)
+
+    Returns:
+        Combined usage
+    """
+    return TokenUsage(
+        prompt_tokens=sum(u.prompt_tokens for u in usages),
+        completion_tokens=sum(u.completion_tokens for u in usages),
+        total_tokens=sum(u.total_tokens for u in usages),
+    )
 
 
 class RunError(Exception):
@@ -81,7 +97,12 @@ class AsyncAgentRunner:
             AgentResult with execution outcome
         """
         start_time = time.time()
-        start_usage = self.provider.get_token_usage()
+
+        # Per-call usage reported by the provider, one entry per request
+        # (including repair attempts). The provider's cumulative counter cannot
+        # be used here: stages in the same wave share one provider and run
+        # concurrently, so a snapshot delta captures other stages' calls too.
+        call_usages: list[TokenUsage] = []
 
         try:
             # Merge default variables
@@ -110,13 +131,12 @@ class AsyncAgentRunner:
 
             # Execute with schema repair loop (async)
             response_data, repair_attempts = await self._execute_with_repair_async(
-                spec, messages, state
+                spec, messages, state, call_usages
             )
 
             # Calculate duration and tokens
             duration = time.time() - start_time
-            end_usage = self.provider.get_token_usage()
-            tokens = end_usage.total_tokens - start_usage.total_tokens
+            usage = sum_token_usage(call_usages)
 
             # Track state if provided
             if state:
@@ -128,8 +148,7 @@ class AsyncAgentRunner:
                 raw_response=response_data,
                 validated_response=response_data,
                 validation_errors=[],
-                start_usage=start_usage,
-                end_usage=end_usage,
+                usage=usage,
                 duration=duration,
                 success=True,
                 repair_attempts=repair_attempts,
@@ -144,15 +163,16 @@ class AsyncAgentRunner:
                 success=True,
                 data=response_data,
                 duration_seconds=duration,
-                tokens_used=tokens,
+                tokens_used=usage.total_tokens,
+                prompt_tokens=usage.prompt_tokens,
+                completion_tokens=usage.completion_tokens,
                 conversation_id=state.conversation_id if state else None,
                 metadata=metadata,
             )
 
         except LLMProviderError as e:
             duration = time.time() - start_time
-            end_usage = self.provider.get_token_usage()
-            tokens = end_usage.total_tokens - start_usage.total_tokens
+            usage = sum_token_usage(call_usages)
 
             logger.error(f"Provider error in {spec.name}: {e}")
 
@@ -161,13 +181,14 @@ class AsyncAgentRunner:
                 data=None,
                 error_message=f"Provider error: {e}",
                 duration_seconds=duration,
-                tokens_used=tokens,
+                tokens_used=usage.total_tokens,
+                prompt_tokens=usage.prompt_tokens,
+                completion_tokens=usage.completion_tokens,
             )
 
         except RunError as e:
             duration = time.time() - start_time
-            end_usage = self.provider.get_token_usage()
-            tokens = end_usage.total_tokens - start_usage.total_tokens
+            usage = sum_token_usage(call_usages)
 
             logger.error(f"Run error in {spec.name}: {e}")
 
@@ -179,14 +200,15 @@ class AsyncAgentRunner:
                 data=None,
                 error_message=str(e),
                 duration_seconds=duration,
-                tokens_used=tokens,
+                tokens_used=usage.total_tokens,
+                prompt_tokens=usage.prompt_tokens,
+                completion_tokens=usage.completion_tokens,
                 metadata=metadata,
             )
 
         except Exception as e:
             duration = time.time() - start_time
-            end_usage = self.provider.get_token_usage()
-            tokens = end_usage.total_tokens - start_usage.total_tokens
+            usage = sum_token_usage(call_usages)
 
             logger.error(f"Unexpected error in {spec.name}: {e}")
 
@@ -195,7 +217,9 @@ class AsyncAgentRunner:
                 data=None,
                 error_message=f"Execution error: {e}",
                 duration_seconds=duration,
-                tokens_used=tokens,
+                tokens_used=usage.total_tokens,
+                prompt_tokens=usage.prompt_tokens,
+                completion_tokens=usage.completion_tokens,
             )
 
     def _build_messages(self, prompts: dict[str, Any], spec: AgentSpec) -> list[dict[str, str]]:
@@ -313,6 +337,7 @@ class AsyncAgentRunner:
         spec: AgentSpec,
         messages: list[dict[str, str]],
         state: AgentState | None,
+        call_usages: list[TokenUsage],
     ) -> tuple[Any, int]:
         """Execute agent with schema repair loop (async).
 
@@ -320,6 +345,9 @@ class AsyncAgentRunner:
             spec: Agent specification
             messages: Messages for LLM
             state: Optional state (for conversation tracking)
+            call_usages: Sink the usage of each provider call is appended to,
+                so the caller sees every request's tokens — including those of
+                repair attempts and of an attempt that then raised.
 
         Returns:
             Tuple of (validated_data, repair_attempts)
@@ -336,6 +364,8 @@ class AsyncAgentRunner:
                 response = await self._call_conversational_async(spec, messages, state)
             else:
                 response = await self._call_oneshot_async(spec, messages)
+
+            call_usages.append(response.metadata.token_usage)
 
             # Skip validation if response_model is dict
             if spec.response_model is dict:
@@ -513,15 +543,13 @@ class AsyncAgentRunner:
         raw_response: Any,
         validated_response: Any,
         validation_errors: list[str],
-        start_usage: Any,
-        end_usage: Any,
+        usage: TokenUsage,
         duration: float,
         success: bool,
         repair_attempts: int,
     ) -> None:
         """Safely log call completion (async).
 
-        Calculates per-call token deltas from start and end usage.
         Never raises - logs errors silently.
 
         Args:
@@ -529,26 +557,21 @@ class AsyncAgentRunner:
             raw_response: Raw LLM response
             validated_response: Validated response (after Pydantic parsing)
             validation_errors: List of validation error messages
-            start_usage: TokenUsage before the call (cumulative)
-            end_usage: TokenUsage after the call (cumulative)
+            usage: Tokens this agent's own requests consumed, summed across
+                repair attempts
             duration: Call duration in seconds
             success: Whether the call succeeded
             repair_attempts: Number of schema repair attempts
         """
         try:
-            # Calculate per-call token deltas
-            tokens_used = end_usage.total_tokens - start_usage.total_tokens
-            prompt_tokens = end_usage.prompt_tokens - start_usage.prompt_tokens
-            completion_tokens = end_usage.completion_tokens - start_usage.completion_tokens
-
             await self.llm_logger.complete_call_async(
                 call_id=call_id,
                 raw_response=raw_response,
                 validated_response=validated_response,
                 validation_errors=validation_errors,
-                tokens_used=tokens_used,
-                prompt_tokens=prompt_tokens,
-                completion_tokens=completion_tokens,
+                tokens_used=usage.total_tokens,
+                prompt_tokens=usage.prompt_tokens,
+                completion_tokens=usage.completion_tokens,
                 duration_seconds=duration,
                 success=success,
                 repair_attempts=repair_attempts,

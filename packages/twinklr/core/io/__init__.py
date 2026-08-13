@@ -25,6 +25,7 @@ from twinklr.core.io.models import (
     RelativePath,
     WriteResult,
     absolute_path,
+    anchored_path,
     relative_path,
 )
 from twinklr.core.io.protocols import FileSystem, FileSystemSync
@@ -48,6 +49,7 @@ __all__ = [
     # Result types
     "WriteResult",
     "absolute_path",
+    "anchored_path",
     "relative_path",
     # Utilities
     "sanitize_path_component",

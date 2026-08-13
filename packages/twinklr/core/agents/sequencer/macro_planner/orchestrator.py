@@ -11,7 +11,9 @@ import hashlib
 import json
 import logging
 
+from twinklr.core.agents._paths import AGENTS_BASE_PATH
 from twinklr.core.agents.logging import LLMCallLogger, NullLLMCallLogger
+from twinklr.core.agents.prompts import spec_prompt_hash
 from twinklr.core.agents.providers.base import LLMProvider
 from twinklr.core.agents.sequencer.macro_planner.context import PlanningContext
 from twinklr.core.agents.sequencer.macro_planner.heuristics import (
@@ -112,6 +114,7 @@ class MacroPlannerOrchestrator:
         - Max iterations
         - Min pass score
         - Model configuration
+        - Planner and judge prompt-pack content
 
         Args:
             planning_context: Planning context for this run
@@ -131,6 +134,7 @@ class MacroPlannerOrchestrator:
             "min_pass_score": self.controller.config.approval_score_threshold,
             "planner_model": self.planner_spec.model,
             "judge_model": self.judge_spec.model,
+            "prompt_packs": spec_prompt_hash(AGENTS_BASE_PATH, self.planner_spec, self.judge_spec),
         }
 
         # Canonical JSON encoding for stable hashing

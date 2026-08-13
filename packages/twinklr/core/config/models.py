@@ -421,6 +421,13 @@ class AppConfig(ConfigBase):
     """Application-level configuration (shared across all jobs/tasks)."""
 
     model_config = ConfigDict(extra="ignore")
+    project_root: str | None = Field(
+        default=None,
+        description=(
+            "Absolute directory that relative paths (caches, artifacts) resolve against. "
+            "Falls back to $TWINKLR_PROJECT_ROOT, then the current working directory."
+        ),
+    )
     output_dir: str = "artifacts"
     cache_dir: str = "data/audio_cache"
     audio_processing: AudioProcessingConfig = AudioProcessingConfig()

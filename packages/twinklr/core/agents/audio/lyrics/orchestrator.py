@@ -14,7 +14,9 @@ from pathlib import Path
 import uuid
 
 from twinklr.core.agents.audio.lyrics.models import LyricContextModel
+from twinklr.core.agents.audio.lyrics.spec import get_lyrics_spec
 from twinklr.core.agents.logging import LLMCallLogger, NullLLMCallLogger
+from twinklr.core.agents.prompts import spec_prompt_hash
 from twinklr.core.agents.providers.base import LLMProvider
 from twinklr.core.audio.models import SongBundle
 
@@ -65,6 +67,12 @@ class LyricsOrchestrator:
 
         logger.debug(f"LyricsOrchestrator initialized (model={model}, temperature={temperature})")
 
+    def _resolved_prompt_base(self) -> Path:
+        """Directory the agent's prompt pack resolves against."""
+        if self.prompt_base_path is not None:
+            return Path(self.prompt_base_path)
+        return Path(__file__).parent / "prompts"
+
     async def get_cache_key(self, song_bundle: SongBundle) -> str:
         """Generate cache key for deterministic caching.
 
@@ -72,6 +80,7 @@ class LyricsOrchestrator:
         - Song bundle (with lyrics text)
         - Model configuration
         - Temperature setting
+        - Prompt pack content (so editing a prompt invalidates cached results)
 
         Args:
             song_bundle: Full SongBundle from AudioAnalyzer
@@ -79,10 +88,16 @@ class LyricsOrchestrator:
         Returns:
             SHA256 hash of canonical inputs
         """
+        spec = get_lyrics_spec(
+            model=self.model,
+            temperature=self.temperature,
+            token_budget=self.token_budget,
+        )
         key_data = {
             "song_bundle": song_bundle.model_dump(),
             "model": self.model,
             "temperature": self.temperature,
+            "prompt_pack": spec_prompt_hash(self._resolved_prompt_base(), spec),
         }
 
         # Canonical JSON encoding for stable hashing
@@ -115,7 +130,6 @@ class LyricsOrchestrator:
         from twinklr.core.agents.async_runner import AgentResult, AsyncAgentRunner
         from twinklr.core.agents.audio.lyrics.context import shape_lyrics_context
         from twinklr.core.agents.audio.lyrics.models import Provenance
-        from twinklr.core.agents.audio.lyrics.spec import get_lyrics_spec
         from twinklr.core.agents.audio.lyrics.validation import validate_lyrics
 
         try:
@@ -137,10 +151,7 @@ class LyricsOrchestrator:
                 token_budget=self.token_budget,
             )
 
-            # Determine prompt base path
-            prompt_base = self.prompt_base_path
-            if prompt_base is None:
-                prompt_base = Path(__file__).parent / "prompts"
+            prompt_base = self._resolved_prompt_base()
 
             # Create runner
             runner = AsyncAgentRunner(

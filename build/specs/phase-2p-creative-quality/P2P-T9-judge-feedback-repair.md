@@ -323,3 +323,9 @@ so cache invalidation is honest, and note the expected plan-output change in the
 handoff so P2P-T13 does not attribute it to an arm. Third risk: making informed repair
 *more* expensive per attempt (bigger requests) — bounded by the truncation rule and
 checked by criterion 7.
+
+## Backlog addition (P1P-T9 verification, 2026-08-13)
+min_pass_score is present in the three planner cache keys yet behaviorally inert
+(the verdict enforcer hardcodes 7.0/5.0) — changing it forces spurious full
+uncached re-plans that cannot differ. Resolve here with the threshold wiring:
+either make it behavioral or remove it from the keys.

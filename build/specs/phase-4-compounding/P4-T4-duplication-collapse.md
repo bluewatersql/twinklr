@@ -272,3 +272,10 @@ wire, verifier-reproduced). Fix here: normalize `extra` keys before the update
 (case-insensitive merge). A local workaround (lowercased key + comment) lives at
 musicbrainz.py; its test pins the correct single-value behavior and will catch a
 regression. Pull earlier than Phase 4 if convenient.
+
+## Backlog addition (P1P-T9 verification, 2026-08-13)
+Cache eviction: derived session IDs bound disk growth by distinct audio×config
+pairs (less urgent than the T9 spec assumed) but nothing ever evicts — add
+TTL/size-based eviction here alongside the conversation-store eviction this task
+already owns. Also: session-id derivation should exclude AppConfig.cache_dir
+(latent divergence if a machine-local absolute cache path is configured).

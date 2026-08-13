@@ -16,6 +16,11 @@ Key features:
 from twinklr.core.caching.backends.fs import FSCache, FSCacheSync
 from twinklr.core.caching.backends.null import NullCache, NullCacheSync
 from twinklr.core.caching.fingerprint import compute_fingerprint
+from twinklr.core.caching.identity import (
+    config_fingerprint,
+    derive_session_id,
+    hash_file_content,
+)
 from twinklr.core.caching.models import CacheKey, CacheMeta, CacheOptions
 from twinklr.core.caching.protocols import Cache, CacheSync
 
@@ -33,4 +38,7 @@ __all__ = [
     "NullCacheSync",
     # Utils
     "compute_fingerprint",
+    "config_fingerprint",
+    "derive_session_id",
+    "hash_file_content",
 ]

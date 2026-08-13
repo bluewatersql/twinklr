@@ -14,6 +14,11 @@ import sys
 
 from rich.console import Console
 
+from twinklr.cli.recipe_builder_cmd import (
+    add_curate_catalog_subparser,
+    run_curate_catalog_command,
+)
+from twinklr.core.caching import derive_session_id
 from twinklr.core.config.loader import load_app_config, load_job_config
 from twinklr.core.pipeline import PipelineContext, PipelineExecutor
 from twinklr.core.pipeline.definitions import build_moving_heads_pipeline
@@ -141,6 +146,7 @@ async def run_pipeline_async(
     output_dir: Path,
     app_config_path: Path,
     job_config_path: Path,
+    session_id: str | None = None,
 ) -> int:
     """Run the pipeline using the Pipeline Framework.
 
@@ -150,6 +156,9 @@ async def run_pipeline_async(
         output_dir: Output directory for artifacts
         app_config_path: Path to app config JSON
         job_config_path: Path to job config JSON
+        session_id: Optional session ID override. When omitted, the ID is
+            derived from the audio content and configs so an identical re-run
+            reuses cached LLM work.
 
     Returns:
         Exit code (0 for success, 1 for failure)
@@ -225,10 +234,20 @@ async def run_pipeline_async(
 
     console.print(f"[green]✅ Pipeline validated[/green] ({len(pipeline.stages)} stages)")
 
+    # Derive a deterministic session ID so a re-run of the same job addresses
+    # the same cache subtree instead of an unreachable random one.
+    resolved_session_id = session_id or derive_session_id(
+        audio_path=audio_path,
+        configs=(app_config, job_config),
+    )
+    console.print(f"[green]🔑 Session:[/green] {resolved_session_id}")
+
     # Create session (manages provider, cache, logger lazily)
     session = TwinklrSession(
         app_config=app_config,
         job_config=job_config,
+        session_id=resolved_session_id,
+        project_root=job_config_path.parent,
     )
 
     # Create pipeline context
@@ -323,6 +342,7 @@ def run_pipeline(args: argparse.Namespace) -> None:
             output_dir=output_dir,
             app_config_path=app_config_path,
             job_config_path=job_config_path,
+            session_id=args.session_id,
         )
     )
     sys.exit(exit_code)
@@ -350,6 +370,16 @@ def build_arg_parser() -> argparse.ArgumentParser:
         required=True,
         help="Path to job config JSON",
     )
+    run.add_argument(
+        "--session-id",
+        default=None,
+        help=(
+            "Override the cache session ID (default: derived from audio content "
+            "and configs, so identical re-runs reuse cached LLM work)"
+        ),
+    )
+
+    add_curate_catalog_subparser(sub)
 
     return p
 
@@ -361,3 +391,5 @@ def main() -> None:
 
     if args.cmd == "run":
         run_pipeline(args)
+    elif args.cmd == "curate-catalog":
+        sys.exit(run_curate_catalog_command(args))
