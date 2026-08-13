@@ -273,7 +273,6 @@ class TestAssetResolutionStage:
 class TestDisplayRenderStage:
     """Tests for the DisplayRenderStage."""
 
-    @pytest.mark.requires_template_data
     @pytest.mark.asyncio
     async def test_basic_render(self) -> None:
         """Renders plan to sequence with effects."""
@@ -298,7 +297,6 @@ class TestDisplayRenderStage:
         assert "render_result" in output
         assert output["render_result"].effects_written > 0
 
-    @pytest.mark.requires_template_data
     @pytest.mark.asyncio
     async def test_creates_sequence_if_not_provided(self) -> None:
         """Creates empty XSequence when none is provided."""
@@ -319,7 +317,6 @@ class TestDisplayRenderStage:
         assert result.success
         assert isinstance(result.output["sequence"], XSequence)
 
-    @pytest.mark.requires_template_data
     @pytest.mark.asyncio
     async def test_uses_provided_sequence(self) -> None:
         """Uses existing XSequence when provided."""
@@ -342,7 +339,6 @@ class TestDisplayRenderStage:
         assert result.success
         assert result.output["sequence"] is sequence
 
-    @pytest.mark.requires_template_data
     @pytest.mark.asyncio
     async def test_render_with_catalog_produces_overlays(self) -> None:
         """Catalog-backed render produces overlay events."""
@@ -369,7 +365,6 @@ class TestDisplayRenderStage:
         # 2 events: procedural + overlay
         assert render_result.render_plan.total_events == 2
 
-    @pytest.mark.requires_template_data
     @pytest.mark.asyncio
     async def test_tracks_metrics(self) -> None:
         """Render metrics are tracked in context."""
@@ -390,7 +385,6 @@ class TestDisplayRenderStage:
         assert "effects_written" in context.metrics
         assert "elements_created" in context.metrics
 
-    @pytest.mark.requires_template_data
     @pytest.mark.asyncio
     async def test_pipeline_mode_direct_plan_set(self) -> None:
         """Pipeline mode: accepts GroupPlanSet directly with deps in constructor."""
@@ -408,7 +402,6 @@ class TestDisplayRenderStage:
         assert result.success
         assert result.output["render_result"].effects_written > 0
 
-    @pytest.mark.requires_template_data
     @pytest.mark.asyncio
     async def test_pipeline_mode_beat_grid_from_context_metrics(self) -> None:
         """Pipeline mode: builds BeatGrid from context metrics when not provided."""
@@ -428,7 +421,6 @@ class TestDisplayRenderStage:
         assert result.success
         assert result.output["render_result"].effects_written > 0
 
-    @pytest.mark.requires_template_data
     @pytest.mark.asyncio
     async def test_pipeline_mode_beat_grid_uses_derived_beats_per_bar(self) -> None:
         """Pipeline mode: derived timing meter should flow into beat grid construction."""
@@ -447,7 +439,6 @@ class TestDisplayRenderStage:
         assert result.success
         assert context.metrics.get("beat_grid_beats_per_bar") == 3
 
-    @pytest.mark.requires_template_data
     @pytest.mark.asyncio
     async def test_pipeline_mode_beat_grid_warns_and_falls_back_to_4_4(
         self, caplog: pytest.LogCaptureFixture

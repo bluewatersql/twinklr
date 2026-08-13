@@ -60,7 +60,12 @@ ALL_EFFECT_TYPES = frozenset(
     }
 )
 
-DEFAULT_TEMPLATES_DIR = Path(__file__).resolve().parents[4] / "data" / "templates"
+DEFAULT_TEMPLATES_DIR = Path(__file__).resolve().parents[4] / "catalog" / "templates"
+# Optional local, untracked overlay (see TemplateStore.from_catalog_with_local_extensions):
+# lets a developer's locally-staged/promoted recipes be picked up without
+# promoting them into the tracked catalog first. Only consulted when the
+# caller uses the default templates_dir.
+DEFAULT_LOCAL_EXTENSIONS_DIR = Path(__file__).resolve().parents[4] / "data" / "templates"
 DEFAULT_FE_DIR = Path(__file__).resolve().parents[4] / "data" / "features" / "feature_engineering"
 
 
@@ -140,7 +145,8 @@ def load_catalog(templates_dir: Path | None = None) -> list[EffectRecipe]:
 
     Args:
         templates_dir: Path to templates directory with index.json.
-            Defaults to data/templates/ in the repo root.
+            Defaults to catalog/templates/ (the tracked catalog root) in the
+            repo root, merged with a local data/templates/ overlay if present.
 
     Returns:
         List of all EffectRecipe instances from the catalog.
@@ -150,7 +156,12 @@ def load_catalog(templates_dir: Path | None = None) -> list[EffectRecipe]:
         logger.warning("Templates directory not found: %s", directory)
         return []
 
-    store = TemplateStore.from_directory(directory)
+    if templates_dir is None:
+        store = TemplateStore.from_catalog_with_local_extensions(
+            directory, DEFAULT_LOCAL_EXTENSIONS_DIR
+        )
+    else:
+        store = TemplateStore.from_directory(directory)
     catalog = RecipeCatalog.from_store(store)
     recipes = catalog.recipes
     logger.info("Loaded %d recipes from %s", len(recipes), directory)

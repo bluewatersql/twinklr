@@ -54,7 +54,7 @@ def parse_args() -> argparse.Namespace:
         "--templates-dir",
         type=Path,
         default=None,
-        help="Template catalog directory. Defaults to data/templates/.",
+        help="Template catalog directory. Defaults to catalog/templates/.",
     )
     parser.add_argument(
         "--fe-dir",
@@ -167,7 +167,7 @@ def main() -> int:
     print("=" * 60)
     print(f"  run_name          : {args.run_name}")
     print(f"  output_dir        : {args.output_dir}")
-    print(f"  templates_dir     : {args.templates_dir or 'default (data/templates/)'}")
+    print(f"  templates_dir     : {args.templates_dir or 'default (catalog/templates/)'}")
     print(f"  fe_dir            : {args.fe_dir or 'default'}")
     print(f"  dry_run           : {args.dry_run}")
     print(f"  bootstrap         : {args.enable_bootstrap}")
@@ -284,7 +284,7 @@ def _promote(args: argparse.Namespace, config: object) -> int:
     promote_from = args.promote_from or (config.output_dir / config.run_name)
     staged_dir = promote_from / "staged_recipes"
 
-    templates_dir = config.templates_dir or (ROOT / "data" / "templates")
+    templates_dir = config.templates_dir or (ROOT / "catalog" / "templates")
 
     _section("Promoting staged recipes")
     print(f"  Source : {staged_dir}")

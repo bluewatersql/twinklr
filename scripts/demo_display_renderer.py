@@ -485,7 +485,7 @@ def main() -> None:
     from twinklr.core.sequencer.templates.group.store import TemplateStore
 
     repo_root = Path(__file__).resolve().parent.parent
-    template_store = TemplateStore.from_directory(repo_root / "data" / "templates")
+    template_store = TemplateStore.from_directory(repo_root / "catalog" / "templates")
     recipe_catalog = RecipeCatalog.from_store(template_store)
     recipe_compiler = RecipeCompiler(catalog=recipe_catalog)
 

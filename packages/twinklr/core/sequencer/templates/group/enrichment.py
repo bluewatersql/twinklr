@@ -18,7 +18,7 @@ from twinklr.core.sequencer.templates.group.recipe import (
 class EnrichmentSidecar(BaseModel):
     """Sidecar data for a single recipe.
 
-    Stored at ``data/templates/.enrichment/{recipe_id}.json``.
+    Stored at ``catalog/templates/.enrichment/{recipe_id}.json``.
     Recomputed by the FE pipeline; never needed at runtime.
 
     Attributes:

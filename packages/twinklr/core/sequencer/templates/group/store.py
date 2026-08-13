@@ -1,7 +1,9 @@
 """TemplateStore — JSON-backed template storage.
 
-Loads template metadata from ``data/templates/index.json`` and lazy-loads
-full ``EffectRecipe`` objects from individual JSON files on demand.
+Loads template metadata from ``catalog/templates/index.json`` (the tracked
+catalog root) and lazy-loads full ``EffectRecipe`` objects from individual
+JSON files on demand. Optionally merges in a local, untracked
+``data/templates/`` overlay via ``from_catalog_with_local_extensions``.
 """
 
 from __future__ import annotations
@@ -78,6 +80,10 @@ class TemplateStore:
     ) -> None:
         self._entries_by_id: dict[str, TemplateStoreEntry] = {e.recipe_id: e for e in entries}
         self._base_dir = base_dir
+        # Per-entry base directory, defaulting to base_dir. Lets merge() combine
+        # entries loaded from different directories (see from_catalog_with_local_extensions)
+        # while each entry's recipe file still resolves against the directory it came from.
+        self._entry_dirs: dict[str, Path] = dict.fromkeys(self._entries_by_id, base_dir)
         self._cache: dict[str, EffectRecipe] = {}
 
     @classmethod
@@ -115,6 +121,56 @@ class TemplateStore:
         logger.info(f"TemplateStore loaded {len(entries)} entries from {index_path}")
         return cls(entries=entries, base_dir=directory)
 
+    @classmethod
+    def from_catalog_with_local_extensions(
+        cls,
+        catalog_dir: Path,
+        local_extensions_dir: Path | None,
+    ) -> TemplateStore:
+        """Load the tracked catalog, then merge in a local, untracked overlay.
+
+        ``catalog_dir`` (the git-tracked ``catalog/templates/`` root) is loaded
+        first and is authoritative. ``local_extensions_dir`` (typically the
+        legacy, gitignored ``data/templates/`` overlay a developer may have
+        populated locally via ``recipe_builder``'s promotion pipeline) is
+        optional: when present, its entries are merged on top, so a developer
+        can iterate against locally-staged recipes without promoting them
+        into git first. Entries sharing a ``recipe_id`` in both directories
+        prefer the local extension.
+
+        Args:
+            catalog_dir: Tracked catalog root with ``index.json``. Must exist.
+            local_extensions_dir: Optional local overlay directory with its
+                own ``index.json``. Silently ignored if absent, identical to
+                ``catalog_dir``, or missing its own ``index.json``.
+
+        Returns:
+            Merged TemplateStore.
+        """
+        store = cls.from_directory(catalog_dir)
+        if (
+            local_extensions_dir is not None
+            and local_extensions_dir != catalog_dir
+            and (local_extensions_dir / "index.json").exists()
+        ):
+            store = store.merge(cls.from_directory(local_extensions_dir))
+        return store
+
+    def merge(self, other: TemplateStore) -> TemplateStore:
+        """Return a new store combining this store's entries with ``other``'s.
+
+        Entries in ``other`` take precedence over entries sharing a
+        ``recipe_id`` in ``self``. Each entry's recipe file resolves against
+        the base directory it was originally loaded from, so the merged store
+        can safely combine entries sourced from different directories.
+        """
+        merged = TemplateStore(entries=list(self._entries_by_id.values()), base_dir=self._base_dir)
+        merged._entry_dirs = dict(self._entry_dirs)
+        for recipe_id, entry in other._entries_by_id.items():
+            merged._entries_by_id[recipe_id] = entry
+            merged._entry_dirs[recipe_id] = other._entry_dirs.get(recipe_id, other._base_dir)
+        return merged
+
     @property
     def entries(self) -> list[TemplateStoreEntry]:
         """All metadata entries (sorted by type and name)."""
@@ -145,7 +201,8 @@ class TemplateStore:
         if entry is None:
             return None
 
-        file_path = self._base_dir / entry.file
+        base_dir = self._entry_dirs.get(recipe_id, self._base_dir)
+        file_path = base_dir / entry.file
         if not file_path.exists():
             logger.warning(f"Recipe file not found: {file_path}")
             return None

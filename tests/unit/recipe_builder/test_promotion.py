@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+import shutil
 
 import pytest
 
@@ -12,6 +13,9 @@ from twinklr.core.recipe_builder.promotion import (
     promote_staged_recipes,
 )
 from twinklr.core.sequencer.templates.group.recipe import EffectRecipe
+
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+_CATALOG_TEMPLATES_DIR = _REPO_ROOT / "catalog" / "templates"
 
 
 def _recipe_json(
@@ -338,3 +342,30 @@ def test_promoted_file_is_valid_effect_recipe(tmp_path: Path) -> None:
     data = json.loads((builtins_dir / "gen_twinkle_v1.json").read_text())
     recipe = EffectRecipe.model_validate(data)
     assert recipe.recipe_id == "gen_twinkle_v1"
+
+
+# ---------------------------------------------------------------------------
+# Test 13: promotes into a tmp copy of the real tracked catalog/templates/
+# tree (P1K-T3), not just a synthetic index.json shape.
+# ---------------------------------------------------------------------------
+
+
+def test_promotes_into_real_catalog_shaped_copy(tmp_path: Path) -> None:
+    """A tmp copy of catalog/templates/ gains the new entry and keeps the rest."""
+    templates_dir = tmp_path / "templates"
+    shutil.copytree(_CATALOG_TEMPLATES_DIR, templates_dir, ignore=shutil.ignore_patterns("*.md"))
+    original_index = json.loads((templates_dir / "index.json").read_text())
+    original_ids = {e["recipe_id"] for e in original_index["entries"]}
+    assert original_ids, "catalog/templates/index.json must have at least one seed entry"
+
+    staged_dir = tmp_path / "staged"
+    staged_dir.mkdir()
+    _write_staged(staged_dir, "gen_promoted_v1")
+
+    result = promote_staged_recipes(staged_dir=staged_dir, templates_dir=templates_dir)
+
+    assert result.promoted == 1
+    index = json.loads((templates_dir / "index.json").read_text())
+    ids = {e["recipe_id"] for e in index["entries"]}
+    assert ids == original_ids | {"gen_promoted_v1"}
+    assert (templates_dir / "builtins" / "gen_promoted_v1.json").exists()

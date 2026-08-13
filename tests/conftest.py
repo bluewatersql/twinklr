@@ -31,26 +31,46 @@ if _VENDORED_NLTK_DATA.is_dir() and str(_VENDORED_NLTK_DATA) not in nltk.data.pa
     nltk.data.path.insert(0, str(_VENDORED_NLTK_DATA))
 
 # ============================================================================
-# requires_template_data marker — fixture-presence skip
+# requires_template_data marker — corpus-scale-content-presence skip
 # ============================================================================
-# A handful of tests (and the production code paths they exercise) still
-# hardcode the legacy, gitignored `data/templates/index.json` path rather
-# than the tracked `catalog/templates/` seed set (see
-# `catalog/templates/README.md` and `build/specs/phase-0-foundation/
-# P0-T2-structural-test-repair.md`). Repointing those production call sites
-# is P1K-T3's job, not this one. Until that lands, tests marked
-# `requires_template_data` skip cleanly instead of failing when the legacy
-# path is absent — same pattern as
-# `tests/integration/profiling/test_profiler_integration.py`'s
+# P1K-T3 repointed every production call site from the legacy, gitignored
+# `data/templates/` to the tracked `catalog/templates/` seed catalog (see
+# `catalog/templates/README.md`), so most of the tests that used to need this
+# marker now pass unmarked against the tracked seed set. The marker/skip
+# infrastructure itself stays, for the residual case: tests that need
+# corpus-scale catalog content beyond the small hand-authored seed set (e.g.
+# `test_get_supported_motif_ids`, which needs at least one recipe tagged
+# with a real `MOTIF_REGISTRY` id — the seed catalog's placeholder tags like
+# "wash"/"chase"/"hit" don't qualify). That content is an owner-review/
+# licensing-gated curation item (P6-F5), not something a test or executor
+# should fabricate — see `catalog/templates/README.md`'s provenance section.
+# Same pattern as `tests/integration/profiling/test_profiler_integration.py`'s
 # `pytest.skip()` on absent vendor fixtures.
 
-_LEGACY_TEMPLATES_INDEX = (
-    Path(__file__).resolve().parent.parent / "data" / "templates" / "index.json"
+_CATALOG_TEMPLATES_INDEX = (
+    Path(__file__).resolve().parent.parent / "catalog" / "templates" / "index.json"
 )
 
 
-def _legacy_template_data_available() -> bool:
-    return _LEGACY_TEMPLATES_INDEX.exists()
+def _catalog_has_motif_tagged_recipes() -> bool:
+    """True once the tracked catalog has a recipe tagged with a real motif id.
+
+    Cheap, dependency-light check: reads index.json's raw tag strings rather
+    than importing MOTIF_REGISTRY (avoids a heavier import at collection
+    time) and compares against the same identifiers MOTIF_REGISTRY exposes.
+    """
+    import json
+
+    if not _CATALOG_TEMPLATES_INDEX.exists():
+        return False
+    try:
+        from twinklr.core.sequencer.theming import MOTIF_REGISTRY
+
+        motif_ids = set(MOTIF_REGISTRY.list_ids())
+        data = json.loads(_CATALOG_TEMPLATES_INDEX.read_text(encoding="utf-8"))
+        return any(motif_ids & set(entry.get("tags", [])) for entry in data.get("entries", []))
+    except Exception:
+        return False
 
 
 # ============================================================================
@@ -72,15 +92,16 @@ def pytest_addoption(parser: pytest.Parser) -> None:
 
 
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
-    """Skip `requires_template_data`-marked tests when the legacy data is absent."""
-    if _legacy_template_data_available():
+    """Skip `requires_template_data`-marked tests when corpus-scale data is absent."""
+    if _catalog_has_motif_tagged_recipes():
         return
     skip_reason = pytest.mark.skip(
         reason=(
-            "data/templates/index.json not present; this test depends on a production "
-            "code path not yet repointed to catalog/templates/ (see P1K-T3). Run the "
-            "recipe_builder promotion pipeline to populate data/templates/ locally, or "
-            "wait for P1K-T3's repoint."
+            "catalog/templates/ has no motif-tagged recipe yet; this test needs "
+            "corpus-scale catalog content beyond the current hand-authored seed set "
+            "(see catalog/templates/README.md's provenance/licensing-gate section "
+            "and P6-F5). Not fabricatable by an executor — pending the author's "
+            "curated mining pass."
         )
     )
     for item in items:

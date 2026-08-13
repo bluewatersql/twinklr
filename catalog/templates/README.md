@@ -51,16 +51,27 @@ verbatim, plus a curated first mining pass — see P1K-T3's spec). Whoever
 picks up P1K-T3/P1K-T4 should extend this directory in place rather than
 create a second tracked template directory.
 
-## What still points elsewhere
+## Repoint complete (P1K-T3)
 
-A handful of tests and production call sites still hardcode the legacy
-`data/templates` path (gitignored, absent on a clean checkout) rather than
-this directory — `pipeline/display_stages.py`,
-`agents/taxonomy_utils.py::_get_supported_motif_ids_cached`, and
-`recipe_builder/evidence.py::DEFAULT_TEMPLATES_DIR`. Repointing those is
-P1K-T3's job (production code), not this task's (test-only scope); the
-corresponding tests are marked `requires_template_data` and skip cleanly
-until that repoint lands.
+All production call sites (`pipeline/display_stages.py`,
+`agents/taxonomy_utils.py::_get_supported_motif_ids_cached`,
+`recipe_builder/evidence.py::DEFAULT_TEMPLATES_DIR`, and the `scripts/demo_*`/
+`scripts/enrich_builtin_templates.py`/`scripts/cleanup_display_templates.py`
+tools) now load from this tracked directory. The 11 tests that were marked
+`requires_template_data` because they exercised those call sites have been
+re-verified against the tracked seed catalog (see P1K-T3's handoff for
+per-test disposition); the `requires_template_data` marker/skip
+infrastructure in `tests/conftest.py` remains in place for any future
+corpus-scale test that genuinely needs data beyond this seed set.
+
+`TemplateStore.from_catalog_with_local_extensions(catalog_dir,
+local_extensions_dir)` loads this tracked catalog first (authoritative), then
+optionally merges in a local, untracked `data/templates/` overlay if a
+developer has populated one locally (e.g. via `recipe_builder`'s promotion
+pipeline) — letting them iterate on locally-staged recipes without promoting
+into git first. Entries with a matching `recipe_id` in both prefer the local
+overlay. This overlay directory is never itself tracked; only this
+`catalog/templates/` tree is.
 
 ## `.enrichment/`
 

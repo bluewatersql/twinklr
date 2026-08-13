@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Enrich builtin group templates with real xLights effect types and params.
 
-For each template in data/templates/builtins/:
+For each template in catalog/templates/builtins/:
 1. Resolves the effect type via effect_map.resolve_effect_type(recipe_id)
 2. Replaces placeholder layer effect_type values with the resolved xLights type
 3. Populates layer params from effect_map presets (in ParamValue format)
@@ -36,8 +36,8 @@ PLACEHOLDERS = frozenset(
 )
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[1]
-_BUILTINS_DIR = _PROJECT_ROOT / "data" / "templates" / "builtins"
-_INDEX_PATH = _PROJECT_ROOT / "data" / "templates" / "index.json"
+_BUILTINS_DIR = _PROJECT_ROOT / "catalog" / "templates" / "builtins"
+_INDEX_PATH = _PROJECT_ROOT / "catalog" / "templates" / "index.json"
 
 
 def _to_param_value(value: Any) -> dict[str, Any]:

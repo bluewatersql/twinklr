@@ -262,8 +262,11 @@ class DisplayRenderStage:
                 from twinklr.core.sequencer.templates.group.store import TemplateStore
 
                 _root = Path(__file__).resolve().parent.parent.parent.parent.parent
-                templates_dir = _root / "data" / "templates"
-                template_store = TemplateStore.from_directory(templates_dir)
+                templates_dir = _root / "catalog" / "templates"
+                local_extensions_dir = _root / "data" / "templates"
+                template_store = TemplateStore.from_catalog_with_local_extensions(
+                    templates_dir, local_extensions_dir
+                )
                 rc = RecipeCatalog.from_store(template_store)
 
             if not isinstance(rc, RecipeCatalog):

@@ -12,7 +12,7 @@ from pathlib import Path
 import shutil
 
 ROOT = Path(__file__).resolve().parent.parent
-TEMPLATES_DIR = ROOT / "data" / "templates"
+TEMPLATES_DIR = ROOT / "catalog" / "templates"
 BUILTINS_DIR = TEMPLATES_DIR / "builtins"
 INDEX_FILE = TEMPLATES_DIR / "index.json"
 DEPRECATED_DIR = TEMPLATES_DIR / "deprecated"

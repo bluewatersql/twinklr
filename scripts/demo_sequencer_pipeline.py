@@ -483,7 +483,7 @@ async def main() -> None:
     display_groups = choreo_graph.to_planner_summary()
 
     # Build catalog from JSON template store
-    template_store = TemplateStore.from_directory(repo_root / "data" / "templates")
+    template_store = TemplateStore.from_directory(repo_root / "catalog" / "templates")
     template_catalog = build_template_catalog_from_store(template_store)
 
     # Build recipe catalog from store (always available now)
