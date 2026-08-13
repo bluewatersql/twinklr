@@ -5,7 +5,6 @@ from __future__ import annotations
 import hashlib
 from pathlib import Path
 import shutil
-import uuid
 from zipfile import ZipFile
 
 import defusedxml.ElementTree as defused_ET  # safe parsing — blocks XXE and billion-laughs
@@ -15,6 +14,11 @@ from twinklr.core.profiling.models.pack import FileEntry, PackageManifest
 from twinklr.core.utils.logging import get_logger
 
 logger = get_logger(__name__)
+
+# package_id is a prefix of zip_sha256: it appears inside many downstream
+# composite strings (profile_id, uuid5 namespaces, log lines), where 64 bits of
+# collision resistance is ample for a single-developer corpus.
+PACKAGE_ID_HEX_LENGTH = 16
 
 ZIP_EXTENSIONS: frozenset[str] = frozenset({".zip", ".xsqz"})
 SEQUENCE_EXTENSIONS: frozenset[str] = frozenset({".xsq", ".seq"})
@@ -170,12 +174,13 @@ def _detect_sequence_file(files: list[FileEntry], extracted_dir: Path) -> str | 
 
         promoted_path = xml_path.with_suffix(".xsq")
         promoted_path.write_bytes(xml_path.read_bytes())
+        promoted_sha256 = sha256_file(promoted_path)
         promoted_entry = FileEntry(
-            file_id=str(uuid.uuid4()),
+            file_id=promoted_sha256,
             filename=promoted_path.name,
             ext=".xsq",
             size=promoted_path.stat().st_size,
-            sha256=sha256_file(promoted_path),
+            sha256=promoted_sha256,
             kind=FileKind.SEQUENCE,
             original_ext=".xml",
         )
@@ -206,13 +211,15 @@ def ingest_zip(zip_path: Path) -> tuple[PackageManifest, Path]:
         if _is_ignored_filename(path.name):
             continue
         ext = path.suffix.lower()
+        file_sha256 = sha256_file(path)
         files.append(
             FileEntry(
-                file_id=str(uuid.uuid4()),
+                # Content-addressed: byte-identical files share a file_id by design.
+                file_id=file_sha256,
                 filename=path.name,
                 ext=ext,
                 size=path.stat().st_size,
-                sha256=sha256_file(path),
+                sha256=file_sha256,
                 kind=_classify_kind(path.name, ext),
             )
         )
@@ -220,9 +227,11 @@ def ingest_zip(zip_path: Path) -> tuple[PackageManifest, Path]:
     sequence_file_id = _detect_sequence_file(files, extracted_dir)
     rgb_effects_file_id = _detect_rgb_effects_file(files)
 
+    zip_sha256 = sha256_file(zip_path)
+
     manifest = PackageManifest(
-        package_id=str(uuid.uuid4()),
-        zip_sha256=sha256_file(zip_path),
+        package_id=zip_sha256[:PACKAGE_ID_HEX_LENGTH],
+        zip_sha256=zip_sha256,
         source_extensions=frozenset(source_extensions or {zip_path.suffix.lower()}),
         files=tuple(sorted(files, key=lambda f: f.filename.lower())),
         sequence_file_id=sequence_file_id,

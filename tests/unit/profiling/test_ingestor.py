@@ -180,3 +180,79 @@ def test_extract_zip_flat_traversal_entry_raises(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="would extract outside target directory"):
         extract_zip_flat(zip_path, out_dir)
+
+
+# ---------------------------------------------------------------------------
+# Content-hash identity (P1K-T1)
+# ---------------------------------------------------------------------------
+
+
+def test_ingest_zip_is_idempotent_on_unchanged_archive(tmp_path: Path) -> None:
+    """Re-ingesting byte-identical input yields identical package_id/file_ids."""
+    zip_path = tmp_path / "pack.xsqz"
+    _write_zip(
+        zip_path,
+        {
+            "sequence.xsq": b"<xsequence></xsequence>",
+            "xlights_rgbeffects.xml": b"<xrgb></xrgb>",
+            "song.mp3": b"audio-bytes",
+        },
+    )
+
+    first, _ = ingest_zip(zip_path)
+    second, _ = ingest_zip(zip_path)
+
+    assert first.package_id == second.package_id
+    assert first.package_id == first.zip_sha256[:16]
+    assert [f.file_id for f in first.files] == [f.file_id for f in second.files]
+    assert first.sequence_file_id == second.sequence_file_id
+    assert first.rgb_effects_file_id == second.rgb_effects_file_id
+
+
+def test_ingest_zip_changes_id_on_content_change(tmp_path: Path) -> None:
+    """A single changed byte in the archive changes package_id."""
+    original = tmp_path / "original.zip"
+    _write_zip(original, {"sequence.xsq": b"<xsequence></xsequence>"})
+
+    mutated = tmp_path / "mutated.zip"
+    data = bytearray(original.read_bytes())
+    data[-1] = (data[-1] + 1) % 256
+    mutated.write_bytes(bytes(data))
+
+    first, _ = ingest_zip(original)
+    second, _ = ingest_zip(mutated)
+
+    assert first.zip_sha256 != second.zip_sha256
+    assert first.package_id != second.package_id
+
+
+def test_duplicate_content_files_share_file_id(tmp_path: Path) -> None:
+    """Byte-identical files are content-addressed to the same file_id."""
+    zip_path = tmp_path / "dupes.zip"
+    _write_zip(
+        zip_path,
+        {
+            "one.txt": b"same-bytes",
+            "two.txt": b"same-bytes",
+            "sequence.xsq": b"<xsequence></xsequence>",
+        },
+    )
+
+    manifest, _ = ingest_zip(zip_path)
+    by_name = {entry.filename: entry for entry in manifest.files}
+
+    assert by_name["one.txt"].file_id == by_name["two.txt"].file_id
+    assert all(entry.file_id == entry.sha256 for entry in manifest.files)
+
+
+def test_promoted_xml_sequence_file_id_is_content_derived(tmp_path: Path) -> None:
+    """An XML sequence promoted to .xsq gets its own SHA-256 as file_id."""
+    zip_path = tmp_path / "promote.zip"
+    _write_zip(zip_path, {"show.xml": b"<xsequence><head/></xsequence>"})
+
+    first, _ = ingest_zip(zip_path)
+    second, _ = ingest_zip(zip_path)
+
+    promoted = next(entry for entry in first.files if entry.original_ext == ".xml")
+    assert promoted.file_id == promoted.sha256
+    assert first.sequence_file_id == second.sequence_file_id == promoted.file_id

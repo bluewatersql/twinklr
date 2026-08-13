@@ -7,6 +7,13 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
+# Bumped to 2.0.0 for content-hash corpus identity (P1K-T1): ids written by the
+# profiling pipeline changed from random uuid4 to content-derived values. The
+# table DDL is unchanged, so only this version gate distinguishes a pre-P1K-T1
+# database from a current one. There is no migration runner by design — a
+# mismatched store must be deleted and rebuilt from a fresh profiling run.
+FEATURE_STORE_SCHEMA_VERSION = "2.0.0"
+
 
 class FeatureStoreConfig(BaseModel):
     """Configuration for a feature store backend.
@@ -30,7 +37,7 @@ class FeatureStoreConfig(BaseModel):
     reference_data_dir: Path | None = None
     auto_bootstrap: bool = True
     enable_wal: bool = True
-    schema_version: str = "1.0.0"
+    schema_version: str = FEATURE_STORE_SCHEMA_VERSION
 
 
 class CorpusStats(BaseModel):

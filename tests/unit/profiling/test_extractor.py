@@ -101,3 +101,74 @@ def test_extract_effect_events_effectdb_resolution() -> None:
     assert "E_TEXTCTRL_Eff_speed=10" in first.effectdb_settings_raw
     assert first.effectdb_parse_status is EffectDbParseStatus.PARSED
     assert any(param.param_name_normalized == "eff_speed" for param in first.effectdb_params)
+
+
+# ---------------------------------------------------------------------------
+# Content-hash identity (P1K-T1)
+# ---------------------------------------------------------------------------
+
+
+def _sequence_with_identical_effects() -> XSequence:
+    """Two effects sharing start/end/layer/target/type/config in one layer."""
+    duplicate = Effect(
+        effect_type="Bars",
+        start_time_ms=100,
+        end_time_ms=200,
+        palette="#FF0000",
+        protected=False,
+        parameters={"Speed": "10"},
+    )
+    return XSequence(
+        head=SequenceHead(
+            version="2025.1",
+            media_file="song.mp3",
+            sequence_duration_ms=10_000,
+        ),
+        element_effects=[
+            ElementEffects(
+                element_name="Arch 1",
+                layers=[
+                    EffectLayer(
+                        index=0,
+                        name="Main",
+                        effects=[duplicate, duplicate.model_copy()],
+                    )
+                ],
+            )
+        ],
+    )
+
+
+def test_effect_event_id_is_deterministic() -> None:
+    sequence = _sequence_with_effects()
+
+    first = extract_effect_events(sequence, "pkg", "seq", "sha")
+    second = extract_effect_events(sequence, "pkg", "seq", "sha")
+
+    ids = tuple(event.effect_event_id for event in first.events)
+    assert ids == tuple(event.effect_event_id for event in second.events)
+    assert len(set(ids)) == len(ids)
+
+
+def test_effect_event_id_depends_on_package_identity() -> None:
+    sequence = _sequence_with_effects()
+
+    first = extract_effect_events(sequence, "pkg-a", "seq", "sha")
+    second = extract_effect_events(sequence, "pkg-b", "seq", "sha")
+
+    assert all(
+        a.effect_event_id != b.effect_event_id
+        for a, b in zip(first.events, second.events, strict=True)
+    )
+
+
+def test_duplicate_effect_signature_gets_distinct_ids() -> None:
+    result = extract_effect_events(_sequence_with_identical_effects(), "pkg", "seq", "sha")
+
+    ids = [event.effect_event_id for event in result.events]
+    assert len(ids) == 2
+    assert len(set(ids)) == 2
+
+    # Still deterministic across runs despite the dup_index disambiguator.
+    repeat = extract_effect_events(_sequence_with_identical_effects(), "pkg", "seq", "sha")
+    assert sorted(ids) == sorted(event.effect_event_id for event in repeat.events)

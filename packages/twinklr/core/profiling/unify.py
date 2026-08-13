@@ -17,7 +17,6 @@ from datetime import UTC, datetime
 import json
 from pathlib import Path
 from typing import Any
-import uuid
 import warnings
 
 from twinklr.core.profiling.constants import (
@@ -25,11 +24,31 @@ from twinklr.core.profiling.constants import (
     LEGACY_PROFILE_SCHEMA_VERSION,
     STRUCTURED_EFFECTDB_SCHEMA_VERSION,
 )
+from twinklr.core.profiling.identity import content_digest
 from twinklr.core.profiling.models.corpus import (
     CorpusManifest,
     CorpusQualityReport,
     CorpusRowCounts,
 )
+
+_CORPUS_ID_HEX_LENGTH = 16
+
+
+def _corpus_id(schema_version: str, profile_dirs: list[Path]) -> str:
+    """Return a content-derived corpus id for a profile-directory set.
+
+    The same set of directories at the same schema versions always yields the
+    same id; adding or removing a directory changes it.
+    """
+    digest = content_digest(
+        {
+            "profile_dirs": sorted(str(p) for p in profile_dirs),
+            "schema_version": schema_version,
+            "manifest_schema_version": CORPUS_MANIFEST_SCHEMA_VERSION,
+        }
+    )
+    return f"corpus:{digest[:_CORPUS_ID_HEX_LENGTH]}"
+
 
 _REQUIRED_FILES = (
     "sequence_metadata.json",
@@ -246,7 +265,7 @@ class ProfileCorpusBuilder:
         )
 
         manifest = CorpusManifest(
-            corpus_id=str(uuid.uuid4()),
+            corpus_id=_corpus_id(schema_version, profile_dirs),
             created_at=datetime.now(UTC).isoformat(),
             schema_version=schema_version,
             manifest_schema_version=CORPUS_MANIFEST_SCHEMA_VERSION,

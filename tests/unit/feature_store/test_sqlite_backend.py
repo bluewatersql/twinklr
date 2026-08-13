@@ -39,7 +39,11 @@ from twinklr.core.feature_engineering.models.transitions import (
     TransitionType,
 )
 from twinklr.core.feature_store.backends.sqlite import SQLiteFeatureStore
-from twinklr.core.feature_store.models import FeatureStoreConfig
+from twinklr.core.feature_store.models import (
+    FEATURE_STORE_SCHEMA_VERSION,
+    FeatureStoreConfig,
+    FeatureStoreSchemaError,
+)
 from twinklr.core.feature_store.protocols import FeatureStoreProviderSync
 from twinklr.core.sequencer.templates.group.models.template import TimingHints
 from twinklr.core.sequencer.templates.group.recipe import (
@@ -316,8 +320,28 @@ def test_satisfies_protocol(store: SQLiteFeatureStore) -> None:
 
 
 def test_get_schema_version(store: SQLiteFeatureStore) -> None:
-    """get_schema_version returns '1.0.0' after bootstrap."""
-    assert store.get_schema_version() == "1.0.0"
+    """get_schema_version returns the current schema version after bootstrap."""
+    assert store.get_schema_version() == FEATURE_STORE_SCHEMA_VERSION
+
+
+def test_pre_content_hash_store_fails_loud(tmp_path: Path) -> None:
+    """A database written before content-hash identity (P1K-T1) must not open.
+
+    Schema 1.0.0 stores hold random-uuid4 identity keys that can never
+    deduplicate against today's content-derived ones; there is no migration, so
+    initialize() refuses the database and asks for a rebuild.
+    """
+    db_path = tmp_path / "legacy.db"
+    legacy = SQLiteFeatureStore(
+        FeatureStoreConfig(backend="sqlite", db_path=db_path, schema_version="1.0.0")
+    )
+    legacy.initialize()
+    legacy.close()
+
+    current = SQLiteFeatureStore(FeatureStoreConfig(backend="sqlite", db_path=db_path))
+    with pytest.raises(FeatureStoreSchemaError, match="delete the database file"):
+        current.initialize()
+    current.close()
 
 
 # ---------------------------------------------------------------------------

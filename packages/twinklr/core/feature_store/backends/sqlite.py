@@ -84,6 +84,13 @@ class SQLiteFeatureStore:
     def initialize(self) -> None:
         """Open the SQLite connection, apply schema bootstrap if configured.
 
+        There is no migration runner: a version mismatch means the database
+        must be deleted and rebuilt from a fresh profiling run. In particular,
+        stores created before schema 2.0.0 hold random-uuid4 corpus identity
+        keys (``package_id``, ``file_id``, ``effect_event_id``, ``corpus_id``)
+        that no longer match the content-derived values written today, so their
+        rows can never be deduplicated against new ones.
+
         Raises:
             FeatureStoreSchemaError: If the stored schema version does not
                 match the configured ``schema_version``.
@@ -101,20 +108,33 @@ class SQLiteFeatureStore:
 
         self._conn = conn
 
+        bootstrapper = SchemaBootstrapper(conn, self._config.schema_dir)
+
+        # Check before bootstrapping: bootstrap() rewrites the recorded version,
+        # so a pre-existing database at another version would otherwise be
+        # silently relabelled instead of rejected.
+        stored = bootstrapper.get_version()
+        if stored is not None and stored != self._config.schema_version:
+            raise self._schema_mismatch(stored)
+
         if self._config.auto_bootstrap:
-            SchemaBootstrapper(conn, self._config.schema_dir).bootstrap(self._config.schema_version)
+            bootstrapper.bootstrap(self._config.schema_version)
 
         if self._config.reference_data_dir is not None:
             ReferenceDataLoader(conn).load_directory(self._config.reference_data_dir)
 
         # Version integrity check.
-        stored = SchemaBootstrapper(conn, self._config.schema_dir).get_version()
+        stored = bootstrapper.get_version()
         if stored != self._config.schema_version:
-            raise FeatureStoreSchemaError(
-                f"Schema version mismatch: stored={stored!r}, "
-                f"expected={self._config.schema_version!r}. "
-                "Run a migration or recreate the database."
-            )
+            raise self._schema_mismatch(stored)
+
+    def _schema_mismatch(self, stored: str | None) -> FeatureStoreSchemaError:
+        return FeatureStoreSchemaError(
+            f"Schema version mismatch: stored={stored!r}, "
+            f"expected={self._config.schema_version!r}. "
+            "There is no migration runner: delete the database file and "
+            "rebuild it from a fresh profiling run."
+        )
 
     def close(self) -> None:
         """Close the SQLite connection. Safe to call multiple times."""

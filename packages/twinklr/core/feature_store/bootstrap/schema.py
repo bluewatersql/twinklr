@@ -13,6 +13,8 @@ from pathlib import Path
 import sqlite3
 from typing import Any
 
+from twinklr.core.feature_store.models import FEATURE_STORE_SCHEMA_VERSION
+
 # Default schema directory: schemas/ alongside the feature_store package root.
 _DEFAULT_SCHEMA_DIR = Path(__file__).resolve().parent.parent / "schemas"
 
@@ -44,7 +46,7 @@ class SchemaBootstrapper:
     # Public interface
     # ------------------------------------------------------------------
 
-    def bootstrap(self, version: str = "1.0.0") -> None:
+    def bootstrap(self, version: str = FEATURE_STORE_SCHEMA_VERSION) -> None:
         """Create all tables, views, and indexes; set schema version.
 
         Safe to call on an existing database — all DDL uses ``IF NOT EXISTS``

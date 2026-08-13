@@ -180,3 +180,40 @@ def test_unify_fail_on_quality_gate(tmp_path: Path) -> None:
     )
     with pytest.raises(ValueError, match="Quality gate failed"):
         builder.build(profiles_root=profiles_root, output_root=output_root)
+
+
+# ---------------------------------------------------------------------------
+# Content-hash identity (P1K-T1)
+# ---------------------------------------------------------------------------
+
+
+def _corpus_id(output_root: Path, schema_version: str = "v0_effectdb_structured_1") -> str:
+    manifest = json.loads(
+        (output_root / schema_version / "corpus_manifest.json").read_text(encoding="utf-8")
+    )
+    return str(manifest["corpus_id"])
+
+
+def test_corpus_id_stable_across_unchanged_profile_set(tmp_path: Path) -> None:
+    profiles_root = tmp_path / "profiles"
+    _write_profile_dir(profiles_root, "structured-a", structured=True)
+    _write_profile_dir(profiles_root, "structured-b", structured=True)
+
+    builder = ProfileCorpusBuilder()
+    builder.build(profiles_root=profiles_root, output_root=tmp_path / "corpus_a")
+    builder.build(profiles_root=profiles_root, output_root=tmp_path / "corpus_b")
+
+    assert _corpus_id(tmp_path / "corpus_a") == _corpus_id(tmp_path / "corpus_b")
+
+
+def test_corpus_id_changes_with_profile_set(tmp_path: Path) -> None:
+    profiles_root = tmp_path / "profiles"
+    _write_profile_dir(profiles_root, "structured-a", structured=True)
+
+    builder = ProfileCorpusBuilder()
+    builder.build(profiles_root=profiles_root, output_root=tmp_path / "corpus_one")
+
+    _write_profile_dir(profiles_root, "structured-b", structured=True)
+    builder.build(profiles_root=profiles_root, output_root=tmp_path / "corpus_two")
+
+    assert _corpus_id(tmp_path / "corpus_one") != _corpus_id(tmp_path / "corpus_two")
