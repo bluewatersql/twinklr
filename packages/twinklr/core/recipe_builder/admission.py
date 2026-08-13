@@ -69,10 +69,12 @@ def admit_candidates(
             result = CandidateValidationResult(candidate_id=candidate.candidate_id, issues=[], passed=True)
         decisions.append(_classify_decision(result))
 
-    for candidate in metadata_candidates:
-        result = result_by_id.get(candidate.candidate_id)
+    for metadata_candidate in metadata_candidates:
+        result = result_by_id.get(metadata_candidate.candidate_id)
         if result is None:
-            result = CandidateValidationResult(candidate_id=candidate.candidate_id, issues=[], passed=True)
+            result = CandidateValidationResult(
+                candidate_id=metadata_candidate.candidate_id, issues=[], passed=True
+            )
         decisions.append(_classify_decision(result))
 
     counts = {"accepted_to_stage": 0, "review_required": 0, "rejected": 0}
@@ -110,15 +112,15 @@ def write_staged_outputs(
             logger.debug("Wrote staged recipe: %s", out_path)
 
     patches: list[StagedMetadataPatch] = []
-    for candidate in metadata_candidates:
-        decision = _get_decision_for(candidate.candidate_id, admission_report)
+    for metadata_candidate in metadata_candidates:
+        decision = _get_decision_for(metadata_candidate.candidate_id, admission_report)
         if decision is not None and decision.decision != "rejected":
             patches.append(
                 StagedMetadataPatch(
-                    candidate_id=candidate.candidate_id,
-                    target_recipe_id=candidate.target_recipe_id,
+                    candidate_id=metadata_candidate.candidate_id,
+                    target_recipe_id=metadata_candidate.target_recipe_id,
                     decision=decision.decision,
-                    patch=candidate.proposed_metadata_patch,
+                    patch=metadata_candidate.proposed_metadata_patch,
                     reasons=decision.reasons,
                 )
             )
