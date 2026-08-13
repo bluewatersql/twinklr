@@ -122,13 +122,14 @@ def _get_supported_motif_ids_cached() -> frozenset[str]:
     from twinklr.core.sequencer.templates.group.store import TemplateStore
 
     _root = Path(__file__).resolve().parent.parent.parent.parent.parent
-    templates_dir = _root / "data" / "templates"
+    templates_dir = _root / "catalog" / "templates"
     if not templates_dir.exists():
         return frozenset()
 
     from twinklr.core.sequencer.theming import MOTIF_REGISTRY
 
-    store = TemplateStore.from_directory(templates_dir)
+    local_extensions_dir = _root / "data" / "templates"
+    store = TemplateStore.from_catalog_with_local_extensions(templates_dir, local_extensions_dir)
     valid_motif_ids = set(MOTIF_REGISTRY.list_ids())
     motif_tags: set[str] = set()
     for entry in store.entries:

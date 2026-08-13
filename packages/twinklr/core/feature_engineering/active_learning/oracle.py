@@ -132,6 +132,7 @@ def _parse_llm_response(
         logger.warning("Failed to parse LLM response for %s: %s", c.effect_type, exc)
         return TaxonomyCorrectionResult(
             candidate_id=c.candidate_id,
+            effect_type=c.effect_type,
             original_family=c.current_family,
             original_motion=c.current_motion,
             corrected_family=None,
@@ -143,6 +144,7 @@ def _parse_llm_response(
 
     return TaxonomyCorrectionResult(
         candidate_id=c.candidate_id,
+        effect_type=c.effect_type,
         original_family=c.current_family,
         original_motion=c.current_motion,
         corrected_family=corrected_family,

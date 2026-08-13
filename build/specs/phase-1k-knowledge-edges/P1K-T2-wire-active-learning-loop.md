@@ -317,3 +317,15 @@ re-applied identical correction is a no-op, not a duplicate). Secondary risk:
 conflating this task's "human-reviewed by default" scope creep into building a
 full review UI — out of scope; the human step is "hand-edit a JSON file," no
 tooling beyond that is required here.
+
+## Execution notes (2026-08-13, verified + accepted)
+
+- Spec-gap resolved: corrections name effect families/motions but the classifier
+  scores TaxonomyLabel values — `resolve_correction_label()` maps verbatim-label →
+  family table → motion fallback, skip-with-warning on unmappable (verifier-probed;
+  a regression test for the unmappable branch is a welcome small follow-up).
+- Phase-owner flag (verifier): corrections persist to DEFAULT_CORRECTIONS_PATH
+  inside the package tree — correct for the source-checkout workflow this project
+  uses, but will fail/diverge under a read-only site-packages install. If wheel
+  installs ever become a supported runtime (P0-T5 made them possible), the
+  corrections path must move to user-config space.

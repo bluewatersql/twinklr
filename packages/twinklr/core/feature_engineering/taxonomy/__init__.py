@@ -1,6 +1,7 @@
 """Taxonomy and target-role engines."""
 
 from twinklr.core.feature_engineering.taxonomy.classifier import (
+    DEFAULT_CORRECTIONS_PATH,
     TaxonomyClassifier,
     TaxonomyClassifierOptions,
 )
@@ -18,6 +19,7 @@ from twinklr.core.feature_engineering.taxonomy.target_roles import (
 )
 
 __all__ = [
+    "DEFAULT_CORRECTIONS_PATH",
     "LearnedTaxonomyInference",
     "LearnedTaxonomyInferenceOptions",
     "LearnedTaxonomyTrainer",

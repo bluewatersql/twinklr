@@ -13,6 +13,20 @@ from twinklr.core.feature_engineering.models.phrases import EffectPhrase
 from twinklr.core.feature_engineering.models.taxonomy import PhraseTaxonomyRecord
 
 
+def candidate_id_for(effect_type: str, param_signature: str) -> str:
+    """Return the stable candidate identity for an effect/signature pair.
+
+    Args:
+        effect_type: Vendor effect type of the phrase.
+        param_signature: Parameter signature of the phrase.
+
+    Returns:
+        A 16-character hex digest, stable across runs, used as the key for
+        review candidates, corrections, and persisted correction rules.
+    """
+    return hashlib.sha1(f"{effect_type}::{param_signature}".encode()).hexdigest()[:16]
+
+
 class UncertaintySampler:
     """Selects high-uncertainty taxonomy rows for review.
 
@@ -100,7 +114,7 @@ class UncertaintySampler:
             if not reasons:
                 continue
 
-            candidate_id = hashlib.sha1(normalized_key.encode()).hexdigest()[:16]
+            candidate_id = candidate_id_for(effect_type, group_phrases[0].param_signature)
             uncertainty_score = round(1.0 - min_confidence, 10)
             sample_ids = tuple(p.phrase_id for p in group_phrases[:5])
 
@@ -123,4 +137,4 @@ class UncertaintySampler:
         return tuple(candidates[: opts.max_batch_size])
 
 
-__all__ = ["UncertaintySampler"]
+__all__ = ["UncertaintySampler", "candidate_id_for"]

@@ -224,8 +224,17 @@ def write_v1_tail_artifacts(
     if o.enable_active_learning and phrases and taxonomy_rows:
         if progress_fn:
             progress_fn("active learning sampling")
+        from twinklr.core.feature_engineering.active_learning.batch_builder import (
+            ReviewBatchBuilder,
+        )
         from twinklr.core.feature_engineering.active_learning.models import (
             UncertaintySamplerOptions,
+        )
+        from twinklr.core.feature_engineering.active_learning.pipeline import (
+            CORRECTIONS_FILE_NAME,
+            DEFAULT_CORRECTIONS_PATH,
+            apply_corrections_file,
+            signatures_from_phrases,
         )
         from twinklr.core.feature_engineering.active_learning.sampler import (
             UncertaintySampler,
@@ -234,12 +243,28 @@ def write_v1_tail_artifacts(
         sampler = UncertaintySampler(UncertaintySamplerOptions())
         candidates = sampler.sample(phrases, taxonomy_rows)
         if candidates:
-            batch_data: dict[str, object] = {
-                "schema_version": "1.0.0",
-                "total_candidates": len(candidates),
-                "candidates": [c.model_dump(mode="json") for c in candidates],
-            }
-            m["review_batch"] = str(w.write_review_batch(output_root, batch_data))
+            batch = ReviewBatchBuilder().build(candidates, phrases)
+            m["review_batch"] = str(
+                w.write_review_batch(output_root, batch.model_dump(mode="json"))
+            )
+            # A reviewer answers the batch by writing taxonomy_corrections.json
+            # beside it; the next run picks it up here.
+            report = apply_corrections_file(
+                output_root / CORRECTIONS_FILE_NAME,
+                taxonomy_overrides={
+                    c.candidate_id: {"family": c.current_family, "motion": c.current_motion}
+                    for c in candidates
+                },
+                signatures=signatures_from_phrases(phrases),
+                config_path=o.taxonomy_corrections_path or DEFAULT_CORRECTIONS_PATH,
+            )
+            if report is not None:
+                report_path = output_root / "taxonomy_correction_report.json"
+                report_path.write_text(
+                    json.dumps(report.model_dump(mode="json"), indent=2) + "\n",
+                    encoding="utf-8",
+                )
+                m["taxonomy_correction_report"] = str(report_path)
     if template_catalogs is not None:
         if o.enable_v2_motif_mining:
             if progress_fn:

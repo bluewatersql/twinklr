@@ -36,6 +36,7 @@ from twinklr.core.feature_engineering.retrieval import TemplateRetrievalRanker
 from twinklr.core.feature_engineering.stack_detector import EffectStackDetector
 from twinklr.core.feature_engineering.style import StyleFingerprintExtractor
 from twinklr.core.feature_engineering.taxonomy import (
+    DEFAULT_CORRECTIONS_PATH,
     LearnedTaxonomyTrainer,
     LearnedTaxonomyTrainerOptions,
     TargetRoleAssigner,
@@ -99,10 +100,18 @@ class ComponentFactory:
         """Taxonomy classifier (lazy).
 
         Returns:
-            A ``TaxonomyClassifier`` configured with the pipeline options.
+            A ``TaxonomyClassifier`` configured with the pipeline options, with
+            the active-learning corrections layer merged over the base rules
+            when one exists.
         """
+        corrections_path = self._options.taxonomy_corrections_path
+        if corrections_path is None and DEFAULT_CORRECTIONS_PATH.exists():
+            corrections_path = DEFAULT_CORRECTIONS_PATH
         return TaxonomyClassifier(
-            TaxonomyClassifierOptions(rules_path=self._options.taxonomy_rules_path)
+            TaxonomyClassifierOptions(
+                rules_path=self._options.taxonomy_rules_path,
+                corrections_path=corrections_path,
+            )
         )
 
     @cached_property

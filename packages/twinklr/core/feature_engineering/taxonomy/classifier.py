@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import copy
 from dataclasses import dataclass
 import json
+import logging
 from pathlib import Path
 from typing import Any
 
@@ -14,14 +16,28 @@ from twinklr.core.feature_engineering.models.taxonomy import (
     TaxonomyLabelScore,
 )
 
+logger = logging.getLogger(__name__)
+
 _DEFAULT_CONFIG = Path(__file__).resolve().parent / "config" / "effect_function_v2.json"
+
+DEFAULT_CORRECTIONS_PATH = Path(__file__).resolve().parent / "config" / "corrections.json"
+"""Git-tracked layer of human-reviewed taxonomy corrections merged over the base rules."""
 
 
 @dataclass(frozen=True)
 class TaxonomyClassifierOptions:
-    """Runtime options for deterministic taxonomy classification."""
+    """Runtime options for deterministic taxonomy classification.
+
+    Attributes:
+        rules_path: Base weighted-rules config; defaults to ``effect_function_v2.json``.
+        corrections_path: Optional additive corrections layer written by the
+            active-learning loop.  Its ``labels[*].rules`` are appended to the
+            base config's matching labels; nothing in the base config is
+            rewritten or removed.
+    """
 
     rules_path: Path | None = None
+    corrections_path: Path | None = None
 
 
 class TaxonomyClassifier:
@@ -30,6 +46,11 @@ class TaxonomyClassifier:
     def __init__(self, options: TaxonomyClassifierOptions | None = None) -> None:
         self._options = options or TaxonomyClassifierOptions()
         self._config = self._load_config(self._options.rules_path or _DEFAULT_CONFIG)
+        corrections_path = self._options.corrections_path
+        if corrections_path is not None and corrections_path.exists():
+            self._config = self._merge_corrections(
+                self._config, self._load_config(corrections_path)
+            )
         self._schema_version = str(self._config["schema_version"])
         self._classifier_version = str(self._config["classifier_version"])
         labels = self._config.get("labels")
@@ -43,6 +64,61 @@ class TaxonomyClassifier:
         if not isinstance(payload, dict):
             raise ValueError(f"Invalid taxonomy config at {path}")
         return payload
+
+    @staticmethod
+    def _merge_corrections(
+        base: dict[str, Any],
+        corrections: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Append correction rules onto the base config's labels.
+
+        The merge is additive: existing rules are never rewritten or dropped,
+        and a rule whose ``id`` is already present is ignored so re-loading the
+        same corrections file is idempotent.  Labels that are not valid
+        :class:`TaxonomyLabel` members are skipped — the scoring loop cannot
+        construct them.
+
+        Args:
+            base: Parsed base rules config.
+            corrections: Parsed corrections config (same ``labels`` schema).
+
+        Returns:
+            A new config dict with correction rules merged in.
+        """
+        merged = copy.deepcopy(base)
+        extra = corrections.get("labels")
+        if not isinstance(extra, dict):
+            return merged
+        labels = merged.setdefault("labels", {})
+        if not isinstance(labels, dict):
+            return merged
+        valid_labels = {label.value for label in TaxonomyLabel}
+
+        for name, spec in sorted(extra.items()):
+            if name not in valid_labels:
+                logger.warning("Ignoring correction for unknown taxonomy label %r", name)
+                continue
+            if not isinstance(spec, dict):
+                continue
+            new_rules = spec.get("rules", [])
+            if not isinstance(new_rules, list):
+                continue
+            entry = labels.get(name)
+            if not isinstance(entry, dict):
+                labels[name] = {
+                    "base": float(spec.get("base", 0.0)),
+                    "min_confidence": float(spec.get("min_confidence", 0.0)),
+                    "rules": list(new_rules),
+                }
+                continue
+            existing = entry.setdefault("rules", [])
+            if not isinstance(existing, list):
+                continue
+            known_ids = {rule.get("id") for rule in existing if isinstance(rule, dict)}
+            for rule in new_rules:
+                if isinstance(rule, dict) and rule.get("id") not in known_ids:
+                    existing.append(rule)
+        return merged
 
     def classify(
         self,

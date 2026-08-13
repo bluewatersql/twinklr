@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from twinklr.core.feature_engineering.component_factory import ComponentFactory
 from twinklr.core.feature_engineering.pipeline import FeatureEngineeringPipelineOptions
+from twinklr.core.feature_engineering.taxonomy import DEFAULT_CORRECTIONS_PATH
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -245,3 +247,20 @@ class TestComponentFactoryFileSize:
         src = repo_root / "packages/twinklr/core/feature_engineering/component_factory.py"
         lines = len(src.read_text().splitlines())
         assert lines < 500, f"component_factory.py is {lines} lines (must be < 500)"
+
+
+class TestTaxonomyCorrectionsWiring:
+    """The classifier receives the active-learning corrections layer."""
+
+    def test_defaults_to_the_packaged_corrections_layer(self) -> None:
+        factory = ComponentFactory(_default_options())
+
+        assert factory.taxonomy_classifier._options.corrections_path == DEFAULT_CORRECTIONS_PATH
+
+    def test_explicit_corrections_path_wins(self, tmp_path: Path) -> None:
+        path = tmp_path / "corrections.json"
+        factory = ComponentFactory(
+            FeatureEngineeringPipelineOptions(taxonomy_corrections_path=path)
+        )
+
+        assert factory.taxonomy_classifier._options.corrections_path == path

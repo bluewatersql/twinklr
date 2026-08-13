@@ -61,11 +61,19 @@ class ReviewBatch(BaseModel):
 
 
 class TaxonomyCorrectionResult(BaseModel):
-    """Result of LLM review for a single candidate."""
+    """Result of review (human or LLM) for a single candidate.
+
+    ``candidate_id`` is the sha1 identity of the reviewed
+    ``(effect_type, param_signature)`` pair — the key every downstream
+    consumer uses.  ``effect_type`` carries the real effect type of that
+    pair so an applied correction can be written back as a rule without
+    re-resolving it from the review batch.
+    """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     candidate_id: str
+    effect_type: str
     original_family: str
     original_motion: str
     corrected_family: str | None = None
