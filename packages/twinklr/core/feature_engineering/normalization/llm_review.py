@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-import json
 import logging
-from typing import Any
 
+from twinklr.core.agents.providers.base import LLMProvider
+from twinklr.core.config.models import AgentConfig
 from twinklr.core.feature_engineering.normalization.models import (
     AliasClusterGroup,
     AliasReviewResult,
@@ -25,13 +25,18 @@ class LLMReviewPass:
     """Use LLM to review alias candidates and propose canonical labels.
 
     Args:
-        llm_client: OpenAI client adapter from twinklr.core.api.llm.
-        model: Model name to use for review.
+        provider: LLM provider satisfying the agents/providers ``LLMProvider``
+            protocol (see ``agents/providers/factory.py::create_llm_provider``).
+        config: Per-agent LLM configuration (model, temperature, etc.).
+
+    Note: this call site's model is config-driven but not yet retargeted —
+    see the sequencing constraint in ``build/plan/00-overview.md`` for the
+    later model-retarget task (P2P-T10) that must find and update it.
     """
 
-    def __init__(self, llm_client: Any, model: str = "gpt-4o-mini") -> None:
-        self._client = llm_client
-        self._model = model
+    def __init__(self, provider: LLMProvider, config: AgentConfig) -> None:
+        self._provider = provider
+        self._config = config
 
     def review(
         self,
@@ -68,16 +73,15 @@ class LLMReviewPass:
         """
         user_prompt = self._build_user_prompt(cluster)
         try:
-            response = self._client.client.chat.completions.create(
-                model=self._model,
+            response = self._provider.generate_json(
                 messages=[
                     {"role": "system", "content": _REVIEW_SYSTEM_PROMPT},
                     {"role": "user", "content": user_prompt},
                 ],
-                response_format={"type": "json_object"},
+                model=self._config.model,
+                temperature=self._config.temperature,
             )
-            content = response.choices[0].message.content or "{}"
-            data = json.loads(content)
+            data = response.content
             return AliasReviewResult(
                 cluster_id=cluster.cluster_id,
                 approved=bool(data.get("approved", False)),

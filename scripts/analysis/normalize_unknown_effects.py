@@ -132,13 +132,15 @@ def main() -> int:
         return 0
 
     # Step 4: LLM review
-    from twinklr.core.api.llm.openai.client import OpenAIClient
+    from twinklr.core.agents.providers.factory import create_llm_provider
+    from twinklr.core.config.models import AgentConfig, AppConfig
     from twinklr.core.feature_engineering.normalization.llm_review import (
         LLMReviewPass,
     )
 
-    llm_client = OpenAIClient()
-    reviewer = LLMReviewPass(llm_client=llm_client)
+    llm_provider = create_llm_provider(AppConfig(), session_id="normalize_unknown_effects")
+    review_config = AgentConfig(model="gpt-4o-mini")
+    reviewer = LLMReviewPass(provider=llm_provider, config=review_config)
     results = reviewer.review(clusters)
     approved = [r for r in results if r.approved]
     logger.info("LLM review: %d/%d clusters approved", len(approved), len(results))

@@ -7,6 +7,7 @@ generation when no LLM client is available or in dry-run mode.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import random
@@ -15,6 +16,8 @@ import uuid
 
 from pydantic import ValidationError
 
+from twinklr.core.agents.providers.base import LLMProvider
+from twinklr.core.config.models import AgentConfig
 from twinklr.core.recipe_builder.evidence import format_analysis_for_prompt
 from twinklr.core.recipe_builder.models import (
     CatalogAnalysis,
@@ -268,7 +271,12 @@ def _select_diverse_examples(
         return []
 
     candidates = list(recipes)
-    random.shuffle(candidates)
+    # Deterministic per-opportunity seed: same opportunity + catalog always
+    # selects the same example set, while different opportunities still see
+    # different shuffles (a single global seed would make every
+    # opportunity's example selection identical, defeating diversity intent).
+    seed = int(hashlib.sha1(opportunity.opportunity_id.encode()).hexdigest()[:8], 16)
+    random.Random(seed).shuffle(candidates)
 
     selected: list[EffectRecipe] = []
     used_effects: set[str] = set()
@@ -335,9 +343,8 @@ def generate_with_llm(
     opportunities: list[Opportunity],
     analysis: CatalogAnalysis,
     catalog_recipes: list[EffectRecipe],
-    llm_client: Any,
-    model: str = "gpt-4.1",
-    temperature: float = 0.9,
+    provider: LLMProvider,
+    config: AgentConfig,
 ) -> list[RecipeCandidate]:
     """Generate recipe candidates using LLM for each opportunity.
 
@@ -345,9 +352,9 @@ def generate_with_llm(
         opportunities: Identified creative opportunities.
         analysis: Catalog analysis for prompt context.
         catalog_recipes: Full catalog for example selection.
-        llm_client: OpenAIClient instance.
-        model: LLM model to use.
-        temperature: Sampling temperature (higher = more creative).
+        provider: LLM provider satisfying the agents/providers ``LLMProvider``
+            protocol (see ``agents/providers/factory.py::create_llm_provider``).
+        config: Per-agent LLM configuration (model, temperature, etc.).
 
     Returns:
         List of successfully generated RecipeCandidate instances.
@@ -370,13 +377,13 @@ def generate_with_llm(
                 opp.category,
             )
 
-            raw = llm_client.generate_json(
+            response = provider.generate_json(
                 messages=messages,
-                model=model,
-                temperature=temperature,
+                model=config.model,
+                temperature=config.temperature,
             )
 
-            recipe = _parse_llm_response(raw)
+            recipe = _parse_llm_response(response.content)
 
             candidate = RecipeCandidate(
                 candidate_id=uuid.uuid4().hex[:12],
@@ -612,32 +619,32 @@ def generate_candidates(
     opportunities: list[Opportunity],
     analysis: CatalogAnalysis,
     catalog_recipes: list[EffectRecipe],
-    llm_client: Any | None = None,
+    provider: LLMProvider | None = None,
     dry_run: bool = False,
-    model: str = "gpt-4.1",
-    temperature: float = 0.9,
+    config: AgentConfig | None = None,
 ) -> list[RecipeCandidate]:
     """Generate recipe candidates from opportunities.
 
     Uses LLM when available; falls back to deterministic generation
-    in dry-run mode or when no client is provided.
+    in dry-run mode or when no provider is available.
 
     Args:
         opportunities: Creative opportunities to generate for.
         analysis: Catalog analysis for prompt context.
         catalog_recipes: Full catalog for example selection.
-        llm_client: Optional OpenAIClient instance.
+        provider: Optional LLM provider satisfying the agents/providers
+            ``LLMProvider`` protocol.
         dry_run: Skip LLM calls, use deterministic fallback.
-        model: LLM model to use.
-        temperature: Sampling temperature.
+        config: Per-agent LLM configuration. Defaults preserve this
+            module's historical model/temperature when not provided.
 
     Returns:
         List of RecipeCandidate instances.
     """
-    if dry_run or llm_client is None:
-        if llm_client is None and not dry_run:
+    if dry_run or provider is None:
+        if provider is None and not dry_run:
             logger.warning(
-                "No LLM client provided — falling back to deterministic generation",
+                "No LLM provider provided — falling back to deterministic generation",
             )
         return generate_deterministic(opportunities)
 
@@ -645,7 +652,6 @@ def generate_candidates(
         opportunities=opportunities,
         analysis=analysis,
         catalog_recipes=catalog_recipes,
-        llm_client=llm_client,
-        model=model,
-        temperature=temperature,
+        provider=provider,
+        config=config or AgentConfig(model="gpt-4.1", temperature=0.9),
     )

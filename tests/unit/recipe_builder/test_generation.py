@@ -2,11 +2,21 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
+import pytest
+
+from twinklr.core.agents.providers.base import (
+    LLMProvider,
+    LLMResponse,
+    ResponseMetadata,
+)
+from twinklr.core.config.models import AgentConfig
 from twinklr.core.recipe_builder.generation import (
+    _select_diverse_examples,
     generate_candidates,
     generate_deterministic,
+    generate_with_llm,
 )
 from twinklr.core.recipe_builder.models import (
     Opportunity,
@@ -16,6 +26,24 @@ from twinklr.core.recipe_builder.models import (
 if TYPE_CHECKING:
     from twinklr.core.recipe_builder.models import CatalogAnalysis
     from twinklr.core.sequencer.templates.group.recipe import EffectRecipe
+
+
+class _FakeProvider(LLMProvider):
+    """Fake LLMProvider that returns a pre-built LLMResponse."""
+
+    def __init__(self, content: dict[str, Any]) -> None:
+        self._content = content
+        self.calls: list[dict[str, Any]] = []
+
+    def generate_json(
+        self,
+        messages: list[dict[str, str]],
+        model: str,
+        temperature: float | None = None,
+        **kwargs: Any,
+    ) -> LLMResponse:
+        self.calls.append({"messages": messages, "model": model, "temperature": temperature})
+        return LLMResponse(content=self._content, metadata=ResponseMetadata())
 
 
 def test_generate_deterministic_returns_list(sample_opportunity: Opportunity):
@@ -90,7 +118,7 @@ def test_generate_candidates_dry_run(
         opportunities=[sample_opportunity],
         analysis=sample_analysis,
         catalog_recipes=sample_recipes,
-        llm_client=None,
+        provider=None,
         dry_run=True,
     )
     assert len(candidates) == 1
@@ -106,7 +134,7 @@ def test_generate_candidates_no_client_fallback(
         opportunities=[sample_opportunity],
         analysis=sample_analysis,
         catalog_recipes=sample_recipes,
-        llm_client=None,
+        provider=None,
         dry_run=False,
     )
     assert len(candidates) == 1
@@ -163,3 +191,91 @@ def test_generate_deterministic_motion_target():
     recipe = candidates[0].recipe
     motions = [m.value for layer in recipe.layers for m in layer.motion]
     assert "ROLL" in motions
+
+
+# ---------------------------------------------------------------------------
+# generate_with_llm — provider framework
+# ---------------------------------------------------------------------------
+
+
+def test_generate_with_llm_uses_provider_framework(
+    sample_opportunity: Opportunity,
+    sample_analysis: CatalogAnalysis,
+    sample_recipes: list[EffectRecipe],
+    sample_recipe: EffectRecipe,
+) -> None:
+    """generate_with_llm() calls provider.generate_json() with config's model/
+    temperature and reads response.content directly (no manual json.loads)."""
+    raw = sample_recipe.model_dump(mode="json")
+    raw["recipe_id"] = "rb_generated_test_v1"
+    provider = _FakeProvider(content=raw)
+    config = AgentConfig(model="gpt-4.1-test", temperature=0.42)
+
+    candidates = generate_with_llm(
+        opportunities=[sample_opportunity],
+        analysis=sample_analysis,
+        catalog_recipes=sample_recipes,
+        provider=provider,
+        config=config,
+    )
+
+    assert len(candidates) == 1
+    assert candidates[0].generation_mode == "llm"
+    assert len(provider.calls) == 1
+    assert provider.calls[0]["model"] == "gpt-4.1-test"
+    assert provider.calls[0]["temperature"] == pytest.approx(0.42)
+
+
+def test_generate_candidates_dispatches_to_provider(
+    sample_opportunity: Opportunity,
+    sample_analysis: CatalogAnalysis,
+    sample_recipes: list[EffectRecipe],
+    sample_recipe: EffectRecipe,
+) -> None:
+    """generate_candidates() with a provider and dry_run=False uses the LLM path."""
+    raw = sample_recipe.model_dump(mode="json")
+    raw["recipe_id"] = "rb_generated_test_v2"
+    provider = _FakeProvider(content=raw)
+
+    candidates = generate_candidates(
+        opportunities=[sample_opportunity],
+        analysis=sample_analysis,
+        catalog_recipes=sample_recipes,
+        provider=provider,
+        dry_run=False,
+    )
+
+    assert len(candidates) == 1
+    assert candidates[0].generation_mode == "llm"
+    assert len(provider.calls) == 1
+
+
+# ---------------------------------------------------------------------------
+# _select_diverse_examples — seeded shuffle determinism
+# ---------------------------------------------------------------------------
+
+
+def test_select_diverse_examples_is_deterministic(
+    sample_opportunity: Opportunity,
+    sample_recipes: list[EffectRecipe],
+) -> None:
+    """Two calls with the same opportunity + catalog produce identical
+    selected-example ordering; a different opportunity may (not must)
+    produce a different ordering."""
+    first = _select_diverse_examples(sample_recipes, sample_opportunity)
+    second = _select_diverse_examples(sample_recipes, sample_opportunity)
+
+    assert [r.recipe_id for r in first] == [r.recipe_id for r in second]
+
+    other_opportunity = Opportunity(
+        opportunity_id="opp_other_002",
+        category="missing_effect_type",
+        description="A different opportunity for shuffle-seed comparison.",
+        priority=0.5,
+        target_effect_type="Fire",
+    )
+    other = _select_diverse_examples(sample_recipes, other_opportunity)
+    # Reproducibility (not divergence) is the primary claim — re-running with
+    # the same opportunity is still deterministic even when compared here.
+    other_repeat = _select_diverse_examples(sample_recipes, other_opportunity)
+    assert [r.recipe_id for r in other] == [r.recipe_id for r in other_repeat]

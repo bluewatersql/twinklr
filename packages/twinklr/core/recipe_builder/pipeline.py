@@ -16,6 +16,8 @@ import logging
 from pathlib import Path
 from typing import Any
 
+from twinklr.core.agents.providers.base import LLMProvider
+from twinklr.core.config.models import AgentConfig
 from twinklr.core.recipe_builder.admission import admit_candidates, write_staged_outputs
 from twinklr.core.recipe_builder.enrichment import generate_enrichments
 from twinklr.core.recipe_builder.evidence import (
@@ -58,9 +60,10 @@ class PipelineConfig:
     enable_enrich: bool = True
     synthetic_fallback: bool = False
     dry_run: bool = False
-    llm_client: Any | None = None
-    llm_model: str = "gpt-4.1"
-    llm_temperature: float = 0.9
+    llm_provider: LLMProvider | None = None
+    generation_agent: AgentConfig = field(
+        default_factory=lambda: AgentConfig(model="gpt-4.1", temperature=0.9)
+    )
     max_opportunities: int = 10
     phases: tuple[str, ...] = field(default_factory=lambda: ALL_PHASES)
 
@@ -229,10 +232,9 @@ def run_pipeline(config: PipelineConfig) -> RunManifest:
                 opportunities=opportunities,
                 analysis=analysis,
                 catalog_recipes=catalog_recipes,
-                llm_client=config.llm_client,
+                provider=config.llm_provider,
                 dry_run=config.dry_run,
-                model=config.llm_model,
-                temperature=config.llm_temperature,
+                config=config.generation_agent,
             )
 
             collection = RecipeCandidateCollection(
@@ -379,7 +381,7 @@ def run_pipeline(config: PipelineConfig) -> RunManifest:
             "enable_bootstrap": str(config.enable_bootstrap),
             "enable_enrich": str(config.enable_enrich),
             "synthetic_fallback": str(config.synthetic_fallback),
-            "llm_model": config.llm_model,
+            "llm_model": config.generation_agent.model,
             "max_opportunities": str(config.max_opportunities),
         },
         artifact_paths={

@@ -1,10 +1,15 @@
 from __future__ import annotations
 
-import json
-from unittest.mock import MagicMock
+from typing import Any
 
 import pytest
 
+from twinklr.core.agents.providers.base import (
+    LLMProvider,
+    LLMResponse,
+    ResponseMetadata,
+)
+from twinklr.core.config.models import AgentConfig
 from twinklr.core.feature_engineering.normalization.llm_review import LLMReviewPass
 from twinklr.core.feature_engineering.normalization.models import (
     AliasClusterGroup,
@@ -28,22 +33,25 @@ def _make_cluster(
     )
 
 
-def _make_llm_client(response_json: dict) -> MagicMock:
-    """Build a mock OpenAI client that returns the given JSON payload."""
-    content = json.dumps(response_json)
-    message = MagicMock()
-    message.content = content
-    choice = MagicMock()
-    choice.message = message
-    completion = MagicMock()
-    completion.choices = [choice]
+class _FakeProvider(LLMProvider):
+    """Fake LLMProvider that returns a pre-built LLMResponse or raises."""
 
-    inner_client = MagicMock()
-    inner_client.chat.completions.create.return_value = completion
+    def __init__(self, content: dict[str, Any] | None = None, error: Exception | None = None) -> None:
+        self._content = content
+        self._error = error
+        self.calls: list[dict[str, Any]] = []
 
-    llm_client = MagicMock()
-    llm_client.client = inner_client
-    return llm_client
+    def generate_json(
+        self,
+        messages: list[dict[str, str]],
+        model: str,
+        temperature: float | None = None,
+        **kwargs: Any,
+    ) -> LLMResponse:
+        self.calls.append({"messages": messages, "model": model, "temperature": temperature})
+        if self._error is not None:
+            raise self._error
+        return LLMResponse(content=self._content, metadata=ResponseMetadata())
 
 
 # ---------------------------------------------------------------------------
@@ -61,8 +69,8 @@ def test_valid_cluster_approved() -> None:
         "suggested_effect_family": "MOTION",
         "suggested_motion_class": "chase",
     }
-    client = _make_llm_client(response)
-    reviewer = LLMReviewPass(llm_client=client)
+    provider = _FakeProvider(content=response)
+    reviewer = LLMReviewPass(provider=provider, config=AgentConfig())
     cluster = _make_cluster()
 
     (result,) = reviewer.review((cluster,))
@@ -87,8 +95,8 @@ def test_dissimilar_cluster_rejected() -> None:
         "suggested_effect_family": "MOTION",
         "suggested_motion_class": "unknown",
     }
-    client = _make_llm_client(response)
-    reviewer = LLMReviewPass(llm_client=client)
+    provider = _FakeProvider(content=response)
+    reviewer = LLMReviewPass(provider=provider, config=AgentConfig())
     cluster = _make_cluster()
 
     (result,) = reviewer.review((cluster,))
@@ -118,8 +126,8 @@ def test_llm_response_parsed_into_model() -> None:
         centroid_similarity=0.88,
         suggested_canonical="sweep",
     )
-    client = _make_llm_client(response)
-    reviewer = LLMReviewPass(llm_client=client, model="gpt-4o")
+    provider = _FakeProvider(content=response)
+    reviewer = LLMReviewPass(provider=provider, config=AgentConfig(model="gpt-4o"))
 
     (result,) = reviewer.review((cluster,))
 
@@ -131,6 +139,37 @@ def test_llm_response_parsed_into_model() -> None:
     assert result.members == ("sweep", "sweeper", "sweep_left")
     assert result.suggested_effect_family == "MOTION"
     assert result.suggested_motion_class == "sweep"
+    assert provider.calls[0]["model"] == "gpt-4o"
+
+
+# ---------------------------------------------------------------------------
+# test_review_single_uses_provider_framework
+# ---------------------------------------------------------------------------
+
+
+def test_review_single_uses_provider_framework() -> None:
+    """_review_single() calls provider.generate_json() and reads response.content
+    directly with no manual json.loads step in the test's mock path."""
+    response = {
+        "approved": True,
+        "canonical_label": "chase",
+        "confidence": 0.9,
+        "rationale": "Same effect",
+        "suggested_effect_family": "MOTION",
+        "suggested_motion_class": "chase",
+    }
+    provider = _FakeProvider(content=response)
+    config = AgentConfig(model="gpt-4o-mini", temperature=0.2)
+    reviewer = LLMReviewPass(provider=provider, config=config)
+    cluster = _make_cluster()
+
+    reviewer._review_single(cluster)
+
+    assert len(provider.calls) == 1
+    call = provider.calls[0]
+    assert call["model"] == "gpt-4o-mini"
+    assert call["temperature"] == pytest.approx(0.2)
+    assert isinstance(call["messages"], list)
 
 
 # ---------------------------------------------------------------------------
@@ -140,12 +179,8 @@ def test_llm_response_parsed_into_model() -> None:
 
 def test_malformed_llm_response_fallback() -> None:
     """When the LLM call raises an exception, a fallback result is returned."""
-    inner_client = MagicMock()
-    inner_client.chat.completions.create.side_effect = RuntimeError("API error")
-    llm_client = MagicMock()
-    llm_client.client = inner_client
-
-    reviewer = LLMReviewPass(llm_client=llm_client)
+    provider = _FakeProvider(error=RuntimeError("API error"))
+    reviewer = LLMReviewPass(provider=provider, config=AgentConfig())
     cluster = _make_cluster(suggested_canonical="chase")
 
     (result,) = reviewer.review((cluster,))

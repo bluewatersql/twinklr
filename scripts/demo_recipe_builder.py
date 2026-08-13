@@ -178,19 +178,24 @@ def main() -> int:
     print(f"  model             : {args.model}")
     print(f"  temperature       : {args.temperature}")
 
-    # Create LLM client (unless dry-run)
-    llm_client = None
+    # Create LLM provider (unless dry-run)
+    llm_provider = None
     if not args.dry_run:
         api_key = os.environ.get("OPENAI_API_KEY")
         if not api_key:
             print("\n  WARNING: OPENAI_API_KEY not set — falling back to deterministic mode")
             print("  Set OPENAI_API_KEY or use --dry-run for deterministic generation")
         else:
-            from twinklr.core.api.llm.openai.client import create_client
+            from pydantic import SecretStr
 
-            llm_client = create_client(api_key=api_key)
-            print(f"  LLM client        : OpenAI ({args.model})")
+            from twinklr.core.agents.providers.factory import create_llm_provider
+            from twinklr.core.config.models import AppConfig
 
+            app_config = AppConfig(llm_api_key=SecretStr(api_key))
+            llm_provider = create_llm_provider(app_config, session_id=args.run_name)
+            print(f"  LLM provider      : OpenAI ({args.model})")
+
+    from twinklr.core.config.models import AgentConfig
     from twinklr.core.recipe_builder.pipeline import ALL_PHASES, PipelineConfig, run_pipeline
 
     phases: tuple[str, ...] = ALL_PHASES if args.phase == "all" else (args.phase,)
@@ -204,9 +209,8 @@ def main() -> int:
         enable_enrich=args.enable_enrich,
         synthetic_fallback=args.synthetic_fallback,
         dry_run=args.dry_run,
-        llm_client=llm_client,
-        llm_model=args.model,
-        llm_temperature=args.temperature,
+        llm_provider=llm_provider,
+        generation_agent=AgentConfig(model=args.model, temperature=args.temperature),
         max_opportunities=args.max_opportunities,
         phases=phases,
     )
