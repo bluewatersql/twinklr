@@ -35,3 +35,20 @@ provider framework.
   human-reviewed batches — this loop exists to inject non-model truth.
 - T3 must NOT invent a new format — `EffectRecipe` JSON + `index.json` as-is; only the
   location and tracking change.
+
+## COMPLETION RECORD (2026-08-13)
+
+**Phase 1K COMPLETE — all five tasks merged, independently verified.** Commits:
+3fb3ee8 (T1 content-hash identity + the discovered-dead version gate made real) ·
+6afa07a (T2 label loop live, round-trip proven) · f394e15 (T3 catalog home +
+consumer repoint + hygiene test) · a78b4b0 (T4 curate-catalog CLI + honesty fixes) ·
+36c61a3+64c048a (T5 provider-framework migration + format fix).
+
+Exit criteria met: re-ingestion idempotent (double-ingest test, content-hash keys);
+a human taxonomy correction demonstrably changes the next run's labels (real-chain
+test, 0.15-excluded → top-scored); versioned catalog in git with overlay semantics
+test-pinned; recipe-generation LLM calls inside the provider framework.
+
+Standing items recorded in specs: owner-gated curation for mined/curated seed
+provenance (P2K); site-packages corrections-path hazard if wheel installs become a
+runtime; corpus_id path-dependence note for P1K-T2 consumers.
