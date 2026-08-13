@@ -1,5 +1,12 @@
 # Normalized Findings Register
 
+_v3 note (lens audit, 2026-08-13): the FACTS in every entry stand as verified; a
+handful of DISPOSITION cells carried skewed judgments and are corrected inline
+(SF-5) or superseded by the reactivation proposal's decision points (assets → part-2
+capability not spend-hazard; judge iteration → fix-feedback-and-keep default;
+licensing gates → void). Where a disposition conflicts with
+[reactivation-proposal.md](reactivation-proposal.md), the proposal wins._
+
 _Consolidated from the seven VERIFIED phase reviews (2026-08-13, baseline `aa8d325`).
 One entry per root cause; `Sources` lists the constituent phase-finding IDs (full
 evidence, reproducers, and verifier verdicts live in reviews/phases/*.md and
@@ -43,7 +50,7 @@ that remediation-roadmap item._
 | SF-2 | Lyrics resolution order inverted by analyzer parallelization: LRCLib/Genius structurally skipped; ASR outranks synced lyrics; double resolution when WhisperX off; no vocal gate on transcription | HIGH | P2-M1/F14 | FIX → RM-1.3 |
 | SF-3 | Metadata enrichment fails 100% (httpx.Response into dict parsers; both clients; MB unreachable until AcoustID fixed — limiter must land in same change) | HIGH | P1-F1/F2, P2-M3/F13 | FIX → RM-1.3 |
 | SF-4 | Evaluation harness: writer deleted (restorable ~10 lines, schema drift trap), CLI unbridged, ComparisonReport zero producers/tests, measures self-consistency only, no result ever committed | HIGH (enabler) | P6-F3/F4 + verifier archaeology | FIX FIRST → RM-1.6 |
-| SF-5 | Corpus 4-pack: unreachable from product; uuid identity; license/rights untracked for vendor mining (prospective gate); learned taxonomy is weak-supervision circular; style_transfer + 3/4 of active_learning orphaned | MEDIUM (strategic) | P6 all | EXTRACT → RM-5.3, gate RM-G2 |
+| SF-5 | Corpus 4-pack = the choreography-learning system with four broken edges: uuid identity defeats accumulation; apply edge unreachable; active-learning label loop built-but-unwired (fixes the weak-supervision circularity); eval writer deleted. **Disposition REVISED per owner + proposal v2/v3: REPAIR the edges, keep in-tree; licensing de-escalated (personal project)** | HIGH (strategic, was mislabeled) | P6 all + proposal §0.3 | REPAIR → proposal Track K |
 | SF-6 | Display composition defects (deferred subsystem): sub-beat floor + non-inverse mapping, SEQUENCED continuous-light, blend modes structurally lost, TRIM gaps, unreset state | HIGH-in-subsystem | P5-F1/F2/F3/F12/M2 | DEFER (documented) → RM-5.4 |
 | SF-7 | Engineering system: no quality-gate CI; validate mutates; packaging nonfunctional (empty wheels + pollution); mypy gate = one loop-variable rename; ruff core-config weakness; .env illusion; no LICENSE ever | HIGH | P7 all, P1-F20..F23, Stage 4, P6-M3 | FIX → RM-0.* |
 | SF-8 | Docs describe a different system: six-channel claim false; removed LLM-validator documented; user-guide knob table unreliable; phantom paths; "dozens of hours" claim is unsourced marketing provenance | HIGH (docs) | P7-M2/M3, Stage 2 §1, B7 | FIX → RM-5.5 |

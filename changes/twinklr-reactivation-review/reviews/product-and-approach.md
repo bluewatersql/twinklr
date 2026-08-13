@@ -1,5 +1,26 @@
 # Product Thesis & System-Approach Review (Stage 2)
 
+> **v3 LENS-AUDIT CORRECTIONS (2026-08-13).** This document's *facts* stand; four of
+> its *judgments* were made through a commercial-product lens inappropriate for a
+> personal, non-commercial project and are corrected as follows:
+> 1. §1's "population of one / no user evidence / no license" strikes are **not
+>    defects** — they are what a personal project looks like. The "dozens of hours"
+>    provenance analysis stands as fact-tracing, but the claim is the owner's own
+>    lived experience and needs no citation; the edict to exclude it from planning is
+>    withdrawn.
+> 2. §7's ranking of option **(d) human-in-the-loop assistance** ("best product fit,
+>    worst effort fit for one maintainer") used a staffing argument that doesn't
+>    apply: for a hobbyist iterating on their own show, interactive
+>    regenerate-this-section — via the xLights automation API — is a **best-fit
+>    workflow**, and it is promoted accordingly in the reactivation proposal (v3).
+> 3. §6's licensing paragraph is void per the owner: no commercialization is
+>    planned; the only residual rule is "don't redistribute vendor-derived content."
+> 4. §3's "ABANDON or SPLIT OUT feature_engineering" recommendation was reversed in
+>    the proposal (§0.3): the corpus pipeline is the project's choreography-learning
+>    system; its broken edges get repaired, not amputated.
+> The authoritative integrated judgment is
+> [reactivation-proposal.md](reactivation-proposal.md).
+
 _Authored 2026-08-13 by the Stage 2 architect (opus, non-author of discovery), verified
 against source at baseline `aa8d325`; competitive/pricing claims rest on Stage 6
 official-source research (access date 2026-08-13). Conclusions are PROVISIONAL until
