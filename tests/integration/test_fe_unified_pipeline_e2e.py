@@ -43,7 +43,6 @@ from twinklr.core.feature_store.factory import create_feature_store
 from twinklr.core.feature_store.models import CorpusStats, FeatureStoreConfig
 from twinklr.core.pipeline.context import PipelineContext
 from twinklr.core.pipeline.definition import (
-    ExecutionPattern,
     PipelineDefinition,
     StageDefinition,
 )
@@ -828,7 +827,6 @@ class TestUnifiedPipelineDAG:
                     id="cond",
                     stage=stage_cond,
                     inputs=["a"],
-                    pattern=ExecutionPattern.CONDITIONAL,
                     condition=lambda ctx: ctx.get_state("run_cond", False),
                 ),
             ],
@@ -854,7 +852,6 @@ class TestUnifiedPipelineDAG:
                     id="cond",
                     stage=stage_cond,
                     inputs=["a"],
-                    pattern=ExecutionPattern.CONDITIONAL,
                     condition=lambda ctx: ctx.get_state("run_cond", False),
                 ),
             ],
@@ -957,4 +954,4 @@ class TestUnifiedPipelineDAG:
         assert "moving_heads" in stage_map["render"].inputs
 
         # Lyrics is conditional
-        assert stage_map["lyrics"].pattern == ExecutionPattern.CONDITIONAL
+        assert stage_map["lyrics"].condition is not None

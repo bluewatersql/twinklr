@@ -45,13 +45,6 @@ from twinklr.core.agents.result import AgentResult
 from twinklr.core.agents.shared.judge.feedback import FeedbackEntry, FeedbackManager, FeedbackType
 from twinklr.core.agents.spec import AgentMode, AgentSpec
 from twinklr.core.agents.state import AgentState
-from twinklr.core.agents.state_machine import (
-    InvalidTransitionError,
-    OrchestrationState,
-    OrchestrationStateMachine,
-    StateMetrics,
-    StateTransition,
-)
 
 __all__ = [
     # Issues
@@ -72,7 +65,6 @@ __all__ = [
     "FeedbackManager",
     "FeedbackType",
     "IdentityContextShaper",
-    "InvalidTransitionError",
     "Issue",
     "IssueCategory",
     "IssueEffort",
@@ -88,9 +80,6 @@ __all__ = [
     "LLMResponse",
     "NullLLMCallLogger",
     "OpenAIProvider",
-    # State Machine
-    "OrchestrationState",
-    "OrchestrationStateMachine",
     # Prompts
     "PromptPackLoader",
     "PromptRenderer",
@@ -98,8 +87,6 @@ __all__ = [
     "ResponseMetadata",
     "RunError",
     "ShapedContext",
-    "StateMetrics",
-    "StateTransition",
     "SuggestedAction",
     "TargetedAction",
     "TokenEstimator",

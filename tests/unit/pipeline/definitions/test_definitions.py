@@ -31,14 +31,12 @@ class TestBuildCommonStages:
         assert ids == ["audio", "profile", "lyrics", "macro"]
 
     def test_lyrics_is_conditional(self) -> None:
-        """Lyrics stage uses CONDITIONAL pattern and is not critical."""
+        """Lyrics stage has a condition callable gating its execution."""
         from twinklr.core.pipeline.definitions.common import build_common_stages
 
         stages = build_common_stages(display_groups=MOCK_DISPLAY_GROUPS)
         lyrics_stage = next(s for s in stages if s.id == "lyrics")
 
-        assert lyrics_stage.pattern == ExecutionPattern.CONDITIONAL
-        assert lyrics_stage.critical is False
         assert lyrics_stage.condition is not None
 
     def test_macro_depends_on_profile_and_lyrics(self) -> None:

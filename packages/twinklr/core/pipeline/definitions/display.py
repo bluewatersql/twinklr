@@ -206,6 +206,5 @@ def build_display_pipeline(
     return PipelineDefinition(
         name="display_pipeline",
         description="Display group choreography pipeline",
-        fail_fast=True,
         stages=common + display_stages,
     )

@@ -30,7 +30,6 @@ class PipelineContext:
         job_config: Job configuration
         cache: Optional cache backend for agent results (enables deterministic caching)
         llm_logger: LLM call logger (defaults to NullLLMCallLogger)
-        checkpoint_dir: Optional checkpoint directory
         output_dir: Optional output directory for artifacts
         state: Mutable state dictionary for sharing data between stages
         metrics: Mutable metrics dictionary (timing, tokens, etc.)
@@ -52,7 +51,6 @@ class PipelineContext:
     session: TwinklrSession
 
     # Paths
-    checkpoint_dir: Path | None = None
     output_dir: Path | None = None
 
     # Mutable state

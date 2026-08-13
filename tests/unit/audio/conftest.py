@@ -205,9 +205,7 @@ def mock_app_config() -> MagicMock:
 @pytest.fixture
 def mock_job_config() -> MagicMock:
     """Mocked JobConfig for audio tests."""
-    config = MagicMock()
-    config.checkpoint_dir = "/tmp/test_checkpoints"
-    return config
+    return MagicMock()
 
 
 # ============================================================================

@@ -233,7 +233,6 @@ async def test_conditional_stage_skipped(mock_context):
             StageDefinition(
                 "stage2",
                 MockStage("stage2", "output2"),
-                pattern=ExecutionPattern.CONDITIONAL,
                 inputs=["stage1"],
                 condition=lambda ctx: False,  # Always skip
             ),
@@ -263,7 +262,6 @@ async def test_conditional_stage_executed(mock_context):
             StageDefinition(
                 "stage2",
                 MockStage("stage2", "output2"),
-                pattern=ExecutionPattern.CONDITIONAL,
                 inputs=["stage1"],
                 condition=lambda ctx: ctx.get_state("execute_stage2", False),
             ),
@@ -308,7 +306,7 @@ async def test_fan_out_execution(mock_context):
 
 
 @pytest.mark.asyncio
-async def test_fan_out_any_failure_fails_stage_even_when_non_critical(mock_context):
+async def test_fan_out_any_failure_fails_stage(mock_context):
     """Fan-out stages must fail on any item failure to avoid partial downstream outputs."""
 
     class SelectiveFailStage:
@@ -330,7 +328,6 @@ async def test_fan_out_any_failure_fails_stage_even_when_non_critical(mock_conte
                 SelectiveFailStage(),
                 pattern=ExecutionPattern.FAN_OUT,
                 inputs=["producer"],
-                critical=False,
             ),
         ],
     )
@@ -344,10 +341,9 @@ async def test_fan_out_any_failure_fails_stage_even_when_non_critical(mock_conte
 
 @pytest.mark.asyncio
 async def test_stage_failure_stops_pipeline(mock_context):
-    """Test that stage failure stops pipeline (fail_fast=True)."""
+    """Test that stage failure stops pipeline (execution is unconditionally fail-fast)."""
     pipeline = PipelineDefinition(
         name="failure",
-        fail_fast=True,
         stages=[
             StageDefinition("stage1", MockStage("stage1", "output1")),
             StageDefinition(

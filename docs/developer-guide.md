@@ -105,24 +105,22 @@ from twinklr.core.pipeline import (
 
 | Type | Purpose |
 |---|---|
-| `PipelineDefinition` | Declares ordered stages with dependency graph and `fail_fast` policy |
+| `PipelineDefinition` | Declares ordered stages with dependency graph (execution is unconditionally fail-fast on stage failure) |
 | `StageDefinition` | Stage ID, `PipelineStage` instance, input dependencies, execution pattern, type annotations |
 | `PipelineStage` | Abstract base — subclass and implement `execute()` for each stage |
 | `PipelineExecutor` | Resolves dependencies and runs stages, collecting `PipelineResult` |
 | `PipelineContext` | Carries `TwinklrSession`, state dict, metrics, and output dir |
-| `ExecutionPattern` | `SEQUENTIAL` (default), `PARALLEL`, `FAN_OUT`, `CONDITIONAL` |
+| `ExecutionPattern` | `SEQUENTIAL` (default), `FAN_OUT` |
 | `PipelineResult` | Overall success/failure, per-stage results, timing, outputs dict |
 
-**Conditional stages:** Set `pattern=ExecutionPattern.CONDITIONAL` with a `condition` lambda on `StageDefinition`. The lyrics stage uses this to skip when no lyrics are detected:
+**Conditional stages:** Set a `condition` lambda on `StageDefinition` (independent of the declared `pattern`). The lyrics stage uses this to skip when no lyrics are detected:
 
 ```python
 StageDefinition(
     id="lyrics",
     stage=LyricsStage(),
     inputs=["audio"],
-    pattern=ExecutionPattern.CONDITIONAL,
     condition=lambda ctx: ctx.get_state("has_lyrics", False),
-    critical=False,
 )
 ```
 
@@ -135,7 +133,7 @@ Pipeline factories compose stages into complete pipelines:
 **Common stages** (`build_common_stages()` in `common.py`):
 1. `audio` — `AudioAnalysisStage` → `SongBundle`
 2. `profile` — `AudioProfileStage` → `AudioProfileModel`
-3. `lyrics` — `LyricsStage` → `LyricContextModel` (conditional, non-critical)
+3. `lyrics` — `LyricsStage` → `LyricContextModel` (conditional)
 4. `macro` — `MacroPlannerStage` → `list[MacroSectionPlan]`
 
 **Moving heads pipeline** (`build_moving_heads_pipeline()` in `moving_heads.py`):
@@ -368,7 +366,7 @@ Scripts in `scripts/` provide demo, analysis, and validation utilities:
 1. Create a class extending `PipelineStage` with an `execute()` method
 2. Add a `StageDefinition` to the appropriate pipeline factory in `packages/twinklr/core/pipeline/definitions/`
 3. Declare `inputs` (upstream stage IDs), `input_type`, and `output_type`
-4. Use `ExecutionPattern.CONDITIONAL` with a `condition` lambda for optional stages
+4. Use a `condition` lambda for optional stages
 
 ### Adding a New Moving Head Template
 

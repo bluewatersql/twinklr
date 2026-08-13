@@ -81,7 +81,6 @@ class PipelineExecutor:
 
         logger.info(f"Starting pipeline: {pipeline.name}")
         logger.info(f"  Stages: {len(pipeline.stages)}")
-        logger.debug(f"  Fail fast: {pipeline.fail_fast}")
 
         # Build execution plan (waves of stages that can run in parallel)
         execution_plan = self._build_execution_plan(pipeline, context)

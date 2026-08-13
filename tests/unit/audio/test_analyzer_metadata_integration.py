@@ -35,7 +35,7 @@ class TestAudioAnalyzerMetadataIntegration:
     @pytest.fixture
     def job_config(self):
         """Create job config."""
-        return JobConfig(checkpoint=False)
+        return JobConfig()
 
     @pytest.fixture
     def analyzer(self, app_config, job_config):

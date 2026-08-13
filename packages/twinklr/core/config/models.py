@@ -518,7 +518,6 @@ class JobConfig(ConfigBase):
     agent: AgentOrchestrationConfig = Field(default_factory=lambda: _get_agent_config_default())
     output_dir: str | None = None
     project_name: str | None = None
-    checkpoint: bool = True
 
     pose_config: PoseConfig = Field(
         default_factory=PoseConfig,

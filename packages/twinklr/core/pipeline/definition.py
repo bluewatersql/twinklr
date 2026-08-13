@@ -22,15 +22,11 @@ class ExecutionPattern(StrEnum):
 
     Values:
         SEQUENTIAL: Execute once with single input (default)
-        PARALLEL: Execute alongside other stages with same deps
         FAN_OUT: Execute N times in parallel (one per input item)
-        CONDITIONAL: Execute only if condition is met
     """
 
     SEQUENTIAL = "sequential"
-    PARALLEL = "parallel"
     FAN_OUT = "fan_out"
-    CONDITIONAL = "conditional"
 
 
 @dataclass(frozen=True)
@@ -64,10 +60,10 @@ class StageDefinition:
         stage: Stage implementation (must implement PipelineStage protocol)
         pattern: Execution pattern (default: SEQUENTIAL)
         inputs: List of stage IDs this stage depends on
-        condition: Optional condition function (for CONDITIONAL pattern)
+        condition: Optional condition function; when set, the stage is skipped
+            unless it returns True (independent of the declared pattern)
         retry_config: Optional retry configuration
         timeout_ms: Optional timeout in milliseconds
-        critical: Legacy field (reserved). Pipeline execution is fail-fast on stage failure.
         max_concurrent_fan_out: Max concurrent executions for FAN_OUT (default: 4, None=unlimited)
         description: Optional human-readable description
         input_type: Optional type annotation string for stage input (documentation/validation)
@@ -81,11 +77,11 @@ class StageDefinition:
         ...     description="Analyze audio file"
         ... )
         >>>
-        >>> # Parallel stages
+        >>> # Stages sharing an input execute in parallel (derived from the
+        >>> # dependency graph, not a declared pattern)
         >>> profile_stage = StageDefinition(
         ...     id="profile",
         ...     stage=AudioProfileStage(),
-        ...     pattern=ExecutionPattern.PARALLEL,
         ...     inputs=["audio"],
         ... )
         >>>
@@ -93,7 +89,6 @@ class StageDefinition:
         >>> lyrics_stage = StageDefinition(
         ...     id="lyrics",
         ...     stage=LyricsStage(),
-        ...     pattern=ExecutionPattern.CONDITIONAL,
         ...     inputs=["audio"],
         ...     condition=lambda ctx: ctx.get_state("has_lyrics", False),
         ... )
@@ -116,7 +111,6 @@ class StageDefinition:
     condition: Callable[[PipelineContext], bool] | None = None
     retry_config: RetryConfig | None = None
     timeout_ms: float | None = None
-    critical: bool = True
     max_concurrent_fan_out: int | None = 4
     description: str | None = None
     input_type: str | None = None
@@ -160,7 +154,6 @@ class PipelineDefinition(BaseModel):
         name: Pipeline name (for logging/tracking)
         stages: List of stage definitions (order not significant, deps define order)
         description: Optional human-readable description
-        fail_fast: Whether to stop on first failure (default: True)
 
     Example:
         >>> pipeline = PipelineDefinition(
@@ -180,7 +173,6 @@ class PipelineDefinition(BaseModel):
     name: str = Field(description="Pipeline name")
     stages: list[StageDefinition] = Field(description="List of stage definitions")
     description: str | None = Field(default=None, description="Optional description")
-    fail_fast: bool = Field(default=True, description="Stop on first failure")
 
     model_config = ConfigDict(frozen=True, extra="forbid", arbitrary_types_allowed=True)
 

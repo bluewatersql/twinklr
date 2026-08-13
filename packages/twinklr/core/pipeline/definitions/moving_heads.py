@@ -90,6 +90,5 @@ def build_moving_heads_pipeline(
     return PipelineDefinition(
         name="moving_heads_pipeline",
         description="Moving head DMX choreography pipeline",
-        fail_fast=True,
         stages=common + mh_stages,
     )

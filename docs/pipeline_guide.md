@@ -634,9 +634,8 @@ built on three core types:
 4. **State Sharing** — Stages communicate via `PipelineContext.state`
    (e.g. `context.set_state("has_lyrics", True)`).
 
-5. **Fail-Fast** — If a critical stage fails, the pipeline stops
-   immediately. Non-critical stages (like lyrics) can fail without
-   halting the pipeline.
+5. **Fail-Fast** — If any stage fails, the pipeline stops immediately;
+   termination on first wave failure is unconditional.
 
 ### DAG Diagram — Moving Heads Pipeline
 
@@ -650,12 +649,11 @@ audio ──┬──► profile ──┬──► macro ──► moving_heads
 ### Building a Pipeline
 
 ```python
-from twinklr.core.pipeline import PipelineDefinition, StageDefinition, ExecutionPattern
+from twinklr.core.pipeline import PipelineDefinition, StageDefinition
 
 pipeline = PipelineDefinition(
     name="my_pipeline",
     description="Custom pipeline",
-    fail_fast=True,
     stages=[
         StageDefinition(id="audio", stage=AudioAnalysisStage()),
         StageDefinition(
@@ -667,7 +665,6 @@ pipeline = PipelineDefinition(
             id="lyrics",
             stage=LyricsStage(),
             inputs=["audio"],
-            pattern=ExecutionPattern.CONDITIONAL,
             condition=lambda ctx: ctx.get_state("has_lyrics", False),
         ),
         StageDefinition(

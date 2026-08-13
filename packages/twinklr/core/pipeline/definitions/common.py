@@ -12,7 +12,7 @@ from twinklr.core.agents.audio.lyrics.stage import LyricsStage
 from twinklr.core.agents.audio.profile.stage import AudioProfileStage
 from twinklr.core.agents.audio.stages.analysis import AudioAnalysisStage
 from twinklr.core.agents.sequencer.macro_planner.stage import MacroPlannerStage
-from twinklr.core.pipeline import ExecutionPattern, StageDefinition
+from twinklr.core.pipeline import StageDefinition
 
 
 def build_common_stages(
@@ -26,8 +26,8 @@ def build_common_stages(
         3. ``lyrics`` — Conditional lyric/narrative analysis (skipped if no lyrics)
         4. ``macro`` — Generate high-level choreography strategy
 
-    The ``lyrics`` stage is conditional and non-critical: it runs only when
-    the audio analysis detects lyrics (``has_lyrics`` state flag).
+    The ``lyrics`` stage is conditional: it runs only when the audio analysis
+    detects lyrics (``has_lyrics`` state flag).
 
     Args:
         display_groups: Display group configurations for the MacroPlannerStage.
@@ -63,9 +63,7 @@ def build_common_stages(
             id="lyrics",
             stage=LyricsStage(),
             inputs=["audio"],
-            pattern=ExecutionPattern.CONDITIONAL,
             condition=lambda ctx: ctx.get_state("has_lyrics", False),
-            critical=False,
             input_type="SongBundle",
             output_type="LyricContextModel",
             description="Generate narrative and thematic analysis (if lyrics available)",

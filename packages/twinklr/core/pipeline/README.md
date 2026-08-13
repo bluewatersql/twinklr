@@ -125,13 +125,13 @@ If any fan-out item fails, the fan-out stage fails and the pipeline aborts.
 
 ### Conditional Execution
 
-Skip stages based on runtime conditions:
+Skip stages based on runtime conditions by supplying a `condition` callable
+(independent of the declared `pattern`):
 
 ```python
 StageDefinition(
     id="lyrics",
     stage=LyricsStage(),
-    pattern=ExecutionPattern.CONDITIONAL,
     inputs=["audio"],
     condition=lambda ctx: ctx.get_state("has_lyrics", False),
 )
@@ -313,10 +313,6 @@ Potential additions (not currently implemented):
    - Complete audio → planning → rendering pipeline
    - Demonstrates all patterns
 
-2. **Stage Implementations** (`stages.py`)
-   - Wrapping existing orchestrators as stages
-   - Real-world integration examples
-
-3. **Tests** (`tests/unit/pipeline/`)
+2. **Tests** (`tests/unit/pipeline/`)
    - Unit tests for all functionality
    - Reference for usage patterns

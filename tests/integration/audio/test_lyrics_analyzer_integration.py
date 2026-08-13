@@ -28,10 +28,8 @@ class TestLyricsAnalyzerIntegration:
 
     @pytest.fixture
     def job_config(self):
-        """Job config with checkpoints disabled."""
-        config = JobConfig()
-        config.checkpoint = False
-        return config
+        """Job config for lyrics integration tests."""
+        return JobConfig()
 
     @pytest.fixture
     def audio_file_with_lrc(self, tmp_path):
