@@ -96,8 +96,16 @@ def test_plan_sections_and_transition_are_all_covered(
 ) -> None:
     """A regression that drops a section fails here rather than shipping silently."""
     result = render_cached(RIGS["mh4_minimal"])
-    assert result.sections() == ["intro", "transition_intro_to_chorus", "chorus"]
-    assert len(result.effects) == 12  # 4 fixtures x (2 sections + 1 transition)
+    assert result.sections() == [
+        "intro",
+        "transition_intro_to_chorus",
+        "chorus",
+        "transition_chorus_to_drop",
+        "drop",
+        "transition_drop_to_breakdown",
+        "breakdown",
+    ]
+    assert len(result.effects) == 28  # 4 fixtures x (4 sections + 3 transitions)
 
 
 @pytest.mark.parametrize(

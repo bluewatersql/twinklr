@@ -12,10 +12,16 @@
 #   P4-F10 value-curve points are written at 2-decimal resolution
 #   NEW    every transition segment emits an all-zero settings string with no
 #          value curves at all -- see test_transition_segments_emit_all_zero
+#   P4-M1  template dimmer floor (dimmer_floor_dmx=60) is discarded; the
+#          'breakdown' section's dimmer curve dips to ~0.05 normalized (~13 DMX)
+#          -- see test_dimmer_floor_dropped.py
+#   P4-M2  BLACKOUT dimmer inverts to full brightness under non-MODERATE
+#          presets; the 'drop' section emits E_SLIDER_DMX15=255 under the
+#          'energetic' preset -- see test_blackout_full_brightness.py
 
 # rig=mh4_minimal section=intro
 # 4 heads, pan/tilt/dimmer only — the shape used by the repo's own tests
-# plan: 120.0 bpm, 8 bars, n_samples=64
+# plan: 120.0 bpm, 16 bars, n_samples=64
 
 ## fixture=MH1 segment=A step=main t0=0 t1=8000 template=sweep_lr_fan_hold preset=chill
 B_CHOICE_BufferStyle=Per Model Default,E_CHECKBOX_INVDMX1=0,E_CHECKBOX_INVDMX2=0,E_CHECKBOX_INVDMX3=0,E_CHECKBOX_INVDMX4=0,E_CHECKBOX_INVDMX5=0,E_CHECKBOX_INVDMX6=0,E_CHECKBOX_INVDMX7=0,E_CHECKBOX_INVDMX8=0,E_CHECKBOX_INVDMX9=0,E_CHECKBOX_INVDMX10=0,E_CHECKBOX_INVDMX11=0,E_CHECKBOX_INVDMX12=0,E_CHECKBOX_INVDMX13=0,E_CHECKBOX_INVDMX14=0,E_CHECKBOX_INVDMX15=0,E_CHECKBOX_INVDMX16=0,E_NOTEBOOK1=Channels 1-16,E_SLIDER_DMX1=0,E_SLIDER_DMX2=0,E_SLIDER_DMX3=0,E_SLIDER_DMX4=0,E_SLIDER_DMX5=0,E_SLIDER_DMX6=0,E_SLIDER_DMX7=0,E_SLIDER_DMX8=0,E_SLIDER_DMX9=0,E_SLIDER_DMX10=0,E_SLIDER_DMX11=0,E_SLIDER_DMX12=0,E_SLIDER_DMX13=0,E_SLIDER_DMX14=0,E_SLIDER_DMX15=255,E_SLIDER_DMX16=0,E_VALUECURVE_DMX11=Active=TRUE|Id=ID_VALUECURVE_DMX11|Type=Custom|Min=0.00|Max=255.00|RV=FALSE|Values=0.00:0.00;0.02:0.00;0.03:0.01;0.05:0.01;0.06:0.01;0.08:0.02;0.09:0.02;0.11:0.02;0.12:0.03;0.14:0.03;0.16:0.03;0.17:0.03;0.19:0.04;0.20:0.04;0.22:0.04;0.23:0.05;0.25:0.05;0.27:0.05;0.28:0.06;0.30:0.06;0.31:0.06;0.33:0.07;0.34:0.07;0.36:0.07;0.38:0.08;0.39:0.08;0.41:0.08;0.42:0.09;0.44:0.09;0.45:0.09;0.47:0.10;0.48:0.10;0.50:0.10;0.52:0.10;0.53:0.11;0.55:0.11;0.56:0.11;0.58:0.12;0.59:0.12;0.61:0.12;0.62:0.13;0.64:0.13;0.66:0.13;0.67:0.14;0.69:0.14;0.70:0.14;0.72:0.15;0.73:0.15;0.75:0.15;0.77:0.16;0.78:0.16;0.80:0.16;0.81:0.17;0.83:0.17;0.84:0.17;0.86:0.17;0.88:0.18;0.89:0.18;0.91:0.18;0.92:0.19;0.94:0.19;0.95:0.19;0.97:0.20;0.98:0.20;1.00:0.00|,E_VALUECURVE_DMX13=Active=TRUE|Id=ID_VALUECURVE_DMX13|Type=Custom|Min=0.00|Max=255.00|RV=FALSE|Values=0.00:0.50;0.02:0.50;0.03:0.50;0.05:0.50;0.06:0.50;0.08:0.50;0.09:0.50;0.11:0.50;0.12:0.50;0.14:0.50;0.16:0.50;0.17:0.50;0.19:0.50;0.20:0.50;0.22:0.50;0.23:0.50;0.25:0.50;0.27:0.50;0.28:0.50;0.30:0.50;0.31:0.50;0.33:0.50;0.34:0.50;0.36:0.50;0.38:0.50;0.39:0.50;0.41:0.50;0.42:0.50;0.44:0.50;0.45:0.50;0.47:0.50;0.48:0.50;0.50:0.50;0.52:0.50;0.53:0.50;0.55:0.50;0.56:0.50;0.58:0.50;0.59:0.50;0.61:0.50;0.62:0.50;0.64:0.50;0.66:0.50;0.67:0.50;0.69:0.50;0.70:0.50;0.72:0.50;0.73:0.50;0.75:0.50;0.77:0.50;0.78:0.50;0.80:0.50;0.81:0.50;0.83:0.50;0.84:0.50;0.86:0.50;0.88:0.50;0.89:0.50;0.91:0.50;0.92:0.50;0.94:0.50;0.95:0.50;0.97:0.50;0.98:0.50;1.00:0.50|

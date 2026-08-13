@@ -13,6 +13,9 @@ byte of `.xsq`, and the only end-to-end render test patched `compile_template` w
 | `test_shutter_channel_emission.py` | `shutter_channel=6` → `E_SLIDER_DMX6=0` emitted; `shutter_channel=17` → no `E_SLIDER_DMX17` token |
 | `test_xsq_round_trip.py` | `parse → export → parse` over the repo's first tracked `.xsq` |
 | `test_validator_on_golden_render.py` | The existing 587-LOC validator runs against a freshly rendered sequence |
+| `test_blackout_full_brightness.py` (P1P-T2) | P4-M2: `pop_lock_spotlight_blackout` under `energetic` emits `E_SLIDER_DMX15=255` instead of 0 |
+| `test_dimmer_floor_dropped.py` (P1P-T2) | P4-M1: `circle_asym_left_strobe`'s dimmer curve dips below the template's declared 60-DMX floor |
+| `test_8head_role_mismatch.py` (P1P-T2) | P4-F26 (stronger than "degraded ordering"): the 8-head rig renders zero section segments — every fixture's positional role (`ALL_0..ALL_7`) misses every template's declared role names |
 
 Rigs live in `harness.py` (`RIGS`); goldens live in `<rig_id>/<section_id>.settings.txt`.
 
@@ -47,6 +50,19 @@ authored here because P1P-T1 lands before P1P-T2. T2 is expected to **extend** `
 and `build_plan()` rather than replace the harness. Adding a rig or a section requires a
 regeneration pass; `test_every_rendered_section_has_a_golden` fails if a newly emitted
 section has no committed pin.
+
+P1P-T2 added:
+- `RIGS["mh8_reference"]` — an 8-fixture rig, added to prove the pipeline is not
+  4-specific. It instead surfaced a **stronger** version of P4-F26: an 8-fixture group
+  gets positional roles (`ALL_0..ALL_7`, `fixture_builder.py`'s `_ROLE_MAPS` only covers
+  1-4), which match none of the role names every builtin template declares, so
+  `compile_template` silently skips every section for this rig — only the (also
+  defective) transition segments render. See `test_8head_role_mismatch.py`.
+- Two `build_plan()` sections, `drop` (`pop_lock_spotlight_blackout`, `energetic`) and
+  `breakdown` (`circle_asym_left_strobe`, `chill`), so P4-M1 (dropped dimmer floor) and
+  P4-M2 (BLACKOUT full-brightness inversion) are visible pinned golden behavior rather
+  than latent bugs with no golden coverage. See `test_blackout_full_brightness.py` and
+  `test_dimmer_floor_dropped.py`.
 
 ## Determinism
 

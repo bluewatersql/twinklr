@@ -37,7 +37,7 @@ GOLDEN_ROOT = Path(__file__).resolve().parent
 # expected to *extend* these (add rigs / sections), not replace the harness.
 
 PLAN_BPM = 120.0
-PLAN_TOTAL_BARS = 8
+PLAN_TOTAL_BARS = 16
 PLAN_BEATS_PER_BAR = 4
 
 # `TemplateCompileContext.n_samples` is not settable through RenderingPipeline, so the
@@ -96,6 +96,19 @@ RIGS: dict[str, RigSpec] = {
         shutter_channel=17,
         color_channel=18,
     ),
+    # P1P-T2: proves the pipeline is not 4-specific and exercises
+    # `_order_fixtures_for_chase` (template_compiler.py) beyond the 4-fixture reference
+    # rig — the hard-coded 11-role chase order is fragile beyond 4 fixtures (P4-F26,
+    # recorded not fixed here). This is the acceptance rig for P1P-T11's removal of the
+    # literal `fixture_count=4` passed into the planner path (main.py).
+    "mh8_reference": RigSpec(
+        rig_id="mh8_reference",
+        description="8 heads, pan/tilt/dimmer only — proves the pipeline is not 4-specific",
+        fixture_count=8,
+        pan_channel=11,
+        tilt_channel=13,
+        dimmer_channel=15,
+    ),
 }
 
 
@@ -131,7 +144,24 @@ def build_fixture_group(rig: RigSpec) -> FixtureGroup:
 
 
 def build_plan() -> ChoreographyPlan:
-    """The deterministic plan fixture: two 4-bar sections, fixed templates and presets."""
+    """The deterministic plan fixture: four 4-bar sections, fixed templates and presets.
+
+    P1P-T2 extends the original two-section plan (intro/chorus) with two further
+    sections so P4-M1 and P4-M2 become visible pinned golden behavior rather than
+    latent bugs with no golden coverage (P1P-T5's binding "Golden coverage
+    prerequisite" backlog item):
+
+    - `drop` uses `pop_lock_spotlight_blackout` (`DimmerType.BLACKOUT`) under the
+      `energetic` preset, which the P4-M2 defect drives to `E_SLIDER_DMX15=255` —
+      full brightness — instead of the intended blackout. Only the `moderate` preset
+      happens to hit BLACKOUT's own SMOOTH entry and render correctly; `energetic` is
+      chosen here specifically because it exposes the inversion.
+    - `breakdown` uses `circle_asym_left_strobe`, whose dimmer declares
+      `min_norm=0.05` against the template's own `dimmer_floor_dmx=60` — the P4-M1
+      defect discards that floor, so the emitted curve dips to ~0.05 normalized
+      (~13 DMX) instead of being held at the declared floor (60 DMX, ~0.235
+      normalized).
+    """
     return ChoreographyPlan(
         sections=[
             PlanSection(
@@ -147,6 +177,20 @@ def build_plan() -> ChoreographyPlan:
                 end_bar=8,
                 template_id="bounce_fan_pulse",
                 preset_id="energetic",
+            ),
+            PlanSection(
+                section_name="drop",
+                start_bar=9,
+                end_bar=12,
+                template_id="pop_lock_spotlight_blackout",
+                preset_id="energetic",
+            ),
+            PlanSection(
+                section_name="breakdown",
+                start_bar=13,
+                end_bar=16,
+                template_id="circle_asym_left_strobe",
+                preset_id="chill",
             ),
         ]
     )
@@ -326,6 +370,12 @@ _GOLDEN_BANNER = (
     "#   P4-F10 value-curve points are written at 2-decimal resolution\n"
     "#   NEW    every transition segment emits an all-zero settings string with no\n"
     "#          value curves at all -- see test_transition_segments_emit_all_zero\n"
+    "#   P4-M1  template dimmer floor (dimmer_floor_dmx=60) is discarded; the\n"
+    "#          'breakdown' section's dimmer curve dips to ~0.05 normalized (~13 DMX)\n"
+    "#          -- see test_dimmer_floor_dropped.py\n"
+    "#   P4-M2  BLACKOUT dimmer inverts to full brightness under non-MODERATE\n"
+    "#          presets; the 'drop' section emits E_SLIDER_DMX15=255 under the\n"
+    "#          'energetic' preset -- see test_blackout_full_brightness.py\n"
 )
 
 

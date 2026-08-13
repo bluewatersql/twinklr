@@ -54,7 +54,7 @@ def validation(rendered_xsq: Path) -> ValidationResult:
 def test_validator_runs_on_golden_render(validation: ValidationResult) -> None:
     """The validator executes against freshly rendered output inside the test suite."""
     assert validation.stats["models_with_effects"] == 4
-    assert validation.stats["total_effects"] == 8  # 4 fixtures x 2 sections, layer 0
+    assert validation.stats["total_effects"] == 16  # 4 fixtures x 4 sections, layer 0
     assert validation.artifacts_checked
 
 

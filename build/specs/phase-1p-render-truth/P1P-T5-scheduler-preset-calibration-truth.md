@@ -451,3 +451,11 @@ merged grid and regenerates goldens once, not twice.
    tests/golden/harness.py `build_plan()`/RIGS with a blackout section and a
    floor-declaring template (per the P1P-T2 extension note) BEFORE fixing M1/M2, so
    the fixes land as visible golden diffs.
+
+3. **8-fixture rigs render NOTHING (P1P-T2 discovery, mechanism-verified):**
+   `fixture_builder._infer_fixture_role` maps only 1-4 fixtures to spatial roles;
+   larger rigs get positional names (ALL_0..ALL_7) matching no template role, and
+   `compile_template`'s role filter silently skips every section (`continue`, no
+   error). Pinned in tests/golden/test_8head_role_mismatch.py. Fix the silent-skip
+   here (loud behavior + role-inference generalization or documented rig limits);
+   P1P-T11's CLI rig-config work must surface unsupported rig shapes to the user.
