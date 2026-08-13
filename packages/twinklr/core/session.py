@@ -26,7 +26,8 @@ from twinklr.core.caching import Cache
 from twinklr.core.caching.backends.fs import FSCache
 from twinklr.core.caching.backends.null import NullCache
 from twinklr.core.config.models import AppConfig, ConfigBase, JobConfig
-from twinklr.core.io import RealFileSystem, absolute_path
+from twinklr.core.config.paths import resolve_project_root
+from twinklr.core.io import RealFileSystem, anchored_path
 
 T = TypeVar("T", bound=ConfigBase)
 
@@ -48,6 +49,7 @@ class TwinklrSession:
         app_config: AppConfig | Path | str | None = None,
         job_config: JobConfig | Path | str | None = None,
         session_id: str | None = None,
+        project_root: Path | str | None = None,
     ):
         """Initialize session with configs.
 
@@ -55,7 +57,11 @@ class TwinklrSession:
             app_config: AppConfig instance, path, or None (uses default path)
             job_config: JobConfig instance, path, or None (uses default path)
             session_id: Optional session ID. If None, generates a new UUID.
-                        Pass a deterministic ID for cache reuse across runs.
+                        Pass a deterministic ID for cache reuse across runs
+                        (see ``twinklr.core.caching.derive_session_id``).
+            project_root: Root that relative configured paths (the cache tree)
+                          anchor to when ``AppConfig.project_root`` is unset.
+                          Without either, paths anchor to the working directory.
 
         Raises:
             FileNotFoundError: If config files don't exist
@@ -65,6 +71,7 @@ class TwinklrSession:
         self.app_config: AppConfig = self._resolve_config(app_config, AppConfig)
         self.job_config: JobConfig = self._resolve_config(job_config, JobConfig)
         self.session_id = session_id or str(uuid4())
+        self.project_root = resolve_project_root(self.app_config, fallback=project_root)
 
         # Set up project/artifact management
         self.project_name = self.job_config.project_name or "twinklr_project"
@@ -109,6 +116,7 @@ class TwinklrSession:
         config_dir: Path | str = ".",
         *,
         session_id: str | None = None,
+        project_root: Path | str | None = None,
     ) -> TwinklrSession:
         """Create session from a directory containing config files.
 
@@ -117,6 +125,9 @@ class TwinklrSession:
         Args:
             config_dir: Directory containing config files (default: current directory)
             session_id: Optional session ID for cache reuse. If None, generates new UUID.
+            project_root: Root for relative configured paths when the app config
+                does not set one. Defaults to ``config_dir``, so the cache tree
+                follows the configs rather than the working directory.
 
         Returns:
             Initialized TwinklrSession
@@ -130,6 +141,7 @@ class TwinklrSession:
             app_config=config_dir / "config.json",
             job_config=config_dir / "job_config.json",
             session_id=session_id,
+            project_root=project_root if project_root is not None else config_dir,
         )
 
     @property
@@ -149,7 +161,7 @@ class TwinklrSession:
                 cache_config = self.job_config.agent.agent_cache
                 agent_cache = FSCache(
                     RealFileSystem(),
-                    absolute_path(cache_config.cache_path),
+                    anchored_path(cache_config.cache_path, self.project_root),
                     ttl_seconds=cache_config.ttl_seconds,
                 )
             else:
