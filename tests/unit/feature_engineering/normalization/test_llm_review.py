@@ -36,7 +36,9 @@ def _make_cluster(
 class _FakeProvider(LLMProvider):
     """Fake LLMProvider that returns a pre-built LLMResponse or raises."""
 
-    def __init__(self, content: dict[str, Any] | None = None, error: Exception | None = None) -> None:
+    def __init__(
+        self, content: dict[str, Any] | None = None, error: Exception | None = None
+    ) -> None:
         self._content = content
         self._error = error
         self.calls: list[dict[str, Any]] = []
