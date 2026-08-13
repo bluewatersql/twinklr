@@ -262,3 +262,63 @@ falsely pass; (3) sequencing — this task is explicitly gated on T1–T3 landin
 merge the CI workflow before confirming a clean local run of all four gate commands,
 since a red CI workflow from day one undermines its purpose as a gate for every later
 phase.
+
+## Execution deviation record (2026-08-13, verified + accepted)
+
+**1. Version-consistency site count: the spec's "confirmed 4" was itself stale — 5 sites
+exist on the current tree.** Re-running the grep this spec directs
+(`grep -rn "^version = \|__version__" pyproject.toml packages/twinklr/*/pyproject.toml
+packages/twinklr/core/__init__.py packages/twinklr/cli/`) turned up a fifth site the
+Evidence section flagged as unconfirmed: `packages/twinklr/cli/__init__.py:3` →
+`__version__ = "0.2.0"`. `scripts/check_version_consistency.py` covers all 5: root
+`pyproject.toml` (0.2.0), `packages/twinklr/core/pyproject.toml` (0.1.0),
+`packages/twinklr/cli/pyproject.toml` (0.1.0), `packages/twinklr/core/__init__.py`
+(0.2.0), `packages/twinklr/cli/__init__.py` (0.2.0) — 2 distinct values across 5 sites.
+`make version-check` fails today as required, printing all 5 with their values; fixing
+the drift remains out of scope per this spec.
+
+**2. Cache-immunity: CI's lint step uses `ruff check . --no-cache` directly; the
+`lint` Makefile target itself is intentionally left unchanged.** Per the P0-T3 descope
+record's finding that `.ruff_cache` staleness can under-report errors, the CI workflow
+(`.github/workflows/ci.yml`) invokes `uv run ruff check . --no-cache` rather than
+`make lint` (fresh runners have no cache to begin with, but this keeps the step
+cache-immune under any future runner-caching change too). `make lint` was **not**
+modified to add `--no-cache` — CI does not call it, so no ruff invocation is actually
+shared between CI and the Makefile, and this spec's own acceptance criteria require
+`make lint` to "remain unchanged in behavior." Instead, a comment was added directly
+above the `lint` target (`Makefile`) documenting the staleness hazard and pointing
+developers at `--no-cache` / `rm -rf .ruff_cache` if lint output looks suspiciously
+clean.
+
+**3. Network-in-tests audit: no test hits the network on a fresh runner; none required
+new `requires_template_data`-style marking.** Grepped all test files referencing
+`requests`/`httpx`/`urllib`/`OpenAI(`/`http(s)://` (12 files) and read each: every one
+either uses `unittest.mock`/`httpx.MockTransport`/`AsyncMock` to fully stub the network
+boundary, or (in `test_xml_security.py`) only references a URL string inside XXE-attack
+test *payloads*, never dispatching a real request. The two `@pytest.mark.integration`
+suites that touch external-shaped resources (`tests/integration/audio/test_pipeline.py`,
+`tests/integration/profiling/test_profiler_integration.py`) use synthetic
+in-test-generated audio / `pytest.skip()` on absent local vendor fixtures — no network.
+NLTK data is already vendored offline via `tests/conftest.py`'s `nltk.data.path` prepend
+(landed with P0-T2). Full suite (`uv run pytest tests/ -q --no-cov`) passed 4089 passed /
+26 skipped in ~29s with no network access. No test needed marking.
+
+**Process note (not a spec deviation, flagged for the orchestrator):** verifying the
+`make validate` guard's "proceeds normally on a clean tree" behavior required a genuinely
+clean working tree, but this session's checkout had concurrent uncommitted work from
+another in-flight task (P0-T7) at the time. `git stash -u` / `git stash pop` was used to
+clean and restore the tree around that one verification step; `git diff`/`git status`
+confirm the pre- and post-stash trees matched exactly and the other task's edits (visible
+continuing to change after the pop) were undisturbed. No data was lost, but stashing in a
+shared working tree with other active agents is a hazard — a future task needing the same
+"clean tree" verification should prefer a disposable clone/worktree instead.
+
+### Deviations 4 and 5 (verification-pass additions, 2026-08-13)
+
+4. **Version drift FIXED in this changeset** (orchestrator-authorized): the spec said
+   the check need only fail-on-drift, but the competing CI-green criterion wins —
+   both package pyprojects bumped 0.1.0→0.2.0 (+ uv.lock, verified no dependency
+   drift). All 5 sites agree on 0.2.0.
+5. CI's pytest step uses `-q --no-cov` (not the spec's `-v`) — no gate weakened (no
+   coverage threshold configured); quieter CI logs preferred. Also added at
+   verification: `permissions: contents: read` and `timeout-minutes: 30`.

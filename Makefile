@@ -1,4 +1,4 @@
-.PHONY: help install install-dev sync clean lint format type-check test test-cov test-watch run-demo build verify-install check-all pre-commit validate coverage coverage-detailed reset
+.PHONY: help install install-dev sync clean lint format type-check test test-cov test-watch run-demo build verify-install check-all pre-commit validate version-check coverage coverage-detailed reset
 
 # Default target
 .DEFAULT_GOAL := help
@@ -61,6 +61,12 @@ sync: ## Sync dependencies (update after pyproject.toml changes)
 # Development
 #############################################################################
 
+# NOTE: .ruff_cache is gitignored and not invalidated across unrelated file
+# changes made by concurrent work (see the P0-T3 descope record). A stale
+# cache can make `ruff check .` under-report errors that a clean run (or CI,
+# which starts cache-free) would catch. If lint results here ever look
+# suspiciously clean, rerun with `uv run ruff check . --no-cache` (or `rm -rf
+# .ruff_cache`) before trusting the output.
 lint: ## Run linter (ruff check)
 	@echo "$(BLUE)→ Running ruff check...$(NC)"
 	uv run ruff check .
@@ -146,6 +152,12 @@ check-all: lint format type-check test-cov ## Run all quality checks (recommende
 pre-commit: check-all ## Alias for check-all
 
 validate: ## Run format, lint-fix, type-check, and test (shows all errors/warnings)
+	@git diff --quiet && git diff --cached --quiet || { \
+		echo "$(RED)Error: You have uncommitted changes. Commit or stash first.$(NC)"; \
+		echo "$(RED)validate mutates the working tree (format/lint-fix) — starting from a$(NC)"; \
+		echo "$(RED)dirty tree would conflate your changes with its output.$(NC)"; \
+		exit 1; \
+	}
 	@echo "$(BLUE)========================================$(NC)"
 	@echo "$(BLUE)Running all validation checks...$(NC)"
 	@echo "$(BLUE)========================================$(NC)"
@@ -173,6 +185,9 @@ validate: ## Run format, lint-fix, type-check, and test (shows all errors/warnin
 		echo "$(GREEN)✓ All validation checks passed!$(NC)"; \
 		echo "$(GREEN)========================================$(NC)"; \
 	fi
+
+version-check: ## Verify version declarations agree across all sites
+	@uv run python scripts/check_version_consistency.py
 
 #############################################################################
 # Building

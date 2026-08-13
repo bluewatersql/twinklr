@@ -1,0 +1,50 @@
+name: CI
+
+permissions:
+  contents: read
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+
+env:
+  # Reduce CI flakiness from transient network stalls during dependency
+  # resolution/download (observed class of failure: scipy download timeout +
+  # DNS loss during P0 execution; see build/specs/phase-0-foundation/
+  # P0-T4-minimal-ci.md evidence).
+  UV_HTTP_TIMEOUT: "180"
+
+jobs:
+  quality-gates:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.12"
+
+      - name: Sync workspace
+        run: uv sync --extra dev --all-packages
+
+      - name: Format check
+        run: uv run ruff format --check .
+
+      - name: Lint
+        # --no-cache: fresh runners have no .ruff_cache to begin with, but a
+        # cache could persist across an actions/cache-enabled run in future;
+        # keep this cache-immune per the P0-T3 descope record (see Makefile
+        # comment near the `lint` target).
+        run: uv run ruff check . --no-cache
+
+      - name: Type check
+        run: uv run mypy .
+
+      - name: Test
+        run: uv run pytest tests/ -q --no-cov
+
+      - name: Version consistency
+        run: make version-check

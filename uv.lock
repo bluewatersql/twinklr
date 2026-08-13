@@ -2405,7 +2405,7 @@ provides-extras = ["dev", "ml", "fe"]
 
 [[package]]
 name = "twinklr-cli"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "packages/twinklr/cli" }
 dependencies = [
     { name = "rich" },
@@ -2422,7 +2422,7 @@ requires-dist = [
 
 [[package]]
 name = "twinklr-core"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "packages/twinklr/core" }
 dependencies = [
     { name = "aiofiles" },
