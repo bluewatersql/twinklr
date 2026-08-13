@@ -4,8 +4,13 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+import shutil
 
 from twinklr.core.recipe_builder.pipeline import PipelineConfig, run_pipeline
+from twinklr.core.recipe_builder.promotion import promote_staged_recipes
+
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+_CATALOG_TEMPLATES_DIR = _REPO_ROOT / "catalog" / "templates"
 
 
 class TestPipelineIntegration:
@@ -101,3 +106,68 @@ class TestPipelineIntegration:
             data = json.loads(candidates_path.read_text())
             for candidate in data.get("candidates", []):
                 assert candidate["generation_mode"] == "deterministic"
+
+
+class TestStagedThenPromoteEndToEnd:
+    """Verify the staged->promote gate end-to-end against a tmp catalog home.
+
+    Staged outputs must never be visible in the target catalog's index.json
+    until promote_staged_recipes() is explicitly invoked, and a second
+    promote of the same staged directory must be a no-op (existing_ids skip
+    logic in promotion.py, exercised here rather than re-implemented).
+    """
+
+    def _tmp_catalog(self, tmp_path: Path) -> Path:
+        """Copy the real catalog/templates/ shape into a tmp directory."""
+        tmp_templates = tmp_path / "templates"
+        shutil.copytree(_CATALOG_TEMPLATES_DIR, tmp_templates)
+        return tmp_templates
+
+    def test_staged_not_visible_until_explicit_promote(self, tmp_path: Path):
+        tmp_templates = self._tmp_catalog(tmp_path)
+        index_before = json.loads((tmp_templates / "index.json").read_text())
+        entries_before = len(index_before["entries"])
+
+        config = PipelineConfig(
+            run_name="promote_e2e",
+            output_dir=tmp_path / "runs",
+            templates_dir=tmp_templates,
+            dry_run=True,
+        )
+        manifest = run_pipeline(config)
+
+        staged_dir = tmp_path / "runs" / "promote_e2e" / "staged_recipes"
+        staged_files = list(staged_dir.glob("*.json"))
+        assert staged_files, "expected staged recipes from deterministic dry-run generation"
+        assert manifest.summary_metrics.recipe_candidates_generated > 0
+
+        # Analysis/generation/validation/admission alone must not touch index.json.
+        index_after_run = json.loads((tmp_templates / "index.json").read_text())
+        assert len(index_after_run["entries"]) == entries_before
+
+    def test_promote_then_reprepromote_is_noop(self, tmp_path: Path):
+        tmp_templates = self._tmp_catalog(tmp_path)
+        index_before = json.loads((tmp_templates / "index.json").read_text())
+        entries_before = len(index_before["entries"])
+
+        config = PipelineConfig(
+            run_name="promote_e2e",
+            output_dir=tmp_path / "runs",
+            templates_dir=tmp_templates,
+            dry_run=True,
+        )
+        run_pipeline(config)
+        staged_dir = tmp_path / "runs" / "promote_e2e" / "staged_recipes"
+
+        first = promote_staged_recipes(staged_dir=staged_dir, templates_dir=tmp_templates)
+        assert first.promoted > 0
+        index_after_first = json.loads((tmp_templates / "index.json").read_text())
+        assert len(index_after_first["entries"]) == entries_before + first.promoted
+        promoted_ids = {e["recipe_id"] for e in index_after_first["entries"]}
+        assert set(first.promoted_ids).issubset(promoted_ids)
+
+        second = promote_staged_recipes(staged_dir=staged_dir, templates_dir=tmp_templates)
+        assert second.promoted == 0
+        assert second.skipped == len(first.promoted_ids) + len(first.skipped_ids)
+        index_after_second = json.loads((tmp_templates / "index.json").read_text())
+        assert len(index_after_second["entries"]) == len(index_after_first["entries"])

@@ -20,7 +20,10 @@ from twinklr.core.feature_engineering.audio_discovery import (
     AudioDiscoveryService,
 )
 from twinklr.core.feature_engineering.component_factory import ComponentFactory
-from twinklr.core.feature_engineering.config import FeatureEngineeringPipelineOptions
+from twinklr.core.feature_engineering.config import (
+    FeatureEngineeringPipelineOptions,
+    warn_missing_corpus_roots,
+)
 from twinklr.core.feature_engineering.constants import FEATURE_BUNDLE_SCHEMA_VERSION
 from twinklr.core.feature_engineering.datasets.writer import FeatureEngineeringWriter
 from twinklr.core.feature_engineering.models import (
@@ -61,6 +64,7 @@ class FeatureEngineeringPipeline:
         music_library_index: MusicLibraryIndex | None = None,
     ) -> None:
         self._options = options or FeatureEngineeringPipelineOptions()
+        warn_missing_corpus_roots(self._options)
         from twinklr.core.feature_store.backends.null import NullFeatureStore
         from twinklr.core.feature_store.factory import create_feature_store
 

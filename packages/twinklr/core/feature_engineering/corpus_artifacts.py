@@ -8,6 +8,7 @@ ruff formatting.
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -42,6 +43,8 @@ from twinklr.core.feature_store.protocols import FeatureStoreProviderSync
 
 if TYPE_CHECKING:
     from pydantic import BaseModel as _BaseModel
+
+logger = logging.getLogger(__name__)
 
 _ProgressFn = Any  # Callable[[str], None] | None
 
@@ -729,7 +732,15 @@ def load_profile_artifacts(
 
                     table = pq.read_table(p)
                     return tuple(model_cls.model_validate(row) for row in table.to_pylist())
-                except (ImportError, Exception):
+                except ImportError:
+                    continue  # pyarrow not installed; jsonl sibling is the legitimate fallback
+                except Exception as exc:
+                    logger.warning(
+                        "Parquet read failed for %s (%s): %s — falling back to jsonl",
+                        p,
+                        stem,
+                        exc,
+                    )
                     continue
             else:
                 rows = _read_jsonl(p)

@@ -8,11 +8,14 @@ used within the decomposed implementation classes.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import logging
 from pathlib import Path
 from typing import Literal
 
 from twinklr.core.config.models import AgentConfig
 from twinklr.core.feature_store.models import FeatureStoreConfig
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -64,7 +67,12 @@ class FeatureEngineeringPipelineOptions:
         enable_color_discovery: Run corpus color palette discovery.
         enable_effect_metadata: Build per-family effect metadata profiles.
         enable_vocabulary_expansion: Run compound vocabulary expansion.
-        enable_active_learning: Run active learning uncertainty sampling.
+        enable_active_learning: Run the active-learning taxonomy review loop.
+            Off by default and deliberately so: it emits ``review_batch.json``,
+            which changes nothing until a human (or an explicitly invoked
+            oracle) writes back ``taxonomy_corrections.json``. It is a
+            human-in-the-loop stage, not an automated one, so it must not
+            activate silently on every corpus run.
         enable_transition_v2: Fit duration-conditioned Markov transition model.
         color_palette_library_path: Path to pre-existing color palette library.
         recipe_promotion_min_support: Minimum support count for recipe promotion.
@@ -73,6 +81,9 @@ class FeatureEngineeringPipelineOptions:
         recipe_promotion_max_per_family: Maximum recipes promoted per effect family.
         recipe_promotion_param_profiles: Named parameter profiles for promotion.
         taxonomy_rules_path: Path to custom taxonomy rules file.
+        taxonomy_corrections_path: Path to the additive taxonomy corrections
+            layer written by the active-learning loop. ``None`` uses the
+            packaged ``taxonomy/config/corrections.json`` when it exists.
         feature_store_config: Configuration for the feature store backend.
         fail_fast: Re-raise the first profile error instead of continuing.
         template_min_instance_count: Minimum instances for template mining.
@@ -150,6 +161,7 @@ class FeatureEngineeringPipelineOptions:
     stack_signature_mode: Literal["strict", "relaxed"] = "relaxed"
     recipe_promotion_param_profiles: dict[str, dict[str, object]] | None = None
     taxonomy_rules_path: Path | None = None
+    taxonomy_corrections_path: Path | None = None
     feature_store_config: FeatureStoreConfig | None = None
     fail_fast: bool = True
     template_min_instance_count: int = 2
@@ -172,7 +184,31 @@ class FeatureEngineeringPipelineOptions:
 # Alias for use within the decomposed implementation classes.
 PipelineConfig = FeatureEngineeringPipelineOptions
 
+
+def warn_missing_corpus_roots(options: FeatureEngineeringPipelineOptions) -> None:
+    """Log a warning naming any configured corpus-root path absent on disk.
+
+    Not a hard failure: a fresh checkout legitimately has no corpus yet, and
+    this is a local single-user tool, not a service with strict startup
+    validation. Callers that don't override ``extracted_search_roots`` /
+    ``music_repo_roots`` on a machine where the defaults don't exist would
+    otherwise get silent zero-phrase output with no indication why.
+    """
+    missing = [
+        root
+        for root in (*options.extracted_search_roots, *options.music_repo_roots)
+        if not root.exists()
+    ]
+    if missing:
+        logger.warning(
+            "Corpus root path(s) not found on disk — mining will yield zero phrases "
+            "from these roots: %s",
+            ", ".join(str(root) for root in missing),
+        )
+
+
 __all__ = [
     "FeatureEngineeringPipelineOptions",
     "PipelineConfig",
+    "warn_missing_corpus_roots",
 ]
