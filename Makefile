@@ -325,16 +325,12 @@ env-check: ## Check environment setup
 	@echo "$(YELLOW)Python:$(NC)"
 	@uv run python --version 2>/dev/null && echo "  ✓ Python available" || echo "  $(RED)✗ Python not available$(NC)"
 	@echo ""
-	@echo "$(YELLOW)Environment File:$(NC)"
-	@if [ -f ".env" ]; then \
-		echo "  ✓ .env exists"; \
-		if grep -q "OPENAI_API_KEY" .env; then \
-			echo "  ✓ OPENAI_API_KEY is set"; \
-		else \
-			echo "  $(YELLOW)⚠ OPENAI_API_KEY not found in .env$(NC)"; \
-		fi \
+	@echo "$(YELLOW)Environment Variables:$(NC)"
+	@if [ -n "$$OPENAI_API_KEY" ]; then \
+		echo "  ✓ OPENAI_API_KEY is set in the current shell"; \
 	else \
-		echo "  $(YELLOW)⚠ .env not found (copy from .env.example)$(NC)"; \
+		echo "  $(RED)✗ OPENAI_API_KEY is not set in the current shell$(NC)"; \
+		echo "  $(YELLOW)→ export OPENAI_API_KEY='your-key-here'$(NC)"; \
 	fi
 
 #############################################################################

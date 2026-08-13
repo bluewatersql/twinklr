@@ -28,7 +28,7 @@ Example:
     ... )
     >>>
     >>> # Execute
-    >>> ctx = PipelineContext(provider=provider, config=config)
+    >>> ctx = PipelineContext(session=session)
     >>> executor = PipelineExecutor()
     >>> result = await executor.execute(pipeline, audio_path, ctx)
 """

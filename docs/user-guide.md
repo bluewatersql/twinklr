@@ -69,15 +69,13 @@ Checks that both packages are importable and the CLI responds to `--help`.
 The pipeline requires an OpenAI API key for LLM agent calls:
 
 ```bash
-# Option 1: Environment variable
 export OPENAI_API_KEY='your-key-here'
-
-# Option 2: .env file
-cp .env.example .env
-# Edit .env and set OPENAI_API_KEY
 ```
 
 The CLI checks for `OPENAI_API_KEY` at startup and exits with an error if it is not set.
+`.env.example` lists the variables Twinklr reads, but nothing in the codebase loads a
+`.env` file automatically — export the variable in your shell (or set it in your shell
+profile) rather than relying on a `.env` file.
 
 _Source: `packages/twinklr/cli/main.py:158-163`_
 
@@ -96,7 +94,7 @@ _Source: `packages/twinklr/cli/main.py:158-163`_
 make env-check
 ```
 
-Verifies that `uv` is installed, Python is available, and `.env` exists with `OPENAI_API_KEY`.
+Verifies that `uv` is installed, Python is available, and `OPENAI_API_KEY` is set in the current shell environment.
 
 ---
 
@@ -276,7 +274,7 @@ _Source: `Makefile` targets `test-audio`, `test-audio-whisperx`, `test-audio-all
 
 ### `OPENAI_API_KEY environment variable not set`
 
-Set the environment variable or add it to your `.env` file. The CLI checks for this at startup.
+Export the environment variable: `export OPENAI_API_KEY='your-key-here'`. The CLI checks for this at startup.
 
 ### `Config file not found`
 

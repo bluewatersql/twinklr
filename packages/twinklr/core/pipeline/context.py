@@ -37,13 +37,7 @@ class PipelineContext:
         cancel_token: Optional cancellation token (asyncio.Event)
 
     Example:
-        >>> context = PipelineContext(
-        ...     provider=provider,
-        ...     app_config=app_config,
-        ...     job_config=job_config,
-        ...     cache=fs_cache,
-        ...     output_dir=Path("artifacts/demo"),
-        ... )
+        >>> context = PipelineContext(session=session, output_dir=Path("artifacts/demo"))
         >>>
         >>> # Access in stage
         >>> async def execute(self, input, context):
