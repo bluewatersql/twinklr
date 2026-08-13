@@ -1,5 +1,14 @@
 # Final Assessment — Twinklr Reactivation Review
 
+> **SUPERSEDED (2026-08-13, same day):** the owner rejected this document's framing —
+> correctly — as answers-without-a-proposal. The integrating deliverable is now
+> **[reactivation-proposal.md](reactivation-proposal.md)** (one analysis, positions
+> taken, alternatives + recommendations at each decision point, program toward the
+> fixed product targets). Three of this document's claims are retracted/revised in
+> the proposal's §0 (the xLights "commodity squeeze" jump, the display DEFER verdict,
+> and the wholesale corpus extraction). Retained as history and for its per-question
+> evidence summaries.
+
 _2026-08-13, baseline `aa8d325`. Method: 7-worker discovery → independent gate critic
 → product-thesis review → 7 phase reviews, each adversarially verified by a non-author
 and revised → local runtime baseline → official-source modernization research →

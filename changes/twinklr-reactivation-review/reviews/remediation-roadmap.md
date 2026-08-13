@@ -1,4 +1,13 @@
-# Remediation Roadmap (Stage 8)
+# Remediation Roadmap (Stage 8) — appendix
+
+> **SUPERSEDED AS THE PLAN (2026-08-13, same day):** the owner rejected this
+> document's defect-class organization — correctly — as "version bumps and bug
+> fixes" without a destination. The plan is now
+> **[reactivation-proposal.md](reactivation-proposal.md)**, whose workstreams
+> reference this document's item IDs (RM-x.y) for item-level evidence, dependencies,
+> and sequencing traps, which remain valid. Note the owner's edit standing in
+> RM-3.1: the default retarget is `gpt-5.6-sol` (quality axis) — reflected in the
+> proposal's D6.
 
 _Dependency-aware program derived from the normalized findings (findings.md) and the
 sequencing constraints recorded during verification. Baseline `aa8d325`, authored
@@ -55,7 +64,7 @@ behavior.**_
 
 | Item | What | Deps | I/E/C/R |
 |---|---|---|---|
-| RM-3.1 | Model retarget (M1): `gpt-5.2→gpt-5.6-terra` default, judge→terra/luna, image→gpt-image-2; explicit `reasoning.effort` per role; consolidate the 29 hardcoded sites into (now-wired) config; **include the out-of-framework site** `normalization/llm_review.py`; deadlines per RM-G3 | RM-1.4 (config wiring), RM-1.5 | 4/2/2/2 |
+| RM-3.1 | Model retarget (M1): `gpt-5.2→gpt-5.6-sol` default, judge→terra/luna, image→gpt-image-2; explicit `reasoning.effort` per role; consolidate the 29 hardcoded sites into (now-wired) config; **include the out-of-framework site** `normalization/llm_review.py`; deadlines per RM-G3 | RM-1.4 (config wiring), RM-1.5 | 4/2/2/2 |
 | RM-3.2 | Structured outputs (M2): after a one-call `json_object`-on-5.6 probe; migrate to strict json_schema / `responses.parse` (model changes: all-required fields, no top-level unions); shrinks the repair loop to refusal/truncation | RM-3.1 | 4/3/3/2 |
 | RM-3.3 | ML chain bump (M3): torch/torchaudio 2.8.x + whisperx 3.8.6 + pyannote 4.x (breakage risk concentrated in the orphaned diarization module — delete it first) + Python 3.12→3.13 ⚖ (update constraint memory) | RM-0.4 | 3/3/3/3 |
 | RM-3.4 | Drop sqlite-vec extra (M7); defer openai-SDK 3.x and mypy 2.x as soak-then-adopt (M4/M5) | — | 2/1/1/1 |
