@@ -129,10 +129,24 @@ twinklr/
 │   │   └── pipeline/            # Declarative pipeline framework
 │   └── cli/                     # CLI entry point (twinklr-cli)
 ├── tests/                       # Unit, integration, e2e tests
-├── blog/                        # Technical blog series
+├── docs/                        # Published documentation (GitHub Pages)
+├── context/                     # Durable project knowledge (see AGENTS.md)
+├── changes/                     # Change specs, plans, handoffs
+├── memories/                    # Shared decisions, learnings, constraints, patterns
+├── prompts/                     # Reusable agent workflows
 ├── Makefile                     # Development commands
 └── pyproject.toml               # Workspace configuration
 ```
+
+## Project Knowledge & AI Agents
+
+This repository is also the shared knowledge base for humans (via Obsidian) and coding
+agents (Claude Code, Codex, others):
+
+- **[AGENTS.md](AGENTS.md)** — canonical instructions and context-loading protocol for all agents
+- **[context/INDEX.md](context/INDEX.md)** — durable project truth ([current state](context/current-state.md))
+- **[changes/ACTIVE.md](changes/ACTIVE.md)** — what is being worked on right now
+- **[HOME.md](HOME.md)** — Obsidian vault entry point
 
 ## Architecture
 

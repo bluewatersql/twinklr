@@ -1,50 +1,72 @@
-# Development directories
-.archive/
-.venv/
-.dev/
+# === OS metadata ===
+.DS_Store
+.AppleDouble
+.LSOverride
+Thumbs.db
+
+# === Editors / IDEs (machine-local) ===
 .vscode/
-.omc/
-
-# Python cache and test artifacts
-.pytest_cache/
-.ruff_cache/
-.mypy_cache/
-.coverage*
-__pycache__/
-*.py[cod]
-*$py.class
-
-# Python distribution / packaging
-dist/
-build/
-*.egg-info/
-
-# Project data and artifacts (never check in)
-data/
-artifacts/
-changes/
-
-# Environment and configuration
-.env*
-.cursorrules
-config.json
-fixture_config.json
-job_config.json
-
-# Documentation (local only)
-CLAUDE.md
-.cursor/
-.claude/
-
-# IDEs
 .idea/
 *.swp
 *.swo
 *~
 
-# OS
-.DS_Store
-Thumbs.db
+# === Obsidian (vault runtime state is machine-local; no shared config is versioned) ===
+.obsidian/
 
-# Backups
+# === Agent-local / session state ===
+# Shared agent knowledge is Git-tracked in AGENTS.md, CLAUDE.md, context/, changes/,
+# memories/, prompts/. Everything below is machine-local runtime state.
+.claude/
+.cursor/
+.cursorrules
+.codex/
+.chatgpt/
+.memories/
+.omc/
+.omc-workspace
+.remember/
+
+# === Python ===
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+
+# === Test / lint / type-check caches ===
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage*
+htmlcov/
+
+# === Build / packaging ===
+dist/
+build/
+*.egg-info/
+
+# === Generated project data & run artifacts (never check in) ===
+data/
+artifacts/
+.archive/
+.dev/
+
+# === Local configuration (create from documented schemas; see context/engineering/conventions.md) ===
+config.json
+fixture_config.json
+job_config.json
+
+# === Environment / secrets ===
+.env
+.env.*
+!.env.example
+
+# === Logs / temp ===
+*.log
+logs/
+tmp/
+temp/
+.cache/
+
+# === Backups ===
 *.bak*
