@@ -459,3 +459,9 @@ merged grid and regenerates goldens once, not twice.
    error). Pinned in tests/golden/test_8head_role_mismatch.py. Fix the silent-skip
    here (loud behavior + role-inference generalization or documented rig limits);
    P1P-T11's CLI rig-config work must surface unsupported rig shapes to the user.
+
+4. **P4-F14 un-masked by T3's M5 fix (verifier-routed):** step_compiler's
+   phase-shift with wrap=True now snaps mid-segment for curves that no longer
+   close on their start value (9 of 108 golden curves gained a full-span interior
+   jump; net discontinuities still improved 84→69 and 66 pre-date T3). Nothing
+   tests the phase path — add a discontinuity pin and fix the wrap semantics here.

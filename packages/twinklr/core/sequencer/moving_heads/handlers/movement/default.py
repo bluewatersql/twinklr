@@ -78,9 +78,15 @@ class DefaultMovementHandler:
             )
         base_params = {**pattern.base_params, **params.get("base_params", {})}
 
-        intensity = params.get("intensity", Intensity.SMOOTH)
+        # The caller-supplied `intensity` argument is authoritative. It used to be
+        # overwritten by a lookup in `params` — the step's movement params dict,
+        # which never carries that key — so every movement in every show rendered
+        # at SMOOTH regardless of what the plan asked for (P4-F1).
         categorical_params_set = pattern.categorical_params or DEFAULT_MOVEMENT_PARAMS
-        categorical_params = categorical_params_set[intensity]
+        categorical_params = categorical_params_set.get(
+            intensity,
+            DEFAULT_MOVEMENT_PARAMS.get(intensity, DEFAULT_MOVEMENT_PARAMS[Intensity.SMOOTH]),
+        )
 
         renderer_log.debug(f"Categorical Params: {categorical_params}")
         renderer_log.debug(f"Intensity: {intensity}")

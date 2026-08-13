@@ -2,6 +2,15 @@
 
 Tests that handlers correctly pass categorical parameters and adapter
 registry through to the curve generation pipeline.
+
+Every call here uses **production's call shape**: intensity is supplied only as
+the `generate` argument, exactly as `step_compiler.compile_step` does. The
+earlier version of this file passed intensity twice — once as the argument and
+once as a params-dict key — which is what let the suite stay green while
+`DefaultMovementHandler.generate` discarded the argument and read the key that
+production never sets (P4-F1/P4-M4). The key is deliberately absent below; a
+dedicated pin that the argument beats a conflicting key lives in
+`tests/unit/sequencer/moving_heads/test_movement_intensity.py`.
 """
 
 from __future__ import annotations
@@ -20,10 +29,8 @@ from twinklr.core.sequencer.moving_heads.libraries.movement import (
 class TestMovementHandlerCategoricalParams:
     """Tests for DefaultMovementHandler with categorical parameters."""
 
-    def test_handler_generates_curves_currently(self):
-        """Test handler generates curves with current implementation."""
-        # This test documents current behavior - categorical params are already
-        # extracted and passed to generate_curve, but not through registry adapter system
+    def test_handler_generates_curves(self):
+        """Handler resolves a library pattern into curves."""
         handler = DefaultMovementHandler()
 
         # Use existing pattern from library
@@ -32,7 +39,6 @@ class TestMovementHandlerCategoricalParams:
         params = {
             "movement_pattern": pattern,
             "geometry": GeometryType.FAN,
-            "intensity": Intensity.FAST,
         }
 
         # Generate curves
@@ -48,19 +54,26 @@ class TestMovementHandlerCategoricalParams:
         assert len(result.pan_curve) > 0
         assert result.tilt_curve is not None or result.tilt_static_dmx is not None
 
-    def test_handler_intensity_affects_curves_currently(self):
-        """Test that different intensities produce different curve energies (current behavior)."""
+    def test_handler_intensity_affects_curves(self):
+        """Rising intensity yields rising curve energy, along the whole ladder."""
         handler = DefaultMovementHandler()
 
         # Use sweep_lr pattern which doesn't have custom categorical_params
         pattern = MovementLibrary.PATTERNS[MovementType.SWEEP_LR]
 
-        results = {}
-        for intensity in [Intensity.SLOW, Intensity.SMOOTH, Intensity.FAST, Intensity.DRAMATIC]:
+        ladder = [
+            Intensity.SLOW,
+            Intensity.SMOOTH,
+            Intensity.DRAMATIC,
+            Intensity.FAST,
+            Intensity.INTENSE,
+        ]
+
+        energies = []
+        for intensity in ladder:
             params = {
                 "movement_pattern": pattern,
                 "geometry": GeometryType.FAN,
-                "intensity": intensity,
             }
 
             result = handler.generate(
@@ -72,14 +85,13 @@ class TestMovementHandlerCategoricalParams:
 
             # Calculate energy (total variation)
             pan_values = [p.v for p in result.pan_curve]
-            pan_energy = sum(
-                abs(pan_values[i + 1] - pan_values[i]) for i in range(len(pan_values) - 1)
+            energies.append(
+                sum(abs(pan_values[i + 1] - pan_values[i]) for i in range(len(pan_values) - 1))
             )
-            results[intensity] = pan_energy
 
-        # Higher intensity should have more energy
-        assert results[Intensity.SLOW] < results[Intensity.FAST]
-        assert results[Intensity.SMOOTH] < results[Intensity.DRAMATIC]
+        # Higher intensity should have more energy, and the ends must differ
+        assert energies == sorted(energies), energies
+        assert energies[0] < energies[-1], energies
 
     def test_handler_with_dramatic_intensity(self):
         """Test handler with dramatic intensity produces significant movement."""
@@ -91,14 +103,13 @@ class TestMovementHandlerCategoricalParams:
         params = {
             "movement_pattern": pattern,
             "geometry": GeometryType.FAN,
-            "intensity": Intensity.DRAMATIC,  # High amplitude
         }
 
         result = handler.generate(
             params=params,
             n_samples=30,
             cycles=1.0,
-            intensity=Intensity.DRAMATIC,
+            intensity=Intensity.DRAMATIC,  # High amplitude
         )
 
         # Should generate valid curves
@@ -119,7 +130,6 @@ class TestMovementHandlerCategoricalParams:
         params = {
             "movement_pattern": pattern,
             "geometry": GeometryType.FAN,
-            "intensity": Intensity.SMOOTH,
         }
 
         # Should still work (falls back to direct params)

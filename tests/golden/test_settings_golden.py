@@ -130,16 +130,18 @@ def test_shutter_mapping_is_invisible_in_the_emitted_settings(
 
 
 @pytest.mark.parametrize("preset_pair", [("chill", "energetic"), ("chill", "intense")])
-def test_preset_id_does_not_change_movement_curve(preset_pair: tuple[str, str]) -> None:
-    """KNOWN-WRONG PIN (P4-F1): preset intensity does not reach the movement curve.
+def test_preset_id_changes_the_movement_curve(preset_pair: tuple[str, str]) -> None:
+    """P4-F1 (FIXED in P1P-T3): preset intensity reaches the movement curve.
 
-    `sweep_lr`'s movement pattern carries flat `base_params` rather than per-intensity
-    `categorical_params`, so the intensity the pipeline derives from `preset_id` is
-    discarded and the emitted settings string is byte-identical across presets. A
-    planner asking for INTENSE gets exactly what CHILL produces.
+    This pin used to assert `==`. `DefaultMovementHandler.generate` overwrote its
+    `intensity` argument with a lookup in the step's movement params — a dict that
+    never carries that key — so the intensity the pipeline derives from `preset_id`
+    was discarded and the emitted settings string was byte-identical across presets:
+    a planner asking for INTENSE got exactly what CHILL produced.
 
-    Pinned here so P1P-T4's fix shows up as this test failing; at that point the
-    assertion inverts to `!=` and the goldens are regenerated.
+    `sweep_lr` is the sharpest probe because it declares no `categorical_params` of
+    its own and resolves through `DEFAULT_MOVEMENT_PARAMS`, so nothing but the
+    intensity plumbing can make these payloads differ.
     """
     low, high = preset_pair
     low_effects = render_single_section(
@@ -149,16 +151,18 @@ def test_preset_id_does_not_change_movement_curve(preset_pair: tuple[str, str]) 
         RIGS["mh4_minimal"], template_id="sweep_lr_fan_hold", preset_id=high
     )
 
-    assert [effect.settings for effect in low_effects] == [
+    assert [effect.settings for effect in low_effects] != [
         effect.settings for effect in high_effects
     ]
 
 
 def test_preset_id_does_change_curves_where_the_pattern_declares_intensities() -> None:
-    """The contrast case, so the pin above is read as a defect and not as "presets never matter".
+    """The same guarantee for a pattern that declares its own per-intensity table.
 
-    `bounce` declares `categorical_params` per intensity, and there the preset really
-    does reach the curve. The difference between the two templates is the defect.
+    `bounce` resolves through its own `categorical_params` rather than through
+    `DEFAULT_MOVEMENT_PARAMS`, so this covers the other half of the lookup that
+    P1P-T3 repaired — and the P4-F1a fill-in that gave that table all five
+    intensities instead of two.
     """
     low_effects = render_single_section(
         RIGS["mh4_minimal"], template_id="bounce_fan_pulse", preset_id="chill"

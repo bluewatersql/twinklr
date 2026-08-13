@@ -365,8 +365,6 @@ _GOLDEN_BANNER = (
     "# Known-defective behavior visible below (fixed in P1P-T3..T6, not here):\n"
     "#   P4-F3  every channel 1..16 is emitted, unchoreographed ones zero-filled --\n"
     "#          so E_SLIDER_DMX<n>=0 here means 'zero-filled', not 'commanded to 0'\n"
-    "#   P4-F1  movement curves can be identical across preset_id (see\n"
-    "#          test_preset_id_does_not_change_movement_curve)\n"
     "#   P4-F10 value-curve points are written at 2-decimal resolution\n"
     "#   NEW    every transition segment emits an all-zero settings string with no\n"
     "#          value curves at all -- see test_transition_segments_emit_all_zero\n"

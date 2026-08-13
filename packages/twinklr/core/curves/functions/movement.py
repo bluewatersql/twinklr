@@ -15,9 +15,9 @@ from twinklr.core.curves.semantics import center_curve, ensure_loop_ready
 def _movement_post_process(
     points: list[CurvePoint],
     *,
-    loop_mode: str = "append",
+    loop_mode: str = "extend",
 ) -> list[CurvePoint]:
-    """Center and enforce loop readiness for movement curves."""
+    """Recenter on 0.5 and give the curve a defined value at t=1.0."""
     centered = center_curve(points)
     return ensure_loop_ready(centered, mode=loop_mode)
 
@@ -26,7 +26,7 @@ def generate_movement_linear(
     n_samples: int,
     ascending: bool = True,
     *,
-    loop_mode: str = "append",
+    loop_mode: str = "extend",
     **kwargs,  # Accept but ignore intensity params (cycles, frequency, amplitude)
 ) -> list[CurvePoint]:
     """Generate a loop-ready, offset-centered linear curve for movement.
@@ -34,7 +34,7 @@ def generate_movement_linear(
     Args:
         n_samples: Number of samples to generate.
         ascending: If True, ramp from 0→1. If False, ramp from 1→0.
-        loop_mode: Loop preparation mode.
+        loop_mode: Terminal-anchor mode (see `ensure_loop_ready`).
         **kwargs: Ignored intensity parameters (for compatibility).
 
     Returns:
@@ -50,7 +50,7 @@ def generate_movement_hold(
     n_samples: int,
     value: float = 1.0,
     *,
-    loop_mode: str = "append",
+    loop_mode: str = "extend",
     **kwargs,  # Accept but ignore intensity params (cycles, frequency, amplitude)
 ) -> list[CurvePoint]:
     """Generate a loop-ready, offset-centered hold curve for movement.
@@ -58,7 +58,7 @@ def generate_movement_hold(
     Args:
         n_samples: Number of samples to generate.
         value: Constant value (clamped to [0, 1]).
-        loop_mode: Loop preparation mode.
+        loop_mode: Terminal-anchor mode (see `ensure_loop_ready`).
         **kwargs: Ignored intensity parameters (for compatibility).
 
     Returns:
@@ -77,7 +77,7 @@ def generate_movement_sine(
     amplitude: float = DEFAULT_CURVE_INTENSITY_PARAMS["amplitude"],
     frequency: float = DEFAULT_CURVE_INTENSITY_PARAMS["frequency"],
     *,
-    loop_mode: str = "append",
+    loop_mode: str = "extend",
 ) -> list[CurvePoint]:
     """Generate a loop-ready, offset-centered sine curve for movement.
 
@@ -87,7 +87,7 @@ def generate_movement_sine(
         phase: Phase offset in radians.
         amplitude: Amplitude scaling factor [0, 1] (default: 1.0).
         frequency: Frequency multiplier (default: 1.0).
-        loop_mode: Loop preparation mode.
+        loop_mode: Terminal-anchor mode (see `ensure_loop_ready`).
 
     Returns:
         List of CurvePoints centered at 0.5 and loop-ready.
@@ -110,7 +110,7 @@ def generate_movement_triangle(
     amplitude: float = DEFAULT_CURVE_INTENSITY_PARAMS["amplitude"],
     frequency: float = DEFAULT_CURVE_INTENSITY_PARAMS["frequency"],
     *,
-    loop_mode: str = "append",
+    loop_mode: str = "extend",
 ) -> list[CurvePoint]:
     """Generate a loop-ready, offset-centered triangle curve for movement.
 
@@ -119,7 +119,7 @@ def generate_movement_triangle(
         cycles: Base number of complete cycles.
         amplitude: Amplitude scaling factor [0, 1] (default: 1.0).
         frequency: Frequency multiplier (default: 1.0).
-        loop_mode: Loop preparation mode.
+        loop_mode: Terminal-anchor mode (see `ensure_loop_ready`).
 
     Returns:
         List of CurvePoints centered at 0.5 and loop-ready.
@@ -143,7 +143,7 @@ def generate_movement_pulse(
     low: float = 0.0,
     frequency: float = DEFAULT_CURVE_INTENSITY_PARAMS["frequency"],
     *,
-    loop_mode: str = "append",
+    loop_mode: str = "extend",
     **kwargs,  # Accept but ignore other params (e.g., amplitude from defaults)
 ) -> list[CurvePoint]:
     """Generate a loop-ready, offset-centered pulse curve for movement.
@@ -159,7 +159,7 @@ def generate_movement_pulse(
         high: Value during high portion.
         low: Value during low portion.
         frequency: Frequency multiplier (default: 1.0).
-        loop_mode: Loop preparation mode.
+        loop_mode: Terminal-anchor mode (see `ensure_loop_ready`).
 
     Returns:
         List of CurvePoints centered at 0.5 and loop-ready.
