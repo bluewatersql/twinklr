@@ -28,6 +28,7 @@ dependencies = [
     "python-Levenshtein>=0.25.0", # Levenshtein distance for mismatch ratio
     "defusedxml>=0.7.1",          # Safe XML parsing (XXE/billion-laughs protection)
     "simpleeval>=1.0",             # Safe expression evaluation (replaces eval())
+    "pillow>=12.1.0",              # Image generation/rendering (agents/assets); was only declared transitively via the root meta-package
 ]
 
 [project.optional-dependencies]

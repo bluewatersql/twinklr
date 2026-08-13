@@ -287,3 +287,17 @@ may run concurrently in separate worktrees; (3) verify the editable-install path
 (`uv sync`) is re-tested after any change, since that is the path every other developer
 and every other Phase 0 task's `uv run` commands depend on — regressing it would be far
 more disruptive than the empty-wheel bug this task fixes.
+
+## Execution deviation record (2026-08-13, verified + accepted)
+
+The "setup.py no longer exists" acceptance bullet is AMENDED: both setup.py files are
+retained as thin (~20-line) declarative-equivalents. Verified rationale: uv_build
+cannot address a dotted namespace parent outside the project root; hatchling's
+editable path rejects prefix-adding source rewrites; and a pure-pyproject setuptools
+config does NOT reprefix the 109 discovered subpackages to `twinklr.core.*` (the
+verifier reproduced bare `agents/` in the wheel) — the programmatic find_packages
+list is load-bearing. Additional verified fixes that rode with the task: pillow
+declared as a direct core dep (3 direct PIL imports in agents/assets); 4 missing
+__init__.py added (real-wheel imports failed without them). All other acceptance
+criteria met as written (non-empty wheels, no tree pollution, make build works,
+editable path unregressed, full suite green).

@@ -180,11 +180,10 @@ validate: ## Run format, lint-fix, type-check, and test (shows all errors/warnin
 
 build: ## Build distribution packages
 	@echo "$(BLUE)→ Building packages...$(NC)"
-	@cd packages/core && uv build
-	@cd packages/cli && uv build
+	@cd packages/twinklr/core && uv build
+	@cd packages/twinklr/cli && uv build
 	@echo "$(GREEN)✓ Packages built$(NC)"
-	@echo "$(YELLOW)→ Core package: packages/core/dist/$(NC)"
-	@echo "$(YELLOW)→ CLI package: packages/cli/dist/$(NC)"
+	@echo "$(YELLOW)→ Output: dist/ (workspace root)$(NC)"
 
 #############################################################################
 # Cleanup
