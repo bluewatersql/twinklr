@@ -36,3 +36,26 @@ does not work.
 - T7 explicitly must NOT touch: `success_threshold`, `max_iterations`, `judge_agent`,
   channel/fixture defaults, `Template.defaults` — those get WIRED (not deleted) in
   P1P/P2P tasks.
+
+## COMPLETION RECORD (2026-08-13)
+
+**Phase 0 COMPLETE — exit criteria met.** All seven tasks executed by parallel
+sonnet executors with independent verification (2 verifier REJECT cycles caught real
+defects: the NLTK offline gap, and the T3 escalation redirect), landed as commits
+f0ae952 (T1) · e2480c4 (T2) · dc065f1 (T3) · 54b044c (T4, incl. four T7 deletions
+via shared-index sweep — split provenance) · 69ce480 (T5) · e1b3b71 (T6) ·
+eeeb4c6 (T7).
+
+Exit-gate evidence (final tree): ruff format --check clean (1186 files) · ruff
+check --no-cache clean · mypy clean (667 files) · version-check OK (5 sites, 0.2.0)
+· wheels real (core 672 / cli 7 members, no pollution) · full suite **4068 passed /
+26 skipped / 0 failed**. CI workflow in place (.github/workflows/ci.yml, check-only,
+offline-capable); `make validate` guarded against dirty trees.
+
+Execution learnings for later phases (adopted): workers must never pre-stage
+(`git rm`) in the shared tree — orchestrator commits use pathspec form; clean-tree
+verification steps use disposable worktrees, never stash; ruff counts are only
+trustworthy with --no-cache; spec line-number evidence drifts — executors re-verify
+before editing (caught extra live references twice).
+
+Next: Phase 1P (render truth) ∥ Phase 1K (knowledge edges) per 00-overview.md.
