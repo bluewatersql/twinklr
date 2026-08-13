@@ -1,336 +1,313 @@
-# Twinklr Reactivation Proposal
+# Twinklr Reactivation Proposal (v2)
 
-_2026-08-13. This is the review's integrating deliverable: one analysis, one proposed
-plan. It supersedes the framing of `final-assessment.md` and `remediation-roadmap.md`
-(both retained as appendices; the roadmap's item-level evidence and sequencing traps
-remain valid and are referenced by ID). Every claim traces to the adversarially
-verified evidence in `reviews/phases/*.md` / `verification.md` / `modernization.md`._
+_2026-08-13. The review's integrating deliverable: one analysis, one plan. v2 is a
+substantive rewrite after the owner corrected v1's misreading of the corpus
+subsystem's purpose. Supersedes `final-assessment.md` and `remediation-roadmap.md` as
+the plan (both remain evidence appendices; RM-x.y item IDs are still referenced for
+item-level detail). Every factual claim traces to the adversarially verified evidence
+in `reviews/phases/*.md` / `verification.md` / `modernization.md`._
 
-**Fixed constraints from the owner:** the core functional targets do not change —
-(1) auto-sequencing moving heads is the most mature capability and part 1 of the
-product; (2) choreographing full shows (display) is part 2, largely unfinished, to be
-completed rather than deferred. Quality is the optimization axis (per the owner's
-retarget of the default model to `gpt-5.6-sol`), not token cost.
-
----
-
-## 0. Corrections to earlier review claims
-
-Three conclusions from the review's own Stage 2/synthesis were jumps beyond the
-evidence. They are retracted or revised here so the proposal doesn't inherit them:
-
-**0.1 — The "commodity squeeze" claim is retracted.** The review argued xLights'
-2026 AI features commoditize Twinklr's agent framework and lyrics/audio chain. The
-review's own Stage 6 research contradicts that: xLights' AI Services layer is
-**configuration-extensible only and scoped to palettes, images, and import-mapping**
-— there is no choreography hook, no plugin ABI, and no way for an external tool to
-consume xLights' AI or stem-separation capabilities. A capability with no external
-hook changes nothing for Twinklr. What survives from that research: (a) the **HTTP
-automation API** (`addEffect`, `importXLightsSequence`, `getModels`) is a real,
-usable integration surface; (b) stem separation is a capability Twinklr *lacks* and
-should **add** (D8), not a reason to concede anything.
-
-**0.2 — "DEFER display" is replaced by "complete display as part 2."** The deferral
-verdict treated display as a second product. Under the fixed targets it is the
-unfinished half of *this* product. The evidence supports completion: the code is
-competent (verified), its defects are enumerated and bounded (P5-F1/F2/F3/F12/M1/M2
-— all with corrected mechanisms and known fixes), and its real blocker is **data**
-(an empty, gitignored recipe store), not architecture.
-
-**0.3 — "Extract the corpus stack wholesale" is revised to a split verdict.** If
-display ships, its runtime supply chain (template store, recipes, theming,
-recipe_builder's staged authoring flow) is product infrastructure and stays. What
-still leaves the hot tree is the *research* mining pipeline (FE mining, embeddings,
-active learning, profiling) — parked until recipe supply actually demands mining,
-and gated on vendor-rights resolution (RM-G2) regardless.
+**Fixed constraints from the owner:**
+- Core functional targets do not change: **(1)** auto-sequencing moving heads — the
+  most mature capability; **(2)** choreographing full shows — the largely unfinished
+  second part.
+- **The research/corpus phase exists so the system can LEARN choreography** — what
+  megatree choreography looks like, what it means to sequence arches in a yard with
+  icicles. Learning patterns is the point; replicating any particular vendor sequence
+  is not.
+- Licensing is a non-issue: this is a personal, non-commercial project. (One residual
+  courtesy rule only: don't *redistribute* vendor-derived content. Learning from
+  purchased material for personal use is normal use.)
+- Quality over cost: planner-grade calls on `gpt-5.6-sol` (owner's edit).
 
 ---
 
-## 1. The product (position taken)
+## 0. Corrections carried into v2
 
-**Twinklr is an offline-first tool that turns a song into a complete, editable light
-show — moving-head choreography first, coordinated display choreography second —
-delivered into the user's existing xLights workflow without ever touching their
-master sequence file.**
+**0.1 (from v1) — xLights 2026 obsoletes nothing.** Its AI services have no external
+hooks (verified); a capability you cannot consume changes nothing. What matters from
+that research: the HTTP automation API (`getModels`, `addEffect`,
+`importXLightsSequence`) is a usable integration surface, and `.xtiming` import is a
+mapping-free delivery channel.
 
-- **User:** an xLights hobbyist with DMX moving heads (a small rig, like the
-  author's 4-head setup, is the design center) who can edit sequences but doesn't
-  want to hand-author pan/tilt/dimmer curves for every song.
-- **Deliverables ladder** (each independently useful, in shipping order):
-  1. **`.xtiming` timing/section/lyric tracks** — mapping-free import, already
-     backed by the best-tested code in `formats/` (ST-8). Ships almost immediately;
-     puts Twinklr output inside real workflows while the rest matures.
-  2. **A fresh, minimal `.xsq`** containing only Twinklr's models/effects plus a
-     shipped `.xmap` mapping hint — imported into the user's master sequence via
-     xLights' import (manually or via `importXLightsSequence`, `mapmethod:"both"`).
-  3. **Direct injection** via the automation API (`getModels` → plan against the
-     user's real layout → `addEffect`) — the iteration-loop experience (regenerate a
-     section while xLights is open), added once 1–2 are true.
-- **The user's master file is never an input.** This eliminates the confirmed
-  template-content-loss defect (CF-5) by construction and removes the parser from
-  the export trust path (it remains for corpus reading only).
-- **Quality over cost:** planner-grade calls run `gpt-5.6-sol`; at the verified
-  pricing this is roughly $0.59–$1.35/song — acceptable for the value of a good
-  show, and cheap relative to the hours saved *if* the output is good, which is what
-  Part M2 makes measurable.
-- **Commitments the current system doesn't keep, made explicit:** reproducibility
-  (same song + config + seed → same show), honesty (degradation is a surfaced
-  status, never a silently swallowed exception), and editability (output opens
-  clean in current xLights — verified by an in-CI acceptance test, not assumed).
-- **Gate:** a LICENSE decision (RM-G1). Until one exists, nobody else may legally
-  use this. This is the cheapest highest-leverage item in the entire program.
+**0.2 (from v1) — display is part 2 of this product**, not a deferred second product.
+
+**0.3 (v2, replaces v1's §0.3/D5) — the corpus pipeline is the learning system, and
+v1 was wrong to cleave it off.** v1 recommended parking the mining pipeline and
+bootstrapping display recipes "by authoring" — silently replacing machine learning
+with the hand-labor the project exists to eliminate, and leaving no answer to *where
+the system learns what a megatree does during a chorus*. The evidence never supported
+amputation; it supported **repair of the loop's broken edges** (identity, the apply
+edge, the label loop). §2 and D5 are rebuilt around that.
+
+**0.4 (v2) — licensing de-escalated.** v1's RM-G1 "gate" treated a personal project
+like a distribution business. Dropped. The only standing note: if distribution is
+ever wanted later, add a license then; and don't redistribute vendor-derived content
+meanwhile.
+
+---
+
+## 1. What the project is trying to accomplish
+
+**Twinklr turns a song plus a description of *your* display into a complete,
+coordinated light show — moving heads and display elements — that looks like it was
+choreographed by someone who knows what they're doing.**
+
+The hard problem is not rendering (deterministic code does that) and not musical
+analysis (DSP does that). The hard problem is **choreographic knowledge**: knowing
+that a megatree carries spirals and wipes at the chorus, that arches chase and
+leapfrog in call-response, that icicles drip and twinkle as texture, that these roles
+coordinate rather than compete, and that all of it must serve the music's structure.
+No hand-written rulebook covers every element type × musical moment × style; humans
+encode some of it (the 37 MH templates), but the display side across heterogeneous
+layouts is exactly where hand-encoding stops scaling.
+
+**Therefore the system's defining loop is a knowledge loop:**
+
+```
+        ACQUIRE                 LEARN                    CURATE
+  sequences (vendor packs,   taxonomy: choreographic   recipe synthesis →
+  community, own shows)  ──► function of each phrase   staged human review ──► CATALOG
+  aligned to music           propensity: what belongs  (recipe_builder;          │
+  (profiling + FE align)     on WHICH element type     LLM-generated candidates  │
+                             templates/stacks: layered enter the same gate)      │
+                             idioms; transitions;                                │
+                             color arcs; style                                   │
+                                                                                 ▼
+        EVALUATE ◄──────────── RENDER ◄──────────── PLAN with learned context
+  harness + human judgment   deterministic,          planner sees: catalog filtered
+  → feeds propensity/labels  precise (both parts)    by the USER'S layout via
+  (active-learning loop)                             propensity/model_affinities,
+                                                     style constraints, macro arc
+```
+
+Nearly all of this **already exists in the repository** — that is the review's most
+important structural fact once read correctly. What's broken is not the idea or most
+of the machinery; it's four specific edges (§2.2) plus the part-1 renderer defects.
+The proposal is: **close the loop, and make part 1 true while doing it.**
+
+**Where the system learns megatree/arches/icicles choreography — the concrete
+answer:** `PropensityMiner` learns effect↔element-type affinity from real shows
+(`propensity.py`: co-occurrence over `target_name`→model-type); the taxonomy
+classifies each mined phrase's choreographic function (BASE/RHYTHM/ACCENT);
+template/stack mining captures multi-layer idioms with support/stability stats;
+recipes carry `model_affinities` and `motif_compatibility` so that, at plan time, the
+catalog is **conditioned on the user's actual layout** (element types from
+`xlights_rgbeffects.xml` via the layout parser / `getModels`), and the group planner
+already consumes exactly this context (`context_shaping.py` — verified working glue).
+The knowledge path exists end-to-end in code. It has never been connected to a
+runnable product path — that is the defect, and it is a wiring defect, not a design
+one.
+
+**Delivery (unchanged from v1):** never touch the user's master sequence. Ladder:
+`.xtiming` timing/section/lyric tracks (immediate) → fresh minimal `.xsq` + `.xmap`
+import → automation-API injection (`getModels` → plan against real layout →
+`addEffect`) as the live-iteration workflow. The layout the API/rgbeffects provides
+is *also* what conditions the learned catalog — delivery and knowledge share the same
+layout contract.
 
 ## 2. Target architecture
 
-One pipeline, two rendering back-ends, one delivery layer. Components marked ✔ exist
-and are kept largely as-is; ✚ exist but get repaired/extended; ✖ are cut.
+### 2.1 The three systems and their state
 
-```
-audio ──► ANALYSIS ✚          deterministic DSP core (kept) + stem separation (new, D8)
-              │                enhancement chain repaired (SF-1/2/3); degradation surfaced
-              ▼
-        INTERPRETATION ✚      • deterministic features go straight to planners (no LLM re-typing)
-              │                • ONE profiling call (sol): creative brief only — mood arc, style,
-              │                  section roles (the parts DSP cannot produce)
-              │                • lyrics agent (sol): word/phrase MomentCues — THE unique LLM value,
-              │                  currently discarded; becomes a first-class plan input
-              ▼
-        SHOW PLAN ✚           macro arc as STRUCTURED data (D3): per-section energy target,
-              │                palette/theme role, motif continuity, cross-section coordination —
-              │                consumed by BOTH back-ends as typed fields, never as prompt prose
-              ▼
-   ┌── MH SECTION PLANNER ✚   widened plan schema v2 (D1): template + preset + intensity +
-   │                           color/gobo/shutter intents + lyric-moment events + segmentation;
-   │                           deterministic selector as baseline/fallback/regression arm
-   │
-   └── DISPLAY GROUP PLANNER ✔ (already the best LLM integration in the repo: FE context,
-                               auto-repair passes, categorical vocabulary — becomes the model
-                               for the MH side rather than the exception)
-              ▼
-        RENDERERS ✚           MH compile pipeline repaired (CF-1/2/6/7) and extended to resolve
-              │                the widened schema; display composition repaired (P5 cluster);
-              │                fixture channel DEFAULTS emitted, never zero-fill;
-              │                ONE time-grid (real beat grid) shared by planner numbering,
-              │                effect placement, and timing tracks
-              ▼
-        DELIVERY ✚            fresh minimal .xsq + .xmap + .xtiming; automation-API injection
-                               optional; display writer's dedup registries harvested as the
-                               single export core (ST-5); golden-file + xLights acceptance in CI
-```
+| System | Role | State (verified) |
+|---|---|---|
+| **Analysis** (audio → musical structure) | shared substrate for everything | DSP core sound; enhancement chain broken in known ways (SF-1/2/3); stems missing (D8) |
+| **Knowledge** (corpus → grammar → catalog) | the learning loop above | machinery complete; four broken edges (§2.2); never connected to a shipped path |
+| **Performance** (plan → render → deliver) | MH = part 1; display = part 2 | MH renderer defect cluster (CF-1/2/6/7); display code-complete, unreachable, composition defects known (P5) |
 
-**The load-bearing design change — widening the LLM→renderer channel (D1/D2 below):**
-today the renderer reads two strings per section and the vocabulary never reaches it
-(verified). Target: `PlanSection` v2 carries typed intents — categorical intensity
-(one enum, actually wired), color intent (palette role or explicit lyric-cue color),
-shutter/gobo events (from MomentCues: "sharp white flash on 'ROCK'"), optional
-segmentation — and the **renderer alone** resolves them to curves/DMX (the accepted
-decision, finally implemented as written). Template layer: parameterized channel
-support (~300 LOC mirroring the Dimmer family — the export layer already needs zero
-changes, verified P5-V1), plus a **data-first template loader** so the 37 built-ins
-migrate progressively from Python to data without a big-bang rewrite.
+### 2.2 The four broken edges of the knowledge loop (all verified, all repairable)
 
-**Cut (✖), per verified evidence:** the 20 dead solicited schema fields; the
-prose-only macro→prompt path (replaced by D3's structured contract); default
-multi-iteration judging (D4); one of the two OpenAI clients; the duplicate
-emitters/loggers/configs; the confirmed-dead tail (~4–6k LOC, with the recorded
-sequencing constraints); the research-mining half of the corpus stack from the hot
-tree (D5).
+1. **Identity**: re-ingesting the same archive mints new uuid4 primary keys while
+   content hashes are computed and discarded (P6-M2) — the corpus cannot accumulate
+   idempotently. Fix: content-hash identity (`zip_sha256`/file sha) as the key.
+2. **The apply edge**: learned context reaches only the display planner, which no
+   product command runs; the recipe catalog lives only in a gitignored local store.
+   Fix: display pipeline reachable from the CLI (part 2), catalog treated as a real,
+   versioned data artifact of the project (tracked seed catalog + local extensions —
+   it is project knowledge, not scratch).
+3. **The label loop**: the "learned" taxonomy is trained on the rule engine's own
+   output (weak-supervision circularity, P6 verified) — it cannot exceed the rules.
+   The fix **already exists as code**: the orphaned `active_learning` stages
+   (`UncertaintySampler` → `ReviewBatchBuilder` → oracle/human → `CorrectionApplier`)
+   are precisely the human-corrections loop that breaks the circularity. Wire them
+   (v1 called this "half-built, orphaned"; correct reading: built, unwired).
+4. **Evaluation feedback**: the eval harness's writer was deleted (restorable ~10
+   lines, schema-drift trap documented) and no result was ever committed — so
+   nothing the system produces ever teaches it anything. Fix: restore writer, bridge
+   CLI, and record human judgments alongside harness scores (these judgments are
+   also future propensity/quality signal).
+
+### 2.3 Performance side (carried from v1, unchanged in substance)
+
+- **MH render repair campaign** (CF-1/2/6/7 cluster: intensity, single time-grid,
+  scheduler, calibration, floors, BLACKOUT inversion, channel defaults instead of
+  zero-fill) behind a golden harness built on the existing 587-LOC validator.
+- **Widened LLM→renderer channel** (D1): plan schema v2 with typed intents —
+  categorical intensity (one enum, actually wired), color/shutter/gobo intents,
+  lyric MomentCues (the lyric agent finally gets a sink) — resolved by the renderer
+  alone. Template layer: parameterized channels + data-first loader; and note the
+  convergence — **a data-first MH template is structurally a recipe**, which over
+  time lets MH templates live in the same catalog/curation flow as display recipes
+  (one knowledge store, two renderers).
+- **Macro plan as structured contract** (D3): the show-coherence spine both parts
+  consume as typed fields, never prompt prose.
+- **Display composition repairs** (P5 cluster) when part 2 wires up.
+- **Export core unified** on the display writer's dedup registries (ST-5), one
+  emitter, one stamp/grid policy.
 
 ## 3. Decision points — alternatives and recommendations
 
-**D1 — Role of the LLM in moving-head planning.**
-- *(a) Deterministic-only:* selector over the verified-discriminating template
-  annotations. Free, instant, reproducible, exhaustively testable — and structurally
-  incapable of lyric awareness or novel section interpretation; global variety needs
-  hand-tuned rules.
-- *(b) Widen the channel* (schema v2 above): preserves the product's creative
-  thesis; the lyrics agent finally has a sink; cost is trivial at these volumes.
-  Risk: more LLM surface to validate; template layer work.
-- *(c) Status quo:* pays full LLM cost for two strings of influence. Indefensible on
-  the evidence.
-- **Recommendation: (b), with (a) built anyway** — as the fallback mode, the
-  regression baseline, and one arm of the M2 validation gate. Default standing
-  decision: if blind human evaluation cannot distinguish (b) from (a) after the
-  channel is genuinely wired, the LLM becomes opt-in per song and the default flips
-  to (a). The experiment validates a committed direction; it is not an open fork.
+**D1 — LLM's role in section planning** *(unchanged from v1)*: deterministic-only
+(a) vs widened channel (b) vs status quo (c). **Recommend (b) with (a) built as
+baseline/fallback/regression arm**; standing default: if blind evaluation can't
+distinguish them once the channel is honestly wired, default flips to (a) with LLM
+opt-in. The experiment validates a committed direction.
 
-**D2 — Delivery contract.**
-- *(a) Keep template-merge and fix fidelity:* requires a preserving parser tracking
-  a third-party format forever; the loss class worsens with every xLights release.
-- *(b) Fresh minimal `.xsq` + `.xmap` import:* loss-free by construction; mapping
-  friction mitigated by the map file and xLights' auto/AI mapping; ~1–2 days of code
-  (verified — the parser attaches at one optional site).
-- *(c) Automation-API injection:* zero mapping friction, live iteration; requires
-  xLights running with the API enabled; unauthenticated local port (document it).
-- *(d) `.xtiming` only:* trivial and mapping-free but not a show.
-- **Recommendation: (b) as the primary contract, (d) shipped immediately alongside,
-  (c) added in M3 as the premium workflow. Retire template-merge.** ⚖ (removes a
-  required CLI input — user-facing change).
+**D2 — Delivery contract** *(unchanged)*: fresh minimal `.xsq`+`.xmap` primary;
+`.xtiming` immediate; automation-API injection as the premium loop; retire
+template-merge ⚖ (removes a required CLI input).
 
-**D3 — The macro planner.**
-- *(a) Cut it:* saves 2–6 calls/song; but the show-level arc (energy narrative,
-  palette continuity, motif reuse) is exactly what section-local planning cannot
-  see, and part 2 (display) needs cross-section coordination even more than MH does.
-- *(b) Keep as-is:* its output provably never reaches rendering except as prose —
-  the current state is the worst of both.
-- *(c) Repair to a structured contract:* MacroPlan slims to the fields both
-  back-ends actually consume (typed, versioned, in the plan-section inputs), judge
-  kept single-pass.
-- **Recommendation: (c).** The macro layer becomes the show-coherence spine of the
-  two-part product — the thing that makes MH and display *one* choreography. This
-  reverses the review's earlier "cut" lean, on the owner's product definition plus
-  the display-side evidence (its group planner already consumes structured context
-  well).
+**D3 — Macro planner** *(unchanged)*: repair to a structured contract (not cut, not
+prose). It is the cross-element coordination layer — "arches answer the megatree" is
+a macro-level statement.
 
-**D4 — Judge/iteration loop.**
-- *(a) Remove judging:* cheapest; loses the only quality backstop until the eval
-  harness matures.
-- *(b) Keep 3-iteration loops:* no evidence of value in the repo's entire history;
-  known defects (judge has no memory; ONESHOT repair is a blind resample).
-- *(c) Single judge pass, hard-fail-only revision, with the feedback defects fixed*
-  (judge sees prior verdict + plan diff; repair shows the model its failing output).
-- **Recommendation: (c)**, and let the M2 harness — not intuition — argue iteration
-  counts back up if the data supports them.
+**D4 — Judge/iteration** *(unchanged)*: single-pass judge with the feedback defects
+fixed; iteration counts must earn their way back via the harness.
 
-**D5 — Corpus/FE stack.**
-- *(a) Extract everything:* clean tree, but amputates display's supply chain.
-- *(b) Keep everything hot:* ~24k LOC taxing every gate run, mostly research.
-- *(c) Split:* **runtime supply chain stays** (template store, EffectRecipe,
-  theming, recipe_builder staged authoring — the path that turns a curated catalog
-  into display shows); **research mining parks** (FE mining, embeddings, active
-  learning, profiling) — extracted or archived until display's recipe demand
-  justifies mining, and never resumed before the vendor-rights gate (RM-G2). Fix
-  the uuid→content-hash identity defect (P6-M2) whenever it wakes.
-- **Recommendation: (c).** Display's M3 catalog is bootstrapped by *authoring*
-  (hand-seeded + recipe_builder curation), not mining — mining is an optimization
-  with a legal gate, not a dependency.
+**D5 — The knowledge system (rewritten).** How should the system come to know
+choreography?
+- *(a) Hand-encode it* (templates/recipes written by the author): rejected as the
+  primary mechanism — it's the labor the project exists to remove, and it cannot
+  cover element-type × moment × style diversity. It remains the **seed** mechanism
+  (the 37 MH templates prove its value at small scale).
+- *(b) LLM-embedded knowledge*: prompt models to propose recipes. Ungrounded in what
+  actually reads well on physical elements — but cheap, diverse, and **already
+  implemented** as recipe_builder's generation phase feeding the same staged review.
+- *(c) Learn from real shows* (mining): grounded, layout-aware (propensity),
+  style-aware (fingerprints), statistically gated (support/stability) — **already
+  implemented** end-to-end minus the four edges.
+- *(d) Learn from own output + evaluation* (closing the outer loop): the long-term
+  compounding mechanism; needs edge 4 first.
+- **Recommendation: (c) + (b) as complementary supply arms feeding ONE curated
+  catalog** — which is literally what `recipe_builder` already is (mined evidence
+  enriches LLM candidates; humans admit) — with (a) as seeds and (d) wired as soon
+  as evaluation lands. Repair the four edges rather than parking anything. The only
+  pieces that stay parked until their trigger: `style_transfer` re-ranking (trigger:
+  catalog large enough that retrieval ranking matters) and embeddings beyond
+  brute-force (trigger: corpus scale actually hurts). Nothing is extracted from the
+  repo. ⚖ reverses v1's D5.
 
-**D6 — Models and API surface.**
-- **Recommendation (owner-aligned):** planners + profile + lyrics on `gpt-5.6-sol`
-  (quality axis, per the owner's edit); judge on `gpt-5.6-terra`; image work (if/
-  when assets revive) `gpt-image-2`. Explicit `reasoning.effort` per role (5.6
-  defaults to medium — a silent cost/latency change otherwise). Migrate to strict
-  structured outputs (`responses.parse` + Pydantic) after the one-call probe;
-  hard deadlines stand (image model 2026-12-01, current judge model 2026-12-11).
-  Include the out-of-framework call site (`normalization/llm_review.py`) in the
-  retarget sweep. Cache note: model IDs are already in cache keys (retarget-safe);
-  prompt-content hashing must land with the session-ID fix.
+**D6 — Models** *(updated)*: sol for planners/profile/lyrics, terra judge,
+gpt-image-2 when assets revive; explicit `reasoning.effort`; structured-outputs
+migration after the probe; retirement deadlines stand (Dec 1 / Dec 11, 2026);
+include the out-of-framework call site in the sweep. The knowledge loop adds one:
+recipe-generation calls (currently raw client) move inside the same provider
+framework.
 
-**D7 — Python/ML chain.**
-- **Recommendation:** coordinated single change after M1 stabilizes — torch/
-  torchaudio 2.8.x + whisperx 3.8.6 + pyannote 4.x (delete the orphaned diarization
-  module first; it's where the major-version breakage concentrates) + Python
-  3.12→3.13 ⚖. Not before: it's churn with no user-visible payoff until the core is
-  true.
+**D7 — Python/ML chain** *(unchanged)*: coordinated bump post-M1 (torch 2.8.x,
+whisperx 3.8.6, pyannote 4.x — delete orphaned diarization first), Python 3.13 ⚖.
 
-**D8 — Stem separation (new capability).**
-- *(a) Skip it:* full-mix analysis only, as today.
-- *(b) Add HTDemucs-based stems* (drums/vocals/other) feeding rhythm and vocal
-  features: better beat/onset evidence for MH accents, better vocal-presence truth
-  for lyrics gating (fixes the current detector's role after its alignment bug is
-  repaired), and it feeds MomentCue placement.
-- **Recommendation: (b), in M2** — it strengthens exactly the features both
-  planners consume. (Not because xLights has stems — because our own evidence shows
-  full-mix vocal detection is the weakest analysis link.)
+**D8 — Stems** *(unchanged)*: add HTDemucs-based separation in M2 — our own evidence
+shows full-mix vocal detection is the weakest analysis link; drum-stem onsets
+sharpen accent placement for both parts.
 
-## 4. The delta, evidence-mapped
+**D9 (new) — Catalog as project knowledge.** Where does the learned catalog live?
+- *(a) Gitignored local store* (today): the loop's output evaporates per-machine;
+  partly why the apply edge never closed.
+- *(b) Track a curated catalog in-repo* (seed + admitted recipes; mined-statistics
+  provenance retained; large raw corpora stay local): makes knowledge durable,
+  reviewable, versioned — consistent with the repo's own knowledge-management
+  philosophy.
+- **Recommendation: (b).** Raw vendor archives stay local (size + courtesy); the
+  *learned, curated* artifacts are the project's crown jewels and belong in git.
 
-Every workstream exists because the target needs it — not as free-floating repair:
+## 4. The program
 
-| Target property | Today (verified) | Workstream |
-|---|---|---|
-| Output represents planned intent | Intensity always SMOOTH; BLACKOUT renders bright; floors dropped; calibration annihilated; short sections empty (CF-1/6) | W2 render-repair campaign |
-| One musical time base | Three misaligned grids incl. planner-side floor (CF-2) | W2 (spans agents+sequencer) |
-| Light actually comes out per fixture defaults | Zero-fill vs declared `shutter_default=255` (CF-7) | W2 channel-default policy |
-| LLM value reaches the show | Two-string channel; lyric agent blind-wired; macro = prose (CF-3/4) | W4 schema v2 + D3 contract |
-| System can measure itself | Eval writer deleted; token attribution races; knobs inert (SF-4, CC-4, CC-1) | W3 instrumentation + eval restore |
-| User's files are safe | Unconditional template-content loss (CF-5) | W5 delivery contract |
-| A second person can run it | No LICENSE; broken onboarding; gates fail from clean checkout (SF-7, CC-2) | W1 + RM-G1 |
-| Part 2 exists | Display unreachable; composition defects; empty recipe store (0.2, SF-6) | W6 display completion |
-| Honest degradation | CC-3 silent-failure class | W3 observability spine |
-| Current platform | Model retirements Dec 2026; torch 2.4-era chain | W7 modernization |
+Two tracks that converge, instead of v1's strictly serial milestones: **Track P
+(performance)** makes part 1 true; **Track K (knowledge)** closes the loop; they
+merge in M3 where part 2 ships as *learned grammar, applied*. M0 precedes both.
 
-## 5. The program
+**M0 — Honest foundation** *(days; unchanged from v1 minus the license gate)*
+Gates green from a clean checkout (RM-0.1..0.4), packaging fix (RM-0.5), onboarding
+truth (RM-0.6). *(License: dropped per owner — personal project.)*
 
-Workstreams (W) ordered by dependency; milestones (M) are shippable states. Effort
-is calibrated to a single maintainer with agent assistance; each milestone ends with
-its exit criteria, and the item-level details live in the roadmap appendix by RM-id.
+**M1 [Track P] — Part 1 true: the MH auto-sequencer works as designed**
+Golden harness first (RM-1.0) → render-repair campaign (RM-1.1, one golden-diffed
+branch) → channel defaults (RM-1.2) → audio truth campaign (RM-1.3) →
+instrumentation + cache identity (RM-1.4) → eval writer restored + first committed
+evaluation with a human judgment (RM-1.6) → delivery v1: `.xtiming` + fresh
+`.xsq`/`.xmap`, template-merge retired ⚖, xLights acceptance test in CI.
+*Exit:* a song renders to a correct, importable MH show; the system can measure and
+remember what it produced; the CLI takes the user's fixture config (no hardcoded
+rig).
 
-**M0 — Honest foundation** *(days)*
-W1: gates green from clean checkout (RM-0.1..0.4: the one-variable mypy fix,
-structural test repair, format/lint baseline, minimal check-only CI), packaging via
-`uv_build` (RM-0.5), onboarding truth (RM-0.6), **LICENSE decision (RM-G1)** ⚖.
-*Exit:* CI green on a fresh clone; a second person may legally clone and run it.
+**M2 [Track P] — Creative quality, measured**
+Plan schema v2 + template channel parameters + data-first loader; lyric MomentCues
+wired; macro structured contract (D3); judge repair (D4); deterministic selector
+arm; the three-arm blind-eval gate (D1's standing default); stems (D8); model
+retarget + structured outputs (D6, deadline-driven).
+*Exit:* an evidence-backed answer to whether the LLM makes better MH shows, and a
+plan schema rich enough to carry learned display grammar in M3.
 
-**M1 — Part 1 true: the moving-head auto-sequencer works as designed** *(the core
-investment)*
-W2: golden render harness FIRST (wire the existing 587-LOC validator, pin golden
-settings-strings, shutter-channel test, one round-trip test — RM-1.0), then the
-render-repair campaign as one golden-diffed branch (RM-1.1: intensity+data-fill+
-frequency-amplitude together; floors; BLACKOUT; calibration; scheduler; single
-time-grid including the planner-side fix), channel defaults (RM-1.2).
-W3: instrumentation + truth (RM-1.3 audio campaign incl. metadata clients + MB
-limiter together; RM-1.4 token attribution, cache identity + prompt hashing, config
-triage start; RM-1.6 eval writer restored + `eval-report` bridged).
-W5: delivery contract v1 — `.xtiming` output + fresh minimal `.xsq`+`.xmap`; retire
-template-merge ⚖; empirical xLights acceptance test in CI (import into 2026.15,
-current stamp).
-*Exit:* a song renders to a correct, importable show; **the first committed
-evaluation result + recorded human judgment in the project's history**; CLI takes a
-fixture config instead of hardcoding the author's rig.
+**M1-K [Track K, parallel with M1] — The loop's edges**
+Content-hash identity (edge 1); active-learning corrections wired (edge 3);
+recipe-generation calls into the provider framework; catalog-in-repo decision
+implemented (D9): seed catalog committed (initial content: the existing builtin
+recipes + a first curated mining pass over the author's local corpus).
+*Exit:* re-ingesting the same corpus is idempotent; a taxonomy correction made by a
+human demonstrably changes the next mining run; a versioned catalog exists in git.
 
-**M2 — Creative quality, measured** *(where the LLM earns its keep)*
-W4: plan schema v2 + template channel parameters + data-first loader (progressive
-re-authoring of the 37 templates); lyric MomentCues wired end-to-end; macro
-structured contract (D3); judge repair (D4); deterministic selector arm; **the
-three-arm blind-eval gate with D1's standing default**; stems (D8).
-W7 (parallel, deadline-driven): model retarget per D6 + structured outputs.
-*Exit:* an evidence-backed answer to "does the LLM make better shows," and either a
-validated creative pipeline or a deliberate deterministic default — both are wins.
+**M2-K [Track K] — Grammar at usable scale**
+Mining passes over the available corpus → recipe_builder curation sessions (mined +
+LLM-generated arms) → catalog grows with propensity/affinity data per element type;
+quality gates tuned; style fingerprints for the author's preferred styles.
+*Exit:* the catalog answers "what does a megatree do at a chorus / arches at a drop /
+icicles under a verse" with admitted, layout-conditioned recipes — measured by
+coverage: every element type in the author's layout has BASE/RHYTHM/ACCENT options
+across the energy range.
 
-**M3 — Part 2: show choreography** *(display completion)*
-W6: display composition repairs (P5 cluster: sequencing math, blend-mode
-structural loss, TRIM gaps); recipe catalog bootstrap by authoring (seed set +
-recipe_builder staged curation — D5); macro-arc coordination across MH + display;
-CLI exposure of the display pipeline; harvest/unify the export core (dedup
-registries, one emitter — also fixes the stamp/grid divergence).
-W5+: automation-API injection workflow (D2c).
-*Exit:* one command produces a coordinated MH + display show for a real layout;
-corpus mining remains parked behind RM-G2 unless recipe demand reopens it ⚖.
+**M3 [Tracks converge] — Part 2: the show choreographs**
+Display composition repairs (P5 cluster); display pipeline CLI-reachable, consuming
+the catalog + macro arc + the user's layout (the propensity-conditioned apply edge —
+edge 2 closed); MH + display coordinated by the shared macro contract; unified
+export core; automation-API injection workflow.
+*Exit:* one command, one song, the user's layout → a coordinated MH + display show
+built from **learned** choreography, importable into xLights; evaluation results +
+human judgments recorded and feeding the loop (edge 4 → D5(d) begins).
 
-**M4 — Continuous** *(threaded through, not an era)*
-W7: ML chain + Python 3.13 (D7, post-M1); debt retirement per the recorded
-sequencing constraints (RM-5.x); documentation truth pass — the user guide
-regenerated from *wired* config only, the "dozens of hours" claim replaced by
-measured numbers from M1/M2.
+**M4 — Compounding** *(ongoing)*
+ML/Python bump (D7); MH mining exploration (vendor packs contain DMX moving-head
+sequences — the deleted-history artifact was literally one — so extending the miner
+to MH idioms is plausible and would begin unifying part 1 with the knowledge loop);
+style transfer when the catalog justifies ranking; debt retirement per recorded
+sequencing constraints; documentation truth pass.
 
-## 6. Risks, costs, and what would change this plan
+## 5. Risks and honesty checks
 
-- **Biggest technical risk:** template re-authoring scale in M2. Mitigated by the
-  data-first loader (progressive migration, not big-bang) and by the fact that the
-  export layer verifiably needs zero changes.
-- **Biggest empirical unknowns (all cheap to resolve early):** bare-`.xsq` import
-  without `rgbeffects.xml` (M1 W5 test); `json_object` acceptance on 5.6 (one call,
-  before W7's structured-outputs step); physical shutter mapping (the written
-  channel-6/17 test + one real-rig check).
-- **Biggest schedule risk:** single-maintainer attention. The plan front-loads
-  deletion and measurement precisely because every retained line taxes every later
-  step; M1 is deliberately the largest single investment because part 1 being
-  *true* is what everything else stands on.
-- **Cost:** ~$1/song-class LLM spend at sol-tier planning (measured properly from
-  M1's instrumentation, replacing the estimate); pyannote-4.x migration risk is
-  bounded by deleting its only (orphaned) consumer first.
-- **What would change the plan:** the blind eval failing D1's default (flips the
-  creative default to deterministic — the plan absorbs this by design); the owner
-  declaring this a hobby rather than a product (drops M0's second-person goals and
-  the LICENSE urgency, nothing else); xLights shipping an actual external
-  choreography hook (would re-rank D2c upward — to be *verified* against release
-  notes, not assumed).
+- **Corpus availability is the knowledge track's pacing item**: mining quality is
+  bounded by what's locally available to learn from. Mitigation: the LLM-generation
+  arm and seeds keep the catalog moving; M2-K's exit is defined by coverage, not by
+  corpus size.
+- **Weak supervision remains partially circular until enough human corrections
+  accumulate** (edge 3 wired ≠ labels fixed overnight). Honest metric: track
+  correction-driven label changes per mining run.
+- **Template re-authoring scale (M2)**: mitigated by the data-first loader and the
+  MH-template≈recipe convergence — re-authoring is also catalog seeding.
+- **Single maintainer**: the two tracks are independently pausable; every milestone
+  exits at a usable state.
+- **Empirical unknowns** (cheap, front-loaded): bare-`.xsq` import without
+  rgbeffects; `json_object` on 5.6; physical shutter mapping (channel-6/17 test).
+- **What would change this plan**: blind eval flipping D1's default (absorbed by
+  design); the catalog failing M2-K's coverage exit despite both supply arms (would
+  force rethinking recipe granularity — the honest fallback, stated now, is
+  coarser-grained learned *style profiles* steering hand-seeded recipe families);
+  xLights shipping an actual external choreography hook (re-rank D2c upward — verify
+  against release notes, never assume).
 
-## 7. Non-goals (explicit)
+## 6. Non-goals
 
-No rewrite. No provider swap. No UI product. No marketplace/distribution ambitions
-beyond making a second user legal and able. No corpus mining before the rights gate.
-No display revival shortcut that skips M1 — part 2 inherits every part-1 repair
-(shared exporter, shared time grid, shared macro contract), which is exactly why the
-order is what it is.
+No rewrite; no provider swap; no UI product; no commercialization scaffolding
+(licensing, distribution, marketplaces) unless the owner's intent changes; no
+deletion of the learning system — its four edges get repaired, its supply arms get
+exercised, and its output finally reaches a show.

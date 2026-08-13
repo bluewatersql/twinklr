@@ -42,8 +42,18 @@ must outlive the change. Readiness: **REQUIRES_STABILIZATION**._
    services but **no auto-choreography** (thesis space unoccupied) and a documented
    HTTP automation API (`addEffect`, `importXLightsSequence`); version stamps ≥2020
    accepted; `.xtiming` import is mapping-free (smallest viable deliverable).
-8. **No LICENSE has ever existed** — blocks distribution independent of all code
-   work; vendor-corpus mining has a rights gate before any resumption.
+8. **Licensing is a non-issue by owner decision** (personal, non-commercial
+   project). No LICENSE exists; add one only if distribution is ever wanted.
+   Courtesy rule: don't redistribute vendor-derived content; learning from
+   purchased material for personal use is normal use.
+8b. **The corpus pipeline is the project's learning system** (owner-corrected
+   reading, v2 proposal §0.3): propensity learns effect↔element-type affinity,
+   taxonomy learns choreographic function, mining learns layered idioms — it is how
+   the system knows what megatree/arch/icicle choreography looks like. Its four
+   broken edges (uuid identity, the unreachable apply edge, the unwired
+   active-learning label loop, the deleted eval writer) are repair targets, NOT
+   grounds for extraction. v1's "extract to sibling repo" recommendation is
+   superseded.
 9. Verified strengths worth building on: schema/taxonomy auto-injection, judge
    verdict enforcement, BeatGrid authority, atomic cache commits, display writer
    dedup+trace, the existing 587-LOC `.xsq` validator, `timeline.py`, the audio DSP
