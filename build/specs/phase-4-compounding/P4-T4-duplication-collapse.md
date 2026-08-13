@@ -262,3 +262,13 @@ multiplicative amplification under a different name. Mitigation: the request-cou
 regression test is the acceptance gate, and P3-M-G's existing (buggy) behavior must
 be preserved bit-for-bit so this task's diff is reviewable in isolation from that
 separate fix.
+
+## Backlog addition from P1P-T7 verification (2026-08-13)
+
+`api/http/client.py _merge_headers` lowercases the base header dict (via
+`dict(httpx.Headers)`) then plain-`update`s caller-cased keys — a title-case
+`User-Agent` override is APPENDED, not replaced (two user-agent entries on the
+wire, verifier-reproduced). Fix here: normalize `extra` keys before the update
+(case-insensitive merge). A local workaround (lowercased key + comment) lives at
+musicbrainz.py; its test pins the correct single-value behavior and will catch a
+regression. Pull earlier than Phase 4 if convenient.

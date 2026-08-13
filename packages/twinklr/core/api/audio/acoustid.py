@@ -7,14 +7,16 @@ Uses framework async HTTP client for requests.
 import logging
 from typing import Any
 
+from twinklr.core.api.audio.errors import ProviderFailureCategory, ProviderLookupError
 from twinklr.core.api.audio.models import AcoustIDRecording, AcoustIDResponse
-from twinklr.core.api.http.errors import ApiError, TimeoutError
+from twinklr.core.api.http.client import AsyncApiClient
+from twinklr.core.api.http.errors import ApiError, AuthError, DecodeError, TimeoutError
 
 logger = logging.getLogger(__name__)
 
 
-class AcoustIDError(RuntimeError):
-    """AcoustID API error."""
+class AcoustIDError(ProviderLookupError):
+    """AcoustID API error, categorized by failure kind."""
 
 
 class AcoustIDClient:
@@ -36,7 +38,7 @@ class AcoustIDClient:
 
     API_BASE_URL = "https://api.acoustid.org/v2"
 
-    def __init__(self, api_key: str | None, http_client: Any):
+    def __init__(self, api_key: str | None, http_client: AsyncApiClient):
         """Initialize AcoustID client.
 
         Args:
@@ -79,18 +81,43 @@ class AcoustIDClient:
         try:
             # Make async API request (Phase 8)
             logger.debug(f"AcoustID lookup: duration={duration_int}s")
-            response_data = await self.http_client.get(
+            response = await self.http_client.get(
                 f"{self.API_BASE_URL}/lookup",
                 params=params,
             )
 
-            # Parse response
-            return self._parse_response(response_data)
+            # get() returns an undecoded httpx.Response; decoding is a separate step
+            data = self.http_client.json(response)
+            if not isinstance(data, dict):
+                raise AcoustIDError(
+                    f"Invalid response from AcoustID: expected a JSON object, got {type(data).__name__}",
+                    category=ProviderFailureCategory.PARSE,
+                )
 
+            return self._parse_response(data)
+
+        except AcoustIDError:
+            raise
         except TimeoutError as e:
-            raise AcoustIDError(f"AcoustID request timed out: {e}") from e
+            raise AcoustIDError(
+                f"AcoustID request timed out: {e}",
+                category=ProviderFailureCategory.TRANSPORT,
+            ) from e
+        except AuthError as e:
+            raise AcoustIDError(
+                f"AcoustID rejected the credentials: {e}",
+                category=ProviderFailureCategory.CREDENTIAL,
+            ) from e
+        except DecodeError as e:
+            raise AcoustIDError(
+                f"AcoustID response could not be decoded: {e}",
+                category=ProviderFailureCategory.PARSE,
+            ) from e
         except ApiError as e:
-            raise AcoustIDError(f"AcoustID HTTP error: {e}") from e
+            raise AcoustIDError(
+                f"AcoustID HTTP error: {e}",
+                category=ProviderFailureCategory.TRANSPORT,
+            ) from e
         except Exception as e:
             raise AcoustIDError(f"AcoustID lookup failed: {e}") from e
 
@@ -108,7 +135,10 @@ class AcoustIDClient:
         """
         # Check for required fields
         if "status" not in data:
-            raise AcoustIDError("Invalid response from AcoustID: missing 'status' field")
+            raise AcoustIDError(
+                "Invalid response from AcoustID: missing 'status' field",
+                category=ProviderFailureCategory.PARSE,
+            )
 
         status = data["status"]
 
@@ -120,7 +150,10 @@ class AcoustIDClient:
                     error_msg = data["error"]["message"]
                 elif isinstance(data["error"], str):
                     error_msg = data["error"]
-            raise AcoustIDError(f"AcoustID API error: {error_msg}")
+            raise AcoustIDError(
+                f"AcoustID API error: {error_msg}",
+                category=ProviderFailureCategory.PROVIDER_ERROR,
+            )
 
         # Parse results
         results = []

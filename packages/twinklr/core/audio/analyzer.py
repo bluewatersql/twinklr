@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from pathlib import Path
 import time
 from typing import Any
 
@@ -57,7 +56,8 @@ from twinklr.core.audio.timeline.builder import build_timeline_export
 from twinklr.core.audio.validation.validator import validate_features
 from twinklr.core.caching import FSCache
 from twinklr.core.config.models import AppConfig, JobConfig
-from twinklr.core.io import RealFileSystem, absolute_path
+from twinklr.core.config.paths import resolve_project_root
+from twinklr.core.io import RealFileSystem, anchored_path
 
 logger = logging.getLogger(__name__)
 
@@ -95,7 +95,10 @@ class AudioAnalyzer:
 
         # Initialize async cache
         fs = RealFileSystem()
-        cache_root = absolute_path(str(Path(app_config.cache_dir or "data/cache")))
+        cache_root = anchored_path(
+            app_config.cache_dir or "data/cache",
+            resolve_project_root(app_config),
+        )
         self.cache = FSCache(fs, cache_root)
 
         # Initialize cache if not in an async context
@@ -271,21 +274,16 @@ class AudioAnalyzer:
         # Extract vocal segments for passing to lyrics pipeline
         vocal_segments: list[dict] = features.get("vocals", [])
 
-        # Extract metadata and lyrics in parallel (async)
-        # Pass embedded_metadata to avoid re-extracting
-        metadata_bundle, lyrics_bundle = await asyncio.gather(
-            self._extract_metadata_if_enabled(audio_path, embedded_metadata),
-            self._extract_lyrics_if_enabled(audio_path, duration_ms, None, vocal_segments),
-        )
+        # Metadata resolves first: the lyrics pipeline gates LRCLib and Genius —
+        # its two highest-priority sources — on having an artist/title. Running
+        # the two concurrently hands lyrics no metadata, so those providers are
+        # structurally skipped and ASR outranks synced lyrics.
+        metadata_bundle = await self._extract_metadata_if_enabled(audio_path, embedded_metadata)
 
-        # If lyrics needs metadata, re-extract with metadata context
-        if (
-            lyrics_bundle.stage_status == StageStatus.SKIPPED
-            and metadata_bundle.stage_status != StageStatus.SKIPPED
-        ):
-            lyrics_bundle = await self._extract_lyrics_if_enabled(
-                audio_path, duration_ms, metadata_bundle, vocal_segments
-            )
+        # Single, metadata-informed lyrics pass
+        lyrics_bundle = await self._extract_lyrics_if_enabled(
+            audio_path, duration_ms, metadata_bundle, vocal_segments
+        )
 
         # Extract phonemes from timed words (depends on lyrics)
         phoneme_bundle = await self._extract_phonemes_if_enabled(lyrics_bundle, duration_ms)
@@ -323,10 +321,12 @@ class AudioAnalyzer:
         """
         # Check if pipeline was initialized (feature enabled)
         if self.metadata_pipeline is None:
+            # Carry the embedded tags anyway: they are what lets the lyrics
+            # pipeline reach LRCLib/Genius when provider lookup is disabled.
             return MetadataBundle(
                 schema_version="3.0.0",
                 stage_status=StageStatus.SKIPPED,
-                embedded=EmbeddedMetadata(),
+                embedded=embedded_metadata or EmbeddedMetadata(),
             )
 
         # Use pre-initialized pipeline

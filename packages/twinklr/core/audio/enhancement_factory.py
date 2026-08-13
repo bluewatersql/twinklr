@@ -10,6 +10,7 @@ from typing import Any
 
 from twinklr.core.api.audio.acoustid import AcoustIDClient
 from twinklr.core.api.audio.musicbrainz import MusicBrainzClient
+from twinklr.core.api.audio.rate_limit import AsyncRateLimiter
 from twinklr.core.api.http import AsyncApiClient, HttpClientConfig
 from twinklr.core.audio.lyrics.pipeline import LyricsPipeline, LyricsPipelineConfig
 from twinklr.core.audio.lyrics.providers.genius import GeniusClient
@@ -78,6 +79,11 @@ class EnhancementServiceFactory:
                 musicbrainz_client = MusicBrainzClient(
                     http_client=http_client,
                     user_agent=user_agent,
+                    rate_limiter=AsyncRateLimiter(
+                        rate_per_second=(
+                            config.audio_processing.enhancements.musicbrainz_rate_limit_rps
+                        )
+                    ),
                 )
 
         # Create pipeline config

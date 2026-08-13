@@ -4,22 +4,31 @@ Client for MusicBrainz music metadata database.
 Uses framework async HTTP client for requests.
 
 MusicBrainz Rate Limiting:
-- Limit: 1 request per second
+- Limit: 1 request per second, no concurrent requests
 - Higher limits available with MusicBrainz account
 - See: https://musicbrainz.org/doc/MusicBrainz_API/Rate_Limiting
+
+The policy is enforced by an AsyncRateLimiter held across each request, so
+every call site inherits the pacing.
 """
 
 import logging
 from typing import Any
 
+from twinklr.core.api.audio.errors import ProviderFailureCategory, ProviderLookupError
 from twinklr.core.api.audio.models import MusicBrainzRecording, MusicBrainzRelease
-from twinklr.core.api.http.errors import ApiError, TimeoutError
+from twinklr.core.api.audio.rate_limit import AsyncRateLimiter
+from twinklr.core.api.http.client import AsyncApiClient
+from twinklr.core.api.http.errors import ApiError, AuthError, DecodeError, TimeoutError
 
 logger = logging.getLogger(__name__)
 
+DEFAULT_RATE_LIMIT_RPS = 1.0
+"""MusicBrainz's documented anonymous rate limit."""
 
-class MusicBrainzError(RuntimeError):
-    """MusicBrainz API error."""
+
+class MusicBrainzError(ProviderLookupError):
+    """MusicBrainz API error, categorized by failure kind."""
 
 
 class MusicBrainzClient:
@@ -29,12 +38,14 @@ class MusicBrainzClient:
     Uses framework async HTTP client for retry/error handling.
 
     Rate Limiting:
-        MusicBrainz enforces 1 request/second rate limit for anonymous requests.
-        Client relies on framework HTTP client for retry/backoff.
+        MusicBrainz allows 1 request/second and no concurrent requests for
+        anonymous clients. Every request is issued while holding the rate
+        limiter, which both serializes and paces them.
 
     Args:
         http_client: Framework AsyncApiClient instance
         user_agent: User agent string (required by MusicBrainz)
+        rate_limiter: Pacing limiter; defaults to the documented 1 req/s
 
     Example:
         >>> client = MusicBrainzClient(http_client=http, user_agent="app/1.0")
@@ -44,12 +55,18 @@ class MusicBrainzClient:
 
     API_BASE_URL = "https://musicbrainz.org/ws/2"
 
-    def __init__(self, http_client: Any, user_agent: str | None):
+    def __init__(
+        self,
+        http_client: AsyncApiClient,
+        user_agent: str | None,
+        rate_limiter: AsyncRateLimiter | None = None,
+    ):
         """Initialize MusicBrainz client.
 
         Args:
             http_client: Framework HTTP client
             user_agent: User agent string (required by MusicBrainz API guidelines)
+            rate_limiter: Pacing limiter shared by all calls on this client
 
         Raises:
             ValueError: If user_agent is empty or None
@@ -59,6 +76,7 @@ class MusicBrainzClient:
 
         self.http_client = http_client
         self.user_agent = user_agent
+        self.rate_limiter = rate_limiter or AsyncRateLimiter(rate_per_second=DEFAULT_RATE_LIMIT_RPS)
 
     async def lookup_recording(self, *, mbid: str) -> MusicBrainzRecording:
         """Look up recording by MusicBrainz ID (async).
@@ -78,26 +96,58 @@ class MusicBrainzClient:
             "fmt": "json",
             "inc": "artists+releases+isrcs",  # Include related data
         }
+        # httpx normalizes header names to lower case, and the framework merges
+        # request headers over the client defaults with a plain dict update. Use
+        # the normalized casing so this replaces the default User-Agent rather
+        # than being appended to it — MusicBrainz requires an identifying agent.
         headers = {
-            "User-Agent": self.user_agent,
+            "user-agent": self.user_agent,
         }
 
         try:
-            # Make async API request (Phase 8)
-            logger.debug(f"MusicBrainz lookup: mbid={mbid} (note: 1 req/sec rate limit applies)")
-            response_data = await self.http_client.get(
-                url,
-                params=params,
-                headers=headers,
-            )
+            logger.debug(f"MusicBrainz lookup: mbid={mbid}")
 
-            # Parse response
-            return self._parse_recording(response_data)
+            # The limiter is held for the whole request: 1 req/s, never concurrent
+            async with self.rate_limiter:
+                response = await self.http_client.get(
+                    url,
+                    params=params,
+                    headers=headers,
+                )
 
+            # get() returns an undecoded httpx.Response; decoding is a separate step
+            data = self.http_client.json(response)
+            if not isinstance(data, dict):
+                raise MusicBrainzError(
+                    f"Invalid response from MusicBrainz: expected a JSON object, "
+                    f"got {type(data).__name__}",
+                    category=ProviderFailureCategory.PARSE,
+                )
+
+            return self._parse_recording(data)
+
+        except MusicBrainzError:
+            raise
         except TimeoutError as e:
-            raise MusicBrainzError(f"MusicBrainz request timed out: {e}") from e
+            raise MusicBrainzError(
+                f"MusicBrainz request timed out: {e}",
+                category=ProviderFailureCategory.TRANSPORT,
+            ) from e
+        except AuthError as e:
+            raise MusicBrainzError(
+                f"MusicBrainz rejected the credentials: {e}",
+                category=ProviderFailureCategory.CREDENTIAL,
+            ) from e
+        except DecodeError as e:
+            raise MusicBrainzError(
+                f"MusicBrainz response could not be decoded: {e}",
+                category=ProviderFailureCategory.PARSE,
+            ) from e
         except ApiError as e:
-            raise MusicBrainzError(f"MusicBrainz HTTP error: {e}") from e
+            raise MusicBrainzError(
+                f"MusicBrainz HTTP error: {e}",
+                category=ProviderFailureCategory.TRANSPORT,
+            ) from e
         except Exception as e:
             raise MusicBrainzError(f"MusicBrainz lookup failed: {e}") from e
 
@@ -116,7 +166,8 @@ class MusicBrainzClient:
         # Check for required fields
         if "id" not in data or "title" not in data:
             raise MusicBrainzError(
-                "Invalid response from MusicBrainz: missing 'id' or 'title' field"
+                "Invalid response from MusicBrainz: missing 'id' or 'title' field",
+                category=ProviderFailureCategory.PARSE,
             )
 
         recording_id = data["id"]

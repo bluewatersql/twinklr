@@ -8,7 +8,6 @@ Orchestrates the full metadata extraction pipeline:
 5. Metadata merging
 """
 
-import asyncio
 import datetime
 import hashlib
 import logging
@@ -17,6 +16,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
+from twinklr.core.api.audio.errors import failure_category
 from twinklr.core.audio.metadata.embedded_tags import extract_embedded_metadata
 from twinklr.core.audio.metadata.fingerprint import (
     ChromaprintError,
@@ -151,7 +151,10 @@ class MetadataPipeline:
             acoustid_candidates = await self._query_acoustid(fingerprint, warnings)
             candidates.extend(acoustid_candidates)
 
-        # Query MusicBrainz (if MBID available from AcoustID) - parallel (Phase 8)
+        # Query MusicBrainz (if MBID available from AcoustID).
+        # Sequential by design: MusicBrainz allows 1 req/s and no concurrent
+        # requests. The client's rate limiter paces them; fanning out here would
+        # queue every request behind that limiter for no benefit.
         if self.config.enable_musicbrainz:
             # Collect MBIDs to query
             mbids_to_query = []
@@ -159,20 +162,17 @@ class MetadataPipeline:
                 if candidate.provider == "acoustid" and candidate.mbids.recording_mbid:
                     mbids_to_query.append(candidate.mbids.recording_mbid)
 
-            # Query MusicBrainz in parallel for all MBIDs
-            if mbids_to_query:
-                mb_tasks = [self._query_musicbrainz(mbid, warnings) for mbid in mbids_to_query]
-                mb_results = await asyncio.gather(*mb_tasks)
+            for mbid in mbids_to_query:
+                mb_candidate = await self._query_musicbrainz(mbid, warnings)
 
-                # Add successful results, avoiding duplicate MusicBrainz entries
-                # (but allowing MB + AcoustID with the same MBID)
-                for mb_candidate in mb_results:
-                    if mb_candidate and not any(
-                        c.provider == "musicbrainz"
-                        and c.mbids.recording_mbid == mb_candidate.mbids.recording_mbid
-                        for c in candidates
-                    ):
-                        candidates.append(mb_candidate)
+                # Skip duplicate MusicBrainz entries
+                # (but allow MB + AcoustID with the same MBID)
+                if mb_candidate and not any(
+                    c.provider == "musicbrainz"
+                    and c.mbids.recording_mbid == mb_candidate.mbids.recording_mbid
+                    for c in candidates
+                ):
+                    candidates.append(mb_candidate)
 
         # Stage 4: Merge metadata
         resolved = self._merge_metadata(embedded, candidates, warnings)
@@ -278,8 +278,11 @@ class MetadataPipeline:
             return candidates
 
         except Exception as e:
-            logger.warning(f"AcoustID lookup failed: {e}")
-            warnings.append(f"AcoustID lookup failed: {e!s}")
+            # Name the failure kind: a parse/contract fault reads identically to a
+            # network or credential fault otherwise, and points debugging astray.
+            category = failure_category(e)
+            logger.warning(f"AcoustID lookup failed ({category}): {e}")
+            warnings.append(f"AcoustID lookup failed ({category}): {e!s}")
             return []
 
     async def _query_musicbrainz(self, mbid: str, warnings: list[str]) -> MetadataCandidate | None:
@@ -322,8 +325,9 @@ class MetadataPipeline:
             return candidate
 
         except Exception as e:
-            logger.warning(f"MusicBrainz lookup failed for {mbid}: {e}")
-            warnings.append(f"MusicBrainz lookup failed: {e!s}")
+            category = failure_category(e)
+            logger.warning(f"MusicBrainz lookup failed for {mbid} ({category}): {e}")
+            warnings.append(f"MusicBrainz lookup failed ({category}): {e!s}")
             return None
 
     def _merge_metadata(
