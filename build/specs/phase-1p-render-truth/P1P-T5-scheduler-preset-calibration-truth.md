@@ -458,7 +458,7 @@ merged grid and regenerates goldens once, not twice.
    `compile_template`'s role filter silently skips every section (`continue`, no
    error). Pinned in tests/golden/test_8head_role_mismatch.py. Fix the silent-skip
    here (loud behavior + role-inference generalization or documented rig limits);
-   P1P-T11's CLI rig-config work must surface unsupported rig shapes to the user.
+   P1P-T11's CLI rig-config work must surface unsupported rig shapes to the user. When fixed: tighten tests/integration/test_all_templates_compile.py's emitted-effects assertion to cover mh8_reference and regenerate the 8-head goldens with real section files (they are transitions-only today).
 
 4. **P4-F14 un-masked by T3's M5 fix (verifier-routed):** step_compiler's
    phase-shift with wrap=True now snaps mid-segment for curves that no longer

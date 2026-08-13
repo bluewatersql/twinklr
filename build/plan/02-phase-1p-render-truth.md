@@ -47,3 +47,13 @@ Merge order at phase end: G → R → A → I → D (D rebases on R for exporter
   so the executor cannot "fix" a different reading of the bug.
 - T11 is ⚖ (user-facing input change) — the spec must include the CLI migration notes
   and is the one task in this phase whose merge the owner reviews directly.
+
+## Execution learnings (mid-phase, binding for remaining tasks)
+
+- **State acceptance criteria at the discriminating seam.** T3 proved the spec's
+  handler-level M6 metric passed on unfixed code (the rescale masked the coupling);
+  the real pin lived at the curve-generator seam. Verifiers for T4/T5/T6: before
+  trusting a spec's acceptance metric, check it FAILS on the pre-fix code.
+- Worker discipline recap: no staging; orchestrator commits via pathspec after a
+  format-check of the set; worktree verification requires an own-synced venv via
+  `python -m pytest`.
