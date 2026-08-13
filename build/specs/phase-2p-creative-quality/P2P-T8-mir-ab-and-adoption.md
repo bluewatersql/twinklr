@@ -1,0 +1,281 @@
+# P2P-T8 — MIR A/B + adoption (D10)
+
+Phase: 2P (Creative Quality, Measured) · Lane: M (analysis substrate, parallel) · Executor: opus · Verifier: opus · Depends on: P1P-T4, P1P-T8
+
+⚖ **Owner-decision-bearing.** The owner reviews the A/B verdict and the adoption
+decision. The decision is made by the pre-committed numeric gate in §"Adoption gate",
+not by judgment after the numbers are seen. **Record the decision either way** — a
+"keep the current DSP" outcome is a result, not a failure.
+
+## Objective
+
+Integrate `beat-this` (beats + downbeats) and All-In-One (structure labels) behind the
+existing `BeatGrid` interface, A/B them against the current DSP on golden fixtures
+using criteria fixed **before** any measurement, and adopt or reject per that gate.
+Whatever wins, one model-derived rhythmic/structural truth then feeds every grid
+consumer — completing at the source what P1P-T4 completed at the consumer level.
+
+## Evidence & background
+
+Finding: **D10 (new) — MIR modernization**, research-verified, accessed 2026-08-13.
+Also **CF-2** (three misaligned grids), **P2 §7** (the DSP that stays), **CC-7**
+(zero ground-truth assertions).
+Sources: `changes/twinklr-reactivation-review/reviews/reactivation-proposal.md` D10,
+§2.3, §5, §6; `.../reviews/verification.md` "Phase 2", "Phase 4" (P4-F2/M3);
+`.../reviews/phases/moving-heads-rendering.md` P4-F2.
+
+### D10 quoted (versions, licences and the honest gaps are load-bearing)
+
+> - **Beats+downbeats: adopt `beat-this`** (CPJKU; PyPI 1.1.0 2026-04-14, MIT code+
+>   weights, deps just `torch>=2`+torchaudio+einops, ~78 MB, no madmom; GTZAN beat F1
+>   89.1 / downbeat F1 78.3). Decisive context: **librosa has no downbeat tracker at
+>   all** — Twinklr's custom phase-voting competes against nothing maintained
+>   (madmom: no release since 2018, git-install only). Known trade-off: slightly
+>   lower continuity metrics (CMLt/AMLt) than DBN post-processing; the optional
+>   `--dbn` flag reintroduces madmom — skip it.
+> - **Structure labels (verse/chorus): All-In-One** — beats+downbeats+tempo+labeled
+>   segments in one pass. Canonical `allin1` is install-broken on modern stacks
+>   (madmom + NATTEN torch-ceiling); on Apple Silicon use **`all-in-one-mlx`**
+>   (PyPI 1.0.6, 2026-08-12, MIT, no torch/madmom/NATTEN, claims 12.6× on M4;
+>   single-maintainer risk) or the `all-in-one-fix` fork from git (torch ≤2.7 —
+>   conflicts with our pin; UNVERIFIED PyPI presence).
+> - **Keep custom**: energy/multiscale, builds/drops (post-fix), tension, timeline —
+>   no model equivalent exists and the verified DSP is sound.
+> - **Adoption gate (honest)**: A/B on golden fixtures against the current BeatGrid
+>   before switchover — the repo's own test gap (no tempo/beat ground-truth
+>   assertions anywhere) gets fixed by this A/B's fixture set. Python 3.13 support
+>   for beat-this is UNVERIFIED (no upper bound declared, no CI claim).
+> - **Payoff beyond accuracy**: one model-derived rhythmic/structural truth feeds
+>   planner numbering, renderer placement, and timing tracks — dissolving CF-2's
+>   three-grid class instead of reconciling it.
+
+### UNVERIFIED items — carry them, do not quietly resolve them
+
+These are the review's own words. The executor must treat each as an open question to
+be answered empirically in this task, and must record the answer:
+
+1. **`beat-this` on Python 3.13: UNVERIFIED** — "no upper bound declared, no CI
+   claim". The repo is on Python 3.12.13 today (Stage 4 baseline), and the 3.12→3.13
+   move belongs to Phase 4 (D7/M3). So this task runs on 3.12; the 3.13 question is
+   *recorded as still open* and handed to Phase 4, not answered here by assumption.
+2. **`all-in-one-mlx` is single-maintainer** (PyPI 1.0.6, 2026-08-12) — an accepted,
+   named risk. Mitigation per §5: "the A/B gate means we never depend on a model we
+   haven't verified against our own fixtures."
+3. **`all-in-one-fix` fork: UNVERIFIED PyPI presence**, and it declares torch ≤2.7
+   which "conflicts with our pin". Do not adopt it on the strength of this spec; if
+   the mlx path fails on the owner's machine, report rather than substituting.
+4. **torchaudio**: `beat-this` "still declares it" while torchaudio is in maintenance
+   wind-down (D7). Note the dependency; do not build anything new on torchaudio APIs.
+
+### What must NOT change
+
+> **Keep custom**: energy/multiscale, builds/drops (post-fix), tension, timeline — no
+> model equivalent exists and the verified DSP is sound.
+
+And from §6 (non-goals): "no MIR/model adoption without the fixture A/B".
+
+### Relationship to P1P-T4 (quoted verbatim from the plan)
+
+> - CF-2 grid fix spans agents-context (`_ms_to_bar`) and sequencer — one task, both
+>   halves (P1P-T4).
+
+and from the Phase 1P task table:
+
+> NOTE: P2P-T8 (MIR adoption) upgrades the grid's SOURCE; this task fixes the
+> CONSUMERS.
+
+So P1P-T4 has already made every consumer read one grid. This task changes what
+produces that grid. If P1P-T4 has not merged, **stop** — swapping the source under
+three disagreeing consumers reproduces CF-2 with new numbers.
+
+## Current behavior
+
+- Beats, downbeats and structure come from Twinklr's own DSP. `BeatGrid`
+  (`sequencer/timing/beat_grid.py`) is constructed via `from_resolver`,
+  `from_tempo`, or `from_song_features`, and exposes `beat_boundaries`,
+  `bar_boundaries`, `ms_per_bar`, `ms_per_beat`, `snap_to_nearest_bar/beat`.
+- The repo has **no tempo, beat-position, or key ground-truth assertion anywhere**
+  (P2-F24, verifier-revised form): "real ground-truth assertions exist (~15, incl. a
+  reference-loop Foote check) but **no tempo value, beat position, or key label is
+  ever asserted against a known correct value anywhere in the repo**." P1P-T8 adds the
+  first ones (click-track tempo/beats, known key); this task builds the fixture set
+  out.
+- Downbeat detection is custom phase-voting; librosa offers no alternative.
+
+## Target behavior
+
+1. **A `BeatGrid` source abstraction.** Beat/downbeat/structure production sits behind
+   an interface with at least three implementations: `dsp` (current), `beat_this`,
+   and `allinone` (structure labels; on Apple Silicon via `all-in-one-mlx`). Selection
+   is configuration. `BeatGrid` itself — the consumed artifact — does not change
+   shape; that is the whole point of putting the swap behind it.
+2. **A golden fixture set with ground truth.** Songs (or click tracks / annotated
+   excerpts) with known beat times, downbeat times, and section boundaries, tracked in
+   the repo or referenced deterministically. This fixture set is the durable
+   deliverable even if adoption is rejected — it closes CC-7's ground-truth gap for
+   rhythm.
+3. **An A/B harness** that runs each source over the fixture set and reports the
+   metrics in the gate below, deterministically and re-runnably.
+4. **The adoption decision, executed and recorded**, per the gate. Adopted or not,
+   write a decision record into `memories/decisions/` with the numbers, the fixture
+   set, the versions tested, and the open UNVERIFIED items.
+5. **Custom analysis preserved**: energy/multiscale, builds/drops, tension, timeline
+   remain Twinklr's regardless of outcome.
+6. **Optional extras, not core dependencies.** Same rule as P2P-T7: `beat-this` and
+   `all-in-one-mlx` are optional extras; the default suite installs and passes without
+   them.
+
+## Adoption gate — pre-committed numeric criteria
+
+**These numbers are fixed by this spec before any measurement. Do not adjust them
+after seeing results.** Plan note, verbatim:
+
+> - T8's A/B criteria must be numeric and pre-committed (beat F1 / downbeat F1 /
+>   section-boundary tolerance on the fixture set) — no post-hoc judgment.
+
+Metrics (standard MIR definitions; state the tolerance in the harness output):
+
+| Metric | Definition | Tolerance |
+|---|---|---|
+| **Beat F1** | F-measure of detected vs annotated beat times | ±70 ms matching window |
+| **Downbeat F1** | F-measure of detected vs annotated downbeat times | ±70 ms matching window |
+| **Section-boundary hit rate** | fraction of annotated section boundaries matched by a detected boundary | ±0.5 s (report ±3 s as a secondary, looser figure) |
+
+Adoption rules, evaluated on the **mean across the fixture set**:
+
+- **Adopt `beat-this` for beats+downbeats** if it beats the current DSP by
+  **≥ 0.05 absolute on downbeat F1** *and* is **no worse than 0.02 absolute on beat
+  F1**. Rationale: downbeats are where the DSP competes against nothing maintained,
+  and downbeat truth is what the bar-numbered plan contract rests on.
+- **Reject** (keep the DSP) if `beat-this` is worse on beat F1 by > 0.02, or fails to
+  clear the downbeat margin. Record the numbers; the proposal already absorbs this
+  outcome ("beat-this A/B losing to the current BeatGrid on our fixtures (keep DSP,
+  revisit later — absorbed)").
+- **Adopt All-In-One for section labels** if section-boundary hit rate at ±0.5 s
+  improves by **≥ 0.10 absolute** over the current structure detector. Otherwise keep
+  the custom structure path.
+- **Independent decisions.** Beats/downbeats and structure are adopted or rejected
+  separately; a win on one does not carry the other.
+- **Regression guard, absolute**: no adopted source may reduce beat F1 below the
+  current DSP's measured value by more than 0.02, on any single fixture, without an
+  explicit owner override recorded in the decision record.
+- **Determinism requirement**: an adopted source must produce identical output across
+  two runs on the same input. A non-deterministic source is rejected regardless of
+  accuracy — CC-8 records determinism violations in "deterministic" layers as an
+  existing defect class, and the render path's reproducibility depends on the grid.
+
+Publication figures for context only, not gate inputs: `beat-this` reports GTZAN beat
+F1 89.1 / downbeat F1 78.3. **Our fixtures decide, not GTZAN.**
+
+### Non-goals
+
+- The stems stage (**P2P-T7**, lands first in the same lane).
+- The `--dbn` flag: explicitly skipped — "the optional `--dbn` flag reintroduces
+  madmom — skip it."
+- madmom or canonical `allin1` (install-broken on modern stacks).
+- Replacing energy/builds/tension/timeline analysis.
+- Python 3.13 migration (Phase 4).
+
+## Implementation approach
+
+Files/symbols (re-verify first):
+
+- `packages/twinklr/core/sequencer/timing/beat_grid.py` — the consumed artifact;
+  `from_song_features` / `from_resolver` are the seams where a source plugs in.
+  **Do not change `BeatGrid`'s public shape.**
+- `packages/twinklr/core/audio/rhythm/` and `structure/` — current DSP producers;
+  they become the `dsp` implementation of the new source interface.
+- New: the source interface, the two model-backed implementations, the A/B harness,
+  and the fixture set + annotations.
+- `pyproject.toml` optional extras for `beat-this` and `all-in-one-mlx`.
+- `memories/decisions/` — the decision record (per `AGENTS.md`'s memory protocol:
+  record provenance and date in frontmatter, link related context/change documents,
+  update `memories/INDEX.md`).
+
+Sequencing constraints copied verbatim from the plan:
+
+> - CF-2 grid fix spans agents-context (`_ms_to_bar`) and sequencer — one task, both
+>   halves (P1P-T4).
+> - T8's A/B criteria must be numeric and pre-committed (beat F1 / downbeat F1 /
+>   section-boundary tolerance on the fixture set) — no post-hoc judgment.
+> - **Verification currency**: evidence in specs is from baseline `aa8d325`.
+>   Executors must re-verify cited line numbers before editing.
+
+Lane order: T7 → T8, merging before T13.
+
+## Acceptance criteria
+
+1. A source abstraction exists with `dsp`, `beat_this` and `allinone`
+   implementations, selectable by configuration, with `BeatGrid`'s public shape
+   unchanged.
+2. A golden fixture set with annotated beats, downbeats and section boundaries exists
+   and is tracked (or deterministically fetchable), with at least enough material to
+   make the mean meaningful — **minimum 5 songs/excerpts spanning at least: one
+   steady 4/4 pop track, one non-4/4 or tempo-varying track, one sparse/ambient
+   track**.
+3. The A/B harness reports beat F1, downbeat F1 and section-boundary hit rate per
+   fixture and as a mean, at the stated tolerances, re-runnably and deterministically.
+4. The gate is applied **as written**; the decision (adopt/reject, per component) is
+   recorded in `memories/decisions/` with the numbers, versions, fixture list and the
+   open UNVERIFIED items (beat-this on Python 3.13; `all-in-one-mlx` single
+   maintainer; `all-in-one-fix` PyPI presence; torchaudio wind-down).
+5. If adopted: every grid consumer reads the new source through `BeatGrid` with no
+   consumer-side change (P1P-T4 already unified them), and the golden render suite
+   either passes unchanged or its diffs are explained as grid-truth improvements
+   with BEFORE/AFTER evidence per changed fixture.
+6. If rejected: the custom DSP stays, the fixture set and harness remain in the tree
+   as the permanent regression guard, and the decision record says why.
+7. The determinism requirement is tested (two runs, identical output) for any adopted
+   source.
+8. Optional extras: `uv sync` without them succeeds and the full suite passes.
+9. `make validate` check-only forms pass.
+
+## Tests
+
+1. `test_beat_f1_on_click_track` — a synthetic click track with exactly known beat
+   times; the `dsp` source must score near 1.0. Ground-truth assertion, the class the
+   repo has none of.
+2. `test_downbeat_f1_on_annotated_fixture`.
+3. `test_section_boundary_hit_rate_on_annotated_fixture`.
+4. `test_ab_harness_is_deterministic` — two runs, identical metric output.
+5. `test_beat_grid_shape_unchanged` — the public interface of `BeatGrid` is pinned so
+   a source swap cannot alter it.
+6. `test_source_selection_from_config`.
+7. **LOCAL-ONLY** `test_model_sources_run` — `beat-this` and `all-in-one-mlx` execute
+   on one fixture on Apple Silicon; excluded from CI (model weights, ~78 MB download).
+8. Golden render suite (criterion 5).
+
+## Verification commands
+
+```bash
+uv run ruff format --check .
+uv run ruff check .
+uv run mypy .
+uv run pytest tests/unit/audio tests/unit/sequencer -k "beat or grid or structure" -q
+uv run pytest -m "not local_only" -q
+uv sync --extra dev --all-packages          # must succeed WITHOUT the mir extras
+```
+
+LOCAL-ONLY (Apple Silicon, mir extras installed):
+
+```bash
+uv sync --extra mir
+uv run pytest -m local_only -k "mir or beat_this or allinone" -q
+uv run <ab-harness-entrypoint> --report     # produces the gate table
+```
+
+No paid API calls.
+
+## Effort & risk
+
+**L.** Main risk: fixture annotation quality. A gate is only as good as its ground
+truth, and hand-annotating downbeats is error-prone. Mitigation: include at least one
+synthetic click track where the answer is exact by construction (it validates the
+metric implementation itself), and cross-check hand annotations by listening before
+they become the gate. Second risk: dependency conflict — `beat-this` declares
+torchaudio, which is winding down, and `all-in-one-fix` declares torch ≤2.7 against
+our pin. Mitigation: optional extras, `all-in-one-mlx` (no torch) as the structure
+path, and a hard rule that this task does not move the torch pin — if it cannot
+resolve, report and hand to Phase 4. Third risk: adopting on GTZAN reputation rather
+than our fixtures — mitigated by the gate being pre-committed here, in writing,
+before any number exists.

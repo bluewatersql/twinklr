@@ -44,6 +44,9 @@ htmlcov/
 dist/
 build/
 *.egg-info/
+# Root build/ holds the implementation plan & specs (tracked); packaging build/ dirs stay ignored
+!/build/
+!/build/**
 
 # === Generated project data & run artifacts (never check in) ===
 data/
