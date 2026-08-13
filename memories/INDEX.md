@@ -9,7 +9,8 @@ memory — those are machine-local supplemental caches (see the memory protocol 
 - **[decisions/](decisions/)** — durable architectural/engineering decisions and their rationale
   - [llm-plans-intent-renderer-implements-precision.md](decisions/llm-plans-intent-renderer-implements-precision.md)
 - **[learnings/](learnings/)** — non-obvious discoveries from previous work
-  - [known-test-failures.md](learnings/known-test-failures.md) — pre-existing failures on `main` (reported Feb 2026; re-verify before relying)
+  - [reactivation-review-2026-08.md](learnings/reactivation-review-2026-08.md) — durable conclusions of the 2026-08 reactivation review (readiness, verified defect classes, external facts, strengths)
+  - [known-test-failures.md](learnings/known-test-failures.md) — VERIFIED gate baseline on `main` at `aa8d325` (2026-08-13): 120 failures classified; the old four-failure claim refuted
   - [simplification-pass-2026-02.md](learnings/simplification-pass-2026-02.md) — stale auto-memory case study: a claimed simplification pass that never landed on `main`
 - **[constraints/](constraints/)** — limitations that repeatedly shape design
   - [python-3.12-only.md](constraints/python-3.12-only.md)

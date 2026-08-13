@@ -6,14 +6,23 @@ updated: 2026-08-13
 
 # Multi-Agent Planning
 
+_Corrected 2026-08-13 from source evidence (reactivation review): the separate "LLM
+validator" role documented earlier was removed from code
+(`agents/state_machine.py:18` records the removal); the live loop is below._
+
 The choreography planner is an iterative refinement loop over structured Pydantic models:
 
-1. **Planner** generates a `ChoreographyPlan` (template + preset per song section).
-2. **Heuristic validator** checks structural validity (fast, free — template exists,
-   timing valid).
-3. **LLM validator** checks semantic quality (template appropriateness, coordination).
-4. **Judge** scores 0–10 and decides: approve (≥ 7.0), soft-fail (revise), or hard-fail
-   (redo). Structured feedback loops back to the planner. Up to 3 iterations by default.
+1. **Planner** generates a plan (template + preset per song section).
+2. **Heuristic validation** checks structural validity (fast, free); on the display
+   path five deterministic auto-repair passes fix common LLM mistakes before scoring.
+3. **Judge** scores 0–10 and decides: approve (≥ 7.0, enforced by a model validator
+   that reconciles status to score), soft-fail (revise), or hard-fail (redo).
+   Structured feedback loops back to the planner. Up to 3 iterations by default.
+
+> **Reality note (verified 2026-08-13):** on the shipped moving-heads path the
+> renderer consumes only `template_id` + `preset_id` from all of this — see the
+> reality-check in
+> [memories/decisions/llm-plans-intent-renderer-implements-precision.md](../../memories/decisions/llm-plans-intent-renderer-implements-precision.md).
 
 ## Design principles
 

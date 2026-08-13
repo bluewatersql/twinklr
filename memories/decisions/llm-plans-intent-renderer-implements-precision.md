@@ -37,6 +37,21 @@ fixture control is a precision problem.
 - Validation splits into cheap heuristics (structure) and LLM judging (semantics).
 - The renderer is the sole owner of fixture math; changes there never require prompt changes.
 
+## Reality check (2026-08-13, reactivation review — adversarially verified)
+
+The **principle stands; its description of reality is false for the shipped
+moving-heads path.** Verified: the shipped LLM decides only `template_id` +
+`preset_id` (~67 distinguishable outcomes); it emits no categorical intensity or
+duration enums that reach rendering (the categorical vocabulary is never imported by
+the renderer — `Intensity` and `IntensityLevel` are unrelated enums with no
+converter); the creative arc (MacroPlan) reaches the renderer only as prose in a
+downstream prompt. The description matches the unshipped display pipeline. Whether to
+re-implement the decision as written (widen the channel) or narrow it (deterministic
+selector, LLM opt-in) is an open project decision gated on the review's three-arm
+experiment — see
+[changes/twinklr-reactivation-review/reviews/final-assessment.md](../../changes/twinklr-reactivation-review/reviews/final-assessment.md)
+and roadmap RM-2.3.
+
 ## Related
 
 - [context/architecture/multi-agent-planning.md](../../context/architecture/multi-agent-planning.md)

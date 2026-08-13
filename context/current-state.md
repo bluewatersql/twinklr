@@ -19,8 +19,9 @@ precision (curves, DMX values, timing). See [product/overview.md](product/overvi
   Genius, WhisperX), phonemes/visemes. `packages/twinklr/core/audio/`
 - **Audio profiling & lyrics agents** (LLM) — musical interpretation and creative
   guidance. `packages/twinklr/core/agents/audio/`
-- **Multi-agent choreography planning** (LLM) — iterative planner → heuristic validator →
-  LLM validator → judge loop. See
+- **Multi-agent choreography planning** (LLM) — iterative planner → heuristic
+  validation (with deterministic auto-repair on the display path) → judge loop; the
+  formerly-documented separate LLM-validator role was removed from code. See
   [architecture/multi-agent-planning.md](architecture/multi-agent-planning.md).
 - **Rendering & compilation** (deterministic) — template compiler, curve generation,
   DMX export for moving heads; display sequencer for RGB/pixel elements.
@@ -35,17 +36,28 @@ precision (curves, DMX values, timing). See [product/overview.md](product/overvi
 
 ## Known issues
 
-- Four pre-existing test failures on `main`, unrelated to recent work — see
-  [memories/learnings/known-test-failures.md](../memories/learnings/known-test-failures.md).
+- **`main` does not pass its own quality gates from a clean checkout** (verified
+  2026-08-13 at `aa8d325`): 120 test failures (classified — 60 tests for nonexistent
+  scripts, 52 needing gitignored template data, 8 environmental), 4 mypy errors,
+  150 ruff errors, 13 unformatted files. See
+  [memories/learnings/known-test-failures.md](../memories/learnings/known-test-failures.md)
+  (the earlier four-failure claim is refuted).
+- The 2026-08 reactivation review found verified correctness defects on the shipped
+  render path and a wide dead-configuration class; readiness classification
+  **REQUIRES_STABILIZATION** with a dependency-ordered roadmap — see
+  [memories/learnings/reactivation-review-2026-08.md](../memories/learnings/reactivation-review-2026-08.md)
+  and the review under
+  [changes/twinklr-reactivation-review/](../changes/twinklr-reactivation-review/).
 - A superseded group-planner v3 attempt is referenced in
   `packages/twinklr/core/pipeline/stages.py` (comment pointing at
   `changes/archive/group_planner_v3_failed/`); that archive predates change tracking and
-  is not present in the repository.
+  is not present in the repository. (`stages.py` itself is confirmed dead code.)
 
 ## Active work
 
-None currently — see [changes/ACTIVE.md](../changes/ACTIVE.md). Recent commits are
-documentation/branding polish.
+None currently — see [changes/ACTIVE.md](../changes/ACTIVE.md). The
+twinklr-reactivation-review change completed 2026-08-13; remediation has not started
+(review-only — no production code was changed).
 
 ## Key constraints
 
