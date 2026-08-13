@@ -433,3 +433,21 @@ within a factor of ~1 of the nominal step rate; record the choice in the spec's 
 **Third risk: unclamping/clamping interactions with P1P-T4's grid change** — both alter
 segment boundaries. Mitigation: Lane R is serial (T3 → T4 → T5), so T5 rebases onto T4's
 merged grid and regenerates goldens once, not twice.
+
+## Backlog additions from P1P-T1 verification (2026-08-13, binding)
+
+1. **NEW DEFECT owned by this task — transition segments emit all-zero settings:**
+   `channel_blender.py` returns the blend on `ChannelValue(curve=...)` with
+   static/base/value_points unset; `dmx_settings_builder._extract_channel_data`
+   reads only those three and never `curve` — the blend is dropped and zero-fill
+   writes 0 to all 16 channels for ~1s at every section boundary (validator missed
+   it: transitions sit on layer 1). Pinned in
+   tests/golden/test_transition_segments_emit_all_zero. **P1P-T6 is BARRED from
+   "resolving" this via channel defaults** — defaults would flip the test green
+   while the blend is still discarded; the fix is the compile→export contract
+   (settings builder must consume `curve`).
+2. **Golden coverage prerequisite:** the current golden plan fixtures do NOT
+   exercise P4-M1 (dimmer floors) or P4-M2 (BLACKOUT inversion) — extend
+   tests/golden/harness.py `build_plan()`/RIGS with a blackout section and a
+   floor-declaring template (per the P1P-T2 extension note) BEFORE fixing M1/M2, so
+   the fixes land as visible golden diffs.

@@ -53,6 +53,24 @@ def _legacy_template_data_available() -> bool:
     return _LEGACY_TEMPLATES_INDEX.exists()
 
 
+# ============================================================================
+# --regen-goldens — golden render harness (tests/golden/)
+# ============================================================================
+# Registered here rather than in tests/golden/conftest.py so the flag exists for
+# whole-suite invocations too; pytest only honours pytest_addoption in conftest
+# files loaded at startup. TWINKLR_REGEN_GOLDENS=1 is the equivalent env var.
+
+
+def pytest_addoption(parser: pytest.Parser) -> None:
+    """Register the golden-regeneration flag."""
+    parser.addoption(
+        "--regen-goldens",
+        action="store_true",
+        default=False,
+        help="Rewrite tests/golden/**/*.settings.txt from the current render output.",
+    )
+
+
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
     """Skip `requires_template_data`-marked tests when the legacy data is absent."""
     if _legacy_template_data_available():

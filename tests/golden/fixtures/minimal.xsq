@@ -1,0 +1,56 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!--
+  The repository's first tracked .xsq. Hand-built and deliberately tiny so a human can
+  review every byte; it exists so parse -> export -> parse can be asserted at all
+  (P5 SS-V4 / CC-7: the repo had no sample .xsq, no golden, no round-trip test).
+
+  Load-bearing details, do not "tidy" them away:
+    - <mediaFile> is non-empty. The fresh-emit branch of xsq_export.py writes
+      media_file="" which xLights treats as fatal; the round-trip test asserts a
+      non-empty mediaFile so that defect cannot be re-introduced unnoticed.
+    - the second Effect carries selected/bufferTransform attributes that no model field
+      knows about. They are the documented survivors of P5-F5 item 7 (they land in
+      Effect.parameters) and the round-trip test asserts they come back out.
+-->
+<xsequence BaseChannel="0" ChanCtrlBasic="0" ChanCtrlColor="0" FixedPointTiming="1" ModelBlending="true">
+  <head>
+    <version>2024.10</version>
+    <author>Twinklr Test Fixture</author>
+    <author-email />
+    <author-website />
+    <song>Minimal Round Trip</song>
+    <artist>Twinklr</artist>
+    <album />
+    <MusicURL />
+    <comment />
+    <sequenceTiming>50 ms</sequenceTiming>
+    <sequenceType>Media</sequenceType>
+    <sequenceDuration>4.000</sequenceDuration>
+    <imageDir />
+    <mediaFile>minimal_round_trip.mp3</mediaFile>
+  </head>
+  <nextid>3</nextid>
+  <Jukebox />
+  <EffectDB>
+    <Effect>B_CHOICE_BufferStyle=Per Model Default,E_NOTEBOOK1=Channels 1-16,E_SLIDER_DMX1=128,E_SLIDER_DMX2=64,E_SLIDER_DMX3=255</Effect>
+    <Effect>B_CHOICE_BufferStyle=Per Model Default,E_NOTEBOOK1=Channels 1-16,E_SLIDER_DMX1=0,E_VALUECURVE_DMX2=Active=TRUE|Id=ID_VALUECURVE_DMX2|Type=Custom|Min=0.00|Max=255.00|RV=FALSE|Values=0.00:0.00;0.50:1.00;1.00:0.00|</Effect>
+  </EffectDB>
+  <DisplayElements>
+    <Element type="timing" name="Bars" visible="1" collapsed="0" />
+    <Element type="model" name="Dmx MH1" visible="1" collapsed="0" />
+  </DisplayElements>
+  <ElementEffects>
+    <Element type="timing" name="Bars">
+      <EffectLayer>
+        <Effect label="1" startTime="0" endTime="2000" />
+        <Effect label="2" startTime="2000" endTime="4000" />
+      </EffectLayer>
+    </Element>
+    <Element type="model" name="Dmx MH1">
+      <EffectLayer>
+        <Effect name="DMX" startTime="0" endTime="2000" ref="0" label="bar1_hold" />
+        <Effect name="DMX" startTime="2000" endTime="4000" ref="1" label="bar2_sweep" selected="0" bufferTransform="None" />
+      </EffectLayer>
+    </Element>
+  </ElementEffects>
+</xsequence>
