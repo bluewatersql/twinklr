@@ -1,0 +1,103 @@
+{
+  "enabled": true,
+  "presets": [],
+  "template": {
+    "category": "low_energy",
+    "defaults": {
+      "dimmer_ceiling_dmx": 255,
+      "dimmer_floor_dmx": 60
+    },
+    "metadata": {
+      "description": "Ultra-slow random drift across a wall wash for atmospheric ambient moments.",
+      "energy_range": [
+        5,
+        25
+      ],
+      "recommended_sections": [
+        "intro",
+        "ambient",
+        "verse"
+      ],
+      "tags": [
+        "ambient",
+        "random_walk",
+        "wall_wash",
+        "atmospheric"
+      ]
+    },
+    "name": "Ambient Random Wash",
+    "repeat": {
+      "cycle_bars": 8.0,
+      "loop_step_ids": [
+        "main"
+      ],
+      "mode": "JOINER",
+      "remainder_policy": "HOLD_LAST_POSE",
+      "repeatable": true
+    },
+    "roles": [
+      "OUTER_LEFT",
+      "INNER_LEFT",
+      "INNER_RIGHT",
+      "OUTER_RIGHT"
+    ],
+    "steps": [
+      {
+        "blend_mode": "override",
+        "color": {
+          "params": {},
+          "preset": "blue"
+        },
+        "dimmer": {
+          "cycles": 1.0,
+          "dimmer_type": "hold",
+          "intensity": "SMOOTH",
+          "max_norm": 0.9,
+          "min_norm": 0.6,
+          "params": {}
+        },
+        "entry_transition": null,
+        "exit_transition": null,
+        "geometry": {
+          "aim_zone": "HORIZON",
+          "geometry_type": "wall_wash",
+          "pan_pose_by_role": null,
+          "params": {},
+          "tilt_pose": "horizon"
+        },
+        "gobo": null,
+        "movement": {
+          "amplitude_override": null,
+          "center_offset_override": null,
+          "cycles": 0.5,
+          "frequency_override": null,
+          "intensity": "SLOW",
+          "movement_type": "random_walk",
+          "params": {}
+        },
+        "priority": 0,
+        "shutter": null,
+        "step_id": "main",
+        "target": "ALL",
+        "timing": {
+          "base_timing": {
+            "duration_bars": 8.0,
+            "mode": "musical",
+            "quantize_type": "downbeat",
+            "start_offset_bars": 0.0
+          },
+          "phase_offset": {
+            "distribution": "LINEAR",
+            "group": "ALL",
+            "mode": "NONE",
+            "order": "LEFT_TO_RIGHT",
+            "spread_bars": 0.0,
+            "wrap": true
+          }
+        }
+      }
+    ],
+    "template_id": "ambient_random_wash",
+    "version": 1
+  }
+}

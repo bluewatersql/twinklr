@@ -246,6 +246,21 @@ Factory: `TwinklrSession.from_directory(config_dir)` discovers `config.json` and
 - Template compiler transforms `ChoreographyPlan` sections into DMX fixture segments
 - Each fixture gets per-channel value curves (pan, tilt, dimmer, shutter, color, gobo)
 - Output is a fresh xLights `.xsq` plus `.xtiming`/`.xmap` sidecars, written by `moving_heads/delivery.py`; no user sequence is read
+- The template registry accepts both Python factories and strict JSON `TemplateDoc`
+  files. Python builtins load first; normalized ID/name/alias collisions fail unless
+  an explicit override targets the exact incumbent ID. Tracked moving-head data lives at
+  `catalog/templates/moving_heads/` alongside, but schema-distinct from, display recipes.
+
+Export every Python builtin to deterministic JSON and validate any data directory with:
+
+```bash
+uv run twinklr template-export --out /tmp/mh-templates
+uv run twinklr template-validate --template-dir /tmp/mh-templates
+```
+
+The converter writes one document per template. Registration lints repeat-cycle
+partitioning, timing overruns, energy ranges, recommended sections, and declared
+remainder policy for both Python and data sources.
 
 **Display sequencer** (`packages/twinklr/core/sequencer/display/`):
 - 24 effect handlers for RGB/pixel elements
@@ -381,7 +396,12 @@ Scripts in `scripts/` provide demo, analysis, and validation utilities:
 
 ### Adding a New Moving Head Template
 
-Templates are registered via `load_builtin_templates()` in `packages/twinklr/core/sequencer/moving_heads/templates/`. Each template defines geometry, movement patterns, dimmer behavior, and presets.
+Prefer a strict JSON `TemplateDoc` in a configured template directory. Validate it with
+`twinklr template-validate`, then pass the directory to `twinklr run --template-dir`.
+Python factories under `packages/twinklr/core/sequencer/moving_heads/templates/builtins/`
+remain supported as an authoring convenience and load through `load_builtin_templates()`.
+Each form defines the same geometry, movement, dimmer, wheel-axis, metadata, and preset
+contract, and both pass the same registration linter.
 
 ### Adding a New LLM Provider
 

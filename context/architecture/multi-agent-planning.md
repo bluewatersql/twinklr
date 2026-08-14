@@ -1,7 +1,7 @@
 ---
 type: context
 area: architecture
-updated: 2026-08-13
+updated: 2026-08-14
 ---
 
 # Multi-Agent Planning
@@ -32,6 +32,13 @@ The choreography planner is an iterative refinement loop over structured Pydanti
   HIT/BURST/PHRASE/EXTENDED/SECTION. The renderer resolves categories to DMX values.
 - **Templates as complete units** — geometry + movement + dimmer as tested, self-contained
   choreography units. The LLM selects templates; it never invents them.
+- **Data-first template loading** — moving-head `TemplateDoc` JSON and Python factories
+  share one validating registry. Python builtins load first; configured data loads second,
+  and normalized ID/name/alias collisions fail unless an explicit override targets the
+  exact incumbent ID. The two forms coexist for progressive migration. Moving-head
+  templates and display recipes now share the
+  tracked `catalog/templates/` data home but not yet a schema: one catalog with two
+  renderers is the recorded convergence direction, not current behavior.
 - **Schema auto-injection** — Pydantic response models generate the JSON schemas embedded
   in prompts, eliminating prompt/schema drift.
 - **Two-tier validation** — heuristics run before the LLM judge to save tokens on
@@ -46,3 +53,4 @@ The choreography planner is an iterative refinement loop over structured Pydanti
 - Runtime prompt packs: `packages/twinklr/core/**/prompts/` (Jinja2 — application source,
   distinct from the root `prompts/` agent-workflow library)
 - Deep reference: [docs/audio_profile/index.md](../../docs/audio_profile/index.md) series
+- Moving-head data loader: `packages/twinklr/core/sequencer/moving_heads/templates/`

@@ -210,6 +210,8 @@ uv run twinklr run \
 | `--config` | Yes | — | Path to job config JSON |
 | `--out` | No | `.` | Output directory |
 | `--app-config` | No | `config.json` | Path to app config JSON |
+| `--template-dir` | No | — | Load strict JSON moving-head templates from this directory after Python builtins |
+| `--allow-template-overrides` | No | `false` | Explicitly permit a data template to replace a colliding Python builtin ID |
 
 Twinklr takes **no input sequence**. It used to require `--xsq` and rewrite the sequence you
 gave it, which cost you your jukebox state, your per-element display state, anything in the
@@ -225,6 +227,32 @@ Your rig comes from the fixture config that `job_config.json` points at
 to.
 
 _Source: `packages/twinklr/cli/main.py` (`build_arg_parser`, `build_run_pipeline`)_
+
+### Data-form moving-head templates
+
+Moving-head templates can be supplied as strict JSON `TemplateDoc` files without
+adding a Python module or reinstalling Twinklr. Builtins always load first. Duplicate
+normalized ID, display-name, and explicit-alias collisions are rejected by default so
+filesystem order cannot silently decide which choreography runs. An override can replace
+only the exact incumbent template ID and cannot steal an unrelated alias; use
+`--allow-template-overrides` only when replacement is deliberate.
+
+To export the Python library as editable JSON or validate a template directory:
+
+```bash
+uv run twinklr template-export --out /tmp/mh-templates
+uv run twinklr template-validate --template-dir /tmp/mh-templates
+```
+
+Then opt a run into that directory:
+
+```bash
+uv run twinklr run \
+  --audio path/to/song.mp3 \
+  --config path/to/job_config.json \
+  --template-dir /tmp/mh-templates \
+  --allow-template-overrides
+```
 
 ### Deterministic FSEQ comparison (CI-safe)
 

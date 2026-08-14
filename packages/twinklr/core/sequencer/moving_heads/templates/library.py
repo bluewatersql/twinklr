@@ -17,7 +17,7 @@ class TemplateNotFoundError(KeyError):
 
 
 class InvalidTemplateError(ValueError):
-    """A template's repeat contract does not describe a renderable cycle."""
+    """A template document does not describe a renderable, searchable template."""
 
 
 def validate_repeat_contract(template: Template) -> None:
@@ -73,6 +73,59 @@ def validate_repeat_contract(template: Template) -> None:
             "the cycle must be exactly the span its steps occupy"
         )
 
+    # Multi-step timing must cover the cycle without a hole. Overlap remains valid:
+    # multiple steps can deliberately run in parallel against the same or disjoint
+    # fixture groups, as pinned by the original repeat-contract tests.
+    if len(loop_step_ids) > 1:
+        intervals: list[tuple[float, float, str]] = []
+        for step in template.steps:
+            if step.step_id not in loop_step_ids:
+                continue
+            timing = step.timing.base_timing
+            intervals.append(
+                (
+                    timing.start_offset_bars,
+                    timing.start_offset_bars + timing.duration_bars,
+                    step.step_id,
+                )
+            )
+
+        cursor = 0.0
+        for start, end, step_id in sorted(intervals):
+            if start > cursor + _EPSILON_BARS:
+                raise InvalidTemplateError(
+                    f"template '{template.template_id}': loop schedule has an unscheduled "
+                    f"gap from {cursor} to {start} bars before step '{step_id}'"
+                )
+            cursor = max(cursor, end)
+
+
+def validate_template_document(document: TemplateDoc) -> None:
+    """Lint source-independent template properties required by selection/rendering.
+
+    Registration calls this function for both Python factories and data documents,
+    so neither source can bypass the repeat-contract checks or the annotations used
+    by deterministic template selection.
+    """
+    template = document.template
+    validate_repeat_contract(template)
+
+    metadata = template.metadata
+    if metadata is None or metadata.energy_range is None:
+        raise InvalidTemplateError(
+            f"template '{template.template_id}': metadata.energy_range is required"
+        )
+    minimum, maximum = metadata.energy_range
+    if minimum > maximum:
+        raise InvalidTemplateError(
+            f"template '{template.template_id}': metadata.energy_range must be ordered "
+            f"(got {minimum}, {maximum})"
+        )
+    if not metadata.recommended_sections:
+        raise InvalidTemplateError(
+            f"template '{template.template_id}': metadata.recommended_sections must not be empty"
+        )
+
 
 def _norm_key(s: str) -> str:
     """Normalize user-provided keys (id/name/alias) to a stable lookup key."""
@@ -101,6 +154,7 @@ class TemplateRegistry:
         self._factories_by_id: dict[str, Callable[[], TemplateDoc]] = {}
         self._aliases: dict[str, str] = {}  # alias_key -> template_id
         self._info_by_id: dict[str, TemplateInfo] = {}
+        self._source_by_id: dict[str, str] = {}
 
     def register(
         self,
@@ -108,25 +162,64 @@ class TemplateRegistry:
         *,
         template_id: str | None = None,
         aliases: Iterable[str] = (),
-    ) -> None:
+        source: str = "python",
+        allow_override: bool = False,
+    ) -> bool:
         t = factory()  # materialize once for validation + metadata
         tid = template_id or t.template.template_id
 
+        # Disabled templates are skipped only after proving they are otherwise valid.
+        # A disabled flag is not an escape hatch around the source-independent linter:
+        # invalid dormant data tends to become a production failure when re-enabled.
+        validate_template_document(t)
+
         if not t.enabled:
             logger.warning(f"Template {tid} is disabled, skipping registration")
-            return
+            return False
 
-        validate_repeat_contract(t.template)
+        alias_keys = {_norm_key(alias) for alias in (tid, t.template.name, *aliases)}
+        if "" in alias_keys:
+            raise ValueError(
+                f"Template {tid!r} has an empty normalized alias (new source={source})"
+            )
 
-        if tid in self._factories_by_id:
-            raise ValueError(f"Template already registered: {tid}")
+        exact_incumbent = tid if tid in self._factories_by_id else None
+        if exact_incumbent is not None and not allow_override:
+            raise self._collision_error(
+                normalized_key=_norm_key(tid),
+                incumbent_id=exact_incumbent,
+                new_id=tid,
+                new_source=source,
+            )
+
+        # Preflight *every* normalized lookup key before mutating any registry map.
+        # An override may reuse keys owned by its exact incumbent and nothing else;
+        # in particular, `fan-pulse` cannot be shadowed by `fan_pulse`, and a
+        # replacement cannot steal another template's display name or explicit alias.
+        for alias_key in sorted(alias_keys):
+            incumbent_id = self._aliases.get(alias_key)
+            if incumbent_id is None:
+                continue
+            replacing_exact_incumbent = (
+                allow_override and exact_incumbent == tid and incumbent_id == tid
+            )
+            if not replacing_exact_incumbent:
+                raise self._collision_error(
+                    normalized_key=alias_key,
+                    incumbent_id=incumbent_id,
+                    new_id=tid,
+                    new_source=source,
+                )
+
+        # Mutation starts only after validation and the complete collision preflight.
+        if exact_incumbent is not None:
+            self._remove_registration(exact_incumbent)
 
         self._factories_by_id[tid] = factory
 
         # Add default aliases: id and display name
-        all_aliases = {tid, t.template.name, *aliases}
-        for a in all_aliases:
-            self._aliases[_norm_key(a)] = tid
+        for alias_key in alias_keys:
+            self._aliases[alias_key] = tid
 
         # Store lightweight info for list/search
         tags = tuple(getattr(t.template.metadata, "tags", []) or [])
@@ -138,6 +231,58 @@ class TemplateRegistry:
             category=t.template.category,
             tags=tags,
         )
+        self._source_by_id[tid] = source
+        return True
+
+    def _collision_error(
+        self,
+        *,
+        normalized_key: str,
+        incumbent_id: str,
+        new_id: str,
+        new_source: str,
+    ) -> ValueError:
+        """Describe a collision with enough provenance to resolve it."""
+        incumbent_source = self._source_by_id[incumbent_id]
+        return ValueError(
+            f"Template normalized key collision: {normalized_key!r} belongs to "
+            f"template {incumbent_id!r} (existing source={incumbent_source}); "
+            f"cannot register template {new_id!r} (new source={new_source})"
+        )
+
+    def register_document(
+        self,
+        document: TemplateDoc,
+        *,
+        aliases: Iterable[str] = (),
+        source: str = "data",
+        allow_override: bool = False,
+    ) -> bool:
+        """Register a validated data document through the factory path.
+
+        The captured model is copied on every lookup, preserving the registry's
+        existing fresh-instance guarantee for data and Python sources alike.
+        """
+        captured = document.model_copy(deep=True)
+
+        def factory() -> TemplateDoc:
+            return captured.model_copy(deep=True)
+
+        return self.register(
+            factory,
+            aliases=aliases,
+            source=source,
+            allow_override=allow_override,
+        )
+
+    def _remove_registration(self, template_id: str) -> None:
+        """Remove one registration and every alias that points to it."""
+        self._factories_by_id.pop(template_id, None)
+        self._info_by_id.pop(template_id, None)
+        self._source_by_id.pop(template_id, None)
+        self._aliases = {
+            alias: target for alias, target in self._aliases.items() if target != template_id
+        }
 
     def get(self, key: str, *, deep_copy: bool = True) -> TemplateDoc:
         """

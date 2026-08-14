@@ -1,0 +1,101 @@
+{
+  "enabled": true,
+  "presets": [],
+  "template": {
+    "category": "high_energy",
+    "defaults": {
+      "dimmer_ceiling_dmx": 255,
+      "dimmer_floor_dmx": 60
+    },
+    "metadata": {
+      "description": "Mirrored figure-8 patterns with strobe-rate dimmer pulses.",
+      "energy_range": [
+        75,
+        100
+      ],
+      "recommended_sections": [
+        "drop",
+        "peak"
+      ],
+      "tags": [
+        "figure8",
+        "mirror",
+        "strobe"
+      ]
+    },
+    "name": "Figure 8 Mirror Strobe",
+    "repeat": {
+      "cycle_bars": 4.0,
+      "loop_step_ids": [
+        "main"
+      ],
+      "mode": "PING_PONG",
+      "remainder_policy": "HOLD_LAST_POSE",
+      "repeatable": true
+    },
+    "roles": [
+      "OUTER_LEFT",
+      "INNER_LEFT",
+      "INNER_RIGHT",
+      "OUTER_RIGHT"
+    ],
+    "steps": [
+      {
+        "blend_mode": "override",
+        "color": null,
+        "dimmer": {
+          "cycles": 8.0,
+          "dimmer_type": "pulse",
+          "intensity": "INTENSE",
+          "max_norm": 1.0,
+          "min_norm": 0.05,
+          "params": {}
+        },
+        "entry_transition": null,
+        "exit_transition": null,
+        "geometry": {
+          "aim_zone": "HORIZON",
+          "geometry_type": "mirror_lr",
+          "pan_pose_by_role": null,
+          "params": {},
+          "tilt_pose": "horizon"
+        },
+        "gobo": null,
+        "movement": {
+          "amplitude_override": null,
+          "center_offset_override": null,
+          "cycles": 2.0,
+          "frequency_override": null,
+          "intensity": "INTENSE",
+          "movement_type": "figure8",
+          "params": {}
+        },
+        "priority": 0,
+        "shutter": {
+          "params": {},
+          "pattern": "strobe_fast"
+        },
+        "step_id": "main",
+        "target": "ALL",
+        "timing": {
+          "base_timing": {
+            "duration_bars": 4.0,
+            "mode": "musical",
+            "quantize_type": "downbeat",
+            "start_offset_bars": 0.0
+          },
+          "phase_offset": {
+            "distribution": "LINEAR",
+            "group": "ALL",
+            "mode": "GROUP_ORDER",
+            "order": "LEFT_TO_RIGHT",
+            "spread_bars": 0.5,
+            "wrap": true
+          }
+        }
+      }
+    ],
+    "template_id": "figure8_mirror_strobe",
+    "version": 1
+  }
+}

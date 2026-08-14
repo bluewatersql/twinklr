@@ -1,0 +1,101 @@
+{
+  "enabled": true,
+  "presets": [],
+  "template": {
+    "category": "high_energy",
+    "defaults": {
+      "dimmer_ceiling_dmx": 255,
+      "dimmer_floor_dmx": 60
+    },
+    "metadata": {
+      "description": "Rapid accent snaps in tunnel cone formation with matched pulse hits.",
+      "energy_range": [
+        80,
+        100
+      ],
+      "recommended_sections": [
+        "drop",
+        "peak"
+      ],
+      "tags": [
+        "accent_snap",
+        "tunnel",
+        "hit"
+      ]
+    },
+    "name": "Accent Snap Tunnel Hit",
+    "repeat": {
+      "cycle_bars": 4.0,
+      "loop_step_ids": [
+        "main"
+      ],
+      "mode": "PING_PONG",
+      "remainder_policy": "HOLD_LAST_POSE",
+      "repeatable": true
+    },
+    "roles": [
+      "OUTER_LEFT",
+      "INNER_LEFT",
+      "INNER_RIGHT",
+      "OUTER_RIGHT"
+    ],
+    "steps": [
+      {
+        "blend_mode": "override",
+        "color": null,
+        "dimmer": {
+          "cycles": 4.0,
+          "dimmer_type": "pulse",
+          "intensity": "INTENSE",
+          "max_norm": 1.0,
+          "min_norm": 0.1,
+          "params": {}
+        },
+        "entry_transition": null,
+        "exit_transition": null,
+        "geometry": {
+          "aim_zone": "HORIZON",
+          "geometry_type": "tunnel_cone",
+          "pan_pose_by_role": null,
+          "params": {},
+          "tilt_pose": "horizon"
+        },
+        "gobo": {
+          "params": {},
+          "pattern": "prism"
+        },
+        "movement": {
+          "amplitude_override": null,
+          "center_offset_override": null,
+          "cycles": 4.0,
+          "frequency_override": null,
+          "intensity": "INTENSE",
+          "movement_type": "accent_snap",
+          "params": {}
+        },
+        "priority": 0,
+        "shutter": null,
+        "step_id": "main",
+        "target": "ALL",
+        "timing": {
+          "base_timing": {
+            "duration_bars": 4.0,
+            "mode": "musical",
+            "quantize_type": "downbeat",
+            "start_offset_bars": 0.0
+          },
+          "phase_offset": {
+            "distribution": "LINEAR",
+            "group": "ALL",
+            "mode": "GROUP_ORDER",
+            "order": "INSIDE_OUT",
+            "spread_bars": 0.5,
+            "wrap": true
+          }
+        }
+      }
+    ],
+    "template_id": "accent_snap_tunnel_hit",
+    "version": 1
+  }
+}

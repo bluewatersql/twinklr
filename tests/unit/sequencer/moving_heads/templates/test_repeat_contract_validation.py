@@ -28,6 +28,7 @@ from twinklr.core.sequencer.models.template import (
     StepTiming,
     Template,
     TemplateDoc,
+    TemplateMetadata,
     TemplateStep,
 )
 from twinklr.core.sequencer.moving_heads.libraries.dimmer import DimmerType
@@ -79,6 +80,12 @@ def _doc(*, cycle_bars: float, loop_step_ids: list[str], steps: list[TemplateSte
             ),
             defaults={"dimmer_floor_dmx": 60, "dimmer_ceiling_dmx": 255},
             steps=steps,
+            metadata=TemplateMetadata(
+                tags=["test"],
+                recommended_sections=["verse"],
+                energy_range=(20, 80),
+                description="Repeat contract fixture.",
+            ),
         )
     )
 

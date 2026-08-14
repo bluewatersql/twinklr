@@ -27,6 +27,11 @@ from twinklr.cli.recipe_builder_cmd import (
     add_curate_catalog_subparser,
     run_curate_catalog_command,
 )
+from twinklr.cli.template_cmd import (
+    add_template_subparsers,
+    run_template_export_command,
+    run_template_validate_command,
+)
 from twinklr.core.caching import derive_session_id
 from twinklr.core.config.fixtures import FixtureGroup
 from twinklr.core.config.loader import load_app_config, load_fixture_group, load_job_config
@@ -38,7 +43,10 @@ from twinklr.core.sequencer.display.xlights_mapping import (
     XLightsGroupMapping,
     XLightsMapping,
 )
-from twinklr.core.sequencer.moving_heads.templates import load_builtin_templates
+from twinklr.core.sequencer.moving_heads.templates import (
+    load_builtin_templates,
+    load_templates_from_directory,
+)
 from twinklr.core.sequencer.moving_heads.templates.library import list_templates
 from twinklr.core.sequencer.templates.group.models.choreography import (
     ChoreographyGraph,
@@ -171,6 +179,8 @@ async def run_pipeline_async(
     app_config_path: Path,
     job_config_path: Path,
     session_id: str | None = None,
+    template_dir: Path | None = None,
+    allow_template_overrides: bool = False,
 ) -> int:
     """Run the pipeline using the Pipeline Framework.
 
@@ -182,6 +192,9 @@ async def run_pipeline_async(
         session_id: Optional session ID override. When omitted, the ID is
             derived from the audio content and configs so an identical re-run
             reuses cached LLM work.
+        template_dir: Optional directory of strict JSON moving-head templates.
+        allow_template_overrides: Whether data documents may explicitly shadow
+            colliding Python builtin IDs.
 
     Returns:
         Exit code (0 for success, 1 for failure)
@@ -218,6 +231,18 @@ async def run_pipeline_async(
     # Load templates
     console.print("[bold]Loading templates...[/bold]")
     load_builtin_templates()
+    if template_dir is not None:
+        try:
+            loaded_ids = load_templates_from_directory(
+                template_dir,
+                allow_overrides=allow_template_overrides,
+            )
+        except (OSError, ValueError) as error:
+            console.print(f"[red]ERROR: Could not load data templates: {error}[/red]")
+            return 1
+        console.print(
+            f"[green]📄 Data templates loaded:[/green] {len(loaded_ids)} from {template_dir}"
+        )
     available_templates = [t.template_id for t in list_templates()]
     console.print(f"[green]📚 Templates loaded:[/green] {len(available_templates)}")
 
@@ -373,6 +398,8 @@ def run_pipeline(args: argparse.Namespace) -> None:
             app_config_path=app_config_path,
             job_config_path=job_config_path,
             session_id=args.session_id,
+            template_dir=args.template_dir.resolve() if args.template_dir else None,
+            allow_template_overrides=args.allow_template_overrides,
         )
     )
     sys.exit(exit_code)
@@ -406,6 +433,17 @@ def build_arg_parser() -> argparse.ArgumentParser:
         help="Path to app config JSON (default: config.json)",
     )
     run.add_argument(
+        "--template-dir",
+        type=Path,
+        default=None,
+        help="Directory of strict JSON moving-head templates loaded after Python builtins",
+    )
+    run.add_argument(
+        "--allow-template-overrides",
+        action="store_true",
+        help="Explicitly allow data templates to shadow colliding Python builtin ids",
+    )
+    run.add_argument(
         "--config",
         required=True,
         help="Path to job config JSON",
@@ -422,6 +460,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     add_curate_catalog_subparser(sub)
     add_catalog_coverage_subparser(sub)
     add_review_staged_recipes_subparser(sub)
+    add_template_subparsers(sub)
 
     # Registered only so `twinklr --help` lists it; `main()` dispatches "eval-report"
     # to click before argparse ever parses its arguments (see below — argparse's
@@ -463,6 +502,10 @@ def main() -> None:
         sys.exit(run_catalog_coverage_command(args))
     elif args.cmd == "review-staged-recipes":
         sys.exit(run_review_staged_recipes_command(args))
+    elif args.cmd == "template-export":
+        sys.exit(run_template_export_command(args))
+    elif args.cmd == "template-validate":
+        sys.exit(run_template_validate_command(args))
 
 
 if __name__ == "__main__":
