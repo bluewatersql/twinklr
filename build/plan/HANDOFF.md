@@ -1,7 +1,7 @@
 # Build-campaign handoff — current execution state
 
-_Last updated: 2026-08-14 ~03:50 AST (session date 2026-08-13→14). Maintained by the
-orchestrating agent; update this file at every pause or phase boundary._
+_Last updated: 2026-08-14 ~04:00 AST, at the Phase 1P boundary (paused here). Maintained
+by the orchestrating agent; update this file at every pause or phase boundary._
 
 ## What this campaign is
 
@@ -18,7 +18,7 @@ documents and always read FULLY, including appendices.
 |---|---|---|
 | 0 — Foundation honesty | **COMPLETE** (7/7) | COMPLETION RECORD in `01-phase-0-foundation.md`; commits f0ae952…eeeb4c6 |
 | 1K — Knowledge edges | **COMPLETE** (5/5) | COMPLETION RECORD in `03-phase-1k-knowledge-edges.md`; commits 3fb3ee8…64c048a |
-| 1P — Render truth | **11/12 merged; T12 in final verification** | see below |
+| 1P — Render truth | **COMPLETE** (12/12) | COMPLETION RECORD in `02-phase-1p-render-truth.md`; ledger below |
 | 2P / 2K / 3 / 4 | Not started | specs exist for all tasks |
 
 ### Phase 1P task ledger (merge commits)
@@ -43,21 +43,17 @@ documents and always read FULLY, including appendices.
   CLI takes fixture config (hardcoded 4-head rig gone). Owner also answered the open
   contract question: **bare .xsq imports; rgbeffects.xml NOT required** (recorded in
   T12 spec, 6fd4bd2).
-- **T12** xLights acceptance (LOCAL-ONLY) — **IN FLIGHT, uncommitted**. Suite built
-  (`tests/golden/test_xlights_acceptance.py`, `xlights_client.py`, conftest marker
-  `requires_xlights`); xLights NOT installed on this machine → all 7 tests SKIP with
-  explicit relaunch instructions. First verifier pass REJECTED on 3 discrimination
-  gaps (identical Q1 arms; no-op xtiming assertion; runbook gap); executor fixed all
-  three (env-var-gated arms via `TWINKLR_XLIGHTS_SHOWDIR_MODE`; independent
-  marker-math assertion verified byte-for-byte; autouse `new_sequence()` fixture).
-  **Awaiting verify-1p-t12's final verdict.** On APPROVE: pathspec-commit
-  (tests/golden/* + README), then write the Phase 1P COMPLETION RECORD in
-  `02-phase-1p-render-truth.md` (same shape as Phase 0/1K records).
+- **T12** xLights acceptance (LOCAL-ONLY) — **3099090**. Suite built and verified
+  (two-pass: REJECT on 3 discrimination gaps → all fixed, re-verified by execution);
+  xLights NOT installed on this machine → all 7 tests SKIP with the relaunch runbook.
+  Q1 arms env-gated via `TWINKLR_XLIGHTS_SHOWDIR_MODE=with_rgbeffects|bare`; autouse
+  `new_sequence()` keeps imports out of the operator's real show; nothing auto-saves.
 
-### Current tree / gates (at last measurement)
+### Current tree / gates (at phase close)
 
-- HEAD: 2e77f9d (+ uncommitted T12 suite files). ~35 commits on main this session;
-  **nothing pushed to any remote** (owner has not requested push).
+- HEAD: clean at the Phase 1P completion-record commit (after 3099090). ~38 commits
+  on main this session; **nothing pushed to any remote** (owner has not requested
+  push).
 - Full suite: **4823 passed / 25 skipped / 0 failed** (7 of the skips are the new
   xLights acceptance tests). Goldens 72 passed / 7 skipped. ruff format --check +
   ruff check `--no-cache` clean; mypy clean (679 files).
