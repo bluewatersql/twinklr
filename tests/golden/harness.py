@@ -466,10 +466,7 @@ _GOLDEN_BANNER = (
     "#\n"
     "# These pins encode the render's CURRENT behavior, remaining defects included.\n"
     "# They are a diff surface for Lane R, not a statement of desired output.\n"
-    "# Known-defective behavior still visible below (owned by P1P-T6 and later):\n"
-    "#   P4-F3  every channel 1..16 is emitted, unchoreographed ones zero-filled --\n"
-    "#          so E_SLIDER_DMX<n>=0 here means 'zero-filled', not 'commanded to 0'\n"
-    "#   P4-F10 value-curve points are written at 2-decimal resolution\n"
+    "# No known-defective behavior remains as of P1P-T6.\n"
     "# Repaired in P1P-T5 and pinned here as the corrected behavior:\n"
     "#   P4-F4  a section shorter than the template's cycle renders the truncated\n"
     "#          head of that cycle ('one_bar'), where it used to render nothing\n"
@@ -479,6 +476,12 @@ _GOLDEN_BANNER = (
     "#   P4-M2  BLACKOUT emits DMX 0 under every preset ('drop')\n"
     "#   P4-F9  emitted pan/tilt stay inside the rig's calibrated window\n"
     "#   transitions carry their blended value curves instead of an all-zero string\n"
+    "# Repaired in P1P-T6 and pinned here as the corrected behavior:\n"
+    "#   P4-F3  a channel the fixture maps but nothing wrote gets its declared\n"
+    "#          default (shutter_default=255, color/gobo map's 'open' entry), not a\n"
+    "#          zero-fill; a channel the fixture does not map is omitted entirely;\n"
+    "#          the emitted window is `get_max_channel`, not a floor-16 guess\n"
+    "#   P4-F10 value-curve points are written at 4-decimal resolution\n"
 )
 
 

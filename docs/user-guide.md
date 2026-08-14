@@ -147,9 +147,6 @@ Key fields and defaults:
 | `planner_features.enable_shutter` | `true` | Plan shutter/strobe |
 | `planner_features.enable_color` | `true` | Plan color changes |
 | `planner_features.enable_gobo` | `true` | Plan gobo selection |
-| `channel_defaults.shutter` | `"open"` | Default shutter state |
-| `channel_defaults.color` | `"white"` | Default color |
-| `channel_defaults.gobo` | `"open"` | Default gobo |
 | `transitions.enabled` | `true` | Enable section transitions |
 | `transitions.default_duration_bars` | `0.5` | Transition length in bars |
 | `checkpoint` | `true` | Enable stage result caching |
@@ -171,7 +168,9 @@ Minimal example:
 
 Defines the physical moving head fixtures — names, DMX channels, and positions. The path is specified in `job_config.json` as `fixture_config_path`, resolved relative to the job config directory.
 
-_Source: `packages/twinklr/cli/main.py:50-59` (`_resolve_fixture_config_path`)_
+Each fixture's `dmx_mapping` also declares the value the render exports for that channel when the choreography never writes to it: `shutter_default` (0-255, defaults to `255` — open), and `color_map`/`gobo_map`'s `"open"` entry for color and gobo. A channel the mapping does not declare at all (e.g. `shutter_channel: null`) is omitted from the exported settings string rather than defaulted.
+
+_Source: `packages/twinklr/cli/main.py:50-59` (`_resolve_fixture_config_path`), `packages/twinklr/core/config/fixtures/dmx.py` (`DmxMapping`)_
 
 ---
 

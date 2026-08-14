@@ -13,6 +13,7 @@ if TYPE_CHECKING:
     from twinklr.core.config.fixtures.instances import FixtureInstance
     from twinklr.core.sequencer.moving_heads.channels.state import ChannelValue, FixtureSegment
 
+from twinklr.core.config.adapter import get_max_channel
 from twinklr.core.curves.models import CurvePoint
 from twinklr.core.sequencer.models.enum import ChannelName
 
@@ -55,8 +56,16 @@ class DmxSettingsBuilder:
         for channel_name, channel_value in segment.channels.items():
             self._extract_channel_data(channel_name, channel_value, channel_values, channel_curves)
 
-        # Determine max channel for output
-        max_channel = self._calculate_max_channel(channel_values, channel_curves)
+        # Determine the emitted window from the fixture's real channel count, not from
+        # a floor-16/round-to-16 guess over channels the renderer happened to write
+        # (P1P-T6 / P4-F3): a shutter mapped above 16 must still get its declared
+        # default, and `get_max_channel` includes every declared role, so it does.
+        max_channel = get_max_channel(self.dmx_mapping)
+
+        # Channels the fixture maps but the renderer did not write get the fixture's
+        # declared default instead of a zero-fill (P1P-T6 / P4-F3 / P5-V1): shutter
+        # opens ("usually open"), color/gobo settle on their configured "open" value.
+        declared_defaults = self._declared_defaults()
 
         # Build settings parts in required order
         parts: list[str] = []
@@ -73,14 +82,18 @@ class DmxSettingsBuilder:
         parts.append("E_NOTEBOOK1=Channels 1-16")
 
         # 4. Channel values (E_SLIDER_DMX)
-        # CRITICAL: E_SLIDER_DMX must be 0 when value curve is defined
+        # CRITICAL: E_SLIDER_DMX must be 0 when value curve is defined.
+        # A channel with neither a written value, a curve, nor a declared default is
+        # not mapped by this fixture at all -- omitted entirely rather than zero-filled,
+        # left to whatever the console already holds for it.
         for ch in range(1, max_channel + 1):
             if ch in channel_curves:
                 # Value curve present - slider must be 0
                 parts.append(f"E_SLIDER_DMX{ch}=0")
-            else:
-                # No curve - use discrete value
-                parts.append(f"E_SLIDER_DMX{ch}={int(channel_values.get(ch, 0))}")
+            elif ch in channel_values:
+                parts.append(f"E_SLIDER_DMX{ch}={int(channel_values[ch])}")
+            elif ch in declared_defaults:
+                parts.append(f"E_SLIDER_DMX{ch}={declared_defaults[ch]}")
 
         # 5. Value curves (E_VALUECURVE_DMX) - only if present, in channel order so
         # the string does not depend on the order channels happened to be built in
@@ -189,6 +202,35 @@ class DmxSettingsBuilder:
             return int(channel.channel)
         return None
 
+    def _declared_defaults(self) -> dict[int, int]:
+        """Fixture-declared defaults for mapped channels the renderer did not write.
+
+        Only shutter, colour and gobo have a declared "at rest" value in this
+        repo's fixture config: `DmxMapping.shutter_default` (255, "usually open"),
+        and each of `color_map`/`gobo_map`'s `"open"` entry. Pan/tilt/dimmer and
+        16-bit fine channels have no such declaration, so if one is ever mapped
+        but unwritten it is omitted rather than assigned an invented value
+        (P1P-T6; see the policy note on `build_settings_string`).
+
+        Returns:
+            Dict mapping DMX channel number to its declared default value.
+        """
+        defaults: dict[int, int] = {}
+
+        shutter_channel = self._get_dmx_channel_number(ChannelName.SHUTTER)
+        if shutter_channel is not None:
+            defaults[shutter_channel] = int(self.dmx_mapping.shutter_default)
+
+        color_channel = self._get_dmx_channel_number(ChannelName.COLOR)
+        if color_channel is not None:
+            defaults[color_channel] = int(self.dmx_mapping.color_map.get("open", 0))
+
+        gobo_channel = self._get_dmx_channel_number(ChannelName.GOBO)
+        if gobo_channel is not None:
+            defaults[gobo_channel] = int(self.dmx_mapping.gobo_map.get("open", 0))
+
+        return defaults
+
     def _get_inversion_dict(self) -> dict[int, int]:
         """Get inversion flags for all DMX channels.
 
@@ -244,34 +286,6 @@ class DmxSettingsBuilder:
 
         return inv
 
-    def _calculate_max_channel(
-        self,
-        channel_values: dict[int, int],
-        channel_curves: dict[int, list[CurvePoint]],
-    ) -> int:
-        """Calculate maximum channel number to output.
-
-        Args:
-            channel_values: DMX channel values
-            channel_curves: Value curve specs
-
-        Returns:
-            Maximum channel number, rounded up to nearest 16
-        """
-        max_channel = 16  # Minimum sensible channel count
-
-        # Check all channels with values or curves
-        for ch in channel_values:
-            max_channel = max(max_channel, ch)
-
-        for ch in channel_curves:
-            max_channel = max(max_channel, ch)
-
-        # Round up to nearest 16 (DMX convention)
-        max_channel = ((max_channel + 15) // 16) * 16
-
-        return max_channel
-
     def _curve_points_to_xlights_string(
         self, dmx_channel: int, curve_points: list[CurvePoint]
     ) -> str:
@@ -290,21 +304,24 @@ class DmxSettingsBuilder:
             ...     CurvePoint(t=0.5, v=0.5),
             ...     CurvePoint(t=1.0, v=1.0),
             ... ])
-            "Active=TRUE|Id=ID_VALUECURVE_DMX1|Type=Custom|Min=0.00|Max=255.00|RV=FALSE|Values=0.00:0.00;0.50:0.50;1.00:1.00|"
+            "Active=TRUE|Id=ID_VALUECURVE_DMX1|Type=Custom|Min=0.00|Max=255.00|RV=FALSE|Values=0.0000:0.0000;0.5000:0.5000;1.0000:1.0000|"
         """
         if not curve_points:
             return ""
 
         # Build time:value pairs
         # Both time and value are already normalized [0, 1]
+        #
+        # 4 decimal places (P1P-T6 / P4-F10): `Min=0.00|Max=255.00` means a `v`
+        # resolution of 0.01 is 2.55 DMX steps -- a curve could not express a
+        # one-step change, and repeated values were visible in the goldens as
+        # quantisation. 4 decimals gives ~0.026 DMX resolution and, at this
+        # curve's `n_samples` grid, leaves no two points sharing a `t` key.
         pairs = []
         for point in curve_points:
-            # Format: time:value (both normalized 0-1)
-            # Use 2 decimal places for both time and value
-            # Round values safely to avoid precision issues
-            t_rounded = round(point.t, 2)
-            v_rounded = round(point.v, 2)
-            pair = f"{t_rounded:.2f}:{v_rounded:.2f}"
+            t_rounded = round(point.t, 4)
+            v_rounded = round(point.v, 4)
+            pair = f"{t_rounded:.4f}:{v_rounded:.4f}"
 
             # if dmx_channel == 13:
             #     logger.debug(f"{dmx_channel}: {point.t}|{t_rounded}|{point.v}|{v_rounded}")
@@ -314,14 +331,14 @@ class DmxSettingsBuilder:
         # Check if first point is at t=0.0
         if curve_points and curve_points[0].t > 0.01:
             # Prepend anchor at 0.0 using first point's value
-            v_start = round(curve_points[0].v, 2)
-            pairs.insert(0, f"0.00:{v_start:.2f}")
+            v_start = round(curve_points[0].v, 4)
+            pairs.insert(0, f"0.0000:{v_start:.4f}")
 
         # Check if last point is at t=1.0
         if curve_points and curve_points[-1].t < 0.99:
             # Append anchor at 1.0 using last point's value
-            v_end = round(curve_points[-1].v, 2)
-            pairs.append(f"1.00:{v_end:.2f}")
+            v_end = round(curve_points[-1].v, 4)
+            pairs.append(f"1.0000:{v_end:.4f}")
 
         # Join with semicolons
         values_str = ";".join(pairs)

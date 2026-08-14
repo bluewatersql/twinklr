@@ -126,33 +126,17 @@ def _get_cache_default(cache_type: str) -> CacheConfig:
     return CacheConfig(enabled=True, cache_path=f"data/cache/{cache_type}", ttl_seconds=None)
 
 
-class ChannelDefaults(BaseModel):
-    """Job-level channel defaults.
-
-    Applied to all sections unless overridden at section level.
-    Immutable after creation to prevent accidental modification.
-
-    Example:
-        >>> defaults = ChannelDefaults()
-        >>> defaults.shutter  # "open"
-        >>> defaults.color    # "white"
-        >>> defaults.gobo     # "open"
-    """
-
-    shutter: str = Field(
-        default="open", description="Default shutter state (open, closed, strobe_fast, etc.)"
-    )
-
-    color: str = Field(default="white", description="Default color preset (red, blue, white, etc.)")
-
-    gobo: str = Field(
-        default="open", description="Default gobo pattern (open, stars, clouds, etc.)"
-    )
-
-    model_config = ConfigDict(
-        extra="forbid",  # Reject unknown fields
-        frozen=True,  # Immutable after creation
-    )
+# NOTE (P1P-T6): `ChannelDefaults` (job-level named shutter/color/gobo states) and
+# `JobConfig.is_channel_enabled` used to live here, declared and validated but never
+# read by anything. P0-T7 deliberately left them in place, reserved for this task to
+# wire or delete. Deleted: the rig config's `DmxMapping.shutter_default`/`color_map`/
+# `gobo_map` (packages/twinklr/core/config/fixtures/dmx.py) already express the same
+# concept at the layer the exporter actually reads from -- per-fixture, numeric,
+# resolved at the emit loop in `DmxSettingsBuilder` -- so a second job-level, named-state
+# copy would be a duplicate mechanism rather than a wire-up. `is_channel_enabled` is a
+# planner feature-flag question (may the LLM choreograph this channel type at all), which
+# is orthogonal to what an *unwritten* channel should emit and was never a dependency of
+# that decision. See build/specs/phase-1p-render-truth/P1P-T6-channel-default-policy.md.
 
 
 def _get_agent_config_default() -> AgentOrchestrationConfig:
@@ -542,14 +526,6 @@ class JobConfig(ConfigBase):
         ),
     )
 
-    channel_defaults: ChannelDefaults = Field(
-        default_factory=ChannelDefaults,
-        description=(
-            "Default channel states for entire sequence. "
-            "Applied to all sections unless overridden by agent plan."
-        ),
-    )
-
     transitions: TransitionConfig = Field(
         default_factory=TransitionConfig,
         description="Transition behavior configuration for smooth blending between sections and steps",
@@ -567,31 +543,3 @@ class JobConfig(ConfigBase):
     def default_path(cls) -> Path:
         """Default path for job config."""
         return Path("job_config.json")
-
-    def is_channel_enabled(self, channel: str) -> bool:
-        """Check if a specific channel is enabled for planning.
-
-        Args:
-            channel: Channel name ("shutter", "color", "gobo")
-
-        Returns:
-            True if channel planning is enabled
-
-        Raises:
-            ValueError: If channel name is unknown
-
-        Example:
-            >>> config = JobConfig()
-            >>> config.is_channel_enabled("shutter")
-            True
-            >>> config.is_channel_enabled("invalid")
-            ValueError: Unknown channel: invalid
-        """
-        if channel == "shutter":
-            return self.planner_features.enable_shutter
-        elif channel == "color":
-            return self.planner_features.enable_color
-        elif channel == "gobo":
-            return self.planner_features.enable_gobo
-        else:
-            raise ValueError(f"Unknown channel: {channel}")

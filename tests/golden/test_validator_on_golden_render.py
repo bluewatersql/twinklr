@@ -23,6 +23,7 @@ from scripts.validation._core.mh_xsq_validation import (
     MHXSQValidationPaths,
     load_xsq_effects,
     run_mh_xsq_validation,
+    validate_channel_usage_vs_plan,
 )
 from scripts.validation._core.models import ValidationResult
 from tests.golden.harness import RIGS, render_rig
@@ -96,3 +97,40 @@ def test_validator_sees_movement_on_every_rendered_model(rendered_xsq: Path) -> 
             assert {11, 13} <= set(effect.dmx_curves), (
                 f"{model_name} lost its pan/tilt curves: {sorted(effect.dmx_curves)}"
             )
+
+
+def test_validator_channel_crosscheck_clean(tmp_path: Path) -> None:
+    """P1P-T6 acceptance: the validator's shutter/colour cross-check finds no mismatch.
+
+    Uses `mh4_shutter_out_of_window` (shutter=17, colour=18) deliberately: before this
+    task, those channels fell outside the exporter's floor-16 window, so no
+    `E_SLIDER_DMX` token existed for them at all and `validate_channel_usage_vs_plan`
+    reported "has no shutter/colour data" for every section the plan named a value.
+    `get_max_channel` now widens the window to include any mapped channel, so the
+    declared default reaches the token and the cross-check finds nothing.
+
+    Checked against the `chorus` section (8000-16000ms), not `intro`: the very first
+    effect in the file carries the unrelated, already-pinned MISSING_REF defect
+    (`BASELINE_FINDINGS` above; EffectDB ref=0 reads as "no entry"), which empties its
+    `dmx_channels` regardless of this task's change and would be a false positive here.
+    """
+    output_path = tmp_path / "shutter_high_rig.xsq"
+    render_rig(RIGS["mh4_shutter_out_of_window"], output_path=output_path)
+    effects_by_model = load_xsq_effects(output_path)
+
+    fixture_config = {
+        "fixtures": [
+            {
+                "xlights_model_name": f"Dmx MH{index}",
+                "config": {"dmx_mapping": {"shutter_channel": 17, "color_channel": 18}},
+            }
+            for index in range(1, 5)
+        ]
+    }
+    raw_plan = {"sections": [{"name": "chorus", "channels": {"shutter": "open", "color": "white"}}]}
+    implementation = {"sections": [{"name": "chorus", "start_ms": 8000, "end_ms": 16000}]}
+
+    issues = validate_channel_usage_vs_plan(
+        raw_plan, implementation, effects_by_model, fixture_config
+    )
+    assert issues == [], issues

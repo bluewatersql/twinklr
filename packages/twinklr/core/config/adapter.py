@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from twinklr.core.config.fixtures import ChannelWithConfig, FixtureGroup
+    from twinklr.core.config.fixtures.dmx import DmxMapping
 
 
 def _to_int(channel: int | ChannelWithConfig | None) -> int | None:
@@ -74,42 +75,41 @@ def get_inversion_map(fixtures: FixtureGroup) -> dict[int, int]:
     return inversion_map
 
 
-def get_max_channel(fixtures: FixtureGroup) -> int:
-    """Get maximum DMX channel number used across all fixtures.
+def get_max_channel(dmx_mapping: DmxMapping) -> int:
+    """Get the highest DMX channel a single fixture's mapping declares.
+
+    This is the window authority for the exporter (P1P-T6): every declared role
+    counts, whether or not the renderer wrote to it for a given segment --
+    pan/tilt/dimmer (always present), their optional 16-bit fine channels, and
+    the optional shutter/colour/gobo channels. It replaces the exporter's old
+    floor-16/round-to-16 heuristic, which was computed only from channels the
+    renderer happened to write and so could hide a mapped channel above 16
+    (e.g. a shutter at DMX 17) from the emitted settings string entirely.
+
+    Operates on one fixture's `DmxMapping` rather than a `FixtureGroup`: the
+    settings string this feeds (`DmxSettingsBuilder.build_settings_string`) is
+    built per fixture, and channel numbers here are per-fixture-relative (not
+    absolute DMX universe addresses), so aggregating across fixtures would mix
+    unrelated numbering.
 
     Args:
-        fixtures: Fixture group to analyze
+        dmx_mapping: A single fixture's DMX channel assignments.
 
     Returns:
-        Maximum DMX channel number (1-512)
+        Highest DMX channel number this mapping declares.
 
     Example:
-        >>> max_ch = get_max_channel(fixture_group)
-        >>> max_ch
-        13  # Highest channel used is tilt at DMX 13
+        >>> get_max_channel(DmxMapping(pan_channel=11, tilt_channel=13, dimmer_channel=15))
+        15
     """
-    max_channel = 0
-
-    # Expand fixtures to ensure we have full FixtureInstance objects
-    expanded_fixtures = fixtures.expand_fixtures()
-
-    for fixture in expanded_fixtures:
-        dmx_mapping = fixture.config.dmx_mapping
-
-        # Check all possible channels
-        channels = [
-            _to_int(dmx_mapping.pan_channel),
-            _to_int(dmx_mapping.tilt_channel),
-            _to_int(dmx_mapping.dimmer_channel),
-            _to_int(dmx_mapping.pan_fine_channel),
-            _to_int(dmx_mapping.tilt_fine_channel),
-            _to_int(dmx_mapping.shutter_channel),
-            _to_int(dmx_mapping.color_channel),
-            _to_int(dmx_mapping.gobo_channel),
-        ]
-
-        for ch in channels:
-            if ch is not None:
-                max_channel = max(max_channel, ch)
-
-    return max_channel
+    channels = [
+        _to_int(dmx_mapping.pan_channel),
+        _to_int(dmx_mapping.tilt_channel),
+        _to_int(dmx_mapping.dimmer_channel),
+        _to_int(dmx_mapping.pan_fine_channel),
+        _to_int(dmx_mapping.tilt_fine_channel),
+        _to_int(dmx_mapping.shutter_channel),
+        _to_int(dmx_mapping.color_channel),
+        _to_int(dmx_mapping.gobo_channel),
+    ]
+    return max((ch for ch in channels if ch is not None), default=0)

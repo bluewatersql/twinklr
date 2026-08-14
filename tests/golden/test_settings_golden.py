@@ -117,24 +117,36 @@ def test_plan_sections_and_transition_are_all_covered(
 
 
 @pytest.mark.parametrize(
-    "rig_id", ["mh4_minimal", "mh4_shutter_in_window", "mh4_shutter_out_of_window"]
+    ("rig_id", "expected_extra_channels"),
+    [
+        ("mh4_minimal", set()),
+        ("mh4_shutter_in_window", {6, 7, 8}),
+        ("mh4_shutter_out_of_window", {17, 18}),
+    ],
 )
-def test_shutter_mapping_is_invisible_in_the_emitted_settings(
+def test_shutter_mapping_changes_the_emitted_settings(
     rig_id: str,
+    expected_extra_channels: set[int],
     render_cached: Callable[[RigSpec], RenderResult],
 ) -> None:
-    """KNOWN-WRONG PIN (P4-F3): the shutter mapping does not change what is emitted.
+    """REPAIRED (P4-F3, P1P-T6): the shutter/colour/gobo mapping now changes what is
+    emitted. Was the KNOWN-WRONG PIN `test_shutter_mapping_is_invisible_in_the_emitted_settings`.
 
-    All three rigs emit the identical set of `E_SLIDER_DMX` tokens — channels 1..16,
-    zero-filled — whether the shutter is mapped to channel 6, to channel 17, or not at
-    all. Nothing in the render path consults `shutter_channel`, so the byte on channel 6
-    is a zero-fill artefact rather than a shutter command, and a shutter above 16 is
-    never addressed. `test_shutter_channel_emission.py` pins the consequences of that
-    for each arm.
+    Before this task, all three rigs emitted the identical 16-channel zero-filled set
+    regardless of where shutter/colour/gobo were mapped, or whether they were mapped at
+    all. Now the emitted window (`get_max_channel`) and each mapped channel's declared
+    default both depend on the mapping: pan/tilt/dimmer (11/13/15) are always present,
+    unmapped channels never appear, and shutter/colour/gobo appear at their declared
+    default whenever the fixture maps them. `test_shutter_channel_emission.py` pins the
+    exact values for the shutter arms.
     """
     settings = render_cached(RIGS[rig_id]).effects[0].settings
-    emitted = {part.split("=")[0] for part in settings.split(",") if part.startswith("E_SLIDER_")}
-    assert emitted == {f"E_SLIDER_DMX{channel}" for channel in range(1, 17)}
+    emitted = {
+        int(part.removeprefix("E_SLIDER_DMX").split("=")[0])
+        for part in settings.split(",")
+        if part.startswith("E_SLIDER_DMX")
+    }
+    assert emitted == {11, 13, 15} | expected_extra_channels
 
 
 @pytest.mark.parametrize("preset_pair", [("chill", "energetic"), ("chill", "intense")])
@@ -184,33 +196,36 @@ def test_preset_id_does_change_curves_where_the_pattern_declares_intensities() -
     ]
 
 
-def test_unchoreographed_channels_are_zero_filled(
+def test_unmapped_channels_are_omitted_not_zero_filled(
     render_cached: Callable[[RigSpec], RenderResult],
 ) -> None:
-    """KNOWN-WRONG PIN (P4-F3): channels 1..16 are always emitted, zero-filled.
+    """REPAIRED (P4-F3, P1P-T6): channels the fixture does not map are omitted.
 
-    Only pan/tilt/dimmer are choreographed, yet the builder emits an
-    `E_SLIDER_DMX<n>` for every channel up to 16. On a real console that overwrites
-    channels the show never intended to touch. Recorded, not fixed, by P1P-T1.
+    Was the KNOWN-WRONG PIN `test_unchoreographed_channels_are_zero_filled`. Only
+    pan/tilt/dimmer are mapped on `mh4_minimal` (no shutter/colour/gobo), so
+    `get_max_channel` narrows the emitted window to 15 and every channel other than
+    11/13/15 is absent from the settings string entirely -- not zero-filled, which on
+    a real console used to overwrite channels the show never intended to touch.
     """
     settings = render_cached(RIGS["mh4_minimal"]).effects[0].settings
-    for channel in range(1, 17):
+    for channel in (11, 13, 15):
         assert f"E_SLIDER_DMX{channel}=" in settings
-    unchoreographed = [channel for channel in range(1, 17) if channel not in {11, 13, 15}]
-    for channel in unchoreographed:
-        assert f"E_SLIDER_DMX{channel}=0" in settings
+    for channel in range(1, 19):
+        if channel in (11, 13, 15):
+            continue
+        assert f"E_SLIDER_DMX{channel}=" not in settings
 
 
-def test_value_curve_points_are_two_decimal(
+def test_value_curve_points_are_four_decimal(
     render_cached: Callable[[RigSpec], RenderResult],
 ) -> None:
-    """KNOWN-WRONG PIN (P4-F10): curve points are written at 2-decimal resolution.
+    """REPAIRED (P4-F10, P1P-T6): curve points are written at 4-decimal resolution.
 
-    `_curve_points_to_xlights_string` rounds both time and value to two decimals, so a
-    255-step DMX range is emitted through 101 distinct levels — a curve cannot express a
-    one-step change, and the quantisation is visible as repeated values in the goldens.
-    Pinned so the resolution fix is a reviewable diff rather than whole-file churn of
-    unclear origin.
+    Was the KNOWN-WRONG PIN `test_value_curve_points_are_two_decimal`. 2-decimal `v`
+    was 2.55 DMX steps of quantisation -- a curve could not express a one-step change,
+    and repeated values were visible in the goldens. At 4 decimals the resolution is
+    ~0.026 DMX steps and, at this curve's `n_samples` grid, no two points collapse
+    onto the same value.
     """
     curve = _value_curve(render_cached(RIGS["mh4_minimal"]).effects[0].settings, channel=11)
     points = curve.split("Values=")[1].rstrip("|").split(";")
@@ -219,12 +234,13 @@ def test_value_curve_points_are_two_decimal(
     decimals = {
         len(coordinate.split(".")[1]) for point in points for coordinate in point.split(":")
     }
-    assert decimals == {2}
+    assert decimals == {4}
 
     values = [point.split(":")[1] for point in points]
-    assert len(set(values)) < len(values), (
-        "2-decimal rounding used to collapse distinct DMX levels onto the same value; "
-        "if it no longer does, the curve resolution changed and this pin needs updating."
+    assert len(set(values)) == len(values), (
+        "4-decimal rounding was chosen so distinct DMX levels no longer collapse onto "
+        "the same value at this curve's sample grid; if they do again, the resolution "
+        "regressed and this pin needs updating."
     )
 
 

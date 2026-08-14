@@ -9,10 +9,10 @@ byte of `.xsq`, and the only end-to-end render test patched `compile_template` w
 
 | File | Behavior pinned |
 |---|---|
-| `test_settings_golden.py` | The complete emitted settings string of every effect, per rig, against a committed golden; plus the transition blend, the value-curve channel ordering, and the two remaining known-wrong pins below |
-| `test_shutter_channel_emission.py` | `shutter_channel=6` → `E_SLIDER_DMX6=0` emitted; `shutter_channel=17` → no `E_SLIDER_DMX17` token |
+| `test_settings_golden.py` | The complete emitted settings string of every effect, per rig, against a committed golden; plus the transition blend and the value-curve channel ordering |
+| `test_shutter_channel_emission.py` | `shutter_channel=6` → `E_SLIDER_DMX6=255` (declared default); `shutter_channel=17` → `E_SLIDER_DMX17=255` (the window now reaches it too) |
 | `test_xsq_round_trip.py` | `parse → export → parse` over the repo's first tracked `.xsq` |
-| `test_validator_on_golden_render.py` | The existing 587-LOC validator runs against a freshly rendered sequence |
+| `test_validator_on_golden_render.py` | The existing 587-LOC validator runs against a freshly rendered sequence, including its shutter/colour/gobo channel-map cross-check |
 | `test_blackout_is_black.py` (T2 → flipped in T5) | P4-M2 repaired: both blackout templates emit `E_SLIDER_DMX15=0` under all four presets. Was `test_blackout_full_brightness.py`, pinning the 255 inversion |
 | `test_dimmer_floor_honored.py` (T2 → flipped in T5) | P4-M1 repaired: no non-blackout dimmer curve dips below the template's declared 60-DMX floor; the blackout's exemption is explicit. Was `test_dimmer_floor_dropped.py` |
 | `test_8head_rig_renders.py` (T2 → flipped in T5) | P4-F26 repaired: the 8-head rig renders every plan section on all eight heads, roles are spatial, and a group the rig cannot fill raises `UnsupportedRigShapeError`. Was `test_8head_role_mismatch.py` |
@@ -20,21 +20,21 @@ byte of `.xsq`, and the only end-to-end render test patched `compile_template` w
 
 Rigs live in `harness.py` (`RIGS`); goldens live in `<rig_id>/<section_id>.settings.txt`.
 
-## The goldens still encode some broken output on purpose
+## No known-broken output remains (as of P1P-T6)
 
-Two defects remain visible in the committed goldens, both owned by **P1P-T6**:
+P1P-T6 repaired the last two defects the goldens deliberately encoded:
 
-- **P4-F3** — every channel 1..16 is emitted, unchoreographed ones zero-filled, so
-  `E_SLIDER_DMX<n>=0` means "zero-filled", not "commanded to 0"
-  (`test_unchoreographed_channels_are_zero_filled`).
-- **P4-F10** — value-curve points are written at 2-decimal resolution
-  (`test_value_curve_points_are_two_decimal`).
+- **P4-F3** — an unwritten channel the fixture *maps* now emits its declared default
+  (`shutter_default=255`, or the color/gobo map's `"open"` entry) instead of a
+  zero-fill; a channel the fixture does not map is omitted from the settings string
+  entirely; the emitted window comes from `get_max_channel`, not a floor-16 guess.
+  Was `test_unchoreographed_channels_are_zero_filled`, now
+  `test_unmapped_channels_are_omitted_not_zero_filled`.
+- **P4-F10** — value-curve points are written at 4-decimal resolution. Was
+  `test_value_curve_points_are_two_decimal`, now `test_value_curve_points_are_four_decimal`.
 
-Each carries a `KNOWN-WRONG PIN` comment naming its defect id, and the banner at the top
-of every golden file lists both, alongside the P1P-T5 repairs the goldens now encode as
-*correct* behavior. **Do not read a `KNOWN-WRONG PIN` as a statement of desired output.**
-
-When a Lane-R fix lands, the corresponding test fails by design. Read the diff, confirm
+The banner at the top of every golden file records both as repaired. When a future
+Lane-R-shaped fix lands, its corresponding test fails by design: read the diff, confirm
 it is the intended behavioral change, flip the affected pin (rename the file if its name
 now describes the defect rather than the behavior), and regenerate.
 
@@ -66,6 +66,22 @@ P1P-T5 regeneration produced, as a worked example of what "attributable" means:
    signal that a second fix is in the hunk.
 5. **Value curves appearing in transition sections** — the settings builder now reads
    `ChannelValue.curve`, so the blend reaches the exporter instead of being dropped.
+
+The P1P-T6 regeneration is two categories, both present in every golden file:
+
+1. **Emitted `E_SLIDER_DMX`/`E_CHECKBOX_INVDMX` window** — P4-F3. The window is now
+   `get_max_channel`, not floor-16/round-to-16: `mh4_minimal` (pan/tilt/dimmer only)
+   shrinks from 16 to 15, dropping channels 1-10/12/14/16 entirely rather than
+   zero-filling them; `mh4_shutter_in_window` gains `E_SLIDER_DMX6=255` (declared
+   shutter default) where it used to hold `=0`; `mh4_shutter_out_of_window` gains
+   `E_SLIDER_DMX17=255` and `E_SLIDER_DMX18=0` (declared shutter/colour defaults),
+   both previously absent because 17/18 fell outside the old window.
+2. **Value-curve point precision** (every `E_VALUECURVE_DMX` payload) — P4-F10. Points
+   are now `t:v` at 4 decimals instead of 2; the underlying curve values are unchanged,
+   only their written precision is, so a curve's *shape* in the diff is identical, not
+   its digit count. The signal that no third fix is hiding in a hunk: subtracting the
+   window/default changes above and re-rounding the remaining `E_VALUECURVE_DMX` values
+   to 2 decimals reproduces the pre-T6 file exactly.
 
 ## Extending
 

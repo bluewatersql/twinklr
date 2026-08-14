@@ -207,7 +207,6 @@ ConfigBase (load_or_default)
     │   ├── LLMLoggingConfig
     │   └── CacheConfig
     ├── PlannerFeatures
-    ├── ChannelDefaults (frozen)
     ├── TransitionConfig
     ├── PoseConfig
     ├── AssumptionsConfig
