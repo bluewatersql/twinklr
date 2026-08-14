@@ -324,3 +324,191 @@ track where the answer is exact by construction" that this spec's risk section r
 > (beat_this, allinone), re-measure the signed mean offset rather than assuming the
 > bias persists or was fixed — the method routes forward; the number is
 > baseline-specific.
+
+## Implementation handoff (2026-08-14)
+
+**Status:** implemented; the fixed gate rejected both model candidates because a
+complete five-fixture result could not be produced offline under the repository's
+declared dependency constraints. The default remains `dsp`. Independent verifier and
+owner review remain required; this executor does not self-approve.
+
+### Pre-committed gate applied
+
+The implementation encodes the gate from this specification without changing it:
+
+- adopt `beat_this` rhythm only when the complete five-fixture candidate mean is
+  deterministic, downbeat F1 improves by at least `0.05`, mean beat F1 is no worse
+  than `-0.02` relative to DSP, and no individual fixture's beat F1 is worse than
+  `-0.02` relative to its matching DSP fixture;
+- adopt `allinone` structure only when the complete five-fixture candidate mean is
+  deterministic, strict (`±0.5 s`) section-boundary hit rate improves by at least
+  `0.10`; the loose (`±3.0 s`) rate is reported but is not an adoption rule;
+- before either decision, DSP and candidate results must each contain exactly the
+  five unique fixture IDs from the loaded committed manifest; `fixture_count` alone
+  is not sufficient;
+- a missing fixture result, optional dependency, or model weight is an incomplete
+  candidate result and therefore a rejection. Unavailable/unmeasured metric means
+  serialize as `null`, never as fabricated numeric zero scores.
+
+### Measured committed-fixture baseline
+
+The deterministic harness ran the DSP source twice over the five committed synthetic
+fixtures. All values below are direct harness output; no model-candidate metric was
+available and none is represented as zero.
+
+| Fixture | Beat F1 (`±70 ms`) | Downbeat F1 (`±70 ms`) | Section hit (`±0.5 s`) | Section hit (`±3.0 s`) | Signed beat offset |
+|---|---:|---:|---:|---:|---:|
+| `steady_4_4_pop` | 1.000000 | 1.000000 | 0.000000 | 0.333333 | +0.019206 s |
+| `waltz_3_4` | 1.000000 | 0.666667 | 0.000000 | 0.333333 | +0.020363 s |
+| `tempo_change_4_4` | 0.655172 | 0.476190 | 0.000000 | 0.333333 | -0.021409 s |
+| `sparse_ambient` | 1.000000 | 0.666667 | 0.000000 | 0.000000 | +0.020021 s |
+| `syncopated_4_4` | 1.000000 | 1.000000 | 0.000000 | 0.333333 | +0.019639 s |
+| **Mean** | **0.931034** | **0.761905** | **0.000000** | **0.266667** | — |
+
+Harness output was written only to the local temporary path
+`/tmp/twinklr-p2p-t8-final-report.json`; generated reports are intentionally not
+tracked. The fixture manifest, synthesis instructions, annotations, metric code, and
+gate are tracked and offline-deterministic.
+
+### Adoption decision and dependency limitations
+
+- **Rhythm: reject `beat_this`; retain DSP.** The official `beat-this==1.1.0`
+  dependency resolves in the optional `mir`/`mir-beats` extra on this Darwin arm64,
+  Python 3.12.13 environment. No final checkpoint was already present, however. An
+  initial upstream download attempt showed a multi-hour ETA and was stopped without
+  leaving a partial cache file; no candidate inference result was claimed. The
+  adapter now refuses implicit network downloads and reports the explicit checkpoint
+  argument, `TWINKLR_BEAT_THIS_CHECKPOINT`, and expected torch-cache location. Python
+  3.13 inference remains UNVERIFIED and is still routed to Phase 4. `beat-this`
+  continues to declare `torchaudio`; Twinklr added no torchaudio API usage.
+- **Structure: reject `allinone`; retain DSP.** Official `all-in-one-mlx==1.0.6`
+  metadata declares `librosa>=0.11.0`, while the repository deliberately pins
+  `librosa>=0.10.2,<0.11.0`. Adding it to the workspace extra would require the
+  forbidden core-dependency widening, so it was not declared. The source adapter is
+  available for an isolated compatible Apple-Silicon environment and otherwise
+  raises an actionable incompatibility message. No weights were locally available,
+  so no structure-candidate metric was claimed. The single-maintainer risk remains
+  open. `all-in-one-fix` PyPI presence remains UNVERIFIED and its torch ceiling was
+  not substituted around the gate.
+
+The authoritative decision record is
+`memories/decisions/keep-dsp-after-mir-ab.md`. This outcome satisfies the reject path:
+the current DSP stays while the fixture set, harness, source seams, provenance, and
+cache isolation remain as permanent regression infrastructure.
+
+### Runtime result
+
+`AudioAnalyzer` selects rhythm and structure sources from configuration. One selected
+rhythm result supplies `tempo_bpm`, `beats_s`, `bars_s`, and time signature; one
+selected structure result supplies the final sections. Existing BeatGrid consumers
+are unchanged and its public shape is pinned by test. Custom energy/multiscale,
+builds/drops, tension, and timeline analysis remain in place and consume the selected
+rhythm truth. Results include source/version provenance.
+
+The under-ten-second path applies the same no-fallback rule. It returns minimal DSP
+features with truthful `dsp` source/version provenance when DSP is selected. If
+`beat_this` or `allinone` is explicitly selected, that adapter is invoked; an
+unavailable dependency or checkpoint fails loudly rather than being bypassed by the
+minimal-feature return.
+
+The audio-features cache schema is version 5. Its identity now includes both selected
+source names and adapter versions; an actual DSP-versus-`beat_this` cache miss is
+covered by test.
+
+### Exact changed-file manifest
+
+Added:
+
+- `packages/twinklr/core/audio/mir/__init__.py`
+- `packages/twinklr/core/audio/mir/benchmark.py`
+- `packages/twinklr/core/audio/mir/fixtures.py`
+- `packages/twinklr/core/audio/mir/metrics.py`
+- `packages/twinklr/core/audio/mir/sources.py`
+- `tests/fixtures/mir/manifest.json`
+- `tests/unit/audio/mir/__init__.py`
+- `tests/unit/audio/mir/test_analyzer_integration.py`
+- `tests/unit/audio/mir/test_benchmark.py`
+- `tests/unit/audio/mir/test_fixtures.py`
+- `tests/unit/audio/mir/test_metrics.py`
+- `tests/unit/audio/mir/test_model_sources_local.py`
+- `tests/unit/audio/mir/test_sources.py`
+- `memories/decisions/keep-dsp-after-mir-ab.md`
+
+Modified:
+
+- `packages/twinklr/core/audio/analyzer.py`
+- `packages/twinklr/core/audio/cache_adapter.py`
+- `packages/twinklr/core/config/__init__.py`
+- `packages/twinklr/core/config/models.py`
+- `packages/twinklr/core/pyproject.toml`
+- `pyproject.toml`
+- `uv.lock`
+- `tests/unit/audio/test_cache_adapter.py`
+- `context/current-state.md`
+- `context/architecture/pipeline.md`
+- `docs/user-guide.md`
+- `memories/INDEX.md`
+- this specification
+
+### Red to green evidence
+
+1. Before the implementation existed, the focused new suite failed during collection
+   with four missing-module/API errors (`twinklr.core.audio.mir` modules and the cache
+   fingerprint).
+2. The first implementation pass made the isolated MIR/cache suite green: `19 passed`.
+3. The deliberately added analyzer integration test then failed because the analyzer
+   had no source-selection seam. Wiring source selection and authoritative-result
+   propagation made it green.
+4. The first broad run exposed the core-package direct-`print` guard as its sole
+   failure (`5071 passed`, one failure). Replacing it with the permitted stdout writer
+   made the logging-focused suite and broad suite green.
+5. The first independent verifier rejected five contracts. The remediation tests
+   produced `13 failed, 9 passed`: the official BeatThis tuple was decoded backward;
+   the gate had no manifest-identity argument; `None` means failed model validation;
+   and the DSP, BeatThis, and All-In-One short-audio cases exposed the early bypass.
+   Correcting all five produced `25 passed` in the focused source/gate/analyzer suite.
+   The BeatThis regression now uses the official `Audio2Beats`-shaped
+   `(beats, downbeats)` return, the gate derives its fixture means and worst-fixture
+   beat delta from exact unique matching manifest IDs, unavailable means are `null`,
+   and short audio honors explicit selections without fallback.
+
+### Verification evidence
+
+- initial `uv sync`, then `uv sync --extra dev --all-packages`: succeeded;
+- `uv sync --extra dev --extra mir --all-packages`: succeeded with
+  `beat-this==1.1.0`; restoring the default no-MIR environment succeeded and removed
+  the ten optional model packages;
+- focused MIR/cache/BeatGrid: `93 passed, 1 skipped`;
+- all audio tests: `808 passed`;
+- audio/sequencer beat-grid-structure focus: `233 passed, 1579 deselected`;
+- golden render suite: `73 passed, 8 skipped`;
+- local-only model command in the MIR environment: `1 skipped, 5108 deselected`
+  because the required local checkpoint was absent;
+- broad offline suite: `5072 passed, 25 skipped, 12 deselected`;
+- Ruff format/check: `1321 files already formatted`, all checks passed;
+- mypy: success on `713` source files;
+- `make check-all` equivalent full gate: `5072 passed, 37 skipped`, 87% coverage,
+  all quality checks passed.
+
+Post-verifier remediation was revalidated independently from the earlier author run:
+
+- corrected source/gate/short-audio focus: `25 passed`;
+- all audio tests: `823 passed, 1 skipped`;
+- audio/sequencer beat-grid-structure focus: `235 passed, 1587 deselected`;
+- golden render suite: `73 passed, 8 skipped`;
+- remediated offline harness: five deterministic DSP fixture rows, unavailable
+  candidate means serialized as `null`, separate `reject` decisions for rhythm and
+  structure;
+- Ruff format/check: `1321 files already formatted`, all checks passed;
+- mypy: success on `713` source files;
+- broad non-local suite: `5082 passed, 25 skipped, 12 deselected`;
+- final `make check-all`: `5082 passed, 37 skipped`, 87% coverage, all quality checks
+  passed.
+
+`make validate` itself was attempted and correctly stopped at the repository's P0
+clean-worktree guard because this handoff necessarily contains uncommitted changes.
+The task expressly forbids git commands and self-commit, so the executor did not
+stash, commit, or bypass that guard. `make check-all` ran the formatter, linter,
+type-checker, and full coverage suite that follow the guard, and passed. No live or
+paid API call was made, no commit was created, and independent verification remains
+pending.

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from enum import StrEnum
 import logging
 import os
 from pathlib import Path
@@ -420,12 +421,34 @@ class AudioEnhancementConfig(BaseModel):
     )
 
 
+class RhythmSourceName(StrEnum):
+    """Selectable producer for BeatGrid beat and downbeat truth."""
+
+    DSP = "dsp"
+    BEAT_THIS = "beat_this"
+
+
+class StructureSourceName(StrEnum):
+    """Selectable producer for labeled musical sections."""
+
+    DSP = "dsp"
+    ALLINONE = "allinone"
+
+
 class AudioProcessingConfig(BaseModel):
     """Audio processing configuration."""
 
     hop_length: int = Field(default=512, ge=64, le=2048)
     frame_length: int = Field(default=2048, ge=512, le=8192)
     cache_enabled: bool = True
+    rhythm_source: RhythmSourceName = Field(
+        default=RhythmSourceName.DSP,
+        description="Producer for the beats/downbeats consumed through BeatGrid",
+    )
+    structure_source: StructureSourceName = Field(
+        default=StructureSourceName.DSP,
+        description="Producer for labeled musical sections",
+    )
 
     # NEW: v3.0 enhancements
     enhancements: AudioEnhancementConfig = Field(

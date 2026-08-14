@@ -10,12 +10,14 @@ import pytest
 
 from twinklr.core.audio.cache_adapter import (
     AUDIO_FEATURES_CACHE_VERSION,
+    audio_analysis_fingerprint,
     compute_audio_file_hash,
     load_audio_features_async,
     save_audio_features_async,
 )
 from twinklr.core.audio.models import SongBundle, SongTiming
 from twinklr.core.caching import CacheKey, FSCache
+from twinklr.core.config.models import AudioProcessingConfig, RhythmSourceName
 
 
 class TestComputeAudioHash:
@@ -60,6 +62,16 @@ class TestComputeAudioHash:
         finally:
             Path(path1).unlink()
             Path(path2).unlink()
+
+    def test_analysis_fingerprint_includes_selected_source_versions(self) -> None:
+        dsp = audio_analysis_fingerprint(AudioProcessingConfig())
+        beat_this = audio_analysis_fingerprint(
+            AudioProcessingConfig(rhythm_source=RhythmSourceName.BEAT_THIS)
+        )
+
+        assert dsp != beat_this
+        assert "dsp" in dsp
+        assert "beat_this" in beat_this
 
     @pytest.mark.asyncio
     async def test_hash_uses_full_file_not_prefix_only(self) -> None:
@@ -223,6 +235,48 @@ class TestSaveAudioFeatures:
 
             assert loaded is not None
             assert loaded.features["tempo_bpm"] == 140.0
+
+    @pytest.mark.asyncio
+    async def test_selected_source_identity_prevents_cross_source_cache_hit(self) -> None:
+        """The same audio analyzed by different source/version profiles cannot collide."""
+        with tempfile.TemporaryDirectory() as cache_dir:
+            from twinklr.core.io import RealFileSystem
+
+            audio_path = Path(cache_dir) / "fixture.wav"
+            audio_path.write_bytes(b"deterministic fixture")
+            cache = FSCache(RealFileSystem(), cache_dir)
+            await cache.initialize()
+            bundle = SongBundle(
+                schema_version="3.0",
+                audio_path=str(audio_path),
+                recording_id="test123",
+                features={"tempo_bpm": 120.0},
+                timing=SongTiming(sr=22050, hop_length=512, duration_s=10.0, duration_ms=10000),
+            )
+            dsp_identity = audio_analysis_fingerprint(AudioProcessingConfig())
+            model_identity = audio_analysis_fingerprint(
+                AudioProcessingConfig(rhythm_source=RhythmSourceName.BEAT_THIS)
+            )
+
+            await save_audio_features_async(
+                str(audio_path), cache, bundle, analysis_identity=dsp_identity
+            )
+
+            assert (
+                await load_audio_features_async(
+                    str(audio_path),
+                    cache,
+                    SongBundle,
+                    analysis_identity=model_identity,
+                )
+                is None
+            )
+            assert (
+                await load_audio_features_async(
+                    str(audio_path), cache, SongBundle, analysis_identity=dsp_identity
+                )
+                is not None
+            )
 
     @pytest.mark.asyncio
     async def test_compute_ms_optional(self) -> None:

@@ -1,7 +1,7 @@
 ---
 type: context
 area: overview
-updated: 2026-08-13
+updated: 2026-08-14
 ---
 
 # Twinklr — Current State
@@ -17,7 +17,10 @@ precision (curves, DMX values, timing). See [product/overview.md](product/overvi
 
 - **Audio analysis pipeline** (deterministic) — tempo/beats (BeatGrid), energy, section
   structure, harmonic content, lyrics with multi-source fallback (embedded tags, LRCLib,
-  Genius, WhisperX), phonemes/visemes. `packages/twinklr/core/audio/`
+  Genius, WhisperX), phonemes/visemes. P2P-T8 put rhythm/structure production behind
+  selectable, source-versioned adapters and a five-fixture offline A/B harness; the
+  current DSP remains the accepted default because the optional model arms did not
+  produce complete local gate evidence. `packages/twinklr/core/audio/`
 - **Audio profiling & lyrics agents** (LLM) — musical interpretation and creative
   guidance. `packages/twinklr/core/agents/audio/`
 - **Multi-agent choreography planning** (LLM) — iterative planner → heuristic

@@ -1,0 +1,86 @@
+{
+  "schema_version": "1",
+  "sample_rate": 22050,
+  "fixtures": [
+    {
+      "id": "steady_4_4_pop",
+      "description": "Steady 120 BPM 4/4 excerpt with four timbral sections",
+      "category": "steady_4_4",
+      "duration_s": 16.5,
+      "beats_per_bar": 4,
+      "beat_times_s": [0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 5.5, 6.0, 6.5, 7.0, 7.5, 8.0, 8.5, 9.0, 9.5, 10.0, 10.5, 11.0, 11.5, 12.0, 12.5, 13.0, 13.5, 14.0, 14.5, 15.0, 15.5, 16.0],
+      "downbeat_times_s": [0.5, 2.5, 4.5, 6.5, 8.5, 10.5, 12.5, 14.5],
+      "sections": [
+        {"start_s": 0.0, "end_s": 4.0, "label": "intro"},
+        {"start_s": 4.0, "end_s": 8.0, "label": "verse"},
+        {"start_s": 8.0, "end_s": 12.0, "label": "chorus"},
+        {"start_s": 12.0, "end_s": 16.5, "label": "outro"}
+      ],
+      "synthesis": {"kind": "metered", "bpm": 120.0, "accent_pattern": [1.0, 0.45, 0.65, 0.45], "tone_hz": [220.0, 293.66, 392.0, 261.63]}
+    },
+    {
+      "id": "waltz_3_4",
+      "description": "Steady 100 BPM waltz excerpt with explicit three-beat bars",
+      "category": "non_4_4",
+      "duration_s": 15.0,
+      "beats_per_bar": 3,
+      "beat_times_s": [0.6, 1.2, 1.8, 2.4, 3.0, 3.6, 4.2, 4.8, 5.4, 6.0, 6.6, 7.2, 7.8, 8.4, 9.0, 9.6, 10.2, 10.8, 11.4, 12.0, 12.6, 13.2, 13.8, 14.4],
+      "downbeat_times_s": [0.6, 2.4, 4.2, 6.0, 7.8, 9.6, 11.4, 13.2],
+      "sections": [
+        {"start_s": 0.0, "end_s": 4.2, "label": "intro"},
+        {"start_s": 4.2, "end_s": 9.6, "label": "verse"},
+        {"start_s": 9.6, "end_s": 13.2, "label": "chorus"},
+        {"start_s": 13.2, "end_s": 15.0, "label": "outro"}
+      ],
+      "synthesis": {"kind": "metered", "bpm": 100.0, "accent_pattern": [1.0, 0.4, 0.4], "tone_hz": [196.0, 293.66, 392.0, 246.94]}
+    },
+    {
+      "id": "tempo_change_4_4",
+      "description": "4/4 excerpt changing from 100 BPM to 140 BPM at eight seconds",
+      "category": "tempo_varying",
+      "duration_s": 16.5,
+      "beats_per_bar": 4,
+      "beat_times_s": [0.6, 1.2, 1.8, 2.4, 3.0, 3.6, 4.2, 4.8, 5.4, 6.0, 6.6, 7.2, 7.8, 8.228571, 8.657143, 9.085714, 9.514286, 9.942857, 10.371429, 10.8, 11.228571, 11.657143, 12.085714, 12.514286, 12.942857, 13.371429, 13.8, 14.228571, 14.657143, 15.085714, 15.514286, 15.942857],
+      "downbeat_times_s": [0.6, 3.0, 5.4, 7.8, 9.514286, 11.228571, 12.942857, 14.657143],
+      "sections": [
+        {"start_s": 0.0, "end_s": 4.2, "label": "intro"},
+        {"start_s": 4.2, "end_s": 8.228571, "label": "verse"},
+        {"start_s": 8.228571, "end_s": 12.514286, "label": "chorus"},
+        {"start_s": 12.514286, "end_s": 16.5, "label": "outro"}
+      ],
+      "synthesis": {"kind": "annotated_beats", "accent_pattern": [1.0, 0.45, 0.65, 0.45], "tone_hz": [164.81, 246.94, 329.63, 220.0]}
+    },
+    {
+      "id": "sparse_ambient",
+      "description": "Sparse 60 BPM ambient excerpt with low-transient section changes",
+      "category": "sparse_ambient",
+      "duration_s": 20.0,
+      "beats_per_bar": 4,
+      "beat_times_s": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0, 17.0, 18.0, 19.0],
+      "downbeat_times_s": [1.0, 5.0, 9.0, 13.0, 17.0],
+      "sections": [
+        {"start_s": 0.0, "end_s": 5.0, "label": "intro"},
+        {"start_s": 5.0, "end_s": 10.0, "label": "verse"},
+        {"start_s": 10.0, "end_s": 15.0, "label": "bridge"},
+        {"start_s": 15.0, "end_s": 20.0, "label": "outro"}
+      ],
+      "synthesis": {"kind": "ambient", "bpm": 60.0, "accent_pattern": [0.35, 0.2, 0.25, 0.2], "tone_hz": [110.0, 146.83, 196.0, 130.81]}
+    },
+    {
+      "id": "syncopated_4_4",
+      "description": "128 BPM 4/4 excerpt with offbeat percussion and contrasting sections",
+      "category": "syncopated",
+      "duration_s": 15.5,
+      "beats_per_bar": 4,
+      "beat_times_s": [0.46875, 0.9375, 1.40625, 1.875, 2.34375, 2.8125, 3.28125, 3.75, 4.21875, 4.6875, 5.15625, 5.625, 6.09375, 6.5625, 7.03125, 7.5, 7.96875, 8.4375, 8.90625, 9.375, 9.84375, 10.3125, 10.78125, 11.25, 11.71875, 12.1875, 12.65625, 13.125, 13.59375, 14.0625, 14.53125, 15.0],
+      "downbeat_times_s": [0.46875, 2.34375, 4.21875, 6.09375, 7.96875, 9.84375, 11.71875, 13.59375],
+      "sections": [
+        {"start_s": 0.0, "end_s": 3.75, "label": "intro"},
+        {"start_s": 3.75, "end_s": 7.5, "label": "verse"},
+        {"start_s": 7.5, "end_s": 11.25, "label": "chorus"},
+        {"start_s": 11.25, "end_s": 15.5, "label": "outro"}
+      ],
+      "synthesis": {"kind": "syncopated", "bpm": 128.0, "accent_pattern": [1.0, 0.4, 0.65, 0.4], "tone_hz": [220.0, 329.63, 440.0, 277.18]}
+    }
+  ]
+}

@@ -24,6 +24,7 @@ import numpy as np
 from twinklr.core.audio.advanced.tension import compute_tension_curve
 from twinklr.core.audio.cache_adapter import (
     AUDIO_FEATURES_CACHE_VERSION,
+    audio_analysis_fingerprint,
     load_audio_features_async,
     save_audio_features_async,
 )
@@ -34,6 +35,16 @@ from twinklr.core.audio.harmonic.chords import detect_chords
 from twinklr.core.audio.harmonic.hpss import compute_hpss, compute_onset_env
 from twinklr.core.audio.harmonic.key import detect_musical_key, extract_chroma
 from twinklr.core.audio.harmonic.pitch import extract_pitch_tracking
+from twinklr.core.audio.mir.sources import (
+    DSPSource,
+    MIRInput,
+    RhythmAnalysis,
+    RhythmSource,
+    StructureAnalysis,
+    StructureSource,
+    create_rhythm_source,
+    create_structure_source,
+)
 from twinklr.core.audio.models import (
     LyricsBundle,
     MetadataBundle,
@@ -44,11 +55,6 @@ from twinklr.core.audio.models import (
 from twinklr.core.audio.models.enums import StageStatus
 from twinklr.core.audio.models.metadata import EmbeddedMetadata
 from twinklr.core.audio.phonemes.bundle import build_phoneme_bundle
-from twinklr.core.audio.rhythm.beats import (
-    compute_beats,
-    detect_downbeats_phase_aligned,
-    detect_time_signature,
-)
 from twinklr.core.audio.rhythm.tempo import detect_tempo_changes
 from twinklr.core.audio.spectral.bands import extract_dynamic_features
 from twinklr.core.audio.spectral.basic import extract_spectral_features
@@ -61,7 +67,6 @@ from twinklr.core.audio.stems import (
     apply_stem_consumers,
     stem_result_matches_config,
 )
-from twinklr.core.audio.structure.sections import detect_song_sections
 from twinklr.core.audio.timeline.builder import build_timeline_export
 from twinklr.core.audio.validation.validator import validate_features
 from twinklr.core.caching import FSCache
@@ -162,6 +167,8 @@ class AudioAnalyzer:
             await self.cache.initialize()
             self._cache_initialized = True
 
+        analysis_identity = audio_analysis_fingerprint(self.app_config.audio_processing)
+
         # Check cache (unless forcing reprocess)
         cache_version = self._audio_cache_version()
         if not force_reprocess:
@@ -170,6 +177,7 @@ class AudioAnalyzer:
                 self.cache,
                 SongBundle,
                 step_version=cache_version,
+                analysis_identity=analysis_identity,
             )
             if cached_bundle and stem_result_matches_config(
                 cached_bundle.features.get("stems", {}),
@@ -199,6 +207,7 @@ class AudioAnalyzer:
                         self.cache,
                         cached_bundle,
                         step_version=cache_version,
+                        analysis_identity=analysis_identity,
                     )
 
                 logger.debug("Using cached SongBundle")
@@ -239,6 +248,7 @@ class AudioAnalyzer:
             self.cache,
             bundle,
             step_version=cache_version,
+            analysis_identity=analysis_identity,
             compute_ms=compute_ms,
         )
 
@@ -560,11 +570,25 @@ class AudioAnalyzer:
         y, sr_raw = librosa.load(audio_path, sr=None, mono=True)
         sr = int(sr_raw)  # Ensure sr is int
         duration = float(len(y)) / float(sr)
+        rhythm_source = create_rhythm_source(self.app_config.audio_processing.rhythm_source)
+        structure_source = create_structure_source(
+            self.app_config.audio_processing.structure_source
+        )
 
         # Handle very short audio
         if duration < 10.0:
             logger.warning(f"Audio too short ({duration:.1f}s) for meaningful analysis")
-            return self._minimal_features(audio_path, y, sr, duration, stem_features)
+            return self._short_audio_features(
+                audio_path,
+                y,
+                sr,
+                duration,
+                hop_length=hop_length,
+                rhythm_source=rhythm_source,
+                structure_source=structure_source,
+                genre=genre,
+                stem_features=stem_features,
+            )
 
         # HPSS decomposition - do this first to get onset envelope
         hpss = compute_hpss(y)
@@ -573,28 +597,49 @@ class AudioAnalyzer:
         del hpss  # keeps PERF-18's reclaim of the component arrays effective
         onset_env = compute_onset_env(percussive, sr, hop_length=hop_length)
 
-        # Core rhythm analysis - uses onset envelope
-        tempo_bpm, beat_frames = compute_beats(onset_env=onset_env, sr=sr, hop_length=hop_length)
-        time_sig_result = detect_time_signature(beat_frames=beat_frames, onset_env=onset_env)
-        time_sig_label = time_sig_result["time_signature"]
-        # Extract beats_per_bar from time signature (e.g., "4/4" -> 4, "3/4" -> 3)
-        beats_per_bar = int(time_sig_label.split("/")[0])
-
-        # Convert beat frames to times
-        beats_s = librosa.frames_to_time(beat_frames, sr=sr, hop_length=hop_length).tolist()
-
-        # Detect downbeats - need to extract chroma first for the function
+        # Rhythm sources share the same already-loaded waveform and preprocessing.
+        # The selected result becomes the sole beats/bars truth that all later
+        # analysis and BeatGrid consumers receive.
         chroma = extract_chroma(y, sr, hop_length=hop_length)
-        downbeat_result = detect_downbeats_phase_aligned(
-            beat_frames=beat_frames,
-            sr=sr,
+        mir_input = MIRInput(
+            audio_path=Path(audio_path),
+            audio=y,
+            sample_rate=sr,
             hop_length=hop_length,
-            onset_env=onset_env,
-            chroma_cqt=chroma,
-            beats_per_bar=beats_per_bar,
+            onset_envelope=onset_env,
+            chroma=chroma,
+            genre=genre,
+            harmonic_audio=harmonic,
         )
-        bars_s = [db["time_s"] for db in downbeat_result["downbeats"]]
-        downbeats_idx = [db["beat_index"] for db in downbeat_result["downbeats"]]
+        rhythm_analysis = rhythm_source.analyze_rhythm(mir_input)
+        tempo_bpm = rhythm_analysis.tempo_bpm
+        beats_s = rhythm_analysis.beats_s
+        bars_s = rhythm_analysis.downbeats_s
+        beats_per_bar = rhythm_analysis.beats_per_bar
+        time_sig_label = f"{beats_per_bar}/4"
+        time_sig_result = dict(
+            rhythm_analysis.metadata.get(
+                "time_signature",
+                {
+                    "time_signature": time_sig_label,
+                    "confidence": rhythm_analysis.beat_confidence,
+                    "method": rhythm_analysis.source,
+                },
+            )
+        )
+        time_sig_label = str(time_sig_result.get("time_signature", time_sig_label))
+        beat_frames = np.asarray(
+            librosa.time_to_frames(beats_s, sr=sr, hop_length=hop_length), dtype=int
+        )
+        downbeats_idx = (
+            [
+                int(np.argmin(np.abs(np.asarray(beats_s, dtype=np.float64) - downbeat)))
+                for downbeat in bars_s
+            ]
+            if beats_s
+            else []
+        )
+        downbeat_result = dict(rhythm_analysis.metadata.get("downbeat_meta", {}))
 
         # Energy analysis
         energy_result = extract_smoothed_energy(
@@ -657,7 +702,7 @@ class AudioAnalyzer:
         )
         stem_consumers = apply_stem_consumers(
             active_stems,
-            full_mix_beat_confidence=float(time_sig_result.get("confidence", 0.0)),
+            full_mix_beat_confidence=rhythm_analysis.beat_confidence,
             beats_s=beats_s,
             full_mix_builds_drops=builds_drops,
             full_mix_vocal_segments=vocal_result["vocal_segments"],
@@ -684,23 +729,28 @@ class AudioAnalyzer:
         stft_mag_2048 = np.abs(librosa.stft(y, n_fft=2048, hop_length=hop_length)).astype(
             np.float32
         )
-        sections = detect_song_sections(
-            y,
-            sr,
+        structure_input = MIRInput(
+            audio_path=Path(audio_path),
+            audio=y,
+            sample_rate=sr,
             hop_length=hop_length,
+            onset_envelope=onset_env,
+            chroma=chroma,
             genre=genre,
-            rms_for_energy=rms_norm,
-            chroma_cqt=chroma,
-            beats_s=beats_s,
-            bars_s=bars_s,
+            harmonic_audio=harmonic,
+            rms=np.asarray(rms_norm),
+            stft_magnitude=stft_mag_2048,
             builds=builds,
             drops=drops,
             vocal_segments=vocal_regions,
-            chords=chords["chords"],  # Extract chord list from result dict
-            onset_env=onset_env,
-            stft_mag=stft_mag_2048,
-            y_harm=harmonic,
+            chords=chords["chords"],
         )
+        structure_analysis = structure_source.analyze_structure(structure_input, rhythm_analysis)
+        sections = {
+            "sections": structure_analysis.sections,
+            "boundary_times_s": structure_analysis.boundary_times_s,
+            "meta": structure_analysis.metadata,
+        }
         tempo_changes = detect_tempo_changes(y, sr, hop_length=hop_length)
 
         # Tension curve
@@ -733,7 +783,7 @@ class AudioAnalyzer:
             chroma_cqt=chroma,
             beats_s=beats_s,
             downbeats_s=bars_s,
-            section_bounds_s=sections["boundary_times_s"],
+            section_bounds_s=structure_analysis.boundary_times_s,
             y_harm=harmonic,
             y_perc=percussive,
         )
@@ -756,11 +806,22 @@ class AudioAnalyzer:
                 "beats_per_bar": beats_per_bar,
             },
             "rhythm": {
+                "beat_confidence": rhythm_analysis.beat_confidence,
                 **stem_consumers["rhythm"],
                 "downbeats": [int(i) for i in downbeats_idx],
                 "downbeat_meta": {
                     "phase": int(downbeat_result.get("phase", 0)),
-                    "phase_confidence": float(downbeat_result.get("phase_confidence", 0.0)),
+                    "phase_confidence": rhythm_analysis.downbeat_confidence,
+                },
+            },
+            "analysis_sources": {
+                "rhythm": {
+                    "name": rhythm_analysis.source,
+                    "version": rhythm_analysis.source_version,
+                },
+                "structure": {
+                    "name": structure_analysis.source,
+                    "version": structure_analysis.source_version,
                 },
             },
             "energy": {
@@ -810,6 +871,92 @@ class AudioAnalyzer:
 
         return features
 
+    @classmethod
+    def _short_audio_features(
+        cls,
+        audio_path: str,
+        y: np.ndarray,
+        sr: int,
+        duration: float,
+        *,
+        hop_length: int,
+        rhythm_source: RhythmSource,
+        structure_source: StructureSource,
+        genre: str | None,
+        stem_features: StemFeatures | None = None,
+    ) -> dict[str, Any]:
+        """Honor explicit MIR selections without silently substituting short-audio defaults."""
+        frame_count = max(1, 1 + len(y) // hop_length)
+        inputs = MIRInput(
+            audio_path=Path(audio_path),
+            audio=y,
+            sample_rate=sr,
+            hop_length=hop_length,
+            onset_envelope=np.zeros(frame_count, dtype=np.float32),
+            chroma=np.zeros((12, frame_count), dtype=np.float32),
+            genre=genre,
+        )
+        if rhythm_source.name == DSPSource.name:
+            rhythm = RhythmAnalysis(
+                tempo_bpm=0.0,
+                beats_s=[],
+                downbeats_s=[],
+                beats_per_bar=4,
+                beat_confidence=0.0,
+                downbeat_confidence=0.0,
+                source=rhythm_source.name,
+                source_version=rhythm_source.version,
+                metadata={"short_audio": True},
+            )
+        else:
+            rhythm = rhythm_source.analyze_rhythm(inputs)
+
+        if structure_source.name == DSPSource.name:
+            structure = StructureAnalysis(
+                sections=[],
+                boundary_times_s=[0.0, duration],
+                source=structure_source.name,
+                source_version=structure_source.version,
+                metadata={"short_audio": True},
+            )
+        else:
+            structure = structure_source.analyze_structure(inputs, rhythm)
+
+        result = cls._minimal_features(
+            audio_path,
+            y,
+            sr,
+            duration,
+            stem_features,
+            full_mix_beat_confidence=rhythm.beat_confidence,
+        )
+        stem_rhythm = dict(result["rhythm"])
+        result.update(
+            {
+                "tempo_bpm": rhythm.tempo_bpm,
+                "beats_s": rhythm.beats_s,
+                "bars_s": rhythm.downbeats_s,
+                "assumptions": {
+                    "time_signature": f"{rhythm.beats_per_bar}/4 (short audio)",
+                    "beats_per_bar": rhythm.beats_per_bar,
+                },
+                "rhythm": {**stem_rhythm, "downbeats": []},
+                "structure": {
+                    "sections": structure.sections,
+                    "boundary_times_s": structure.boundary_times_s,
+                    "meta": structure.metadata,
+                },
+                "analysis_sources": {
+                    "rhythm": {"name": rhythm.source, "version": rhythm.source_version},
+                    "structure": {
+                        "name": structure.source,
+                        "version": structure.source_version,
+                    },
+                },
+            }
+        )
+        return result
+
     @staticmethod
     def _minimal_features(
         audio_path: str,
@@ -817,6 +964,8 @@ class AudioAnalyzer:
         sr: int,
         duration: float,
         stem_features: StemFeatures | None = None,
+        *,
+        full_mix_beat_confidence: float = 0.0,
     ) -> dict[str, Any]:
         """Generate minimal features for very short audio.
 
@@ -836,7 +985,7 @@ class AudioAnalyzer:
         )
         stem_consumers = apply_stem_consumers(
             active_stems,
-            full_mix_beat_confidence=0.0,
+            full_mix_beat_confidence=full_mix_beat_confidence,
             beats_s=[],
             full_mix_builds_drops={"builds": [], "drops": [], "statistics": {}},
             full_mix_vocal_segments=[],
@@ -870,6 +1019,10 @@ class AudioAnalyzer:
             "full_mix_vocals_statistics": stem_consumers["full_mix_vocals_statistics"],
             "vocal_gate_open": stem_consumers["vocal_gate_open"],
             "stems": stem_consumers["stems"],
+            "analysis_sources": {
+                "rhythm": {"name": DSPSource.name, "version": DSPSource.version},
+                "structure": {"name": DSPSource.name, "version": DSPSource.version},
+            },
             "tempo_analysis": {},
             "key": {"key": "C", "mode": "major", "confidence": 0.0},
             "warnings": ["Audio too short for meaningful analysis"],

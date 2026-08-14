@@ -32,6 +32,12 @@ fe = [
 stems = [
     "twinklr-core[stems]>=0.1.0",
 ]
+mir = [
+    "twinklr-core[mir]>=0.1.0",
+]
+mir-beats = [
+    "twinklr-core[mir-beats]>=0.1.0",
+]
 
 [build-system]
 requires = ["setuptools>=61.0", "wheel"]

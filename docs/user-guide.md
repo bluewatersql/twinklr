@@ -134,6 +134,8 @@ Key fields and defaults:
 | `audio_processing.enhancements.stems.enabled` | `false` | Opt in to cached Demucs source separation |
 | `audio_processing.enhancements.stems.model_name` | `"htdemucs"` | Demucs model name; changing it produces a clean cache miss |
 | `audio_processing.enhancements.stems.vocal_presence_threshold` | `0.05` | Minimum separated-vocal coverage that opens the WhisperX gate |
+| `audio_processing.rhythm_source` | `"dsp"` | Beat/downbeat source (`"dsp"` or optional `"beat_this"`) |
+| `audio_processing.structure_source` | `"dsp"` | Section source (`"dsp"` or isolated-runtime `"allinone"`) |
 | `logging.level` | `"INFO"` | Log level |
 
 The `llm_api_key` field is populated from the `OPENAI_API_KEY` environment variable automatically.

@@ -66,6 +66,12 @@ normalization = [
     "sentence-transformers>=3.0",  # Effect name embedding
     "scikit-learn>=1.4",           # Optional clustering backends
 ]
+mir = [
+    "beat-this==1.1.0", # Local-only beat/downbeat A/B; weights are not used in CI
+]
+mir-beats = [
+    "beat-this==1.1.0", # Named extra used by the actionable missing-dependency error
+]
 
 [build-system]
 requires = ["setuptools>=61.0", "wheel"]

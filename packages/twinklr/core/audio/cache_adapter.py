@@ -26,6 +26,7 @@ from typing import TypeVar
 from pydantic import BaseModel
 
 from twinklr.core.caching import CacheKey, FSCache
+from twinklr.core.config.models import AudioProcessingConfig
 
 logger = logging.getLogger(__name__)
 
@@ -34,12 +35,28 @@ T = TypeVar("T", bound=BaseModel)
 # Cache-invalidation version for the stored SongBundle payload. Bump whenever the
 # cached shape changes, not only when SongBundle's own schema_version does: entries
 # written before the bump are rejected on load (CacheKey.step_version mismatch).
-# "5" — the source-separation stage adds explicit stem status and changes the
-# rhythm, build/drop, vocal, and lyrics-gating consumer inputs.
+# "5" — source selection and source-separation add explicit provenance/stem
+# status and change rhythm, structure, build/drop, vocal, and lyrics-gating inputs.
 AUDIO_FEATURES_CACHE_VERSION = "5"
 
+_MIR_SOURCE_VERSIONS = {
+    "dsp": "twinklr-dsp-v1",
+    "beat_this": "1.1.0",
+    "allinone": "1.0.6",
+}
 
-async def compute_audio_file_hash(audio_path: str) -> str:
+
+def audio_analysis_fingerprint(config: AudioProcessingConfig) -> str:
+    """Return the cache identity for selected timing/structure implementations."""
+    rhythm = config.rhythm_source.value
+    structure = config.structure_source.value
+    return (
+        f"rhythm={rhythm}@{_MIR_SOURCE_VERSIONS[rhythm]};"
+        f"structure={structure}@{_MIR_SOURCE_VERSIONS[structure]}"
+    )
+
+
+async def compute_audio_file_hash(audio_path: str, *, analysis_identity: str = "") -> str:
     """Compute SHA256 hash of audio file for cache key.
 
     Uses full-file content to reduce collision risk for cache keys.
@@ -64,6 +81,10 @@ async def compute_audio_file_hash(audio_path: str) -> str:
         for chunk in iter(lambda: f.read(1024 * 1024), b""):
             hasher.update(chunk)
 
+    if analysis_identity:
+        hasher.update(b"\0twinklr-analysis-identity\0")
+        hasher.update(analysis_identity.encode("utf-8"))
+
     return hasher.hexdigest()
 
 
@@ -73,6 +94,7 @@ async def load_audio_features_async[T: BaseModel](
     model_cls: type[T],
     *,
     step_version: str = AUDIO_FEATURES_CACHE_VERSION,
+    analysis_identity: str = "",
 ) -> T | None:
     """Load cached audio features using core.caching.
 
@@ -92,7 +114,7 @@ async def load_audio_features_async[T: BaseModel](
     """
     try:
         # Compute audio hash
-        audio_hash = await compute_audio_file_hash(audio_path)
+        audio_hash = await compute_audio_file_hash(audio_path, analysis_identity=analysis_identity)
 
         # Create cache key
         key = CacheKey(
@@ -118,6 +140,7 @@ async def save_audio_features_async(
     features: BaseModel,
     *,
     step_version: str = AUDIO_FEATURES_CACHE_VERSION,
+    analysis_identity: str = "",
     compute_ms: float | None = None,
 ) -> None:
     """Save audio features to cache.
@@ -134,7 +157,7 @@ async def save_audio_features_async(
     """
     try:
         # Compute audio hash
-        audio_hash = await compute_audio_file_hash(audio_path)
+        audio_hash = await compute_audio_file_hash(audio_path, analysis_identity=analysis_identity)
 
         # Create cache key
         key = CacheKey(

@@ -32,6 +32,8 @@ from twinklr.core.config.models import (
     JobConfig,
     LoggingConfig,
     PlanningContextConfig,
+    RhythmSourceName,
+    StructureSourceName,
 )
 
 __all__ = [
@@ -58,7 +60,9 @@ __all__ = [
     "PlanningContextConfig",
     "Pose",
     "RestingPosition",
+    "RhythmSourceName",
     "ShutterMap",
+    "StructureSourceName",
     "configure_logging",
     "load_app_config",
     # Loaders

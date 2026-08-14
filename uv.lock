@@ -190,6 +190,23 @@ wheels = [
 ]
 
 [[package]]
+name = "beat-this"
+version = "1.1.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "einops" },
+    { name = "numpy" },
+    { name = "rotary-embedding-torch" },
+    { name = "soxr" },
+    { name = "torch" },
+    { name = "torchaudio" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/d1/c4/7ce01e047c1e8d99490e95172d710e08901c24fb24e19a5dd4f885177c99/beat_this-1.1.0.tar.gz", hash = "sha256:3017c741f972972a650edcaccfe5760687fe4f5587feaa98896d90f866c2435c", size = 40635, upload-time = "2026-04-14T10:16:39.5Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/ce/0e/e23cbbe6e3efcd54e84dec22b6d88954655036a993cc3843ab741bc24de4/beat_this-1.1.0-py3-none-any.whl", hash = "sha256:3f2b2d1e027c6dac380bf80c71555e3c28a4036a7f1af20129a945915a72a645", size = 40060, upload-time = "2026-04-14T10:16:37.955Z" },
+]
+
+[[package]]
 name = "bezier"
 version = "2024.6.20"
 source = { registry = "https://pypi.org/simple" }
@@ -1897,6 +1914,19 @@ wheels = [
 ]
 
 [[package]]
+name = "rotary-embedding-torch"
+version = "0.9.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "einops" },
+    { name = "torch" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/fc/63/776d55b395aed9d2815afc1740056e919691d1be1ceee203d101d33d1674/rotary_embedding_torch-0.9.1.tar.gz", hash = "sha256:f43c39cd9c0aaa17d47e876db89a552a203dd8af35e7980f484ab7ad7ea8bf69", size = 13246, upload-time = "2026-06-20T23:39:14.667Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/ea/63/ca681366df98d207876c6ad7761ef6910668c83ec766fd5a70c56b9c3567/rotary_embedding_torch-0.9.1-py3-none-any.whl", hash = "sha256:489ef53e21ab4c4eb35c0c97b551d724f5eea71c2bca39acb8fee8d88b142a76", size = 17423, upload-time = "2026-06-20T23:39:13.427Z" },
+]
+
+[[package]]
 name = "ruamel-yaml"
 version = "0.18.17"
 source = { registry = "https://pypi.org/simple" }
@@ -2431,6 +2461,12 @@ dev = [
 fe = [
     { name = "twinklr-core", extra = ["fe"] },
 ]
+mir = [
+    { name = "twinklr-core", extra = ["mir"] },
+]
+mir-beats = [
+    { name = "twinklr-core", extra = ["mir-beats"] },
+]
 ml = [
     { name = "twinklr-core", extra = ["ml"] },
 ]
@@ -2451,11 +2487,13 @@ requires-dist = [
     { name = "twinklr-cli", editable = "packages/twinklr/cli" },
     { name = "twinklr-core", editable = "packages/twinklr/core" },
     { name = "twinklr-core", extras = ["fe"], marker = "extra == 'fe'", editable = "packages/twinklr/core" },
+    { name = "twinklr-core", extras = ["mir"], marker = "extra == 'mir'", editable = "packages/twinklr/core" },
+    { name = "twinklr-core", extras = ["mir-beats"], marker = "extra == 'mir-beats'", editable = "packages/twinklr/core" },
     { name = "twinklr-core", extras = ["ml"], marker = "extra == 'ml'", editable = "packages/twinklr/core" },
     { name = "twinklr-core", extras = ["stems"], marker = "extra == 'stems'", editable = "packages/twinklr/core" },
     { name = "types-aiofiles", marker = "extra == 'dev'", specifier = ">=24.1" },
 ]
-provides-extras = ["dev", "ml", "fe", "stems"]
+provides-extras = ["dev", "ml", "fe", "stems", "mir", "mir-beats"]
 
 [[package]]
 name = "twinklr-cli"
@@ -2524,6 +2562,12 @@ dev = [
 fe = [
     { name = "sqlite-vec" },
 ]
+mir = [
+    { name = "beat-this" },
+]
+mir-beats = [
+    { name = "beat-this" },
+]
 ml = [
     { name = "pyannote-audio" },
     { name = "torch" },
@@ -2542,6 +2586,8 @@ stems = [
 requires-dist = [
     { name = "aiofiles", specifier = ">=25.1.0" },
     { name = "anthropic", marker = "extra == 'anthropic'", specifier = ">=0.40" },
+    { name = "beat-this", marker = "extra == 'mir'", specifier = "==1.1.0" },
+    { name = "beat-this", marker = "extra == 'mir-beats'", specifier = "==1.1.0" },
     { name = "bezier", specifier = ">=2024.6.20" },
     { name = "defusedxml", specifier = ">=0.7.1" },
     { name = "demucs", marker = "platform_machine != 'x86_64' and sys_platform == 'darwin' and extra == 'stems'", specifier = "==4.1.0" },
@@ -2585,7 +2631,7 @@ requires-dist = [
     { name = "whisperx", marker = "extra == 'ml'", specifier = ">=3.1.1" },
     { name = "zstandard", specifier = ">=0.21.0" },
 ]
-provides-extras = ["stems", "anthropic", "dev", "ml", "fe", "normalization"]
+provides-extras = ["stems", "anthropic", "dev", "ml", "fe", "normalization", "mir", "mir-beats"]
 
 [[package]]
 name = "typeguard"

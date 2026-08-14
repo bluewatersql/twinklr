@@ -1,7 +1,7 @@
 ---
 type: context
 area: architecture
-updated: 2026-08-13
+updated: 2026-08-14
 ---
 
 # Pipeline Architecture
@@ -44,6 +44,11 @@ The CLI package (`packages/twinklr/cli/`) wires the end-to-end `twinklr run` wor
 - **Restartability**: successful-stage results are cached and reused on rerun.
 - **Store-driven FE**: the feature-engineering pipeline is incremental — already-processed
   sequences are skipped ([Pipeline Guide](../../docs/pipeline_guide.md)).
+- **One timing/structure source**: audio configuration selects independent rhythm and
+  structure producers, whose normalized `beats_s`, `bars_s`, and section output feed
+  every downstream consumer through the unchanged `BeatGrid`. `dsp` is the default;
+  model-backed selections are explicit optional dependencies and fail loudly when
+  their local runtime/weights are unavailable.
 
 ## Deep reference
 
