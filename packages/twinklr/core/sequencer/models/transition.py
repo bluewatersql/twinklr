@@ -129,7 +129,9 @@ class Boundary(BaseModel):
         source_id: Identifier of segment ending at boundary.
         target_id: Identifier of segment starting at boundary.
         time_ms: Boundary time in milliseconds.
-        bar_position: Boundary position in bars (musical time).
+        bar_position: Boundary position in bars, absolute and 1-indexed — the same
+            numbering `PlanSection.start_bar` uses, not an offset within a section.
+            `TransitionPlanner` relies on this when it converts to milliseconds.
     """
 
     model_config = ConfigDict(extra="forbid")

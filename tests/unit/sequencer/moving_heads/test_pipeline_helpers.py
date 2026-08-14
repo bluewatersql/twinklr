@@ -101,19 +101,36 @@ class TestInferFixtureRole:
         assert _infer_fixture_role(group_id="g1", fixture_index=2, group_size=4) == "INNER_RIGHT"
         assert _infer_fixture_role(group_id="g1", fixture_index=3, group_size=4) == "OUTER_RIGHT"
 
-    def test_five_fixture_group_uses_positional(self) -> None:
-        """Groups with 5+ fixtures use positional naming."""
+    def test_five_fixture_group_spreads_across_the_spatial_vocabulary(self) -> None:
+        """Groups of 5+ used to get positional names (`front_2`) that match no role
+        any template declares, so every step was silently skipped and the rig
+        rendered nothing at all."""
         from twinklr.core.sequencer.moving_heads.fixture_builder import _infer_fixture_role
 
-        role = _infer_fixture_role(group_id="front", fixture_index=2, group_size=5)
-        assert role == "front_2"
+        roles = [
+            _infer_fixture_role(group_id="front", fixture_index=index, group_size=5)
+            for index in range(5)
+        ]
+        assert roles == ["FAR_LEFT", "MID_LEFT", "CENTER", "CENTER_RIGHT", "FAR_RIGHT"]
 
-    def test_large_group_uses_positional(self) -> None:
-        """Groups with many fixtures use positional naming."""
+    def test_large_group_spreads_across_the_spatial_vocabulary(self) -> None:
+        """An 8-head rig gets a symmetric left-to-right fan of real roles."""
         from twinklr.core.sequencer.moving_heads.fixture_builder import _infer_fixture_role
 
-        role = _infer_fixture_role(group_id="array", fixture_index=7, group_size=8)
-        assert role == "array_7"
+        roles = [
+            _infer_fixture_role(group_id="array", fixture_index=index, group_size=8)
+            for index in range(8)
+        ]
+        assert roles == [
+            "FAR_LEFT",
+            "OUTER_LEFT",
+            "MID_LEFT",
+            "INNER_LEFT",
+            "INNER_RIGHT",
+            "MID_RIGHT",
+            "OUTER_RIGHT",
+            "FAR_RIGHT",
+        ]
 
 
 class TestEnergyToIntensityMap:

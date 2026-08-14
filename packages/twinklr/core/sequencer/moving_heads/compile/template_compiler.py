@@ -10,7 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from twinklr.core.curves.models import CurvePoint, PointsCurve
 from twinklr.core.sequencer.models.context import FixtureContext, TemplateCompileContext
-from twinklr.core.sequencer.models.enum import ChannelName, ChaseOrder
+from twinklr.core.sequencer.models.enum import ChannelName, ChaseOrder, TemplateRole
 from twinklr.core.sequencer.models.template import (
     RemainderPolicy,
     Template,
@@ -33,6 +33,16 @@ from twinklr.core.utils.logging import get_renderer_logger, log_performance
 
 logger = logging.getLogger(__name__)
 renderer_log = get_renderer_logger()
+
+
+class UnsupportedRigShapeError(ValueError):
+    """A step targets a fixture group the rig cannot supply.
+
+    Raised instead of skipping the step in silence. An 8-head rig used to render
+    *nothing* — every step's role filter came back empty and `compile_template`
+    `continue`d past it without an exception or a surfaced warning, so the show was
+    dark and the pipeline reported success (P4-F26).
+    """
 
 
 class TemplateCompileResult(BaseModel):
@@ -99,11 +109,13 @@ def compile_template(
         working_template = apply_preset(template, preset)
         provenance.append(f"preset:{preset.preset_id}")
 
-    # Build step duration map
+    # Build step duration and offset maps
     step_durations: dict[str, float] = {}
+    step_offsets: dict[str, float] = {}
     step_map: dict[str, TemplateStep] = {}
     for step in working_template.steps:
         step_durations[step.step_id] = step.timing.base_timing.duration_bars
+        step_offsets[step.step_id] = step.timing.base_timing.start_offset_bars
         step_map[step.step_id] = step
 
     # Schedule repeats
@@ -111,6 +123,7 @@ def compile_template(
         working_template.repeat,
         context.duration_bars,
         step_durations=step_durations,
+        step_offsets=step_offsets,
     )
 
     # Compile each scheduled instance for each fixture
@@ -121,21 +134,10 @@ def compile_template(
         step = step_map[instance.step_id]
 
         # Filter fixtures based on step's target semantic group
-        target_roles = resolve_semantic_group(step.target, template.roles)
-
-        if not target_roles:
-            # If group not defined in template, default to all fixtures
-            target_fixtures = list(context.fixtures)
-        else:
-            # Filter fixtures by role membership in target group
-            target_fixtures = [f for f in context.fixtures if f.role in target_roles]
+        target_fixtures = _resolve_target_fixtures(step, template, context)
 
         renderer_log.debug(f"Target group: {step.target}")
         renderer_log.debug(f"# of Target fixtures: {len(target_fixtures)}")
-
-        if not target_fixtures:
-            # No fixtures for this group, skip
-            continue
 
         # Order fixtures according to ChaseOrder for phase offsets
         phase_config = step.timing.phase_offset
@@ -189,6 +191,7 @@ def compile_template(
                 fixture_id=fixture.fixture_id,
                 role=fixture.role,
                 calibration=fixture.calibration,
+                template_defaults=working_template.defaults,
                 start_ms=start_ms,
                 duration_ms=duration_ms,
                 n_samples=context.n_samples,
@@ -209,14 +212,15 @@ def compile_template(
             # Add segments
             all_segments.append(step_result.segment)
 
-    # Clip segments to section boundary for TRUNCATE/FADE_OUT policies
-    if schedule_result.remainder_policy in (RemainderPolicy.TRUNCATE, RemainderPolicy.FADE_OUT):
-        section_end_ms = context.end_ms
-        all_segments = _clip_segments_to_boundary(
-            all_segments,
-            section_end_ms,
-            fade_out=(schedule_result.remainder_policy == RemainderPolicy.FADE_OUT),
-        )
+    # Clip segments to the section boundary. This runs for every remainder policy,
+    # not just TRUNCATE/FADE_OUT: no shipped template selects those two, so the clip
+    # never ran and a schedule that overran its section (P4-F6) or a cycle rendered
+    # into a shorter-than-one-cycle window (P4-F4) spilled past the section end.
+    all_segments = _clip_segments_to_boundary(
+        all_segments,
+        context.end_ms,
+        fade_out=(schedule_result.remainder_policy == RemainderPolicy.FADE_OUT),
+    )
 
     return TemplateCompileResult(
         template_id=working_template.template_id,
@@ -224,6 +228,66 @@ def compile_template(
         num_complete_cycles=schedule_result.num_complete_cycles,
         provenance=provenance,
     )
+
+
+def _resolve_target_fixtures(
+    step: TemplateStep,
+    template: Template,
+    context: TemplateCompileContext,
+) -> list[FixtureContext]:
+    """Resolve the fixtures a step targets, against the roles the rig actually has.
+
+    The semantic group is resolved against the *rig's* roles rather than the roles
+    the template declares. A template declaring the four-head
+    `OUTER_LEFT/INNER_LEFT/INNER_RIGHT/OUTER_RIGHT` vocabulary is not a statement
+    that it may only light four heads; it is the shape it was authored for. Resolving
+    against the template's list is what made every step on a rig with any other
+    fixture count match nothing at all.
+
+    Args:
+        step: The step whose target group is being resolved.
+        template: The template being compiled (its roles are the fallback vocabulary).
+        context: Compile context carrying the rig's fixtures.
+
+    Returns:
+        Fixtures the step should be compiled for.
+
+    Raises:
+        UnsupportedRigShapeError: If the step's target group matches no fixture.
+    """
+    rig_roles: list[TemplateRole] = []
+    for fixture in context.fixtures:
+        try:
+            role = TemplateRole(fixture.role)
+        except ValueError:
+            continue
+        if role not in rig_roles:
+            rig_roles.append(role)
+
+    available_roles = rig_roles or list(template.roles)
+
+    try:
+        target_roles = resolve_semantic_group(step.target, available_roles)
+    except ValueError as error:
+        raise UnsupportedRigShapeError(
+            f"template '{template.template_id}' step '{step.step_id}' targets group "
+            f"'{step.target.value}', which no fixture in this rig can fill "
+            f"(rig roles: {[role.value for role in rig_roles] or 'none recognized'}). "
+            "Use a rig whose fixture count maps onto the group, or a template that "
+            "does not address it."
+        ) from error
+
+    target_fixtures = [fixture for fixture in context.fixtures if fixture.role in target_roles]
+
+    if not target_fixtures:
+        raise UnsupportedRigShapeError(
+            f"template '{template.template_id}' step '{step.step_id}' targets group "
+            f"'{step.target.value}' (roles {[role.value for role in target_roles]}), "
+            f"but no fixture in this rig holds any of them "
+            f"(rig roles: {sorted({fixture.role for fixture in context.fixtures})})."
+        )
+
+    return target_fixtures
 
 
 def _order_fixtures_for_chase(
@@ -347,8 +411,11 @@ def _clip_segments_to_boundary(
             if channel_value.curve and channel_value.value_points:
                 clipped_points = _clip_curve_points(channel_value.value_points, keep_fraction)
 
-                # For FADE_OUT on dimmer channel, apply fade
-                if fade_out and channel_name.value == "DIMMER":
+                # For FADE_OUT on dimmer channel, apply fade.
+                # `ChannelName.DIMMER.value` is lower-case; this gate compared it
+                # against the upper-cased name and so never matched, degenerating
+                # FADE_OUT into a hard truncate (P4-F21).
+                if fade_out and channel_name is ChannelName.DIMMER:
                     clipped_points = _apply_fade_out(clipped_points)
 
                 clipped_channels[channel_name] = ChannelValue(

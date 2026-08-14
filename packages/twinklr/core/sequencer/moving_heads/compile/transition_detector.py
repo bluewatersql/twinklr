@@ -122,23 +122,30 @@ class TransitionDetector:
             source_instance = instances[i]
             target_instance = instances[i + 1]
 
-            # Boundary is at the end of source step (start of target step)
-            # Calculate absolute boundary position
-            boundary_bar = source_instance.start_bars + source_instance.duration_bars
-            boundary_ms = context.bar_offset_to_ms(boundary_bar)
+            # Boundary is at the end of source step (start of target step).
+            # `ScheduledInstance` counts bars from the start of the section;
+            # `Boundary.bar_position` is absolute and 1-indexed, which is how
+            # `detect_section_boundaries` fills it and how `TransitionPlanner` reads it
+            # (`bar_span_ms(bar_position - 1.0, ...)`). This used to emit the
+            # section-relative offset under the same field name -- harmless only
+            # because nothing in production consumes step boundaries yet, and a trap
+            # for whoever enables step transitions.
+            offset_bars = source_instance.start_bars + source_instance.duration_bars
+            boundary_ms = context.bar_offset_to_ms(offset_bars)
 
             boundary = Boundary(
                 type=BoundaryType.STEP_BOUNDARY,
                 source_id=f"{context.section_id}:{source_instance.step_id}",
                 target_id=f"{context.section_id}:{target_instance.step_id}",
                 time_ms=boundary_ms,
-                bar_position=boundary_bar,
+                bar_position=context.start_bar + offset_bars,
             )
 
             boundaries.append(boundary)
             logger.debug(
                 f"Detected step boundary: {source_instance.step_id} → "
-                f"{target_instance.step_id} at bar {boundary_bar:.2f} ({boundary_ms}ms)"
+                f"{target_instance.step_id} at bar {context.start_bar + offset_bars:.2f} "
+                f"({boundary_ms}ms)"
             )
 
         logger.debug(

@@ -277,3 +277,22 @@ channels — before wiring it in.
 which explicitly must *not* touch channel/fixture defaults because they get wired here.
 Mitigation: if the decision is "delete", confirm P0-T7 left them in place and say so in
 the handoff so the two tasks do not both claim the deletion.
+
+## Notes routed from P1P-T5 (2026-08-13, binding)
+
+1. **The transition-zeros defect is fixed at the compile→export contract**, as this
+   spec's bar required: `DmxSettingsBuilder._extract_channel_data` now reads
+   `ChannelValue.curve` when `value_points` is unset, so every transition segment
+   carries its blend. The pin moved and inverted:
+   `test_settings_golden.py::test_transition_segments_carry_their_blend` asserts the
+   value curves are present and non-flat. Do not weaken it to a slider-value check —
+   the sliders read 0 legitimately wherever a value curve exists.
+2. **Transition channel order is now load-bearing.** The blended channel set used to
+   be a `set[ChannelName]`, whose iteration order varies with `PYTHONHASHSEED`; that
+   was invisible only while transitions emitted no value curves. Both ends are fixed
+   (insertion order in `transition_segment_compiler`, ascending channel order in the
+   settings builder). The golden suite passes under several hash seeds; keep it that
+   way when reordering the emit loop.
+3. **P4-F3 (zero-fill of unchoreographed channels) is untouched and still yours.**
+   The goldens' banner lists it as the remaining known-defective behavior together
+   with P4-F10.

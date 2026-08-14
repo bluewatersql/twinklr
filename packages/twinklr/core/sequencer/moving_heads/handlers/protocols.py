@@ -80,6 +80,11 @@ class DimmerResult(BaseModel):
     Attributes:
         dimmer_curve: Dimmer curve (absolute, v=0 to v=1).
         dimmer_static_dmx: Static DMX value (if any).
+        clamp_min_dmx: Lower DMX bound the curve is mapped onto (the anti-flicker
+            floor, after the template's declaration and the rig's calibration are
+            combined). The curve carries no absolute DMX itself, so this is the only
+            route by which a declared floor reaches the output.
+        clamp_max_dmx: Upper DMX bound the curve is mapped onto.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -91,6 +96,8 @@ class DimmerResult(BaseModel):
     min_intensity: int
     max_intensity: int
     period: float
+    clamp_min_dmx: int = Field(default=0, ge=0, le=255)
+    clamp_max_dmx: int = Field(default=255, ge=0, le=255)
 
 
 # =============================================================================

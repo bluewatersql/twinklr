@@ -104,8 +104,16 @@ def test_plan_sections_and_transition_are_all_covered(
         "drop",
         "transition_drop_to_breakdown",
         "breakdown",
+        "transition_breakdown_to_one_bar",
+        "one_bar",
+        "transition_one_bar_to_phrase",
+        "phrase",
+        "transition_phrase_to_arc",
+        "arc",
     ]
-    assert len(result.effects) == 28  # 4 fixtures x (4 sections + 3 transitions)
+    # 4 fixtures x (5 single-step sections + 6 transitions + 3 steps for each of the
+    # two narrative sections).
+    assert len(result.effects) == 4 * (5 + 6 + 3 + 3)
 
 
 @pytest.mark.parametrize(
@@ -220,35 +228,62 @@ def test_value_curve_points_are_two_decimal(
     )
 
 
-def test_transition_segments_emit_all_zero(
+def test_transition_segments_carry_their_blend(
     render_cached: Callable[[RigSpec], RenderResult],
 ) -> None:
-    """KNOWN-WRONG PIN (not previously catalogued): transitions emit a full blackout.
+    """The blend reaches the exporter (was: every transition emitted a blackout).
 
-    `ChannelBlender.create_blended_channel_value` returns a `ChannelValue` carrying its
-    blend on the `curve` field, leaving `static_dmx`, `base_dmx` and `value_points`
-    unset. `DmxSettingsBuilder._extract_channel_data` reads only those three, never
-    `curve`, so the entire blend is dropped and the zero-fill writes 0 to all sixteen
-    channels. Every section boundary therefore emits one second of pan, tilt and dimmer
-    slammed to zero on layer 1.
+    `ChannelBlender.create_blended_channel_value` returns a `ChannelValue` carrying
+    its blend on the `curve` field, leaving `static_dmx`, `base_dmx` and
+    `value_points` unset. `DmxSettingsBuilder._extract_channel_data` read only those
+    three, never `curve`, so the entire blend was dropped and the zero-fill wrote 0
+    to all sixteen channels: one second of pan, tilt and dimmer slammed to zero at
+    every section boundary, on layer 1 where the validator's all-zero check (which
+    reads only the first `EffectLayer` per element) could not see it.
 
-    The existing validator's all-zero CRITICAL check does not catch this: it reads only
-    the first `EffectLayer` per element, and transitions are placed on layer 1.
+    P1P-T6 owns the channel-default policy and is barred from "resolving" this with
+    defaults -- a default would make the emitted bytes look plausible while the blend
+    was still discarded, which is why this pin is on the value curve itself.
     """
     transitions = render_cached(RIGS["mh4_minimal"]).for_section("transition_intro_to_chorus")
     assert transitions, "expected transition segments at the section boundary"
 
     for effect in transitions:
-        assert "E_VALUECURVE_DMX" not in effect.settings, (
-            f"{effect.header} now emits a value curve — the blend reaches the exporter, "
-            "so this pin should be replaced by an assertion on the blended curve."
-        )
-        sliders = {
-            part.split("=")[1]
+        for channel in (11, 13, 15):
+            assert f"E_VALUECURVE_DMX{channel}=" in effect.settings, (
+                f"{effect.header} dropped the blended curve for channel {channel}"
+            )
+
+        # The sliders are legitimately 0 here: the exporter's contract is that
+        # E_SLIDER_DMX<n> reads 0 wherever a value curve is present. What used to be
+        # wrong is that there were no curves at all, so 0 was the whole message.
+        values = [
+            float(pair.split(":")[1])
+            for pair in _value_curve(effect.settings, channel=13)
+            .split("Values=")[1]
+            .rstrip("|")
+            .split(";")
+        ]
+        assert max(values) > 0.0, f"{effect.header} blended to a flat zero on tilt"
+
+
+def test_value_curves_are_emitted_in_channel_order(
+    render_cached: Callable[[RigSpec], RenderResult],
+) -> None:
+    """The settings string must not depend on the order channels were built in.
+
+    The transition compiler collected its channels into a `set[ChannelName]`, which
+    iterates in hash order, so the emitted string differed between processes — a
+    golden that passed locally and failed in CI under a different PYTHONHASHSEED.
+    Invisible until the blend started reaching the exporter at all.
+    """
+    for effect in render_cached(RIGS["mh4_minimal"]).effects:
+        channels = [
+            int(part.split("=")[0].removeprefix("E_VALUECURVE_DMX"))
             for part in effect.settings.split(",")
-            if part.startswith("E_SLIDER_")
-        }
-        assert sliders == {"0"}
+            if part.startswith("E_VALUECURVE_DMX")
+        ]
+        assert channels == sorted(channels), f"{effect.header} emits curves out of order"
 
 
 def _value_curve(settings: str, *, channel: int) -> str:

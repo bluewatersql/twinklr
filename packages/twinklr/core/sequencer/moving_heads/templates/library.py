@@ -5,13 +5,73 @@ from dataclasses import dataclass
 import logging
 from typing import Any
 
-from twinklr.core.sequencer.models.template import TemplateDoc
+from twinklr.core.sequencer.models.template import Template, TemplateDoc
 
 logger = logging.getLogger(__name__)
+
+_EPSILON_BARS = 1e-9
 
 
 class TemplateNotFoundError(KeyError):
     pass
+
+
+class InvalidTemplateError(ValueError):
+    """A template's repeat contract does not describe a renderable cycle."""
+
+
+def validate_repeat_contract(template: Template) -> None:
+    """Reject repeat contracts the scheduler cannot honor.
+
+    Two families of defect shipped undetected because nothing checked the contract
+    against the steps it names:
+
+    - a step defined on the template but absent from ``loop_step_ids`` is never
+      scheduled, so the whole arc of a narrative template was dead data (P4-F5);
+    - loop steps whose placements run past ``cycle_bars`` schedule more bars than
+      the cycle claims, and the section overruns (P4-F6).
+
+    The cycle span is ``max(start_offset_bars + duration_bars)``, not the sum of the
+    durations: steps that target disjoint fixture groups run at the same time.
+
+    Args:
+        template: The template to check.
+
+    Raises:
+        InvalidTemplateError: If the contract is unrenderable.
+    """
+    # `Template` already rejects a loop_step_id with no matching step, so the only
+    # direction left to check is the other one.
+    step_ids = [step.step_id for step in template.steps]
+    loop_step_ids = list(template.repeat.loop_step_ids)
+
+    unreachable = [step_id for step_id in step_ids if step_id not in loop_step_ids]
+    if unreachable:
+        raise InvalidTemplateError(
+            f"template '{template.template_id}': steps {unreachable} are declared but "
+            "absent from loop_step_ids, so they would never be scheduled"
+        )
+
+    if not loop_step_ids:
+        return
+
+    placements = {
+        step.step_id: (
+            step.timing.base_timing.start_offset_bars,
+            step.timing.base_timing.duration_bars,
+        )
+        for step in template.steps
+        if step.step_id in loop_step_ids
+    }
+    cycle_bars = template.repeat.cycle_bars
+    span = max(offset + duration for offset, duration in placements.values())
+
+    if abs(span - cycle_bars) > _EPSILON_BARS:
+        raise InvalidTemplateError(
+            f"template '{template.template_id}': loop steps span {span} bars "
+            f"(max start_offset_bars + duration_bars) but cycle_bars is {cycle_bars}; "
+            "the cycle must be exactly the span its steps occupy"
+        )
 
 
 def _norm_key(s: str) -> str:
@@ -55,6 +115,8 @@ class TemplateRegistry:
         if not t.enabled:
             logger.warning(f"Template {tid} is disabled, skipping registration")
             return
+
+        validate_repeat_contract(t.template)
 
         if tid in self._factories_by_id:
             raise ValueError(f"Template already registered: {tid}")

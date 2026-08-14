@@ -112,8 +112,11 @@ class TransitionSegmentCompiler:
         Returns:
             FixtureSegment for this fixture's transition.
         """
-        # Get all channels that need blending
-        all_channels = set(source_state.keys()) | set(target_state.keys())
+        # Get all channels that need blending, in a stable order. A set of
+        # `ChannelName` iterates in hash order, which varies between processes, so
+        # the emitted settings string used to depend on PYTHONHASHSEED. That was
+        # invisible while transitions exported no value curves at all.
+        all_channels = list(dict.fromkeys([*source_state, *target_state]))
 
         blended_channels: dict[ChannelName, ChannelValue] = {}
 

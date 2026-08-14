@@ -46,11 +46,15 @@ def make_template() -> TemplateDoc:
             name="Intro Main Outro Phrase",
             category=TemplateCategory.MEDIUM_ENERGY,
             roles=TemplateRoleHelper.IN_OUT_LEFT_RIGHT,
+            # The cycle is the whole phrase: intro (bars 0-2), main (2-6), outro (6-8).
+            # It used to name only "main", so the FADE_IN entry and FADE_OUT exit --
+            # the point of the template -- were never scheduled. JOINER, not
+            # PING_PONG: a phrase does not play outro -> main -> intro.
             repeat=RepeatContract(
                 repeatable=True,
-                mode=RepeatMode.PING_PONG,
-                cycle_bars=4.0,
-                loop_step_ids=["main"],
+                mode=RepeatMode.JOINER,
+                cycle_bars=8.0,
+                loop_step_ids=["intro", "main", "outro"],
                 remainder_policy=RemainderPolicy.HOLD_LAST_POSE,
             ),
             defaults={"dimmer_floor_dmx": 60, "dimmer_ceiling_dmx": 255},

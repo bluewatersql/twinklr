@@ -116,6 +116,7 @@ def compile_step(
     # Build dimmer segment (absolute, not offset-centered)
     dimmer_params = dict(step.dimmer.params)
     dimmer_params["calibration"] = context.calibration
+    dimmer_params["template_defaults"] = context.template_defaults
     dimmer_handler = context.dimmer_registry.get_with_params(
         step.dimmer.dimmer_type.value, dimmer_params
     )
@@ -218,12 +219,18 @@ def compile_step(
     if dimmer_result.dimmer_static_dmx is not None:
         renderer_log.debug(f"Dimmer Static DMX: {dimmer_result.dimmer_static_dmx}")
 
+    # The dimmer curve carries no absolute DMX of its own: the exporter maps it onto
+    # [clamp_min, clamp_max]. Passing the handler's resolved bounds is what makes the
+    # template's declared anti-flicker floor visible in the emitted DMX (P4-M1) --
+    # left at the 0/255 defaults, the mapping is the identity and the floor is lost.
     segment.add_channel(
         channel=ChannelName.DIMMER,
         curve=PointsCurve(points=dimmer_points) if dimmer_points is not None else None,
         static_dmx=dimmer_result.dimmer_static_dmx,
         value_points=dimmer_points,
         offset_centered=False,
+        clamp_min=dimmer_result.clamp_min_dmx,
+        clamp_max=dimmer_result.clamp_max_dmx,
     )
 
     return StepCompileResult(

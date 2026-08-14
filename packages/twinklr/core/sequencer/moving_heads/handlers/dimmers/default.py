@@ -14,7 +14,10 @@ from twinklr.core.curves.models import CurvePoint
 from twinklr.core.curves.semantics import CurveKind
 from twinklr.core.sequencer.models.enum import Intensity
 from twinklr.core.sequencer.moving_heads.handlers.protocols import DimmerResult
-from twinklr.core.sequencer.moving_heads.libraries.dimmer import DEFAULT_DIMMER_PARAMS
+from twinklr.core.sequencer.moving_heads.libraries.dimmer import (
+    DEFAULT_DIMMER_PARAMS,
+    DimmerCategoricalParams,
+)
 from twinklr.core.utils.logging import get_renderer_logger, log_performance
 
 logger = logging.getLogger(__name__)
@@ -81,29 +84,17 @@ class DefaultDimmerHandler:
                 "Handler is not correctly configured. 'dimmer_pattern' is missing from params."
             )
 
-        categorical_params_set = pattern.categorical_params or DEFAULT_DIMMER_PARAMS
-        categorical_params = (
-            categorical_params_set[intensity]
-            if intensity in categorical_params_set
-            else DEFAULT_DIMMER_PARAMS[Intensity.SMOOTH]
-        )
+        categorical_params = self._resolve_categorical_params(pattern, intensity)
         renderer_log.debug(f"Categorical Params: {categorical_params}")
         renderer_log.debug(f"Intensity: {intensity}")
 
-        calibration = params.get("calibration", {})
-        dimmer_min = calibration.get("dimmer_floor_dmx", 0) if calibration else 0
-        dimmer_max = calibration.get("dimmer_ceiling_dmx", 255) if calibration else 255
-        dimmer_amplitude_dmx = int((dimmer_max - dimmer_min) / 2)
-
+        dimmer_min, dimmer_max = self._resolve_dimmer_bounds(params, pattern)
         renderer_log.debug(f"Dimmer Min: {dimmer_min}, Dimmer Max: {dimmer_max}")
-        renderer_log.debug(f"Dimmer Amplitude DMX: {dimmer_amplitude_dmx}")
 
         # Generate dimmer curve
         if pattern.curve == CurveLibrary.HOLD:
-            dimmer_floor_dmx = calibration.get("dimmer_floor_dmx", 0) if calibration else 0
-            dimmer_ceiling_dmx = calibration.get("dimmer_ceiling_dmx", 255) if calibration else 255
             dimmer_static_dmx = self._resolve_static_dmx_value(
-                categorical_params.max_intensity, dimmer_floor_dmx, dimmer_ceiling_dmx
+                categorical_params.max_intensity, dimmer_min, dimmer_max
             )
 
             return DimmerResult(
@@ -113,6 +104,8 @@ class DefaultDimmerHandler:
                 min_intensity=categorical_params.min_intensity,
                 max_intensity=categorical_params.max_intensity,
                 period=categorical_params.period,
+                clamp_min_dmx=dimmer_min,
+                clamp_max_dmx=dimmer_max,
             )
         else:
             # Convert period_bars to cycles if both template_duration_ms and beat_grid are available
@@ -142,6 +135,7 @@ class DefaultDimmerHandler:
                 max_intensity=categorical_params.max_intensity,
                 min_norm=min_norm,
                 max_norm=max_norm,
+                invert=pattern.invert,
             )
             return DimmerResult(
                 dimmer_curve=dimmer_curve,
@@ -150,28 +144,113 @@ class DefaultDimmerHandler:
                 min_intensity=categorical_params.min_intensity,
                 max_intensity=categorical_params.max_intensity,
                 period=categorical_params.period,
+                clamp_min_dmx=dimmer_min,
+                clamp_max_dmx=dimmer_max,
             )
 
-    def _resolve_static_dmx_value(
-        self, normalized_value: float, clamp_min: int = 0, clamp_max: int = 255
-    ) -> int:
-        """Resolve static DMX value from normalized value.
+    def _resolve_categorical_params(
+        self, pattern: Any, intensity: Intensity
+    ) -> DimmerCategoricalParams:
+        """Pick the params for `intensity`, never discarding the pattern's semantics.
+
+        The fallback used to be the library defaults' SMOOTH entry, so BLACKOUT --
+        which declares only a SMOOTH entry of its own -- resolved to that entry's
+        `max_intensity=128` for every other intensity. Combined
+        with the unit bug in `_resolve_static_dmx_value` that rendered a blackout as
+        full brightness (P4-M2). A pattern that declares any table of its own is now
+        only ever served from that table.
 
         Args:
-            normalized_value: Normalized value [0, 1].
+            pattern: The dimmer pattern being rendered.
+            intensity: The intensity the plan asked for.
+
+        Returns:
+            The categorical params to render with.
+        """
+        declared = pattern.categorical_params
+
+        if not declared:
+            if intensity not in DEFAULT_DIMMER_PARAMS:
+                # Adding an Intensity member without an entry here is what produced
+                # P4-F8: the missing member resolved to SMOOTH and the plan's request
+                # vanished silently. Say so instead.
+                raise ValueError(
+                    f"DEFAULT_DIMMER_PARAMS has no entry for {intensity}; every "
+                    "Intensity member needs one, or a plan asking for it renders "
+                    "some other intensity without saying so."
+                )
+            return DEFAULT_DIMMER_PARAMS[intensity]
+
+        if intensity in declared:
+            resolved: DimmerCategoricalParams = declared[intensity]
+            return resolved
+
+        fallback: DimmerCategoricalParams = declared.get(
+            Intensity.SMOOTH, next(iter(declared.values()))
+        )
+        renderer_log.debug(
+            f"Pattern '{pattern.id}' declares no {intensity} entry; "
+            f"using its own {fallback} rather than the library default"
+        )
+        return fallback
+
+    def _resolve_dimmer_bounds(self, params: dict[str, Any], pattern: Any) -> tuple[int, int]:
+        """Combine the template's declared dimmer bounds with the rig's calibration.
+
+        The template declares an anti-flicker floor (`defaults["dimmer_floor_dmx"]`,
+        60 on every shipped template) which nothing used to read; the rig declares a
+        physical floor/ceiling. Both are lower/upper bounds, so the effective floor
+        is the higher of the two and the effective ceiling the lower.
+
+        Args:
+            params: Handler params, carrying `calibration` and `template_defaults`.
+            pattern: The dimmer pattern (a blackout is exempt from the floor).
+
+        Returns:
+            (floor_dmx, ceiling_dmx).
+        """
+        calibration = params.get("calibration") or {}
+        template_defaults = params.get("template_defaults") or {}
+
+        floor = max(
+            int(calibration.get("dimmer_floor_dmx", 0) or 0),
+            int(template_defaults.get("dimmer_floor_dmx", 0) or 0),
+        )
+        ceiling = min(
+            int(calibration.get("dimmer_ceiling_dmx", 255) or 255),
+            int(template_defaults.get("dimmer_ceiling_dmx", 255) or 255),
+        )
+
+        if pattern.bypasses_dimmer_floor:
+            # A blackout is the one intent the floor must not lift off zero.
+            floor = 0
+
+        floor = max(0, min(255, floor))
+        ceiling = max(floor, min(255, ceiling))
+        return floor, ceiling
+
+    def _resolve_static_dmx_value(
+        self, dmx_value: float, clamp_min: int = 0, clamp_max: int = 255
+    ) -> int:
+        """Clamp a DMX intensity into the fixture's usable range.
+
+        `max_intensity` is already a DMX value in [0, 255]; this used to multiply it
+        by 255 as if it were normalized, so BLACKOUT's fallback `128` became `32 640`
+        and clamped to the ceiling -- full brightness (P4-M2). HOLD's `255 * 255`
+        clamped to 255 as well, which is why the bug was invisible there.
+
+        Args:
+            dmx_value: DMX intensity [0, 255].
             clamp_min: Minimum DMX value [0, 255].
             clamp_max: Maximum DMX value [0, 255].
 
         Returns:
             Static DMX value [0, 255].
         """
-        renderer_log.debug(
-            f"Resolving static DMX value: {normalized_value}, {clamp_min}, {clamp_max}"
-        )
+        renderer_log.debug(f"Resolving static DMX value: {dmx_value}, {clamp_min}, {clamp_max}")
         floor = max(clamp_min, 0)
         ceiling = min(clamp_max, 255)
-        value = int(normalized_value * 255)
-        return max(floor, min(ceiling, value))
+        return max(floor, min(ceiling, int(dmx_value)))
 
     def _generate_curve(
         self,
@@ -183,6 +262,7 @@ class DefaultDimmerHandler:
         max_intensity: int,
         min_norm: float,
         max_norm: float,
+        invert: bool = False,
     ) -> list[CurvePoint]:
         """Generate a dimmer curve with specified parameters.
 
@@ -199,6 +279,7 @@ class DefaultDimmerHandler:
             max_intensity: Max DMX intensity from categorical params [0, 255].
             min_norm: Min normalized brightness [0, 1].
             max_norm: Max normalized brightness [0, 1].
+            invert: Emit `1 - v`, so an ascending ramp becomes a descending one.
 
         Returns:
             List of curve points in normalized space [0, 1].
@@ -216,6 +297,9 @@ class DefaultDimmerHandler:
             num_points=n_samples,
             **curve_params,
         )
+
+        if invert:
+            base_curve = [CurvePoint(t=point.t, v=1.0 - point.v) for point in base_curve]
 
         # Get curve definition to check kind
         curve_def = self._curve_gen._registry.get(curve_type.value)

@@ -31,11 +31,34 @@ class DimmerPattern(BaseModel):
     curve: CurveLibrary
     base_params: dict[str, float | int | str] = Field(default_factory=dict)
     categorical_params: dict[Intensity, DimmerCategoricalParams] = Field(default_factory=dict)
+    bypasses_dimmer_floor: bool = Field(
+        default=False,
+        description=(
+            "Whether the pattern is exempt from the anti-flicker dimmer floor. "
+            "Only a pattern whose intent is darkness may set this."
+        ),
+    )
+    invert: bool = Field(
+        default=False,
+        description=(
+            "Emit 1 - v instead of v. The curve library has no descending ramp, so a "
+            "fade-out is its fade-in inverted."
+        ),
+    )
 
 
 DEFAULT_DIMMER_PARAMS = {
+    # One entry per Intensity member. SLOW and FAST used to be missing, and the
+    # handler substituted SMOOTH for anything absent, so a plan asking for CHILL
+    # (-> SLOW) or INTENSE (-> FAST) silently got the SMOOTH dimmer (P4-F8). The
+    # ladder runs slow/dim to fast/bright, matching DEFAULT_MOVEMENT_PARAMS.
+    # SLOW is the dim end of the ladder rather than the long-period end: a period
+    # longer than the section renders a *constant*, because the off-phase of the
+    # PULSE curve falls outside the window entirely.
+    Intensity.SLOW: DimmerCategoricalParams(min_intensity=0, max_intensity=100, period=4.0),
     Intensity.SMOOTH: DimmerCategoricalParams(min_intensity=0, max_intensity=128, period=4.0),
     Intensity.DRAMATIC: DimmerCategoricalParams(min_intensity=100, max_intensity=255, period=1.25),
+    Intensity.FAST: DimmerCategoricalParams(min_intensity=128, max_intensity=255, period=0.5),
     Intensity.INTENSE: DimmerCategoricalParams(min_intensity=150, max_intensity=255, period=0.25),
 }
 
@@ -64,6 +87,10 @@ class DimmerLibrary:
             name="Fade Out",
             description="Linear fade from full intensity to 0",
             curve=CurveLibrary.LINEAR,
+            # Without this the pattern is FADE_IN under another name: it names the
+            # same ascending LINEAR curve and nothing inverted it. Invisible until
+            # P1P-T5, because no FADE_OUT step in the library was ever scheduled.
+            invert=True,
         ),
         DimmerType.BLACKOUT: DimmerPattern(
             id="blackout",
@@ -75,6 +102,9 @@ class DimmerLibrary:
                     min_intensity=0, max_intensity=0, period=1.0
                 ),
             },
+            # The one pattern the anti-flicker floor must not lift off zero. Every
+            # other pattern is held at or above the template's declared floor.
+            bypasses_dimmer_floor=True,
         ),
         DimmerType.HOLD: DimmerPattern(
             id="hold",

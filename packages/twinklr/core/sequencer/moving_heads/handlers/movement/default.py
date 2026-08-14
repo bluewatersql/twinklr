@@ -108,27 +108,20 @@ class DefaultMovementHandler:
         base_pan_norm = params.get("base_pan_norm", 0.5)
         base_tilt_norm = params.get("base_tilt_norm", 0.5)
 
-        # Calculate maximum amplitude that fits within DMX constraints
-        # Base position is in normalized [0,1] space relative to full DMX range [0-255]
-        # We need to ensure curves stay within [min_dmx, max_dmx] constraints
-
-        # Convert DMX limits to normalized space
+        # The calibrated windows, in the same normalized [0,1] space the curves use.
+        # Every emitted point is scaled and re-centred into these bounds by
+        # `_generate_curve`: the calibration used to reach the curve only through the
+        # `center_offset` term, which every pattern in the library leaves at 0.5, so
+        # it was multiplied by zero and a fixture calibrated to a narrow safe window
+        # was still driven across its full mechanical range (P4-F9).
         pan_min_norm = pan_min / 255.0
         pan_max_norm = pan_max / 255.0
         tilt_min_norm = tilt_min / 255.0
         tilt_max_norm = tilt_max / 255.0
 
-        # Calculate how far we can extend from base position before hitting boundaries
-        pan_dist_to_min = base_pan_norm - pan_min_norm
-        pan_dist_to_max = pan_max_norm - base_pan_norm
-        pan_max_amplitude_norm = min(pan_dist_to_min, pan_dist_to_max)
-
-        tilt_dist_to_min = base_tilt_norm - tilt_min_norm
-        tilt_dist_to_max = tilt_max_norm - base_tilt_norm
-        tilt_max_amplitude_norm = min(tilt_dist_to_min, tilt_dist_to_max)
-
         renderer_log.debug(
-            f"Max safe amplitude (norm): pan={pan_max_amplitude_norm:.3f}, tilt={tilt_max_amplitude_norm:.3f}"
+            f"Calibrated window (norm): pan=[{pan_min_norm:.3f}, {pan_max_norm:.3f}], "
+            f"tilt=[{tilt_min_norm:.3f}, {tilt_max_norm:.3f}]"
         )
 
         # Resolve amplitude (allow param override)
@@ -147,7 +140,8 @@ class DefaultMovementHandler:
             frequency=categorical_params.frequency,
             center=categorical_params.center_offset,
             base_norm=base_pan_norm,
-            max_amplitude_norm=pan_max_amplitude_norm,
+            window_min_norm=pan_min_norm,
+            window_max_norm=pan_max_norm,
             params=self._filter_base_params("curve", "pan", base_params),
         )
 
@@ -167,7 +161,8 @@ class DefaultMovementHandler:
             frequency=categorical_params.frequency,
             center=categorical_params.center_offset,
             base_norm=base_tilt_norm,
-            max_amplitude_norm=tilt_max_amplitude_norm,
+            window_min_norm=tilt_min_norm,
+            window_max_norm=tilt_max_norm,
             params=self._filter_base_params("curve", "tilt", base_params),
         )
 
@@ -238,14 +233,20 @@ class DefaultMovementHandler:
         frequency: float,
         center: float,
         base_norm: float,
-        max_amplitude_norm: float,
+        window_min_norm: float,
+        window_max_norm: float,
         params: dict[str, Any] | None = None,
     ) -> list[CurvePoint] | None:
-        """Generate a movement curve scaled to fit within DMX constraints.
+        """Generate a movement curve scaled and re-centred into the calibrated window.
 
         Intensity parameters (amplitude, frequency) are passed to the curve generator
         to modulate the base curve shape. The center_offset parameter is applied here
         at the handler level by offsetting the base position.
+
+        The calibrated window bounds the output: the base position is pulled inside it
+        and the amplitude is scaled so the excursion fits. Scale-and-recentre, rather
+        than a hard clamp, because a clamp flattens the extremes of the curve into
+        plateaus and reads on a real fixture as a stuck head.
 
         Args:
             curve_type: CurveLibrary enum value.
@@ -255,40 +256,52 @@ class DefaultMovementHandler:
             frequency: Frequency multiplier from categorical params (passed to curve).
             center: Center offset [0, 1] from categorical params (applied to base_norm).
             base_norm: Base position from geometry [0, 1].
-            max_amplitude_norm: Maximum safe amplitude in normalized space before hitting constraints.
+            window_min_norm: Calibrated lower bound for this axis, normalized [0, 1].
+            window_max_norm: Calibrated upper bound for this axis, normalized [0, 1].
             params: Optional parameters to override defaults/presets.
 
         Returns:
-            List of curve points scaled to fit within fixture DMX limits.
-
-        Note:
-            The curve is generated centered at base_norm (adjusted by center offset)
-            with amplitude scaled to stay within fixture movement limits.
+            List of curve points, every one inside the calibrated window.
         """
         if curve_type == CurveLibrary.HOLD:
             return None
 
-        # Apply center offset to base position (center is [0, 1] where 0.5 = no shift)
-        # Convert center [0, 1] to offset [-0.5, 0.5] and scale by max amplitude
-        # The multiplier should be 1.0, not 2.0, to keep offset within one amplitude unit
-        center_offset_normalized = (center - 0.5) * max_amplitude_norm * 1.0
-        adjusted_base_norm = base_norm + center_offset_normalized
+        window_min = max(0.0, min(window_min_norm, window_max_norm))
+        window_max = min(1.0, max(window_min_norm, window_max_norm))
 
-        # Assert instead of clamp during development to catch math errors
-        # TODO: Replace with proper error handling in production
-        if not (0.0 <= adjusted_base_norm <= 1.0):
-            logger.warning(
-                f"adjusted_base_norm {adjusted_base_norm:.3f} out of bounds [0, 1] "
-                f"(base={base_norm:.3f}, center_offset={center_offset_normalized:.3f})"
+        # Scale: the excursion is the intensity's, reduced only if the window itself
+        # is narrower than the movement asks for.
+        desired_amplitude = amplitude * 0.5  # e.g. SMOOTH (0.4) -> 0.2 of full range
+        effective_amplitude = min(desired_amplitude, (window_max - window_min) / 2)
+
+        # Re-centre: shift the base far enough inside the window for that excursion to
+        # fit. Clamping the base to the window edge instead would leave a fixture
+        # posed at the edge with zero room to move -- a curve flattened to a plateau,
+        # which on a real head reads as a stuck fixture rather than as choreography.
+        inner_min = window_min + effective_amplitude
+        inner_max = window_max - effective_amplitude
+        centred_base_norm = max(inner_min, min(inner_max, base_norm))
+        if abs(centred_base_norm - base_norm) > 1e-9:
+            renderer_log.debug(
+                f"Base {base_norm:.3f} leaves no room inside the calibrated window "
+                f"[{window_min:.3f}, {window_max:.3f}] for an amplitude of "
+                f"{effective_amplitude:.3f}; re-centred to {centred_base_norm:.3f}"
             )
-        adjusted_base_norm = max(0.0, min(1.0, adjusted_base_norm))
+
+        # Apply center offset to base position (center is [0, 1] where 0.5 = no shift),
+        # scaled by the room left inside the window.
+        max_amplitude_norm = min(centred_base_norm - inner_min, inner_max - centred_base_norm)
+        center_offset_normalized = (center - 0.5) * max_amplitude_norm * 1.0
+        adjusted_base_norm = max(
+            inner_min, min(inner_max, centred_base_norm + center_offset_normalized)
+        )
 
         # Build curve generation parameters with intensity params
         curve_params = {
             "cycles": cycles,
             "frequency": frequency,  # Pass frequency to curve function
-            # NOTE: amplitude is NOT passed here - it's applied to the generated curve below
-            # This is because we need to scale by max_amplitude_norm first
+            # NOTE: amplitude is NOT passed here - it's applied to the generated curve
+            # below, after it has been scaled into the calibrated window
             **(params or {}),
         }
 
@@ -302,25 +315,12 @@ class DefaultMovementHandler:
         # Get curve definition to check kind
         curve_def = self._curve_gen._registry.get(curve_type.value)
 
-        # Calculate desired amplitude based on intensity (relative to full [0,1] range)
-        # This ensures consistent movement regardless of base position
-        desired_amplitude = amplitude * 0.5  # e.g., SMOOTH (0.4) → 0.2 (±20% of full range)
-
-        # Calculate how much we can actually move from base position
-        # These are the maximum excursions before hitting boundaries
-        max_positive_excursion = 1.0 - adjusted_base_norm
-        max_negative_excursion = adjusted_base_norm - 0.0
-
-        # Effective amplitude is the desired amplitude, constrained by boundaries
-        # This prevents artificial reduction based on base position
-        effective_amplitude = min(desired_amplitude, max_positive_excursion, max_negative_excursion)
-
-        # Log if amplitude was constrained by boundaries
+        # Log if the window, not the intensity, decided the amplitude
         if effective_amplitude < desired_amplitude:
             renderer_log.debug(
-                f"Amplitude constrained: desired={desired_amplitude:.3f}, "
-                f"effective={effective_amplitude:.3f}, "
-                f"base={adjusted_base_norm:.3f}"
+                f"Amplitude limited by the calibrated window: desired="
+                f"{desired_amplitude:.3f}, effective={effective_amplitude:.3f}, "
+                f"window=[{window_min:.3f}, {window_max:.3f}]"
             )
 
         # Build scaled points based on curve kind
@@ -337,13 +337,14 @@ class DefaultMovementHandler:
                 # Apply to adjusted base position (already has center offset applied)
                 new_v = adjusted_base_norm + scaled_offset
 
-                # Safety clamp with warning if triggered
-                if not (0.0 <= new_v <= 1.0):
+                # Safety net only: the amplitude scaling above already keeps every
+                # point inside the window, so a clamp here means the maths drifted.
+                if not (window_min <= new_v <= window_max):
                     logger.debug(
-                        f"Curve point out of bounds: {new_v:.3f} "
+                        f"Curve point outside the calibrated window: {new_v:.3f} "
                         f"(adjusted_base={adjusted_base_norm:.3f}, scaled_offset={scaled_offset:.3f})"
                     )
-                new_v = max(0.0, min(1.0, new_v))
+                new_v = max(window_min, min(window_max, new_v))
 
                 scaled_points.append(CurvePoint(t=point.t, v=new_v))
 
@@ -358,13 +359,14 @@ class DefaultMovementHandler:
                 # Apply to adjusted base position (already has center offset applied)
                 new_v = adjusted_base_norm + scaled_offset
 
-                # Safety clamp with warning if triggered
-                if not (0.0 <= new_v <= 1.0):
+                # Safety net only: the amplitude scaling above already keeps every
+                # point inside the window, so a clamp here means the maths drifted.
+                if not (window_min <= new_v <= window_max):
                     logger.debug(
-                        f"Curve point out of bounds: {new_v:.3f} "
+                        f"Curve point outside the calibrated window: {new_v:.3f} "
                         f"(adjusted_base={adjusted_base_norm:.3f}, scaled_offset={scaled_offset:.3f})"
                     )
-                new_v = max(0.0, min(1.0, new_v))
+                new_v = max(window_min, min(window_max, new_v))
 
                 scaled_points.append(CurvePoint(t=point.t, v=new_v))
 
@@ -375,13 +377,14 @@ class DefaultMovementHandler:
                 scaled_offset = offset * (effective_amplitude / 0.5)
                 new_v = adjusted_base_norm + scaled_offset
 
-                # Safety clamp with warning if triggered
-                if not (0.0 <= new_v <= 1.0):
+                # Safety net only: the amplitude scaling above already keeps every
+                # point inside the window, so a clamp here means the maths drifted.
+                if not (window_min <= new_v <= window_max):
                     logger.debug(
-                        f"Curve point out of bounds: {new_v:.3f} "
+                        f"Curve point outside the calibrated window: {new_v:.3f} "
                         f"(adjusted_base={adjusted_base_norm:.3f}, scaled_offset={scaled_offset:.3f})"
                     )
-                new_v = max(0.0, min(1.0, new_v))
+                new_v = max(window_min, min(window_max, new_v))
                 scaled_points.append(CurvePoint(t=point.t, v=new_v))
 
         return scaled_points

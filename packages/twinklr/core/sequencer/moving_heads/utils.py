@@ -4,8 +4,12 @@ from collections.abc import Iterable, Sequence
 
 from twinklr.core.sequencer.models.enum import SemanticGroupType, TemplateRole
 
-# Canonical left→right ordering (covers your current TemplateRole set)
+# Canonical left→right ordering (covers the full TemplateRole set). The bare
+# LEFT/RIGHT roles a 2- or 3-fixture rig uses belong here too: left out, they sorted
+# to the end and `_is_left` / `_is_right` did not recognize them, so a LEFT-targeting
+# step matched nothing on the very rigs that name their fixtures that way.
 _ROLE_ORDER: list[TemplateRole] = [
+    TemplateRole.LEFT,
     TemplateRole.FAR_LEFT,
     TemplateRole.OUTER_LEFT,
     TemplateRole.CENTER_LEFT,
@@ -17,6 +21,7 @@ _ROLE_ORDER: list[TemplateRole] = [
     TemplateRole.CENTER_RIGHT,
     TemplateRole.OUTER_RIGHT,
     TemplateRole.FAR_RIGHT,
+    TemplateRole.RIGHT,
 ]
 _ROLE_ORDER_INDEX = {r: i for i, r in enumerate(_ROLE_ORDER)}
 
@@ -31,11 +36,11 @@ def canonical_sort_roles(roles: Iterable[TemplateRole]) -> list[TemplateRole]:
 
 
 def _is_left(role: TemplateRole) -> bool:
-    return role.value.endswith("_LEFT") or role is TemplateRole.FAR_LEFT
+    return role.value.endswith("_LEFT") or role is TemplateRole.LEFT
 
 
 def _is_right(role: TemplateRole) -> bool:
-    return role.value.endswith("_RIGHT") or role is TemplateRole.FAR_RIGHT
+    return role.value.endswith("_RIGHT") or role is TemplateRole.RIGHT
 
 
 def resolve_semantic_group(

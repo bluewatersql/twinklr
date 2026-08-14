@@ -283,6 +283,11 @@ class TestTransitionDetectorStepBoundaries:
         assert "main" in boundary.target_id
         # Boundary at relative bar 2.0, absolute ms = start_ms + (2.0 * 2000) = 0 + 4000 = 4000ms
         assert boundary.time_ms == 4000
+        # `bar_position` is absolute and 1-indexed, the same convention
+        # `detect_section_boundaries` uses and `TransitionPlanner` reads: section
+        # start bar 1 + 2 bars in. It used to be the section-relative offset (2.0)
+        # under the same field name.
+        assert boundary.bar_position == 3.0
 
     def test_detect_no_step_boundaries_single_step(self, beat_grid, registries):
         """Test that no boundaries are detected for a single step."""

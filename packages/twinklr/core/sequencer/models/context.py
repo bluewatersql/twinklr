@@ -40,6 +40,9 @@ class StepCompileContext(BaseModel):
         duration_ms: Duration in milliseconds.
         n_samples: Number of samples for curves.
         beat_grid: Beat grid for timing conversions (needed for period_bars → cycles).
+        template_defaults: The template's own `defaults` (after preset merge). Carries
+            the declared `dimmer_floor_dmx` / `dimmer_ceiling_dmx` anti-flicker bounds
+            to the handlers, which is the only route by which they reach the output.
         geometry_registry: Registry of geometry handlers.
         movement_registry: Registry of movement handlers.
         dimmer_registry: Registry of dimmer handlers.
@@ -55,6 +58,7 @@ class StepCompileContext(BaseModel):
     fixture_id: str
     role: str
     calibration: dict[str, Any]
+    template_defaults: dict[str, Any] = Field(default_factory=dict)
     start_ms: int
     duration_ms: int
     n_samples: int = Field(default=64, ge=2)

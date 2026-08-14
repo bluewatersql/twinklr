@@ -10,6 +10,7 @@ from typing import Any
 
 from twinklr.core.config.fixtures import FixtureGroup
 from twinklr.core.sequencer.models.context import FixtureContext
+from twinklr.core.sequencer.models.enum import TemplateRole
 from twinklr.core.sequencer.models.moving_heads.rig import RigProfile
 
 _ROLE_MAP_1 = ["CENTER"]
@@ -24,12 +25,31 @@ _ROLE_MAPS: dict[int, list[str]] = {
     4: _ROLE_MAP_4,
 }
 
+_SPATIAL_ROLES: list[str] = [
+    TemplateRole.FAR_LEFT,
+    TemplateRole.OUTER_LEFT,
+    TemplateRole.CENTER_LEFT,
+    TemplateRole.MID_LEFT,
+    TemplateRole.INNER_LEFT,
+    TemplateRole.CENTER,
+    TemplateRole.INNER_RIGHT,
+    TemplateRole.MID_RIGHT,
+    TemplateRole.CENTER_RIGHT,
+    TemplateRole.OUTER_RIGHT,
+    TemplateRole.FAR_RIGHT,
+]
+"""Left-to-right spatial vocabulary larger rigs are distributed across."""
+
 
 def _infer_fixture_role(group_id: str, fixture_index: int, group_size: int) -> str:
     """Infer a semantic fixture role from its position within a group.
 
-    Groups of 1-4 fixtures get well-known spatial role names.  Larger groups
-    fall back to ``{group_id}_{fixture_index}`` positional naming.
+    Groups of 1-4 fixtures get their well-known spatial role names. Larger groups
+    are spread evenly across the left-to-right spatial vocabulary. They used to get
+    positional names (``ALL_0``..``ALL_7``) that match no role any template declares,
+    so every step's role filter came back empty and an 8-head rig rendered nothing
+    at all (P4-F26). Rigs with more fixtures than the vocabulary has names share
+    roles rather than losing them.
 
     Args:
         group_id: Identifier of the fixture group.
@@ -42,7 +62,12 @@ def _infer_fixture_role(group_id: str, fixture_index: int, group_size: int) -> s
     role_map = _ROLE_MAPS.get(group_size)
     if role_map is not None and fixture_index < len(role_map):
         return role_map[fixture_index]
-    return f"{group_id}_{fixture_index}"
+
+    if group_size <= 1:
+        return str(TemplateRole.CENTER)
+
+    position = fixture_index * (len(_SPATIAL_ROLES) - 1) / (group_size - 1)
+    return str(_SPATIAL_ROLES[min(len(_SPATIAL_ROLES) - 1, int(position + 0.5))])
 
 
 def build_fixture_contexts(

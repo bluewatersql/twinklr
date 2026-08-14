@@ -45,11 +45,16 @@ def make_template() -> TemplateDoc:
             name="Build Drop Recover",
             category=TemplateCategory.HIGH_ENERGY,
             roles=TemplateRoleHelper.IN_OUT_LEFT_RIGHT,
+            # The cycle is the whole three-phase arc: build (bars 0-2), drop (2-4),
+            # recover (4-6). It used to name only "drop", which is the sole step the
+            # scheduler instantiates, so the template advertised an arc and rendered
+            # a 2-bar accent loop. JOINER, not PING_PONG: an arc played backwards is
+            # recover -> drop -> build.
             repeat=RepeatContract(
                 repeatable=True,
-                mode=RepeatMode.PING_PONG,
-                cycle_bars=2.0,
-                loop_step_ids=["drop"],
+                mode=RepeatMode.JOINER,
+                cycle_bars=6.0,
+                loop_step_ids=["build", "drop", "recover"],
                 remainder_policy=RemainderPolicy.HOLD_LAST_POSE,
             ),
             defaults={"dimmer_floor_dmx": 60, "dimmer_ceiling_dmx": 255},

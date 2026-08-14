@@ -400,3 +400,16 @@ P1P-T6 changes the same emit path. Mitigation: keep this task's exporter diff to
 structure and head fields, never to channel-value resolution; regenerate goldens once,
 after the rebase, and confirm effect payloads are unchanged (see the golden-diff
 expectation).
+
+## Notes routed from P1P-T5 (2026-08-13, binding)
+
+**Unsupported rig shapes now raise instead of rendering nothing.**
+`compile_template` raises `UnsupportedRigShapeError` when a step's semantic group
+matches no fixture on the rig — the silent `continue` that made an 8-head rig render
+a completely dark show is gone. Role inference covers rigs of any size (fixtures are
+spread across the spatial vocabulary), and semantic groups resolve against the roles
+the rig actually has rather than the four a template declares, so the remaining
+failure mode is a genuine mismatch: e.g. a template addressing LEFT and RIGHT on a
+single-head rig. This task's CLI rig-config work must surface that exception to the
+user as an actionable message rather than a traceback; the exception text already
+names the template, the step, the group and the rig's roles.

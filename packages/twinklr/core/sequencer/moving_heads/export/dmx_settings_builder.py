@@ -82,8 +82,9 @@ class DmxSettingsBuilder:
                 # No curve - use discrete value
                 parts.append(f"E_SLIDER_DMX{ch}={int(channel_values.get(ch, 0))}")
 
-        # 5. Value curves (E_VALUECURVE_DMX) - only if present
-        for ch, curve_points in channel_curves.items():
+        # 5. Value curves (E_VALUECURVE_DMX) - only if present, in channel order so
+        # the string does not depend on the order channels happened to be built in
+        for ch, curve_points in sorted(channel_curves.items()):
             curve_str = self._curve_points_to_xlights_string(ch, curve_points)
             parts.append(f"E_VALUECURVE_DMX{ch}={curve_str}")
 
@@ -116,8 +117,14 @@ class DmxSettingsBuilder:
             # For curves with base_dmx, use base as static value
             channel_values[dmx_channel] = int(channel_value.base_dmx)
 
-        # Get value curve if present
-        if channel_value.value_points:
+        # Get value curve if present.
+        # `value_points` is the compiler's channel curve; a ChannelValue built
+        # elsewhere may carry its curve only on `curve` (every transition segment
+        # does, and reading just these three fields dropped the whole blend, so each
+        # section boundary exported a one-second all-zero blackout).
+        value_points = channel_value.value_points or self._curve_points(channel_value)
+
+        if value_points:
             # Convert curve to DMX and normalize for xLights export
             from twinklr.core.curves.dmx_conversion import (
                 dimmer_curve_to_dmx,
@@ -128,7 +135,7 @@ class DmxSettingsBuilder:
                 # Movement curve (pan/tilt): apply offset formula with base and amplitude
                 # Formula: dmx = base_dmx + amplitude_dmx * (v - 0.5), then clamp
                 normalized_points = movement_curve_to_dmx(
-                    points=channel_value.value_points,
+                    points=value_points,
                     base_dmx=float(channel_value.base_dmx or 128),
                     amplitude_dmx=float(channel_value.amplitude_dmx or 64),
                     clamp_min=float(channel_value.clamp_min),
@@ -138,13 +145,20 @@ class DmxSettingsBuilder:
                 # Dimmer curve: scale directly to [clamp_min, clamp_max]
                 # Formula: dmx = clamp_min + v * (clamp_max - clamp_min)
                 normalized_points = dimmer_curve_to_dmx(
-                    points=channel_value.value_points,
+                    points=value_points,
                     clamp_min=float(channel_value.clamp_min),
                     clamp_max=float(channel_value.clamp_max),
                 )
 
             # Store normalized points for xLights value curve format
             channel_curves[dmx_channel] = normalized_points
+
+    @staticmethod
+    def _curve_points(channel_value: ChannelValue) -> list[CurvePoint] | None:
+        """Points carried on `ChannelValue.curve`, when it is a points curve."""
+        curve = channel_value.curve
+        points = getattr(curve, "points", None) if curve is not None else None
+        return list(points) if points else None
 
     def _get_dmx_channel_number(self, channel_name: ChannelName) -> int | None:
         """Map logical channel name to DMX channel number.

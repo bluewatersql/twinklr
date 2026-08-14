@@ -28,12 +28,6 @@ ENERGY_PRESETS = sorted(keyword.lower() for keyword in ENERGY_TO_INTENSITY)
 
 RIG_IDS = ["mh4_minimal", "mh8_reference"]
 
-# `render_single_section` renders a 4-bar window; this template's cycle is 8 bars,
-# so the scheduler emits nothing for it ("Section window shorter than cycle").
-# That is a scheduler/time-grid concern, not a compile failure — recorded here,
-# owned by the scheduler tasks.
-LONGER_THAN_THE_WINDOW = {"ambient_random_wash"}
-
 
 @pytest.fixture(scope="module")
 def template_ids() -> list[str]:
@@ -46,24 +40,32 @@ def template_ids() -> list[str]:
 @pytest.mark.parametrize("rig_id", RIG_IDS)
 @pytest.mark.parametrize("preset_id", ENERGY_PRESETS)
 def test_all_templates_compile(rig_id: str, preset_id: str, template_ids: list[str]) -> None:
-    """No template raises for either rig at any energy preset.
+    """No template raises for either rig at any energy preset, and both emit DMX.
 
-    Only compilation is asserted for `mh8_reference`: the 8-head rig emits
-    transitions but no section effects at all, which is why its committed goldens
-    contain only transition files. That is pre-existing at the P1P baseline and
-    tracked as P4-F26 (the chase ordering is hard-coded for 11 roles / 4 fixtures).
+    This asserted compilation only for `mh8_reference` until P1P-T5: the 8-head rig
+    emitted transitions and no section effects at all, because `_infer_fixture_role`
+    gave rigs larger than four positional names matching no template role and the
+    role filter then skipped every step in silence (P4-F26). Both rigs now have to
+    emit, which is the assertion that would have caught it.
     """
     failures: list[str] = []
+    silent: list[str] = []
     for template_id in template_ids:
         try:
-            render_single_section(RIGS[rig_id], template_id=template_id, preset_id=preset_id)
+            effects = render_single_section(
+                RIGS[rig_id], template_id=template_id, preset_id=preset_id
+            )
         except Exception as error:
             failures.append(f"{template_id}: {type(error).__name__}: {error}")
+            continue
+        if not effects:
+            silent.append(template_id)
 
     assert not failures, (
         f"{len(failures)} of {len(template_ids)} templates raised on {rig_id} "
         f"at preset '{preset_id}':\n  " + "\n  ".join(failures)
     )
+    assert not silent, f"templates emitted nothing on {rig_id} at preset '{preset_id}': {silent}"
 
 
 @pytest.mark.parametrize("preset_id", ENERGY_PRESETS)
@@ -74,8 +76,7 @@ def test_all_templates_emit_effects_on_the_reference_rig(
     silent = [
         template_id
         for template_id in template_ids
-        if template_id not in LONGER_THAN_THE_WINDOW
-        and not render_single_section(
+        if not render_single_section(
             RIGS["mh4_minimal"], template_id=template_id, preset_id=preset_id
         )
     ]

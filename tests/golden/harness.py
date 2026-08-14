@@ -19,6 +19,7 @@ from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan, 
 from twinklr.core.config.fixtures import FixtureGroup
 from twinklr.core.config.fixtures.dmx import DmxMapping
 from twinklr.core.config.fixtures.instances import FixtureConfig, FixtureInstance
+from twinklr.core.config.fixtures.physical import MovementLimits
 from twinklr.core.config.models import JobConfig
 from twinklr.core.sequencer.models.context import TemplateCompileContext
 from twinklr.core.sequencer.moving_heads.export.dmx_settings_builder import DmxSettingsBuilder
@@ -37,7 +38,7 @@ GOLDEN_ROOT = Path(__file__).resolve().parent
 # expected to *extend* these (add rigs / sections), not replace the harness.
 
 PLAN_BPM = 120.0
-PLAN_TOTAL_BARS = 16
+PLAN_TOTAL_BARS = 32
 PLAN_BEATS_PER_BAR = 4
 
 # `TemplateCompileContext.n_samples` is not settable through RenderingPipeline, so the
@@ -60,6 +61,10 @@ class RigSpec:
     shutter_channel: int | None = None
     color_channel: int | None = None
     gobo_channel: int | None = None
+    limits: MovementLimits | None = None
+    """Safe movement window. None uses `MovementLimits`' defaults (pan 50-190,
+    tilt 5-125), which is what every rig here had before the narrow-calibration rig
+    made the calibrated window a variable rather than a constant."""
 
 
 RIGS: dict[str, RigSpec] = {
@@ -109,6 +114,22 @@ RIGS: dict[str, RigSpec] = {
         tilt_channel=13,
         dimmer_channel=15,
     ),
+    # P1P-T5: the P4-F9 worked example as a rig. Every other rig here uses the
+    # default movement limits, which are wide enough that a curve escaping them is
+    # easy to overlook; this window is 35 DMX steps of tilt, so any emitted tilt
+    # value outside [110, 145] is unmistakable in the golden.
+    "mh4_narrow_calibration": RigSpec(
+        rig_id="mh4_narrow_calibration",
+        description=(
+            "4 heads whose tilt is calibrated to a narrow physically-safe window "
+            "(tilt 110-145, pan 100-150) — the P4-F9 worked example"
+        ),
+        fixture_count=4,
+        pan_channel=11,
+        tilt_channel=13,
+        dimmer_channel=15,
+        limits=MovementLimits(pan_min=100, pan_max=150, tilt_min=110, tilt_max=145),
+    ),
 }
 
 
@@ -132,6 +153,7 @@ def build_fixture_group(rig: RigSpec) -> FixtureGroup:
                 color_channel=rig.color_channel,
                 gobo_channel=rig.gobo_channel,
             ),
+            **({"limits": rig.limits} if rig.limits is not None else {}),
         )
         group.add_fixture(
             FixtureInstance(
@@ -161,6 +183,19 @@ def build_plan() -> ChoreographyPlan:
       defect discards that floor, so the emitted curve dips to ~0.05 normalized
       (~13 DMX) instead of being held at the declared floor (60 DMX, ~0.235
       normalized).
+
+    P1P-T5 adds three more so the scheduler's behavior is pinned rather than
+    inferred:
+
+    - `one_bar` is a single bar against a 4-bar cycle. Every one of the 37 shipped
+      templates rendered *nothing* for a section shorter than its cycle, so this
+      section was empty in the golden; it now carries the truncated head of the
+      cycle.
+    - `phrase` is exactly one 8-bar cycle of `intro_main_outro_phrase`, and `arc`
+      one 6-bar cycle of `build_drop_recover`. Both templates listed only their
+      middle step in `loop_step_ids`, so their FADE_IN entries and FADE_OUT exits —
+      the only places in the library where a template shapes its own entry and exit
+      — never reached the output.
     """
     return ChoreographyPlan(
         sections=[
@@ -191,6 +226,27 @@ def build_plan() -> ChoreographyPlan:
                 end_bar=16,
                 template_id="circle_asym_left_strobe",
                 preset_id="chill",
+            ),
+            PlanSection(
+                section_name="one_bar",
+                start_bar=17,
+                end_bar=17,
+                template_id="sweep_lr_fan_hold",
+                preset_id="moderate",
+            ),
+            PlanSection(
+                section_name="phrase",
+                start_bar=18,
+                end_bar=25,
+                template_id="intro_main_outro_phrase",
+                preset_id="moderate",
+            ),
+            PlanSection(
+                section_name="arc",
+                start_bar=26,
+                end_bar=31,
+                template_id="build_drop_recover",
+                preset_id="energetic",
             ),
         ]
     )
@@ -341,12 +397,13 @@ def render_rig(
 
 
 def render_single_section(
-    rig: RigSpec, *, template_id: str, preset_id: str | None
+    rig: RigSpec, *, template_id: str, preset_id: str | None, bars: int = 4
 ) -> list[EmittedEffect]:
-    """Render one 4-bar section with an explicit template/preset, for A/B pins.
+    """Render one section with an explicit template/preset, for A/B pins.
 
     Used by the preset-sensitivity pin, where the whole point is to vary one input and
-    compare the emitted settings strings.
+    compare the emitted settings strings, and by the short-section pins, which vary
+    `bars` against templates whose cycle is longer than the window.
     """
     fixture_group = build_fixture_group(rig)
     pipeline = RenderingPipeline(
@@ -355,14 +412,14 @@ def render_single_section(
                 PlanSection(
                     section_name="section",
                     start_bar=1,
-                    end_bar=4,
+                    end_bar=bars,
                     template_id=template_id,
                     preset_id=preset_id,
                 )
             ]
         ),
         beat_grid=BeatGrid.from_tempo(
-            tempo_bpm=PLAN_BPM, total_bars=4, beats_per_bar=PLAN_BEATS_PER_BAR
+            tempo_bpm=PLAN_BPM, total_bars=bars + 1, beats_per_bar=PLAN_BEATS_PER_BAR
         ),
         fixture_group=fixture_group,
         job_config=JobConfig(),
@@ -407,20 +464,21 @@ _GOLDEN_BANNER = (
     "#   uv run pytest tests/golden --regen-goldens -q\n"
     "# (or TWINKLR_REGEN_GOLDENS=1 uv run pytest tests/golden -q)\n"
     "#\n"
-    "# These pins encode the render's CURRENT behavior at the P1P baseline, defects\n"
-    "# included. They are a diff surface for Lane R, not a statement of desired output.\n"
-    "# Known-defective behavior visible below (fixed in P1P-T3..T6, not here):\n"
+    "# These pins encode the render's CURRENT behavior, remaining defects included.\n"
+    "# They are a diff surface for Lane R, not a statement of desired output.\n"
+    "# Known-defective behavior still visible below (owned by P1P-T6 and later):\n"
     "#   P4-F3  every channel 1..16 is emitted, unchoreographed ones zero-filled --\n"
     "#          so E_SLIDER_DMX<n>=0 here means 'zero-filled', not 'commanded to 0'\n"
     "#   P4-F10 value-curve points are written at 2-decimal resolution\n"
-    "#   NEW    every transition segment emits an all-zero settings string with no\n"
-    "#          value curves at all -- see test_transition_segments_emit_all_zero\n"
-    "#   P4-M1  template dimmer floor (dimmer_floor_dmx=60) is discarded; the\n"
-    "#          'breakdown' section's dimmer curve dips to ~0.05 normalized (~13 DMX)\n"
-    "#          -- see test_dimmer_floor_dropped.py\n"
-    "#   P4-M2  BLACKOUT dimmer inverts to full brightness under non-MODERATE\n"
-    "#          presets; the 'drop' section emits E_SLIDER_DMX15=255 under the\n"
-    "#          'energetic' preset -- see test_blackout_full_brightness.py\n"
+    "# Repaired in P1P-T5 and pinned here as the corrected behavior:\n"
+    "#   P4-F4  a section shorter than the template's cycle renders the truncated\n"
+    "#          head of that cycle ('one_bar'), where it used to render nothing\n"
+    "#   P4-F5  narrative templates play every step they declare ('phrase', 'arc'),\n"
+    "#          so FADE_IN / FADE_OUT dimmer curves reach the output\n"
+    "#   P4-M1  the template's declared dimmer floor (60) bounds the emitted curve\n"
+    "#   P4-M2  BLACKOUT emits DMX 0 under every preset ('drop')\n"
+    "#   P4-F9  emitted pan/tilt stay inside the rig's calibrated window\n"
+    "#   transitions carry their blended value curves instead of an all-zero string\n"
 )
 
 
