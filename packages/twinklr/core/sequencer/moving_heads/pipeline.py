@@ -14,6 +14,7 @@ from twinklr.core.config.fixtures import FixtureGroup
 from twinklr.core.config.models import JobConfig
 from twinklr.core.curves.generator import CurveGenerator
 from twinklr.core.curves.registry import CurveRegistry
+from twinklr.core.formats.xlights.sequence.fresh import resolve_media_file
 from twinklr.core.formats.xlights.sequence.models.xsq import (
     TimeMarker,
     TimingTrack,
@@ -32,13 +33,13 @@ from twinklr.core.sequencer.moving_heads.compile.transition_planner import Trans
 from twinklr.core.sequencer.moving_heads.compile.transition_segment_compiler import (
     TransitionSegmentCompiler,
 )
+from twinklr.core.sequencer.moving_heads.delivery import DeliveryArtifacts, export_delivery
 from twinklr.core.sequencer.moving_heads.fixture_builder import build_fixture_contexts
 from twinklr.core.sequencer.moving_heads.handlers.defaults import create_default_registries
 from twinklr.core.sequencer.moving_heads.templates import (
     get_template,
     load_builtin_templates,
 )
-from twinklr.core.sequencer.moving_heads.xsq_export import export_to_xsq
 from twinklr.core.sequencer.timing.beat_grid import BeatGrid
 
 logger = logging.getLogger(__name__)
@@ -82,8 +83,10 @@ class RenderingPipeline:
         fixture_group: FixtureGroup,
         job_config: JobConfig,
         output_path: Path | None = None,
-        template_xsq: Path | None = None,
         timeline_tracks: list[TimingTrack] | None = None,
+        media_file: str | None = None,
+        song: str = "",
+        artist: str = "",
     ):
         """Initialize rendering pipeline.
 
@@ -92,17 +95,25 @@ class RenderingPipeline:
             beat_grid: Beat grid for musical timing
             fixture_group: Fixture configuration
             job_config: Job configuration
-            output_path: Optional output path for XSQ file
-            template_xsq: Optional template XSQ path
+            output_path: Optional output path for the delivered .xsq. When set, the
+                run also writes the .xtiming and .xmap sidecars beside it.
             timeline_tracks: Optional pre-built timeline tracks (beats, bars, lyrics, etc.)
+            media_file: Audio file the sequence plays against. Falls back to a
+                placeholder name, since an empty mediaFile makes the file unopenable.
+            song: Song title for the sequence head
+            artist: Artist for the sequence head
         """
         self.choreography_plan = choreography_plan
         self.fixture_group = fixture_group
         self.job_config = job_config
         self.beat_grid = beat_grid
         self.output_path = output_path
-        self.template_xsq = template_xsq
         self.timeline_tracks = timeline_tracks or []
+        self.media_file = resolve_media_file(media_file)
+        self.song = song
+        self.artist = artist
+        self.artifacts: DeliveryArtifacts | None = None
+        """Set by `render()` when `output_path` is given."""
 
         # Create shared infrastructure
         self.curve_generator = CurveGenerator()
@@ -281,9 +292,9 @@ class RenderingPipeline:
 
         logger.debug(f"Render complete: {len(all_segments)} total segments")
 
-        # Step 5: Export to XSQ
+        # Step 5: Write the delivery (.xsq + .xtiming + .xmap)
         if self.output_path:
-            self._export_to_xsq(all_segments, time_markers)
+            self._export_delivery(all_segments, time_markers)
 
         return all_segments
 
@@ -499,26 +510,29 @@ class RenderingPipeline:
         """
         return build_fixture_contexts(self.rig_profile, self.fixture_group)
 
-    def _export_to_xsq(
+    def _export_delivery(
         self, segments: list[FixtureSegment], time_markers: list[TimeMarker]
     ) -> None:
-        """Export segments to XSQ file.
+        """Write the run's delivery (.xsq + .xtiming + .xmap).
 
-        Delegates to :func:`export_to_xsq` in ``xsq_export``.
+        Delegates to :func:`export_delivery` in ``delivery``.
 
         Args:
             segments: List of fixture segments to export.
             time_markers: List of time markers to export.
         """
         if not self.output_path:
-            logger.warning("No output_path specified, skipping XSQ export")
+            logger.warning("No output_path specified, skipping delivery export")
             return
 
-        export_to_xsq(
+        self.artifacts = export_delivery(
             segments,
             time_markers,
             fixture_group=self.fixture_group,
             output_path=self.output_path,
-            template_xsq=self.template_xsq,
+            media_file=self.media_file,
+            duration_ms=int(self.beat_grid.duration_ms),
+            song=self.song,
+            artist=self.artist,
             timeline_tracks=self.timeline_tracks,
         )

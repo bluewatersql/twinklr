@@ -35,12 +35,6 @@ logger = logging.getLogger(__name__)
     help="Path to fixture configuration JSON",
 )
 @click.option(
-    "--xsq",
-    type=click.Path(exists=True, path_type=Path),
-    required=True,
-    help="Path to xLights sequence file",
-)
-@click.option(
     "--out",
     type=click.Path(path_type=Path),
     required=True,
@@ -61,7 +55,6 @@ def eval_report_cli(
     checkpoint: Path,
     audio: Path,
     fixture: Path,
-    xsq: Path,
     out: Path,
     config: Path | None,
     log_level: str,
@@ -77,7 +70,6 @@ def eval_report_cli(
             --checkpoint artifacts/my_song/checkpoints/plans/final.json \\
             --audio data/music/my_song.mp3 \\
             --fixture fixture_config.json \\
-            --xsq data/sequences/my_song.xsq \\
             --out artifacts/my_song/eval_reports/run_001
     """
     # Configure logging
@@ -110,7 +102,6 @@ def eval_report_cli(
                 checkpoint_path=checkpoint,
                 audio_path=audio,
                 fixture_config_path=fixture,
-                xsq_path=xsq,
                 output_dir=out,
                 config=eval_config,
             )

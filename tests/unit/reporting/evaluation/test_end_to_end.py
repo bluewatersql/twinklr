@@ -26,8 +26,6 @@ from twinklr.core.reporting.evaluation.generator import generate_evaluation_repo
 from twinklr.core.reporting.evaluation.models import EvaluationReport
 from twinklr.core.session import TwinklrSession
 
-GOLDEN_XSQ = Path(__file__).resolve().parents[3] / "golden" / "fixtures" / "minimal.xsq"
-
 
 def _write_synthetic_tone(
     path: Path, *, duration_s: float = 64.0, sample_rate: int = 22050
@@ -87,7 +85,6 @@ async def test_eval_report_runs_on_written_checkpoint(tmp_path: Path) -> None:
         checkpoint_path=checkpoint_path,
         audio_path=audio_path,
         fixture_config_path=fixture_path,
-        xsq_path=GOLDEN_XSQ,
         output_dir=tmp_path / "report_out",
         config=EvalConfig(),
     )
@@ -99,3 +96,8 @@ async def test_eval_report_runs_on_written_checkpoint(tmp_path: Path) -> None:
     assert report_json_path.exists()
     written = json.loads(report_json_path.read_text(encoding="utf-8"))
     assert written["summary"]["sections"] == len(plan.sections)
+
+    # P1P-T11: evaluation reads segments and writes reports. It used to take the user's
+    # sequence as a render template and drop a `temp_eval.xsq` beside their audio; the
+    # report path now writes no sequence file at all.
+    assert list(tmp_path.rglob("*.xsq")) == []

@@ -8,8 +8,9 @@ updated: 2026-08-13
 
 _Verified 2026-08-13 from repository evidence (docs, source tree, git history)._
 
-Twinklr is an AI-powered choreography engine: audio file in, native xLights `.xsq`
-sequence out. LLMs plan creative intent (what should happen); deterministic code renders
+Twinklr is an AI-powered choreography engine: audio file in, xLights artifacts out — a
+fresh `.xsq`, standalone `.xtiming` timing tracks, and an `.xmap` mapping hint, which the
+user imports into their own show. LLMs plan creative intent (what should happen); deterministic code renders
 precision (curves, DMX values, timing). See [product/overview.md](product/overview.md).
 
 ## Implemented
@@ -30,9 +31,13 @@ precision (curves, DMX values, timing). See [product/overview.md](product/overvi
   analysis of xLights sequence corpora into style profiles and recipes.
   `packages/twinklr/core/feature_engineering/`, `feature_store/`;
   deep reference: [Pipeline Guide](../docs/pipeline_guide.md).
-- **xLights export** — native `.xsq` read/write. `packages/twinklr/core/formats/xlights/`
-- **CLI** — `twinklr run` executes the moving-heads pipeline end-to-end.
-  `packages/twinklr/cli/`
+- **xLights delivery** — writes a self-contained `.xsq`, one `.xtiming` per timing track
+  (these import standalone, with no model mapping), and an `.xmap`. Since P1P-T11 no
+  export path reads a user sequence; the `.xsq` parser is analysis-only (`profiling/`).
+  `packages/twinklr/core/formats/xlights/`
+- **CLI** — `twinklr run --audio ... --config ...` executes the moving-heads pipeline
+  end-to-end. It takes no input sequence, and the fixture config supplies the rig the
+  planner is told about. `packages/twinklr/cli/`
 
 ## Known issues
 

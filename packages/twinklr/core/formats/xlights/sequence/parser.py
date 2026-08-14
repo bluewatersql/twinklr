@@ -2,6 +2,14 @@
 
 This parser reads xLights .xsq (XML Sequence) files and converts them
 into type-safe Pydantic models for manipulation and validation.
+
+Analysis only. P1P-T11 removed the parser from the export path: nothing Twinklr writes
+is derived from a document it read, so a parse cannot damage a user's sequence. Its
+remaining consumer is `profiling/` (corpus reading) and the round-trip test that keeps
+the exporter honest. `_ensure_all_display_elements` went with the export path — it
+existed to carry template models with no effects through a regenerate-and-write-back
+cycle, which no longer happens; for reading a corpus, a model with no effects is simply
+a model with no effects.
 """
 
 from __future__ import annotations
@@ -130,10 +138,6 @@ class XSQParser:
         # Parse timing tracks and effects
         timing_tracks = self._parse_timing_tracks(root)
         element_effects = self._parse_element_effects(root)
-
-        # Ensure all DisplayElements models are represented in element_effects
-        # This preserves models from the template even if they have no effects
-        element_effects = self._ensure_all_display_elements(root, element_effects)
 
         return XSequence(
             base_channel=base_channel,
@@ -344,51 +348,6 @@ class XSQParser:
             element_effects_list.append(element_effects)
 
         return element_effects_list
-
-    def _ensure_all_display_elements(
-        self, root: ET.Element, element_effects: list[ElementEffects]
-    ) -> list[ElementEffects]:
-        """Ensure all DisplayElements models are represented in element_effects.
-
-        This preserves all models from the template, even if they have no effects.
-        Models are added with empty effect layers if not already present.
-
-        Args:
-            root: Root XML element
-            element_effects: Existing element effects list
-
-        Returns:
-            Updated element effects list with all display elements
-        """
-        # Get existing element names
-        existing_names = {e.element_name for e in element_effects}
-
-        # Parse DisplayElements section
-        display_elements_section = root.find("DisplayElements")
-        if display_elements_section is None:
-            return element_effects
-
-        # Add missing models from DisplayElements
-        for element in display_elements_section.findall("Element"):
-            element_type = element.get("type", "model")
-            element_name = element.get("name", "")
-
-            # Skip timing tracks and elements without names
-            if element_type == "timing" or not element_name:
-                continue
-
-            # Add if not already present
-            if element_name not in existing_names:
-                element_effects.append(
-                    ElementEffects(
-                        element_name=element_name,
-                        element_type=element_type,
-                        layers=[EffectLayer(index=0, name="", effects=[])],
-                    )
-                )
-                logger.debug(f"Preserved model from DisplayElements: {element_name}")
-
-        return element_effects
 
     def _parse_effect_layers(self, element: ET.Element) -> list[EffectLayer]:
         """Parse effect layers from element.

@@ -712,7 +712,6 @@ export OPENAI_API_KEY="sk-..."
 
 uv run twinklr run \
   --audio path/to/song.mp3 \
-  --xsq path/to/template.xsq \
   --config path/to/job_config.json \
   --app-config path/to/config.json \
   --out output/
@@ -723,7 +722,6 @@ uv run twinklr run \
 | Flag | Description | Default |
 |---|---|---|
 | `--audio` | Path to audio file (MP3/WAV) | (required) |
-| `--xsq` | Path to xLights template `.xsq` file | (required) |
 | `--config` | Path to job configuration JSON | (required) |
 | `--app-config` | Path to app configuration JSON | `config.json` |
 | `--out` | Output directory | `output/` |
@@ -797,7 +795,7 @@ uv run python scripts/demo_recipe_pipeline.py --phase all
   "fixture_config_path": "data/fixtures/my_fixtures.json",
   "agent": {
     "max_iterations": 3,
-    "success_threshold": 7.0,
+    "success_threshold": 70,
     "plan_agent": { "model": "gpt-4o", "temperature": 0.7 },
     "judge_agent": { "model": "gpt-4o", "temperature": 0.3 }
   },
@@ -991,9 +989,9 @@ None of these targets touch the feature store, profiles, or FE output.
 - Export the key: `export OPENAI_API_KEY="sk-..."`
 - Or set it in your `config.json` under `llm_api_key`.
 
-**Problem: Low judge scores (< 7.0)**
+**Problem: Low judge scores (< 70)**
 - Increase `max_iterations` in job config to give the planner more attempts.
-- Lower `success_threshold` if the default 7.0 is too strict for your use case.
+- Lower `success_threshold` (0-100) if the default 70 is too strict for your use case.
 - Check the LLM logs for judge feedback to understand scoring rationale.
 
 **Problem: Missing templates in plan**

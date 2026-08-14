@@ -181,7 +181,7 @@ The agent system is data-driven: `AgentSpec` data objects define prompt pack, re
 
 **Orchestration loop** (`AgentOrchestrationConfig` defaults):
 - `max_iterations`: 3 — planner/judge cycles
-- `success_threshold`: 70 — config field (0-100 scale); the CLI hard-codes `min_pass_score=7.0` (0-10 scale) as the operative gate in `build_moving_heads_pipeline()`
+- `success_threshold`: 70 — minimum judge score, 0-100, the single configured scale; `AgentOrchestrationConfig.min_pass_score` converts it once to the planners' 0-10 scale
 - `token_budget`: 75,000 — total token limit
 
 **Agent configs** (`AgentConfig` defaults):
@@ -238,7 +238,7 @@ Factory: `TwinklrSession.from_directory(config_dir)` discovers `config.json` and
 **Moving heads** (`packages/twinklr/core/sequencer/moving_heads/`):
 - Template compiler transforms `ChoreographyPlan` sections into DMX fixture segments
 - Each fixture gets per-channel value curves (pan, tilt, dimmer, shutter, color, gobo)
-- Output is written as an xLights `.xsq` file via the format module
+- Output is a fresh xLights `.xsq` plus `.xtiming`/`.xmap` sidecars, written by `moving_heads/delivery.py`; no user sequence is read
 
 **Display sequencer** (`packages/twinklr/core/sequencer/display/`):
 - 24 effect handlers for RGB/pixel elements
@@ -249,7 +249,12 @@ Factory: `TwinklrSession.from_directory(config_dir)` discovers `config.json` and
 - Used for transition interpolation and DMX value smoothing
 
 **xLights format** (`packages/twinklr/core/formats/xlights/`):
-- Native `.xsq` sequence reader/writer
+- Native `.xsq` sequence writer; the reader (`parser.py`) is analysis-only, used by
+  `profiling/` and the round-trip test, never to derive what Twinklr writes
+- `fresh.py` is the single from-nothing emitter — one version stamp, one timing grid,
+  never an empty `mediaFile`
+- `.xtiming` and `.xmap` writers for the mapping-free timing deliverable and the import
+  mapping hint
 - Custom value curve support
 - Timeline tracks for beat/section markers
 

@@ -89,7 +89,6 @@ async def generate_evaluation_report(
     checkpoint_path: Path,
     audio_path: Path,
     fixture_config_path: Path,
-    xsq_path: Path,
     output_dir: Path,
     config: EvalConfig | None = None,
 ) -> EvaluationReport:
@@ -106,7 +105,6 @@ async def generate_evaluation_report(
         checkpoint_path: Path to checkpoint JSON
         audio_path: Path to audio file
         fixture_config_path: Path to fixture config
-        xsq_path: Path to xLights sequence
         output_dir: Directory for output artifacts
         config: Optional evaluation configuration
 
@@ -165,7 +163,6 @@ async def generate_evaluation_report(
         plan=plan,
         audio_path=audio_path,
         fixture_config_path=fixture_config_path,
-        xsq_path=xsq_path,
     )
 
     logger.debug(f"Re-rendered {len(render_data.segments)} segments")

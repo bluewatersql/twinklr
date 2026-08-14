@@ -19,8 +19,11 @@ from twinklr.cli.recipe_builder_cmd import (
     run_curate_catalog_command,
 )
 from twinklr.core.caching import derive_session_id
-from twinklr.core.config.loader import load_app_config, load_job_config
+from twinklr.core.config.fixtures import FixtureGroup
+from twinklr.core.config.loader import load_app_config, load_fixture_group, load_job_config
+from twinklr.core.config.models import JobConfig
 from twinklr.core.pipeline import PipelineContext, PipelineExecutor
+from twinklr.core.pipeline.definition import PipelineDefinition
 from twinklr.core.pipeline.definitions import build_moving_heads_pipeline
 from twinklr.core.sequencer.display.xlights_mapping import (
     XLightsGroupMapping,
@@ -64,85 +67,97 @@ def _resolve_fixture_config_path(job_config_path: Path, fixture_config_path: str
     return job_config_path.parent / fixture_path
 
 
-def build_display_graph() -> tuple[ChoreographyGraph, XLightsMapping]:
-    """Build a default ChoreographyGraph and XLightsMapping for the CLI pipeline.
+def build_display_graph(fixture_group: FixtureGroup) -> tuple[ChoreographyGraph, XLightsMapping]:
+    """Build the ChoreographyGraph and XLightsMapping from the user's rig.
 
-    Constructs a choreography graph with hierarchy and spatial metadata
-    representing a typical residential Christmas display.  The layout
-    parser will eventually auto-populate this; for now values are
-    hardcoded as sensible defaults.  XLightsMapping maps each ChoreoGroup.id
-    to its xLights element display name for XSQ output.
+    The graph used to be a hardcoded three-group residential display — moving heads,
+    outline, mega tree — with a literal fixture count each, describing the author's own
+    yard to the planner of every run (P7-M1). It now describes exactly one group: the
+    moving heads in the loaded fixture config, at the count that config declares.
 
-    Structure::
+    That is the whole display Twinklr drives today. The outline and mega-tree groups
+    were addressable in the planner's prompt but nothing rendered them — the display
+    pipeline is deferred (P3-T3 makes it CLI-reachable), so naming them here only told
+    the planner about hardware the run would never light.
 
-        MOVING_HEADS (MOVING_HEAD, HORIZONTAL_ROW, CENTER/FULL_HEIGHT, 30%)
-        OUTLINE (STRING, HORIZONTAL_ROW, FULL_WIDTH/HIGH, 50%)
-        MEGA_TREE (TREE, SINGLE, CENTER/FULL_HEIGHT, 20%)
+    Args:
+        fixture_group: Loaded moving-head rig.
 
     Returns:
         Tuple of (ChoreographyGraph, XLightsMapping).
     """
-    groups = [
-        ChoreoGroup(
-            id="MOVING_HEADS",
-            role="MOVING_HEADS",
-            element_kind=DisplayElementKind.MOVING_HEAD,
-            arrangement=GroupArrangement.HORIZONTAL_ROW,
-            prominence=DisplayProminence.HERO,
-            position=GroupPosition(
-                horizontal=HorizontalZone.CENTER,
-                vertical=VerticalZone.FULL_HEIGHT,
-                depth=DepthZone.NEAR,
-                zone=DisplayZone.YARD,
-            ),
-            fixture_count=4,
-            pixel_fraction=0.30,
+    fixtures = fixture_group.expand_fixtures()
+    if not fixtures:
+        raise ValueError(
+            f"Fixture config for group {fixture_group.group_id!r} declares no fixtures; "
+            f"add at least one moving head for the planner to choreograph."
+        )
+    group = ChoreoGroup(
+        id="MOVING_HEADS",
+        role="MOVING_HEADS",
+        element_kind=DisplayElementKind.MOVING_HEAD,
+        arrangement=GroupArrangement.HORIZONTAL_ROW,
+        prominence=DisplayProminence.HERO,
+        position=GroupPosition(
+            horizontal=HorizontalZone.CENTER,
+            vertical=VerticalZone.FULL_HEIGHT,
+            depth=DepthZone.NEAR,
+            zone=DisplayZone.YARD,
         ),
-        ChoreoGroup(
-            id="OUTLINE",
-            role="OUTLINE",
-            element_kind=DisplayElementKind.STRING,
-            arrangement=GroupArrangement.HORIZONTAL_ROW,
-            prominence=DisplayProminence.ANCHOR,
-            position=GroupPosition(
-                horizontal=HorizontalZone.FULL_WIDTH,
-                vertical=VerticalZone.HIGH,
-                depth=DepthZone.FAR,
-                zone=DisplayZone.HOUSE,
-            ),
-            fixture_count=10,
-            pixel_fraction=0.50,
-        ),
-        ChoreoGroup(
-            id="MEGA_TREE",
-            role="MEGA_TREE",
-            element_kind=DisplayElementKind.TREE,
-            arrangement=GroupArrangement.SINGLE,
-            prominence=DisplayProminence.HERO,
-            position=GroupPosition(
-                horizontal=HorizontalZone.CENTER,
-                vertical=VerticalZone.FULL_HEIGHT,
-                depth=DepthZone.NEAR,
-                zone=DisplayZone.YARD,
-            ),
-            fixture_count=1,
-            pixel_fraction=0.20,
-        ),
-    ]
-    choreo_graph = ChoreographyGraph(graph_id="cli_display", groups=groups)
+        fixture_count=len(fixtures),
+        pixel_fraction=1.0,
+    )
+    choreo_graph = ChoreographyGraph(graph_id="cli_display", groups=[group])
     xlights_mapping = XLightsMapping(
         entries=[
-            XLightsGroupMapping(choreo_id="MOVING_HEADS", group_name="Moving Heads"),
-            XLightsGroupMapping(choreo_id="OUTLINE", group_name="Outline"),
-            XLightsGroupMapping(choreo_id="MEGA_TREE", group_name="Mega Tree"),
+            XLightsGroupMapping(
+                choreo_id="MOVING_HEADS",
+                group_name=fixture_group.xlights_group or "Moving Heads",
+            )
         ]
     )
     return choreo_graph, xlights_mapping
 
 
+def build_run_pipeline(
+    *,
+    fixture_group: FixtureGroup,
+    job_config: JobConfig,
+    available_templates: list[str],
+    xsq_output_path: Path,
+    fixture_config_path: Path,
+) -> tuple[PipelineDefinition, ChoreographyGraph, XLightsMapping]:
+    """Build the pipeline a `twinklr run` executes, from configuration alone.
+
+    Every operative value the CLI used to hardcode is resolved here from the two
+    configs the user already passes: the fixture count and the display graph come from
+    the fixture config, the approval threshold from `job_config.agent`.
+
+    Args:
+        fixture_group: Loaded moving-head rig.
+        job_config: Loaded job config.
+        available_templates: Template IDs the planner may choose from.
+        xsq_output_path: Where the delivered .xsq goes; sidecars land beside it.
+        fixture_config_path: Resolved path to the fixture config, for the render stage.
+
+    Returns:
+        Tuple of (pipeline, choreography graph, xLights mapping).
+    """
+    choreo_graph, xlights_mapping = build_display_graph(fixture_group)
+    pipeline = build_moving_heads_pipeline(
+        display_groups=choreo_graph.to_planner_summary(),
+        fixture_count=len(fixture_group.expand_fixtures()),
+        available_templates=available_templates,
+        max_iterations=job_config.agent.max_iterations,
+        min_pass_score=job_config.agent.min_pass_score,
+        xsq_output_path=xsq_output_path,
+        fixture_config_path=fixture_config_path,
+    )
+    return pipeline, choreo_graph, xlights_mapping
+
+
 async def run_pipeline_async(
     audio_path: Path,
-    xsq_in: Path,
     output_dir: Path,
     app_config_path: Path,
     job_config_path: Path,
@@ -152,7 +167,6 @@ async def run_pipeline_async(
 
     Args:
         audio_path: Path to audio file
-        xsq_in: Path to input .xsq template
         output_dir: Output directory for artifacts
         app_config_path: Path to app config JSON
         job_config_path: Path to job config JSON
@@ -169,7 +183,7 @@ async def run_pipeline_async(
         console.print("[red]ERROR: OPENAI_API_KEY environment variable not set[/red]")
         console.print("\nTo run Twinklr:")
         console.print("  export OPENAI_API_KEY='your-key-here'")
-        console.print("  twinklr run --audio <file> --xsq <file> --config <config>")
+        console.print("  twinklr run --audio <file> --config <job_config>")
         return 1
 
     console.print("[green]✅ OpenAI API key found[/green]")
@@ -198,32 +212,39 @@ async def run_pipeline_async(
     available_templates = [t.template_id for t in list_templates()]
     console.print(f"[green]📚 Templates loaded:[/green] {len(available_templates)}")
 
-    # Build choreography graph and xLights mapping
-    choreo_graph, xlights_mapping = build_display_graph()
-    display_groups = choreo_graph.to_planner_summary()
+    # Load the rig: the fixture config is the run's real input, so the planner is told
+    # what the user actually owns instead of the literal 4 the CLI used to pass.
+    fixture_config_path = _resolve_fixture_config_path(
+        job_config_path,
+        job_config.fixture_config_path,
+    )
+    try:
+        fixture_group = load_fixture_group(fixture_config_path)
+    except Exception as e:
+        console.print(f"[red]ERROR: Could not load fixture config {fixture_config_path}: {e}[/red]")
+        return 1
 
-    console.print(f"[green]🗺️  Display groups:[/green] {len(display_groups)}")
-    for dg in display_groups:
-        console.print(
-            f"   • {dg['role_key']} ({dg['element_kind']}) — "
-            f"{dg['pixel_fraction']:.0%} of display, "
-            f"{dg['prominence']}, {dg['horizontal']}/{dg['vertical']}"
-        )
+    console.print(
+        f"[green]💡 Rig:[/green] {len(fixture_group.expand_fixtures())} moving head(s) "
+        f"from {fixture_config_path.name}"
+    )
 
     # Define pipeline via pipeline definitions module
     console.print("\n[bold]Defining pipeline...[/bold]")
-    pipeline = build_moving_heads_pipeline(
-        display_groups=display_groups,
-        fixture_count=4,
-        available_templates=available_templates,
-        max_iterations=job_config.agent.max_iterations,
-        min_pass_score=7.0,
-        xsq_output_path=artifact_dir / f"{song_name}_twinklr_mh.xsq",
-        xsq_template_path=xsq_in,
-        fixture_config_path=_resolve_fixture_config_path(
-            job_config_path,
-            job_config.fixture_config_path,
-        ),
+    try:
+        pipeline, choreo_graph, xlights_mapping = build_run_pipeline(
+            fixture_group=fixture_group,
+            job_config=job_config,
+            available_templates=available_templates,
+            xsq_output_path=artifact_dir / f"{song_name}_twinklr_mh.xsq",
+            fixture_config_path=fixture_config_path,
+        )
+    except ValueError as e:
+        console.print(f"[red]ERROR: {e}[/red]")
+        return 1
+    console.print(
+        f"[green]🗺️  Display groups:[/green] {len(choreo_graph.groups)} "
+        f"(approval threshold {job_config.agent.success_threshold}/100)"
     )
 
     # Validate pipeline
@@ -300,10 +321,16 @@ async def run_pipeline_async(
             console.print(f"   Strategy: {plan.overall_strategy[:80]}...")
 
         if "render" in result.outputs:
-            xsq_path = result.outputs["render"]
             segment_count = pipeline_context.metrics.get("mh_render_segments", 0)
-            console.print(f"\n[bold]🎄 XSQ Output:[/bold] {xsq_path}")
-            console.print(f"   Segments rendered: {segment_count}")
+            artifacts = pipeline_context.get_state("delivery_artifacts")
+            console.print(f"\n[bold]🎄 Import into xLights:[/bold] ({segment_count} segments)")
+            if artifacts is not None:
+                console.print(f"   effects  {artifacts.xsq_path.name}")
+                for xtiming_path in artifacts.xtiming_paths:
+                    console.print(f"   timing   {xtiming_path.name}")
+                console.print(f"   mapping  {artifacts.xmap_path.name}")
+            else:
+                console.print(f"   {result.outputs['render']}")
 
         console.print(f"\n[green]📁 All artifacts saved to:[/green] {artifact_dir}")
         return 0
@@ -316,7 +343,6 @@ def run_pipeline(args: argparse.Namespace) -> None:
     configure_logging(level="INFO")
 
     audio_path = Path(args.audio).resolve()
-    xsq_path = Path(args.xsq).resolve()
     output_dir = Path(args.out).resolve()
     app_config_path = Path(args.app_config).resolve()
     job_config_path = Path(args.config).resolve()
@@ -324,10 +350,6 @@ def run_pipeline(args: argparse.Namespace) -> None:
     # Validate inputs
     if not audio_path.exists():
         console.print(f"[red]ERROR: Audio file not found: {audio_path}[/red]")
-        sys.exit(1)
-
-    if not xsq_path.exists():
-        console.print(f"[red]ERROR: XSQ file not found: {xsq_path}[/red]")
         sys.exit(1)
 
     if not job_config_path.exists():
@@ -338,7 +360,6 @@ def run_pipeline(args: argparse.Namespace) -> None:
     exit_code = asyncio.run(
         run_pipeline_async(
             audio_path=audio_path,
-            xsq_in=xsq_path,
             output_dir=output_dir,
             app_config_path=app_config_path,
             job_config_path=job_config_path,
@@ -356,9 +377,13 @@ def build_arg_parser() -> argparse.ArgumentParser:
     )
     sub = p.add_subparsers(dest="cmd", required=True)
 
+    # `--xsq` is deliberately absent. It used to be required, and every run parsed the
+    # user's sequence, regenerated it and handed back a damaged copy. Twinklr now emits
+    # its own files for the user to import, so there is no input sequence to take.
+    # Removed outright rather than accepted-and-ignored: silently ignoring a flag that
+    # used to decide what the output was built from is its own failure class.
     run = sub.add_parser("run", help="Run the full pipeline")
     run.add_argument("--audio", required=True, help="Path to audio file (mp3/wav)")
-    run.add_argument("--xsq", required=True, help="Path to input .xsq template")
     run.add_argument("--out", default=".", help="Output directory (default: current dir)")
     run.add_argument(
         "--app-config",

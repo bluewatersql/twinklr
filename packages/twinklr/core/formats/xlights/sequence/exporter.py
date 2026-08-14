@@ -232,15 +232,12 @@ class XSQExporter:
             layer: EffectLayer element
             marker: TimeMarker model
         """
-        # Timing markers are stored as effects with start/end times.
-        # Use end_time_ms if provided, otherwise default to start + 1ms duration
-        # for point markers.
-        end_time = marker.end_time_ms if marker.end_time_ms is not None else marker.time_ms + 1
-
+        # Timing markers are stored as effects with start/end times; the point-marker
+        # rule lives on TimeMarker so the `.xtiming` writer applies the same one.
         attribs = {
             "label": marker.name,
             "startTime": str(marker.time_ms),
-            "endTime": str(end_time),
+            "endTime": str(marker.resolved_end_time_ms),
         }
 
         ET.SubElement(layer, "Effect", attribs)

@@ -7,7 +7,12 @@ updated: 2026-08-13
 # Glossary
 
 - **xLights** — open-source lighting control software; Twinklr's output target.
-- **`.xsq`** — xLights sequence file format (native Twinklr output).
+- **`.xsq`** — xLights sequence file format. Twinklr writes one containing only its own
+  effects and models; it reads one only to profile a corpus, never to build output.
+- **`.xtiming`** — a standalone xLights timing track. Imports into any sequence with no
+  model mapping, which makes it Twinklr's mapping-free deliverable.
+- **`.xmap`** — mapping hints for xLights' effect import, naming the models a donor
+  sequence emitted so the mapping is pre-filled rather than entered row by row.
 - **DMX** — digital lighting control protocol; channels/values driven by the renderer,
   never by the LLM.
 - **Moving head** — pan/tilt light fixture with dimmer, shutter, color, and gobo channels.
@@ -21,7 +26,8 @@ updated: 2026-08-13
   renderer resolves to precise values.
 - **ChoreographyPlan** — the structured Pydantic plan the planner agent produces
   (template + preset per song section).
-- **Judge** — the LLM agent scoring plans 0–10; ≥ 7.0 approves.
+- **Judge** — the LLM agent scoring plans 0–10; the bar comes from
+  `agent.success_threshold` (configured 0–100, converted once to the planners' 0–10).
 - **Prompt pack** — a versioned set of Jinja2 templates (system/user/developer) plus
   config that defines one runtime agent's prompting (`packages/twinklr/core/**/prompts/`).
 - **FE (feature engineering) pipeline** — incremental corpus analysis of xLights sequence

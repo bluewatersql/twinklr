@@ -95,12 +95,6 @@ def parse_args() -> argparse.Namespace:
         help="Force new session ID (invalidates cache). Default uses stable ID based on audio file.",
     )
     parser.add_argument(
-        "--xsq-template",
-        type=Path,
-        default=None,
-        help="Optional template .xsq to merge into",
-    )
-    parser.add_argument(
         "--fixture-config",
         type=Path,
         default=None,
@@ -196,7 +190,6 @@ async def main() -> None:
 
     # Resolve paths
     xsq_output_path = output_dir / f"{song_name}_twinklr_mh.xsq"
-    xsq_template_path = args.xsq_template or (repo_root / "data/sequences/Need A Favor.xsq")
     fixture_config_path = args.fixture_config or (repo_root / "fixture_config.json")
 
     # ========================================================================
@@ -210,8 +203,7 @@ async def main() -> None:
         available_templates=available_templates,
         xsq_output_path=xsq_output_path,
         max_iterations=session.job_config.agent.max_iterations,
-        min_pass_score=7.0,
-        xsq_template_path=xsq_template_path if xsq_template_path.exists() else None,
+        min_pass_score=session.job_config.agent.min_pass_score,
         fixture_config_path=fixture_config_path if fixture_config_path.exists() else None,
     )
 

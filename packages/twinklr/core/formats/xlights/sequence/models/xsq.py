@@ -43,6 +43,18 @@ class TimeMarker(BaseModel):
             raise ValueError(f"end_time_ms ({v}) must be >= time_ms ({info.data['time_ms']})")
         return v
 
+    @property
+    def resolved_end_time_ms(self) -> int:
+        """End time as written to a file, with the 1 ms point-marker rule applied.
+
+        A beat or bar marker is an instant, but both `.xsq` and `.xtiming` store
+        markers as intervals, so a marker with no end gets a 1 ms span. Both writers
+        call this so the same marker cannot come out of the two deliverables with
+        different times (P5-F5 item 6 names the heuristic; keeping it in one place is
+        what stops `.xtiming` and `.xsq` drifting apart).
+        """
+        return self.end_time_ms if self.end_time_ms is not None else self.time_ms + 1
+
 
 class TimingTrack(BaseModel):
     """A timing track containing timing markers."""

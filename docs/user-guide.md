@@ -140,7 +140,7 @@ Key fields and defaults:
 | `schema_version` | `"3.0"` | Config schema version |
 | `fixture_config_path` | `"fixture_config.json"` | Path to fixture definitions (relative to job config dir) |
 | `agent.max_iterations` | `3` | Max planner/judge iterations |
-| `agent.success_threshold` | `70` | Config field (0-100 scale); the CLI currently hard-codes `min_pass_score=7.0` (0-10 scale) as the operative gate |
+| `agent.success_threshold` | `70` | Minimum judge score to accept a plan, on a 0-100 scale (validated; values outside the range are rejected). This is the only place the threshold is set — the planners take it converted to their own 0-10 scale. Note it does not yet stop a run: the judge score is recorded, not enforced. |
 | `agent.token_budget` | `75000` | Total token budget |
 | `agent.plan_agent.model` | `"gpt-5.2"` | Planner LLM model |
 | `agent.judge_agent.model` | `"gpt-5-mini"` | Judge LLM model |
@@ -181,7 +181,6 @@ _Source: `packages/twinklr/cli/main.py:50-59` (`_resolve_fixture_config_path`), 
 ```bash
 uv run twinklr run \
   --audio path/to/song.mp3 \
-  --xsq path/to/template.xsq \
   --config path/to/job_config.json \
   --out artifacts \
   --app-config config.json
@@ -190,12 +189,24 @@ uv run twinklr run \
 | Argument | Required | Default | Description |
 |---|---|---|---|
 | `--audio` | Yes | — | Path to audio file (MP3 or WAV) |
-| `--xsq` | Yes | — | Path to input `.xsq` template (existing xLights sequence to merge into) |
 | `--config` | Yes | — | Path to job config JSON |
 | `--out` | No | `.` | Output directory |
 | `--app-config` | No | `config.json` | Path to app config JSON |
 
-_Source: `packages/twinklr/cli/main.py:331-354` (`build_arg_parser`)_
+Twinklr takes **no input sequence**. It used to require `--xsq` and rewrite the sequence you
+gave it, which cost you your jukebox state, your per-element display state, anything in the
+file Twinklr does not model, and flattened multi-layer lyric timing tracks — on every run.
+Twinklr now emits its own files for you to import into your show (see
+[Understanding Outputs](#understanding-outputs)). If you have a script that passes `--xsq`,
+delete the flag: it is rejected rather than ignored, so a stale invocation fails loudly
+instead of quietly building something other than what you asked for.
+
+Your rig comes from the fixture config that `job_config.json` points at
+(`fixture_config_path`). That file decides how many moving heads the planner is told about
+— an 8-head rig is planned as 8 heads — and which xLights models the effects are written
+to.
+
+_Source: `packages/twinklr/cli/main.py` (`build_arg_parser`, `build_run_pipeline`)_
 
 ### What the Pipeline Does
 
@@ -206,23 +217,23 @@ The `twinklr run` command executes the moving heads pipeline with these stages:
 3. **Lyrics Analysis** (`lyrics`) — conditional stage; runs only if lyrics are detected. Produces narrative and thematic context.
 4. **Macro Planning** (`macro`) — LLM generates a high-level choreography strategy across all display groups.
 5. **Moving Head Planning** (`moving_heads`) — multi-agent loop (planner -> validator -> judge) generates a `ChoreographyPlan` with template selections and parameters per section.
-6. **Rendering** (`render`) — compiles the plan into DMX values, curve data, and fixture segments, then writes the output `.xsq` file.
+6. **Rendering** (`render`) — compiles the plan into DMX values, curve data, and fixture segments, then writes the delivery: a fresh `.xsq`, one `.xtiming` per timing track, and an `.xmap`.
 
 _Source: `packages/twinklr/core/pipeline/definitions/moving_heads.py` and `common.py`_
 
 ### Display Graph
 
-The CLI currently uses a hardcoded display layout with three groups:
+The display graph describes what the planner may address. It is built from your fixture
+config and contains one group — `MOVING_HEADS`, at the fixture count your config declares.
 
-| Group | Element Kind | Fixtures | Pixel Fraction | Position |
-|---|---|---|---|---|
-| `MOVING_HEADS` | Moving Head | 4 | 30% | Center, full height, yard |
-| `OUTLINE` | String | 10 | 50% | Full width, high, house |
-| `MEGA_TREE` | Tree | 1 | 20% | Center, full height, yard |
+It used to be a hardcoded three-group yard (moving heads, outline, mega tree) with literal
+fixture counts, which described the author's own display to the planner of every run. The
+outline and mega-tree groups were addressable in the prompt but nothing rendered them: the
+display pipeline is deferred, so naming them only told the planner about hardware the run
+would never light. When that pipeline becomes reachable, its groups join the graph from
+configuration.
 
-_Source: `packages/twinklr/cli/main.py:62-135` (`build_display_graph`)_
-
-A layout parser to auto-populate this from xLights layout files is planned but not yet implemented.
+_Source: `packages/twinklr/cli/main.py` (`build_display_graph`)_
 
 ---
 
@@ -232,16 +243,33 @@ A layout parser to auto-populate this from xLights layout files is planned but n
 
 Artifacts are written to `<output_dir>/<song_name>/`:
 
-- **`<song_name>_twinklr_mh.xsq`** — the generated xLights sequence file for moving heads
+- **`<song_name>_twinklr_mh.xsq`** — a self-contained xLights sequence carrying Twinklr's
+  effects. It names only Twinklr's own models and the audio file it was choreographed
+  against; it is a donor sequence to import from, not a show file to open as your show.
+- **`<song_name>_twinklr_mh.<track>.xtiming`** — one file per timing track Twinklr built
+  from the audio (`audiosections`, `beats`, `bars`, and `lyrics`/`phonemes` when available).
+- **`<song_name>_twinklr_mh.xmap`** — mapping hints naming every model the `.xsq` emitted,
+  proposed against a layout model of the same name.
 - Stage artifacts and intermediate results (audio analysis data, profiles, plans)
 
-### Using the XSQ Output
+### Using the Output
 
-1. Open **xLights**
-2. Import or open the generated `.xsq` file
-3. The sequence contains value curves for each moving head fixture across all DMX channels (pan, tilt, dimmer, shutter, color, gobo)
-4. Timeline timing tracks (beats, sections) are included if configured in `job_config.json` (`timeline_tracks`)
-5. You can refine the sequence manually in xLights if desired
+You **import** these into your own sequence rather than opening Twinklr's file as your show.
+
+1. Open your sequence in **xLights**.
+2. Import the effects from the generated `.xsq` as a donor sequence, using the shipped
+   `.xmap` to pre-fill the model mapping. Your layout must already contain models the
+   mapping can point at — Twinklr names them from your fixture config's
+   `xlights_model_name` values.
+3. The imported effects contain value curves for each moving head across all mapped DMX
+   channels (pan, tilt, dimmer, shutter, color, gobo).
+4. Import the `.xtiming` files to get Twinklr's timing tracks. These need **no mapping at
+   all** — they import standalone into any sequence, so they are useful even if you take
+   none of the effects.
+5. Refine anything you kept, in xLights, as usual.
+
+Whether a bare `.xsq` imports without an accompanying `xlights_rgbeffects.xml` is being
+verified empirically; the `.xtiming` path has no such question.
 
 ---
 

@@ -17,6 +17,7 @@ byte of `.xsq`, and the only end-to-end render test patched `compile_template` w
 | `test_dimmer_floor_honored.py` (T2 → flipped in T5) | P4-M1 repaired: no non-blackout dimmer curve dips below the template's declared 60-DMX floor; the blackout's exemption is explicit. Was `test_dimmer_floor_dropped.py` |
 | `test_8head_rig_renders.py` (T2 → flipped in T5) | P4-F26 repaired: the 8-head rig renders every plan section on all eight heads, roles are spatial, and a group the rig cannot fill raises `UnsupportedRigShapeError`. Was `test_8head_role_mismatch.py` |
 | `test_calibrated_movement_range.py` (P1P-T5) | P4-F9: every emitted pan/tilt value stays inside the rig's calibrated window, and a narrow window really does narrow the output |
+| `test_delivery_artifacts.py` (P1P-T11) | What a real render hands the user: the fresh `.xsq` re-parses through `XSQParser` and names only Twinklr's models, the `.xtiming` markers equal the `.xsq` timing tracks, and the `.xmap` names what was emitted |
 
 Rigs live in `harness.py` (`RIGS`); goldens live in `<rig_id>/<section_id>.settings.txt`.
 

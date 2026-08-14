@@ -100,7 +100,7 @@ class MacroPlannerStage:
             orchestrator = MacroPlannerOrchestrator(
                 provider=context.provider,
                 max_iterations=context.job_config.agent.max_iterations,
-                min_pass_score=context.job_config.agent.success_threshold / 10.0,
+                min_pass_score=context.job_config.agent.min_pass_score,
                 llm_logger=context.llm_logger,
             )
 

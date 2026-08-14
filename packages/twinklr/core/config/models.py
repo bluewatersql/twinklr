@@ -97,7 +97,10 @@ class AgentOrchestrationConfig(BaseModel):
     )
 
     success_threshold: int = Field(
-        default=70, ge=0, le=100, description="Minimum judge score to accept plan"
+        default=70,
+        ge=0,
+        le=100,
+        description="Minimum judge score to accept plan, 0-100 (the single configured scale)",
     )
 
     # Per-agent configurations
@@ -119,6 +122,17 @@ class AgentOrchestrationConfig(BaseModel):
     agent_cache: CacheConfig = Field(
         default_factory=lambda: _get_cache_default("agent"), description="Agent cache configuration"
     )
+
+    @property
+    def min_pass_score(self) -> float:
+        """`success_threshold` on the 0-10 scale the planner orchestrators take.
+
+        There is one configured scale — `success_threshold`, 0-100, range-validated by
+        the field above — and one conversion, here. The CLI used to pass its own
+        `min_pass_score=7.0` literal on a 0-10 scale straight past this field, so a
+        configured threshold had no effect on the shipped path at all (P7-M1/P7-M2).
+        """
+        return self.success_threshold / 10.0
 
 
 def _get_cache_default(cache_type: str) -> CacheConfig:

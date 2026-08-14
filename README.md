@@ -46,7 +46,7 @@ Audio File (.mp3)
 └─────────────────────────────────────────────────────────┘
      │
      ▼
- xLights Sequence (.xsq)
+ Delivery: .xsq + .xtiming + .xmap
 ```
 
 **Stages 1 and 4 are entirely deterministic** — signal processing, curve math, and file format compliance. **Stages 2 and 3 use LLMs** for musical interpretation and choreography planning. The LLM never touches DMX values directly.
@@ -59,7 +59,7 @@ Audio File (.mp3)
 - **Template Library** — pre-built choreography units (fan formations, sweeps, chases, pulses) with presets and phase offsets for fixture-to-fixture coordination
 - **Schema Auto-Injection** — Pydantic models generate the JSON schemas shown to the LLM, eliminating prompt/schema drift
 - **Two-Tier Validation** — fast heuristic checks before expensive LLM evaluation
-- **xLights Export** — native `.xsq` output with custom value curves, DMX mapping, and fixture grouping
+- **xLights Delivery** — a fresh `.xsq` with custom value curves, DMX mapping and fixture grouping, plus standalone `.xtiming` timing tracks and an `.xmap` mapping hint; no input sequence is read or rewritten
 
 ## Quick Start
 
@@ -95,12 +95,11 @@ make install-dev   # Includes ML dependencies (~2GB+)
 ```bash
 uv run twinklr run \
   --audio path/to/song.mp3 \
-  --xsq path/to/template.xsq \
   --config job_config.json \
   --out artifacts
 ```
 
-This runs the full pipeline: audio analysis, LLM profiling, multi-agent planning, and rendering. The output is an xLights `.xsq` sequence file ready to import.
+This runs the full pipeline: audio analysis, LLM profiling, multi-agent planning, and rendering. Twinklr takes no input sequence — it emits a fresh `.xsq` of its own effects, one `.xtiming` per timing track (these import standalone, with no model mapping), and an `.xmap` mapping hint, for you to import into your show.
 
 ## Project Structure
 

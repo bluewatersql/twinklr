@@ -37,12 +37,12 @@ class MovingHeadRenderingStage:
 
     State stored:
         - "xsq_output_path": Path to generated XSQ file
+        - "delivery_artifacts": DeliveryArtifacts (.xsq, .xtiming files, .xmap)
         - "rendered_segment_count": Number of segments rendered
 
     Example:
         >>> stage = MovingHeadRenderingStage(
         ...     fixture_config_path="fixtures.json",
-        ...     xsq_template_path="template.xsq",
         ...     xsq_output_path="output.xsq",
         ... )
         >>> input = {"moving_heads": choreography_plan}
@@ -54,18 +54,16 @@ class MovingHeadRenderingStage:
     def __init__(
         self,
         xsq_output_path: str | Path,
-        xsq_template_path: str | Path | None = None,
         fixture_config_path: str | Path | None = None,
     ) -> None:
         """Initialize moving head rendering stage.
 
         Args:
-            xsq_output_path: Path for output XSQ file
-            xsq_template_path: Optional template XSQ to use as base
+            xsq_output_path: Path for the delivered .xsq; the .xtiming and .xmap
+                sidecars are written beside it.
             fixture_config_path: Optional path to fixture config JSON
         """
         self.xsq_output_path = Path(xsq_output_path)
-        self.xsq_template_path = Path(xsq_template_path) if xsq_template_path else None
         self.fixture_config_path = Path(fixture_config_path) if fixture_config_path else None
 
     @property
@@ -89,6 +87,7 @@ class MovingHeadRenderingStage:
 
         Side Effects:
             - Stores "xsq_output_path" in context.state
+            - Stores "delivery_artifacts" in context.state
             - Stores "rendered_segment_count" in context.state
             - Adds "mh_render_segments" to context.metrics
             - Adds "mh_render_transitions" to context.metrics
@@ -98,6 +97,9 @@ class MovingHeadRenderingStage:
         )
         from twinklr.core.pipeline.result import failure_result, success_result
         from twinklr.core.pipeline.stage import resolve_typed_input
+        from twinklr.core.sequencer.moving_heads.compile.template_compiler import (
+            UnsupportedRigShapeError,
+        )
         from twinklr.core.sequencer.moving_heads.pipeline import RenderingPipeline
 
         try:
@@ -128,6 +130,7 @@ class MovingHeadRenderingStage:
 
             # Build timeline tracks from audio data
             timeline_tracks = self._build_timeline_tracks(beat_grid, context)
+            media_file, song, artist = self._resolve_media_metadata(context)
 
             # Create and run rendering pipeline
             pipeline = RenderingPipeline(
@@ -136,17 +139,20 @@ class MovingHeadRenderingStage:
                 fixture_group=fixture_group,
                 job_config=context.job_config,
                 output_path=self.xsq_output_path,
-                template_xsq=self.xsq_template_path,
                 timeline_tracks=timeline_tracks,
+                media_file=media_file,
+                song=song,
+                artist=artist,
             )
 
-            # Render to segments and export to XSQ
+            # Render to segments and write the delivery
             segments = pipeline.render()
 
             logger.debug(f"✅ Rendered {len(segments)} segments to {self.xsq_output_path}")
 
             # Store state for downstream stages
             context.set_state("xsq_output_path", self.xsq_output_path)
+            context.set_state("delivery_artifacts", pipeline.artifacts)
             context.set_state("rendered_segment_count", len(segments))
 
             # Track metrics
@@ -155,9 +161,44 @@ class MovingHeadRenderingStage:
 
             return success_result(self.xsq_output_path, stage_name=self.name)
 
+        except UnsupportedRigShapeError as e:
+            # The rig cannot fill a group the plan's template addresses (e.g. a template
+            # written for LEFT/RIGHT against a single-head rig). The exception text
+            # already names the template, step, group and the rig's roles, so it is the
+            # actionable message — reported without a traceback, which would bury it.
+            logger.error("Rendering failed: %s", e)
+            return failure_result(
+                f"{e} Pick a template your rig can fill, or add fixtures to the rig "
+                f"config so the group has heads to address.",
+                stage_name=self.name,
+            )
         except Exception as e:
             logger.exception("Rendering failed", exc_info=e)
             return failure_result(str(e), stage_name=self.name)
+
+    @staticmethod
+    def _resolve_media_metadata(context: PipelineContext) -> tuple[str, str, str]:
+        """Resolve the sequence head's media file, song and artist from the audio bundle.
+
+        The emitted `.xsq` names the audio it was choreographed against; an empty
+        `mediaFile` is fatal to both xLights and Twinklr's own parser, so the resolver
+        always returns a non-empty name.
+
+        Args:
+            context: Pipeline context with audio_bundle in state.
+
+        Returns:
+            `(media_file, song, artist)`.
+        """
+        from twinklr.core.formats.xlights.sequence.fresh import resolve_media_file
+
+        audio_bundle = context.get_state("audio_bundle")
+        media_file = resolve_media_file(getattr(audio_bundle, "audio_path", None))
+
+        embedded = getattr(getattr(audio_bundle, "metadata", None), "embedded", None)
+        song = getattr(embedded, "title", None) or ""
+        artist = getattr(embedded, "artist", None) or ""
+        return media_file, song, artist
 
     @staticmethod
     def _build_timeline_tracks(

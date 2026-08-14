@@ -297,30 +297,46 @@ class TestRender:
 # ---------------------------------------------------------------------------
 
 
-class TestExportToXsq:
-    """Tests for _export_to_xsq with timeline tracks."""
+class TestExportDelivery:
+    """Tests for _export_delivery with timeline tracks."""
+
+    def _pipeline(self, tmp_path: Path) -> RenderingPipeline:
+        from twinklr.core.formats.xlights.sequence.models.xsq import TimeMarker
+
+        beat_track = TimingTrack(
+            name="Twinklr Beats",
+            markers=[TimeMarker(name="1", time_ms=0), TimeMarker(name="2", time_ms=500)],
+        )
+        return RenderingPipeline(
+            choreography_plan=_make_plan([("intro", 1, 4, "sweep_lr_fan_hold")]),
+            beat_grid=_make_beat_grid(bars=4),
+            fixture_group=_make_fixture_group(4),
+            job_config=JobConfig(),
+            output_path=tmp_path / "test.xsq",
+            timeline_tracks=[beat_track],
+            media_file="song.mp3",
+        )
 
     def test_export_creates_xsq_file(self, tmp_path: Path) -> None:
         """Export should create an XSQ file with timing layers."""
         from twinklr.core.formats.xlights.sequence.models.xsq import TimeMarker
 
-        output_path = tmp_path / "test.xsq"
+        rp = self._pipeline(tmp_path)
+        rp._export_delivery([], [TimeMarker(name="intro", time_ms=0, end_time_ms=4000)])
 
-        beat_track = TimingTrack(
-            name="Beats",
-            markers=[TimeMarker(name="1", time_ms=0), TimeMarker(name="2", time_ms=500)],
-        )
+        assert (tmp_path / "test.xsq").exists()
 
-        rp = RenderingPipeline(
-            choreography_plan=_make_plan([("intro", 1, 4, "sweep_lr_fan_hold")]),
-            beat_grid=_make_beat_grid(bars=4),
-            fixture_group=_make_fixture_group(4),
-            job_config=JobConfig(),
-            output_path=output_path,
-            timeline_tracks=[beat_track],
-        )
+    def test_export_creates_sidecar_deliverables(self, tmp_path: Path) -> None:
+        """The run hands back three kinds of artifact, not just the sequence."""
+        from twinklr.core.formats.xlights.sequence.models.xsq import TimeMarker
 
-        time_markers = [TimeMarker(name="intro", time_ms=0, end_time_ms=4000)]
-        rp._export_to_xsq([], time_markers)
+        rp = self._pipeline(tmp_path)
+        rp._export_delivery([], [TimeMarker(name="intro", time_ms=0, end_time_ms=4000)])
 
-        assert output_path.exists()
+        assert rp.artifacts is not None
+        assert rp.artifacts.xmap_path == tmp_path / "test.xmap"
+        assert {path.name for path in rp.artifacts.xtiming_paths} == {
+            "test.audiosections.xtiming",
+            "test.beats.xtiming",
+        }
+        assert all(path.exists() for path in rp.artifacts.all_paths)

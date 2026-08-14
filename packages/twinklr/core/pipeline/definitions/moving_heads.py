@@ -27,7 +27,6 @@ def build_moving_heads_pipeline(
     xsq_output_path: Path,
     max_iterations: int = 3,
     min_pass_score: float = 7.0,
-    xsq_template_path: Path | None = None,
     fixture_config_path: Path | None = None,
 ) -> PipelineDefinition:
     """Build the moving-head sequencer pipeline.
@@ -39,10 +38,11 @@ def build_moving_heads_pipeline(
         display_groups: Display group configs for MacroPlannerStage.
         fixture_count: Number of moving head fixtures.
         available_templates: List of available template IDs.
-        xsq_output_path: Output path for the generated .xsq file.
+        xsq_output_path: Output path for the generated .xsq file; the .xtiming and
+            .xmap sidecars are written beside it.
         max_iterations: Maximum agent orchestration iterations.
-        min_pass_score: Minimum score for plan approval (0-10).
-        xsq_template_path: Optional template .xsq to merge into.
+        min_pass_score: Minimum score for plan approval, on the planners' 0-10 scale
+            (`AgentSettings.min_pass_score` converts the 0-100 config field).
         fixture_config_path: Optional path to fixture config JSON.
 
     Returns:
@@ -77,7 +77,6 @@ def build_moving_heads_pipeline(
             id="render",
             stage=MovingHeadRenderingStage(
                 xsq_output_path=xsq_output_path,
-                xsq_template_path=xsq_template_path,
                 fixture_config_path=fixture_config_path,
             ),
             inputs=["moving_heads"],

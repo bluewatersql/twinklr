@@ -18,7 +18,7 @@ Audio File (.mp3)
 4. Rendering & Compilation (det.)      templates → curves → DMX values → fixture segments
      │
      ▼
-xLights Sequence (.xsq)
+Delivery: fresh .xsq + .xtiming tracks + .xmap mapping hint
 ```
 
 ## Subsystem map (`packages/twinklr/core/`)
@@ -31,7 +31,7 @@ xLights Sequence (.xsq)
 | Curves | `curves/` | native + custom curve generation |
 | Pipeline | `pipeline/` | declarative stage framework; fail-fast policy, stage caching |
 | Feature engineering | `feature_engineering/`, `feature_store/` | corpus mining → profiles, recipes (SQLite store) |
-| Formats | `formats/xlights/` | `.xsq` reader/writer |
+| Formats | `formats/xlights/` | `.xsq`/`.xtiming`/`.xmap` writers; the `.xsq` reader is analysis-only (P1P-T11) |
 | Config | `config/` | Pydantic app/job/fixture config models |
 | API clients | `api/` | HTTP (sync+async), OpenAI LLM client, AcoustID/MusicBrainz |
 | Caching | `caching/` | FSCache (async), sync variants, null cache |

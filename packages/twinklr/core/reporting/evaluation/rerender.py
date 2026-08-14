@@ -53,7 +53,6 @@ async def rerender_plan(
     plan: ChoreographyPlan,
     audio_path: Path,
     fixture_config_path: Path,
-    xsq_path: Path,
 ) -> RerenderResult:
     """Re-render a choreography plan through the sequencing pipeline.
 
@@ -61,11 +60,15 @@ async def rerender_plan(
     IR segments and curves from a saved plan. It uses the same sequencer
     code as production.
 
+    Evaluation reads segments and curves, so nothing here writes a `.xsq` — this used
+    to take the user's sequence as a template and drop a `temp_eval.xsq` next to their
+    audio on every report. It is the third export-path caller P1P-T11 detached from the
+    user's document, and the easiest of the three to miss.
+
     Args:
         plan: ChoreographyPlan to render
         audio_path: Path to audio file (for tempo/structure)
         fixture_config_path: Path to fixture configuration
-        xsq_path: Path to xLights sequence file
 
     Returns:
         RerenderResult with segments, audio features, and fixture contexts
@@ -79,7 +82,6 @@ async def rerender_plan(
         ...     plan=plan,
         ...     audio_path=Path("song.mp3"),
         ...     fixture_config_path=Path("fixtures.json"),
-        ...     xsq_path=Path("sequence.xsq"),
         ... )
         >>> len(result.segments) > 0
         True
@@ -89,8 +91,6 @@ async def rerender_plan(
         raise FileNotFoundError(f"Audio file not found: {audio_path}")
     if not fixture_config_path.exists():
         raise FileNotFoundError(f"Fixture config not found: {fixture_config_path}")
-    if not xsq_path.exists():
-        raise FileNotFoundError(f"XSQ file not found: {xsq_path}")
 
     logger.debug(f"Re-rendering plan with {len(plan.sections)} sections")
 
@@ -127,8 +127,7 @@ async def rerender_plan(
         beat_grid=beat_grid,
         fixture_group=fixture_group,
         job_config=job_config,
-        output_path=audio_path.parent / "temp_eval.xsq",  # Temp path, won't export
-        template_xsq=xsq_path,
+        output_path=None,  # Evaluation reads segments; it writes no sequence file.
     )
 
     # Render segments

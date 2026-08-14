@@ -16,10 +16,8 @@ from typing import Any
 
 from twinklr.core.agents.assets.models import AssetCatalog
 from twinklr.core.agents.assets.resolver import resolve_plan_assets
-from twinklr.core.formats.xlights.sequence.models.xsq import (
-    SequenceHead,
-    XSequence,
-)
+from twinklr.core.formats.xlights.sequence.fresh import build_fresh_sequence, resolve_media_file
+from twinklr.core.formats.xlights.sequence.models.xsq import XSequence
 from twinklr.core.pipeline.context import PipelineContext
 from twinklr.core.pipeline.result import StageResult, failure_result, success_result
 from twinklr.core.pipeline.stage import resolve_typed_input
@@ -236,17 +234,15 @@ class DisplayRenderStage:
                     len(raw_index),
                 )
 
-            # Create empty sequence if not provided
+            # Create empty sequence if not provided. Same emitter as the moving-heads
+            # delivery: one version stamp, one timing grid, never an empty mediaFile
+            # (P5-M3 — the two fresh emitters used to disagree on all three).
             if sequence is None:
-                sequence = XSequence(
-                    head=SequenceHead(
-                        version="2024.01",
-                        author="Twinklr Display Renderer",
-                        song="",
-                        sequence_timing="20 ms",
-                        media_file="",
-                        sequence_duration_ms=int(beat_grid.duration_ms),
-                    ),
+                audio_bundle = context.get_state("audio_bundle")
+                sequence = build_fresh_sequence(
+                    media_file=resolve_media_file(getattr(audio_bundle, "audio_path", None)),
+                    duration_ms=int(beat_grid.duration_ms),
+                    author="Twinklr Display Renderer",
                 )
 
             # Extract section boundaries from macro plan (audio-sourced timing)
