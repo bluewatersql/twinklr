@@ -5,6 +5,7 @@ Wraps MovingHeadPlannerOrchestrator for pipeline execution.
 
 from __future__ import annotations
 
+import json
 import logging
 from typing import TYPE_CHECKING, Any
 
@@ -257,7 +258,26 @@ class MovingHeadStage:
 
         plan = result.get("plan") if isinstance(result, dict) else getattr(result, "plan", None)
         if plan:
-            context.set_state("choreography_plan", ChoreographyPlan.model_validate(plan))
+            validated_plan = ChoreographyPlan.model_validate(plan)
+            context.set_state("choreography_plan", validated_plan)
+            self._write_checkpoint(validated_plan, context)
+
+    def _write_checkpoint(self, plan: ChoreographyPlan, context: PipelineContext) -> None:
+        """Serialize today's plan for `twinklr eval-report` (P1P-T10).
+
+        Historical checkpoints used a `templates:[...]` list shape that today's
+        `PlanSection` model no longer has; this writes `plan.model_dump()` directly,
+        which is exactly what `collect.extract_plan` already validates against.
+        """
+        if not context.job_config.write_checkpoint or context.output_dir is None:
+            return
+        checkpoint_path = context.output_dir / "checkpoints" / "plans" / "final.json"
+        checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
+        checkpoint_data = {
+            "run_id": context.session.session_id,
+            "plan": plan.model_dump(mode="json"),
+        }
+        checkpoint_path.write_text(json.dumps(checkpoint_data, indent=2), encoding="utf-8")
 
     def _handle_metrics(self, result: Any, context: PipelineContext) -> None:
         """Track iteration metrics (extends defaults from execute_step)."""

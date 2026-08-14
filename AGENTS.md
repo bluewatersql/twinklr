@@ -34,6 +34,7 @@ Before substantial work:
 | Durable learning, decision, constraint, or pattern | `memories/` |
 | Reusable agent procedure / workflow | `prompts/` |
 | Human-facing product & developer documentation (published site) | `docs/` |
+| Dated evaluation results (`eval-report` output + human judgment) | `evaluations/` |
 
 One source owns each fact. `context/` summarizes and links into `docs/` rather than
 duplicating it; `docs/` remains the deep human-facing reference and GitHub Pages site.

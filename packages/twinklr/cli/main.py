@@ -381,11 +381,30 @@ def build_arg_parser() -> argparse.ArgumentParser:
 
     add_curate_catalog_subparser(sub)
 
+    # Registered only so `twinklr --help` lists it; `main()` dispatches "eval-report"
+    # to click before argparse ever parses its arguments (see below — argparse's
+    # REMAINDER cannot reliably swallow a leading `--option` token).
+    sub.add_parser(
+        "eval-report",
+        help="Generate an evaluation report from a checkpoint (see `eval-report --help`)",
+        add_help=False,
+    )
+
     return p
 
 
 def main() -> None:
     """Main entry point for CLI."""
+    # Bridges the existing `eval-report` click command (reporting/evaluation/cli.py)
+    # onto the twinklr console script by handing it argv directly, before argparse
+    # parses anything. Keeps click as the single implementation of `eval-report`
+    # instead of duplicating its options in argparse.
+    if len(sys.argv) > 1 and sys.argv[1] == "eval-report":
+        from twinklr.core.reporting.evaluation.cli import eval_report_cli
+
+        eval_report_cli.main(args=sys.argv[2:], prog_name="twinklr eval-report")
+        return
+
     p = build_arg_parser()
     args = p.parse_args()
 

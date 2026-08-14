@@ -1,0 +1,106 @@
+{
+  "run_id": "p1p-t10-first-evaluation",
+  "plan": {
+    "sections": [
+      {
+        "section_name": "intro",
+        "start_bar": 1,
+        "end_bar": 4,
+        "section_role": null,
+        "energy_level": null,
+        "template_id": "sweep_lr_fan_hold",
+        "preset_id": "chill",
+        "modifiers": {},
+        "reasoning": "",
+        "segments": null,
+        "transition_in": null,
+        "transition_out": null
+      },
+      {
+        "section_name": "chorus",
+        "start_bar": 5,
+        "end_bar": 8,
+        "section_role": null,
+        "energy_level": null,
+        "template_id": "bounce_fan_pulse",
+        "preset_id": "energetic",
+        "modifiers": {},
+        "reasoning": "",
+        "segments": null,
+        "transition_in": null,
+        "transition_out": null
+      },
+      {
+        "section_name": "drop",
+        "start_bar": 9,
+        "end_bar": 12,
+        "section_role": null,
+        "energy_level": null,
+        "template_id": "pop_lock_spotlight_blackout",
+        "preset_id": "energetic",
+        "modifiers": {},
+        "reasoning": "",
+        "segments": null,
+        "transition_in": null,
+        "transition_out": null
+      },
+      {
+        "section_name": "breakdown",
+        "start_bar": 13,
+        "end_bar": 16,
+        "section_role": null,
+        "energy_level": null,
+        "template_id": "circle_asym_left_strobe",
+        "preset_id": "chill",
+        "modifiers": {},
+        "reasoning": "",
+        "segments": null,
+        "transition_in": null,
+        "transition_out": null
+      },
+      {
+        "section_name": "one_bar",
+        "start_bar": 17,
+        "end_bar": 17,
+        "section_role": null,
+        "energy_level": null,
+        "template_id": "sweep_lr_fan_hold",
+        "preset_id": "moderate",
+        "modifiers": {},
+        "reasoning": "",
+        "segments": null,
+        "transition_in": null,
+        "transition_out": null
+      },
+      {
+        "section_name": "phrase",
+        "start_bar": 18,
+        "end_bar": 25,
+        "section_role": null,
+        "energy_level": null,
+        "template_id": "intro_main_outro_phrase",
+        "preset_id": "moderate",
+        "modifiers": {},
+        "reasoning": "",
+        "segments": null,
+        "transition_in": null,
+        "transition_out": null
+      },
+      {
+        "section_name": "arc",
+        "start_bar": 26,
+        "end_bar": 31,
+        "section_role": null,
+        "energy_level": null,
+        "template_id": "build_drop_recover",
+        "preset_id": "energetic",
+        "modifiers": {},
+        "reasoning": "",
+        "segments": null,
+        "transition_in": null,
+        "transition_out": null
+      }
+    ],
+    "overall_strategy": ""
+  }
+}

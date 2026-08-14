@@ -1,0 +1,1338 @@
+{
+  "schema_version": "1.0.0",
+  "run": {
+    "run_id": "p1p-t10-first-evaluation",
+    "timestamp": "2026-08-14T03:07:08.626967+00:00",
+    "git_sha": "92af8895767aaa9bd70dbec07400d541e8c27023",
+    "engine_version": "0.2.0",
+    "checkpoint_path": "evaluations/2026-08-13-golden-fixture-mh4-minimal/checkpoint.json"
+  },
+  "song": {
+    "bpm": 117.45383522727273,
+    "time_signature": "2/4",
+    "bars_total": 63,
+    "bar_duration_ms": 999.9516129032259,
+    "song_structure": {
+      "sections": [
+        {
+          "section_id": 0,
+          "start_s": 0.0,
+          "end_s": 24.00943374633789,
+          "duration_s": 24.00943374633789,
+          "similarity": 0.9042694568634033,
+          "repeat_count": 1,
+          "energy_rank": 0.5,
+          "energy": 0.5,
+          "repetition": 0.663,
+          "confidence": 0.202,
+          "label": "verse",
+          "label_confidence": 0.27,
+          "boundary_strength_in": 0.5,
+          "boundary_strength_out": 0.5,
+          "vocal_density": 0.0,
+          "harmonic_complexity": 0.957956786611352
+        },
+        {
+          "section_id": 1,
+          "start_s": 24.00943374633789,
+          "end_s": 45.02349090576172,
+          "duration_s": 21.014057159423828,
+          "similarity": 0.6904727816581726,
+          "repeat_count": 0,
+          "energy_rank": 0.248,
+          "energy": 0.248,
+          "repetition": 0.043,
+          "confidence": 0.125,
+          "label": "verse",
+          "label_confidence": 0.253,
+          "boundary_strength_in": 0.5,
+          "boundary_strength_out": 0.5,
+          "vocal_density": 0.0,
+          "harmonic_complexity": 0.9993310592372914
+        },
+        {
+          "section_id": 2,
+          "start_s": 45.02349090576172,
+          "end_s": 64.0,
+          "duration_s": 18.97650909423828,
+          "similarity": 0.9042694568634033,
+          "repeat_count": 1,
+          "energy_rank": 0.663,
+          "energy": 0.663,
+          "repetition": 0.5,
+          "confidence": 0.198,
+          "label": "instrumental",
+          "label_confidence": 0.329,
+          "boundary_strength_in": 0.5,
+          "boundary_strength_out": 0.5,
+          "vocal_density": 0.0,
+          "harmonic_complexity": 0.9748895283177789
+        }
+      ],
+      "boundary_times_s": [
+        0.0,
+        24.00943374633789,
+        45.02349090576172,
+        64.0
+      ],
+      "meta": {
+        "method": "hybrid_foote_v3",
+        "genre": "default",
+        "preset_source": "genre_lookup",
+        "tempo_bpm": 117.4541680046,
+        "num_beats": 125,
+        "hop_length": 512,
+        "min_section_s_input": 3.0,
+        "min_section_s_effective": 3.0,
+        "trim": {
+          "used": false,
+          "start_offset_s": 0.0,
+          "duration_work_s": 64.0,
+          "duration_orig_s": 64.0
+        },
+        "preset": {
+          "min_sections": 8,
+          "max_sections": 14,
+          "min_len_beats": 22,
+          "novelty_l_beats": 14,
+          "peak_delta": 0.085,
+          "pre_avg": 12,
+          "post_avg": 12
+        },
+        "repeat_threshold_derived": 0.9,
+        "discrimination": 0.5
+      }
+    }
+  },
+  "summary": {
+    "sections": 7,
+    "total_warnings": 12,
+    "total_errors": 11,
+    "max_concurrent_layers": 0,
+    "templates_used": [
+      "bounce_fan_pulse",
+      "build_drop_recover",
+      "circle_asym_left_strobe",
+      "intro_main_outro_phrase",
+      "pop_lock_spotlight_blackout",
+      "sweep_lr_fan_hold"
+    ],
+    "roles_targeted": [
+      "INNER_LEFT",
+      "INNER_RIGHT",
+      "OUTER_LEFT",
+      "OUTER_RIGHT"
+    ],
+    "validation_errors": 0,
+    "physics_violations": 9,
+    "compliance_issues": 2,
+    "harsh_transitions": 0
+  },
+  "sections": [
+    {
+      "section_id": "intro",
+      "label": "Intro",
+      "bar_range": [
+        1.0,
+        4.0
+      ],
+      "time_range_ms": [
+        999,
+        3999
+      ],
+      "selected_template": {
+        "template_id": "sweep_lr_fan_hold",
+        "preset_id": "chill",
+        "modifiers": {},
+        "reasoning": "",
+        "steps": []
+      },
+      "segments": null,
+      "targets": {
+        "bindings": {},
+        "resolved_roles": [
+          "OUTER_LEFT",
+          "INNER_LEFT",
+          "INNER_RIGHT",
+          "OUTER_RIGHT"
+        ]
+      },
+      "curves": [
+        {
+          "role": "OUTER_LEFT",
+          "channel": "pan",
+          "space": "dmx",
+          "plot_path": "evaluations/2026-08-13-golden-fixture-mh4-minimal/plots/intro__OUTER_LEFT__pan.png",
+          "stats": {
+            "min": 0.0,
+            "max": 0.32116071625821085,
+            "range": 0.32116071625821085,
+            "mean": 0.28116635170599547,
+            "std": 0.03588546583864595,
+            "clamp_pct": 1.0416666666666665,
+            "energy": 0.001119026885917111
+          },
+          "continuity": {
+            "loop_delta": 0.32116071625821085,
+            "ok": false,
+            "threshold": 0.05
+          },
+          "curve_type": "movement_triangle",
+          "handler": "__default__",
+          "base_position": 0.1,
+          "static_dmx": null,
+          "physics_check": {
+            "speed_ok": true,
+            "acceleration_ok": false,
+            "max_speed_deg_per_sec": 50.05778612230629,
+            "max_accel_deg_per_sec2": 4788.861539033969,
+            "violations": [
+              "Acceleration 4788.9\u00b0/s\u00b2 exceeds limit 1000.0\u00b0/s\u00b2"
+            ]
+          }
+        },
+        {
+          "role": "OUTER_LEFT",
+          "channel": "tilt",
+          "space": "dmx",
+          "plot_path": "evaluations/2026-08-13-golden-fixture-mh4-minimal/plots/intro__OUTER_LEFT__tilt.png",
+          "stats": {
+            "min": 0.0,
+            "max": 0.3901960784313725,
+            "range": 0.3901960784313725,
+            "mean": 0.3861315359477124,
+            "std": 0.03961625969397433,
+            "clamp_pct": 1.0416666666666665,
+            "energy": 0.0013595682175309145
+          },
+          "continuity": {
+            "loop_delta": 0.3901960784313725,
+            "ok": false,
+            "threshold": 0.05
+          },
+          "curve_type": "movement_hold",
+          "handler": "__default__",
+          "base_position": 0.5,
+          "static_dmx": null,
+          "physics_check": {
+            "speed_ok": true,
+            "acceleration_ok": false,
+            "max_speed_deg_per_sec": 39.52456747404844,
+            "max_accel_deg_per_sec2": 3781.1836216839674,
+            "violations": [
+              "Acceleration 3781.2\u00b0/s\u00b2 exceeds limit 1000.0\u00b0/s\u00b2"
+            ]
+          }
+        },
+        {
+          "role": "OUTER_LEFT",
+          "channel": "dimmer",
+          "space": "dmx",
+          "plot_path": "evaluations/2026-08-13-golden-fixture-mh4-minimal/plots/intro__OUTER_LEFT__dimmer.png",
+          "stats": {
+            "min": 0.0,
+            "max": 1.0,
+            "range": 1.0,
+            "mean": 0.9895833333333334,
+            "std": 0.1015291077584267,
+            "clamp_pct": 100.0,
+            "energy": 0.003484320557491289
+          },
+          "continuity": {
+            "loop_delta": 1.0,
+            "ok": true,
+            "threshold": 0.05
+          },
+          "curve_type": "hold",
+          "handler": "__default__",
+          "base_position": null,
+          "static_dmx": 255,
+          "physics_check": null
+        }
+      ],
+      "flags": [
+        {
+          "level": "error",
+          "code": "PHYSICS_VIOLATION",
+          "message": "Acceleration 4788.9\u00b0/s\u00b2 exceeds limit 1000.0\u00b0/s\u00b2",
+          "details": {
+            "channel": "pan",
+            "max_speed": 50.05778612230629,
+            "max_accel": 4788.861539033969
+          }
+        },
+        {
+          "level": "warning",
+          "code": "LOOP_DISCONTINUITY",
+          "message": "Loop discontinuity: delta=0.321",
+          "details": {
+            "loop_delta": 0.32116071625821085
+          }
+        },
+        {
+          "level": "error",
+          "code": "PHYSICS_VIOLATION",
+          "message": "Acceleration 3781.2\u00b0/s\u00b2 exceeds limit 1000.0\u00b0/s\u00b2",
+          "details": {
+            "channel": "tilt",
+            "max_speed": 39.52456747404844,
+            "max_accel": 3781.1836216839674
+          }
+        },
+        {
+          "level": "warning",
+          "code": "LOOP_DISCONTINUITY",
+          "message": "Loop discontinuity: delta=0.390",
+          "details": {
+            "loop_delta": 0.3901960784313725
+          }
+        }
+      ],
+      "template_compliance": {
+        "template_id": "sweep_lr_fan_hold",
+        "curve_type_correct": true,
+        "modifiers_compliant": [],
+        "geometry_correct": true,
+        "overall_compliant": true,
+        "issues": []
+      },
+      "transition_to_next": {
+        "from_section": "intro",
+        "to_section": "chorus",
+        "position_delta_pan": 9.923849359473385e-05,
+        "position_delta_tilt": 0.0,
+        "velocity_delta": 0.0004120876693191045,
+        "dimmer_snap": false,
+        "smooth": true,
+        "issues": []
+      },
+      "validation_issues": []
+    },
+    {
+      "section_id": "chorus",
+      "label": "Chorus",
+      "bar_range": [
+        5.0,
+        8.0
+      ],
+      "time_range_ms": [
+        4999,
+        7999
+      ],
+      "selected_template": {
+        "template_id": "bounce_fan_pulse",
+        "preset_id": "energetic",
+        "modifiers": {},
+        "reasoning": "",
+        "steps": []
+      },
+      "segments": null,
+      "targets": {
+        "bindings": {},
+        "resolved_roles": [
+          "OUTER_LEFT",
+          "INNER_LEFT",
+          "INNER_RIGHT",
+          "OUTER_RIGHT"
+        ]
+      },
+      "curves": [
+        {
+          "role": "OUTER_LEFT",
+          "channel": "pan",
+          "space": "dmx",
+          "plot_path": "evaluations/2026-08-13-golden-fixture-mh4-minimal/plots/chorus__OUTER_LEFT__pan.png",
+          "stats": {
+            "min": 0.20273253361966956,
+            "max": 0.7161323208004403,
+            "range": 0.5133997871807707,
+            "mean": 0.45654534426177595,
+            "std": 0.1481093298680099,
+            "clamp_pct": 0.0,
+            "energy": 0.009055764318479749
+          },
+          "continuity": {
+            "loop_delta": 0.3318164551514774,
+            "ok": false,
+            "threshold": 0.05
+          },
+          "curve_type": "movement_triangle",
+          "handler": "__default__",
+          "base_position": 0.1,
+          "static_dmx": null,
+          "physics_check": {
+            "speed_ok": true,
+            "acceleration_ok": false,
+            "max_speed_deg_per_sec": 29.17014409942122,
+            "max_accel_deg_per_sec2": 2965.755881719339,
+            "violations": [
+              "Acceleration 2965.8\u00b0/s\u00b2 exceeds limit 1000.0\u00b0/s\u00b2"
+            ]
+          }
+        },
+        {
+          "role": "OUTER_LEFT",
+          "channel": "tilt",
+          "space": "dmx",
+          "plot_path": "evaluations/2026-08-13-golden-fixture-mh4-minimal/plots/chorus__OUTER_LEFT__tilt.png",
+          "stats": {
+            "min": 0.025572304535234052,
+            "max": 0.48576258996337596,
+            "range": 0.4601902854281419,
+            "mean": 0.25471622722073317,
+            "std": 0.13298644114110222,
+            "clamp_pct": 0.0,
+            "energy": 0.00893716189163844
+          },
+          "continuity": {
+            "loop_delta": 0.06163325871159697,
+            "ok": false,
+            "threshold": 0.05
+          },
+          "curve_type": "movement_hold",
+          "handler": "__default__",
+          "base_position": 0.5,
+          "static_dmx": null,
+          "physics_check": {
+            "speed_ok": true,
+            "acceleration_ok": false,
+            "max_speed_deg_per_sec": 36.934243449950024,
+            "max_accel_deg_per_sec2": 3611.8725077668446,
+            "violations": [
+              "Acceleration 3611.9\u00b0/s\u00b2 exceeds limit 1000.0\u00b0/s\u00b2"
+            ]
+          }
+        },
+        {
+          "role": "OUTER_LEFT",
+          "channel": "dimmer",
+          "space": "dmx",
+          "plot_path": "evaluations/2026-08-13-golden-fixture-mh4-minimal/plots/chorus__OUTER_LEFT__dimmer.png",
+          "stats": {
+            "min": 0.5137254901960784,
+            "max": 1.0,
+            "range": 0.4862745098039216,
+            "mean": 0.7976899990508639,
+            "std": 0.23270142774946137,
+            "clamp_pct": 54.166666666666664,
+            "energy": 0.006777345084375214
+          },
+          "continuity": {
+            "loop_delta": 0.0,
+            "ok": true,
+            "threshold": 0.05
+          },
+          "curve_type": "hold",
+          "handler": "__default__",
+          "base_position": null,
+          "static_dmx": 255,
+          "physics_check": null
+        }
+      ],
+      "flags": [
+        {
+          "level": "error",
+          "code": "PHYSICS_VIOLATION",
+          "message": "Acceleration 2965.8\u00b0/s\u00b2 exceeds limit 1000.0\u00b0/s\u00b2",
+          "details": {
+            "channel": "pan",
+            "max_speed": 29.17014409942122,
+            "max_accel": 2965.755881719339
+          }
+        },
+        {
+          "level": "warning",
+          "code": "LOOP_DISCONTINUITY",
+          "message": "Loop discontinuity: delta=0.332",
+          "details": {
+            "loop_delta": 0.3318164551514774
+          }
+        },
+        {
+          "level": "error",
+          "code": "PHYSICS_VIOLATION",
+          "message": "Acceleration 3611.9\u00b0/s\u00b2 exceeds limit 1000.0\u00b0/s\u00b2",
+          "details": {
+            "channel": "tilt",
+            "max_speed": 36.934243449950024,
+            "max_accel": 3611.8725077668446
+          }
+        },
+        {
+          "level": "warning",
+          "code": "LOOP_DISCONTINUITY",
+          "message": "Loop discontinuity: delta=0.062",
+          "details": {
+            "loop_delta": 0.06163325871159697
+          }
+        }
+      ],
+      "template_compliance": {
+        "template_id": "bounce_fan_pulse",
+        "curve_type_correct": true,
+        "modifiers_compliant": [],
+        "geometry_correct": true,
+        "overall_compliant": true,
+        "issues": []
+      },
+      "transition_to_next": {
+        "from_section": "chorus",
+        "to_section": "drop",
+        "position_delta_pan": 0.000789731011959117,
+        "position_delta_tilt": 0.0007078821395711973,
+        "velocity_delta": 0.00019768223106718895,
+        "dimmer_snap": false,
+        "smooth": true,
+        "issues": []
+      },
+      "validation_issues": []
+    },
+    {
+      "section_id": "drop",
+      "label": "Drop",
+      "bar_range": [
+        9.0,
+        12.0
+      ],
+      "time_range_ms": [
+        8999,
+        11999
+      ],
+      "selected_template": {
+        "template_id": "pop_lock_spotlight_blackout",
+        "preset_id": "energetic",
+        "modifiers": {},
+        "reasoning": "",
+        "steps": []
+      },
+      "segments": null,
+      "targets": {
+        "bindings": {},
+        "resolved_roles": [
+          "OUTER_LEFT",
+          "INNER_LEFT",
+          "INNER_RIGHT",
+          "OUTER_RIGHT"
+        ]
+      },
+      "curves": [
+        {
+          "role": "OUTER_LEFT",
+          "channel": "pan",
+          "space": "dmx",
+          "plot_path": "evaluations/2026-08-13-golden-fixture-mh4-minimal/plots/drop__OUTER_LEFT__pan.png",
+          "stats": {
+            "min": 0.21500000000000002,
+            "max": 0.74,
+            "range": 0.5249999999999999,
+            "mean": 0.49753417602615596,
+            "std": 0.2382441100085015,
+            "clamp_pct": 0.0,
+            "energy": 0.02277050921392807
+          },
+          "continuity": {
+            "loop_delta": 0.2351361443973563,
+            "ok": false,
+            "threshold": 0.05
+          },
+          "curve_type": "movement_triangle",
+          "handler": "__default__",
+          "base_position": 0.1,
+          "static_dmx": null,
+          "physics_check": {
+            "speed_ok": true,
+            "acceleration_ok": false,
+            "max_speed_deg_per_sec": 47.63581654732323,
+            "max_accel_deg_per_sec2": 4557.159783027256,
+            "violations": [
+              "Acceleration 4557.2\u00b0/s\u00b2 exceeds limit 1000.0\u00b0/s\u00b2"
+            ]
+          }
+        },
+        {
+          "role": "OUTER_LEFT",
+          "channel": "tilt",
+          "space": "dmx",
+          "plot_path": "evaluations/2026-08-13-golden-fixture-mh4-minimal/plots/drop__OUTER_LEFT__tilt.png",
+          "stats": {
+            "min": 0.0196078431372549,
+            "max": 0.49019607843137253,
+            "range": 0.47058823529411764,
+            "mean": 0.27291865628434603,
+            "std": 0.21355628563589793,
+            "clamp_pct": 0.0,
+            "energy": 0.020351444619275707
+          },
+          "continuity": {
+            "loop_delta": 0.19380578220271633,
+            "ok": false,
+            "threshold": 0.05
+          },
+          "curve_type": "movement_triangle",
+          "handler": "__default__",
+          "base_position": 0.5,
+          "static_dmx": null,
+          "physics_check": {
+            "speed_ok": true,
+            "acceleration_ok": false,
+            "max_speed_deg_per_sec": 19.631385703122206,
+            "max_accel_deg_per_sec2": 1878.0692322653579,
+            "violations": [
+              "Acceleration 1878.1\u00b0/s\u00b2 exceeds limit 1000.0\u00b0/s\u00b2"
+            ]
+          }
+        },
+        {
+          "role": "OUTER_LEFT",
+          "channel": "dimmer",
+          "space": "dmx",
+          "plot_path": "evaluations/2026-08-13-golden-fixture-mh4-minimal/plots/drop__OUTER_LEFT__dimmer.png",
+          "stats": {
+            "min": 0.0,
+            "max": 1.0,
+            "range": 1.0,
+            "mean": 0.003472222222222222,
+            "std": 0.058823174812838254,
+            "clamp_pct": 100.0,
+            "energy": 0.003484320557491289
+          },
+          "continuity": {
+            "loop_delta": 1.0,
+            "ok": true,
+            "threshold": 0.05
+          },
+          "curve_type": "pulse",
+          "handler": "__default__",
+          "base_position": null,
+          "static_dmx": null,
+          "physics_check": null
+        }
+      ],
+      "flags": [
+        {
+          "level": "error",
+          "code": "PHYSICS_VIOLATION",
+          "message": "Acceleration 4557.2\u00b0/s\u00b2 exceeds limit 1000.0\u00b0/s\u00b2",
+          "details": {
+            "channel": "pan",
+            "max_speed": 47.63581654732323,
+            "max_accel": 4557.159783027256
+          }
+        },
+        {
+          "level": "warning",
+          "code": "LOOP_DISCONTINUITY",
+          "message": "Loop discontinuity: delta=0.235",
+          "details": {
+            "loop_delta": 0.2351361443973563
+          }
+        },
+        {
+          "level": "error",
+          "code": "PHYSICS_VIOLATION",
+          "message": "Acceleration 1878.1\u00b0/s\u00b2 exceeds limit 1000.0\u00b0/s\u00b2",
+          "details": {
+            "channel": "tilt",
+            "max_speed": 19.631385703122206,
+            "max_accel": 1878.0692322653579
+          }
+        },
+        {
+          "level": "warning",
+          "code": "LOOP_DISCONTINUITY",
+          "message": "Loop discontinuity: delta=0.194",
+          "details": {
+            "loop_delta": 0.19380578220271633
+          }
+        },
+        {
+          "level": "error",
+          "code": "CLAMP_PCT_HIGH",
+          "message": "Curve clamps 100.0% of samples",
+          "details": {
+            "clamp_pct": 100.0,
+            "threshold": 60.0
+          }
+        }
+      ],
+      "template_compliance": {
+        "template_id": "pop_lock_spotlight_blackout",
+        "curve_type_correct": true,
+        "modifiers_compliant": [],
+        "geometry_correct": true,
+        "overall_compliant": true,
+        "issues": []
+      },
+      "transition_to_next": {
+        "from_section": "drop",
+        "to_section": "breakdown",
+        "position_delta_pan": 0.002058823529411765,
+        "position_delta_tilt": 0.0018454440599769317,
+        "velocity_delta": 0.0005199877766139395,
+        "dimmer_snap": false,
+        "smooth": true,
+        "issues": []
+      },
+      "validation_issues": []
+    },
+    {
+      "section_id": "breakdown",
+      "label": "Breakdown",
+      "bar_range": [
+        13.0,
+        16.0
+      ],
+      "time_range_ms": [
+        12999,
+        15999
+      ],
+      "selected_template": {
+        "template_id": "circle_asym_left_strobe",
+        "preset_id": "chill",
+        "modifiers": {},
+        "reasoning": "",
+        "steps": []
+      },
+      "segments": null,
+      "targets": {
+        "bindings": {},
+        "resolved_roles": [
+          "OUTER_LEFT",
+          "INNER_LEFT",
+          "INNER_RIGHT",
+          "OUTER_RIGHT"
+        ]
+      },
+      "curves": [
+        {
+          "role": "OUTER_LEFT",
+          "channel": "pan",
+          "space": "dmx",
+          "plot_path": "evaluations/2026-08-13-golden-fixture-mh4-minimal/plots/breakdown__OUTER_LEFT__pan.png",
+          "stats": {
+            "min": 0.29674675422768465,
+            "max": 0.74,
+            "range": 0.44325324577231534,
+            "mean": 0.4440400177723769,
+            "std": 0.06457158288314106,
+            "clamp_pct": 0.0,
+            "energy": 0.002430553396842776
+          },
+          "continuity": {
+            "loop_delta": 0.29892991936486424,
+            "ok": false,
+            "threshold": 0.05
+          },
+          "curve_type": "movement_pulse",
+          "handler": "__default__",
+          "base_position": 0.47750000000000004,
+          "static_dmx": null,
+          "physics_check": {
+            "speed_ok": true,
+            "acceleration_ok": false,
+            "max_speed_deg_per_sec": 89.79789284940318,
+            "max_accel_deg_per_sec2": 8622.4119599024,
+            "violations": [
+              "Acceleration 8622.4\u00b0/s\u00b2 exceeds limit 1000.0\u00b0/s\u00b2"
+            ]
+          }
+        },
+        {
+          "role": "OUTER_LEFT",
+          "channel": "tilt",
+          "space": "dmx",
+          "plot_path": "evaluations/2026-08-13-golden-fixture-mh4-minimal/plots/breakdown__OUTER_LEFT__tilt.png",
+          "stats": {
+            "min": 0.15252471822921274,
+            "max": 0.49019607843137253,
+            "range": 0.3376713602021598,
+            "mean": 0.353553876189699,
+            "std": 0.10936363470564654,
+            "clamp_pct": 0.0,
+            "energy": 0.0011765552620284314
+          },
+          "continuity": {
+            "loop_delta": 0.3376713602021598,
+            "ok": false,
+            "threshold": 0.05
+          },
+          "curve_type": "movement_pulse",
+          "handler": "__default__",
+          "base_position": 0.3075,
+          "static_dmx": null,
+          "physics_check": {
+            "speed_ok": true,
+            "acceleration_ok": true,
+            "max_speed_deg_per_sec": 0.16592444586846383,
+            "max_accel_deg_per_sec2": 0.45380914869217936,
+            "violations": []
+          }
+        },
+        {
+          "role": "OUTER_LEFT",
+          "channel": "dimmer",
+          "space": "dmx",
+          "plot_path": "evaluations/2026-08-13-golden-fixture-mh4-minimal/plots/breakdown__OUTER_LEFT__dimmer.png",
+          "stats": {
+            "min": 0.0,
+            "max": 0.4225490196078431,
+            "range": 0.4225490196078431,
+            "mean": 0.3014661476828532,
+            "std": 0.17373442741121956,
+            "clamp_pct": 1.0416666666666665,
+            "energy": 0.0027703764432602303
+          },
+          "continuity": {
+            "loop_delta": 0.05,
+            "ok": true,
+            "threshold": 0.05
+          },
+          "curve_type": "hold",
+          "handler": "__default__",
+          "base_position": null,
+          "static_dmx": 0,
+          "physics_check": null
+        }
+      ],
+      "flags": [
+        {
+          "level": "error",
+          "code": "PHYSICS_VIOLATION",
+          "message": "Acceleration 8622.4\u00b0/s\u00b2 exceeds limit 1000.0\u00b0/s\u00b2",
+          "details": {
+            "channel": "pan",
+            "max_speed": 89.79789284940318,
+            "max_accel": 8622.4119599024
+          }
+        },
+        {
+          "level": "warning",
+          "code": "LOOP_DISCONTINUITY",
+          "message": "Loop discontinuity: delta=0.299",
+          "details": {
+            "loop_delta": 0.29892991936486424
+          }
+        },
+        {
+          "level": "warning",
+          "code": "LOOP_DISCONTINUITY",
+          "message": "Loop discontinuity: delta=0.338",
+          "details": {
+            "loop_delta": 0.3376713602021598
+          }
+        }
+      ],
+      "template_compliance": {
+        "template_id": "circle_asym_left_strobe",
+        "curve_type_correct": true,
+        "modifiers_compliant": [],
+        "geometry_correct": true,
+        "overall_compliant": true,
+        "issues": []
+      },
+      "transition_to_next": {
+        "from_section": "breakdown",
+        "to_section": "one_bar",
+        "position_delta_pan": 0.0005557095807614298,
+        "position_delta_tilt": 0.00024361426262931984,
+        "velocity_delta": 0.00026306720318467874,
+        "dimmer_snap": false,
+        "smooth": true,
+        "issues": []
+      },
+      "validation_issues": []
+    },
+    {
+      "section_id": "one_bar",
+      "label": "One Bar",
+      "bar_range": [
+        17.0,
+        17.0
+      ],
+      "time_range_ms": [
+        16999,
+        16999
+      ],
+      "selected_template": {
+        "template_id": "sweep_lr_fan_hold",
+        "preset_id": "moderate",
+        "modifiers": {},
+        "reasoning": "",
+        "steps": []
+      },
+      "segments": null,
+      "targets": {
+        "bindings": {},
+        "resolved_roles": [
+          "OUTER_LEFT",
+          "INNER_LEFT",
+          "INNER_RIGHT",
+          "OUTER_RIGHT"
+        ]
+      },
+      "curves": [
+        {
+          "role": "OUTER_LEFT",
+          "channel": "pan",
+          "space": "dmx",
+          "plot_path": "evaluations/2026-08-13-golden-fixture-mh4-minimal/plots/one_bar__OUTER_LEFT__pan.png",
+          "stats": {
+            "min": 0.0,
+            "max": 0.0,
+            "range": 0.0,
+            "mean": 0.0,
+            "std": 0.0,
+            "clamp_pct": 0.0,
+            "energy": 0.0
+          },
+          "continuity": {
+            "loop_delta": 0.0,
+            "ok": true,
+            "threshold": 0.05
+          },
+          "curve_type": "movement_sine",
+          "handler": "__default__",
+          "base_position": 0.16999999999999998,
+          "static_dmx": null,
+          "physics_check": {
+            "speed_ok": true,
+            "acceleration_ok": true,
+            "max_speed_deg_per_sec": 0.0,
+            "max_accel_deg_per_sec2": 0.0,
+            "violations": []
+          }
+        },
+        {
+          "role": "OUTER_LEFT",
+          "channel": "tilt",
+          "space": "dmx",
+          "plot_path": "evaluations/2026-08-13-golden-fixture-mh4-minimal/plots/one_bar__OUTER_LEFT__tilt.png",
+          "stats": {
+            "min": 0.0,
+            "max": 0.0,
+            "range": 0.0,
+            "mean": 0.0,
+            "std": 0.0,
+            "clamp_pct": 0.0,
+            "energy": 0.0
+          },
+          "continuity": {
+            "loop_delta": 0.0,
+            "ok": true,
+            "threshold": 0.05
+          },
+          "curve_type": "movement_cosine",
+          "handler": "__default__",
+          "base_position": 0.3,
+          "static_dmx": null,
+          "physics_check": {
+            "speed_ok": true,
+            "acceleration_ok": true,
+            "max_speed_deg_per_sec": 0.0,
+            "max_accel_deg_per_sec2": 0.0,
+            "violations": []
+          }
+        },
+        {
+          "role": "OUTER_LEFT",
+          "channel": "dimmer",
+          "space": "dmx",
+          "plot_path": "evaluations/2026-08-13-golden-fixture-mh4-minimal/plots/one_bar__OUTER_LEFT__dimmer.png",
+          "stats": {
+            "min": 0.0,
+            "max": 0.0,
+            "range": 0.0,
+            "mean": 0.0,
+            "std": 0.0,
+            "clamp_pct": 0.0,
+            "energy": 0.0
+          },
+          "continuity": {
+            "loop_delta": 0.0,
+            "ok": true,
+            "threshold": 0.05
+          },
+          "curve_type": "pulse",
+          "handler": "__default__",
+          "base_position": null,
+          "static_dmx": null,
+          "physics_check": null
+        }
+      ],
+      "flags": [],
+      "template_compliance": {
+        "template_id": "sweep_lr_fan_hold",
+        "curve_type_correct": true,
+        "modifiers_compliant": [],
+        "geometry_correct": true,
+        "overall_compliant": true,
+        "issues": []
+      },
+      "transition_to_next": {
+        "from_section": "one_bar",
+        "to_section": "phrase",
+        "position_delta_pan": 0.000522116550445078,
+        "position_delta_tilt": 0.0007833689852589589,
+        "velocity_delta": 0.0001143946853818617,
+        "dimmer_snap": false,
+        "smooth": true,
+        "issues": []
+      },
+      "validation_issues": []
+    },
+    {
+      "section_id": "phrase",
+      "label": "Phrase",
+      "bar_range": [
+        18.0,
+        25.0
+      ],
+      "time_range_ms": [
+        17999,
+        24998
+      ],
+      "selected_template": {
+        "template_id": "intro_main_outro_phrase",
+        "preset_id": "moderate",
+        "modifiers": {},
+        "reasoning": "",
+        "steps": []
+      },
+      "segments": null,
+      "targets": {
+        "bindings": {},
+        "resolved_roles": [
+          "OUTER_LEFT",
+          "INNER_LEFT",
+          "INNER_RIGHT",
+          "OUTER_RIGHT"
+        ]
+      },
+      "curves": [
+        {
+          "role": "OUTER_LEFT",
+          "channel": "pan",
+          "space": "dmx",
+          "plot_path": "evaluations/2026-08-13-golden-fixture-mh4-minimal/plots/phrase__OUTER_LEFT__pan.png",
+          "stats": {
+            "min": 0.19996015513180954,
+            "max": 0.5959824602922327,
+            "range": 0.39602230516042314,
+            "mean": 0.39771491432088385,
+            "std": 0.08741120231887543,
+            "clamp_pct": 0.0,
+            "energy": 0.00132966050703722
+          },
+          "continuity": {
+            "loop_delta": 0.09882792939409113,
+            "ok": false,
+            "threshold": 0.05
+          },
+          "curve_type": null,
+          "handler": null,
+          "base_position": null,
+          "static_dmx": null,
+          "physics_check": {
+            "speed_ok": true,
+            "acceleration_ok": false,
+            "max_speed_deg_per_sec": 40.52415200106544,
+            "max_accel_deg_per_sec2": 3889.430447982053,
+            "violations": [
+              "Acceleration 3889.4\u00b0/s\u00b2 exceeds limit 1000.0\u00b0/s\u00b2"
+            ]
+          }
+        },
+        {
+          "role": "OUTER_LEFT",
+          "channel": "tilt",
+          "space": "dmx",
+          "plot_path": "evaluations/2026-08-13-golden-fixture-mh4-minimal/plots/phrase__OUTER_LEFT__tilt.png",
+          "stats": {
+            "min": 0.2901960784313725,
+            "max": 0.2901960784313725,
+            "range": 0.0,
+            "mean": 0.29019607843137246,
+            "std": 5.551115123125783e-17,
+            "clamp_pct": 0.0,
+            "energy": 0.0
+          },
+          "continuity": {
+            "loop_delta": 0.0,
+            "ok": true,
+            "threshold": 0.05
+          },
+          "curve_type": null,
+          "handler": null,
+          "base_position": null,
+          "static_dmx": null,
+          "physics_check": {
+            "speed_ok": true,
+            "acceleration_ok": true,
+            "max_speed_deg_per_sec": 0.0,
+            "max_accel_deg_per_sec2": 0.0,
+            "violations": []
+          }
+        },
+        {
+          "role": "OUTER_LEFT",
+          "channel": "dimmer",
+          "space": "dmx",
+          "plot_path": "evaluations/2026-08-13-golden-fixture-mh4-minimal/plots/phrase__OUTER_LEFT__dimmer.png",
+          "stats": {
+            "min": 0.10042777320392875,
+            "max": 1.0,
+            "range": 0.8995722267960713,
+            "mean": 0.3679086133744657,
+            "std": 0.1834706443454095,
+            "clamp_pct": 0.29806259314456035,
+            "energy": 0.0036159710351179775
+          },
+          "continuity": {
+            "loop_delta": 0.6705621571938156,
+            "ok": true,
+            "threshold": 0.05
+          },
+          "curve_type": null,
+          "handler": null,
+          "base_position": null,
+          "static_dmx": null,
+          "physics_check": null
+        }
+      ],
+      "flags": [
+        {
+          "level": "error",
+          "code": "PHYSICS_VIOLATION",
+          "message": "Acceleration 3889.4\u00b0/s\u00b2 exceeds limit 1000.0\u00b0/s\u00b2",
+          "details": {
+            "channel": "pan",
+            "max_speed": 40.52415200106544,
+            "max_accel": 3889.430447982053
+          }
+        },
+        {
+          "level": "warning",
+          "code": "LOOP_DISCONTINUITY",
+          "message": "Loop discontinuity: delta=0.099",
+          "details": {
+            "loop_delta": 0.09882792939409113
+          }
+        },
+        {
+          "level": "info",
+          "code": "LIMITED_RANGE",
+          "message": "Curve has limited range: 0.000",
+          "details": {
+            "range": 0.0
+          }
+        },
+        {
+          "level": "info",
+          "code": "STATIC_CURVE",
+          "message": "Curve appears static or nearly static",
+          "details": {
+            "energy": 0.0,
+            "range": 0.0
+          }
+        },
+        {
+          "level": "warning",
+          "code": "COMPLIANCE_ISSUE",
+          "message": "Missing curve type metadata for pan",
+          "details": {
+            "template_id": "intro_main_outro_phrase"
+          }
+        },
+        {
+          "level": "warning",
+          "code": "COMPLIANCE_ISSUE",
+          "message": "2 curves missing handler metadata",
+          "details": {
+            "template_id": "intro_main_outro_phrase"
+          }
+        }
+      ],
+      "template_compliance": {
+        "template_id": "intro_main_outro_phrase",
+        "curve_type_correct": false,
+        "modifiers_compliant": [],
+        "geometry_correct": false,
+        "overall_compliant": false,
+        "issues": [
+          "Missing curve type metadata for pan",
+          "2 curves missing handler metadata"
+        ]
+      },
+      "transition_to_next": {
+        "from_section": "phrase",
+        "to_section": "arc",
+        "position_delta_pan": 0.0,
+        "position_delta_tilt": 0.0,
+        "velocity_delta": 0.00022326711424306705,
+        "dimmer_snap": false,
+        "smooth": true,
+        "issues": []
+      },
+      "validation_issues": []
+    },
+    {
+      "section_id": "arc",
+      "label": "Arc",
+      "bar_range": [
+        26.0,
+        31.0
+      ],
+      "time_range_ms": [
+        25998,
+        30998
+      ],
+      "selected_template": {
+        "template_id": "build_drop_recover",
+        "preset_id": "energetic",
+        "modifiers": {},
+        "reasoning": "",
+        "steps": []
+      },
+      "segments": null,
+      "targets": {
+        "bindings": {},
+        "resolved_roles": [
+          "OUTER_LEFT",
+          "INNER_LEFT",
+          "INNER_RIGHT",
+          "OUTER_RIGHT"
+        ]
+      },
+      "curves": [
+        {
+          "role": "OUTER_LEFT",
+          "channel": "pan",
+          "space": "dmx",
+          "plot_path": "evaluations/2026-08-13-golden-fixture-mh4-minimal/plots/arc__OUTER_LEFT__pan.png",
+          "stats": {
+            "min": 0.20057383869922527,
+            "max": 0.7404694664545839,
+            "range": 0.5398956277553586,
+            "mean": 0.48132815118047945,
+            "std": 0.10465678853198983,
+            "clamp_pct": 0.0,
+            "energy": 0.005191976948802221
+          },
+          "continuity": {
+            "loop_delta": 0.0889098681564579,
+            "ok": false,
+            "threshold": 0.05
+          },
+          "curve_type": "movement_hold",
+          "handler": "__default__",
+          "base_position": 0.1,
+          "static_dmx": null,
+          "physics_check": {
+            "speed_ok": true,
+            "acceleration_ok": false,
+            "max_speed_deg_per_sec": 54.69068793501655,
+            "max_accel_deg_per_sec2": 5378.511481131686,
+            "violations": [
+              "Acceleration 5378.5\u00b0/s\u00b2 exceeds limit 1000.0\u00b0/s\u00b2"
+            ]
+          }
+        },
+        {
+          "role": "OUTER_LEFT",
+          "channel": "tilt",
+          "space": "dmx",
+          "plot_path": "evaluations/2026-08-13-golden-fixture-mh4-minimal/plots/arc__OUTER_LEFT__tilt.png",
+          "stats": {
+            "min": 0.25370852408781847,
+            "max": 0.38466925849134753,
+            "range": 0.13096073440352907,
+            "mean": 0.26359277139840676,
+            "std": 0.025757512967810987,
+            "clamp_pct": 0.0,
+            "energy": 0.0008305457639673577
+          },
+          "continuity": {
+            "loop_delta": 0.022951205445725098,
+            "ok": true,
+            "threshold": 0.05
+          },
+          "curve_type": "movement_hold",
+          "handler": "__default__",
+          "base_position": 0.5,
+          "static_dmx": null,
+          "physics_check": {
+            "speed_ok": true,
+            "acceleration_ok": true,
+            "max_speed_deg_per_sec": 3.580069204152251,
+            "max_accel_deg_per_sec2": 342.9706297577857,
+            "violations": []
+          }
+        },
+        {
+          "role": "OUTER_LEFT",
+          "channel": "dimmer",
+          "space": "dmx",
+          "plot_path": "evaluations/2026-08-13-golden-fixture-mh4-minimal/plots/arc__OUTER_LEFT__dimmer.png",
+          "stats": {
+            "min": 0.1,
+            "max": 1.0,
+            "range": 0.9,
+            "mean": 0.775312194043867,
+            "std": 0.21605891461875595,
+            "clamp_pct": 25.0,
+            "energy": 0.007254191736349089
+          },
+          "continuity": {
+            "loop_delta": 0.6315674725907726,
+            "ok": true,
+            "threshold": 0.05
+          },
+          "curve_type": "linear",
+          "handler": "__default__",
+          "base_position": null,
+          "static_dmx": null,
+          "physics_check": null
+        }
+      ],
+      "flags": [
+        {
+          "level": "error",
+          "code": "PHYSICS_VIOLATION",
+          "message": "Acceleration 5378.5\u00b0/s\u00b2 exceeds limit 1000.0\u00b0/s\u00b2",
+          "details": {
+            "channel": "pan",
+            "max_speed": 54.69068793501655,
+            "max_accel": 5378.511481131686
+          }
+        },
+        {
+          "level": "warning",
+          "code": "LOOP_DISCONTINUITY",
+          "message": "Loop discontinuity: delta=0.089",
+          "details": {
+            "loop_delta": 0.0889098681564579
+          }
+        },
+        {
+          "level": "error",
+          "code": "CLAMP_PCT_HIGH",
+          "message": "Curve clamps 25.0% of samples",
+          "details": {
+            "clamp_pct": 25.0,
+            "threshold": 20.0
+          }
+        }
+      ],
+      "template_compliance": {
+        "template_id": "build_drop_recover",
+        "curve_type_correct": true,
+        "modifiers_compliant": [],
+        "geometry_correct": true,
+        "overall_compliant": true,
+        "issues": []
+      },
+      "transition_to_next": null,
+      "validation_issues": []
+    }
+  ]
+}

@@ -1,5 +1,6 @@
 """Tests for MovingHeadStage."""
 
+import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -292,6 +293,7 @@ class TestMovingHeadStageStateHandler:
         )
 
         mock_context = MagicMock()
+        mock_context.output_dir = None  # checkpoint writing is exercised separately below
         plan = ChoreographyPlan(
             sections=[
                 PlanSection(
@@ -316,6 +318,7 @@ class TestMovingHeadStageStateHandler:
     def test_handle_state_with_dict(self, stage: MovingHeadStage) -> None:
         """Test state handler normalizes dict payload to ChoreographyPlan."""
         mock_context = MagicMock()
+        mock_context.output_dir = None  # checkpoint writing is exercised separately below
         result = {
             "success": True,
             "plan": {
@@ -345,6 +348,108 @@ class TestMovingHeadStageStateHandler:
 
         stored_plan = mock_context.set_state.call_args[0][1]
         assert isinstance(stored_plan, ChoreographyPlan)
+
+
+class TestMovingHeadStageCheckpointWriter:
+    """Tests for the P1P-T10 checkpoint writer at the `_handle_state` seam.
+
+    Uses a real `PipelineContext`/`TwinklrSession`/`JobConfig` (not `MagicMock`) so the
+    checkpoint actually lands on disk and can be round-tripped through
+    `reporting.evaluation.collect`, exactly as `eval-report` will read it.
+    """
+
+    @pytest.fixture
+    def stage(self) -> MovingHeadStage:
+        return MovingHeadStage(fixture_count=4, available_templates=["template1"])
+
+    def _real_context(self, tmp_path, *, write_checkpoint: bool = True):
+        from twinklr.core.config.models import JobConfig
+        from twinklr.core.pipeline.context import PipelineContext
+        from twinklr.core.session import TwinklrSession
+
+        session = TwinklrSession(
+            job_config=JobConfig(project_name="stage_test", write_checkpoint=write_checkpoint),
+            session_id="stage-test-session",
+            project_root=tmp_path,
+        )
+        return PipelineContext(session=session, output_dir=tmp_path / "artifacts")
+
+    def _dict_result(self) -> dict:
+        return {
+            "plan": {
+                "sections": [
+                    {
+                        "section_name": "intro",
+                        "start_bar": 1,
+                        "end_bar": 8,
+                        "template_id": "template1",
+                    }
+                ],
+                "overall_strategy": "Test",
+            }
+        }
+
+    def test_checkpoint_written_on_run(self, stage: MovingHeadStage, tmp_path) -> None:
+        """The writer fires at the `_handle_state` seam and lands under output_dir."""
+        context = self._real_context(tmp_path)
+
+        stage._handle_state(self._dict_result(), context)
+
+        checkpoint_path = tmp_path / "artifacts" / "checkpoints" / "plans" / "final.json"
+        assert checkpoint_path.exists()
+
+    def test_checkpoint_roundtrips_through_collect(self, stage: MovingHeadStage, tmp_path) -> None:
+        """`load_checkpoint` -> `extract_plan` succeeds with no adapter."""
+        from twinklr.core.reporting.evaluation.collect import extract_plan, load_checkpoint
+
+        context = self._real_context(tmp_path)
+        stage._handle_state(self._dict_result(), context)
+
+        checkpoint_path = tmp_path / "artifacts" / "checkpoints" / "plans" / "final.json"
+        checkpoint_data = load_checkpoint(checkpoint_path)
+        plan = extract_plan(checkpoint_data)
+
+        assert isinstance(plan, ChoreographyPlan)
+        assert len(plan.sections) == 1
+        assert plan.sections[0].section_name == "intro"
+
+    def test_checkpoint_uses_current_plan_schema(self, stage: MovingHeadStage, tmp_path) -> None:
+        """No `templates:[...]` list-shaped entry — the schema-drift trap."""
+        context = self._real_context(tmp_path)
+        stage._handle_state(self._dict_result(), context)
+
+        checkpoint_path = tmp_path / "artifacts" / "checkpoints" / "plans" / "final.json"
+        written = json.loads(checkpoint_path.read_text(encoding="utf-8"))
+
+        for section in written["plan"]["sections"]:
+            assert "templates" not in section
+            has_template_id = bool(section.get("template_id"))
+            has_segments = bool(section.get("segments"))
+            assert has_template_id != has_segments  # exactly one of the two
+
+    def test_checkpoint_disabled_by_config(self, stage: MovingHeadStage, tmp_path) -> None:
+        """`JobConfig.write_checkpoint = False` is a real, read control field."""
+        context = self._real_context(tmp_path, write_checkpoint=False)
+
+        stage._handle_state(self._dict_result(), context)
+
+        checkpoint_path = tmp_path / "artifacts" / "checkpoints" / "plans" / "final.json"
+        assert not checkpoint_path.exists()
+
+    def test_checkpoint_skipped_without_output_dir(self, stage: MovingHeadStage, tmp_path) -> None:
+        """No output_dir configured -> no crash, no write (nowhere to put it)."""
+        from twinklr.core.config.models import JobConfig
+        from twinklr.core.pipeline.context import PipelineContext
+        from twinklr.core.session import TwinklrSession
+
+        session = TwinklrSession(
+            job_config=JobConfig(project_name="stage_test"),
+            session_id="stage-test-session",
+            project_root=tmp_path,
+        )
+        context = PipelineContext(session=session, output_dir=None)
+
+        stage._handle_state(self._dict_result(), context)  # must not raise
 
 
 class TestMovingHeadStageMetricsHandler:

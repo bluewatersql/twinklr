@@ -510,6 +510,15 @@ class JobConfig(ConfigBase):
     output_dir: str | None = None
     project_name: str | None = None
 
+    write_checkpoint: bool = Field(
+        default=True,
+        description=(
+            "Write the final moving-heads ChoreographyPlan to "
+            "<output_dir>/checkpoints/plans/final.json after planning completes. "
+            "Consumed by `twinklr eval-report`."
+        ),
+    )
+
     pose_config: PoseConfig = Field(
         default_factory=PoseConfig,
         description=(
