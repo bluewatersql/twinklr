@@ -44,7 +44,12 @@ jobs:
         run: uv run mypy .
 
       - name: Test
-        run: uv run pytest tests/ -q --no-cov
+        run: uv run pytest tests/ -m "not local_only" -q --no-cov
+
+      - name: FSEQ deterministic comparison
+        # P2P-T5's xLights preview needs a windowed local app, but this byte-level
+        # comparison is deliberately headless and therefore CI-safe.
+        run: uv run pytest tests/unit/api/xlights/test_fseq_compare.py -q --no-cov
 
       - name: Version consistency
         run: make version-check

@@ -22,6 +22,7 @@ from twinklr.cli.curation_cmd import (
     add_review_staged_recipes_subparser,
     run_review_staged_recipes_command,
 )
+from twinklr.cli.fseqcmp_cmd import run_fseqcmp_command
 from twinklr.cli.recipe_builder_cmd import (
     add_curate_catalog_subparser,
     run_curate_catalog_command,
@@ -383,7 +384,13 @@ def build_arg_parser() -> argparse.ArgumentParser:
         prog="twinklr",
         description="Twinklr - AI-powered lighting sequencer for xLights",
     )
-    sub = p.add_subparsers(dest="cmd", required=True)
+    p.add_argument(
+        "--fseqcmp",
+        nargs=2,
+        metavar=("EXPECTED.fseq", "ACTUAL.fseq"),
+        help="Compare two rendered FSEQ files deterministically (headless/CI-safe).",
+    )
+    sub = p.add_subparsers(dest="cmd")
 
     # `--xsq` is deliberately absent. It used to be required, and every run parsed the
     # user's sequence, regenerated it and handed back a damaged copy. Twinklr now emits
@@ -443,6 +450,11 @@ def main() -> None:
     p = build_arg_parser()
     args = p.parse_args()
 
+    if args.fseqcmp is not None:
+        expected_path, actual_path = (Path(path) for path in args.fseqcmp)
+        sys.exit(run_fseqcmp_command(expected_path, actual_path))
+    if args.cmd is None:
+        p.error("a command or --fseqcmp EXPECTED.fseq ACTUAL.fseq is required")
     if args.cmd == "run":
         run_pipeline(args)
     elif args.cmd == "curate-catalog":

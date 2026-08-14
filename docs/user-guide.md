@@ -226,6 +226,41 @@ to.
 
 _Source: `packages/twinklr/cli/main.py` (`build_arg_parser`, `build_run_pipeline`)_
 
+### Deterministic FSEQ comparison (CI-safe)
+
+After xLights has rendered two `.fseq` files, compare them without launching xLights or
+a graphical session:
+
+```bash
+uv run twinklr --fseqcmp baseline.fseq candidate.fseq
+```
+
+The command succeeds only when the files are byte-identical. On a mismatch it reports
+the first changed byte, file sizes, and SHA-256 hashes, then exits non-zero. This is the
+deterministic CI-tier check; it does not judge visual quality.
+
+### Preview video export (LOCAL-ONLY)
+
+Twinklr's xLights automation client can load a generated `.xsq`, render it, export the
+House Preview video, and close the sequence. It requires a **windowed** xLights 2026.15
+instance with its HTTP automation API enabled; headless xLights can render FSEQ but not
+video previews. No preview export runs in CI.
+
+The automation endpoint is unauthenticated by xLights. While it is enabled, any local
+process can drive the application. Use it only on a trusted local machine, keep unsaved
+work out of the target instance, and disable the endpoint when finished. The client never
+enables, launches, quits, or exposes xLights on its own.
+
+To run the smoke test after starting xLights and enabling its API:
+
+```bash
+TWINKLR_XLIGHTS_PREVIEW_SEQUENCE=/absolute/path/to/generated.xsq \\
+  uv run pytest -m local_only -k preview -q
+```
+
+The test asserts that the returned video exists and is non-empty. This machine has not
+yet performed that empirical check; it is an owner-local step.
+
 ### What the Pipeline Does
 
 The `twinklr run` command executes the moving heads pipeline with these stages:
