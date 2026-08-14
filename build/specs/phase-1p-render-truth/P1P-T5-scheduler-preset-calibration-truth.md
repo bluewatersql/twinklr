@@ -465,3 +465,9 @@ merged grid and regenerates goldens once, not twice.
    close on their start value (9 of 108 golden curves gained a full-span interior
    jump; net discontinuities still improved 84→69 and 66 pre-date T3). Nothing
    tests the phase path — add a discontinuity pin and fix the wrap semantics here.
+
+5. **Latent trap for transition work (T4-verifier-routed):** `Boundary.bar_position`
+   is absolute 1-indexed from detect_section_boundaries but SECTION-RELATIVE from
+   detect_step_boundaries; transition_planner now treats it as absolute. Harmless
+   today (step boundaries have zero production callers) — whoever enables step
+   transitions must reconcile the convention first.

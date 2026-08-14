@@ -204,6 +204,50 @@ def build_beat_grid() -> BeatGrid:
     )
 
 
+# --- Uneven grid (P1P-T4) --------------------------------------------------------
+#
+# `build_beat_grid` is metronomic and starts at 0 ms, so the song-wide average bar
+# duration and the detected downbeats coincide exactly — under that grid the
+# average-based placement the renderer used before P1P-T4 and grid-based placement
+# are indistinguishable. This grid separates them the way a real recording does:
+# a first downbeat after an intro, and a tempo that drifts.
+
+UNEVEN_FIRST_DOWNBEAT_MS = 1500.0
+UNEVEN_FIRST_BAR_MS = 2000.0
+UNEVEN_BAR_GROWTH_MS = 12.0
+"""Each bar is 12 ms longer than the last — ~120 BPM easing to ~110 over 16 bars."""
+
+
+def build_uneven_beat_grid() -> BeatGrid:
+    """A non-uniform grid whose first downbeat is not at 0 ms.
+
+    Bar boundaries run one past `PLAN_TOTAL_BARS` so the last section's end bar is
+    still inside the detected range and does not exercise the extrapolation path.
+    """
+    bar_boundaries: list[float] = []
+    time_ms = UNEVEN_FIRST_DOWNBEAT_MS
+    for index in range(PLAN_TOTAL_BARS + 1):
+        bar_boundaries.append(time_ms)
+        time_ms += UNEVEN_FIRST_BAR_MS + UNEVEN_BAR_GROWTH_MS * index
+
+    beat_boundaries: list[float] = []
+    for index in range(len(bar_boundaries) - 1):
+        bar_start = bar_boundaries[index]
+        beat_ms = (bar_boundaries[index + 1] - bar_start) / PLAN_BEATS_PER_BAR
+        beat_boundaries.extend(bar_start + beat * beat_ms for beat in range(PLAN_BEATS_PER_BAR))
+    beat_boundaries.append(bar_boundaries[-1])
+
+    return BeatGrid(
+        bar_boundaries=bar_boundaries,
+        beat_boundaries=beat_boundaries,
+        eighth_boundaries=BeatGrid._calculate_eighth_boundaries(beat_boundaries),
+        sixteenth_boundaries=BeatGrid._calculate_sixteenth_boundaries(beat_boundaries),
+        tempo_bpm=PLAN_BPM,
+        beats_per_bar=PLAN_BEATS_PER_BAR,
+        duration_ms=bar_boundaries[-1],
+    )
+
+
 @dataclass(frozen=True)
 class EmittedEffect:
     """One rendered segment together with the settings string it emits."""
@@ -252,12 +296,15 @@ class RenderResult:
         return [effect for effect in self.effects if effect.section_id == section_id]
 
 
-def render_rig(rig: RigSpec, *, output_path: Path | None = None) -> RenderResult:
+def render_rig(
+    rig: RigSpec, *, output_path: Path | None = None, beat_grid: BeatGrid | None = None
+) -> RenderResult:
     """Render the deterministic plan against `rig` through the real pipeline.
 
     Args:
         rig: Rig to render.
         output_path: If given, the pipeline also exports a `.xsq` there.
+        beat_grid: Grid to place the plan on; defaults to the even 120 BPM grid.
 
     Returns:
         RenderResult with segments sorted deterministically and their settings strings.
@@ -265,7 +312,7 @@ def render_rig(rig: RigSpec, *, output_path: Path | None = None) -> RenderResult
     fixture_group = build_fixture_group(rig)
     pipeline = RenderingPipeline(
         choreography_plan=build_plan(),
-        beat_grid=build_beat_grid(),
+        beat_grid=beat_grid if beat_grid is not None else build_beat_grid(),
         fixture_group=fixture_group,
         job_config=JobConfig(),
         output_path=output_path,
@@ -381,19 +428,28 @@ def golden_path(rig_id: str, section_id: str) -> Path:
     return GOLDEN_ROOT / rig_id / f"{section_id}.settings.txt"
 
 
-def render_golden_text(result: RenderResult, section_id: str) -> str:
+def render_golden_text(
+    result: RenderResult, section_id: str, *, grid_label: str | None = None
+) -> str:
     """Serialize one section of a render into golden text.
 
     Deterministic by construction: effects are pre-sorted and each settings string is
     written verbatim, so a diff shows exactly which channel or curve point moved.
+
+    Args:
+        result: Render to serialize.
+        section_id: Section within the render.
+        grid_label: Describes the beat grid when it is not the default even one.
     """
     lines = [
         _GOLDEN_BANNER,
         f"# rig={result.rig.rig_id} section={section_id}",
         f"# {result.rig.description}",
         f"# plan: {PLAN_BPM:.1f} bpm, {PLAN_TOTAL_BARS} bars, n_samples={actual_n_samples()}",
-        "",
     ]
+    if grid_label is not None:
+        lines.append(f"# grid: {grid_label}")
+    lines.append("")
     for effect in result.for_section(section_id):
         lines.append(effect.header)
         lines.append(effect.settings)

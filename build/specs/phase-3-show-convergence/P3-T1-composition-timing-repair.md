@@ -397,3 +397,8 @@ coordination-mode tests cannot run in a clean checkout (P5-F11), which is the
 proximate reason these defects survived. *Mitigation*: every new test in this task is
 required to be corpus-independent, so the repair arrives with coverage that actually
 executes in CI.
+
+## Backlog addition (P1P-T4 verification, 2026-08-13)
+display/composition/section_map.py keeps the last private nearest-bar
+implementation (_find_nearest_bar_index) — route it through
+BeatGrid.nearest_bar_index as part of this task's grid unification.

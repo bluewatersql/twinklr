@@ -7,6 +7,11 @@ and energy-to-intensity mapping — all previously hardcoded or placeholder logi
 from __future__ import annotations
 
 from twinklr.core.sequencer.models.enum import Intensity
+from twinklr.core.sequencer.timing.beat_grid import BeatGrid
+
+
+def _even_grid(bpm: float = 120.0, total_bars: int = 32) -> BeatGrid:
+    return BeatGrid.from_tempo(tempo_bpm=bpm, total_bars=total_bars, beats_per_bar=4)
 
 
 class TestComputeSectionDurationMs:
@@ -16,36 +21,51 @@ class TestComputeSectionDurationMs:
         """A 1-bar section at 120 BPM (500ms/beat, 2000ms/bar) returns 2000ms."""
         from twinklr.core.sequencer.moving_heads.pipeline import _compute_section_duration_ms
 
-        # 120 BPM, 4 beats/bar → 2000ms per bar
-        ms_per_bar = 2000.0
-        result = _compute_section_duration_ms(start_bar=1, end_bar=1, ms_per_bar=ms_per_bar)
+        result = _compute_section_duration_ms(start_bar=1, end_bar=1, beat_grid=_even_grid())
         assert result == 2000
 
     def test_multi_bar_section(self) -> None:
         """An 8-bar section at 120 BPM returns 16000ms."""
         from twinklr.core.sequencer.moving_heads.pipeline import _compute_section_duration_ms
 
-        ms_per_bar = 2000.0
-        result = _compute_section_duration_ms(start_bar=1, end_bar=8, ms_per_bar=ms_per_bar)
+        result = _compute_section_duration_ms(start_bar=1, end_bar=8, beat_grid=_even_grid())
         assert result == 16000
 
     def test_non_first_bar_section(self) -> None:
         """Section from bar 5 to bar 12 is 8 bars."""
         from twinklr.core.sequencer.moving_heads.pipeline import _compute_section_duration_ms
 
-        ms_per_bar = 2000.0
-        result = _compute_section_duration_ms(start_bar=5, end_bar=12, ms_per_bar=ms_per_bar)
+        result = _compute_section_duration_ms(start_bar=5, end_bar=12, beat_grid=_even_grid())
         assert result == 16000
 
-    def test_fractional_ms_per_bar_rounds_to_int(self) -> None:
-        """Non-integer ms_per_bar (e.g. 130 BPM) returns an int."""
+    def test_fractional_bar_duration_rounds_to_int(self) -> None:
+        """Non-integer bar duration (e.g. 130 BPM) returns an int."""
         from twinklr.core.sequencer.moving_heads.pipeline import _compute_section_duration_ms
 
         # 130 BPM, 4 beats/bar → 60000/130 * 4 ≈ 1846.15ms/bar
         ms_per_bar = 60_000.0 / 130.0 * 4.0
-        result = _compute_section_duration_ms(start_bar=1, end_bar=4, ms_per_bar=ms_per_bar)
+        result = _compute_section_duration_ms(
+            start_bar=1, end_bar=4, beat_grid=_even_grid(bpm=130.0)
+        )
         assert isinstance(result, int)
         assert result == int(4 * ms_per_bar)
+
+    def test_uneven_grid_measures_the_actual_bars(self) -> None:
+        """On a non-uniform grid the duration is the real span, not bars x average."""
+        from twinklr.core.sequencer.moving_heads.pipeline import _compute_section_duration_ms
+
+        # Bar 1 is 1000ms long, bar 2 is 3000ms; the average is 2000ms.
+        grid = BeatGrid(
+            bar_boundaries=[0.0, 1000.0, 4000.0, 6000.0],
+            beat_boundaries=[0.0, 1000.0, 4000.0, 6000.0],
+            eighth_boundaries=[],
+            sixteenth_boundaries=[],
+            tempo_bpm=120.0,
+            beats_per_bar=4,
+            duration_ms=6000.0,
+        )
+        assert _compute_section_duration_ms(start_bar=1, end_bar=1, beat_grid=grid) == 1000
+        assert _compute_section_duration_ms(start_bar=2, end_bar=2, beat_grid=grid) == 3000
 
 
 class TestInferFixtureRole:

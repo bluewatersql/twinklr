@@ -6,11 +6,16 @@ Wraps TimeResolver to provide a simpler interface focused on boundary access.
 
 from __future__ import annotations
 
+import bisect
+import logging
+import math
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from twinklr.core.sequencer.timing.resolver import TimeResolver
+
+logger = logging.getLogger(__name__)
 
 
 class BeatGrid(BaseModel):
@@ -215,23 +220,6 @@ class BeatGrid(BaseModel):
         total_duration = self.beat_boundaries[-1] - self.beat_boundaries[0]
         return total_duration / (len(self.beat_boundaries) - 1)
 
-    def get_bar_start_ms(self, bar_index: int) -> float:
-        """Get the start time of a specific bar.
-
-        Args:
-            bar_index: Bar index (0-based)
-
-        Returns:
-            Start time in milliseconds
-
-        Raises:
-            IndexError: If bar_index is out of range
-
-        Example:
-            >>> chorus_start = beat_grid.get_bar_start_ms(8)  # Bar 8
-        """
-        return self.bar_boundaries[bar_index]
-
     def get_beat_time_ms(self, beat_index: int) -> float:
         """Get the time of a specific beat.
 
@@ -248,6 +236,133 @@ class BeatGrid(BaseModel):
             >>> beat_time = beat_grid.get_beat_time_ms(32)  # Beat 32
         """
         return self.beat_boundaries[beat_index]
+
+    # ======================================================================
+    # Bar <-> millisecond conversion (the single grid authority)
+    #
+    # Everything on the moving-heads path — the planner's bar numbering, the
+    # renderer's effect placement, transition boundaries — resolves time through
+    # these two methods, so all three agree with the "Twinklr Bars" timing track
+    # written from `bar_boundaries`.
+    # ======================================================================
+
+    def get_bar_start_ms(self, bar_index: float) -> float:
+        """Get the start time of a 0-based, possibly fractional, bar index.
+
+        Whole in-range indices return the detected downbeat verbatim. Fractional
+        indices interpolate linearly between the two enclosing downbeats, so a
+        half-bar offset lands halfway through that bar's real duration rather than
+        halfway through the song-wide average.
+
+        Indices outside the detected range extrapolate from the nearest end using
+        the average bar duration and log the fallback: a section scheduled past the
+        end of the analysed audio must still render effects, not raise.
+
+        Args:
+            bar_index: Bar index (0-based; bar 1 of a plan is index 0)
+
+        Returns:
+            Start time in milliseconds
+
+        Example:
+            >>> chorus_start = beat_grid.get_bar_start_ms(8)  # Bar 9, 0-based
+        """
+        boundaries = self.bar_boundaries
+        if not boundaries:
+            logger.warning(
+                "BeatGrid has no bar boundaries; falling back to average bar duration "
+                "for bar index %.3f",
+                bar_index,
+            )
+            return bar_index * self.ms_per_bar
+
+        last = len(boundaries) - 1
+        floor_index = math.floor(bar_index)
+        fraction = bar_index - floor_index
+
+        if floor_index < 0:
+            logger.debug(
+                "Bar index %.3f precedes the detected grid; extrapolating from the "
+                "first downbeat at %.1fms",
+                bar_index,
+                boundaries[0],
+            )
+            return boundaries[0] + bar_index * self.ms_per_bar
+
+        if floor_index >= last:
+            if floor_index == last and fraction == 0.0:
+                return boundaries[last]
+            logger.debug(
+                "Bar index %.3f is past the detected grid (%d bars); extrapolating "
+                "from the last downbeat at %.1fms using the average bar duration",
+                bar_index,
+                len(boundaries),
+                boundaries[last],
+            )
+            return boundaries[last] + (bar_index - last) * self.ms_per_bar
+
+        start = boundaries[floor_index]
+        if fraction == 0.0:
+            return start
+        return start + fraction * (boundaries[floor_index + 1] - start)
+
+    def bar_span_ms(self, start_bar_index: float, span_bars: float) -> float:
+        """Duration of `span_bars` bars beginning at `start_bar_index`.
+
+        Measured against the detected downbeats, so a span over a slowing passage
+        is longer than the same span over a faster one.
+
+        Args:
+            start_bar_index: Bar index (0-based) the span starts on
+            span_bars: Length of the span in bars
+
+        Returns:
+            Duration in milliseconds
+        """
+        return self.get_bar_start_ms(start_bar_index + span_bars) - self.get_bar_start_ms(
+            start_bar_index
+        )
+
+    def nearest_bar_index(self, time_ms: float) -> int:
+        """Resolve a time to the 0-based index of the *nearest* detected downbeat.
+
+        Rounding to nearest (rather than flooring) is what keeps a section start
+        that sits just before a downbeat from being dragged back a whole bar.
+
+        Times past the detected range extrapolate with the average bar duration and
+        may therefore return an index beyond the last boundary; `get_bar_start_ms`
+        accepts those symmetrically, so the pair round-trips.
+
+        Args:
+            time_ms: Time in milliseconds
+
+        Returns:
+            Bar index (0-based), never negative
+        """
+        boundaries = self.bar_boundaries
+        if not boundaries:
+            logger.warning(
+                "BeatGrid has no bar boundaries; resolving %.1fms against the average bar duration",
+                time_ms,
+            )
+            return max(0, round(time_ms / self.ms_per_bar))
+
+        last = len(boundaries) - 1
+        if time_ms > boundaries[last]:
+            logger.debug(
+                "Time %.1fms is past the detected grid (last downbeat %.1fms); "
+                "extrapolating with the average bar duration",
+                time_ms,
+                boundaries[last],
+            )
+            return last + max(0, round((time_ms - boundaries[last]) / self.ms_per_bar))
+
+        index = bisect.bisect_left(boundaries, time_ms)
+        if index == 0:
+            return 0
+        before = boundaries[index - 1]
+        after = boundaries[index]
+        return index if (after - time_ms) < (time_ms - before) else index - 1
 
     def snap_to_nearest_bar(self, time_ms: float) -> float:
         """Snap arbitrary time to nearest bar boundary.
@@ -269,17 +384,9 @@ class BeatGrid(BaseModel):
         if not self.bar_boundaries:
             return time_ms
 
-        # Find nearest bar boundary
-        min_distance = float("inf")
-        nearest_bar_time = self.bar_boundaries[0]
-
-        for bar_time in self.bar_boundaries:
-            distance = abs(time_ms - bar_time)
-            if distance < min_distance:
-                min_distance = distance
-                nearest_bar_time = bar_time
-
-        return nearest_bar_time
+        # Clamped, not extrapolated: this returns an existing boundary by contract.
+        index = min(self.nearest_bar_index(time_ms), len(self.bar_boundaries) - 1)
+        return self.get_bar_start_ms(index)
 
     def snap_to_nearest_beat(self, time_ms: float) -> float:
         """Snap arbitrary time to nearest beat boundary.

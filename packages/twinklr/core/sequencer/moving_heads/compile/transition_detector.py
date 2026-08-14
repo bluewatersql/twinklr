@@ -64,9 +64,10 @@ class TransitionDetector:
             # Use target section's start_bar as the boundary position
             boundary_bar = float(target_section.start_bar)
 
-            # Convert bar position to milliseconds
-            # Bars are 1-indexed, so bar N starts at (N-1) * ms_per_bar
-            boundary_ms = int((boundary_bar - 1.0) * beat_grid.ms_per_bar)
+            # Convert bar position to milliseconds through the beat grid's detected
+            # downbeats — the same conversion the compile context uses, so boundaries
+            # land on the section starts they separate.
+            boundary_ms = int(beat_grid.get_bar_start_ms(boundary_bar - 1.0))
 
             boundary = Boundary(
                 type=BoundaryType.SECTION_BOUNDARY,
@@ -124,7 +125,7 @@ class TransitionDetector:
             # Boundary is at the end of source step (start of target step)
             # Calculate absolute boundary position
             boundary_bar = source_instance.start_bars + source_instance.duration_bars
-            boundary_ms = context.start_ms + int(boundary_bar * context.ms_per_bar)
+            boundary_ms = context.bar_offset_to_ms(boundary_bar)
 
             boundary = Boundary(
                 type=BoundaryType.STEP_BOUNDARY,

@@ -100,26 +100,39 @@ class TemplateCompileContext(BaseModel):
 
     @property
     def end_ms(self) -> int:
-        return int(self._bar_to_ms(self.start_bar + self.duration_bars))
+        return self._bar_to_ms(self.start_bar + self.duration_bars)
 
     @property
     def duration_ms(self) -> int:
         return self.end_ms - self.start_ms
 
-    @property
-    def ms_per_bar(self) -> float:
-        """Get milliseconds per bar from beat grid.
+    def bar_offset_to_ms(self, offset_bars: float) -> int:
+        """Convert a bar offset measured from this section's start to absolute ms.
 
-        Uses detected beat boundaries to stay synced with actual music,
-        not tempo-based calculation which can drift.
+        Steps and step boundaries are positioned in bars relative to the section;
+        this resolves them against the same detected downbeats `_bar_to_ms` uses, so
+        a step half a bar into a section lands half of *that bar's* real duration in.
+
+        Args:
+            offset_bars: Bars after the section's first downbeat (may be fractional)
+
+        Returns:
+            Absolute time in milliseconds
         """
-        return self.beat_grid.ms_per_bar
+        return int(self.beat_grid.get_bar_start_ms(self.start_bar - 1 + offset_bars))
 
     def _bar_to_ms(self, bar: int) -> int:
         """Convert bar number to milliseconds.
 
         Single source of truth for bar→ms conversion.
-        Bars are 1-indexed and inclusive (bar 1 = 0-2000ms, bar 2 = 2000-4000ms).
+
+        Uses the beat grid's detected downbeats to stay synced with the actual
+        music, not a tempo-derived average anchored at 0 ms, which drifts and
+        ignores the lead-in before the first downbeat. Bar 1 therefore starts at
+        `bar_boundaries[0]`, which is where the "Twinklr Bars" timing track puts it.
+
+        Bars are 1-indexed and inclusive, so `bar` used as an end bar names the
+        downbeat the section ends on (exclusive).
 
         Args:
             bar: Bar number (1-indexed, inclusive for end_bar)
@@ -127,6 +140,4 @@ class TemplateCompileContext(BaseModel):
         Returns:
             Time in milliseconds at the START of the bar
         """
-        # Bar 1 starts at 0ms, bar 2 starts at ms_per_bar, bar 3 at 2*ms_per_bar, etc.
-        # For end_bar: bar 4 ends at 4*ms_per_bar = 8000ms
-        return int((bar - 1) * self.beat_grid.ms_per_bar)
+        return int(self.beat_grid.get_bar_start_ms(bar - 1))

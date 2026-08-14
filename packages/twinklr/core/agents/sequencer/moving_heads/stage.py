@@ -156,6 +156,9 @@ class MovingHeadStage:
                 audio_profile=audio_profile,
                 lyric_context=lyric_context,
                 fixtures=fixture_context,
+                # Same grid the renderer places effects on, so the bar numbers the
+                # planner produces name the instants the renderer will use.
+                beat_grid=beat_grid,
                 available_templates=self.available_templates,
                 macro_plan=macro_plan,
                 template_descriptions=template_descriptions,

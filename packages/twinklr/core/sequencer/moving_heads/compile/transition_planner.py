@@ -146,8 +146,11 @@ class TransitionPlanner:
             # Instant transition - no overlap
             return (boundary.time_ms, boundary.time_ms, 0)
 
-        # Convert duration from bars to milliseconds
-        duration_ms = int(hint.duration_bars * self.beat_grid.ms_per_bar)
+        # Convert duration from bars to milliseconds against the bars the transition
+        # actually spans, measured from the boundary it is centred on.
+        duration_ms = int(
+            self.beat_grid.bar_span_ms(boundary.bar_position - 1.0, hint.duration_bars)
+        )
 
         if hint.mode == TransitionMode.CROSSFADE:
             # Asymmetric split based on fade_out_ratio
@@ -275,7 +278,9 @@ class TransitionPlanner:
                 f"({target_duration_ms}ms)"
             )
 
-        # Check minimum section duration (convert to ms)
+        # Check minimum section duration (convert to ms). This is an unanchored
+        # feasibility threshold, not a placement, so the song-wide average bar
+        # duration is the right scale here.
         min_duration_ms = int(self.config.min_section_duration_bars * self.beat_grid.ms_per_bar)
         if source_duration_ms < min_duration_ms:
             warnings.append(

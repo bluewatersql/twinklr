@@ -54,18 +54,21 @@ ENERGY_TO_INTENSITY: dict[str, Intensity] = {
 """Maps energy-level keywords (from preset IDs) to movement Intensity enums."""
 
 
-def _compute_section_duration_ms(start_bar: int, end_bar: int, ms_per_bar: float) -> int:
+def _compute_section_duration_ms(start_bar: int, end_bar: int, beat_grid: BeatGrid) -> int:
     """Compute the duration of a section in milliseconds.
+
+    Measured between the section's detected downbeats rather than as a bar count
+    times a song-wide average, so the duration matches what the renderer emits.
 
     Args:
         start_bar: First bar of the section (1-indexed).
         end_bar: Last bar of the section (1-indexed, inclusive).
-        ms_per_bar: Milliseconds per bar from the beat grid.
+        beat_grid: Beat grid supplying the detected downbeats.
 
     Returns:
         Duration in milliseconds (rounded to int).
     """
-    return int((end_bar - start_bar + 1) * ms_per_bar)
+    return int(beat_grid.get_bar_start_ms(end_bar) - beat_grid.get_bar_start_ms(start_bar - 1))
 
 
 class RenderingPipeline:
@@ -334,7 +337,6 @@ class RenderingPipeline:
 
         # Build section lookup for duration computation
         section_lookup: dict[str, PlanSection] = {s.section_name: s for s in flattened_sections}
-        ms_per_bar = self.beat_grid.ms_per_bar
 
         # Plan transitions for each boundary
         registry = TransitionRegistry()
@@ -351,14 +353,14 @@ class RenderingPipeline:
 
             source_duration_ms = (
                 _compute_section_duration_ms(
-                    source_section.start_bar, source_section.end_bar, ms_per_bar
+                    source_section.start_bar, source_section.end_bar, self.beat_grid
                 )
                 if source_section is not None
                 else 0
             )
             target_duration_ms = (
                 _compute_section_duration_ms(
-                    target_section.start_bar, target_section.end_bar, ms_per_bar
+                    target_section.start_bar, target_section.end_bar, self.beat_grid
                 )
                 if target_section is not None
                 else 0

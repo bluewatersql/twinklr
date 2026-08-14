@@ -1,0 +1,35 @@
+# GOLDEN — DO NOT HAND-EDIT. Regenerate with:
+#   uv run pytest tests/golden --regen-goldens -q
+# (or TWINKLR_REGEN_GOLDENS=1 uv run pytest tests/golden -q)
+#
+# These pins encode the render's CURRENT behavior at the P1P baseline, defects
+# included. They are a diff surface for Lane R, not a statement of desired output.
+# Known-defective behavior visible below (fixed in P1P-T3..T6, not here):
+#   P4-F3  every channel 1..16 is emitted, unchoreographed ones zero-filled --
+#          so E_SLIDER_DMX<n>=0 here means 'zero-filled', not 'commanded to 0'
+#   P4-F10 value-curve points are written at 2-decimal resolution
+#   NEW    every transition segment emits an all-zero settings string with no
+#          value curves at all -- see test_transition_segments_emit_all_zero
+#   P4-M1  template dimmer floor (dimmer_floor_dmx=60) is discarded; the
+#          'breakdown' section's dimmer curve dips to ~0.05 normalized (~13 DMX)
+#          -- see test_dimmer_floor_dropped.py
+#   P4-M2  BLACKOUT dimmer inverts to full brightness under non-MODERATE
+#          presets; the 'drop' section emits E_SLIDER_DMX15=255 under the
+#          'energetic' preset -- see test_blackout_full_brightness.py
+
+# rig=mh4_minimal section=transition_drop_to_breakdown
+# 4 heads, pan/tilt/dimmer only — the shape used by the repo's own tests
+# plan: 120.0 bpm, 16 bars, n_samples=64
+# grid: uneven: first downbeat 1500 ms, bars growing 12 ms each (P1P-T4)
+
+## fixture=MH1 segment=trans_drop_to_breakdown step=transition t0=25756 t1=26828 template=transition preset=-
+B_CHOICE_BufferStyle=Per Model Default,E_CHECKBOX_INVDMX1=0,E_CHECKBOX_INVDMX2=0,E_CHECKBOX_INVDMX3=0,E_CHECKBOX_INVDMX4=0,E_CHECKBOX_INVDMX5=0,E_CHECKBOX_INVDMX6=0,E_CHECKBOX_INVDMX7=0,E_CHECKBOX_INVDMX8=0,E_CHECKBOX_INVDMX9=0,E_CHECKBOX_INVDMX10=0,E_CHECKBOX_INVDMX11=0,E_CHECKBOX_INVDMX12=0,E_CHECKBOX_INVDMX13=0,E_CHECKBOX_INVDMX14=0,E_CHECKBOX_INVDMX15=0,E_CHECKBOX_INVDMX16=0,E_NOTEBOOK1=Channels 1-16,E_SLIDER_DMX1=0,E_SLIDER_DMX2=0,E_SLIDER_DMX3=0,E_SLIDER_DMX4=0,E_SLIDER_DMX5=0,E_SLIDER_DMX6=0,E_SLIDER_DMX7=0,E_SLIDER_DMX8=0,E_SLIDER_DMX9=0,E_SLIDER_DMX10=0,E_SLIDER_DMX11=0,E_SLIDER_DMX12=0,E_SLIDER_DMX13=0,E_SLIDER_DMX14=0,E_SLIDER_DMX15=0,E_SLIDER_DMX16=0
+
+## fixture=MH2 segment=trans_drop_to_breakdown step=transition t0=25756 t1=26828 template=transition preset=-
+B_CHOICE_BufferStyle=Per Model Default,E_CHECKBOX_INVDMX1=0,E_CHECKBOX_INVDMX2=0,E_CHECKBOX_INVDMX3=0,E_CHECKBOX_INVDMX4=0,E_CHECKBOX_INVDMX5=0,E_CHECKBOX_INVDMX6=0,E_CHECKBOX_INVDMX7=0,E_CHECKBOX_INVDMX8=0,E_CHECKBOX_INVDMX9=0,E_CHECKBOX_INVDMX10=0,E_CHECKBOX_INVDMX11=0,E_CHECKBOX_INVDMX12=0,E_CHECKBOX_INVDMX13=0,E_CHECKBOX_INVDMX14=0,E_CHECKBOX_INVDMX15=0,E_CHECKBOX_INVDMX16=0,E_NOTEBOOK1=Channels 1-16,E_SLIDER_DMX1=0,E_SLIDER_DMX2=0,E_SLIDER_DMX3=0,E_SLIDER_DMX4=0,E_SLIDER_DMX5=0,E_SLIDER_DMX6=0,E_SLIDER_DMX7=0,E_SLIDER_DMX8=0,E_SLIDER_DMX9=0,E_SLIDER_DMX10=0,E_SLIDER_DMX11=0,E_SLIDER_DMX12=0,E_SLIDER_DMX13=0,E_SLIDER_DMX14=0,E_SLIDER_DMX15=0,E_SLIDER_DMX16=0
+
+## fixture=MH3 segment=trans_drop_to_breakdown step=transition t0=25756 t1=26828 template=transition preset=-
+B_CHOICE_BufferStyle=Per Model Default,E_CHECKBOX_INVDMX1=0,E_CHECKBOX_INVDMX2=0,E_CHECKBOX_INVDMX3=0,E_CHECKBOX_INVDMX4=0,E_CHECKBOX_INVDMX5=0,E_CHECKBOX_INVDMX6=0,E_CHECKBOX_INVDMX7=0,E_CHECKBOX_INVDMX8=0,E_CHECKBOX_INVDMX9=0,E_CHECKBOX_INVDMX10=0,E_CHECKBOX_INVDMX11=0,E_CHECKBOX_INVDMX12=0,E_CHECKBOX_INVDMX13=0,E_CHECKBOX_INVDMX14=0,E_CHECKBOX_INVDMX15=0,E_CHECKBOX_INVDMX16=0,E_NOTEBOOK1=Channels 1-16,E_SLIDER_DMX1=0,E_SLIDER_DMX2=0,E_SLIDER_DMX3=0,E_SLIDER_DMX4=0,E_SLIDER_DMX5=0,E_SLIDER_DMX6=0,E_SLIDER_DMX7=0,E_SLIDER_DMX8=0,E_SLIDER_DMX9=0,E_SLIDER_DMX10=0,E_SLIDER_DMX11=0,E_SLIDER_DMX12=0,E_SLIDER_DMX13=0,E_SLIDER_DMX14=0,E_SLIDER_DMX15=0,E_SLIDER_DMX16=0
+
+## fixture=MH4 segment=trans_drop_to_breakdown step=transition t0=25756 t1=26828 template=transition preset=-
+B_CHOICE_BufferStyle=Per Model Default,E_CHECKBOX_INVDMX1=0,E_CHECKBOX_INVDMX2=0,E_CHECKBOX_INVDMX3=0,E_CHECKBOX_INVDMX4=0,E_CHECKBOX_INVDMX5=0,E_CHECKBOX_INVDMX6=0,E_CHECKBOX_INVDMX7=0,E_CHECKBOX_INVDMX8=0,E_CHECKBOX_INVDMX9=0,E_CHECKBOX_INVDMX10=0,E_CHECKBOX_INVDMX11=0,E_CHECKBOX_INVDMX12=0,E_CHECKBOX_INVDMX13=0,E_CHECKBOX_INVDMX14=0,E_CHECKBOX_INVDMX15=0,E_CHECKBOX_INVDMX16=0,E_NOTEBOOK1=Channels 1-16,E_SLIDER_DMX1=0,E_SLIDER_DMX2=0,E_SLIDER_DMX3=0,E_SLIDER_DMX4=0,E_SLIDER_DMX5=0,E_SLIDER_DMX6=0,E_SLIDER_DMX7=0,E_SLIDER_DMX8=0,E_SLIDER_DMX9=0,E_SLIDER_DMX10=0,E_SLIDER_DMX11=0,E_SLIDER_DMX12=0,E_SLIDER_DMX13=0,E_SLIDER_DMX14=0,E_SLIDER_DMX15=0,E_SLIDER_DMX16=0

@@ -413,3 +413,68 @@ class TestTransitionDetectorCycleBoundaries:
 
         # Not yet implemented, should return empty list
         assert len(boundaries) == 0
+
+
+class TestTransitionBoundariesUseTheSameGrid:
+    """P1P-T4: boundary times come from the detected downbeats, not a bar average.
+
+    The detector used to repeat the renderer's `(bar - 1) * ms_per_bar` formula
+    independently. On a non-uniform grid that put transition boundaries somewhere
+    other than the section starts they separate, so the crossfade straddled nothing.
+    """
+
+    @pytest.fixture
+    def uneven_grid(self) -> BeatGrid:
+        # Bars of 2000 / 2500 / 1500 / 2500 ms from 1500 ms; average 2125 ms.
+        boundaries = [1500.0, 3500.0, 6000.0, 7500.0, 10000.0]
+        return BeatGrid(
+            bar_boundaries=boundaries,
+            beat_boundaries=list(boundaries),
+            eighth_boundaries=[],
+            sixteenth_boundaries=[],
+            tempo_bpm=120.0,
+            beats_per_bar=4,
+            duration_ms=10000.0,
+        )
+
+    def test_section_boundary_is_the_detected_downbeat(self, uneven_grid: BeatGrid) -> None:
+        plan = ChoreographyPlan(
+            sections=[
+                PlanSection(section_name="intro", start_bar=1, end_bar=2, template_id="t"),
+                PlanSection(section_name="verse", start_bar=3, end_bar=4, template_id="t"),
+            ]
+        )
+
+        boundaries = TransitionDetector().detect_section_boundaries(plan, uneven_grid)
+
+        assert len(boundaries) == 1
+        # Bar 3's downbeat is 6000ms; two average bars from zero would be 4250ms.
+        assert boundaries[0].time_ms == 6000
+        assert boundaries[0].time_ms == int(uneven_grid.get_bar_start_ms(2))
+
+    def test_section_boundary_matches_the_target_sections_start_ms(
+        self, uneven_grid: BeatGrid, registries
+    ) -> None:
+        """The boundary and the section it opens agree to the millisecond."""
+        plan = ChoreographyPlan(
+            sections=[
+                PlanSection(section_name="intro", start_bar=1, end_bar=2, template_id="t"),
+                PlanSection(section_name="verse", start_bar=3, end_bar=4, template_id="t"),
+            ]
+        )
+        target_context = TemplateCompileContext(
+            section_id="verse",
+            template_id="test_template",
+            fixtures=[],
+            beat_grid=uneven_grid,
+            start_bar=3,
+            duration_bars=2,
+            curve_registry=registries["curve"],
+            geometry_registry=registries["geometry"],
+            movement_registry=registries["movement"],
+            dimmer_registry=registries["dimmer"],
+        )
+
+        boundaries = TransitionDetector().detect_section_boundaries(plan, uneven_grid)
+
+        assert boundaries[0].time_ms == target_context.start_ms

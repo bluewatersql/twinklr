@@ -151,9 +151,11 @@ def compile_template(
         else:
             phase_offsets = PhaseOffsetResult(offsets=dict.fromkeys(fixture_ids, 0.0))
 
-        # Calculate timing in milliseconds
-        start_ms = context.start_ms + int(instance.start_bars * context.ms_per_bar)
-        duration_ms = int(instance.duration_bars * context.ms_per_bar)
+        # Calculate timing in milliseconds against the detected downbeats
+        start_ms = context.bar_offset_to_ms(instance.start_bars)
+        duration_ms = context.bar_offset_to_ms(instance.start_bars + instance.duration_bars) - (
+            start_ms
+        )
         renderer_log.debug(f"Section Timing (ms): {start_ms} - {duration_ms}")
 
         # Check if this step uses phase offsets
@@ -209,7 +211,7 @@ def compile_template(
 
     # Clip segments to section boundary for TRUNCATE/FADE_OUT policies
     if schedule_result.remainder_policy in (RemainderPolicy.TRUNCATE, RemainderPolicy.FADE_OUT):
-        section_end_ms = context.start_ms + int(context.duration_bars * context.ms_per_bar)
+        section_end_ms = context.end_ms
         all_segments = _clip_segments_to_boundary(
             all_segments,
             section_end_ms,
