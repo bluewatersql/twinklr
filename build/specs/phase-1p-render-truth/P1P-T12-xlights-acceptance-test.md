@@ -287,3 +287,14 @@ a required acceptance criterion, not an optional extra.
 **Third risk: the automation API is left enabled** on the owner's machine after the test —
 an unauthenticated local service. Mitigation: the protocol enables it for the duration and
 disables it afterwards; nothing in the repository turns it on.
+
+## Owner-provided answer to the open contract question (2026-08-14)
+
+The owner confirms empirically: **xLights still imports a bare `.xsq`;
+`xlights_rgbeffects.xml` is NOT required.** This resolves the M6/M6b unknown this
+spec was written around. T12's job shifts from "discover the answer" to "pin it as
+a regression test": exercise the import via the automation API both with and
+without rgbeffects.xml present, assert both succeed, and document the result in the
+golden suite so a future xLights version that changes the contract fails loudly.
+Also verify T11's per-track `.xtiming` files import (flagged UNVERIFIED by T11's
+verifier) and shutter-open output on the >16-channel rig.
