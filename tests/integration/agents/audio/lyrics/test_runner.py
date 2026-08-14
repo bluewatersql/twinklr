@@ -16,7 +16,8 @@ def test_lyrics_spec_can_be_created():
 def test_lyrics_spec_has_correct_defaults():
     """Test that Lyrics spec has correct default values."""
     spec = get_lyrics_spec()
-    assert spec.model == "gpt-5.2"
+    assert spec.model == "gpt-5.6-sol"
+    assert spec.reasoning_effort == "medium"
     assert spec.temperature == 0.5
     assert spec.max_schema_repair_attempts == 2
 
