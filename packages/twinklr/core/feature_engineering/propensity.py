@@ -3,36 +3,13 @@
 from __future__ import annotations
 
 from collections import defaultdict
-import re
 
+from twinklr.core.feature_engineering.element_types import extract_model_type
 from twinklr.core.feature_engineering.models.phrases import EffectPhrase
 from twinklr.core.feature_engineering.models.propensity import (
     EffectModelAffinity,
     EffectModelAntiAffinity,
     PropensityIndex,
-)
-
-# Known model type patterns in target names (order matters — first match wins).
-_MODEL_TYPE_PATTERNS: tuple[tuple[str, str], ...] = (
-    ("megatree", r"mega\s*tree"),
-    ("matrix", r"matrix"),
-    ("arch", r"arch"),
-    ("candy_cane", r"candy\s*cane"),
-    ("snowflake", r"snowflake"),
-    ("wreath", r"wreath"),
-    ("star", r"star"),
-    ("icicle", r"icicle"),
-    ("spiral", r"spiral"),
-    ("mini_tree", r"mini\s*tree"),
-    ("fence", r"fence"),
-    ("roofline", r"roof\s*line"),
-    ("window", r"window"),
-    ("bush", r"bush"),
-    ("pillar", r"pillar"),
-    ("stake", r"stake"),
-    ("spinner", r"spinner"),
-    ("flood", r"flood"),
-    ("pixel_tree", r"pixel\s*tree"),
 )
 
 # Minimum corpus support to emit an affinity/anti-affinity.
@@ -114,8 +91,4 @@ class PropensityMiner:
     @staticmethod
     def _extract_model_type(target_name: str) -> str | None:
         """Extract model type from target name using pattern matching."""
-        lower = target_name.lower().strip()
-        for model_type, pattern in _MODEL_TYPE_PATTERNS:
-            if re.search(pattern, lower):
-                return model_type
-        return None
+        return extract_model_type(target_name)

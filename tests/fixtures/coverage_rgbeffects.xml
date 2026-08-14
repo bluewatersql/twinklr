@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xrgb>
+  <models>
+    <model
+      name="Mega Tree"
+      DisplayAs="Custom"
+      StringType="RGB Nodes"
+      StringCount="1"
+      NodesPerString="100"
+      StartChannel="1"
+    />
+    <model
+      name="Mega Tree 2"
+      DisplayAs="Custom"
+      StringType="RGB Nodes"
+      StringCount="1"
+      NodesPerString="100"
+      StartChannel="301"
+    />
+  </models>
+</xrgb>
