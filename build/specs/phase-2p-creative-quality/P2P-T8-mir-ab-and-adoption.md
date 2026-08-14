@@ -318,3 +318,9 @@ and needed no allowance. Fixtures are synthesised in-process: no network, no aud
 files. Reuse them rather than re-deriving — the click track this note measures is
 `tests/unit/audio/conftest.py::click_track_120bpm`, which is also the "synthetic click
 track where the answer is exact by construction" that this spec's risk section requires.
+
+> Verifier addendum (2026-08-13): the +1-frame bias above is a property of the
+> *current* onset-envelope pipeline, not of the fixture. After any detector swap
+> (beat_this, allinone), re-measure the signed mean offset rather than assuming the
+> bias persists or was fixed — the method routes forward; the number is
+> baseline-specific.
