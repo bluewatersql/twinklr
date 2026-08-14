@@ -5,9 +5,10 @@ Wraps MovingHeadPlannerOrchestrator for pipeline execution.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
     from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan
@@ -64,6 +65,8 @@ class MovingHeadStage:
         max_iterations: int = 3,
         min_pass_score: float = 7.0,
         include_template_metadata: bool = True,
+        section_id: str | None = None,
+        regeneration_nonce: str | None = None,
     ) -> None:
         """Initialize moving head planner stage.
 
@@ -81,6 +84,8 @@ class MovingHeadStage:
         self.max_iterations = max_iterations
         self.min_pass_score = min_pass_score
         self.include_template_metadata = include_template_metadata
+        self.section_id = section_id
+        self.regeneration_nonce = regeneration_nonce
 
     @property
     def name(self) -> str:
@@ -138,6 +143,10 @@ class MovingHeadStage:
             audio_profile = input["profile"]
             lyric_context = input.get("lyrics")  # May be None (conditional stage)
             macro_plan = input.get("macro")  # list[MacroSectionPlan] from MacroPlannerStage
+            if self.section_id is not None:
+                audio_profile, lyric_context, macro_plan = self._select_section_inputs(
+                    audio_profile, lyric_context, macro_plan, self.section_id
+                )
 
             # Build BeatGrid from audio bundle for downstream rendering
             from twinklr.core.sequencer.timing.beat_grid import BeatGrid
@@ -211,7 +220,7 @@ class MovingHeadStage:
                 compute=lambda: orchestrator.run(planning_context),
                 result_extractor=extract_plan,
                 result_type=IterationResult,
-                cache_key_fn=lambda: orchestrator.get_cache_key(planning_context),
+                cache_key_fn=lambda: self._cache_key(orchestrator, planning_context),
                 cache_version=MOVING_HEAD_CACHE_VERSION,
                 state_handler=self._handle_state,
                 metrics_handler=self._handle_metrics,
@@ -223,6 +232,73 @@ class MovingHeadStage:
         except Exception as e:
             logger.exception("Moving head planning failed", exc_info=e)
             return failure_result(str(e), stage_name=self.name)
+
+    async def _cache_key(self, orchestrator: Any, planning_context: Any) -> str:
+        base = cast("str", await orchestrator.get_cache_key(planning_context))
+        if self.regeneration_nonce is None:
+            return base
+        return hashlib.sha256(f"{base}:{self.regeneration_nonce}".encode()).hexdigest()
+
+    @staticmethod
+    def _select_section_inputs(
+        audio_profile: Any,
+        lyric_context: Any,
+        macro_plan: Any,
+        section_id: str,
+    ) -> tuple[Any, Any, Any]:
+        """Restrict only the planning input; deterministic audio/BeatGrid stay whole."""
+        matches = [
+            section
+            for section in audio_profile.structure.sections
+            if section.section_id == section_id
+        ]
+        if not matches:
+            raise ValueError(f"Unknown section_id {section_id!r}; use the canonical unique ID")
+        section = matches[0]
+        structure = audio_profile.structure.model_copy(update={"sections": [section]})
+        energy_profile = audio_profile.energy_profile.model_copy(
+            update={
+                "section_profiles": [
+                    profile
+                    for profile in audio_profile.energy_profile.section_profiles
+                    if profile.section_id == section_id
+                ]
+            }
+        )
+        selected_profile = audio_profile.model_copy(
+            update={"structure": structure, "energy_profile": energy_profile}
+        )
+        selected_macro = (
+            [item for item in macro_plan if item.section.section_id == section_id]
+            if macro_plan is not None
+            else None
+        )
+        if lyric_context is None:
+            return selected_profile, None, selected_macro
+
+        def in_section(item: Any) -> bool:
+            item_section_id = getattr(item, "section_id", None)
+            if item_section_id is not None:
+                return bool(item_section_id == section_id)
+            timestamp = getattr(item, "timestamp_ms", None)
+            return timestamp is None or section.start_ms <= timestamp <= section.end_ms
+
+        selected_lyrics = lyric_context.model_copy(
+            update={
+                "story_beats": (
+                    [item for item in lyric_context.story_beats if in_section(item)]
+                    if lyric_context.story_beats is not None
+                    else None
+                ),
+                "key_phrases": [item for item in lyric_context.key_phrases if in_section(item)],
+                "moment_cues": (
+                    [item for item in lyric_context.moment_cues if in_section(item)]
+                    if lyric_context.moment_cues is not None
+                    else None
+                ),
+            }
+        )
+        return selected_profile, selected_lyrics, selected_macro
 
     def _build_template_descriptions(self) -> list[Any] | None:
         """Load template metadata from the registry for prompt enrichment.

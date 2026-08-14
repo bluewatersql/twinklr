@@ -219,3 +219,177 @@ and a dry run. Second risk: a third settings-string serialization path drifting 
 the exporter — mitigated by criterion 6's golden comparison. Third risk: the
 automation API's response shapes differing from what the client assumes — mitigated by
 P2P-T5's captured fixtures and the LOCAL-ONLY round trip.
+
+## Implementation handoff (2026-08-14)
+
+Implementation is complete in the isolated P2P-T12 worktree and is ready for an
+independent review. It has not been committed, self-approved, or exercised against a
+live xLights instance or a paid model provider.
+
+### Upstream API re-verification
+
+The automation contract was re-verified on 2026-08-14 against primary upstream xLights
+sources at master commit
+[`5f48d23a8a9861440b2c1386a1cea0c51e753be5`](https://github.com/xLightsSequencer/xLights/commit/5f48d23a8a9861440b2c1386a1cea0c51e753be5):
+
+- [`documentation/xlDo Commands.txt`](https://github.com/xLightsSequencer/xLights/blob/5f48d23a8a9861440b2c1386a1cea0c51e753be5/documentation/xlDo%20Commands.txt),
+  blob `0edb85865edbbbba290072734c99f2e1e918d4b5`;
+- [`src-ui-wx/automation/xLightsAutomations.cpp`](https://github.com/xLightsSequencer/xLights/blob/5f48d23a8a9861440b2c1386a1cea0c51e753be5/src-ui-wx/automation/xLightsAutomations.cpp),
+  blob `cf993f95ec70623959cf4bb28e3b94c7a9352fac`.
+
+Those sources confirm POST `/xlDoAutomation` on the documented local xFade service
+ports 49913/49914; no authentication is documented. `getModels` returns names only,
+so live names are authoritative while fixture DMX semantics come only from matching
+configured models. `addEffect` accepts string fields `target`, `effect`, `settings`,
+`palette`, `layer`, `startTime`, and `endTime`, creates missing layers, and reports
+only `worked` (not a created effect ID). `getEffectIDs`, `getEffectSettings`, and
+`deleteEffect` provide the read/delete seam used for ownership preflight and
+replacement. The implementation has per-command undo capture but no multi-command
+transaction. Consequently an ambiguous add/delete POST is never automatically
+replayed.
+
+### Delivered behavior
+
+- `twinklr inject` and `twinklr regenerate <canonical-section-id>` keep one T5
+  `XLightsAutomationClient` alive and pinned from the successful layout read through
+  planning and mutation. A connection refusal can select the alternate documented
+  port before pinning; later timeouts/read failures cannot fail over or replay on
+  another xLights window.
+- Separate `getModels` reads obtain live model and group names. Matching configured
+  fixtures retain their deterministic channel/calibration data; missing configured
+  models/groups and unknown live models are reported, and unknown channels are never
+  guessed.
+- T2's existing `XsqAdapter` and `DmxSettingsBuilder` path serializes every live DMX
+  effect. No third effect-settings emitter was introduced.
+- Layers starting at 99 are reserved for Twinklr, with every `XsqAdapter` relative
+  layer preserved by adding 99. Before writes, every affected target/layer is read via
+  `getEffectIDs` and `getEffectSettings` and compared with the sequence-keyed,
+  artifact-local `.twinklr-live-ownership.json` manifest. Any overlapping effect not
+  identified by that manifest halts before mutation. Full injection replaces all
+  previously owned sections; section regeneration deletes/re-adds only that canonical
+  section, including the valid case where re-planning produces no effects.
+- Replacement is explicitly destructive for previously Twinklr-owned effects:
+  confirmed old effect IDs are deleted before new effects are added. Dry run reports
+  that exact ordered wire plan without writes. Identical runs are no-ops. Partial
+  failures report the confirmed prefix and failed payload. An add whose response is
+  lost is recorded as uncertain ownership so the next preflight can recognize either
+  outcome without replaying the ambiguous POST.
+- Twinklr never sends a save command. The user must inspect the reserved layers starting
+  at 99 and save manually.
+  Help, user docs, developer docs, and the owner-only harness all state the
+  unauthenticated-local-port caveat.
+
+### Exact implementation manifest
+
+- `packages/twinklr/core/api/xlights/models.py`
+- `packages/twinklr/core/api/xlights/client.py`
+- `packages/twinklr/core/api/xlights/injection.py` (new)
+- `packages/twinklr/core/api/xlights/__init__.py`
+- `packages/twinklr/core/agents/sequencer/moving_heads/stage.py`
+- `packages/twinklr/core/agents/sequencer/moving_heads/rendering_stage.py`
+- `packages/twinklr/core/pipeline/definitions/moving_heads.py`
+- `packages/twinklr/cli/main.py`
+- `tests/unit/api/xlights/test_client.py`
+- `tests/unit/api/xlights/test_injection.py` (new)
+- `tests/unit/cli/test_live_injection_command.py` (new)
+- `tests/unit/agents/sequencer/moving_heads/test_stage.py`
+- `tests/local_only/test_live_injection.py` (new)
+- `docs/user-guide.md`
+- `docs/developer-guide.md`
+- this specification handoff
+
+### Test-first and verification evidence
+
+The discriminating test-first checkpoint failed collection with
+`ModuleNotFoundError: twinklr.core.api.xlights.injection`. After implementation:
+
+- focused live-injection/CLI/stage/local-only selection: `27 passed, 1 skipped`;
+- xLights client plus injection contracts after the disappearing-target hardening:
+  `18 passed`;
+- CLI/agent/MH sequencer regression selection: `475 passed, 2 skipped`;
+- non-local repository suite before the final two hardening tests:
+  `5063 passed, 25 skipped, 12 deselected`;
+- golden selection after implementation: `74 passed, 8 skipped, 5020 deselected`;
+- LOCAL-ONLY harness without opt-in: `1 skipped`;
+- `ruff format --check`, `ruff check --no-cache`, and `mypy .`: passed (mypy checked
+  709 source files);
+- final full default suite, including this handoff: `5065 passed, 37 skipped`, with nine
+  pre-existing `ProfileCorpusBuilder` deprecation warnings.
+
+The four substantive `make validate` gates passed via their direct commands: formatting,
+lint, type checking, and the full test suite. The wrapper target itself was intentionally
+not invoked because it begins with `git diff`, while this execution brief prohibits all
+git commands.
+
+### Residual owner gate — not claimed
+
+The only residual acceptance evidence is the deliberately skipped empirical xLights
+2026.15 round trip. On the owner's Mac, open an expendable scratch sequence, ensure the
+explicit model exists, enable the local automation API, and run:
+
+```bash
+TWINKLR_RUN_LIVE_XLIGHTS_INJECTION=1 \
+TWINKLR_XLIGHTS_SCRATCH_SEQUENCE=/absolute/path/scratch.xsq \
+TWINKLR_XLIGHTS_SCRATCH_MODEL='Dmx MH1' \
+  uv run pytest tests/local_only/test_live_injection.py -m local_only -q
+```
+
+The harness compares `getOpenSequence.fullseq` with the exact opt-in scratch path before
+mutation, adds one short layer-99 DMX effect, calls `renderAll`, and calls
+`checkSequence`. It never saves. Do not run it against a valued sequence; discard the
+scratch sequence and disable the unauthenticated local API afterward. This executor
+made no live xLights or provider calls and does not claim this owner gate passed.
+
+### Independent-verifier rejection remediation (2026-08-14)
+
+The first independent verification correctly rejected the author handoff because it
+flattened every `XsqAdapter` placement onto layer 99 and the generic CLI exception path
+hid structured partial-failure evidence. Both findings were remediated red-first:
+
+- `LiveEffect`, its manifest representation, semantic signature, preflight, delete, and
+  exact add wire payload now carry the actual reserved layer. The mapping is
+  `live_layer = 99 + placement.layer_index`, preserving regular/transition topology
+  instead of collapsing exporter layers 0/1 into 99/99.
+- Preflight groups reads by target and examines every actual affected layer. Ownership,
+  idempotence, selective section regeneration, disappearing-target deletion, and
+  uncertain-add recovery are layer-sensitive. Planned effects that overlap on the same
+  target and actual layer now halt before even the first xLights request; overlap across
+  different exporter layers remains valid.
+- A golden regression independently obtains `XsqAdapter` placements and proves the live
+  target/relative-layer/time topology is identical. Multi-layer fake tests cover exact
+  99/100 add wires, idempotence, section replacement, a failed layer-100 add after a
+  confirmed layer-99 prefix, and JSON manifest round-trip.
+- The CLI catches `InjectionPartialError` before its generic safe-stop path and prints
+  every confirmed injected effect, every confirmed deletion, the exact failed payload,
+  the underlying error, and the recovery instructions. A command-facing output test
+  pins all five fields.
+- Section regeneration now also narrows `energy_profile.section_profiles` to the one
+  canonical section (in addition to structure, macro, and lyric cues). The previously
+  reported formatting defect in `test_stage.py` was fixed.
+
+Post-remediation evidence: focused live/client/CLI/stage selection `40 passed, 1
+skipped`; broad xLights/CLI/MH regression selection `501 passed, 2 skipped`; golden
+selection `75 passed, 8 skipped, 5023 deselected`; frozen static gates passed with 1,313
+files formatted, no Ruff findings with `--no-cache`, and no mypy findings across 709
+source files; final frozen full suite `5069 passed, 37 skipped`, with the same nine
+pre-existing `ProfileCorpusBuilder` deprecation warnings. No git, live xLights, or
+provider calls were made during remediation, and this author does not self-approve the
+result.
+
+### Final CLI wiring correction (2026-08-14)
+
+The final re-review found that the typed `InjectionPartialError` reporter had been
+attached to the read-only `getModels` try block instead of the mutation try block. The
+dead read handler was removed and the typed catch now immediately wraps the actual
+`workflow.inject` / `workflow.regenerate_section` await, before the generic exception
+handler.
+
+The helper-only output test was replaced with a real `run_pipeline_async` regression.
+It drives the live command path through successful offline layout/planning fakes, forces
+`LiveInjectionWorkflow.inject` to raise `InjectionPartialError`, asserts exit code 1,
+and pins the confirmed injected prefix, confirmed deletions, exact failed payload,
+underlying error, and recovery text. Red evidence showed only the generic safe-stop
+message before the catch was moved. Post-fix evidence: CLI plus xLights unit selection
+`56 passed`; focused injection/command-path selection `15 passed`; frozen format check
+1,313 files, no-cache Ruff, and mypy across 709 source files all passed. No git, live
+xLights, provider call, commit, or self-approval occurred.

@@ -7,10 +7,12 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import json
 import logging
 import os
 from pathlib import Path
 import sys
+from uuid import uuid4
 
 from rich.console import Console
 
@@ -31,6 +33,15 @@ from twinklr.cli.template_cmd import (
     add_template_subparsers,
     run_template_export_command,
     run_template_validate_command,
+)
+from twinklr.core.api.xlights import (
+    GetModelsRequest,
+    InjectionPartialError,
+    JsonOwnershipStore,
+    LiveInjectionWorkflow,
+    XLightsAutomationClient,
+    live_effects_from_segments,
+    reconcile_live_layout,
 )
 from twinklr.core.caching import derive_session_id
 from twinklr.core.config.fixtures import FixtureGroup
@@ -69,6 +80,36 @@ from twinklr.core.utils.formatting import clean_audio_filename
 from twinklr.core.utils.logging import configure_logging
 
 console = Console()
+
+
+def _print_live_injection_partial(error: InjectionPartialError) -> None:
+    """Render every recovery fact retained after a non-transactional failure."""
+    result = error.result
+    console.print("[red]ERROR: Live injection stopped after a partial failure.[/red]")
+    console.print(f"Confirmed injected prefix: {len(result.injected)}")
+    for effect in result.injected:
+        console.print(
+            json.dumps(
+                {"section_id": effect.section_id, **effect.request().to_wire()},
+                sort_keys=True,
+            )
+        )
+    console.print(f"Confirmed deletions: {len(result.deleted)}")
+    for effect in result.deleted:
+        console.print(
+            json.dumps(
+                {"section_id": effect.section_id, **effect.request().to_wire()},
+                sort_keys=True,
+            )
+        )
+    console.print(
+        "Exact failed payload: "
+        + (json.dumps(result.failed_command, sort_keys=True) if result.failed_command else "none")
+    )
+    console.print(f"Underlying error: {result.error or 'unknown'}")
+    console.print(f"Recovery: {result.recovery}")
+
+
 logger = logging.getLogger(__name__)
 
 
@@ -143,6 +184,8 @@ def build_run_pipeline(
     available_templates: list[str],
     xsq_output_path: Path,
     fixture_config_path: Path,
+    section_id: str | None = None,
+    regeneration_nonce: str | None = None,
 ) -> tuple[PipelineDefinition, ChoreographyGraph, XLightsMapping]:
     """Build the pipeline a `twinklr run` executes, from configuration alone.
 
@@ -169,6 +212,23 @@ def build_run_pipeline(
         min_pass_score=job_config.agent.min_pass_score,
         xsq_output_path=xsq_output_path,
         fixture_config_path=fixture_config_path,
+        fixture_groups=[
+            {
+                "fixture_id": fixture.fixture_id,
+                "xlights_model_name": fixture.xlights_model_name,
+                "channels": {
+                    "pan": fixture.config.dmx_mapping.pan,
+                    "tilt": fixture.config.dmx_mapping.tilt,
+                    "dimmer": fixture.config.dmx_mapping.dimmer,
+                    "color": fixture.config.dmx_mapping.color,
+                    "gobo": fixture.config.dmx_mapping.gobo,
+                    "shutter": fixture.config.dmx_mapping.shutter,
+                },
+            }
+            for fixture in fixture_group.expand_fixtures()
+        ],
+        section_id=section_id,
+        regeneration_nonce=regeneration_nonce,
     )
     return pipeline, choreo_graph, xlights_mapping
 
@@ -181,6 +241,48 @@ async def run_pipeline_async(
     session_id: str | None = None,
     template_dir: Path | None = None,
     allow_template_overrides: bool = False,
+    live_injection: bool = False,
+    dry_run: bool = False,
+    section_id: str | None = None,
+) -> int:
+    """Run normally or hold one stateful xLights client across live planning/injection."""
+    if live_injection:
+        async with XLightsAutomationClient() as live_client:
+            return await _run_pipeline_async(
+                audio_path,
+                output_dir,
+                app_config_path,
+                job_config_path,
+                session_id,
+                template_dir,
+                allow_template_overrides,
+                live_client=live_client,
+                dry_run=dry_run,
+                section_id=section_id,
+            )
+    return await _run_pipeline_async(
+        audio_path,
+        output_dir,
+        app_config_path,
+        job_config_path,
+        session_id,
+        template_dir,
+        allow_template_overrides,
+    )
+
+
+async def _run_pipeline_async(
+    audio_path: Path,
+    output_dir: Path,
+    app_config_path: Path,
+    job_config_path: Path,
+    session_id: str | None = None,
+    template_dir: Path | None = None,
+    allow_template_overrides: bool = False,
+    *,
+    live_client: XLightsAutomationClient | None = None,
+    dry_run: bool = False,
+    section_id: str | None = None,
 ) -> int:
     """Run the pipeline using the Pipeline Framework.
 
@@ -263,6 +365,37 @@ async def run_pipeline_async(
         f"from {fixture_config_path.name}"
     )
 
+    if live_client is not None:
+        try:
+            models = await live_client.get_models(
+                GetModelsRequest(include_models=True, include_groups=False)
+            )
+            groups = await live_client.get_models(
+                GetModelsRequest(include_models=False, include_groups=True)
+            )
+        except Exception as error:
+            console.print(f"[red]ERROR: Could not read the live xLights layout: {error}[/red]")
+            return 1
+        reconciliation = reconcile_live_layout(
+            fixture_group,
+            model_names=models.models,
+            group_names=groups.models,
+        )
+        fixture_group = reconciliation.rig
+        if reconciliation.report.has_divergence:
+            console.print(
+                "[yellow]Live layout differs from fixture config; live names win:[/yellow] "
+                f"configured-only={reconciliation.report.configured_only_models}, "
+                f"live-only={reconciliation.report.live_only_models}, "
+                f"missing-groups={reconciliation.report.missing_configured_groups}"
+            )
+        if not fixture_group.expand_fixtures():
+            console.print(
+                "[red]ERROR: No configured moving-head model names exist in the live layout; "
+                "Twinklr will not guess DMX channel mappings.[/red]"
+            )
+            return 1
+
     # Define pipeline via pipeline definitions module
     console.print("\n[bold]Defining pipeline...[/bold]")
     try:
@@ -272,6 +405,8 @@ async def run_pipeline_async(
             available_templates=available_templates,
             xsq_output_path=artifact_dir / f"{song_name}_twinklr_mh.xsq",
             fixture_config_path=fixture_config_path,
+            section_id=section_id,
+            regeneration_nonce=uuid4().hex if section_id is not None else None,
         )
     except ValueError as e:
         console.print(f"[red]ERROR: {e}[/red]")
@@ -313,6 +448,8 @@ async def run_pipeline_async(
     pipeline_context.set_state("job_config_dir", job_config_path.parent)
     pipeline_context.set_state("choreo_graph", choreo_graph)
     pipeline_context.set_state("xlights_mapping", xlights_mapping)
+    if live_client is not None:
+        pipeline_context.set_state("live_fixture_group", fixture_group)
 
     # Execute pipeline
     console.print(f"\n[bold]🎵 Processing:[/bold] {audio_path.name}")
@@ -324,6 +461,36 @@ async def run_pipeline_async(
         initial_input=str(audio_path),
         context=pipeline_context,
     )
+
+    if result.success and live_client is not None:
+        segments = list(pipeline_context.get_state("rendered_segments", ()))
+        try:
+            live_effects = live_effects_from_segments(segments, fixture_group)
+            workflow = LiveInjectionWorkflow(
+                live_client,
+                ownership=JsonOwnershipStore(artifact_dir / ".twinklr-live-ownership.json"),
+            )
+            injection = (
+                await workflow.regenerate_section(section_id, live_effects, dry_run=dry_run)
+                if section_id is not None
+                else await workflow.inject(live_effects, dry_run=dry_run)
+            )
+        except InjectionPartialError as error:
+            _print_live_injection_partial(error)
+            return 1
+        except Exception as error:
+            console.print(f"[red]ERROR: Live injection stopped safely: {error}[/red]")
+            return 1
+        if injection.dry_run:
+            console.print("[yellow]Dry run; exact planned xLights writes:[/yellow]")
+            for command in injection.commands:
+                console.print(json.dumps(command, sort_keys=True))
+        else:
+            console.print(
+                f"[green]Live injection complete:[/green] {len(injection.injected)} added, "
+                f"{len(injection.deleted)} replaced, {len(injection.unchanged)} unchanged. "
+                "Twinklr did not save the sequence."
+            )
 
     # Report results
     console.print("\n" + "=" * 50)
@@ -400,6 +567,9 @@ def run_pipeline(args: argparse.Namespace) -> None:
             session_id=args.session_id,
             template_dir=args.template_dir.resolve() if args.template_dir else None,
             allow_template_overrides=args.allow_template_overrides,
+            live_injection=args.cmd in {"inject", "regenerate"},
+            dry_run=getattr(args, "dry_run", False),
+            section_id=getattr(args, "section", None),
         )
     )
     sys.exit(exit_code)
@@ -425,37 +595,34 @@ def build_arg_parser() -> argparse.ArgumentParser:
     # Removed outright rather than accepted-and-ignored: silently ignoring a flag that
     # used to decide what the output was built from is its own failure class.
     run = sub.add_parser("run", help="Run the full pipeline")
-    run.add_argument("--audio", required=True, help="Path to audio file (mp3/wav)")
-    run.add_argument("--out", default=".", help="Output directory (default: current dir)")
-    run.add_argument(
-        "--app-config",
-        default="config.json",
-        help="Path to app config JSON (default: config.json)",
-    )
-    run.add_argument(
-        "--template-dir",
-        type=Path,
-        default=None,
-        help="Directory of strict JSON moving-head templates loaded after Python builtins",
-    )
-    run.add_argument(
-        "--allow-template-overrides",
-        action="store_true",
-        help="Explicitly allow data templates to shadow colliding Python builtin ids",
-    )
-    run.add_argument(
-        "--config",
-        required=True,
-        help="Path to job config JSON",
-    )
-    run.add_argument(
-        "--session-id",
-        default=None,
-        help=(
-            "Override the cache session ID (default: derived from audio content "
-            "and configs, so identical re-runs reuse cached LLM work)"
+    _add_pipeline_arguments(run)
+
+    inject = sub.add_parser(
+        "inject",
+        help="Plan against getModels and add effects to the already-open xLights sequence",
+        description=(
+            "Plan against the running xLights layout and inject into reserved layers "
+            "starting at 99. "
+            "The local automation port has no documented authentication: any local process "
+            "can drive xLights while it is enabled. Twinklr never saves your sequence."
         ),
     )
+    _add_pipeline_arguments(inject)
+    inject.add_argument("--dry-run", action="store_true", help="Print exact writes only")
+
+    regenerate = sub.add_parser(
+        "regenerate",
+        help="Re-plan and replace exactly one section in the already-open sequence",
+        description=(
+            "Re-plan one canonical section ID using cached analysis and replace only that "
+            "section on reserved layers starting at 99. The unauthenticated local xLights "
+            "port lets any local process drive the app; disable it when finished. Twinklr "
+            "never saves."
+        ),
+    )
+    regenerate.add_argument("section", help="Canonical unique section ID, e.g. chorus_2")
+    _add_pipeline_arguments(regenerate)
+    regenerate.add_argument("--dry-run", action="store_true", help="Print exact writes only")
 
     add_curate_catalog_subparser(sub)
     add_catalog_coverage_subparser(sub)
@@ -472,6 +639,36 @@ def build_arg_parser() -> argparse.ArgumentParser:
     )
 
     return p
+
+
+def _add_pipeline_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--audio", required=True, help="Path to audio file (mp3/wav)")
+    parser.add_argument("--out", default=".", help="Output directory (default: current dir)")
+    parser.add_argument(
+        "--app-config",
+        default="config.json",
+        help="Path to app config JSON (default: config.json)",
+    )
+    parser.add_argument(
+        "--template-dir",
+        type=Path,
+        default=None,
+        help="Directory of strict JSON moving-head templates loaded after Python builtins",
+    )
+    parser.add_argument(
+        "--allow-template-overrides",
+        action="store_true",
+        help="Explicitly allow data templates to shadow colliding Python builtin ids",
+    )
+    parser.add_argument("--config", required=True, help="Path to job config JSON")
+    parser.add_argument(
+        "--session-id",
+        default=None,
+        help=(
+            "Override the cache session ID (default: derived from audio content and configs, "
+            "so identical re-runs reuse cached analysis)"
+        ),
+    )
 
 
 def main() -> None:
@@ -494,7 +691,7 @@ def main() -> None:
         sys.exit(run_fseqcmp_command(expected_path, actual_path))
     if args.cmd is None:
         p.error("a command or --fseqcmp EXPECTED.fseq ACTUAL.fseq is required")
-    if args.cmd == "run":
+    if args.cmd in {"run", "inject", "regenerate"}:
         run_pipeline(args)
     elif args.cmd == "curate-catalog":
         sys.exit(run_curate_catalog_command(args))

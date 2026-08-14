@@ -281,6 +281,11 @@ remainder policy for both Python and data sources.
   never an empty `mediaFile`
 - `.xtiming` and `.xmap` writers for the mapping-free timing deliverable and the import
   mapping hint
+- Typed live automation in `core/api/xlights/`: one stateful async client is pinned to
+  the instance whose `getModels` response drove planning. Injection uses the same
+  `XsqAdapter`/`DmxSettingsBuilder` settings and relative-layer boundary as file export,
+  maps those layers into a reserved namespace starting at 99,
+  preflights `getEffectIDs`/`getEffectSettings`, and never retries an ambiguous POST.
 - Custom value curve support
 - Timeline tracks for beat/section markers
 

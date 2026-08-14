@@ -34,16 +34,26 @@ from twinklr.core.api.xlights.errors import (
     XLightsTimeoutError,
 )
 from twinklr.core.api.xlights.models import (
+    AddEffectRequest,
     CheckSequenceRequest,
     CheckSequenceResult,
     CloseSequenceRequest,
     CommandResult,
+    DeleteEffectRequest,
+    EffectIdsResult,
+    EffectSettingsResult,
     ExportVideoPreviewRequest,
     ExportVideoPreviewResult,
+    GetEffectIdsRequest,
+    GetEffectSettingsRequest,
     GetModelsRequest,
     GetModelsResult,
+    GetOpenSequenceRequest,
+    GetViewsRequest,
+    GetViewsResult,
     LoadSequenceRequest,
     LoadSequenceResult,
+    OpenSequenceResult,
     PreviewResult,
     RenderAllRequest,
     command_result,
@@ -211,11 +221,119 @@ class XLightsAutomationClient:
         models = body.get("models", [])
         if not isinstance(models, list) or not all(isinstance(name, str) for name in models):
             raise XLightsCommandError(f"xLights getModels response has invalid 'models': {body!r}")
-        return GetModelsResult(
+        result = GetModelsResult(
             result_code=common.result_code,
             message=common.message,
             models=tuple(models),
         )
+        # A live workflow must continue talking to the instance whose layout it
+        # planned against. Once selected, never fail over to a second xLights window.
+        self._pinned_client_index = raw.client_index
+        return result
+
+    async def get_views(
+        self,
+        request: GetViewsRequest | None = None,
+        *,
+        timeout_s: float = DEFAULT_COMMAND_TIMEOUT_S,
+    ) -> GetViewsResult:
+        raw = await self._send((request or GetViewsRequest()).to_wire(), timeout_s=timeout_s)
+        body = _response_body(raw, "getViews")
+        common = command_result(raw.response.status_code, body)
+        views = body.get("views", [])
+        if not isinstance(views, list) or not all(isinstance(name, str) for name in views):
+            raise XLightsCommandError(f"xLights getViews response has invalid 'views': {body!r}")
+        self._pinned_client_index = raw.client_index
+        return GetViewsResult(common.result_code, common.message, tuple(views))
+
+    async def get_open_sequence(
+        self,
+        request: GetOpenSequenceRequest | None = None,
+        *,
+        timeout_s: float = DEFAULT_COMMAND_TIMEOUT_S,
+    ) -> OpenSequenceResult:
+        raw = await self._send((request or GetOpenSequenceRequest()).to_wire(), timeout_s=timeout_s)
+        body = _response_body(raw, "getOpenSequence")
+        common = command_result(raw.response.status_code, body)
+        frame_value = body.get("framems")
+        frame_ms = (
+            _required_positive_float(body, "framems", "getOpenSequence")
+            if frame_value not in (None, "")
+            else None
+        )
+        self._pinned_client_index = raw.client_index
+        return OpenSequenceResult(
+            result_code=common.result_code,
+            message=common.message,
+            sequence_name=required_text(body, "seq", "getOpenSequence"),
+            sequence_path=Path(required_text(body, "fullseq", "getOpenSequence")),
+            frame_ms=frame_ms,
+        )
+
+    async def get_effect_ids(
+        self,
+        request: GetEffectIdsRequest,
+        *,
+        timeout_s: float = DEFAULT_COMMAND_TIMEOUT_S,
+    ) -> EffectIdsResult:
+        raw = await self._send(request.to_wire(), timeout_s=timeout_s)
+        body = _response_body(raw, "getEffectIDs")
+        common = command_result(raw.response.status_code, body)
+        layers = body.get("effects", [])
+        if not isinstance(layers, list) or not all(
+            isinstance(layer, list) and all(isinstance(effect_id, str) for effect_id in layer)
+            for layer in layers
+        ):
+            raise XLightsCommandError(
+                f"xLights getEffectIDs response has invalid 'effects': {body!r}"
+            )
+        return EffectIdsResult(common.result_code, common.message, tuple(map(tuple, layers)))
+
+    async def get_effect_settings(
+        self,
+        request: GetEffectSettingsRequest,
+        *,
+        timeout_s: float = DEFAULT_COMMAND_TIMEOUT_S,
+    ) -> EffectSettingsResult:
+        raw = await self._send(request.to_wire(), timeout_s=timeout_s)
+        body = _response_body(raw, "getEffectSettings")
+        common = command_result(raw.response.status_code, body)
+        settings = _settings_value(body.get("settings"), "settings", body)
+        palette = _settings_value(body.get("palette"), "palette", body)
+        return EffectSettingsResult(
+            result_code=common.result_code,
+            message=common.message,
+            model=request.model,
+            layer=request.layer,
+            effect_id=request.effect_id,
+            name=required_text(body, "name", "getEffectSettings"),
+            settings=settings,
+            palette=palette,
+            start_ms=_required_int(body, "startTime", "getEffectSettings"),
+            end_ms=_required_int(body, "endTime", "getEffectSettings"),
+        )
+
+    async def add_effect(
+        self,
+        request: AddEffectRequest,
+        *,
+        timeout_s: float = DEFAULT_COMMAND_TIMEOUT_S,
+    ) -> CommandResult:
+        raw = await self._send(request.to_wire(), timeout_s=timeout_s)
+        body = _response_body(raw, "addEffect")
+        _require_worked(body, "addEffect")
+        return command_result(raw.response.status_code, body)
+
+    async def delete_effect(
+        self,
+        request: DeleteEffectRequest,
+        *,
+        timeout_s: float = DEFAULT_COMMAND_TIMEOUT_S,
+    ) -> CommandResult:
+        raw = await self._send(request.to_wire(), timeout_s=timeout_s)
+        body = _response_body(raw, "deleteEffect")
+        _require_worked(body, "deleteEffect")
+        return command_result(raw.response.status_code, body)
 
     async def check_sequence(
         self,
@@ -393,3 +511,27 @@ def _optional_int(value: Any, key: str, command: str) -> int | None:
         raise XLightsCommandError(
             f"xLights {command} response has invalid {key!r}: {value!r}"
         ) from exc
+
+
+def _required_int(body: dict[str, Any], key: str, command: str) -> int:
+    value = _optional_int(body.get(key), key, command)
+    if value is None:
+        raise XLightsCommandError(f"xLights {command} response omitted {key!r}: {body!r}")
+    return value
+
+
+def _settings_value(value: Any, key: str, body: dict[str, Any]) -> str | dict[str, str]:
+    if isinstance(value, str):
+        return value
+    if isinstance(value, dict) and all(
+        isinstance(item_key, str) and isinstance(item_value, str)
+        for item_key, item_value in value.items()
+    ):
+        return value
+    raise XLightsCommandError(f"xLights getEffectSettings response has invalid {key!r}: {body!r}")
+
+
+def _require_worked(body: dict[str, Any], command: str) -> None:
+    worked = body.get("worked")
+    if worked not in (True, "true", "1", 1):
+        raise XLightsCommandError(f"xLights {command} did not confirm the state change: {body!r}")

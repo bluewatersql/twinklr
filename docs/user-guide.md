@@ -294,6 +294,36 @@ TWINKLR_XLIGHTS_PREVIEW_SEQUENCE=/absolute/path/to/generated.xsq \\
 The test asserts that the returned video exists and is non-empty. This machine has not
 yet performed that empirical check; it is an owner-local step.
 
+### Live injection and section regeneration (LOCAL-ONLY)
+
+With a sequence already open in windowed xLights, the live workflow reads the actual
+model/group names, plans only against configured moving heads that really exist there,
+and writes DMX effects to reserved layers starting at 99. Relative exporter layers are
+preserved (for example, regular effects use 99 and transitions use 100), so effects that
+the deterministic renderer separated are never flattened into overlaps. Differences
+between the live layout and the
+fixture config are printed; Twinklr never guesses channel mappings for unknown models.
+
+```bash
+uv run twinklr inject --audio song.mp3 --config job_config.json --dry-run
+uv run twinklr inject --audio song.mp3 --config job_config.json
+uv run twinklr regenerate chorus_2 --audio song.mp3 --config job_config.json
+```
+
+The dry run prints the exact `deleteEffect`/`addEffect` requests and writes nothing.
+`regenerate` reuses cached audio/profile/lyrics/macro analysis, forces a fresh plan for
+only the canonical section ID, and leaves other sections untouched. Twinklr tracks its
+reserved-layer ownership in the song artifact directory, stops before touching an
+unowned collision, and never saves the xLights sequence. Replacement is explicit:
+owned effects for the named section are deleted before the new effects are added.
+
+The xLights automation API has no documented authentication. Any local process can drive
+the application while the port is enabled. Use a trusted machine, inspect the reserved
+layer before saving, and disable the API when finished. Because xLights offers no
+transaction and `addEffect` returns no ID, a timeout can be ambiguous; do not save, inspect
+reserved layers starting at 99, then run the same command again. Preflight makes that
+recovery idempotent.
+
 ### What the Pipeline Does
 
 The `twinklr run` command executes the moving heads pipeline with these stages:

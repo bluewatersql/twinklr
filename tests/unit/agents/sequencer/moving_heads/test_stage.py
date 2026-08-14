@@ -95,6 +95,35 @@ def create_test_audio_profile() -> AudioProfileModel:
     )
 
 
+def test_regenerate_planning_input_contains_only_named_section() -> None:
+    """Section regeneration narrows the LLM input while leaving prior analysis reusable."""
+    profile = create_test_audio_profile()
+
+    selected, lyrics, macro = MovingHeadStage._select_section_inputs(
+        profile, None, None, "chorus_1"
+    )
+
+    assert [section.section_id for section in selected.structure.sections] == ["chorus_1"]
+    assert [profile.section_id for profile in selected.energy_profile.section_profiles] == [
+        "chorus_1"
+    ]
+    assert lyrics is None
+    assert macro is None
+    assert [section.section_id for section in profile.structure.sections] == [
+        "intro",
+        "verse_1",
+        "chorus_1",
+    ]
+
+
+def test_regenerate_rejects_ambiguous_display_name() -> None:
+    """The command accepts canonical IDs, never a repeated presentation label."""
+    profile = create_test_audio_profile()
+
+    with pytest.raises(ValueError, match="canonical unique ID"):
+        MovingHeadStage._select_section_inputs(profile, None, None, "chorus")
+
+
 def create_mock_beat_grid() -> MagicMock:
     """Create a mock BeatGrid for testing."""
     beat_grid = MagicMock()

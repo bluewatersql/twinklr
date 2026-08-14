@@ -10,6 +10,7 @@ rendering to an xLights .xsq sequence file.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 from twinklr.core.agents.sequencer.moving_heads.rendering_stage import (
     MovingHeadRenderingStage,
@@ -28,6 +29,9 @@ def build_moving_heads_pipeline(
     max_iterations: int = 3,
     min_pass_score: float = 7.0,
     fixture_config_path: Path | None = None,
+    fixture_groups: list[dict[str, Any]] | None = None,
+    section_id: str | None = None,
+    regeneration_nonce: str | None = None,
 ) -> PipelineDefinition:
     """Build the moving-head sequencer pipeline.
 
@@ -67,6 +71,9 @@ def build_moving_heads_pipeline(
                 available_templates=available_templates,
                 max_iterations=max_iterations,
                 min_pass_score=min_pass_score,
+                fixture_groups=fixture_groups,
+                section_id=section_id,
+                regeneration_nonce=regeneration_nonce,
             ),
             inputs=["audio", "profile", "lyrics", "macro"],
             input_type="dict[str, Any]",

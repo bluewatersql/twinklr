@@ -9,6 +9,7 @@ import httpx
 import pytest
 
 from twinklr.core.api.xlights import (
+    AddEffectRequest,
     CheckSequenceRequest,
     ExportVideoPreviewRequest,
     GetModelsRequest,
@@ -148,6 +149,41 @@ async def test_read_error_is_not_replayed_on_alternate_instance() -> None:
             await client.render_all(RenderAllRequest(), timeout_s=1)
 
     assert ports == [49913]
+
+
+@pytest.mark.anyio
+async def test_getmodels_pins_all_later_stateful_commands_to_same_instance() -> None:
+    """Planning and mutation cannot drift between two open xLights windows."""
+    calls: list[tuple[int | None, str]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.content)
+        calls.append((request.url.port, body["cmd"]))
+        if request.url.port == 49913:
+            raise httpx.ConnectError("connection refused", request=request)
+        if body["cmd"] == "getModels":
+            return httpx.Response(200, json={"models": ["Dmx MH1"]})
+        return httpx.Response(200, json={"worked": "true"})
+
+    async with XLightsAutomationClient(transport=httpx.MockTransport(handler)) as client:
+        await client.get_models(GetModelsRequest())
+        await client.add_effect(
+            AddEffectRequest(
+                target="Dmx MH1",
+                effect="DMX",
+                settings="E_SLIDER_DMX1=128",
+                palette="",
+                layer=99,
+                start_ms=0,
+                end_ms=500,
+            )
+        )
+
+    assert calls == [
+        (49913, "getModels"),
+        (49914, "getModels"),
+        (49914, "addEffect"),
+    ]
 
 
 @pytest.mark.anyio

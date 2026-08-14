@@ -94,6 +94,91 @@ class GetModelsRequest:
 
 
 @dataclass(frozen=True)
+class GetViewsRequest:
+    """Request view names from the currently open sequence."""
+
+    def to_wire(self) -> dict[str, str]:
+        return {"cmd": "getViews"}
+
+
+@dataclass(frozen=True)
+class GetOpenSequenceRequest:
+    """Request the identity of the currently open sequence."""
+
+    def to_wire(self) -> dict[str, str]:
+        return {"cmd": "getOpenSequence"}
+
+
+@dataclass(frozen=True)
+class GetEffectIdsRequest:
+    """Request all effect IDs, grouped by layer, for one model."""
+
+    model: str
+
+    def to_wire(self) -> dict[str, str]:
+        return {"cmd": "getEffectIDs", "model": self.model}
+
+
+@dataclass(frozen=True)
+class GetEffectSettingsRequest:
+    """Request one effect's settings from a model layer."""
+
+    model: str
+    layer: int
+    effect_id: str
+
+    def to_wire(self) -> dict[str, str]:
+        return {
+            "cmd": "getEffectSettings",
+            "model": self.model,
+            "layer": str(self.layer),
+            "id": self.effect_id,
+        }
+
+
+@dataclass(frozen=True)
+class AddEffectRequest:
+    """Add one effect to the currently open sequence."""
+
+    target: str
+    effect: str
+    settings: str
+    palette: str
+    layer: int
+    start_ms: int
+    end_ms: int
+
+    def to_wire(self) -> dict[str, str]:
+        return {
+            "cmd": "addEffect",
+            "target": self.target,
+            "effect": self.effect,
+            "settings": self.settings,
+            "palette": self.palette,
+            "layer": str(self.layer),
+            "startTime": str(self.start_ms),
+            "endTime": str(self.end_ms),
+        }
+
+
+@dataclass(frozen=True)
+class DeleteEffectRequest:
+    """Delete one known effect from the currently open sequence."""
+
+    model: str
+    layer: int
+    effect_id: str
+
+    def to_wire(self) -> dict[str, str]:
+        return {
+            "cmd": "deleteEffect",
+            "model": self.model,
+            "layer": str(self.layer),
+            "id": self.effect_id,
+        }
+
+
+@dataclass(frozen=True)
 class CheckSequenceRequest:
     """Request xLights' built-in check for one sequence path."""
 
@@ -140,6 +225,35 @@ class GetModelsResult(CommandResult):
     """Layout element names reported by ``getModels``."""
 
     models: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class GetViewsResult(CommandResult):
+    views: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class OpenSequenceResult(CommandResult):
+    sequence_name: str = ""
+    sequence_path: Path = Path()
+    frame_ms: float | None = None
+
+
+@dataclass(frozen=True)
+class EffectIdsResult(CommandResult):
+    layers: tuple[tuple[str, ...], ...] = ()
+
+
+@dataclass(frozen=True)
+class EffectSettingsResult(CommandResult):
+    model: str = ""
+    layer: int = 0
+    effect_id: str = ""
+    name: str = ""
+    settings: str | dict[str, str] = ""
+    palette: str | dict[str, str] = ""
+    start_ms: int = 0
+    end_ms: int = 0
 
 
 @dataclass(frozen=True)

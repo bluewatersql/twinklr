@@ -154,6 +154,7 @@ class MovingHeadRenderingStage:
             context.set_state("xsq_output_path", self.xsq_output_path)
             context.set_state("delivery_artifacts", pipeline.artifacts)
             context.set_state("rendered_segment_count", len(segments))
+            context.set_state("rendered_segments", tuple(segments))
 
             # Track metrics
             context.add_metric("mh_render_segments", len(segments))
@@ -243,7 +244,12 @@ class MovingHeadRenderingStage:
         Returns:
             FixtureGroup or None if loading fails
         """
+        from twinklr.core.config.fixtures import FixtureGroup
         from twinklr.core.config.loader import load_fixture_group
+
+        live_fixture_group = context.get_state("live_fixture_group")
+        if isinstance(live_fixture_group, FixtureGroup):
+            return live_fixture_group
 
         # Try constructor path first
         if self.fixture_config_path and self.fixture_config_path.exists():
