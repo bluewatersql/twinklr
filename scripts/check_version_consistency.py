@@ -6,7 +6,7 @@ two sub-package `pyproject.toml` files, and two sub-package `__init__.py`
 modules) with no automated sync. This script reads all five and fails loudly
 if they disagree, so drift is caught rather than silently ignored.
 
-See build/specs/phase-0-foundation/P0-T4-minimal-ci.md for the task that
+See changes/twinklr-reactivation-review/build/specs/phase-0-foundation/P0-T4-minimal-ci.md for the task that
 added this check, and the file's evidence section for why fixing existing
 drift is explicitly out of scope here — this only detects and reports it.
 """

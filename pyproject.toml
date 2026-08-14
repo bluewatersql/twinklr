@@ -94,7 +94,7 @@ ignore = [
                # pydantic.BaseModel runtime-evaluated-base-classes exemption (P0-T3,
                # 2026-08-13); too large/risky to hand-triage in one pass (a bulk unsafe-fix
                # attempt broke Pydantic model_rebuild() at runtime). Descope recorded in
-               # build/specs/phase-0-foundation/P0-T3-format-lint-baseline.md; follow-up
+               # changes/twinklr-reactivation-review/build/specs/phase-0-foundation/P0-T3-format-lint-baseline.md; follow-up
                # TYPE_CHECKING migration belongs in the Phase 4 debt wave.
     "PLR091",  # Complexity rules (returns/branches/statements/arguments)
     "PERF401", # Manual list comprehension

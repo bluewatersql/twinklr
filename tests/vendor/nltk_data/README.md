@@ -43,6 +43,6 @@ uv run python -c "import nltk; nltk.download('cmudict', download_dir='tests/vend
 ## Scope note
 
 This vendoring is test-time only (see
-`build/specs/phase-0-foundation/P0-T2-structural-test-repair.md`'s
+`changes/twinklr-reactivation-review/build/specs/phase-0-foundation/P0-T2-structural-test-repair.md`'s
 non-goals) — it does not change how production code
 (`packages/twinklr/core/audio/phonemes/*`) locates NLTK data at runtime.

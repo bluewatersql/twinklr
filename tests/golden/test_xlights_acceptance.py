@@ -10,7 +10,7 @@ documented as unauthenticated (M6b).
 ## What this pins
 
 The spec this module implements
-(`build/specs/phase-1p-render-truth/P1P-T12-xlights-acceptance-test.md`) was written
+(`changes/twinklr-reactivation-review/build/specs/phase-1p-render-truth/P1P-T12-xlights-acceptance-test.md`) was written
 to *discover* whether a bare `.xsq` imports without `xlights_rgbeffects.xml`. The
 owner has since confirmed empirically (2026-08-14) that it does. This module's job is
 narrower: pin that answer, and three adjacent ones, as a regression suite so a future

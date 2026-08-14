@@ -30,7 +30,7 @@ class LLMReviewPass:
         config: Per-agent LLM configuration (model, temperature, etc.).
 
     Note: this call site's model is config-driven but not yet retargeted —
-    see the sequencing constraint in ``build/plan/00-overview.md`` for the
+    see the sequencing constraint in ``changes/twinklr-reactivation-review/build/plan/00-overview.md`` for the
     later model-retarget task (P2P-T10) that must find and update it.
     """
 

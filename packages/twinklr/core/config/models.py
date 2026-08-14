@@ -150,7 +150,7 @@ def _get_cache_default(cache_type: str) -> CacheConfig:
 # copy would be a duplicate mechanism rather than a wire-up. `is_channel_enabled` is a
 # planner feature-flag question (may the LLM choreograph this channel type at all), which
 # is orthogonal to what an *unwritten* channel should emit and was never a dependency of
-# that decision. See build/specs/phase-1p-render-truth/P1P-T6-channel-default-policy.md.
+# that decision. See changes/twinklr-reactivation-review/build/specs/phase-1p-render-truth/P1P-T6-channel-default-policy.md.
 
 
 def _get_agent_config_default() -> AgentOrchestrationConfig:

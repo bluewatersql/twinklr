@@ -3,8 +3,8 @@
 Git-tracked home for the recipe catalog (`EffectRecipe` / group templates)
 consumed by `TemplateStore.from_directory()`. This directory is the single
 data home for `data/templates`-class content — see
-`build/specs/phase-1k-knowledge-edges/P1K-T3-catalog-in-git.md` and
-`build/specs/phase-0-foundation/P0-T2-structural-test-repair.md`'s
+`changes/twinklr-reactivation-review/build/specs/phase-1k-knowledge-edges/P1K-T3-catalog-in-git.md` and
+`changes/twinklr-reactivation-review/build/specs/phase-0-foundation/P0-T2-structural-test-repair.md`'s
 Orchestrator reconciliation notes (2026-08-13). Tests consume this catalog;
 they never fork their own copy of it (except the tiny pathological-case set
 under `tests/fixtures/templates-extra/`, which is deliberately *not* real

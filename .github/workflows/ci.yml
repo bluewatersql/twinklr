@@ -11,7 +11,7 @@ on:
 env:
   # Reduce CI flakiness from transient network stalls during dependency
   # resolution/download (observed class of failure: scipy download timeout +
-  # DNS loss during P0 execution; see build/specs/phase-0-foundation/
+  # DNS loss during P0 execution; see changes/twinklr-reactivation-review/build/specs/phase-0-foundation/
   # P0-T4-minimal-ci.md evidence).
   UV_HTTP_TIMEOUT: "180"
 

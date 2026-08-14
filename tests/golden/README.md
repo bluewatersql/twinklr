@@ -136,7 +136,7 @@ marker, `tests/golden/conftest.py`) that drives a real, running xLights 2026.15 
 its unauthenticated HTTP automation API
 (`tests/golden/xlights_client.py`, default `http://127.0.0.1:49913`) to pin the
 answers to the four questions
-`build/specs/phase-1p-render-truth/P1P-T12-xlights-acceptance-test.md` posed. It
+`changes/twinklr-reactivation-review/build/specs/phase-1p-render-truth/P1P-T12-xlights-acceptance-test.md` posed. It
 never runs in CI: `pytest_collection_modifyitems` probes the API once at collection
 time and skips every `requires_xlights` test with an explicit reason when nothing
 answers — exactly what happened on every run to date.

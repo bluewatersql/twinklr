@@ -44,9 +44,10 @@ htmlcov/
 dist/
 build/
 *.egg-info/
-# Root build/ holds the implementation plan & specs (tracked); packaging build/ dirs stay ignored
-!/build/
-!/build/**
+# The reactivation campaign's plan & specs live in changes/twinklr-reactivation-review/build/
+# (tracked); packaging build/ dirs elsewhere stay ignored
+!/changes/twinklr-reactivation-review/build/
+!/changes/twinklr-reactivation-review/build/**
 
 # === Generated project data & run artifacts (never check in) ===
 data/
