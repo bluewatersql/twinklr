@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from twinklr.core.agents.async_runner import AsyncAgentRunner
 from twinklr.core.agents.providers.base import LLMResponse, ProviderType, TokenUsage
 from twinklr.core.agents.providers.conversation import generate_conversation_id
 from twinklr.core.agents.providers.errors import LLMProviderError
+from twinklr.core.agents.spec import AgentSpec
 
 # ---------------------------------------------------------------------------
 # Helpers / fixtures
@@ -105,6 +108,7 @@ def test_generate_json_returns_llm_response(mock_anthropic_clients: dict) -> Non
     assert isinstance(result, LLMResponse)
     assert result.content == {"result": "ok"}
     assert result.metadata.model == "claude-sonnet-4-20250514"
+    assert result.metadata.model == "claude-sonnet-4-20250514"
 
 
 def test_generate_json_token_usage(mock_anthropic_clients: dict) -> None:
@@ -183,7 +187,54 @@ async def test_generate_json_async_returns_llm_response(mock_anthropic_clients: 
 
     assert isinstance(result, LLMResponse)
     assert result.content == {"result": "ok"}
-    assert result.metadata.model == "claude-sonnet-4-20250514"
+
+
+@pytest.mark.asyncio
+async def test_generate_json_async_filters_openai_reasoning_option(
+    mock_anthropic_clients: dict,
+) -> None:
+    """Portable limits are forwarded while OpenAI-only reasoning is removed."""
+    provider = _make_provider(mock_anthropic_clients)
+
+    await provider.generate_json_async(
+        messages=[{"role": "user", "content": "test"}],
+        model="claude-configured",
+        reasoning_effort="high",
+        max_tokens=1234,
+        timeout_seconds=17,
+    )
+
+    request = mock_anthropic_clients["async_client"].messages.create.call_args.kwargs
+    assert "reasoning_effort" not in request
+    assert "reasoning" not in request
+    assert request["max_tokens"] == 1234
+    assert request["timeout"] == 17
+
+
+@pytest.mark.asyncio
+async def test_async_runner_does_not_send_reasoning_to_anthropic(
+    mock_anthropic_clients: dict, tmp_path: Path
+) -> None:
+    """The runner filters provider-specific options before the integration boundary."""
+    provider = _make_provider(mock_anthropic_clients)
+    runner = AsyncAgentRunner(provider=provider, prompt_base_path=tmp_path)
+    spec = AgentSpec(
+        name="anthropic-test",
+        prompt_pack="unused",
+        response_model=dict,
+        model="claude-configured",
+        reasoning_effort="high",
+        max_tokens=2222,
+        timeout_seconds=19,
+    )
+
+    await runner._call_oneshot_async(spec, [{"role": "user", "content": "test"}])
+
+    request = mock_anthropic_clients["async_client"].messages.create.call_args.kwargs
+    assert "reasoning_effort" not in request
+    assert "reasoning" not in request
+    assert request["max_tokens"] == 2222
+    assert request["timeout"] == 19
 
 
 @pytest.mark.asyncio

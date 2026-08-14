@@ -133,13 +133,13 @@ def main() -> int:
 
     # Step 4: LLM review
     from twinklr.core.agents.providers.factory import create_llm_provider
-    from twinklr.core.config.models import AgentConfig, AppConfig
+    from twinklr.core.config.models import AppConfig
     from twinklr.core.feature_engineering.normalization.llm_review import (
         LLMReviewPass,
     )
 
     llm_provider = create_llm_provider(AppConfig(), session_id="normalize_unknown_effects")
-    review_config = AgentConfig(model="gpt-4o-mini")
+    review_config = AppConfig().agent.judge_agent
     reviewer = LLMReviewPass(provider=llm_provider, config=review_config)
     results = reviewer.review(clusters)
     approved = [r for r in results if r.approved]

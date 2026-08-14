@@ -17,7 +17,7 @@ import uuid
 from pydantic import ValidationError
 
 from twinklr.core.agents.providers.base import LLMProvider
-from twinklr.core.config.models import AgentConfig
+from twinklr.core.config.models import AgentConfig, AgentOrchestrationConfig
 from twinklr.core.recipe_builder.evidence import format_analysis_for_prompt
 from twinklr.core.recipe_builder.models import (
     CatalogAnalysis,
@@ -381,6 +381,9 @@ def generate_with_llm(
                 messages=messages,
                 model=config.model,
                 temperature=config.temperature,
+                reasoning_effort=config.reasoning_effort,
+                max_tokens=config.max_tokens,
+                timeout_seconds=config.timeout_seconds,
             )
 
             recipe = _parse_llm_response(response.content)
@@ -653,5 +656,5 @@ def generate_candidates(
         analysis=analysis,
         catalog_recipes=catalog_recipes,
         provider=provider,
-        config=config or AgentConfig(model="gpt-4.1", temperature=0.9),
+        config=config or AgentOrchestrationConfig().recipe_generation_agent,
     )

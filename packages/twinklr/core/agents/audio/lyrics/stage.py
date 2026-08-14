@@ -73,14 +73,16 @@ class LyricsStage:
                     stage_name=self.name,
                 )
 
-            model = context.job_config.agent.plan_agent.model
-            temperature = 0.5
+            agent_config = context.job_config.agent.lyrics_agent
 
             # Create orchestrator
             orchestrator = LyricsOrchestrator(
                 provider=context.provider,
-                model=model,
-                temperature=temperature,
+                model=agent_config.model,
+                temperature=agent_config.temperature,
+                reasoning_effort=agent_config.reasoning_effort,
+                max_tokens=agent_config.max_tokens,
+                timeout_seconds=agent_config.timeout_seconds,
                 llm_logger=context.llm_logger,
             )
 

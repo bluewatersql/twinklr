@@ -17,6 +17,7 @@ from typing import Any
 from twinklr.core.agents.sequencer.group_planner.holistic import (
     HolisticEvaluation,
     HolisticEvaluator,
+    get_holistic_judge_spec,
 )
 from twinklr.core.pipeline.context import PipelineContext
 from twinklr.core.pipeline.execution import execute_step
@@ -110,6 +111,9 @@ class HolisticEvaluatorStage:
 
             evaluator = HolisticEvaluator(
                 provider=context.provider,
+                holistic_judge_spec=get_holistic_judge_spec(
+                    config=context.job_config.agent.judge_agent
+                ),
                 llm_logger=context.llm_logger,
             )
 

@@ -10,12 +10,16 @@ from __future__ import annotations
 from twinklr.core.agents.shared.judge.models import JudgeVerdict
 from twinklr.core.agents.spec import AgentMode, AgentSpec
 from twinklr.core.agents.taxonomy_utils import get_taxonomy_dict
+from twinklr.core.config.models import AgentConfig, AgentOrchestrationConfig
 from twinklr.core.sequencer.planning import SectionCoordinationPlan
 
 
 def get_planner_spec(
-    model: str = "gpt-5.2",
-    temperature: float = 0.7,
+    config: AgentConfig | None = None,
+    *,
+    model: str | None = None,
+    temperature: float | None = None,
+    reasoning_effort: str | None = None,
     token_budget: int | None = None,
 ) -> AgentSpec:
     """Get GroupPlanner agent specification.
@@ -25,20 +29,25 @@ def get_planner_spec(
     for Christmas light shows.
 
     Args:
-        model: LLM model to use (default: gpt-5.2 for creative coordination)
-        temperature: Sampling temperature (default: 0.7 for balanced creativity)
+        config: Per-role model, sampling, and reasoning configuration.
         token_budget: Optional token budget
 
     Returns:
         GroupPlanner agent spec
     """
+    resolved = _resolve_config(
+        config or AgentOrchestrationConfig().plan_agent, model, temperature, reasoning_effort
+    )
     return AgentSpec(
         name="group_planner",
         prompt_pack="sequencer/group_planner/prompts/planner",
         response_model=SectionCoordinationPlan,
         mode=AgentMode.CONVERSATIONAL,  # Maintains context for refinement
-        model=model,
-        temperature=temperature,
+        model=resolved.model,
+        temperature=resolved.temperature,
+        reasoning_effort=resolved.reasoning_effort,
+        max_tokens=resolved.max_tokens,
+        timeout_seconds=resolved.timeout_seconds,
         max_schema_repair_attempts=3,
         token_budget=token_budget,
         default_variables={"taxonomy": get_taxonomy_dict()},
@@ -46,8 +55,11 @@ def get_planner_spec(
 
 
 def get_section_judge_spec(
-    model: str = "gpt-5-mini",
-    temperature: float = 0.3,
+    config: AgentConfig | None = None,
+    *,
+    model: str | None = None,
+    temperature: float | None = None,
+    reasoning_effort: str | None = None,
     token_budget: int | None = None,
 ) -> AgentSpec:
     """Get SectionJudge agent specification.
@@ -58,23 +70,28 @@ def get_section_judge_spec(
     - Timing validity within section bounds
     - Group coverage completeness
 
-    Uses lighter model (gpt-5-mini) since section-level evaluation is focused.
+    Uses the configured judge model because section-level evaluation is focused.
 
     Args:
-        model: LLM model to use (default: gpt-5-mini for fast evaluation)
-        temperature: Sampling temperature (default: 0.3 for consistent judgment)
+        config: Per-role model, sampling, and reasoning configuration.
         token_budget: Optional token budget
 
     Returns:
         SectionJudge agent spec
     """
+    resolved = _resolve_config(
+        config or AgentOrchestrationConfig().judge_agent, model, temperature, reasoning_effort
+    )
     return AgentSpec(
         name="section_judge",
         prompt_pack="sequencer/group_planner/prompts/section_judge",
         response_model=JudgeVerdict,
         mode=AgentMode.ONESHOT,  # Stateless per-section evaluation
-        model=model,
-        temperature=temperature,
+        model=resolved.model,
+        temperature=resolved.temperature,
+        reasoning_effort=resolved.reasoning_effort,
+        max_tokens=resolved.max_tokens,
+        timeout_seconds=resolved.timeout_seconds,
         max_schema_repair_attempts=5,  # Increased for enum validation
         token_budget=token_budget,
         default_variables={"taxonomy": get_taxonomy_dict()},
@@ -82,8 +99,11 @@ def get_section_judge_spec(
 
 
 def get_holistic_corrector_spec(
-    model: str = "gpt-5.2",
-    temperature: float = 0.3,
+    config: AgentConfig | None = None,
+    *,
+    model: str | None = None,
+    temperature: float | None = None,
+    reasoning_effort: str | None = None,
     token_budget: int | None = None,
 ) -> AgentSpec:
     """Get HolisticCorrector agent specification.
@@ -94,8 +114,7 @@ def get_holistic_corrector_spec(
     keeping both input and output within feasible token budgets.
 
     Args:
-        model: LLM model to use (default: gpt-5.2 for complex plan modification)
-        temperature: Sampling temperature (default: 0.3 for precise corrections)
+        config: Per-role model, sampling, and reasoning configuration.
         token_budget: Optional token budget
 
     Returns:
@@ -103,16 +122,46 @@ def get_holistic_corrector_spec(
     """
     from twinklr.core.sequencer.planning import CorrectionResult
 
+    resolved = _resolve_config(
+        config or AgentOrchestrationConfig().refinement_agent,
+        model,
+        temperature,
+        reasoning_effort,
+    )
     return AgentSpec(
         name="holistic_corrector",
         prompt_pack="sequencer/group_planner/prompts/holistic_corrector",
         response_model=CorrectionResult,
         mode=AgentMode.ONESHOT,
-        model=model,
-        temperature=temperature,
+        model=resolved.model,
+        temperature=resolved.temperature,
+        reasoning_effort=resolved.reasoning_effort,
+        max_tokens=resolved.max_tokens,
+        timeout_seconds=resolved.timeout_seconds,
         max_schema_repair_attempts=3,
         token_budget=token_budget,
         default_variables={"taxonomy": get_taxonomy_dict()},
+    )
+
+
+def _resolve_config(
+    config: AgentConfig,
+    model: str | None,
+    temperature: float | None,
+    reasoning_effort: str | None,
+) -> AgentConfig:
+    """Resolve an explicit role config while retaining public override compatibility."""
+    resolved = config
+    if model is None and temperature is None and reasoning_effort is None:
+        return resolved
+    return resolved.model_copy(
+        update={
+            "model": model if model is not None else resolved.model,
+            "temperature": temperature if temperature is not None else resolved.temperature,
+            "reasoning_effort": (
+                reasoning_effort if reasoning_effort is not None else resolved.reasoning_effort
+            ),
+        }
     )
 
 

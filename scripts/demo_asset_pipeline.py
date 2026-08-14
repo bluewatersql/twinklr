@@ -50,6 +50,7 @@ from twinklr.core.agents.audio.lyrics.models import (
     LyricContextModel,
     StoryBeat,
 )
+from twinklr.core.config.models import AgentOrchestrationConfig
 from twinklr.core.sequencer.planning.group_plan import (
     GroupPlanSet,
     LanePlan,
@@ -676,7 +677,7 @@ async def run_pipeline(
             from openai import AsyncOpenAI
 
             image_client = OpenAIImageClient(AsyncOpenAI())
-            print("  Image client: AsyncOpenAI gpt-image-1.5")
+            print(f"  Image client: AsyncOpenAI {AgentOrchestrationConfig().image_model}")
         except Exception as e:
             print(f"  Image client: UNAVAILABLE ({e})")
     else:

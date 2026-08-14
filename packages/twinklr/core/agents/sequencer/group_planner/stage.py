@@ -128,6 +128,10 @@ class GroupPlannerStage:
             - Adds "group_planner_iterations_{section_id}" to context.metrics
             - Adds "group_planner_tokens_{section_id}" to context.metrics
         """
+        from twinklr.core.agents.sequencer.group_planner.specs import (
+            get_planner_spec,
+            get_section_judge_spec,
+        )
         from twinklr.core.agents.shared.judge.controller import IterationResult
         from twinklr.core.pipeline.execution import execute_step
 
@@ -142,6 +146,10 @@ class GroupPlannerStage:
             # Create orchestrator with pipeline context dependencies
             orchestrator = GroupPlannerOrchestrator(
                 provider=context.provider,
+                planner_spec=get_planner_spec(config=context.job_config.agent.plan_agent),
+                section_judge_spec=get_section_judge_spec(
+                    config=context.job_config.agent.judge_agent
+                ),
                 max_iterations=self.max_iterations,
                 min_pass_score=self.min_pass_score,
                 llm_logger=context.llm_logger,

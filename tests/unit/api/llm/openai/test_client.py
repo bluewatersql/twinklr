@@ -314,6 +314,28 @@ class TestGenerateJson:
 
         assert result == {"result": "success", "count": 5}
 
+    def test_generate_json_serializes_string_effort_and_limits(
+        self, client_with_mock: OpenAIClient
+    ) -> None:
+        """String config values reach the Responses API in its exact request shape."""
+        messages = [{"role": "user", "content": "Test"}]
+
+        client_with_mock.generate_json(
+            messages=messages,
+            model="configured-model",
+            reasoning_effort="high",
+            temperature=0.4,
+            max_tokens=1234,
+            timeout_seconds=17,
+        )
+
+        request = client_with_mock.client.responses.create.call_args.kwargs
+        assert request["model"] == "configured-model"
+        assert request["reasoning"] == {"effort": "high"}
+        assert request["temperature"] == pytest.approx(0.4)
+        assert request["max_output_tokens"] == 1234
+        assert request["timeout"] == 17
+
     def test_generate_json_with_verbosity(self, client_with_mock: OpenAIClient) -> None:
         """Test with verbosity parameter."""
         messages = [{"role": "user", "content": "Test"}]
@@ -391,8 +413,8 @@ class TestGenerateJson:
             with pytest.raises(OpenAIRetryExhaustedError):
                 client.generate_json(messages=messages, model="gpt-5.2")
 
-    def test_generate_json_mini_model_skips_temperature(self) -> None:
-        """Test mini models skip temperature parameter."""
+    def test_generate_json_current_model_sends_temperature(self) -> None:
+        """The retarget sends configured temperature without model-name guessing."""
         with patch("twinklr.core.api.llm.openai.client.OpenAI") as mock_openai:
             mock_response = MagicMock()
             mock_response.output_text = '{"result": "ok"}'
@@ -410,13 +432,13 @@ class TestGenerateJson:
 
             client.generate_json(
                 messages=messages,
-                model="gpt-5-mini",
+                model="gpt-5.6-terra",
                 temperature=0.5,
             )
 
-            # Check that temperature was NOT passed to the API call
+            # Check that temperature is passed to the API call.
             call_kwargs = mock_client.responses.create.call_args.kwargs
-            assert "temperature" not in call_kwargs
+            assert call_kwargs["temperature"] == 0.5
 
 
 class TestGenerateText:

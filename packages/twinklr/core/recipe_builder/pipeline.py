@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Any
 
 from twinklr.core.agents.providers.base import LLMProvider
-from twinklr.core.config.models import AgentConfig
+from twinklr.core.config.models import AgentConfig, AgentOrchestrationConfig
 from twinklr.core.recipe_builder.admission import admit_candidates, write_staged_outputs
 from twinklr.core.recipe_builder.enrichment import generate_enrichments
 from twinklr.core.recipe_builder.evidence import (
@@ -62,7 +62,7 @@ class PipelineConfig:
     dry_run: bool = False
     llm_provider: LLMProvider | None = None
     generation_agent: AgentConfig = field(
-        default_factory=lambda: AgentConfig(model="gpt-4.1", temperature=0.9)
+        default_factory=lambda: AgentOrchestrationConfig().recipe_generation_agent
     )
     max_opportunities: int = 10
     phases: tuple[str, ...] = field(default_factory=lambda: ALL_PHASES)

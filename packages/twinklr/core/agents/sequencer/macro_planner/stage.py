@@ -80,6 +80,10 @@ class MacroPlannerStage:
             MacroPlannerOrchestrator,
             PlanningContext,
         )
+        from twinklr.core.agents.sequencer.macro_planner.specs import (
+            get_judge_spec,
+            get_planner_spec,
+        )
         from twinklr.core.agents.shared.judge.controller import IterationResult
         from twinklr.core.pipeline.execution import execute_step
         from twinklr.core.pipeline.result import failure_result
@@ -99,6 +103,8 @@ class MacroPlannerStage:
             # Create orchestrator with pipeline context dependencies
             orchestrator = MacroPlannerOrchestrator(
                 provider=context.provider,
+                planner_spec=get_planner_spec(config=context.job_config.agent.plan_agent),
+                judge_spec=get_judge_spec(config=context.job_config.agent.judge_agent),
                 max_iterations=context.job_config.agent.max_iterations,
                 min_pass_score=context.job_config.agent.min_pass_score,
                 llm_logger=context.llm_logger,

@@ -254,6 +254,8 @@ class AnthropicProvider:
         """
         try:
             system_text, conversation_messages = self._split_messages(messages)
+            kwargs.pop("reasoning_effort", None)
+            timeout_seconds = kwargs.pop("timeout_seconds", None)
 
             request_params: dict[str, Any] = {
                 "model": model,
@@ -264,6 +266,8 @@ class AnthropicProvider:
                 request_params["system"] = system_text
             if temperature is not None:
                 request_params["temperature"] = temperature
+            if timeout_seconds is not None:
+                request_params["timeout"] = timeout_seconds
 
             response = self._sync_client.messages.create(**request_params, **kwargs)
 
@@ -384,6 +388,8 @@ class AnthropicProvider:
         """
         try:
             system_text, conversation_messages = self._split_messages(messages)
+            kwargs.pop("reasoning_effort", None)
+            timeout_seconds = kwargs.pop("timeout_seconds", None)
 
             request_params: dict[str, Any] = {
                 "model": model,
@@ -394,6 +400,8 @@ class AnthropicProvider:
                 request_params["system"] = system_text
             if temperature is not None:
                 request_params["temperature"] = temperature
+            if timeout_seconds is not None:
+                request_params["timeout"] = timeout_seconds
 
             response = await self._async_client.messages.create(**request_params, **kwargs)
 

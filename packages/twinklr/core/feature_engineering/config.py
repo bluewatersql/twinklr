@@ -12,7 +12,6 @@ import logging
 from pathlib import Path
 from typing import Literal
 
-from twinklr.core.config.models import AgentConfig
 from twinklr.core.feature_store.models import FeatureStoreConfig
 
 logger = logging.getLogger(__name__)
@@ -98,12 +97,6 @@ class FeatureEngineeringPipelineOptions:
         quality_max_high_variance_template_ratio: Maximum high-variance template ratio (None = off).
         quality_max_over_generic_template_ratio: Maximum over-generic template ratio (None = off).
         quality_diagnostics_gate_mode: Gate mode for diagnostics checks ("enforce" or "warn").
-        normalization_review_agent: LLM configuration for
-            ``normalization.llm_review.LLMReviewPass``. Not consumed by this
-            pipeline directly today — ``LLMReviewPass``'s only caller is the
-            standalone ``scripts/analysis/normalize_unknown_effects.py``
-            script; this field exists to keep the config-shape pattern
-            consistent for a future wiring into the main pipeline.
     """
 
     audio_required: bool = False
@@ -178,7 +171,6 @@ class FeatureEngineeringPipelineOptions:
     quality_max_high_variance_template_ratio: float | None = None
     quality_max_over_generic_template_ratio: float | None = None
     quality_diagnostics_gate_mode: Literal["enforce", "warn"] = "warn"
-    normalization_review_agent: AgentConfig | None = None
 
 
 # Alias for use within the decomposed implementation classes.

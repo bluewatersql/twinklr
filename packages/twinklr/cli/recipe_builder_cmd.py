@@ -29,6 +29,9 @@ def add_curate_catalog_subparser(
     sub: argparse._SubParsersAction[argparse.ArgumentParser],
 ) -> None:
     """Register the ``curate-catalog`` subcommand on ``sub``."""
+    from twinklr.core.config.models import AgentOrchestrationConfig
+
+    generation_defaults = AgentOrchestrationConfig().recipe_generation_agent
     cmd = sub.add_parser(
         "curate-catalog",
         help=(
@@ -111,14 +114,26 @@ def add_curate_catalog_subparser(
     )
     cmd.add_argument(
         "--model",
-        default="gpt-4.1",
-        help="LLM model for recipe generation (default: gpt-4.1).",
+        default=generation_defaults.model,
+        help=f"LLM model for recipe generation (default: {generation_defaults.model}).",
     )
     cmd.add_argument(
         "--temperature",
         type=float,
-        default=0.9,
-        help="LLM sampling temperature; higher is more creative (default: 0.9).",
+        default=generation_defaults.temperature,
+        help=(
+            "LLM sampling temperature; higher is more creative "
+            f"(default: {generation_defaults.temperature})."
+        ),
+    )
+    cmd.add_argument(
+        "--reasoning-effort",
+        choices=["low", "medium", "high"],
+        default=generation_defaults.reasoning_effort,
+        help=(
+            "Explicit reasoning effort for recipe generation "
+            f"(default: {generation_defaults.reasoning_effort})."
+        ),
     )
     cmd.add_argument(
         "--promote",
@@ -169,10 +184,11 @@ def run_curate_catalog_command(args: argparse.Namespace) -> int:
             app_config = AppConfig(llm_api_key=SecretStr(api_key))
             llm_provider = create_llm_provider(app_config, session_id=args.run_name)
 
-    from twinklr.core.config.models import AgentConfig
+    from twinklr.core.config.models import AgentConfig, AgentOrchestrationConfig
     from twinklr.core.recipe_builder.pipeline import ALL_PHASES, run_pipeline
 
     phases: tuple[str, ...] = ALL_PHASES if args.phase == "all" else (args.phase,)
+    generation_defaults = AgentOrchestrationConfig().recipe_generation_agent
 
     config = PipelineConfig(
         run_name=args.run_name,
@@ -184,7 +200,15 @@ def run_curate_catalog_command(args: argparse.Namespace) -> int:
         synthetic_fallback=args.synthetic_fallback,
         dry_run=args.dry_run,
         llm_provider=llm_provider,
-        generation_agent=AgentConfig(model=args.model, temperature=args.temperature),
+        generation_agent=AgentConfig(
+            model=args.model,
+            temperature=args.temperature,
+            reasoning_effort=getattr(
+                args, "reasoning_effort", generation_defaults.reasoning_effort
+            ),
+            max_tokens=generation_defaults.max_tokens,
+            timeout_seconds=generation_defaults.timeout_seconds,
+        ),
         max_opportunities=args.max_opportunities,
         phases=phases,
     )

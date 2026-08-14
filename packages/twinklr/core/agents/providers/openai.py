@@ -30,6 +30,11 @@ from twinklr.core.api.llm.openai.client import OpenAIClient
 logger = logging.getLogger(__name__)
 
 
+def _as_int(value: Any) -> int:
+    """Normalize optional SDK usage fields without accepting mock objects as counts."""
+    return value if isinstance(value, int) else 0
+
+
 class OpenAIProvider:
     """OpenAI provider implementation with async-first design.
 
@@ -72,6 +77,7 @@ class OpenAIProvider:
         # Thread-safe token tracking
         self._token_lock = threading.Lock()
         self._total_tokens = TokenUsage()
+        self._sync_usage_snapshot = TokenUsage()
 
         # Conversation state
         self._conversations: dict[str, Conversation] = {}
@@ -105,11 +111,13 @@ class OpenAIProvider:
                 messages=messages, model=model, temperature=temperature, **kwargs
             )
 
-            usage = self._sync_client.get_total_token_usage()
+            cumulative_usage = self._sync_client.get_total_token_usage()
+            usage = self._sync_usage_delta(cumulative_usage)
 
             # Update thread-safe token tracking
             self._update_token_usage(
                 prompt_tokens=usage.prompt_tokens,
+                reasoning_tokens=usage.reasoning_tokens,
                 completion_tokens=usage.completion_tokens,
                 total_tokens=usage.total_tokens,
             )
@@ -119,6 +127,7 @@ class OpenAIProvider:
                 metadata=ResponseMetadata(
                     token_usage=TokenUsage(
                         prompt_tokens=usage.prompt_tokens,
+                        reasoning_tokens=usage.reasoning_tokens,
                         completion_tokens=usage.completion_tokens,
                         total_tokens=usage.total_tokens,
                     ),
@@ -162,10 +171,12 @@ class OpenAIProvider:
                 {"role": "assistant", "content": json.dumps(response_data)}
             )
 
-            usage = self._sync_client.get_total_token_usage()
+            cumulative_usage = self._sync_client.get_total_token_usage()
+            usage = self._sync_usage_delta(cumulative_usage)
 
             self._update_token_usage(
                 prompt_tokens=usage.prompt_tokens,
+                reasoning_tokens=usage.reasoning_tokens,
                 completion_tokens=usage.completion_tokens,
                 total_tokens=usage.total_tokens,
             )
@@ -173,6 +184,7 @@ class OpenAIProvider:
             response_metadata = ResponseMetadata(
                 token_usage=TokenUsage(
                     prompt_tokens=usage.prompt_tokens,
+                    reasoning_tokens=usage.reasoning_tokens,
                     completion_tokens=usage.completion_tokens,
                     total_tokens=usage.total_tokens,
                 ),
@@ -209,15 +221,35 @@ class OpenAIProvider:
         """Reset token tracking (thread-safe)."""
         with self._token_lock:
             self._total_tokens = TokenUsage()
+            self._sync_usage_snapshot = TokenUsage()
         self._sync_client.reset_conversation()
 
+    def _sync_usage_delta(self, cumulative: Any) -> TokenUsage:
+        """Return the current sync call's usage from the client's cumulative totals."""
+        current = TokenUsage(
+            prompt_tokens=_as_int(getattr(cumulative, "prompt_tokens", 0)),
+            reasoning_tokens=_as_int(getattr(cumulative, "reasoning_tokens", 0)),
+            completion_tokens=_as_int(getattr(cumulative, "completion_tokens", 0)),
+            total_tokens=_as_int(getattr(cumulative, "total_tokens", 0)),
+        )
+        previous = self._sync_usage_snapshot
+        delta = TokenUsage(
+            prompt_tokens=max(0, current.prompt_tokens - previous.prompt_tokens),
+            reasoning_tokens=max(0, current.reasoning_tokens - previous.reasoning_tokens),
+            completion_tokens=max(0, current.completion_tokens - previous.completion_tokens),
+            total_tokens=max(0, current.total_tokens - previous.total_tokens),
+        )
+        self._sync_usage_snapshot = current
+        return delta
+
     def _update_token_usage(
-        self, prompt_tokens: int, completion_tokens: int, total_tokens: int
+        self, prompt_tokens: int, reasoning_tokens: int, completion_tokens: int, total_tokens: int
     ) -> None:
         """Thread-safe token usage update."""
         with self._token_lock:
             self._total_tokens = TokenUsage(
                 prompt_tokens=self._total_tokens.prompt_tokens + prompt_tokens,
+                reasoning_tokens=self._total_tokens.reasoning_tokens + reasoning_tokens,
                 completion_tokens=self._total_tokens.completion_tokens + completion_tokens,
                 total_tokens=self._total_tokens.total_tokens + total_tokens,
             )
@@ -287,7 +319,9 @@ class OpenAIProvider:
             "frequency_penalty",
             "presence_penalty",
             "reasoning",
+            "reasoning_effort",
             "metadata",
+            "timeout_seconds",
         }
 
         try:
@@ -298,14 +332,24 @@ class OpenAIProvider:
                 "text": {"format": {"type": "json_object"}},
             }
 
-            # Add temperature if provided and model supports it
-            is_mini_model = "mini" in model.lower()
-            if temperature is not None and not is_mini_model:
+            # GPT-5.6 supports temperature.  We intentionally send it for every
+            # configured model instead of guessing from a substring in its name.
+            if temperature is not None:
                 request_params["temperature"] = temperature
 
-            request_params.update(
-                {key: value for key, value in kwargs.items() if key in allowed_request_kwargs}
-            )
+            allowed_kwargs = {
+                key: value for key, value in kwargs.items() if key in allowed_request_kwargs
+            }
+            reasoning_effort = allowed_kwargs.pop("reasoning_effort", None)
+            if reasoning_effort is not None:
+                request_params["reasoning"] = {"effort": reasoning_effort}
+            max_tokens = allowed_kwargs.pop("max_tokens", None)
+            if max_tokens is not None and "max_output_tokens" not in allowed_kwargs:
+                allowed_kwargs["max_output_tokens"] = max_tokens
+            timeout_seconds = allowed_kwargs.pop("timeout_seconds", None)
+            if timeout_seconds is not None:
+                allowed_kwargs["timeout"] = timeout_seconds
+            request_params.update(allowed_kwargs)
 
             # Make async API call with transient retry handling
             response = None
@@ -337,23 +381,28 @@ class OpenAIProvider:
             # Extract token usage
             token_usage = TokenUsage()
             if hasattr(response, "usage") and response.usage:
-                prompt_tokens = getattr(response.usage, "prompt_tokens", None)
-                completion_tokens = getattr(response.usage, "completion_tokens", None)
-                total_tokens = getattr(response.usage, "total_tokens", None)
+                prompt_tokens = _as_int(getattr(response.usage, "prompt_tokens", None))
+                completion_tokens = _as_int(getattr(response.usage, "completion_tokens", None))
+                total_tokens = _as_int(getattr(response.usage, "total_tokens", None))
                 # Responses API variants may expose input/output token names instead.
                 if prompt_tokens in (None, 0):
-                    prompt_tokens = getattr(response.usage, "input_tokens", 0)
+                    prompt_tokens = _as_int(getattr(response.usage, "input_tokens", 0))
                 if completion_tokens in (None, 0):
-                    completion_tokens = getattr(response.usage, "output_tokens", 0)
+                    completion_tokens = _as_int(getattr(response.usage, "output_tokens", 0))
                 if total_tokens in (None, 0):
                     total_tokens = (prompt_tokens or 0) + (completion_tokens or 0)
+                output_details = getattr(response.usage, "output_tokens_details", None)
+                reasoning_tokens = _as_int(getattr(output_details, "reasoning_tokens", 0))
+                completion_without_reasoning = max(0, (completion_tokens or 0) - reasoning_tokens)
                 token_usage = TokenUsage(
                     prompt_tokens=prompt_tokens or 0,
-                    completion_tokens=completion_tokens or 0,
+                    reasoning_tokens=reasoning_tokens,
+                    completion_tokens=completion_without_reasoning,
                     total_tokens=total_tokens or 0,
                 )
                 self._update_token_usage(
                     prompt_tokens=token_usage.prompt_tokens,
+                    reasoning_tokens=token_usage.reasoning_tokens,
                     completion_tokens=token_usage.completion_tokens,
                     total_tokens=token_usage.total_tokens,
                 )

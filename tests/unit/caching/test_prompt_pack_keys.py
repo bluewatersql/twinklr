@@ -336,10 +336,71 @@ class TestModelIdRemainsKeyed:
             moving_heads_context
         ) != await retargeted_mh.get_cache_key(moving_heads_context)
 
+    async def test_reasoning_effort_changes_every_llm_stage_key(
+        self,
+        provider: MagicMock,
+        audio_packs: Path,
+        macro_context: PlanningContext,
+        section_context: SectionPlanningContext,
+        moving_heads_context: MovingHeadPlanningContext,
+        song_bundle: SongBundle,
+    ) -> None:
+        profile = AudioProfileOrchestrator(provider=provider, prompt_base_path=audio_packs)
+        changed_profile = AudioProfileOrchestrator(
+            provider=provider, reasoning_effort="high", prompt_base_path=audio_packs
+        )
+        assert await profile.get_cache_key(song_bundle) != await changed_profile.get_cache_key(
+            song_bundle
+        )
+
+        lyrics = LyricsOrchestrator(provider=provider, prompt_base_path=audio_packs)
+        changed_lyrics = LyricsOrchestrator(
+            provider=provider, reasoning_effort="high", prompt_base_path=audio_packs
+        )
+        assert await lyrics.get_cache_key(song_bundle) != await changed_lyrics.get_cache_key(
+            song_bundle
+        )
+
+        macro = MacroPlannerOrchestrator(provider=provider)
+        changed_macro = MacroPlannerOrchestrator(
+            provider=provider,
+            planner_spec=_change_reasoning(macro.planner_spec),
+            judge_spec=macro.judge_spec,
+        )
+        assert await macro.get_cache_key(macro_context) != await changed_macro.get_cache_key(
+            macro_context
+        )
+
+        group = GroupPlannerOrchestrator(provider=provider)
+        changed_group = GroupPlannerOrchestrator(
+            provider=provider,
+            planner_spec=_change_reasoning(group.planner_spec),
+            section_judge_spec=group.section_judge_spec,
+        )
+        assert await group.get_cache_key(section_context) != await changed_group.get_cache_key(
+            section_context
+        )
+
+        moving_heads = MovingHeadPlannerOrchestrator(provider=provider)
+        changed_mh = MovingHeadPlannerOrchestrator(
+            provider=provider,
+            planner_spec=_change_reasoning(moving_heads.planner_spec),
+            judge_spec=moving_heads.judge_spec,
+        )
+        assert await moving_heads.get_cache_key(
+            moving_heads_context
+        ) != await changed_mh.get_cache_key(moving_heads_context)
+
 
 def _retarget(spec: AgentSpec) -> AgentSpec:
     """Same spec pointed at a different model."""
     return spec.model_copy(update={"model": "gpt-5.6"})
+
+
+def _change_reasoning(spec: AgentSpec) -> AgentSpec:
+    """Same spec with a different explicit reasoning effort."""
+    effort = "low" if spec.reasoning_effort != "low" else "high"
+    return spec.model_copy(update={"reasoning_effort": effort})
 
 
 class TestPromptPackHashing:

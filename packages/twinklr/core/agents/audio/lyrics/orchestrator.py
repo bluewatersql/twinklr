@@ -19,6 +19,7 @@ from twinklr.core.agents.logging import LLMCallLogger, NullLLMCallLogger
 from twinklr.core.agents.prompts import spec_prompt_hash
 from twinklr.core.agents.providers.base import LLMProvider
 from twinklr.core.audio.models import SongBundle
+from twinklr.core.config.models import AgentConfig
 
 logger = logging.getLogger(__name__)
 
@@ -42,8 +43,11 @@ class LyricsOrchestrator:
         self,
         provider: LLMProvider,
         *,
-        model: str = "gpt-5.2",
+        model: str | None = None,
         temperature: float = 0.5,
+        reasoning_effort: str = "medium",
+        max_tokens: int = AgentConfig().max_tokens,
+        timeout_seconds: int = AgentConfig().timeout_seconds,
         llm_logger: LLMCallLogger | None = None,
         prompt_base_path: str | Path | None = None,
         token_budget: int | None = None,
@@ -52,15 +56,18 @@ class LyricsOrchestrator:
 
         Args:
             provider: LLM provider for agent execution
-            model: Model identifier (default: gpt-5.2)
+            model: Model identifier (defaults to the configured AgentConfig model)
             temperature: Sampling temperature (default: 0.5, higher than AudioProfile)
             llm_logger: Optional LLM call logger (uses NullLLMCallLogger if None)
             prompt_base_path: Optional prompt pack base path
             token_budget: Optional token budget limit
         """
         self.provider = provider
-        self.model = model
+        self.model = model or AgentConfig().model
         self.temperature = temperature
+        self.reasoning_effort = reasoning_effort
+        self.max_tokens = max_tokens
+        self.timeout_seconds = timeout_seconds
         self.llm_logger = llm_logger or NullLLMCallLogger()
         self.prompt_base_path = prompt_base_path
         self.token_budget = token_budget
@@ -72,6 +79,16 @@ class LyricsOrchestrator:
         if self.prompt_base_path is not None:
             return Path(self.prompt_base_path)
         return Path(__file__).parent / "prompts"
+
+    def _agent_config(self) -> AgentConfig:
+        """Materialize the request-affecting role configuration."""
+        return AgentConfig(
+            model=self.model,
+            temperature=self.temperature,
+            reasoning_effort=self.reasoning_effort,  # type: ignore[arg-type]
+            max_tokens=self.max_tokens,
+            timeout_seconds=self.timeout_seconds,
+        )
 
     async def get_cache_key(self, song_bundle: SongBundle) -> str:
         """Generate cache key for deterministic caching.
@@ -89,14 +106,16 @@ class LyricsOrchestrator:
             SHA256 hash of canonical inputs
         """
         spec = get_lyrics_spec(
-            model=self.model,
-            temperature=self.temperature,
+            config=self._agent_config(),
             token_budget=self.token_budget,
         )
         key_data = {
             "song_bundle": song_bundle.model_dump(),
             "model": self.model,
             "temperature": self.temperature,
+            "reasoning_effort": self.reasoning_effort,
+            "max_tokens": self.max_tokens,
+            "timeout_seconds": self.timeout_seconds,
             "prompt_pack": spec_prompt_hash(self._resolved_prompt_base(), spec),
         }
 
@@ -146,8 +165,7 @@ class LyricsOrchestrator:
 
             # Get spec
             spec = get_lyrics_spec(
-                model=self.model,
-                temperature=self.temperature,
+                config=self._agent_config(),
                 token_budget=self.token_budget,
             )
 

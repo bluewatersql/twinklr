@@ -42,7 +42,14 @@ class _FakeProvider(LLMProvider):
         temperature: float | None = None,
         **kwargs: Any,
     ) -> LLMResponse:
-        self.calls.append({"messages": messages, "model": model, "temperature": temperature})
+        self.calls.append(
+            {
+                "messages": messages,
+                "model": model,
+                "temperature": temperature,
+                **kwargs,
+            }
+        )
         return LLMResponse(content=self._content, metadata=ResponseMetadata())
 
 
@@ -209,7 +216,13 @@ def test_generate_with_llm_uses_provider_framework(
     raw = sample_recipe.model_dump(mode="json")
     raw["recipe_id"] = "rb_generated_test_v1"
     provider = _FakeProvider(content=raw)
-    config = AgentConfig(model="gpt-4.1-test", temperature=0.42)
+    config = AgentConfig(
+        model="configured-recipe-model",
+        temperature=0.42,
+        reasoning_effort="high",
+        max_tokens=1234,
+        timeout_seconds=17,
+    )
 
     candidates = generate_with_llm(
         opportunities=[sample_opportunity],
@@ -222,8 +235,11 @@ def test_generate_with_llm_uses_provider_framework(
     assert len(candidates) == 1
     assert candidates[0].generation_mode == "llm"
     assert len(provider.calls) == 1
-    assert provider.calls[0]["model"] == "gpt-4.1-test"
+    assert provider.calls[0]["model"] == "configured-recipe-model"
     assert provider.calls[0]["temperature"] == pytest.approx(0.42)
+    assert provider.calls[0]["reasoning_effort"] == "high"
+    assert provider.calls[0]["max_tokens"] == 1234
+    assert provider.calls[0]["timeout_seconds"] == 17
 
 
 def test_generate_candidates_dispatches_to_provider(

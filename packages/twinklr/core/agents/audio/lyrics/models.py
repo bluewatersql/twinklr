@@ -31,7 +31,7 @@ class Provenance(BaseModel):
 
     provider_id: str = Field(description="LLM provider (e.g., 'openai')")
 
-    model_id: str = Field(description="LLM model (e.g., 'gpt-5.2')")
+    model_id: str = Field(description="LLM model identifier")
 
     prompt_pack: str = Field(description="Prompt pack ID used")
 

@@ -44,10 +44,11 @@ def test_audio_profile_spec_uses_low_temperature():
     assert spec.temperature == 0.4
 
 
-def test_audio_profile_spec_uses_gpt5_2():
-    """Test that spec uses gpt-5.2 model."""
+def test_audio_profile_spec_uses_current_model():
+    """Test that spec uses the configured current profile model."""
     spec = get_audio_profile_spec()
-    assert spec.model == "gpt-5.2"
+    assert spec.model == "gpt-5.6-sol"
+    assert spec.reasoning_effort == "medium"
 
 
 def test_audio_profile_spec_has_schema_repair():

@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 import os
 from pathlib import Path
-from typing import Self
+from typing import Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, SecretStr
 
@@ -19,7 +19,12 @@ from twinklr.core.sequencer.models.transition import TransitionStrategy
 class AgentConfig(BaseModel):
     """Per-agent LLM configuration."""
 
-    model: str = Field(default="gpt-5.2", description="LLM model name")
+    model: str = Field(default="gpt-5.6-sol", description="LLM model name")
+
+    reasoning_effort: Literal["low", "medium", "high"] = Field(
+        default="medium",
+        description="Explicit GPT-5.6 reasoning effort; never rely on the provider default",
+    )
 
     temperature: float = Field(
         default=0.7, ge=0.0, le=2.0, description="LLM temperature (0=deterministic, 2=creative)"
@@ -103,16 +108,54 @@ class AgentOrchestrationConfig(BaseModel):
         description="Minimum judge score to accept plan, 0-100 (the single configured scale)",
     )
 
-    # Per-agent configurations
-    plan_agent: AgentConfig = Field(default_factory=lambda: AgentConfig(temperature=0.7))
-
-    implementation_agent: AgentConfig = Field(default_factory=lambda: AgentConfig(temperature=0.7))
-
-    judge_agent: AgentConfig = Field(
-        default_factory=lambda: AgentConfig(model="gpt-5-mini", temperature=1.0)
+    # Per-agent configurations. Planning is quality-critical; judges evaluate rather
+    # than create, so they use the lower-cost model and deliberate low effort.
+    plan_agent: AgentConfig = Field(
+        default_factory=lambda: AgentConfig(
+            model="gpt-5.6-sol", reasoning_effort="high", temperature=0.7
+        )
     )
 
-    refinement_agent: AgentConfig = Field(default_factory=lambda: AgentConfig(temperature=0.7))
+    judge_agent: AgentConfig = Field(
+        default_factory=lambda: AgentConfig(
+            model="gpt-5.6-terra", reasoning_effort="low", temperature=0.3
+        )
+    )
+
+    refinement_agent: AgentConfig = Field(
+        default_factory=lambda: AgentConfig(
+            model="gpt-5.6-sol", reasoning_effort="medium", temperature=0.3
+        )
+    )
+
+    profile_agent: AgentConfig = Field(
+        default_factory=lambda: AgentConfig(
+            model="gpt-5.6-sol", reasoning_effort="medium", temperature=0.4
+        )
+    )
+
+    lyrics_agent: AgentConfig = Field(
+        default_factory=lambda: AgentConfig(
+            model="gpt-5.6-sol", reasoning_effort="medium", temperature=0.5
+        )
+    )
+
+    asset_enricher_agent: AgentConfig = Field(
+        default_factory=lambda: AgentConfig(
+            model="gpt-5.6-terra", reasoning_effort="low", temperature=0.6
+        )
+    )
+
+    recipe_generation_agent: AgentConfig = Field(
+        default_factory=lambda: AgentConfig(
+            model="gpt-5.6-terra", reasoning_effort="medium", temperature=0.9
+        )
+    )
+
+    image_model: str = Field(
+        default="gpt-image-2",
+        description="OpenAI Images API model; assets remain disabled unless explicitly enabled",
+    )
 
     llm_logging: LLMLoggingConfig = Field(
         default_factory=LLMLoggingConfig,

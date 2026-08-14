@@ -64,14 +64,16 @@ class AudioProfileStage:
         from twinklr.core.pipeline.result import failure_result
 
         try:
-            model = context.job_config.agent.plan_agent.model
-            temperature = 0.3
+            agent_config = context.job_config.agent.profile_agent
 
             # Create orchestrator
             orchestrator = AudioProfileOrchestrator(
                 provider=context.provider,
-                model=model,
-                temperature=temperature,
+                model=agent_config.model,
+                temperature=agent_config.temperature,
+                reasoning_effort=agent_config.reasoning_effort,
+                max_tokens=agent_config.max_tokens,
+                timeout_seconds=agent_config.timeout_seconds,
                 llm_logger=context.llm_logger,
             )
 

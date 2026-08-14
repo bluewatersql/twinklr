@@ -31,6 +31,11 @@ _TRACE: int = 5
 logging.addLevelName(_TRACE, "TRACE")
 
 
+def _as_int(value: Any) -> int:
+    """Normalize optional SDK usage fields without accepting mock objects as counts."""
+    return value if isinstance(value, int) else 0
+
+
 class ReasoningEffort(StrEnum):
     """Reasoning effort levels for API requests"""
 
@@ -52,6 +57,7 @@ class TokenUsage:
     """Token usage information from API response"""
 
     prompt_tokens: int = 0
+    reasoning_tokens: int = 0
     completion_tokens: int = 0
     total_tokens: int = 0
 
@@ -59,6 +65,7 @@ class TokenUsage:
         """Add token counts from multiple responses"""
         return TokenUsage(
             prompt_tokens=self.prompt_tokens + other.prompt_tokens,
+            reasoning_tokens=self.reasoning_tokens + other.reasoning_tokens,
             completion_tokens=self.completion_tokens + other.completion_tokens,
             total_tokens=self.total_tokens + other.total_tokens,
         )
@@ -66,6 +73,7 @@ class TokenUsage:
     def __str__(self) -> str:
         return (
             f"TokenUsage(prompt={self.prompt_tokens}, "
+            f"reasoning={self.reasoning_tokens}, "
             f"completion={self.completion_tokens}, "
             f"total={self.total_tokens})"
         )
@@ -274,10 +282,12 @@ class OpenAIClient:
     def generate_json(
         self,
         messages: list[dict[str, str]],
-        model: str = "gpt-5.2",
+        model: str,
         *,
-        reasoning_effort: ReasoningEffort | None = None,
+        reasoning_effort: ReasoningEffort | str | None = None,
         temperature: float | None = None,
+        max_tokens: int | None = None,
+        timeout_seconds: float | None = None,
         verbosity: Verbosity = Verbosity.MEDIUM,
         validate_json: Callable[[Any], bool] | None = None,
         return_metadata: bool = False,
@@ -313,7 +323,11 @@ class OpenAIClient:
             )
 
         # Convert enums to strings if needed
-        effort = reasoning_effort.value if isinstance(reasoning_effort, ReasoningEffort) else None
+        effort = (
+            reasoning_effort.value
+            if isinstance(reasoning_effort, ReasoningEffort)
+            else reasoning_effort
+        )
 
         # Convert simple messages to OpenAI format
         openai_messages = self.get_messages_from_simple(messages)
@@ -334,21 +348,20 @@ class OpenAIClient:
                 "text": text_param,
             }
 
-            # Mini models (gpt-5-mini, gpt-4o-mini, etc.) don't support temperature or reasoning
-            is_mini_model = "mini" in model.lower()
-
-            # Add temperature as top-level parameter if provided and supported
-            if temperature is not None and not is_mini_model:
+            # Temperature handling is explicit rather than inferred from a model-id
+            # substring.  The GPT-5.6 targets support the configured value.
+            if temperature is not None:
                 request_params["temperature"] = temperature
-            elif temperature is not None and is_mini_model:
-                logger.debug(f"Model {model} does not support temperature parameter, skipping")
 
-            # Only add reasoning if effort is specified AND model supports it
-            if effort is not None and not is_mini_model:
+            if max_tokens is not None:
+                request_params["max_output_tokens"] = max_tokens
+
+            if timeout_seconds is not None:
+                request_params["timeout"] = timeout_seconds
+
+            if effort is not None:
                 reasoning_param: Reasoning = {"effort": effort}  # type: ignore[typeddict-item]
                 request_params["reasoning"] = reasoning_param
-            elif effort is not None and is_mini_model:
-                logger.debug(f"Model {model} does not support reasoning parameter, skipping")
 
             response = self.client.responses.create(**request_params)
 
@@ -420,10 +433,20 @@ class OpenAIClient:
         # Extract token usage
         if hasattr(response, "usage"):
             usage = response.usage
+            prompt_tokens = _as_int(getattr(usage, "prompt_tokens", 0)) or _as_int(
+                getattr(usage, "input_tokens", 0)
+            )
+            output_tokens = _as_int(getattr(usage, "completion_tokens", 0)) or _as_int(
+                getattr(usage, "output_tokens", 0)
+            )
+            output_details = getattr(usage, "output_tokens_details", None)
+            reasoning_tokens = _as_int(getattr(output_details, "reasoning_tokens", 0))
             metadata.token_usage = TokenUsage(
-                prompt_tokens=getattr(usage, "prompt_tokens", 0),
-                completion_tokens=getattr(usage, "completion_tokens", 0),
-                total_tokens=getattr(usage, "total_tokens", 0),
+                prompt_tokens=prompt_tokens,
+                reasoning_tokens=reasoning_tokens,
+                completion_tokens=max(0, output_tokens - reasoning_tokens),
+                total_tokens=_as_int(getattr(usage, "total_tokens", 0))
+                or prompt_tokens + output_tokens,
             )
 
         # Extract finish reason (if available)
@@ -507,7 +530,7 @@ class OpenAIClient:
     def generate_json_with_conversation(
         self,
         user_message: str,
-        model: str = "gpt-5.2",
+        model: str,
         reasoning_effort: ReasoningEffort | str = ReasoningEffort.MEDIUM,
         verbosity: Verbosity | str = Verbosity.LOW,
         validate_json: Callable[[Any], bool] | None = None,
@@ -632,7 +655,7 @@ class OpenAIClient:
     def generate_text(
         self,
         messages: list[dict[str, str]],
-        model: str = "gpt-5.2",
+        model: str,
         reasoning_effort: ReasoningEffort | str = ReasoningEffort.MEDIUM,
         verbosity: Verbosity | str = Verbosity.MEDIUM,
         return_metadata: bool = False,

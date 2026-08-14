@@ -3,7 +3,7 @@
 Async-first implementation wrapping client.images.generate() with
 exponential backoff, error handling, base64 decoding, and SHA-256 hashing.
 
-Supports gpt-image-1.5 (default) which:
+Supports the configured OpenAI Images API model which:
 - Returns base64 by default (no response_format needed)
 - Uses output_format (png/webp/jpeg) instead of response_format
 - Only supports sizes: 1024x1024, 1024x1536, 1536x1024, auto
@@ -28,6 +28,7 @@ from openai import (
 from PIL import Image
 
 from twinklr.core.agents.assets.models import ImageResult
+from twinklr.core.config.models import AgentOrchestrationConfig
 from twinklr.core.sequencer.vocabulary import BackgroundMode
 
 if TYPE_CHECKING:
@@ -40,14 +41,15 @@ logger = logging.getLogger(__name__)
 # Errors worth retrying
 _RETRYABLE_ERRORS = (APIConnectionError, APITimeoutError, RateLimitError)
 
-# gpt-image-1.5 supported sizes
+# OpenAI Images API supported sizes
 _SUPPORTED_SIZES = {"1024x1024", "1024x1536", "1536x1024", "auto"}
 
 
 def _select_api_size(width: int, height: int) -> str:
     """Select the best API size for the target dimensions.
 
-    gpt-image-1.5 only supports 1024x1024, 1024x1536, 1536x1024, or auto.
+    The configured OpenAI Images API model supports 1024x1024, 1024x1536,
+    1536x1024, or auto.
     We pick the smallest that covers the target and resize locally afterward.
 
     Args:
@@ -123,7 +125,7 @@ class OpenAIImageClient:
     """Async-first client for generating images via the OpenAI Images API.
 
     Handles retry logic with async sleep, base64 decoding, local resizing,
-    file writing, and SHA-256 hashing. Designed for gpt-image-1.5.
+    file writing, and SHA-256 hashing.
 
     Args:
         client: AsyncOpenAI client instance.
@@ -137,13 +139,13 @@ class OpenAIImageClient:
         self,
         client: AsyncOpenAI,
         *,
-        model: str = "gpt-image-1.5",
+        model: str | None = None,
         max_retries: int = 3,
         retry_delay_s: float = 2.0,
         retry_backoff: float = 2.0,
     ) -> None:
         self._client = client
-        self._model = model
+        self._model = model or AgentOrchestrationConfig().image_model
         self._max_retries = max_retries
         self._retry_delay_s = retry_delay_s
         self._retry_backoff = retry_backoff
@@ -191,7 +193,7 @@ class OpenAIImageClient:
                     background=bg,
                 )
 
-                # gpt-image-1 returns base64 by default in data[0].b64_json
+                # The configured Images API model returns base64 in data[0].b64_json.
                 if not response.data:
                     raise RuntimeError("API returned empty data list")
                 b64_data = response.data[0].b64_json

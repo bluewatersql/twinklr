@@ -184,11 +184,18 @@ The agent system is data-driven: `AgentSpec` data objects define prompt pack, re
 - `success_threshold`: 70 — minimum judge score, 0-100, the single configured scale; `AgentOrchestrationConfig.min_pass_score` converts it once to the planners' 0-10 scale
 - `token_budget`: 75,000 — total token limit
 
-**Agent configs** (`AgentConfig` defaults):
-- `plan_agent.model`: `"gpt-5.2"`, temperature 0.7
-- `judge_agent.model`: `"gpt-5-mini"`, temperature 1.0
-- `implementation_agent.model`: `"gpt-5.2"`, temperature 0.7
-- `refinement_agent.model`: `"gpt-5.2"`, temperature 0.7
+**Agent configs** (`AgentOrchestrationConfig` role defaults):
+- Planning: `gpt-5.6-sol`, high reasoning, temperature 0.7
+- Audio profile / lyrics: `gpt-5.6-sol`, medium reasoning
+- Judges: `gpt-5.6-terra`, low reasoning, temperature 0.3
+- Holistic correction: `gpt-5.6-sol`, medium reasoning, temperature 0.3
+- Asset prompt enrichment: `gpt-5.6-terra`, low reasoning, temperature 0.6
+- Recipe generation: `gpt-5.6-terra`, medium reasoning, temperature 0.9
+- Image generation: `gpt-image-2` (assets remain disabled by default)
+
+Each `AgentConfig` also carries `max_tokens` and `timeout_seconds`; the runner
+forwards both to the provider. OpenAI roles send `reasoning_effort` as
+`reasoning.effort`; providers without that capability filter it out.
 
 **Schema auto-injection:** Pydantic response models generate JSON schemas shown in LLM prompts. Model changes automatically propagate to prompts — no manual schema sync.
 

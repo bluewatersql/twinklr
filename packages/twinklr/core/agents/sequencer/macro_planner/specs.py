@@ -5,12 +5,16 @@ from __future__ import annotations
 from twinklr.core.agents.shared.judge.models import JudgeVerdict
 from twinklr.core.agents.spec import AgentMode, AgentSpec
 from twinklr.core.agents.taxonomy_utils import get_taxonomy_dict, get_theming_ids
+from twinklr.core.config.models import AgentConfig, AgentOrchestrationConfig
 from twinklr.core.sequencer.planning import MacroPlan
 
 
 def get_planner_spec(
-    model: str = "gpt-5.2",
-    temperature: float = 0.7,
+    config: AgentConfig | None = None,
+    *,
+    model: str | None = None,
+    temperature: float | None = None,
+    reasoning_effort: str | None = None,
     token_budget: int | None = None,
 ) -> AgentSpec:
     """Get MacroPlanner agent specification.
@@ -20,20 +24,25 @@ def get_planner_spec(
     architecture for Christmas light shows.
 
     Args:
-        model: LLM model to use (default: gpt-5.2 for strategic creative work)
-        temperature: Sampling temperature (default: 0.7 for balanced creativity)
+        config: Per-role model, sampling, and reasoning configuration.
         token_budget: Optional token budget
 
     Returns:
         MacroPlanner agent spec
     """
+    resolved = _resolve_config(
+        config or AgentOrchestrationConfig().plan_agent, model, temperature, reasoning_effort
+    )
     return AgentSpec(
         name="macro_planner",
         prompt_pack="sequencer/macro_planner/prompts/planner",
         response_model=MacroPlan,
         mode=AgentMode.CONVERSATIONAL,  # Maintains context across iterations
-        model=model,
-        temperature=temperature,
+        model=resolved.model,
+        temperature=resolved.temperature,
+        reasoning_effort=resolved.reasoning_effort,
+        max_tokens=resolved.max_tokens,
+        timeout_seconds=resolved.timeout_seconds,
         max_schema_repair_attempts=3,  # More attempts for complex plans
         token_budget=token_budget,
         default_variables={"taxonomy": get_taxonomy_dict()},  # Auto-inject taxonomy
@@ -41,8 +50,11 @@ def get_planner_spec(
 
 
 def get_judge_spec(
-    model: str = "gpt-5.2",
-    temperature: float = 0.3,
+    config: AgentConfig | None = None,
+    *,
+    model: str | None = None,
+    temperature: float | None = None,
+    reasoning_effort: str | None = None,
     token_budget: int | None = None,
 ) -> AgentSpec:
     """Get MacroPlanner judge agent specification.
@@ -52,26 +64,52 @@ def get_judge_spec(
     and bold impactful design suitable for Christmas light shows.
 
     Args:
-        model: LLM model to use (default: gpt-5.2 for nuanced evaluation)
-        temperature: Sampling temperature (default: 0.3 for consistent judgment)
+        config: Per-role model, sampling, and reasoning configuration.
         token_budget: Optional token budget
 
     Returns:
         MacroPlanner judge spec
     """
+    resolved = _resolve_config(
+        config or AgentOrchestrationConfig().judge_agent, model, temperature, reasoning_effort
+    )
     return AgentSpec(
         name="macro_judge",
         prompt_pack="sequencer/macro_planner/prompts/judge",
         response_model=JudgeVerdict,
         mode=AgentMode.ONESHOT,  # Stateless evaluation
-        model=model,
-        temperature=temperature,
+        model=resolved.model,
+        temperature=resolved.temperature,
+        reasoning_effort=resolved.reasoning_effort,
+        max_tokens=resolved.max_tokens,
+        timeout_seconds=resolved.timeout_seconds,
         max_schema_repair_attempts=5,  # Increased for enum validation issues
         token_budget=token_budget,
         default_variables={
             "taxonomy": get_taxonomy_dict(),
             "theming_ids": get_theming_ids(),  # For theme/tag/palette validation
         },
+    )
+
+
+def _resolve_config(
+    config: AgentConfig,
+    model: str | None,
+    temperature: float | None,
+    reasoning_effort: str | None,
+) -> AgentConfig:
+    """Resolve an explicit role config while retaining public override compatibility."""
+    resolved = config
+    if model is None and temperature is None and reasoning_effort is None:
+        return resolved
+    return resolved.model_copy(
+        update={
+            "model": model if model is not None else resolved.model,
+            "temperature": temperature if temperature is not None else resolved.temperature,
+            "reasoning_effort": (
+                reasoning_effort if reasoning_effort is not None else resolved.reasoning_effort
+            ),
+        }
     )
 
 

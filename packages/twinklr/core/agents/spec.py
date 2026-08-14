@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
+
+from twinklr.core.config.models import AgentConfig
 
 
 class AgentMode(StrEnum):
@@ -43,7 +45,7 @@ class AgentSpec(BaseModel):
 
     # LLM settings
     model: str = Field(
-        default="gpt-5.2",
+        default_factory=lambda: AgentConfig().model,
         description="LLM model identifier",
     )
 
@@ -52,6 +54,23 @@ class AgentSpec(BaseModel):
         ge=0.0,
         le=2.0,
         description="Sampling temperature",
+    )
+
+    reasoning_effort: Literal["low", "medium", "high"] = Field(
+        default="medium",
+        description="Explicit reasoning effort forwarded to supported providers",
+    )
+
+    max_tokens: int = Field(
+        default=50000,
+        gt=0,
+        description="Maximum output tokens forwarded to the provider",
+    )
+
+    timeout_seconds: int = Field(
+        default=60,
+        gt=0,
+        description="Per-request provider timeout in seconds",
     )
 
     # Schema repair

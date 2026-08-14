@@ -147,7 +147,9 @@ class AssetCreationStage:
             )
 
             # Step 3: Enrich image specs via LLM (concurrent)
-            enricher_agent_spec = build_enricher_spec()
+            enricher_agent_spec = build_enricher_spec(
+                config=context.job_config.agent.asset_enricher_agent
+            )
             runner = AsyncAgentRunner(
                 provider=context.provider,
                 prompt_base_path=AGENTS_BASE_PATH,
@@ -276,7 +278,7 @@ class AssetCreationStage:
                 client = provider._async_client
             else:
                 client = _create_openai_client()
-            return OpenAIImageClient(client)
+            return OpenAIImageClient(client, model=context.job_config.agent.image_model)
         except Exception:
             logger.warning("Could not create OpenAI image client")
             return None

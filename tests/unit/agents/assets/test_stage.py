@@ -11,6 +11,7 @@ from twinklr.core.agents.assets.models import AssetCatalog, EnrichedPrompt
 from twinklr.core.agents.assets.stage import AssetCreationStage
 from twinklr.core.agents.assets.text_renderer import TextRenderer
 from twinklr.core.agents.result import AgentResult
+from twinklr.core.config.models import AgentOrchestrationConfig, JobConfig
 from twinklr.core.pipeline.context import PipelineContext
 from twinklr.core.sequencer.planning.group_plan import (
     GroupPlanSet,
@@ -48,7 +49,7 @@ def _mock_context(tmp_path: Path) -> PipelineContext:
     """Create a mock pipeline context."""
     mock_session = MagicMock()
     mock_session.app_config = MagicMock()
-    mock_session.job_config = MagicMock()
+    mock_session.job_config = JobConfig(agent=AgentOrchestrationConfig())
     mock_session.llm_provider = MagicMock()
     mock_session.agent_cache = MagicMock()
     mock_session.llm_logger = MagicMock()

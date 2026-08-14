@@ -50,7 +50,14 @@ class _FakeProvider(LLMProvider):
         temperature: float | None = None,
         **kwargs: Any,
     ) -> LLMResponse:
-        self.calls.append({"messages": messages, "model": model, "temperature": temperature})
+        self.calls.append(
+            {
+                "messages": messages,
+                "model": model,
+                "temperature": temperature,
+                **kwargs,
+            }
+        )
         if self._error is not None:
             raise self._error
         return LLMResponse(content=self._content, metadata=ResponseMetadata())
@@ -161,7 +168,13 @@ def test_review_single_uses_provider_framework() -> None:
         "suggested_motion_class": "chase",
     }
     provider = _FakeProvider(content=response)
-    config = AgentConfig(model="gpt-4o-mini", temperature=0.2)
+    config = AgentConfig(
+        model="configured-normalization-model",
+        temperature=0.2,
+        reasoning_effort="high",
+        max_tokens=1234,
+        timeout_seconds=17,
+    )
     reviewer = LLMReviewPass(provider=provider, config=config)
     cluster = _make_cluster()
 
@@ -169,8 +182,11 @@ def test_review_single_uses_provider_framework() -> None:
 
     assert len(provider.calls) == 1
     call = provider.calls[0]
-    assert call["model"] == "gpt-4o-mini"
+    assert call["model"] == "configured-normalization-model"
     assert call["temperature"] == pytest.approx(0.2)
+    assert call["reasoning_effort"] == "high"
+    assert call["max_tokens"] == 1234
+    assert call["timeout_seconds"] == 17
     assert isinstance(call["messages"], list)
 
 

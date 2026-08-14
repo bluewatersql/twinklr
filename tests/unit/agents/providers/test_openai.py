@@ -262,7 +262,35 @@ def test_get_token_usage(mock_openai_client):
         assert isinstance(usage, TokenUsage)
         assert usage.prompt_tokens == 100
         assert usage.completion_tokens == 50
-        assert usage.total_tokens == 150
+    assert usage.total_tokens == 150
+
+
+def test_sync_usage_adds_per_call_deltas_including_reasoning() -> None:
+    """Cumulative raw-client totals must not be re-added on later sync calls."""
+    client = MagicMock()
+    client.generate_json.return_value = {"ok": True}
+    client.get_total_token_usage.side_effect = [
+        TokenUsage(prompt_tokens=10, reasoning_tokens=4, completion_tokens=6, total_tokens=20),
+        TokenUsage(prompt_tokens=17, reasoning_tokens=7, completion_tokens=10, total_tokens=34),
+    ]
+
+    with (
+        patch("twinklr.core.agents.providers.openai.OpenAIClient", return_value=client),
+        patch("twinklr.core.agents.providers.openai.AsyncOpenAI"),
+    ):
+        provider = OpenAIProvider(api_key="test-key")
+        first = provider.generate_json(messages=[], model="configured-model")
+        second = provider.generate_json(messages=[], model="configured-model")
+
+    assert first.metadata.token_usage == TokenUsage(
+        prompt_tokens=10, reasoning_tokens=4, completion_tokens=6, total_tokens=20
+    )
+    assert second.metadata.token_usage == TokenUsage(
+        prompt_tokens=7, reasoning_tokens=3, completion_tokens=4, total_tokens=14
+    )
+    assert provider.get_token_usage() == TokenUsage(
+        prompt_tokens=17, reasoning_tokens=7, completion_tokens=10, total_tokens=34
+    )
 
 
 def test_reset_token_tracking(mock_openai_client):
@@ -319,13 +347,51 @@ async def test_generate_json_async_passes_supported_kwargs() -> None:
             messages=[{"role": "user", "content": "hello"}],
             model="gpt-5",
             top_p=0.9,
-            max_output_tokens=120,
+            reasoning_effort="high",
+            max_tokens=120,
+            timeout_seconds=17,
         )
 
     assert result.content["ok"] is True
     request_kwargs = mock_client.responses.create.call_args.kwargs
     assert request_kwargs["top_p"] == 0.9
     assert request_kwargs["max_output_tokens"] == 120
+    assert request_kwargs["reasoning"] == {"effort": "high"}
+    assert request_kwargs["timeout"] == 17
+
+
+@pytest.mark.asyncio
+async def test_generate_json_async_separates_reasoning_tokens() -> None:
+    """Responses API reasoning tokens are not counted as completion tokens."""
+    response = MagicMock()
+    response.output_text = '{"ok": true}'
+    response.id = "resp_reasoning"
+    response.usage = MagicMock(
+        input_tokens=10,
+        output_tokens=15,
+        total_tokens=25,
+        output_tokens_details=MagicMock(reasoning_tokens=9),
+    )
+
+    with (
+        patch("twinklr.core.agents.providers.openai.OpenAIClient"),
+        patch("twinklr.core.agents.providers.openai.AsyncOpenAI") as mock_async_openai,
+    ):
+        mock_client = MagicMock()
+        mock_client.responses.create = AsyncMock(return_value=response)
+        mock_async_openai.return_value = mock_client
+        provider = OpenAIProvider(api_key="test-key")
+
+        result = await provider.generate_json_async(
+            messages=[{"role": "user", "content": "hello"}],
+            model="gpt-5.6-sol",
+            reasoning_effort="high",
+        )
+
+    assert result.metadata.token_usage.prompt_tokens == 10
+    assert result.metadata.token_usage.reasoning_tokens == 9
+    assert result.metadata.token_usage.completion_tokens == 6
+    assert result.metadata.token_usage.total_tokens == 25
 
 
 @pytest.mark.asyncio

@@ -13,6 +13,7 @@ from twinklr.core.agents.assets.models import AssetSpec, EnrichedPrompt
 from twinklr.core.agents.async_runner import AsyncAgentRunner
 from twinklr.core.agents.result import AgentResult
 from twinklr.core.agents.spec import AgentMode, AgentSpec
+from twinklr.core.config.models import AgentConfig, AgentOrchestrationConfig
 
 logger = logging.getLogger(__name__)
 
@@ -21,28 +22,43 @@ _PROMPT_PACK = "assets/prompts/asset_prompt_enricher"
 
 
 def build_enricher_spec(
+    config: AgentConfig | None = None,
     *,
-    model: str = "gpt-5-mini",
-    temperature: float = 0.6,
+    model: str | None = None,
+    temperature: float | None = None,
+    reasoning_effort: str | None = None,
     token_budget: int | None = None,
 ) -> AgentSpec:
     """Create the agent spec for asset prompt enrichment.
 
     Args:
-        model: LLM model name.
-        temperature: Sampling temperature.
+        config: Per-role model, sampling, and reasoning configuration.
         token_budget: Optional per-call token limit.
 
     Returns:
         AgentSpec configured for oneshot prompt enrichment.
     """
+    resolved = config or AgentOrchestrationConfig().asset_enricher_agent
+    if model is not None or temperature is not None or reasoning_effort is not None:
+        resolved = resolved.model_copy(
+            update={
+                "model": model if model is not None else resolved.model,
+                "temperature": temperature if temperature is not None else resolved.temperature,
+                "reasoning_effort": (
+                    reasoning_effort if reasoning_effort is not None else resolved.reasoning_effort
+                ),
+            }
+        )
     return AgentSpec(
         name="asset_prompt_enricher",
         prompt_pack=_PROMPT_PACK,
         response_model=EnrichedPrompt,
         mode=AgentMode.ONESHOT,
-        model=model,
-        temperature=temperature,
+        model=resolved.model,
+        temperature=resolved.temperature,
+        reasoning_effort=resolved.reasoning_effort,
+        max_tokens=resolved.max_tokens,
+        timeout_seconds=resolved.timeout_seconds,
         max_schema_repair_attempts=1,
         token_budget=token_budget,
     )

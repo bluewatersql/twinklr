@@ -124,7 +124,7 @@ class AssetSpec(BaseModel):
     section_ids: list[str] = Field(min_length=1, description="Sections referencing this asset")
     scene_context: list[str] = Field(default_factory=list)
 
-    # Generation parameters — default 1024x1024 (largest square supported by gpt-image-1.5).
+    # Generation parameters — default 1024x1024 (largest square supported by the Images API).
     # Prefer large source images: renderer can safely downsize, cannot safely upscale.
     width: int = Field(default=1024, gt=0)
     height: int = Field(default=1024, gt=0)

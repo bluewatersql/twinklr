@@ -214,7 +214,9 @@ class HolisticCorrectorStage:
             get_holistic_corrector_spec,
         )
 
-        spec = self.corrector_spec or get_holistic_corrector_spec()
+        spec = self.corrector_spec or get_holistic_corrector_spec(
+            config=context.job_config.agent.refinement_agent
+        )
 
         variables = shape_holistic_corrector_context(
             group_plan_set=plan_set,

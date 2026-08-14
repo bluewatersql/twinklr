@@ -11,7 +11,7 @@ from pydantic import ValidationError
 
 from twinklr.core.agents.logging import LLMCallLogger, NullLLMCallLogger
 from twinklr.core.agents.prompts import PromptPackLoader
-from twinklr.core.agents.providers.base import LLMProvider, TokenUsage
+from twinklr.core.agents.providers.base import LLMProvider, ProviderType, TokenUsage
 from twinklr.core.agents.providers.conversation import generate_conversation_id
 from twinklr.core.agents.providers.errors import LLMProviderError
 from twinklr.core.agents.result import AgentResult
@@ -34,6 +34,7 @@ def sum_token_usage(usages: list[TokenUsage]) -> TokenUsage:
     """
     return TokenUsage(
         prompt_tokens=sum(u.prompt_tokens for u in usages),
+        reasoning_tokens=sum(u.reasoning_tokens for u in usages),
         completion_tokens=sum(u.completion_tokens for u in usages),
         total_tokens=sum(u.total_tokens for u in usages),
     )
@@ -439,6 +440,7 @@ class AsyncAgentRunner:
             messages=messages,
             model=spec.model,
             temperature=spec.temperature,
+            **self._provider_request_kwargs(spec),
         )
 
     async def _call_conversational_async(
@@ -490,7 +492,18 @@ class AsyncAgentRunner:
             model=spec.model,
             system_prompt=system_prompt,
             temperature=spec.temperature,
+            **self._provider_request_kwargs(spec),
         )
+
+    def _provider_request_kwargs(self, spec: AgentSpec) -> dict[str, Any]:
+        """Build portable request options and gate provider-specific features."""
+        kwargs: dict[str, Any] = {
+            "max_tokens": spec.max_tokens,
+            "timeout_seconds": spec.timeout_seconds,
+        }
+        if self.provider.provider_type == ProviderType.OPENAI:
+            kwargs["reasoning_effort"] = spec.reasoning_effort
+        return kwargs
 
     def _format_validation_error(self, error: ValidationError) -> str:
         """Format validation error for repair message.

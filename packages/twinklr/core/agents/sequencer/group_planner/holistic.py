@@ -29,6 +29,7 @@ from twinklr.core.agents.providers.base import LLMProvider
 from twinklr.core.agents.shared.judge.models import VerdictStatus
 from twinklr.core.agents.spec import AgentMode, AgentSpec
 from twinklr.core.agents.taxonomy_utils import get_taxonomy_dict
+from twinklr.core.config.models import AgentConfig, AgentOrchestrationConfig
 from twinklr.core.sequencer.planning import GroupPlanSet
 from twinklr.core.sequencer.templates.group.catalog import TemplateCatalog
 from twinklr.core.sequencer.templates.group.models.choreography import ChoreographyGraph
@@ -99,8 +100,11 @@ class HolisticEvaluation(BaseModel):
 
 
 def get_holistic_judge_spec(
-    model: str = "gpt-5.2",
-    temperature: float = 0.3,
+    config: AgentConfig | None = None,
+    *,
+    model: str | None = None,
+    temperature: float | None = None,
+    reasoning_effort: str | None = None,
     token_budget: int | None = None,
 ) -> AgentSpec:
     """Get HolisticJudge agent specification.
@@ -111,24 +115,37 @@ def get_holistic_judge_spec(
     - Group utilization balance
     - Alignment with MacroPlan global story
 
-    Uses gpt-5.2 for nuanced cross-section evaluation where scoring
-    consistency is critical for downstream pipeline decisions.
+    Uses the configured judge model for nuanced cross-section evaluation where
+    scoring consistency is critical for downstream pipeline decisions.
 
     Args:
-        model: LLM model to use (default: gpt-5.2 for nuanced evaluation)
-        temperature: Sampling temperature (default: 0.3 for consistent judgment)
+        config: Per-role model, sampling, and reasoning configuration.
         token_budget: Optional token budget
 
     Returns:
         HolisticJudge agent spec
     """
+    resolved = config or AgentOrchestrationConfig().judge_agent
+    if model is not None or temperature is not None or reasoning_effort is not None:
+        resolved = resolved.model_copy(
+            update={
+                "model": model if model is not None else resolved.model,
+                "temperature": temperature if temperature is not None else resolved.temperature,
+                "reasoning_effort": (
+                    reasoning_effort if reasoning_effort is not None else resolved.reasoning_effort
+                ),
+            }
+        )
     return AgentSpec(
         name="holistic_judge",
         prompt_pack="sequencer/group_planner/prompts/holistic_judge",
         response_model=HolisticEvaluation,
         mode=AgentMode.ONESHOT,
-        model=model,
-        temperature=temperature,
+        model=resolved.model,
+        temperature=resolved.temperature,
+        reasoning_effort=resolved.reasoning_effort,
+        max_tokens=resolved.max_tokens,
+        timeout_seconds=resolved.timeout_seconds,
         max_schema_repair_attempts=5,
         token_budget=token_budget,
         default_variables={"taxonomy": get_taxonomy_dict()},
@@ -214,6 +231,7 @@ class HolisticEvaluator:
             "macro_plan_summary": macro_plan_summary or {},
             "lyric_context": _shape_lyric_context_summary(lyric_context),
             "model": self.holistic_judge_spec.model,
+            "reasoning_effort": self.holistic_judge_spec.reasoning_effort,
             "prompt_packs": spec_prompt_hash(AGENTS_BASE_PATH, self.holistic_judge_spec),
         }
 

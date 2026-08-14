@@ -133,7 +133,9 @@ class MacroPlannerOrchestrator:
             "max_iterations": self.controller.config.max_iterations,
             "min_pass_score": self.controller.config.approval_score_threshold,
             "planner_model": self.planner_spec.model,
+            "planner_reasoning_effort": self.planner_spec.reasoning_effort,
             "judge_model": self.judge_spec.model,
+            "judge_reasoning_effort": self.judge_spec.reasoning_effort,
             "prompt_packs": spec_prompt_hash(AGENTS_BASE_PATH, self.planner_spec, self.judge_spec),
         }
 

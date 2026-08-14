@@ -29,9 +29,9 @@ class LLMReviewPass:
             protocol (see ``agents/providers/factory.py::create_llm_provider``).
         config: Per-agent LLM configuration (model, temperature, etc.).
 
-    Note: this call site's model is config-driven but not yet retargeted —
-    see the sequencing constraint in ``changes/twinklr-reactivation-review/build/plan/00-overview.md`` for the
-    later model-retarget task (P2P-T10) that must find and update it.
+    The caller supplies the complete ``AgentConfig``; model, sampling,
+    reasoning, output-limit, and timeout settings are forwarded unchanged to
+    the provider framework.
     """
 
     def __init__(self, provider: LLMProvider, config: AgentConfig) -> None:
@@ -80,6 +80,9 @@ class LLMReviewPass:
                 ],
                 model=self._config.model,
                 temperature=self._config.temperature,
+                reasoning_effort=self._config.reasoning_effort,
+                max_tokens=self._config.max_tokens,
+                timeout_seconds=self._config.timeout_seconds,
             )
             data = response.content
             return AliasReviewResult(

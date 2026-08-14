@@ -142,8 +142,18 @@ Key fields and defaults:
 | `agent.max_iterations` | `3` | Max planner/judge iterations |
 | `agent.success_threshold` | `70` | Minimum judge score to accept a plan, on a 0-100 scale (validated; values outside the range are rejected). This is the only place the threshold is set — the planners take it converted to their own 0-10 scale. Note it does not yet stop a run: the judge score is recorded, not enforced. |
 | `agent.token_budget` | `75000` | Total token budget |
-| `agent.plan_agent.model` | `"gpt-5.2"` | Planner LLM model |
-| `agent.judge_agent.model` | `"gpt-5-mini"` | Judge LLM model |
+| `agent.plan_agent.model` | `"gpt-5.6-sol"` | Model for macro, moving-head, and group planners |
+| `agent.plan_agent.reasoning_effort` | `"high"` | Explicit planner reasoning level; quality-focused by default |
+| `agent.judge_agent.model` | `"gpt-5.6-terra"` | Model for macro, moving-head, group, and holistic judges |
+| `agent.judge_agent.reasoning_effort` | `"low"` | Explicit judge reasoning level; judges evaluate rather than create |
+| `agent.profile_agent` | `gpt-5.6-sol`, medium reasoning | Audio-profile model, temperature, and reasoning settings |
+| `agent.lyrics_agent` | `gpt-5.6-sol`, medium reasoning | Lyrics-context model, temperature, and reasoning settings |
+| `agent.refinement_agent` | `gpt-5.6-sol`, medium reasoning | Holistic-correction model, temperature, and reasoning settings |
+| `agent.asset_enricher_agent` | `gpt-5.6-terra`, low reasoning | Image-prompt enrichment settings; this does not enable asset generation |
+| `agent.recipe_generation_agent` | `gpt-5.6-terra`, medium reasoning | Recipe-builder model, temperature, reasoning, output limit, and timeout settings |
+| `agent.image_model` | `"gpt-image-2"` | OpenAI Images API target if a future display run explicitly enables assets |
+| `agent.<role>.max_tokens` | `50000` | Maximum output tokens forwarded on that role's requests |
+| `agent.<role>.timeout_seconds` | `60` | Per-request provider timeout |
 | `planner_features.enable_shutter` | `true` | Plan shutter/strobe |
 | `planner_features.enable_color` | `true` | Plan color changes |
 | `planner_features.enable_gobo` | `true` | Plan gobo selection |
@@ -159,10 +169,18 @@ Minimal example:
   "fixture_config_path": "fixture_config.json",
   "agent": {
     "max_iterations": 3,
-    "plan_agent": { "model": "gpt-5.2" }
+    "plan_agent": { "model": "gpt-5.6-sol", "reasoning_effort": "high" },
+    "judge_agent": { "model": "gpt-5.6-terra", "reasoning_effort": "low" }
   }
 }
 ```
+
+Every OpenAI LLM role sends its configured `reasoning_effort` explicitly;
+providers without that capability filter the option. Set all of
+`model`, `temperature`, and `reasoning_effort` together on the role you are
+changing; cache identity includes the model and reasoning level, so a retarget
+gets a fresh result rather than reusing an incompatible plan. Asset generation
+remains disabled by default; changing `agent.image_model` alone does not turn it on.
 
 ### `fixture_config.json` (Fixture Config)
 

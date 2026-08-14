@@ -243,7 +243,9 @@ class MovingHeadPlannerOrchestrator:
                 "groups": context.fixtures.groups,
             },
             "planner_model": self.planner_spec.model,
+            "planner_reasoning_effort": self.planner_spec.reasoning_effort,
             "judge_model": self.judge_spec.model,
+            "judge_reasoning_effort": self.judge_spec.reasoning_effort,
             "prompt_packs": spec_prompt_hash(
                 self.prompt_base_path, self.planner_spec, self.judge_spec
             ),

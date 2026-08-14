@@ -16,7 +16,8 @@ class TestGetLyricsSpec:
         assert spec.prompt_pack == "lyrics"
         assert spec.response_model == LyricContextModel
         assert spec.mode == AgentMode.ONESHOT
-        assert spec.model == "gpt-5.2"
+        assert spec.model == "gpt-5.6-sol"
+        assert spec.reasoning_effort == "medium"
         assert spec.temperature == 0.5
         assert spec.max_schema_repair_attempts == 2
         assert spec.token_budget is None
