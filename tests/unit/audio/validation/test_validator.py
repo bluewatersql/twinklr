@@ -123,3 +123,66 @@ class TestValidateFeatures:
         }
         warnings = validate_features(features)
         assert len(warnings) >= 4  # At least 4 different warnings
+
+
+class TestValidatorSchemaAlignment:
+    """The checks must read the keys the analyzer actually writes."""
+
+    @staticmethod
+    def _well_formed() -> dict[str, Any]:
+        """A feature dict shaped the way the full analysis path emits it."""
+        return {
+            "tempo_bpm": 120.0,
+            "beats_s": [0.5 * i for i in range(100)],
+            "harmonic": {"key": {"key": "C", "mode": "major", "confidence": 0.85}},
+            "structure": {"sections": [{"label": "verse", "start_s": 0, "end_s": 30}]},
+            "rhythm": {"downbeat_meta": {"phase": 0, "phase_confidence": 0.7}},
+        }
+
+    def test_validator_no_spurious_key_warning(self) -> None:
+        """Key data under features["harmonic"] does not trip the low-confidence check.
+
+        The check used to read a top-level "key" the analyzer never writes, so
+        `key_conf` defaulted to 0 and "Low key detection confidence: 0.00" fired on
+        every single run.
+        """
+        warnings = validate_features(self._well_formed())
+
+        assert not any("Low key detection confidence" in w for w in warnings)
+        assert warnings == []
+
+    def test_low_confidence_under_harmonic_still_warns(self) -> None:
+        """A genuinely low confidence in the current schema is still reported."""
+        features = self._well_formed()
+        features["harmonic"]["key"]["confidence"] = 0.1
+
+        warnings = validate_features(features)
+
+        assert any("Low key detection confidence: 0.10" in w for w in warnings)
+
+    def test_missing_key_is_reported_as_missing(self) -> None:
+        """Absent key data is named for what it is, not reported as 0.00 confidence."""
+        features = self._well_formed()
+        del features["harmonic"]
+
+        warnings = validate_features(features)
+
+        assert any("Key detection result missing" in w for w in warnings)
+        assert not any("Low key detection confidence" in w for w in warnings)
+
+    def test_short_audio_top_level_key_still_read(self) -> None:
+        """The short-audio path writes a top-level "key"; that schema still works."""
+        features = self._well_formed()
+        del features["harmonic"]
+        features["key"] = {"key": "C", "mode": "major", "confidence": 0.85}
+
+        assert validate_features(features) == []
+
+    def test_validator_downbeat_check_can_fire(self) -> None:
+        """The downbeat check fires on the key the analyzer now writes."""
+        features = self._well_formed()
+        features["rhythm"]["downbeat_meta"]["phase_confidence"] = 0.11
+
+        warnings = validate_features(features)
+
+        assert any("Low downbeat phase confidence: 0.11" in w for w in warnings)

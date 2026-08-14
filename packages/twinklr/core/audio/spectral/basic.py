@@ -33,9 +33,9 @@ def extract_spectral_features(
     rolloff = librosa.feature.spectral_rolloff(
         y=y, sr=sr, hop_length=hop_length, roll_percent=0.85
     )[0].astype(np.float32)
-    flatness = librosa.feature.spectral_flatness(y=np.asarray(y, dtype=np.float32))[0].astype(
-        np.float32
-    )
+    flatness = librosa.feature.spectral_flatness(
+        y=np.asarray(y, dtype=np.float32), hop_length=hop_length
+    )[0].astype(np.float32)
 
     times_s = frames_to_time(np.arange(len(centroid)), sr=sr, hop_length=hop_length)
 

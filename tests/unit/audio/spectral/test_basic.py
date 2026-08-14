@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import numpy as np
+import pytest
 
 from twinklr.core.audio.spectral.basic import extract_spectral_features
 
@@ -189,3 +190,35 @@ class TestExtractSpectralFeatures:
         times = result["times_s"]
         for i in range(1, len(times)):
             assert times[i] > times[i - 1]
+
+
+class TestHopAlignment:
+    """Every spectral array must be on the configured hop's frame grid."""
+
+    @pytest.mark.parametrize("hop", [128, 256, 1024])
+    def test_spectral_flatness_aligned_at_non_default_hop(
+        self,
+        sine_wave_440hz: np.ndarray,
+        sample_rate: int,
+        frame_length: int,
+        hop: int,
+    ) -> None:
+        """spectral_flatness has the same length as times_s at any hop.
+
+        It used to run at librosa's default hop of 512, which happens to match the
+        app default — so the misalignment was invisible until the job configured
+        anything else.
+        """
+        result = extract_spectral_features(
+            sine_wave_440hz,
+            sample_rate,
+            hop_length=hop,
+            frame_length=frame_length,
+        )
+
+        expected = len(result["times_s"])
+        assert len(result["spectral_flatness"]) == expected
+        assert len(result["brightness"]) == expected
+        assert len(result["fullness"]) == expected
+        assert len(result["high_freq_energy"]) == expected
+        assert len(result["_np"]["flatness_norm"]) == expected

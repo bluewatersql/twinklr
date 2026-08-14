@@ -9,6 +9,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from twinklr.core.audio.cache_adapter import (
+    AUDIO_FEATURES_CACHE_VERSION,
     compute_audio_file_hash,
     load_audio_features_async,
     save_audio_features_async,
@@ -134,7 +135,7 @@ class TestLoadAudioFeatures:
                 key = CacheKey(
                     domain="audio",
                     step_id="audio.features",
-                    step_version="3",
+                    step_version=AUDIO_FEATURES_CACHE_VERSION,
                     input_fingerprint=audio_hash,
                 )
                 await cache.store(key, bundle)
@@ -145,6 +146,48 @@ class TestLoadAudioFeatures:
             assert loaded is not None
             assert loaded.audio_path == "/test.mp3"
             assert loaded.features["tempo_bpm"] == 120.0
+
+    @pytest.mark.asyncio
+    async def test_entry_from_an_older_cache_version_is_not_served(self) -> None:
+        """A bundle cached before the version bump misses instead of loading stale.
+
+        Entries written at "3" predate features schema 2.4, so they carry no
+        warnings, no harmonic.hpss and no rhythm.downbeat_meta — serving one would
+        report an analysis with no warnings when the analysis was never validated.
+        """
+        with tempfile.TemporaryDirectory() as cache_dir:
+            from twinklr.core.io import RealFileSystem
+
+            fs = RealFileSystem()
+            cache = FSCache(fs, cache_dir)
+            await cache.initialize()
+
+            stale = SongBundle(
+                schema_version="3.0",
+                audio_path="/test.mp3",
+                recording_id="test123",
+                features={"schema_version": "2.3", "tempo_bpm": 120.0},
+                timing=SongTiming(sr=22050, hop_length=512, duration_s=10.0, duration_ms=10000),
+            )
+
+            audio_hash = "test_hash"
+            with patch(
+                "twinklr.core.audio.cache_adapter.compute_audio_file_hash",
+                return_value=audio_hash,
+            ):
+                await cache.store(
+                    CacheKey(
+                        domain="audio",
+                        step_id="audio.features",
+                        step_version="3",
+                        input_fingerprint=audio_hash,
+                    ),
+                    stale,
+                )
+
+                loaded = await load_audio_features_async("/test.mp3", cache, SongBundle)
+
+            assert loaded is None
 
 
 class TestSaveAudioFeatures:

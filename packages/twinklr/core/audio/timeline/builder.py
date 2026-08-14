@@ -86,7 +86,8 @@ def build_timeline_export(
 
     # OPTIMIZATION: Use pre-computed HPSS if available
     if y_harm is None or y_perc is None:
-        y_harm, y_perc = compute_hpss(y)
+        hpss = compute_hpss(y)
+        y_harm, y_perc = hpss.harmonic, hpss.percussive
 
     try:
         rms_h = librosa.feature.rms(y=y_harm, frame_length=frame_length, hop_length=hop_length)[

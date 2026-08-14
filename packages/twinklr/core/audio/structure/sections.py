@@ -104,6 +104,45 @@ def detect_song_sections(
     )
 
 
+def align_rms_to_work_timeline(
+    rms: np.ndarray | None,
+    *,
+    sr: int,
+    hop_length: int,
+    start_offset_s: float,
+    duration_work: float,
+) -> np.ndarray | None:
+    """Slice an original-timeline RMS curve down to the trimmed work timeline.
+
+    Boundaries, beats and section indices are all computed on the trimmed signal,
+    but callers hand in an RMS curve computed over the whole file. Indexing one with
+    the other reads every section's energy from the wrong offset, and makes the
+    fade-out time come back on the original timeline only to have the trim offset
+    added to it a second time.
+
+    Args:
+        rms: RMS curve on the original timeline (or None)
+        sr: Sample rate
+        hop_length: Hop length the RMS curve was computed at
+        start_offset_s: Trim offset in seconds
+        duration_work: Duration of the trimmed signal
+
+    Returns:
+        The frames covering the work timeline, or None when rms is None
+    """
+    if rms is None:
+        return None
+
+    arr = np.asarray(rms, dtype=np.float32)
+    if start_offset_s <= 0.0 or arr.size == 0:
+        return arr
+
+    start_frame = int(librosa.time_to_frames(start_offset_s, sr=sr, hop_length=hop_length))
+    start_frame = int(np.clip(start_frame, 0, arr.size - 1))
+    n_work_frames = int(librosa.time_to_frames(duration_work, sr=sr, hop_length=hop_length)) + 1
+    return arr[start_frame : start_frame + n_work_frames]
+
+
 def merge_short_sections(times: list[float], min_s: float, duration: float) -> list[float]:
     """Merge sections shorter than min_s while avoiding overly long merges.
 
@@ -285,6 +324,16 @@ class SongSectionDetector:
                 y_work, sr, hop_length, duration_work, beats_s, bars_s, start_offset_s
             )
 
+            # The RMS curve is indexed by work-timeline frames from here on, so it has
+            # to be sliced to the trimmed signal first.
+            rms_work = align_rms_to_work_timeline(
+                rms_for_energy,
+                sr=sr,
+                hop_length=hop_length,
+                start_offset_s=start_offset_s,
+                duration_work=duration_work,
+            )
+
             # Stage 3: Extract features
             # Only pass pre-computed arrays when no trimming offset (they match y_work)
             _pass_precomputed = start_offset_s == 0.0
@@ -320,7 +369,7 @@ class SongSectionDetector:
                 preset=preset,
                 min_section_s=min_section_s,
                 bars_work=bars_work,
-                rms_for_energy=rms_for_energy,
+                rms_for_energy=rms_work,
                 y_work=y_work,
                 sr=sr,
                 hop_length=hop_length,
@@ -337,7 +386,7 @@ class SongSectionDetector:
                 boundaries_work=boundaries_work,
                 boundaries_orig=boundaries_orig,
                 prominence=prominence,
-                rms_for_energy=rms_for_energy,
+                rms_for_energy=rms_work,
                 y_work=y_work,
                 sr=sr,
                 hop_length=hop_length,

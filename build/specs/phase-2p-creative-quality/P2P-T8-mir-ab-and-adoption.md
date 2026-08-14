@@ -279,3 +279,42 @@ path, and a hard rule that this task does not move the torch pin — if it canno
 resolve, report and hand to Phase 4. Third risk: adopting on GTZAN reputation rather
 than our fixtures — mitigated by the gate being pre-committed here, in writing,
 before any number exists.
+
+## Routed note from P1P-T8 (2026-08-13) — measured baseline behavior
+
+P1P-T8 gave the repository its first ground-truth assertions
+(`tests/unit/audio/test_ground_truth.py`). Three properties of the *current* librosa
+detectors were measured against a synthetic 120 BPM click track (sr=22050, exact by
+construction). They are baseline behavior, not defects P1P-T8 fixed, and they are the
+numbers any A/B here must beat — or must consciously accept.
+
+1. **Tempo is quantized by the tempogram's integer lag grid.** At the app's default
+   `hop_length=512` a true 120.0 BPM click reports **117.4538 BPM**. A 0.5s beat period
+   is 43.07 frames at that hop; only integer lags are reachable, so the two candidates
+   are 60·(22050/512)/22 = 117.45 and /21 = 123.05. **±2 BPM of truth is unreachable at
+   hop 512** — the error is not the detector mis-hearing the beat, it is the grid. At
+   `hop_length=441` the same period is exactly 25 frames and the answer is 120.0000.
+   `test_detected_tempo_matches_click_track_120bpm` therefore runs at 441, and
+   `test_detected_tempo_at_default_hop_is_frame_quantized` pins the hop-512 value.
+   *Consequence for this task:* any tempo-accuracy comparison run at hop 512 is
+   measuring the frame grid as much as the estimator. Fix the hop, or report tempo
+   error in frames rather than BPM, before declaring a winner.
+
+2. **Beat positions carry a systematic one-frame lag.** At hop 441 all 19 detected
+   beats are **+0.0200s late — exactly one hop, uniformly**, from the onset-envelope
+   rise. The assertion `max(errors) <= hop_s` therefore passes with **approximately
+   zero margin**: it reads as "beats align within one hop" but the real content is
+   "every beat is one frame late, none is two". A candidate detector that removes this
+   bias will look no better under a one-hop tolerance — compare *signed mean* offset,
+   not absolute error, or the A/B will score a genuine improvement as a tie.
+
+3. **The t=0 click is never detected** (19 of 20). There is no onset rise in front of
+   the first click. Any recall metric computed over a fixture whose first event sits at
+   t=0 starts at 95% for structural reasons; either pad the fixture or exclude the
+   first event from the metric.
+
+Key detection was also pinned (`c_major_tonal_audio` → C major, confidence 0.72–0.93)
+and needed no allowance. Fixtures are synthesised in-process: no network, no audio
+files. Reuse them rather than re-deriving — the click track this note measures is
+`tests/unit/audio/conftest.py::click_track_120bpm`, which is also the "synthetic click
+track where the answer is exact by construction" that this spec's risk section requires.

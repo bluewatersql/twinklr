@@ -20,7 +20,7 @@ class TestAudioAnalyzer:
             duration=1.0,
         )
 
-        assert result["schema_version"] == "2.3"
+        assert result["schema_version"] == "2.4"
         assert result["audio_path"] == "/test/path.mp3"
         assert result["sr"] == 22050
         assert result["duration_s"] == 1.0

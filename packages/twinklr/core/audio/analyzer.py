@@ -247,11 +247,11 @@ class AudioAnalyzer:
     async def _build_song_bundle(
         self, audio_path: str, features: dict[str, Any], embedded_metadata: EmbeddedMetadata
     ) -> SongBundle:
-        """Build SongBundle from v2.3 features dict (async).
+        """Build SongBundle from the v2.4 features dict (async).
 
         Args:
             audio_path: Path to audio file
-            features: v2.3 features dict
+            features: v2.4 features dict
             embedded_metadata: Pre-extracted embedded metadata (for efficiency)
 
         Returns:
@@ -303,6 +303,7 @@ class AudioAnalyzer:
             metadata=metadata_bundle,
             lyrics=lyrics_bundle,
             phonemes=phoneme_bundle,
+            warnings=[str(w) for w in features.get("warnings", [])],
         )
 
     async def _extract_metadata_if_enabled(
@@ -495,7 +496,10 @@ class AudioAnalyzer:
             return self._minimal_features(audio_path, y, sr, duration)
 
         # HPSS decomposition - do this first to get onset envelope
-        harmonic, percussive = compute_hpss(y)
+        hpss = compute_hpss(y)
+        harmonic, percussive = hpss.harmonic, hpss.percussive
+        hpss_separated, hpss_error = hpss.separated, hpss.error
+        del hpss  # keeps PERF-18's reclaim of the component arrays effective
         onset_env = compute_onset_env(percussive, sr, hop_length=hop_length)
 
         # Core rhythm analysis - uses onset envelope
@@ -534,6 +538,7 @@ class AudioAnalyzer:
             onset_env=onset_env,
             beats_s=beats_s,
             tempo_bpm=tempo_bpm,
+            beats_per_bar=beats_per_bar,
         )
         builds = builds_drops["builds"]
         drops = builds_drops["drops"]
@@ -573,6 +578,7 @@ class AudioAnalyzer:
             spectral_flatness=spectral_flatness_np,
             times_s=np.asarray(spectral_features["times_s"]),
             sr=sr,
+            hop_length=hop_length,
         )
         # Extract just the segments list for backward compatibility
         vocal_regions = vocal_result["vocal_segments"]
@@ -651,7 +657,7 @@ class AudioAnalyzer:
 
         # Assemble results
         features = {
-            "schema_version": "2.3",
+            "schema_version": "2.4",
             "audio_path": audio_path,
             "sr": sr,
             "duration_s": duration,
@@ -666,6 +672,10 @@ class AudioAnalyzer:
             "rhythm": {
                 "beat_confidence": time_sig_result.get("confidence", 0.0),
                 "downbeats": [int(i) for i in downbeats_idx],
+                "downbeat_meta": {
+                    "phase": int(downbeat_result.get("phase", 0)),
+                    "phase_confidence": float(downbeat_result.get("phase_confidence", 0.0)),
+                },
             },
             "energy": {
                 "rms_norm": rms_norm.tolist() if isinstance(rms_norm, np.ndarray) else rms_norm,
@@ -684,6 +694,7 @@ class AudioAnalyzer:
                 "key": key_result,
                 "chords": chords,
                 "pitch": pitch,
+                "hpss": {"separated": hpss_separated, "error": hpss_error},
             },
             "structure": sections,
             "tempo_analysis": tempo_changes,
@@ -692,10 +703,17 @@ class AudioAnalyzer:
             "composites": timeline_export["composites"],  # Add composites at top level
         }
 
-        # Validate
-        validation_warnings = validate_features(features)
-        if validation_warnings:
-            logger.debug(f"Feature validation warnings: {validation_warnings}")
+        # Validate. These reach the caller on SongBundle.warnings — a warning nobody
+        # can see is not a check.
+        analysis_warnings: list[str] = []
+        if not hpss_separated:
+            analysis_warnings.append(
+                f"HPSS separation failed ({hpss_error}) - harmonic ratios are unreliable"
+            )
+        analysis_warnings.extend(validate_features(features))
+        if analysis_warnings:
+            logger.warning(f"Feature validation warnings: {analysis_warnings}")
+        features["warnings"] = analysis_warnings
 
         return features
 
@@ -715,7 +733,7 @@ class AudioAnalyzer:
             Minimal feature dictionary
         """
         return {
-            "schema_version": "2.3",
+            "schema_version": "2.4",
             "audio_path": audio_path,
             "sr": sr,
             "duration_s": duration,

@@ -326,3 +326,91 @@ already landed and the two effects are separable in review.
 misalignments** across the spectral suite. Mitigation: that is the point; triage anything
 new as either in-scope (a hop-alignment defect of the same class) or as a recorded finding
 for a follow-up task — do not re-pin the fixture to hide it.
+
+## Completion handoff (2026-08-13)
+
+All eight defects fixed; suite **4782 passed / 18 skipped / 0 failed**; `ruff format
+--check`, `ruff check --no-cache`, `mypy .` (676 files) clean. Verified against a
+disposable worktree at `92af889` with its own synced venv.
+
+### Per-fix mechanism and discriminating test
+
+| # | Mechanism | Discriminating test | Pre-fix at 92af889 |
+|---|---|---|---|
+| 1 | `detect_vocals` takes `hop_length`; both `times_s`-derived expressions gone | `test_vocal_detector_frames_align_with_analyzer_times` | hop 529 vs 512; 6.43s of tail unclassified; segment at 96.77–111.33s vs truth 100–115s |
+| 2 | `_detect_builds_windowed` sorts by `start_s` before the adjacent merge | `test_builds_merge_preserves_all_and_is_time_ordered` | 3 builds collapse to 1 |
+| 3 | `sections.align_rms_to_work_timeline()` slices caller RMS to the work window; feeds boundaries *and* descriptors | `test_section_energy_correct_with_leading_silence`, `test_fade_out_offset_applied_once` | 1766 RMS frames against a 1542-frame timeline; fade at 30.28s vs truth 35.0s |
+| 4 | `beats_per_bar` threaded from the detected time signature | `test_build_windows_respect_time_signature` | parameter absent; `* 4` hardcoded |
+| 5 | `spectral_flatness(..., hop_length=hop_length)` | `test_spectral_flatness_aligned_at_non_default_hop` | length mismatch at hops 256/1024 |
+| 6 | `compute_hpss` → `HpssResult(harmonic, percussive, separated, error)` + WARNING log | `test_hpss_failure_logs_and_flags`, `test_hpss_failure_flags_and_warns` | no flag, no log |
+| 7 | Validator **wired** (below) | `test_validator_no_spurious_key_warning` + 4 others, `test_validator_result_reaches_caller` | see below |
+| 8 | First ground-truth assertions | `tests/unit/audio/test_ground_truth.py` | see below |
+
+### P2-F1 disposition: WIRED, not retired
+
+Check 3 reads `features["harmonic"]["key"]`, falling back to the top-level `key` the
+short-audio path writes, and reports *missing* key data as missing rather than as
+0.00 confidence. The analyzer now writes `rhythm.downbeat_meta.phase_confidence`, so
+check 6 can fire. Results reach `features["warnings"]` → `SongBundle.warnings`, logged
+at WARNING. Both halves land together, as the review's sequencing note required.
+
+Wired rather than deleted because the checks fire on real data once they can see it: a
+real 25s analysis at `92af889` emitted `Low key detection confidence: 0.00` while the
+actual confidence was **0.72**, and simultaneously *hid* a true
+`Low downbeat phase confidence: 0.11`. The checks were not worthless — they were blind
+and inaudible.
+
+### Ground truth: what it does and does not prove
+
+The four assertions pin *existing* detector behavior, so unlike fixes 1–7 they do not
+fail at `92af889` for the right reason (they fail only through the changed HPSS API).
+Their discriminator is **absence**: verified by grep at `92af889` that no test anywhere
+asserted a detected tempo, beat position, or key against a reference value. Three
+measured behaviors are **not papered over** and are routed to
+`build/specs/phase-2p-creative-quality/P2P-T8-mir-ab-and-adoption.md`: the hop-512
+tempogram lag-grid quantization (a true 120 BPM click reports 117.4538, and ±2 BPM is
+unreachable at that hop), the systematic **+1-frame beat bias** (at hop 441 every beat
+is +0.0200s late, uniformly, so the one-hop assertion passes with ~zero margin — the
+comment at the assertion site says so), and the undetected t=0 click. No tolerance was
+widened to make anything pass.
+
+### Test changes, each a correction — none loosened
+
+1. **`compute_hpss` return type** — unpacking updated at its call sites:
+   `core/audio/timeline/builder.py`, `tests/unit/audio/harmonic/test_hpss.py`,
+   `tests/integration/audio/test_pipeline.py`. Mechanical; no assertion weakened.
+2. **`tests/unit/audio/conftest.py::hop_length`** is now `params=[512, 256]` rather than
+   pinned at 512 — the pin is what hid defect 5. Un-pinning surfaced exactly one
+   failure, everything else passed at both hops.
+3. **`tests/unit/audio/test_utils.py::test_basic_conversion`** — that one failure. It
+   hardcoded frame indices `[0, 43, 86]` computed for hop 512 while consuming the
+   `hop_length` fixture, so it asserted "~1 second" against 0.499s at hop 256. Now
+   derives its frames from the hop under test. A test-side coupling, **not** a DSP
+   defect of the class this task fixes.
+4. **Existing `detect_vocals` call sites** gained
+   `hop_length=round(sr * frame_step)` — reproducing exactly what the function used to
+   compute internally, so those tests keep their prior semantics.
+5. **`tests/unit/audio/test_analyzer.py`** now asserts features `schema_version ==
+   "2.4"` (below). `tests/unit/audio/models/test_song_bundle.py` was deliberately left
+   at "2.3": its dict is local fixture data for a pass-through test, not a claim about
+   what the analyzer emits.
+
+### Features schema 2.3 → 2.4, and the cache gate behind it
+
+The features dict gained `warnings`, `harmonic.hpss` and `rhythm.downbeat_meta`, so it
+is now `"2.4"`. Nothing in production gates on that string — the real gate is
+`CacheKey.step_version`, which `core/caching/backends/fs.py` compares on load. Bumping
+the features version alone would have left stale v3 cache entries being served as
+valid: a bundle with **no** warnings, indistinguishable from a clean analysis. So
+`cache_adapter.AUDIO_FEATURES_CACHE_VERSION = "4"` now backs both adapter defaults, and
+`test_entry_from_an_older_cache_version_is_not_served` pins the miss. Cost is
+deliberate: every existing cached analysis re-computes once.
+
+### Left for others
+
+- **P2-F14 (WhisperX vocal gating)** is now unblocked — its blocker was defect 1's
+  misaligned evidence — but was explicitly out of scope here.
+- `vocal_presence_pct` changes for every song as a consequence of fix 1. It was wrong
+  by ~3% of the track; the new value is the correction.
+- The MFCC mel-scale question (P2-M13-adjacent) was not investigated; no free check
+  presented itself.

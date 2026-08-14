@@ -7,6 +7,23 @@ from typing import Any
 import numpy as np
 
 
+def _key_info(result: dict[str, Any]) -> dict[str, Any] | None:
+    """Locate the key-detection result in either schema the analyzer emits.
+
+    The full analysis path writes it to ``features["harmonic"]["key"]``; the
+    short-audio path writes a top-level ``features["key"]``.
+    """
+    harmonic = result.get("harmonic")
+    if isinstance(harmonic, dict):
+        harmonic_key = harmonic.get("key")
+        if isinstance(harmonic_key, dict):
+            return harmonic_key
+    top_level = result.get("key")
+    if isinstance(top_level, dict):
+        return top_level
+    return None
+
+
 def validate_features(result: dict[str, Any]) -> list[str]:
     """Check for common issues in extracted features.
 
@@ -28,9 +45,13 @@ def validate_features(result: dict[str, Any]) -> list[str]:
     if len(beats) < 10:
         warnings.append(f"Very few beats detected ({len(beats)}) - possible detection failure")
 
-    key_conf = result.get("key", {}).get("confidence", 0)
-    if key_conf < 0.3:
-        warnings.append(f"Low key detection confidence: {key_conf:.2f}")
+    key_info = _key_info(result)
+    if key_info is None:
+        warnings.append("Key detection result missing")
+    else:
+        key_conf = float(key_info.get("confidence", 0.0))
+        if key_conf < 0.3:
+            warnings.append(f"Low key detection confidence: {key_conf:.2f}")
 
     # Check beat intervals for outliers
     if len(beats) > 2:

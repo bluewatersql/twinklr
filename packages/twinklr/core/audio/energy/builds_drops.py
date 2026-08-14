@@ -29,6 +29,7 @@ def detect_builds_and_drops(
     onset_env: np.ndarray,
     beats_s: list[float],
     tempo_bpm: float,
+    beats_per_bar: int = 4,
 ) -> dict[str, Any]:
     """Detect energy ramps (builds) and sudden changes (drops) with context awareness.
 
@@ -41,6 +42,8 @@ def detect_builds_and_drops(
         onset_env: Onset envelope
         beats_s: Beat positions in seconds
         tempo_bpm: Estimated tempo
+        beats_per_bar: Beats per bar from the detected time signature. Sizes every
+            build/drop window; a 3/4 track windowed at 4 gets bars ~33% too long.
 
     Returns:
         Dictionary with builds, drops, pre-drops, statistics, and profile info
@@ -85,7 +88,7 @@ def detect_builds_and_drops(
 
     # Build detection: Use window-based approach for gentle music
     # Traditional continuous gradient fails on subtle energy changes
-    bar_duration_s = 60.0 / tempo_bpm * 4  # 4 beats per bar
+    bar_duration_s = 60.0 / tempo_bpm * max(1, int(beats_per_bar))
     min_build_bars = params["min_build_bars"]  # Adaptive based on profile
 
     builds = _detect_builds_windowed(
@@ -280,8 +283,11 @@ def _detect_builds_windowed(
                     }
                 )
 
-    # Sort by energy gain and keep most significant
-    builds.sort(key=lambda b: b["energy_gain"], reverse=True)
+    # The merge below walks the list once and compares each build against the
+    # previous one (`gap = build["start_s"] - last["end_s"]`), so the list must be
+    # in time order. Ranking by energy_gain here instead collapses unrelated builds
+    # into whichever one happened to be most significant.
+    builds.sort(key=lambda b: b["start_s"])
 
     # Merge overlapping/adjacent builds
     merged_builds: list[dict[str, Any]] = []

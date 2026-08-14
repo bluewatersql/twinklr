@@ -5,6 +5,7 @@ from __future__ import annotations
 import numpy as np
 
 from twinklr.core.audio.spectral.vocals import detect_vocals
+from twinklr.core.audio.utils import as_float_list, frames_to_time
 
 
 class TestDetectVocals:
@@ -29,6 +30,7 @@ class TestDetectVocals:
             spectral_flatness=spectral_flatness,
             times_s=times_s,
             sr=sample_rate,
+            hop_length=round(sample_rate * float(times_s[1] - times_s[0])),
         )
 
         assert "vocal_probability" in result
@@ -56,6 +58,7 @@ class TestDetectVocals:
             spectral_flatness=spectral_flatness,
             times_s=times_s,
             sr=sample_rate,
+            hop_length=round(sample_rate * float(times_s[1] - times_s[0])),
         )
 
         if result["vocal_segments"]:
@@ -84,6 +87,7 @@ class TestDetectVocals:
             spectral_flatness=spectral_flatness,
             times_s=times_s,
             sr=sample_rate,
+            hop_length=round(sample_rate * float(times_s[1] - times_s[0])),
         )
 
         probs = result["vocal_probability"]
@@ -108,6 +112,7 @@ class TestDetectVocals:
             spectral_flatness=spectral_flatness,
             times_s=times_s,
             sr=sample_rate,
+            hop_length=round(sample_rate * float(times_s[1] - times_s[0])),
         )
 
         assert all(v in {0, 1} for v in result["is_vocal"])
@@ -131,6 +136,7 @@ class TestDetectVocals:
             spectral_flatness=spectral_flatness,
             times_s=times_s,
             sr=sample_rate,
+            hop_length=round(sample_rate * float(times_s[1] - times_s[0])),
         )
 
         stats = result["statistics"]
@@ -162,6 +168,7 @@ class TestDetectVocals:
             spectral_flatness=spectral_flatness,
             times_s=times_s,
             sr=sample_rate,
+            hop_length=round(sample_rate * float(times_s[1] - times_s[0])),
         )
 
         # Average probability should be relatively high
@@ -189,6 +196,7 @@ class TestDetectVocals:
             spectral_flatness=spectral_flatness,
             times_s=times_s,
             sr=sample_rate,
+            hop_length=round(sample_rate * float(times_s[1] - times_s[0])),
         )
 
         # If segments exist, check they have reasonable duration
@@ -216,6 +224,7 @@ class TestDetectVocals:
             spectral_flatness=spectral_flatness,
             times_s=times_s,
             sr=sample_rate,
+            hop_length=round(sample_rate * float(times_s[1] - times_s[0])),
         )
 
         assert "vocal_probability" in result
@@ -254,6 +263,7 @@ class TestVocalSegmentMerging:
             spectral_flatness=spectral_flatness,
             times_s=times_s,
             sr=sample_rate,
+            hop_length=round(sample_rate * float(times_s[1] - times_s[0])),
         )
 
         # Should have valid structure and process vocal detection
@@ -285,6 +295,7 @@ class TestVocalSegmentMerging:
             spectral_flatness=spectral_flatness,
             times_s=times_s,
             sr=sample_rate,
+            hop_length=round(sample_rate * float(times_s[1] - times_s[0])),
         )
 
         # Should have valid structure
@@ -323,6 +334,7 @@ class TestVocalSegmentMerging:
             spectral_flatness=spectral_flatness,
             times_s=times_s,
             sr=sample_rate,
+            hop_length=round(sample_rate * float(times_s[1] - times_s[0])),
         )
 
         # Should handle end segment
@@ -357,6 +369,7 @@ class TestVocalSegmentMerging:
             spectral_flatness=spectral_flatness,
             times_s=times_s,
             sr=sample_rate,
+            hop_length=round(sample_rate * float(times_s[1] - times_s[0])),
         )
 
         # Should have merged segments
@@ -397,6 +410,7 @@ class TestVocalSegmentMerging:
             spectral_flatness=spectral_flatness,
             times_s=times_s,
             sr=sample_rate,
+            hop_length=round(sample_rate * float(times_s[1] - times_s[0])),
         )
 
         # Should have detected vocal segments
@@ -424,7 +438,62 @@ class TestVocalSegmentMerging:
             spectral_flatness=spectral_flatness,
             times_s=times_s,
             sr=sample_rate,
+            hop_length=round(sample_rate * float(times_s[1] - times_s[0])),
         )
 
         # Low vocal coverage expected
         assert result["statistics"]["vocal_coverage_pct"] < 0.5
+
+
+class TestVocalDetectorAlignment:
+    """The detector must analyse the same frame grid the analyzer reports."""
+
+    def test_vocal_detector_frames_align_with_analyzer_times(self) -> None:
+        """Frames stay aligned with times_s over a >=3-minute signal.
+
+        times_s reaches the detector rounded to milliseconds (as_float_list(..., 3)),
+        so reconstructing the hop from it recovers 529 instead of 512 at sr=44100.
+        That drops ~3% of the frames off the tail and slides every reported time
+        ~6s late by the end of a 3-minute track.
+        """
+        sr = 44100
+        hop_length = 512
+        duration_s = 200.0
+        n_samples = int(sr * duration_s)
+
+        rng = np.random.default_rng(7)
+        noise = rng.standard_normal(n_samples).astype(np.float32) * 0.3
+
+        # Harmonic content only between 100s and 115s; everything else percussive.
+        y_harm = noise * 0.05
+        y_perc = noise.copy()
+        vocal_start_s, vocal_end_s = 100.0, 115.0
+        sl = slice(int(vocal_start_s * sr), int(vocal_end_s * sr))
+        y_harm[sl] = noise[sl]
+        y_perc[sl] = noise[sl] * 0.05
+
+        # Exactly how the analyzer builds times_s (rounded to milliseconds).
+        n_frames = 1 + n_samples // hop_length
+        times_s = np.asarray(
+            as_float_list(frames_to_time(np.arange(n_frames), sr=sr, hop_length=hop_length), 3)
+        )
+
+        result = detect_vocals(
+            y_harm=y_harm,
+            y_perc=y_perc,
+            spectral_centroid=np.full(n_frames, 0.4, dtype=np.float32),
+            spectral_flatness=np.full(n_frames, 0.1, dtype=np.float32),
+            times_s=times_s,
+            sr=sr,
+            hop_length=hop_length,
+        )
+
+        # No tail truncation: every analyzer frame is classified.
+        assert len(result["is_vocal"]) == len(times_s)
+
+        # No drift: the detected segment sits where the harmonic content actually is.
+        hop_s = hop_length / sr
+        segments = [s for s in result["vocal_segments"] if s["duration_s"] > 1.0]
+        assert len(segments) == 1, f"expected one vocal segment, got {segments}"
+        assert abs(segments[0]["start_s"] - vocal_start_s) <= 10 * hop_s
+        assert abs(segments[0]["end_s"] - vocal_end_s) <= 10 * hop_s

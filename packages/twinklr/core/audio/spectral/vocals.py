@@ -20,6 +20,7 @@ def detect_vocals(
     spectral_flatness: np.ndarray,
     times_s: np.ndarray,
     sr: int,
+    hop_length: int,
 ) -> dict[str, Any]:
     """Detect vocal presence using harmonic ratio and spectral features.
 
@@ -35,13 +36,15 @@ def detect_vocals(
         spectral_flatness: Spectral flatness values
         times_s: Time points in seconds
         sr: Sample rate
+        hop_length: Hop length the caller's spectral frames were computed at.
+            Must be the real configured value: `times_s` is rounded to
+            milliseconds, so inverting it recovers a different hop (529 instead
+            of 512 at sr=44100) and drifts the RMS frames against every other
+            spectral array.
 
     Returns:
         Dictionary with vocal probability, segments, and statistics
     """
-    # Compute harmonic/percussive ratio per frame
-    hop_length = int(sr * (times_s[1] - times_s[0])) if len(times_s) > 1 else 512
-
     rms_h = librosa.feature.rms(y=y_harm, hop_length=hop_length)[0]
     rms_p = librosa.feature.rms(y=y_perc, hop_length=hop_length)[0]
 
@@ -96,7 +99,8 @@ def detect_vocals(
     segment_start = 0
 
     min_segment_duration_s = 0.5  # Minimum vocal segment (was 2.0, too strict)
-    min_segment_frames = int(min_segment_duration_s / (times_s[1] - times_s[0]))
+    frame_duration_s = hop_length / sr
+    min_segment_frames = int(min_segment_duration_s / frame_duration_s)
 
     for i in range(len(is_vocal)):
         if is_vocal[i] and not in_vocal:

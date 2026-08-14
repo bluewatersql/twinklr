@@ -19,10 +19,15 @@ def sample_rate() -> int:
     return 22050
 
 
-@pytest.fixture
-def hop_length() -> int:
-    """Standard hop length for tests."""
-    return 512
+@pytest.fixture(params=[512, 256], ids=["hop512", "hop256"])
+def hop_length(request: pytest.FixtureRequest) -> int:
+    """Hop length under test.
+
+    Parameterized rather than pinned: every test running at the librosa default
+    hid `spectral_flatness` being computed at that default instead of the job's
+    configured hop, which misaligns it against every other spectral array.
+    """
+    return int(request.param)
 
 
 @pytest.fixture
@@ -66,6 +71,29 @@ def click_track_120bpm(sample_rate: int) -> tuple[np.ndarray, list[float]]:
         t += beat_interval_s
 
     return y, beat_times
+
+
+@pytest.fixture
+def c_major_tonal_audio(sample_rate: int) -> np.ndarray:
+    """12s of unambiguous C major: sustained C-E-G triad under a C major scale.
+
+    Ground-truth fixture for key detection — the expected label is C major.
+    """
+    duration = 12.0
+    t = np.linspace(0.0, duration, int(sample_rate * duration), endpoint=False, dtype=np.float32)
+
+    triad = np.zeros_like(t)
+    for freq in (261.63, 329.63, 392.00):  # C4, E4, G4
+        triad += np.sin(2 * np.pi * freq * t) / 3.0
+
+    scale_freqs = [261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88, 523.25]
+    melody = np.zeros_like(t)
+    step = len(t) // len(scale_freqs)
+    for i, freq in enumerate(scale_freqs):
+        window = slice(i * step, (i + 1) * step)
+        melody[window] = np.sin(2 * np.pi * freq * t[window])
+
+    return (0.6 * triad + 0.4 * melody).astype(np.float32)
 
 
 @pytest.fixture

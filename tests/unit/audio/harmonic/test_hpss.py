@@ -2,9 +2,20 @@
 
 from __future__ import annotations
 
+import logging
+from typing import TYPE_CHECKING
+
 import numpy as np
 
-from twinklr.core.audio.harmonic.hpss import compute_hpss, compute_onset_env
+if TYPE_CHECKING:
+    import pytest
+
+from twinklr.core.audio.harmonic.hpss import HpssResult, compute_hpss, compute_onset_env
+
+
+def _components(result: HpssResult) -> tuple[np.ndarray, np.ndarray]:
+    """Unpack the two component arrays from an HPSS result."""
+    return result.harmonic, result.percussive
 
 
 class TestComputeHPSS:
@@ -15,7 +26,7 @@ class TestComputeHPSS:
         sine_wave_440hz: np.ndarray,
     ) -> None:
         """Function returns tuple of two arrays."""
-        y_harm, y_perc = compute_hpss(sine_wave_440hz)
+        y_harm, y_perc = _components(compute_hpss(sine_wave_440hz))
 
         assert isinstance(y_harm, np.ndarray)
         assert isinstance(y_perc, np.ndarray)
@@ -25,7 +36,7 @@ class TestComputeHPSS:
         sine_wave_440hz: np.ndarray,
     ) -> None:
         """Harmonic and percussive components have same length as input."""
-        y_harm, y_perc = compute_hpss(sine_wave_440hz)
+        y_harm, y_perc = _components(compute_hpss(sine_wave_440hz))
 
         assert len(y_harm) == len(sine_wave_440hz)
         assert len(y_perc) == len(sine_wave_440hz)
@@ -35,7 +46,7 @@ class TestComputeHPSS:
         sine_wave_440hz: np.ndarray,
     ) -> None:
         """Output arrays are float32."""
-        y_harm, y_perc = compute_hpss(sine_wave_440hz)
+        y_harm, y_perc = _components(compute_hpss(sine_wave_440hz))
 
         assert y_harm.dtype == np.float32
         assert y_perc.dtype == np.float32
@@ -45,7 +56,7 @@ class TestComputeHPSS:
         sine_wave_440hz: np.ndarray,
     ) -> None:
         """Pure sine wave should be mostly harmonic."""
-        y_harm, y_perc = compute_hpss(sine_wave_440hz)
+        y_harm, y_perc = _components(compute_hpss(sine_wave_440hz))
 
         harm_energy = np.sum(y_harm**2)
         perc_energy = np.sum(y_perc**2)
@@ -59,7 +70,7 @@ class TestComputeHPSS:
     ) -> None:
         """Click track should have significant percussive content."""
         audio, _ = click_track_120bpm
-        _, y_perc = compute_hpss(audio)
+        y_perc = compute_hpss(audio).percussive
 
         # Should have some percussive energy
         perc_energy = np.sum(y_perc**2)
@@ -73,7 +84,7 @@ class TestComputeHPSS:
     ) -> None:
         """Function returns numpy array."""
         # First get percussive component
-        _, y_perc = compute_hpss(sine_wave_440hz)
+        y_perc = compute_hpss(sine_wave_440hz).percussive
         onset_env = compute_onset_env(y_perc, sample_rate, hop_length=hop_length)
 
         assert isinstance(onset_env, np.ndarray)
@@ -86,7 +97,7 @@ class TestComputeHPSS:
     ) -> None:
         """Click track onset envelope has peaks."""
         audio, _ = click_track_120bpm
-        _, y_perc = compute_hpss(audio)
+        y_perc = compute_hpss(audio).percussive
         onset_env = compute_onset_env(y_perc, sample_rate, hop_length=hop_length)
 
         # Should have variation (peaks at clicks)
@@ -99,7 +110,7 @@ class TestComputeHPSS:
         hop_length: int,
     ) -> None:
         """Onset envelope values are non-negative."""
-        _, y_perc = compute_hpss(sine_wave_440hz)
+        y_perc = compute_hpss(sine_wave_440hz).percussive
         onset_env = compute_onset_env(y_perc, sample_rate, hop_length=hop_length)
 
         assert np.all(onset_env >= 0)
@@ -116,7 +127,8 @@ class TestHPSSFallback:
 
         # Mock librosa.effects.hpss to raise an exception
         with patch("librosa.effects.hpss", side_effect=Exception("HPSS failed")):
-            y_harm, y_perc = compute_hpss(test_audio)
+            result = compute_hpss(test_audio)
+            y_harm, y_perc = result.harmonic, result.percussive
 
             # Should return copies of input
             assert len(y_harm) == len(test_audio)
@@ -131,7 +143,8 @@ class TestHPSSFallback:
         test_audio = np.random.rand(1000).astype(np.float32)
 
         with patch("librosa.effects.hpss", side_effect=Exception("HPSS failed")):
-            y_harm, y_perc = compute_hpss(test_audio)
+            result = compute_hpss(test_audio)
+            y_harm, y_perc = result.harmonic, result.percussive
 
             assert y_harm.dtype == np.float32
             assert y_perc.dtype == np.float32
@@ -143,7 +156,40 @@ class TestHPSSFallback:
         empty_audio = np.array([], dtype=np.float32)
 
         with patch("librosa.effects.hpss", side_effect=Exception("HPSS failed")):
-            y_harm, y_perc = compute_hpss(empty_audio)
+            result = compute_hpss(empty_audio)
+            y_harm, y_perc = result.harmonic, result.percussive
 
             assert len(y_harm) == 0
             assert len(y_perc) == 0
+
+
+class TestHpssFailureObservability:
+    """A failed separation must be visible, not silently degraded."""
+
+    def test_hpss_failure_logs_and_flags(self, caplog: pytest.LogCaptureFixture) -> None:
+        """The fallback logs a warning and reports separated=False with the reason."""
+        from unittest.mock import patch
+
+        test_audio = np.random.rand(1000).astype(np.float32)
+
+        with (
+            patch("librosa.effects.hpss", side_effect=RuntimeError("boom")),
+            caplog.at_level(logging.WARNING, logger="twinklr.core.audio.harmonic.hpss"),
+        ):
+            result = compute_hpss(test_audio)
+
+        assert result.separated is False
+        assert result.error is not None
+        assert "boom" in result.error
+        assert any(r.levelno == logging.WARNING for r in caplog.records)
+        assert "HPSS" in caplog.text
+
+        # The fallback is what makes harmonic_ratio a constant ~0.5 downstream.
+        np.testing.assert_array_equal(result.harmonic, result.percussive)
+
+    def test_successful_separation_reports_separated(self, sine_wave_440hz: np.ndarray) -> None:
+        """A normal run reports separated=True and no error."""
+        result = compute_hpss(sine_wave_440hz)
+
+        assert result.separated is True
+        assert result.error is None

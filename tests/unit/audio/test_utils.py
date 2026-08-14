@@ -37,7 +37,9 @@ class TestNormalizeTo01:
 
     def test_basic_conversion(self, sample_rate: int, hop_length: int) -> None:
         """Test basic frame to time conversion."""
-        frames = np.array([0, 43, 86], dtype=int)  # ~0, 1, 2 seconds at sr=22050, hop=512
+        # Frames covering ~0, 1 and 2 seconds at whatever hop is under test.
+        frames_per_second = round(sample_rate / hop_length)
+        frames = np.array([0, frames_per_second, 2 * frames_per_second], dtype=int)
         result = frames_to_time(frames, sr=sample_rate, hop_length=hop_length)
 
         assert result[0] == pytest.approx(0.0, abs=0.01)

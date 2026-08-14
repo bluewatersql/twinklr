@@ -91,7 +91,8 @@ class TestAudioPipelineIntegration:
         y, sr = librosa.load(test_audio_path, sr=sample_rate, mono=True)
 
         # HPSS
-        y_harm, y_perc = compute_hpss(y)
+        hpss = compute_hpss(y)
+        y_harm, y_perc = hpss.harmonic, hpss.percussive
         assert len(y_harm) == len(y)
         assert len(y_perc) == len(y)
 
@@ -123,7 +124,7 @@ class TestAudioPipelineIntegration:
         y, sr = librosa.load(test_audio_path, sr=sample_rate, mono=True)
 
         # Get onset envelope
-        _, y_perc = compute_hpss(y)
+        y_perc = compute_hpss(y).percussive
         onset_env = compute_onset_env(y_perc, sr, hop_length=hop_length)
 
         # Beat detection
@@ -183,7 +184,7 @@ class TestAudioPipelineIntegration:
         assert len(energy["raw"]) > 0
 
         # Get rhythm info for builds/drops
-        _, y_perc = compute_hpss(y)
+        y_perc = compute_hpss(y).percussive
         onset_env = compute_onset_env(y_perc, sr, hop_length=hop_length)
         tempo, beat_frames = compute_beats(onset_env=onset_env, sr=sr, hop_length=hop_length)
         beats_s = librosa.frames_to_time(beat_frames, sr=sr, hop_length=hop_length).tolist()
@@ -267,7 +268,7 @@ class TestAudioPipelineIntegration:
         assert chroma.shape[0] == 12
 
         # Get beats for chord detection
-        _, y_perc = compute_hpss(y)
+        y_perc = compute_hpss(y).percussive
         onset_env = compute_onset_env(y_perc, sr, hop_length=hop_length)
         _, beat_frames = compute_beats(onset_env=onset_env, sr=sr, hop_length=hop_length)
 
@@ -336,7 +337,8 @@ class TestAudioPipelineIntegration:
         y, sr = librosa.load(test_audio_path, sr=sample_rate, mono=True)
 
         # Extract all required features
-        y_harm, y_perc = compute_hpss(y)
+        hpss = compute_hpss(y)
+        y_harm, y_perc = hpss.harmonic, hpss.percussive
         onset_env = compute_onset_env(y_perc, sr, hop_length=hop_length)
 
         energy = extract_smoothed_energy(y, sr, hop_length=hop_length, frame_length=frame_length)
@@ -405,7 +407,7 @@ class TestAudioPipelineIntegration:
         duration = librosa.get_duration(y=y, sr=sr)
 
         # Step 1: HPSS
-        _, y_perc = compute_hpss(y)
+        y_perc = compute_hpss(y).percussive
         onset_env = compute_onset_env(y_perc, sr, hop_length=hop_length)
 
         # Step 2: Rhythm

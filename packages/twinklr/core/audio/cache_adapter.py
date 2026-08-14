@@ -31,6 +31,13 @@ logger = logging.getLogger(__name__)
 
 T = TypeVar("T", bound=BaseModel)
 
+# Cache-invalidation version for the stored SongBundle payload. Bump whenever the
+# cached shape changes, not only when SongBundle's own schema_version does: entries
+# written before the bump are rejected on load (CacheKey.step_version mismatch).
+# "4" — features schema 2.4 added warnings, harmonic.hpss and rhythm.downbeat_meta,
+# so a "3" entry deserializes into a bundle that silently reports no warnings.
+AUDIO_FEATURES_CACHE_VERSION = "4"
+
 
 async def compute_audio_file_hash(audio_path: str) -> str:
     """Compute SHA256 hash of audio file for cache key.
@@ -65,7 +72,7 @@ async def load_audio_features_async[T: BaseModel](
     cache: FSCache,
     model_cls: type[T],
     *,
-    step_version: str = "3",
+    step_version: str = AUDIO_FEATURES_CACHE_VERSION,
 ) -> T | None:
     """Load cached audio features using core.caching.
 
@@ -73,7 +80,7 @@ async def load_audio_features_async[T: BaseModel](
         audio_path: Path to audio file
         cache: FSCache instance
         model_cls: Pydantic model class (e.g., SongBundle)
-        step_version: Schema version (default: "3" for v3.0)
+        step_version: Cache-invalidation version (default: AUDIO_FEATURES_CACHE_VERSION)
 
     Returns:
         Cached model or None if not found
@@ -110,7 +117,7 @@ async def save_audio_features_async(
     cache: FSCache,
     features: BaseModel,
     *,
-    step_version: str = "3",
+    step_version: str = AUDIO_FEATURES_CACHE_VERSION,
     compute_ms: float | None = None,
 ) -> None:
     """Save audio features to cache.
@@ -119,7 +126,7 @@ async def save_audio_features_async(
         audio_path: Path to audio file
         cache: FSCache instance
         features: Pydantic model to cache
-        step_version: Schema version
+        step_version: Cache-invalidation version (default: AUDIO_FEATURES_CACHE_VERSION)
         compute_ms: Optional computation duration in milliseconds
 
     Example:
