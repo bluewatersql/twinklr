@@ -198,7 +198,12 @@ class PlanSection(BaseModel):
     unused arm explicitly ``null``; P2P-T11 therefore retains this one repair surface.
     """
 
-    section_name: str = Field(description="Section name (e.g., 'verse_1', 'chorus_1')")
+    section_name: str = Field(
+        description=(
+            "Unique SongSectionRef.section_id (e.g., 'verse_1', 'chorus_1'); never the "
+            "repeatable display name"
+        )
+    )
     start_bar: int = Field(ge=1, description="Start bar (1-indexed)")
     end_bar: int = Field(ge=1, description="End bar (1-indexed, inclusive)")
     section_role: str | None = Field(

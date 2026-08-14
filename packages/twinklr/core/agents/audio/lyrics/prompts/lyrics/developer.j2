@@ -41,6 +41,15 @@ You must respond with valid JSON matching this exact schema:
   
   **Test:** Would this hint ONLY make sense for these specific words? If not, REWRITE.
 
+- **moment_cues**: null when there are no usable lyric moments, otherwise stable cues
+  suitable for downstream choreography references
+  - `cue_id`: unique song-local identifier built from the section id and a short slug
+  - `timestamp_ms`: phrase start time from the supplied timing data
+  - `section_id`: exact identifier from Song Structure
+  - `emphasis`: choose a value allowed by the injected response schema
+  - `text`: short verbatim lyric phrase
+  - `visual_hint`: short actionable interpretation tied to those words
+
 - **recommended_visual_themes**: 3-5 items (REQUIRED when has_lyrics=true)
   - Each theme should tie to actual lyric content
   - Examples:
@@ -67,6 +76,7 @@ You must respond with valid JSON matching this exact schema:
 **If has_lyrics = false:**
 - Then themes SHOULD be empty or minimal
 - Then key_phrases MUST be empty
+- Then moment_cues MUST be null or empty
 - Then recommended_visual_themes SHOULD be empty or minimal
 - Then has_narrative MUST be false
 
@@ -77,12 +87,14 @@ You must respond with valid JSON matching this exact schema:
 **If has_lyrics = true:**
 - Then themes SHOULD have 2-5 items (not empty)
 - Then key_phrases MUST have 5-10 items
+- Then moment_cues SHOULD identify the strongest choreography-worthy lyric moments
 - Then recommended_visual_themes SHOULD have 3-5 items
 
 ## Timestamp Validation
 
 **All timestamps must be within song duration:**
 - `key_phrases[].timestamp_ms` ≤ duration_ms
+- `moment_cues[].timestamp_ms` ≤ duration_ms
 - `story_beats[].timestamp_range[1]` ≤ duration_ms
 - `silent_sections[].end_ms` ≤ duration_ms
 

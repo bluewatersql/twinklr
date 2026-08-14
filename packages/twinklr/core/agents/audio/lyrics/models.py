@@ -14,6 +14,14 @@ class Severity(StrEnum):
     ERROR = "ERROR"
 
 
+class CueEmphasis(StrEnum):
+    """Visual emphasis carried by lyric MomentCues."""
+
+    LOW = "LOW"
+    MED = "MED"
+    HIGH = "HIGH"
+
+
 class Issue(BaseModel):
     """Validation or generation issue."""
 
@@ -147,6 +155,39 @@ class KeyPhrase(BaseModel):
         return v
 
 
+class MomentCue(BaseModel):
+    """Stable lyric interpretation that a choreography plan can reference.
+
+    ``timestamp_ms`` remains an audio-analysis fact. The moving-head planner names
+    ``cue_id`` while deterministic code snaps the timestamp to the authoritative
+    BeatGrid before rendering.
+    """
+
+    cue_id: str = Field(
+        min_length=1,
+        pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]*$",
+        description="Stable song-local cue identifier",
+    )
+    timestamp_ms: int = Field(ge=0, description="Lyric moment start in milliseconds")
+    section_id: str = Field(min_length=1, description="Matching song section identifier")
+    emphasis: CueEmphasis = Field(description="Schema-valid visual emphasis")
+    text: str = Field(min_length=1, description="Short verbatim lyric phrase")
+    visual_hint: str = Field(
+        min_length=5,
+        description="Short actionable choreography interpretation tied to the phrase",
+    )
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    @field_validator("cue_id", "section_id")
+    @classmethod
+    def _strip_identifier(cls, value: str) -> str:
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("identifier must not be blank")
+        return stripped
+
+
 class SilentSection(BaseModel):
     """Instrumental section without lyrics."""
 
@@ -229,6 +270,10 @@ class LyricContextModel(BaseModel):
     # Visual Hooks
     key_phrases: list[KeyPhrase] = Field(description="Memorable moments (5-10 items)")
 
+    moment_cues: list[MomentCue] | None = Field(
+        description="Stable lyric moments available to choreography planners, or null"
+    )
+
     recommended_visual_themes: list[str] = Field(
         description="Visual design recommendations (3-5 items)"
     )
@@ -264,6 +309,7 @@ class LyricContextModel(BaseModel):
             "characters": None,
             "story_beats": None,
             "key_phrases": [],
+            "moment_cues": None,
             "recommended_visual_themes": [],
             "lyric_density": "MED",
             "timed_word_coverage_pct": None,
@@ -290,6 +336,17 @@ class LyricContextModel(BaseModel):
             raise ValueError(f"key_phrases must contain 5-10 items, got {len(v)}")
         return v
 
+    @field_validator("moment_cues")
+    @classmethod
+    def validate_moment_cues(cls, value: list[MomentCue] | None) -> list[MomentCue] | None:
+        """Cue identifiers are stable join keys and therefore unique per song."""
+        if value is None:
+            return None
+        cue_ids = [cue.cue_id for cue in value]
+        if len(cue_ids) != len(set(cue_ids)):
+            raise ValueError("moment_cues must contain unique cue_id values")
+        return value
+
     @field_validator("recommended_visual_themes")
     @classmethod
     def validate_visual_themes(cls, v: list[str]) -> list[str]:
@@ -315,14 +372,15 @@ class LyricContextModel(BaseModel):
         story beat — it represents a point-in-time marker like a coda
         tag at the end of the song.
         """
-        if not self.story_beats:
-            return self
-        for beat in self.story_beats[:-1]:
-            start, end = beat.timestamp_range
-            if start == end:
-                raise ValueError(
-                    f"zero-duration story beat '{beat.beat_type}' in "
-                    f"'{beat.section_id}' is only valid as the last beat "
-                    f"(song boundary)"
-                )
+        if self.story_beats:
+            for beat in self.story_beats[:-1]:
+                start, end = beat.timestamp_range
+                if start == end:
+                    raise ValueError(
+                        f"zero-duration story beat '{beat.beat_type}' in "
+                        f"'{beat.section_id}' is only valid as the last beat "
+                        f"(song boundary)"
+                    )
+        if not self.has_lyrics and self.moment_cues:
+            raise ValueError("has_lyrics=False requires moment_cues to be null or empty")
         return self

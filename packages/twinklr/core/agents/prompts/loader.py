@@ -24,7 +24,8 @@ class PromptPackLoader:
         ├── system.j2            # Required: System prompt
         ├── developer.j2         # Optional: Developer/contract prompt
         ├── user.j2              # Optional: User message template
-        └── examples.jsonl       # Optional: Few-shot examples
+        ├── examples.jsonl       # Optional: role/content messages
+        └── examples/            # Optional: example_*.json input/output pairs
     """
 
     def __init__(self, base_path: str | Path):
@@ -80,19 +81,9 @@ class PromptPackLoader:
         if user_path.exists():
             prompts["user"] = user_path.read_text()
 
-        # Load examples (optional)
-        examples_path = pack_dir / "examples.jsonl"
-        if examples_path.exists():
-            try:
-                examples = []
-                for line in examples_path.read_text().strip().split("\n"):
-                    if line.strip():
-                        examples.append(json.loads(line))
-                prompts["examples"] = examples
-            except json.JSONDecodeError as e:
-                raise LoadError(
-                    f"Invalid JSON in examples.jsonl for pack '{pack_name}': {e}"
-                ) from e
+        examples = self._load_examples(pack_dir, pack_name)
+        if examples:
+            prompts["examples"] = examples
 
         logger.debug(f"Loaded prompt pack '{pack_name}': {list(prompts.keys())}")
 
@@ -195,20 +186,63 @@ class PromptPackLoader:
             # Use standard user template
             prompts["user"] = user_path.read_text()
 
-        # Load examples (optional)
-        examples_path = pack_dir / "examples.jsonl"
-        if examples_path.exists():
-            try:
-                examples = []
-                for line in examples_path.read_text().strip().split("\n"):
-                    if line.strip():
-                        examples.append(json.loads(line))
-                prompts["examples"] = examples
-            except json.JSONDecodeError as e:
-                raise LoadError(
-                    f"Invalid JSON in examples.jsonl for pack '{pack_name}': {e}"
-                ) from e
+        examples = self._load_examples(pack_dir, pack_name)
+        if examples:
+            prompts["examples"] = examples
 
         logger.debug(f"Loaded prompt pack '{pack_name}': {list(prompts.keys())}")
 
         return prompts
+
+    @staticmethod
+    def _load_examples(pack_dir: Path, pack_name: str) -> list[dict[str, str]]:
+        """Load both supported few-shot layouts in deterministic order.
+
+        Directory-form examples are concrete input/expected-output pairs; they are
+        converted to the same role/content message shape as JSONL without consulting
+        the intentionally inert ``pack.yaml`` file.
+        """
+        examples: list[dict[str, str]] = []
+        jsonl_path = pack_dir / "examples.jsonl"
+        if jsonl_path.exists():
+            try:
+                for line in jsonl_path.read_text().splitlines():
+                    if line.strip():
+                        message = json.loads(line)
+                        if not isinstance(message, dict):
+                            raise LoadError(f"Example message in '{jsonl_path}' must be an object")
+                        role = message.get("role")
+                        content = message.get("content")
+                        if role not in {"user", "assistant"} or not isinstance(content, str):
+                            raise LoadError(
+                                f"Example message in '{jsonl_path}' requires a user/assistant "
+                                "role and string content"
+                            )
+                        examples.append({"role": role, "content": content})
+            except json.JSONDecodeError as error:
+                raise LoadError(
+                    f"Invalid JSON in examples.jsonl for pack '{pack_name}': {error}"
+                ) from error
+
+        examples_dir = pack_dir / "examples"
+        for example_path in sorted(examples_dir.glob("example_*.json")):
+            try:
+                document = json.loads(example_path.read_text())
+            except json.JSONDecodeError as error:
+                raise LoadError(f"Invalid JSON in {example_path}: {error}") from error
+            if not isinstance(document, dict) or not {"input", "expected_output"}.issubset(
+                document
+            ):
+                raise LoadError(
+                    f"Directory example '{example_path}' requires input and expected_output"
+                )
+            examples.extend(
+                [
+                    {"role": "user", "content": json.dumps(document["input"], sort_keys=True)},
+                    {
+                        "role": "assistant",
+                        "content": json.dumps(document["expected_output"], sort_keys=True),
+                    },
+                ]
+            )
+        return examples

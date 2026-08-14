@@ -99,17 +99,29 @@ V2 Migration: Uses structured context from MovingHeadPlanningContext
 {% endif %}
 {% endif %}
 
-{% if lyric_context is defined and lyric_context %}
+{% if lyric_context %}
 ## Lyric Context
 
-**Has Lyrics**: Yes
-{% if lyric_context.narrative_arc is defined and lyric_context.narrative_arc %}
-**Narrative**: {{ lyric_context.narrative_arc }}
+**Has Lyrics**: {{ "Yes" if lyric_context.has_lyrics else "No" }}
+{% if lyric_context.mood_arc %}
+**Mood Arc**: {{ lyric_context.mood_arc }}
 {% endif %}
-{% if lyric_context.key_moments is defined and lyric_context.key_moments %}
-**Key Moments**:
-{% for moment in lyric_context.key_moments[:5] %}
-- {{ moment.section_id }}: {{ moment.description }}
+{% if lyric_context.story_beats %}
+**Story Beats**:
+{% for story_beat in lyric_context.story_beats[:5] %}
+- {{ story_beat.section_id }}: {{ story_beat.description }} — {{ story_beat.visual_opportunity }}
+{% endfor %}
+{% endif %}
+{% if lyric_context.key_phrases %}
+**Key Phrases**:
+{% for phrase in lyric_context.key_phrases[:5] %}
+- {{ phrase.section_id }} at {{ phrase.timestamp_ms }}ms: "{{ phrase.text }}" — {{ phrase.visual_hint }}
+{% endfor %}
+{% endif %}
+{% if lyric_context.moment_cues %}
+**Moment Cues**:
+{% for cue in lyric_context.moment_cues %}
+- `{{ cue.cue_id }}` ({{ cue.section_id }}, {{ cue.timestamp_ms }}ms, {{ cue.emphasis }}): "{{ cue.text }}" — {{ cue.visual_hint }}
 {% endfor %}
 {% endif %}
 {% endif %}
@@ -174,7 +186,9 @@ For each song section, choose ONE approach:
   unused nullable value in that arm null.
 - Use `shutter_events` and `gobo_events` for discrete bar/beat changes; use empty lists
   when no change is planned.
-- Set `moment_cues` to an empty list until lyric MomentCues are supplied in context.
+- Reference only MomentCue ids listed in Lyric Context; use an empty list when none are
+  listed. For a cue-driven shutter or gobo accent, set its `moment_cue_id` to the same id.
+  Deterministic code rebinds the event's exact bar/beat from the cue timestamp.
 - Never emit DMX values, milliseconds, angles, or hand-authored enum values; the renderer
   resolves the categorical intent.
 

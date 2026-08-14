@@ -23,6 +23,7 @@ from twinklr.core.agents.sequencer.moving_heads.heuristic_validator import (
     create_validator_function,
 )
 from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan
+from twinklr.core.agents.sequencer.moving_heads.moment_cues import bind_lyric_moment_cues
 from twinklr.core.agents.sequencer.moving_heads.specs import (
     get_judge_spec,
     get_planner_spec,
@@ -323,6 +324,12 @@ class MovingHeadPlannerOrchestrator:
             prompt_base_path=self.prompt_base_path,
             judge_context_builder=lambda plan, iteration, iteration_context: build_judge_variables(
                 context, plan, iteration, iteration_context
+            ),
+            plan_normalizer=lambda plan: bind_lyric_moment_cues(
+                plan,
+                context.lyric_context,
+                context.beat_grid,
+                context.sections,
             ),
         )
 

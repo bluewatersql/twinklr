@@ -7,6 +7,7 @@ import pytest
 from twinklr.core.agents.prompts.loader import LoadError, PromptPackLoader
 
 FIXTURES_PATH = Path(__file__).parent.parent.parent.parent / "fixtures" / "prompts"
+AGENTS_PATH = Path(__file__).parents[4] / "packages" / "twinklr" / "core" / "agents"
 
 
 def test_loader_init():
@@ -110,6 +111,43 @@ def test_examples_parsing():
     assert examples[0]["role"] == "user"
     assert examples[0]["content"] == "Example user message"
     assert examples[1]["role"] == "assistant"
+
+
+def test_loader_discovers_example_directory_form(tmp_path: Path) -> None:
+    pack = tmp_path / "directory_examples"
+    examples = pack / "examples"
+    examples.mkdir(parents=True)
+    (pack / "system.j2").write_text("System")
+    (examples / "example_2.json").write_text(
+        '{"description":"second","input":{"track":2},"expected_output":{"result":2}}'
+    )
+    (examples / "example_1.json").write_text(
+        '{"description":"first","input":{"track":1},"expected_output":{"result":1}}'
+    )
+
+    prompts = PromptPackLoader(tmp_path).load("directory_examples")
+
+    assert prompts["examples"] == [
+        {"role": "user", "content": '{"track": 1}'},
+        {"role": "assistant", "content": '{"result": 1}'},
+        {"role": "user", "content": '{"track": 2}'},
+        {"role": "assistant", "content": '{"result": 2}'},
+    ]
+
+
+def test_real_audio_profile_pack_delivers_both_authored_examples() -> None:
+    prompts_path = AGENTS_PATH / "audio" / "profile" / "prompts"
+
+    prompts = PromptPackLoader(prompts_path).load("audio_profile")
+
+    examples = prompts["examples"]
+    assert len(examples) == 4
+    assert [message["role"] for message in examples] == [
+        "user",
+        "assistant",
+        "user",
+        "assistant",
+    ]
 
 
 def test_load_invalid_examples_jsonl():

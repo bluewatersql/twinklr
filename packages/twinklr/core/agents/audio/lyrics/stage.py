@@ -16,6 +16,11 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# T4 adds MomentCue schema and authoritative duration/section validation. Version 1
+# artifacts predate those invariants and must not be served through the identity
+# extractor on cache hits.
+LYRICS_CACHE_VERSION = "2"
+
 
 class LyricsStage:
     """Pipeline stage for lyrics context generation.
@@ -94,7 +99,7 @@ class LyricsStage:
                 result_extractor=lambda r: r,  # Result is already LyricContextModel
                 result_type=LyricContextModel,
                 cache_key_fn=lambda: orchestrator.get_cache_key(input),
-                cache_version="1",
+                cache_version=LYRICS_CACHE_VERSION,
                 state_handler=self._handle_state,
             )
 

@@ -13,6 +13,8 @@ import time
 from pydantic import BaseModel
 import pytest
 
+from twinklr.core.agents.audio.lyrics.stage import LYRICS_CACHE_VERSION
+from twinklr.core.agents.sequencer.moving_heads.stage import MOVING_HEAD_CACHE_VERSION
 from twinklr.core.caching import CacheKey, CacheMeta, FSCache
 from twinklr.core.io import FakeFileSystem, absolute_path
 
@@ -70,6 +72,34 @@ async def test_different_fingerprint_misses(cache: FSCache) -> None:
     await cache.store(_key("fp-1"), SampleArtifact(value="one"))
 
     assert await cache.load(_key("fp-2"), SampleArtifact) is None
+
+
+@pytest.mark.parametrize(
+    ("stage_name", "current_version"),
+    [
+        ("lyrics", LYRICS_CACHE_VERSION),
+        ("moving_head_planner", MOVING_HEAD_CACHE_VERSION),
+    ],
+)
+async def test_t4_stage_version_bump_rejects_pre_moment_cue_artifacts(
+    cache: FSCache,
+    stage_name: str,
+    current_version: str,
+) -> None:
+    """A same-input v1 artifact cannot bypass T4 validation and cue binding."""
+    assert current_version == "2"
+    old_key = CacheKey(
+        domain=stage_name,
+        session_id="sess_t4",
+        step_id=stage_name,
+        step_version="1",
+        input_fingerprint="unchanged-input-and-prompt-key",
+    )
+    current_key = old_key.model_copy(update={"step_version": current_version})
+    await cache.store(old_key, SampleArtifact(value="pre-t4-unvalidated"))
+
+    assert await cache.load(old_key, SampleArtifact) is not None
+    assert await cache.load(current_key, SampleArtifact) is None
 
 
 async def test_expired_entry_is_a_miss(fs: FakeFileSystem) -> None:

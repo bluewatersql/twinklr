@@ -24,7 +24,11 @@ from twinklr.core.agents.sequencer.moving_heads.models import (
     ChoreographyPlan,
     PlanSection,
 )
-from twinklr.core.agents.sequencer.moving_heads.stage import MovingHeadStage
+from twinklr.core.agents.sequencer.moving_heads.stage import (
+    MOVING_HEAD_CACHE_VERSION,
+    MovingHeadStage,
+)
+from twinklr.core.config.models import AgentConfig
 
 
 def create_test_audio_profile() -> AudioProfileModel:
@@ -159,6 +163,8 @@ class TestMovingHeadStageExecute:
         context.llm_logger = MagicMock()
         context.job_config = MagicMock()
         context.job_config.agent.max_iterations = 3
+        context.job_config.agent.plan_agent = AgentConfig()
+        context.job_config.agent.judge_agent = AgentConfig()
         context.set_state = MagicMock()
         context.add_metric = MagicMock()
         return context
@@ -263,8 +269,10 @@ class TestMovingHeadStageExecute:
         with patch(
             "twinklr.core.pipeline.execution.execute_step",
             new=AsyncMock(return_value=MagicMock(success=True, output=mock_result.plan)),
-        ):
+        ) as execute_step:
             await stage.execute(valid_input, mock_context)
+
+        assert execute_step.await_args.kwargs["cache_version"] == MOVING_HEAD_CACHE_VERSION
 
         # Verify planning context was stored
         calls = list(mock_context.set_state.call_args_list)

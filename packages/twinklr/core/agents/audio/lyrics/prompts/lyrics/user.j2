@@ -137,6 +137,13 @@ Only populate if song has clear storytelling:
     - "Soft blue night sky palette (lyrics emphasize starlight and moonlight)"
     - "Cascading white sweeps (lyrics repeat 'falling snow' motif)"
 
+- **moment_cues**: Promote the strongest key phrases into stable downstream cues
+  - Use the exact section id and phrase timestamp supplied above
+  - Give every cue a unique song-local `cue_id` based on section id plus a short slug
+  - Copy the verbatim phrase into `text` and preserve its actionable `visual_hint`
+  - Choose `emphasis` from the injected response schema
+  - Return null only when there are no lyrics or no trustworthy timed lyric moment
+
 ### 4. Density & Coverage
 
 Analyze vocal patterns:

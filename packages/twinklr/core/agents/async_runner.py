@@ -135,6 +135,7 @@ class AsyncAgentRunner:
 
             # Build messages
             messages = self._build_messages(prompts, spec)
+            delivered_examples_count = len(prompts.get("examples") or [])
 
             # Start logging (async)
             call_id = await self._safe_log_start(
@@ -142,6 +143,7 @@ class AsyncAgentRunner:
                 variables=merged_vars,
                 prompts=prompts,
                 state=state,
+                delivered_examples_count=delivered_examples_count,
             )
 
             # Execute with schema repair loop (async)
@@ -287,6 +289,7 @@ class AsyncAgentRunner:
         variables: dict[str, Any],
         prompts: dict[str, Any],
         spec: AgentSpec,
+        delivered_examples_count: int,
     ) -> dict[str, Any]:
         """Build a compact, useful context summary for LLM call logging.
 
@@ -319,6 +322,7 @@ class AsyncAgentRunner:
             "developer_chars": len(prompts.get("developer") or ""),
             "user_chars": len(prompts.get("user") or ""),
             "examples_count": len(prompts.get("examples") or []),
+            "delivered_examples_count": delivered_examples_count,
         }
 
         # Common context counts used for optimization/debugging
@@ -556,13 +560,15 @@ class AsyncAgentRunner:
             raise RunError(f"Conversational agent {spec.name} requires state but none provided")
 
         # Create or reuse conversation
-        if not state.conversation_id:
+        is_new_conversation = not state.conversation_id
+        if is_new_conversation:
             state.conversation_id = generate_conversation_id(spec.name, state.attempt_count)
             logger.debug(f"Created conversation: {state.conversation_id}")
+        assert state.conversation_id is not None
 
         # Build system prompt (only for first message)
         system_prompt = None
-        if state.attempt_count == 0:
+        if is_new_conversation:
             system_parts = []
             if any(m["role"] == "developer" for m in messages):
                 system_parts.append(
@@ -578,6 +584,30 @@ class AsyncAgentRunner:
             raise RunError(f"No user message found in prompts for {spec.name}")
 
         user_message = user_messages[-1]["content"]
+
+        # The provider's conversational surface accepts one user message rather than a
+        # message list. Preserve the authored roles by folding the concrete few-shot
+        # transcript into the first system prompt. It then remains in provider-managed
+        # conversation history for refinements without extra seeding calls or tokens.
+        if is_new_conversation:
+            final_user_index = max(
+                index for index, message in enumerate(messages) if message["role"] == "user"
+            )
+            examples = [
+                message
+                for index, message in enumerate(messages)
+                if index < final_user_index and message["role"] in {"user", "assistant"}
+            ]
+            if examples:
+                transcript = "\n".join(json.dumps(message, sort_keys=True) for message in examples)
+                example_block = (
+                    "## Few-shot examples (role-labelled transcript)\n"
+                    f"{transcript}\n"
+                    "## End few-shot examples"
+                )
+                system_prompt = (
+                    f"{system_prompt}\n\n{example_block}" if system_prompt else example_block
+                )
 
         return await self.provider.generate_json_with_conversation_async(
             user_message=user_message,
@@ -631,6 +661,7 @@ class AsyncAgentRunner:
         variables: dict[str, Any],
         prompts: dict[str, Any],
         state: AgentState | None,
+        delivered_examples_count: int,
     ) -> str:
         """Safely log call start (async).
 
@@ -644,7 +675,9 @@ class AsyncAgentRunner:
                 model=spec.model,
                 temperature=spec.temperature,
                 prompts=prompts,
-                context=self._build_logging_context(variables, prompts, spec),
+                context=self._build_logging_context(
+                    variables, prompts, spec, delivered_examples_count
+                ),
                 conversation_id=state.conversation_id if state else None,
                 run_id=variables.get("run_id"),
                 provider=self.provider.provider_type.value,

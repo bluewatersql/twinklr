@@ -19,6 +19,7 @@ import logging
 from typing import TYPE_CHECKING, Any, NamedTuple
 
 from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan, PlanSection
+from twinklr.core.agents.sequencer.moving_heads.moment_cues import lyric_moment_cue_errors
 
 if TYPE_CHECKING:
     from twinklr.core.agents.sequencer.moving_heads.context import MovingHeadPlanningContext
@@ -74,7 +75,7 @@ def create_validator_function(
     def validate(plan: ChoreographyPlan) -> list[str]:
         """Validate plan and return list of error messages."""
         result = heuristic_validator.validate(plan)
-        return result.errors  # Only errors, not warnings
+        return result.errors + lyric_moment_cue_errors(plan, context.lyric_context)
 
     return validate
 

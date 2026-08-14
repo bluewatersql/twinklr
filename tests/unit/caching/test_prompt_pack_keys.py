@@ -426,6 +426,13 @@ class TestPromptPackHashing:
 
         assert prompt_pack_hash(audio_packs, "audio_profile") != before
 
+    def test_editing_example_changes_the_hash(self, audio_packs: Path) -> None:
+        before = prompt_pack_hash(audio_packs, "audio_profile")
+        example = audio_packs / "audio_profile" / "examples" / "example_1.json"
+        example.write_text(example.read_text() + "\n")
+
+        assert prompt_pack_hash(audio_packs, "audio_profile") != before
+
     def test_combined_hash_is_order_independent(self, audio_packs: Path) -> None:
         forward = prompt_packs_hash([(audio_packs, "audio_profile"), (audio_packs, "lyrics")])
         reverse = prompt_packs_hash([(audio_packs, "lyrics"), (audio_packs, "audio_profile")])

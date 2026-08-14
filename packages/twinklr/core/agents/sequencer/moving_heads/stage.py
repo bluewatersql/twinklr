@@ -16,6 +16,10 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# T4 canonicalizes section identities and binds lyric cues to the authoritative
+# BeatGrid before validation/judging. Version 1 plans were cached before that seam.
+MOVING_HEAD_CACHE_VERSION = "2"
+
 
 class MovingHeadStage:
     """Pipeline stage for moving head choreography planning.
@@ -208,7 +212,7 @@ class MovingHeadStage:
                 result_extractor=extract_plan,
                 result_type=IterationResult,
                 cache_key_fn=lambda: orchestrator.get_cache_key(planning_context),
-                cache_version="1",
+                cache_version=MOVING_HEAD_CACHE_VERSION,
                 state_handler=self._handle_state,
                 metrics_handler=self._handle_metrics,
             )

@@ -82,7 +82,9 @@ A choreography plan contains a list of **sections**. Each `PlanSection` may be e
 - `shutter_events` and `gobo_events` are ordered discrete changes at absolute 1-indexed
   bar/beat positions. Their pattern vocabularies come only from the injected schema.
 - `moment_cues` contains stable lyric MomentCue references. Use an empty list when the
-  context supplies none; event `moment_cue_id` values must name one of those references.
+  context supplies none; every id must appear in the supplied Lyric Context and event
+  `moment_cue_id` values must name one of those references. Deterministic code snaps cue
+  timestamps to the authoritative BeatGrid before rendering.
 - The renderer, not the model, owns DMX values, milliseconds, movement amplitudes, and angles.
 
 ### Coverage Requirements
@@ -93,6 +95,10 @@ A choreography plan contains a list of **sections**. Each `PlanSection` may be e
 - **Intentional gaps**: If you deliberately leave gaps (e.g., blackout), explain in `reasoning`
 
 ### Field Requirements
+
+`section_name` is the historical plan-field spelling for the unique
+`SongSectionRef.section_id` shown in the Song Structure table. Always copy the Section
+ID (for example `chorus_1` or `chorus_2`), never the repeatable display Name (`chorus`).
 
 **PlanSection (single-template)**:
 - `section_name`, `start_bar`, `end_bar`, and `template_id`: populated

@@ -66,6 +66,7 @@ def _audio_profile() -> dict[str, Any]:
 
 def _lyric_context() -> dict[str, Any]:
     return {
+        "has_lyrics": True,
         "has_narrative": True,
         "characters": ["winter traveler"],
         "themes": ["returning home", "celebration"],
@@ -96,8 +97,16 @@ def _lyric_context() -> dict[str, Any]:
         "lyric_density": "MED",
         "vocal_coverage_pct": 0.82,
         "timed_word_coverage_pct": 0.91,
-        "narrative_arc": "A quiet opening grows into celebration.",
-        "key_moments": [{"section_id": "chorus_1", "description": "The hook arrives."}],
+        "moment_cues": [
+            {
+                "cue_id": "chorus-home",
+                "timestamp_ms": 6_000,
+                "section_id": "chorus_1",
+                "emphasis": "HIGH",
+                "text": "light the way home",
+                "visual_hint": "Open a white fan from center on home.",
+            }
+        ],
     }
 
 
@@ -581,6 +590,23 @@ def test_every_pack_renders_against_populated_context(
     if case_id == "moving_head_planner":
         assert "Recommended sections: chorus, drop" in rendered["user"]
         assert "Use broad motion for the hook" in rendered["user"]
+        assert "Longing grows into celebration." in rendered["user"]
+        assert "light the way home" in rendered["user"]
+        assert "chorus-home" in rendered["user"]
+
+
+def test_phantom_lyric_fields_are_absent_from_runtime_tree() -> None:
+    """Pin the exact silent Jinja typo class without matching this test itself."""
+    repository = Path(__file__).parents[4]
+    forbidden = ("narrative" + "_arc", "key" + "_moments")
+    matches: list[str] = []
+    for root in (repository / "packages", repository / "tests"):
+        for path in root.rglob("*"):
+            if path.suffix not in {".py", ".j2"}:
+                continue
+            if any(name in path.read_text() for name in forbidden):
+                matches.append(str(path.relative_to(repository)))
+    assert matches == []
 
 
 def test_all_refinement_templates_render_with_populated_context() -> None:

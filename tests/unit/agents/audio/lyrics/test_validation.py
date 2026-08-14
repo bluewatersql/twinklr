@@ -5,6 +5,7 @@ import pytest
 from twinklr.core.agents.audio.lyrics.models import (
     KeyPhrase,
     LyricContextModel,
+    MomentCue,
     Severity,
     SilentSection,
     StoryBeat,
@@ -26,6 +27,82 @@ class TestValidateLyrics:
 
         issues = validate_lyrics(model, minimal_song_bundle)
         assert len(issues) == 0
+
+    def test_moment_cue_timestamp_and_section_membership(self, minimal_song_bundle):
+        minimal_song_bundle.features = {
+            "structure": {
+                "sections": [
+                    {"label": "verse", "start_s": 0.0, "end_s": 90.0},
+                    {"label": "chorus", "start_s": 90.0, "end_s": 180.0},
+                ]
+            }
+        }
+        model = LyricContextModel(
+            has_lyrics=True,
+            vocal_coverage_pct=0.5,
+            moment_cues=[
+                MomentCue(
+                    cue_id="bad-section",
+                    timestamp_ms=181_000,
+                    section_id="chorus_9",
+                    emphasis="HIGH",
+                    text="outside",
+                    visual_hint="Reject this cue deterministically.",
+                )
+            ],
+        )
+
+        issues = validate_lyrics(model, minimal_song_bundle)
+
+        assert {issue.code for issue in issues} >= {
+            "MOMENT_CUE_TIMESTAMP_OUT_OF_BOUNDS",
+            "MOMENT_CUE_UNKNOWN_SECTION",
+        }
+
+    def test_moment_cue_timestamp_must_belong_to_its_section(self, minimal_song_bundle):
+        minimal_song_bundle.features = {
+            "structure": {
+                "sections": [
+                    {"label": "verse", "start_s": 0.0, "end_s": 90.0},
+                    {"label": "chorus", "start_s": 90.0, "end_s": 180.0},
+                ]
+            }
+        }
+        model = LyricContextModel(
+            has_lyrics=True,
+            vocal_coverage_pct=0.5,
+            moment_cues=[
+                MomentCue(
+                    cue_id="misfiled",
+                    timestamp_ms=100_000,
+                    section_id="verse",
+                    emphasis="MED",
+                    text="chorus words",
+                    visual_hint="Reject the wrong section membership.",
+                )
+            ],
+        )
+
+        issues = validate_lyrics(model, minimal_song_bundle)
+
+        assert any(issue.code == "MOMENT_CUE_OUTSIDE_SECTION" for issue in issues)
+
+    def test_has_lyrics_false_rejects_moment_cues(self) -> None:
+        with pytest.raises(ValueError, match=r"has_lyrics=False.*moment_cues"):
+            LyricContextModel(
+                has_lyrics=False,
+                vocal_coverage_pct=0.0,
+                moment_cues=[
+                    MomentCue(
+                        cue_id="impossible",
+                        timestamp_ms=0,
+                        section_id="intro",
+                        emphasis="LOW",
+                        text="not available",
+                        visual_hint="This cue must be rejected.",
+                    )
+                ],
+            )
 
     def test_valid_full_model(self, full_song_bundle):
         """Test validation of full valid model."""

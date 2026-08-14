@@ -7,11 +7,34 @@ from twinklr.core.agents.audio.lyrics.models import (
     Issue,
     KeyPhrase,
     LyricContextModel,
+    MomentCue,
     Provenance,
     Severity,
     SilentSection,
     StoryBeat,
 )
+
+
+def test_moment_cue_strict_round_trip() -> None:
+    """Lyric cues are stable, response-compatible planner references."""
+    cue = MomentCue(
+        cue_id="chorus-home",
+        timestamp_ms=6_250,
+        section_id="chorus_1",
+        emphasis="HIGH",
+        text="light the way home",
+        visual_hint="Open a white fan from center on home.",
+    )
+    context = LyricContextModel(
+        has_lyrics=True,
+        vocal_coverage_pct=0.1,
+        moment_cues=[cue],
+    )
+
+    assert LyricContextModel.model_validate_json(context.model_dump_json()) == context
+    schema = LyricContextModel.model_json_schema()
+    assert "moment_cues" in schema["required"]
+    assert schema["additionalProperties"] is False
 
 
 class TestStoryBeat:

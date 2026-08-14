@@ -181,6 +181,44 @@ async def test_async_run_conversational_mode(mock_async_provider):
 
 
 @pytest.mark.asyncio
+async def test_conversational_examples_are_delivered_and_logged(
+    tmp_path: Path, mock_async_provider, mock_llm_logger
+) -> None:
+    pack = tmp_path / "few_shot"
+    pack.mkdir()
+    (pack / "system.j2").write_text("System contract")
+    (pack / "user.j2").write_text("Real request")
+    (pack / "examples.jsonl").write_text(
+        '{"role":"user","content":"Example request"}\n'
+        '{"role":"assistant","content":"{\\"result\\":\\"example\\",\\"count\\":1}"}\n'
+    )
+    mock_async_provider.generate_json_with_conversation_async = AsyncMock(
+        return_value=LLMResponse(
+            content={"result": "actual", "count": 2},
+            metadata=ResponseMetadata(token_usage=TokenUsage()),
+        )
+    )
+    spec = AgentSpec(
+        name="few_shot_agent",
+        prompt_pack="few_shot",
+        response_model=SampleResponse,
+        mode=AgentMode.CONVERSATIONAL,
+    )
+    runner = AsyncAgentRunner(mock_async_provider, tmp_path, mock_llm_logger)
+
+    result = await runner.run(spec, {}, AgentState(name="few_shot_agent"))
+
+    assert result.success is True
+    request = mock_async_provider.generate_json_with_conversation_async.call_args.kwargs
+    assert "Example request" in request["system_prompt"]
+    assert '"role": "assistant"' in request["system_prompt"]
+    assert request["user_message"] == "Real request"
+    logged = mock_llm_logger.start_call_async.call_args.kwargs["context"]["prompt_sizes"]
+    assert logged["examples_count"] == 2
+    assert logged["delivered_examples_count"] == 2
+
+
+@pytest.mark.asyncio
 async def test_async_run_schema_validation_failure_and_repair(test_spec, mock_async_provider):
     """Test async schema validation failure with automatic repair."""
     runner = AsyncAgentRunner(

@@ -271,3 +271,51 @@ option, document it in the runner docstring, and pin it with the fake-provider t
 so a future refactor cannot silently re-drop them. Second risk: re-landing the same
 defect class in a new place — every new prompt field must be covered by the
 rendered-output test, not just by the template diff.
+
+## Implementation handoff — 2026-08-14 (pending independent verification)
+
+### Implemented contract
+
+- `MomentCue` is a strict response-compatible lyrics model. Lyrics validation rejects
+  timestamps outside the song duration, unknown section ids, timestamps outside the
+  cue's canonical section window, and populated cues when `has_lyrics` is false.
+- Moving-head plans join lyric cues to the audio profile by unique
+  `SongSectionRef.section_id`; repeatable display names remain presentation data. A
+  legacy display-name reference is canonicalized only when it identifies exactly one
+  section. Repeated names are rejected rather than guessed.
+- A plan normalizer runs after every planner response, including revisions, and before
+  heuristic validation or judging. It canonicalizes section ids, validates each
+  referenced cue against its authoritative song-section interval, and then binds
+  shutter/gobo cue events to the nearest authoritative `BeatGrid` position. Equal
+  distance ties select the earlier beat. Invalid endpoint input is rejected before
+  snapping, so clamping cannot legitimize it.
+- The moving-head planner prompt renders real lyrics fields (`mood_arc`,
+  `story_beats`, `key_phrases`, and `moment_cues`). The fictional
+  `narrative_arc`/`key_moments` fields were removed. Prompt-content and response-schema
+  identities already participate in the cache fingerprint. In addition, the lyrics
+  and moving-head pipeline stages explicitly bump their cache versions from 1 to 2:
+  v1 lyrics artifacts bypassed the new duration/section checks on identity extraction,
+  and v1 moving-head artifacts bypassed section canonicalization and BeatGrid binding
+  on cached extraction. A same-fingerprint v1 artifact is therefore a cache miss under
+  the T4 stages rather than being legitimized by model-only deserialization.
+- Prompt loading supports both `examples.jsonl` and the declared
+  `examples/example_*.json` directory form. Conversational agents fold the example
+  turns into the delivered request in order, and call logging records the count that
+  was actually delivered. `pack.yaml` remains deliberately inert per the non-goal.
+
+### Privacy and prompt-injection residual
+
+This task deliberately increases the amount of raw third-party lyric material sent to
+the moving-head planner: lyric text, story-beat descriptions, key phrases, cue text,
+and visual hints now cross that LLM boundary. No lyric sanitization, delimiter
+escaping, or instruction/data isolation was added here. Malicious lyrics can therefore
+inject prompt-like text or imitate the prompt's delimiters. That residual is the
+existing **P3-F18 / CC-9** trust-boundary finding; this wider live data path raises its
+priority for the owning Phase 3 security work. It is not silently treated as resolved
+by T4.
+
+### Owner-gated evidence still pending
+
+No paid provider call was made. The optional LOCAL-ONLY lyric-aware planner smoke run
+remains owner-gated and is not merge evidence. Independent verification is still
+required; this author handoff is not approval.

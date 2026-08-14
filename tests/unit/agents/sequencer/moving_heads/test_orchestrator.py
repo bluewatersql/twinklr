@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from twinklr.core.agents.audio.lyrics.models import LyricContextModel, MomentCue
 from twinklr.core.agents.audio.profile.models import (
     AudioProfileModel,
     Contrast,
@@ -19,13 +20,20 @@ from twinklr.core.agents.audio.profile.models import (
     SongSectionRef,
     Structure,
 )
+from twinklr.core.agents.providers.base import (
+    LLMResponse,
+    ProviderType,
+    ResponseMetadata,
+)
 from twinklr.core.agents.sequencer.moving_heads.context import (
     FixtureContext,
     MovingHeadPlanningContext,
 )
 from twinklr.core.agents.sequencer.moving_heads.models import (
     ChoreographyPlan,
+    MomentCueReference,
     PlanSection,
+    ShutterEvent,
 )
 from twinklr.core.agents.sequencer.moving_heads.orchestrator import (
     MovingHeadPlannerOrchestrator,
@@ -34,6 +42,7 @@ from twinklr.core.agents.sequencer.moving_heads.orchestrator import (
 )
 from twinklr.core.agents.shared.judge.controller import IterationContext
 from twinklr.core.agents.shared.judge.models import JudgeVerdict, VerdictStatus
+from twinklr.core.sequencer.timing.beat_grid import BeatGrid
 
 
 def create_test_audio_profile() -> AudioProfileModel:
@@ -424,3 +433,187 @@ class TestOrchestratorIntegration:
         )
         shaped = judge_context_builder(result.plan, 1, history)
         assert shaped["previous_feedback"] == ["Add a stronger chorus contrast."]
+
+    @pytest.mark.asyncio
+    async def test_final_plan_binds_lyric_cue_to_authoritative_grid(self) -> None:
+        """The actual orchestration seam returns the render-ready cue timing."""
+        from twinklr.core.agents.shared.judge.controller import IterationContext, IterationResult
+
+        cue_id = "intro-home"
+        plan = ChoreographyPlan(
+            sections=[
+                PlanSection(
+                    section_name="intro",
+                    start_bar=1,
+                    end_bar=2,
+                    template_id="sweep_lr_fan_pulse",
+                    moment_cues=[MomentCueReference(cue_id=cue_id)],
+                    shutter_events=[
+                        ShutterEvent(
+                            bar=1,
+                            beat=1,
+                            pattern="strobe_fast",
+                            moment_cue_id=cue_id,
+                        )
+                    ],
+                )
+            ],
+            overall_strategy="Accentuate the lyric.",
+        )
+        controller_result = IterationResult[ChoreographyPlan](
+            success=True,
+            plan=plan,
+            context=IterationContext(),
+        )
+        context = MovingHeadPlanningContext(
+            audio_profile=create_test_audio_profile(),
+            lyric_context=LyricContextModel(
+                has_lyrics=True,
+                vocal_coverage_pct=0.25,
+                moment_cues=[
+                    MomentCue(
+                        cue_id=cue_id,
+                        timestamp_ms=1_450,
+                        section_id="intro",
+                        emphasis="HIGH",
+                        text="light the way home",
+                        visual_hint="Open a white fan from center on home.",
+                    )
+                ],
+            ),
+            fixtures=FixtureContext(count=4, groups=[]),
+            beat_grid=BeatGrid.from_tempo(tempo_bpm=120, total_bars=2),
+            available_templates=["sweep_lr_fan_pulse"],
+        )
+        orchestrator = MovingHeadPlannerOrchestrator(provider=MagicMock())
+
+        with patch.object(
+            orchestrator.controller,
+            "run",
+            new=AsyncMock(return_value=controller_result),
+        ) as controller_run:
+            result = await orchestrator.run(context)
+
+        assert result.plan is not None
+        normalizer = controller_run.call_args.kwargs["plan_normalizer"]
+        normalized = normalizer(result.plan)
+        event = normalized.sections[0].shutter_events[0]
+        assert (event.bar, event.beat) == (1, 4)
+
+    @pytest.mark.asyncio
+    async def test_judge_provider_receives_canonical_section_and_bound_cue_event(self) -> None:
+        section = SongSectionRef(
+            section_id="chorus_1",
+            name="chorus",
+            start_ms=0,
+            end_ms=4_000,
+        )
+        profile = create_test_audio_profile().model_copy(
+            update={
+                "song_identity": SongIdentity(
+                    title="Cue Song",
+                    artist="Test Artist",
+                    duration_ms=4_000,
+                    bpm=120.0,
+                    time_signature="4/4",
+                ),
+                "structure": Structure(sections=[section], structure_confidence=0.9),
+            }
+        )
+        cue_id = "chorus-home"
+        planner_plan = ChoreographyPlan(
+            sections=[
+                PlanSection(
+                    section_name="chorus",  # Display name; normalizer must canonicalize it.
+                    start_bar=1,
+                    end_bar=2,
+                    template_id="sweep_lr_fan_pulse",
+                    moment_cues=[MomentCueReference(cue_id=cue_id)],
+                    shutter_events=[
+                        ShutterEvent(
+                            bar=2,
+                            beat=4,
+                            pattern="strobe_fast",
+                            moment_cue_id=cue_id,
+                        )
+                    ],
+                )
+            ],
+            overall_strategy="Accentuate the lyric.",
+        )
+        verdict = JudgeVerdict(
+            status=VerdictStatus.APPROVE,
+            score=8.0,
+            confidence=0.9,
+            strengths=["Canonical and on-grid"],
+            issues=[],
+            feedback_for_planner="No changes needed",
+            iteration=1,
+        )
+        judge_messages: list[dict[str, str]] = []
+        provider = MagicMock()
+        provider.provider_type = ProviderType.ANTHROPIC
+        invalid_plan = planner_plan.model_copy(
+            update={
+                "sections": [
+                    planner_plan.sections[0].model_copy(update={"section_name": "missing_section"})
+                ]
+            }
+        )
+        provider.generate_json_with_conversation_async = AsyncMock(
+            side_effect=[
+                LLMResponse(
+                    content=invalid_plan.model_dump(mode="json"),
+                    metadata=ResponseMetadata(),
+                ),
+                LLMResponse(
+                    content=planner_plan.model_dump(mode="json"),
+                    metadata=ResponseMetadata(),
+                ),
+            ]
+        )
+
+        async def judge_call(*, messages: list[dict[str, str]], **kwargs: object) -> LLMResponse:
+            judge_messages.extend(messages)
+            return LLMResponse(
+                content=verdict.model_dump(mode="json"),
+                metadata=ResponseMetadata(),
+            )
+
+        provider.generate_json_async = AsyncMock(side_effect=judge_call)
+        context = MovingHeadPlanningContext(
+            audio_profile=profile,
+            lyric_context=LyricContextModel(
+                has_lyrics=True,
+                vocal_coverage_pct=0.25,
+                moment_cues=[
+                    MomentCue(
+                        cue_id=cue_id,
+                        timestamp_ms=1_250,
+                        section_id="chorus_1",
+                        emphasis="HIGH",
+                        text="light the way home",
+                        visual_hint="Open a white fan from center on home.",
+                    )
+                ],
+            ),
+            fixtures=FixtureContext(count=4, groups=[]),
+            beat_grid=BeatGrid.from_tempo(tempo_bpm=120, total_bars=2),
+            available_templates=["sweep_lr_fan_pulse"],
+        )
+
+        result = await MovingHeadPlannerOrchestrator(
+            provider=provider,
+            max_iterations=2,
+        ).run(context)
+
+        assert result.success
+        assert provider.generate_json_with_conversation_async.await_count == 2
+        assert provider.generate_json_async.await_count == 1
+        assert result.plan is not None
+        assert result.plan.sections[0].section_name == "chorus_1"
+        event = result.plan.sections[0].shutter_events[0]
+        assert (event.bar, event.beat) == (1, 3)
+        rendered_judge_request = "\n".join(message["content"] for message in judge_messages)
+        assert '"section_name": "chorus_1"' in rendered_judge_request
+        assert '"beat": 3' in rendered_judge_request

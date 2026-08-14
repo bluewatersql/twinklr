@@ -10,6 +10,7 @@ This is separate from Pydantic schema validation:
 
 from twinklr.core.agents.audio.lyrics.models import Issue, LyricContextModel, Severity
 from twinklr.core.audio.models import SongBundle
+from twinklr.core.audio.sections import generate_section_ids
 
 
 def _issue(**values: object) -> Issue:
@@ -48,6 +49,7 @@ def validate_lyrics(lyric_context: LyricContextModel, song_bundle: SongBundle) -
 
     # Timestamp validation
     issues.extend(_validate_timestamps(lyric_context, duration_ms))
+    issues.extend(_validate_moment_cues(lyric_context, song_bundle))
 
     # Cross-field consistency
     issues.extend(_validate_cross_field_consistency(lyric_context))
@@ -55,6 +57,67 @@ def validate_lyrics(lyric_context: LyricContextModel, song_bundle: SongBundle) -
     # Thematic consistency
     issues.extend(_validate_thematic_consistency(lyric_context))
 
+    return issues
+
+
+def _validate_moment_cues(lyric_context: LyricContextModel, song_bundle: SongBundle) -> list[Issue]:
+    """Validate cue duration and canonical section membership from source analysis."""
+    issues: list[Issue] = []
+    if not lyric_context.moment_cues:
+        return issues
+
+    duration_ms = song_bundle.timing.duration_ms
+    raw_sections = song_bundle.features.get("structure", {}).get("sections", [])
+    section_ids = generate_section_ids(raw_sections)
+    sections: dict[str, tuple[int, int, bool]] = {}
+    for index, (section_id, raw) in enumerate(zip(section_ids, raw_sections, strict=True)):
+        start_ms = int(raw.get("start_ms", float(raw.get("start_s", 0)) * 1000))
+        end_ms = int(raw.get("end_ms", float(raw.get("end_s", 0)) * 1000))
+        sections[section_id] = (start_ms, end_ms, index == len(raw_sections) - 1)
+
+    for cue in lyric_context.moment_cues:
+        if cue.timestamp_ms > duration_ms:
+            issues.append(
+                _issue(
+                    severity=Severity.ERROR,
+                    code="MOMENT_CUE_TIMESTAMP_OUT_OF_BOUNDS",
+                    message=(
+                        f"MomentCue '{cue.cue_id}' timestamp {cue.timestamp_ms}ms exceeds "
+                        f"song duration ({duration_ms}ms)"
+                    ),
+                    path=f"$.moment_cues[?(@.cue_id=='{cue.cue_id}')].timestamp_ms",
+                )
+            )
+        bounds = sections.get(cue.section_id)
+        if bounds is None:
+            issues.append(
+                _issue(
+                    severity=Severity.ERROR,
+                    code="MOMENT_CUE_UNKNOWN_SECTION",
+                    message=(
+                        f"MomentCue '{cue.cue_id}' references unknown canonical section_id "
+                        f"'{cue.section_id}'"
+                    ),
+                    path=f"$.moment_cues[?(@.cue_id=='{cue.cue_id}')].section_id",
+                )
+            )
+            continue
+        start_ms, end_ms, end_is_inclusive = bounds
+        in_section = start_ms <= cue.timestamp_ms and (
+            cue.timestamp_ms <= end_ms if end_is_inclusive else cue.timestamp_ms < end_ms
+        )
+        if not in_section:
+            issues.append(
+                _issue(
+                    severity=Severity.ERROR,
+                    code="MOMENT_CUE_OUTSIDE_SECTION",
+                    message=(
+                        f"MomentCue '{cue.cue_id}' timestamp {cue.timestamp_ms}ms is outside "
+                        f"section '{cue.section_id}' ({start_ms}-{end_ms}ms)"
+                    ),
+                    path=f"$.moment_cues[?(@.cue_id=='{cue.cue_id}')].timestamp_ms",
+                )
+            )
     return issues
 
 

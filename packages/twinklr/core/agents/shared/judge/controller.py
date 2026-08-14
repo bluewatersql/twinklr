@@ -302,6 +302,7 @@ class StandardIterationController[TPlan]:
         prompt_base_path: Path | str = AGENTS_BASE_PATH,
         judge_context_builder: Callable[[TPlan, int, IterationContext], dict[str, Any]]
         | None = None,
+        plan_normalizer: Callable[[TPlan], TPlan] | None = None,
     ) -> IterationResult[TPlan]:
         """Run iteration loop until approval or termination.
 
@@ -317,6 +318,8 @@ class StandardIterationController[TPlan]:
                 variables from (plan, iteration, same-run iteration context). Its
                 variables augment the controller's common plan, history, and threshold
                 variables rather than replacing them.
+            plan_normalizer: Optional deterministic normalization applied to every
+                planner result before heuristic validation and judging.
 
         Returns:
             IterationResult with final plan and metadata
@@ -380,12 +383,18 @@ class StandardIterationController[TPlan]:
 
             plan = cast("TPlan", plan_result.data)
             assert plan is not None, "Planner succeeded but returned None data"
+            normalization_errors: list[str] = []
+            if plan_normalizer is not None:
+                try:
+                    plan = plan_normalizer(plan)
+                except ValueError as error:
+                    normalization_errors.append(str(error))
 
             # === VALIDATION STAGE ===
             context.update_state(IterationState.VALIDATING)
             self.logger.debug("Validating plan (heuristics)")
 
-            validation_errors = validator(plan)
+            validation_errors = normalization_errors or validator(plan)
 
             if validation_errors:
                 context.update_state(IterationState.VALIDATION_FAILED)
