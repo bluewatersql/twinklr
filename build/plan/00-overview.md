@@ -7,6 +7,9 @@ finding IDs like P4-F1/CF-2) or proposal decision points (D1–D13). This folder
 **plan** (what, in what order, run by which agents); `build/specs/` holds the
 **per-task specifications** (how, exactly)._
 
+> **Continuing this work? Start at [HANDOFF.md](HANDOFF.md)** — live execution state,
+> per-phase status, binding process rules, and pending owner actions.
+
 ## Program map
 
 ```
