@@ -11,6 +11,7 @@ from twinklr.core.sequencer.models.template import (
     BaseTiming,
     Dimmer,
     Geometry,
+    Gobo,
     Movement,
     PhaseOffset,
     PhaseOffsetMode,
@@ -25,6 +26,7 @@ from twinklr.core.sequencer.models.template import (
 )
 from twinklr.core.sequencer.moving_heads.libraries.dimmer import DimmerType
 from twinklr.core.sequencer.moving_heads.libraries.geometry import GeometryType
+from twinklr.core.sequencer.moving_heads.libraries.gobo import GoboPattern
 from twinklr.core.sequencer.moving_heads.libraries.movement import MovementType
 from twinklr.core.sequencer.moving_heads.templates.library import register_template
 from twinklr.core.sequencer.moving_heads.templates.utils import TemplateRoleHelper
@@ -78,6 +80,7 @@ def make_template() -> TemplateDoc:
                         max_norm=1.00,
                         cycles=4.0,
                     ),
+                    gobo=Gobo(pattern=GoboPattern.PRISM),
                 )
             ],
             metadata=TemplateMetadata(

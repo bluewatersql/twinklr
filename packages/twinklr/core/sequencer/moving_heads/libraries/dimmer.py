@@ -52,9 +52,11 @@ DEFAULT_DIMMER_PARAMS = {
     # handler substituted SMOOTH for anything absent, so a plan asking for CHILL
     # (-> SLOW) or INTENSE (-> FAST) silently got the SMOOTH dimmer (P4-F8). The
     # ladder runs slow/dim to fast/bright, matching DEFAULT_MOVEMENT_PARAMS.
-    # SLOW is the dim end of the ladder rather than the long-period end: a period
-    # longer than the section renders a *constant*, because the off-phase of the
-    # PULSE curve falls outside the window entirely.
+    # P2P-T2 decision: SLOW remains the dim end of the ladder, and a section shorter
+    # than its four-bar period intentionally reads as a sustained low light. Scaling
+    # the period to every short section would turn "slow" into a full fast-looking
+    # pulse and would rewrite established template output. A future vocabulary may
+    # add a separate short-section pulse intent if that look is wanted.
     Intensity.SLOW: DimmerCategoricalParams(min_intensity=0, max_intensity=100, period=4.0),
     Intensity.SMOOTH: DimmerCategoricalParams(min_intensity=0, max_intensity=128, period=4.0),
     Intensity.DRAMATIC: DimmerCategoricalParams(min_intensity=100, max_intensity=255, period=1.25),

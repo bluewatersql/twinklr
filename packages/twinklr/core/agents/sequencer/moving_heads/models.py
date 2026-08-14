@@ -3,9 +3,19 @@
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import Annotated, Literal
+from typing import TYPE_CHECKING, Annotated, Any, Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    PrivateAttr,
+    field_validator,
+    model_validator,
+)
+
+if TYPE_CHECKING:
+    from pydantic import ModelWrapValidatorHandler
 
 from twinklr.core.sequencer.models.enum import Intensity
 from twinklr.core.sequencer.models.transition import TransitionHint
@@ -230,6 +240,41 @@ class PlanSection(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
+    _legacy_intent_omitted: bool = PrivateAttr(default=False)
+
+    @model_validator(mode="wrap")
+    @classmethod
+    def _capture_intent_provenance(
+        cls, value: Any, handler: ModelWrapValidatorHandler[Self]
+    ) -> Self:
+        """Remember whether an internal legacy caller omitted schema-v2 intent.
+
+        The strict response schema still requires every public field. This private
+        marker exists only because the compatibility pre-validator below supplies
+        defaults for older deterministic constructors, and value comparison cannot
+        distinguish those omissions from an explicit SMOOTH/PRIMARY request.
+        """
+        intent_fields = {
+            "intensity",
+            "color_intent",
+            "shutter_events",
+            "gobo_events",
+            "moment_cues",
+        }
+        if isinstance(value, cls):
+            omitted = value.legacy_intent_omitted
+        else:
+            omitted = isinstance(value, dict) and intent_fields.isdisjoint(value)
+        section = handler(value)
+        assert section.__pydantic_private__ is not None
+        section.__pydantic_private__["_legacy_intent_omitted"] = omitted
+        return section
+
+    @property
+    def legacy_intent_omitted(self) -> bool:
+        """Whether a deterministic legacy constructor supplied no v2 intent fields."""
+        return self._legacy_intent_omitted
+
     @model_validator(mode="before")
     @classmethod
     def _normalize_legacy_input(cls, value: object) -> object:
@@ -330,7 +375,7 @@ def flatten_plan_segment(section: PlanSection, segment: PlanSegment) -> PlanSect
     is inherited unchanged unless the segment supplies its own template metadata.
     """
 
-    return PlanSection(
+    flattened = PlanSection(
         section_name=f"{section.section_name}|{segment.segment_id}",
         start_bar=segment.start_bar,
         end_bar=segment.end_bar,
@@ -357,6 +402,9 @@ def flatten_plan_segment(section: PlanSection, segment: PlanSegment) -> PlanSect
         ],
         moment_cues=section.moment_cues,
     )
+    assert flattened.__pydantic_private__ is not None
+    flattened.__pydantic_private__["_legacy_intent_omitted"] = section.legacy_intent_omitted
+    return flattened
 
 
 class ChoreographyPlan(BaseModel):

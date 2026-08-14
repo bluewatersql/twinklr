@@ -17,6 +17,7 @@ from twinklr.core.sequencer.models.template import (
     RemainderPolicy,
     RepeatContract,
     RepeatMode,
+    Shutter,
     StepTiming,
     Template,
     TemplateDoc,
@@ -26,6 +27,7 @@ from twinklr.core.sequencer.models.template import (
 from twinklr.core.sequencer.moving_heads.libraries.dimmer import DimmerType
 from twinklr.core.sequencer.moving_heads.libraries.geometry import GeometryType
 from twinklr.core.sequencer.moving_heads.libraries.movement import MovementType
+from twinklr.core.sequencer.moving_heads.libraries.shutter import ShutterPattern
 from twinklr.core.sequencer.moving_heads.templates.library import register_template
 from twinklr.core.sequencer.moving_heads.templates.utils import TemplateRoleHelper
 
@@ -78,6 +80,7 @@ def make_template() -> TemplateDoc:
                         max_norm=1.00,
                         cycles=8.0,
                     ),
+                    shutter=Shutter(pattern=ShutterPattern.STROBE_FAST),
                 )
             ],
             metadata=TemplateMetadata(

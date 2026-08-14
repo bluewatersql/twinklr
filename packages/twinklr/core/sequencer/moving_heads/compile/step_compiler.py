@@ -133,6 +133,23 @@ def compile_step(
         beat_grid=context.beat_grid,  # Pass beat grid for period conversion
     )
 
+    wheel_results: dict[ChannelName, tuple[Any, Any]] = {}
+    for channel, axis, registry, key in (
+        (ChannelName.COLOR, step.color, context.color_registry, "preset"),
+        (ChannelName.SHUTTER, step.shutter, context.shutter_registry, "pattern"),
+        (ChannelName.GOBO, step.gobo, context.gobo_registry, "pattern"),
+    ):
+        if axis is None:
+            continue
+        axis_params = dict(axis.params)
+        axis_params["calibration"] = context.calibration
+        axis_params[key] = getattr(axis, key)
+        handler = registry.get(getattr(axis, key).value)
+        wheel_results[channel] = (
+            handler,
+            handler.generate(axis_params, context.n_samples),
+        )
+
     # Apply phase offset if needed
     pan_points = movement_result.pan_curve
     tilt_points = movement_result.tilt_curve
@@ -190,6 +207,10 @@ def compile_step(
     segment.add_metadata("dimmer_curve_type", str(dimmer_result.dimmer_curve_type))
     segment.add_metadata("dimmer_static_dmx", dimmer_result.dimmer_static_dmx)
 
+    for channel, (handler, result) in wheel_results.items():
+        segment.add_metadata(f"{channel.value}_handler", handler.handler_id)
+        segment.add_metadata(f"{channel.value}_trace", result.trace)
+
     # Misc Metadata
     segment.add_metadata("start_ms", t0_ms)
     segment.add_metadata("end_ms", t1_ms)
@@ -232,6 +253,20 @@ def compile_step(
         clamp_min=dimmer_result.clamp_min_dmx,
         clamp_max=dimmer_result.clamp_max_dmx,
     )
+
+    for channel, (_, result) in wheel_results.items():
+        if not result.emit:
+            continue
+        points = result.curve
+        segment.add_channel(
+            channel=channel,
+            curve=PointsCurve(points=points) if points is not None else None,
+            static_dmx=result.static_dmx,
+            value_points=points,
+            offset_centered=False,
+            clamp_min=result.clamp_min_dmx,
+            clamp_max=result.clamp_max_dmx,
+        )
 
     return StepCompileResult(
         step_id=step.step_id,

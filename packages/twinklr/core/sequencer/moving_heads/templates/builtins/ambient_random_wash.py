@@ -8,6 +8,7 @@ from twinklr.core.sequencer.models.enum import (
 )
 from twinklr.core.sequencer.models.template import (
     BaseTiming,
+    Color,
     Dimmer,
     Geometry,
     Movement,
@@ -20,6 +21,7 @@ from twinklr.core.sequencer.models.template import (
     TemplateMetadata,
     TemplateStep,
 )
+from twinklr.core.sequencer.moving_heads.libraries.color import ColorPreset
 from twinklr.core.sequencer.moving_heads.libraries.dimmer import DimmerType
 from twinklr.core.sequencer.moving_heads.libraries.geometry import GeometryType
 from twinklr.core.sequencer.moving_heads.libraries.movement import MovementType
@@ -68,6 +70,7 @@ def make_template() -> TemplateDoc:
                         max_norm=0.90,
                         cycles=1.0,
                     ),
+                    color=Color(preset=ColorPreset.BLUE),
                 )
             ],
             metadata=TemplateMetadata(

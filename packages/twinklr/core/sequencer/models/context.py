@@ -3,12 +3,57 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field
 
 from twinklr.core.curves.registry import CurveRegistry
+from twinklr.core.sequencer.models.enum import Intensity
 from twinklr.core.sequencer.moving_heads.handlers.registry import (
+    ColorRegistry,
     DimmerRegistry,
     GeometryRegistry,
+    GoboRegistry,
     MovementRegistry,
+    ShutterRegistry,
 )
+from twinklr.core.sequencer.moving_heads.libraries.color import ColorPreset
 from twinklr.core.sequencer.timing.beat_grid import BeatGrid
+
+
+def _default_color_registry() -> ColorRegistry:
+    from twinklr.core.sequencer.moving_heads.handlers.defaults import create_default_color_registry
+
+    return create_default_color_registry()
+
+
+def _default_shutter_registry() -> ShutterRegistry:
+    from twinklr.core.sequencer.moving_heads.handlers.defaults import (
+        create_default_shutter_registry,
+    )
+
+    return create_default_shutter_registry()
+
+
+def _default_gobo_registry() -> GoboRegistry:
+    from twinklr.core.sequencer.moving_heads.handlers.defaults import create_default_gobo_registry
+
+    return create_default_gobo_registry()
+
+
+class TimedChannelIntent(BaseModel):
+    """Renderer-neutral discrete wheel change placed on the authoritative grid."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    at_ms: int = Field(ge=0)
+    pattern_id: str = Field(min_length=1)
+
+
+class SectionRenderIntent(BaseModel):
+    """Plan intent already translated into renderer-owned vocabulary."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    intensity: Intensity | None = None
+    color: ColorPreset | None = None
+    shutter_events: list[TimedChannelIntent] = Field(default_factory=list)
+    gobo_events: list[TimedChannelIntent] = Field(default_factory=list)
 
 
 class FixtureContext(BaseModel):
@@ -68,6 +113,9 @@ class StepCompileContext(BaseModel):
     geometry_registry: GeometryRegistry
     movement_registry: MovementRegistry
     dimmer_registry: DimmerRegistry
+    color_registry: ColorRegistry = Field(default_factory=_default_color_registry)
+    shutter_registry: ShutterRegistry = Field(default_factory=_default_shutter_registry)
+    gobo_registry: GoboRegistry = Field(default_factory=_default_gobo_registry)
 
 
 class TemplateCompileContext(BaseModel):
@@ -93,6 +141,10 @@ class TemplateCompileContext(BaseModel):
     geometry_registry: GeometryRegistry
     movement_registry: MovementRegistry
     dimmer_registry: DimmerRegistry
+    color_registry: ColorRegistry = Field(default_factory=_default_color_registry)
+    shutter_registry: ShutterRegistry = Field(default_factory=_default_shutter_registry)
+    gobo_registry: GoboRegistry = Field(default_factory=_default_gobo_registry)
+    intent: SectionRenderIntent = Field(default_factory=SectionRenderIntent)
 
     @property
     def bpm(self) -> float:

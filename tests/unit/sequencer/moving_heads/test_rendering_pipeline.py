@@ -13,18 +13,29 @@ import pytest
 
 from twinklr.core.agents.sequencer.moving_heads.models import (
     ChoreographyPlan,
+    ColorIntent,
+    ColorIntentKind,
+    GoboEvent,
     PlanSection,
     PlanSegment,
+    ShutterEvent,
 )
 from twinklr.core.config.fixtures import FixtureGroup
 from twinklr.core.config.fixtures.dmx import DmxMapping
 from twinklr.core.config.fixtures.instances import FixtureConfig, FixtureInstance
 from twinklr.core.config.models import JobConfig
 from twinklr.core.formats.xlights.sequence.models.xsq import TimingTrack
+from twinklr.core.sequencer.models.enum import ChannelName, Intensity
+from twinklr.core.sequencer.models.template import Color
+from twinklr.core.sequencer.moving_heads.compile.intent_resolution import apply_template_intent
+from twinklr.core.sequencer.moving_heads.export.dmx_settings_builder import DmxSettingsBuilder
+from twinklr.core.sequencer.moving_heads.libraries.color import ColorPreset
 from twinklr.core.sequencer.moving_heads.pipeline import (
     RenderingPipeline,
 )
+from twinklr.core.sequencer.moving_heads.templates import get_template
 from twinklr.core.sequencer.timing.beat_grid import BeatGrid
+from twinklr.core.sequencer.vocabulary.visual import PaletteRole
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -33,6 +44,19 @@ from twinklr.core.sequencer.timing.beat_grid import BeatGrid
 
 def _make_dmx_mapping() -> DmxMapping:
     return DmxMapping(pan_channel=11, tilt_channel=13, dimmer_channel=15)
+
+
+def _make_parameterized_mapping() -> DmxMapping:
+    return DmxMapping(
+        pan_channel=1,
+        tilt_channel=2,
+        dimmer_channel=3,
+        color_channel=4,
+        shutter_channel=6,
+        gobo_channel=7,
+        color_map={"open": 0, "magenta": 126},
+        gobo_map={"open": 0, "stars": 60},
+    )
 
 
 def _make_fixture_group(count: int = 4) -> FixtureGroup:
@@ -44,6 +68,170 @@ def _make_fixture_group(count: int = 4) -> FixtureGroup:
         inst = FixtureInstance(fixture_id=fid, config=cfg, xlights_model_name=f"Dmx {fid}")
         group.add_fixture(inst)
     return group
+
+
+def _make_parameterized_fixture_group(count: int = 4) -> FixtureGroup:
+    group = FixtureGroup(group_id="parameterized_group")
+    for i in range(count):
+        fixture_id = f"MH{i + 1}"
+        config = FixtureConfig(fixture_id=fixture_id, dmx_mapping=_make_parameterized_mapping())
+        group.add_fixture(
+            FixtureInstance(
+                fixture_id=fixture_id,
+                config=config,
+                xlights_model_name=f"Dmx {fixture_id}",
+            )
+        )
+    return group
+
+
+def test_schema_v2_intents_reach_emitted_fixture_segments() -> None:
+    plan = ChoreographyPlan(
+        sections=[
+            PlanSection(
+                section_name="chorus",
+                start_bar=1,
+                end_bar=4,
+                template_id="sweep_lr_fan_hold",
+                intensity=Intensity.INTENSE,
+                color_intent=ColorIntent(
+                    kind=ColorIntentKind.PALETTE_ROLE,
+                    palette_role=PaletteRole.ACCENT,
+                    explicit_color=None,
+                ),
+                shutter_events=[
+                    ShutterEvent(bar=1, beat=2, pattern="strobe_fast", moment_cue_id=None)
+                ],
+                gobo_events=[GoboEvent(bar=1, beat=3, pattern="stars", moment_cue_id=None)],
+            )
+        ]
+    )
+    pipeline = RenderingPipeline(
+        choreography_plan=plan,
+        beat_grid=_make_beat_grid(),
+        fixture_group=_make_parameterized_fixture_group(),
+        job_config=JobConfig(),
+    )
+
+    segments = pipeline.render()
+
+    assert any(segment.channels[ChannelName.COLOR].static_dmx == 126 for segment in segments)
+    assert any(
+        (value := segment.channels.get(ChannelName.SHUTTER)) is not None and value.static_dmx == 190
+        for segment in segments
+    )
+    assert any(
+        (value := segment.channels.get(ChannelName.GOBO)) is not None and value.static_dmx == 60
+        for segment in segments
+    )
+    assert any(segment.t0_ms == 500 for segment in segments)
+    assert any(segment.t0_ms == 1000 for segment in segments)
+
+    settings = []
+    for segment in segments:
+        fixture = pipeline.fixture_group.get_fixture(segment.fixture_id)
+        assert fixture is not None
+        settings.append(DmxSettingsBuilder(fixture).build_settings_string(segment))
+    assert any("E_SLIDER_DMX4=126" in value for value in settings)
+    assert any("E_SLIDER_DMX6=190" in value for value in settings)
+    assert any("E_SLIDER_DMX7=60" in value for value in settings)
+
+
+def test_legacy_default_intent_does_not_add_parameterized_channels() -> None:
+    pipeline = RenderingPipeline(
+        choreography_plan=_make_plan([("intro", 1, 4, "sweep_lr_fan_hold")]),
+        beat_grid=_make_beat_grid(),
+        fixture_group=_make_parameterized_fixture_group(),
+        job_config=JobConfig(),
+    )
+
+    segments = pipeline.render()
+
+    assert all(ChannelName.COLOR not in segment.channels for segment in segments)
+    assert all(ChannelName.SHUTTER not in segment.channels for segment in segments)
+    assert all(ChannelName.GOBO not in segment.channels for segment in segments)
+
+
+def test_omitted_legacy_intent_differs_from_explicit_smooth_primary() -> None:
+    legacy_section = PlanSection(
+        section_name="legacy",
+        start_bar=1,
+        end_bar=4,
+        template_id="sweep_lr_fan_hold",
+    )
+    explicit_section = PlanSection(
+        section_name="explicit",
+        start_bar=1,
+        end_bar=4,
+        template_id="sweep_lr_fan_hold",
+        intensity=Intensity.SMOOTH,
+        color_intent=ColorIntent(
+            kind=ColorIntentKind.PALETTE_ROLE,
+            palette_role=PaletteRole.PRIMARY,
+            explicit_color=None,
+        ),
+        shutter_events=[],
+        gobo_events=[],
+        moment_cues=[],
+    )
+    pipeline = RenderingPipeline(
+        choreography_plan=ChoreographyPlan(sections=[legacy_section]),
+        beat_grid=_make_beat_grid(),
+        fixture_group=_make_parameterized_fixture_group(),
+        job_config=JobConfig(),
+    )
+    original = get_template("sweep_lr_fan_hold").template
+    nonmatching_steps = [
+        step.model_copy(
+            update={
+                "movement": step.movement.model_copy(
+                    update={"intensity": Intensity.INTENSE}, deep=True
+                ),
+                "dimmer": step.dimmer.model_copy(
+                    update={"intensity": Intensity.INTENSE}, deep=True
+                ),
+                "color": Color(preset=ColorPreset.BLUE),
+            },
+            deep=True,
+        )
+        for step in original.steps
+    ]
+    nonmatching = original.model_copy(update={"steps": nonmatching_steps}, deep=True)
+
+    legacy = apply_template_intent(nonmatching, pipeline._resolve_section_intent(legacy_section))
+    explicit = apply_template_intent(
+        nonmatching, pipeline._resolve_section_intent(explicit_section)
+    )
+
+    assert all(step.movement.intensity is Intensity.INTENSE for step in legacy.steps)
+    assert all(step.color == Color(preset=ColorPreset.BLUE) for step in legacy.steps)
+    assert all(step.movement.intensity is Intensity.SMOOTH for step in explicit.steps)
+    assert all(step.dimmer.intensity is Intensity.SMOOTH for step in explicit.steps)
+    assert all(step.color == Color(preset=ColorPreset.RED) for step in explicit.steps)
+
+    schema = PlanSection.model_json_schema()
+    assert "_legacy_intent_omitted" not in schema["properties"]
+    assert {
+        "intensity",
+        "color_intent",
+        "shutter_events",
+        "gobo_events",
+        "moment_cues",
+    } <= set(schema["required"])
+
+
+def test_one_head_rig_collapses_spatial_groups_to_its_only_fixture() -> None:
+    pipeline = RenderingPipeline(
+        choreography_plan=_make_plan([("intro", 1, 4, "sweep_lr_fan_hold")]),
+        beat_grid=_make_beat_grid(),
+        fixture_group=_make_fixture_group(1),
+        job_config=JobConfig(),
+    )
+
+    segments = pipeline.render()
+
+    assert segments
+    assert {segment.fixture_id for segment in segments} == {"MH1"}
 
 
 def _make_beat_grid(bars: int = 8, bpm: float = 120.0) -> BeatGrid:

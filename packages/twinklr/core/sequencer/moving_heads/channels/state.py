@@ -1,3 +1,11 @@
+"""Moving-head channel IR and a legacy in-memory projection helper.
+
+``FixtureSegment``/``ChannelValue`` are the live channel-generic IR. ``ChannelState``
+is retained as a small projection utility, but it is not a second authority for the
+emitted DMX window or defaults: the live exporter uses
+``config.adapter.get_max_channel`` plus fixture-declared defaults (P1P-T6/P2P-T2).
+"""
+
 from __future__ import annotations
 
 from enum import Enum

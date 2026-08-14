@@ -2,10 +2,13 @@ from typing import Literal, overload
 
 from twinklr.core.sequencer.models.template import (
     BaseTiming,
+    Color,
     Dimmer,
     Geometry,
+    Gobo,
     Movement,
     PhaseOffset,
+    Shutter,
     StepPatch,
     StepTiming,
     Template,
@@ -33,6 +36,9 @@ def apply_step_patch(step: TemplateStep, patch: StepPatch) -> TemplateStep:
     movement_dict = step.movement.model_dump()
     dimmer_dict = step.dimmer.model_dump()
     timing_dict = step.timing.model_dump()
+    color_dict = step.color.model_dump() if step.color is not None else None
+    shutter_dict = step.shutter.model_dump() if step.shutter is not None else None
+    gobo_dict = step.gobo.model_dump() if step.gobo is not None else None
 
     # Apply patches if present
     if patch.geometry is not None:
@@ -47,6 +53,13 @@ def apply_step_patch(step: TemplateStep, patch: StepPatch) -> TemplateStep:
     if patch.timing is not None:
         timing_dict = deep_merge(timing_dict, patch.timing)
 
+    if patch.color is not None:
+        color_dict = deep_merge(color_dict or {}, patch.color)
+    if patch.shutter is not None:
+        shutter_dict = deep_merge(shutter_dict or {}, patch.shutter)
+    if patch.gobo is not None:
+        gobo_dict = deep_merge(gobo_dict or {}, patch.gobo)
+
     # Reconstruct timing (nested structure)
     base_timing = BaseTiming(**timing_dict["base_timing"])
 
@@ -57,13 +70,17 @@ def apply_step_patch(step: TemplateStep, patch: StepPatch) -> TemplateStep:
         new_timing = StepTiming(base_timing=base_timing)
 
     # Create new step with patched components
-    return TemplateStep(
-        step_id=step.step_id,
-        target=step.target,
-        timing=new_timing,
-        geometry=Geometry(**geometry_dict),
-        movement=Movement(**movement_dict),
-        dimmer=Dimmer(**dimmer_dict),
+    return step.model_copy(
+        update={
+            "timing": new_timing,
+            "geometry": Geometry(**geometry_dict),
+            "movement": Movement(**movement_dict),
+            "dimmer": Dimmer(**dimmer_dict),
+            "color": Color(**color_dict) if color_dict is not None else None,
+            "shutter": Shutter(**shutter_dict) if shutter_dict is not None else None,
+            "gobo": Gobo(**gobo_dict) if gobo_dict is not None else None,
+        },
+        deep=True,
     )
 
 
@@ -126,16 +143,7 @@ def apply_preset(
             new_steps.append(patched_step)
         else:
             # No patch for this step - create new instance to maintain immutability
-            new_steps.append(
-                TemplateStep(
-                    step_id=step.step_id,
-                    target=step.target,
-                    timing=step.timing,
-                    geometry=step.geometry,
-                    movement=step.movement,
-                    dimmer=step.dimmer,
-                )
-            )
+            new_steps.append(step.model_copy(deep=True))
 
     # Track provenance
     provenance.append(f"preset:{preset.preset_id}")

@@ -19,7 +19,11 @@ from twinklr.core.formats.xlights.sequence.models.xsq import (
     TimeMarker,
     TimingTrack,
 )
-from twinklr.core.sequencer.models.context import TemplateCompileContext
+from twinklr.core.sequencer.models.context import (
+    SectionRenderIntent,
+    TemplateCompileContext,
+    TimedChannelIntent,
+)
 from twinklr.core.sequencer.models.enum import Intensity
 from twinklr.core.sequencer.models.moving_heads.rig import rig_profile_from_fixture_group
 from twinklr.core.sequencer.models.transition import TransitionRegistry
@@ -36,11 +40,13 @@ from twinklr.core.sequencer.moving_heads.compile.transition_segment_compiler imp
 from twinklr.core.sequencer.moving_heads.delivery import DeliveryArtifacts, export_delivery
 from twinklr.core.sequencer.moving_heads.fixture_builder import build_fixture_contexts
 from twinklr.core.sequencer.moving_heads.handlers.defaults import create_default_registries
+from twinklr.core.sequencer.moving_heads.libraries.color import ColorPreset
 from twinklr.core.sequencer.moving_heads.templates import (
     get_template,
     load_builtin_templates,
 )
 from twinklr.core.sequencer.timing.beat_grid import BeatGrid
+from twinklr.core.sequencer.vocabulary.visual import PaletteRole
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +59,19 @@ ENERGY_TO_INTENSITY: dict[str, Intensity] = {
     "INTENSE": Intensity.FAST,
 }
 """Maps energy-level keywords (from preset IDs) to movement Intensity enums."""
+
+PALETTE_ROLE_TO_COLOR: dict[PaletteRole, ColorPreset | None] = {
+    PaletteRole.PRIMARY: ColorPreset.RED,
+    PaletteRole.ACCENT: ColorPreset.MAGENTA,
+    PaletteRole.WARM: ColorPreset.AMBER,
+    PaletteRole.COOL: ColorPreset.CYAN,
+    PaletteRole.NEUTRAL: ColorPreset.WHITE,
+}
+"""Deterministic wheel presets for renderer vocabulary roles.
+
+Legacy omission is tracked separately on ``PlanSection``. Consequently every explicit
+palette role, including PRIMARY, remains an actionable renderer request.
+"""
 
 
 def _compute_section_duration_ms(start_bar: int, end_bar: int, beat_grid: BeatGrid) -> int:
@@ -130,6 +149,9 @@ class RenderingPipeline:
         self.geometry_registry = registries["geometry"]
         self.movement_registry = registries["movement"]
         self.dimmer_registry = registries["dimmer"]
+        self.color_registry = registries["color"]
+        self.shutter_registry = registries["shutter"]
+        self.gobo_registry = registries["gobo"]
 
         # Create transition components
         self.transition_detector = TransitionDetector()
@@ -249,6 +271,10 @@ class RenderingPipeline:
                 geometry_registry=self.geometry_registry,
                 movement_registry=self.movement_registry,
                 dimmer_registry=self.dimmer_registry,
+                color_registry=self.color_registry,
+                shutter_registry=self.shutter_registry,
+                gobo_registry=self.gobo_registry,
+                intent=self._resolve_section_intent(section),
             )
 
             time_markers.append(
@@ -297,6 +323,56 @@ class RenderingPipeline:
             self._export_delivery(all_segments, time_markers)
 
         return all_segments
+
+    def _resolve_section_intent(self, section: PlanSection) -> SectionRenderIntent:
+        """Translate the approved planner schema into renderer-owned categories."""
+        if section.legacy_intent_omitted:
+            return SectionRenderIntent()
+
+        selection = section.color_intent.selection
+        color: ColorPreset | None
+        if selection.explicit_color is not None:
+            color = selection.explicit_color
+        elif selection.palette_role is not None:
+            color = PALETTE_ROLE_TO_COLOR[selection.palette_role]
+        else:  # pragma: no cover - rejected by ColorIntent's discriminated union
+            color = None
+
+        shutter_events = [
+            TimedChannelIntent(
+                at_ms=self._event_time_ms(event.bar, event.beat),
+                pattern_id=event.pattern.value,
+            )
+            for event in section.shutter_events
+        ]
+        gobo_events = [
+            TimedChannelIntent(
+                at_ms=self._event_time_ms(event.bar, event.beat),
+                pattern_id=event.pattern.value,
+            )
+            for event in section.gobo_events
+        ]
+
+        return SectionRenderIntent(
+            intensity=section.intensity,
+            color=color,
+            shutter_events=shutter_events,
+            gobo_events=gobo_events,
+        )
+
+    def _event_time_ms(self, bar: int, beat: int) -> int:
+        """Place a 1-based bar/beat event on the existing BeatGrid."""
+        if beat > self.beat_grid.beats_per_bar:
+            raise ValueError(
+                f"Beat {beat} is outside a {self.beat_grid.beats_per_bar}/4 bar at bar {bar}"
+            )
+        beat_index = (bar - 1) * self.beat_grid.beats_per_bar + (beat - 1)
+        try:
+            return int(self.beat_grid.get_beat_time_ms(beat_index))
+        except IndexError as error:
+            raise ValueError(
+                f"Event at bar {bar}, beat {beat} is outside the detected beat grid"
+            ) from error
 
     def iterate_plan_sections(self, plan: ChoreographyPlan) -> Iterator[PlanSection]:
         """Iterate over the plan sections and yield each section.

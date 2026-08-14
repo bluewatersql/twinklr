@@ -6,6 +6,7 @@ and dimmer handlers. Each handler type has a specific contract:
 - GeometryHandler: Resolves static base poses (no animation)
 - MovementHandler: Generates offset-centered motion curves
 - DimmerHandler: Generates absolute brightness curves
+- Color/Shutter/Gobo handlers: Resolve fixture-aware discrete channels
 
 All handlers are pure functions that produce deterministic outputs.
 """
@@ -98,6 +99,19 @@ class DimmerResult(BaseModel):
     period: float
     clamp_min_dmx: int = Field(default=0, ge=0, le=255)
     clamp_max_dmx: int = Field(default=255, ge=0, le=255)
+
+
+class WheelResult(BaseModel):
+    """Resolved output for a fixture wheel/shutter channel."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    static_dmx: int | None = Field(default=None, ge=0, le=255)
+    curve: list[CurvePoint] | None = None
+    clamp_min_dmx: int = Field(default=0, ge=0, le=255)
+    clamp_max_dmx: int = Field(default=255, ge=0, le=255)
+    emit: bool = True
+    trace: str
 
 
 # =============================================================================
@@ -208,3 +222,27 @@ class DimmerHandler(Protocol):
             DimmerResult with absolute dimmer curve.
         """
         ...
+
+
+class ColorHandler(Protocol):
+    """Protocol for fixture-aware colour-wheel resolution."""
+
+    handler_id: str
+
+    def generate(self, params: dict[str, Any], n_samples: int) -> WheelResult: ...
+
+
+class ShutterHandler(Protocol):
+    """Protocol for fixture-aware shutter resolution."""
+
+    handler_id: str
+
+    def generate(self, params: dict[str, Any], n_samples: int) -> WheelResult: ...
+
+
+class GoboHandler(Protocol):
+    """Protocol for fixture-aware gobo-wheel resolution."""
+
+    handler_id: str
+
+    def generate(self, params: dict[str, Any], n_samples: int) -> WheelResult: ...

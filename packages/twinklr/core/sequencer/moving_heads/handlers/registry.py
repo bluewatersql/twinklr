@@ -3,7 +3,7 @@
 This module provides registry classes for managing handlers.
 Registries support registration, lookup, and listing of handlers.
 
-Each handler type (geometry, movement, dimmer) has its own registry
+Each handler type (geometry, movement, dimmer, color, shutter, gobo) has its own registry
 with type-specific error messages.
 """
 
@@ -11,9 +11,12 @@ from typing import Any, Protocol, TypeVar
 
 from twinklr.core.sequencer.models.enum import Intensity
 from twinklr.core.sequencer.moving_heads.handlers.protocols import (
+    ColorHandler,
     DimmerResult,
     GeometryResult,
+    GoboHandler,
     MovementResult,
+    ShutterHandler,
 )
 from twinklr.core.sequencer.moving_heads.libraries.dimmer import DimmerLibrary, DimmerType
 from twinklr.core.sequencer.moving_heads.libraries.movement import MovementLibrary, MovementType
@@ -256,6 +259,27 @@ class DimmerRegistry(HandlerRegistry["DimmerHandlerProtocol"]):
             self._handler_type,
             available=self.list_handlers(),
         )
+
+
+class ColorRegistry(HandlerRegistry[ColorHandler]):
+    """Registry for colour-wheel handlers."""
+
+    def __init__(self) -> None:
+        super().__init__(handler_type="color")
+
+
+class ShutterRegistry(HandlerRegistry[ShutterHandler]):
+    """Registry for shutter handlers."""
+
+    def __init__(self) -> None:
+        super().__init__(handler_type="shutter")
+
+
+class GoboRegistry(HandlerRegistry[GoboHandler]):
+    """Registry for gobo-wheel handlers."""
+
+    def __init__(self) -> None:
+        super().__init__(handler_type="gobo")
 
 
 class GeometryHandlerProtocol(Protocol):

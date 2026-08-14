@@ -18,6 +18,10 @@ from twinklr.core.sequencer.models.template import (
     TemplateStep,
 )
 from twinklr.core.sequencer.moving_heads.channels.state import ChannelValue, FixtureSegment
+from twinklr.core.sequencer.moving_heads.compile.intent_resolution import (
+    apply_template_intent,
+    apply_timed_intents,
+)
 from twinklr.core.sequencer.moving_heads.compile.phase_offset import (
     PhaseOffsetResult,
     calculate_fixture_offsets,
@@ -108,6 +112,12 @@ def compile_template(
         renderer_log.debug(f"Applying preset: {preset.preset_id}")
         working_template = apply_preset(template, preset)
         provenance.append(f"preset:{preset.preset_id}")
+
+    working_template = apply_template_intent(working_template, context.intent)
+    if context.intent.intensity is not None:
+        provenance.append(f"intensity:{context.intent.intensity.value}")
+    if context.intent.color is not None:
+        provenance.append(f"color:{context.intent.color.value}")
 
     # Build step duration and offset maps
     step_durations: dict[str, float] = {}
@@ -200,6 +210,9 @@ def compile_template(
                 geometry_registry=context.geometry_registry,
                 movement_registry=context.movement_registry,
                 dimmer_registry=context.dimmer_registry,
+                color_registry=context.color_registry,
+                shutter_registry=context.shutter_registry,
+                gobo_registry=context.gobo_registry,
             )
 
             # Compile the step
@@ -221,6 +234,7 @@ def compile_template(
         context.end_ms,
         fade_out=(schedule_result.remainder_policy == RemainderPolicy.FADE_OUT),
     )
+    all_segments = apply_timed_intents(all_segments, context)
 
     return TemplateCompileResult(
         template_id=working_template.template_id,

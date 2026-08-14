@@ -8,6 +8,7 @@ Use these functions to get ready-to-use registries in your application.
 
 from typing import TypedDict
 
+from twinklr.core.sequencer.moving_heads.handlers.colors.default import DefaultColorHandler
 from twinklr.core.sequencer.moving_heads.handlers.dimmers.default import (
     DefaultDimmerHandler,
 )
@@ -51,14 +52,19 @@ from twinklr.core.sequencer.moving_heads.handlers.geometry.wall_wash import (
 )
 from twinklr.core.sequencer.moving_heads.handlers.geometry.wave_lr import WaveLRHandler
 from twinklr.core.sequencer.moving_heads.handlers.geometry.x_cross import XCrossHandler
+from twinklr.core.sequencer.moving_heads.handlers.gobos.default import DefaultGoboHandler
 from twinklr.core.sequencer.moving_heads.handlers.movement.default import (
     DefaultMovementHandler,
 )
 from twinklr.core.sequencer.moving_heads.handlers.registry import (
+    ColorRegistry,
     DimmerRegistry,
     GeometryRegistry,
+    GoboRegistry,
     MovementRegistry,
+    ShutterRegistry,
 )
+from twinklr.core.sequencer.moving_heads.handlers.shutters.default import DefaultShutterHandler
 
 
 def create_default_geometry_registry() -> GeometryRegistry:
@@ -132,12 +138,36 @@ def create_default_dimmer_registry() -> DimmerRegistry:
     return registry
 
 
+def create_default_color_registry() -> ColorRegistry:
+    """Create a colour-wheel registry with the fixture-aware default handler."""
+    registry = ColorRegistry()
+    registry.register_default(DefaultColorHandler())
+    return registry
+
+
+def create_default_shutter_registry() -> ShutterRegistry:
+    """Create a shutter registry with the fixture-aware default handler."""
+    registry = ShutterRegistry()
+    registry.register_default(DefaultShutterHandler())
+    return registry
+
+
+def create_default_gobo_registry() -> GoboRegistry:
+    """Create a gobo-wheel registry with the fixture-aware default handler."""
+    registry = GoboRegistry()
+    registry.register_default(DefaultGoboHandler())
+    return registry
+
+
 class DefaultRegistries(TypedDict):
     """Type definition for default registries bundle."""
 
     geometry: GeometryRegistry
     movement: MovementRegistry
     dimmer: DimmerRegistry
+    color: ColorRegistry
+    shutter: ShutterRegistry
+    gobo: GoboRegistry
 
 
 def create_default_registries() -> DefaultRegistries:
@@ -153,4 +183,7 @@ def create_default_registries() -> DefaultRegistries:
         "geometry": create_default_geometry_registry(),
         "movement": create_default_movement_registry(),
         "dimmer": create_default_dimmer_registry(),
+        "color": create_default_color_registry(),
+        "shutter": create_default_shutter_registry(),
+        "gobo": create_default_gobo_registry(),
     }

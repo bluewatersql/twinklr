@@ -265,17 +265,19 @@ def rig_profile_from_fixture_group(
             )
         )
         mid = len(fixture_ids) // 2
+        left_ids = fixture_ids[:mid] or fixture_ids
+        right_ids = fixture_ids[mid:] or fixture_ids
         groups.append(
             SemanticGroup(
                 group_id=SemanticGroupType.LEFT,
-                fixture_ids=fixture_ids[:mid],
+                fixture_ids=left_ids,
                 order=order_mode,
             )
         )
         groups.append(
             SemanticGroup(
                 group_id=SemanticGroupType.RIGHT,
-                fixture_ids=fixture_ids[mid:],
+                fixture_ids=right_ids,
                 order=order_mode,
             )
         )
@@ -299,14 +301,14 @@ def rig_profile_from_fixture_group(
         groups.append(
             SemanticGroup(
                 group_id=SemanticGroupType.ODD,
-                fixture_ids=fixture_ids[::2],
+                fixture_ids=fixture_ids[::2] or fixture_ids,
                 order=order_mode,
             )
         )
         groups.append(
             SemanticGroup(
                 group_id=SemanticGroupType.EVEN,
-                fixture_ids=fixture_ids[1::2],
+                fixture_ids=fixture_ids[1::2] or fixture_ids,
                 order=order_mode,
             )
         )

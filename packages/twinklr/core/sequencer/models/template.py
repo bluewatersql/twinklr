@@ -27,9 +27,12 @@ from twinklr.core.sequencer.models.enum import (
     TimingMode,
     TransitionMode,
 )
+from twinklr.core.sequencer.moving_heads.libraries.color import ColorPreset
 from twinklr.core.sequencer.moving_heads.libraries.dimmer import DimmerType
 from twinklr.core.sequencer.moving_heads.libraries.geometry import GeometryType
+from twinklr.core.sequencer.moving_heads.libraries.gobo import GoboPattern
 from twinklr.core.sequencer.moving_heads.libraries.movement import MovementType
+from twinklr.core.sequencer.moving_heads.libraries.shutter import ShutterPattern
 
 
 class RepeatMode(StrEnum):
@@ -264,6 +267,33 @@ class Dimmer(BaseModel):
         return self
 
 
+class Color(BaseModel):
+    """Discrete colour-wheel selection for a template step."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    preset: ColorPreset
+    params: dict[str, Any] = Field(default_factory=dict)
+
+
+class Shutter(BaseModel):
+    """Discrete or patterned shutter selection for a template step."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    pattern: ShutterPattern
+    params: dict[str, Any] = Field(default_factory=dict)
+
+
+class Gobo(BaseModel):
+    """Discrete gobo-wheel selection for a template step."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    pattern: GoboPattern
+    params: dict[str, Any] = Field(default_factory=dict)
+
+
 class StepTiming(BaseModel):
     """Timing specification for a template step.
 
@@ -331,6 +361,9 @@ class TemplateStep(BaseModel):
     geometry: Geometry
     movement: Movement
     dimmer: Dimmer
+    color: Color | None = None
+    shutter: Shutter | None = None
+    gobo: Gobo | None = None
     entry_transition: Transition | None = None
     exit_transition: Transition | None = None
     priority: int = 0
@@ -378,6 +411,9 @@ class StepPatch(BaseModel):
     geometry: dict[str, Any] | None = None
     movement: dict[str, Any] | None = None
     dimmer: dict[str, Any] | None = None
+    color: dict[str, Any] | None = None
+    shutter: dict[str, Any] | None = None
+    gobo: dict[str, Any] | None = None
     timing: dict[str, Any] | None = None
 
 
