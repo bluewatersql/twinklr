@@ -8,8 +8,15 @@ _Last updated: 2026-08-14._
   [reactivation proposal](twinklr-reactivation-review/reviews/reactivation-proposal.md)
   as a multi-agent build campaign living in
   [`twinklr-reactivation-review/build/`](twinklr-reactivation-review/build/plan/00-overview.md)
-  (plan + 56 per-task specs). **Status: Phases 0, 1K, and 1P COMPLETE (24 tasks
-  merged, independently verified); paused at the phase boundary before 2P ∥ 2K.**
+  (plan + 56 per-task specs). **Status: Phases 0 and 1K are complete. All Phase 1P
+  implementation tasks, all 13 Phase 2P offline implementations, and all four Phase 2K
+  tooling implementations are merged and independently verified at `6b2b34a`, but
+  Phases 1P, 2P, and 2K still have owner-gated exit evidence.** Phase 1P needs its
+  recorded human judgment and empirical xLights acceptance; Phase 2P needs its required
+  owner decisions/live calibration and three-arm evidence; Phase 2K needs real-layout,
+  real-corpus, human-curation, and preferred-style evidence. Phases 3 and 4 have not
+  started; Phase 3 waits for prior exits unless the owner explicitly reassesses
+  sequencing. The overall change therefore remains active.
   Live execution state, process rules, and pending owner actions:
   **[build/plan/HANDOFF.md](twinklr-reactivation-review/build/plan/HANDOFF.md)**.
   Review artifacts:

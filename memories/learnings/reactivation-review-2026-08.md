@@ -1,18 +1,29 @@
 ---
 type: learning
-status: active
+status: historical
 created: 2026-08-13
-updated: 2026-08-13
+updated: 2026-08-14
 confidence: confirmed
 tags: [review, architecture, baseline]
 ---
 
 # Reactivation Review 2026-08 — Durable Conclusions
 
+> **Historical review baseline.** The numbered conclusions below describe the
+> adversarially verified `aa8d325` baseline and explain why the review verdict was
+> **REQUIRES_STABILIZATION**. They are preserved as findings, not silently rewritten as
+> current behavior. The active build campaign has since completed Phases 0 and 1K,
+> merged and independently verified all Phase 1P and Phase 2P offline implementations
+> plus all Phase 2K tooling, and reached a green integrated gate at `6b2b34a`. Phase 1P,
+> 2P, and 2K exit evidence remains owner-gated. Current truth lives in
+> [context/current-state.md](../../context/current-state.md); unfinished owner gates and
+> Phases 3–4 live in the campaign
+> [handoff](../../changes/twinklr-reactivation-review/build/plan/HANDOFF.md).
+
 _Provenance: `changes/twinklr-reactivation-review/` (baseline `aa8d325`; every major
 conclusion adversarially verified by a non-author; full audit trail in
-`reviews/verification.md`). This memory is the pointer + the handful of truths that
-must outlive the change. Readiness: **REQUIRES_STABILIZATION**._
+`reviews/verification.md`). This memory is the pointer + the handful of baseline truths
+that must outlive the change. Review-time readiness: **REQUIRES_STABILIZATION**._
 
 1. **Only the moving-heads path ships.** Display pipeline (~8.3k LOC), corpus/FE
    stack (~24k with profiling), and the evaluation harness are complete but

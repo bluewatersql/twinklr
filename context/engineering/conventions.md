@@ -1,7 +1,7 @@
 ---
 type: context
 area: engineering
-updated: 2026-08-13
+updated: 2026-08-14
 ---
 
 # Engineering Conventions
@@ -28,7 +28,8 @@ make env-check    # verify uv / Python / .env setup
 ## Quality gates
 
 All commits must pass: ruff (0 issues), mypy (0 errors on new code), pytest (0 new
-failures, coverage ≥ 65%). Pre-existing failures on `main` are documented in
+failures, coverage ≥ 65%). The previously documented `aa8d325` failure set is a
+historical baseline, not a current waiver; see
 [memories/learnings/known-test-failures.md](../../memories/learnings/known-test-failures.md).
 
 ## Style

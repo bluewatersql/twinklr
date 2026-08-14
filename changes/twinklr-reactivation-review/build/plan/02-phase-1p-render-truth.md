@@ -58,10 +58,12 @@ Merge order at phase end: G → R → A → I → D (D rebases on R for exporter
   format-check of the set; worktree verification requires an own-synced venv via
   `python -m pytest`.
 
-## COMPLETION RECORD (2026-08-14)
+## Implementation milestone record (2026-08-14)
 
-**Phase 1P COMPLETE — all twelve tasks merged, each independently verified (opus
-verifiers on all CRITICAL/⚖ tasks; five REJECT→remedy cycles caught real gaps).**
+**All twelve Phase 1P task implementations are merged and independently verified
+(opus verifiers on all CRITICAL/⚖ tasks; five REJECT→remedy cycles caught real gaps).
+Phase exit is not complete:** the required recorded human judgment and empirical
+xLights acceptance evidence remain pending owner actions.
 Commits: T1/T2 (harness + rigs) · 582ff54 (T3 intensity/movement, CRITICAL) ·
 bd07df5 (T4 one time grid, CRITICAL) · d193be0 (T5 scheduler/preset/calibration +
 routed backlog; found FADE_OUT inversion + hash-seed-dependent DMX in flight) ·
@@ -70,18 +72,19 @@ lyrics · 34697eb (T8 audio DSP; validator wired; first ground-truth assertions)
 T9 cache identity · 881348c (T10 first recorded evaluation) · 5c74992 (T11 ⚖
 delivery v1, OWNER APPROVED) · 3099090 (T12 xLights acceptance suite, skip-gated).
 
-**Exit criteria:** golden render suite green in CI-shape (78 goldens, all pinning
-correct behavior — zero known-wrong pins remain); first committed evaluation +
-judgment file (human judgment PENDING-OWNER); CLI takes the user's fixture config;
+**Exit-criteria state:** golden render suite green in CI-shape (78 goldens, all
+pinning correct behavior — zero known-wrong pins remain); first evaluation artifacts
+committed but human judgment PENDING-OWNER; CLI takes the user's fixture config;
 .xtiming + fresh-.xsq + .xmap delivery shipped; template-merge retired. The "imports
-into xLights 2026.15" leg is owner-confirmed empirically (bare .xsq, no
-rgbeffects.xml needed) and pinned by the T12 suite, which SKIPS until run on a
-machine with xLights (runbook in tests/golden/README.md).
+into xLights 2026.15" leg is **not yet evidenced on this machine**: the T12 suite
+SKIPS until run by the owner with xLights in both documented show-directory modes
+(runbook in `tests/golden/README.md`).
 
 Final gates: suite 4823 passed / 25 skipped / 0 failed · ruff format --check +
 check --no-cache clean · mypy clean (679 files).
 
-Standing items: owner writes judgment.md; owner runs the empirical xLights pass
+Standing exit items: owner writes judgment.md; owner runs the empirical xLights pass
 (both TWINKLR_XLIGHTS_SHOWDIR_MODE arms); single-head rig ValidationError routed to
-P2P-T2; MIR measured baselines routed to P2P-T8. Next: Phase 2P ∥ 2K per
-00-overview.md; live state in HANDOFF.md.
+P2P-T2; MIR measured baselines routed to P2P-T8. Later phases must not infer that
+Phase 1P exited merely from implementation merge; sequencing changes require explicit
+owner reassessment. Live state is in [HANDOFF.md](HANDOFF.md).

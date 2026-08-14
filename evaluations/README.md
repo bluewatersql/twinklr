@@ -13,6 +13,11 @@ Each subdirectory is one run, named `YYYY-MM-DD-<short-slug>/`, and contains:
   watched the render yet. Never fabricate this: an agent producing a run must not also
   supply the opinion in it.
 
+Phase 2P also implements typed N-run/three-arm comparison records and an
+evidence-preserving writer path. No real three-arm result belongs here yet: P2P-T6
+calibration, the owner-local run, blind human ranking, and independent result review are
+still pending. Offline fixtures and harness tests are not evaluation results.
+
 ## Why this directory exists
 
 Before P1P-T10, nothing in the project had ever recorded whether a generated show was any
@@ -25,9 +30,9 @@ moved on — check its recorded commit SHA before relying on it.
 
 ## What does *not* belong here
 
-- The `ComparisonReport`/N-run comparison harness (unbuilt — see P6-F4). When it exists,
-  its multi-run output may warrant its own convention; this directory is single-run
-  results only.
+- Uncalibrated fixture output, synthetic comparison data, or an incomplete
+  `ComparisonReport`. A multi-run result may be committed only after the owning protocol
+  validates its source artifacts, costs, calibration, blind ranking, and human evidence.
 - Durable decisions, learnings, or constraints about the evaluation *harness itself* — those
   belong in `memories/` per `AGENTS.md`'s knowledge-placement table, with a link back to
   the run that surfaced them.

@@ -1,13 +1,20 @@
 ---
 type: learning
-status: active
+status: historical
 created: 2026-02-01
-updated: 2026-08-13
+updated: 2026-08-14
 confidence: confirmed
 tags: [testing, baseline]
 ---
 
-# Verified Quality-Gate Baseline on `main` (2026-08-13, commit aa8d325)
+# Historical Quality-Gate Baseline (2026-08-13, commit `aa8d325`)
+
+> **Historical baseline, not current test status.** The build campaign repaired this
+> classified failure set. At integrated snapshot `6b2b34a`, fresh `make validate`
+> passed with **5,239 tests passed, 39 skipped**, clean Ruff formatting/lint, and mypy
+> success across **718 source files**. Keep the record below because it explains the
+> review's starting point; do not use it to waive a new failure or claim that current
+> `main` is red.
 
 **The Feb 2026 auto-memory claim of "four pre-existing test failures" is REFUTED in
 both directions** by a fresh run (uv-managed Python 3.12.13, clean checkout,
@@ -30,5 +37,7 @@ Failure classification (all 120 accounted for):
 - **8** — NLTK resource not downloaded (`averaged_perceptron_tagger_eng`) —
   environmental, but "unit tests need a live download" is itself a defect.
 
-Do not treat any of these 120 as regressions caused by new work, and do not claim
-the suite is green. Remediation: reactivation-review roadmap items RM-0.1..0.4.
+At that baseline, none of these 120 could be treated as a regression caused by the
+review itself, and the suite could not be called green. The completed foundation work
+subsequently addressed roadmap items RM-0.1..0.4; current gate evidence is owned by
+[context/current-state.md](../../context/current-state.md).

@@ -6,6 +6,14 @@ scored by the vision-eval harness — then the deterministic-vs-LLM comparison r
 a validation gate inside the committed direction. Proposal M2; D1/D4/D6/D8/D10/D11 +
 parts of D2._
 
+> **Status — 2026-08-14:** all 13 deterministic/offline implementations are merged
+> and independently verified at integrated snapshot `6b2b34a`. This is an **offline
+> implementation milestone, not Phase 2P completion**. Live xLights/provider checks,
+> owner reviews for T1/T6/T8/T9, owner-accepted vision calibration, the real three-arm
+> run and blind human review, and the resulting T13/D1 decision evidence remain pending. The current snapshot and
+> continuation order are owned by [HANDOFF.md](HANDOFF.md); dated appendices in task
+> specs remain evidence snapshots from their authoring/review moment.
+
 **Exit criteria:** plan schema v2 rendered end-to-end (intensity/color/shutter/gobo
 intents + lyric MomentCues); MIR A/B decided on golden fixtures; stems stage cached
 and feeding features; vision-eval harness scores any sequence for ~$0.15; the
@@ -47,3 +55,27 @@ structured outputs done before the Dec 2026 retirements.
   section-boundary tolerance on the fixture set) — no post-hoc judgment.
 - T13's spec includes the experiment protocol (N songs, arms, seeds, cost cap, what
   "parity" means) — copy the standing-default language from D1 verbatim.
+
+## Offline implementation record — 2026-08-14
+
+T1–T13 code, offline fixtures, and deterministic evidence seams are merged and
+independently verified. The integrated full gate at `6b2b34a` passed with **5,239
+tests passed, 39 skipped**, clean Ruff formatting/lint, and mypy success across **718
+source files**.
+
+This record does not satisfy the phase exit criteria. In particular:
+
+- P2P-T6 still needs the live one-song proof and an owner-accepted, hash-pinned N≥5
+  calibration artifact, plus owner review of the rubric and cost budget.
+- P2P-T1's field/vocabulary/deletion contract, P2P-T8's DSP-retention recommendation,
+  and P2P-T9's iteration/threshold semantics still require their specified owner reviews.
+- P2P-T13 still needs the owner-local N≥8 / exactly-5N experiment, blinded human
+  ranking, and independent evidence review. No D1 verdict or result artifact exists.
+- The bounded local-only T5, T7, T10/T11, and T12 empirical checks remain pending as
+  enumerated in [HANDOFF.md](HANDOFF.md) and their owning specs.
+
+P2P-T8's fixed offline gate recommends retaining the current custom DSP default because
+neither optional model arm supplied complete admissible evidence. The runtime default
+remains DSP, but the adoption decision is pending explicit owner review. The active
+pending-owner record is
+[keep-dsp-after-mir-ab.md](../../../../memories/decisions/keep-dsp-after-mir-ab.md).

@@ -1,122 +1,145 @@
 # Build-campaign handoff — current execution state
 
-_Last updated: 2026-08-14 ~04:00 AST, at the Phase 1P boundary (paused here). Maintained
-by the orchestrating agent; update this file at every pause or phase boundary._
+_Last updated: 2026-08-14 after the Phase 2P offline-build and Phase 2K tooling-build
+milestone. Maintained by the orchestrating agent; update this file at every pause or
+phase boundary._
 
 ## What this campaign is
 
-Multi-agent execution of the accepted reactivation proposal
-(`changes/twinklr-reactivation-review/reviews/reactivation-proposal.md`, v3 — decisions
-D1–D13). Plan: `changes/twinklr-reactivation-review/build/plan/00-overview.md` (dependency graph, agent model, 56 tasks
-across 7 phase files). Specs: `changes/twinklr-reactivation-review/build/specs/<phase>/<task>.md` — several specs carry
-appended **routed notes / backlog additions / completion handoffs**; specs are living
-documents and always read FULLY, including appendices.
+Multi-agent execution of the accepted
+[reactivation proposal](../../reviews/reactivation-proposal.md) (v3, decisions D1–D13).
+The dependency graph and agent model live in [00-overview.md](00-overview.md); task
+contracts live under `../specs/`. Appended implementation handoffs in task specs are
+dated evidence snapshots. They may still say “pending independent verification” from
+their authoring moment; this handoff owns the current campaign status.
 
-## Execution status by phase
+## Current snapshot
 
-| Phase | Status | Evidence |
+| Phase | Current status | Evidence / remaining boundary |
 |---|---|---|
-| 0 — Foundation honesty | **COMPLETE** (7/7) | COMPLETION RECORD in `01-phase-0-foundation.md`; commits f0ae952…eeeb4c6 |
-| 1K — Knowledge edges | **COMPLETE** (5/5) | COMPLETION RECORD in `03-phase-1k-knowledge-edges.md`; commits 3fb3ee8…64c048a |
-| 1P — Render truth | **COMPLETE** (12/12) | COMPLETION RECORD in `02-phase-1p-render-truth.md`; ledger below |
-| 2P / 2K / 3 / 4 | Not started | specs exist for all tasks |
+| 0 — Foundation honesty | **COMPLETE** (7/7) | Completion record in [01-phase-0-foundation.md](01-phase-0-foundation.md) |
+| 1K — Knowledge edges | **COMPLETE** (5/5) | Completion record in [03-phase-1k-knowledge-edges.md](03-phase-1k-knowledge-edges.md) |
+| 1P — Render truth | **IMPLEMENTATION MERGED AND VERIFIED** (12/12); **phase exit not complete** | The recorded human judgment and empirical xLights acceptance evidence remain pending; see [02-phase-1p-render-truth.md](02-phase-1p-render-truth.md). |
+| 2P — Creative quality | **OFFLINE IMPLEMENTATION MERGED AND VERIFIED** (13/13); **phase exit not complete** | Live checks plus the T1/T6/T8/T9/T13 owner decisions remain pending; see [04-phase-2p-creative-quality.md](04-phase-2p-creative-quality.md). |
+| 2K — Catalog growth | **TOOLING IMPLEMENTATION MERGED AND VERIFIED** (4/4); **phase exit not complete** | Tooling is ready, but coverage/corpus/curation/style exit criteria require the author's real layout, corpus, preferences, and judgments; see [05-phase-2k-catalog-growth.md](05-phase-2k-catalog-growth.md). |
+| 3 — Show convergence | **NOT STARTED** | Do not start until prior phase exits are satisfied or the owner explicitly reassesses sequencing. |
+| 4 — Compounding | **NOT STARTED** | No Phase 4 implementation has started. |
 
-### Phase 1P task ledger (merge commits)
+The overall `twinklr-reactivation-review` change remains **ACTIVE**. Finishing an
+offline implementation lane is not the same as satisfying its phase exit criteria.
 
-- T1 golden harness / T2 rig configs / T3 intensity+movement (CRITICAL, 582ff54) /
-  T4 one time grid (CRITICAL, bd07df5) / T7 metadata+lyrics / T9 cache identity —
-  merged earlier this session.
-- **T5** scheduler+preset+calibration truth — **d193be0** (118 files; flipped reserved
-  pins blackout/floor/8-head/transition-blend; 2 extra defects found in flight:
-  FADE_OUT inversion, hash-seed-dependent transition DMX).
-- **T6** channel-default policy — **83a0d89** (declared defaults emitted; floor-16 rule
-  gone; ChannelDefaults DELETED with pinned rationale; **golden README known-wrong
-  section now EMPTY** — all 78 goldens pin correct behavior).
-- **T8** audio DSP correctness — **34697eb** (8 fixes; validator WIRED; first
-  ground-truth audio assertions; AUDIO_FEATURES_CACHE_VERSION bumped — one-time
-  cache recompute; measured MIR baselines routed to P2P-T8 spec).
-- **T10** evaluation writer + bridge — **881348c** (checkpoint writer at MH stage seam;
-  `twinklr eval-report` bridged; first committed evaluation in
-  `evaluations/2026-08-13-golden-fixture-mh4-minimal/`).
-- **T11 ⚖** delivery v1 — **5c74992** (OWNER APPROVED 2026-08-14): fresh .xsq +
-  per-track .xtiming + .xmap; `--xsq` template-merge RETIRED (rejected loudly);
-  CLI takes fixture config (hardcoded 4-head rig gone). Owner also answered the open
-  contract question: **bare .xsq imports; rgbeffects.xml NOT required** (recorded in
-  T12 spec, 6fd4bd2).
-- **T12** xLights acceptance (LOCAL-ONLY) — **3099090**. Suite built and verified
-  (two-pass: REJECT on 3 discrimination gaps → all fixed, re-verified by execution);
-  xLights NOT installed on this machine → all 7 tests SKIP with the relaunch runbook.
-  Q1 arms env-gated via `TWINKLR_XLIGHTS_SHOWDIR_MODE=with_rgbeffects|bare`; autouse
-  `new_sequence()` keeps imports out of the operator's real show; nothing auto-saves.
+### Repository and quality-gate evidence
 
-### Current tree / gates (at phase close)
+- Canonical current repository and quality-gate evidence is maintained in
+  [context/current-state.md](../../../../context/current-state.md); do not fork its
+  rolling snapshot into this execution handoff.
+- No implementation or test failure is being carried as an accepted baseline.
+- Nothing was pushed as part of this milestone.
 
-- HEAD: clean at the Phase 1P completion-record commit (after 3099090). ~38 commits
-  on main this session; **nothing pushed to any remote** (owner has not requested
-  push).
-- Full suite: **4823 passed / 25 skipped / 0 failed** (7 of the skips are the new
-  xLights acceptance tests). Goldens 72 passed / 7 skipped. ruff format --check +
-  ruff check `--no-cache` clean; mypy clean (679 files).
+### Phase 2P offline implementation record
 
-## Owner actions pending (do not let these die)
+All 13 task implementations are merged and independently verified: schema-v2 intent
+and renderer wiring, data-first templates, lyric MomentCues, xLights preview client,
+vision/sync evaluation, opt-in stems, fixed-gate MIR A/B, iterative-judge repair, model
+retargeting, strict structured outputs, live-injection workflow, and the deterministic
+selector/three-arm experiment harness. P2P-T8's precommitted offline gate recommends
+retaining the current DSP default because neither optional model candidate produced
+complete admissible local evidence. The runtime default remains `dsp`, but the adoption
+decision still requires owner review; see the active pending-owner
+[MIR decision record](../../../../memories/decisions/keep-dsp-after-mir-ab.md).
 
-1. **`evaluations/2026-08-13-golden-fixture-mh4-minimal/judgment.md` is
-   PENDING-OWNER** — the spec's "recorded human judgment" is deliberately not
-   fabricated; owner writes it.
-2. **Empirical xLights pass** — xLights 2026.15 is not installed on this machine.
-   When the owner runs it (see runbook in `tests/golden/README.md`, both
-   `TWINKLR_XLIGHTS_SHOWDIR_MODE` arms), the suite's Q1–Q4 get real answers; update
-   the README run record.
-3. Push to remote — only on owner request.
+P2P-T13 produced an evidence-preserving experiment implementation, **not an experiment
+result**. There is no D1 verdict, proposal update, D1 decision record, or three-arm
+evaluation artifact. The exact owner protocol and caps remain in
+[P2P-T13-three-arm-comparison.md](../specs/phase-2p-creative-quality/P2P-T13-three-arm-comparison.md).
 
-## Orchestration model (how to continue this work)
+### Phase 2K tooling implementation record
 
-One orchestrator (team lead) + per-task **executor/verifier pairs** (named
-`exec-<task>` / `verify-<task>`; models per the phase plan tables — verifiers for
-CRITICAL/⚖ tasks are opus). Verify → REJECT/remedy cycles until APPROVE → orchestrator
-commits → shut the pair down (owner directive: clean up resources as tasks complete).
-⚖ tasks (owner-facing contract changes) get verified, then the commit is HELD for the
-owner's direct review.
+The four tooling changes are merged and independently verified:
 
-### Binding process rules (learned the hard way; do not relearn)
+- P2K-T1 coverage report tooling — `25ea555`
+- P2K-T2 corpus mining/distribution and threshold-review tooling — `1bd56c3`
+- P2K-T3 targeted generation and human-admission tooling — `df2b295`
+- P2K-T4 style-group fingerprints, propensity refresh, and selection plumbing — `64bc4d1`
 
-- **Workers never run git state commands** — no `git add`/`rm`/commit/stash. The
-  orchestrator commits via **pathspec form** (`git add -A -- <paths> && git commit --
-  <paths>`) after checking lane separation (pre-staged deletions were twice swept
-  into the wrong commit before this rule).
-- **Worktree verification requires an own synced venv** (`uv sync` in the worktree,
-  then `python -m pytest`) — the shared venv resolves twinklr packages from the main
-  checkout's editable install and silently falsifies pre-fix probes.
-- **ruff counts only trusted with `--no-cache`** (stale .ruff_cache deflated counts
-  3–10×).
-- **Acceptance metrics must DISCRIMINATE**: before trusting any metric, prove it
-  FAILS on pre-fix code (disposable worktree at the baseline SHA). Executors state
-  the discriminating test per fix; verifiers spot-check several themselves.
-- **Golden discipline**: `--regen-goldens` is the only write path; every changed hunk
-  must be attributed to a named fix; unattributable hunks stop the task. Reserved
-  known-wrong pins are flipped only by their owning task. `tests/golden/README.md`
-  is the pin registry and MUST be updated when pins change (T5 was rejected for
-  missing this).
-- **Routed notes**: discoveries outside a task's mechanism are appended to the OWNING
-  task's spec (see appends in P1P-T5/T6/T11, P2P-T2, P2P-T8 specs for the shape) —
-  never silently dropped. Completion handoffs may be appended to the task's own spec
-  (P1P-T8 precedent).
-- **Spec citations drift** — the tree moves fast; executors re-verify line citations
-  against the current HEAD before editing.
-- Format-check the exact file set before committing (one unformatted file nearly
-  reached CI twice).
-- Transient API stalls mid-stream happen; the resume protocol is: verify actual tree
-  state (`git status`), continue from the verified point, work in smaller turns.
+These commits make the owner sessions executable and auditable. They do not assert that
+the author's catalog has reached coverage, that real corpus thresholds were decided,
+that any generated recipe was admitted, or that preferred-style artifacts exist.
 
-## What's next (after T12 closes Phase 1P)
+## Owner/local gates still pending
 
-Per `00-overview.md`: **Phase 2P (creative quality) ∥ Phase 2K (catalog growth)** —
-disjoint file scopes, same pairing model. Notable pre-routed context waiting in those
-specs: P2P-T2 carries three routed notes (SLOW-period constant-render;
-single-head-rig raw ValidationError — discharges the remainder of T5's note; plus its
-own scope); P2P-T8 carries the measured MIR baselines (tempo-grid quantization,
-+1-frame beat bias — baseline-specific, re-measure after any detector swap; t=0 click
-undetected); P2K-T2 carries a PromotionPipeline threshold discrepancy; P4-T4 carries
-the _merge_headers case-append bug. Phase-boundary bookkeeping when 1P completes:
-COMPLETION RECORD in the phase plan, this file updated, `changes/ACTIVE.md` reviewed,
-durable-lesson promotion per AGENTS.md if any lesson transcends the build campaign.
+The owning task specs contain the exact commands and safety constraints; do not copy or
+improvise their runbooks here.
+
+### Earlier empirical checks
+
+1. Add the human judgment to
+   `evaluations/2026-08-13-golden-fixture-mh4-minimal/judgment.md`.
+2. Run the Phase 1P xLights acceptance suite in both documented show-directory modes
+   against an expendable show and record the result.
+
+### Phase 2P
+
+Decision-bearing reviews are requirements, not implied approvals from merge:
+
+1. [P2P-T1](../specs/phase-2p-creative-quality/P2P-T1-plan-schema-v2.md): review the
+   final `PlanSection` v2 field list, intensity/color vocabulary, and dead-field
+   deletion list.
+2. [P2P-T6](../specs/phase-2p-creative-quality/P2P-T6-vision-judge-and-sync-metrics.md):
+   review the four-category rubric and criteria, calibration outcome, and
+   per-song cost budget. First run the capped one-song live provider/xLights proof and
+   complete an owner-accepted, hash-pinned blinded calibration with at least five
+   independent shows.
+3. [P2P-T8](../specs/phase-2p-creative-quality/P2P-T8-mir-ab-and-adoption.md): review
+   the fixed-gate A/B evidence and the recommendation to retain DSP; owner approval of
+   that adoption decision is not yet recorded.
+4. [P2P-T9](../specs/phase-2p-creative-quality/P2P-T9-judge-feedback-repair.md): review
+   the retained iterative-judging policy and configurable `success_threshold` semantics.
+5. [P2P-T13](../specs/phase-2p-creative-quality/P2P-T13-three-arm-comparison.md): only
+   after accepted T6 calibration, freeze a manifest of at least eight
+   songs, run exactly 5N sequences within the frozen cost caps, complete the blinded
+   human ranking, independently verify the evidence, and then have the owner review the
+   verdict and human spot-checks before any D1 result is recorded.
+
+The remaining empirical checks are also pending:
+
+6. P2P-T5: exercise preview rendering against the owner's windowed xLights instance.
+7. P2P-T7: run real Demucs separation on supported Apple Silicon hardware and observe
+   MPS/CPU-fallback behavior.
+8. P2P-T10/P2P-T11: run the bounded live model-retarget and structured-output probes;
+   record evidence before promoting any provider conclusion.
+9. P2P-T12: run live injection only against an expendable scratch sequence and discard
+   it afterward.
+
+### Phase 2K
+
+1. Run the coverage report against the author's real layout and curate until the
+   element-type × role × energy gap count is zero.
+2. Run idempotent mining over the author's real corpus and record the owner-authored
+   threshold keep/change/defer log.
+3. Run live targeted recipe generation and explicit human admission/rejection sessions;
+   do not promote candidates without the session evidence.
+4. Supply the author's style-group declaration, generate per-style fingerprints, rebuild
+   propensity from stable corpus identities, and verify planner consumption on real data.
+
+## Continuation order
+
+1. Complete the Phase 1P human-judgment and empirical xLights exit evidence.
+2. Complete the P2P-T1/T6/T8/T9 owner reviews, including the T6 calibration gate.
+3. Run the P2P-T13 owner protocol and record a D1 outcome only if its evidence validates.
+4. Complete the Phase 2K owner-data sessions and coverage exit criteria.
+5. Reassess Phase 1P, 2P, and 2K exit criteria explicitly; do not mark a phase complete
+   merely because its code/tooling is merged.
+6. Start Phase 3 only after prior phase exits are satisfied, unless the owner explicitly
+   reassesses and authorizes different sequencing. Phase 4 remains downstream of Phase 3.
+
+## Binding orchestration rules
+
+- Use executor/verifier separation; an author never approves their own work.
+- Workers do not run git state or mutation commands. The orchestrator owns integration.
+- Verify from a worktree-local synced environment; shared editable installs can point at
+  the wrong checkout.
+- Use Ruff with `--no-cache` when a count matters.
+- Acceptance metrics must discriminate on a pre-fix or adversarial case.
+- Golden changes use only the explicit regeneration path and require hunk attribution.
+- Owner judgment, paid/live calls, calibration, and local data are never fabricated.

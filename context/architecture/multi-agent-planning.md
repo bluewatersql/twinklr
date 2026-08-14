@@ -6,23 +6,28 @@ updated: 2026-08-14
 
 # Multi-Agent Planning
 
-_Corrected 2026-08-13 from source evidence (reactivation review): the separate "LLM
-validator" role documented earlier was removed from code
-(`agents/state_machine.py:18` records the removal); the live loop is below._
+_Updated 2026-08-14 from the integrated Phase 2P implementation. The separate "LLM
+validator" role documented before the reactivation review remains removed; deterministic
+heuristics plus the LLM judge form the live validation loop._
 
 The choreography planner is an iterative refinement loop over structured Pydantic models:
 
-1. **Planner** generates a plan (template + preset per song section).
+1. **Planner** generates a typed schema-v2 plan. A section selects a template/preset and
+   can carry categorical intensity, color, shutter, gobo, segmentation, and lyric
+   MomentCue intent.
 2. **Heuristic validation** checks structural validity (fast, free); on the display
    path five deterministic auto-repair passes fix common LLM mistakes before scoring.
 3. **Judge** scores 0–10 and decides: approve (≥ 7.0, enforced by a model validator
    that reconciles status to score), soft-fail (revise), or hard-fail (redo).
    Structured feedback loops back to the planner. Up to 3 iterations by default.
 
-> **Reality note (verified 2026-08-13):** on the shipped moving-heads path the
-> renderer consumes only `template_id` + `preset_id` from all of this — see the
-> reality-check in
-> [memories/decisions/llm-plans-intent-renderer-implements-precision.md](../../memories/decisions/llm-plans-intent-renderer-implements-precision.md).
+The moving-head renderer now resolves schema-v2 intensity, color, shutter, gobo, and
+MomentCue intent deterministically. The earlier `template_id` + `preset_id`-only
+bottleneck is preserved as a dated baseline and resolution record in
+[llm-plans-intent-renderer-implements-precision.md](../../memories/decisions/llm-plans-intent-renderer-implements-precision.md).
+The implemented three-arm harness will test the standing default against a deterministic
+selector and a macro-ablated LLM arm, but the owner experiment and D1 verdict are still
+pending; implementation fixtures are not decision evidence.
 
 ## Design principles
 
@@ -31,7 +36,8 @@ The choreography planner is an iterative refinement loop over structured Pydanti
 - **Categorical over numeric** — intensity is WHISPER/SOFT/MED/STRONG/PEAK; duration is
   HIT/BURST/PHRASE/EXTENDED/SECTION. The renderer resolves categories to DMX values.
 - **Templates as complete units** — geometry + movement + dimmer as tested, self-contained
-  choreography units. The LLM selects templates; it never invents them.
+  choreography units. The LLM selects templates and expresses typed categorical intent;
+  it never invents fixture math or direct DMX values.
 - **Data-first template loading** — moving-head `TemplateDoc` JSON and Python factories
   share one validating registry. Python builtins load first; configured data loads second,
   and normalized ID/name/alias collisions fail unless an explicit override targets the

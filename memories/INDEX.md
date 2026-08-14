@@ -7,11 +7,11 @@ memory — those are machine-local supplemental caches (see the memory protocol 
 ## Categories
 
 - **[decisions/](decisions/)** — durable architectural/engineering decisions and their rationale
-  - [llm-plans-intent-renderer-implements-precision.md](decisions/llm-plans-intent-renderer-implements-precision.md)
-  - [keep-dsp-after-mir-ab.md](decisions/keep-dsp-after-mir-ab.md) — P2P-T8's fixed-gate result: DSP remains the rhythm/structure default; model arms did not produce complete local evidence
+  - [llm-plans-intent-renderer-implements-precision.md](decisions/llm-plans-intent-renderer-implements-precision.md) — accepted boundary; includes the dated narrow-channel baseline and the 2026-08-14 schema-v2 implementation resolution (D1 comparison still pending)
+  - [keep-dsp-after-mir-ab.md](decisions/keep-dsp-after-mir-ab.md) — active pending-owner P2P-T8 recommendation: retain the current DSP rhythm/structure default because model arms did not produce complete local evidence
 - **[learnings/](learnings/)** — non-obvious discoveries from previous work
-  - [reactivation-review-2026-08.md](learnings/reactivation-review-2026-08.md) — durable conclusions of the 2026-08 reactivation review (readiness, verified defect classes, external facts, strengths)
-  - [known-test-failures.md](learnings/known-test-failures.md) — VERIFIED gate baseline on `main` at `aa8d325` (2026-08-13): 120 failures classified; the old four-failure claim refuted
+  - [reactivation-review-2026-08.md](learnings/reactivation-review-2026-08.md) — historical `aa8d325` review conclusions (readiness, verified defect classes, external facts, strengths), with a pointer to current campaign truth
+  - [known-test-failures.md](learnings/known-test-failures.md) — historical gate baseline at `aa8d325` (2026-08-13): 120 failures classified; superseded by the green integrated campaign gate
   - [simplification-pass-2026-02.md](learnings/simplification-pass-2026-02.md) — stale auto-memory case study: a claimed simplification pass that never landed on `main`
 - **[constraints/](constraints/)** — limitations that repeatedly shape design
   - [python-3.12-only.md](constraints/python-3.12-only.md)

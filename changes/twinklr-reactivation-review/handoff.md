@@ -2,13 +2,14 @@
 type: handoff
 status: completed
 change: twinklr-reactivation-review
-updated: 2026-08-13
+updated: 2026-08-14
 ---
 
 > **UPDATE (2026-08-14): remediation is now UNDERWAY.** The owner authorized executing
 > the reactivation proposal; the implementation lives in this change's
-> [`build/`](build/plan/00-overview.md) subtree (plan + specs). Phases 0, 1K, and 1P
-> are complete; the live implementation handoff is
+> [`build/`](build/plan/00-overview.md) subtree (plan + specs). Phases 0 and 1K are
+> complete; all Phase 1P implementation tasks are merged and verified, but its human-
+> judgment and empirical xLights exit evidence remain pending. The live implementation handoff is
 > **[build/plan/HANDOFF.md](build/plan/HANDOFF.md)** — that file, not this one, is the
 > pickup point for continuing the build campaign. This document remains the REVIEW
 > handoff (historical).
