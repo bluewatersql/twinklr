@@ -18,6 +18,7 @@ byte of `.xsq`, and the only end-to-end render test patched `compile_template` w
 | `test_8head_rig_renders.py` (T2 → flipped in T5) | P4-F26 repaired: the 8-head rig renders every plan section on all eight heads, roles are spatial, and a group the rig cannot fill raises `UnsupportedRigShapeError`. Was `test_8head_role_mismatch.py` |
 | `test_calibrated_movement_range.py` (P1P-T5) | P4-F9: every emitted pan/tilt value stays inside the rig's calibrated window, and a narrow window really does narrow the output |
 | `test_delivery_artifacts.py` (P1P-T11) | What a real render hands the user: the fresh `.xsq` re-parses through `XSQParser` and names only Twinklr's models, the `.xtiming` markers equal the `.xsq` timing tracks, and the `.xmap` names what was emitted |
+| `test_xlights_acceptance.py` (P1P-T12, **LOCAL-ONLY**, `requires_xlights`) | Whether a real xLights 2026.15 accepts what Twinklr emits — import with/without `xlights_rgbeffects.xml`, version-stamp acceptance, `.xtiming` standalone import, shutter-open output on the >16-channel rig, and the `split_lr_sweep_counter` overlap-clamp probe. See "xLights acceptance (P1P-T12)" below |
 
 Rigs live in `harness.py` (`RIGS`); goldens live in `<rig_id>/<section_id>.settings.txt`.
 
@@ -127,3 +128,77 @@ loop, re-run the suite under a few values of `PYTHONHASHSEED`.
 
 `n_samples` is not settable through `RenderingPipeline`, so
 `test_golden_harness_pins_n_samples` asserts the default the goldens were generated at.
+
+## xLights acceptance (P1P-T12)
+
+`test_xlights_acceptance.py` is a **LOCAL-ONLY** regression suite (`requires_xlights`
+marker, `tests/golden/conftest.py`) that drives a real, running xLights 2026.15 over
+its unauthenticated HTTP automation API
+(`tests/golden/xlights_client.py`, default `http://127.0.0.1:49913`) to pin the
+answers to the four questions
+`build/specs/phase-1p-render-truth/P1P-T12-xlights-acceptance-test.md` posed. It
+never runs in CI: `pytest_collection_modifyitems` probes the API once at collection
+time and skips every `requires_xlights` test with an explicit reason when nothing
+answers — exactly what happened on every run to date.
+
+### Run record
+
+| Date | Twinklr SHA | xLights build | API reachable | Rigs | Result |
+|---|---|---|---|---|---|
+| 2026-08-14 | `2e77f9d7c093ba364257de79cc8ca89277b59bc5` | N/A — xLights not installed on the executing machine | **No** (`127.0.0.1:49913` and `:49914` both refused connections) | `mh4_minimal`, `mh4_shutter_out_of_window` | All 7 tests **SKIPPED** (collection-time, `requires_xlights`). No empirical evidence gathered this run. |
+
+**Q1–Q4 status: UNANSWERED as of the above run.** The owner's 2026-08-14 empirical
+note in the spec (bare `.xsq` imports without `xlights_rgbeffects.xml`) stands as the
+project's authoritative answer to Q1; this suite exists to keep re-confirming it
+against future xLights versions, and has not yet had the chance to run against a real
+instance. Nothing in this run's evidence contradicts or confirms it beyond what the
+spec already records.
+
+**Ground-truth fixture: not yet committed.** The spec's protocol calls for saving the
+imported sequence from xLights and committing the diff against the generated file as
+the repository's first ground-truth fixture. That step requires a live xLights
+session to produce and could not be performed this run — filed as the immediate
+follow-up (see below), not fabricated.
+
+**Effect-parameter UI inspection (P5 §V4 risk 5 — silently-ignored `E_*` keys):**
+not scriptable through the documented automation surface (M6b lists no
+"get effect parameters" command); this remains a manual step for whoever runs this
+suite against a live xLights, alongside the automated assertions.
+
+### To actually run this suite
+
+1. Launch xLights 2026.15, open (or create) a show directory, and enable the HTTP
+   automation API in Tools → Preferences (local interface only). The suite itself
+   calls `newSequence` before every test (an `autouse` fixture in the test module),
+   so each import lands in a fresh, throwaway sequence rather than whatever you had
+   open — you do not need to create one yourself, but you do need xLights running
+   against *a* show directory first.
+2. **Nothing saves automatically.** `importXLightsSequence` targets that throwaway
+   sequence; close xLights (or the sequence) **without saving** after each run
+   unless you are deliberately doing step 4 below. The client deliberately has no
+   `save` wrapper — see `xlights_client.py`'s docstring for why.
+3. For the two Q1 arms specifically, run the suite **twice**, setting
+   `TWINKLR_XLIGHTS_SHOWDIR_MODE` to say which show directory is open — the API has
+   no documented "open show directory" command, so this is an operator precondition
+   the env var makes explicit rather than implicit. The mismatched arm skips with a
+   reason naming the required mode instead of silently passing:
+   ```bash
+   # xLights open against a show directory that HAS xlights_rgbeffects.xml:
+   TWINKLR_XLIGHTS_SHOWDIR_MODE=with_rgbeffects uv run pytest tests/golden/test_xlights_acceptance.py -v
+   # xLights open against a show directory that LACKS it:
+   TWINKLR_XLIGHTS_SHOWDIR_MODE=bare uv run pytest tests/golden/test_xlights_acceptance.py -v
+   ```
+   Everything else in the module runs under either invocation (the env var only
+   gates the two Q1 tests).
+4. In the xLights UI: inspect one imported effect's parameters against the emitted
+   settings string (spec risk 5), save the sequence, and diff the saved file against
+   the generated one (`xmllint --format` both sides). Commit the saved file plus a
+   diff summary as the ground-truth fixture, and update the run record above.
+5. Disable the automation API again — it is unauthenticated (M6b).
+
+### Follow-up filed
+
+Producing the xLights-saved ground-truth fixture (spec's step 9/10, and the
+`test_emitted_xsq_matches_saved_ground_truth_structure` CI assertion it would enable)
+needs a machine with xLights 2026.15 installed and available for interactive use.
+Route to the owner or a follow-up task rather than fabricated here.
