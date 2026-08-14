@@ -82,6 +82,7 @@ from twinklr.core.sequencer.vocabulary import (
     LaneKind,
     PlanningTimeRef,
     StepUnit,
+    TimingHint,
 )
 from twinklr.core.sequencer.vocabulary.choreography import TargetType
 from twinklr.core.sequencer.vocabulary.coordination import SpatialIntent
@@ -704,6 +705,7 @@ class CompositionEngine:
         return PlanningTimeRef(
             bar=bar_0 + 1,  # 1-indexed
             beat=beat_in_bar + 1,  # 1-indexed
+            timing_hint=TimingHint.ON_BEAT,
         )
 
     def _ms_to_duration(self, duration_ms: float) -> EffectDuration:

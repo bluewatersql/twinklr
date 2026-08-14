@@ -44,7 +44,7 @@ def get_planner_spec(
         reasoning_effort=resolved.reasoning_effort,
         max_tokens=resolved.max_tokens,
         timeout_seconds=resolved.timeout_seconds,
-        max_schema_repair_attempts=3,  # More attempts for complex plans
+        max_schema_repair_attempts=1,
         token_budget=token_budget,
     )
 
@@ -85,7 +85,7 @@ def get_judge_spec(
         reasoning_effort=resolved.reasoning_effort,
         max_tokens=resolved.max_tokens,
         timeout_seconds=resolved.timeout_seconds,
-        max_schema_repair_attempts=3,  # Increased for enum validation
+        max_schema_repair_attempts=1,
         token_budget=token_budget,
     )
 

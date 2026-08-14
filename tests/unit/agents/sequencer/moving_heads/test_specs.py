@@ -19,7 +19,7 @@ def test_get_planner_spec_defaults():
     assert spec.response_model == ChoreographyPlan
     assert spec.mode == AgentMode.CONVERSATIONAL  # Planner is conversational
     assert spec.temperature > 0.5  # Creative temperature
-    assert spec.max_schema_repair_attempts >= 2
+    assert spec.max_schema_repair_attempts == 1
 
 
 def test_get_planner_spec_with_overrides():
@@ -40,7 +40,7 @@ def test_get_judge_spec_defaults():
     assert spec.mode == AgentMode.ONESHOT  # Judge is stateless
     # V2: Lower temperature for more consistent evaluation
     assert spec.temperature <= 0.5
-    assert spec.max_schema_repair_attempts >= 2
+    assert spec.max_schema_repair_attempts == 1
 
 
 def test_get_judge_spec_with_overrides():

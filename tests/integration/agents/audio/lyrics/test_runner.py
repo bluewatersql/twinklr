@@ -19,7 +19,7 @@ def test_lyrics_spec_has_correct_defaults():
     assert spec.model == "gpt-5.6-sol"
     assert spec.reasoning_effort == "medium"
     assert spec.temperature == 0.5
-    assert spec.max_schema_repair_attempts == 2
+    assert spec.max_schema_repair_attempts == 1
 
 
 @pytest.mark.skip(reason="Requires real SongBundle fixture with lyrics - to be implemented")

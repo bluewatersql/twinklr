@@ -15,6 +15,7 @@ from __future__ import annotations
 import hashlib
 from pathlib import Path
 
+from twinklr.core.agents.schema_utils import response_schema_hash
 from twinklr.core.agents.spec import AgentSpec
 
 MISSING_PACK_MARKER = "<missing>"
@@ -68,13 +69,26 @@ def prompt_packs_hash(entries: list[tuple[Path | str, str]]) -> str:
 
 
 def spec_prompt_hash(base_path: Path | str, *specs: AgentSpec) -> str:
-    """Hash the prompt packs used by the given agent specs.
+    """Hash prompt packs and machine-derived response contracts for agent specs.
+
+    The historical name is retained for API compatibility.  Strict structured
+    output makes the Pydantic schema part of the provider request, so it must be
+    part of cache identity too: a schema-only edit may change valid output even
+    when every prompt byte is unchanged.
 
     Args:
         base_path: Directory the specs' ``prompt_pack`` values resolve against
         *specs: Agent specs whose prompt packs the stage renders
 
     Returns:
-        Hex digest covering every referenced pack's content
+        Hex digest covering every referenced pack and response schema
     """
-    return prompt_packs_hash([(base_path, spec.prompt_pack) for spec in specs])
+    parts: list[str] = []
+    for spec in specs:
+        prompt_digest = prompt_pack_hash(base_path, spec.prompt_pack)
+        if spec.response_model is dict:
+            schema_digest = "<json-object>"
+        else:
+            schema_digest = response_schema_hash(spec.response_model)
+        parts.append(f"{spec.prompt_pack}:{prompt_digest}:{schema_digest}")
+    return hashlib.sha256("|".join(sorted(parts)).encode("utf-8")).hexdigest()

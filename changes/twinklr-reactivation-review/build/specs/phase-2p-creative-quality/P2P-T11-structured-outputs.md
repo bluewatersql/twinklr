@@ -248,3 +248,98 @@ claiming a retry-surface reduction that the `PlanSection` invariant prevents —
 mitigated by criterion 8 requiring the honest statement. Third risk: the fallback path
 becoming the silent default if strict mode errors intermittently — mitigated by making
 the fallback record itself (CC-3's silent-degradation lesson).
+
+## Implementation handoff — 2026-08-14 (pending independent verification)
+
+### Implemented contract
+
+- `AsyncAgentRunner` passes the exact Pydantic response root through the provider
+  framework. `OpenAIProvider` sends `text.format={type: json_schema, name, schema,
+  strict: true}` where `schema` is machine-derived from `model_json_schema()` and then
+  normalized by one general supported-subset transform: Pydantic discriminated-union
+  `oneOf` becomes equivalent nested `anyOf`, and discriminator metadata is removed.
+  No response model has a hand-patched schema.
+- The normalized schema is rejected locally if it contains `oneOf`, `discriminator`,
+  or an officially unsupported composition keyword, if any object is not closed and
+  all-required, or if it exceeds 5,000 properties, 10 object/array levels, or 1,000
+  enum values. `CorrectionResponse` is exactly depth 10. Its display-domain behavior
+  is unchanged: override names and typed values use equal-length parallel strict arrays
+  which the adapter zips back into the renderer's parameter mapping.
+- The final response metadata records `structured_output_mode`, an optional fallback
+  reason, and the SHA-256 response-schema identity. The same schema identity is part of
+  `spec_prompt_hash`, so a schema-only contract edit invalidates agent-stage caches.
+- The SDK retry layer is explicit and disabled (`max_retries=0`). The provider owns one
+  three-attempt transient loop. Each registered role retains one logical response retry:
+  the normal ceiling is therefore 2 logical calls × 3 HTTP attempts = **6 HTTP
+  requests** per agent invocation, down from the previous worst case of 6 logical calls
+  × 9 composed HTTP attempts = 54. A capability-only strict rejection can add one 400
+  response before each `json_object` fallback, making the compatibility-path ceiling 8.
+  Against P3-F9's approximate 60 base agent invocations, the explicit normal ceiling is
+  120 logical calls / 360 HTTP attempts; the fallback-only ceiling is 480 HTTP attempts
+  and is observable rather than silent.
+- Recoverable JSON decoding, refusal, truncation, content filtering, and empty-response
+  outcomes get the same one-retry treatment. Usage is extracted and recorded before
+  any of those classifications, and the recoverable exception carries that attempt's
+  exact usage into the runner's integrated per-stage total. Schema-invalid output is
+  prevented by the server, except for Pydantic post-model invariants that JSON Schema
+  cannot express.
+- Strict-capability rejection falls back only for an explicit 400 capability phrase,
+  logs a warning, and records `json_object_fallback`. Invalid-schema/request 400s,
+  including messages that also mention `response_format` or `json_schema`, fail loudly
+  without fallback.
+- `AnthropicProvider` is latent-reachable by configuration but has no equivalent strict
+  contract. Registered `AgentSpec` calls now reject it loudly; legacy/direct calls keep
+  their prior behavior.
+
+### Resolution of the P2P-T1 display-root deferral
+
+P2P-T1 deliberately limited its strict-root assertion to five roots and deferred
+`SectionCoordinationPlan` / `CorrectionResult` here. Requiring the runtime display
+models directly would expose framework-populated timing/asset fields and an arbitrary
+`param_overrides` object that strict mode cannot represent. This task therefore adds
+strict `SectionCoordinationResponse` / `CorrectionResponse` DTO roots and explicit
+`AgentSpec.response_adapter` functions. The DTOs:
+
+- exclude `schema_version`, `start_ms`, `end_ms`, narrative `section_ids`, and
+  `resolved_asset_ids`; adapters populate them after server validation;
+- encode parameter overrides as equal-length `param_override_keys` and typed
+  `param_overrides` arrays and adapt them back to the renderer's dictionary;
+- make all LLM-owned keys required, including nullable/list-valued keys.
+
+All nine unique registered response roots (including the asset enricher, though asset
+revival remains Phase 3) pass a local strict-schema walker. This deliberately resolves
+the earlier §4/non-goal tension without redesigning the renderer-facing domain models.
+
+### Honest remaining client-side validation
+
+P2P-T1 retained `PlanSection`'s `template_id` XOR `segments` invariant as a Pydantic
+post-model validator. Strict JSON Schema cannot enforce it, so `ChoreographyPlan` can
+still consume the single logical retry after a server-schema-valid response violates
+that XOR. The migration does not claim that this repair surface disappeared.
+
+### Owner-gated live evidence still pending
+
+No paid API call was made during implementation. The standing
+`json_object`-on-gpt-5.6 question is therefore **still unanswered**, and no memory entry
+was created. The committed LOCAL-ONLY harness skips unless both the API key and explicit
+opt-in are present. Run these separately so the call counts remain visible:
+
+```bash
+TWINKLR_RUN_LIVE_LLM_TESTS=1 uv run pytest \
+  tests/local_only/test_openai_structured_outputs.py \
+  -m local_only -k json_object_probe -q
+
+TWINKLR_RUN_LIVE_LLM_TESTS=1 uv run pytest \
+  tests/local_only/test_openai_structured_outputs.py \
+  -m local_only -k live_strict_mode_per_agent -q
+```
+
+The first command makes exactly one HTTP request. The second makes exactly eight HTTP
+requests (one per currently shipped distinct role/root; the Phase-3 asset role is
+excluded), uses low reasoning and caps each output at 4,000 tokens for the task's
+≤$1.50 suite budget. Provider transport attempts are set to one and strict fallback is
+disabled in this bounded harness, so a rejection fails the role rather than silently
+spending a ninth strict-suite request. The `moving_head_judge` arm explicitly asks the
+model to omit required `score`, then asserts that strict server enforcement retained the
+key and returns a Pydantic-valid result. Record the probe answer here and promote it to
+`memories/` only after the owner runs it.

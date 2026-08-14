@@ -6,7 +6,7 @@ precision issues with beat_frac and offset_ms.
 
 from enum import StrEnum
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class TimingHint(StrEnum):
@@ -38,9 +38,18 @@ class PlanningTimeRef(BaseModel):
     bar: int = Field(..., ge=1, description="Bar number (1-indexed)")
     beat: int = Field(..., ge=1, le=16, description="Beat within bar (1-indexed, typically 1-4)")
     timing_hint: TimingHint = Field(
-        default=TimingHint.ON_BEAT,
         description="Optional timing micro-adjustment",
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def _normalize_legacy_input(cls, value: object) -> object:
+        """Retain the runtime default while keeping the LLM schema all-required."""
+        if not isinstance(value, dict):
+            return value
+        normalized = dict(value)
+        normalized.setdefault("timing_hint", TimingHint.ON_BEAT)
+        return normalized
 
     def __str__(self) -> str:
         """Human-readable representation."""

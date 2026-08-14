@@ -386,6 +386,11 @@ class AnthropicProvider:
         Raises:
             LLMProviderError: On API errors or JSON parse failures.
         """
+        if kwargs.pop("response_model", None) is not None:
+            raise LLMProviderError(
+                "AnthropicProvider does not support Twinklr's strict structured-output "
+                "contract; choose the OpenAI provider for registered AgentSpec roles"
+            )
         try:
             system_text, conversation_messages = self._split_messages(messages)
             kwargs.pop("reasoning_effort", None)

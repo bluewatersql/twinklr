@@ -33,6 +33,9 @@ class ResponseMetadata:
     model: str | None = None
     finish_reason: str | None = None
     conversation_id: str | None = None
+    structured_output_mode: str | None = None
+    structured_output_fallback_reason: str | None = None
+    response_schema_hash: str | None = None
 
 
 @dataclass(frozen=True)
@@ -76,7 +79,10 @@ class LLMProvider(Protocol):
         - Rate limits (429)
         - Server errors (500, 502, 503, 529)
 
-        Higher-level failures (validation errors) are NOT retried.
+        Strict-output response failures (refusal, truncation, content filtering,
+        malformed fallback JSON) are surfaced as recoverable errors for the
+        agent runner's single bounded logical retry. Transport retries remain
+        provider-owned.
 
         Args:
             messages: List of message dicts with 'role' and 'content'
@@ -182,7 +188,8 @@ class LLMProvider(Protocol):
         - Rate limits (429)
         - Server errors (500, 502, 503, 529)
 
-        Higher-level failures (validation errors) are NOT retried.
+        Strict-output response failures are surfaced to the agent runner for
+        its single bounded logical retry; transport retries remain here.
 
         Args:
             messages: List of message dicts with 'role' and 'content'

@@ -192,14 +192,22 @@ class TimingContext(BaseModel):
         """
         if duration == EffectDuration.SECTION:
             # Use section bounds
-            end_ref = PlanningTimeRef(bar=section_end_bar, beat=section_end_beat)
+            end_ref = PlanningTimeRef(
+                bar=section_end_bar,
+                beat=section_end_beat,
+                timing_hint=TimingHint.ON_BEAT,
+            )
             return self.resolve_planning_time_ref(end_ref)
 
         # Get minimum beats for duration
         min_beats, _ = DURATION_BEATS[duration]
         if min_beats is None:
             # Fallback to section end
-            end_ref = PlanningTimeRef(bar=section_end_bar, beat=section_end_beat)
+            end_ref = PlanningTimeRef(
+                bar=section_end_bar,
+                beat=section_end_beat,
+                timing_hint=TimingHint.ON_BEAT,
+            )
             return self.resolve_planning_time_ref(end_ref)
 
         # Calculate end bar/beat
@@ -214,5 +222,9 @@ class TimingContext(BaseModel):
             end_bar = section_end_bar
             end_beat = section_end_beat
 
-        end_ref = PlanningTimeRef(bar=end_bar, beat=end_beat)
+        end_ref = PlanningTimeRef(
+            bar=end_bar,
+            beat=end_beat,
+            timing_hint=TimingHint.ON_BEAT,
+        )
         return self.resolve_planning_time_ref(end_ref)

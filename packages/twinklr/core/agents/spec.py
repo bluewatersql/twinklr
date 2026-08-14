@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from enum import StrEnum
 from typing import Any, Literal
 
@@ -35,6 +36,13 @@ class AgentSpec(BaseModel):
     # Response configuration
     response_model: type[Any] = Field(
         description="Pydantic model for response validation (or dict for unstructured)"
+    )
+
+    response_adapter: Callable[[Any], Any] | None = Field(
+        default=None,
+        description=(
+            "Optional adapter from the strict provider response model to the runtime domain model"
+        ),
     )
 
     # Execution mode
@@ -75,9 +83,12 @@ class AgentSpec(BaseModel):
 
     # Schema repair
     max_schema_repair_attempts: int = Field(
-        default=2,
+        default=1,
         ge=0,
-        description="Max attempts to auto-repair schema validation failures",
+        description=(
+            "One retry for response-level refusal/truncation/content-filter/JSON failures "
+            "and post-schema model validators"
+        ),
     )
 
     # Variables and budgets

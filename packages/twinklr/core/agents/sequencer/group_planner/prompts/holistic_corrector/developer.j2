@@ -4,7 +4,7 @@ Technical constraints for plan correction.
 #}
 ## Response Schema
 
-You must return a `CorrectionResult` that matches this JSON schema:
+You must return a strict correction response that matches this JSON schema:
 
 ```json
 {{ response_schema }}
@@ -22,13 +22,17 @@ unambiguously, use its description conservatively rather than inventing identifi
 
 ## Structural Constraints
 
-1. Every returned SectionCoordinationPlan must have:
-   - `schema_version`: "section-coordination-plan.v1"
+1. Every returned section must have:
    - `section_id`: unchanged from input
    - `theme`: valid ThemeRef with scope SECTION
    - `motif_ids`: non-empty list
    - `palette`: valid PaletteRef with palette_id
    - `lane_plans`: non-empty list of LanePlans
+   - no framework fields (`schema_version`, `start_ms`, `end_ms`, `resolved_asset_ids`)
+
+   The framework adds those fields after validation. Encode override names in
+   `param_override_keys` and typed values in the parallel `param_overrides` list.
+   Both lists must have equal length; use two empty lists when there are no overrides.
 
 2. Only return sections you actually modified. Do NOT include unchanged sections.
 

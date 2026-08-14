@@ -164,6 +164,7 @@ asyncio_mode = "auto"
 markers = [
     "integration: marks tests as integration tests (deselect with '-m \"not integration\"')",
     "slow: marks tests as slow running (deselect with '-m \"not slow\"')",
+    "local_only: owner-invoked test that may call a paid/local external service; never runs in CI",
     "requires_template_data: test needs data/templates/index.json (skips if absent, always-present subset covered by tracked fixtures in catalog/templates/)",
     "requires_xlights: LOCAL-ONLY test that drives a running xLights 2026.15 via its HTTP automation API (default http://127.0.0.1:49913); skips cleanly when unreachable, never runs in CI (P1P-T12)",
     "local_only: test requires an operator-controlled local dependency and is excluded from CI (P2P-T5 preview export)",

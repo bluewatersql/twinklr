@@ -6,7 +6,7 @@ import asyncio
 import json
 import logging
 import threading
-from typing import Any
+from typing import TYPE_CHECKING, Any, cast
 
 from openai import (
     APIConnectionError,
@@ -24,10 +24,27 @@ from twinklr.core.agents.providers.base import (
     TokenUsage,
 )
 from twinklr.core.agents.providers.conversation import Conversation
-from twinklr.core.agents.providers.errors import LLMProviderError
+from twinklr.core.agents.providers.errors import (
+    LLMProviderError,
+    RecoverableLLMProviderError,
+    RecoverableResponseReason,
+)
+from twinklr.core.agents.schema_utils import response_schema_hash, strict_response_format
 from twinklr.core.api.llm.openai.client import OpenAIClient
 
+if TYPE_CHECKING:
+    from pydantic import BaseModel
+
 logger = logging.getLogger(__name__)
+
+SDK_MAX_RETRIES = 0
+PROVIDER_MAX_ATTEMPTS = 3
+"""One logical strict call makes at most three HTTP requests.
+
+The SDK retry layer is explicitly disabled, so these manual attempts do not
+multiply by the SDK default.  A non-retryable strict-schema rejection may add
+one compatibility request before the three-attempt json_object fallback.
+"""
 
 
 def _as_int(value: Any) -> int:
@@ -69,7 +86,12 @@ class OpenAIProvider:
             timeout: Request timeout
         """
         # Async client for async-first implementation
-        self._async_client = AsyncOpenAI(api_key=api_key, timeout=timeout, base_url=base_url)
+        self._async_client = AsyncOpenAI(
+            api_key=api_key,
+            timeout=timeout,
+            base_url=base_url,
+            max_retries=SDK_MAX_RETRIES,
+        )
         self._sync_client = OpenAIClient(api_key=api_key, timeout=timeout)
 
         self.session_id = session_id or "default"
@@ -312,6 +334,25 @@ class OpenAIProvider:
         Raises:
             LLMProviderError: On unrecoverable errors
         """
+        response_model = kwargs.pop("response_model", None)
+        allow_json_object_fallback = kwargs.pop("allow_json_object_fallback", True)
+        provider_max_attempts = kwargs.pop("provider_max_attempts", PROVIDER_MAX_ATTEMPTS)
+        if not isinstance(allow_json_object_fallback, bool):
+            raise LLMProviderError("allow_json_object_fallback must be a boolean")
+        if (
+            not isinstance(provider_max_attempts, int)
+            or isinstance(provider_max_attempts, bool)
+            or not 1 <= provider_max_attempts <= PROVIDER_MAX_ATTEMPTS
+        ):
+            raise LLMProviderError(
+                f"provider_max_attempts must be between 1 and {PROVIDER_MAX_ATTEMPTS}"
+            )
+        schema_hash: str | None = None
+        if response_model is not None:
+            if not hasattr(response_model, "model_json_schema"):
+                raise LLMProviderError("response_model must be a Pydantic model class")
+            schema_hash = response_schema_hash(cast("type[BaseModel]", response_model))
+
         allowed_request_kwargs = {
             "max_output_tokens",
             "max_tokens",
@@ -326,10 +367,15 @@ class OpenAIProvider:
 
         try:
             # Build request parameters
+            response_format: dict[str, Any]
+            if response_model is None:
+                response_format = {"type": "json_object"}
+            else:
+                response_format = strict_response_format(cast("type[BaseModel]", response_model))
             request_params: dict[str, Any] = {
                 "model": model,
                 "input": messages,
-                "text": {"format": {"type": "json_object"}},
+                "text": {"format": response_format},
             }
 
             # GPT-5.6 supports temperature.  We intentionally send it for every
@@ -351,61 +397,67 @@ class OpenAIProvider:
                 allowed_kwargs["timeout"] = timeout_seconds
             request_params.update(allowed_kwargs)
 
-            # Make async API call with transient retry handling
-            response = None
-            max_attempts = 3
-            for attempt in range(max_attempts):
-                try:
-                    response = await self._async_client.responses.create(**request_params)
-                    break
-                except Exception as error:
-                    if not self._should_retry_async_error(error, attempt, max_attempts):
-                        raise
-                    await asyncio.sleep(0.5 * (2**attempt))
+            # SDK retries are disabled at client construction.  Therefore the
+            # only transient layer is this bounded loop: at most three HTTP
+            # requests for one logical call (not the former implicit 3 x 3).
+            fallback_reason: str | None = None
+            try:
+                response = await self._create_response_with_retries(
+                    request_params, max_attempts=provider_max_attempts
+                )
+            except APIStatusError as error:
+                fallback_reason = self._strict_rejection_reason(error)
+                if (
+                    response_model is None
+                    or fallback_reason is None
+                    or not allow_json_object_fallback
+                ):
+                    raise
+                logger.warning(
+                    "OpenAI model %s rejected strict json_schema; falling back to json_object: %s",
+                    model,
+                    fallback_reason,
+                )
+                request_params["text"] = {"format": {"type": "json_object"}}
+                response = await self._create_response_with_retries(
+                    request_params, max_attempts=provider_max_attempts
+                )
 
-            if response is None:
-                raise LLMProviderError("No response received from OpenAI API")
+            # Usage belongs to this completed HTTP response even when refusal,
+            # truncation, filtering, empty content, or JSON decoding makes the
+            # logical attempt recoverable. Extract and account it before any
+            # response classification so the runner can attribute every attempt.
+            token_usage = self._extract_response_token_usage(response)
+            self._update_token_usage(
+                prompt_tokens=token_usage.prompt_tokens,
+                reasoning_tokens=token_usage.reasoning_tokens,
+                completion_tokens=token_usage.completion_tokens,
+                total_tokens=token_usage.total_tokens,
+            )
+
+            recoverable = self._recoverable_response_error(response, token_usage)
+            if recoverable is not None:
+                raise recoverable
 
             # Extract response content
             content = response.output_text
             if not content:
-                raise LLMProviderError("Empty response from OpenAI API")
+                raise RecoverableLLMProviderError(
+                    reason="empty_response",
+                    message="Empty response from OpenAI API",
+                    token_usage=token_usage,
+                )
 
             # Parse JSON
             try:
                 response_data = json.loads(content)
             except json.JSONDecodeError as e:
                 logger.error(f"Failed to parse JSON response: {e}")
-                raise LLMProviderError(f"Failed to parse JSON response: {e}") from e
-
-            # Extract token usage
-            token_usage = TokenUsage()
-            if hasattr(response, "usage") and response.usage:
-                prompt_tokens = _as_int(getattr(response.usage, "prompt_tokens", None))
-                completion_tokens = _as_int(getattr(response.usage, "completion_tokens", None))
-                total_tokens = _as_int(getattr(response.usage, "total_tokens", None))
-                # Responses API variants may expose input/output token names instead.
-                if prompt_tokens in (None, 0):
-                    prompt_tokens = _as_int(getattr(response.usage, "input_tokens", 0))
-                if completion_tokens in (None, 0):
-                    completion_tokens = _as_int(getattr(response.usage, "output_tokens", 0))
-                if total_tokens in (None, 0):
-                    total_tokens = (prompt_tokens or 0) + (completion_tokens or 0)
-                output_details = getattr(response.usage, "output_tokens_details", None)
-                reasoning_tokens = _as_int(getattr(output_details, "reasoning_tokens", 0))
-                completion_without_reasoning = max(0, (completion_tokens or 0) - reasoning_tokens)
-                token_usage = TokenUsage(
-                    prompt_tokens=prompt_tokens or 0,
-                    reasoning_tokens=reasoning_tokens,
-                    completion_tokens=completion_without_reasoning,
-                    total_tokens=total_tokens or 0,
-                )
-                self._update_token_usage(
-                    prompt_tokens=token_usage.prompt_tokens,
-                    reasoning_tokens=token_usage.reasoning_tokens,
-                    completion_tokens=token_usage.completion_tokens,
-                    total_tokens=token_usage.total_tokens,
-                )
+                raise RecoverableLLMProviderError(
+                    reason="json_decode",
+                    message=f"Failed to parse JSON response: {e}",
+                    token_usage=token_usage,
+                ) from e
 
             return LLMResponse(
                 content=response_data,
@@ -413,6 +465,16 @@ class OpenAIProvider:
                     response_id=getattr(response, "id", None),
                     token_usage=token_usage,
                     model=model,
+                    finish_reason=getattr(response, "status", None),
+                    structured_output_mode=(
+                        "json_object_fallback"
+                        if fallback_reason is not None
+                        else "json_schema"
+                        if response_model is not None
+                        else "json_object"
+                    ),
+                    structured_output_fallback_reason=fallback_reason,
+                    response_schema_hash=schema_hash,
                 ),
             )
 
@@ -421,6 +483,100 @@ class OpenAIProvider:
         except Exception as e:
             logger.error(f"Async OpenAI provider error: {e}")
             raise LLMProviderError(f"Provider error: {e}") from e
+
+    async def _create_response_with_retries(
+        self, request_params: dict[str, Any], *, max_attempts: int
+    ) -> Any:
+        """Create one response with the single explicit transient retry layer."""
+        for attempt in range(max_attempts):
+            try:
+                return await self._async_client.responses.create(**request_params)
+            except Exception as error:
+                if not self._should_retry_async_error(error, attempt, max_attempts):
+                    raise
+                await asyncio.sleep(0.5 * (2**attempt))
+        raise LLMProviderError("No response received from OpenAI API")
+
+    @staticmethod
+    def _strict_rejection_reason(error: APIStatusError) -> str | None:
+        """Return an observable reason only for a strict-format capability rejection."""
+        if error.status_code != 400:
+            return None
+        body = getattr(error, "body", None)
+        text = f"{error} {body}".lower()
+        invalid_schema_markers = (
+            "invalid schema",
+            "schema is invalid",
+            "schema validation",
+            "is not permitted",
+            "unsupported schema keyword",
+        )
+        if any(marker in text for marker in invalid_schema_markers):
+            return None
+        capability_patterns = (
+            "unsupported text.format",
+            "unsupported response_format",
+            "does not support json_schema",
+            "doesn't support json_schema",
+            "json_schema is unsupported",
+            "json_schema is not supported",
+            "structured outputs are not supported",
+            "structured output is not supported",
+        )
+        return str(error) if any(pattern in text for pattern in capability_patterns) else None
+
+    @staticmethod
+    def _recoverable_response_error(
+        response: Any, token_usage: TokenUsage
+    ) -> RecoverableLLMProviderError | None:
+        """Classify response-level outcomes that merit another logical call."""
+        status = getattr(response, "status", None)
+        details = getattr(response, "incomplete_details", None)
+        detail_reason = str(getattr(details, "reason", "") or "").lower()
+        if status == "incomplete":
+            reason: RecoverableResponseReason = (
+                "content_filter" if "content_filter" in detail_reason else "truncation"
+            )
+            return RecoverableLLMProviderError(
+                reason=reason,
+                message=f"OpenAI response incomplete: {detail_reason or 'unknown reason'}",
+                token_usage=token_usage,
+            )
+
+        for item in getattr(response, "output", ()) or ():
+            for content in getattr(item, "content", ()) or ():
+                if getattr(content, "type", None) == "refusal" or getattr(content, "refusal", None):
+                    return RecoverableLLMProviderError(
+                        reason="refusal",
+                        message="OpenAI refused the structured response",
+                        token_usage=token_usage,
+                    )
+        return None
+
+    @staticmethod
+    def _extract_response_token_usage(response: Any) -> TokenUsage:
+        """Normalize one Responses API result's exact token attribution."""
+        usage = getattr(response, "usage", None)
+        if not usage:
+            return TokenUsage()
+        prompt_tokens = _as_int(getattr(usage, "prompt_tokens", None))
+        completion_tokens = _as_int(getattr(usage, "completion_tokens", None))
+        total_tokens = _as_int(getattr(usage, "total_tokens", None))
+        # Responses API variants expose input/output token names.
+        if prompt_tokens == 0:
+            prompt_tokens = _as_int(getattr(usage, "input_tokens", 0))
+        if completion_tokens == 0:
+            completion_tokens = _as_int(getattr(usage, "output_tokens", 0))
+        if total_tokens == 0:
+            total_tokens = prompt_tokens + completion_tokens
+        output_details = getattr(usage, "output_tokens_details", None)
+        reasoning_tokens = _as_int(getattr(output_details, "reasoning_tokens", 0))
+        return TokenUsage(
+            prompt_tokens=prompt_tokens,
+            reasoning_tokens=reasoning_tokens,
+            completion_tokens=max(0, completion_tokens - reasoning_tokens),
+            total_tokens=total_tokens,
+        )
 
     @staticmethod
     def _should_retry_async_error(error: Exception, attempt: int, max_attempts: int) -> bool:
@@ -507,6 +663,12 @@ class OpenAIProvider:
                     token_usage=response.metadata.token_usage,
                     model=model,
                     conversation_id=conversation_id,
+                    finish_reason=response.metadata.finish_reason,
+                    structured_output_mode=response.metadata.structured_output_mode,
+                    structured_output_fallback_reason=(
+                        response.metadata.structured_output_fallback_reason
+                    ),
+                    response_schema_hash=response.metadata.response_schema_hash,
                 ),
             )
 

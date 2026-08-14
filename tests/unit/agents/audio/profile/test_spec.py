@@ -51,10 +51,10 @@ def test_audio_profile_spec_uses_current_model():
     assert spec.reasoning_effort == "medium"
 
 
-def test_audio_profile_spec_has_schema_repair():
-    """Test that spec has schema repair configured."""
+def test_audio_profile_spec_has_one_response_retry():
+    """Strict output retains one retry for response-level failure."""
     spec = get_audio_profile_spec()
-    assert spec.max_schema_repair_attempts >= 2
+    assert spec.max_schema_repair_attempts == 1
 
 
 def test_audio_profile_spec_allows_custom_model():

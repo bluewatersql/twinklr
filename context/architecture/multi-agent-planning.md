@@ -39,8 +39,17 @@ The choreography planner is an iterative refinement loop over structured Pydanti
   templates and display recipes now share the
   tracked `catalog/templates/` data home but not yet a schema: one catalog with two
   renderers is the recorded convergence direction, not current behavior.
-- **Schema auto-injection** — Pydantic response models generate the JSON schemas embedded
-  in prompts, eliminating prompt/schema drift.
+- **Schema auto-injection and enforcement** — Pydantic response models generate both the
+  JSON schemas embedded in prompts and the OpenAI Responses API strict `json_schema`
+  request. A general provider transform converts Pydantic discriminated-union `oneOf`
+  to supported nested `anyOf` and removes discriminator metadata; Pydantic still
+  enforces the branch semantics after generation. Unsupported schema keywords and the
+  provider's 5,000-property/10-level/1,000-enum ceilings fail locally before a request.
+  The exact normalized response-schema hash is part of agent-stage cache identity.
+  Explicit model-capability rejection can take an observable `json_object` fallback;
+  invalid-schema/request errors fail loudly. Malformed JSON, refusal, truncation,
+  content filtering, and empty responses get one bounded logical retry, with each
+  failed response's tokens retained in exact per-stage attribution.
 - **Two-tier validation** — heuristics run before the LLM judge to save tokens on
   structurally invalid plans.
 - **Data-driven agents** — no agent class hierarchies: one runner + `AgentSpec` data
@@ -50,6 +59,9 @@ The choreography planner is an iterative refinement loop over structured Pydanti
 
 - Agent orchestration: `packages/twinklr/core/agents/` (audio/lyrics profiling,
   sequencer planners, shared judge/iteration controller, OpenAI provider adapter)
+- OpenAI is the required provider for registered strict-output agent roles. Anthropic is
+  still configurable for legacy/direct calls but is rejected loudly for those roles
+  until it has an equivalent schema-enforcement implementation.
 - Runtime prompt packs: `packages/twinklr/core/**/prompts/` (Jinja2 — application source,
   distinct from the root `prompts/` agent-workflow library)
 - Deep reference: [docs/audio_profile/index.md](../../docs/audio_profile/index.md) series

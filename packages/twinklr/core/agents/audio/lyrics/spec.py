@@ -46,7 +46,7 @@ def get_lyrics_spec(
         reasoning_effort=resolved.reasoning_effort,
         max_tokens=resolved.max_tokens,
         timeout_seconds=resolved.timeout_seconds,
-        max_schema_repair_attempts=2,
+        max_schema_repair_attempts=1,
         token_budget=token_budget,
         default_variables={},
     )

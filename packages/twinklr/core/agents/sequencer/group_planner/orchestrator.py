@@ -36,7 +36,12 @@ from twinklr.core.agents.shared.judge.feedback import FeedbackManager
 from twinklr.core.agents.shared.judge.models import IterationState
 from twinklr.core.agents.spec import AgentSpec
 from twinklr.core.sequencer.planning import SectionCoordinationPlan
-from twinklr.core.sequencer.vocabulary import CoordinationMode, EffectDuration, LaneKind
+from twinklr.core.sequencer.vocabulary import (
+    CoordinationMode,
+    EffectDuration,
+    LaneKind,
+    TimingHint,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -745,7 +750,11 @@ class GroupPlannerOrchestrator:
                 # 2. Clamp window end to max_valid_bar
                 if coord_plan.window and coord_plan.window.end.bar > max_valid_bar:
                     old_end = coord_plan.window.end.bar
-                    clamped_end = PlanningTimeRef(bar=max_valid_bar, beat=1)
+                    clamped_end = PlanningTimeRef(
+                        bar=max_valid_bar,
+                        beat=1,
+                        timing_hint=TimingHint.ON_BEAT,
+                    )
                     coord_plan.window = coord_plan.window.model_copy(update={"end": clamped_end})
                     logger.debug(
                         "Clamped window end bar %d→%d in %s/%s",

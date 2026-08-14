@@ -11,7 +11,12 @@ from twinklr.core.agents.shared.judge.models import JudgeVerdict
 from twinklr.core.agents.spec import AgentMode, AgentSpec
 from twinklr.core.agents.taxonomy_utils import get_taxonomy_dict
 from twinklr.core.config.models import AgentConfig, AgentOrchestrationConfig
-from twinklr.core.sequencer.planning import SectionCoordinationPlan
+from twinklr.core.sequencer.planning.group_plan import (
+    CorrectionResponse,
+    SectionCoordinationResponse,
+    adapt_correction_response,
+    adapt_section_coordination_response,
+)
 
 
 def get_planner_spec(
@@ -41,14 +46,15 @@ def get_planner_spec(
     return AgentSpec(
         name="group_planner",
         prompt_pack="sequencer/group_planner/prompts/planner",
-        response_model=SectionCoordinationPlan,
+        response_model=SectionCoordinationResponse,
+        response_adapter=adapt_section_coordination_response,
         mode=AgentMode.CONVERSATIONAL,  # Maintains context for refinement
         model=resolved.model,
         temperature=resolved.temperature,
         reasoning_effort=resolved.reasoning_effort,
         max_tokens=resolved.max_tokens,
         timeout_seconds=resolved.timeout_seconds,
-        max_schema_repair_attempts=3,
+        max_schema_repair_attempts=1,
         token_budget=token_budget,
         default_variables={"taxonomy": get_taxonomy_dict()},
     )
@@ -92,7 +98,7 @@ def get_section_judge_spec(
         reasoning_effort=resolved.reasoning_effort,
         max_tokens=resolved.max_tokens,
         timeout_seconds=resolved.timeout_seconds,
-        max_schema_repair_attempts=5,  # Increased for enum validation
+        max_schema_repair_attempts=1,
         token_budget=token_budget,
         default_variables={"taxonomy": get_taxonomy_dict()},
     )
@@ -120,8 +126,6 @@ def get_holistic_corrector_spec(
     Returns:
         HolisticCorrector agent spec
     """
-    from twinklr.core.sequencer.planning import CorrectionResult
-
     resolved = _resolve_config(
         config or AgentOrchestrationConfig().refinement_agent,
         model,
@@ -131,14 +135,15 @@ def get_holistic_corrector_spec(
     return AgentSpec(
         name="holistic_corrector",
         prompt_pack="sequencer/group_planner/prompts/holistic_corrector",
-        response_model=CorrectionResult,
+        response_model=CorrectionResponse,
+        response_adapter=adapt_correction_response,
         mode=AgentMode.ONESHOT,
         model=resolved.model,
         temperature=resolved.temperature,
         reasoning_effort=resolved.reasoning_effort,
         max_tokens=resolved.max_tokens,
         timeout_seconds=resolved.timeout_seconds,
-        max_schema_repair_attempts=3,
+        max_schema_repair_attempts=1,
         token_budget=token_budget,
         default_variables={"taxonomy": get_taxonomy_dict()},
     )

@@ -13,7 +13,9 @@ targeting mechanics, and mode examples.
 
 ## Response Schema
 
-Return a `SectionCoordinationPlan` matching this schema:
+Return a strict section-coordination response matching this schema. Framework
+metadata (`schema_version`, section timing, resolved asset IDs) is added after
+the response is validated and must not be emitted:
 
 ```json
 {{ response_schema }}
@@ -68,11 +70,15 @@ the plan targets, and size the window for the configured step duration.
 ## Timing Format
 
 ```json
-{"bar": 1, "beat": 1}  // Section-relative (bar 1 = section start)
+{"bar": 1, "beat": 1, "timing_hint": "ON_BEAT"}  // Section-relative
 ```
 
 - Bars: 1 to available_bars (see user prompt)
 - Beats: 1 to 4 (assuming 4/4)
+- `timing_hint` is required; use `ON_BEAT` unless an explicit micro-offset is intended.
+- `param_override_keys` and `param_overrides` are parallel lists of equal length.
+  Values are typed string/integer/number/boolean/null entries; use two empty lists when
+  there are no overrides. The framework zips them back into the renderer's mapping.
 
 **No extra fields:** Do not output keys not present in the response schema. Specifically: `lane_plans[*]` must NOT include `planning_notes`.
 

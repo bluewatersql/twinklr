@@ -11,9 +11,17 @@ from pydantic import ValidationError
 
 from twinklr.core.agents.logging import LLMCallLogger, NullLLMCallLogger
 from twinklr.core.agents.prompts import PromptPackLoader
-from twinklr.core.agents.providers.base import LLMProvider, ProviderType, TokenUsage
+from twinklr.core.agents.providers.base import (
+    LLMProvider,
+    ProviderType,
+    ResponseMetadata,
+    TokenUsage,
+)
 from twinklr.core.agents.providers.conversation import generate_conversation_id
-from twinklr.core.agents.providers.errors import LLMProviderError
+from twinklr.core.agents.providers.errors import (
+    LLMProviderError,
+    RecoverableLLMProviderError,
+)
 from twinklr.core.agents.result import AgentResult
 from twinklr.core.agents.schema_utils import get_json_schema_example
 from twinklr.core.agents.spec import AgentMode, AgentSpec
@@ -131,9 +139,11 @@ class AsyncAgentRunner:
             )
 
             # Execute with schema repair loop (async)
-            response_data, repair_attempts = await self._execute_with_repair_async(
-                spec, messages, state, call_usages
-            )
+            (
+                response_data,
+                repair_attempts,
+                response_metadata,
+            ) = await self._execute_with_repair_async(spec, messages, state, call_usages)
 
             # Calculate duration and tokens
             duration = time.time() - start_time
@@ -157,6 +167,14 @@ class AsyncAgentRunner:
 
             # Build result
             metadata: dict[str, Any] = {"schema_repair_attempts": repair_attempts}
+            if response_metadata.structured_output_mode is not None:
+                metadata["structured_output_mode"] = response_metadata.structured_output_mode
+            if response_metadata.structured_output_fallback_reason is not None:
+                metadata["structured_output_fallback_reason"] = (
+                    response_metadata.structured_output_fallback_reason
+                )
+            if response_metadata.response_schema_hash is not None:
+                metadata["response_schema_hash"] = response_metadata.response_schema_hash
             if state and state.conversation_id:
                 metadata["conversation_id"] = state.conversation_id
 
@@ -339,7 +357,7 @@ class AsyncAgentRunner:
         messages: list[dict[str, str]],
         state: AgentState | None,
         call_usages: list[TokenUsage],
-    ) -> tuple[Any, int]:
+    ) -> tuple[Any, int, ResponseMetadata]:
         """Execute agent with schema repair loop (async).
 
         Args:
@@ -351,7 +369,7 @@ class AsyncAgentRunner:
                 repair attempts and of an attempt that then raised.
 
         Returns:
-            Tuple of (validated_data, repair_attempts)
+            Tuple of (validated_data, repair_attempts, final response metadata)
 
         Raises:
             RunError: If schema validation exhausted attempts
@@ -361,22 +379,49 @@ class AsyncAgentRunner:
 
         for attempt in range(spec.max_schema_repair_attempts + 1):
             # Call provider (async, oneshot or conversational)
-            if spec.mode == AgentMode.CONVERSATIONAL:
-                response = await self._call_conversational_async(spec, messages, state)
-            else:
-                response = await self._call_oneshot_async(spec, messages)
+            try:
+                if spec.mode == AgentMode.CONVERSATIONAL:
+                    response = await self._call_conversational_async(spec, messages, state)
+                else:
+                    response = await self._call_oneshot_async(spec, messages)
+            except RecoverableLLMProviderError as error:
+                call_usages.append(error.token_usage)
+                repair_attempts += 1
+                if attempt >= spec.max_schema_repair_attempts:
+                    raise RunError(
+                        f"Recoverable structured response failure exhausted retries "
+                        f"({error.reason}): {error}"
+                    ) from error
+                logger.warning(
+                    "Agent %s retrying recoverable structured response failure (%s)",
+                    spec.name,
+                    error.reason,
+                )
+                messages.append(
+                    {
+                        "role": "user",
+                        "content": (
+                            "The previous structured response could not be consumed "
+                            f"({error.reason}). Return one complete response matching "
+                            "the schema in the system prompt."
+                        ),
+                    }
+                )
+                continue
 
             call_usages.append(response.metadata.token_usage)
 
             # Skip validation if response_model is dict
             if spec.response_model is dict:
-                return response.content, 0
+                return response.content, 0, response.metadata
 
             # Try to validate response
             try:
                 validated = spec.response_model(**response.content)
+                if spec.response_adapter is not None:
+                    validated = spec.response_adapter(validated)
                 logger.debug(f"Agent {spec.name} succeeded (repair attempts: {repair_attempts})")
-                return validated, repair_attempts
+                return validated, repair_attempts, response.metadata
 
             except ValidationError as e:
                 repair_attempts += 1
@@ -501,6 +546,8 @@ class AsyncAgentRunner:
             "max_tokens": spec.max_tokens,
             "timeout_seconds": spec.timeout_seconds,
         }
+        if spec.response_model is not dict:
+            kwargs["response_model"] = spec.response_model
         if self.provider.provider_type == ProviderType.OPENAI:
             kwargs["reasoning_effort"] = spec.reasoning_effort
         return kwargs
