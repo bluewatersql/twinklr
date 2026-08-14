@@ -67,6 +67,7 @@ class MovingHeadStage:
         include_template_metadata: bool = True,
         section_id: str | None = None,
         regeneration_nonce: str | None = None,
+        macro_planning_enabled: bool = True,
     ) -> None:
         """Initialize moving head planner stage.
 
@@ -86,6 +87,7 @@ class MovingHeadStage:
         self.include_template_metadata = include_template_metadata
         self.section_id = section_id
         self.regeneration_nonce = regeneration_nonce
+        self.macro_planning_enabled = macro_planning_enabled
 
     @property
     def name(self) -> str:
@@ -179,6 +181,7 @@ class MovingHeadStage:
                 beat_grid=beat_grid,
                 available_templates=self.available_templates,
                 macro_plan=macro_plan,
+                macro_planning_enabled=self.macro_planning_enabled,
                 template_descriptions=template_descriptions,
             )
 

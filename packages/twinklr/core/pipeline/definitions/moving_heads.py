@@ -32,6 +32,7 @@ def build_moving_heads_pipeline(
     fixture_groups: list[dict[str, Any]] | None = None,
     section_id: str | None = None,
     regeneration_nonce: str | None = None,
+    include_macro: bool = True,
 ) -> PipelineDefinition:
     """Build the moving-head sequencer pipeline.
 
@@ -61,7 +62,14 @@ def build_moving_heads_pipeline(
         ... )
         >>> result = await PipelineExecutor().execute(pipeline, audio_path, context)
     """
-    common = build_common_stages(display_groups=display_groups)
+    common = build_common_stages(
+        display_groups=display_groups,
+        include_macro=include_macro,
+        regeneration_nonce=regeneration_nonce,
+    )
+    moving_head_inputs = ["audio", "profile", "lyrics"]
+    if include_macro:
+        moving_head_inputs.append("macro")
 
     mh_stages = [
         StageDefinition(
@@ -74,8 +82,9 @@ def build_moving_heads_pipeline(
                 fixture_groups=fixture_groups,
                 section_id=section_id,
                 regeneration_nonce=regeneration_nonce,
+                macro_planning_enabled=include_macro,
             ),
-            inputs=["audio", "profile", "lyrics", "macro"],
+            inputs=moving_head_inputs,
             input_type="dict[str, Any]",
             output_type="ChoreographyPlan",
             description="Generate moving head choreography",

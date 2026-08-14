@@ -25,9 +25,12 @@ from twinklr.core.agents.providers.base import (
     ProviderType,
     ResponseMetadata,
 )
+from twinklr.core.agents.sequencer.macro_planner.context import PlanningContext
+from twinklr.core.agents.sequencer.macro_planner.orchestrator import MacroPlannerOrchestrator
 from twinklr.core.agents.sequencer.moving_heads.context import (
     FixtureContext,
     MovingHeadPlanningContext,
+    TemplateDescription,
 )
 from twinklr.core.agents.sequencer.moving_heads.models import (
     ChoreographyPlan,
@@ -324,6 +327,97 @@ class TestMovingHeadPlannerOrchestrator:
         assert await judge_disabled.get_cache_key(planning_context) != baseline_key
 
     @pytest.mark.asyncio
+    async def test_cache_key_tracks_sampling_temperature(
+        self, mock_provider: MagicMock, planning_context: MovingHeadPlanningContext
+    ) -> None:
+        from twinklr.core.agents.sequencer.moving_heads.specs import (
+            get_judge_spec,
+            get_planner_spec,
+        )
+
+        baseline = MovingHeadPlannerOrchestrator(
+            provider=mock_provider,
+            planner_spec=get_planner_spec().model_copy(update={"temperature": 0.3}),
+            judge_spec=get_judge_spec().model_copy(update={"temperature": 0.4}),
+        )
+        changed = MovingHeadPlannerOrchestrator(
+            provider=mock_provider,
+            planner_spec=get_planner_spec().model_copy(update={"temperature": 0.9}),
+            judge_spec=get_judge_spec().model_copy(update={"temperature": 0.4}),
+        )
+        assert await baseline.get_cache_key(planning_context) != await changed.get_cache_key(
+            planning_context
+        )
+
+    @pytest.mark.asyncio
+    async def test_cache_key_tracks_exact_template_metadata_and_ids(
+        self, mock_provider: MagicMock, planning_context: MovingHeadPlanningContext
+    ) -> None:
+        """A same-ID metadata edit and a changed available set both invalidate plans."""
+        orchestrator = MovingHeadPlannerOrchestrator(provider=mock_provider)
+        baseline = planning_context.model_copy(
+            update={
+                "template_descriptions": [
+                    TemplateDescription(
+                        template_id="sweep_lr_fan_pulse", name="Sweep", tags=["low"]
+                    )
+                ]
+            }
+        )
+        metadata_changed = baseline.model_copy(
+            update={
+                "template_descriptions": [
+                    TemplateDescription(
+                        template_id="sweep_lr_fan_pulse", name="Sweep", tags=["high"]
+                    )
+                ]
+            }
+        )
+        set_changed = baseline.model_copy(
+            update={"available_templates": [*baseline.available_templates, "new_template"]}
+        )
+
+        key = await orchestrator.get_cache_key(baseline)
+        assert await orchestrator.get_cache_key(metadata_changed) != key
+        assert await orchestrator.get_cache_key(set_changed) != key
+
+    @pytest.mark.asyncio
+    async def test_cache_key_tracks_authoritative_beat_grid_and_macro_ablation(
+        self, mock_provider: MagicMock, planning_context: MovingHeadPlanningContext
+    ) -> None:
+        """Timing drift and explicit no-macro mode cannot reuse a normal cached plan."""
+        orchestrator = MovingHeadPlannerOrchestrator(provider=mock_provider)
+        grid = BeatGrid.from_tempo(120.0, total_bars=48, start_offset_ms=0.0)
+        shifted_grid = BeatGrid.from_tempo(120.0, total_bars=48, start_offset_ms=17.0)
+        baseline = planning_context.model_copy(
+            update={"beat_grid": grid, "macro_planning_enabled": True}
+        )
+        shifted = baseline.model_copy(update={"beat_grid": shifted_grid})
+        ablated = baseline.model_copy(update={"macro_planning_enabled": False})
+
+        key = await orchestrator.get_cache_key(baseline)
+        assert await orchestrator.get_cache_key(shifted) != key
+        assert await orchestrator.get_cache_key(ablated) != key
+
+    @pytest.mark.asyncio
+    async def test_cache_key_tracks_exact_planning_fixture_identity(
+        self, mock_provider: MagicMock, planning_context: MovingHeadPlanningContext
+    ) -> None:
+        """A fixture-group capability change invalidates the planning cache."""
+        orchestrator = MovingHeadPlannerOrchestrator(provider=mock_provider)
+        changed = planning_context.model_copy(
+            update={
+                "fixtures": FixtureContext(
+                    count=4,
+                    groups=[{"id": "front", "fixtures": [1, 2], "position": "stage_left"}],
+                )
+            }
+        )
+        assert await orchestrator.get_cache_key(changed) != await orchestrator.get_cache_key(
+            planning_context
+        )
+
+    @pytest.mark.asyncio
     async def test_run_validates_empty_templates(self, mock_provider: MagicMock) -> None:
         """Test run validates that templates are not empty."""
         orchestrator = MovingHeadPlannerOrchestrator(provider=mock_provider)
@@ -344,6 +438,30 @@ class TestMovingHeadPlannerOrchestrator:
 
         with pytest.raises(ValidationError):
             FixtureContext(count=0, groups=[])
+
+    @pytest.mark.asyncio
+    async def test_macro_cache_key_tracks_exact_theming_catalog(
+        self, mock_provider: MagicMock
+    ) -> None:
+        """A catalog-only revision invalidates the macro plan it conditions."""
+        context = PlanningContext(
+            audio_profile=create_test_audio_profile(),
+            display_groups=[{"id": "MH", "model_count": 4}],
+        )
+        orchestrator = MacroPlannerOrchestrator(provider=mock_provider)
+        target = "twinklr.core.agents.sequencer.macro_planner.orchestrator"
+        with (
+            patch(f"{target}.get_theming_catalog_dict", return_value={"themes": ["v1"]}),
+            patch(f"{target}.get_theming_ids", return_value={"themes": ["v1"]}),
+        ):
+            baseline = await orchestrator.get_cache_key(context)
+        with (
+            patch(f"{target}.get_theming_catalog_dict", return_value={"themes": ["v2"]}),
+            patch(f"{target}.get_theming_ids", return_value={"themes": ["v2"]}),
+        ):
+            changed = await orchestrator.get_cache_key(context)
+
+        assert changed != baseline
 
 
 class TestOrchestratorIntegration:

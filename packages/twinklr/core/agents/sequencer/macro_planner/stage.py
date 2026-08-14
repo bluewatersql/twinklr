@@ -5,6 +5,7 @@ Wraps MacroPlannerOrchestrator for pipeline execution.
 
 from __future__ import annotations
 
+import hashlib
 import logging
 from typing import TYPE_CHECKING, Any
 
@@ -41,13 +42,19 @@ class MacroPlannerStage:
         ...     sections = result.output  # list[MacroSectionPlan] for FAN_OUT
     """
 
-    def __init__(self, display_groups: list[dict[str, Any]]) -> None:
+    def __init__(
+        self,
+        display_groups: list[dict[str, Any]],
+        *,
+        regeneration_nonce: str | None = None,
+    ) -> None:
         """Initialize macro planner stage.
 
         Args:
             display_groups: List of display group configs with concrete id, model_count, group_type
         """
         self.display_groups = display_groups
+        self.regeneration_nonce = regeneration_nonce
 
     @property
     def name(self) -> str:
@@ -131,7 +138,7 @@ class MacroPlannerStage:
                 compute=lambda: orchestrator.run(planning_context),
                 result_extractor=extract_sections,
                 result_type=IterationResult,
-                cache_key_fn=lambda: orchestrator.get_cache_key(planning_context),
+                cache_key_fn=lambda: self._cache_key(orchestrator, planning_context),
                 cache_version="1",
                 state_handler=self._handle_state,
                 metrics_handler=self._handle_metrics,
@@ -143,6 +150,12 @@ class MacroPlannerStage:
         except Exception as e:
             logger.exception("Macro planning failed", exc_info=e)
             return failure_result(str(e), stage_name=self.name)
+
+    async def _cache_key(self, orchestrator: Any, planning_context: Any) -> str:
+        base = await orchestrator.get_cache_key(planning_context)
+        if self.regeneration_nonce is None:
+            return str(base)
+        return hashlib.sha256(f"{base}:{self.regeneration_nonce}".encode()).hexdigest()
 
     def _handle_state(self, result: Any, context: PipelineContext) -> None:
         """Store macro plan in state for downstream stages."""

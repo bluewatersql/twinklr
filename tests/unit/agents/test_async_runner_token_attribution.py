@@ -187,6 +187,19 @@ async def test_repair_attempts_tokens_are_summed() -> None:
     assert result.tokens_used == 45
     assert result.prompt_tokens == 30
     assert result.completion_tokens == 15
+    assert result.metadata["logical_request_count"] == 3
+    assert (
+        result.metadata["call_usages"]
+        == [
+            {
+                "prompt_tokens": 10,
+                "reasoning_tokens": 0,
+                "completion_tokens": 5,
+                "total_tokens": 15,
+            }
+        ]
+        * 3
+    )
 
 
 async def test_exhausted_repairs_still_report_tokens_spent() -> None:
@@ -200,6 +213,8 @@ async def test_exhausted_repairs_still_report_tokens_spent() -> None:
     assert result.success is False
     assert provider.call_count == 2
     assert result.tokens_used == 30
+    assert result.metadata["logical_request_count"] == 2
+    assert len(result.metadata["call_usages"]) == 2
 
 
 async def test_completion_log_receives_per_call_usage() -> None:

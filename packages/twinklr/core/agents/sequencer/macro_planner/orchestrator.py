@@ -130,12 +130,18 @@ class MacroPlannerOrchestrator:
                 else None
             ),
             "display_groups": planning_context.display_groups,
+            # The catalog is injected into the planner and constrains its output;
+            # catalog-only revisions therefore invalidate macro-plan cache entries.
+            "theming_catalog": get_theming_catalog_dict(),
+            "theming_ids": get_theming_ids(),
             "max_iterations": self.controller.config.max_iterations,
             "min_pass_score": self.controller.config.approval_score_threshold,
             "planner_model": self.planner_spec.model,
             "planner_reasoning_effort": self.planner_spec.reasoning_effort,
+            "planner_temperature": self.planner_spec.temperature,
             "judge_model": self.judge_spec.model,
             "judge_reasoning_effort": self.judge_spec.reasoning_effort,
+            "judge_temperature": self.judge_spec.temperature,
             "prompt_packs": spec_prompt_hash(AGENTS_BASE_PATH, self.planner_spec, self.judge_spec),
         }
 

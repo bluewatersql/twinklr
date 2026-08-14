@@ -326,3 +326,289 @@ that disagreement is itself the headline finding and must be reported, not smoot
 Planner temperature is NOT in the planner cache keys (only profile/lyrics key it)
 and every call site uses the hardcoded spec default — if any arm varies sampling
 temperature, key it first or cached plans will confound the arms.
+
+## Author implementation handoff — 2026-08-14
+
+Status: **IMPLEMENTED, PENDING INDEPENDENT VERIFICATION, EXPERIMENT PENDING-OWNER.**
+This is an author handoff, not approval. No provider call, owner audio, xLights run,
+human ranking, comparison verdict, proposal update, decision record, or evaluation
+result was produced during implementation.
+
+### Reverified preconditions before implementation
+
+The author received and reviewed the fresh combined-baseline precondition audit at
+`8aeda12`: **114 passed, 2 expected skips**. All six source/code preconditions passed:
+
+1. P4-F1/P4-F8 render bottlenecks are removed by the Phase 1P T3/T5 renderer and
+   template-space implementations and their regression tests.
+2. P3-F5/P3-F7/P3-F14 channel fixes are present in the merged T4/T9/T1 prompt,
+   context, and judge-memory implementations.
+3. P3-F24 attribution is now carried as exact prompt/reasoning/completion usage for
+   each logical call, including repair and failure paths, in `async_runner.py` and the
+   shared judge controller. T13 converts those records into priced arm call records.
+4. P3-M-A is behavioral: the judge threshold participates in acceptance, with the T9
+   behavioral tests still passing.
+5. P3-M-B is fixed and `max_iterations=0` remains supported. T13 does **not** misuse
+   zero iterations as macro ablation: arm C removes the macro stage from the graph.
+6. Threshold and sampling temperature now participate in macro and moving-head
+   planning cache identities, so changed experiment configuration cannot silently hit
+   an incompatible plan cache.
+
+Any regression of one of these checks invalidates the experiment and is a hard stop.
+
+### Implemented evidence seams
+
+- The seeded deterministic selector reads each actual `TemplateDoc.metadata` through
+  `REGISTRY.get`, uses the fixed role/energy fallback ladder, enforces configurable
+  repeat/role variety, converts profile energy from 0–1 to 0–100 exactly once, and
+  preserves authoritative section bars. It explicitly constructs intensity, color,
+  shutter, gobo, and moment-cue fields on today's schema-v2 `PlanSection`; tests assert
+  `legacy_intent_omitted is False` and observable renderer effect. If a song is longer
+  than the template catalog can satisfy under the strict variety rules, it applies the
+  frozen relaxation order (distinct roles, repeat cap, consecutive repeat), returns a
+  plan deterministically, and records the exact relaxed constraints in each trace.
+- The runner freezes the N ≥ 8 manifest before work and records SHA-256 identities for
+  audio, analysis payload/cache key, beat grid, stems, fixture config, template set,
+  renderer, and evaluation config. One analysis snapshot is reused for all five runs.
+- Arms are exactly A1, B1/B2, and C1/C2 per song. B includes the macro stage; C removes
+  it with a real stage-graph switch while retaining the moving-head judge loop. Every
+  B/C run has a distinct persisted regeneration nonce so planning caches regenerate
+  while upstream analysis/profile/lyrics/grid inputs remain frozen.
+- Macro and moving-head plan cache identities bind the exact available-template IDs
+  and `TemplateDoc.metadata`, the authoritative `BeatGrid`, fixture-planning identity,
+  macro-enabled/ablated graph mode, threshold, temperature, model, reasoning, and
+  prompt fingerprints. The B/C regeneration nonce is also part of the planning key.
+- `PreCallSpendGate` must authorize every planning or vision logical request immediately
+  before the provider call and use the shipped provider-bound wrapper to settle an
+  exact success-or-failure record before another request can be authorized. Successes,
+  failures, retries, and repairs all consume the same caps. The backend result must
+  exactly match the gated call ledger; arm C containing a macro call is rejected.
+  `arm_call_records_from_iteration` converts current-pipeline `IterationCallRecord`
+  evidence into exact priced records bound to model/reasoning/temperature/pricing ID.
+  The LOCAL-ONLY CLI supplies an atomic per-run partial-attempt journal, updated on
+  every settlement before another call can be authorized, so failed and repair usage
+  survives a later owner-backend failure.
+- Blind review first selects one complete five-sequence song plus five randomly drawn
+  sequences, then deterministically expands the packet only as needed to make five
+  independent A-vs-B song comparisons reachable. It randomizes with the frozen seed,
+  copies previews to opaque filenames, and exposes no
+  source filename, arm, score, metadata, or reasoning. The packet commitment covers
+  exact preview bytes, opaque paths, track grouping, ordering, and seed; every preview
+  is re-hashed before ranking and finalization. Ranking is packet-hash-pinned and must
+  be persisted before the reveal key can be written.
+- `ComparisonReport` schema 2 records song/arm/run/cache/hash/call/cost/blind/human/
+  parity/calibration evidence and writes through the current evaluation writer. Its
+  validator rechecks the accepted calibration artifact and recomputes the exact 5N
+  matrix, summaries, spend, parity, human evidence, and signed outcome from bound raw
+  run records; supplied derived claims are not trusted. Full serialized P2P-T6
+  `VisionEvaluationResult` evidence is retained as the typed current-schema result with
+  calibration and evaluation-config hashes; validation requires the vision call-record
+  tokens and spend to equal its embedded usage ledger exactly. The JSON writer excludes
+  computed fields and round-trips exactly.
+
+### Second verifier-rejection remediation
+
+All six follow-up acceptance blockers were implemented red-first and are covered by
+adversarial tests:
+
+1. A run's `SequenceScore` is reconstructed exactly from its embedded calibrated
+   `VisionEvaluationResult`; the run plan SHA must equal the typed plan and the vision
+   plan SHA, and the blinded artifact path/SHA must be that result's exact preview.
+   Report finalization repeats those checks, so scoring, parity, and blind review cannot
+   silently refer to different artifacts or plans.
+2. The fixed human protocol remains one full five-arm song plus five random sequences.
+   A deterministic seeded expansion adds the minimum missing A/B selections needed for
+   the precommitted five independent song comparisons. One hundred seed probes verify
+   both requirements are simultaneously reachable without weakening the evidence rule.
+3. Each frozen role config carries positive prompt/reasoning/completion rates and the
+   `token-components-v1` formula, not merely a pricing label. Finalization recalculates
+   every record from exact token components; even a self-reported zero-cost million-token
+   record is rejected. Multi-call repair/failure usage becomes one independently priced
+   and gated settlement per logical request. The provider-bound gate persists each
+  settlement before it authorizes the next request.
+4. Macro planning, moving-head planning/repair, and vision judging are validated against
+   their own model/reasoning/temperature/pricing identities. The full vision result's
+   model must equal the frozen vision role, independently of either planning role.
+5. Every B/C record persists its planning-input SHA, regeneration nonce, and derived
+   planning-cache key. The finalizer recomputes the input from the exact manifest,
+   per-song held constants, arm/ablation mode, and role configs, then recomputes the key
+   from that input and nonce and requires all B/C keys to be distinct.
+6. Blind track groups are reconstructed from reveal-bound song IDs in packet order.
+   Recommitting the packet and reveal together after changing a group to `Track-99` is
+   still rejected.
+
+These are evidence-integrity constraints only. They do not supply owner calibration,
+audio, provider output, a human judgment, parity evidence, or a D1 result.
+
+### Final narrow integrity remediation
+
+The provider and blind-review boundaries are fail-closed:
+
+- Only one pre-call authorization may exist at a time. A second sequential or parallel
+  authorization is rejected until the first is settled, and role/kind binding is fixed:
+  `vision_judge` uses the judging gate while macro/moving-head planning and repair use
+  the planning gate. A provider exception carrying `ProviderOperationError` journals
+  its exact failed `ArmCallRecord` before the original exception is rethrown. If exact
+  usage is unavailable, the wrapper journals a role-bound, zero-token/zero-cost failed
+  record with the frozen `provider_exception_usage_unavailable` status. Invalid normal
+  returns (including `None` and non-model objects) also close through that explicit
+  unknown-usage record, then raise `ExperimentBlockedError` with the validation or
+  settlement cause preserved. The fallback is used only while the authorization is
+  still outstanding, preventing double settlement when a gate error already journaled
+  the returned evidence. Even an apparent `ArmCallRecord` is serialized and freshly
+  validated before settlement, so `model_construct` or non-validating `model_copy`
+  cannot bypass token-total or failure-state invariants. Every wrapper-created
+  authorization therefore closes once; failed, cancelled, over-reservation, and
+  provider-attempt evidence cannot disappear or leave a parallel-call loophole.
+- Blind IDs must match the generated opaque `Sequence-NN-<8 hex>` form. Every artifact
+  basename is exactly `<blind_id>.mp4`, and all packet items share one staging parent.
+  Ranking and finalization re-parse those constraints and require the artifact parent
+  to equal the packet file's parent before any bytes are trusted. Recommitting packet
+  and reveal hashes cannot make a leaky ID, `Arm-A-source-name.mp4`, or mixed-parent
+  packet valid.
+
+Adversarial tests cover outstanding/sequential authorization, concurrent wrapper calls,
+cross-kind cap bypasses, exact-usage and unavailable-usage provider exceptions,
+exactly-once closure, leaky blind IDs/basenames, mixed parents, and recommitted paths.
+
+The pre-data operational definition of the second parity bullet is fixed as follows:
+for each song calculate `abs(B1.total - B2.total)` on the 0–40 rubric scale, then take
+the arithmetic mean across songs. The absolute difference between the overall A and B
+mean totals must be strictly smaller than that `mean_within_song_abs_delta`. This keeps
+both sides in the same units and implements the spec's gloss that the arms must differ
+by less than the LLM differs from itself. The 0.5-point boundary is inclusive. Tests
+pin the equality boundary and opposing per-song deltas before any experiment data exist.
+
+Human preference uses at most one independent A-vs-B (or C-vs-B) comparison per song,
+and only songs whose relevant blinded runs were in the committed packet count. A
+precommitted minimum of five independent song comparisons is required before "no
+consistent preference" can pass; fewer comparisons yield `INCONCLUSIVE`, never parity.
+
+### Exact LOCAL-ONLY owner protocol — all steps pending
+
+Do not start at step 2. The first gate currently fails because P2P-T6 calibration has
+not been owner-accepted.
+
+1. Complete P2P-T6's real calibration on the owner's Mac. Freeze its owner-accepted
+   artifact and SHA-256, and set both `calibration_record` fields in the manifest. The
+   runner validates the file, accepted decision, hash, and rubric version before it
+   calls `backend.analyze`; an absent/rejected/mismatched artifact fails loudly.
+2. Create an owner-local manifest containing at least eight named/hashed songs and all
+   required composition flags, fixed per-role model/reasoning/temperature plus positive
+   prompt/reasoning/completion token rates and the `token-components-v1` pricing formula,
+   grid/stems settings,
+   fixture hash, evaluation version, seed, and held-constant inputs. Keep the manifest,
+   audio, backend adapter, credentials, videos, and generated artifacts local only.
+3. Provide an owner-local `module:callable` backend factory implementing
+   `ExperimentBackend`. It must use `request.include_macro` as the real graph switch,
+   pass `request.regeneration_nonce` to both planning cache seams, reuse the supplied
+   analysis snapshot, use `request.spend_gate` around every provider attempt/repair,
+   convert current judge-loop usage with `arm_call_records_from_iteration`, render/export
+   locally, retain `VisionEvaluationEvidence.from_vision`, and derive scores with
+   `SequenceScore.from_vision`. These adapters are shipped; the owner backend wires the
+   actual local pipeline to them rather than redefining accounting or evidence rules.
+   Each provider operation must return its exact success-or-failure call record to the
+   wrapper; a provider exception may not be allowed to bypass usage settlement.
+4. After explicit owner approval, run exactly 5N sequences:
+
+   ```bash
+   uv run python -m twinklr.core.reporting.evaluation.three_arm_cli run \
+     --manifest /OWNER/LOCAL/p2p-t13-manifest.json \
+     --backend-factory owner_p2p_t13_backend:build_backend \
+     --results /OWNER/LOCAL/p2p-t13-results.json --owner-opt-in
+   ```
+
+5. Stage the owner-visible blind packet. This command does not persist the reveal key:
+
+   ```bash
+   uv run python -m twinklr.core.reporting.evaluation.three_arm_cli prepare-blind \
+     --results /OWNER/LOCAL/p2p-t13-results.json --seed <FROZEN-SEED> \
+     --output-dir /OWNER/LOCAL/p2p-t13-blind
+   ```
+
+6. Without opening the results file, source videos, logs, plan prose, or any filename
+   other than the opaque packet names, the owner ranks every blind ID. Save the ordered
+   IDs as a JSON string list, then persist the ranking before unblinding:
+
+   ```bash
+   uv run python -m twinklr.core.reporting.evaluation.three_arm_cli record-ranking \
+     --packet /OWNER/LOCAL/p2p-t13-blind/blind-review.json \
+     --ordered-ids /OWNER/LOCAL/p2p-t13-blind/ordered-ids.json \
+     --ranking /OWNER/LOCAL/p2p-t13-blind/ranking.json
+   ```
+
+7. Only after `ranking.json` exists, reconstruct and persist the reveal key, revalidate
+   the real calibration, compute the frozen criteria, and write through the evaluation
+   writer:
+
+   ```bash
+   uv run python -m twinklr.core.reporting.evaluation.three_arm_cli finalize \
+     --manifest /OWNER/LOCAL/p2p-t13-manifest.json \
+     --results /OWNER/LOCAL/p2p-t13-results.json \
+     --packet /OWNER/LOCAL/p2p-t13-blind/blind-review.json \
+     --ranking /OWNER/LOCAL/p2p-t13-blind/ranking.json \
+     --reveal /OWNER/LOCAL/p2p-t13-blind/reveal.json \
+     --report /OWNER/LOCAL/p2p-t13-comparison.json
+   ```
+
+8. An independent verifier checks the 5N matrix, exact hashes/cache identities, call
+   records/spend, blind commitment/ranking timestamps, calibrated harness evidence,
+   and the fixed parity computation. Only then may the owner read the verdict and
+   authorize the proposal update, decision record, and committed evaluation result.
+
+At N=8 the frozen ceilings are: 40 sequences; judging ≤ $0.20 each and ≤ $8.00 total;
+planning ≤ $25.00 total across B/C, divided into a conservative pre-call reservation
+of $0.78125 for each of the 32 LLM runs; and planning plus judging ≤ $40.00. Each LLM
+run permits at most 12 logical planning requests and 3 provider attempts per logical
+request; each sequence permits exactly one vision-judge logical request. Raising any
+cap requires orchestrator sign-off and a newly frozen manifest before calls.
+
+### Truthful non-result
+
+P2P-T6 owner calibration acceptance is unmet. Therefore the real manifest, 5N run,
+P2P-T6 scoring, blind human ranking, parity outcome, D1 verdict, proposal update,
+decision record, and repository evaluation artifact are all **PENDING-OWNER**. The
+standing-default sentence in §D1 and the fixed parity criteria in §4 remain unmodified.
+No result should be inferred from the offline unit fixtures.
+
+### Fresh author verification evidence
+
+Run from the isolated `8aeda12` author worktree with no network, live provider, owner
+audio, or xLights execution:
+
+- `uv run ruff format --check .` — **1,333 files already formatted**.
+- `uv run ruff check .` — **all checks passed**.
+- `uv run mypy .` — **success: 718 source files**.
+- `uv run pytest tests/unit/reporting/evaluation/test_three_arm_experiment.py -q` —
+  **35 passed**. This includes all six second-remediation adversarial probes, the final
+  narrow fail-closed/neutrality probes, and 100
+  deterministic blind-selection seeds.
+- Adjacent selector/runner/cache/report regression gate — **199 passed**.
+- `uv run pytest tests/unit -k "selector or experiment or comparison" -q` —
+  **119 passed, 4,811 deselected**.
+- Most recent complete full offline gate (after the preceding narrow remediation and
+  before the final malformed-normal-return-only patch) — **5,235 passed, 25 skipped,
+  14 deselected, 9 pre-existing profiling deprecation warnings** in 100.09 seconds.
+
+Implementation/evidence manifest for independent review:
+
+- `packages/twinklr/core/agents/sequencer/moving_heads/deterministic_selector.py`
+- `packages/twinklr/core/agents/async_runner.py`
+- `packages/twinklr/core/agents/shared/judge/controller.py`
+- `packages/twinklr/core/agents/sequencer/{macro_planner,moving_heads}/orchestrator.py`
+- `packages/twinklr/core/agents/sequencer/moving_heads/{context,deterministic_selector}.py`
+- `packages/twinklr/core/agents/sequencer/macro_planner/stage.py`
+- `packages/twinklr/core/pipeline/definitions/{common,moving_heads}.py`
+- `packages/twinklr/core/sequencer/moving_heads/pipeline.py`
+- `packages/twinklr/core/sequencer/theming/catalog.py`
+- `packages/twinklr/core/reporting/evaluation/{three_arm,three_arm_cli,render,models,__init__}.py`
+- `tests/unit/agents/sequencer/moving_heads/test_deterministic_selector.py`
+- `tests/unit/agents/{test_async_runner_token_attribution.py,shared/judge/test_controller.py}`
+- `tests/unit/pipeline/definitions/test_definitions.py`
+- `tests/unit/reporting/evaluation/test_three_arm_experiment.py`
+- this specification handoff.
+
+The focused, static, adjacent, and keyword-broad counts are fresh after the final
+patch; the full-suite timing is labeled with its exact currency above. These are
+evidence for independent verification, not author approval and not evidence of an
+experiment result.

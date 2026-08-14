@@ -105,6 +105,44 @@ class TestBuildMovingHeadsPipeline:
         render = next(s for s in pipeline.stages if s.id == "render")
         assert "moving_heads" in render.inputs
 
+    def test_macro_ablated_arm_is_a_real_graph_switch(self) -> None:
+        """Arm C omits the macro stage; max_iterations remains an independent knob."""
+        from twinklr.core.pipeline.definitions.moving_heads import (
+            build_moving_heads_pipeline,
+        )
+
+        pipeline = build_moving_heads_pipeline(
+            display_groups=MOCK_DISPLAY_GROUPS,
+            fixture_count=4,
+            available_templates=["template_a"],
+            xsq_output_path=Path("/tmp/test.xsq"),
+            include_macro=False,
+            max_iterations=3,
+        )
+
+        assert "macro" not in {stage.id for stage in pipeline.stages}
+        moving_heads = next(stage for stage in pipeline.stages if stage.id == "moving_heads")
+        assert moving_heads.inputs == ["audio", "profile", "lyrics"]
+        assert moving_heads.stage.max_iterations == 3
+        assert pipeline.validate_pipeline() == []
+
+    def test_full_llm_replicate_nonce_reaches_both_planning_stages(self) -> None:
+        from twinklr.core.pipeline.definitions.moving_heads import (
+            build_moving_heads_pipeline,
+        )
+
+        pipeline = build_moving_heads_pipeline(
+            display_groups=MOCK_DISPLAY_GROUPS,
+            fixture_count=4,
+            available_templates=["template_a"],
+            xsq_output_path=Path("/tmp/test.xsq"),
+            regeneration_nonce="replicate-b-2",
+        )
+        macro = next(stage for stage in pipeline.stages if stage.id == "macro")
+        moving_heads = next(stage for stage in pipeline.stages if stage.id == "moving_heads")
+        assert macro.stage.regeneration_nonce == "replicate-b-2"
+        assert moving_heads.stage.regeneration_nonce == "replicate-b-2"
+
 
 class TestBuildDisplayPipeline:
     """Tests for build_display_pipeline factory."""

@@ -298,6 +298,8 @@ async def test_max_iterations_zero_skips_judge() -> None:
     assert result.context.final_verdict is None
     assert provider.planner_calls == 1
     assert provider.judge_calls == 0
+    assert [record.role for record in result.context.call_records] == ["planner"]
+    assert result.context.call_records[0].total_tokens == 10
 
 
 @pytest.mark.asyncio
@@ -328,3 +330,11 @@ async def test_call_ceiling_not_increased() -> None:
     assert provider.planner_calls == 3
     assert provider.judge_calls == 3
     assert len(provider.calls) == 6
+    assert [record.role for record in result.context.call_records] == [
+        "planner",
+        "judge",
+        "planner",
+        "judge",
+        "planner",
+        "judge",
+    ]

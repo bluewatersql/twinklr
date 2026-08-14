@@ -4,7 +4,6 @@ from twinklr.core.reporting.evaluation.config import EvalConfig
 from twinklr.core.reporting.evaluation.generator import generate_evaluation_report
 from twinklr.core.reporting.evaluation.models import (
     ComparisonMetrics,
-    ComparisonReport,
     ContinuityCheck,
     CurveAnalysis,
     CurveStats,
@@ -26,6 +25,7 @@ from twinklr.core.reporting.evaluation.models import (
     ValidationResult,
 )
 from twinklr.core.reporting.evaluation.sync_metrics import DeterministicSyncMetrics
+from twinklr.core.reporting.evaluation.three_arm import ComparisonReport
 from twinklr.core.reporting.evaluation.vision_evaluation import VisionEvaluationResult
 
 __all__ = [

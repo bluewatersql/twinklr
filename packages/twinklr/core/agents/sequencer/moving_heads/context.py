@@ -99,6 +99,11 @@ class MovingHeadPlanningContext(BaseModel):
         description="MacroPlan section outputs for coordination (energy targets, motion density, style per section)",
     )
 
+    macro_planning_enabled: bool = Field(
+        default=True,
+        description="Whether the macro-planning graph arm was enabled for this plan",
+    )
+
     # Template descriptions for prompt enrichment (optional)
     template_descriptions: list[TemplateDescription] | None = Field(
         default=None,

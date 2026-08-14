@@ -15,6 +15,8 @@ from twinklr.core.reporting.evaluation.models import EvaluationReport, SectionRe
 if TYPE_CHECKING:
     from pydantic import BaseModel
 
+    from twinklr.core.reporting.evaluation.three_arm import ComparisonReport
+
 logger = logging.getLogger(__name__)
 
 
@@ -49,6 +51,16 @@ def write_vision_evaluation_json(result: BaseModel, output_path: Path) -> None:
         encoding="utf-8",
     )
     logger.debug("Wrote vision evaluation JSON: %s", output_path)
+
+
+def write_comparison_report_json(report: ComparisonReport, output_path: Path) -> None:
+    """Serialize the typed P2P-T13 comparison through the evaluation writer seam."""
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(
+        json.dumps(report.model_dump(mode="json", exclude_computed_fields=True), indent=2),
+        encoding="utf-8",
+    )
+    logger.debug("Wrote comparison report JSON: %s", output_path)
 
 
 def write_report_markdown(report: EvaluationReport, output_path: Path) -> None:

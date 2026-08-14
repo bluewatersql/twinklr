@@ -100,6 +100,33 @@ class IterationConfig(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid", validate_assignment=True)
 
 
+class IterationCallUsage(BaseModel):
+    """Exact usage returned by one logical provider response."""
+
+    prompt_tokens: int = Field(ge=0)
+    reasoning_tokens: int = Field(ge=0)
+    completion_tokens: int = Field(ge=0)
+    total_tokens: int = Field(ge=0)
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+
+class IterationCallRecord(BaseModel):
+    """One planner/judge invocation, including repair-attempt usage."""
+
+    role: str = Field(min_length=1)
+    iteration: int = Field(ge=0)
+    success: bool
+    logical_requests: int = Field(ge=0)
+    prompt_tokens: int = Field(ge=0)
+    reasoning_tokens: int = Field(ge=0)
+    completion_tokens: int = Field(ge=0)
+    total_tokens: int = Field(ge=0)
+    call_usages: list[IterationCallUsage]
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+
 class IterationContext(BaseModel):
     """Runtime context for iteration loop.
 
@@ -126,6 +153,7 @@ class IterationContext(BaseModel):
 
     # Tracking
     total_tokens_used: int = Field(ge=0, default=0)
+    call_records: list[IterationCallRecord] = Field(default_factory=list)
 
     # Termination
     termination_reason: str | None = Field(default=None)
@@ -169,6 +197,23 @@ class IterationContext(BaseModel):
             tokens: Number of tokens to add
         """
         self.total_tokens_used += tokens
+
+    def record_call(self, *, role: str, iteration: int, result: AgentResult) -> None:
+        """Retain exact per-logical-call usage instead of only the aggregate total."""
+        usages = result.metadata.get("call_usages", [])
+        self.call_records.append(
+            IterationCallRecord(
+                role=role,
+                iteration=iteration,
+                success=result.success,
+                logical_requests=int(result.metadata.get("logical_request_count", len(usages))),
+                prompt_tokens=result.prompt_tokens,
+                reasoning_tokens=result.reasoning_tokens,
+                completion_tokens=result.completion_tokens,
+                total_tokens=result.tokens_used,
+                call_usages=list(usages),
+            )
+        )
 
     def judge_prompt_history(self) -> dict[str, Any]:
         """Serialize only this run's prior judge history for the next judge prompt."""
@@ -377,6 +422,11 @@ class StandardIterationController[TPlan]:
                 spec=planner_spec, variables=planner_vars, state=planner_state
             )
             context.add_tokens(plan_result.tokens_used or 0)
+            context.record_call(
+                role=planner_spec.name,
+                iteration=iteration,
+                result=plan_result,
+            )
 
             if not plan_result.success:
                 return self._handle_planner_failure(context, plan_result)
@@ -460,6 +510,11 @@ class StandardIterationController[TPlan]:
             # Run judge
             judge_result = await runner.run(spec=judge_spec, variables=judge_vars)
             context.add_tokens(judge_result.tokens_used or 0)
+            context.record_call(
+                role=judge_spec.name,
+                iteration=iteration,
+                result=judge_result,
+            )
 
             if not judge_result.success:
                 return self._handle_judge_failure(context, plan, judge_result)

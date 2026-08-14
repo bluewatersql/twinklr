@@ -241,12 +241,28 @@ class MovingHeadPlannerOrchestrator:
                 "count": context.fixtures.count,
                 "groups": context.fixtures.groups,
             },
+            # These are prompt/validation inputs, not merely registry diagnostics.
+            # Hash both the admitted IDs and the exact metadata snapshot so a
+            # metadata-only library revision cannot reuse an older plan.
+            "available_templates": context.available_templates,
+            "template_descriptions": (
+                [item.model_dump(mode="json") for item in context.template_descriptions]
+                if context.template_descriptions is not None
+                else None
+            ),
+            # Bar numbers in the plan name positions on this authoritative grid.
+            "beat_grid": (context.beat_grid.model_dump(mode="json") if context.beat_grid else None),
+            # None is also a valid macro result, so the experiment ablation must
+            # remain distinguishable from a macro-enabled run that produced none.
+            "macro_planning_enabled": context.macro_planning_enabled,
             "max_iterations": self.controller.config.max_iterations,
             "min_pass_score": self.controller.config.approval_score_threshold,
             "planner_model": self.planner_spec.model,
             "planner_reasoning_effort": self.planner_spec.reasoning_effort,
+            "planner_temperature": self.planner_spec.temperature,
             "judge_model": self.judge_spec.model,
             "judge_reasoning_effort": self.judge_spec.reasoning_effort,
+            "judge_temperature": self.judge_spec.temperature,
             "prompt_packs": spec_prompt_hash(
                 self.prompt_base_path, self.planner_spec, self.judge_spec
             ),

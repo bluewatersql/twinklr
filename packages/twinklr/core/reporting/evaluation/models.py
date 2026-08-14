@@ -309,8 +309,8 @@ class ComparisonMetrics(BaseModel):
     model_config = ConfigDict(frozen=True)
 
 
-class ComparisonReport(BaseModel):
-    """Comparison of multiple evaluation reports."""
+class LegacyComparisonReport(BaseModel):
+    """Pre-P2P-T13 iteration comparison retained for checkpoint compatibility."""
 
     schema_version: str = Field(default="1.0.0", description="Comparison schema version")
     run_ids: list[str] = Field(description="Run IDs being compared")

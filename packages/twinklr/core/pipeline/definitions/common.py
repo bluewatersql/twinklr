@@ -17,6 +17,9 @@ from twinklr.core.pipeline import StageDefinition
 
 def build_common_stages(
     display_groups: list[dict[str, object]],
+    *,
+    include_macro: bool = True,
+    regeneration_nonce: str | None = None,
 ) -> list[StageDefinition]:
     """Build the shared pipeline prefix stages.
 
@@ -43,7 +46,7 @@ def build_common_stages(
         >>> [s.id for s in stages]
         ['audio', 'profile', 'lyrics', 'macro']
     """
-    return [
+    stages = [
         StageDefinition(
             id="audio",
             stage=AudioAnalysisStage(),
@@ -68,12 +71,19 @@ def build_common_stages(
             output_type="LyricContextModel",
             description="Generate narrative and thematic analysis (if lyrics available)",
         ),
-        StageDefinition(
-            id="macro",
-            stage=MacroPlannerStage(display_groups=display_groups),
-            inputs=["profile", "lyrics"],
-            input_type="dict[str, Any]",
-            output_type="list[MacroSectionPlan]",
-            description="Generate high-level choreography strategy",
-        ),
     ]
+    if include_macro:
+        stages.append(
+            StageDefinition(
+                id="macro",
+                stage=MacroPlannerStage(
+                    display_groups=display_groups,
+                    regeneration_nonce=regeneration_nonce,
+                ),
+                inputs=["profile", "lyrics"],
+                input_type="dict[str, Any]",
+                output_type="list[MacroSectionPlan]",
+                description="Generate high-level choreography strategy",
+            )
+        )
+    return stages

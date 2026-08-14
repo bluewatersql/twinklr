@@ -179,6 +179,7 @@ class AsyncAgentRunner:
             metadata: dict[str, Any] = {
                 "schema_repair_attempts": repair_attempts,
                 "model": response_metadata.model or spec.model,
+                **self._usage_metadata(call_usages),
             }
             if response_metadata.structured_output_mode is not None:
                 metadata["structured_output_mode"] = response_metadata.structured_output_mode
@@ -218,6 +219,7 @@ class AsyncAgentRunner:
                 prompt_tokens=usage.prompt_tokens,
                 completion_tokens=usage.completion_tokens,
                 reasoning_tokens=usage.reasoning_tokens,
+                metadata=self._usage_metadata(call_usages),
             )
 
         except RunError as e:
@@ -227,7 +229,10 @@ class AsyncAgentRunner:
             logger.error(f"Run error in {spec.name}: {e}")
 
             repair_attempts = spec.max_schema_repair_attempts
-            metadata = {"schema_repair_attempts": repair_attempts}
+            metadata = {
+                "schema_repair_attempts": repair_attempts,
+                **self._usage_metadata(call_usages),
+            }
 
             return AgentResult(
                 success=False,
@@ -256,7 +261,24 @@ class AsyncAgentRunner:
                 prompt_tokens=usage.prompt_tokens,
                 completion_tokens=usage.completion_tokens,
                 reasoning_tokens=usage.reasoning_tokens,
+                metadata=self._usage_metadata(call_usages),
             )
+
+    @staticmethod
+    def _usage_metadata(call_usages: list[TokenUsage]) -> dict[str, Any]:
+        """Serialize each logical response usage for experiment-grade costing."""
+        return {
+            "logical_request_count": len(call_usages),
+            "call_usages": [
+                {
+                    "prompt_tokens": usage.prompt_tokens,
+                    "reasoning_tokens": usage.reasoning_tokens,
+                    "completion_tokens": usage.completion_tokens,
+                    "total_tokens": usage.total_tokens,
+                }
+                for usage in call_usages
+            ],
+        }
 
     def _build_messages(self, prompts: dict[str, Any], spec: AgentSpec) -> list[dict[str, str]]:
         """Build message list for LLM provider.
