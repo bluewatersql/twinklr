@@ -263,3 +263,14 @@ the smallest vocabulary, a declared default, and an existing validator cross-che
 land each behind its own golden test, and require the byte-identical no-intent case
 to pass after every axis. Second risk: scope creep into the 37-template re-authoring
 — explicitly out of scope here; migrate 2–3 templates only, as capability proof.
+
+## Routed note from P1P-T6 verification (2026-08-13)
+
+`DEFAULT_DIMMER_PARAMS[SLOW]` uses period 4.0 bars; in any section shorter than the
+period, PULSE's off-phase falls outside the window and the dimmer renders CONSTANT
+(rationale comment at `packages/twinklr/core/sequencer/moving_heads/libraries/dimmer.py`,
+"SLOW" entry). This is an intentional-but-unlovely artifact of period-based patterns
+meeting short sections. Whoever reworks dimmer/channel resolution here should decide:
+scale period to section length, gate SLOW out of short sections, or accept CONSTANT
+as the correct reading of "slow" at 1 bar. P1P-T6 adjudicated it out-of-mechanism for
+channel defaults; it must not die silently.
