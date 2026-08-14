@@ -90,6 +90,14 @@ For full audio features including WhisperX transcription:
 make install-dev   # Includes ML dependencies (~2GB+)
 ```
 
+For optional cached Demucs stem features on supported systems:
+
+```bash
+uv sync --package twinklr-core --extra stems
+```
+
+Stem separation is off by default and must also be enabled in `config.json`.
+
 ### Usage
 
 ```bash

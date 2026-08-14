@@ -228,6 +228,42 @@ class TestWhisperXGatingLogic:
         # Should return SKIPPED status (no lyrics, no whisperx)
         assert bundle.stage_status == StageStatus.SKIPPED
 
+    async def test_instrumental_fixture_gates_off_transcription(self, tmp_path):
+        """Separated instrumental evidence prevents a hallucination-prone ASR call."""
+        audio_path = str(tmp_path / "instrumental.mp3")
+        (tmp_path / "instrumental.mp3").write_text("mock")
+        whisperx = MockWhisperXService()
+        pipeline = LyricsPipeline(
+            config=LyricsPipelineConfig(), providers={}, whisperx_service=whisperx
+        )
+
+        bundle = await pipeline.resolve(
+            audio_path=audio_path,
+            duration_ms=1000,
+            vocal_gate_open=False,
+        )
+
+        assert bundle.stage_status == StageStatus.SKIPPED
+        assert whisperx.transcribe_called is False
+        assert any("vocal-stem gate" in warning.lower() for warning in bundle.warnings)
+
+    async def test_vocal_fixture_gates_on_transcription(self, tmp_path):
+        """Separated vocal evidence retains the existing WhisperX path."""
+        audio_path = str(tmp_path / "vocal.mp3")
+        (tmp_path / "vocal.mp3").write_text("mock")
+        whisperx = MockWhisperXService()
+        pipeline = LyricsPipeline(
+            config=LyricsPipelineConfig(), providers={}, whisperx_service=whisperx
+        )
+
+        await pipeline.resolve(
+            audio_path=audio_path,
+            duration_ms=1000,
+            vocal_gate_open=True,
+        )
+
+        assert whisperx.transcribe_called is True
+
 
 class TestWhisperXConfidenceScoring:
     """Test confidence scoring for WhisperX results."""

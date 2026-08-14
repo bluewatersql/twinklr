@@ -213,3 +213,70 @@ that is D7/M3's change to make. Second risk: silent quality regression if a cons
 switches to stem-derived features without comparison; mitigated by keeping both
 feature families present and flagging which was used, so P2P-T8's A/B and P2P-T13's
 comparison can attribute changes correctly.
+
+## Implementation handoff (2026-08-14)
+
+Implemented, pending the independent verifier/owner gates below:
+
+- Added the opt-in `StemSeparationConfig` and a lazy Demucs adapter. The default
+  environment neither imports Demucs nor downloads weights. Demucs's own device
+  default supplies automatic MPS selection; an MPS runtime failure retries once on
+  CPU and records a warning.
+- Cached compact derived features through `FSCache` with the exact
+  `sha256(audio_hash:model_name)` identity. Only successful separation is reusable;
+  unavailable results are not stored as successful stem cache entries, and enabled
+  SongBundle caches with missing/unavailable/wrong-model status are rejected.
+- Wired drum-stem onsets into beat/accent confidence, bass-stem energy into the
+  existing build/drop detector, and vocal-stem presence/segments into both the
+  primary vocal feature path and the WhisperX gate. Full-mix equivalents and source
+  provenance remain beside every selected feature family. Disabled/unavailable
+  paths expose an explicit full-mix-fallback status in `SongBundle.features.stems`.
+- Surfaced the selected stem signals and provenance to the audio-profile prompt,
+  which supplies the shared creative substrate consumed by downstream planning.
+- Added root and core `stems` extras plus lock entries. The core extra intentionally
+  declares two Demucs requirements:
+  `demucs==4.1.0; sys_platform != 'darwin'` and
+  `demucs==4.1.0; sys_platform == 'darwin' and platform_machine != 'x86_64'`.
+  This keeps Intel macOS installable while runtime analysis reports the explicit
+  unsupported/full-mix fallback. No NumPy, Torch, WhisperX, pyannote, or torchaudio
+  constraint was changed.
+
+Fresh evidence in the isolated implementation worktree:
+
+- Red first: focused collection failed with
+  `ModuleNotFoundError: No module named 'twinklr.core.audio.stems'`.
+- Focused stems/config/lyrics/profile contract: `46 passed, 1 skipped` after adding
+  the two fixture gate cases; the skip is the declared LOCAL-ONLY real separation.
+- Audio suite: `810 passed, 1 skipped`.
+- Static gates: Ruff format check `1312 files already formatted`; Ruff check
+  `All checks passed`; mypy `709 source files` with no issues.
+- `uv sync --extra dev --all-packages` succeeds and removes/omits Demucs and Torch.
+- On Apple Silicon, `uv sync --extra stems` resolves and installs Demucs 4.1.0 with
+  the existing Torch 2.4.0 and NumPy 2.3.5 (no dependency bump). The equivalent
+  `aarch64-apple-darwin` dry run selects Demucs.
+- The `x86_64-apple-darwin` dry run resolves successfully and does not select Demucs
+  or Torch; the manifest marker unit test pins this behavior.
+- Full non-LOCAL suite initially found one strict-template compatibility failure;
+  the prompt guard was corrected; the fresh full rerun is green:
+  `5070 passed, 25 skipped, 12 deselected` (87% coverage).
+
+Verifier remediation (2026-08-14): outer SongBundle acceptance now recomputes the
+expected vocal gate from stored `vocal_presence_pct` and the current configured
+threshold. A mismatch in either direction rejects the outer bundle, while the
+unchanged audio-hash + model inner key reuses successful stem features. Two
+end-to-end cache regressions prove the bundle and lyrics gate rebuild, the refreshed
+stem result is an inner-cache hit, and the separator call count remains exactly one.
+Unavailable enabled results remain rejected, disabled results remain reusable, and
+the outer cache version intentionally stays threshold-agnostic because acceptance
+validates the threshold-derived content directly.
+
+Residual owner/verifier gates:
+
+- Run `TWINKLR_REAL_STEMS_AUDIO=<short-song> uv run pytest -m local_only
+  -k separation -q` with the stems extra on Apple Silicon. This is the only test that
+  downloads/executes the model and is deliberately excluded from default tests.
+- Confirm live MPS runtime and the one-time CPU fallback on owner hardware. Intel
+  macOS is deliberately unsupported for stems, not an unverified supported target.
+- Twinklr and xLights 2026.11 may both separate the same audio. No cache handoff to
+  xLights exists in this task, so owners should watch for duplicate runtime/storage.
+- No paid API, live xLights, or LOCAL-ONLY model call was made in this lane.

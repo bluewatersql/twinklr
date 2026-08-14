@@ -15,6 +15,17 @@ Analyze the following song and produce a complete AudioProfileModel.
 - **Tempo Confidence:** {{ shaped_context.tempo.confidence | round(2) }}
 {% endif %}
 
+{% if shaped_context.stem_signals is defined and shaped_context.stem_signals %}
+## Source-Separation Signals
+
+- **Status:** {{ shaped_context.stem_signals.status }}
+- **Model:** {{ shaped_context.stem_signals.model_name or "None (full-mix fallback)" }}
+- **Rhythm source:** {{ shaped_context.stem_signals.rhythm_source }}
+- **Beat / accent confidence:** {{ shaped_context.stem_signals.beat_confidence | round(2) }} / {{ shaped_context.stem_signals.accent_confidence | round(2) }}
+- **Build/drop source:** {{ shaped_context.stem_signals.build_drop_source }}
+- **Vocal source / presence:** {{ shaped_context.stem_signals.vocals_source }} / {{ shaped_context.stem_signals.vocal_presence_pct | round(2) }}
+{% endif %}
+
 {% if shaped_context.key %}
 ## Musical Key
 

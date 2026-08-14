@@ -24,6 +24,8 @@ class TestAudioEnhancementConfigDefaults:
         assert config.enable_lyrics_lookup is False
         assert config.enable_whisperx is False
         assert config.enable_diarization is False
+        assert config.stems.enabled is False
+        assert config.stems.model_name == "htdemucs"
 
     def test_embedded_only_mode(self):
         """Embedded-only mode (no network, no ML)."""

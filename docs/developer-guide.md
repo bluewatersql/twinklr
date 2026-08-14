@@ -420,6 +420,15 @@ Implement the `LLMProvider` interface in `packages/twinklr/core/agents/providers
 
 Configure via `AudioEnhancementConfig` fields in `packages/twinklr/core/config/models.py`. Network features (AcoustID, MusicBrainz, lyrics lookup, WhisperX) require explicit opt-in and may need API keys.
 
+Source separation is also opt-in: install it with
+`uv sync --package twinklr-core --extra stems`, then enable
+`audio_processing.enhancements.stems.enabled`. Derived stem features are cached by
+audio content hash plus Demucs model name. Drum onsets, bass energy, and vocal
+presence feed rhythm confidence, build/drop detection, and the WhisperX gate while
+their full-mix equivalents and provenance remain in the analysis result. Intel macOS
+uses the explicit full-mix fallback; Apple Silicon uses Demucs's automatic MPS choice
+with a one-time CPU retry on MPS failure.
+
 ---
 
 ## Known Transitional Areas

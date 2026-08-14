@@ -84,6 +84,7 @@ class LyricsPipeline:
         artist: str | None = None,
         title: str | None = None,
         vocal_segments: list[dict[str, float]] | None = None,
+        vocal_gate_open: bool | None = None,
     ) -> LyricsBundle:
         """Resolve lyrics through stage gating (async).
 
@@ -94,6 +95,8 @@ class LyricsPipeline:
             title: Track title for provider lookup
             vocal_segments: Optional vocal detector segments for vocal_presence_pct computation.
                            Format: [{"start_s": float, "end_s": float, ...}, ...]
+            vocal_gate_open: Whether a separated vocal stem justifies WhisperX work.
+                None preserves the full-mix fallback behavior.
 
         Returns:
             LyricsBundle with resolved lyrics and status
@@ -148,6 +151,7 @@ class LyricsPipeline:
                     self.config.require_timed_words
                     and not plain_bundle.words
                     and self.whisperx_service
+                    and vocal_gate_open is not False
                 ):
                     align_bundle = self._try_whisperx_align(
                         audio_path=audio_path,
@@ -162,7 +166,7 @@ class LyricsPipeline:
                 return plain_bundle
 
         # Stage 5: Try WhisperX transcribe (no lyrics from any source)
-        if self.whisperx_service:
+        if self.whisperx_service and vocal_gate_open is not False:
             transcribe_bundle = self._try_whisperx_transcribe(
                 audio_path=audio_path,
                 duration_ms=duration_ms,
@@ -171,6 +175,9 @@ class LyricsPipeline:
             )
             if transcribe_bundle:
                 return transcribe_bundle
+
+        if vocal_gate_open is False:
+            warnings.append("WhisperX skipped: vocal-stem gate is closed")
 
         # No lyrics found
         logger.debug(

@@ -52,6 +52,21 @@ This adds the `ml` extra group (~2GB+ for PyTorch and WhisperX). WhisperX models
 
 _Source: `Makefile` target `install-dev`_
 
+### Optional Stem Separation
+
+To enable cached Demucs 4.1.0 source separation on supported systems:
+
+```bash
+uv sync --package twinklr-core --extra stems
+```
+
+The stage remains off until `audio_processing.enhancements.stems.enabled` is set.
+Apple Silicon follows Demucs's automatic MPS selection and retries once on CPU if an
+MPS kernel fails. Intel macOS is explicitly unsupported by this extra because Demucs
+4.1.0 conflicts with Twinklr's NumPy 2 requirement there; analysis remains available
+with a result-visible full-mix fallback. The default install does not include Demucs,
+PyTorch, or model downloads.
+
 ### Verify Installation
 
 ```bash
@@ -116,6 +131,9 @@ Key fields and defaults:
 | `llm_base_url` | `"https://api.openai.com/v1"` | LLM API base URL |
 | `audio_processing.hop_length` | `512` | Librosa hop length |
 | `audio_processing.frame_length` | `2048` | Librosa frame length |
+| `audio_processing.enhancements.stems.enabled` | `false` | Opt in to cached Demucs source separation |
+| `audio_processing.enhancements.stems.model_name` | `"htdemucs"` | Demucs model name; changing it produces a clean cache miss |
+| `audio_processing.enhancements.stems.vocal_presence_threshold` | `0.05` | Minimum separated-vocal coverage that opens the WhisperX gate |
 | `logging.level` | `"INFO"` | Log level |
 
 The `llm_api_key` field is populated from the `OPENAI_API_KEY` environment variable automatically.

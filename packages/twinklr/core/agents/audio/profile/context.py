@@ -154,6 +154,23 @@ def shape_context(bundle: SongBundle) -> dict[str, Any]:
     energy_data = features.get("energy", {})
     context["energy"] = _shape_energy(energy_data, context["sections"])
 
+    stems_data = features.get("stems", {})
+    rhythm_data = features.get("rhythm", {})
+    vocals_statistics = features.get("vocals_statistics", {})
+    context["stem_signals"] = {
+        "status": stems_data.get("status", "disabled_full_mix_fallback"),
+        "model_name": stems_data.get("model_name"),
+        "rhythm_source": rhythm_data.get("source", "full_mix"),
+        "beat_confidence": rhythm_data.get("beat_confidence", 0.0),
+        "accent_confidence": rhythm_data.get("accent_confidence", 0.0),
+        "build_drop_source": energy_data.get("build_drop_source", "full_mix"),
+        "vocals_source": features.get("vocals_source", "full_mix"),
+        "vocal_presence_pct": stems_data.get(
+            "vocal_presence_pct",
+            vocals_statistics.get("vocal_coverage_pct", 0.0),
+        ),
+    }
+
     # Lyrics (metadata only, no full text)
     context["lyrics"] = _shape_lyrics(bundle.lyrics)
 

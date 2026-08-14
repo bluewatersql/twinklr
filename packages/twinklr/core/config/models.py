@@ -270,6 +270,21 @@ class AssumptionsConfig(BaseModel):
     beats_per_bar: int = Field(default=4, ge=1, le=12)
 
 
+class StemSeparationConfig(BaseModel):
+    """Opt-in source-separation configuration."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    enabled: bool = Field(default=False, description="Enable cached Demucs source separation")
+    model_name: str = Field(default="htdemucs", min_length=1)
+    vocal_presence_threshold: float = Field(
+        default=0.05,
+        ge=0.0,
+        le=1.0,
+        description="Minimum vocal-stem duration fraction required to run WhisperX",
+    )
+
+
 class AudioEnhancementConfig(BaseModel):
     """Audio enhancement configuration (v3.0 features).
 
@@ -305,6 +320,10 @@ class AudioEnhancementConfig(BaseModel):
     enable_diarization: bool = Field(
         default=False,
         description="Enable speaker diarization (requires pyannote models)",
+    )
+    stems: StemSeparationConfig = Field(
+        default_factory=StemSeparationConfig,
+        description="Optional cached source-separation stage",
     )
 
     # Lyrics pipeline

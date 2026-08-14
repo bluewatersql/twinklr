@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from pathlib import Path
 import time
 from typing import Any
 
@@ -22,6 +23,7 @@ import numpy as np
 # Import all the analysis modules
 from twinklr.core.audio.advanced.tension import compute_tension_curve
 from twinklr.core.audio.cache_adapter import (
+    AUDIO_FEATURES_CACHE_VERSION,
     load_audio_features_async,
     save_audio_features_async,
 )
@@ -51,6 +53,14 @@ from twinklr.core.audio.rhythm.tempo import detect_tempo_changes
 from twinklr.core.audio.spectral.bands import extract_dynamic_features
 from twinklr.core.audio.spectral.basic import extract_spectral_features
 from twinklr.core.audio.spectral.vocals import detect_vocals
+from twinklr.core.audio.stems import (
+    StemFeatures,
+    StemSeparator,
+    StemStatus,
+    analyze_stems,
+    apply_stem_consumers,
+    stem_result_matches_config,
+)
 from twinklr.core.audio.structure.sections import detect_song_sections
 from twinklr.core.audio.timeline.builder import build_timeline_export
 from twinklr.core.audio.validation.validator import validate_features
@@ -82,6 +92,7 @@ class AudioAnalyzer:
         app_config: AppConfig,
         job_config: JobConfig,
         service_factory: EnhancementServiceFactory | None = None,
+        stem_separator: StemSeparator | None = None,
     ):
         """Initialize audio analyzer with configuration.
 
@@ -89,9 +100,11 @@ class AudioAnalyzer:
             app_config: Application configuration (audio processing settings)
             job_config: Job configuration (checkpoint settings)
             service_factory: Optional factory for creating enhancement services (DI)
+            stem_separator: Optional source-separation adapter for dependency injection
         """
         self.app_config = app_config
         self.job_config = job_config
+        self.stem_separator = stem_separator
 
         # Initialize async cache
         fs = RealFileSystem()
@@ -150,9 +163,18 @@ class AudioAnalyzer:
             self._cache_initialized = True
 
         # Check cache (unless forcing reprocess)
+        cache_version = self._audio_cache_version()
         if not force_reprocess:
-            cached_bundle = await load_audio_features_async(audio_path, self.cache, SongBundle)
-            if cached_bundle:
+            cached_bundle = await load_audio_features_async(
+                audio_path,
+                self.cache,
+                SongBundle,
+                step_version=cache_version,
+            )
+            if cached_bundle and stem_result_matches_config(
+                cached_bundle.features.get("stems", {}),
+                self.app_config.audio_processing.enhancements.stems,
+            ):
                 # If lyrics were skipped when the cache was populated but are now enabled,
                 # extract them and refresh the cache so has_lyrics is correct downstream.
                 if (
@@ -168,9 +190,16 @@ class AudioAnalyzer:
                         audio_path,
                         cached_bundle.timing.duration_ms,
                         cached_bundle.metadata,
+                        cached_bundle.features.get("vocals", []),
+                        cached_bundle.features.get("vocal_gate_open"),
                     )
                     cached_bundle = cached_bundle.model_copy(update={"lyrics": lyrics_bundle})
-                    await save_audio_features_async(audio_path, self.cache, cached_bundle)
+                    await save_audio_features_async(
+                        audio_path,
+                        self.cache,
+                        cached_bundle,
+                        step_version=cache_version,
+                    )
 
                 logger.debug("Using cached SongBundle")
                 return cached_bundle
@@ -182,9 +211,21 @@ class AudioAnalyzer:
         embedded_metadata = await self._extract_embedded_metadata_fast(audio_path)
         genre = embedded_metadata.genre[0] if embedded_metadata.genre else None
 
+        stem_features = await analyze_stems(
+            Path(audio_path),
+            self.cache,
+            self.app_config.audio_processing.enhancements.stems,
+            separator=self.stem_separator,
+        )
+
         # Process audio (CPU-bound, run in thread pool) with genre hint
         logger.debug(f"Analyzing audio: {audio_path} (genre={genre})")
-        features = await asyncio.to_thread(self._process_audio, audio_path, genre=genre)
+        features = await asyncio.to_thread(
+            self._process_audio,
+            audio_path,
+            genre=genre,
+            stem_features=stem_features,
+        )
 
         # Build bundle (includes async metadata/lyrics extraction)
         bundle = await self._build_song_bundle(audio_path, features, embedded_metadata)
@@ -193,11 +234,23 @@ class AudioAnalyzer:
         compute_ms = time.perf_counter() * 1000 - start_time_ms
 
         # Save to cache (SongBundle format, v3.0) with compute time
-        await save_audio_features_async(audio_path, self.cache, bundle, compute_ms=compute_ms)
+        await save_audio_features_async(
+            audio_path,
+            self.cache,
+            bundle,
+            step_version=cache_version,
+            compute_ms=compute_ms,
+        )
 
         logger.debug(f"Audio analysis complete: {compute_ms:.0f}ms")
 
         return bundle
+
+    def _audio_cache_version(self) -> str:
+        """Partition SongBundle caches by the configured stem consumer mode."""
+        config = self.app_config.audio_processing.enhancements.stems
+        mode = config.model_name if config.enabled else "off"
+        return f"{AUDIO_FEATURES_CACHE_VERSION}:stems:{mode}"
 
     def analyze_sync(
         self,
@@ -282,7 +335,11 @@ class AudioAnalyzer:
 
         # Single, metadata-informed lyrics pass
         lyrics_bundle = await self._extract_lyrics_if_enabled(
-            audio_path, duration_ms, metadata_bundle, vocal_segments
+            audio_path,
+            duration_ms,
+            metadata_bundle,
+            vocal_segments,
+            features.get("vocal_gate_open"),
         )
 
         # Extract phonemes from timed words (depends on lyrics)
@@ -353,6 +410,7 @@ class AudioAnalyzer:
         duration_ms: int,
         metadata_bundle: MetadataBundle | None,
         vocal_segments: list[dict] | None = None,
+        vocal_gate_open: bool | None = None,
     ) -> LyricsBundle:
         """Extract lyrics if feature is enabled (async).
 
@@ -363,6 +421,8 @@ class AudioAnalyzer:
             duration_ms: Song duration in milliseconds
             metadata_bundle: Resolved metadata (for artist/title)
             vocal_segments: Optional vocal detector segments for vocal_presence_pct
+            vocal_gate_open: Whether separated vocals justify WhisperX processing;
+                None preserves the full-mix fallback behavior.
 
         Returns:
             LyricsBundle (with SKIPPED status if disabled)
@@ -400,12 +460,17 @@ class AudioAnalyzer:
                 f"(from {'resolved' if metadata_bundle and metadata_bundle.resolved and artist else 'embedded' if artist else 'none'})"
             )
 
+            resolve_kwargs: dict[str, Any] = {
+                "audio_path": audio_path,
+                "duration_ms": duration_ms,
+                "artist": artist,
+                "title": title,
+                "vocal_segments": vocal_segments or [],
+            }
+            if vocal_gate_open is not None:
+                resolve_kwargs["vocal_gate_open"] = vocal_gate_open
             bundle = await self.lyrics_pipeline.resolve(
-                audio_path=audio_path,
-                duration_ms=duration_ms,
-                artist=artist,
-                title=title,
-                vocal_segments=vocal_segments or [],
+                **resolve_kwargs,
             )
             return bundle
 
@@ -472,12 +537,18 @@ class AudioAnalyzer:
             logger.warning(f"Phoneme pipeline failed: {e}")
             return None
 
-    def _process_audio(self, audio_path: str, genre: str | None = None) -> dict[str, Any]:
+    def _process_audio(
+        self,
+        audio_path: str,
+        genre: str | None = None,
+        stem_features: StemFeatures | None = None,
+    ) -> dict[str, Any]:
         """Process audio file (internal implementation).
 
         Args:
             audio_path: Path to audio file
             genre: Optional genre hint for section detection
+            stem_features: Optional cached source-separation feature result
 
         Returns:
             Feature dictionary
@@ -493,7 +564,7 @@ class AudioAnalyzer:
         # Handle very short audio
         if duration < 10.0:
             logger.warning(f"Audio too short ({duration:.1f}s) for meaningful analysis")
-            return self._minimal_features(audio_path, y, sr, duration)
+            return self._minimal_features(audio_path, y, sr, duration, stem_features)
 
         # HPSS decomposition - do this first to get onset envelope
         hpss = compute_hpss(y)
@@ -580,8 +651,23 @@ class AudioAnalyzer:
             sr=sr,
             hop_length=hop_length,
         )
-        # Extract just the segments list for backward compatibility
-        vocal_regions = vocal_result["vocal_segments"]
+        active_stems = stem_features or StemFeatures(
+            status=StemStatus.DISABLED_FULL_MIX_FALLBACK,
+            fallback_reason="Stem analysis was not requested",
+        )
+        stem_consumers = apply_stem_consumers(
+            active_stems,
+            full_mix_beat_confidence=float(time_sig_result.get("confidence", 0.0)),
+            beats_s=beats_s,
+            full_mix_builds_drops=builds_drops,
+            full_mix_vocal_segments=vocal_result["vocal_segments"],
+            full_mix_vocal_statistics=vocal_result["statistics"],
+            tempo_bpm=tempo_bpm,
+            beats_per_bar=beats_per_bar,
+        )
+        builds = stem_consumers["energy"]["builds"]
+        drops = stem_consumers["energy"]["drops"]
+        vocal_regions = stem_consumers["vocals"]
 
         # Harmonic analysis (chroma already computed above for downbeat detection)
         key_result = detect_musical_key(y, sr, hop_length=hop_length, chroma=chroma)
@@ -670,7 +756,7 @@ class AudioAnalyzer:
                 "beats_per_bar": beats_per_bar,
             },
             "rhythm": {
-                "beat_confidence": time_sig_result.get("confidence", 0.0),
+                **stem_consumers["rhythm"],
                 "downbeats": [int(i) for i in downbeats_idx],
                 "downbeat_meta": {
                     "phase": int(downbeat_result.get("phase", 0)),
@@ -684,11 +770,17 @@ class AudioAnalyzer:
                 else rms_times_s,
                 "builds": builds,
                 "drops": drops,
+                **stem_consumers["energy"],
             },
             "spectral": spectral_features,
             "dynamics": dynamic_features,
             "vocals": vocal_regions,
-            "vocals_statistics": vocal_result["statistics"],
+            "vocals_statistics": stem_consumers["vocals_statistics"],
+            "vocals_source": stem_consumers["vocals_source"],
+            "full_mix_vocals": stem_consumers["full_mix_vocals"],
+            "full_mix_vocals_statistics": stem_consumers["full_mix_vocals_statistics"],
+            "vocal_gate_open": stem_consumers["vocal_gate_open"],
+            "stems": stem_consumers["stems"],
             "harmonic": {
                 "chroma": chroma.tolist() if isinstance(chroma, np.ndarray) else chroma,
                 "key": key_result,
@@ -706,6 +798,7 @@ class AudioAnalyzer:
         # Validate. These reach the caller on SongBundle.warnings — a warning nobody
         # can see is not a check.
         analysis_warnings: list[str] = []
+        analysis_warnings.extend(active_stems.warnings)
         if not hpss_separated:
             analysis_warnings.append(
                 f"HPSS separation failed ({hpss_error}) - harmonic ratios are unreliable"
@@ -719,7 +812,11 @@ class AudioAnalyzer:
 
     @staticmethod
     def _minimal_features(
-        audio_path: str, y: np.ndarray, sr: int, duration: float
+        audio_path: str,
+        y: np.ndarray,
+        sr: int,
+        duration: float,
+        stem_features: StemFeatures | None = None,
     ) -> dict[str, Any]:
         """Generate minimal features for very short audio.
 
@@ -728,10 +825,25 @@ class AudioAnalyzer:
             y: Audio samples
             sr: Sample rate
             duration: Duration in seconds
+            stem_features: Optional stem-stage status to retain in short-file results
 
         Returns:
             Minimal feature dictionary
         """
+        active_stems = stem_features or StemFeatures(
+            status=StemStatus.DISABLED_FULL_MIX_FALLBACK,
+            fallback_reason="Stem analysis was not requested",
+        )
+        stem_consumers = apply_stem_consumers(
+            active_stems,
+            full_mix_beat_confidence=0.0,
+            beats_s=[],
+            full_mix_builds_drops={"builds": [], "drops": [], "statistics": {}},
+            full_mix_vocal_segments=[],
+            full_mix_vocal_statistics={},
+            tempo_bpm=120.0,
+            beats_per_bar=4,
+        )
         return {
             "schema_version": "2.4",
             "audio_path": audio_path,
@@ -740,13 +852,24 @@ class AudioAnalyzer:
             "tempo_bpm": 0.0,
             "beats_s": [],
             "bars_s": [],
-            "energy": {"rms_norm": [], "times_s": []},
+            "energy": {
+                "rms_norm": [],
+                "times_s": [],
+                **stem_consumers["energy"],
+            },
             "time_signature": {"time_signature": "4/4", "confidence": 0.0, "method": "default"},
             "assumptions": {"time_signature": "4/4 (default)", "beats_per_bar": 4},
-            "rhythm": {"beat_confidence": [], "downbeats": []},
+            "rhythm": {**stem_consumers["rhythm"], "downbeats": []},
             "spectral": {},
             "dynamics": {},
             "structure": {"sections": [], "boundary_times_s": [0.0, duration]},
+            "vocals": stem_consumers["vocals"],
+            "vocals_statistics": stem_consumers["vocals_statistics"],
+            "vocals_source": stem_consumers["vocals_source"],
+            "full_mix_vocals": stem_consumers["full_mix_vocals"],
+            "full_mix_vocals_statistics": stem_consumers["full_mix_vocals_statistics"],
+            "vocal_gate_open": stem_consumers["vocal_gate_open"],
+            "stems": stem_consumers["stems"],
             "tempo_analysis": {},
             "key": {"key": "C", "mode": "major", "confidence": 0.0},
             "warnings": ["Audio too short for meaningful analysis"],

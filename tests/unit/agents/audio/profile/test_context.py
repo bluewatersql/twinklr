@@ -45,6 +45,45 @@ def test_shape_context_basic():
     assert len(context["sections"]) == 2
 
 
+def test_shape_context_surfaces_stem_signals_to_planners():
+    """Planner substrate retains the three provenance-tagged stem signals."""
+    from twinklr.core.agents.audio.profile.context import shape_context
+    from twinklr.core.audio.models import SongBundle, SongTiming
+
+    bundle = SongBundle(
+        schema_version="3.0",
+        audio_path="/test/song.mp3",
+        recording_id="test_123",
+        features={
+            "duration_ms": 10_000,
+            "sections": [],
+            "stems": {"status": "available", "model_name": "htdemucs"},
+            "rhythm": {
+                "source": "drum_stem",
+                "beat_confidence": 0.92,
+                "accent_confidence": 0.88,
+            },
+            "energy": {"build_drop_source": "bass_stem", "builds": [], "drops": []},
+            "vocals_source": "vocal_stem",
+            "vocals_statistics": {"vocal_coverage_pct": 0.64},
+        },
+        timing=SongTiming(sr=22_050, hop_length=512, duration_s=10.0, duration_ms=10_000),
+    )
+
+    context = shape_context(bundle)
+
+    assert context["stem_signals"] == {
+        "status": "available",
+        "model_name": "htdemucs",
+        "rhythm_source": "drum_stem",
+        "beat_confidence": 0.92,
+        "accent_confidence": 0.88,
+        "build_drop_source": "bass_stem",
+        "vocals_source": "vocal_stem",
+        "vocal_presence_pct": 0.64,
+    }
+
+
 def test_shape_context_energy_compression():
     """Test energy curve is compressed per-section."""
     from twinklr.core.agents.audio.profile.context import shape_context

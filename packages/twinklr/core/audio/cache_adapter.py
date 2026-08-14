@@ -34,9 +34,9 @@ T = TypeVar("T", bound=BaseModel)
 # Cache-invalidation version for the stored SongBundle payload. Bump whenever the
 # cached shape changes, not only when SongBundle's own schema_version does: entries
 # written before the bump are rejected on load (CacheKey.step_version mismatch).
-# "4" — features schema 2.4 added warnings, harmonic.hpss and rhythm.downbeat_meta,
-# so a "3" entry deserializes into a bundle that silently reports no warnings.
-AUDIO_FEATURES_CACHE_VERSION = "4"
+# "5" — the source-separation stage adds explicit stem status and changes the
+# rhythm, build/drop, vocal, and lyrics-gating consumer inputs.
+AUDIO_FEATURES_CACHE_VERSION = "5"
 
 
 async def compute_audio_file_hash(audio_path: str) -> str:

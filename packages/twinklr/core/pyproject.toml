@@ -33,6 +33,12 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+stems = [
+    # Demucs 4.1.0 is incompatible with Twinklr's NumPy 2 requirement on Intel macOS.
+    # Keep the base package installable there; the runtime reports the explicit fallback.
+    "demucs==4.1.0; sys_platform != 'darwin'",
+    "demucs==4.1.0; sys_platform == 'darwin' and platform_machine != 'x86_64'",
+]
 anthropic = [
     "anthropic>=0.40",
 ]
