@@ -143,7 +143,7 @@ class ArtifactWriter:
         """Write template diagnostics report as JSON."""
         return self._writer.write_template_diagnostics(output_root, diagnostics)
 
-    def write_feature_store_manifest(self, output_root: Path, manifest: dict[str, str]) -> Path:
+    def write_feature_store_manifest(self, output_root: Path, manifest: dict[str, object]) -> Path:
         """Write feature store manifest as JSON."""
         return self._writer.write_feature_store_manifest(output_root, manifest)
 

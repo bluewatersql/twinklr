@@ -22,6 +22,7 @@ from twinklr.core.feature_engineering.pipeline import (
     FeatureEngineeringPipeline,
     FeatureEngineeringPipelineOptions,
 )
+from twinklr.core.feature_engineering.style_groups import load_style_group_declaration
 from twinklr.core.profiling.unify import CorpusBuildOptions, ProfileCorpusBuilder
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -90,6 +91,15 @@ def parse_args() -> argparse.Namespace:
         help="Unified profile corpus dir (required unless --skip-build).",
     )
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
+    parser.add_argument(
+        "--style-groups",
+        type=Path,
+        default=None,
+        help=(
+            "Owner-authored JSON declaration that runs per-style fingerprint extraction; "
+            "requires a build (incompatible with --skip-build)."
+        ),
+    )
     parser.add_argument(
         "--skip-build",
         action="store_true",
@@ -906,6 +916,22 @@ def _write_markdown(
 def main() -> int:
     args = parse_args()
     output_dir = args.output_dir.resolve()
+    if args.skip_build and args.style_groups is not None:
+        print(
+            "ERROR: --style-groups cannot be used with --skip-build; grouped fingerprint "
+            "extraction requires a build.",
+            file=sys.stderr,
+        )
+        return 2
+    try:
+        style_groups = (
+            load_style_group_declaration(args.style_groups.resolve())
+            if args.style_groups is not None
+            else None
+        )
+    except (FileNotFoundError, ValueError) as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 2
 
     if not args.skip_build:
         if args.corpus_dir is None:
@@ -960,6 +986,7 @@ def main() -> int:
             quality_max_over_generic_template_ratio=args.quality_max_over_generic_template_ratio,
             quality_diagnostics_gate_mode=args.quality_diagnostics_gate_mode,
             feature_store_config=feature_store_config,
+            style_groups=style_groups,
         )
         pipeline = FeatureEngineeringPipeline(
             options=effective_options,

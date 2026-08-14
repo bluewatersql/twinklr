@@ -199,6 +199,51 @@ decision: the owner records keep/change/defer and rationale for every threshold
 after reviewing the empirical report. Neither command promotes a candidate or
 modifies `catalog/templates/`.
 
+### Owner-selected style fingerprints
+
+Style groups are owner declarations, never inferred from corpus content.
+`--style-groups <declaration.json>` is the sole explicit action for a per-style
+refresh and cannot be combined with `--skip-build`. A missing or invalid
+declaration fails loudly. The declaration is JSON and selects the
+content-hash-stable corpus identities produced by P1K-T1:
+
+```json
+{
+  "schema_version": "twinklr.style-groups.v1",
+  "groups": [
+    {
+      "style_name": "Warm Pop",
+      "selector": {"package_ids": ["<content-hash-package-id>"]}
+    },
+    {
+      "style_name": "Sparse Drama",
+      "selector": {
+        "sequence_keys": ["<content-hash-package-id>/<sequence-file-id>"]
+      }
+    }
+  ]
+}
+```
+
+Selectors are an explicit union of `package_ids`, `sequence_file_ids`, and
+`sequence_keys`; every group must contain at least one. The run produces one
+`style_fingerprint_<style-name>.json` file per group and
+`style_fingerprint_report.json`. The report flags groups with fewer than two
+source sequences as `thin`; it does not disguise that low support as confidence.
+
+```bash
+uv run python scripts/demo_feature_engineering.py \
+  --corpus-dir <author-local-corpus> \
+  --output-dir <staged-mining-run> \
+  --feature-store-db <staged-mining-run>/feature-store.sqlite \
+  --style-groups <owner-style-groups.json>
+```
+
+The propensity index is refreshed once over the full content-hash-identified
+corpus. A grouped output has no implicit default style: omitting `style_name`
+raises with the available group names, and consumers select one explicitly with
+`load_fe_artifacts(output_dir, style_name="Warm Pop")`.
+
 ## 4) Query Template Retrieval
 
 Script:

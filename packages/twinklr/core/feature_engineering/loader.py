@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
@@ -43,20 +44,20 @@ class FEArtifactBundle(BaseModel):
     transition_model_v2_path: str | None = None
 
 
-def _read_json(path: Path) -> dict:
+def _read_json(path: Path) -> dict[str, Any]:
     """Read a JSON file and return the parsed dict."""
     return json.loads(path.read_text(encoding="utf-8"))  # type: ignore[no-any-return]
 
 
 def _load_optional_model(
-    manifest: dict[str, str],
+    manifest: dict[str, Any],
     key: str,
     model_cls: type[BaseModel],
     fe_dir: Path,
 ) -> BaseModel | None:
     """Load a Pydantic model from the manifest if the key exists."""
     rel_path = manifest.get(key)
-    if not rel_path:
+    if not isinstance(rel_path, str) or not rel_path:
         return None
     full = Path(rel_path)
     if not full.is_absolute():
@@ -68,15 +69,38 @@ def _load_optional_model(
     return model_cls.model_validate(data)
 
 
-def load_fe_artifacts(fe_output_dir: Path) -> FEArtifactBundle:
+def _load_required_model(
+    artifact_path: str,
+    model_cls: type[BaseModel],
+    fe_dir: Path,
+    *,
+    artifact_label: str,
+) -> BaseModel:
+    """Load an explicitly selected artifact or fail without degrading to ``None``."""
+    full = Path(artifact_path)
+    if not full.is_absolute():
+        full = fe_dir / full
+    if not full.is_file():
+        raise FileNotFoundError(f"selected {artifact_label} artifact was not found: {full}")
+    try:
+        data = _read_json(full)
+        return model_cls.model_validate(data)
+    except ValueError as exc:
+        raise ValueError(f"selected {artifact_label} artifact is invalid: {full}: {exc}") from exc
+
+
+def load_fe_artifacts(fe_output_dir: Path, *, style_name: str | None = None) -> FEArtifactBundle:
     """Load all FE artifacts from a feature store output directory.
 
     Reads ``feature_store_manifest.json`` to discover artifact paths,
-    then loads each typed artifact.  Missing artifacts gracefully
-    default to ``None`` / empty tuples.
+    then loads each typed artifact. Missing optional artifacts gracefully
+    default to ``None`` / empty tuples. Grouped style artifacts are strict:
+    callers must select a name, and a selected artifact must exist and validate.
 
     Args:
         fe_output_dir: Root directory of FE output (contains manifest).
+        style_name: Explicit group name for a grouped style-fingerprint run.
+            Omit it only for the legacy single-fingerprint artifact.
 
     Returns:
         Typed bundle with all available FE data.
@@ -86,11 +110,34 @@ def load_fe_artifacts(fe_output_dir: Path) -> FEArtifactBundle:
         logger.warning("No feature_store_manifest.json in %s", fe_output_dir)
         return FEArtifactBundle()
 
-    manifest: dict[str, str] = _read_json(manifest_path)
+    manifest = _read_json(manifest_path)
 
     color_arc = _load_optional_model(manifest, "color_arc", SongColorArc, fe_output_dir)
     propensity = _load_optional_model(manifest, "propensity_index", PropensityIndex, fe_output_dir)
-    style = _load_optional_model(manifest, "style_fingerprint", StyleFingerprint, fe_output_dir)
+    grouped = manifest.get("style_fingerprints")
+    style: BaseModel | None
+    if "style_fingerprints" in manifest and not isinstance(grouped, dict):
+        raise ValueError("FE manifest style_fingerprints must be an object keyed by style name")
+    if isinstance(grouped, dict):
+        available = ", ".join(sorted(str(name) for name in grouped)) or "(none)"
+        if style_name is None:
+            raise ValueError(
+                "style_name is required for grouped style fingerprints; "
+                f"available groups: {available}"
+            )
+        selected = grouped.get(style_name)
+        if not isinstance(selected, str) or not selected:
+            raise ValueError(f"unknown style group {style_name!r}; available groups: {available}")
+        style = _load_required_model(
+            selected,
+            StyleFingerprint,
+            fe_output_dir,
+            artifact_label=f"style fingerprint {style_name!r}",
+        )
+    else:
+        if style_name is not None:
+            raise ValueError("this FE output has no grouped style fingerprints to select from")
+        style = _load_optional_model(manifest, "style_fingerprint", StyleFingerprint, fe_output_dir)
     transition = _load_optional_model(manifest, "transition_graph", TransitionGraph, fe_output_dir)
     motif = _load_optional_model(manifest, "motif_catalog", MotifCatalog, fe_output_dir)
 
@@ -103,7 +150,8 @@ def load_fe_artifacts(fe_output_dir: Path) -> FEArtifactBundle:
     narrative = _load_color_narrative(manifest, fe_output_dir)
 
     # Transition model V2 path (written by MarkovTransitionModel.save)
-    transition_v2_path = manifest.get("transition_model_v2")
+    raw_transition_v2_path = manifest.get("transition_model_v2")
+    transition_v2_path = raw_transition_v2_path if isinstance(raw_transition_v2_path, str) else None
 
     return FEArtifactBundle(
         recipe_catalog_entries=tuple(recipes),
@@ -121,7 +169,7 @@ def load_fe_artifacts(fe_output_dir: Path) -> FEArtifactBundle:
 
 
 def _load_discovered_palettes(
-    manifest: dict[str, str],
+    manifest: dict[str, Any],
     fe_dir: Path,
 ) -> tuple[DiscoveredPalette, ...]:
     """Load color palettes from the palette library artifact.
@@ -134,7 +182,7 @@ def _load_discovered_palettes(
         Tuple of DiscoveredPalette instances, or empty tuple if absent/missing.
     """
     rel_path = manifest.get("color_palette_library")
-    if not rel_path:
+    if not isinstance(rel_path, str) or not rel_path:
         return ()
     full = Path(rel_path)
     if not full.is_absolute():
@@ -161,7 +209,7 @@ def _load_discovered_palettes(
 
 
 def _load_color_narrative(
-    manifest: dict[str, str],
+    manifest: dict[str, Any],
     fe_dir: Path,
 ) -> tuple[ColorNarrativeRow, ...]:
     """Load color narrative rows from the color narrative artifact.
@@ -174,7 +222,7 @@ def _load_color_narrative(
         Tuple of ColorNarrativeRow instances, or empty tuple if absent/missing.
     """
     rel_path = manifest.get("color_narrative")
-    if not rel_path:
+    if not isinstance(rel_path, str) or not rel_path:
         return ()
     full = Path(rel_path)
     if not full.is_absolute():
@@ -197,12 +245,12 @@ def _load_color_narrative(
 
 
 def _load_recipe_catalog(
-    manifest: dict[str, str],
+    manifest: dict[str, Any],
     fe_dir: Path,
 ) -> list[EffectRecipe]:
     """Load promoted recipes from the recipe catalog artifact."""
     rel_path = manifest.get("recipe_catalog")
-    if not rel_path:
+    if not isinstance(rel_path, str) or not rel_path:
         return []
     full = Path(rel_path)
     if not full.is_absolute():
@@ -216,12 +264,12 @@ def _load_recipe_catalog(
 
 
 def _load_adapter_payloads(
-    manifest: dict[str, str],
+    manifest: dict[str, Any],
     fe_dir: Path,
 ) -> list[SequencerAdapterBundle]:
     """Load adapter payloads from JSONL file."""
     rel_path = manifest.get("planner_adapter_payloads")
-    if not rel_path:
+    if not isinstance(rel_path, str) or not rel_path:
         return []
     full = Path(rel_path)
     if not full.is_absolute():

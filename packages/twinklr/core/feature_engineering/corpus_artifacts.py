@@ -38,6 +38,11 @@ from twinklr.core.feature_engineering.models.promotion import PromotionReport
 from twinklr.core.feature_engineering.models.propensity import PropensityIndex
 from twinklr.core.feature_engineering.models.stacks import EffectStack, EffectStackCatalog
 from twinklr.core.feature_engineering.promotion import PromotionPipeline
+from twinklr.core.feature_engineering.style_groups import (
+    StyleGroupDeclaration,
+    filter_style_group_inputs,
+    style_group_slug,
+)
 from twinklr.core.feature_engineering.transitions_v2.markov import MarkovTransitionModel
 from twinklr.core.feature_store.protocols import FeatureStoreProviderSync
 
@@ -87,7 +92,7 @@ def write_v1_tail_artifacts(
         progress_fn: Optional progress callback.
     """
     o, w, c, s = options, writer, components, store
-    m: dict[str, str] = {}
+    m: dict[str, object] = {}
     ri: TemplateRetrievalIndex | None = None
     tg: TransitionGraph | None = None
     if o.enable_transition_modeling and template_catalogs is not None:
@@ -170,19 +175,36 @@ def write_v1_tail_artifacts(
         m["vocabulary_extensions"] = str(
             w.write_vocabulary_extensions(output_root, vocab_extensions)
         )
-    sp = write_style_fingerprint(
-        output_root=output_root,
-        creator_id=bundles[0].package_id if bundles else "unknown",
-        phrases=phrases,
-        layering_rows=lr,
-        color_rows=cr,
-        transition_graph=tg,
-        options=o,
-        writer=w,
-        components=c,
-    )
-    if sp is not None:
-        m["style_fingerprint"] = str(sp)
+    if o.style_groups is None:
+        sp = write_style_fingerprint(
+            output_root=output_root,
+            creator_id=bundles[0].package_id if bundles else "unknown",
+            phrases=phrases,
+            layering_rows=lr,
+            color_rows=cr,
+            transition_graph=tg,
+            options=o,
+            writer=w,
+            components=c,
+        )
+        if sp is not None:
+            m["style_fingerprint"] = str(sp)
+    else:
+        group_result = write_style_group_fingerprints(
+            output_root=output_root,
+            declaration=o.style_groups,
+            phrases=phrases,
+            layering_rows=lr,
+            color_rows=cr,
+            transition_graph=tg,
+            options=o,
+            writer=w,
+            components=c,
+        )
+        m["style_fingerprints"] = {
+            style_name: str(path) for style_name, path in group_result.artifact_paths.items()
+        }
+        m["style_fingerprint_report"] = str(group_result.report_path)
     mc: MotifCatalog | None = None
     clc: TemplateClusterCatalog | None = None
     diag = None
@@ -611,6 +633,8 @@ def write_style_fingerprint(
     options: FeatureEngineeringPipelineOptions,
     writer: FeatureEngineeringWriter,
     components: ComponentFactory,
+    output_filename: str = "style_fingerprint.json",
+    allow_empty: bool = False,
 ) -> Path | None:
     """Write style-fingerprint artifact.
 
@@ -628,9 +652,9 @@ def write_style_fingerprint(
     Returns:
         Path to written file, or ``None`` if disabled or no data.
     """
-    if not options.enable_style_fingerprint or not phrases:
+    if not options.enable_style_fingerprint or (not phrases and not allow_empty):
         return None
-    p = output_root / "style_fingerprint.json"
+    p = output_root / output_filename
     writer._write_json(
         p,
         components.style_fingerprint.extract(
@@ -642,6 +666,84 @@ def write_style_fingerprint(
         ).model_dump(mode="json"),
     )
     return p
+
+
+class StyleGroupFingerprintResult:
+    """Inspectable result of one grouped style-fingerprint refresh."""
+
+    def __init__(self, artifact_paths: dict[str, Path], report_path: Path) -> None:
+        self.artifact_paths = artifact_paths
+        self.report_path = report_path
+
+
+def write_style_group_fingerprints(
+    *,
+    output_root: Path,
+    declaration: StyleGroupDeclaration,
+    phrases: tuple[EffectPhrase, ...],
+    layering_rows: tuple[LayeringFeatureRow, ...],
+    color_rows: tuple[ColorNarrativeRow, ...],
+    transition_graph: TransitionGraph | None,
+    options: FeatureEngineeringPipelineOptions,
+    writer: FeatureEngineeringWriter,
+    components: ComponentFactory,
+    minimum_sequence_support: int = 2,
+) -> StyleGroupFingerprintResult:
+    """Write one owner-selected fingerprint per group and a confidence report.
+
+    The minimum is a reporting threshold only: thin groups still produce a
+    valid artifact so the owner can inspect their actual evidence.
+    """
+    artifact_paths: dict[str, Path] = {}
+    report_styles: list[dict[str, object]] = []
+    for group in declaration.groups:
+        group_phrases, group_layering, group_color, group_transitions = filter_style_group_inputs(
+            group=group,
+            phrases=phrases,
+            layering_rows=layering_rows,
+            color_rows=color_rows,
+            transition_graph=transition_graph,
+        )
+        path = write_style_fingerprint(
+            output_root=output_root,
+            creator_id=group.style_name,
+            phrases=group_phrases,
+            layering_rows=group_layering,
+            color_rows=group_color,
+            transition_graph=group_transitions,
+            options=options,
+            writer=writer,
+            components=components,
+            output_filename=f"style_fingerprint_{style_group_slug(group.style_name)}.json",
+            allow_empty=True,
+        )
+        if path is None:
+            raise RuntimeError(
+                "style fingerprint extraction was disabled for a requested style group"
+            )
+        artifact_paths[group.style_name] = path
+        fingerprint = json.loads(path.read_text(encoding="utf-8"))
+        sequence_count = int(fingerprint["corpus_sequence_count"])
+        report_styles.append(
+            {
+                "style_name": group.style_name,
+                "artifact": str(path),
+                "phrase_count": len(group_phrases),
+                "corpus_sequence_count": sequence_count,
+                "minimum_sequence_support": minimum_sequence_support,
+                "thin": sequence_count < minimum_sequence_support,
+            }
+        )
+    report_path = output_root / "style_fingerprint_report.json"
+    writer._write_json(
+        report_path,
+        {
+            "schema_version": "style_fingerprint_report.v1",
+            "minimum_sequence_support": minimum_sequence_support,
+            "styles": report_styles,
+        },
+    )
+    return StyleGroupFingerprintResult(artifact_paths=artifact_paths, report_path=report_path)
 
 
 def _extract_param_profiles(

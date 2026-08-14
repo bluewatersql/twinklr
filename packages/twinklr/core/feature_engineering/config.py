@@ -12,6 +12,7 @@ import logging
 from pathlib import Path
 from typing import Literal
 
+from twinklr.core.feature_engineering.style_groups import StyleGroupDeclaration
 from twinklr.core.feature_store.models import FeatureStoreConfig
 
 logger = logging.getLogger(__name__)
@@ -60,6 +61,9 @@ class FeatureEngineeringPipelineOptions:
         enable_color_arc: Extract colour-arc features.
         enable_propensity: Mine propensity index.
         enable_style_fingerprint: Extract style fingerprint.
+        style_groups: Optional owner declaration used to emit one fingerprint per
+            explicitly selected corpus group. Without it, the legacy single
+            whole-corpus fingerprint remains backward compatible.
         enable_stack_detection: Run effect-stack detection.
         enable_quality_gates: Evaluate quality gates.
         enable_recipe_promotion: Run recipe promotion pipeline.
@@ -134,6 +138,7 @@ class FeatureEngineeringPipelineOptions:
     enable_color_arc: bool = True
     enable_propensity: bool = True
     enable_style_fingerprint: bool = True
+    style_groups: StyleGroupDeclaration | None = None
     enable_stack_detection: bool = True
     enable_quality_gates: bool = True
     enable_recipe_promotion: bool = True

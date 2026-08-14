@@ -323,7 +323,7 @@ class FeatureEngineeringWriter:
         self._write_json(output_path, diagnostics.model_dump(mode="json"))
         return output_path
 
-    def write_feature_store_manifest(self, output_root: Path, manifest: dict[str, str]) -> Path:
+    def write_feature_store_manifest(self, output_root: Path, manifest: dict[str, object]) -> Path:
         """Write feature store manifest as JSON.
 
         Args:
