@@ -37,6 +37,10 @@ Welcome to the documentation for **Twinklr** — an AI-powered choreography engi
 
 > Repository structure, architecture details, pipeline framework, configuration models, testing and quality workflows, and extension points for contributors.
 
+### [Vision Evaluation](vision-evaluation.md)
+
+> Local-only preview judging, deterministic beat/effect metrics, enforced cost caps, and the owner-blind calibration protocol.
+
 ---
 
 ### [From Sound to Show: How Audio Intelligence Drives AI Choreography](audio_profile/)

@@ -122,6 +122,20 @@ class AgentOrchestrationConfig(BaseModel):
         )
     )
 
+    vision_judge_agent: AgentConfig = Field(
+        default_factory=lambda: AgentConfig(
+            model="gpt-5.6-luna",
+            reasoning_effort="low",
+            temperature=0.2,
+            max_tokens=3000,
+            timeout_seconds=180,
+        ),
+        description=(
+            "Mini-cost-tier vision evaluator. Kept separate from the terra plan judges "
+            "because image-token cost is the controlling constraint."
+        ),
+    )
+
     refinement_agent: AgentConfig = Field(
         default_factory=lambda: AgentConfig(
             model="gpt-5.6-sol", reasoning_effort="medium", temperature=0.3

@@ -361,6 +361,39 @@ async def test_generate_json_async_passes_supported_kwargs() -> None:
 
 
 @pytest.mark.asyncio
+async def test_generate_json_async_embeds_input_images_in_user_message() -> None:
+    """Vision agents stay in the provider framework while sending image inputs."""
+    response = MagicMock()
+    response.output_text = '{"ok": true}'
+    response.id = "resp_image"
+    response.usage = MagicMock(prompt_tokens=10, completion_tokens=2, total_tokens=12)
+
+    with (
+        patch("twinklr.core.agents.providers.openai.OpenAIClient"),
+        patch("twinklr.core.agents.providers.openai.AsyncOpenAI") as mock_async_openai,
+    ):
+        mock_client = MagicMock()
+        mock_client.responses.create = AsyncMock(return_value=response)
+        mock_async_openai.return_value = mock_client
+        provider = OpenAIProvider(api_key="test-key")
+
+        await provider.generate_json_async(
+            messages=[{"role": "user", "content": "judge these labeled frames"}],
+            model="configured-model",
+            input_image_urls=["data:image/png;base64,AAAA"],
+            provider_max_attempts=1,
+        )
+
+    request = mock_client.responses.create.call_args.kwargs
+    content = request["input"][0]["content"]
+    assert content == [
+        {"type": "input_text", "text": "judge these labeled frames"},
+        {"type": "input_image", "image_url": "data:image/png;base64,AAAA", "detail": "low"},
+    ]
+    assert mock_client.responses.create.await_count == 1
+
+
+@pytest.mark.asyncio
 async def test_generate_json_async_separates_reasoning_tokens() -> None:
     """Responses API reasoning tokens are not counted as completion tokens."""
     response = MagicMock()

@@ -97,6 +97,8 @@ class AsyncAgentRunner:
         spec: AgentSpec,
         variables: dict[str, Any],
         state: AgentState | None = None,
+        *,
+        input_image_urls: list[str] | None = None,
     ) -> AgentResult:
         """Execute agent with spec and variables (async).
 
@@ -104,6 +106,7 @@ class AsyncAgentRunner:
             spec: Agent specification
             variables: Variables for prompt rendering
             state: Optional state (required for conversational agents)
+            input_image_urls: Optional data URLs attached to an ONESHOT OpenAI user turn
 
         Returns:
             AgentResult with execution outcome
@@ -146,7 +149,9 @@ class AsyncAgentRunner:
                 response_data,
                 repair_attempts,
                 response_metadata,
-            ) = await self._execute_with_repair_async(spec, messages, state, call_usages)
+            ) = await self._execute_with_repair_async(
+                spec, messages, state, call_usages, input_image_urls
+            )
 
             # Calculate duration and tokens
             duration = time.time() - start_time
@@ -169,7 +174,10 @@ class AsyncAgentRunner:
             )
 
             # Build result
-            metadata: dict[str, Any] = {"schema_repair_attempts": repair_attempts}
+            metadata: dict[str, Any] = {
+                "schema_repair_attempts": repair_attempts,
+                "model": response_metadata.model or spec.model,
+            }
             if response_metadata.structured_output_mode is not None:
                 metadata["structured_output_mode"] = response_metadata.structured_output_mode
             if response_metadata.structured_output_fallback_reason is not None:
@@ -188,6 +196,7 @@ class AsyncAgentRunner:
                 tokens_used=usage.total_tokens,
                 prompt_tokens=usage.prompt_tokens,
                 completion_tokens=usage.completion_tokens,
+                reasoning_tokens=usage.reasoning_tokens,
                 conversation_id=state.conversation_id if state else None,
                 metadata=metadata,
             )
@@ -206,6 +215,7 @@ class AsyncAgentRunner:
                 tokens_used=usage.total_tokens,
                 prompt_tokens=usage.prompt_tokens,
                 completion_tokens=usage.completion_tokens,
+                reasoning_tokens=usage.reasoning_tokens,
             )
 
         except RunError as e:
@@ -225,6 +235,7 @@ class AsyncAgentRunner:
                 tokens_used=usage.total_tokens,
                 prompt_tokens=usage.prompt_tokens,
                 completion_tokens=usage.completion_tokens,
+                reasoning_tokens=usage.reasoning_tokens,
                 metadata=metadata,
             )
 
@@ -242,6 +253,7 @@ class AsyncAgentRunner:
                 tokens_used=usage.total_tokens,
                 prompt_tokens=usage.prompt_tokens,
                 completion_tokens=usage.completion_tokens,
+                reasoning_tokens=usage.reasoning_tokens,
             )
 
     def _build_messages(self, prompts: dict[str, Any], spec: AgentSpec) -> list[dict[str, str]]:
@@ -360,6 +372,7 @@ class AsyncAgentRunner:
         messages: list[dict[str, str]],
         state: AgentState | None,
         call_usages: list[TokenUsage],
+        input_image_urls: list[str] | None,
     ) -> tuple[Any, int, ResponseMetadata]:
         """Execute agent with schema repair loop (async).
 
@@ -384,9 +397,11 @@ class AsyncAgentRunner:
             # Call provider (async, oneshot or conversational)
             try:
                 if spec.mode == AgentMode.CONVERSATIONAL:
+                    if input_image_urls:
+                        raise RunError("Image inputs require an ONESHOT agent specification")
                     response = await self._call_conversational_async(spec, messages, state)
                 else:
-                    response = await self._call_oneshot_async(spec, messages)
+                    response = await self._call_oneshot_async(spec, messages, input_image_urls)
             except RecoverableLLMProviderError as error:
                 call_usages.append(error.token_usage)
                 repair_attempts += 1
@@ -499,7 +514,12 @@ class AsyncAgentRunner:
 
         raise RunError("Schema repair loop exited unexpectedly")
 
-    async def _call_oneshot_async(self, spec: AgentSpec, messages: list[dict[str, str]]) -> Any:
+    async def _call_oneshot_async(
+        self,
+        spec: AgentSpec,
+        messages: list[dict[str, str]],
+        input_image_urls: list[str] | None = None,
+    ) -> Any:
         """Call provider in oneshot mode (async).
 
         Args:
@@ -513,7 +533,7 @@ class AsyncAgentRunner:
             messages=messages,
             model=spec.model,
             temperature=spec.temperature,
-            **self._provider_request_kwargs(spec),
+            **self._provider_request_kwargs(spec, input_image_urls),
         )
 
     async def _call_conversational_async(
@@ -568,7 +588,9 @@ class AsyncAgentRunner:
             **self._provider_request_kwargs(spec),
         )
 
-    def _provider_request_kwargs(self, spec: AgentSpec) -> dict[str, Any]:
+    def _provider_request_kwargs(
+        self, spec: AgentSpec, input_image_urls: list[str] | None = None
+    ) -> dict[str, Any]:
         """Build portable request options and gate provider-specific features."""
         kwargs: dict[str, Any] = {
             "max_tokens": spec.max_tokens,
@@ -578,6 +600,12 @@ class AsyncAgentRunner:
             kwargs["response_model"] = spec.response_model
         if self.provider.provider_type == ProviderType.OPENAI:
             kwargs["reasoning_effort"] = spec.reasoning_effort
+            kwargs["provider_max_attempts"] = spec.provider_max_attempts
+            kwargs["allow_json_object_fallback"] = spec.allow_json_object_fallback
+            if input_image_urls:
+                kwargs["input_image_urls"] = input_image_urls
+        elif input_image_urls:
+            raise RunError("Configured provider does not support vision image inputs")
         return kwargs
 
     def _format_validation_error(self, error: ValidationError) -> str:

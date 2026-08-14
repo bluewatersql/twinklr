@@ -271,3 +271,62 @@ output is detectable. Second risk: scope leakage into sync judging — the struc
 test (criterion 1) exists specifically because a future prompt edit is the likely
 vector. Third risk: cost drift as frame counts grow — bounded by the pre-call
 estimate and cap.
+
+## Implementation handoff — 2026-08-14
+
+Author implementation is complete and awaiting an independent verifier. The offline
+harness now provides ffmpeg frame sampling/contact sheets, a strict four-category
+configured vision role through `AsyncAgentRunner`, hard pre-call song/run budget
+reservations, exact per-call usage recording, deterministic rendered-XSQ/grid metrics,
+one evaluation-writer record, and the blinded N≥5 calibration calculation/protocol.
+
+No live provider or xLights call and no owner calibration were performed during
+implementation. Acceptance criteria 6 and 7 therefore remain deliberately
+**owner/local-only**: results cannot declare themselves calibrated without a calibration
+record, and the documented one-song command is the only paid proof path. The remaining
+integration risk is whether the currently configured mini-tier model accepts the tested
+Responses API `input_image` data-URL payload in a live account; the SDK request shape is
+covered offline, but only the capped local-only command can prove provider/model support.
+
+Author gate evidence (fresh after the final edit):
+
+- `uv run ruff format --check .` — 1,305 files already formatted
+- `uv run ruff check --no-cache .` — passed
+- `uv run mypy .` — 707 source files passed
+- focused rubric/sync/judge selection — 9 passed, 4,679 deselected
+- default offline suite — 4,998 passed, 25 skipped, 11 deselected
+
+### Verifier-reject remediation — 2026-08-14
+
+The first independent verification rejected the author handoff on seven gaps. The author
+remediation now pins the vision role to one strict HTTP request (no transport retry,
+schema repair, or `json_object` fallback), enforces 1,500-image and 512 MiB encoded-request
+preflight limits, settles failed-result usage before raising, and reconciles run budgets
+as actual spend plus outstanding reservations. Calibration uses tie-aware ranks and a
+permutation test; only a hash-pinned, existing, owner-accepted frozen N≥5 artifact with
+rubric/sampling/hashes/cost/date/owner evidence can authorize calibrated status.
+
+Deterministic empty/boundary outputs no longer report invented zero-millisecond evidence.
+ffmpeg sampling uses unique directories and a bounded actionable timeout. Grounding is
+validated against actual frame/contact-sheet ranges and section names. Preview/XSQ hashes,
+current plan identity, config identity, delivered-grid compatibility, and deterministic
+prerequisites are established before the paid request. This remediation still performs
+no live provider or xLights call and does not manufacture owner calibration evidence.
+
+Fresh remediation gates:
+
+- discriminating remediation selection — 19 passed, 4,683 deselected
+- agents + reporting broad batch — 1,173 passed, 1 skipped
+- `uv run ruff format --check .` — 1,305 files already formatted
+- `uv run ruff check --no-cache .` — passed
+- `uv run mypy .` — 707 source files passed
+- final default offline suite — 5,012 passed, 25 skipped, 11 deselected
+
+The re-review additionally pinned calibration sample independence: both artifact hashes
+and preview hashes must be independently unique across the N≥5 frozen evidence rows.
+Changing opaque sequence IDs or ranks cannot make duplicate immutable inputs count as
+distinct calibration shows.
+
+Re-review remediation gates: calibration 10 passed; strict/provider selection 10 passed;
+agents + reporting broad batch 1,177 passed and 1 skipped; format, no-cache Ruff, and
+Mypy (707 source files) passed.

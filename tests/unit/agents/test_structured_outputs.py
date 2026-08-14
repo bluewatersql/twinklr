@@ -342,6 +342,37 @@ async def test_strict_rejection_falls_back_to_json_object_and_records_it() -> No
 
 
 @pytest.mark.asyncio
+async def test_strict_rejection_does_not_fallback_when_disabled() -> None:
+    """A one-request role must not turn a capability rejection into request two."""
+    error_response = MagicMock(status_code=400, headers={})
+    rejection = BadRequestError(
+        "Unsupported text.format json_schema",
+        response=error_response,
+        body={"error": {"message": "json_schema is unsupported for this model"}},
+    )
+
+    with (
+        patch("twinklr.core.agents.providers.openai.OpenAIClient"),
+        patch("twinklr.core.agents.providers.openai.AsyncOpenAI") as async_openai,
+    ):
+        client = MagicMock()
+        client.responses.create = AsyncMock(side_effect=rejection)
+        async_openai.return_value = client
+        provider = OpenAIProvider(api_key="test-key")
+
+        with pytest.raises(LLMProviderError, match=r"Unsupported text\.format"):
+            await provider.generate_json_async(
+                messages=[{"role": "user", "content": "respond"}],
+                model="configured-vision-model",
+                response_model=StrictSample,
+                provider_max_attempts=1,
+                allow_json_object_fallback=False,
+            )
+
+    assert client.responses.create.await_count == 1
+
+
+@pytest.mark.asyncio
 async def test_invalid_strict_schema_400_propagates_without_fallback() -> None:
     error_response = MagicMock(status_code=400, headers={})
     rejection = BadRequestError(

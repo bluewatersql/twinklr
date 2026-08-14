@@ -25,6 +25,8 @@ from twinklr.core.reporting.evaluation.models import (
     TransitionAnalysis,
     ValidationResult,
 )
+from twinklr.core.reporting.evaluation.sync_metrics import DeterministicSyncMetrics
+from twinklr.core.reporting.evaluation.vision_evaluation import VisionEvaluationResult
 
 __all__ = [
     # Phase 2 Models
@@ -34,6 +36,7 @@ __all__ = [
     "ContinuityCheck",
     "CurveAnalysis",
     "CurveStats",
+    "DeterministicSyncMetrics",
     "EvalConfig",
     "EvaluationReport",
     "ModifierCompliance",
@@ -51,6 +54,7 @@ __all__ = [
     "TemplateSelection",
     "TransitionAnalysis",
     "ValidationResult",
+    "VisionEvaluationResult",
     # Generator
     "generate_evaluation_report",
 ]

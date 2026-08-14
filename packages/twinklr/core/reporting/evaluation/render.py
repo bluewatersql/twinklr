@@ -8,8 +8,12 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from twinklr.core.reporting.evaluation.models import EvaluationReport, SectionReport
+
+if TYPE_CHECKING:
+    from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +39,16 @@ def write_report_json(report: EvaluationReport, output_path: Path) -> None:
     )
 
     logger.debug(f"Wrote report JSON: {output_path}")
+
+
+def write_vision_evaluation_json(result: BaseModel, output_path: Path) -> None:
+    """Write the vision+deterministic producer through the evaluation writer seam."""
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(
+        json.dumps(result.model_dump(mode="json"), indent=2),
+        encoding="utf-8",
+    )
+    logger.debug("Wrote vision evaluation JSON: %s", output_path)
 
 
 def write_report_markdown(report: EvaluationReport, output_path: Path) -> None:

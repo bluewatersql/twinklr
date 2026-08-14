@@ -29,6 +29,7 @@ dependencies = [
     "defusedxml>=0.7.1",          # Safe XML parsing (XXE/billion-laughs protection)
     "simpleeval>=1.0",             # Safe expression evaluation (replaces eval())
     "pillow>=12.1.0",              # Image generation/rendering (agents/assets); was only declared transitively via the root meta-package
+    "imageio-ffmpeg>=0.6.0",       # Bundled ffmpeg fallback for local vision-evaluation frame sampling
 ]
 
 [project.optional-dependencies]
@@ -63,4 +64,3 @@ normalization = [
 [build-system]
 requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
-

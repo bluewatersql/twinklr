@@ -48,6 +48,12 @@ class AgentResult(BaseModel):
         description="Output tokens consumed, summed across repair attempts",
     )
 
+    reasoning_tokens: int = Field(
+        default=0,
+        ge=0,
+        description="Reasoning tokens consumed, summed across repair attempts",
+    )
+
     conversation_id: str | None = Field(
         default=None,
         description="Conversation ID (for conversational agents)",

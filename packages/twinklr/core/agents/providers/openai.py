@@ -337,6 +337,7 @@ class OpenAIProvider:
         response_model = kwargs.pop("response_model", None)
         allow_json_object_fallback = kwargs.pop("allow_json_object_fallback", True)
         provider_max_attempts = kwargs.pop("provider_max_attempts", PROVIDER_MAX_ATTEMPTS)
+        input_image_urls = kwargs.pop("input_image_urls", None)
         if not isinstance(allow_json_object_fallback, bool):
             raise LLMProviderError("allow_json_object_fallback must be a boolean")
         if (
@@ -374,7 +375,7 @@ class OpenAIProvider:
                 response_format = strict_response_format(cast("type[BaseModel]", response_model))
             request_params: dict[str, Any] = {
                 "model": model,
-                "input": messages,
+                "input": self._attach_input_images(messages, input_image_urls),
                 "text": {"format": response_format},
             }
 
@@ -483,6 +484,38 @@ class OpenAIProvider:
         except Exception as e:
             logger.error(f"Async OpenAI provider error: {e}")
             raise LLMProviderError(f"Provider error: {e}") from e
+
+    @staticmethod
+    def _attach_input_images(
+        messages: list[dict[str, str]], input_image_urls: object
+    ) -> list[dict[str, Any]]:
+        """Attach image inputs to the final user turn without bypassing the provider."""
+        copied: list[dict[str, Any]] = [dict(message) for message in messages]
+        if input_image_urls is None:
+            return copied
+        if not isinstance(input_image_urls, list) or not all(
+            isinstance(url, str) and url.startswith("data:image/") for url in input_image_urls
+        ):
+            raise LLMProviderError("input_image_urls must be data:image URLs")
+        if not input_image_urls:
+            return copied
+        user_index = next(
+            (index for index in range(len(copied) - 1, -1, -1) if copied[index]["role"] == "user"),
+            None,
+        )
+        if user_index is None:
+            raise LLMProviderError("Vision requests require a user message")
+        text = copied[user_index].get("content")
+        if not isinstance(text, str):
+            raise LLMProviderError("Vision user message content must be text before attachment")
+        copied[user_index]["content"] = [
+            {"type": "input_text", "text": text},
+            *(
+                {"type": "input_image", "image_url": url, "detail": "low"}
+                for url in input_image_urls
+            ),
+        ]
+        return copied
 
     async def _create_response_with_retries(
         self, request_params: dict[str, Any], *, max_attempts: int

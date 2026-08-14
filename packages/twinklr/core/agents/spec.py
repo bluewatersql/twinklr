@@ -81,6 +81,18 @@ class AgentSpec(BaseModel):
         description="Per-request provider timeout in seconds",
     )
 
+    provider_max_attempts: int = Field(
+        default=3,
+        ge=1,
+        le=3,
+        description="Maximum provider transport attempts for one logical request",
+    )
+
+    allow_json_object_fallback: bool = Field(
+        default=True,
+        description="Allow a second compatibility request after strict-format rejection",
+    )
+
     # Schema repair
     max_schema_repair_attempts: int = Field(
         default=1,
