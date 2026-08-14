@@ -274,3 +274,14 @@ meeting short sections. Whoever reworks dimmer/channel resolution here should de
 scale period to section length, gate SLOW out of short sections, or accept CONSTANT
 as the correct reading of "slow" at 1 bar. P1P-T6 adjudicated it out-of-mechanism for
 channel defaults; it must not die silently.
+
+## Routed follow-up from P1P-T11 verification (2026-08-14)
+
+A single-head rig never reaches `UnsupportedRigShapeError`: it dies earlier, in
+`rig_profile_from_fixture_group`, with a raw Pydantic `ValidationError` — the LEFT
+semantic group receives zero fixtures when `len // 2 == 0`. Reproduced identically
+before and after T11, so it predates delivery v1; it is exactly the example P1P-T5's
+routed note cited ("a template addressing LEFT and RIGHT on a single-head rig"), so
+that note is NOT fully discharged by T5/T11. Whoever reworks role/group resolution
+here must make 1-head rigs either plan sensibly (all spatial roles collapse to the
+one head) or fail with the actionable error — never a traceback.
