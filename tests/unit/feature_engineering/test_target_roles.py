@@ -115,6 +115,8 @@ def test_target_roles_assigner_assigns_high_activity_lead() -> None:
     by_target = {row.target_name: row for row in rows}
     assert by_target["MegaTree"].role in {TargetRole.LEAD, TargetRole.IMPACT}
     assert by_target["MegaTree"].role_confidence >= 0.35
+    assert by_target["MegaTree"].role_confidence == 1.0
+    assert by_target["MegaTree"].top_role_score == 1.05
     assert by_target["Stars"].event_count == 1
 
 
@@ -139,4 +141,6 @@ def test_target_roles_assigner_fallback_when_weak_signal() -> None:
 
     assert len(rows) == 1
     assert rows[0].role is TargetRole.FALLBACK
+    assert rows[0].role_confidence == 0.0
+    assert rows[0].top_role_score == 0.2
     assert rows[0].reason_keys == ("fallback_default",)

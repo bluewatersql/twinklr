@@ -214,6 +214,7 @@ class TargetRoleAssigner:
             target_kind=target_kind,
             role=role,
             role_confidence=max(0.0, min(1.0, role_score)),
+            top_role_score=max(0.0, ranked[0][1] if ranked else 0.0),
             reason_keys=role_reason_keys,
             event_count=event_count,
             active_duration_ms=int(row["active_duration_ms"]),

@@ -5,11 +5,16 @@ from __future__ import annotations
 
 import argparse
 from collections import Counter
+from collections.abc import Sequence
+from dataclasses import fields
+from datetime import UTC, datetime
+import hashlib
 import json
 from pathlib import Path
-import shutil
+import shlex
+import sys
 import time
-from typing import Any
+from typing import Any, Literal, cast
 
 from twinklr.core.config.models import AppConfig, JobConfig
 from twinklr.core.feature_engineering.models import MusicLibraryIndex
@@ -73,7 +78,7 @@ def _ensure_corpus(corpus_dir: Path) -> Path:
     if corpus_dir.name in {r.schema_version for r in results}:
         return corpus_dir
     print(f"  [auto] Using corpus: {best.output_dir.relative_to(ROOT)}")
-    return best.output_dir
+    return cast("Path", best.output_dir)
 
 
 def parse_args() -> argparse.Namespace:
@@ -190,6 +195,201 @@ def _read_jsonl(path: Path) -> list[dict[str, Any]]:
     return rows
 
 
+def _json_ready(value: object) -> object:
+    """Convert nested option values into deterministic JSON-compatible data."""
+    if isinstance(value, Path):
+        return str(value.resolve())
+    if isinstance(value, dict):
+        return {str(key): _json_ready(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_json_ready(item) for item in value]
+    model_dump = getattr(value, "model_dump", None)
+    if callable(model_dump):
+        return _json_ready(model_dump(mode="json"))
+    return value
+
+
+def _effective_options(options: FeatureEngineeringPipelineOptions) -> dict[str, object]:
+    """Serialize every effective FE dataclass option, including defaults."""
+    return {
+        field.name: _json_ready(getattr(options, field.name))
+        for field in fields(FeatureEngineeringPipelineOptions)
+    }
+
+
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _tree_snapshot(root: Path) -> dict[str, object]:
+    """Measure a recursive tree using both per-file and aggregate content hashes."""
+    if not root.exists():
+        return {"root": str(root), "exists": False, "file_count": 0, "sha256": None, "files": []}
+    files: list[dict[str, object]] = []
+    aggregate = hashlib.sha256()
+    for path in sorted(candidate for candidate in root.rglob("*") if candidate.is_file()):
+        relative = path.relative_to(root).as_posix()
+        digest = _sha256_file(path)
+        size = path.stat().st_size
+        files.append({"path": relative, "size_bytes": size, "sha256": digest})
+        aggregate.update(relative.encode("utf-8"))
+        aggregate.update(b"\0")
+        aggregate.update(digest.encode("ascii"))
+        aggregate.update(b"\0")
+    return {
+        "root": str(root),
+        "exists": True,
+        "file_count": len(files),
+        "sha256": aggregate.hexdigest(),
+        "files": files,
+    }
+
+
+def _store_snapshot(db_path: Path | None, backend: str) -> dict[str, object]:
+    """Read actual feature-store row counts without creating a missing store."""
+    if db_path is None or backend != "sqlite":
+        return {"enabled": False, "backend": backend, "path": None, "exists": False, "stats": None}
+    resolved = db_path.resolve()
+    if not resolved.exists():
+        return {
+            "enabled": True,
+            "backend": backend,
+            "path": str(resolved),
+            "exists": False,
+            "stats": None,
+        }
+    from twinklr.core.feature_store.backends.sqlite import SQLiteFeatureStore
+    from twinklr.core.feature_store.models import FeatureStoreConfig
+
+    store = SQLiteFeatureStore(FeatureStoreConfig(backend="sqlite", db_path=resolved))
+    store.initialize()
+    try:
+        stats = store.get_corpus_stats().model_dump(mode="json")
+    finally:
+        store.close()
+    return {
+        "enabled": True,
+        "backend": backend,
+        "path": str(resolved),
+        "exists": True,
+        "size_bytes": resolved.stat().st_size,
+        "sha256": _sha256_file(resolved),
+        "stats": stats,
+    }
+
+
+def _clean_output_dir(output_dir: Path, feature_store_db: Path | None) -> None:
+    """Clear staged output while preserving an embedded SQLite store and sidecars."""
+    if output_dir == Path(output_dir.anchor):
+        raise ValueError(f"Refusing to clean filesystem root as output directory: {output_dir}")
+    output_dir.mkdir(parents=True, exist_ok=True)
+    preserved: set[Path] = set()
+    if feature_store_db is not None:
+        store = feature_store_db.resolve()
+        if store == output_dir:
+            raise ValueError("--feature-store-db must name a file, not --output-dir itself")
+        preserved.update((store, Path(f"{store}-wal"), Path(f"{store}-shm")))
+
+    def _remove_staged(path: Path) -> None:
+        resolved = path.resolve()
+        if resolved in preserved:
+            return
+        if path.is_dir():
+            for child in path.iterdir():
+                _remove_staged(child)
+            if not any(path.iterdir()):
+                path.rmdir()
+            return
+        path.unlink()
+
+    for child in tuple(output_dir.iterdir()):
+        _remove_staged(child)
+
+
+def _stats(snapshot: object) -> object:
+    return snapshot.get("stats") if isinstance(snapshot, dict) else None
+
+
+def _write_mining_run_manifest(
+    *,
+    output_dir: Path,
+    corpus_dir: Path,
+    feature_store_db: Path | None,
+    feature_store_backend: str,
+    sequence_count: int,
+    options: FeatureEngineeringPipelineOptions,
+    previous_manifest: dict[str, Any] | None,
+    store_before: dict[str, object],
+    store_after: dict[str, object],
+    catalog_before: dict[str, object],
+    catalog_after: dict[str, object],
+) -> Path:
+    """Record measured reproducibility, idempotency, and catalog-safety evidence."""
+    artifact_snapshot = _tree_snapshot(output_dir)
+    prior_after: object = None
+    if previous_manifest is not None:
+        prior_snapshots = previous_manifest.get("feature_store_snapshots")
+        if isinstance(prior_snapshots, dict):
+            prior_after = prior_snapshots.get("after")
+    prior_stats = _stats(prior_after)
+    before_stats = _stats(store_before)
+    after_stats = _stats(store_after)
+    has_prior_measurement = prior_stats is not None
+    before_matches_prior = has_prior_measurement and before_stats == prior_stats
+    after_matches_before = before_stats is not None and after_stats == before_stats
+    verified_unchanged_rerun = before_matches_prior and after_matches_before
+    exact_command = shlex.join([sys.executable, *sys.argv])
+    payload = {
+        "schema_version": "mining_run_manifest_v1",
+        "created_at_utc": datetime.now(UTC).isoformat(),
+        "invocation": {
+            "exact_command": exact_command,
+            "exact_rerun_command": exact_command,
+            "effective_options": _effective_options(options),
+        },
+        "corpus": {
+            "path": str(corpus_dir),
+            "sequence_index_sha256": _sha256_file(corpus_dir / "sequence_index.jsonl"),
+        },
+        "output_dir": str(output_dir.resolve()),
+        "sequence_count": sequence_count,
+        "candidate_staging": {
+            "recursive_artifacts": artifact_snapshot,
+            "note": "FE output is staged under this run directory; promotion into a live catalog is not performed by this command.",
+        },
+        "content_hash_identity": {
+            "required": True,
+            "implementation": "P1K-T1 deterministic package/file/profile identifiers",
+            "verification": {
+                "previous_run_after_stats": prior_stats,
+                "current_run_before_stats": before_stats,
+                "current_run_after_stats": after_stats,
+                "before_matches_previous_after": before_matches_prior,
+                "after_matches_before": after_matches_before,
+                "verified_unchanged_rerun": verified_unchanged_rerun,
+                "status": "verified" if verified_unchanged_rerun else "needs_identical_second_run",
+            },
+        },
+        "feature_store": {
+            "backend": feature_store_backend,
+            "path": str(feature_store_db.resolve()) if feature_store_db else None,
+        },
+        "feature_store_snapshots": {"before": store_before, "after": store_after},
+        "live_catalog_immutability": {
+            "before": catalog_before,
+            "after": catalog_after,
+            "unchanged": catalog_before == catalog_after,
+        },
+    }
+    path = output_dir / "mining_run_manifest.json"
+    path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return path
+
+
 def _read_dataset_rows(sequence_dir: Path, stem: str) -> list[dict[str, Any]]:
     parquet_path = sequence_dir / f"{stem}.parquet"
     jsonl_path = sequence_dir / f"{stem}.jsonl"
@@ -209,7 +409,7 @@ def _read_dataset_rows(sequence_dir: Path, stem: str) -> list[dict[str, Any]]:
     return []
 
 
-def _render_table(headers: tuple[str, ...], rows: list[tuple[str, ...]]) -> str:
+def _render_table(headers: tuple[str, ...], rows: Sequence[tuple[str, ...]]) -> str:
     widths = [len(header) for header in headers]
     for row in rows:
         for idx, value in enumerate(row):
@@ -221,7 +421,7 @@ def _render_table(headers: tuple[str, ...], rows: list[tuple[str, ...]]) -> str:
     return "\n".join([header_line, divider, *body])
 
 
-def _render_markdown_table(headers: tuple[str, ...], rows: list[tuple[str, ...]]) -> str:
+def _render_markdown_table(headers: tuple[str, ...], rows: Sequence[tuple[str, ...]]) -> str:
     head = "| " + " | ".join(headers) + " |"
     sep = "| " + " | ".join("---" for _ in headers) + " |"
     body = ["| " + " | ".join(row) + " |" for row in rows]
@@ -567,11 +767,11 @@ def _write_markdown(
         )
         top_unknown = unknown_diagnostics.get("top_unknown_effect_types", [])
         if isinstance(top_unknown, list) and top_unknown:
-            rows: list[tuple[str, str, str, str]] = []
+            unknown_rows: list[tuple[str, str, str, str]] = []
             for row in top_unknown[:10]:
                 if not isinstance(row, dict):
                     continue
-                rows.append(
+                unknown_rows.append(
                     (
                         str(row.get("effect_type", "")),
                         str(row.get("normalized_key", "")),
@@ -579,14 +779,14 @@ def _write_markdown(
                         str(row.get("distinct_sequence_count", 0)),
                     )
                 )
-            if rows:
+            if unknown_rows:
                 lines.append("")
                 lines.append("### Top Unknown Effect Types")
                 lines.append("")
                 lines.append(
                     _render_markdown_table(
                         ("effect_type", "normalized_key", "count", "sequences"),
-                        rows,
+                        unknown_rows,
                     )
                 )
                 lines.append("")
@@ -598,12 +798,12 @@ def _write_markdown(
                 if not isinstance(group, dict):
                     continue
                 values = group.get("raw_effect_types", [])
-                rendered = (
+                alias_values = (
                     ", ".join(str(value) for value in values[:6])
                     if isinstance(values, list)
                     else ""
                 )
-                alias_rows.append((str(group.get("normalized_key", "")), rendered))
+                alias_rows.append((str(group.get("normalized_key", "")), alias_values))
             if alias_rows:
                 lines.append("### Alias Candidate Groups")
                 lines.append("")
@@ -614,12 +814,12 @@ def _write_markdown(
 
     if template_retrieval_index:
         recommendations = template_retrieval_index.get("recommendations", [])
-        rows: list[tuple[str, str, str, str, str]] = []
+        retrieval_rows: list[tuple[str, str, str, str, str]] = []
         if isinstance(recommendations, list):
             for row in recommendations[:10]:
                 if not isinstance(row, dict):
                     continue
-                rows.append(
+                retrieval_rows.append(
                     (
                         str(row.get("rank", "")),
                         str(row.get("template_kind", "")),
@@ -628,13 +828,13 @@ def _write_markdown(
                         str(row.get("template_id", "")),
                     )
                 )
-        if rows:
+        if retrieval_rows:
             lines.append("## Template Retrieval Baseline")
             lines.append("")
             lines.append(
                 _render_markdown_table(
                     ("rank", "kind", "score", "effect_family", "template_id"),
-                    rows,
+                    retrieval_rows,
                 )
             )
             lines.append("")
@@ -657,10 +857,12 @@ def _write_markdown(
             f"- Over generic: {len(template_diagnostics.get('over_generic_templates', []))}"
         )
 
-        rows = template_diagnostics.get("rows", [])
-        rendered: list[tuple[str, str, str, str, str, str]] = []
-        if isinstance(rows, list):
-            candidates = [row for row in rows if isinstance(row, dict) and row.get("flags")]
+        diagnostic_source_rows = template_diagnostics.get("rows", [])
+        diagnostic_rows: list[tuple[str, str, str, str, str, str]] = []
+        if isinstance(diagnostic_source_rows, list):
+            candidates = [
+                row for row in diagnostic_source_rows if isinstance(row, dict) and row.get("flags")
+            ]
             candidates.sort(
                 key=lambda row: (
                     -int(row.get("support_count", 0)),
@@ -669,7 +871,7 @@ def _write_markdown(
             )
             for row in candidates[:10]:
                 flags = row.get("flags", [])
-                rendered.append(
+                diagnostic_rows.append(
                     (
                         str(row.get("template_id", "")),
                         str(row.get("template_kind", "")),
@@ -679,7 +881,7 @@ def _write_markdown(
                         ",".join(str(flag) for flag in flags) if isinstance(flags, list) else "",
                     )
                 )
-        if rendered:
+        if diagnostic_rows:
             lines.append("")
             lines.append(
                 _render_markdown_table(
@@ -691,7 +893,7 @@ def _write_markdown(
                         "variance",
                         "flags",
                     ),
-                    rendered,
+                    diagnostic_rows,
                 )
             )
         lines.append("")
@@ -706,11 +908,30 @@ def main() -> int:
     output_dir = args.output_dir.resolve()
 
     if not args.skip_build:
-        shutil.rmtree(output_dir, ignore_errors=True)
         if args.corpus_dir is None:
             print("ERROR: --corpus-dir is required unless --skip-build is set.")
             return 2
         corpus_dir = _ensure_corpus(args.corpus_dir.resolve())
+        feature_store_db = (
+            args.feature_store_db.resolve() if args.feature_store_db is not None else None
+        )
+        feature_store_backend: Literal["sqlite", "null"]
+        if args.feature_store_backend is None:
+            feature_store_backend = "sqlite" if feature_store_db is not None else "null"
+        elif args.feature_store_backend == "sqlite":
+            feature_store_backend = "sqlite"
+        elif args.feature_store_backend == "null":
+            feature_store_backend = "null"
+        else:
+            raise ValueError(f"Unsupported feature-store backend: {args.feature_store_backend}")
+        previous_manifest_path = output_dir / "mining_run_manifest.json"
+        previous_manifest = (
+            _read_json(previous_manifest_path) if previous_manifest_path.exists() else None
+        )
+        live_catalog_dir = ROOT / "catalog" / "templates"
+        catalog_before = _tree_snapshot(live_catalog_dir)
+        store_before = _store_snapshot(feature_store_db, feature_store_backend)
+        _clean_output_dir(output_dir, feature_store_db)
         analyzer = None
         if args.run_audio_analysis:
             from twinklr.core.audio.analyzer import AudioAnalyzer
@@ -720,27 +941,28 @@ def main() -> int:
         from twinklr.core.feature_store.models import FeatureStoreConfig
 
         feature_store_config = None
-        if args.feature_store_db is not None:
+        if feature_store_db is not None:
             feature_store_config = FeatureStoreConfig(
-                backend=args.feature_store_backend or "sqlite",
-                db_path=args.feature_store_db,
+                backend=feature_store_backend,
+                db_path=feature_store_db,
             )
 
         music_index = _load_music_library_index()
+        effective_options = FeatureEngineeringPipelineOptions(
+            template_min_instance_count=args.template_min_instance_count,
+            template_min_distinct_pack_count=args.template_min_distinct_pack_count,
+            quality_max_unknown_effect_family_ratio=args.quality_max_unknown_effect_family_ratio,
+            quality_max_unknown_motion_ratio=args.quality_max_unknown_motion_ratio,
+            quality_max_single_unknown_effect_type_ratio=args.quality_max_single_unknown_effect_type_ratio,
+            quality_max_low_support_template_ratio=args.quality_max_low_support_template_ratio,
+            quality_max_high_concentration_template_ratio=args.quality_max_high_concentration_template_ratio,
+            quality_max_high_variance_template_ratio=args.quality_max_high_variance_template_ratio,
+            quality_max_over_generic_template_ratio=args.quality_max_over_generic_template_ratio,
+            quality_diagnostics_gate_mode=args.quality_diagnostics_gate_mode,
+            feature_store_config=feature_store_config,
+        )
         pipeline = FeatureEngineeringPipeline(
-            options=FeatureEngineeringPipelineOptions(
-                template_min_instance_count=args.template_min_instance_count,
-                template_min_distinct_pack_count=args.template_min_distinct_pack_count,
-                quality_max_unknown_effect_family_ratio=args.quality_max_unknown_effect_family_ratio,
-                quality_max_unknown_motion_ratio=args.quality_max_unknown_motion_ratio,
-                quality_max_single_unknown_effect_type_ratio=args.quality_max_single_unknown_effect_type_ratio,
-                quality_max_low_support_template_ratio=args.quality_max_low_support_template_ratio,
-                quality_max_high_concentration_template_ratio=args.quality_max_high_concentration_template_ratio,
-                quality_max_high_variance_template_ratio=args.quality_max_high_variance_template_ratio,
-                quality_max_over_generic_template_ratio=args.quality_max_over_generic_template_ratio,
-                quality_diagnostics_gate_mode=args.quality_diagnostics_gate_mode,
-                feature_store_config=feature_store_config,
-            ),
+            options=effective_options,
             analyzer=analyzer,
             music_library_index=music_index,
         )
@@ -756,6 +978,26 @@ def main() -> int:
             f"  Built feature-engineering artifacts for {len(bundles)} sequences"
             f" in {build_elapsed:.1f}s."
         )
+        store_after = _store_snapshot(feature_store_db, feature_store_backend)
+        catalog_after = _tree_snapshot(live_catalog_dir)
+        manifest_path = _write_mining_run_manifest(
+            output_dir=output_dir,
+            corpus_dir=corpus_dir,
+            feature_store_db=feature_store_db,
+            feature_store_backend=feature_store_backend,
+            sequence_count=len(bundles),
+            options=effective_options,
+            previous_manifest=previous_manifest,
+            store_before=store_before,
+            store_after=store_after,
+            catalog_before=catalog_before,
+            catalog_after=catalog_after,
+        )
+        print(f"  Wrote staged mining-run manifest: {manifest_path}")
+        if catalog_before != catalog_after:
+            raise RuntimeError(
+                f"Live catalog changed during staged mining run; inspect {manifest_path}"
+            )
 
     sequence_dirs = _collect_sequence_dirs(output_dir)
     if not sequence_dirs:
@@ -1003,11 +1245,11 @@ def main() -> int:
         print(f"Unknown motion ratio        : {unknown_diagnostics.get('unknown_motion_ratio', 0)}")
         top_unknown = unknown_diagnostics.get("top_unknown_effect_types", [])
         if isinstance(top_unknown, list) and top_unknown:
-            rows: list[tuple[str, str, str, str]] = []
+            unknown_rows: list[tuple[str, str, str, str]] = []
             for row in top_unknown[:10]:
                 if not isinstance(row, dict):
                     continue
-                rows.append(
+                unknown_rows.append(
                     (
                         str(row.get("effect_type", "")),
                         str(row.get("normalized_key", "")),
@@ -1015,9 +1257,13 @@ def main() -> int:
                         str(row.get("distinct_sequence_count", 0)),
                     )
                 )
-            if rows:
+            if unknown_rows:
                 print("\nTop Unknown Effect Types")
-                print(_render_table(("effect_type", "normalized_key", "count", "sequences"), rows))
+                print(
+                    _render_table(
+                        ("effect_type", "normalized_key", "count", "sequences"), unknown_rows
+                    )
+                )
 
         alias_groups = unknown_diagnostics.get("alias_candidate_groups", [])
         if isinstance(alias_groups, list) and alias_groups:
@@ -1026,24 +1272,24 @@ def main() -> int:
                 if not isinstance(group, dict):
                     continue
                 values = group.get("raw_effect_types", [])
-                rendered = (
+                alias_values = (
                     ", ".join(str(value) for value in values[:6])
                     if isinstance(values, list)
                     else ""
                 )
-                alias_rows.append((str(group.get("normalized_key", "")), rendered))
+                alias_rows.append((str(group.get("normalized_key", "")), alias_values))
             if alias_rows:
                 print("\nAlias Candidate Groups")
                 print(_render_table(("normalized_key", "raw_effect_types"), alias_rows))
 
     if template_retrieval_index is not None:
         recommendations = template_retrieval_index.get("recommendations", [])
-        rows: list[tuple[str, str, str, str, str]] = []
+        retrieval_rows: list[tuple[str, str, str, str, str]] = []
         if isinstance(recommendations, list):
             for row in recommendations[:10]:
                 if not isinstance(row, dict):
                     continue
-                rows.append(
+                retrieval_rows.append(
                     (
                         str(row.get("rank", "")),
                         str(row.get("template_kind", "")),
@@ -1052,9 +1298,13 @@ def main() -> int:
                         str(row.get("template_id", "")),
                     )
                 )
-        if rows:
+        if retrieval_rows:
             print("\nTemplate Retrieval Baseline")
-            print(_render_table(("rank", "kind", "score", "effect_family", "template_id"), rows))
+            print(
+                _render_table(
+                    ("rank", "kind", "score", "effect_family", "template_id"), retrieval_rows
+                )
+            )
 
     if template_diagnostics is not None:
         print("\nTemplate Diagnostics")
@@ -1069,10 +1319,12 @@ def main() -> int:
         print(f"High variance     : {len(template_diagnostics.get('high_variance_templates', []))}")
         print(f"Over generic      : {len(template_diagnostics.get('over_generic_templates', []))}")
 
-        rows = template_diagnostics.get("rows", [])
-        rendered: list[tuple[str, str, str, str, str, str]] = []
-        if isinstance(rows, list):
-            candidates = [row for row in rows if isinstance(row, dict) and row.get("flags")]
+        diagnostic_source_rows = template_diagnostics.get("rows", [])
+        diagnostic_rows: list[tuple[str, str, str, str, str, str]] = []
+        if isinstance(diagnostic_source_rows, list):
+            candidates = [
+                row for row in diagnostic_source_rows if isinstance(row, dict) and row.get("flags")
+            ]
             candidates.sort(
                 key=lambda row: (
                     -int(row.get("support_count", 0)),
@@ -1081,7 +1333,7 @@ def main() -> int:
             )
             for row in candidates[:10]:
                 flags = row.get("flags", [])
-                rendered.append(
+                diagnostic_rows.append(
                     (
                         str(row.get("template_id", "")),
                         str(row.get("template_kind", "")),
@@ -1091,7 +1343,7 @@ def main() -> int:
                         ",".join(str(flag) for flag in flags) if isinstance(flags, list) else "",
                     )
                 )
-        if rendered:
+        if diagnostic_rows:
             print(
                 _render_table(
                     (
@@ -1102,7 +1354,7 @@ def main() -> int:
                         "variance",
                         "flags",
                     ),
-                    rendered,
+                    diagnostic_rows,
                 )
             )
 

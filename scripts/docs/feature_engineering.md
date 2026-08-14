@@ -164,6 +164,41 @@ The demo surfaces:
 - transition graph summary
 - quality gate summary
 
+### Owner mining and threshold-review session
+
+The feature-engineering output directory is a **staging area**, not the live
+recipe catalog. For an owner-local corpus session, run the demo with a dedicated
+output directory and SQLite feature store, then run it a second time unchanged
+before reviewing thresholds. The two runs must leave feature-store row counts
+unchanged; content-hash identity is the prerequisite for trusting support counts.
+
+```bash
+uv run python scripts/demo_feature_engineering.py \
+  --corpus-dir <author-local-corpus> \
+  --output-dir <staged-mining-run> \
+  --feature-store-db <staged-mining-run>/feature-store.sqlite
+
+# Repeat the exact same command. The embedded store is preserved while staged
+# artifacts are rebuilt, and the second manifest must report status=verified.
+uv run python scripts/demo_feature_engineering.py \
+  --corpus-dir <author-local-corpus> \
+  --output-dir <staged-mining-run> \
+  --feature-store-db <staged-mining-run>/feature-store.sqlite
+
+uv run python scripts/report_quality_gate_distributions.py \
+  --run-dir <staged-mining-run>
+```
+
+The first command writes `mining_run_manifest.json` with the corpus path, staged
+artifact hashes, exact effective options and rerun command, before/after
+feature-store row counts, and measured live-catalog hashes. The identical second
+run must record `verified_unchanged_rerun: true` before its distributions are
+trusted. The reporting command writes JSON and Markdown
+distribution reports plus `OWNER_DECISION_LOG_TEMPLATE.md`. The template is not a
+decision: the owner records keep/change/defer and rationale for every threshold
+after reviewing the empirical report. Neither command promotes a candidate or
+modifies `catalog/templates/`.
+
 ## 4) Query Template Retrieval
 
 Script:

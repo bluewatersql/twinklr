@@ -83,6 +83,11 @@ class TargetRoleAssignment(BaseModel):
 
     role: TargetRole
     role_confidence: float = Field(ge=0.0, le=1.0)
+    top_role_score: float = Field(
+        default=0.0,
+        ge=0.0,
+        description="Unclamped highest pre-cutoff role score, retained for threshold review.",
+    )
     reason_keys: tuple[str, ...] = ()
 
     event_count: int = Field(ge=0)
