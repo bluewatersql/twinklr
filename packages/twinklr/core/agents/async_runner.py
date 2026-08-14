@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 from pathlib import Path
 import time
@@ -29,6 +30,8 @@ from twinklr.core.agents.state import AgentState
 from twinklr.core.agents.taxonomy_utils import inject_taxonomy
 
 logger = logging.getLogger(__name__)
+
+MAX_ONESHOT_REPAIR_RESPONSE_CHARS = 6_000
 
 
 def sum_token_usage(usages: list[TokenUsage]) -> TokenUsage:
@@ -431,8 +434,6 @@ class AsyncAgentRunner:
 
                 # Log the failed response for debugging (first attempt only)
                 if attempt == 0:
-                    import json
-
                     try:
                         raw_json = json.dumps(response.content, indent=2)
                     except Exception:
@@ -460,8 +461,35 @@ class AsyncAgentRunner:
                         f"Schema validation failed after {repair_attempts} attempts: {e}"
                     ) from e
 
-                # Add repair feedback to messages (errors only; schema is in system prompt)
+                # A conversational provider retains its assistant turn. ONESHOT has no
+                # such store, so include one bounded excerpt or the repair would be a
+                # blind resample based only on validation errors.
+                failed_response_context = ""
+                if spec.mode == AgentMode.ONESHOT:
+                    try:
+                        failed_response = json.dumps(
+                            response.content,
+                            ensure_ascii=False,
+                            sort_keys=True,
+                            default=str,
+                        )
+                    except (TypeError, ValueError):
+                        failed_response = str(response.content)
+                    was_truncated = len(failed_response) > MAX_ONESHOT_REPAIR_RESPONSE_CHARS
+                    failed_response = failed_response[:MAX_ONESHOT_REPAIR_RESPONSE_CHARS]
+                    bound_note = (
+                        f" (truncated to {MAX_ONESHOT_REPAIR_RESPONSE_CHARS} characters)"
+                        if was_truncated
+                        else ""
+                    )
+                    failed_response_context = (
+                        f"Your previous response{bound_note} was:\n"
+                        f"```json\n{failed_response}\n```\n\n"
+                    )
+
+                # The schema remains in the system prompt; do not echo it here.
                 repair_message = (
+                    f"{failed_response_context}"
                     f"Schema validation failed. Fix these errors:\n{error_details}\n\n"
                     f"The expected schema is in the system prompt. "
                     f"Return a corrected JSON response."

@@ -32,6 +32,8 @@ from twinklr.core.agents.sequencer.moving_heads.orchestrator import (
     build_judge_variables,
     build_planner_variables,
 )
+from twinklr.core.agents.shared.judge.controller import IterationContext
+from twinklr.core.agents.shared.judge.models import JudgeVerdict, VerdictStatus
 
 
 def create_test_audio_profile() -> AudioProfileModel:
@@ -196,6 +198,7 @@ class TestBuildJudgeVariables:
             context=planning_context,
             plan=valid_plan,
             iteration=0,
+            iteration_context=IterationContext(),
         )
 
         assert "plan" in variables
@@ -209,19 +212,29 @@ class TestBuildJudgeVariables:
         self, planning_context: MovingHeadPlanningContext, valid_plan: ChoreographyPlan
     ) -> None:
         """Test judge variables with iteration history."""
+        history = IterationContext()
+        history.add_verdict(
+            JudgeVerdict(
+                status=VerdictStatus.SOFT_FAIL,
+                score=6.0,
+                confidence=0.9,
+                strengths=["Timing is coherent"],
+                issues=[],
+                feedback_for_planner="Fix variety and add energy",
+                iteration=1,
+            )
+        )
         variables = build_judge_variables(
             context=planning_context,
             plan=valid_plan,
             iteration=2,
-            previous_feedback=["Fix variety", "Add energy"],
-            previous_issues=[
-                {"issue_id": "VARIETY_LOW", "severity": "WARN", "message": "Low variety"}
-            ],
+            iteration_context=history,
         )
 
         assert variables["iteration"] == 2
-        assert len(variables["previous_feedback"]) == 2
-        assert len(variables["previous_issues"]) == 1
+        assert variables["previous_feedback"] == ["Fix variety and add energy"]
+        assert variables["previous_issues"] == []
+        assert variables["previous_verdicts"][0]["score"] == 6.0
 
     def test_plan_serialized_as_dict(
         self, planning_context: MovingHeadPlanningContext, valid_plan: ChoreographyPlan
@@ -231,6 +244,7 @@ class TestBuildJudgeVariables:
             context=planning_context,
             plan=valid_plan,
             iteration=0,
+            iteration_context=IterationContext(),
         )
 
         # Plan should be dict, not Pydantic model
@@ -280,6 +294,25 @@ class TestMovingHeadPlannerOrchestrator:
         # Same context should produce same key
         assert key1 == key2
         assert len(key1) == 64  # SHA256 hex digest
+
+    @pytest.mark.asyncio
+    async def test_cache_key_tracks_iteration_and_threshold_config(
+        self, mock_provider: MagicMock, planning_context: MovingHeadPlanningContext
+    ) -> None:
+        """Behavioral judge-loop knobs invalidate cached plans honestly."""
+        baseline = MovingHeadPlannerOrchestrator(
+            provider=mock_provider, max_iterations=3, min_pass_score=7.0
+        )
+        stricter = MovingHeadPlannerOrchestrator(
+            provider=mock_provider, max_iterations=3, min_pass_score=8.0
+        )
+        judge_disabled = MovingHeadPlannerOrchestrator(
+            provider=mock_provider, max_iterations=0, min_pass_score=7.0
+        )
+
+        baseline_key = await baseline.get_cache_key(planning_context)
+        assert await stricter.get_cache_key(planning_context) != baseline_key
+        assert await judge_disabled.get_cache_key(planning_context) != baseline_key
 
     @pytest.mark.asyncio
     async def test_run_validates_empty_templates(self, mock_provider: MagicMock) -> None:
@@ -365,13 +398,29 @@ class TestOrchestratorIntegration:
         mock_provider = MagicMock()
 
         orchestrator = MovingHeadPlannerOrchestrator(provider=mock_provider)
+        controller_run = AsyncMock(side_effect=mock_controller_run)
 
         # Mock the controller.run method
-        with patch.object(
-            orchestrator.controller, "run", new=AsyncMock(side_effect=mock_controller_run)
-        ):
+        with patch.object(orchestrator.controller, "run", new=controller_run):
             result = await orchestrator.run(planning_context)
 
         assert result.success is True
         assert result.plan is not None
         assert len(result.plan.sections) > 0
+        judge_context_builder = controller_run.await_args.kwargs["judge_context_builder"]
+        assert callable(judge_context_builder)
+
+        history = IterationContext()
+        history.add_verdict(
+            JudgeVerdict(
+                status=VerdictStatus.SOFT_FAIL,
+                score=6.0,
+                confidence=0.9,
+                strengths=[],
+                issues=[],
+                feedback_for_planner="Add a stronger chorus contrast.",
+                iteration=0,
+            )
+        )
+        shaped = judge_context_builder(result.plan, 1, history)
+        assert shaped["previous_feedback"] == ["Add a stronger chorus contrast."]

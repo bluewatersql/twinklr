@@ -69,6 +69,15 @@ V2 Migration: Uses iteration number from IterationContext
 
 This is **iteration {{ iteration + 1 }}**.
 
+{% if previous_verdicts is defined and previous_verdicts %}
+### Prior Verdicts
+
+{% for verdict in previous_verdicts %}
+- Iteration {{ verdict.iteration + 1 }}: **{{ verdict.status }}**, score {{ verdict.score }}
+  - {{ verdict.feedback_for_planner }}
+{% endfor %}
+{% endif %}
+
 {% if previous_feedback is defined and previous_feedback %}
 ### Previous Feedback
 
@@ -87,6 +96,14 @@ This is **iteration {{ iteration + 1 }}**.
 {% endfor %}
 
 **Check if these issues have been resolved.**
+{% endif %}
+
+{% if previous_revision_requests is defined and previous_revision_requests %}
+### Prior Revision Requests
+{% for request in previous_revision_requests %}
+- Focus: {{ request.focus_areas | join(', ') }}
+  - Requested fixes: {{ request.specific_fixes | join('; ') }}
+{% endfor %}
 {% endif %}
 {% endif %}
 
@@ -116,8 +133,8 @@ Score the plan 0-10 across these dimensions:
 
 ### Decision
 
-Apply the score-band semantics from the developer prompt and emit the corresponding
-status allowed by the injected response schema.
+Apply the configured score-band semantics from the developer prompt and emit the
+corresponding status allowed by the injected response schema.
 
 ## Required Output
 

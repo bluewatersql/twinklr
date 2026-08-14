@@ -51,19 +51,22 @@ all targets in its `group_order`. (End is exclusive: [start, end).)
 
 ## Scoring and Decisions
 
-Use the schema-defined approval status at 7.0 or above, retryable-failure status from 5.0
-through 6.9, and terminal-failure status below 5.0.
+Use the schema-defined approval status at
+{{ approval_score_threshold | default(7.0) }} or above, retryable-failure status from
+{{ soft_fail_score_threshold | default(5.0) }} up to (but not including) approval,
+and terminal-failure status below the soft-fail threshold.
 
 Calibration guardrail:
 - If there are no technical errors and remaining concerns are localized quality improvements,
-  default to the schema-defined approval status at a score of at least 7.0.
+  score them in the baseline-good range; set status from the configured thresholds above.
 - If there are zero ERROR issues, do not score below 7.2 unless quality problems are clearly broad and structural.
 - Use SOFT_FAIL only when quality issues are broad enough to materially change lane structure or section readability.
 
 **Automatic HARD_FAIL conditions (non-negotiable):**
 - Any MUST-PASS Technical Soundness Check fails
 
-Be calibrated: 7.0 is "good enough", 8.5+ is "excellent", <5.0 is "significant work".
+Be calibrated: 7.0 is baseline good quality and 8.5+ is excellent; the configured
+approval threshold determines whether a score proceeds in this run.
 
 ## Feedback Strategy
 

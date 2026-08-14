@@ -41,7 +41,7 @@ class IterationConfig(BaseModel):
     Controls iteration behavior, termination conditions, and feedback.
 
     Attributes:
-        max_iterations: Maximum iterations (1-10)
+        max_iterations: Maximum judge/iterate cycles (0 skips judging; 1-10 otherwise)
         token_budget: Optional token budget (cumulative)
         max_feedback_entries: Max feedback entries to keep (1-50)
         include_feedback_in_prompt: Include feedback in planner prompt
@@ -53,7 +53,12 @@ class IterationConfig(BaseModel):
         top_n_historical_issues: Number of top historical issues to include
     """
 
-    max_iterations: int = Field(ge=1, le=10, default=3, description="Maximum iterations")
+    max_iterations: int = Field(
+        ge=0,
+        le=10,
+        default=3,
+        description="Maximum judge/iterate cycles (0 plans once and skips judging)",
+    )
     token_budget: int | None = Field(default=None, description="Optional token budget (cumulative)")
 
     # Feedback management
@@ -165,6 +170,34 @@ class IterationContext(BaseModel):
         """
         self.total_tokens_used += tokens
 
+    def judge_prompt_history(self) -> dict[str, Any]:
+        """Serialize only this run's prior judge history for the next judge prompt."""
+        return {
+            "previous_verdicts": [
+                {
+                    "status": verdict.status.value,
+                    "score": verdict.score,
+                    "confidence": verdict.confidence,
+                    "feedback_for_planner": verdict.feedback_for_planner,
+                    "iteration": verdict.iteration,
+                }
+                for verdict in self.verdicts
+            ],
+            "previous_feedback": [
+                verdict.feedback_for_planner
+                for verdict in self.verdicts
+                if verdict.feedback_for_planner
+            ],
+            "previous_issues": [
+                issue.model_dump(mode="json")
+                for verdict in self.verdicts
+                for issue in verdict.issues
+            ],
+            "previous_revision_requests": [
+                request.model_dump(mode="json") for request in self.revision_requests
+            ],
+        }
+
     @property
     def is_complete(self) -> bool:
         """Check if iteration loop is complete.
@@ -267,7 +300,8 @@ class StandardIterationController[TPlan]:
         provider: LLMProvider,
         llm_logger: LLMCallLogger,
         prompt_base_path: Path | str = AGENTS_BASE_PATH,
-        judge_context_builder: Callable[[TPlan, int], dict[str, Any]] | None = None,
+        judge_context_builder: Callable[[TPlan, int, IterationContext], dict[str, Any]]
+        | None = None,
     ) -> IterationResult[TPlan]:
         """Run iteration loop until approval or termination.
 
@@ -280,8 +314,9 @@ class StandardIterationController[TPlan]:
             llm_logger: LLM call logger
             prompt_base_path: Base path for prompt packs (default: AGENTS_BASE_PATH)
             judge_context_builder: Optional callback to build judge-specific
-                variables from (plan, iteration). When provided, these variables
-                are used instead of planner variables for the judge.
+                variables from (plan, iteration, same-run iteration context). Its
+                variables augment the controller's common plan, history, and threshold
+                variables rather than replacing them.
 
         Returns:
             IterationResult with final plan and metadata
@@ -324,11 +359,12 @@ class StandardIterationController[TPlan]:
         initial_variables["learning_context"] = learning_context
 
         plan: TPlan | None = None
-        for iteration in range(self.config.max_iterations):
+        planning_attempts = max(1, self.config.max_iterations)
+        for iteration in range(planning_attempts):
             context.increment_iteration()
 
             # === PLANNING STAGE ===
-            self.logger.debug(f"Iteration {iteration + 1}/{self.config.max_iterations}: Planning")
+            self.logger.debug(f"Iteration {iteration + 1}/{planning_attempts}: Planning")
 
             # Prepare planner variables (include feedback if enabled)
             planner_vars = self._prepare_planner_variables(initial_variables, context, iteration)
@@ -369,7 +405,7 @@ class StandardIterationController[TPlan]:
                 )
 
                 # Check if last iteration
-                if iteration >= self.config.max_iterations - 1:
+                if iteration >= planning_attempts - 1:
                     return self._handle_max_iterations(context, plan)
 
                 # Truncate validation errors to fit RevisionRequest limits
@@ -393,14 +429,24 @@ class StandardIterationController[TPlan]:
                 continue
 
             # === JUDGING STAGE ===
+            if self.config.max_iterations == 0:
+                context.update_state(IterationState.COMPLETE)
+                self.logger.debug("Judge skipped because max_iterations=0")
+                return IterationResult(success=True, plan=plan, context=context)
+
             context.update_state(IterationState.JUDGING)
             self.logger.debug("Judging plan")
 
-            # Prepare judge variables (use domain-specific builder if provided)
+            # Common history/threshold variables always survive domain-specific shaping.
+            judge_vars = self._prepare_judge_variables(plan, initial_variables, iteration, context)
             if judge_context_builder is not None:
-                judge_vars = judge_context_builder(plan, iteration)
-            else:
-                judge_vars = self._prepare_judge_variables(plan, initial_variables, iteration)
+                judge_vars.update(judge_context_builder(plan, iteration, context))
+                judge_vars.update(context.judge_prompt_history())
+                judge_vars["approval_score_threshold"] = self.config.approval_score_threshold
+                judge_vars["soft_fail_score_threshold"] = min(
+                    self.config.soft_fail_score_threshold,
+                    self.config.approval_score_threshold,
+                )
 
             # Run judge
             judge_result = await runner.run(spec=judge_spec, variables=judge_vars)
@@ -411,6 +457,13 @@ class StandardIterationController[TPlan]:
 
             verdict = cast("JudgeVerdict", judge_result.data)
             assert isinstance(verdict, JudgeVerdict), "Judge succeeded but returned invalid data"
+            verdict = verdict.with_score_thresholds(
+                approval_score_threshold=self.config.approval_score_threshold,
+                soft_fail_score_threshold=min(
+                    self.config.soft_fail_score_threshold,
+                    self.config.approval_score_threshold,
+                ),
+            )
             context.add_verdict(verdict)
 
             # Log verdict details for debugging
@@ -446,7 +499,7 @@ class StandardIterationController[TPlan]:
                 context.update_state(IterationState.JUDGE_HARD_FAIL)
 
             # Check termination conditions
-            if iteration >= self.config.max_iterations - 1:
+            if iteration >= planning_attempts - 1:
                 return self._handle_max_iterations(context, plan)
 
             if self.config.token_budget and context.total_tokens_used >= self.config.token_budget:
@@ -464,8 +517,8 @@ class StandardIterationController[TPlan]:
             )
 
         # Should never reach here (loop should exit via termination)
-        # Assert plan exists (loop runs at least once due to max_iterations >= 1)
-        assert plan is not None, "Plan should exist after at least one iteration"
+        # The controller always plans at least once, including judge-disabled mode.
+        assert plan is not None, "Plan should exist after at least one planning attempt"
         return self._handle_max_iterations(context, plan)
 
     def _prepare_planner_variables(
@@ -482,6 +535,11 @@ class StandardIterationController[TPlan]:
             Variables dict for planner
         """
         variables = initial_vars.copy()
+        variables["approval_score_threshold"] = self.config.approval_score_threshold
+        variables["soft_fail_score_threshold"] = min(
+            self.config.soft_fail_score_threshold,
+            self.config.approval_score_threshold,
+        )
 
         if self.config.include_feedback_in_prompt and iteration > 0:
             variables["feedback"] = self.feedback.format_feedback_for_prompt()
@@ -499,7 +557,11 @@ class StandardIterationController[TPlan]:
         return variables
 
     def _prepare_judge_variables(
-        self, plan: TPlan, initial_vars: dict[str, Any], iteration: int
+        self,
+        plan: TPlan,
+        initial_vars: dict[str, Any],
+        iteration: int,
+        context: IterationContext,
     ) -> dict[str, Any]:
         """Prepare variables for judge prompt.
 
@@ -507,6 +569,7 @@ class StandardIterationController[TPlan]:
             plan: Plan to judge
             initial_vars: Initial variables
             iteration: Current iteration number
+            context: Same-run iteration history
 
         Returns:
             Variables dict for judge
@@ -526,8 +589,14 @@ class StandardIterationController[TPlan]:
             {
                 "plan": plan_dict,
                 "iteration": iteration,
+                "approval_score_threshold": self.config.approval_score_threshold,
+                "soft_fail_score_threshold": min(
+                    self.config.soft_fail_score_threshold,
+                    self.config.approval_score_threshold,
+                ),
             }
         )
+        variables.update(context.judge_prompt_history())
 
         # Keep the same filtered template_catalog the planner saw for fair quality
         # evaluation. The full catalog (template_catalog_full) remains available

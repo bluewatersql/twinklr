@@ -381,6 +381,15 @@ class TestV2JudgePrompts:
         """Test judge user prompt shows iteration context."""
         ctx = v2_judge_context.copy()
         ctx["iteration"] = 2
+        ctx["previous_verdicts"] = [
+            {
+                "status": "SOFT_FAIL",
+                "score": 6.2,
+                "confidence": 0.9,
+                "feedback_for_planner": "Fix timing overlap and add variety",
+                "iteration": 1,
+            }
+        ]
         ctx["previous_feedback"] = ["Fix timing overlap", "Add variety"]
         ctx["previous_issues"] = [
             {"issue_id": "TIMING_OVERLAP", "severity": "ERROR", "message": "Sections overlap"}
@@ -390,8 +399,66 @@ class TestV2JudgePrompts:
         rendered = renderer.render(prompts["user"], ctx)
 
         assert "iteration 3" in rendered.lower()  # iteration 2 + 1
+        assert "SOFT_FAIL" in rendered
+        assert "score 6.2" in rendered
         assert "Fix timing overlap" in rendered
         assert "TIMING_OVERLAP" in rendered
+
+    def test_judge_history_block_renders(self, prompt_loader, renderer, v2_judge_context):
+        """Iteration two renders the actual prior verdict summary and issue."""
+        ctx = v2_judge_context.copy()
+        ctx.update(
+            {
+                "iteration": 1,
+                "previous_verdicts": [
+                    {
+                        "status": "HARD_FAIL",
+                        "score": 4.5,
+                        "confidence": 0.8,
+                        "feedback_for_planner": "Repair the chorus timing.",
+                        "iteration": 0,
+                    }
+                ],
+                "previous_feedback": ["Repair the chorus timing."],
+                "previous_issues": [
+                    {
+                        "issue_id": "CHORUS_TIMING",
+                        "severity": "ERROR",
+                        "message": "The chorus starts outside its bar range.",
+                    }
+                ],
+                "previous_revision_requests": [
+                    {
+                        "focus_areas": ["Timing"],
+                        "specific_fixes": ["Move the chorus start to bar 9"],
+                    }
+                ],
+            }
+        )
+
+        rendered = renderer.render(prompt_loader.load("judge")["user"], ctx)
+
+        assert "Prior Verdicts" in rendered
+        assert "HARD_FAIL" in rendered
+        assert "Repair the chorus timing." in rendered
+        assert "CHORUS_TIMING" in rendered
+        assert "Prior Revision Requests" in rendered
+        assert "Move the chorus start to bar 9" in rendered
+
+    def test_judge_developer_renders_configured_thresholds(self, prompt_loader, renderer) -> None:
+        """The prompt uses the same thresholds the controller enforces."""
+        rendered = renderer.render(
+            prompt_loader.load("judge")["developer"],
+            {
+                "response_schema": "{}",
+                "learning_context": "",
+                "approval_score_threshold": 8.5,
+                "soft_fail_score_threshold": 5.0,
+            },
+        )
+
+        assert "8.5" in rendered
+        assert "5.0" in rendered
 
     def test_judge_developer_references_judge_verdict(self, prompt_loader):
         """Test judge developer prompt references JudgeVerdict (not JudgeResponse)."""

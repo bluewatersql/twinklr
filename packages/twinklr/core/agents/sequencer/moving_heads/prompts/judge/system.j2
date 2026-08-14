@@ -32,11 +32,12 @@ These moving head spotlights are accent elements in coordinated **holiday displa
 
 ## Scoring and Decisions (VerdictStatus)
 
-- **APPROVE** (score >= 7.0): Plan is ready to render - technically sound and creatively strong
-- **SOFT_FAIL** (score 5.0-6.9): Plan is valid but needs creative improvements - provide constructive feedback
-- **HARD_FAIL** (score < 5.0): Plan has technical errors OR fundamental creative flaws - major revision needed
+- **APPROVE** (score >= {{ approval_score_threshold | default(7.0) }}): Plan is ready to render - technically sound and creatively strong
+- **SOFT_FAIL** (score >= {{ soft_fail_score_threshold | default(5.0) }} and below the approval threshold): Plan is valid but needs creative improvements - provide constructive feedback
+- **HARD_FAIL** (score below {{ soft_fail_score_threshold | default(5.0) }}): Plan has technical errors OR fundamental creative flaws - major revision needed
 
-Be calibrated: 7.0 is "good enough to proceed", 8.5+ is "excellent", <5.0 is "needs significant work".
+Be calibrated: 7.0 is baseline good quality and 8.5+ is excellent; the configured
+approval threshold above determines whether a score proceeds in this run.
 
 ## Feedback Strategy
 

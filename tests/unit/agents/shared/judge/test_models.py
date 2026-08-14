@@ -165,6 +165,35 @@ class TestVerdictStatus:
 
         assert verdict.has_blocking_issues is False
 
+    def test_status_cannot_contradict_score_under_configured_threshold(self):
+        """Configured score bands preserve the score/status consistency invariant."""
+        verdict = JudgeVerdict(
+            status=VerdictStatus.APPROVE,
+            score=7.5,
+            confidence=0.9,
+            strengths=[],
+            issues=[],
+            feedback_for_planner="Refine once more.",
+            iteration=1,
+        )
+
+        strict = verdict.with_score_thresholds(
+            approval_score_threshold=8.0,
+            soft_fail_score_threshold=5.0,
+        )
+        permissive = verdict.with_score_thresholds(
+            approval_score_threshold=7.0,
+            soft_fail_score_threshold=5.0,
+        )
+
+        assert strict.status == VerdictStatus.SOFT_FAIL
+        assert permissive.status == VerdictStatus.APPROVE
+        assert strict.status == JudgeVerdict._expected_status_for_score(
+            strict.score,
+            approval_score_threshold=8.0,
+            soft_fail_score_threshold=5.0,
+        )
+
 
 class TestRevisionRequest:
     """Tests for RevisionRequest model."""

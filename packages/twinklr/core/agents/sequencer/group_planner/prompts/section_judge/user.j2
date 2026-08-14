@@ -125,6 +125,29 @@ matches section energy ({{ energy_target }}) and duration matches musical intent
 ## Iteration {{ iteration + 1 }}
 
 Check whether prior issues were addressed. Give credit for improvements and focus on remaining issues.
+{% if previous_verdicts is defined and previous_verdicts %}
+
+### Prior Judge History
+{% for verdict in previous_verdicts %}
+- Iteration {{ verdict.iteration + 1 }}: **{{ verdict.status }}**, score {{ verdict.score }}
+  - {{ verdict.feedback_for_planner }}
+{% endfor %}
+{% endif %}
+{% if previous_issues is defined and previous_issues %}
+
+### Outstanding Prior Issues
+{% for issue in previous_issues %}
+- **{{ issue.issue_id }}** ({{ issue.severity }}): {{ issue.message }}
+{% endfor %}
+{% endif %}
+{% if previous_revision_requests is defined and previous_revision_requests %}
+
+### Prior Revision Requests
+{% for request in previous_revision_requests %}
+- Focus: {{ request.focus_areas | join(', ') }}
+  - Requested fixes: {{ request.specific_fixes | join('; ') }}
+{% endfor %}
+{% endif %}
 {% else %}
 ## First Iteration
 

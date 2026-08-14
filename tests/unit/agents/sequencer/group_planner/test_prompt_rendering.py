@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 
+from twinklr.core.agents.prompts import PromptRenderer
 from twinklr.core.agents.sequencer.group_planner.context import SectionPlanningContext
 from twinklr.core.agents.sequencer.group_planner.context_shaping import (
     shape_planner_context,
@@ -208,3 +209,31 @@ def test_prompt_omits_fe_blocks_when_absent(
     assert "Feature Engineering Context" not in rendered
     assert "Color Arc" not in rendered
     assert "Propensity Hints" not in rendered
+
+
+def test_section_judge_high_threshold_separates_calibration_from_approval() -> None:
+    """A 7.x quality calibration never claims approval below an 8.5 boundary."""
+    from pathlib import Path
+
+    prompt_path = Path(__file__).resolve().parents[5] / (
+        "packages/twinklr/core/agents/sequencer/group_planner/prompts/section_judge/developer.j2"
+    )
+    rendered = PromptRenderer().render(
+        prompt_path.read_text(),
+        {
+            "response_schema": "{}",
+            "learning_context": "",
+            "approval_score_threshold": 8.5,
+            "soft_fail_score_threshold": 5.0,
+            "taxonomy": {
+                "IssueCategory": ["QUALITY"],
+                "IssueSeverity": ["WARNING"],
+            },
+        },
+    )
+    normalized = " ".join(rendered.split())
+
+    assert "merits a score of 7.0-7.5" in normalized
+    assert "approval-worthy" not in normalized
+    assert "approval status at 8.5 or above" in normalized
+    assert "approval is determined solely by the configured threshold" in normalized

@@ -209,6 +209,7 @@ class TestBuildDisplayPipeline:
 
         groups = next(s for s in pipeline.stages if s.id == "groups")
         assert groups.pattern == ExecutionPattern.FAN_OUT
+        assert groups.stage.min_pass_score == 7.0
 
     def test_holistic_can_be_disabled(self) -> None:
         """When enable_holistic=False, holistic stage is absent."""

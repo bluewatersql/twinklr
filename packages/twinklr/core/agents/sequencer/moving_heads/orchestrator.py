@@ -29,6 +29,7 @@ from twinklr.core.agents.sequencer.moving_heads.specs import (
 )
 from twinklr.core.agents.shared.judge.controller import (
     IterationConfig,
+    IterationContext,
     IterationResult,
     StandardIterationController,
 )
@@ -99,8 +100,7 @@ def build_judge_variables(
     context: MovingHeadPlanningContext,
     plan: ChoreographyPlan,
     iteration: int,
-    previous_feedback: list[str] | None = None,
-    previous_issues: list[dict[str, Any]] | None = None,
+    iteration_context: IterationContext,
 ) -> dict[str, Any]:
     """Build variables for judge prompt template.
 
@@ -108,8 +108,7 @@ def build_judge_variables(
         context: MovingHead planning context
         plan: Choreography plan to judge
         iteration: Current iteration number
-        previous_feedback: Feedback from previous iterations
-        previous_issues: Issues from previous iterations
+        iteration_context: Same-run verdict and revision history
 
     Returns:
         Dict of variables for judge prompt template
@@ -128,13 +127,12 @@ def build_judge_variables(
         "available_templates": context.available_templates,
         # Iteration context
         "iteration": iteration,
-        "previous_feedback": previous_feedback or [],
-        "previous_issues": previous_issues or [],
         # Audio profile (for context, including planner_hints)
         "audio_profile": context.audio_profile,
         # Macro plan guidance (enriched with palette/motifs for alignment validation)
         "macro_plan": prompt_context["macro_plan"],
     }
+    variables.update(iteration_context.judge_prompt_history())
 
     return variables
 
@@ -242,6 +240,8 @@ class MovingHeadPlannerOrchestrator:
                 "count": context.fixtures.count,
                 "groups": context.fixtures.groups,
             },
+            "max_iterations": self.controller.config.max_iterations,
+            "min_pass_score": self.controller.config.approval_score_threshold,
             "planner_model": self.planner_spec.model,
             "planner_reasoning_effort": self.planner_spec.reasoning_effort,
             "judge_model": self.judge_spec.model,
@@ -321,6 +321,9 @@ class MovingHeadPlannerOrchestrator:
             provider=self.provider,
             llm_logger=self.llm_logger,
             prompt_base_path=self.prompt_base_path,
+            judge_context_builder=lambda plan, iteration, iteration_context: build_judge_variables(
+                context, plan, iteration, iteration_context
+            ),
         )
 
         if result.success:

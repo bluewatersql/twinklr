@@ -1,5 +1,6 @@
 """Tests for AsyncAgentRunner."""
 
+from copy import deepcopy
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock
 
@@ -222,6 +223,106 @@ async def test_async_run_schema_validation_failure_and_repair(test_spec, mock_as
     # Should have metadata about repair
     assert "schema_repair_attempts" in result.metadata
     assert result.metadata["schema_repair_attempts"] == 1
+
+
+@pytest.mark.asyncio
+async def test_oneshot_repair_includes_bounded_failing_output(
+    mock_async_provider, mock_llm_logger
+) -> None:
+    """A stateless repair sees the output it is being asked to correct, within a bound."""
+    marker = "UNIQUE_FAILING_OUTPUT_MARKER"
+    responses = iter(
+        [
+            LLMResponse(
+                content={"result": marker + ("x" * 20_000)},
+                metadata=ResponseMetadata(token_usage=TokenUsage(total_tokens=10)),
+            ),
+            LLMResponse(
+                content={"result": "fixed", "count": 1},
+                metadata=ResponseMetadata(token_usage=TokenUsage(total_tokens=10)),
+            ),
+        ]
+    )
+    calls: list[list[dict[str, str]]] = []
+
+    async def side_effect(*args, **kwargs):
+        calls.append(deepcopy(kwargs["messages"]))
+        return next(responses)
+
+    mock_async_provider.generate_json_async = AsyncMock(side_effect=side_effect)
+    runner = AsyncAgentRunner(
+        provider=mock_async_provider,
+        prompt_base_path=FIXTURES_PATH,
+        llm_logger=mock_llm_logger,
+    )
+    spec = AgentSpec(
+        name="oneshot_repair",
+        prompt_pack="test_pack",
+        response_model=SampleResponse,
+        max_schema_repair_attempts=1,
+    )
+
+    result = await runner.run(
+        spec=spec,
+        variables={"agent_name": "test", "iteration": 0, "context": {}, "feedback": None},
+    )
+
+    assert result.success is True
+    repair_message = calls[1][-1]["content"]
+    assert marker in repair_message
+    assert "truncated" in repair_message.lower()
+    assert "count" in repair_message.lower()
+    assert len(repair_message) < 8_000
+
+
+@pytest.mark.asyncio
+async def test_conversational_repair_does_not_double_append_failing_output(
+    mock_async_provider, mock_llm_logger
+) -> None:
+    """Conversation storage already retained the assistant turn; repair adds errors only."""
+    marker = "CONVERSATION_ALREADY_STORED_THIS_OUTPUT"
+    responses = iter(
+        [
+            LLMResponse(
+                content={"result": marker},
+                metadata=ResponseMetadata(token_usage=TokenUsage(total_tokens=10)),
+            ),
+            LLMResponse(
+                content={"result": "fixed", "count": 1},
+                metadata=ResponseMetadata(token_usage=TokenUsage(total_tokens=10)),
+            ),
+        ]
+    )
+    user_messages: list[str] = []
+
+    async def side_effect(*args, **kwargs):
+        user_messages.append(kwargs["user_message"])
+        return next(responses)
+
+    mock_async_provider.generate_json_with_conversation_async = AsyncMock(side_effect=side_effect)
+    runner = AsyncAgentRunner(
+        provider=mock_async_provider,
+        prompt_base_path=FIXTURES_PATH,
+        llm_logger=mock_llm_logger,
+    )
+    spec = AgentSpec(
+        name="conversational_repair",
+        prompt_pack="test_pack",
+        response_model=SampleResponse,
+        mode=AgentMode.CONVERSATIONAL,
+        max_schema_repair_attempts=1,
+    )
+
+    result = await runner.run(
+        spec=spec,
+        variables={"agent_name": "test", "iteration": 0, "context": {}, "feedback": None},
+        state=AgentState(name="conversational_repair"),
+    )
+
+    assert result.success is True
+    assert len(user_messages) == 2
+    assert marker not in user_messages[1]
+    assert "count" in user_messages[1].lower()
 
 
 @pytest.mark.asyncio

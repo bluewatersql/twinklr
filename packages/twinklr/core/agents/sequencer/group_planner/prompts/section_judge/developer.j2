@@ -101,7 +101,9 @@ Evaluate across these dimensions:
 | layer_balance | Varied intensity levels across groups | All groups have identical intensity | Minor issue |
 
 **Calibration Notes:**
-- A plan with only a few localized low-severity issues is approval-worthy (7.0-7.5).
+- A plan with only a few localized low-severity issues merits a score of 7.0-7.5.
+- Treat score examples as quality calibration only; approval is determined solely by
+  the configured threshold in Decision Criteria below.
 - Scale each penalty with the selected schema-valid severity and its actual impact.
 - Don't stack penalties: if variety AND layering issues stem from same placement, count once
 - Reserve HARD_FAIL for technical errors (missing templates, invalid groups, bad timing)
@@ -112,8 +114,10 @@ Evaluate across these dimensions:
 
 ## Decision Criteria
 
-Use the schema-defined approval status at 7.0 or above, its retryable-failure status from
-5.0 through 6.9, and its terminal-failure status below 5.0.
+Use the schema-defined approval status at {{ approval_score_threshold | default(7.0) }}
+or above, its retryable-failure status from
+{{ soft_fail_score_threshold | default(5.0) }} up to (but not including) the approval
+threshold, and its terminal-failure status below the soft-fail threshold.
 
 The `status` field MUST match the score threshold.
 

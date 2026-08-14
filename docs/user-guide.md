@@ -139,8 +139,8 @@ Key fields and defaults:
 |---|---|---|
 | `schema_version` | `"3.0"` | Config schema version |
 | `fixture_config_path` | `"fixture_config.json"` | Path to fixture definitions (relative to job config dir) |
-| `agent.max_iterations` | `3` | Max planner/judge iterations |
-| `agent.success_threshold` | `70` | Minimum judge score to accept a plan, on a 0-100 scale (validated; values outside the range are rejected). This is the only place the threshold is set — the planners take it converted to their own 0-10 scale. Note it does not yet stop a run: the judge score is recorded, not enforced. |
+| `agent.max_iterations` | `3` | Max planner/judge cycles. Set `0` to run the planner once, require deterministic heuristic validation, and skip the LLM judge. |
+| `agent.success_threshold` | `70` | Minimum judge score to accept a plan, on a 0-100 scale (validated; values outside the range are rejected). This is the only configured scale: the orchestrators convert it once to 0-10, enforce it, and keep the verdict status consistent with the score. |
 | `agent.token_budget` | `75000` | Total token budget |
 | `agent.plan_agent.model` | `"gpt-5.6-sol"` | Model for macro, moving-head, and group planners |
 | `agent.plan_agent.reasoning_effort` | `"high"` | Explicit planner reasoning level; quality-focused by default |
@@ -181,6 +181,11 @@ providers without that capability filter the option. Set all of
 changing; cache identity includes the model and reasoning level, so a retarget
 gets a fresh result rather than reusing an incompatible plan. Asset generation
 remains disabled by default; changing `agent.image_model` alone does not turn it on.
+
+Iterative judging is retained by default. On cycle two and later, each judge sees its
+own prior verdict summaries, feedback, and issues from the current run. That history is
+run-local and is not shared across judge roles. Changing `success_threshold` or
+`max_iterations` changes prompt/cache identity for the affected planning stage.
 
 ### `fixture_config.json` (Fixture Config)
 

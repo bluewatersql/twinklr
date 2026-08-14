@@ -51,11 +51,12 @@ Evidence discipline for technical errors:
 
 ## Scoring Decisions
 
-- **APPROVE** (≥7.0): Ready for group planning
-- **SOFT_FAIL** (5.0-6.9): Needs strategic improvements
-- **HARD_FAIL** (<5.0): Technical errors or fundamental flaws
+- **APPROVE** (≥{{ approval_score_threshold | default(7.0) }}): Ready for group planning
+- **SOFT_FAIL** (≥{{ soft_fail_score_threshold | default(5.0) }} and below approval): Needs strategic improvements
+- **HARD_FAIL** (<{{ soft_fail_score_threshold | default(5.0) }}): Technical errors or fundamental flaws
 
-Calibration: 7.0 = "good enough", 8.5+ = "excellent", <5.0 = "needs major work"
+Calibration: 7.0 = baseline good quality and 8.5+ = excellent; the configured
+approval threshold determines whether a score proceeds in this run.
 - If a plan is technically valid and remaining concerns are patchable quality refinements,
   avoid over-penalizing below approval threshold by default.
 

@@ -329,3 +329,68 @@ min_pass_score is present in the three planner cache keys yet behaviorally inert
 (the verdict enforcer hardcodes 7.0/5.0) — changing it forces spurious full
 uncached re-plans that cannot differ. Resolve here with the threshold wiring:
 either make it behavioral or remove it from the keys.
+
+## Implementation handoff — 2026-08-14 (pending independent verification and owner review)
+
+### Implemented contract
+
+- Iteration is retained. The live `judge_context_builder` now receives the same-run
+  `IterationContext`. The moving-head orchestrator wires its domain-specific builder
+  through a closure over `MovingHeadPlanningContext`; macro and group judges use the
+  controller's common shaping path. Both paths receive prior verdict summaries,
+  feedback, issues, and revision requests. History is created inside each `run()` and
+  cannot cross jobs or judge roles.
+- `success_threshold` is wired. The public config remains the only 0-100 scale and
+  converts once through `min_pass_score`; `IterationConfig` and every judge prompt use
+  the resulting 0-10 approval boundary. `JudgeVerdict.with_score_thresholds()`
+  reconciles the retained status immediately after parsing, preserving the invariant
+  that status cannot contradict score under the active boundary. The 5.0 soft-fail
+  boundary remains the default and is clamped to the approval boundary for thresholds
+  below 5.0.
+- `max_iterations=0` now means: run the planner once, run deterministic heuristic
+  validation, and skip the LLM judge. A heuristic-valid plan succeeds with no final
+  verdict; a heuristic-invalid plan fails without a judge call.
+- ONESHOT Pydantic-validation repair includes the failing response in the next request,
+  deterministically serialized and bounded to 6,000 characters with an explicit
+  truncation notice. CONVERSATIONAL repair remains errors-only because the provider's
+  conversation store already retains the assistant turn.
+- Refusal, truncation, content-filter, empty-response and malformed-response retry
+  behavior from P2P-T11 is unchanged. Per-attempt usage is still appended before
+  classification, so repair/refusal token accounting is unchanged.
+- Moving-head cache identity now includes `max_iterations` and `min_pass_score`,
+  matching macro/group. All edited prompt packs remain covered by `spec_prompt_hash`,
+  so history/threshold prompt changes invalidate cached plans honestly.
+- The display-pipeline factory's stale 0-1-scale default (`0.6`) is corrected to
+  `7.0` on the controller's 0-10 scale. Leaving it in place would have turned the
+  newly-live threshold into an accidental near-zero approval boundary for group plans.
+
+### Request ceiling
+
+No call layer was added. A three-cycle controller still makes at most three planner and
+three judge agent invocations (six). Under P2P-T11 each invocation retains its existing
+normal ceiling of two logical responses times three provider transport attempts: one
+three-cycle controller therefore remains at 12 logical responses / 36 HTTP attempts
+normal, or 48 HTTP attempts on the observable strict-capability fallback path. The
+whole-song ceilings recorded by P2P-T11 remain 120 logical / 360 HTTP normal and 480
+fallback against P3-F9's approximate 60 base invocations. T9 increases only the bounded
+repair-request payload, not the request count.
+
+### Verification evidence
+
+- Discriminating tests were observed red on the pre-fix implementation for the dead
+  history hook, inert threshold, crashing zero value, and blind ONESHOT repair. The
+  unchanged six-call controller ceiling passed before and after.
+- `tests/unit/agents`: **1,097 passed / 1 skipped**.
+- `-k "judge or iteration or repair"`: **140 passed / 2 skipped**.
+- Provider + structured-output + token-attribution + cache suites:
+  **129 passed**.
+- Golden selection: **72 passed / 8 skipped**, byte-stable.
+- Full suite: **4,993 passed / 35 skipped**.
+- `ruff format --check .`: **1,295 files already formatted**;
+  `ruff check --no-cache .`: **clean**; `mypy .`: **702 files clean**.
+- `make validate` itself deliberately refuses an author worktree with uncommitted
+  changes. Its check-only equivalents above all passed; the orchestrator should run
+  the wrapper after committing/integrating.
+
+No live or paid API call was made. Owner review remains required for the retained
+iteration policy and the wired configurable approval-threshold semantics.

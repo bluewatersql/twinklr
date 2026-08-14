@@ -180,8 +180,8 @@ _Source: `packages/twinklr/core/agents/`_
 The agent system is data-driven: `AgentSpec` data objects define prompt pack, response model, and LLM settings. A single `async_runner` executes any spec.
 
 **Orchestration loop** (`AgentOrchestrationConfig` defaults):
-- `max_iterations`: 3 — planner/judge cycles
-- `success_threshold`: 70 — minimum judge score, 0-100, the single configured scale; `AgentOrchestrationConfig.min_pass_score` converts it once to the planners' 0-10 scale
+- `max_iterations`: 3 — planner/judge cycles; 0 plans once, runs heuristics, and skips judging
+- `success_threshold`: 70 — enforced minimum judge score, 0-100, the single configured scale; `AgentOrchestrationConfig.min_pass_score` converts it once to the planners' 0-10 scale
 - `token_budget`: 75,000 — total token limit
 
 **Agent configs** (`AgentOrchestrationConfig` role defaults):
@@ -198,6 +198,10 @@ forwards both to the provider. OpenAI roles send `reasoning_effort` as
 `reasoning.effort`; providers without that capability filter it out.
 
 **Schema auto-injection:** Pydantic response models generate JSON schemas shown in LLM prompts. Model changes automatically propagate to prompts — no manual schema sync.
+
+Every iteration context is local to one controller run. A judge's second and later
+calls receive that run's prior verdict summaries, feedback, and issues; no history is
+shared across roles or jobs.
 
 ### Configuration Models
 

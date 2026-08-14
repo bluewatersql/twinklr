@@ -74,9 +74,11 @@ Return a single overall score from 0-10 using these dimensions as the rubric.
 
 ### Decision Criteria
 
-Use the schema-defined approval status for a technically valid score of at least 7.0,
-the retryable-failure status for a score from 5.0 through 6.9, and the terminal-failure
-status below 5.0 or when technical errors prevent rendering.
+Use the schema-defined approval status for a technically valid score of at least
+{{ approval_score_threshold | default(7.0) }}, the retryable-failure status from
+{{ soft_fail_score_threshold | default(5.0) }} up to (but not including) the approval
+threshold, and the terminal-failure status below the soft-fail threshold or when
+technical errors prevent rendering.
 
 ### Issue Reporting Format
 

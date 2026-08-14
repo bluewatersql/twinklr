@@ -120,21 +120,58 @@ class JudgeVerdict(BaseModel):
         return self
 
     @staticmethod
-    def _expected_status_for_score(score: float) -> VerdictStatus:
+    def _expected_status_for_score(
+        score: float,
+        *,
+        approval_score_threshold: float = 7.0,
+        soft_fail_score_threshold: float = 5.0,
+    ) -> VerdictStatus:
         """Determine expected status for a given score.
 
         Args:
             score: Quality score (0-10)
+            approval_score_threshold: Minimum score for approval
+            soft_fail_score_threshold: Minimum score for a retryable soft failure
 
         Returns:
             Expected VerdictStatus based on score thresholds
+
+        Raises:
+            ValueError: If thresholds are outside 0-10 or ordered incorrectly
         """
-        if score >= 7.0:
+        if not 0.0 <= soft_fail_score_threshold <= approval_score_threshold <= 10.0:
+            raise ValueError(
+                "Judge score thresholds must satisfy "
+                "0 <= soft_fail_score_threshold <= approval_score_threshold <= 10"
+            )
+        if score >= approval_score_threshold:
             return VerdictStatus.APPROVE
-        elif score >= 5.0:
+        elif score >= soft_fail_score_threshold:
             return VerdictStatus.SOFT_FAIL
         else:
             return VerdictStatus.HARD_FAIL
+
+    def with_score_thresholds(
+        self,
+        *,
+        approval_score_threshold: float,
+        soft_fail_score_threshold: float,
+    ) -> "JudgeVerdict":
+        """Return a verdict whose status is consistent with configured thresholds.
+
+        The response model still enforces the documented 7.0/5.0 defaults at its
+        boundary. The iteration controller calls this method immediately after parsing
+        so a configured approval threshold changes both the decision and the retained
+        verdict, preserving the invariant that score and status cannot disagree.
+        """
+        expected_status = self._expected_status_for_score(
+            self.score,
+            approval_score_threshold=approval_score_threshold,
+            soft_fail_score_threshold=soft_fail_score_threshold,
+        )
+        if self.status == expected_status:
+            return self
+        return self.model_copy(update={"status": expected_status})
 
     @property
     def requires_revision(self) -> bool:

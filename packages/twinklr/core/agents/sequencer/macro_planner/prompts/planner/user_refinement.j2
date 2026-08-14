@@ -75,7 +75,7 @@ Use only these theme_ids (do not invent):
 
 ## Instructions
 
-1. Address all highest-severity issues first, then lower-severity issues that block score >= 7.0
+1. Address all highest-severity issues first, then lower-severity issues that block score >= {{ approval_score_threshold | default(7.0) }}
 2. Keep structure that worked - only fix flagged issues
 3. Maintain global story coherence while addressing feedback
 4. If feedback includes `THEME_SHIFT_OVERUSED`, reduce theme overrides and keep any remaining overrides in one bounded scene block

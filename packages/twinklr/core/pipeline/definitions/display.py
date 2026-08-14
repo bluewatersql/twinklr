@@ -50,7 +50,7 @@ def build_display_pipeline(
     fe_bundle: FEArtifactBundle | None = None,
     song_name: str = "sequence",
     max_iterations: int = 3,
-    min_pass_score: float = 0.6,
+    min_pass_score: float = 7.0,
     enable_holistic: bool = True,
     enable_holistic_corrector: bool = True,
     enable_assets: bool = False,
@@ -78,7 +78,7 @@ def build_display_pipeline(
         fe_bundle: Loaded FE artifacts for planner context enrichment.
         song_name: Song name for plan set identification.
         max_iterations: Maximum GroupPlanner iteration cycles.
-        min_pass_score: Minimum score for section plan approval (0.0-1.0).
+        min_pass_score: Minimum score for section plan approval (0.0-10.0).
         enable_holistic: Include the holistic evaluation stage.
         enable_holistic_corrector: Include the holistic corrector stage (requires enable_holistic).
         enable_assets: Include the asset creation stage (extract → enrich → generate).

@@ -91,10 +91,34 @@ Focus targets must be typed objects using a type allowed by the injected schema,
 
 # MacroPlan to Evaluate
 
-{% if iteration > 1 %}
+{% if previous_verdicts is defined and previous_verdicts %}
+**Iteration {{ iteration + 1 }}** - Evaluating refined plan. Check if previous feedback was addressed.
+{% elif iteration > 1 %}
 **Iteration {{ iteration }}** - Evaluating refined plan. Check if previous feedback was addressed.
 {% else %}
 **Iteration 1** - Initial plan evaluation. Provide comprehensive feedback to guide refinement.
+{% endif %}
+
+{% if previous_verdicts is defined and previous_verdicts %}
+## Prior Judge History
+
+{% for verdict in previous_verdicts %}
+- Iteration {{ verdict.iteration + 1 }}: **{{ verdict.status }}**, score {{ verdict.score }}
+  - {{ verdict.feedback_for_planner }}
+{% endfor %}
+{% if previous_issues is defined and previous_issues %}
+### Outstanding Prior Issues
+{% for issue in previous_issues %}
+- **{{ issue.issue_id }}** ({{ issue.severity }}): {{ issue.message }}
+{% endfor %}
+{% endif %}
+{% if previous_revision_requests is defined and previous_revision_requests %}
+### Prior Revision Requests
+{% for request in previous_revision_requests %}
+- Focus: {{ request.focus_areas | join(', ') }}
+  - Requested fixes: {{ request.specific_fixes | join('; ') }}
+{% endfor %}
+{% endif %}
 {% endif %}
 
 ## Global Story
@@ -189,5 +213,8 @@ Evaluate this MacroPlan for a Christmas light show. Assess:
 3. **Actionability**: Are section notes clear enough for group planners?
 
 Provide a score (0-10), a schema-valid verdict status, structured issues, and constructive feedback.
+
+Use the approval threshold {{ approval_score_threshold | default(7.0) }} and soft-fail
+threshold {{ soft_fail_score_threshold | default(5.0) }} supplied for this run.
 
 **Remember**: This is a **Christmas light show** for residential displays. Bold, impactful designs win. Subtle concepts get lost.

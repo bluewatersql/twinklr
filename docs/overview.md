@@ -98,12 +98,13 @@ _Source: `packages/twinklr/core/agents/`_
 Data-driven agent system using `AgentSpec` data objects and an async runner — no agent class hierarchies. The orchestration loop:
 
 1. **Planner** generates a `ChoreographyPlan` (template + preset per song section)
-2. **Heuristic Validator** checks structural validity (fast, free)
-3. **LLM Validator** checks semantic quality (template appropriateness, coordination)
-4. **Judge** scores the plan (0-10) and decides: approve, soft-fail (revise), or hard-fail (redo)
-5. Structured feedback loops back to the planner for the next iteration
+2. **Heuristic validation** checks structural validity (fast, free)
+3. **Judge** scores the plan (0-10) and decides: approve, soft-fail (revise), or hard-fail (redo)
+4. Structured feedback and the judge's own prior verdict history loop back into the next iteration
 
-Plans scoring >= 7.0 are approved. The loop runs up to 3 iterations by default (`AgentOrchestrationConfig.max_iterations`).
+Plans scoring at least the configured threshold are approved (7.0 by default). The loop
+runs up to 3 planner/judge cycles by default; `max_iterations=0` plans once, runs
+heuristics, and skips the judge.
 
 Agent sub-packages:
 - `agents/audio/` — audio profiling and lyrics stages
