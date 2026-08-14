@@ -144,6 +144,16 @@ def test_role_defaults_choose_current_models_and_deliberate_effort() -> None:
     assert config.judge_agent.reasoning_effort == "low"
 
 
+def test_recipe_generation_docs_match_central_default() -> None:
+    """Both published guides report the configured recipe-generation tier and effort."""
+    root = Path(__file__).parents[3]
+    recipe_config = AgentOrchestrationConfig().recipe_generation_agent
+    expected = f"`{recipe_config.model}`, {recipe_config.reasoning_effort} reasoning"
+
+    assert expected in (root / "docs/developer-guide.md").read_text()
+    assert expected in (root / "docs/user-guide.md").read_text()
+
+
 def test_no_hardcoded_legacy_model_literals() -> None:
     """A future retarget grep finds no live legacy model selections."""
     root = Path(__file__).parents[3]

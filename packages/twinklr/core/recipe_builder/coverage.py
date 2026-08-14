@@ -2,14 +2,17 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from dataclasses import asdict, dataclass
+import json
 from pathlib import Path
+from typing import Any
 
 from twinklr.core.feature_engineering.element_types import extract_model_type
 from twinklr.core.profiling.models.enums import ModelCategory
 from twinklr.core.profiling.models.layout import ModelProfile
 from twinklr.core.recipe_builder.evidence import DEFAULT_TEMPLATES_DIR, load_catalog
+from twinklr.core.recipe_builder.models import Opportunity
 from twinklr.core.sequencer.templates.group.recipe import EffectRecipe
 from twinklr.core.sequencer.vocabulary import EnergyTarget, GroupTemplateType
 
@@ -121,6 +124,87 @@ class CoverageReport:
             ],
             "summary": asdict(self.summary),
         }
+
+
+def opportunities_from_coverage_gaps(coverage_report: Mapping[str, Any]) -> list[Opportunity]:
+    """Convert P2K-T1 JSON coverage gaps into generation opportunities.
+
+    Priorities are normalized against the most prominent layout element so the
+    coverage report's pixel-weighted order fits ``Opportunity.priority``'s range.
+    """
+    raw_element_types = coverage_report.get("element_types")
+    raw_gaps = coverage_report.get("gaps")
+    if not isinstance(raw_element_types, list) or not isinstance(raw_gaps, list):
+        raise ValueError("Coverage report must contain list-valued element_types and gaps")
+
+    prominence_by_type: dict[str, float] = {}
+    for item in raw_element_types:
+        if not isinstance(item, Mapping):
+            raise ValueError("Coverage report element_types entries must be objects")
+        element_type = item.get("element_type")
+        prominence = item.get("prominence_share")
+        if not isinstance(element_type, str) or not isinstance(prominence, (int, float)):
+            raise ValueError(
+                "Coverage report element_types entries need element_type and prominence_share"
+            )
+        prominence_by_type[element_type] = float(prominence)
+
+    max_prominence = max(prominence_by_type.values(), default=0.0)
+    opportunities: list[Opportunity] = []
+    for item in raw_gaps:
+        if not isinstance(item, Mapping):
+            raise ValueError("Coverage report gaps entries must be objects")
+        if item.get("is_gap") is not True:
+            continue
+        element_type = item.get("element_type")
+        role = item.get("role")
+        energy = item.get("energy")
+        if (
+            not isinstance(element_type, str)
+            or not isinstance(role, str)
+            or not isinstance(energy, str)
+            or element_type not in prominence_by_type
+        ):
+            raise ValueError("Coverage gap needs known element_type, role, and energy")
+        prominence = prominence_by_type[element_type]
+        opportunities.append(
+            Opportunity(
+                opportunity_id=f"coverage-{element_type}-{role.lower()}-{energy.lower()}",
+                category="missing_layout_coverage",
+                description=(
+                    f"The {element_type} layout element has no {role} recipe for {energy} energy. "
+                    "Create a recipe that specifically suits this coverage gap."
+                ),
+                priority=prominence / max_prominence if max_prominence else 0.0,
+                target_template_type=role,
+                target_energy=energy,
+                target_element_type=element_type,
+                context="Derived from the layout-aware catalog coverage report.",
+            )
+        )
+
+    role_order = {role.value: index for index, role in enumerate(COVERAGE_ROLES)}
+    energy_order = {energy.value: index for index, energy in enumerate(COVERAGE_ENERGIES)}
+    return sorted(
+        opportunities,
+        key=lambda opportunity: (
+            -opportunity.priority,
+            role_order.get(opportunity.target_template_type or "", len(role_order)),
+            energy_order.get(opportunity.target_energy or "", len(energy_order)),
+            opportunity.target_element_type or "",
+        ),
+    )
+
+
+def load_coverage_gap_opportunities(path: Path) -> list[Opportunity]:
+    """Read a P2K-T1 JSON report and return its layout-coverage opportunities."""
+    try:
+        report = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"Coverage report is not valid JSON: {path}") from exc
+    if not isinstance(report, Mapping):
+        raise ValueError(f"Coverage report must be a JSON object: {path}")
+    return opportunities_from_coverage_gaps(report)
 
 
 def extract_layout_element_types(

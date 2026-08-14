@@ -28,6 +28,7 @@ from twinklr.core.sequencer.templates.group.models.template import TimingHints
 from twinklr.core.sequencer.templates.group.recipe import (
     ColorSource,
     EffectRecipe,
+    ModelAffinity,
     PaletteSpec,
     RecipeLayer,
     RecipeProvenance,
@@ -177,6 +178,8 @@ def _build_user_prompt(
         constraints.append(f'- energy_affinity MUST be: "{opportunity.target_energy}"')
     if opportunity.target_template_type:
         constraints.append(f'- template_type MUST be: "{opportunity.target_template_type}"')
+    if opportunity.target_element_type:
+        constraints.append(f'- display element type MUST be: "{opportunity.target_element_type}"')
     if opportunity.target_motions:
         constraints.append(f"- At least one layer MUST use motion: {opportunity.target_motions}")
     if constraints:
@@ -574,6 +577,11 @@ def _deterministic_recipe(opportunity: Opportunity) -> EffectRecipe:
         layers=tuple(layers),
         provenance=RecipeProvenance(source="generated"),
         style_markers=StyleMarkers(complexity=complexity, energy_affinity=energy),
+        model_affinities=(
+            [ModelAffinity(model_type=opportunity.target_element_type, score=1.0)]
+            if opportunity.target_element_type
+            else []
+        ),
     )
 
 

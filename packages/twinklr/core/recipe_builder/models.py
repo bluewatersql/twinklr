@@ -78,6 +78,7 @@ class Opportunity(BaseModel):
         "missing_energy_variant",
         "underutilized_motion",
         "missing_template_type",
+        "missing_layout_coverage",
         "low_layer_diversity",
         "missing_visual_intent",
         "general_diversity",
@@ -87,6 +88,7 @@ class Opportunity(BaseModel):
     target_effect_type: str | None = None
     target_energy: str | None = None
     target_template_type: str | None = None
+    target_element_type: str | None = None
     target_motions: list[str] = Field(default_factory=list)
     context: str = ""
 
@@ -195,6 +197,7 @@ class ValidationReport(BaseModel):
 # ---------------------------------------------------------------------------
 
 AdmissionDecisionType = Literal["accepted_to_stage", "review_required", "rejected"]
+HumanAdmissionDecisionType = Literal["admit", "reject"]
 
 
 class AdmissionDecision(BaseModel):
@@ -216,6 +219,31 @@ class AdmissionReport(BaseModel):
     generated_at: datetime
     decisions: list[AdmissionDecision] = Field(default_factory=list)
     counts: dict[str, int] = Field(default_factory=dict)
+
+
+class CurationSessionRecord(BaseModel):
+    """One human-authored decision for a staged recipe."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    recipe_id: str
+    opportunity_category: str
+    target_element_type: str | None = None
+    automated_decision: AdmissionDecisionType
+    human_decision: HumanAdmissionDecisionType
+    reason: str = Field(min_length=1)
+    timestamp: datetime
+
+
+class CurationSessionLog(BaseModel):
+    """Durable record of all human decisions in one curation session."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    schema_version: str = SCHEMA_VERSION
+    session_id: str
+    created_at: datetime
+    records: list[CurationSessionRecord] = Field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------

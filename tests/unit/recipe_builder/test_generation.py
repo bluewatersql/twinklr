@@ -266,6 +266,37 @@ def test_generate_candidates_dispatches_to_provider(
     assert len(provider.calls) == 1
 
 
+def test_generate_candidates_uses_central_sol_tier_request_defaults(
+    sample_opportunity: Opportunity,
+    sample_analysis: CatalogAnalysis,
+    sample_recipes: list[EffectRecipe],
+    sample_recipe: EffectRecipe,
+) -> None:
+    """The live default is the spec's sol-tier config with every request knob explicit."""
+    raw = sample_recipe.model_dump(mode="json")
+    raw["recipe_id"] = "rb_generated_sol_default_v1"
+    provider = _FakeProvider(content=raw)
+
+    candidates = generate_candidates(
+        opportunities=[sample_opportunity],
+        analysis=sample_analysis,
+        catalog_recipes=sample_recipes,
+        provider=provider,
+        dry_run=False,
+    )
+
+    assert len(candidates) == 1
+    assert len(provider.calls) == 1
+    request = {key: value for key, value in provider.calls[0].items() if key != "messages"}
+    assert request == {
+        "model": "gpt-5.6-sol",
+        "temperature": 0.9,
+        "reasoning_effort": "high",
+        "max_tokens": 50000,
+        "timeout_seconds": 60,
+    }
+
+
 # ---------------------------------------------------------------------------
 # _select_diverse_examples — seeded shuffle determinism
 # ---------------------------------------------------------------------------

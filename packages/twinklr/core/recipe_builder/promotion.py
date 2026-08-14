@@ -52,6 +52,7 @@ def promote_staged_recipes(
     *,
     staged_dir: Path,
     templates_dir: Path,
+    candidate_ids: set[str] | None = None,
 ) -> PromotionResult:
     """Promote staged recipes into builtins/ and register in index.json.
 
@@ -66,6 +67,9 @@ def promote_staged_recipes(
         staged_dir: Directory containing staged recipe JSON files.
         templates_dir: Root templates directory (contains ``index.json``
             and ``builtins/`` subdirectory).
+        candidate_ids: When supplied, promote only recipes whose ``recipe_id``
+            is in this human-admitted set. ``None`` preserves the legacy
+            promote-everything behavior for existing callers.
 
     Returns:
         PromotionResult with counts and IDs.
@@ -98,6 +102,11 @@ def promote_staged_recipes(
         except Exception:
             logger.warning("Skipping invalid recipe file: %s", staged_file.name)
             skipped_ids.append(stem)
+            continue
+
+        if candidate_ids is not None and recipe.recipe_id not in candidate_ids:
+            logger.info("Skipping %s — not admitted in this curation session", recipe.recipe_id)
+            skipped_ids.append(recipe.recipe_id)
             continue
 
         if recipe.recipe_id in existing_ids:

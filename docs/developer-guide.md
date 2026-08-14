@@ -190,7 +190,7 @@ The agent system is data-driven: `AgentSpec` data objects define prompt pack, re
 - Judges: `gpt-5.6-terra`, low reasoning, temperature 0.3
 - Holistic correction: `gpt-5.6-sol`, medium reasoning, temperature 0.3
 - Asset prompt enrichment: `gpt-5.6-terra`, low reasoning, temperature 0.6
-- Recipe generation: `gpt-5.6-terra`, medium reasoning, temperature 0.9
+- Recipe generation: `gpt-5.6-sol`, high reasoning, temperature 0.9
 - Image generation: `gpt-image-2` (assets remain disabled by default)
 
 Each `AgentConfig` also carries `max_tokens` and `timeout_seconds`; the runner

@@ -150,7 +150,7 @@ Key fields and defaults:
 | `agent.lyrics_agent` | `gpt-5.6-sol`, medium reasoning | Lyrics-context model, temperature, and reasoning settings |
 | `agent.refinement_agent` | `gpt-5.6-sol`, medium reasoning | Holistic-correction model, temperature, and reasoning settings |
 | `agent.asset_enricher_agent` | `gpt-5.6-terra`, low reasoning | Image-prompt enrichment settings; this does not enable asset generation |
-| `agent.recipe_generation_agent` | `gpt-5.6-terra`, medium reasoning | Recipe-builder model, temperature, reasoning, output limit, and timeout settings |
+| `agent.recipe_generation_agent` | `gpt-5.6-sol`, high reasoning | Recipe-builder model, temperature, reasoning, output limit, and timeout settings |
 | `agent.image_model` | `"gpt-image-2"` | OpenAI Images API target if a future display run explicitly enables assets |
 | `agent.<role>.max_tokens` | `50000` | Maximum output tokens forwarded on that role's requests |
 | `agent.<role>.timeout_seconds` | `60` | Per-request provider timeout |

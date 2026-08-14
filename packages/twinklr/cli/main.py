@@ -18,6 +18,10 @@ from twinklr.cli.catalog_coverage_cmd import (
     add_catalog_coverage_subparser,
     run_catalog_coverage_command,
 )
+from twinklr.cli.curation_cmd import (
+    add_review_staged_recipes_subparser,
+    run_review_staged_recipes_command,
+)
 from twinklr.cli.recipe_builder_cmd import (
     add_curate_catalog_subparser,
     run_curate_catalog_command,
@@ -410,6 +414,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
 
     add_curate_catalog_subparser(sub)
     add_catalog_coverage_subparser(sub)
+    add_review_staged_recipes_subparser(sub)
 
     # Registered only so `twinklr --help` lists it; `main()` dispatches "eval-report"
     # to click before argparse ever parses its arguments (see below — argparse's
@@ -444,6 +449,8 @@ def main() -> None:
         sys.exit(run_curate_catalog_command(args))
     elif args.cmd == "catalog-coverage":
         sys.exit(run_catalog_coverage_command(args))
+    elif args.cmd == "review-staged-recipes":
+        sys.exit(run_review_staged_recipes_command(args))
 
 
 if __name__ == "__main__":

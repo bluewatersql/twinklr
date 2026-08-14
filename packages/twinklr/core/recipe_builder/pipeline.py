@@ -19,6 +19,7 @@ from typing import Any
 from twinklr.core.agents.providers.base import LLMProvider
 from twinklr.core.config.models import AgentConfig, AgentOrchestrationConfig
 from twinklr.core.recipe_builder.admission import admit_candidates, write_staged_outputs
+from twinklr.core.recipe_builder.coverage import load_coverage_gap_opportunities
 from twinklr.core.recipe_builder.enrichment import generate_enrichments
 from twinklr.core.recipe_builder.evidence import (
     analyze_catalog,
@@ -64,6 +65,7 @@ class PipelineConfig:
     generation_agent: AgentConfig = field(
         default_factory=lambda: AgentOrchestrationConfig().recipe_generation_agent
     )
+    coverage_report_path: Path | None = None
     max_opportunities: int = 10
     phases: tuple[str, ...] = field(default_factory=lambda: ALL_PHASES)
 
@@ -173,6 +175,8 @@ def run_pipeline(config: PipelineConfig) -> RunManifest:
                 analysis,
                 max_opportunities=config.max_opportunities,
             )
+            if config.coverage_report_path is not None:
+                opportunities.extend(load_coverage_gap_opportunities(config.coverage_report_path))
 
             _write_json(run_dir / "catalog_analysis.json", analysis)
             _write_json(
@@ -205,6 +209,8 @@ def run_pipeline(config: PipelineConfig) -> RunManifest:
                         "description": opp.description,
                         "target_effect_type": opp.target_effect_type,
                         "target_energy": opp.target_energy,
+                        "target_template_type": opp.target_template_type,
+                        "target_element_type": opp.target_element_type,
                         "fe_source": fe_evidence.get("source", "none") if fe_evidence else "none",
                     }
                     fh.write(json.dumps(packet, default=str) + "\n")
@@ -382,6 +388,7 @@ def run_pipeline(config: PipelineConfig) -> RunManifest:
             "enable_enrich": str(config.enable_enrich),
             "synthetic_fallback": str(config.synthetic_fallback),
             "llm_model": config.generation_agent.model,
+            "coverage_report_path": str(config.coverage_report_path or "none"),
             "max_opportunities": str(config.max_opportunities),
         },
         artifact_paths={

@@ -60,6 +60,15 @@ def add_curate_catalog_subparser(
         help="Feature-engineering artifact directory (default: data/features/feature_engineering/).",
     )
     cmd.add_argument(
+        "--coverage-report",
+        type=Path,
+        default=None,
+        help=(
+            "P2K-T1 catalog-coverage JSON report. Its gap cells are added to the "
+            "generation opportunities."
+        ),
+    )
+    cmd.add_argument(
         "--dry-run",
         action="store_true",
         help="Skip LLM calls; use deterministic fallback generation.",
@@ -195,6 +204,9 @@ def run_curate_catalog_command(args: argparse.Namespace) -> int:
         output_dir=output_dir,
         templates_dir=templates_dir,
         fe_dir=args.fe_dir.resolve() if args.fe_dir else None,
+        coverage_report_path=(
+            args.coverage_report.resolve() if args.coverage_report is not None else None
+        ),
         enable_bootstrap=args.enable_bootstrap,
         enable_enrich=args.enable_enrich,
         synthetic_fallback=args.synthetic_fallback,

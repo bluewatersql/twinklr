@@ -148,7 +148,7 @@ class AgentOrchestrationConfig(BaseModel):
 
     recipe_generation_agent: AgentConfig = Field(
         default_factory=lambda: AgentConfig(
-            model="gpt-5.6-terra", reasoning_effort="medium", temperature=0.9
+            model="gpt-5.6-sol", reasoning_effort="high", temperature=0.9
         )
     )
 
