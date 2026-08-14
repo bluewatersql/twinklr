@@ -5,6 +5,14 @@ change: twinklr-reactivation-review
 updated: 2026-08-13
 ---
 
+> **UPDATE (2026-08-14): remediation is now UNDERWAY.** The owner authorized executing
+> the reactivation proposal; the implementation lives in this change's
+> [`build/`](build/plan/00-overview.md) subtree (plan + specs). Phases 0, 1K, and 1P
+> are complete; the live implementation handoff is
+> **[build/plan/HANDOFF.md](build/plan/HANDOFF.md)** — that file, not this one, is the
+> pickup point for continuing the build campaign. This document remains the REVIEW
+> handoff (historical).
+
 > **FINAL (2026-08-13): the review is COMPLETE — all 8 stages.** Stage 5 synthesis
 > (`reviews/cross-cutting.md`, `reviews/findings.md`) and Stage 8
 > (`reviews/remediation-roadmap.md`, `reviews/final-assessment.md`) are written;
