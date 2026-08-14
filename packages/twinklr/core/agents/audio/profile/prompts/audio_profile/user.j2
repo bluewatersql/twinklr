@@ -94,18 +94,13 @@ Confirm or infer song identity fields from the metadata above.
 - Convert sections into standardized `SongSectionRef` list
 - **Use the exact `section_id` values provided above** (e.g., "verse_1", "chorus_1", "intro") — do NOT invent new IDs
 - Provide `structure_confidence` based on section clarity
-- Add any relevant notes about the structure **that capture unique structural traits**
-  - Good: "Extended instrumental passages (5 sections, 80s total) dominate runtime unlike typical verse-chorus pop"
-  - Bad: "Song has verse and chorus sections"
 
 ### 3. Energy Profiling
-- Classify overall `macro_energy` (LOW, MED, HIGH, or DYNAMIC)
+- Classify overall `macro_energy` using the injected response schema
 - For each section, **preserve the exact timestamps (`t_ms`) from the energy curve** provided above
-- Update energy values (`energy_0_1`) to reflect normalized 0-1 scale if needed, but **do not change timestamps**
 - Identify section characteristics from curve shape: "building", "drop", "sustained", "peak"
 - Calculate and report mean_energy and peak_energy per section
 - Identify major peaks across all sections (use provided peaks or identify new ones)
-- Provide `energy_confidence` and `overall_mean`
 
 ### 4. Lyric Assessment
 - Report lyrics availability accurately
@@ -119,9 +114,8 @@ Recommend for downstream choreography planners **based on THIS song's specific c
   - 2 = Medium complexity, complementary layers
   - 3 = High complexity, multiple independent layers
   - **Justify your choice** based on song complexity, energy profile, and structure
-- **Contrast** (LOW/MED/HIGH): Visual contrast level **appropriate for this song's dynamics**
-- **Motion density** (SPARSE/MED/BUSY): How busy/active should movement be **for this song's tempo and energy**?
-- **Asset usage** (NONE/SPARSE/HEAVY): Should generated images/shaders be used **for this song**?
+- **Contrast**: Choose a schema-valid visual contrast level appropriate for this song's dynamics
+- **Motion density**: Choose a schema-valid activity level for this song's tempo and energy
 - **Color story** (up to 5 themes): Thematic color palette suggestions **that fit this song's mood and genre**
   - For Christmas songs: Consider traditional vs modern arrangements, vocal style, instrumentation
   - For non-Christmas songs: Reflect actual song mood (don't force Christmas themes)

@@ -60,7 +60,6 @@ class TestHolisticEvaluation:
             summary="Strong coordination across all sections",
             strengths=["Good energy progression", "Consistent template usage"],
             cross_section_issues=[],
-            recommendations=[],
         )
 
         assert evaluation.status == VerdictStatus.APPROVE
@@ -84,7 +83,6 @@ class TestHolisticEvaluation:
                     recommendation="Increase energy in chorus sections",
                 ),
             ],
-            recommendations=["Add variety to chorus sections"],
         )
 
         assert evaluation.status == VerdictStatus.SOFT_FAIL
@@ -100,7 +98,6 @@ class TestHolisticEvaluation:
             summary="Good",
             strengths=[],
             cross_section_issues=[],
-            recommendations=[],
         )
         assert approved.is_approved is True
 
@@ -111,7 +108,6 @@ class TestHolisticEvaluation:
             summary="Needs work",
             strengths=[],
             cross_section_issues=[],
-            recommendations=[],
         )
         assert soft_fail.is_approved is False
 
@@ -199,7 +195,7 @@ class TestCrossSectionIssuesToIssues:
         )
         assert issues[0].fix_hint == "Increase energy in chorus"
         assert issues[0].location.section_id == "verse_1"
-        assert issues[0].scope.value == "GLOBAL"
+        assert "scope" not in type(issues[0]).model_fields
 
     def test_cross_section_issues_to_issues_preserves_targeted_actions(self) -> None:
         """TargetedAction list is carried over from CrossSectionIssue to Issue."""

@@ -17,9 +17,9 @@ References system prompt rules and existing conversation context.
 - **Energy Target:** {{ energy_target }}
 - **Primary Targets:** {{ primary_focus_targets | join(", ") }}
 {% if section_duration_bars < 1 %}
-⚠️ **VERY SHORT SECTION:** Only bar 1 beat 1 with HIT duration. Skip BASE/RHYTHM.
+⚠️ **VERY SHORT SECTION:** Only bar 1 beat 1 with the briefest schema-valid duration. Skip sustained and rhythmic layers.
 {% elif section_duration_bars < 2 %}
-⚠️ **SHORT SECTION:** Use HIT/BURST only.
+⚠️ **SHORT SECTION:** Use only the briefest schema-valid durations.
 {% elif section_duration_bars <= 5 %}
 ⚠️ **BRIEF SECTION:** ONE placement per target per lane — no stacking.
 {% endif %}

@@ -15,23 +15,10 @@ back into the original GroupPlanSet by matching `section_id`.
 
 ## Action Application Rules
 
-Apply each `TargetedAction` based on its `action_type`:
-
-- **ADD_TARGET**: Add the specified target to the specified lane's coordination plan.
-  Create a new CoordinationPlan entry if no existing plan covers that lane+target.
-- **REMOVE_TARGET**: Remove the specified target from the lane's coordination plan.
-- **ADD_PLACEMENT**: Add a new placement to the existing coordination plan for the
-  specified lane and target.
-- **REMOVE_PLACEMENT**: Remove the matching placement from the coordination plan.
-- **SWAP_TEMPLATE**: Replace `template_id` on the matching coordination plan with
-  `replacement_template_id`. Preserve all other fields (targets, placements, config).
-- **CHANGE_PALETTE**: Update the `palette` field on the SectionCoordinationPlan.
-  Set `palette.palette_id` to the specified `palette_id`.
-- **CHANGE_THEME**: Update the `theme` field on the SectionCoordinationPlan.
-- **ADD_MOTIF / REMOVE_MOTIF**: Add or remove from `motif_ids` list.
-- **ADJUST_TIMING**: Modify bar/beat on matching placement.
-- **REORDER_GROUPS**: Update `config.group_order` on matching coordination plan.
-- **OTHER**: Apply using best judgment based on the `description` field.
+Apply each `TargetedAction` according to its schema-defined `action_type` and populated
+locator fields. Make only the specified mutation; preserve unrelated targets, placements,
+configuration, theme, palette, motifs, and timing. If an action cannot be located
+unambiguously, use its description conservatively rather than inventing identifiers.
 
 ## Structural Constraints
 

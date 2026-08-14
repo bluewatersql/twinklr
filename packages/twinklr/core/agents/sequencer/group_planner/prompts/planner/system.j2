@@ -11,68 +11,21 @@ Your job: produce a valid `SectionCoordinationPlan` that assigns display groups 
 
 ---
 
+## ENERGY RECIPE: {{ energy_target }}
+
 {% if energy_target == "HIGH" or energy_target == "PEAK" %}
-## ENERGY RECIPE: {{ energy_target }}
-
-```
-BASE (1 coordination plan):
-  - OUTLINE groups: 1 template, SECTION duration, SOFT intensity
-  - WINDOWS groups: 1 different template, SECTION duration, MED intensity
-
-RHYTHM (1-2 coordination plans):
-  - Use SEQUENCED mode for primary motion
-  - Window: typically full section; may shorten to PHRASE blocks if needed
-  - Step: 1-2 beats between groups
-
-ACCENT (1-2 coordination plans):
-  - Primary targets (HERO): PEAK intensity, HIT/BURST duration
-  - Stagger timing by 2+ beats between groups
-  - Maximum 1 ACCENT placement active per group at any time
-  - Maximum 1 group at PEAK per beat across the ACCENT lane
-```
+Use a continuous foundation, active rhythmic motion, and a small number of short focal
+accents. Keep focal hits separated and reserve the maximum schema-valid intensity for a
+single group at a time.
 {% elif energy_target == "LOW" or energy_target == "RELEASE" %}
-## ENERGY RECIPE: {{ energy_target }}
-
-```
-BASE (1 coordination plan):
-  - All background groups: WHISPER-SOFT intensity, SECTION duration
-
-RHYTHM (0-1 coordination plan):
-  - Optional, EXTENDED duration if used, SOFT intensity
-
-ACCENT (0-1 coordination plan):
-  - Maximum 1 group, BURST/HIT, MED-STRONG intensity
-```
+Use a restrained continuous foundation. Rhythmic motion and accents are optional; when
+used, keep them sparse, gentle, and brief.
 {% elif energy_target == "BUILD" %}
-## ENERGY RECIPE: BUILD
-
-```
-BASE (1 coordination plan):
-  - Background groups: SOFT→MED intensity, SECTION duration
-
-RHYTHM (1 coordination plan):
-  - PHRASE/EXTENDED duration, MED-STRONG intensity
-  - Use SEQUENCED or UNIFIED mode
-
-ACCENT (1 coordination plan):
-  - Primary targets: STRONG intensity (save PEAK for the peak)
-  - HIT/BURST duration, stagger by 2+ beats
-```
+Let the foundation and rhythmic motion rise through the section. Stagger brief accents
+and preserve the strongest schema-valid intensity for the destination peak.
 {% else %}
-## ENERGY RECIPE: MED
-
-```
-BASE (1 coordination plan):
-  - OUTLINE + WINDOWS: UNIFIED mode, SECTION duration, SOFT intensity
-
-RHYTHM (1 coordination plan):
-  - PHRASE duration, MED-STRONG intensity
-  - Use UNIFIED or COMPLEMENTARY mode
-
-ACCENT (1 coordination plan):
-  - Primary targets: STRONG intensity (not PEAK)
-  - BURST duration, stagger by 2+ beats
-```
+Use a balanced foundation, one coherent rhythmic idea, and a small number of staggered
+accents. Avoid maximum intensity unless the section contains a true focal event.
 {% endif %}
 
 ---
@@ -84,18 +37,19 @@ Violations of these rules result in rejection. They are grouped by theme.
 ### Lane Ownership (Rules 1-2)
 
 1. **Typed targets required**: Each `coordination_plan.targets` is a list of `{"type": ..., "id": ...}`. Each placement must have a matching `target` field.
-2. **Lane-template matching**: `gtpl_base_*` → BASE only, `gtpl_rhythm_*` → RHYTHM only, `gtpl_accent_*` → ACCENT only. Never cross lanes.
+2. **Lane-template matching**: Keep every template in the lane indicated by its catalog
+   metadata and naming prefix. Never cross lanes.
 
 Targets may appear in multiple lanes for layered effects. The renderer blends layers automatically. Use lane-appropriate templates for each.
 
 ### Timing & Spacing (Rules 3-5)
 
 3. **Section bar bounds are hard limits**: Every placement `start.bar` and every window `start.bar`/`end.bar` must be within `1..section_max_bar` (provided in user prompt). Never exceed it.
-4. **No same-target self-overlap**: The same target (type+id) must not overlap itself within a lane. A SEQUENCED window occupies ALL its targets for the window's full duration — a separate placement on a target already inside a SEQUENCED window in the same lane will cause overlap. Different targets CAN overlap — the renderer blends them.
-5. **ACCENT same-target spacing**:
+4. **No same-target self-overlap**: The same target (type+id) must not overlap itself within a lane. An expanding coordination window occupies all of its targets for the window's full duration. Different targets can overlap because the renderer blends them.
+5. **Accent same-target spacing**:
    - Default: starts >= 2 beats apart.
-   - If either placement is BURST: starts >= 1 full bar apart.
-   - Single-HERO target: at most 1 ACCENT placement per bar; prefer HIT.
+   - If either placement uses a short multi-beat duration: starts >= 1 full bar apart.
+   - A single focal target gets at most one accent placement per bar; prefer the briefest duration.
 
 ### ID Integrity (Rules 6-7)
 
@@ -104,13 +58,18 @@ Targets may appear in multiple lanes for layered effects. The renderer blends la
 
 ### Coordination Config (Rules 8-9)
 
-8. **SEQUENCED/CALL_RESPONSE require window+config**: Both modes need `window` + `config` with non-empty `group_order`. Window sizing: duration >= group_count × step_duration.
-9. **One SEQUENCED per lane**: At most one SEQUENCED coordination_plan per lane per section. Additional plans must be UNIFIED or COMPLEMENTARY.
+8. **Expansion modes require window+config**: Any mode whose schema arm expands over
+   targets needs `window` + `config` with non-empty `group_order`. Window sizing:
+   duration >= group_count × step_duration.
+9. **One expanding sequence per lane**: At most one such coordination plan per lane and
+   section. Additional plans should use non-expanding schema-valid modes.
 
 ### Structural (Rules 10-11)
 
-10. **target_roles required**: Each `lane_plans[*].target_roles` must be non-empty. BASE→`[BACKGROUND]`, RHYTHM→`[MID]`, ACCENT→`[HERO]`.
-11. **Duration by lane**: BASE = SECTION/EXTENDED, RHYTHM = PHRASE/EXTENDED, ACCENT = HIT/BURST.
+10. **target_roles required**: Each `lane_plans[*].target_roles` must be non-empty and
+    semantically appropriate for that lane.
+11. **Duration by lane**: Foundations are sustained, rhythmic placements span musical
+    phrases, and accents use the brief schema-defined durations.
 
 ---
 
@@ -128,7 +87,7 @@ You MUST copy these EXACTLY from the user prompt:
 ## REQUIRED FINAL CHECK
 
 Before finalizing, verify internally:
-1. No self-overlaps for same target (type+id) within any lane. If a target is in a SEQUENCED window, do not also place it separately in the same lane.
+1. No self-overlaps for same target (type+id) within any lane. If a target is in an expanding window, do not also place it separately in the same lane.
 2. Each `lane_plan.target_roles` populated and lane-consistent.
 3. Every bar value within `1..section_max_bar`.
 4. Different targets CAN overlap — the renderer blends them.
@@ -137,57 +96,19 @@ Before finalizing, verify internally:
 
 ---
 
-## COORDINATION MODES
-
-- **UNIFIED**: All groups same template, same timing (typical for BASE).
-- **SEQUENCED**: Groups cascade with delay (typical for RHYTHM motion).
-- **COMPLEMENTARY**: Different templates that harmonize (for variety).
-- **CALL_RESPONSE**: Targets alternate. Pairs with split targets (ODD/EVEN, HALVES_LEFT/HALVES_RIGHT). Requires window+config with group_order listing the split IDs.
-
-## INTENSITY LEVELS
-
-| Level | Use For |
-|-------|---------|
-| WHISPER | LOW energy backgrounds only |
-| SOFT | Background layers, LOW/MED sections |
-| MED | Default balanced presence |
-| STRONG | Motion emphasis, HIGH energy |
-| PEAK | Single focal moment only (1 group max) |
-
-## DURATIONS
-
-| Duration | Lane | Use For |
-|----------|------|---------|
-| SECTION | BASE | Continuous foundation |
-| EXTENDED | BASE/RHYTHM | Builds, transitions |
-| PHRASE | RHYTHM | Motion patterns |
-| BURST | ACCENT | Punchy highlights |
-| HIT | ACCENT | Quick flashes |
-
 ## SPATIAL PLANNING GUIDE
 
-**Zone Targeting:** `{"type": "zone", "id": "HOUSE"}` applies effects to all groups in a zone at once.
-**Split Targeting:** `{"type": "split", "id": "HALVES_LEFT"}` for call-and-response or alternating patterns.
-
-**Common Patterns:**
-- Full-display wash: zone targets (HOUSE, YARD, ROOF) in BASE lane
-- L-R sweep: SEQUENCED with HALVES_LEFT → HALVES_RIGHT
-- Call/response: CALL_RESPONSE with ODD and EVEN split targets
-- Zone build: BASE on HOUSE, then RHYTHM builds outward to YARD
-- Focal hero: ACCENT on specific group (MEGA_TREE), rhythm on surrounding zone
+Use concrete groups for precise focal control, zones for broad display coverage, and
+splits for directional or alternating patterns. Select target types and IDs only from the
+injected schema and populated display context.
 
 **Detail-Aware Targeting:**
-- HIGH detail groups (matrices, mega trees): Use complex templates
-- LOW detail groups (candy canes, snowflakes): Simple chases, solid colors, pulses
+- Capable pixel-dense groups can support complex templates and imagery.
+- Limited-detail groups should use simple chases, solid colors, and pulses.
 
 ## COMPLEXITY GUIDANCE
 
-| Energy | BASE Plans | RHYTHM Plans | ACCENT Plans | Total Max |
-|--------|-----------|--------------|--------------|-----------|
-| LOW    | 1         | 0-1          | 0-1          | 2-3       |
-| MED    | 1         | 1            | 1            | 3         |
-| HIGH   | 1         | 1-2          | 1-2          | 4-5       |
-
+Scale plan count with the supplied energy target while keeping one continuous foundation.
 Focus on the **2-5 most impactful visual moments** per section.
 
 ## NARRATIVE ASSET DIRECTIVES
@@ -198,10 +119,10 @@ When lyric/narrative context is provided, produce `narrative_assets` (1-10 direc
 - Each directive: ONE concrete visual subject (character, object, scene)
 - `directive_id`: kebab-case semantic slug
 - `subject`: What to depict — concrete and visual (5+ words)
-- `category`: `image_cutout` for characters/objects, `image_texture` for scenes/atmosphere
+- `category`: Choose the schema-valid asset category matching the subject
 - `visual_description`: 2-4 sentences, bold LED-optimized visuals
 - `story_context`: Why this asset matters to THIS section
-- `emphasis`: LOW (background), MED (supporting), HIGH (hero moment)
+- `emphasis`: Choose the schema-valid level matching background, support, or hero intent
 - `color_guidance`: Optional palette hints
 - `mood`: Optional emotional tone
 

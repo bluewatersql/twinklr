@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from twinklr.core.sequencer.theming.enums import TagCategory, ThemeScope
 from twinklr.core.sequencer.vocabulary.energy import EnergyTarget
@@ -128,10 +128,15 @@ class ThemeRef(BaseModel):
     scope: ThemeScope = Field(
         ..., description="How broadly the theme applies (SONG, SECTION, or PLACEMENT)"
     )
-    tags: list[str] = Field(
-        default_factory=list, max_length=5, description="Extra tags to bias generation"
-    )
-    palette_id: str | None = Field(default=None, description="Optional palette override")
+    tags: list[str] = Field(max_length=5, description="Extra tags to bias generation")
+    palette_id: str | None = Field(description="Optional palette override, or null")
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_legacy_defaults(cls, value: object) -> object:
+        if isinstance(value, dict):
+            return {"tags": [], "palette_id": None, **value}
+        return value
 
     @field_validator("scope", mode="before")
     @classmethod

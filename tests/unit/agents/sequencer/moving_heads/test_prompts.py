@@ -400,10 +400,9 @@ class TestV2JudgePrompts:
 
         # Should reference JudgeVerdict
         assert "JudgeVerdict" in developer
-        # Should have VerdictStatus enum values
-        assert "APPROVE" in developer
-        assert "SOFT_FAIL" in developer
-        assert "HARD_FAIL" in developer
+        # Status values come only from the injected schema, not a drifting literal list.
+        assert "schema-defined approval status" in developer
+        assert "APPROVE | SOFT_FAIL | HARD_FAIL" not in developer
 
     def test_judge_developer_with_learning_context(self, prompt_loader, renderer):
         """Test judge developer prompt includes learning context."""

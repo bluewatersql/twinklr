@@ -68,7 +68,6 @@ class TestIterationConfig:
             status=VerdictStatus.APPROVE,
             score=8.0,
             confidence=0.9,
-            overall_assessment="Good",
             feedback_for_planner="Keep it up",
             iteration=1,
         )

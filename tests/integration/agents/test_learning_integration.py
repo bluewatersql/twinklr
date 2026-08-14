@@ -12,11 +12,8 @@ from twinklr.core.agents.analytics.repository import IssueRepository
 from twinklr.core.agents.issues import (
     Issue,
     IssueCategory,
-    IssueEffort,
     IssueLocation,
-    IssueScope,
     IssueSeverity,
-    SuggestedAction,
 )
 from twinklr.core.agents.shared.judge.controller import IterationConfig, StandardIterationController
 from twinklr.core.agents.shared.judge.feedback import FeedbackManager
@@ -38,28 +35,22 @@ def sample_issues():
             issue_id="VARIETY_LOW_CHORUS",
             category=IssueCategory.VARIETY,
             severity=IssueSeverity.WARN,
-            estimated_effort=IssueEffort.LOW,
-            scope=IssueScope.SECTION,
             location=IssueLocation(section_id="chorus_1", bar_start=25, bar_end=33),
             rule="DON'T repeat templates 3+ times in high-energy sections",
             message="Chorus uses same template 3 times without variation",
             fix_hint="Use different geometry types or presets for variety",
             acceptance_test="Chorus sections use at least 2 different templates or presets",
-            suggested_action=SuggestedAction.PATCH,
             generic_example="Repeated template usage without variation in high-energy sections",
         ),
         Issue(
             issue_id="MUSICALITY_ENERGY_MISMATCH",
             category=IssueCategory.MUSICALITY,
             severity=IssueSeverity.WARN,
-            estimated_effort=IssueEffort.MEDIUM,
-            scope=IssueScope.SECTION,
             location=IssueLocation(section_id="verse_1", bar_start=1, bar_end=8),
             rule="DON'T use high intensity in low-energy sections",
             message="Verse energy level too high for audio profile",
             fix_hint="Reduce intensity to match audio profile energy",
             acceptance_test="Verse intensity matches audio profile energy level",
-            suggested_action=SuggestedAction.PATCH,
             generic_example="Energy mismatch between plan and audio profile",
         ),
     ]
@@ -85,9 +76,7 @@ def test_feedback_manager_records_to_repository(temp_storage, sample_issues):
         confidence=0.85,
         strengths=["Good timing", "Clear structure"],
         issues=sample_issues,
-        overall_assessment="Good plan with some variety issues",
         feedback_for_planner="Address variety and energy concerns",
-        score_breakdown={"musicality": 7.0, "variety": 6.0},
         iteration=1,
     )
 
@@ -127,9 +116,7 @@ def test_resolution_tracking_across_iterations(temp_storage, sample_issues):
             confidence=0.85,
             strengths=[],
             issues=sample_issues,  # Both issues
-            overall_assessment="Issues to address",
             feedback_for_planner="Fix variety and musicality",
-            score_breakdown={},
             iteration=1,
         )
         feedback.add_judge_verdict(verdict, iteration=1)
@@ -148,9 +135,7 @@ def test_resolution_tracking_across_iterations(temp_storage, sample_issues):
             confidence=0.85,
             strengths=[],
             issues=[sample_issues[0]],  # Only VARIETY issue
-            overall_assessment="Musicality fixed, variety remains",
             feedback_for_planner="Address remaining variety issue",
-            score_breakdown={},
             iteration=1,
         )
         feedback.add_judge_verdict(verdict, iteration=1)
@@ -186,9 +171,7 @@ def test_learning_context_formatting(temp_storage, sample_issues):
             confidence=0.85,
             strengths=[],
             issues=sample_issues,
-            overall_assessment="Issues to address",
             feedback_for_planner="Fix variety and musicality",
-            score_breakdown={},
             iteration=1,
         )
         feedback = FeedbackManager(
@@ -265,9 +248,7 @@ def test_feedback_manager_with_learning_context(temp_storage, sample_issues):
             confidence=0.85,
             strengths=[],
             issues=sample_issues,
-            overall_assessment="Issues to address",
             feedback_for_planner="Fix variety and musicality",
-            score_breakdown={},
             iteration=1,
         )
         feedback.add_judge_verdict(verdict, iteration=1)
@@ -301,9 +282,7 @@ def test_multiple_agents_isolated_learning(temp_storage, sample_issues):
         confidence=0.85,
         strengths=[],
         issues=[sample_issues[0]],  # VARIETY only
-        overall_assessment="Variety issue",
         feedback_for_planner="Fix variety",
-        score_breakdown={},
         iteration=1,
     )
     for i in range(3):
@@ -322,9 +301,7 @@ def test_multiple_agents_isolated_learning(temp_storage, sample_issues):
         confidence=0.85,
         strengths=[],
         issues=[sample_issues[1]],  # MUSICALITY only
-        overall_assessment="Musicality issue",
         feedback_for_planner="Fix musicality",
-        score_breakdown={},
         iteration=1,
     )
     for i in range(3):
@@ -358,14 +335,11 @@ def test_generic_examples_in_learning_context(temp_storage):
         issue_id="TEST_ISSUE",
         category=IssueCategory.VARIETY,
         severity=IssueSeverity.WARN,
-        estimated_effort=IssueEffort.LOW,
-        scope=IssueScope.SECTION,
         location=IssueLocation(),
         rule="DON'T use repetitive patterns without variation",
         message="Specific message about section X",
         fix_hint="Fix section X",
         acceptance_test="Section X fixed",
-        suggested_action=SuggestedAction.PATCH,
         generic_example="Generic pattern: insufficient variety in repeated sections",
     )
 
@@ -383,9 +357,7 @@ def test_generic_examples_in_learning_context(temp_storage):
             confidence=0.85,
             strengths=[],
             issues=[issue_with_example],
-            overall_assessment="Test",
             feedback_for_planner="Test",
-            score_breakdown={},
             iteration=1,
         )
         feedback.add_judge_verdict(verdict, iteration=1)
@@ -416,9 +388,7 @@ def test_cross_job_learning_accumulation(temp_storage, sample_issues):
             confidence=0.85,
             strengths=[],
             issues=[sample_issues[0]],  # VARIETY issue
-            overall_assessment="Variety issue",
             feedback_for_planner="Fix variety",
-            score_breakdown={},
             iteration=1,
         )
         feedback.add_judge_verdict(verdict, iteration=1)

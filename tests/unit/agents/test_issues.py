@@ -7,11 +7,8 @@ from twinklr.core.agents.issues import (
     ActionType,
     Issue,
     IssueCategory,
-    IssueEffort,
     IssueLocation,
-    IssueScope,
     IssueSeverity,
-    SuggestedAction,
     TargetedAction,
 )
 
@@ -128,14 +125,11 @@ class TestTargetedAction:
             issue_id="TEST_001",
             category=IssueCategory.VARIETY,
             severity=IssueSeverity.WARN,
-            estimated_effort=IssueEffort.LOW,
-            scope=IssueScope.SECTION,
             location=IssueLocation(section_id="verse_1"),
             rule="DON'T lack variety",
             message="Same template repeated",
             fix_hint="Add variety",
             acceptance_test="Variety improved",
-            suggested_action=SuggestedAction.PATCH,
             targeted_actions=[action],
         )
         assert len(issue.targeted_actions) == 1
@@ -147,14 +141,11 @@ class TestTargetedAction:
             issue_id="TEST_002",
             category=IssueCategory.TIMING,
             severity=IssueSeverity.ERROR,
-            estimated_effort=IssueEffort.MEDIUM,
-            scope=IssueScope.SECTION,
             location=IssueLocation(),
             rule="DON'T overlap timing",
             message="Timing overlap",
             fix_hint="Adjust bars",
             acceptance_test="No overlap",
-            suggested_action=SuggestedAction.REPLAN_SECTION,
         )
         assert issue.targeted_actions == []
         assert isinstance(issue.targeted_actions, list)

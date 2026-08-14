@@ -73,10 +73,9 @@ def audio_profile_fixture():
 @pytest.fixture
 def lyric_context_fixture():
     """Minimal LyricContextModel for testing."""
-    from twinklr.core.agents.audio.lyrics.models import KeyPhrase, Provenance
+    from twinklr.core.agents.audio.lyrics.models import KeyPhrase
 
     return LyricContextModel(
-        run_id="test-lyric-run",
         has_lyrics=True,
         themes=["celebration", "joy"],
         mood_arc="happy throughout",
@@ -91,12 +90,4 @@ def lyric_context_fixture():
             for i in range(5)
         ],
         recommended_visual_themes=["bright", "festive", "joyful"],
-        provenance=Provenance(
-            provider_id="openai",
-            model_id="gpt-5.2",
-            prompt_pack="lyrics",
-            prompt_pack_version="2.0",
-            framework_version="twinklr-agents-2.0",
-            temperature=0.5,
-        ),
     )

@@ -14,10 +14,30 @@
       "confidence": 0.93
     },
     "sections": [
-      {"type": "intro", "start_ms": 0, "end_ms": 12000, "confidence": 0.88},
-      {"type": "verse", "start_ms": 12000, "end_ms": 48000, "confidence": 0.85},
-      {"type": "chorus", "start_ms": 48000, "end_ms": 78000, "confidence": 0.82},
-      {"type": "outro", "start_ms": 78000, "end_ms": 120000, "confidence": 0.90}
+      {
+        "type": "intro",
+        "start_ms": 0,
+        "end_ms": 12000,
+        "confidence": 0.88
+      },
+      {
+        "type": "verse",
+        "start_ms": 12000,
+        "end_ms": 48000,
+        "confidence": 0.85
+      },
+      {
+        "type": "chorus",
+        "start_ms": 48000,
+        "end_ms": 78000,
+        "confidence": 0.82
+      },
+      {
+        "type": "outro",
+        "start_ms": 78000,
+        "end_ms": 120000,
+        "confidence": 0.90
+      }
     ],
     "energy": {
       "overall": 0.35,
@@ -25,58 +45,133 @@
         {
           "section_id": "intro",
           "energy_curve": [
-            {"t_ms": 0, "energy": 0.15},
-            {"t_ms": 3000, "energy": 0.18},
-            {"t_ms": 6000, "energy": 0.20},
-            {"t_ms": 9000, "energy": 0.22},
-            {"t_ms": 12000, "energy": 0.25}
+            {
+              "t_ms": 0,
+              "energy": 0.15
+            },
+            {
+              "t_ms": 3000,
+              "energy": 0.18
+            },
+            {
+              "t_ms": 6000,
+              "energy": 0.20
+            },
+            {
+              "t_ms": 9000,
+              "energy": 0.22
+            },
+            {
+              "t_ms": 12000,
+              "energy": 0.25
+            }
           ],
           "mean_energy": 0.20,
           "peak_energy": 0.25,
-          "characteristics": ["building", "valley"]
+          "characteristics": [
+            "building",
+            "valley"
+          ]
         },
         {
           "section_id": "verse_1",
           "energy_curve": [
-            {"t_ms": 12000, "energy": 0.30},
-            {"t_ms": 21000, "energy": 0.32},
-            {"t_ms": 30000, "energy": 0.35},
-            {"t_ms": 39000, "energy": 0.38},
-            {"t_ms": 48000, "energy": 0.42}
+            {
+              "t_ms": 12000,
+              "energy": 0.30
+            },
+            {
+              "t_ms": 21000,
+              "energy": 0.32
+            },
+            {
+              "t_ms": 30000,
+              "energy": 0.35
+            },
+            {
+              "t_ms": 39000,
+              "energy": 0.38
+            },
+            {
+              "t_ms": 48000,
+              "energy": 0.42
+            }
           ],
           "mean_energy": 0.35,
           "peak_energy": 0.42,
-          "characteristics": ["building", "sustained"]
+          "characteristics": [
+            "building",
+            "sustained"
+          ]
         },
         {
           "section_id": "chorus_1",
           "energy_curve": [
-            {"t_ms": 48000, "energy": 0.55},
-            {"t_ms": 56000, "energy": 0.58},
-            {"t_ms": 63000, "energy": 0.60},
-            {"t_ms": 70000, "energy": 0.57},
-            {"t_ms": 78000, "energy": 0.52}
+            {
+              "t_ms": 48000,
+              "energy": 0.55
+            },
+            {
+              "t_ms": 56000,
+              "energy": 0.58
+            },
+            {
+              "t_ms": 63000,
+              "energy": 0.60
+            },
+            {
+              "t_ms": 70000,
+              "energy": 0.57
+            },
+            {
+              "t_ms": 78000,
+              "energy": 0.52
+            }
           ],
           "mean_energy": 0.56,
           "peak_energy": 0.60,
-          "characteristics": ["peak"]
+          "characteristics": [
+            "peak"
+          ]
         },
         {
           "section_id": "outro",
           "energy_curve": [
-            {"t_ms": 78000, "energy": 0.45},
-            {"t_ms": 87000, "energy": 0.38},
-            {"t_ms": 96000, "energy": 0.30},
-            {"t_ms": 105000, "energy": 0.22},
-            {"t_ms": 120000, "energy": 0.15}
+            {
+              "t_ms": 78000,
+              "energy": 0.45
+            },
+            {
+              "t_ms": 87000,
+              "energy": 0.38
+            },
+            {
+              "t_ms": 96000,
+              "energy": 0.30
+            },
+            {
+              "t_ms": 105000,
+              "energy": 0.22
+            },
+            {
+              "t_ms": 120000,
+              "energy": 0.15
+            }
           ],
           "mean_energy": 0.30,
           "peak_energy": 0.45,
-          "characteristics": ["drop", "valley"]
+          "characteristics": [
+            "drop",
+            "valley"
+          ]
         }
       ],
       "peaks": [
-        {"start_ms": 60000, "end_ms": 66000, "energy": 0.60}
+        {
+          "start_ms": 60000,
+          "end_ms": 66000,
+          "energy": 0.60
+        }
       ]
     },
     "lyrics": {
@@ -92,18 +187,6 @@
     }
   },
   "expected_output": {
-    "schema_version": "2.0",
-    "agent_id": "audio_profile.v2",
-    "run_id": "example_2",
-    "provenance": {
-      "provider_id": "openai",
-      "model_id": "gpt-5.6-sol",
-      "prompt_pack": "audio_profile.v2",
-      "prompt_pack_version": "1.0",
-      "framework_version": "2.0.0",
-      "temperature": 0.7,
-      "created_at": "2026-01-29T11:00:00Z"
-    },
     "warnings": [],
     "song_identity": {
       "title": null,
@@ -115,13 +198,32 @@
     },
     "structure": {
       "sections": [
-        {"section_id": "intro", "name": "intro", "start_ms": 0, "end_ms": 12000},
-        {"section_id": "verse_1", "name": "verse", "start_ms": 12000, "end_ms": 48000},
-        {"section_id": "chorus_1", "name": "chorus", "start_ms": 48000, "end_ms": 78000},
-        {"section_id": "outro", "name": "outro", "start_ms": 78000, "end_ms": 120000}
+        {
+          "section_id": "intro",
+          "name": "intro",
+          "start_ms": 0,
+          "end_ms": 12000
+        },
+        {
+          "section_id": "verse_1",
+          "name": "verse",
+          "start_ms": 12000,
+          "end_ms": 48000
+        },
+        {
+          "section_id": "chorus_1",
+          "name": "chorus",
+          "start_ms": 48000,
+          "end_ms": 78000
+        },
+        {
+          "section_id": "outro",
+          "name": "outro",
+          "start_ms": 78000,
+          "end_ms": 120000
+        }
       ],
-      "structure_confidence": 0.86,
-      "notes": ["Simple 4-section structure", "Instrumental piece", "Gradual build and fade"]
+      "structure_confidence": 0.86
     },
     "energy_profile": {
       "macro_energy": "LOW",
@@ -131,81 +233,138 @@
           "start_ms": 0,
           "end_ms": 12000,
           "energy_curve": [
-            {"t_ms": 0, "energy_0_1": 0.15},
-            {"t_ms": 3000, "energy_0_1": 0.18},
-            {"t_ms": 6000, "energy_0_1": 0.20},
-            {"t_ms": 9000, "energy_0_1": 0.22},
-            {"t_ms": 12000, "energy_0_1": 0.25}
+            {
+              "t_ms": 0
+            },
+            {
+              "t_ms": 3000
+            },
+            {
+              "t_ms": 6000
+            },
+            {
+              "t_ms": 9000
+            },
+            {
+              "t_ms": 12000
+            }
           ],
           "mean_energy": 0.20,
           "peak_energy": 0.25,
-          "characteristics": ["building", "valley"]
+          "characteristics": [
+            "building",
+            "valley"
+          ]
         },
         {
           "section_id": "verse_1",
           "start_ms": 12000,
           "end_ms": 48000,
           "energy_curve": [
-            {"t_ms": 12000, "energy_0_1": 0.30},
-            {"t_ms": 21000, "energy_0_1": 0.32},
-            {"t_ms": 30000, "energy_0_1": 0.35},
-            {"t_ms": 39000, "energy_0_1": 0.38},
-            {"t_ms": 48000, "energy_0_1": 0.42}
+            {
+              "t_ms": 12000
+            },
+            {
+              "t_ms": 21000
+            },
+            {
+              "t_ms": 30000
+            },
+            {
+              "t_ms": 39000
+            },
+            {
+              "t_ms": 48000
+            }
           ],
           "mean_energy": 0.35,
           "peak_energy": 0.42,
-          "characteristics": ["building", "sustained"]
+          "characteristics": [
+            "building",
+            "sustained"
+          ]
         },
         {
           "section_id": "chorus_1",
           "start_ms": 48000,
           "end_ms": 78000,
           "energy_curve": [
-            {"t_ms": 48000, "energy_0_1": 0.55},
-            {"t_ms": 56000, "energy_0_1": 0.58},
-            {"t_ms": 63000, "energy_0_1": 0.60},
-            {"t_ms": 70000, "energy_0_1": 0.57},
-            {"t_ms": 78000, "energy_0_1": 0.52}
+            {
+              "t_ms": 48000
+            },
+            {
+              "t_ms": 56000
+            },
+            {
+              "t_ms": 63000
+            },
+            {
+              "t_ms": 70000
+            },
+            {
+              "t_ms": 78000
+            }
           ],
           "mean_energy": 0.56,
           "peak_energy": 0.60,
-          "characteristics": ["peak"]
+          "characteristics": [
+            "peak"
+          ]
         },
         {
           "section_id": "outro",
           "start_ms": 78000,
           "end_ms": 120000,
           "energy_curve": [
-            {"t_ms": 78000, "energy_0_1": 0.45},
-            {"t_ms": 87000, "energy_0_1": 0.38},
-            {"t_ms": 96000, "energy_0_1": 0.30},
-            {"t_ms": 105000, "energy_0_1": 0.22},
-            {"t_ms": 120000, "energy_0_1": 0.15}
+            {
+              "t_ms": 78000
+            },
+            {
+              "t_ms": 87000
+            },
+            {
+              "t_ms": 96000
+            },
+            {
+              "t_ms": 105000
+            },
+            {
+              "t_ms": 120000
+            }
           ],
           "mean_energy": 0.30,
           "peak_energy": 0.45,
-          "characteristics": ["drop", "valley"]
+          "characteristics": [
+            "drop",
+            "valley"
+          ]
         }
       ],
       "peaks": [
-        {"start_ms": 60000, "end_ms": 66000, "energy": 0.60}
-      ],
-      "overall_mean": 0.35,
-      "energy_confidence": 0.88
+        {
+          "start_ms": 60000,
+          "end_ms": 66000,
+          "energy": 0.60
+        }
+      ]
     },
     "lyric_profile": {
       "has_plain_lyrics": false,
       "has_timed_words": false,
       "has_phonemes": false,
       "lyric_confidence": 0.0,
-      "phoneme_confidence": 0.0
+      "phoneme_confidence": 0.0,
+      "notes": []
     },
     "creative_guidance": {
       "recommended_layer_count": 1,
       "recommended_contrast": "LOW",
       "recommended_motion_density": "SPARSE",
-      "recommended_asset_usage": "SPARSE",
-      "palette_color_guidance": ["warm", "soft", "flowing"],
+      "palette_color_guidance": [
+        "warm",
+        "soft",
+        "flowing"
+      ],
       "cautions": [
         "Respect the calm, meditative nature of the piece",
         "Avoid jarring transitions or sudden movements",
@@ -214,12 +373,32 @@
       ]
     },
     "planner_hints": {
-      "section_objectives": {
-        "intro": "Establish gentle, contemplative mood with slow, smooth movements",
-        "verse_1": "Maintain calm atmosphere with subtle progressive movement",
-        "chorus_1": "Gentle elevation in intensity without breaking the peaceful mood",
-        "outro": "Gradually reduce movement intensity, fade to stillness"
-      },
+      "section_objectives": [
+        {
+          "section_id": "intro",
+          "objectives": [
+            "Establish gentle, contemplative mood with slow, smooth movements"
+          ]
+        },
+        {
+          "section_id": "verse_1",
+          "objectives": [
+            "Maintain calm atmosphere with subtle progressive movement"
+          ]
+        },
+        {
+          "section_id": "chorus_1",
+          "objectives": [
+            "Gentle elevation in intensity without breaking the peaceful mood"
+          ]
+        },
+        {
+          "section_id": "outro",
+          "objectives": [
+            "Gradually reduce movement intensity, fade to stillness"
+          ]
+        }
+      ],
       "avoid_patterns": [
         "Fast pan/tilt movements that disrupt tranquility",
         "Strobing or rapid color changes",

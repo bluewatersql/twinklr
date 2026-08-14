@@ -116,19 +116,16 @@ Score the plan 0-10 across these dimensions:
 
 ### Decision
 
-- **APPROVE** (score >= 7.0): Ready to render
-- **SOFT_FAIL** (score 5.0-6.9): Needs improvement, provide feedback
-- **HARD_FAIL** (score < 5.0): Needs major revision
+Apply the score-band semantics from the developer prompt and emit the corresponding
+status allowed by the injected response schema.
 
 ## Required Output
 
 Return a JudgeVerdict with:
-- `status`: APPROVE, SOFT_FAIL, or HARD_FAIL
+- `status`: Schema-valid verdict status
 - `score`: 0.0-10.0
 - `confidence`: 0.0-1.0
 - `strengths`: List of what works well
 - `issues`: List of detailed issues
-- `overall_assessment`: 2-4 sentence summary
 - `feedback_for_planner`: Concise, actionable feedback
-- `score_breakdown`: Named dimension scores
 - `iteration`: {{ iteration }}

@@ -169,10 +169,6 @@ class CorrectionResult(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     corrected_sections: list[SectionCoordinationPlan] = Field(min_length=1)
-    correction_notes: str | None = Field(
-        default=None,
-        description="Optional notes on what was changed and why",
-    )
 
 
 class GroupPlanSet(BaseModel):

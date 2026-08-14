@@ -197,8 +197,8 @@ def test_structure_common_section_names():
     assert [s.name for s in structure.sections] == common_names
 
 
-def test_structure_notes_optional():
-    """Test Structure notes field is optional."""
+def test_structure_notes_is_deleted():
+    """Unconsumed free-form structure notes are rejected."""
     from twinklr.core.agents.audio.profile.models import SongSectionRef, Structure
 
     sections = [
@@ -206,14 +206,12 @@ def test_structure_notes_optional():
     ]
 
     # Without notes
-    structure1 = Structure(sections=sections, structure_confidence=0.9)
-    assert structure1.notes == []
+    Structure(sections=sections, structure_confidence=0.9)
+    assert "notes" not in Structure.model_fields
 
-    # With notes
-    structure2 = Structure(
-        sections=sections,
-        structure_confidence=0.9,
-        notes=["Unusual structure", "Multiple false starts"],
-    )
-    assert len(structure2.notes) == 2
-    assert "Unusual structure" in structure2.notes
+    with pytest.raises(ValidationError, match="notes"):
+        Structure(
+            sections=sections,
+            structure_confidence=0.9,
+            notes=["Unusual structure"],
+        )

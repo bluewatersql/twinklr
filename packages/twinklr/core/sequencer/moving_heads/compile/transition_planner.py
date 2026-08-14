@@ -12,6 +12,7 @@ from twinklr.core.config.models import TransitionConfig
 from twinklr.core.sequencer.models.enum import ChannelName, TransitionMode
 from twinklr.core.sequencer.models.transition import (
     Boundary,
+    ChannelTransitionOverrides,
     TransitionHint,
     TransitionPlan,
     TransitionStrategy,
@@ -115,6 +116,15 @@ class TransitionPlanner:
             mode=self.config.default_mode,
             duration_bars=self.config.default_duration_bars,
             curve=self.config.default_curve,
+            fade_out_ratio=0.5,
+            per_channel_overrides=ChannelTransitionOverrides(
+                pan=None,
+                tilt=None,
+                dimmer=None,
+                shutter=None,
+                color=None,
+                gobo=None,
+            ),
         )
 
     def _calculate_overlap(self, boundary: Boundary, hint: TransitionHint) -> tuple[int, int, int]:

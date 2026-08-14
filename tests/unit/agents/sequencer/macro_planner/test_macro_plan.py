@@ -94,7 +94,7 @@ def _create_layering_plan() -> LayeringPlan:
         timing_driver=TimingDriver.BARS,
         usage_notes="Foundation layer with slow evolving patterns",
     )
-    return LayeringPlan(layers=[base], strategy_notes="Single base layer for clean foundation")
+    return LayeringPlan(layers=[base])
 
 
 def test_macro_plan_valid_minimal():
@@ -103,16 +103,15 @@ def test_macro_plan_valid_minimal():
         global_story=_create_global_story(),
         layering_plan=_create_layering_plan(),
         section_plans=[_create_section_plan("intro", "Intro", 0, 10000, EnergyTarget.LOW)],
-        asset_requirements=[],
     )
 
     assert plan.global_story.story_notes == "Christmas magic with cascading light waves"
     assert len(plan.section_plans) == 1
-    assert len(plan.asset_requirements) == 0
+    assert "asset_requirements" not in MacroPlan.model_fields
 
 
 def test_macro_plan_valid_complete():
-    """Valid MacroPlan with multiple sections and assets."""
+    """Valid MacroPlan with multiple sections."""
     plan = MacroPlan(
         global_story=_create_global_story(),
         layering_plan=_create_layering_plan(),
@@ -121,11 +120,9 @@ def test_macro_plan_valid_complete():
             _create_section_plan("verse1", "Verse 1", 10000, 30000, EnergyTarget.MED),
             _create_section_plan("chorus1", "Chorus 1", 30000, 50000, EnergyTarget.HIGH),
         ],
-        asset_requirements=["snowflake_burst.png", "starburst_gold.png"],
     )
 
     assert len(plan.section_plans) == 3
-    assert len(plan.asset_requirements) == 2
 
 
 def test_macro_plan_empty_section_plans():
@@ -135,7 +132,6 @@ def test_macro_plan_empty_section_plans():
             global_story=_create_global_story(),
             layering_plan=_create_layering_plan(),
             section_plans=[],
-            asset_requirements=[],
         )
 
 
@@ -150,7 +146,6 @@ def test_macro_plan_no_gaps_validator():
                 # Gap from 10000 to 15000
                 _create_section_plan("verse1", "Verse 1", 15000, 30000, EnergyTarget.MED),
             ],
-            asset_requirements=[],
         )
 
 
@@ -165,7 +160,6 @@ def test_macro_plan_overlapping_sections():
                 # Overlap: starts at 10000 but previous ends at 15000
                 _create_section_plan("verse1", "Verse 1", 10000, 30000, EnergyTarget.MED),
             ],
-            asset_requirements=[],
         )
 
 
@@ -179,7 +173,6 @@ def test_macro_plan_duplicate_section_ids():
                 _create_section_plan("intro", "Intro", 0, 10000, EnergyTarget.LOW),
                 _create_section_plan("intro", "Intro Repeated", 10000, 20000, EnergyTarget.LOW),
             ],
-            asset_requirements=[],
         )
 
 
@@ -193,7 +186,6 @@ def test_macro_plan_sections_not_sorted():
                 _create_section_plan("verse1", "Verse 1", 10000, 30000, EnergyTarget.MED),
                 _create_section_plan("intro", "Intro", 0, 10000, EnergyTarget.LOW),  # Out of order
             ],
-            asset_requirements=[],
         )
 
 
@@ -204,16 +196,16 @@ def test_macro_plan_section_invalid_timing():
         _create_section_plan("bad", "Bad Section", 10000, 10000, EnergyTarget.LOW)
 
 
-def test_macro_plan_asset_requirements_empty_string():
-    """Empty strings in asset_requirements rejected."""
-    with pytest.raises(ValidationError, match="at least 1 character"):
+def test_macro_plan_asset_requirements_is_deleted():
+    """Legacy asset requirements are rejected by the closed schema."""
+    with pytest.raises(ValidationError, match="asset_requirements"):
         MacroPlan(
             global_story=_create_global_story(),
             layering_plan=_create_layering_plan(),
             section_plans=[
                 _create_section_plan("intro", "Intro", 0, 10000, EnergyTarget.LOW),
             ],
-            asset_requirements=["valid.png", ""],
+            asset_requirements=["legacy.png"],
         )
 
 
@@ -226,19 +218,16 @@ def test_macro_plan_serialization():
             _create_section_plan("intro", "Intro", 0, 10000, EnergyTarget.LOW),
             _create_section_plan("verse1", "Verse 1", 10000, 30000, EnergyTarget.MED),
         ],
-        asset_requirements=["snowflake.png"],
     )
 
     # Export to JSON
     json_str = plan.model_dump_json(indent=2)
     assert "Christmas magic" in json_str
-    assert "snowflake.png" in json_str
 
     # Import from JSON
     plan2 = MacroPlan.model_validate_json(json_str)
     assert plan2.global_story.theme == plan.global_story.theme
     assert len(plan2.section_plans) == 2
-    assert plan2.asset_requirements == ["snowflake.png"]
 
 
 def test_macro_plan_start_at_nonzero():
@@ -250,7 +239,6 @@ def test_macro_plan_start_at_nonzero():
         section_plans=[
             _create_section_plan("verse1", "Verse 1", 5000, 25000, EnergyTarget.MED),
         ],
-        asset_requirements=[],
     )
 
     assert plan.section_plans[0].section.start_ms == 5000
@@ -266,7 +254,6 @@ def test_macro_plan_adjacent_sections_valid():
             _create_section_plan("verse1", "Verse 1", 10000, 30000, EnergyTarget.MED),
             _create_section_plan("chorus1", "Chorus 1", 30000, 50000, EnergyTarget.HIGH),
         ],
-        asset_requirements=[],
     )
 
     assert len(plan.section_plans) == 3

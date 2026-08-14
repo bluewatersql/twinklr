@@ -115,7 +115,7 @@ Only populate if song has clear storytelling:
     - `timestamp_ms`: Start time from word/phrase timing
     - `section_id`: Matching section from structure
     - `visual_hint`: **Specific choreography suggestion tied to the actual words** (5+ chars)
-    - `emphasis`: "LOW" | "MED" | "HIGH" (based on lyric impact)
+    - `emphasis`: Choose a schema-valid value based on lyric impact
   
   **Quality Bar for visual_hint:**
   - ❌ FORBIDDEN: "Bright lights" / "Flash effect" / "Follow the beat" (too generic)
@@ -141,16 +141,14 @@ Only populate if song has clear storytelling:
 
 Analyze vocal patterns:
 
-- **lyric_density**: "SPARSE" | "MED" | "DENSE"
+- **lyric_density**: Choose a value allowed by the injected response schema
   - Based on word count relative to duration
   - SPARSE: < 100 words/minute (lots of instrumental space)
   - MED: 100-150 words/minute (typical pop song)
   - DENSE: > 150 words/minute (rapid-fire lyrics, minimal gaps)
 
-- **vocal_coverage_pct**: 0.0-1.0
-  - Use **Vocal Presence** from quality metrics above as primary source (spectral detection)
-  - Fall back to **Timed Word Coverage** when Vocal Presence is not available
-  - This represents how much of the song has singing/vocals
+- **vocal_coverage_pct**: 0.0-1.0 using the quality metrics above
+- **timed_word_coverage_pct**: Copy the quality metric above, or null
 
 - **silent_sections**: Identify instrumental breaks
   - Only include sections > 5 seconds without vocals

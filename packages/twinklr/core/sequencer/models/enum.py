@@ -111,15 +111,8 @@ class AimZone(StrEnum):
 class Intensity(StrEnum):
     """Movement intensity levels.
 
-    Maps intensity names to amplitude values.
-    Higher intensity = larger motion amplitude.
-
-    Attributes:
-        SLOW: Minimal motion (0.08 amplitude).
-        SMOOTH: Gentle motion (0.15 amplitude).
-        FAST: Moderate motion (0.25 amplitude).
-        DRAMATIC: Large motion (0.4 amplitude).
-        INTENSE: Maximum motion (0.5 amplitude).
+    This is the single moving-head planner/renderer intensity vocabulary. Numeric
+    movement and dimmer parameters remain owned by the renderer's parameter tables.
     """
 
     SLOW = "SLOW"
@@ -127,22 +120,6 @@ class Intensity(StrEnum):
     FAST = "FAST"
     DRAMATIC = "DRAMATIC"
     INTENSE = "INTENSE"
-
-    @property
-    def amplitude(self) -> float:
-        """Get normalized amplitude for this intensity.
-
-        Returns amplitude as fraction of full range.
-        For pan/tilt, this represents half the total swing.
-        """
-        amplitudes = {
-            Intensity.SLOW: 0.08,
-            Intensity.SMOOTH: 0.15,
-            Intensity.FAST: 0.25,
-            Intensity.DRAMATIC: 0.4,
-            Intensity.INTENSE: 0.5,
-        }
-        return amplitudes[self]
 
 
 class ChannelName(StrEnum):

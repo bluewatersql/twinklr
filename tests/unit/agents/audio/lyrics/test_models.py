@@ -148,12 +148,10 @@ class TestStoryBeat:
     def test_minimal_valid_model(self):
         """Test minimal valid lyric context model."""
         model = LyricContextModel(
-            run_id="test-run-123",
             has_lyrics=False,
             vocal_coverage_pct=0.0,
         )
 
-        assert model.run_id == "test-run-123"
         assert model.has_lyrics is False
         assert model.vocal_coverage_pct == 0.0
         assert model.themes == []
@@ -166,13 +164,11 @@ class TestStoryBeat:
         assert model.recommended_visual_themes == []
         assert model.lyric_density == "MED"
         assert model.silent_sections == []
-        assert model.provenance is None
         assert model.warnings == []
 
     def test_full_valid_model(self):
         """Test full valid lyric context model."""
         model = LyricContextModel(
-            run_id="test-run-123",
             has_lyrics=True,
             themes=["redemption", "celebration", "hope"],
             mood_arc="somber → triumphant",
@@ -240,14 +236,6 @@ class TestStoryBeat:
                     section_id="intro",
                 )
             ],
-            provenance=Provenance(
-                provider_id="openai",
-                model_id="gpt-5.2",
-                prompt_pack="lyrics",
-                prompt_pack_version="2.0",
-                framework_version="twinklr-agents-2.0",
-                temperature=0.5,
-            ),
         )
 
         assert model.has_lyrics is True
@@ -263,7 +251,6 @@ class TestStoryBeat:
             ValidationError, match=r"recommended_visual_themes must contain 3-5 items, got 2"
         ):
             LyricContextModel(
-                run_id="test",
                 has_lyrics=True,
                 themes=["theme1", "theme2"],
                 vocal_coverage_pct=0.5,
@@ -284,7 +271,6 @@ class TestStoryBeat:
             ValidationError, match=r"recommended_visual_themes must contain 3-5 items, got 6"
         ):
             LyricContextModel(
-                run_id="test",
                 has_lyrics=True,
                 themes=["theme1", "theme2"],
                 vocal_coverage_pct=0.5,

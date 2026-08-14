@@ -102,9 +102,7 @@ def valid_macro_plan() -> MacroPlan:
         usage_notes="Foundation layer with slow evolution",
     )
 
-    layering_plan = LayeringPlan(
-        layers=[base_layer], strategy_notes="Single base layer for clean foundation"
-    )
+    layering_plan = LayeringPlan(layers=[base_layer])
 
     return MacroPlan(
         global_story=_make_global_story(),
@@ -112,7 +110,6 @@ def valid_macro_plan() -> MacroPlan:
         section_plans=[
             _make_section_plan("intro", "Intro", 0, 10000, EnergyTarget.LOW, MotionDensity.SPARSE)
         ],
-        asset_requirements=[],
     )
 
 
@@ -158,27 +155,21 @@ def test_has_errors_true():
             issue_id="W001",
             category=IssueCategory.TIMING,
             severity=IssueSeverity.WARN,
-            estimated_effort="LOW",
-            scope="SECTION",
             location={},
             rule="DON'T test - this is a test issue",
             message="Warning message",
             fix_hint="Fix hint",
             acceptance_test="Test",
-            suggested_action="PATCH",
         ),
         Issue(
             issue_id="E001",
             category=IssueCategory.COVERAGE,
             severity=IssueSeverity.ERROR,
-            estimated_effort="MEDIUM",
-            scope="GLOBAL",
             location={},
             rule="DON'T test - this is a test issue",
             message="Error message",
             fix_hint="Fix hint",
             acceptance_test="Test",
-            suggested_action="REPLAN_GLOBAL",
         ),
     ]
 
@@ -193,14 +184,11 @@ def test_has_errors_false():
             issue_id="W001",
             category=IssueCategory.TIMING,
             severity=IssueSeverity.WARN,
-            estimated_effort="LOW",
-            scope="SECTION",
             location={},
             rule="DON'T test - this is a test issue",
             message="Warning message",
             fix_hint="Fix hint",
             acceptance_test="Test",
-            suggested_action="PATCH",
         ),
     ]
 
@@ -215,14 +203,11 @@ def test_has_warnings_true():
             issue_id="W001",
             category=IssueCategory.TIMING,
             severity=IssueSeverity.WARN,
-            estimated_effort="LOW",
-            scope="SECTION",
             location={},
             rule="DON'T test - this is a test issue",
             message="Warning message",
             fix_hint="Fix hint",
             acceptance_test="Test",
-            suggested_action="PATCH",
         ),
     ]
 
@@ -237,14 +222,11 @@ def test_has_warnings_false():
             issue_id="E001",
             category=IssueCategory.COVERAGE,
             severity=IssueSeverity.ERROR,
-            estimated_effort="MEDIUM",
-            scope="GLOBAL",
             location={},
             rule="DON'T test - this is a test issue",
             message="Error message",
             fix_hint="Fix hint",
             acceptance_test="Test",
-            suggested_action="REPLAN_GLOBAL",
         ),
     ]
 
@@ -297,10 +279,8 @@ def test_section_coverage_complete(simple_audio_profile: AudioProfileModel):
                     usage_notes="Foundation layer",
                 )
             ],
-            strategy_notes="Single layer for testing",
         ),
         section_plans=section_plans,
-        asset_requirements=[],
     )
 
     issues = validator._validate_section_coverage(plan, simple_audio_profile)
@@ -340,10 +320,8 @@ def test_section_coverage_missing_sections(simple_audio_profile: AudioProfileMod
                     usage_notes="Foundation layer",
                 )
             ],
-            strategy_notes="Single layer for testing",
         ),
         section_plans=section_plans,
-        asset_requirements=[],
     )
 
     issues = validator._validate_section_coverage(plan, simple_audio_profile)
@@ -414,10 +392,8 @@ def test_section_coverage_extra_sections(simple_audio_profile: AudioProfileModel
                     usage_notes="Foundation layer",
                 )
             ],
-            strategy_notes="Single layer for testing",
         ),
         section_plans=section_plans,
-        asset_requirements=[],
     )
 
     issues = validator._validate_section_coverage(plan, simple_audio_profile)
@@ -484,9 +460,7 @@ def test_layer_count_optimal(simple_audio_profile: AudioProfileModel):
 
     plan = MacroPlan(
         global_story=_make_global_story(),
-        layering_plan=LayeringPlan(
-            layers=layers, strategy_notes="Three-layer composition with clear hierarchy"
-        ),
+        layering_plan=LayeringPlan(layers=layers),
         section_plans=[
             MacroSectionPlan(
                 section=simple_audio_profile.structure.sections[0],
@@ -498,7 +472,6 @@ def test_layer_count_optimal(simple_audio_profile: AudioProfileModel):
                 notes="Test section plan for optimal layer count",
             )
         ],
-        asset_requirements=[],
     )
 
     issues = validator._validate_layer_count(plan)
@@ -525,7 +498,6 @@ def test_layer_count_minimal_warning(simple_audio_profile: AudioProfileModel):
                     usage_notes="Foundation layer only",
                 )
             ],
-            strategy_notes="Single layer composition for minimal testing",
         ),
         section_plans=[
             MacroSectionPlan(
@@ -538,7 +510,6 @@ def test_layer_count_minimal_warning(simple_audio_profile: AudioProfileModel):
                 notes="Test section plan for minimal layer count",
             )
         ],
-        asset_requirements=[],
     )
 
     issues = validator._validate_layer_count(plan)
@@ -601,9 +572,7 @@ def test_layer_count_maximum_warning(simple_audio_profile: AudioProfileModel):
 
     plan = MacroPlan(
         global_story=_make_global_story(),
-        layering_plan=LayeringPlan(
-            layers=layers, strategy_notes="Five-layer composition at maximum complexity"
-        ),
+        layering_plan=LayeringPlan(layers=layers),
         section_plans=[
             MacroSectionPlan(
                 section=simple_audio_profile.structure.sections[0],
@@ -618,7 +587,6 @@ def test_layer_count_maximum_warning(simple_audio_profile: AudioProfileModel):
                 notes="Test section plan for maximum layer count",
             )
         ],
-        asset_requirements=[],
     )
 
     issues = validator._validate_layer_count(plan)
@@ -649,7 +617,6 @@ def test_target_validity_always_passes(simple_audio_profile: AudioProfileModel):
                     usage_notes="Foundation layer",
                 )
             ],
-            strategy_notes="Single layer for target validation testing",
         ),
         section_plans=[
             MacroSectionPlan(
@@ -666,7 +633,6 @@ def test_target_validity_always_passes(simple_audio_profile: AudioProfileModel):
                 notes="Test section with valid targets for validation",
             )
         ],
-        asset_requirements=[],
     )
 
     issues = validator._validate_target_validity(plan, display_groups=None)
@@ -714,10 +680,8 @@ def test_focus_target_variety_good(simple_audio_profile: AudioProfileModel):
                     usage_notes="Foundation layer",
                 )
             ],
-            strategy_notes="Single layer for focus target testing",
         ),
         section_plans=section_plans,
-        asset_requirements=[],
     )
 
     issues = validator._validate_focus_targets(plan)
@@ -760,10 +724,8 @@ def test_focus_target_overused_warning(simple_audio_profile: AudioProfileModel):
                     usage_notes="Foundation layer",
                 )
             ],
-            strategy_notes="Single layer for focus overuse testing",
         ),
         section_plans=section_plans,
-        asset_requirements=[],
     )
 
     issues = validator._validate_focus_targets(plan)
@@ -782,178 +744,13 @@ def test_focus_target_overused_warning(simple_audio_profile: AudioProfileModel):
 # ============================================================================
 
 
-def test_asset_types_valid(simple_audio_profile: AudioProfileModel):
-    """Valid asset types (.png, .gif) pass."""
+def test_asset_validation_is_retired_with_macro_asset_requirements():
+    """The deleted asset_requirements field has no heuristic repair surface."""
     validator = MacroPlanHeuristicValidator()
 
-    plan = MacroPlan(
-        global_story=_make_global_story(),
-        layering_plan=LayeringPlan(
-            layers=[
-                LayerSpec(
-                    layer_index=0,
-                    layer_role=LayerRole.BASE,
-                    target_selector=TargetSelector(roles=["OUTLINE"]),
-                    blend_mode=BlendMode.NORMAL,
-                    timing_driver=TimingDriver.BARS,
-                    usage_notes="Foundation layer",
-                )
-            ],
-            strategy_notes="Single layer for asset testing",
-        ),
-        section_plans=[
-            MacroSectionPlan(
-                section=simple_audio_profile.structure.sections[0],
-                theme=_make_section_theme(),
-                energy_target=EnergyTarget.MED,
-                primary_focus_targets=[PlanTarget(type=TargetType.GROUP, id="OUTLINE")],
-                choreography_style=ChoreographyStyle.ABSTRACT,
-                motion_density=MotionDensity.MED,
-                notes="Test section plan for valid asset types",
-            )
-        ],
-        asset_requirements=["snowflake.png", "starburst.gif", "wave.PNG"],
-    )
-
-    issues = validator._validate_asset_types(plan)
-
-    # All valid extensions - no errors
-    assert len(issues) == 0
-
-
-def test_asset_types_invalid_extension(simple_audio_profile: AudioProfileModel):
-    """Invalid asset extensions trigger ERROR."""
-    validator = MacroPlanHeuristicValidator()
-
-    plan = MacroPlan(
-        global_story=_make_global_story(),
-        layering_plan=LayeringPlan(
-            layers=[
-                LayerSpec(
-                    layer_index=0,
-                    layer_role=LayerRole.BASE,
-                    target_selector=TargetSelector(roles=["OUTLINE"]),
-                    blend_mode=BlendMode.NORMAL,
-                    timing_driver=TimingDriver.BARS,
-                    usage_notes="Foundation layer",
-                )
-            ],
-            strategy_notes="Single layer for invalid asset testing",
-        ),
-        section_plans=[
-            MacroSectionPlan(
-                section=simple_audio_profile.structure.sections[0],
-                theme=_make_section_theme(),
-                energy_target=EnergyTarget.MED,
-                primary_focus_targets=[PlanTarget(type=TargetType.GROUP, id="OUTLINE")],
-                choreography_style=ChoreographyStyle.ABSTRACT,
-                motion_density=MotionDensity.MED,
-                notes="Test section plan for invalid asset types",
-            )
-        ],
-        asset_requirements=["valid.png", "invalid.jpg", "bad.mp4"],
-    )
-
-    issues = validator._validate_asset_types(plan)
-
-    # Should have ERRORs for .jpg and .mp4
-    error_issues = [i for i in issues if i.severity == IssueSeverity.ERROR]
-    assert len(error_issues) == 2
-
-    # Check specific invalid assets mentioned
-    messages = " ".join([i.message for i in error_issues])
-    assert "invalid.jpg" in messages
-    assert "bad.mp4" in messages
-
-
-def test_asset_bloat_warning(simple_audio_profile: AudioProfileModel):
-    """More than 10 assets triggers bloat warning."""
-    validator = MacroPlanHeuristicValidator()
-
-    # Create plan with 15 assets (>10)
-    many_assets = [f"asset_{i:02d}.png" for i in range(15)]
-
-    plan = MacroPlan(
-        global_story=_make_global_story(),
-        layering_plan=LayeringPlan(
-            layers=[
-                LayerSpec(
-                    layer_index=0,
-                    layer_role=LayerRole.BASE,
-                    target_selector=TargetSelector(roles=["OUTLINE"]),
-                    blend_mode=BlendMode.NORMAL,
-                    timing_driver=TimingDriver.BARS,
-                    usage_notes="Foundation layer",
-                )
-            ],
-            strategy_notes="Single layer for asset bloat testing",
-        ),
-        section_plans=[
-            MacroSectionPlan(
-                section=simple_audio_profile.structure.sections[0],
-                theme=_make_section_theme(),
-                energy_target=EnergyTarget.MED,
-                primary_focus_targets=[PlanTarget(type=TargetType.GROUP, id="OUTLINE")],
-                choreography_style=ChoreographyStyle.ABSTRACT,
-                motion_density=MotionDensity.MED,
-                notes="Test section plan for asset bloat warning",
-            )
-        ],
-        asset_requirements=many_assets,
-    )
-
-    issues = validator._check_asset_bloat(plan)
-
-    # Should warn about too many assets
-    assert len(issues) == 1
-    assert issues[0].severity == IssueSeverity.WARN
-    assert issues[0].category == IssueCategory.COMPLEXITY
-    assert "ASSET_BLOAT" in issues[0].issue_id
-    assert "15 assets" in issues[0].message
-
-
-def test_asset_bloat_no_warning(simple_audio_profile: AudioProfileModel):
-    """10 or fewer assets passes without warning."""
-    validator = MacroPlanHeuristicValidator()
-
-    plan = MacroPlan(
-        global_story=_make_global_story(),
-        layering_plan=LayeringPlan(
-            layers=[
-                LayerSpec(
-                    layer_index=0,
-                    layer_role=LayerRole.BASE,
-                    target_selector=TargetSelector(roles=["OUTLINE"]),
-                    blend_mode=BlendMode.NORMAL,
-                    timing_driver=TimingDriver.BARS,
-                    usage_notes="Foundation layer",
-                )
-            ],
-            strategy_notes="Single layer for reasonable assets",
-        ),
-        section_plans=[
-            MacroSectionPlan(
-                section=simple_audio_profile.structure.sections[0],
-                theme=_make_section_theme(),
-                energy_target=EnergyTarget.MED,
-                primary_focus_targets=[PlanTarget(type=TargetType.GROUP, id="OUTLINE")],
-                choreography_style=ChoreographyStyle.ABSTRACT,
-                motion_density=MotionDensity.MED,
-                notes="Test section plan for reasonable asset count",
-            )
-        ],
-        asset_requirements=["a1.png", "a2.png", "a3.gif"],  # 3 assets
-    )
-
-    issues = validator._check_asset_bloat(plan)
-
-    # No warning for reasonable count
-    assert len(issues) == 0
-
-
-# ============================================================================
-# Task 1.2.5: Contrast & Quality Checks Tests
-# ============================================================================
+    assert "asset_requirements" not in MacroPlan.model_fields
+    assert not hasattr(validator, "_validate_asset_types")
+    assert not hasattr(validator, "_check_asset_bloat")
 
 
 def test_contrast_good_variety(simple_audio_profile: AudioProfileModel):
@@ -1004,10 +801,8 @@ def test_contrast_good_variety(simple_audio_profile: AudioProfileModel):
                     usage_notes="Foundation layer",
                 )
             ],
-            strategy_notes="Single layer for contrast testing",
         ),
         section_plans=section_plans,
-        asset_requirements=[],
     )
 
     issues = validator._check_contrast(plan)
@@ -1048,10 +843,8 @@ def test_contrast_no_energy_variety(simple_audio_profile: AudioProfileModel):
                     usage_notes="Foundation layer",
                 )
             ],
-            strategy_notes="Single layer for energy contrast testing",
         ),
         section_plans=section_plans,
-        asset_requirements=[],
     )
 
     issues = validator._check_contrast(plan)
@@ -1095,10 +888,8 @@ def test_contrast_no_density_variety(simple_audio_profile: AudioProfileModel):
                     usage_notes="Foundation layer",
                 )
             ],
-            strategy_notes="Single layer for density contrast testing",
         ),
         section_plans=section_plans,
-        asset_requirements=[],
     )
 
     issues = validator._check_contrast(plan)
@@ -1143,10 +934,8 @@ def test_contrast_single_style_nit(simple_audio_profile: AudioProfileModel):
                     usage_notes="Foundation layer",
                 )
             ],
-            strategy_notes="Single layer for style variety testing",
         ),
         section_plans=section_plans,
-        asset_requirements=[],
     )
 
     issues = validator._check_contrast(plan)

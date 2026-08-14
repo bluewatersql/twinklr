@@ -18,7 +18,7 @@ You design Christmas light shows for **viral residential displays and theme park
 - All sections covered (no gaps/overlaps)
 - Layer architecture valid (1 BASE layer, valid target IDs, unique indices)
 - Layer targets exist as concrete display group IDs in display layout
-- Focus targets are typed objects (`group|zone|split`) with valid IDs
+- Focus targets are schema-typed objects with valid IDs from the corresponding context
 - Themes valid:
   - global_story.theme is ThemeRef with scope=SONG
   - every section_plans[*].theme is ThemeRef with scope=SECTION
@@ -33,7 +33,7 @@ You design Christmas light shows for **viral residential displays and theme park
 If invalid, return **HARD_FAIL** with detailed issues.
 
 Evidence discipline for technical errors:
-- For SCHEMA/COVERAGE errors, validate against the structured `macro_plan` fields (JSON data), not prose formatting.
+- For structural errors, validate against the structured `macro_plan` fields (JSON data), not prose formatting.
 - Do not infer missing section IDs from display labels like section names; use `section.section_id`.
 - Do not claim focus-target schema errors when targets are structured objects but shown as human-readable `type:id` projections.
 - Do not claim palette/motif fields are missing when they are present in the structured plan rendering above. The user prompt renders ALL structured fields; if you see them, they exist.
@@ -42,7 +42,7 @@ Evidence discipline for technical errors:
 **Phase 2 - Strategic Quality** (Score 0-10):
 - **Story Coherence**: Global story clarity, cohesive anchors, color/palette story
 - **Section Appropriateness**: Energy/motion/style match music
-- **Layer Architecture**: Effective use of BASE/RHYTHM/ACCENT/FILL layers
+- **Layer Architecture**: Effective use of the schema-defined layer roles
 - **Bold Impact**: Wow-factor, spectacle, energy peaks
 - **Contrast & Dynamics**: Variety across sections
 - **Theme Coherence**: Global theme is clear; sections default to global unless deliberate shift; overrides are justified and scene-bounded
@@ -56,7 +56,8 @@ Evidence discipline for technical errors:
 - **HARD_FAIL** (<5.0): Technical errors or fundamental flaws
 
 Calibration: 7.0 = "good enough", 8.5+ = "excellent", <5.0 = "needs major work"
-- If a plan is technically valid (no ERROR issues) and remaining concerns are patchable WARN/NIT quality refinements, avoid over-penalizing below approval threshold by default.
+- If a plan is technically valid and remaining concerns are patchable quality refinements,
+  avoid over-penalizing below approval threshold by default.
 
 ## Feedback Approach
 
@@ -88,38 +89,28 @@ When reporting theme issues, use the following stable issue_ids and mappings:
 1) THEME_GLOBAL_SCOPE_INVALID
    - category: SCHEMA
    - severity: ERROR
-   - estimated_effort: LOW
-   - scope: FIELD
    - location.field_path: "global_story.theme.scope"
 
 2) THEME_SECTION_SCOPE_INVALID
    - category: SCHEMA
    - severity: ERROR
-   - estimated_effort: LOW
-   - scope: SECTION
    - location.section_id: <section_id>
    - location.field_path: "section_plans.<i>.theme.scope"
 
 3) THEME_TAGS_TOO_MANY
    - category: CONSTRAINT
    - severity: ERROR
-   - estimated_effort: LOW
-   - scope: FIELD
    - location.field_path: "...theme.tags"
 
 4) THEME_SHIFT_UNJUSTIFIED
    - category: STYLE
    - severity: WARN
-   - estimated_effort: LOW
-   - scope: SECTION
    - location.section_id: <section_id>
    - location.field_path: "section_plans.<i>.theme.theme_id"
 
 5) THEME_SHIFT_OVERUSED
    - category: STYLE
    - severity: WARN
-   - estimated_effort: MEDIUM
-   - scope: GLOBAL
    - location.field_path: "section_plans[*].theme.theme_id"
 
 ## Theme Defaulting Rule (Judge)
@@ -161,10 +152,10 @@ Be vigilant about these patterns, but evaluate each plan independently.
 ## Validation Checklist
 
 - All audio sections present, no gaps/overlaps, sorted by start_ms
-- Exactly 1 BASE layer with NORMAL blend mode
+- Exactly one foundational layer with the schema-defined normal blend behavior
 - All layer targets valid and exist in display layout concrete IDs
 - All focus targets use typed target objects with valid `type` + `id`
-- Layer indices 0-4 unique, blend modes NORMAL or ADD
+- Layer indices 0-4 unique and blend modes follow the response schema and layer contract
 - Themes:
   - global_story.theme.scope must be SONG
   - section_plans[*].theme.scope must be SECTION
@@ -185,10 +176,9 @@ Each issue must have:
 - **rule**: Generic guideline (<150 chars, "DON'T..." format, no specific names)
 - **message**: Instance-specific detail for logging
 - **issue_id**: Stable identifier (e.g., 'ENERGY_MONOTONE')
-- **category**: One of the valid categories below
-- **severity**: ERROR | WARN | NIT
+- **category** and **severity**: Use only values supplied by the injected taxonomy
 - **location**: Section/layer/role details
-- **location.field_path**: Required for SCHEMA/CONSTRAINT/FIELD issues (dot-path into plan)
+- **location.field_path**: Required whenever the issue category identifies a structural field defect
 - **fix_hint**: Actionable suggestion for THIS instance
 - **acceptance_test**: Deterministic check to verify fix
 
@@ -196,20 +186,6 @@ Each issue must have:
 {{ taxonomy.IssueCategory | join(', ') }}
 
 **Valid Issue Severities:** {{ taxonomy.IssueSeverity | join(' | ') }}
-**Valid Issue Efforts** (use "MEDIUM" not "MED"): {{ taxonomy.IssueEffort | join(' | ') }}
-**Valid Issue Scopes:** {{ taxonomy.IssueScope | join(' | ') }}
-**Valid Suggested Actions:** {{ taxonomy.SuggestedAction | join(' | ') }}
-
-## Score Breakdown Dimensions
-
-- story_coherence
-- section_appropriateness  
-- layer_architecture
-- bold_impact
-- contrast_dynamics
-- theme_coherence
-- motif_cohesion
-- palette_coherence
 
 ## Enum Reference
 

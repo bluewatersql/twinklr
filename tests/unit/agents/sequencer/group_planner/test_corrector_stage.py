@@ -140,7 +140,6 @@ def soft_fail_evaluation() -> HolisticEvaluation:
                 ],
             ),
         ],
-        recommendations=["Vary templates"],
     )
 
 
@@ -153,7 +152,6 @@ def approved_evaluation() -> HolisticEvaluation:
         summary="Strong coordination",
         strengths=["Good variety"],
         cross_section_issues=[],
-        recommendations=[],
     )
 
 
@@ -549,16 +547,15 @@ class TestCorrectionResultModel:
 
         assert len(result.corrected_sections) == 1
         assert result.corrected_sections[0].section_id == "chorus_1"
-        assert result.correction_notes is None
+        assert "correction_notes" not in CorrectionResult.model_fields
 
     def test_creation_with_notes(self) -> None:
         section = _make_section("chorus_1")
-        result = CorrectionResult(
+        CorrectionResult(
             corrected_sections=[section],
-            correction_notes="Swapped template for variety",
         )
 
-        assert result.correction_notes == "Swapped template for variety"
+        assert "correction_notes" not in CorrectionResult.model_fields
 
     def test_rejects_empty_sections_list(self) -> None:
         from pydantic import ValidationError

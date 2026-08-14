@@ -24,7 +24,7 @@ You create the **STRATEGIC PLAN** (the WHAT and WHY), not the execution (the HOW
 - Global story and recurring creative anchors for the entire show (motifs)
 - Global palette plan (primary + alternates) consistent with theme
 - Section-by-section energy targets, motion density, and choreography style
-- Layer architecture (BASE, RHYTHM, ACCENT) with target intent
+- Layer architecture with distinct foundational, rhythmic, and accent intent
 - Section themes (ThemeRef) to drive downstream template selection and palette usage
 - Section motif selection (motif_ids) to enforce cohesion across sections
 
@@ -65,7 +65,7 @@ You create the **STRATEGIC PLAN** (the WHAT and WHY), not the execution (the HOW
 
 1. **Energy Arc**: Build tension, create peaks, provide release
 2. **Target Variety**: Don't overuse same targets, spread the wow
-3. **Layering**: Use layers to create depth (BASE foundation, RHYTHM movement, ACCENT highlights)
+3. **Layering**: Use schema-valid layer roles to create foundation, movement, and highlights
 4. **Imagery vs Abstract**: Imagery = literal visuals (snowflakes, stars), Abstract = pure motion/color
 5. **Bold Impact**: Residential displays need bold, clear concepts
 6. **Theme Coherence**: Global theme drives palette and motif choices
@@ -75,10 +75,11 @@ You create the **STRATEGIC PLAN** (the WHAT and WHY), not the execution (the HOW
 
 ## Imagery Budgeting (Behavioral - Important)
 
-- For narrative/character holiday songs (Rudolph, Frosty, Santa, Grinch, etc.), plan for **IMAGERY or HYBRID in ~30–50% of sections** (typically **3–6 sections** in a 10–16 section song).
-- Prefer IMAGERY/HYBRID on **choruses**, plus **intro/outro**, plus **one** narrative verse or bridge.
+- For narrative or character-driven holiday songs, use an imagery-capable schema value in
+  roughly 30–50% of sections (typically 3–6 sections in a 10–16 section song).
+- Prefer imagery-capable schema values on choruses, intro/outro, and one narrative verse or bridge.
 - Use ABSTRACT in remaining sections to preserve motion/energy variety.
-- IMAGERY/HYBRID only signals intent; **do not include asset details**. Downstream AssetPlanner derives assets when applicable (e.g., MATRIX targets).
+- Choreography style only signals intent; **do not include asset details**. Downstream AssetPlanner derives assets when applicable.
 
 ## Final Integrity Check (Required Before You Respond)
 
@@ -86,7 +87,8 @@ Before returning JSON, verify all of these:
 
 1. **Section ID lock:** `section_plans[*].section.section_id` exactly matches every ID from Song Structure (including `_N` suffixes).
 2. **Target ID lock:**
-   - `section_plans[*].primary_focus_targets` and `section_plans[*].secondary_targets` use typed targets only: `{"type":"group|zone|split","id":"..."}`.
+   - `section_plans[*].primary_focus_targets` and `section_plans[*].secondary_targets`
+     use schema-valid typed targets with IDs from the corresponding context.
    - Every `group` id is from the provided display group ID list.
    - Every `zone` id is from the provided zone list.
    - Every `split` id is from the provided split list.

@@ -14,13 +14,48 @@
       "confidence": 0.88
     },
     "sections": [
-      {"type": "intro", "start_ms": 0, "end_ms": 8000, "confidence": 0.92},
-      {"type": "verse", "start_ms": 8000, "end_ms": 38000, "confidence": 0.89},
-      {"type": "chorus", "start_ms": 38000, "end_ms": 68000, "confidence": 0.94},
-      {"type": "verse", "start_ms": 68000, "end_ms": 98000, "confidence": 0.89},
-      {"type": "chorus", "start_ms": 98000, "end_ms": 128000, "confidence": 0.94},
-      {"type": "bridge", "start_ms": 128000, "end_ms": 148000, "confidence": 0.85},
-      {"type": "chorus", "start_ms": 148000, "end_ms": 180000, "confidence": 0.94}
+      {
+        "type": "intro",
+        "start_ms": 0,
+        "end_ms": 8000,
+        "confidence": 0.92
+      },
+      {
+        "type": "verse",
+        "start_ms": 8000,
+        "end_ms": 38000,
+        "confidence": 0.89
+      },
+      {
+        "type": "chorus",
+        "start_ms": 38000,
+        "end_ms": 68000,
+        "confidence": 0.94
+      },
+      {
+        "type": "verse",
+        "start_ms": 68000,
+        "end_ms": 98000,
+        "confidence": 0.89
+      },
+      {
+        "type": "chorus",
+        "start_ms": 98000,
+        "end_ms": 128000,
+        "confidence": 0.94
+      },
+      {
+        "type": "bridge",
+        "start_ms": 128000,
+        "end_ms": 148000,
+        "confidence": 0.85
+      },
+      {
+        "type": "chorus",
+        "start_ms": 148000,
+        "end_ms": 180000,
+        "confidence": 0.94
+      }
     ],
     "energy": {
       "overall": 0.82,
@@ -28,46 +63,107 @@
         {
           "section_id": "intro",
           "energy_curve": [
-            {"t_ms": 0, "energy": 0.3},
-            {"t_ms": 2000, "energy": 0.4},
-            {"t_ms": 4000, "energy": 0.5},
-            {"t_ms": 6000, "energy": 0.6},
-            {"t_ms": 8000, "energy": 0.7}
+            {
+              "t_ms": 0,
+              "energy": 0.3
+            },
+            {
+              "t_ms": 2000,
+              "energy": 0.4
+            },
+            {
+              "t_ms": 4000,
+              "energy": 0.5
+            },
+            {
+              "t_ms": 6000,
+              "energy": 0.6
+            },
+            {
+              "t_ms": 8000,
+              "energy": 0.7
+            }
           ],
           "mean_energy": 0.5,
           "peak_energy": 0.7,
-          "characteristics": ["building"]
+          "characteristics": [
+            "building"
+          ]
         },
         {
           "section_id": "verse_1",
           "energy_curve": [
-            {"t_ms": 8000, "energy": 0.65},
-            {"t_ms": 15000, "energy": 0.68},
-            {"t_ms": 23000, "energy": 0.72},
-            {"t_ms": 30000, "energy": 0.75},
-            {"t_ms": 38000, "energy": 0.80}
+            {
+              "t_ms": 8000,
+              "energy": 0.65
+            },
+            {
+              "t_ms": 15000,
+              "energy": 0.68
+            },
+            {
+              "t_ms": 23000,
+              "energy": 0.72
+            },
+            {
+              "t_ms": 30000,
+              "energy": 0.75
+            },
+            {
+              "t_ms": 38000,
+              "energy": 0.80
+            }
           ],
           "mean_energy": 0.72,
           "peak_energy": 0.80,
-          "characteristics": ["building", "sustained"]
+          "characteristics": [
+            "building",
+            "sustained"
+          ]
         },
         {
           "section_id": "chorus_1",
           "energy_curve": [
-            {"t_ms": 38000, "energy": 0.90},
-            {"t_ms": 45000, "energy": 0.93},
-            {"t_ms": 53000, "energy": 0.95},
-            {"t_ms": 60000, "energy": 0.93},
-            {"t_ms": 68000, "energy": 0.90}
+            {
+              "t_ms": 38000,
+              "energy": 0.90
+            },
+            {
+              "t_ms": 45000,
+              "energy": 0.93
+            },
+            {
+              "t_ms": 53000,
+              "energy": 0.95
+            },
+            {
+              "t_ms": 60000,
+              "energy": 0.93
+            },
+            {
+              "t_ms": 68000,
+              "energy": 0.90
+            }
           ],
           "mean_energy": 0.92,
           "peak_energy": 0.95,
-          "characteristics": ["peak", "sustained"]
+          "characteristics": [
+            "peak",
+            "sustained"
+          ]
         }
       ],
       "peaks": [
-        {"start_ms": 48000, "end_ms": 58000, "energy": 0.95},
-        {"start_ms": 158000, "end_ms": 168000, "energy": 0.96}
+        {
+          "start_ms": 48000,
+          "end_ms": 58000,
+          "energy": 0.95
+        },
+        {
+          "start_ms": 158000,
+          "end_ms": 168000,
+          "energy": 0.96
+        }
       ]
     },
     "lyrics": {
@@ -83,18 +179,6 @@
     }
   },
   "expected_output": {
-    "schema_version": "2.0",
-    "agent_id": "audio_profile.v2",
-    "run_id": "example_1",
-    "provenance": {
-      "provider_id": "openai",
-      "model_id": "gpt-5.6-sol",
-      "prompt_pack": "audio_profile.v2",
-      "prompt_pack_version": "1.0",
-      "framework_version": "2.0.0",
-      "temperature": 0.7,
-      "created_at": "2026-01-29T10:00:00Z"
-    },
     "warnings": [],
     "song_identity": {
       "title": null,
@@ -106,16 +190,50 @@
     },
     "structure": {
       "sections": [
-        {"section_id": "intro", "name": "intro", "start_ms": 0, "end_ms": 8000},
-        {"section_id": "verse_1", "name": "verse", "start_ms": 8000, "end_ms": 38000},
-        {"section_id": "chorus_1", "name": "chorus", "start_ms": 38000, "end_ms": 68000},
-        {"section_id": "verse_2", "name": "verse", "start_ms": 68000, "end_ms": 98000},
-        {"section_id": "chorus_2", "name": "chorus", "start_ms": 98000, "end_ms": 128000},
-        {"section_id": "bridge", "name": "bridge", "start_ms": 128000, "end_ms": 148000},
-        {"section_id": "chorus_3", "name": "chorus", "start_ms": 148000, "end_ms": 180000}
+        {
+          "section_id": "intro",
+          "name": "intro",
+          "start_ms": 0,
+          "end_ms": 8000
+        },
+        {
+          "section_id": "verse_1",
+          "name": "verse",
+          "start_ms": 8000,
+          "end_ms": 38000
+        },
+        {
+          "section_id": "chorus_1",
+          "name": "chorus",
+          "start_ms": 38000,
+          "end_ms": 68000
+        },
+        {
+          "section_id": "verse_2",
+          "name": "verse",
+          "start_ms": 68000,
+          "end_ms": 98000
+        },
+        {
+          "section_id": "chorus_2",
+          "name": "chorus",
+          "start_ms": 98000,
+          "end_ms": 128000
+        },
+        {
+          "section_id": "bridge",
+          "name": "bridge",
+          "start_ms": 128000,
+          "end_ms": 148000
+        },
+        {
+          "section_id": "chorus_3",
+          "name": "chorus",
+          "start_ms": 148000,
+          "end_ms": 180000
+        }
       ],
-      "structure_confidence": 0.91,
-      "notes": ["Clear verse-chorus structure", "Strong section boundaries", "Classic dance track arrangement"]
+      "structure_confidence": 0.91
     },
     "energy_profile": {
       "macro_energy": "HIGH",
@@ -125,67 +243,116 @@
           "start_ms": 0,
           "end_ms": 8000,
           "energy_curve": [
-            {"t_ms": 0, "energy_0_1": 0.3},
-            {"t_ms": 2000, "energy_0_1": 0.4},
-            {"t_ms": 4000, "energy_0_1": 0.5},
-            {"t_ms": 6000, "energy_0_1": 0.6},
-            {"t_ms": 8000, "energy_0_1": 0.7}
+            {
+              "t_ms": 0
+            },
+            {
+              "t_ms": 2000
+            },
+            {
+              "t_ms": 4000
+            },
+            {
+              "t_ms": 6000
+            },
+            {
+              "t_ms": 8000
+            }
           ],
           "mean_energy": 0.5,
           "peak_energy": 0.7,
-          "characteristics": ["building"]
+          "characteristics": [
+            "building"
+          ]
         },
         {
           "section_id": "verse_1",
           "start_ms": 8000,
           "end_ms": 38000,
           "energy_curve": [
-            {"t_ms": 8000, "energy_0_1": 0.65},
-            {"t_ms": 15000, "energy_0_1": 0.68},
-            {"t_ms": 23000, "energy_0_1": 0.72},
-            {"t_ms": 30000, "energy_0_1": 0.75},
-            {"t_ms": 38000, "energy_0_1": 0.80}
+            {
+              "t_ms": 8000
+            },
+            {
+              "t_ms": 15000
+            },
+            {
+              "t_ms": 23000
+            },
+            {
+              "t_ms": 30000
+            },
+            {
+              "t_ms": 38000
+            }
           ],
           "mean_energy": 0.72,
           "peak_energy": 0.80,
-          "characteristics": ["building", "sustained"]
+          "characteristics": [
+            "building",
+            "sustained"
+          ]
         },
         {
           "section_id": "chorus_1",
           "start_ms": 38000,
           "end_ms": 68000,
           "energy_curve": [
-            {"t_ms": 38000, "energy_0_1": 0.90},
-            {"t_ms": 45000, "energy_0_1": 0.93},
-            {"t_ms": 53000, "energy_0_1": 0.95},
-            {"t_ms": 60000, "energy_0_1": 0.93},
-            {"t_ms": 68000, "energy_0_1": 0.90}
+            {
+              "t_ms": 38000
+            },
+            {
+              "t_ms": 45000
+            },
+            {
+              "t_ms": 53000
+            },
+            {
+              "t_ms": 60000
+            },
+            {
+              "t_ms": 68000
+            }
           ],
           "mean_energy": 0.92,
           "peak_energy": 0.95,
-          "characteristics": ["peak", "sustained"]
+          "characteristics": [
+            "peak",
+            "sustained"
+          ]
         }
       ],
       "peaks": [
-        {"start_ms": 48000, "end_ms": 58000, "energy": 0.95},
-        {"start_ms": 158000, "end_ms": 168000, "energy": 0.96}
-      ],
-      "overall_mean": 0.82,
-      "energy_confidence": 0.93
+        {
+          "start_ms": 48000,
+          "end_ms": 58000,
+          "energy": 0.95
+        },
+        {
+          "start_ms": 158000,
+          "end_ms": 168000,
+          "energy": 0.96
+        }
+      ]
     },
     "lyric_profile": {
       "has_plain_lyrics": true,
       "has_timed_words": true,
       "has_phonemes": false,
       "lyric_confidence": 0.90,
-      "phoneme_confidence": 0.0
+      "phoneme_confidence": 0.0,
+      "notes": []
     },
     "creative_guidance": {
       "recommended_layer_count": 3,
       "recommended_contrast": "HIGH",
       "recommended_motion_density": "BUSY",
-      "recommended_asset_usage": "HEAVY",
-      "palette_color_guidance": ["vibrant", "energetic", "pulsing", "electric"],
+      "palette_color_guidance": [
+        "vibrant",
+        "energetic",
+        "pulsing",
+        "electric"
+      ],
       "cautions": [
         "Intro is only 8s with rapid 0.30→0.70 ramp - instant-on at beat 1, not fade-in",
         "Three choruses with near-identical energy profiles (0.90-0.95) - must vary choreography to prevent repetition fatigue",
@@ -193,15 +360,50 @@
       ]
     },
     "planner_hints": {
-      "section_objectives": {
-        "intro": "Energy ramps 0.30→0.70 across 8s (doubling) - use continuous intensity sweep, not stepped; peak at 7s just before verse hit",
-        "verse_1": "30s sustained build (0.65→0.80), unusually long verse for dance track - avoid repetition by varying chase patterns at 15s (0.68) and 23s (0.72) transition points",
-        "chorus_1": "Peak at 53s (0.95 energy, mean 0.92) - this is highest sustained energy in song; design for 30s of intense output with brief 0.90 entry/exit ramps",
-        "verse_2": "Identical energy profile to verse_1 - must differentiate choreography; consider routing swap or movement direction reversal",
-        "chorus_2": "Matches chorus_1 profile but leads to bridge - end at 128s should anticipate contrast, not sustain",
-        "bridge": "Only 20s section with different energy character (data shows sustained mid-high); use this for pattern reset before final chorus",
-        "chorus_3": "32s finale (longest chorus) with peak at 158-168s (0.96, highest in song); design for extended climax with definitive ending"
-      },
+      "section_objectives": [
+        {
+          "section_id": "intro",
+          "objectives": [
+            "Energy ramps 0.30→0.70 across 8s (doubling) - use continuous intensity sweep, not stepped; peak at 7s just before verse hit"
+          ]
+        },
+        {
+          "section_id": "verse_1",
+          "objectives": [
+            "30s sustained build (0.65→0.80), unusually long verse for dance track - avoid repetition by varying chase patterns at 15s (0.68) and 23s (0.72) transition points"
+          ]
+        },
+        {
+          "section_id": "chorus_1",
+          "objectives": [
+            "Peak at 53s (0.95 energy, mean 0.92) - this is highest sustained energy in song; design for 30s of intense output with brief 0.90 entry/exit ramps"
+          ]
+        },
+        {
+          "section_id": "verse_2",
+          "objectives": [
+            "Identical energy profile to verse_1 - must differentiate choreography; consider routing swap or movement direction reversal"
+          ]
+        },
+        {
+          "section_id": "chorus_2",
+          "objectives": [
+            "Matches chorus_1 profile but leads to bridge - end at 128s should anticipate contrast, not sustain"
+          ]
+        },
+        {
+          "section_id": "bridge",
+          "objectives": [
+            "Only 20s section with different energy character (data shows sustained mid-high); use this for pattern reset before final chorus"
+          ]
+        },
+        {
+          "section_id": "chorus_3",
+          "objectives": [
+            "32s finale (longest chorus) with peak at 158-168s (0.96, highest in song); design for extended climax with definitive ending"
+          ]
+        }
+      ],
       "avoid_patterns": [
         "Copy-paste choreography between verse_1 and verse_2 (identical energy profiles require varied routing)",
         "4-beat or 8-beat patterns that ignore the 128 BPM 4/4 time - use 32-beat phrase structures",

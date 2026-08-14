@@ -33,7 +33,7 @@ def test_layering_plan_valid_minimal():
     """Valid LayeringPlan with minimal layers (BASE only)."""
     base = _create_layer(0, LayerRole.BASE, ["OUTLINE"], BlendMode.NORMAL, TimingDriver.BARS)
 
-    plan = LayeringPlan(layers=[base], strategy_notes="Single base layer for minimal coverage")
+    plan = LayeringPlan(layers=[base])
 
     assert len(plan.layers) == 1
     assert plan.layers[0].layer_role == LayerRole.BASE
@@ -47,7 +47,6 @@ def test_layering_plan_valid_complete():
 
     plan = LayeringPlan(
         layers=[base, rhythm, accent],
-        strategy_notes="Three-layer composition with base, rhythm, and accent",
     )
 
     assert len(plan.layers) == 3
@@ -59,7 +58,7 @@ def test_layering_plan_missing_base_layer():
     accent = _create_layer(2, LayerRole.ACCENT, ["HERO"], BlendMode.ADD, TimingDriver.PEAKS)
 
     with pytest.raises(ValidationError, match="Must have exactly one BASE layer"):
-        LayeringPlan(layers=[rhythm, accent], strategy_notes="Missing base layer")
+        LayeringPlan(layers=[rhythm, accent])
 
 
 def test_layering_plan_multiple_base_layers():
@@ -68,7 +67,7 @@ def test_layering_plan_multiple_base_layers():
     base2 = _create_layer(1, LayerRole.BASE, ["ARCHES"], BlendMode.NORMAL, TimingDriver.BARS)
 
     with pytest.raises(ValidationError, match="Must have exactly one BASE layer"):
-        LayeringPlan(layers=[base1, base2], strategy_notes="Two base layers")
+        LayeringPlan(layers=[base1, base2])
 
 
 def test_layering_plan_duplicate_indices():
@@ -77,13 +76,13 @@ def test_layering_plan_duplicate_indices():
     rhythm = _create_layer(0, LayerRole.RHYTHM, ["MEGA_TREE"], BlendMode.ADD, TimingDriver.BEATS)
 
     with pytest.raises(ValidationError, match="Duplicate layer index"):
-        LayeringPlan(layers=[base, rhythm], strategy_notes="Duplicate indices")
+        LayeringPlan(layers=[base, rhythm])
 
 
 def test_layering_plan_empty_layers():
     """Empty layers list rejected."""
     with pytest.raises(ValidationError, match="at least 1 item"):
-        LayeringPlan(layers=[], strategy_notes="Empty layers")
+        LayeringPlan(layers=[])
 
 
 def test_layering_plan_too_many_layers():
@@ -101,7 +100,7 @@ def test_layering_plan_too_many_layers():
     ]
 
     with pytest.raises(ValidationError, match="at most 5 items"):
-        LayeringPlan(layers=layers, strategy_notes="Too many layers")
+        LayeringPlan(layers=layers)
 
 
 def test_layering_plan_base_must_use_normal_blend():
@@ -109,15 +108,15 @@ def test_layering_plan_base_must_use_normal_blend():
     base_with_add = _create_layer(0, LayerRole.BASE, ["OUTLINE"], BlendMode.ADD, TimingDriver.BARS)
 
     with pytest.raises(ValidationError, match="BASE layer must use NORMAL blend"):
-        LayeringPlan(layers=[base_with_add], strategy_notes="Base with ADD blend")
+        LayeringPlan(layers=[base_with_add])
 
 
-def test_layering_plan_strategy_notes_too_short():
-    """Strategy notes < 20 characters rejected."""
+def test_layering_plan_strategy_notes_is_deleted():
+    """Legacy prose strategy notes are rejected by the closed schema."""
     base = _create_layer(0, LayerRole.BASE, ["OUTLINE"], BlendMode.NORMAL, TimingDriver.BARS)
 
-    with pytest.raises(ValidationError, match="at least 20 characters"):
-        LayeringPlan(layers=[base], strategy_notes="Short")
+    with pytest.raises(ValidationError, match="strategy_notes"):
+        LayeringPlan(layers=[base], strategy_notes="legacy strategy")
 
 
 def test_layering_plan_serialization():
@@ -129,7 +128,6 @@ def test_layering_plan_serialization():
 
     plan = LayeringPlan(
         layers=[base, rhythm],
-        strategy_notes="Two-layer composition with foundation and rhythmic accents",
     )
 
     # Export to JSON
@@ -152,7 +150,6 @@ def test_layering_plan_layer_ordering():
 
     plan = LayeringPlan(
         layers=[rhythm, base, accent],  # Out of order
-        strategy_notes="Layers defined out of order but still valid",
     )
 
     assert len(plan.layers) == 3

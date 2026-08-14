@@ -263,7 +263,7 @@ class HeuristicValidator:
                     end_bar=section.end_bar,
                     template_id=template_id or "",
                     preset_id=section.preset_id,
-                    modifiers=dict(section.modifiers or {}),
+                    modifiers={modifier.key: modifier.value for modifier in section.modifiers},
                 )
             )
             return units
@@ -315,7 +315,7 @@ class HeuristicValidator:
                     end_bar=seg.end_bar,
                     template_id=seg.template_id,
                     preset_id=seg.preset_id,
-                    modifiers=dict(seg.modifiers or {}),
+                    modifiers={modifier.key: modifier.value for modifier in seg.modifiers},
                 )
             )
 

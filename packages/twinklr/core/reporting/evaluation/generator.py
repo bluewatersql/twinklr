@@ -53,30 +53,14 @@ def _expand_plan_sections(plan):
     Returns:
         List of PlanSection objects (one per segment)
     """
-    from twinklr.core.agents.sequencer.moving_heads.models import PlanSection
+    from twinklr.core.agents.sequencer.moving_heads.models import flatten_plan_segment
 
     expanded = []
     for section in plan.sections:
         if section.segments:
             # Expand each segment into its own PlanSection
             for seg in section.segments:
-                expanded.append(
-                    PlanSection(
-                        section_name=f"{section.section_name}|{seg.segment_id}",
-                        start_bar=seg.start_bar,
-                        end_bar=seg.end_bar,
-                        section_role=section.section_role,
-                        energy_level=section.energy_level,
-                        template_id=seg.template_id,
-                        preset_id=seg.preset_id,
-                        modifiers=seg.modifiers,
-                        reasoning=seg.reasoning or section.reasoning,
-                        segments=None,  # Don't carry segments forward
-                        # Inherit parent section's transition hints (if any)
-                        transition_in=section.transition_in,
-                        transition_out=section.transition_out,
-                    )
-                )
+                expanded.append(flatten_plan_segment(section, seg))
         else:
             # No segments, keep as-is
             expanded.append(section)
@@ -582,9 +566,10 @@ def _process_section(
     # Phase 2: Template compliance check (if enabled)
     template_compliance = None
     if config.enable_compliance_checks and plan_section.template_id:
+        modifiers = {modifier.key: modifier.value for modifier in plan_section.modifiers}
         template_compliance = verify_template_compliance(
             template_id=plan_section.template_id,
-            modifiers=plan_section.modifiers or {},
+            modifiers=modifiers,
             curves=curve_analyses,
             metadata={},  # Could add more metadata from segments
         )
@@ -609,7 +594,7 @@ def _process_section(
         template_selection = TemplateSelection(
             template_id=plan_section.template_id,
             preset_id=plan_section.preset_id,
-            modifiers=plan_section.modifiers,
+            modifiers={modifier.key: modifier.value for modifier in plan_section.modifiers},
             reasoning=plan_section.reasoning,
             steps=[],
         )

@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class Severity(StrEnum):
@@ -21,10 +21,20 @@ class Issue(BaseModel):
     severity: Severity
     code: str = Field(description="Machine-readable error code")
     message: str = Field(description="Human-readable message")
-    path: str | None = Field(default=None, description="JSONPath to field")
-    hint: str | None = Field(default=None, description="Suggestion for resolution")
+    path: str | None = Field(description="JSONPath to field, or null")
+    hint: str | None = Field(description="Suggestion for resolution, or null")
 
     model_config = ConfigDict(extra="forbid", frozen=True)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _normalize_legacy_input(cls, value: object) -> object:
+        if not isinstance(value, dict):
+            return value
+        normalized = dict(value)
+        normalized.setdefault("path", None)
+        normalized.setdefault("hint", None)
+        return normalized
 
 
 class Provenance(BaseModel):
@@ -55,23 +65,29 @@ class Provenance(BaseModel):
 class SongIdentity(BaseModel):
     """Basic song metadata and identity."""
 
-    title: str | None = Field(default=None, description="Song title if available")
+    title: str | None = Field(description="Song title if available, or null")
 
-    artist: str | None = Field(default=None, description="Artist name if available")
+    artist: str | None = Field(description="Artist name if available, or null")
 
     duration_ms: int = Field(gt=0, description="Song duration in milliseconds")
 
-    bpm: float | None = Field(
-        default=None, gt=0, lt=300, description="Beats per minute if detected"
-    )
+    bpm: float | None = Field(gt=0, lt=300, description="Beats per minute if detected, or null")
 
-    key: str | None = Field(default=None, description="Musical key (e.g., 'C major', 'A minor')")
+    key: str | None = Field(description="Musical key (e.g., 'C major', 'A minor'), or null")
 
-    time_signature: str | None = Field(
-        default=None, description="Time signature (e.g., '4/4', '3/4')"
-    )
+    time_signature: str | None = Field(description="Time signature (e.g., '4/4', '3/4'), or null")
 
     model_config = ConfigDict(extra="forbid")
+
+    @model_validator(mode="before")
+    @classmethod
+    def _normalize_legacy_input(cls, value: object) -> object:
+        if not isinstance(value, dict):
+            return value
+        normalized = dict(value)
+        for key in ("title", "artist", "bpm", "key", "time_signature"):
+            normalized.setdefault(key, None)
+        return normalized
 
     @field_validator("duration_ms")
     @classmethod
@@ -130,8 +146,6 @@ class Structure(BaseModel):
         ge=0.0, le=1.0, description="Confidence in structure analysis (0-1)"
     )
 
-    notes: list[str] = Field(default_factory=list, description="Additional notes about structure")
-
     model_config = ConfigDict(extra="forbid")
 
 
@@ -148,8 +162,6 @@ class EnergyPoint(BaseModel):
     """Point on energy curve."""
 
     t_ms: int = Field(ge=0, description="Timestamp in milliseconds")
-    energy_0_1: float = Field(ge=0.0, le=1.0, description="Energy value 0-1")
-
     model_config = ConfigDict(extra="forbid", frozen=True)
 
 
@@ -192,11 +204,19 @@ class SectionEnergyProfile(BaseModel):
     peak_energy: float = Field(ge=0.0, le=1.0, description="Maximum energy in section")
 
     characteristics: list[str] = Field(
-        default_factory=list,
         description="Section energy characteristics (e.g., 'building', 'drop', 'sustained', 'peak')",
     )
 
     model_config = ConfigDict(extra="forbid", frozen=True)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _normalize_legacy_input(cls, value: object) -> object:
+        if not isinstance(value, dict):
+            return value
+        normalized = dict(value)
+        normalized.setdefault("characteristics", [])
+        return normalized
 
     @field_validator("end_ms")
     @classmethod
@@ -224,16 +244,20 @@ class EnergyProfile(BaseModel):
     )
 
     peaks: list[EnergyPeak] = Field(
-        default_factory=list,
         max_length=10,
         description="Major energy peaks/climaxes across song (top 10 max)",
     )
 
-    overall_mean: float = Field(ge=0.0, le=1.0, description="Mean energy across entire song")
-
-    energy_confidence: float = Field(ge=0.0, le=1.0, description="Confidence in energy analysis")
-
     model_config = ConfigDict(extra="forbid")
+
+    @model_validator(mode="before")
+    @classmethod
+    def _normalize_legacy_input(cls, value: object) -> object:
+        if not isinstance(value, dict):
+            return value
+        normalized = dict(value)
+        normalized.setdefault("peaks", [])
+        return normalized
 
 
 class LyricProfile(BaseModel):
@@ -253,11 +277,18 @@ class LyricProfile(BaseModel):
 
     phoneme_confidence: float = Field(ge=0.0, le=1.0, description="Confidence in phoneme timing")
 
-    notes: list[str] = Field(
-        default_factory=list, description="Additional notes about lyric data quality"
-    )
+    notes: list[str] = Field(description="Additional notes about lyric data quality")
 
     model_config = ConfigDict(extra="forbid")
+
+    @model_validator(mode="before")
+    @classmethod
+    def _normalize_legacy_input(cls, value: object) -> object:
+        if not isinstance(value, dict):
+            return value
+        normalized = dict(value)
+        normalized.setdefault("notes", [])
+        return normalized
 
 
 class Contrast(StrEnum):
@@ -277,7 +308,7 @@ class MotionDensity(StrEnum):
 
 
 class AssetUsage(StrEnum):
-    """Asset usage recommendation."""
+    """Legacy asset-usage vocabulary retained for import compatibility."""
 
     NONE = "NONE"
     SPARSE = "SPARSE"
@@ -297,43 +328,69 @@ class CreativeGuidance(BaseModel):
         description="Recommended motion density/business"
     )
 
-    recommended_asset_usage: AssetUsage = Field(
-        description="Recommended asset (images/shaders) usage level"
-    )
-
     palette_color_guidance: list[str] = Field(
-        default_factory=list,
         max_length=5,
         description="Color characteristic hints for palette selection (e.g., 'warm', 'cool', 'high-contrast', 'vibrant')",
     )
 
     cautions: list[str] = Field(
-        default_factory=list,
         description="Specific cautions for planners (e.g., 'avoid strobing', 'respect quiet sections')",
     )
 
     model_config = ConfigDict(extra="forbid")
 
+    @model_validator(mode="before")
+    @classmethod
+    def _normalize_legacy_input(cls, value: object) -> object:
+        if not isinstance(value, dict):
+            return value
+        normalized = dict(value)
+        normalized.setdefault("palette_color_guidance", [])
+        normalized.setdefault("cautions", [])
+        return normalized
+
+
+class SectionObjectives(BaseModel):
+    """Objectives for one section without a free-form JSON object map."""
+
+    section_id: str = Field(description="Section identifier")
+    objectives: list[str] = Field(description="Planner objectives for the section")
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
 
 class PlannerHints(BaseModel):
     """Specific hints for downstream planning agents."""
 
-    section_objectives: dict[str, list[str]] = Field(
-        default_factory=dict,
-        description="Per-section objectives (section_id → list of objectives)",
+    section_objectives: list[SectionObjectives] = Field(
+        description="Per-section objectives as strict key/value entries",
     )
 
     avoid_patterns: list[str] = Field(
-        default_factory=list,
         description="Patterns to avoid (e.g., 'repetitive pan/tilt', 'strobing in quiet sections')",
     )
 
     emphasize_groups: list[str] = Field(
-        default_factory=list,
         description="Fixture groups to emphasize (group IDs or names)",
     )
 
     model_config = ConfigDict(extra="forbid")
+
+    @model_validator(mode="before")
+    @classmethod
+    def _normalize_legacy_input(cls, value: object) -> object:
+        if not isinstance(value, dict):
+            return value
+        normalized = dict(value)
+        objectives = normalized.setdefault("section_objectives", [])
+        if isinstance(objectives, dict):
+            normalized["section_objectives"] = [
+                {"section_id": section_id, "objectives": section_objectives}
+                for section_id, section_objectives in objectives.items()
+            ]
+        normalized.setdefault("avoid_patterns", [])
+        normalized.setdefault("emphasize_groups", [])
+        return normalized
 
 
 class AudioProfileModel(BaseModel):
@@ -343,30 +400,11 @@ class AudioProfileModel(BaseModel):
     a complete understanding of song characteristics for downstream
     planning agents.
 
-    NOTE: provenance is injected by the framework after LLM generation,
-    not generated by the LLM itself.
+    Framework metadata is deliberately excluded from this response model so the
+    strict schema cannot contradict prompts about framework-populated fields.
     """
 
-    # Metadata
-    schema_version: str = Field(
-        default="2.0", description="Schema version for compatibility tracking"
-    )
-
-    agent_id: str = Field(
-        default="audio_profile.v2", description="Agent that produced this profile"
-    )
-
-    run_id: str = Field(
-        default="", description="Unique identifier for this agent run (injected post-LLM)"
-    )
-
-    provenance: Provenance | None = Field(
-        default=None,
-        description="Metadata about how this profile was generated (injected by framework after LLM generation)",
-    )
-
     warnings: list[Issue] = Field(
-        default_factory=list,
         description="Non-fatal issues encountered during generation",
     )
 
@@ -388,3 +426,12 @@ class AudioProfileModel(BaseModel):
         validate_assignment=True,
         frozen=False,
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def _normalize_legacy_input(cls, value: object) -> object:
+        if not isinstance(value, dict):
+            return value
+        normalized = dict(value)
+        normalized.setdefault("warnings", [])
+        return normalized

@@ -3,7 +3,7 @@
 Models for strategic planning at the macro (song/section) level.
 """
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from twinklr.core.agents.audio.profile.models import SongSectionRef
 from twinklr.core.sequencer.templates.group.models.coordination import PlanTarget
@@ -25,19 +25,26 @@ class PaletteRef(BaseModel):
     palette_id: str = Field(..., description="Palette ID")
 
     role: PaletteRole | None = Field(
-        default=None,
         description="Optional usage role (e.g. PRIMARY, ACCENT, WARM, COOL)",
     )
     intensity: float | None = Field(
-        default=None,
         ge=0.0,
         le=1.0,
         description="Optional global intensity scaler for this palette usage",
     )
     variant: str | None = Field(
-        default=None,
         description="Optional palette variant key (e.g. 'a', 'b', 'night', 'day')",
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def _normalize_legacy_input(cls, value: object) -> object:
+        if not isinstance(value, dict):
+            return value
+        normalized = dict(value)
+        for key in ("role", "intensity", "variant"):
+            normalized.setdefault(key, None)
+        return normalized
 
 
 class PalettePlan(BaseModel):
@@ -47,25 +54,39 @@ class PalettePlan(BaseModel):
     primary: PaletteRef = Field(..., description="Default palette for the song")
 
     # Optional alternates allowed for variation (still theme-consistent)
-    alternates: list[PaletteRef] = Field(default_factory=list, max_length=6)
+    alternates: list[PaletteRef] = Field(max_length=6)
 
-    # Simple transition intent (kept minimal but structured)
-    transition_notes: str = Field(
-        default="",
-        description="Rules for when/how to shift palette usage across song/sections",
-    )
+    @model_validator(mode="before")
+    @classmethod
+    def _normalize_legacy_input(cls, value: object) -> object:
+        if not isinstance(value, dict):
+            return value
+        normalized = dict(value)
+        normalized.setdefault("alternates", [])
+        return normalized
 
 
 class MotifSpec(BaseModel):
     model_config = {"extra": "forbid"}
 
     motif_id: str = Field(..., description="Stable id e.g. 'candy_cane_swirl'")
-    tags: list[str] = Field(default_factory=list, max_length=8)  # used for template matching
+    tags: list[str] = Field(max_length=8)  # used for template matching
     description: str = Field(..., min_length=10, max_length=300)
 
     # Optional: where it should appear
-    preferred_energy: list[EnergyTarget] = Field(default_factory=list)
-    usage_notes: str = Field(default="", max_length=500)
+    preferred_energy: list[EnergyTarget] = Field()
+    usage_notes: str = Field(max_length=500)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _normalize_legacy_input(cls, value: object) -> object:
+        if not isinstance(value, dict):
+            return value
+        normalized = dict(value)
+        normalized.setdefault("tags", [])
+        normalized.setdefault("preferred_energy", [])
+        normalized.setdefault("usage_notes", "")
+        return normalized
 
 
 class GlobalStory(BaseModel):
@@ -132,7 +153,6 @@ class MacroSectionPlan(BaseModel):
         max_length=8,
     )
     secondary_targets: list[PlanTarget] = Field(
-        default_factory=list,
         description="Supporting typed targets (group/zone/split)",
         max_length=12,
     )
@@ -141,18 +161,27 @@ class MacroSectionPlan(BaseModel):
     )
 
     palette: PaletteRef | None = Field(
-        default=None,
         description="Optional palette override for this section; if None use global primary",
     )
 
     motif_ids: list[str] = Field(
-        default_factory=list,
         description="Motifs to emphasize in this section (references GlobalStory.motifs[*].motif_id)",
         max_length=5,
     )
 
     motion_density: MotionDensity = Field(..., description="Activity level (SPARSE, MED, BUSY)")
     notes: str = Field(..., description="Strategic notes for this section", min_length=20)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _normalize_legacy_input(cls, value: object) -> object:
+        if not isinstance(value, dict):
+            return value
+        normalized = dict(value)
+        normalized.setdefault("secondary_targets", [])
+        normalized.setdefault("palette", None)
+        normalized.setdefault("motif_ids", [])
+        return normalized
 
     @field_validator("primary_focus_targets", "secondary_targets")
     @classmethod
@@ -193,9 +222,17 @@ class TargetSelector(BaseModel):
         max_length=10,
     )
     coordination: str = Field(
-        default="unified",
         description="How targets work together (unified, complementary, independent)",
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def _normalize_legacy_input(cls, value: object) -> object:
+        if not isinstance(value, dict):
+            return value
+        normalized = dict(value)
+        normalized.setdefault("coordination", "unified")
+        return normalized
 
     @field_validator("roles")
     @classmethod
@@ -226,9 +263,18 @@ class LayerSpec(BaseModel):
     blend_mode: BlendMode = Field(..., description="How layer combines with others (NORMAL, ADD)")
     timing_driver: TimingDriver = Field(..., description="Musical timing this layer follows")
     intensity_bias: float = Field(
-        default=1.0, ge=0.0, le=1.5, description="Global intensity multiplier for this layer"
+        ge=0.0, le=1.5, description="Global intensity multiplier for this layer"
     )
     usage_notes: str = Field(..., description="Strategic guidance for GroupPlanner", min_length=10)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _normalize_legacy_input(cls, value: object) -> object:
+        if not isinstance(value, dict):
+            return value
+        normalized = dict(value)
+        normalized.setdefault("intensity_bias", 1.0)
+        return normalized
 
 
 class LayeringPlan(BaseModel):
@@ -246,7 +292,6 @@ class LayeringPlan(BaseModel):
     layers: list[LayerSpec] = Field(
         ..., description="Layer specifications", min_length=1, max_length=5
     )
-    strategy_notes: str = Field(..., description="High-level layering strategy", min_length=20)
 
     @field_validator("layers")
     @classmethod
@@ -274,7 +319,7 @@ class MacroPlan(BaseModel):
     """Complete strategic plan for entire sequence.
 
     Root schema that ties together global story, layering architecture,
-    per-section plans, and asset requirements.
+    and per-section plans.
 
     Validates:
     - No gaps or overlaps between sections
@@ -289,20 +334,6 @@ class MacroPlan(BaseModel):
     section_plans: list[MacroSectionPlan] = Field(
         ..., description="Per-section strategic plans", min_length=1
     )
-    asset_requirements: list[str] = Field(
-        default_factory=list,
-        description="Required visual assets (PNG/GIF filenames)",
-        max_length=50,
-    )
-
-    @field_validator("asset_requirements")
-    @classmethod
-    def validate_asset_requirements(cls, v: list[str]) -> list[str]:
-        """Validate asset requirement filenames."""
-        for asset in v:
-            if len(asset) < 1:
-                raise ValueError("Asset requirement must have at least 1 character")
-        return v
 
     @field_validator("section_plans")
     @classmethod

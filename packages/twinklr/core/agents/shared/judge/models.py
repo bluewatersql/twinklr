@@ -57,9 +57,7 @@ class JudgeVerdict(BaseModel):
         confidence: Judge confidence in evaluation (0-1)
         strengths: What the plan does well (2-5 items)
         issues: Detailed issues to address
-        overall_assessment: Overall assessment summary (2-4 sentences)
         feedback_for_planner: Concise feedback for next iteration (2-4 sentences)
-        score_breakdown: Named dimension scores (e.g., musicality: 8.5)
         iteration: Iteration number when verdict issued
     """
 
@@ -71,29 +69,31 @@ class JudgeVerdict(BaseModel):
     # Structured feedback
     strengths: list[str] = Field(
         description="What the plan does well (2-5 items)",
-        default_factory=list,
     )
     issues: list[Issue] = Field(
         description="Detailed issues to address",
-        default_factory=list,
     )
 
     # Narrative feedback
-    overall_assessment: str = Field(description="Overall assessment summary (2-4 sentences)")
     feedback_for_planner: str = Field(
         description="Concise feedback for next iteration (2-4 sentences)"
-    )
-
-    # Transparency
-    score_breakdown: dict[str, float] = Field(
-        description="Named dimension scores (e.g., musicality: 8.5, variety: 7.0)",
-        default_factory=dict,
     )
 
     # Metadata
     iteration: int = Field(ge=0, description="Iteration number when verdict issued")
 
     model_config = ConfigDict(frozen=True, extra="forbid", validate_assignment=True)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _normalize_legacy_input(cls, value: object) -> object:
+        """Fill historical collection defaults for deterministic judge callers."""
+        if not isinstance(value, dict):
+            return value
+        normalized = dict(value)
+        normalized.setdefault("strengths", [])
+        normalized.setdefault("issues", [])
+        return normalized
 
     @model_validator(mode="after")
     def enforce_status_matches_score(self) -> "JudgeVerdict":

@@ -131,7 +131,7 @@ class FeedbackManager:
             iteration: Current iteration number
             score: Optional evaluation score
             issues: Optional structured issues
-            metadata: Optional metadata (score_breakdown, confidence, etc.)
+            metadata: Optional metadata (score, confidence, etc.)
         """
         meta = metadata or {}
         if score is not None:
@@ -169,7 +169,7 @@ class FeedbackManager:
             iteration: Current iteration number
             score: Optional evaluation score
             issues: Optional structured issues
-            metadata: Optional metadata (score_breakdown, confidence, etc.)
+            metadata: Optional metadata (score, confidence, etc.)
         """
         meta = metadata or {}
         if score is not None:

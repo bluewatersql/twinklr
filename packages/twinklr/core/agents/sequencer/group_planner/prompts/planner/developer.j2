@@ -30,15 +30,6 @@ Return a `SectionCoordinationPlan` matching this schema:
 - **TargetType:** {{ taxonomy.TargetType | join(', ') }}
 - **SplitDimension:** {{ taxonomy.SplitDimension | join(', ') }}
 - **DetailCapability:** {{ taxonomy.DetailCapability | join(', ') }}
-{% else %}
-- **LaneKind:** BASE, RHYTHM, ACCENT
-- **CoordinationMode:** UNIFIED, COMPLEMENTARY, SEQUENCED, CALL_RESPONSE, RIPPLE
-- **IntensityLevel:** WHISPER, SOFT, MED, STRONG, PEAK
-- **EffectDuration:** HIT, BURST, PHRASE, EXTENDED, SECTION
-- **StepUnit:** BEATS, BARS
-- **TargetType:** group, zone, split
-- **SplitDimension:** HALVES_LEFT, HALVES_RIGHT, THIRDS_LEFT, THIRDS_CENTER, THIRDS_RIGHT, ODD, EVEN
-- **DetailCapability:** LOW, MEDIUM, HIGH
 {% endif %}
 
 {% if taxonomy.CompoundMotionTerm is defined and taxonomy.CompoundMotionTerm %}
@@ -51,90 +42,28 @@ These terms represent multi-layer motion patterns observed in the corpus. Use th
 to express layered intent (e.g. "dual_chase" = two sweep-motion layers).
 {% endif %}
 
-**IMPORTANT:** Valid group target IDs are the exact `ChoreoGroup.id` values listed in the display graph (user prompt), NOT role names. Zone IDs are ChoreoTag values. Split IDs are SplitDimension values above.
+**IMPORTANT:** Target objects must use a type from the injected schema and an ID from
+the matching display-graph context. Group IDs are concrete `ChoreoGroup.id` values;
+aggregate IDs come from their corresponding target-type context, never from role labels.
 
 ## Targeting System
 
-Use typed targets to specify what each coordination plan affects:
-
-| Type | id is | Example | Resolves To |
-|------|-------|---------|-------------|
-| `group` | ChoreoGroup.id | `{"type": "group", "id": "ARCHES"}` | That specific group |
-| `zone` | ChoreoTag value | `{"type": "zone", "id": "HOUSE"}` | All groups tagged with HOUSE |
-| `split` | SplitDimension value | `{"type": "split", "id": "HALVES_LEFT"}` | All groups with HALVES_LEFT membership |
-
-- Targets go in `coordination_plan.targets[]` (list of typed objects).
-- Placements also have a `target` field (single typed object).
-- The renderer resolves zone/split targets to concrete groups at composition time.
+Use schema-valid typed targets in `coordination_plan.targets[]`; each placement also has
+a single matching typed `target`. The renderer resolves aggregate targets to concrete
+groups at composition time.
 - **Different targets may overlap** in the same lane — the renderer blends them.
 - **The SAME target must NOT overlap itself** in the same lane.
 
 ## Detail Capability (Template Suitability)
 
-- **HIGH** (matrices, mega trees): Any template, including imagery and complex patterns
-- **MEDIUM** (arches, wreaths, window frames): Patterns, gradients, moderate complexity
-- **LOW** (candy canes, snowflakes, stars): Simple chases, solid colors, basic on/off
+Match template complexity to the target's supplied detail capability. Use simple looks
+for limited geometry and reserve imagery or complex patterns for capable targets.
 
-## Mode Examples
+## Coordination Modes
 
-### SEQUENCED Mode
-
-```json
-{
-  "coordination_mode": "SEQUENCED",
-  "targets": [{"type": "group", "id": "ARCHES"}, {"type": "group", "id": "CANDY_CANES"}],
-  "window": {
-    "template_id": "gtpl_rhythm_chase_single",
-    "start": {"bar": 1, "beat": 1},
-    "end": {"bar": 4, "beat": 1},
-    "intensity": "STRONG"
-  },
-  "config": {
-    "group_order": ["ARCHES", "CANDY_CANES"],
-    "step_unit": "BEATS",
-    "step_duration": 2
-  }
-}
-```
-
-### UNIFIED Mode — Zone Target
-
-```json
-{
-  "coordination_mode": "UNIFIED",
-  "targets": [{"type": "zone", "id": "HOUSE"}],
-  "placements": [
-    {
-      "placement_id": "base_house_glow",
-      "target": {"type": "zone", "id": "HOUSE"},
-      "template_id": "gtpl_base_glow_warm",
-      "start": {"bar": 1, "beat": 1},
-      "duration": "SECTION",
-      "intensity": "SOFT"
-    }
-  ]
-}
-```
-
-### CALL_RESPONSE Mode — Split Targets
-
-```json
-{
-  "coordination_mode": "CALL_RESPONSE",
-  "targets": [{"type": "split", "id": "ODD"}, {"type": "split", "id": "EVEN"}],
-  "window": {
-    "template_id": "gtpl_rhythm_pulse_even",
-    "start": {"bar": 1, "beat": 1},
-    "end": {"bar": 4, "beat": 1},
-    "intensity": "STRONG"
-  },
-  "config": {
-    "group_order": ["ODD", "EVEN"],
-    "step_unit": "BEATS",
-    "step_duration": 2
-  }
-}
-```
+Choose only a mode supplied by the injected taxonomy. When the selected schema arm
+requires a window and configuration, populate both, keep `group_order` unique and within
+the plan targets, and size the window for the configured step duration.
 
 ## Timing Format
 

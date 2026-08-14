@@ -165,7 +165,7 @@ Available split IDs:
   - `{"type":"group","id":"<group_id>"}`
   - `{"type":"zone","id":"<zone_id>"}`
   - `{"type":"split","id":"<split_id>"}`
-- `primary_focus_targets` must include at least one target object of type `group` or `zone` or `split`.
+- `primary_focus_targets` must include at least one schema-valid typed target object.
 - Do not emit plain strings for focus targets.
 - Do not invent IDs.
 
@@ -175,7 +175,7 @@ Create a strategic MacroPlan for this Christmas light show that:
 
 1. **Tells a story** - Define global theme, motifs, and pacing
 2. **Plans each section** - Energy targets, choreography style, focus targets
-3. **Designs layer architecture** - BASE, RHYTHM, ACCENT layers with proper blend modes
+3. **Designs layer architecture** - distinct foundational, rhythmic, and accent layers with proper blend modes
 4. **Sets themes** - Provide global_story.theme (SONG) and section_plans[*].theme (SECTION) for downstream asset generation
 
 ## Motif Strategy (Critical for Cohesion)
@@ -194,6 +194,6 @@ Example for {{ audio_profile.structure.sections | length }} sections:
 2. Global theme scope is `SONG`; all section theme scopes are `SECTION`.
 3. Global palette plan has valid primary `palette_id`; section overrides are rare and justified in notes.
 4. Every section has non-empty `motif_ids`; 2-4 core motifs are clearly dominant.
-5. All layer targets are concrete display group IDs; all focus targets are typed `group|zone|split` objects with valid IDs.
+5. All layer targets are concrete display group IDs; all focus targets are schema-valid typed objects with valid IDs.
 
 Remember: Bold impact, main character energy, coordinated wow moments!

@@ -168,23 +168,12 @@ def test_audio_profile_model_defaults():
     """Test AudioProfileModel has proper defaults."""
     from twinklr.core.agents.audio.profile.models import (
         AudioProfileModel,
-        Provenance,
     )
 
     # Create minimal model (will need placeholders for required nested models)
     # For now, we'll test this fails appropriately
     with pytest.raises(ValidationError) as exc_info:
-        AudioProfileModel(
-            run_id="test-run-123",
-            provenance=Provenance(
-                provider_id="openai",
-                model_id="gpt-5.2",
-                prompt_pack="audio_profile.v2",
-                prompt_pack_version="1.0.0",
-                framework_version="2.0.0",
-                temperature=0.2,
-            ),
-        )
+        AudioProfileModel()
 
     # Should fail due to missing required nested models
     error_str = str(exc_info.value).lower()
@@ -194,29 +183,26 @@ def test_audio_profile_model_defaults():
     )
 
 
-def test_audio_profile_model_schema_version_default():
-    """Test AudioProfileModel has correct schema_version default."""
+def test_audio_profile_model_excludes_framework_schema_version():
+    """Framework metadata does not belong in the structured response."""
     from twinklr.core.agents.audio.profile.models import AudioProfileModel
 
-    # This will fail due to missing required fields, but we can check the default
-    # in the model schema
-    assert AudioProfileModel.model_fields["schema_version"].default == "2.0"
+    assert "schema_version" not in AudioProfileModel.model_fields
 
 
-def test_audio_profile_model_agent_id_default():
-    """Test AudioProfileModel has correct agent_id default."""
+def test_audio_profile_model_excludes_framework_agent_id():
+    """Agent identity is framework-owned rather than model-generated."""
     from twinklr.core.agents.audio.profile.models import AudioProfileModel
 
-    assert AudioProfileModel.model_fields["agent_id"].default == "audio_profile.v2"
+    assert "agent_id" not in AudioProfileModel.model_fields
 
 
-def test_audio_profile_model_warnings_default():
-    """Test AudioProfileModel has warnings default to empty list."""
+def test_audio_profile_model_warnings_are_schema_required():
+    """Warnings are required by the strict response schema."""
     from twinklr.core.agents.audio.profile.models import AudioProfileModel
 
-    # Check the field has a default_factory
     field = AudioProfileModel.model_fields["warnings"]
-    assert field.default_factory is not None
+    assert field.is_required()
 
 
 def test_audio_profile_model_config():

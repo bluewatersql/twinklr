@@ -11,11 +11,8 @@ from twinklr.core.agents.analytics.repository import IssueRecord, IssueRepositor
 from twinklr.core.agents.issues import (
     Issue,
     IssueCategory,
-    IssueEffort,
     IssueLocation,
-    IssueScope,
     IssueSeverity,
-    SuggestedAction,
 )
 
 
@@ -33,14 +30,11 @@ def sample_issue():
         issue_id="VARIETY_LOW_CHORUS",
         category=IssueCategory.VARIETY,
         severity=IssueSeverity.WARN,
-        estimated_effort=IssueEffort.LOW,
-        scope=IssueScope.SECTION,
         location=IssueLocation(section_id="chorus_1", bar_start=25, bar_end=33),
         rule="DON'T use same template repeatedly in high-energy sections",
         message="Chorus uses same template 3 times without variation",
         fix_hint="Use different geometry types or presets for variety",
         acceptance_test="Chorus sections use at least 2 different templates or presets",
-        suggested_action=SuggestedAction.PATCH,
         generic_example="Repeated template usage without variation in high-energy sections",
     )
 
@@ -111,14 +105,11 @@ def test_record_multiple_issues(repository, sample_issue, temp_storage):
         issue_id="TIMING_OVERLAP",
         category=IssueCategory.TIMING,
         severity=IssueSeverity.ERROR,
-        estimated_effort=IssueEffort.MEDIUM,
-        scope=IssueScope.SECTION,
         location=IssueLocation(section_id="verse_1", bar_start=1, bar_end=8),
         rule="DON'T allow timing overlaps between sections",
         message="Timing overlap in verse",
         fix_hint="Adjust timing to remove overlap",
         acceptance_test="No timing overlaps in verse",
-        suggested_action=SuggestedAction.PATCH,
     )
 
     repository.record_issues(
@@ -156,14 +147,11 @@ def test_get_top_issues(repository, sample_issue):
         issue_id="TIMING_OVERLAP",
         category=IssueCategory.TIMING,
         severity=IssueSeverity.ERROR,
-        estimated_effort=IssueEffort.MEDIUM,
-        scope=IssueScope.SECTION,
         location=IssueLocation(),
         rule="DON'T allow timing overlaps",
         message="Timing issue",
         fix_hint="Fix timing",
         acceptance_test="No timing issues",
-        suggested_action=SuggestedAction.PATCH,
     )
     repository.record_issues(
         issues=[timing_issue],
@@ -389,14 +377,11 @@ def test_issue_record_validation():
         issue_id="TEST",
         category=IssueCategory.VARIETY,
         severity=IssueSeverity.WARN,
-        estimated_effort=IssueEffort.LOW,
-        scope=IssueScope.SECTION,
         location=IssueLocation(),
         rule="DON'T test - this is a test issue",
         message="Test",
         fix_hint="Fix",
         acceptance_test="Test",
-        suggested_action=SuggestedAction.PATCH,
     )
 
     record = IssueRecord(

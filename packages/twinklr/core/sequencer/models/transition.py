@@ -13,7 +13,7 @@ from __future__ import annotations
 from enum import StrEnum
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from twinklr.core.curves.library import CurveLibrary
 from twinklr.core.sequencer.models.enum import ChannelName, TransitionMode
@@ -40,6 +40,62 @@ class TransitionStrategy(StrEnum):
     CROSSFADE = "crossfade"
     FADE_VIA_BLACK = "fade_via_black"
     SEQUENCE = "sequence"
+
+
+class ChannelTransitionOverrides(BaseModel):
+    """Strict, closed set of optional per-channel transition strategies."""
+
+    pan: TransitionStrategy | None = Field(description="Pan override, or null")
+    tilt: TransitionStrategy | None = Field(description="Tilt override, or null")
+    dimmer: TransitionStrategy | None = Field(description="Dimmer override, or null")
+    shutter: TransitionStrategy | None = Field(description="Shutter override, or null")
+    color: TransitionStrategy | None = Field(description="Color override, or null")
+    gobo: TransitionStrategy | None = Field(description="Gobo override, or null")
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _normalize_legacy_mapping(cls, value: Any) -> Any:
+        if isinstance(value, dict):
+            return {
+                "pan": None,
+                "tilt": None,
+                "dimmer": None,
+                "shutter": None,
+                "color": None,
+                "gobo": None,
+                **value,
+            }
+        return value
+
+    def items(self) -> list[tuple[str, TransitionStrategy]]:
+        """Return populated overrides in the legacy mapping form."""
+        pairs: tuple[tuple[str, TransitionStrategy | None], ...] = (
+            ("pan", self.pan),
+            ("tilt", self.tilt),
+            ("dimmer", self.dimmer),
+            ("shutter", self.shutter),
+            ("color", self.color),
+            ("gobo", self.gobo),
+        )
+        return [(name, strategy) for name, strategy in pairs if strategy is not None]
+
+    def __getitem__(self, channel: str) -> TransitionStrategy:
+        values = {
+            "pan": self.pan,
+            "tilt": self.tilt,
+            "dimmer": self.dimmer,
+            "shutter": self.shutter,
+            "color": self.color,
+            "gobo": self.gobo,
+        }
+        if channel not in values:
+            raise KeyError(channel)
+        value = values[channel]
+        if value is None:
+            raise KeyError(channel)
+        return value
 
 
 class TransitionHint(BaseModel):
@@ -80,30 +136,41 @@ class TransitionHint(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    mode: TransitionMode = Field(default=TransitionMode.CROSSFADE, description="Transition mode")
+    mode: TransitionMode = Field(description="Transition mode")
 
     duration_bars: float = Field(
-        default=0.5,
         ge=0.0,
         le=8.0,
         description="Transition duration in bars (0.0 = instant/SNAP)",
     )
 
     curve: CurveLibrary = Field(
-        default=CurveLibrary.EASE_IN_OUT_SINE,
         description="Interpolation curve for smooth transitions",
     )
 
     fade_out_ratio: float = Field(
-        default=0.5,
         ge=0.0,
         le=1.0,
         description="For crossfades, ratio of fade-out to total duration",
     )
 
-    per_channel_overrides: dict[str, TransitionStrategy] | None = Field(
-        default=None, description="Optional per-channel strategy overrides"
+    per_channel_overrides: ChannelTransitionOverrides | None = Field(
+        description="Optional per-channel strategy overrides, or null"
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def _normalize_legacy_defaults(cls, value: Any) -> Any:
+        if isinstance(value, dict):
+            return {
+                "mode": TransitionMode.CROSSFADE,
+                "duration_bars": 0.5,
+                "curve": CurveLibrary.EASE_IN_OUT_SINE,
+                "fade_out_ratio": 0.5,
+                "per_channel_overrides": None,
+                **value,
+            }
+        return value
 
     @property
     def is_snap(self) -> bool:

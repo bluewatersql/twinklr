@@ -30,35 +30,4 @@ class IntensityLevel(StrEnum):
     PEAK = "PEAK"  # Maximum impact, focal moments
 
 
-# Intensity mapping: level -> lane -> numeric value
-# Guarantees BASE < RHYTHM < ACCENT at every intensity level
-INTENSITY_MAP: dict[IntensityLevel, dict[str, float]] = {
-    IntensityLevel.WHISPER: {"BASE": 0.15, "RHYTHM": 0.25, "ACCENT": 0.35},
-    IntensityLevel.SOFT: {"BASE": 0.35, "RHYTHM": 0.50, "ACCENT": 0.65},
-    IntensityLevel.MED: {"BASE": 0.55, "RHYTHM": 0.75, "ACCENT": 0.90},
-    IntensityLevel.STRONG: {"BASE": 0.75, "RHYTHM": 0.95, "ACCENT": 1.10},
-    IntensityLevel.PEAK: {"BASE": 0.90, "RHYTHM": 1.10, "ACCENT": 1.30},
-}
-
-
-def resolve_intensity(level: IntensityLevel, lane: str) -> float:
-    """Resolve categorical intensity to numeric value.
-
-    Args:
-        level: Categorical intensity level
-        lane: Lane name (BASE, RHYTHM, ACCENT)
-
-    Returns:
-        Numeric intensity value appropriate for the lane
-
-    Raises:
-        KeyError: If lane is not recognized
-    """
-    return INTENSITY_MAP[level][lane]
-
-
-__all__ = [
-    "INTENSITY_MAP",
-    "IntensityLevel",
-    "resolve_intensity",
-]
+__all__ = ["IntensityLevel"]

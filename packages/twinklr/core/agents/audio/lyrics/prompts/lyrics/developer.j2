@@ -18,7 +18,7 @@ You must respond with valid JSON matching this exact schema:
 - **story_beats**: null OR list of 2-5 narrative moments
   - Each beat MUST have all fields populated
   - `timestamp_range`: (start_ms, end_ms) within song duration
-  - `beat_type`: Must be one of: "setup", "conflict", "climax", "resolution", "coda"
+  - `beat_type`: Use a value allowed by the injected response schema
   - `description`: 10+ characters, song-specific
   - `visual_opportunity`: 10+ characters, actionable choreography hint
 
@@ -29,7 +29,7 @@ You must respond with valid JSON matching this exact schema:
     - `timestamp_ms`: Within song duration
     - `section_id`: Matching a provided section
     - `visual_hint`: **Specific actionable choreography tied to these words** (5+ chars)
-    - `emphasis`: Must be "LOW", "MED", or "HIGH"
+    - `emphasis`: Use a value allowed by the injected response schema
   
   **Visual hint quality bar:**
   - ✅ GOOD: "Sharp white flash on hard 'K' in 'ROCK' + mega tree starburst"
@@ -50,19 +50,12 @@ You must respond with valid JSON matching this exact schema:
     - ❌ "Follow the mood" (not actionable)
 
 ### Density & Coverage
-- **lyric_density**: Must be "SPARSE", "MED", or "DENSE"
-  - Guidelines:
-    - SPARSE: Long instrumental passages, minimal vocals
-    - MED: Typical balance of vocals and music
-    - DENSE: Rapid-fire lyrics, minimal gaps
+- **lyric_density**: Use a value allowed by the injected response schema and base it on
+  the balance between instrumental passages and vocal activity
 - **vocal_coverage_pct**: 0.0-1.0
-  - Use `vocal_presence_pct` from quality metrics as primary source when available
-    (this is derived from spectral vocal detection — the most accurate measure of actual singing)
-  - Fall back to `timed_word_coverage_pct` when `vocal_presence_pct` is not available
-    (timed word coverage may undercount vocals if lyrics are untimed or partially aligned)
-  - The two metrics measure different things:
-    - `timed_word_coverage_pct`: fraction of song duration covered by word-level timing data
-    - `vocal_presence_pct`: fraction of song duration with detected vocals (from audio analysis)
+  - Use `vocal_presence_pct` from the supplied quality metrics when available
+  - Fall back to supplied `timed_word_coverage_pct` otherwise
+- **timed_word_coverage_pct**: Copy the supplied quality metric, or null
 - **silent_sections**: List of instrumental breaks > 5 seconds
   - Each section: `start_ms`, `end_ms`, `duration_ms` (must match: duration_ms = end_ms - start_ms)
   - `section_id`: optional, should match provided structure
@@ -112,9 +105,6 @@ You must respond with valid JSON matching this exact schema:
 6. Ensure **all lists** have correct item types and lengths
 7. Verify **all timestamps** are in milliseconds
 8. Verify **all enum values** match allowed strings exactly
-9. **DO NOT generate `provenance` field** - this is injected by the framework with actual runtime values
-10. **DO NOT generate `run_id` field** - this is provided externally
-
 ## Warnings Guidance
 
 Use the `warnings` field sparingly for **actionable concerns** only:

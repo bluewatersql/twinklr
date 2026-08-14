@@ -10,17 +10,14 @@ import json
 import logging
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from twinklr.core.agents._paths import AGENTS_BASE_PATH
 from twinklr.core.agents.issues import (
     Issue,
     IssueCategory,
-    IssueEffort,
     IssueLocation,
-    IssueScope,
     IssueSeverity,
-    SuggestedAction,
     TargetedAction,
 )
 from twinklr.core.agents.logging import LLMCallLogger, NullLLMCallLogger
@@ -55,7 +52,6 @@ class CrossSectionIssue(BaseModel):
     description: str = Field(description="Clear description of the issue")
     recommendation: str = Field(description="High-level recommendation summary")
     targeted_actions: list[TargetedAction] = Field(
-        default_factory=list,
         description=(
             "Structured fix actions referencing concrete section_ids, "
             "targets (type+id), template_ids, palette_ids, and/or lanes. "
@@ -63,6 +59,15 @@ class CrossSectionIssue(BaseModel):
             "a specific group plan without further interpretation."
         ),
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def _normalize_legacy_input(cls, value: object) -> object:
+        if not isinstance(value, dict):
+            return value
+        normalized = dict(value)
+        normalized.setdefault("targeted_actions", [])
+        return normalized
 
 
 class HolisticEvaluation(BaseModel):
@@ -76,22 +81,23 @@ class HolisticEvaluation(BaseModel):
 
     status: VerdictStatus = Field(description="APPROVE, SOFT_FAIL, or HARD_FAIL")
     score: float = Field(ge=0.0, le=10.0, description="Overall quality score")
-    score_breakdown: dict[str, float] = Field(
-        default_factory=dict,
-        description="Breakdown of score by dimension (e.g., story_coherence, energy_arc)",
-    )
     confidence: float = Field(ge=0.0, le=1.0, description="Confidence in evaluation")
 
     summary: str = Field(description="Brief summary of evaluation")
     strengths: list[str] = Field(description="Notable strengths of the plan")
     cross_section_issues: list[CrossSectionIssue] = Field(
-        default_factory=list,
         description="Issues spanning multiple sections",
     )
-    recommendations: list[str] = Field(
-        default_factory=list,
-        description="High-level recommendations for improvement",
-    )
+
+    @model_validator(mode="before")
+    @classmethod
+    def _normalize_legacy_input(cls, value: object) -> object:
+        if not isinstance(value, dict):
+            return value
+        normalized = dict(value)
+        normalized.setdefault("strengths", [])
+        normalized.setdefault("cross_section_issues", [])
+        return normalized
 
     @property
     def is_approved(self) -> bool:
@@ -307,7 +313,6 @@ class HolisticEvaluator:
                 summary=f"Holistic evaluation failed: {result.error_message}",
                 strengths=[],
                 cross_section_issues=[],
-                recommendations=["Fix evaluation errors and retry"],
             )
 
         evaluation = result.data
@@ -382,20 +387,23 @@ def cross_section_issues_to_issues(
     for csi in cross_section_issues:
         location = IssueLocation(
             section_id=csi.affected_sections[0] if csi.affected_sections else None,
+            group_id=None,
+            effect_id=None,
+            bar_start=None,
+            bar_end=None,
+            field_path=None,
         )
 
         issue = Issue(
             issue_id=csi.issue_id,
             category=_infer_category(csi.issue_id),
             severity=csi.severity,
-            estimated_effort=IssueEffort.MEDIUM,
-            scope=IssueScope.GLOBAL,
             location=location,
             rule=f"DON'T allow {csi.issue_id.replace('_', ' ')} across sections",
             message=f"{csi.description} (affects: {', '.join(csi.affected_sections)})",
             fix_hint=csi.recommendation,
             acceptance_test=f"Issue {csi.issue_id} is resolved across affected sections",
-            suggested_action=SuggestedAction.PATCH,
+            generic_example=None,
             targeted_actions=list(csi.targeted_actions),
         )
         issues.append(issue)

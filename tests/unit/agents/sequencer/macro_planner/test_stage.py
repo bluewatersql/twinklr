@@ -92,7 +92,6 @@ def test_handle_state_normalizes_cached_plan_to_model(display_groups):
         global_story=MagicMock(),
         layering_plan=MagicMock(),
         section_plans=[],
-        asset_requirements=[],
     )
     result = {
         "success": True,

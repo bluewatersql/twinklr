@@ -37,16 +37,16 @@ Before evaluating holistic quality, verify the plan set is **technically sound**
 
 **Resource Consistency**
 - All target IDs used across sections are valid (use `targets` list)
-  - **Group targets**: `id` must be a concrete ChoreoGroup id from the display graph (e.g., ARCHES, MEGA_TREE)
-  - **Zone targets**: `id` must be a valid zone (e.g., HOUSE, YARD, ROOF, PERIMETER). These are valid and expanded by the renderer — do NOT reject them.
-  - **Split targets**: `id` must be a valid split dimension (e.g., HALVES_LEFT, ODD, EVEN). These are valid and expanded by the renderer — do NOT reject them.
+  - Concrete group IDs must come from the display graph.
+  - Aggregate target IDs must come from the matching populated target-type context.
+    They are valid and expanded by the renderer; do not reject them.
 - Palette/motif ids are present where required:
   - Every SectionCoordinationPlan has plan.palette.palette_id
   - Every SectionCoordinationPlan has plan.motif_ids (>=1)
 
 **If technically invalid**
-- Return status `HARD_FAIL` immediately with critical cross_section_issues
-- Score should be < 5.0 when HARD_FAIL
+- Return the schema-defined terminal-failure status immediately with critical
+  cross-section issues and a score below 5.0.
 
 ### Phase 2: Holistic Quality Evaluation (Score 0-10)
 
@@ -62,18 +62,10 @@ Evaluate **cross-section quality** across these dimensions:
 5. **resource_utilization** (15%): balanced group usage; focus targets shine.
    - **Important (Narrative protagonist):** If the Song Narrative Context shows `has_narrative: true` with named characters, a single hero prop dominating multiple sections is narrative intent, not a planning failure. Evaluate whether *supporting* groups still receive meaningful moments across the show — not whether all groups are equally represented. A hero prop appearing in 5–7 of 10+ sections is acceptable when it represents the song’s protagonist; only score below 6.0 if non-hero groups receive zero attention across the entire show.
    - **Important (Hierarchy):** If a "Group Hierarchy" is provided, a parent group implicitly covers all its children. Do NOT flag a child group as absent/underutilized when its parent group is used in that section.
-Populate `score_breakdown` with exactly these keys:
-- story_coherence
-- energy_arc
-- visual_variety
-- transitions
-- resource_utilization
-
 ### Decision Criteria (STRICT)
 
-- APPROVE: score >= 7.0
-- SOFT_FAIL: score 5.0–6.9
-- HARD_FAIL: score < 5.0
+Use the schema-defined approval status at 7.0 or above, retryable-failure status from 5.0
+through 6.9, and terminal-failure status below 5.0.
 
 The `status` field MUST match the score threshold.
 
@@ -105,7 +97,7 @@ Evaluate themes, palettes, and motifs across ALL sections to ensure the plan mai
 - Frequent theme/palette shifts increase:
   - number of unique assets required
   - inconsistency risk across generated imagery
-- Report risk as LOW/MED/HIGH with 1–2 sentence justification.
+- Report risk with a schema-valid level and a 1–2 sentence justification.
 
 ## Cross-Section Issue Reporting Format
 
@@ -117,37 +109,28 @@ Required fields:
 - `affected_sections`: list of section_ids (>=1)
 - `description`: 2–4 sentences, specific
 - `recommendation`: 1–2 sentence high-level summary of what should change
-- `targeted_actions`: list of **specific, directly actionable** instructions (required for ERROR and WARN severity). Each action must reference concrete identifiers from the GroupPlanSet.
+- `targeted_actions`: list of **specific, directly actionable** instructions whenever
+  required by the selected severity. Each action must reference concrete identifiers.
 
 ### Targeted Actions Format (Structured)
 
 Each `targeted_action` is a structured `TargetedAction` object — NOT a free-text string. Every action must include:
 
-- `action_type`: one of ADD_TARGET, REMOVE_TARGET, ADD_PLACEMENT, REMOVE_PLACEMENT, SWAP_TEMPLATE, CHANGE_PALETTE, CHANGE_THEME, ADD_MOTIF, REMOVE_MOTIF, ADJUST_TIMING, REORDER_GROUPS, OTHER
+- `action_type`: Use only a value allowed by the injected response schema
 - `section_id`: which section to modify (required)
 - `description`: human-readable explanation (required)
 
 Optional fields (populate when relevant to the action_type):
-- `lane`: BASE, RHYTHM, ACCENT, or BURST
-- `target`: target reference e.g. "group:ARCHES", "zone:HOUSE", "split:ODD"
+- `lane`: Use a schema-valid lane when the selected action needs one
+- `target`: a target reference using an ID from the corresponding display context
 - `template_id`: template to add or swap from
 - `replacement_template_id`: for SWAP_TEMPLATE, the new template
 - `palette_id`: palette reference e.g. "core.peppermint"
 - `bar`, `beat`: timing position
 - `bar_end`: end bar for range-based actions
 
-**Required fields per action_type:**
-- ADD_TARGET / REMOVE_TARGET: `lane` + `target` required
-- SWAP_TEMPLATE: `template_id` + `replacement_template_id` required
-- CHANGE_PALETTE: `palette_id` required
-- ADD_PLACEMENT: `lane` + `target` + `template_id` recommended
-- OTHER: only `description` required
-
-**Examples:**
-```json
-{"action_type": "ADD_TARGET", "section_id": "chorus_1", "lane": "ACCENT", "target": "group:STARS", "template_id": "gtpl_accent_motif_radial_rays_hit_small", "bar": 12, "beat": 1, "description": "Add STARS accent at chorus beacon reveal for sky glint"}
-{"action_type": "CHANGE_PALETTE", "section_id": "instrumental", "palette_id": "core.peppermint", "description": "Keep instrumental in peppermint palette to preserve show identity"}
-{"action_type": "SWAP_TEMPLATE", "section_id": "verse_4", "lane": "RHYTHM", "target": "group:ARCHES", "template_id": "gtpl_rhythm_sparkle_beat", "replacement_template_id": "gtpl_rhythm_wave_cascade", "description": "Replace sparkle beat with wave cascade for variety before finale"}
-```
+Populate the optional fields required by the selected action's schema arm. Target changes
+need lane and target context; template replacement needs both template identifiers;
+palette changes need a palette identifier; placement changes should be fully located.
 
 Do NOT invent additional fields or enum values.

@@ -31,9 +31,7 @@ You must respond with valid JSON matching this exact schema:
   - 1 = Simple, unified choreography
   - 2 = Medium complexity, complementary layers
   - 3 = High complexity, multiple independent layers
-- **Contrast** must be LOW, MED, or HIGH
-- **Motion density** must be SPARSE, MED, or BUSY
-- **Asset usage** must be NONE, SPARSE, or HEAVY
+- **Contrast** and **motion density** must use values allowed by the injected response schema
 - **Color story**: Up to 5 thematic terms (e.g., "warm", "vibrant", "monochrome")
 - **Cautions**: Specific, actionable warnings (not generic)
 
@@ -75,13 +73,8 @@ You must respond with valid JSON matching this exact schema:
 - Then has_timed_words **MUST be true**
 - (Phonemes require word timing)
 
-**If recommended_layer_count = 1:**
-- Then recommended_contrast should be LOW or MED
-- (Single layer limits contrast potential)
-
-**If macro_energy = "LOW":**
-- Then recommended_motion_density should NOT be BUSY
-- (Low energy doesn't support busy movement)
+Use restrained contrast when only one layer is recommended, and avoid dense motion when
+the song-level energy classification indicates a subdued arrangement.
 
 ## Output Format Requirements
 
@@ -95,8 +88,6 @@ You must respond with valid JSON matching this exact schema:
 6. Ensure **all lists** have correct item types
 7. Verify **all confidence scores** are in [0, 1]
 8. Confirm **all timestamps** are in milliseconds
-9. **DO NOT generate `provenance` field** - this is injected by the framework with actual runtime values
-
 ## Warnings Guidance
 
 Use the `warnings` field sparingly for **actionable concerns** only:

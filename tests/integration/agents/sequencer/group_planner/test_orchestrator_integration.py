@@ -206,7 +206,6 @@ def create_mock_approve_verdict() -> JudgeVerdict:
         status=VerdictStatus.APPROVE,
         score=8.0,
         confidence=0.9,
-        overall_assessment="Good section coordination plan with proper template selection.",
         feedback_for_planner="No changes needed. Plan is ready for holistic evaluation.",
         iteration=1,
         issues=[],

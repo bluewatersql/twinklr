@@ -64,9 +64,9 @@ Use only these theme_ids (do not invent):
 3. **Section IDs are strict**: Keep exact IDs from structure (e.g., `verse_4`, not `verse`)
 4. **Target IDs are strict**:
    - `layering_plan.layers[*].target_selector.roles` must be concrete display group IDs only
-   - `section_plans[*].primary_focus_targets` and `secondary_targets` must be typed target objects (`group|zone|split`)
+   - `section_plans[*].primary_focus_targets` and `secondary_targets` must be schema-valid typed target objects
    - `primary_focus_targets` must contain at least one typed target object
-5. **Layer Architecture**: Maintain proper BASE/RHYTHM/ACCENT structure
+5. **Layer Architecture**: Maintain distinct foundational, rhythmic, and accent structure
 6. **Story Coherence**: Keep global theme consistent across sections
 7. **Theme Override Discipline**: Keep theme overrides limited and intentional (target <=25-35% of sections unless one explicit contiguous scene block)
 8. **Palette Plan**: Global primary palette required; use valid palette_ids only; section overrides must say exactly where they apply
@@ -75,7 +75,7 @@ Use only these theme_ids (do not invent):
 
 ## Instructions
 
-1. Address ALL ERROR severity issues first, then resolve WARN issues that block score >= 7.0
+1. Address all highest-severity issues first, then lower-severity issues that block score >= 7.0
 2. Keep structure that worked - only fix flagged issues
 3. Maintain global story coherence while addressing feedback
 4. If feedback includes `THEME_SHIFT_OVERUSED`, reduce theme overrides and keep any remaining overrides in one bounded scene block

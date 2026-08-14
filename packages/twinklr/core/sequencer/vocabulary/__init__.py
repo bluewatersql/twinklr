@@ -39,11 +39,7 @@ from twinklr.core.sequencer.vocabulary.energy import (
     EnergyTarget,
     MotionDensity,
 )
-from twinklr.core.sequencer.vocabulary.intensity import (
-    INTENSITY_MAP,
-    IntensityLevel,
-    resolve_intensity,
-)
+from twinklr.core.sequencer.vocabulary.intensity import IntensityLevel
 from twinklr.core.sequencer.vocabulary.motion import (
     MotionVerb,
 )
@@ -86,8 +82,6 @@ from twinklr.core.sequencer.vocabulary.visual import (
 __all__ = [
     # Duration (categorical planning)
     "DURATION_BEATS",
-    # Intensity (categorical planning)
-    "INTENSITY_MAP",
     # Templates
     "AssetSlotType",
     "AssetTemplateType",
@@ -147,5 +141,4 @@ __all__ = [
     "VisualDepth",
     "WarpHint",
     "resolve_duration_beats",
-    "resolve_intensity",
 ]

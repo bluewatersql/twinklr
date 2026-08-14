@@ -18,7 +18,7 @@ Return HARD_FAIL if any are true:
 - Gaps/overlaps or unsorted section timing
 - Layering invalid (not 1-5, missing BASE, duplicate indices)
 - Layer target_selector roles referenced that do not exist in display_groups
-- Section focus targets missing/invalid typed ids (`group|zone|split`)
+- Section focus targets missing or invalid schema-typed IDs
 - Theme invalid:
   - global_story.theme does not use song-level ThemeScope (`SONG`)
   - any section.theme does not use section-level ThemeScope (`SECTION`)
@@ -33,7 +33,8 @@ Return HARD_FAIL if any are true:
 ## Strategic Scoring Guardrails (Phase 2)
 
 - Use `audio_profile.structure.sections` for section counts and percentages.
-- If there are no ERROR issues and all WARN issues are localized/patchable, default to score >= 7.0 unless coherence is fundamentally broken.
+- If there are no technical errors and all remaining issues are localized and patchable,
+  default to score >= 7.0 unless coherence is fundamentally broken.
 - Avoid contradictory counting in issue messages (section totals and override counts must align).
 - Coverage/schema issues must reference concrete structured evidence from `macro_plan.section_plans[*].section.section_id` and typed target objects.
 - Do not emit coverage/schema ERRORs from section display names or other prose summaries.
@@ -41,4 +42,4 @@ Return HARD_FAIL if any are true:
 ## Notes
 
 - Prefer deterministic acceptance tests.
-- Use stable issue_ids and include location.field_path for SCHEMA/CONSTRAINT/FIELD issues.
+- Use stable issue_ids and include location.field_path for structural field issues.

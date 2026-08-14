@@ -99,23 +99,16 @@ CATEGORICAL PLANNING VERSION
 
 ## Categorical Planning Checks
 
-This plan uses **categorical values**:
-
-**Intensity Levels:** WHISPER, SOFT, MED, STRONG, PEAK
-- Check if levels match section energy ({{ energy_target }}):
-  {% if energy_target == "LOW" %}- Prefer WHISPER, SOFT, MED - warn if PEAK used{% elif energy_target == "HIGH" %}- Prefer MED, STRONG, PEAK - warn if WHISPER used{% else %}- Prefer SOFT, MED, STRONG{% endif %}
-
-**Effect Durations:** HIT, BURST, PHRASE, EXTENDED, SECTION
-- Check if durations match musical intent
+This plan uses categorical values from the injected response schema. Check that intensity
+matches section energy ({{ energy_target }}) and duration matches musical intent.
 
 1) **Technical Validation**
 - template_ids exist and are lane-compatible
-- targets are valid: group ids exist in display graph, zone ids are valid zones (see above), split ids are valid splits (see above)
+- targets use schema-valid types and IDs from the matching populated display context
 - start.bar within 1..{{ section_max_bar }} (bar range is authoritative — do NOT infer from duration seconds)
-- duration is valid enum (HIT, BURST, PHRASE, EXTENDED, SECTION)
-- intensity is valid enum (WHISPER, SOFT, MED, STRONG, PEAK)
+- duration and intensity are allowed by the injected response schema
 - no same-target self-overlap within a lane (same type+id; different targets may overlap)
-- if mode requires expansion (SEQUENCED/CALL_RESPONSE/RIPPLE): window+config must be present and valid
+- if the selected mode's schema arm requires expansion, window+config must be present and valid
 - theme must be SECTION-scoped; tags <= 5
 - palette must be present with palette_id
 - motif_ids must be present and non-empty

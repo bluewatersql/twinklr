@@ -24,10 +24,10 @@ def test_energy_point_valid():
     """Test EnergyPoint with valid data."""
     from twinklr.core.agents.audio.profile.models import EnergyPoint
 
-    point = EnergyPoint(t_ms=1000, energy_0_1=0.75)
+    point = EnergyPoint(t_ms=1000)
 
     assert point.t_ms == 1000
-    assert point.energy_0_1 == 0.75
+    assert "energy_0_1" not in EnergyPoint.model_fields
 
 
 def test_energy_point_t_ms_validation():
@@ -35,40 +35,30 @@ def test_energy_point_t_ms_validation():
     from twinklr.core.agents.audio.profile.models import EnergyPoint
 
     # Valid: >= 0
-    EnergyPoint(t_ms=0, energy_0_1=0.5)
-    EnergyPoint(t_ms=1000, energy_0_1=0.5)
+    EnergyPoint(t_ms=0)
+    EnergyPoint(t_ms=1000)
 
     # Invalid: < 0
     with pytest.raises(ValidationError):
-        EnergyPoint(t_ms=-1, energy_0_1=0.5)
+        EnergyPoint(t_ms=-1)
 
 
-def test_energy_point_energy_validation():
-    """Test EnergyPoint energy_0_1 must be in [0, 1]."""
+def test_energy_point_energy_value_is_deleted():
+    """Per-point energy duplicates section summary data and is rejected."""
     from twinklr.core.agents.audio.profile.models import EnergyPoint
 
-    # Valid: [0, 1]
-    EnergyPoint(t_ms=0, energy_0_1=0.0)
-    EnergyPoint(t_ms=0, energy_0_1=0.5)
-    EnergyPoint(t_ms=0, energy_0_1=1.0)
-
-    # Invalid: < 0
-    with pytest.raises(ValidationError):
-        EnergyPoint(t_ms=0, energy_0_1=-0.1)
-
-    # Invalid: > 1
-    with pytest.raises(ValidationError):
-        EnergyPoint(t_ms=0, energy_0_1=1.1)
+    with pytest.raises(ValidationError, match="energy_0_1"):
+        EnergyPoint(t_ms=0, energy_0_1=0.5)
 
 
 def test_energy_point_frozen():
     """Test EnergyPoint is frozen (immutable)."""
     from twinklr.core.agents.audio.profile.models import EnergyPoint
 
-    point = EnergyPoint(t_ms=1000, energy_0_1=0.75)
+    point = EnergyPoint(t_ms=1000)
 
     with pytest.raises(ValidationError):
-        point.energy_0_1 = 0.5
+        point.t_ms = 500
 
 
 def test_energy_point_extra_forbid():
@@ -76,7 +66,7 @@ def test_energy_point_extra_forbid():
     from twinklr.core.agents.audio.profile.models import EnergyPoint
 
     with pytest.raises(ValidationError) as exc_info:
-        EnergyPoint(t_ms=1000, energy_0_1=0.75, extra="not allowed")
+        EnergyPoint(t_ms=1000, extra="not allowed")
 
     assert "extra" in str(exc_info.value).lower()
 
@@ -169,9 +159,9 @@ def test_section_energy_profile_valid():
     )
 
     curve = [
-        EnergyPoint(t_ms=0, energy_0_1=0.3),
-        EnergyPoint(t_ms=5000, energy_0_1=0.7),
-        EnergyPoint(t_ms=10000, energy_0_1=0.9),
+        EnergyPoint(t_ms=0),
+        EnergyPoint(t_ms=5000),
+        EnergyPoint(t_ms=10000),
     ]
 
     profile = SectionEnergyProfile(
@@ -202,9 +192,9 @@ def test_section_energy_profile_minimal_curve():
 
     # Minimum 3 points per spec
     curve = [
-        EnergyPoint(t_ms=0, energy_0_1=0.5),
-        EnergyPoint(t_ms=5000, energy_0_1=0.6),
-        EnergyPoint(t_ms=10000, energy_0_1=0.5),
+        EnergyPoint(t_ms=0),
+        EnergyPoint(t_ms=5000),
+        EnergyPoint(t_ms=10000),
     ]
 
     profile = SectionEnergyProfile(
@@ -227,9 +217,9 @@ def test_section_energy_profile_frozen():
     )
 
     curve = [
-        EnergyPoint(t_ms=0, energy_0_1=0.5),
-        EnergyPoint(t_ms=5000, energy_0_1=0.6),
-        EnergyPoint(t_ms=10000, energy_0_1=0.5),
+        EnergyPoint(t_ms=0),
+        EnergyPoint(t_ms=5000),
+        EnergyPoint(t_ms=10000),
     ]
 
     profile = SectionEnergyProfile(
@@ -254,9 +244,9 @@ def test_section_energy_profile_extra_forbid():
     )
 
     curve = [
-        EnergyPoint(t_ms=0, energy_0_1=0.5),
-        EnergyPoint(t_ms=5000, energy_0_1=0.6),
-        EnergyPoint(t_ms=10000, energy_0_1=0.5),
+        EnergyPoint(t_ms=0),
+        EnergyPoint(t_ms=5000),
+        EnergyPoint(t_ms=10000),
     ]
 
     with pytest.raises(ValidationError) as exc_info:
@@ -289,9 +279,9 @@ def test_energy_profile_valid():
             start_ms=0,
             end_ms=20000,
             energy_curve=[
-                EnergyPoint(t_ms=0, energy_0_1=0.4),
-                EnergyPoint(t_ms=10000, energy_0_1=0.5),
-                EnergyPoint(t_ms=20000, energy_0_1=0.5),
+                EnergyPoint(t_ms=0),
+                EnergyPoint(t_ms=10000),
+                EnergyPoint(t_ms=20000),
             ],
             mean_energy=0.47,
             peak_energy=0.5,
@@ -301,10 +291,10 @@ def test_energy_profile_valid():
             start_ms=20000,
             end_ms=50000,
             energy_curve=[
-                EnergyPoint(t_ms=20000, energy_0_1=0.7),
-                EnergyPoint(t_ms=30000, energy_0_1=0.9),
-                EnergyPoint(t_ms=40000, energy_0_1=0.85),
-                EnergyPoint(t_ms=50000, energy_0_1=0.8),
+                EnergyPoint(t_ms=20000),
+                EnergyPoint(t_ms=30000),
+                EnergyPoint(t_ms=40000),
+                EnergyPoint(t_ms=50000),
             ],
             mean_energy=0.81,
             peak_energy=0.9,
@@ -318,15 +308,13 @@ def test_energy_profile_valid():
         macro_energy=MacroEnergy.DYNAMIC,
         section_profiles=section_profiles,
         peaks=peaks,
-        overall_mean=0.64,
-        energy_confidence=0.92,
     )
 
     assert profile.macro_energy == MacroEnergy.DYNAMIC
     assert len(profile.section_profiles) == 2
     assert len(profile.peaks) == 1
-    assert profile.overall_mean == 0.64
-    assert profile.energy_confidence == 0.92
+    assert "overall_mean" not in EnergyProfile.model_fields
+    assert "energy_confidence" not in EnergyProfile.model_fields
 
 
 def test_energy_profile_empty_peaks():
@@ -344,9 +332,9 @@ def test_energy_profile_empty_peaks():
             start_ms=0,
             end_ms=20000,
             energy_curve=[
-                EnergyPoint(t_ms=0, energy_0_1=0.4),
-                EnergyPoint(t_ms=10000, energy_0_1=0.4),
-                EnergyPoint(t_ms=20000, energy_0_1=0.4),
+                EnergyPoint(t_ms=0),
+                EnergyPoint(t_ms=10000),
+                EnergyPoint(t_ms=20000),
             ],
             mean_energy=0.4,
             peak_energy=0.4,
@@ -357,8 +345,6 @@ def test_energy_profile_empty_peaks():
         macro_energy=MacroEnergy.LOW,
         section_profiles=section_profiles,
         peaks=[],
-        overall_mean=0.4,
-        energy_confidence=0.85,
     )
 
     assert len(profile.peaks) == 0
@@ -379,9 +365,9 @@ def test_energy_profile_not_frozen():
             start_ms=0,
             end_ms=20000,
             energy_curve=[
-                EnergyPoint(t_ms=0, energy_0_1=0.4),
-                EnergyPoint(t_ms=10000, energy_0_1=0.4),
-                EnergyPoint(t_ms=20000, energy_0_1=0.4),
+                EnergyPoint(t_ms=0),
+                EnergyPoint(t_ms=10000),
+                EnergyPoint(t_ms=20000),
             ],
             mean_energy=0.4,
             peak_energy=0.4,
@@ -392,8 +378,6 @@ def test_energy_profile_not_frozen():
         macro_energy=MacroEnergy.LOW,
         section_profiles=section_profiles,
         peaks=[],
-        overall_mean=0.4,
-        energy_confidence=0.85,
     )
 
     # Should be able to modify
@@ -416,9 +400,9 @@ def test_energy_profile_extra_forbid():
             start_ms=0,
             end_ms=20000,
             energy_curve=[
-                EnergyPoint(t_ms=0, energy_0_1=0.4),
-                EnergyPoint(t_ms=10000, energy_0_1=0.4),
-                EnergyPoint(t_ms=20000, energy_0_1=0.4),
+                EnergyPoint(t_ms=0),
+                EnergyPoint(t_ms=10000),
+                EnergyPoint(t_ms=20000),
             ],
             mean_energy=0.4,
             peak_energy=0.4,
@@ -430,8 +414,6 @@ def test_energy_profile_extra_forbid():
             macro_energy=MacroEnergy.LOW,
             section_profiles=section_profiles,
             peaks=[],
-            overall_mean=0.4,
-            energy_confidence=0.85,
             extra="not allowed",
         )
 
@@ -446,9 +428,9 @@ def test_section_energy_profile_timing_validation():
     )
 
     curve = [
-        EnergyPoint(t_ms=0, energy_0_1=0.5),
-        EnergyPoint(t_ms=5000, energy_0_1=0.6),
-        EnergyPoint(t_ms=10000, energy_0_1=0.5),
+        EnergyPoint(t_ms=0),
+        EnergyPoint(t_ms=5000),
+        EnergyPoint(t_ms=10000),
     ]
 
     # Valid
@@ -482,9 +464,9 @@ def test_section_energy_profile_characteristics_optional():
     )
 
     curve = [
-        EnergyPoint(t_ms=0, energy_0_1=0.5),
-        EnergyPoint(t_ms=5000, energy_0_1=0.6),
-        EnergyPoint(t_ms=10000, energy_0_1=0.5),
+        EnergyPoint(t_ms=0),
+        EnergyPoint(t_ms=5000),
+        EnergyPoint(t_ms=10000),
     ]
 
     # Without characteristics
@@ -525,8 +507,8 @@ def test_section_energy_profile_curve_length_validation():
             start_ms=0,
             end_ms=10000,
             energy_curve=[
-                EnergyPoint(t_ms=0, energy_0_1=0.5),
-                EnergyPoint(t_ms=10000, energy_0_1=0.5),
+                EnergyPoint(t_ms=0),
+                EnergyPoint(t_ms=10000),
             ],
             mean_energy=0.5,
             peak_energy=0.5,
@@ -538,14 +520,14 @@ def test_section_energy_profile_curve_length_validation():
             section_id="test",
             start_ms=0,
             end_ms=160000,
-            energy_curve=[EnergyPoint(t_ms=i * 10000, energy_0_1=0.5) for i in range(16)],
+            energy_curve=[EnergyPoint(t_ms=i * 10000) for i in range(16)],
             mean_energy=0.5,
             peak_energy=0.5,
         )
 
 
-def test_energy_profile_confidence_validation():
-    """Test EnergyProfile confidence must be in [0, 1]."""
+def test_energy_profile_redundant_summary_fields_are_deleted():
+    """Redundant overall mean/confidence keys are rejected by the closed schema."""
     from twinklr.core.agents.audio.profile.models import (
         EnergyPoint,
         EnergyProfile,
@@ -559,47 +541,27 @@ def test_energy_profile_confidence_validation():
             start_ms=0,
             end_ms=10000,
             energy_curve=[
-                EnergyPoint(t_ms=0, energy_0_1=0.5),
-                EnergyPoint(t_ms=5000, energy_0_1=0.5),
-                EnergyPoint(t_ms=10000, energy_0_1=0.5),
+                EnergyPoint(t_ms=0),
+                EnergyPoint(t_ms=5000),
+                EnergyPoint(t_ms=10000),
             ],
             mean_energy=0.5,
             peak_energy=0.5,
         ),
     ]
 
-    # Valid
-    EnergyProfile(
-        macro_energy=MacroEnergy.LOW,
-        section_profiles=section_profiles,
-        peaks=[],
-        overall_mean=0.5,
-        energy_confidence=0.0,
-    )
-    EnergyProfile(
-        macro_energy=MacroEnergy.LOW,
-        section_profiles=section_profiles,
-        peaks=[],
-        overall_mean=0.5,
-        energy_confidence=1.0,
-    )
-
-    # Invalid: < 0
-    with pytest.raises(ValidationError):
+    with pytest.raises(ValidationError, match="overall_mean"):
         EnergyProfile(
             macro_energy=MacroEnergy.LOW,
             section_profiles=section_profiles,
             peaks=[],
             overall_mean=0.5,
-            energy_confidence=-0.1,
         )
 
-    # Invalid: > 1
-    with pytest.raises(ValidationError):
+    with pytest.raises(ValidationError, match="energy_confidence"):
         EnergyProfile(
             macro_energy=MacroEnergy.LOW,
             section_profiles=section_profiles,
             peaks=[],
-            overall_mean=0.5,
-            energy_confidence=1.1,
+            energy_confidence=0.8,
         )

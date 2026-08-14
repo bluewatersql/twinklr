@@ -44,7 +44,7 @@ V2 Migration: Uses structured context from MovingHeadPlanningContext
 **Template Library** ({{ available_templates | length }} templates):
 {% if template_descriptions is defined and template_descriptions %}
 {% for td in template_descriptions %}
-- `{{ td.template_id }}`: {{ td.description | default(td.name) }}{% if td.energy_range %} Energy: {{ td.energy_range[0] }}-{{ td.energy_range[1] }}{% endif %}{% if td.tags %} [{{ td.tags | join(', ') }}]{% endif %}
+- `{{ td.template_id }}`: {{ td.description | default(td.name) }}{% if td.energy_range %} Energy: {{ td.energy_range[0] }}-{{ td.energy_range[1] }}{% endif %}{% if td.tags %} [{{ td.tags | join(', ') }}]{% endif %}{% if td.recommended_sections %} Recommended sections: {{ td.recommended_sections | join(', ') }}{% endif %}
 {% endfor %}
 {% else %}
 {% for template in available_templates %}
@@ -77,9 +77,9 @@ V2 Migration: Uses structured context from MovingHeadPlanningContext
 ### Section Planning Directives
 
 {% if audio_profile.planner_hints.section_objectives is defined and audio_profile.planner_hints.section_objectives %}
-{% for section_id, objectives in audio_profile.planner_hints.section_objectives.items() %}
-**{{ section_id }}**:
-{% for obj in objectives[:2] %}
+{% for entry in audio_profile.planner_hints.section_objectives %}
+**{{ entry.section_id }}**:
+{% for obj in entry.objectives[:2] %}
 - {{ obj[:250] }}
 {% endfor %}
 {% endfor %}
@@ -130,9 +130,9 @@ The MacroPlanner has defined the following strategic guidance for each section. 
 {% endfor %}
 
 **IMPORTANT:** Your template selections should support these macro-level directives:
-- **Energy targets** indicate intensity levels (HIGH/PEAK = aggressive/dramatic, MED/BUILD = balanced/rising, LOW/RELEASE = subtle/ambient)
-- **Motion density** guides activity level (BUSY = fast/complex, MED = balanced, SPARSE = slow/simple)
-- **Choreography style** indicates visual approach (IMAGERY = narrative, ABSTRACT = patterns, HYBRID = mixed)
+- **Energy targets** indicate how aggressive, balanced, rising, or restrained the selected schema-valid intensity should feel
+- **Motion density** uses the injected schema to express fast, balanced, or restrained activity
+- **Choreography style** uses the injected schema to express narrative, patterned, or mixed intent
 - **Palette** indicates color theme override for the section (if specified, choose templates that complement this mood)
 - **Motifs** indicate visual patterns emphasized in this section (use to inform template geometry/movement choices)
 {% endif %}
@@ -159,13 +159,24 @@ For each song section, choose ONE approach:
 
 **Single-template section** (preferred, default):
 - Set `template_id` for the entire section
-- Optionally add `preset_id` (CHILL, MODERATE, ENERGETIC)
-- Leave `segments` omitted or null
+- Set `preset_id` to a supported preset or null
+- Set `segments` to null
 
 **Segmented section** (only when musically justified):
 - Use when section has distinct musical phases (pickup → drop, A → B)
 - Max 3 segments per section
 - Segments must be contiguous and cover full section range
+
+### Typed Intent
+
+- Set `intensity` from the response schema's moving-head intensity enum.
+- Set `color_intent.selection` to the schema arm matching its discriminator and keep the
+  unused nullable value in that arm null.
+- Use `shutter_events` and `gobo_events` for discrete bar/beat changes; use empty lists
+  when no change is planned.
+- Set `moment_cues` to an empty list until lyric MomentCues are supplied in context.
+- Never emit DMX values, milliseconds, angles, or hand-authored enum values; the renderer
+  resolves the categorical intent.
 
 ### Bar Numbering
 

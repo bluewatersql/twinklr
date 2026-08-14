@@ -52,9 +52,9 @@ Unlike section judges, you evaluate:
 ## Target Types
 
 Plans use **typed targets** (`PlanTarget` with type + id):
-- **Group targets** (`type: "group"`): Target a specific ChoreoGroup (e.g., `ARCHES`, `MEGA_TREE`).
-- **Zone targets** (`type: "zone"`): Target all groups in a zone (e.g., `HOUSE` → OUTLINE + WINDOWS + WREATHS). Expanded by the renderer.
-- **Split targets** (`type: "split"`): Target a partition of groups (e.g., `HALVES_LEFT`, `ODD`). Expanded by the renderer.
+- Concrete targets select one ChoreoGroup; aggregate targets select a populated region or
+  partition and are expanded by the renderer. Use only target types allowed by the
+  injected response schema and IDs present in the matching display context.
 
 All three target types are valid. Zone and split targets are powerful tools for coordinating multiple groups at once. Do NOT flag them as invalid.
 

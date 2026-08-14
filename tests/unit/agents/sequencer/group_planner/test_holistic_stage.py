@@ -152,7 +152,6 @@ def approved_evaluation() -> HolisticEvaluation:
         summary="Strong coordination",
         strengths=["Good variety"],
         cross_section_issues=[],
-        recommendations=[],
     )
 
 

@@ -117,7 +117,6 @@ def valid_macro_plan(audio_profile: AudioProfileModel) -> MacroPlan:
                     timing_driver=TimingDriver.BEATS,
                 ),
             ],
-            strategy_notes="Two-layer approach: stable BASE for structure, RHYTHM layer for beat-driven accents",
         ),
         section_plans=[
             MacroSectionPlan(
@@ -141,7 +140,6 @@ def valid_macro_plan(audio_profile: AudioProfileModel) -> MacroPlan:
             )
             for i, sec in enumerate(sections)
         ],
-        asset_requirements=["snowflake_sparkle.png"],
     )
 
 

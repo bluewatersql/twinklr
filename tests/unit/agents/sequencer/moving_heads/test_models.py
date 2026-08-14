@@ -26,7 +26,9 @@ def test_plan_section_model():
     assert section.end_bar == 8
     assert section.template_id == "sweep_lr_fan_pulse"
     assert section.preset_id == "CHILL"
-    assert section.modifiers == {"intensity": "HIGH"}
+    assert [modifier.model_dump() for modifier in section.modifiers] == [
+        {"key": "intensity", "value": "HIGH"}
+    ]
 
 
 def test_plan_section_minimal():
@@ -43,7 +45,7 @@ def test_plan_section_minimal():
     assert section.end_bar == 16
     assert section.template_id == "circle_fan_hold"
     assert section.preset_id is None
-    assert section.modifiers == {}
+    assert section.modifiers == []
 
 
 def test_plan_section_bar_validation():

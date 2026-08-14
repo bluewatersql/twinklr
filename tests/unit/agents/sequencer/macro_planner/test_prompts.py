@@ -7,6 +7,7 @@ import pytest
 import yaml
 
 from twinklr.core.agents.audio.profile.models import AudioProfileModel
+from twinklr.core.agents.taxonomy_utils import get_taxonomy_dict
 
 
 @pytest.fixture
@@ -248,7 +249,7 @@ def test_developer_prompt_renders(jinja_env: Environment):
 def test_developer_prompt_includes_constraints(jinja_env: Environment):
     """Developer prompt includes technical constraints."""
     template = jinja_env.get_template("planner/developer.j2")
-    output = template.render()
+    output = template.render(taxonomy=get_taxonomy_dict())
 
     # Should mention key constraints
     assert "BASE" in output
@@ -256,10 +257,10 @@ def test_developer_prompt_includes_constraints(jinja_env: Environment):
     assert "5" in output or "max" in output.lower()
 
 
-def test_developer_prompt_lists_enums(jinja_env: Environment):
-    """Developer prompt lists enum values."""
+def test_developer_prompt_injects_enums_from_taxonomy(jinja_env: Environment):
+    """Developer prompt gets enum values from taxonomy rather than literal fallback."""
     template = jinja_env.get_template("planner/developer.j2")
-    output = template.render()
+    output = template.render(taxonomy=get_taxonomy_dict())
 
     # Should list key enums
     assert "LayerRole" in output or "RHYTHM" in output

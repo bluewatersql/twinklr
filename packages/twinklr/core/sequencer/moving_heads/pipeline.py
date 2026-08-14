@@ -9,7 +9,7 @@ if TYPE_CHECKING:
     from twinklr.core.sequencer.models.context import FixtureContext
 
 from twinklr.core.agents.sequencer.moving_heads import ChoreographyPlan
-from twinklr.core.agents.sequencer.moving_heads.models import PlanSection
+from twinklr.core.agents.sequencer.moving_heads.models import PlanSection, flatten_plan_segment
 from twinklr.core.config.fixtures import FixtureGroup
 from twinklr.core.config.models import JobConfig
 from twinklr.core.curves.generator import CurveGenerator
@@ -310,22 +310,7 @@ class RenderingPipeline:
         for section in plan.sections:
             if section.segments:
                 for seg in section.segments:
-                    yield PlanSection(
-                        section_name=f"{section.section_name}|{seg.segment_id}",
-                        start_bar=seg.start_bar,
-                        end_bar=seg.end_bar,
-                        section_role=section.section_role,
-                        energy_level=section.energy_level,
-                        template_id=seg.template_id,
-                        preset_id=seg.preset_id,
-                        modifiers=seg.modifiers,
-                        reasoning=seg.reasoning or section.reasoning,
-                        # IMPORTANT: do not carry segments forward once flattened
-                        segments=None,
-                        # Inherit parent section's transition hints (if any)
-                        transition_in=section.transition_in,
-                        transition_out=section.transition_out,
-                    )
+                    yield flatten_plan_segment(section, seg)
             else:
                 yield section
 
@@ -341,7 +326,11 @@ class RenderingPipeline:
 
         # Detect section boundaries
         boundaries = self.transition_detector.detect_section_boundaries(
-            ChoreographyPlan(sections=flattened_sections), self.beat_grid
+            ChoreographyPlan(
+                sections=flattened_sections,
+                overall_strategy=self.choreography_plan.overall_strategy,
+            ),
+            self.beat_grid,
         )
 
         logger.debug(f"Detected {len(boundaries)} section boundaries")

@@ -20,7 +20,6 @@ class TestValidateLyrics:
     def test_valid_minimal_model(self, minimal_song_bundle):
         """Test validation of minimal valid model."""
         model = LyricContextModel(
-            run_id="test-123",
             has_lyrics=False,
             vocal_coverage_pct=0.0,
         )
@@ -31,7 +30,6 @@ class TestValidateLyrics:
     def test_valid_full_model(self, full_song_bundle):
         """Test validation of full valid model."""
         model = LyricContextModel(
-            run_id="test-123",
             has_lyrics=True,
             themes=["celebration", "joy"],
             mood_arc="cheerful → exuberant",
@@ -70,7 +68,6 @@ class TestValidateLyrics:
     def test_key_phrase_timestamp_out_of_bounds(self, minimal_song_bundle):
         """Test key phrase timestamp exceeds song duration."""
         model = LyricContextModel(
-            run_id="test-123",
             has_lyrics=True,
             themes=["test", "themes"],
             vocal_coverage_pct=0.5,
@@ -119,7 +116,6 @@ class TestValidateLyrics:
     def test_story_beat_timestamp_out_of_bounds(self, minimal_song_bundle):
         """Test story beat end time exceeds song duration."""
         model = LyricContextModel(
-            run_id="test-123",
             has_lyrics=True,
             themes=["test", "themes"],
             has_narrative=True,
@@ -155,7 +151,6 @@ class TestValidateLyrics:
     def test_overlapping_story_beats(self, minimal_song_bundle):
         """Test overlapping story beats trigger warning."""
         model = LyricContextModel(
-            run_id="test-123",
             has_lyrics=True,
             themes=["test", "themes"],
             has_narrative=True,
@@ -198,7 +193,6 @@ class TestValidateLyrics:
     def test_overlapping_silent_sections(self, minimal_song_bundle):
         """Test overlapping silent sections trigger warning."""
         model = LyricContextModel(
-            run_id="test-123",
             has_lyrics=True,
             themes=["test", "themes"],
             vocal_coverage_pct=0.5,
@@ -227,7 +221,6 @@ class TestValidateLyrics:
     def test_has_narrative_missing_story_beats(self, minimal_song_bundle):
         """Test has_narrative=True requires story_beats."""
         model = LyricContextModel(
-            run_id="test-123",
             has_lyrics=True,
             themes=["test", "themes"],
             has_narrative=True,
@@ -255,7 +248,6 @@ class TestValidateLyrics:
     def test_has_narrative_missing_characters(self, minimal_song_bundle):
         """Test has_narrative=True requires characters (warning)."""
         model = LyricContextModel(
-            run_id="test-123",
             has_lyrics=True,
             themes=["test", "themes"],
             has_narrative=True,
@@ -291,7 +283,6 @@ class TestValidateLyrics:
     def test_no_lyrics_but_key_phrases(self, minimal_song_bundle):
         """Test has_lyrics=False but key_phrases populated."""
         model = LyricContextModel(
-            run_id="test-123",
             has_lyrics=False,
             vocal_coverage_pct=0.0,
             key_phrases=[
@@ -314,7 +305,6 @@ class TestValidateLyrics:
     def test_has_lyrics_missing_themes(self, minimal_song_bundle):
         """Test has_lyrics=True but themes is empty (warning)."""
         model = LyricContextModel(
-            run_id="test-123",
             has_lyrics=True,
             themes=[],  # Empty!
             vocal_coverage_pct=0.5,
@@ -339,7 +329,6 @@ class TestValidateLyrics:
     def test_has_lyrics_missing_key_phrases(self, minimal_song_bundle):
         """Test has_lyrics=True but key_phrases is empty (warning)."""
         model = LyricContextModel(
-            run_id="test-123",
             has_lyrics=True,
             themes=["test", "themes"],
             vocal_coverage_pct=0.5,
@@ -356,7 +345,6 @@ class TestValidateLyrics:
     def test_has_lyrics_missing_visual_themes(self, minimal_song_bundle):
         """Test has_lyrics=True but recommended_visual_themes is empty (warning)."""
         model = LyricContextModel(
-            run_id="test-123",
             has_lyrics=True,
             themes=["test", "themes"],
             vocal_coverage_pct=0.5,

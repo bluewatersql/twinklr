@@ -20,10 +20,20 @@ class Issue(BaseModel):
     severity: Severity
     code: str = Field(description="Machine-readable error code")
     message: str = Field(description="Human-readable message")
-    path: str | None = Field(default=None, description="JSONPath to field")
-    hint: str | None = Field(default=None, description="Suggestion for resolution")
+    path: str | None = Field(description="JSONPath to field, or null")
+    hint: str | None = Field(description="Suggestion for resolution, or null")
 
     model_config = ConfigDict(extra="forbid", frozen=True)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _normalize_legacy_input(cls, value: object) -> object:
+        if not isinstance(value, dict):
+            return value
+        normalized = dict(value)
+        normalized.setdefault("path", None)
+        normalized.setdefault("hint", None)
+        return normalized
 
 
 class Provenance(BaseModel):
@@ -116,9 +126,16 @@ class KeyPhrase(BaseModel):
         min_length=5, description="Specific choreography suggestion for this phrase"
     )
 
-    emphasis: str = Field(
-        default="MED", description="Visual emphasis level: 'LOW' | 'MED' | 'HIGH'"
-    )
+    emphasis: str = Field(description="Visual emphasis level: LOW, MED, or HIGH")
+
+    @model_validator(mode="before")
+    @classmethod
+    def _normalize_legacy_input(cls, value: object) -> object:
+        if not isinstance(value, dict):
+            return value
+        normalized = dict(value)
+        normalized.setdefault("emphasis", "MED")
+        return normalized
 
     @field_validator("emphasis")
     @classmethod
@@ -141,7 +158,16 @@ class SilentSection(BaseModel):
 
     duration_ms: int = Field(gt=0, description="Section duration in milliseconds")
 
-    section_id: str | None = Field(default=None, description="Optional section identifier")
+    section_id: str | None = Field(description="Section identifier, or null")
+
+    @model_validator(mode="before")
+    @classmethod
+    def _normalize_legacy_input(cls, value: object) -> object:
+        if not isinstance(value, dict):
+            return value
+        normalized = dict(value)
+        normalized.setdefault("section_id", None)
+        return normalized
 
     @field_validator("end_ms")
     @classmethod
@@ -176,80 +202,77 @@ class LyricContextModel(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    run_id: str = Field(
-        default="", description="Unique identifier for this agent run (injected post-LLM)"
-    )
-
     # Core Analysis
     has_lyrics: bool = Field(description="Whether lyrics were available for analysis")
 
     themes: list[str] = Field(
-        default_factory=list,
         description="Major themes (2-5 items, e.g., ['redemption', 'celebration'])",
     )
 
-    mood_arc: str = Field(
-        default="neutral", description="Emotional trajectory (e.g., 'melancholic → hopeful')"
-    )
+    mood_arc: str = Field(description="Emotional trajectory (e.g., 'melancholic → hopeful')")
 
     genre_markers: list[str] = Field(
-        default_factory=list,
         description="Genre/context markers (e.g., ['Christmas', 'gospel'])",
     )
 
     # Narrative (if applicable)
-    has_narrative: bool = Field(default=False, description="Whether song has clear narrative")
+    has_narrative: bool = Field(description="Whether song has clear narrative")
 
     characters: list[str] | None = Field(
-        default=None, description="Named characters or personas in the song"
+        description="Named characters or personas in the song, or null"
     )
 
     story_beats: list[StoryBeat] | None = Field(
-        default=None, description="Key narrative moments aligned to song structure"
+        description="Key narrative moments aligned to song structure, or null"
     )
 
     # Visual Hooks
-    key_phrases: list[KeyPhrase] = Field(
-        default_factory=list, description="Memorable moments (5-10 items)"
-    )
+    key_phrases: list[KeyPhrase] = Field(description="Memorable moments (5-10 items)")
 
     recommended_visual_themes: list[str] = Field(
-        default_factory=list, description="Visual design recommendations (3-5 items)"
+        description="Visual design recommendations (3-5 items)"
     )
 
     # Density & Coverage
-    lyric_density: str = Field(
-        default="MED", description="Lyric pacing: 'SPARSE' | 'MED' | 'DENSE'"
-    )
+    lyric_density: str = Field(description="Lyric pacing: SPARSE, MED, or DENSE")
 
     vocal_coverage_pct: float = Field(
         ge=0.0, le=1.0, description="Percentage of song with detected vocals (0.0-1.0)"
     )
 
     timed_word_coverage_pct: float | None = Field(
-        default=None,
         ge=0.0,
         le=1.0,
-        description="Fraction of song duration covered by timed words (0.0-1.0)",
+        description="Fraction of song duration covered by timed words, or null",
     )
 
-    vocal_presence_pct: float | None = Field(
-        default=None,
-        ge=0.0,
-        le=1.0,
-        description="Fraction of song duration with detected vocals from spectral analysis (0.0-1.0)",
-    )
+    silent_sections: list[SilentSection] = Field(description="Instrumental sections without lyrics")
 
-    silent_sections: list[SilentSection] = Field(
-        default_factory=list, description="Instrumental sections without lyrics"
-    )
+    warnings: list[Issue] = Field(description="Analysis warnings")
 
-    # Metadata
-    provenance: Provenance | None = Field(
-        default=None, description="Generation metadata (framework-injected)"
-    )
-
-    warnings: list[Issue] = Field(default_factory=list, description="Analysis warnings")
+    @model_validator(mode="before")
+    @classmethod
+    def _normalize_legacy_input(cls, value: object) -> object:
+        if not isinstance(value, dict):
+            return value
+        normalized = dict(value)
+        legacy_defaults = {
+            "themes": [],
+            "mood_arc": "neutral",
+            "genre_markers": [],
+            "has_narrative": False,
+            "characters": None,
+            "story_beats": None,
+            "key_phrases": [],
+            "recommended_visual_themes": [],
+            "lyric_density": "MED",
+            "timed_word_coverage_pct": None,
+            "silent_sections": [],
+            "warnings": [],
+        }
+        for key, default in legacy_defaults.items():
+            normalized.setdefault(key, default)
+        return normalized
 
     @field_validator("themes")
     @classmethod

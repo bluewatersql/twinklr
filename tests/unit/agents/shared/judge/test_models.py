@@ -4,11 +4,8 @@ from twinklr.core.agents.issues import (
     ActionType,
     Issue,
     IssueCategory,
-    IssueEffort,
     IssueLocation,
-    IssueScope,
     IssueSeverity,
-    SuggestedAction,
     TargetedAction,
 )
 from twinklr.core.agents.shared.judge.models import (
@@ -29,7 +26,6 @@ class TestVerdictStatus:
             status=VerdictStatus.APPROVE,
             score=8.5,
             confidence=0.9,
-            overall_assessment="Plan looks good",
             feedback_for_planner="Good work",
             iteration=1,
         )
@@ -44,14 +40,11 @@ class TestVerdictStatus:
             issue_id="TEST_001",
             category=IssueCategory.TIMING,
             severity=IssueSeverity.ERROR,
-            estimated_effort=IssueEffort.MEDIUM,
-            scope=IssueScope.SECTION,
             location=IssueLocation(),
             rule="DON'T have timing issues in sections",
             message="Test issue",
             fix_hint="Fix the timing",
             acceptance_test="Timing is correct",
-            suggested_action=SuggestedAction.PATCH,
         )
 
         verdict = JudgeVerdict(
@@ -60,15 +53,13 @@ class TestVerdictStatus:
             confidence=0.85,
             strengths=["Good variety", "Nice energy match"],
             issues=[issue],
-            overall_assessment="Needs minor improvements",
             feedback_for_planner="Adjust timing",
-            score_breakdown={"musicality": 7.0, "variety": 6.0},
             iteration=2,
         )
 
         assert len(verdict.strengths) == 2
         assert len(verdict.issues) == 1
-        assert len(verdict.score_breakdown) == 2
+        assert "score_breakdown" not in JudgeVerdict.model_fields
 
     def test_requires_revision_property(self):
         """Test requires_revision property."""
@@ -76,7 +67,6 @@ class TestVerdictStatus:
             status=VerdictStatus.APPROVE,
             score=8.0,
             confidence=0.9,
-            overall_assessment="Test",
             feedback_for_planner="Test",
             iteration=1,
         )
@@ -86,7 +76,6 @@ class TestVerdictStatus:
             status=VerdictStatus.SOFT_FAIL,
             score=6.0,
             confidence=0.9,
-            overall_assessment="Test",
             feedback_for_planner="Test",
             iteration=1,
         )
@@ -98,27 +87,21 @@ class TestVerdictStatus:
             issue_id="ERR_001",
             category=IssueCategory.TIMING,
             severity=IssueSeverity.ERROR,
-            estimated_effort=IssueEffort.HIGH,
-            scope=IssueScope.SECTION,
             location=IssueLocation(),
             rule="DON'T have critical timing errors",
             message="Critical error",
             fix_hint="Fix immediately",
             acceptance_test="Error resolved",
-            suggested_action=SuggestedAction.REPLAN_SECTION,
         )
         warn_issue = Issue(
             issue_id="WARN_001",
             category=IssueCategory.VARIETY,
             severity=IssueSeverity.WARN,
-            estimated_effort=IssueEffort.LOW,
-            scope=IssueScope.GLOBAL,
             location=IssueLocation(),
             rule="DON'T lack variety in sections",
             message="Warning",
             fix_hint="Add variety",
             acceptance_test="Variety improved",
-            suggested_action=SuggestedAction.PATCH,
         )
 
         verdict = JudgeVerdict(
@@ -126,7 +109,6 @@ class TestVerdictStatus:
             score=6.0,
             confidence=0.9,
             issues=[error_issue, warn_issue],
-            overall_assessment="Test",
             feedback_for_planner="Test",
             iteration=1,
         )
@@ -141,14 +123,11 @@ class TestVerdictStatus:
             issue_id="ERR_001",
             category=IssueCategory.TIMING,
             severity=IssueSeverity.ERROR,
-            estimated_effort=IssueEffort.HIGH,
-            scope=IssueScope.SECTION,
             location=IssueLocation(),
             rule="DON'T have critical timing errors",
             message="Critical error",
             fix_hint="Fix immediately",
             acceptance_test="Error resolved",
-            suggested_action=SuggestedAction.REPLAN_SECTION,
         )
 
         verdict = JudgeVerdict(
@@ -156,7 +135,6 @@ class TestVerdictStatus:
             score=4.0,
             confidence=0.9,
             issues=[error_issue],
-            overall_assessment="Test",
             feedback_for_planner="Test",
             iteration=1,
         )
@@ -169,14 +147,11 @@ class TestVerdictStatus:
             issue_id="WARN_001",
             category=IssueCategory.VARIETY,
             severity=IssueSeverity.WARN,
-            estimated_effort=IssueEffort.LOW,
-            scope=IssueScope.GLOBAL,
             location=IssueLocation(),
             rule="DON'T lack variety in sections",
             message="Warning",
             fix_hint="Add variety",
             acceptance_test="Variety improved",
-            suggested_action=SuggestedAction.PATCH,
         )
 
         verdict = JudgeVerdict(
@@ -184,7 +159,6 @@ class TestVerdictStatus:
             score=6.0,
             confidence=0.9,
             issues=[warn_issue],
-            overall_assessment="Test",
             feedback_for_planner="Test",
             iteration=1,
         )
@@ -216,14 +190,11 @@ class TestRevisionRequest:
             issue_id="ERR_001",
             category=IssueCategory.TIMING,
             severity=IssueSeverity.ERROR,
-            estimated_effort=IssueEffort.HIGH,
-            scope=IssueScope.SECTION,
             location=IssueLocation(),
             rule="DON'T have critical timing errors",
             message="Critical timing error",
             fix_hint="Fix the timing issues",
             acceptance_test="Timing is correct",
-            suggested_action=SuggestedAction.REPLAN_SECTION,
         )
 
         verdict = JudgeVerdict(
@@ -232,7 +203,6 @@ class TestRevisionRequest:
             confidence=0.9,
             strengths=["Good energy"],
             issues=[error_issue],
-            overall_assessment="Major issues",
             feedback_for_planner="Fix timing problems",
             iteration=1,
         )
@@ -251,7 +221,6 @@ class TestRevisionRequest:
             confidence=0.9,
             strengths=["Good variety"],
             issues=[],
-            overall_assessment="Needs improvement",
             feedback_for_planner="Improve quality",
             iteration=1,
         )
@@ -268,7 +237,6 @@ class TestRevisionRequest:
             confidence=0.9,
             strengths=["Good variety"],
             issues=[],
-            overall_assessment="Minor improvements needed",
             feedback_for_planner="Polish a bit",
             iteration=1,
         )
@@ -283,14 +251,11 @@ class TestRevisionRequest:
             issue_id="TEST_001",
             category=IssueCategory.SCHEMA,
             severity=IssueSeverity.ERROR,
-            estimated_effort=IssueEffort.MEDIUM,
-            scope=IssueScope.FIELD,
             location=IssueLocation(),
             rule="DON'T have schema validation errors",
             message="Schema validation failed",
             fix_hint="Fix the schema",
             acceptance_test="Schema validates",
-            suggested_action=SuggestedAction.PATCH,
         )
 
         verdict = JudgeVerdict(
@@ -299,7 +264,6 @@ class TestRevisionRequest:
             confidence=0.9,
             strengths=["Good energy"],
             issues=[issue],
-            overall_assessment="Major issues",
             feedback_for_planner="Fix schema and timing",
             iteration=1,
         )
@@ -320,7 +284,6 @@ class TestRevisionRequest:
             confidence=0.9,
             strengths=["Excellent variety", "Great energy match", "Good timing"],
             issues=[],
-            overall_assessment="Minor improvements",
             feedback_for_planner="Polish details",
             iteration=1,
         )
@@ -342,14 +305,11 @@ class TestRevisionRequest:
             issue_id="VARIETY_001",
             category=IssueCategory.VARIETY,
             severity=IssueSeverity.WARN,
-            estimated_effort=IssueEffort.LOW,
-            scope=IssueScope.SECTION,
             location=IssueLocation(section_id="verse_1"),
             rule="DON'T lack variety",
             message="Need more variety",
             fix_hint="Use different templates",
             acceptance_test="Variety improved",
-            suggested_action=SuggestedAction.PATCH,
             targeted_actions=[targeted_action],
         )
         verdict = JudgeVerdict(
@@ -358,7 +318,6 @@ class TestRevisionRequest:
             confidence=0.9,
             strengths=["Good energy"],
             issues=[issue],
-            overall_assessment="Needs refinement",
             feedback_for_planner="Add variety",
             iteration=1,
         )
@@ -374,14 +333,11 @@ class TestRevisionRequest:
             issue_id="TIMING_001",
             category=IssueCategory.TIMING,
             severity=IssueSeverity.ERROR,
-            estimated_effort=IssueEffort.MEDIUM,
-            scope=IssueScope.SECTION,
             location=IssueLocation(section_id="chorus_1"),
             rule="DON'T overlap sections",
             message="Section overlap detected",
             fix_hint="Adjust bar boundaries to prevent overlap",
             acceptance_test="No overlap",
-            suggested_action=SuggestedAction.REPLAN_SECTION,
             targeted_actions=[],
         )
         verdict = JudgeVerdict(
@@ -390,7 +346,6 @@ class TestRevisionRequest:
             confidence=0.9,
             strengths=[],
             issues=[issue],
-            overall_assessment="Major issues",
             feedback_for_planner="Fix timing",
             iteration=1,
         )

@@ -4,11 +4,8 @@ from twinklr.core.agents.issues import (
     ActionType,
     Issue,
     IssueCategory,
-    IssueEffort,
     IssueLocation,
-    IssueScope,
     IssueSeverity,
-    SuggestedAction,
     TargetedAction,
 )
 from twinklr.core.agents.shared.judge.feedback import (
@@ -29,7 +26,6 @@ class TestFeedbackManagerJudgeVerdictIntegration:
             status=VerdictStatus.SOFT_FAIL,
             score=6.5,
             confidence=0.8,
-            overall_assessment="Needs improvement",
             feedback_for_planner="Add more variety to the choreography",
             iteration=1,
         )
@@ -53,7 +49,6 @@ class TestFeedbackManagerJudgeVerdictIntegration:
             status=VerdictStatus.HARD_FAIL,
             score=3.5,
             confidence=0.9,
-            overall_assessment="Fundamental issues",
             feedback_for_planner="Completely revise the structure",
             iteration=2,
         )
@@ -77,7 +72,6 @@ class TestFeedbackManagerJudgeVerdictIntegration:
             status=VerdictStatus.APPROVE,
             score=8.5,
             confidence=0.95,
-            overall_assessment="Excellent plan",
             feedback_for_planner="Great work",
             iteration=1,
         )
@@ -98,19 +92,15 @@ class TestFeedbackManagerJudgeVerdictIntegration:
             severity=IssueSeverity.WARN,
             rule="DON'T mismatch section timing with beat grid",
             message="Section timing mismatch",
-            estimated_effort=IssueEffort.MEDIUM,
-            scope=IssueScope.SECTION,
             location=IssueLocation(section_id="section-2"),
             fix_hint="Adjust section boundaries",
             acceptance_test="Section timing matches beat grid",
-            suggested_action=SuggestedAction.PATCH,
         )
 
         verdict = JudgeVerdict(
             status=VerdictStatus.SOFT_FAIL,
             score=6.0,
             confidence=0.85,
-            overall_assessment="Timing issues",
             feedback_for_planner="Fix timing",
             issues=[issue],
             iteration=1,
@@ -130,7 +120,6 @@ class TestFeedbackManagerJudgeVerdictIntegration:
             status=VerdictStatus.SOFT_FAIL,
             score=6.5,
             confidence=0.8,
-            overall_assessment="Needs work",
             feedback_for_planner="Improve",
             iteration=1,
         )
@@ -153,7 +142,6 @@ class TestFeedbackManagerJudgeVerdictIntegration:
             status=VerdictStatus.SOFT_FAIL,
             score=6.0,
             confidence=0.8,
-            overall_assessment="First attempt",
             feedback_for_planner="Improve variety",
             iteration=0,
         )
@@ -162,7 +150,6 @@ class TestFeedbackManagerJudgeVerdictIntegration:
             status=VerdictStatus.SOFT_FAIL,
             score=6.8,
             confidence=0.85,
-            overall_assessment="Better but still needs work",
             feedback_for_planner="Add more dynamics",
             iteration=1,
         )
@@ -206,7 +193,6 @@ class TestFeedbackManagerBackwardCompatibility:
             status=VerdictStatus.SOFT_FAIL,
             score=6.5,
             confidence=0.8,
-            overall_assessment="Needs work",
             feedback_for_planner="Improve variety",
             iteration=1,
         )
@@ -236,14 +222,11 @@ class TestFeedbackManagerTargetedActions:
             issue_id="GROUP_UNDERUTILIZED",
             category=IssueCategory.COVERAGE,
             severity=IssueSeverity.WARN,
-            estimated_effort=IssueEffort.LOW,
-            scope=IssueScope.SECTION,
             location=IssueLocation(section_id="chorus_1"),
             rule="DON'T underutilize groups",
             message="ARCHES group absent in chorus",
             fix_hint="Add ARCHES to sections",
             acceptance_test="ARCHES used in chorus",
-            suggested_action=SuggestedAction.PATCH,
             targeted_actions=[targeted_action],
         )
         manager = FeedbackManager(max_entries=10)
@@ -268,14 +251,11 @@ class TestFeedbackManagerTargetedActions:
             issue_id="VARIETY_LOW",
             category=IssueCategory.VARIETY,
             severity=IssueSeverity.WARN,
-            estimated_effort=IssueEffort.LOW,
-            scope=IssueScope.SECTION,
             location=IssueLocation(section_id="verse_1"),
             rule="DON'T lack variety",
             message="Same template repeated",
             fix_hint="Use different geometry types for variety",
             acceptance_test="Variety improved",
-            suggested_action=SuggestedAction.PATCH,
             targeted_actions=[],
         )
         manager = FeedbackManager(max_entries=10)

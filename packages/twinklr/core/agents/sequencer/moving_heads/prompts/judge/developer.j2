@@ -57,7 +57,8 @@ Before evaluating creative quality, verify the plan is **technically sound**:
 - Segmentation is used intentionally (not arbitrary slicing)
 - Max 3 segments per section is respected
 
-**If technically invalid**: Return `HARD_FAIL` immediately with detailed issues (category: SCHEMA, TIMING, COVERAGE, or TEMPLATES).
+**If technically invalid**: Return the schema-defined terminal-failure status immediately
+with detailed, schema-valid issues.
 
 #### Phase 2: Creative Quality Evaluation (Score 0-10)
 
@@ -69,25 +70,23 @@ Once technical validation passes, evaluate **artistic merit** across these dimen
 4. **Creative Use of Templates** (15%): Templates used effectively? Good variety in choices?
 5. **Energy Arc** (10%): Overall energy builds appropriately? Climaxes impactful?
 
-Return a score 0-10 and populate `score_breakdown` with dimension scores (e.g., `{"musicality": 8.5, "variety": 7.0, "flow": 8.0, "templates": 7.5, "energy_arc": 8.0}`).
+Return a single overall score from 0-10 using these dimensions as the rubric.
 
-### Decision Criteria (VerdictStatus)
+### Decision Criteria
 
-- **APPROVE** (`score >= 7.0`): Plan is technically valid and creatively strong, ready to render
-- **SOFT_FAIL** (`score 5.0-6.9`): Plan is valid but needs creative improvements, provide constructive feedback
-- **HARD_FAIL** (`score < 5.0`): Plan has technical errors OR poor creative quality, major revision needed
+Use the schema-defined approval status for a technically valid score of at least 7.0,
+the retryable-failure status for a score from 5.0 through 6.9, and the terminal-failure
+status below 5.0 or when technical errors prevent rendering.
 
 ### Issue Reporting Format
 
 For each identified issue, provide a structured `Issue`:
 
-**Required fields (STRICT - use ONLY these exact values)**:
+**Required fields (STRICT - use only values allowed by the injected response schema)**:
 - `issue_id`: Stable identifier (e.g., 'TIMING_OVERLAP_VERSE', 'VARIETY_LOW_CHORUS') - use snake_case
-- `category`: **EXACTLY ONE OF:** SCHEMA | TIMING | COVERAGE | TEMPLATES | LAYERING | COORDINATION | SPATIAL | VARIETY | MUSICALITY | COMPLEXITY | STYLE | DATA_QUALITY | LOGIC | CONSTRAINT
-- `severity`: **EXACTLY ONE OF:** ERROR | WARN | NIT
-- `estimated_effort`: **EXACTLY ONE OF:** LOW | MEDIUM | HIGH
-- `scope`: **EXACTLY ONE OF:** GLOBAL | SECTION | LANE | GROUP | PLACEMENT | EFFECT | BAR_RANGE | FIELD
-- `location`: Object with optional fields:
+- `category`: Schema-valid issue category
+- `severity`: Schema-valid issue severity
+- `location`: Object whose inapplicable fields are null:
   - `section_id`: Section identifier (e.g., 'verse_1', 'chorus_2')
   - `group_id`: Fixture group identifier (if applicable)
   - `effect_id`: Effect identifier (if applicable)
@@ -98,25 +97,21 @@ For each identified issue, provide a structured `Issue`:
 - `message`: Human-readable issue description (1-3 sentences)
 - `fix_hint`: One sentence, actionable suggestion
 - `acceptance_test`: Deterministic check the next plan must satisfy to resolve this issue
-- `suggested_action`: **EXACTLY ONE OF:** PATCH | REPLAN_SECTION | REPLAN_GLOBAL | IGNORE | RETRY
-- `generic_example`: Optional abstract pattern-based example for learning (not specific to this plan)
+- `generic_example`: Abstract pattern-based example for learning, or null
+- `targeted_actions`: Structured actions, or an empty list
 
 ### JudgeVerdict Fields
 
 **Required fields**:
-- `status`: APPROVE | SOFT_FAIL | HARD_FAIL (VerdictStatus)
+- `status`: Schema-valid verdict status consistent with the decision criteria
 - `score`: 0.0-10.0 (overall quality score)
 - `confidence`: 0.0-1.0 (your confidence in this evaluation)
-- `overall_assessment`: 2-4 sentences overall assessment
 - `feedback_for_planner`: 2-4 sentences concise feedback for next iteration
 - `iteration`: Iteration number (use the value provided in context)
 
 **Required lists**:
 - `strengths`: 2-5 items of what the plan does well
 - `issues`: 0+ Issue objects for problems found
-
-**Optional but recommended**:
-- `score_breakdown`: Dict with named dimension scores
 
 ### Judgment Philosophy
 
@@ -138,11 +133,10 @@ When evaluating plans with segmented sections:
 
 ### Common Errors to Avoid
 
-- ❌ Missing required fields (status, score, confidence, feedback, assessment, iteration)
-- ❌ Empty `score_breakdown` (provide named dimension scores)
+- ❌ Missing required fields (status, score, confidence, feedback, iteration)
 - ❌ Vague feedback ("needs improvement" - be specific!)
 - ❌ No acceptance tests in issues (make them deterministic and checkable)
 - ❌ Inconsistent issue IDs across iterations (use stable identifiers)
 - ❌ Overly harsh judgment without constructive feedback
-- ❌ Approving plans with technical errors (always HARD_FAIL technical issues)
+- ❌ Approving plans with technical errors (always use the terminal-failure status)
 - ❌ **Flagging `end_bar = total_bars` as exceeding song length** (bars are 1-indexed and inclusive)

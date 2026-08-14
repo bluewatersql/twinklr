@@ -34,7 +34,6 @@ def test_asset_usage_enum():
 def test_creative_guidance_valid_full():
     """Test CreativeGuidance with all fields."""
     from twinklr.core.agents.audio.profile.models import (
-        AssetUsage,
         Contrast,
         CreativeGuidance,
         MotionDensity,
@@ -44,7 +43,6 @@ def test_creative_guidance_valid_full():
         recommended_layer_count=2,
         recommended_contrast=Contrast.HIGH,
         recommended_motion_density=MotionDensity.BUSY,
-        recommended_asset_usage=AssetUsage.HEAVY,
         palette_color_guidance=["vibrant", "energetic"],
         cautions=["Respect quiet bridge section"],
     )
@@ -52,7 +50,7 @@ def test_creative_guidance_valid_full():
     assert guidance.recommended_layer_count == 2
     assert guidance.recommended_contrast == Contrast.HIGH
     assert guidance.recommended_motion_density == MotionDensity.BUSY
-    assert guidance.recommended_asset_usage == AssetUsage.HEAVY
+    assert "recommended_asset_usage" not in CreativeGuidance.model_fields
     assert len(guidance.palette_color_guidance) == 2
     assert len(guidance.cautions) == 1
 
@@ -60,7 +58,6 @@ def test_creative_guidance_valid_full():
 def test_creative_guidance_layer_count_validation():
     """Test CreativeGuidance layer_count must be in [1, 3]."""
     from twinklr.core.agents.audio.profile.models import (
-        AssetUsage,
         Contrast,
         CreativeGuidance,
         MotionDensity,
@@ -72,7 +69,6 @@ def test_creative_guidance_layer_count_validation():
             recommended_layer_count=count,
             recommended_contrast=Contrast.MED,
             recommended_motion_density=MotionDensity.MED,
-            recommended_asset_usage=AssetUsage.SPARSE,
         )
 
     # Invalid: < 1
@@ -81,7 +77,6 @@ def test_creative_guidance_layer_count_validation():
             recommended_layer_count=0,
             recommended_contrast=Contrast.MED,
             recommended_motion_density=MotionDensity.MED,
-            recommended_asset_usage=AssetUsage.SPARSE,
         )
 
     # Invalid: > 3
@@ -90,14 +85,12 @@ def test_creative_guidance_layer_count_validation():
             recommended_layer_count=4,
             recommended_contrast=Contrast.MED,
             recommended_motion_density=MotionDensity.MED,
-            recommended_asset_usage=AssetUsage.SPARSE,
         )
 
 
 def test_creative_guidance_color_story_max_length():
     """Test CreativeGuidance color_story max 5 items."""
     from twinklr.core.agents.audio.profile.models import (
-        AssetUsage,
         Contrast,
         CreativeGuidance,
         MotionDensity,
@@ -108,7 +101,6 @@ def test_creative_guidance_color_story_max_length():
         recommended_layer_count=2,
         recommended_contrast=Contrast.MED,
         recommended_motion_density=MotionDensity.MED,
-        recommended_asset_usage=AssetUsage.SPARSE,
         palette_color_guidance=["warm", "cool", "vibrant", "dark", "light"],
     )
 
@@ -118,7 +110,6 @@ def test_creative_guidance_color_story_max_length():
             recommended_layer_count=2,
             recommended_contrast=Contrast.MED,
             recommended_motion_density=MotionDensity.MED,
-            recommended_asset_usage=AssetUsage.SPARSE,
             palette_color_guidance=["a", "b", "c", "d", "e", "f"],
         )
 
@@ -137,7 +128,10 @@ def test_planner_hints_valid():
     )
 
     assert len(hints.section_objectives) == 2
-    assert "verse_1" in hints.section_objectives
+    assert [entry.section_id for entry in hints.section_objectives] == [
+        "verse_1",
+        "chorus_1",
+    ]
     assert len(hints.avoid_patterns) == 2
     assert len(hints.emphasize_groups) == 1
 
@@ -148,7 +142,7 @@ def test_planner_hints_minimal():
 
     hints = PlannerHints()
 
-    assert hints.section_objectives == {}
+    assert hints.section_objectives == []
     assert hints.avoid_patterns == []
     assert hints.emphasize_groups == []
 

@@ -6,7 +6,6 @@ import pytest
 def test_audio_profile_model_complete():
     """Test AudioProfileModel with all nested models."""
     from twinklr.core.agents.audio.profile.models import (
-        AssetUsage,
         AudioProfileModel,
         Contrast,
         CreativeGuidance,
@@ -17,7 +16,6 @@ def test_audio_profile_model_complete():
         MacroEnergy,
         MotionDensity,
         PlannerHints,
-        Provenance,
         SectionEnergyProfile,
         SongIdentity,
         SongSectionRef,
@@ -25,15 +23,6 @@ def test_audio_profile_model_complete():
     )
 
     profile = AudioProfileModel(
-        run_id="test_run_123",
-        provenance=Provenance(
-            provider_id="openai",
-            model_id="gpt-5.2",
-            prompt_pack="audio_profile.v2",
-            prompt_pack_version="1.0",
-            framework_version="1.0.0",
-            temperature=0.7,
-        ),
         song_identity=SongIdentity(
             title="Test Song",
             artist="Test Artist",
@@ -65,17 +54,15 @@ def test_audio_profile_model_complete():
                     start_ms=0,
                     end_ms=30000,
                     energy_curve=[
-                        EnergyPoint(t_ms=0, energy_0_1=0.4),
-                        EnergyPoint(t_ms=15000, energy_0_1=0.5),
-                        EnergyPoint(t_ms=30000, energy_0_1=0.6),
+                        EnergyPoint(t_ms=0),
+                        EnergyPoint(t_ms=15000),
+                        EnergyPoint(t_ms=30000),
                     ],
                     mean_energy=0.5,
                     peak_energy=0.6,
                 ),
             ],
             peaks=[EnergyPeak(start_ms=30000, end_ms=35000, energy=0.9)],
-            overall_mean=0.6,
-            energy_confidence=0.92,
         ),
         lyric_profile=LyricProfile(
             has_plain_lyrics=True,
@@ -88,7 +75,6 @@ def test_audio_profile_model_complete():
             recommended_layer_count=2,
             recommended_contrast=Contrast.HIGH,
             recommended_motion_density=MotionDensity.BUSY,
-            recommended_asset_usage=AssetUsage.SPARSE,
             palette_color_guidance=["vibrant", "energetic"],
         ),
         planner_hints=PlannerHints(
@@ -97,10 +83,10 @@ def test_audio_profile_model_complete():
         ),
     )
 
-    # Verify top-level fields
-    assert profile.run_id == "test_run_123"
-    assert profile.schema_version == "2.0"
-    assert profile.agent_id == "audio_profile.v2"
+    # Framework metadata is excluded from the model-generated response.
+    assert "run_id" not in AudioProfileModel.model_fields
+    assert "schema_version" not in AudioProfileModel.model_fields
+    assert "agent_id" not in AudioProfileModel.model_fields
 
     # Verify nested models work
     assert profile.song_identity.title == "Test Song"
@@ -116,7 +102,6 @@ def test_audio_profile_model_validates_nested():
     from pydantic import ValidationError
 
     from twinklr.core.agents.audio.profile.models import (
-        AssetUsage,
         AudioProfileModel,
         Contrast,
         CreativeGuidance,
@@ -125,7 +110,6 @@ def test_audio_profile_model_validates_nested():
         MacroEnergy,
         MotionDensity,
         PlannerHints,
-        Provenance,
         SongIdentity,
         Structure,
     )
@@ -133,23 +117,12 @@ def test_audio_profile_model_validates_nested():
     # Invalid: duration_ms must be > 0
     with pytest.raises(ValidationError):
         AudioProfileModel(
-            run_id="test",
-            provenance=Provenance(
-                provider_id="openai",
-                model_id="gpt-5.2",
-                prompt_pack="audio_profile.v2",
-                prompt_pack_version="1.0",
-                framework_version="1.0.0",
-                temperature=0.7,
-            ),
             song_identity=SongIdentity(duration_ms=0),  # Invalid
             structure=Structure(sections=[], structure_confidence=0.9),
             energy_profile=EnergyProfile(
                 macro_energy=MacroEnergy.LOW,
                 section_profiles=[],
                 peaks=[],
-                overall_mean=0.5,
-                energy_confidence=0.9,
             ),
             lyric_profile=LyricProfile(
                 has_plain_lyrics=False,
@@ -162,7 +135,6 @@ def test_audio_profile_model_validates_nested():
                 recommended_layer_count=2,
                 recommended_contrast=Contrast.MED,
                 recommended_motion_density=MotionDensity.MED,
-                recommended_asset_usage=AssetUsage.SPARSE,
             ),
             planner_hints=PlannerHints(),
         )

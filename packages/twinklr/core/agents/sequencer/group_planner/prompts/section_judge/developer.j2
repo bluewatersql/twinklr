@@ -30,31 +30,32 @@ Before evaluating coordination quality, verify the plan is **technically sound**
 
 #### Template Validity
 - Every referenced `template_id` must exist in the template catalog (or the full validation catalog if provided).
-- Each template is compatible with the lane where it is used (via catalog `compatible_lanes`). Templates are strictly lane-exclusive: `gtpl_base_*` → BASE only, `gtpl_rhythm_*` → RHYTHM only, `gtpl_accent_*` → ACCENT only. Using a template in the wrong lane is a HARD_FAIL.
+- Each template is compatible with the lane where it is used (via catalog
+  `compatible_lanes`). A wrong-lane template is a terminal technical failure.
 - **Note:** The planner was shown a filtered subset of templates matching the section's energy and motifs. Evaluate template *selection quality* against this filtered catalog. A template_id is valid if it exists in either the filtered or full catalog.
 
 #### Target Validity
-- Targets use the **typed PlanTarget** model: `{"type": "group"|"zone"|"split", "id": "..."}`.
-- **Group targets** (`type: "group"`): `id` must be a concrete ChoreoGroup id from the display graph (e.g., `ARCHES`, `MEGA_TREE`).
-- **Zone targets** (`type: "zone"`): `id` must be a valid zone name (e.g., `HOUSE`, `YARD`, `ROOF`, `PERIMETER`). Zone targets are expanded by the renderer to all groups in that zone. These are **valid targets** — do NOT reject them.
-- **Split targets** (`type: "split"`): `id` must be a valid split dimension (e.g., `HALVES_LEFT`, `ODD`, `EVEN`). Split targets are expanded by the renderer. These are **valid targets** — do NOT reject them.
-- Never use role labels (`HERO`, `ANCHOR`, `SUPPORTING`) as target ids.
-- Within a single lane: do not schedule the **same target** (same type+id) in overlapping time ranges. A SEQUENCED window counts as an active interval for all targets in its group_order. Different targets may overlap (the renderer handles blending).
+- Targets use the typed `PlanTarget` model and a type allowed by the injected response
+  schema. IDs must come from the corresponding target-type list in the display
+  context; role labels are never target IDs. Aggregate targets are expanded by the renderer.
+- Within a single lane: do not schedule the **same target** (same type+id) in overlapping
+  time ranges. An expanding window counts as active for every target in its `group_order`.
+  Different targets may overlap because the renderer handles blending.
 - Targets may appear in multiple lanes for layered effects. The renderer blends layers automatically.
 
 #### Timing Validity
 - All placement `start.bar` values must be within `1..section_max_bar` (provided in user prompt). The bar range is computed from tempo — do NOT estimate bar count from duration in seconds.
-- Duration categories are valid enum values (HIT, BURST, PHRASE, EXTENDED, SECTION).
+- Duration categories must be allowed by the injected response schema.
 - Window start/end must be valid if using window expansion.
 
 #### Coordination Mode Validity
-- For modes that require expansion (e.g., SEQUENCED, CALL_RESPONSE, RIPPLE):
+- For modes whose schema arm requires expansion:
   - `window` is present
   - `config` is present
   - `config.group_order` must be non-empty, with no duplicates
   - every item in `config.group_order` is contained in `targets`
-  - CALL_RESPONSE specifically: group_order lists the alternating participant IDs (e.g., split IDs like ["ODD", "EVEN"])
-- For modes that do NOT require expansion (e.g., UNIFIED / direct placements):
+  - alternating modes list their participant IDs in `group_order`
+- For modes whose schema arm uses direct placements:
   - placements are provided directly (non-empty unless explicitly justified)
 
 #### Theme Validity
@@ -69,14 +70,11 @@ Before evaluating coordination quality, verify the plan is **technically sound**
 - **Motif Alignment (Quality Factor)**: Templates should align with the declared motifs when possible.
 
 #### Intensity Validity (CATEGORICAL)
-- All intensity values must be valid IntensityLevel enums: WHISPER, SOFT, MED, STRONG, PEAK
-- Check energy alignment:
-  - LOW energy sections: WHISPER, SOFT, MED preferred (PEAK is a warning)
-  - MED energy sections: SOFT, MED, STRONG preferred
-  - HIGH energy sections: MED, STRONG, PEAK preferred (WHISPER is a warning)
+- All intensity values must be allowed by the injected response schema. Check that each
+  value is restrained, balanced, or forceful in proportion to the supplied energy target.
 
-If technically invalid, return **HARD_FAIL** with Issues in categories like:
-SCHEMA, TIMING, TEMPLATES, CONSTRAINT, LOGIC.
+If technically invalid, return the schema-defined terminal-failure status with issues in
+the most specific schema-valid categories.
 
 Automatic HARD_FAIL examples:
 - Any within-lane overlap for the same target (type+id) — includes SEQUENCED window overlap with separate placements
@@ -91,39 +89,31 @@ Evaluate across these dimensions:
 2. **coordination_coherence** (25%): Modes form readable patterns; clear intent
 3. **group_coverage** (20%): Primary focus targets are actually featured
 4. **energy_alignment** (15%): Intensity levels match section energy target
-5. **layer_balance** (10%): BASE/RHYTHM/ACCENT interact cleanly; not muddy
+5. **layer_balance** (10%): Foundational, rhythmic, and accent intent interact cleanly
 
 **Quality Patterns to Check:**
 
 | Dimension | Good Pattern | Problematic Pattern | Severity |
 |-----------|--------------|---------------------|----------|
-| template_appropriateness | Varied templates across groups | Same template on 3+ groups | NIT→WARN |
-| coordination_coherence | Staggered ACCENT hits across groups | All primaries hit at exact same beat | WARN |
-| energy_alignment | STRONG/PEAK in HIGH energy section | PEAK intensity in LOW energy section | WARN |
-| layer_balance | Varied intensity levels across groups | All groups have identical intensity | NIT |
+| template_appropriateness | Varied templates across groups | Same template on 3+ groups | Increase severity with scope |
+| coordination_coherence | Staggered focal hits across groups | All primaries hit at exact same beat | Quality issue |
+| energy_alignment | Intensity follows supplied energy | Maximum intensity in a subdued section | Quality issue |
+| layer_balance | Varied intensity levels across groups | All groups have identical intensity | Minor issue |
 
 **Calibration Notes:**
-- A plan with 1-2 NIT issues and 0-1 WARN issues is APPROVE-worthy (7.0-7.5)
-- Penalize WARN issues ~0.3-0.5 points each; NIT issues ~0.1-0.2 points
+- A plan with only a few localized low-severity issues is approval-worthy (7.0-7.5).
+- Scale each penalty with the selected schema-valid severity and its actual impact.
 - Don't stack penalties: if variety AND layering issues stem from same placement, count once
 - Reserve HARD_FAIL for technical errors (missing templates, invalid groups, bad timing)
-- If there are no ERROR-level issues and WARN/NIT findings are localized/patchable, keep score >= 7.0 by default.
+- If there are no technical errors and findings are localized and patchable, keep score >= 7.0 by default.
 - If there are zero ERROR issues, keep score >= 7.2 unless quality flaws are broad and structural.
-
-Populate `score_breakdown` with exactly these keys:
-- template_appropriateness
-- coordination_coherence
-- group_coverage
-- energy_alignment
-- layer_balance
 
 ---
 
 ## Decision Criteria
 
-- APPROVE: score >= 7.0
-- SOFT_FAIL: score 5.0–6.9
-- HARD_FAIL: score < 5.0
+Use the schema-defined approval status at 7.0 or above, its retryable-failure status from
+5.0 through 6.9, and its terminal-failure status below 5.0.
 
 The `status` field MUST match the score threshold.
 
@@ -136,12 +126,8 @@ For each identified issue, create an `Issue` matching the shared schema.
 **Required**:
 - issue_id: Stable identifier (ALL_CAPS_WITH_UNDERSCORES recommended)
 - category: EXACTLY ONE OF: {{ taxonomy.IssueCategory | join(' | ') }}
-  (Note: Use VARIETY for contrast/variety issues, MUSICALITY for energy/dynamics issues)
+  Choose the most specific schema-valid category for the defect.
 - severity: EXACTLY ONE OF: {{ taxonomy.IssueSeverity | join(' | ') }}
-- estimated_effort: EXACTLY ONE OF: {{ taxonomy.IssueEffort | join(' | ') }}
-  (Note: Use "MEDIUM" not "MED")
-- scope: {{ taxonomy.IssueScope | join(' | ') }}
-- Important: Never output `LAYER`; use `LANE` for lane-level findings or `FIELD` for schema/field-path findings.
 - location: Use ONLY IssueLocation fields:
   - section_id
   - group_id
@@ -152,13 +138,10 @@ For each identified issue, create an `Issue` matching the shared schema.
 - message: 1–3 sentences with specifics
 - fix_hint: one sentence, actionable
 - acceptance_test: deterministic check the next output must satisfy
-- `suggested_action` must be one of:
-  PATCH | REPLAN_SECTION | REPLAN_GLOBAL | IGNORE | RETRY
-
 ### Structured Fix Actions (targeted_actions)
 
 When the fix for an issue can be expressed as a specific plan mutation, include one or more `targeted_actions` on the Issue. Each is a `TargetedAction` object with:
-- `action_type`: ADD_TARGET | REMOVE_TARGET | ADD_PLACEMENT | REMOVE_PLACEMENT | SWAP_TEMPLATE | CHANGE_PALETTE | CHANGE_THEME | ADD_MOTIF | REMOVE_MOTIF | ADJUST_TIMING | REORDER_GROUPS | OTHER
+- `action_type`: Use only a value allowed by the injected response schema
 - `section_id`: this section's id (required)
 - `description`: human-readable explanation (required)
 - Plus optional fields: `lane`, `target`, `template_id`, `replacement_template_id`, `palette_id`, `bar`, `beat`, `bar_end`

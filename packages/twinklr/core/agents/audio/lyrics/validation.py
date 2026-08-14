@@ -12,6 +12,11 @@ from twinklr.core.agents.audio.lyrics.models import Issue, LyricContextModel, Se
 from twinklr.core.audio.models import SongBundle
 
 
+def _issue(**values: object) -> Issue:
+    """Build deterministic issues with every strict response key populated."""
+    return Issue.model_validate({"path": None, "hint": None, **values})
+
+
 def validate_lyrics(lyric_context: LyricContextModel, song_bundle: SongBundle) -> list[Issue]:
     """Validate LyricContextModel using heuristic rules.
 
@@ -61,7 +66,7 @@ def _validate_timestamps(lyric_context: LyricContextModel, duration_ms: int) -> 
     for phrase in lyric_context.key_phrases:
         if phrase.timestamp_ms > duration_ms:
             issues.append(
-                Issue(
+                _issue(
                     severity=Severity.ERROR,
                     code="TIMESTAMP_OUT_OF_BOUNDS",
                     message=f"Key phrase '{phrase.text[:30]}...' timestamp {phrase.timestamp_ms}ms "
@@ -76,7 +81,7 @@ def _validate_timestamps(lyric_context: LyricContextModel, duration_ms: int) -> 
             _start_ms, end_ms = beat.timestamp_range
             if end_ms > duration_ms:
                 issues.append(
-                    Issue(
+                    _issue(
                         severity=Severity.ERROR,
                         code="TIMESTAMP_OUT_OF_BOUNDS",
                         message=f"Story beat in {beat.section_id} ends at {end_ms}ms, "
@@ -90,7 +95,7 @@ def _validate_timestamps(lyric_context: LyricContextModel, duration_ms: int) -> 
         for i in range(len(sorted_beats) - 1):
             if sorted_beats[i].timestamp_range[1] > sorted_beats[i + 1].timestamp_range[0]:
                 issues.append(
-                    Issue(
+                    _issue(
                         severity=Severity.WARN,
                         code="OVERLAPPING_STORY_BEATS",
                         message=f"Story beats overlap: {sorted_beats[i].section_id} "
@@ -105,7 +110,7 @@ def _validate_timestamps(lyric_context: LyricContextModel, duration_ms: int) -> 
     for section in lyric_context.silent_sections:
         if section.end_ms > duration_ms:
             issues.append(
-                Issue(
+                _issue(
                     severity=Severity.ERROR,
                     code="TIMESTAMP_OUT_OF_BOUNDS",
                     message=f"Silent section ends at {section.end_ms}ms, "
@@ -119,7 +124,7 @@ def _validate_timestamps(lyric_context: LyricContextModel, duration_ms: int) -> 
     for i in range(len(sorted_sections) - 1):
         if sorted_sections[i].end_ms > sorted_sections[i + 1].start_ms:
             issues.append(
-                Issue(
+                _issue(
                     severity=Severity.WARN,
                     code="OVERLAPPING_SILENT_SECTIONS",
                     message=f"Silent sections overlap: [{sorted_sections[i].start_ms}-{sorted_sections[i].end_ms}ms] "
@@ -140,7 +145,7 @@ def _validate_cross_field_consistency(lyric_context: LyricContextModel) -> list[
         lyric_context.story_beats is None or len(lyric_context.story_beats) == 0
     ):
         issues.append(
-            Issue(
+            _issue(
                 severity=Severity.ERROR,
                 code="NARRATIVE_MISSING_STORY_BEATS",
                 message="has_narrative=True but story_beats is empty or None",
@@ -154,7 +159,7 @@ def _validate_cross_field_consistency(lyric_context: LyricContextModel) -> list[
         lyric_context.characters is None or len(lyric_context.characters) == 0
     ):
         issues.append(
-            Issue(
+            _issue(
                 severity=Severity.WARN,
                 code="NARRATIVE_MISSING_CHARACTERS",
                 message="has_narrative=True but characters is empty or None",
@@ -167,7 +172,7 @@ def _validate_cross_field_consistency(lyric_context: LyricContextModel) -> list[
     if not lyric_context.has_lyrics:
         if lyric_context.themes:
             issues.append(
-                Issue(
+                _issue(
                     severity=Severity.WARN,
                     code="NO_LYRICS_BUT_THEMES",
                     message="has_lyrics=False but themes is populated",
@@ -176,7 +181,7 @@ def _validate_cross_field_consistency(lyric_context: LyricContextModel) -> list[
             )
         if lyric_context.key_phrases:
             issues.append(
-                Issue(
+                _issue(
                     severity=Severity.ERROR,
                     code="NO_LYRICS_BUT_KEY_PHRASES",
                     message="has_lyrics=False but key_phrases is populated",
@@ -195,7 +200,7 @@ def _validate_thematic_consistency(lyric_context: LyricContextModel) -> list[Iss
         # Themes should not be empty if lyrics available
         if not lyric_context.themes:
             issues.append(
-                Issue(
+                _issue(
                     severity=Severity.WARN,
                     code="MISSING_THEMES",
                     message="has_lyrics=True but themes is empty",
@@ -207,7 +212,7 @@ def _validate_thematic_consistency(lyric_context: LyricContextModel) -> list[Iss
         # Key phrases should not be empty if lyrics available
         if not lyric_context.key_phrases:
             issues.append(
-                Issue(
+                _issue(
                     severity=Severity.WARN,
                     code="MISSING_KEY_PHRASES",
                     message="has_lyrics=True but key_phrases is empty",
@@ -219,7 +224,7 @@ def _validate_thematic_consistency(lyric_context: LyricContextModel) -> list[Iss
         # Visual themes should not be empty if lyrics available
         if not lyric_context.recommended_visual_themes:
             issues.append(
-                Issue(
+                _issue(
                     severity=Severity.WARN,
                     code="MISSING_VISUAL_THEMES",
                     message="has_lyrics=True but recommended_visual_themes is empty",

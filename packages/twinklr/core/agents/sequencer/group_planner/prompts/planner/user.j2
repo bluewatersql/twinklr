@@ -15,12 +15,12 @@ Rules and energy recipes live in system.j2 — NOT restated here.
 {% if section_duration_bars < 1 %}
 ⚠️ **VERY SHORT SECTION (< 1 bar):** This is a pickup/transition. Use minimal placements:
 - ONE accent HIT on primary target at bar 1, beat 1
-- Skip BASE and RHYTHM lanes (no time for patterns)
+- Skip sustained and rhythmic lanes (no time for patterns)
 - Do NOT use SECTION duration (section is shorter than 1 bar)
 {% elif section_duration_bars < 2 %}
-⚠️ **SHORT SECTION (< 2 bars):** Limited space. Use HIT/BURST durations only. Avoid PHRASE/EXTENDED/SECTION.
+⚠️ **SHORT SECTION (< 2 bars):** Limited space. Use the briefest schema-valid durations.
 {% elif section_duration_bars <= 5 %}
-⚠️ **BRIEF SECTION (≤ 5 bars):** Keep it simple — ONE placement per target per lane. HIT/BURST preferred.
+⚠️ **BRIEF SECTION (≤ 5 bars):** Keep it simple — ONE placement per target per lane and prefer brief durations.
 {% endif %}
 
 ## MacroPlan Intent

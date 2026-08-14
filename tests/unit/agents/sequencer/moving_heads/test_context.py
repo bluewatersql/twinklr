@@ -6,7 +6,6 @@ from pathlib import Path
 import pytest
 
 from twinklr.core.agents.audio.profile.models import (
-    AssetUsage,
     AudioProfileModel,
     Contrast,
     CreativeGuidance,
@@ -63,9 +62,9 @@ def create_minimal_audio_profile(
             start_ms=sec.start_ms,
             end_ms=sec.end_ms,
             energy_curve=[
-                EnergyPoint(t_ms=sec.start_ms, energy_0_1=0.5),
-                EnergyPoint(t_ms=(sec.start_ms + sec.end_ms) // 2, energy_0_1=0.6),
-                EnergyPoint(t_ms=sec.end_ms - 1, energy_0_1=0.5),
+                EnergyPoint(t_ms=sec.start_ms),
+                EnergyPoint(t_ms=(sec.start_ms + sec.end_ms) // 2),
+                EnergyPoint(t_ms=sec.end_ms - 1),
             ],
             mean_energy=0.55,
             peak_energy=0.6,
@@ -77,8 +76,6 @@ def create_minimal_audio_profile(
         macro_energy=MacroEnergy.MED,
         section_profiles=section_profiles,
         peaks=[],
-        overall_mean=0.5,
-        energy_confidence=0.8,
     )
 
     lyric_profile = LyricProfile(
@@ -93,7 +90,6 @@ def create_minimal_audio_profile(
         recommended_layer_count=2,
         recommended_contrast=Contrast.MED,
         recommended_motion_density=MotionDensity.MED,
-        recommended_asset_usage=AssetUsage.SPARSE,
     )
 
     planner_hints = PlannerHints()

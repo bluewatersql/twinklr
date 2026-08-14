@@ -4,7 +4,6 @@
 def test_validate_valid_profile():
     """Test validation passes for valid AudioProfileModel."""
     from twinklr.core.agents.audio.profile.models import (
-        AssetUsage,
         AudioProfileModel,
         Contrast,
         CreativeGuidance,
@@ -15,7 +14,6 @@ def test_validate_valid_profile():
         MacroEnergy,
         MotionDensity,
         PlannerHints,
-        Provenance,
         SectionEnergyProfile,
         SongIdentity,
         SongSectionRef,
@@ -24,15 +22,6 @@ def test_validate_valid_profile():
     from twinklr.core.agents.audio.profile.validation import validate_audio_profile
 
     profile = AudioProfileModel(
-        run_id="test",
-        provenance=Provenance(
-            provider_id="openai",
-            model_id="gpt-5.2",
-            prompt_pack="audio_profile.v2",
-            prompt_pack_version="1.0",
-            framework_version="1.0.0",
-            temperature=0.7,
-        ),
         song_identity=SongIdentity(duration_ms=60000, bpm=120.0),
         structure=Structure(
             sections=[
@@ -49,17 +38,15 @@ def test_validate_valid_profile():
                     start_ms=0,
                     end_ms=30000,
                     energy_curve=[
-                        EnergyPoint(t_ms=0, energy_0_1=0.4),
-                        EnergyPoint(t_ms=15000, energy_0_1=0.5),
-                        EnergyPoint(t_ms=30000, energy_0_1=0.6),
+                        EnergyPoint(t_ms=0),
+                        EnergyPoint(t_ms=15000),
+                        EnergyPoint(t_ms=30000),
                     ],
                     mean_energy=0.5,
                     peak_energy=0.6,
                 ),
             ],
             peaks=[EnergyPeak(start_ms=25000, end_ms=30000, energy=0.6)],
-            overall_mean=0.5,
-            energy_confidence=0.85,
         ),
         lyric_profile=LyricProfile(
             has_plain_lyrics=True,
@@ -72,7 +59,6 @@ def test_validate_valid_profile():
             recommended_layer_count=2,
             recommended_contrast=Contrast.MED,
             recommended_motion_density=MotionDensity.MED,
-            recommended_asset_usage=AssetUsage.SPARSE,
         ),
         planner_hints=PlannerHints(),
     )
@@ -84,7 +70,6 @@ def test_validate_valid_profile():
 def test_validate_sections_not_monotonic():
     """Test validation detects non-monotonic sections."""
     from twinklr.core.agents.audio.profile.models import (
-        AssetUsage,
         AudioProfileModel,
         Contrast,
         CreativeGuidance,
@@ -94,7 +79,6 @@ def test_validate_sections_not_monotonic():
         MacroEnergy,
         MotionDensity,
         PlannerHints,
-        Provenance,
         SectionEnergyProfile,
         SongIdentity,
         SongSectionRef,
@@ -103,15 +87,6 @@ def test_validate_sections_not_monotonic():
     from twinklr.core.agents.audio.profile.validation import validate_audio_profile
 
     profile = AudioProfileModel(
-        run_id="test",
-        provenance=Provenance(
-            provider_id="openai",
-            model_id="gpt-5.2",
-            prompt_pack="audio_profile.v2",
-            prompt_pack_version="1.0",
-            framework_version="1.0.0",
-            temperature=0.7,
-        ),
         song_identity=SongIdentity(duration_ms=60000),
         structure=Structure(
             sections=[
@@ -130,17 +105,15 @@ def test_validate_sections_not_monotonic():
                     start_ms=30000,
                     end_ms=60000,
                     energy_curve=[
-                        EnergyPoint(t_ms=30000, energy_0_1=0.4),
-                        EnergyPoint(t_ms=45000, energy_0_1=0.4),
-                        EnergyPoint(t_ms=60000, energy_0_1=0.4),
+                        EnergyPoint(t_ms=30000),
+                        EnergyPoint(t_ms=45000),
+                        EnergyPoint(t_ms=60000),
                     ],
                     mean_energy=0.4,
                     peak_energy=0.4,
                 ),
             ],
             peaks=[],
-            overall_mean=0.4,
-            energy_confidence=0.8,
         ),
         lyric_profile=LyricProfile(
             has_plain_lyrics=False,
@@ -153,7 +126,6 @@ def test_validate_sections_not_monotonic():
             recommended_layer_count=1,
             recommended_contrast=Contrast.LOW,
             recommended_motion_density=MotionDensity.SPARSE,
-            recommended_asset_usage=AssetUsage.NONE,
         ),
         planner_hints=PlannerHints(),
     )
@@ -166,7 +138,6 @@ def test_validate_sections_not_monotonic():
 def test_validate_sections_overlapping():
     """Test validation detects overlapping sections."""
     from twinklr.core.agents.audio.profile.models import (
-        AssetUsage,
         AudioProfileModel,
         Contrast,
         CreativeGuidance,
@@ -176,7 +147,6 @@ def test_validate_sections_overlapping():
         MacroEnergy,
         MotionDensity,
         PlannerHints,
-        Provenance,
         SectionEnergyProfile,
         SongIdentity,
         SongSectionRef,
@@ -185,15 +155,6 @@ def test_validate_sections_overlapping():
     from twinklr.core.agents.audio.profile.validation import validate_audio_profile
 
     profile = AudioProfileModel(
-        run_id="test",
-        provenance=Provenance(
-            provider_id="openai",
-            model_id="gpt-5.2",
-            prompt_pack="audio_profile.v2",
-            prompt_pack_version="1.0",
-            framework_version="1.0.0",
-            temperature=0.7,
-        ),
         song_identity=SongIdentity(duration_ms=100000),
         structure=Structure(
             sections=[
@@ -212,17 +173,15 @@ def test_validate_sections_overlapping():
                     start_ms=0,
                     end_ms=30000,
                     energy_curve=[
-                        EnergyPoint(t_ms=0, energy_0_1=0.4),
-                        EnergyPoint(t_ms=15000, energy_0_1=0.4),
-                        EnergyPoint(t_ms=30000, energy_0_1=0.4),
+                        EnergyPoint(t_ms=0),
+                        EnergyPoint(t_ms=15000),
+                        EnergyPoint(t_ms=30000),
                     ],
                     mean_energy=0.4,
                     peak_energy=0.4,
                 ),
             ],
             peaks=[],
-            overall_mean=0.4,
-            energy_confidence=0.8,
         ),
         lyric_profile=LyricProfile(
             has_plain_lyrics=False,
@@ -235,7 +194,6 @@ def test_validate_sections_overlapping():
             recommended_layer_count=1,
             recommended_contrast=Contrast.LOW,
             recommended_motion_density=MotionDensity.SPARSE,
-            recommended_asset_usage=AssetUsage.NONE,
         ),
         planner_hints=PlannerHints(),
     )
@@ -248,7 +206,6 @@ def test_validate_sections_overlapping():
 def test_validate_sections_exceed_duration():
     """Test validation detects sections beyond song duration."""
     from twinklr.core.agents.audio.profile.models import (
-        AssetUsage,
         AudioProfileModel,
         Contrast,
         CreativeGuidance,
@@ -258,7 +215,6 @@ def test_validate_sections_exceed_duration():
         MacroEnergy,
         MotionDensity,
         PlannerHints,
-        Provenance,
         SectionEnergyProfile,
         SongIdentity,
         SongSectionRef,
@@ -267,15 +223,6 @@ def test_validate_sections_exceed_duration():
     from twinklr.core.agents.audio.profile.validation import validate_audio_profile
 
     profile = AudioProfileModel(
-        run_id="test",
-        provenance=Provenance(
-            provider_id="openai",
-            model_id="gpt-5.2",
-            prompt_pack="audio_profile.v2",
-            prompt_pack_version="1.0",
-            framework_version="1.0.0",
-            temperature=0.7,
-        ),
         song_identity=SongIdentity(duration_ms=60000),
         structure=Structure(
             sections=[
@@ -293,17 +240,15 @@ def test_validate_sections_exceed_duration():
                     start_ms=0,
                     end_ms=70000,
                     energy_curve=[
-                        EnergyPoint(t_ms=0, energy_0_1=0.4),
-                        EnergyPoint(t_ms=35000, energy_0_1=0.4),
-                        EnergyPoint(t_ms=70000, energy_0_1=0.4),
+                        EnergyPoint(t_ms=0),
+                        EnergyPoint(t_ms=35000),
+                        EnergyPoint(t_ms=70000),
                     ],
                     mean_energy=0.4,
                     peak_energy=0.4,
                 ),
             ],
             peaks=[],
-            overall_mean=0.4,
-            energy_confidence=0.8,
         ),
         lyric_profile=LyricProfile(
             has_plain_lyrics=False,
@@ -316,7 +261,6 @@ def test_validate_sections_exceed_duration():
             recommended_layer_count=1,
             recommended_contrast=Contrast.LOW,
             recommended_motion_density=MotionDensity.SPARSE,
-            recommended_asset_usage=AssetUsage.NONE,
         ),
         planner_hints=PlannerHints(),
     )
@@ -329,7 +273,6 @@ def test_validate_sections_exceed_duration():
 def test_validate_lyric_consistency():
     """Test validation detects lyric field inconsistencies."""
     from twinklr.core.agents.audio.profile.models import (
-        AssetUsage,
         AudioProfileModel,
         Contrast,
         CreativeGuidance,
@@ -339,7 +282,6 @@ def test_validate_lyric_consistency():
         MacroEnergy,
         MotionDensity,
         PlannerHints,
-        Provenance,
         SectionEnergyProfile,
         SongIdentity,
         SongSectionRef,
@@ -348,15 +290,6 @@ def test_validate_lyric_consistency():
     from twinklr.core.agents.audio.profile.validation import validate_audio_profile
 
     profile = AudioProfileModel(
-        run_id="test",
-        provenance=Provenance(
-            provider_id="openai",
-            model_id="gpt-5.2",
-            prompt_pack="audio_profile.v2",
-            prompt_pack_version="1.0",
-            framework_version="1.0.0",
-            temperature=0.7,
-        ),
         song_identity=SongIdentity(duration_ms=60000),
         structure=Structure(
             sections=[
@@ -372,17 +305,15 @@ def test_validate_lyric_consistency():
                     start_ms=0,
                     end_ms=60000,
                     energy_curve=[
-                        EnergyPoint(t_ms=0, energy_0_1=0.4),
-                        EnergyPoint(t_ms=30000, energy_0_1=0.4),
-                        EnergyPoint(t_ms=60000, energy_0_1=0.4),
+                        EnergyPoint(t_ms=0),
+                        EnergyPoint(t_ms=30000),
+                        EnergyPoint(t_ms=60000),
                     ],
                     mean_energy=0.4,
                     peak_energy=0.4,
                 ),
             ],
             peaks=[],
-            overall_mean=0.4,
-            energy_confidence=0.8,
         ),
         lyric_profile=LyricProfile(
             has_plain_lyrics=False,
@@ -395,7 +326,6 @@ def test_validate_lyric_consistency():
             recommended_layer_count=1,
             recommended_contrast=Contrast.LOW,
             recommended_motion_density=MotionDensity.SPARSE,
-            recommended_asset_usage=AssetUsage.NONE,
         ),
         planner_hints=PlannerHints(),
     )
@@ -408,7 +338,6 @@ def test_validate_lyric_consistency():
 def test_validate_energy_timestamps_monotonic():
     """Test validation detects non-monotonic energy timestamps."""
     from twinklr.core.agents.audio.profile.models import (
-        AssetUsage,
         AudioProfileModel,
         Contrast,
         CreativeGuidance,
@@ -418,7 +347,6 @@ def test_validate_energy_timestamps_monotonic():
         MacroEnergy,
         MotionDensity,
         PlannerHints,
-        Provenance,
         SectionEnergyProfile,
         SongIdentity,
         SongSectionRef,
@@ -427,15 +355,6 @@ def test_validate_energy_timestamps_monotonic():
     from twinklr.core.agents.audio.profile.validation import validate_audio_profile
 
     profile = AudioProfileModel(
-        run_id="test",
-        provenance=Provenance(
-            provider_id="openai",
-            model_id="gpt-5.2",
-            prompt_pack="audio_profile.v2",
-            prompt_pack_version="1.0",
-            framework_version="1.0.0",
-            temperature=0.7,
-        ),
         song_identity=SongIdentity(duration_ms=60000),
         structure=Structure(
             sections=[
@@ -451,17 +370,15 @@ def test_validate_energy_timestamps_monotonic():
                     start_ms=0,
                     end_ms=60000,
                     energy_curve=[
-                        EnergyPoint(t_ms=0, energy_0_1=0.5),
-                        EnergyPoint(t_ms=30000, energy_0_1=0.6),
-                        EnergyPoint(t_ms=20000, energy_0_1=0.7),  # Out of order
+                        EnergyPoint(t_ms=0),
+                        EnergyPoint(t_ms=30000),
+                        EnergyPoint(t_ms=20000),  # Out of order
                     ],
                     mean_energy=0.6,
                     peak_energy=0.7,
                 ),
             ],
             peaks=[],
-            overall_mean=0.6,
-            energy_confidence=0.8,
         ),
         lyric_profile=LyricProfile(
             has_plain_lyrics=False,
@@ -474,7 +391,6 @@ def test_validate_energy_timestamps_monotonic():
             recommended_layer_count=2,
             recommended_contrast=Contrast.MED,
             recommended_motion_density=MotionDensity.MED,
-            recommended_asset_usage=AssetUsage.SPARSE,
         ),
         planner_hints=PlannerHints(),
     )
@@ -490,7 +406,6 @@ def test_validate_energy_timestamps_monotonic():
 def test_validate_energy_peaks_within_duration():
     """Test validation detects energy peaks beyond song duration."""
     from twinklr.core.agents.audio.profile.models import (
-        AssetUsage,
         AudioProfileModel,
         Contrast,
         CreativeGuidance,
@@ -501,7 +416,6 @@ def test_validate_energy_peaks_within_duration():
         MacroEnergy,
         MotionDensity,
         PlannerHints,
-        Provenance,
         SectionEnergyProfile,
         SongIdentity,
         SongSectionRef,
@@ -510,15 +424,6 @@ def test_validate_energy_peaks_within_duration():
     from twinklr.core.agents.audio.profile.validation import validate_audio_profile
 
     profile = AudioProfileModel(
-        run_id="test",
-        provenance=Provenance(
-            provider_id="openai",
-            model_id="gpt-5.2",
-            prompt_pack="audio_profile.v2",
-            prompt_pack_version="1.0",
-            framework_version="1.0.0",
-            temperature=0.7,
-        ),
         song_identity=SongIdentity(duration_ms=60000),
         structure=Structure(
             sections=[
@@ -534,9 +439,9 @@ def test_validate_energy_peaks_within_duration():
                     start_ms=0,
                     end_ms=60000,
                     energy_curve=[
-                        EnergyPoint(t_ms=0, energy_0_1=0.6),
-                        EnergyPoint(t_ms=30000, energy_0_1=0.6),
-                        EnergyPoint(t_ms=60000, energy_0_1=0.6),
+                        EnergyPoint(t_ms=0),
+                        EnergyPoint(t_ms=30000),
+                        EnergyPoint(t_ms=60000),
                     ],
                     mean_energy=0.6,
                     peak_energy=0.6,
@@ -545,8 +450,6 @@ def test_validate_energy_peaks_within_duration():
             peaks=[
                 EnergyPeak(start_ms=55000, end_ms=70000, energy=0.9),  # Beyond duration
             ],
-            overall_mean=0.6,
-            energy_confidence=0.8,
         ),
         lyric_profile=LyricProfile(
             has_plain_lyrics=False,
@@ -559,7 +462,6 @@ def test_validate_energy_peaks_within_duration():
             recommended_layer_count=2,
             recommended_contrast=Contrast.MED,
             recommended_motion_density=MotionDensity.MED,
-            recommended_asset_usage=AssetUsage.SPARSE,
         ),
         planner_hints=PlannerHints(),
     )
@@ -572,7 +474,6 @@ def test_validate_energy_peaks_within_duration():
 def test_validate_returns_list_of_strings():
     """Test validation returns list of error strings."""
     from twinklr.core.agents.audio.profile.models import (
-        AssetUsage,
         AudioProfileModel,
         Contrast,
         CreativeGuidance,
@@ -582,7 +483,6 @@ def test_validate_returns_list_of_strings():
         MacroEnergy,
         MotionDensity,
         PlannerHints,
-        Provenance,
         SectionEnergyProfile,
         SongIdentity,
         SongSectionRef,
@@ -591,15 +491,6 @@ def test_validate_returns_list_of_strings():
     from twinklr.core.agents.audio.profile.validation import validate_audio_profile
 
     profile = AudioProfileModel(
-        run_id="test",
-        provenance=Provenance(
-            provider_id="openai",
-            model_id="gpt-5.2",
-            prompt_pack="audio_profile.v2",
-            prompt_pack_version="1.0",
-            framework_version="1.0.0",
-            temperature=0.7,
-        ),
         song_identity=SongIdentity(duration_ms=60000),
         structure=Structure(
             sections=[
@@ -615,17 +506,15 @@ def test_validate_returns_list_of_strings():
                     start_ms=0,
                     end_ms=60000,
                     energy_curve=[
-                        EnergyPoint(t_ms=0, energy_0_1=0.4),
-                        EnergyPoint(t_ms=30000, energy_0_1=0.4),
-                        EnergyPoint(t_ms=60000, energy_0_1=0.4),
+                        EnergyPoint(t_ms=0),
+                        EnergyPoint(t_ms=30000),
+                        EnergyPoint(t_ms=60000),
                     ],
                     mean_energy=0.4,
                     peak_energy=0.4,
                 ),
             ],
             peaks=[],
-            overall_mean=0.4,
-            energy_confidence=0.8,
         ),
         lyric_profile=LyricProfile(
             has_plain_lyrics=False,
@@ -638,7 +527,6 @@ def test_validate_returns_list_of_strings():
             recommended_layer_count=1,
             recommended_contrast=Contrast.LOW,
             recommended_motion_density=MotionDensity.SPARSE,
-            recommended_asset_usage=AssetUsage.NONE,
         ),
         planner_hints=PlannerHints(),
     )

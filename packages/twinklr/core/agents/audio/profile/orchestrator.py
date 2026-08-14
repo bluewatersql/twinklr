@@ -6,7 +6,6 @@ Unlike MacroPlanner/GroupPlanner, this is a single-shot agent with heuristic val
 
 from __future__ import annotations
 
-import datetime as dt
 import hashlib
 import json
 import logging
@@ -148,7 +147,6 @@ class AudioProfileOrchestrator:
         """
         from twinklr.core.agents.async_runner import AsyncAgentRunner
         from twinklr.core.agents.audio.profile.context import shape_context
-        from twinklr.core.agents.audio.profile.models import Provenance
         from twinklr.core.agents.audio.profile.validation import validate_audio_profile
 
         try:
@@ -194,18 +192,6 @@ class AudioProfileOrchestrator:
                 profile = result.data
             else:
                 profile = AudioProfileModel(**result.data)
-
-            # Inject provenance with actual runtime values
-            profile.provenance = Provenance(
-                provider_id=self.provider.provider_type.value,
-                model_id=self.model,
-                prompt_pack="audio_profile",
-                prompt_pack_version="2.0",
-                framework_version="twinklr-agents-2.0",
-                seed=None,
-                temperature=self.temperature,
-                created_at=dt.datetime.now(dt.UTC).isoformat() + "Z",
-            )
 
             # Heuristic validation
             logger.debug("Running heuristic validation")
