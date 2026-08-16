@@ -330,3 +330,222 @@ report rather than regenerating a local corpus to make the test pass.
 parser silently drops unknown sections (P5-F13). *Mitigation*: two contrasting layout
 fixtures in tests, and a run-time summary line listing the groups derived from the
 layout so a user can see what was understood.
+
+## Implementation handoff — 2026-08-16 (author pass; independent verification pending)
+
+The owner explicitly authorized P3-T3 before the outstanding Phase 1P/2P/2K empirical
+exits. This narrow exception covers P3-T3 only: it does not waive those exits or
+authorize P3-T4 or later work. The owner review of the command surface and file-only
+layout-source decision remains pending; this author pass does not approve itself.
+
+### Implemented contract
+
+- Added the offline-first command
+  `twinklr display --audio SONG --layout xlights_rgbeffects.xml --config JOB.json --out DIR`,
+  preserving the standard optional `--app-config` convention and adding optional
+  `--fe-output-dir` / `--style`. `--style` without an FE directory is rejected with an
+  actionable error. No `getModels`, network, live provider, paid API, xLights, or audio
+  operation was used.
+- The CLI now resolves the user's layout through the shared xLights parser and a new
+  reusable core adapter. Explicit model groups are recursively expanded; active
+  ungrouped models remain targets; inactive models, duplicate names, unknown members,
+  and cycles are handled strictly. IDs are deterministic, sanitized, and collision-safe;
+  heterogeneous groups become `GROUP`; mappings, geometry-derived positions, pixel
+  fractions, and a visible topology summary come from the layout rather than CLI
+  literals.
+- Singleton `<model>` and `<modelGroup>` XML shapes normalize to lists. The existing
+  parser limitation remains intentionally unchanged: top-level input is still a
+  four-entry allow-list and unknown top-level sections are debug-logged and discarded.
+  Owner review and Phase 4 debt triage remain pending if a real layout exposes loss.
+- Display wiring loads the five-recipe tracked starter catalog, applies the canonical
+  optional repo-local extensions overlay, then applies FE-promoted recipes. The merged
+  catalog is injected into both planner and render dependencies; missing or empty
+  tracked catalogs report their expected path. A clean-no-`data/` run is covered.
+- `FEArtifactBundle` reaches the real group-planner section context and rendered prompt,
+  including propensity hints, style constraints, and vocabulary extensions. Catalog
+  canonical serialization/fingerprinting makes the actual orchestrator cache key stable
+  for equivalent inputs and different for catalog/FE changes, with prompt ordering
+  aligned to that identity.
+- `AudioAnalysisStage` stores
+  `BeatGrid.from_song_features(bundle.features, duration_ms=bundle.timing.duration_ms)`;
+  the display render integration proves an irregular 520 ms first interval is retained
+  end to end instead of being reconstructed as a 500 ms tempo-average grid.
+- The pipeline still returns an in-memory `XSequence`; the CLI explicitly uses
+  `XSQExporter` and writes a deterministic trace sidecar to
+  `<out>/<song>/<song>_twinklr_display.xsq` and
+  `<out>/<song>/<song>_twinklr_display.xsq.trace.json`. Assets remain disabled.
+- The old demo is a compatibility shim delegating to `twinklr display`; user/developer
+  docs name the CLI as canonical. The existing moving-head `run` path retains its
+  behavior and byte-identical goldens; its private builder/graph identifiers were renamed
+  only to remove the obsolete `cli_display` acceptance-grep collision.
+
+### TDD and author verification evidence
+
+- The first production-free TDD run failed at collection because the new display-wiring
+  and layout-adapter modules did not exist. The first green slice was **22 passed**;
+  the completed focused contract suite is **45 passed**.
+- CLI/pipeline unit regression: **133 passed**. Full display plus integration regression:
+  **435 passed**. Golden render/export regression: **73 passed / 8 skipped**.
+- Repository hygiene discriminator after labeling the canonical local overlay:
+  **10 passed**.
+- Ruff format: **1,350 files clean**; Ruff lint with `--no-cache`: clean; mypy:
+  **721 source files clean**.
+- Full tests: **5,295 passed / 39 skipped / 9 warnings** in 100.65 seconds.
+
+`make validate` cannot run from this intentionally dirty author worktree because its
+guard requires a clean tree before mutating format/lint steps. Its check-only Ruff,
+mypy, and full-test equivalents above all passed. Independent verification and the
+owner-decision review are required before integration.
+
+### File manifest
+
+Production:
+
+- `packages/twinklr/cli/display_cmd.py`
+- `packages/twinklr/cli/main.py`
+- `packages/twinklr/core/agents/audio/stages/analysis.py`
+- `packages/twinklr/core/agents/sequencer/group_planner/context.py`
+- `packages/twinklr/core/agents/sequencer/group_planner/context_shaping.py`
+- `packages/twinklr/core/formats/xlights/layout/__init__.py`
+- `packages/twinklr/core/formats/xlights/layout/choreography.py`
+- `packages/twinklr/core/formats/xlights/layout/models/rgb_effects.py`
+- `packages/twinklr/core/pipeline/definitions/display.py`
+- `packages/twinklr/core/pipeline/display_wiring.py`
+- `packages/twinklr/core/sequencer/templates/group/recipe_catalog.py`
+- `scripts/demo_sequencer_pipeline.py`
+
+Tests and deterministic fixtures:
+
+- `tests/fixtures/display_layout_a.xml`
+- `tests/fixtures/display_layout_b.xml`
+- `tests/golden/fixtures/display_pipeline_first.xsq`
+- `tests/integration/test_display_pipeline_e2e.py`
+- `tests/unit/cli/test_display_command.py`
+- `tests/unit/cli/test_run_contract.py`
+- `tests/unit/pipeline/test_display_pipeline_wiring.py`
+- `tests/unit/sequencer/display/test_layout_to_choreo_graph.py`
+- `tests/unit/sequencer/display/test_recipe_catalog_identity.py`
+
+Human-facing docs and campaign evidence:
+
+- `docs/developer-guide.md`
+- `docs/pipeline_guide.md`
+- `docs/user-guide.md`
+- `scripts/validation/README.md`
+- this specification
+
+## Formal-review remediation handoff — 2026-08-16 (author pass; re-verification pending)
+
+The first independent verification pass rejected the author snapshot on six concrete
+gaps. This remediation fixes all six without expanding into P3-T4+, live calls, xLights,
+audio processing, or network access. The snapshot remains unapproved until a separate
+verifier accepts it.
+
+### Rejected gaps and fixes
+
+1. `RecipeCompiler` event IDs no longer contain `uuid4`. Each ID carries a full SHA-256
+   digest over stable section, lane, group, template, placement ID/index, layer index,
+   and resolved time coordinates. Repeated independent full-definition renders now
+   produce byte-identical XSQ and trace sidecars.
+2. Catalog loading is strict before display pipeline construction or session/provider
+   creation. Tracked and optional local indexes are each validated before overlay merge:
+   duplicate index IDs fail; every referenced file must exist and parse as an
+   `EffectRecipe`; each file's recipe ID must match its index entry. FE-promoted duplicate
+   IDs also fail. Planner `TemplateCatalog` metadata is built from the exact effective
+   renderer `RecipeCatalog`, so their ID sets are equal after tracked → local → FE
+   precedence. Errors name the offending ID and file.
+3. Layout adaptation rejects duplicate raw model names even when every duplicate is
+   inactive, duplicate group names, and every raw model/model-group name intersection.
+   Known inactive members remain omittable; they cannot make ambiguous names acceptable.
+4. The integration test now preserves the complete stage-ID/dependency structure returned
+   by the real display definition. It keeps the real `AudioAnalysisStage`, aggregator,
+   asset resolver, display renderer, and exporter, replacing only provider-owned and
+   holistic judgment boundaries with deterministic fixtures. It executes twice and
+   proves the audio stage's irregular 520 ms boundary reaches the rendered event and both
+   exported byte streams identically.
+5. Display `--app-config` is genuinely optional. Omission passes `None` to
+   `load_app_config()` and uses defaults; an explicitly supplied missing path fails before
+   execution. Help and user/pipeline docs state the distinction.
+6. Pipeline/developer documentation now identifies `catalog/templates/` as the tracked
+   starter catalog and `data/templates/` only as the optional untracked extensions
+   overlay. Stale “CLI-unreachable”, hardcoded graph, and built-ins-under-`data/` claims
+   are removed.
+
+### Remediation TDD and final author evidence
+
+- Discriminating remediation red: **9 failed / 1 passed** across nondeterministic IDs,
+  raw-name ambiguity, optional app config, and strict catalog validity/parity.
+- Remediation-focused green: **53 passed**.
+- CLI/pipeline regression: **142 passed**.
+- Display plus full-definition integration regression: **440 passed**.
+- Golden regression: **73 passed / 8 skipped**.
+- Ruff format: **1,350 files clean**; Ruff lint with `--no-cache`: clean; mypy:
+  **721 source files clean**.
+- Full suite: **5,307 passed / 39 skipped / 9 warnings** in 94.83 seconds.
+
+`make validate` remains unavailable in an intentionally dirty author worktree because
+its guard requires a clean tree before mutating format/lint steps. Its check-only static
+and full-test equivalents passed. Independent re-verification is required.
+
+### Remediation manifest delta
+
+Production added to the prior author manifest:
+
+- `packages/twinklr/core/sequencer/display/composition/recipe_compiler.py`
+- `packages/twinklr/core/sequencer/templates/group/catalog.py`
+- `packages/twinklr/core/sequencer/templates/group/store.py`
+
+Additional test file modified:
+
+- `tests/unit/sequencer/display/composition/test_recipe_compiler.py`
+
+The already-listed CLI, layout adapter, display wiring, recipe catalog, integration test,
+user/developer/pipeline documentation, and this spec also carry remediation edits. The
+complete P3-T3 author manifest is therefore **30 files**.
+
+## Narrow deterministic-ID re-review remediation — 2026-08-16
+
+A second verifier correctly rejected the stable event hash because `placement_index`
+resets inside every coordination plan. Two admissible coordination plans could therefore
+reuse a human placement ID, target, template, timing, and local index while expressing
+different intent, producing the same event ID.
+
+The composition engine now owns a deterministic render-scope occurrence ordinal. It
+resets at the start of every `compose()` call and increments in stable section → lane →
+coordination → placement traversal order. `TemplateCompileContext` carries that ordinal,
+and `RecipeCompiler` includes it in the full SHA-256 identity. This preserves independent-
+render stability while making separate coordination-plan occurrences unique, including
+duplicate human-authored placement IDs with different intensity intent.
+
+Red-first evidence: the adversarial engine test compiled two separate coordination plans
+with the same placement ID, target, template, timing, and local index; both hashes were
+identical before the fix. Final evidence:
+
+- collision discriminator + stable compiler + twice-export integration: **3 passed**
+- full display composition regression: **170 passed**
+- display plus full-definition integration regression: **441 passed**
+- golden regression: **73 passed / 8 skipped**
+- Ruff format: **1,350 files clean**; Ruff lint with `--no-cache`: clean; mypy:
+  **721 source files clean**
+
+Narrow remediation manifest delta:
+
+- `packages/twinklr/core/sequencer/display/composition/engine.py`
+- `packages/twinklr/core/sequencer/display/composition/template_compiler.py`
+- `tests/unit/sequencer/display/composition/test_engine.py`
+
+`recipe_compiler.py`, the full-definition integration, and this handoff were already in
+the 30-file manifest and carry the corresponding identity/evidence coverage. The complete
+P3-T3 author manifest is now **33 files**. The author does not self-approve.
+
+## Owner decision and independent verification — 2026-08-16
+
+The owner accepted the canonical
+`twinklr display --audio SONG --layout xlights_rgbeffects.xml --config JOB.json --out DIR`
+command surface and the offline file-only layout source for v1. Both independent review
+lanes approved the final 33-file snapshot after replaying the cross-coordination event-ID
+collision. The final review confirmed unique deterministic IDs across coordination plans,
+ordinal reset across repeated `compose()` calls, byte-identical XSQ and trace exports,
+the 170-test composition suite, the 441-test display/integration suite, Ruff, and mypy.
+Integration is authorized. This decision does not waive earlier empirical exits or
+authorize P3-T5 and later work.

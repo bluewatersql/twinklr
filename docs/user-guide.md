@@ -253,6 +253,24 @@ to.
 
 _Source: `packages/twinklr/cli/main.py` (`build_arg_parser`, `build_run_pipeline`)_
 
+For the RGB/pixel display pipeline, provide the xLights layout file as well:
+
+```bash
+uv run twinklr display \
+  --audio path/to/song.mp3 \
+  --layout path/to/xlights_rgbeffects.xml \
+  --config path/to/job_config.json \
+  --out artifacts \
+  --app-config config.json
+```
+
+The display command derives its targets and xLights mappings from the layout, loads the
+tracked starter recipe catalog, and writes a display `.xsq` plus its render-trace sidecar.
+Use `--fe-output-dir DIR` to apply persisted feature-engineering context. Add
+`--style NAME` only with that directory to select a named grouped fingerprint.
+The display command may omit `--app-config`; Twinklr then uses application defaults.
+If you supply the flag, its file must exist and validate.
+
 ### Data-form moving-head templates
 
 Moving-head templates can be supplied as strict JSON `TemplateDoc` files without
@@ -359,17 +377,17 @@ _Source: `packages/twinklr/core/pipeline/definitions/moving_heads.py` and `commo
 
 ### Display Graph
 
-The display graph describes what the planner may address. It is built from your fixture
-config and contains one group — `MOVING_HEADS`, at the fixture count your config declares.
+The graph describes what each planner may address. `twinklr run` builds the moving-head
+group from your fixture config at the declared fixture count. `twinklr display` builds
+RGB/pixel targets from your `xlights_rgbeffects.xml`: explicit model groups are preserved,
+and active models not assigned to a group become individual targets. The adapter derives
+model mappings, pixel fractions, and approximate display positions from the layout.
 
-It used to be a hardcoded three-group yard (moving heads, outline, mega tree) with literal
-fixture counts, which described the author's own display to the planner of every run. The
-outline and mega-tree groups were addressable in the prompt but nothing rendered them: the
-display pipeline is deferred, so naming them only told the planner about hardware the run
-would never light. When that pipeline becomes reachable, its groups join the graph from
-configuration.
+The old hardcoded three-group yard described the author's display and is retired from the
+shipped path.
 
-_Source: `packages/twinklr/cli/main.py` (`build_display_graph`)_
+_Source: `packages/twinklr/cli/main.py` and
+`packages/twinklr/core/formats/xlights/layout/choreography.py`_
 
 ---
 
@@ -386,6 +404,10 @@ Artifacts are written to `<output_dir>/<song_name>/`:
   from the audio (`audiosections`, `beats`, `bars`, and `lyrics`/`phonemes` when available).
 - **`<song_name>_twinklr_mh.xmap`** — mapping hints naming every model the `.xsq` emitted,
   proposed against a layout model of the same name.
+- **`<song_name>_twinklr_display.xsq`** — the RGB/pixel donor sequence emitted by
+  `twinklr display`.
+- **`<song_name>_twinklr_display.xsq.trace.json`** — deterministic placement-level
+  display render trace used by validation tooling.
 - Stage artifacts and intermediate results (audio analysis data, profiles, plans)
 
 ### Using the Output

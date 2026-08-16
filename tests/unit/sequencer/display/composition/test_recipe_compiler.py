@@ -108,6 +108,19 @@ def test_recipe_compiler_produces_compiled_effects() -> None:
     assert effect.event.source.template_id == "recipe_wash"
 
 
+def test_recipe_compiler_event_ids_are_stable_and_source_derived() -> None:
+    recipe = _make_recipe()
+    compiler = RecipeCompiler(catalog=RecipeCatalog(recipes=[recipe]))
+
+    first = compiler.compile(_make_placement(), _make_context())
+    second = compiler.compile(_make_placement(), _make_context())
+
+    assert [effect.event.event_id for effect in first] == [
+        effect.event.event_id for effect in second
+    ]
+    assert first[0].event.event_id.startswith("recipe_recipe_wash_")
+
+
 def test_recipe_compiler_uses_palette_colors() -> None:
     """RecipeCompiler passes palette colors from context to renderer."""
     recipe = _make_recipe()

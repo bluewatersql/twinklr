@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xrgb>
+  <models>
+    <model name="Arch 1" DisplayAs="Arches" WorldPosX="-10" WorldPosY="0" WorldPosZ="1" parm1="1" parm2="50" />
+    <model name="Arch 2" DisplayAs="Arches" WorldPosX="10" WorldPosY="0" WorldPosZ="1" parm1="1" parm2="50" />
+    <model name="Mega Tree" DisplayAs="Tree 360" WorldPosX="0" WorldPosY="8" WorldPosZ="4" parm1="16" parm2="50" />
+  </models>
+  <modelGroups>
+    <modelGroup name="Yard Arches" models="Arch 1,Arch 2" />
+  </modelGroups>
+  <colors><color name="Ignored by current parser" /></colors>
+</xrgb>

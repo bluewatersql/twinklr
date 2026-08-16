@@ -6,6 +6,8 @@ interface pattern of TemplateCatalog. Loaded from TemplateStore.
 
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
 from typing import TYPE_CHECKING
 
@@ -33,6 +35,12 @@ class RecipeCatalog:
     """
 
     def __init__(self, recipes: list[EffectRecipe]) -> None:
+        recipe_ids = [recipe.recipe_id for recipe in recipes]
+        duplicate_ids = sorted(
+            recipe_id for recipe_id in set(recipe_ids) if recipe_ids.count(recipe_id) > 1
+        )
+        if duplicate_ids:
+            raise ValueError(f"RecipeCatalog contains duplicate recipe IDs: {duplicate_ids}")
         self._recipes = list(recipes)
         self._by_id: dict[str, EffectRecipe] = {r.recipe_id: r for r in self._recipes}
 
@@ -52,6 +60,26 @@ class RecipeCatalog:
     def list_by_lane(self, lane: LaneKind) -> list[EffectRecipe]:
         """List all recipes compatible with the given lane."""
         return [r for r in self._recipes if _TYPE_TO_LANE.get(r.template_type) == lane]
+
+    def to_canonical_data(self) -> list[dict[str, object]]:
+        """Return stable JSON-compatible recipe data sorted by identity.
+
+        ``RecipeCatalog`` is an arbitrary Pydantic field type. Without an explicit
+        serializer, cache-key construction falls back to ``str(object)`` and embeds a
+        process-local memory address.
+        """
+        return [
+            recipe.model_dump(mode="json")
+            for recipe in sorted(self._recipes, key=lambda item: item.recipe_id)
+        ]
+
+    @property
+    def fingerprint(self) -> str:
+        """Content fingerprint for cache identities and diagnostics."""
+        canonical = json.dumps(
+            self.to_canonical_data(), sort_keys=True, separators=(",", ":"), ensure_ascii=False
+        )
+        return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
     @classmethod
     def merge(
@@ -102,3 +130,12 @@ class RecipeCatalog:
             else:
                 logger.warning(f"Failed to load recipe {recipe_id} from store")
         return cls.merge(builtins, promoted or [])
+
+    @classmethod
+    def from_store_strict(
+        cls,
+        store: TemplateStore,
+        promoted: list[EffectRecipe] | None = None,
+    ) -> RecipeCatalog:
+        """Build an effective catalog only after every store entry validates."""
+        return cls.merge(store.load_all_strict(), promoted or [])

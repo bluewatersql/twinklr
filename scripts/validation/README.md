@@ -166,10 +166,14 @@ To enable placement-level display XSQ validation, generate a sidecar next to the
 
 - `<xsq>.trace.json`
 
-Current display demos write this automatically:
+The canonical display command writes this automatically:
+
+- `twinklr display`
+
+Compatibility and focused renderer demos also write it:
 
 - `scripts/demo_display_renderer.py`
-- `scripts/demo_sequencer_pipeline.py`
+- `scripts/demo_sequencer_pipeline.py` (delegates to `twinklr display`)
 
 ### What the sidecar enables
 

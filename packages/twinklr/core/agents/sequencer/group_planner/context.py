@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_serializer
 
 from twinklr.core.agents.sequencer.group_planner.timing import TimingContext
 from twinklr.core.feature_engineering.models.vocabulary import VocabularyExtensions
@@ -106,6 +106,13 @@ class SectionPlanningContext(BaseModel):
         default=None,
         description="Recipe catalog with FE-promoted and builtin recipes.",
     )
+
+    @field_serializer("recipe_catalog")
+    def serialize_recipe_catalog(
+        self, catalog: RecipeCatalog | None
+    ) -> list[dict[str, object]] | None:
+        """Keep prompt/cache model dumps stable across processes."""
+        return catalog.to_canonical_data() if catalog is not None else None
 
     # Feature Engineering enrichment (optional, from FE pipeline Phase 1)
     # Only sequencer-relevant fields are exposed here.  DMX model-level

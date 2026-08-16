@@ -24,6 +24,7 @@ from twinklr.cli.curation_cmd import (
     add_review_staged_recipes_subparser,
     run_review_staged_recipes_command,
 )
+from twinklr.cli.display_cmd import add_display_subparser, run_display_command
 from twinklr.cli.fseqcmp_cmd import run_fseqcmp_command
 from twinklr.cli.recipe_builder_cmd import (
     add_curate_catalog_subparser,
@@ -125,7 +126,9 @@ def _resolve_fixture_config_path(job_config_path: Path, fixture_config_path: str
     return job_config_path.parent / fixture_path
 
 
-def build_display_graph(fixture_group: FixtureGroup) -> tuple[ChoreographyGraph, XLightsMapping]:
+def build_moving_head_graph(
+    fixture_group: FixtureGroup,
+) -> tuple[ChoreographyGraph, XLightsMapping]:
     """Build the ChoreographyGraph and XLightsMapping from the user's rig.
 
     The graph used to be a hardcoded three-group residential display — moving heads,
@@ -165,7 +168,7 @@ def build_display_graph(fixture_group: FixtureGroup) -> tuple[ChoreographyGraph,
         fixture_count=len(fixtures),
         pixel_fraction=1.0,
     )
-    choreo_graph = ChoreographyGraph(graph_id="cli_display", groups=[group])
+    choreo_graph = ChoreographyGraph(graph_id="moving_heads_rig", groups=[group])
     xlights_mapping = XLightsMapping(
         entries=[
             XLightsGroupMapping(
@@ -203,7 +206,7 @@ def build_run_pipeline(
     Returns:
         Tuple of (pipeline, choreography graph, xLights mapping).
     """
-    choreo_graph, xlights_mapping = build_display_graph(fixture_group)
+    choreo_graph, xlights_mapping = build_moving_head_graph(fixture_group)
     pipeline = build_moving_heads_pipeline(
         display_groups=choreo_graph.to_planner_summary(),
         fixture_count=len(fixture_group.expand_fixtures()),
@@ -628,6 +631,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     add_catalog_coverage_subparser(sub)
     add_review_staged_recipes_subparser(sub)
     add_template_subparsers(sub)
+    add_display_subparser(sub)
 
     # Registered only so `twinklr --help` lists it; `main()` dispatches "eval-report"
     # to click before argparse ever parses its arguments (see below — argparse's
@@ -703,6 +707,8 @@ def main() -> None:
         sys.exit(run_template_export_command(args))
     elif args.cmd == "template-validate":
         sys.exit(run_template_validate_command(args))
+    elif args.cmd == "display":
+        run_display_command(args)
 
 
 if __name__ == "__main__":

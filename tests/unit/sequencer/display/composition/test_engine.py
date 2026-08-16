@@ -208,6 +208,62 @@ class TestCompositionEngine:
         assert event.start_ms == 0  # bar=1, beat=1
         assert event.end_ms > 0
 
+    def test_duplicate_human_ids_across_coordination_plans_get_unique_stable_event_ids(
+        self,
+    ) -> None:
+        class RecordingRecipeCompiler(RecipeCompiler):
+            def __init__(self) -> None:
+                store = TemplateStore.from_directory(_TEMPLATES_DIR)
+                super().__init__(catalog=RecipeCatalog.from_store(store))
+                self.event_ids: list[str] = []
+
+            def compile(self, placement, context):
+                effects = super().compile(placement, context)
+                self.event_ids.extend(effect.event.event_id for effect in effects)
+                return effects
+
+        target = PlanTarget(type=TargetType.GROUP, id="OUTLINE_1")
+        placements = [
+            GroupPlacement(
+                placement_id="duplicate-human-id",
+                target=target,
+                template_id="gtpl_base_wash_split",
+                start=PlanningTimeRef(bar=1, beat=1),
+                duration=EffectDuration.PHRASE,
+                intensity=intensity,
+            )
+            for intensity in (IntensityLevel.SOFT, IntensityLevel.PEAK)
+        ]
+        section = SectionCoordinationPlan(
+            section_id="intro",
+            theme=ThemeRef(theme_id="theme.holiday.traditional", scope=ThemeScope.SECTION),
+            palette=PaletteRef(palette_id="core.christmas_traditional"),
+            lane_plans=[
+                LanePlan(
+                    lane=LaneKind.BASE,
+                    target_roles=["OUTLINE"],
+                    coordination_plans=[
+                        CoordinationPlan(
+                            coordination_mode=CoordinationMode.UNIFIED,
+                            targets=[target],
+                            placements=[placement],
+                        )
+                        for placement in placements
+                    ],
+                )
+            ],
+        )
+        plan_set = GroupPlanSet(plan_set_id="duplicate_ids", section_plans=[section])
+
+        first_compiler = RecordingRecipeCompiler()
+        _make_engine(template_compiler=first_compiler).compose(plan_set)
+        second_compiler = RecordingRecipeCompiler()
+        _make_engine(template_compiler=second_compiler).compose(plan_set)
+
+        assert len(first_compiler.event_ids) == 2
+        assert len(set(first_compiler.event_ids)) == 2
+        assert first_compiler.event_ids == second_compiler.event_ids
+
     def test_intensity_resolved(self) -> None:
         """IntensityLevel is resolved to a float."""
         engine = _make_engine()

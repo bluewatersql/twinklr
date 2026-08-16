@@ -7,8 +7,9 @@ CompositionEngine's TemplateCompiler protocol (placement → CompiledEffects).
 from __future__ import annotations
 
 from difflib import get_close_matches
+import hashlib
+import json
 from typing import Any
-import uuid
 
 from twinklr.core.sequencer.display.composition.models import CompiledEffect, TemplateCompileError
 from twinklr.core.sequencer.display.composition.template_compiler import (
@@ -162,8 +163,25 @@ class RecipeCompiler:
             **dict(layer.resolved_params),
             "E_SLIDER_Mix": int(layer.mix * 100),
         }
+        identity = json.dumps(
+            {
+                "section_id": source.section_id,
+                "lane": source.lane.value,
+                "group_id": source.group_id,
+                "template_id": source.template_id,
+                "placement_id": source.placement_id,
+                "placement_index": source.placement_index,
+                "render_scope_ordinal": context.render_scope_ordinal,
+                "layer_index": layer.layer_index,
+                "start_ms": context.start_ms,
+                "end_ms": context.end_ms,
+            },
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+        event_suffix = hashlib.sha256(identity.encode("utf-8")).hexdigest()
         event = RenderEvent(
-            event_id=f"recipe_{source.template_id}_{layer.layer_index}_{uuid.uuid4().hex[:8]}",
+            event_id=f"recipe_{source.template_id}_{layer.layer_index}_{event_suffix}",
             start_ms=context.start_ms,
             end_ms=context.end_ms,
             effect_type=effect_type,

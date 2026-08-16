@@ -451,7 +451,9 @@ def _shape_recipe_catalog(section_context: SectionPlanningContext) -> dict[str, 
         return None
 
     entries = []
-    for recipe in section_context.recipe_catalog.recipes:
+    # Match RecipeCatalog's canonical cache serialization order so prompt content and
+    # cache identity cannot disagree when a catalog is assembled in a different order.
+    for recipe in sorted(section_context.recipe_catalog.recipes, key=lambda item: item.recipe_id):
         layer_details: list[dict[str, Any]] = []
         for layer in recipe.layers:
             layer_info: dict[str, Any] = {

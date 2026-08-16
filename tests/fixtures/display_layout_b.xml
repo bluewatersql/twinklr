@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xrgb>
+  <models>
+    <model name="Window Left" DisplayAs="Window Frame" WorldPosX="-5" WorldPosY="4" WorldPosZ="5" parm1="20" parm2="4" />
+    <model name="Window Right" DisplayAs="Window Frame" WorldPosX="5" WorldPosY="4" WorldPosZ="5" parm1="20" parm2="4" />
+    <model name="Roof Star" DisplayAs="Star" WorldPosX="0" WorldPosY="10" WorldPosZ="6" parm1="5" parm2="10" />
+  </models>
+  <modelGroups>
+    <modelGroup name="Windows" models="Window Left,Window Right" />
+    <modelGroup name="Roof Accents" models="Roof Star" />
+  </modelGroups>
+</xrgb>

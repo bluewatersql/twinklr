@@ -39,6 +39,7 @@ class TemplateCompileContext(BaseModel):
         end_ms: Effect end time in milliseconds.
         intensity: Normalised intensity (0.0-1.0).
         placement_index: Index of this placement in the plan.
+        render_scope_ordinal: Deterministic occurrence across the complete render traversal.
         transition_in: Optional incoming transition spec.
         transition_out: Optional outgoing transition spec.
     """
@@ -54,6 +55,7 @@ class TemplateCompileContext(BaseModel):
     end_ms: int = 0
     intensity: float = 1.0
     placement_index: int = 0
+    render_scope_ordinal: int = Field(default=0, ge=0)
     transition_in: Any = None
     transition_out: Any = None
 

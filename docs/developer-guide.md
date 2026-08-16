@@ -146,7 +146,8 @@ Pipeline factories compose stages into complete pipelines:
 - Full chain: `audio → profile + lyrics → macro → groups (FAN_OUT) → aggregate → holistic → asset_resolution → display_render`
 - Uses `FAN_OUT` execution pattern to plan each macro section in parallel
 - Configurable stages: `enable_holistic`, `enable_holistic_corrector`, `enable_assets`
-- Not yet wired into the CLI; used by the display sequencer subsystem
+- CLI-reachable through `twinklr display`; provider-owned planning boundaries remain
+  independently testable with deterministic fixtures
 
 ```mermaid
 flowchart LR
@@ -375,7 +376,7 @@ Scripts in `scripts/` provide demo, analysis, and validation utilities:
 | Script | Purpose |
 |---|---|
 | `demo_moving_heads_pipeline.py` | Demo the full moving heads pipeline |
-| `demo_sequencer_pipeline.py` | Demo the sequencer pipeline |
+| `demo_sequencer_pipeline.py` | Compatibility shim forwarding to `twinklr display` |
 | `test_audio_pipeline.py` | Test audio analysis on a file (used by `make test-audio`) |
 | `build_pipeline.py` | Build/feature engineering pipeline (in `scripts/build/`) |
 | `show_coverage_by_component.py` | Coverage breakdown by component (used by `make coverage`) |
@@ -433,6 +434,10 @@ with a one-time CPU retry on MPS failure.
 
 ## Known Transitional Areas
 
-- **Display graph is hardcoded** — `build_display_graph()` in `packages/twinklr/cli/main.py` defines a fixed 3-group layout. A layout parser for xLights layout files is planned.
+- **Display graph is layout-derived** — `twinklr display --layout xlights_rgbeffects.xml`
+  builds deterministic planner groups and mappings from the user's file. The parser's
+  four-entry top-level allow-list remains a known limitation.
 - **Feature engineering pipeline** — `packages/twinklr/core/feature_engineering/` and `packages/twinklr/core/feature_store/` provide an offline analysis pipeline separate from the main CLI workflow. See `docs/pipeline_guide.md` for details.
-- **Display sequencer** — `packages/twinklr/core/sequencer/display/` has effect handlers but is not yet wired into the CLI pipeline.
+- **Display sequencer** — `packages/twinklr/core/sequencer/display/` is wired through
+  the offline-first `twinklr display` command. Its catalog is strictly preflighted and
+  shared by planner and renderer; assets remain disabled until P3-T7.

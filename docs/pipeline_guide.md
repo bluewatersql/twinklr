@@ -490,14 +490,19 @@ taxonomy relates to the planner's vocabulary.
 
 ### Template Sources
 
-Two template sources merge at planner time:
+Three template sources merge at planner time in explicit override order:
 
 | Source | Location | Loaded By |
 |--------|----------|-----------|
-| **Built-in templates** | `data/templates/index.json` + `builtins/*.json` | `TemplateStore.from_directory()` |
-| **FE-mined recipes** | `data/features/feature_engineering/recipe_catalog.json` | `load_fe_artifacts()` → `RecipeCatalog.from_store()` |
+| **Tracked starter recipes** | `catalog/templates/index.json` + `builtins/*.json` | strict `TemplateStore` preflight |
+| **Optional local extensions** | `data/templates/index.json` | strict local overlay, when present |
+| **FE-promoted recipes** | feature-engineering output `recipe_catalog.json` | `load_fe_artifacts()` |
 
-Built-in templates are hand-authored `EffectRecipe` definitions. FE-mined
+Tracked templates are hand-authored `EffectRecipe` definitions. Local extensions
+override matching tracked IDs, and FE-promoted recipes override both; planner metadata
+is then built from the exact same effective recipe IDs used by the renderer. Every
+indexed file must exist, parse, and contain the indexed recipe ID before a display
+session or provider is created. FE-mined
 templates are discovered by `TemplateMiner` from corpus phrases, then
 promoted into recipes via `PromotionPipeline` (see [Section 5](#5-recipe-pipeline)).
 Promoted recipes are one of several FE outputs that feed into the planner — see
@@ -756,12 +761,24 @@ uv run twinklr run \
 # Moving heads pipeline demo
 uv run python scripts/demo_moving_heads_pipeline.py
 
-# Sequencer pipeline demo
-uv run python scripts/demo_sequencer_pipeline.py
+# Display pipeline (the compatibility demo script delegates to this command)
+uv run twinklr display \
+  --audio song.wav \
+  --layout /path/to/xlights_rgbeffects.xml \
+  --config job_config.json \
+  --out output
 
 # Recipe pipeline demo (phases 1, 2a, 2b, 2c, or all)
 uv run python scripts/demo_recipe_pipeline.py --phase all
 ```
+
+The display command writes
+`output/<song>/<song>_twinklr_display.xsq` and the adjacent structured render trace
+`<song>_twinklr_display.xsq.trace.json`. Add `--fe-output-dir DIR` to apply persisted
+feature-engineering context; when the manifest contains grouped style fingerprints,
+select one explicitly with `--style NAME`.
+`--app-config` is optional for this command: omission uses `load_app_config()` defaults;
+an explicitly supplied path must exist and parse successfully.
 
 ---
 
@@ -995,7 +1012,9 @@ None of these targets touch the feature store, profiles, or FE output.
 - Check the LLM logs for judge feedback to understand scoring rationale.
 
 **Problem: Missing templates in plan**
-- Verify the template JSON files exist in `data/templates/`.
+- Verify the tracked recipe index and JSON files exist in `catalog/templates/`.
+- If using local extensions, verify `data/templates/index.json` and every referenced
+  recipe file; an invalid optional overlay fails preflight rather than being ignored.
 - Call `load_builtin_templates()` before checking available template IDs.
 - Ensure the template ID is in the `available_templates` list passed to
   `build_moving_heads_pipeline()`.
@@ -1070,7 +1089,8 @@ tests/
 | `data/profiles/corpus/<schema>` | Unified corpus |
 | `data/features/<run_name>` | Feature outputs |
 | `data/features/twinklr.db` | Feature store |
-| `data/templates/` | Built-in template definitions |
+| `catalog/templates/` | Tracked display starter recipe definitions |
+| `data/templates/` | Optional untracked local recipe-extension overlay |
 | `data/vendor_sequences/` | Source vendor packages |
 
 ## Notes

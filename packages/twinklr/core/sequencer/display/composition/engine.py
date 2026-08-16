@@ -175,6 +175,7 @@ class CompositionEngine:
         self._palette_resolver = palette_resolver
         self._catalog_index: dict[str, object] = catalog_index or {}
         self._layer_blend_modes: dict[tuple[str, int], str] = {}
+        self._render_scope_ordinal = 0
         self._section_map: dict[str, SectionBarRange] = (
             build_section_bar_map(section_boundaries, beat_grid) if section_boundaries else {}
         )
@@ -192,6 +193,7 @@ class CompositionEngine:
         # Every compose call is an independent run.  Blend decisions use first-wins
         # within a run, so stale entries must never survive into the next one.
         self._layer_blend_modes.clear()
+        self._render_scope_ordinal = 0
         diagnostics: list[CompositionDiagnostic] = []
 
         # Accumulator: element_name → layer_index → list[RenderEvent]
@@ -784,6 +786,8 @@ class CompositionEngine:
         # Resolve intensity and transitions
         intensity = self._resolve_intensity(lane, placement.intensity)
         transition_in, transition_out = self._resolve_transitions(lane)
+        render_scope_ordinal = self._render_scope_ordinal
+        self._render_scope_ordinal += 1
 
         # Build compile context
         ctx = TemplateCompileContext(
@@ -794,6 +798,7 @@ class CompositionEngine:
             end_ms=end_ms,
             intensity=intensity,
             placement_index=placement_index,
+            render_scope_ordinal=render_scope_ordinal,
             transition_in=transition_in,
             transition_out=transition_out,
         )

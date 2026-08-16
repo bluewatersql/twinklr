@@ -88,6 +88,18 @@ class AudioAnalysisStage:
             context.set_state("has_lyrics", has_lyrics)
             context.set_state("audio_bundle", bundle)
             context.set_state("beats_per_bar", beats_per_bar)
+            # Preserve the detector's real, potentially irregular boundaries for all
+            # downstream display timing. Reconstructing from average tempo shifts effects
+            # on expressive/live recordings and defeats P3-T1's local-grid resolution.
+            from twinklr.core.sequencer.timing.beat_grid import BeatGrid
+
+            context.set_state(
+                "beat_grid",
+                BeatGrid.from_song_features(
+                    bundle.features,
+                    duration_ms=bundle.timing.duration_ms,
+                ),
+            )
 
             # Track metrics for monitoring
             context.add_metric("audio_duration_ms", bundle.timing.duration_ms)

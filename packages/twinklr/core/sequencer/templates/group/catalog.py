@@ -14,6 +14,7 @@ from twinklr.core.sequencer.templates.group.library import TemplateInfo
 from twinklr.core.sequencer.vocabulary import GroupTemplateType, LaneKind
 
 if TYPE_CHECKING:
+    from twinklr.core.sequencer.templates.group.recipe import EffectRecipe
     from twinklr.core.sequencer.templates.group.store import TemplateStore
 
 _LANE_ASSIGNED_TYPES = {
@@ -100,3 +101,21 @@ def build_template_catalog_from_store(store: TemplateStore) -> TemplateCatalog:
             )
         )
     return TemplateCatalog(entries=entries)
+
+
+def build_template_catalog_from_recipes(recipes: list[EffectRecipe]) -> TemplateCatalog:
+    """Build planner metadata from the exact effective renderer recipe set."""
+    return TemplateCatalog(
+        entries=[
+            TemplateInfo(
+                template_id=recipe.recipe_id,
+                version=recipe.recipe_version,
+                name=recipe.name,
+                template_type=recipe.template_type,
+                visual_intent=recipe.visual_intent,
+                tags=tuple(recipe.tags),
+                description=recipe.description,
+            )
+            for recipe in sorted(recipes, key=lambda item: item.recipe_id)
+        ]
+    )

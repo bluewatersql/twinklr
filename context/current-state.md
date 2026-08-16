@@ -88,11 +88,13 @@ The [twinklr-reactivation-review build campaign](../changes/ACTIVE.md) remains a
 Phases 0 and 1K are complete. Phase 1P's implementation tasks, Phase 2P's 13 offline
 implementations, and Phase 2K's four tooling implementations are merged and independently
 verified, but their owner/live exit criteria are not complete. On 2026-08-16 the owner
-accepted the P2P-T1/T8/T9 recommendations and authorized P3-T1 and then P3-T2 before the
-outstanding empirical exits. P3-T1 is merged and independently verified at `5eebcb2`;
-P3-T2 is merged and independently verified at `5365f70`. That narrow sequencing
-exception does not waive those exits or authorize P3-T3 or later Phase 3 tasks. Phase 4
-has not started.
+accepted the P2P-T1/T8/T9 recommendations and authorized P3-T1, P3-T2, and P3-T3 before
+the outstanding empirical exits. P3-T1 is merged and independently verified at
+`5eebcb2`; P3-T2 is merged and independently verified at `5365f70`; P3-T3 is
+independently verified and approved for integration, including the canonical
+`twinklr display` command and offline file-only layout input. The owner's latest
+continuation authorizes P3-T4 as the next offline task only. These sequencing exceptions
+do not waive the earlier exits. Phase 4 has not started.
 
 The authoritative current task/gate list is the campaign
 [HANDOFF.md](../changes/twinklr-reactivation-review/build/plan/HANDOFF.md). Most notably,

@@ -16,7 +16,7 @@ from pathlib import Path
 import pytest
 
 from tests.golden.harness import RIGS, build_fixture_group
-from twinklr.cli.main import build_arg_parser, build_display_graph, build_run_pipeline
+from twinklr.cli.main import build_arg_parser, build_moving_head_graph, build_run_pipeline
 from twinklr.core.agents.audio.profile.models import AudioProfileModel
 from twinklr.core.agents.sequencer.moving_heads.context import (
     FixtureContext,
@@ -115,7 +115,7 @@ def test_planner_receives_real_fixture_count(rig: FixtureGroup) -> None:
 
 def test_display_graph_describes_the_configured_rig(rig: FixtureGroup) -> None:
     """The graph is the rig, not the author's yard."""
-    graph, mapping = build_display_graph(rig)
+    graph, mapping = build_moving_head_graph(rig)
 
     assert [group.id for group in graph.groups] == ["MOVING_HEADS"]
     assert graph.groups[0].fixture_count == len(rig.expand_fixtures())
@@ -143,7 +143,7 @@ def test_success_threshold_from_config_single_scale() -> None:
 def test_empty_rig_is_reported_not_crashed() -> None:
     """A fixture config with no fixtures fails with something the user can act on."""
     with pytest.raises(ValueError, match="declares no fixtures"):
-        build_display_graph(FixtureGroup(group_id="MOVING_HEADS"))
+        build_moving_head_graph(FixtureGroup(group_id="MOVING_HEADS"))
 
 
 def test_render_stage_takes_no_template(rig: FixtureGroup) -> None:

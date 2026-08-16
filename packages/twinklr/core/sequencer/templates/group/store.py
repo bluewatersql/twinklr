@@ -8,6 +8,7 @@ JSON files on demand. Optionally merges in a local, untracked
 
 from __future__ import annotations
 
+from collections import Counter
 import json
 import logging
 from pathlib import Path
@@ -102,6 +103,15 @@ class TemplateStore:
         index_path = directory / "index.json"
         data = json.loads(index_path.read_text(encoding="utf-8"))
         raw_entries: list[dict[str, Any]] = data.get("entries", [])
+        recipe_ids = [str(raw.get("recipe_id", "")) for raw in raw_entries]
+        duplicate_ids = sorted(
+            recipe_id for recipe_id, count in Counter(recipe_ids).items() if recipe_id and count > 1
+        )
+        if duplicate_ids:
+            raise ValueError(
+                f"Recipe catalog index {index_path} contains duplicate recipe_id values: "
+                f"{duplicate_ids}"
+            )
 
         entries: list[TemplateStoreEntry] = []
         for raw in raw_entries:
@@ -154,6 +164,25 @@ class TemplateStore:
             and (local_extensions_dir / "index.json").exists()
         ):
             store = store.merge(cls.from_directory(local_extensions_dir))
+        return store
+
+    @classmethod
+    def from_catalog_with_local_extensions_strict(
+        cls,
+        catalog_dir: Path,
+        local_extensions_dir: Path | None,
+    ) -> TemplateStore:
+        """Validate each source catalog before applying local override precedence."""
+        store = cls.from_directory(catalog_dir)
+        store.load_all_strict()
+        if (
+            local_extensions_dir is not None
+            and local_extensions_dir != catalog_dir
+            and (local_extensions_dir / "index.json").exists()
+        ):
+            local_store = cls.from_directory(local_extensions_dir)
+            local_store.load_all_strict()
+            store = store.merge(local_store)
         return store
 
     def merge(self, other: TemplateStore) -> TemplateStore:
@@ -215,6 +244,33 @@ class TemplateStore:
         except Exception:
             logger.exception(f"Failed to load recipe {recipe_id} from {file_path}")
             return None
+
+    def load_all_strict(self) -> list[EffectRecipe]:
+        """Eagerly validate every indexed recipe without silently dropping entries."""
+        recipes: list[EffectRecipe] = []
+        for recipe_id, entry in self._entries_by_id.items():
+            base_dir = self._entry_dirs.get(recipe_id, self._base_dir)
+            file_path = base_dir / entry.file
+            if not file_path.is_file():
+                raise ValueError(
+                    f"Recipe catalog entry {recipe_id!r} references missing file {file_path}"
+                )
+            try:
+                data = json.loads(file_path.read_text(encoding="utf-8"))
+                recipe = EffectRecipe.model_validate(data)
+            except Exception as error:
+                raise ValueError(
+                    f"Recipe catalog entry {recipe_id!r} has invalid recipe file "
+                    f"{file_path}: {error}"
+                ) from error
+            if recipe.recipe_id != recipe_id:
+                raise ValueError(
+                    f"Recipe catalog entry {recipe_id!r} at {file_path} contains mismatched "
+                    f"recipe_id {recipe.recipe_id!r}"
+                )
+            self._cache[recipe_id] = recipe
+            recipes.append(recipe)
+        return recipes
 
     def list_by_type(self, template_type: GroupTemplateType) -> list[TemplateStoreEntry]:
         return [e for e in self.entries if e.template_type == template_type]

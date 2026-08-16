@@ -1,0 +1,38 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<xsequence BaseChannel="0" ChanCtrlBasic="0" ChanCtrlColor="0" FixedPointTiming="1" ModelBlending="true">
+  <head>
+    <version>2026.15</version>
+    <author>Twinklr Display Renderer</author>
+    <author-email />
+    <author-website />
+    <song />
+    <artist />
+    <album />
+    <MusicURL />
+    <comment />
+    <sequenceTiming>50 ms</sequenceTiming>
+    <sequenceType>Media</sequenceType>
+    <sequenceDuration>8.000</sequenceDuration>
+    <imageDir />
+    <mediaFile>fixture_song.wav</mediaFile>
+  </head>
+  <nextid>1</nextid>
+  <Jukebox />
+  <ColorPalettes>
+    <ColorPalette>C_BUTTON_Palette1=#E53935,C_BUTTON_Palette2=#43A047,C_BUTTON_Palette3=#F5F1E8,C_BUTTON_Palette4=#FFFFFF,C_BUTTON_Palette5=#000000,C_BUTTON_Palette6=#000000,C_BUTTON_Palette7=#000000,C_BUTTON_Palette8=#000000,C_CHECKBOX_Palette1=1,C_CHECKBOX_Palette2=1,C_CHECKBOX_Palette3=1,C_CHECKBOX_Palette4=1,C_SLIDER_Brightness=50</ColorPalette>
+  </ColorPalettes>
+  <EffectDB>
+    <Effect />
+    <Effect>E_CHECKBOX_ColorWash_HFade=1,E_CHECKBOX_ColorWash_VFade=0,E_CHECKBOX_ColorWash_Shimmer=0,E_TEXTCTRL_ColorWash_Cycles=1.0,E_SLIDER_ColorWash_Speed=20,B_CHOICE_BufferStyle=Per Model Default,T_TEXTCTRL_Fadein=1.00,T_CHOICE_In_Transition_Type=Fade,T_TEXTCTRL_Fadeout=1.00,T_CHOICE_Out_Transition_Type=Fade</Effect>
+  </EffectDB>
+  <DisplayElements>
+    <Element type="model" name="Yard Arches" visible="1" collapsed="0" />
+  </DisplayElements>
+  <ElementEffects>
+    <Element type="model" name="Yard Arches">
+      <EffectLayer>
+        <Effect name="Color Wash" startTime="520" endTime="6520" ref="1" />
+      </EffectLayer>
+    </Element>
+  </ElementEffects>
+</xsequence>

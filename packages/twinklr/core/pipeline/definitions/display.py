@@ -93,7 +93,7 @@ def build_display_pipeline(
         ...     template_catalog=catalog,
         ...     display_groups=[{"role_key": "OUTLINE", "model_count": 10, ...}],
         ...     enable_holistic=True,
-        ...     enable_assets=True,
+        ...     enable_assets=False,
         ... )
         >>> result = await PipelineExecutor().execute(pipeline, audio_path, context)
     """

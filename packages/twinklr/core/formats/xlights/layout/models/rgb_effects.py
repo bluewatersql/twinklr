@@ -141,6 +141,14 @@ class Models(BaseModel):
     model: list[Model] = Field(default_factory=list)
     subModel: list[SubModel] = Field(default_factory=list)  # noqa: N815 — xLights XML attribute name
 
+    @field_validator("model", "subModel", mode="before")
+    @classmethod
+    def normalize_singleton_collections(cls, value: Any) -> list[Any]:
+        """Normalize the XML parser's singleton child shape to a list."""
+        if value is None:
+            return []
+        return value if isinstance(value, list) else [value]
+
 
 class ModelGroup(BaseModel):
     """Group of models that can be controlled together."""
@@ -167,6 +175,14 @@ class ModelGroups(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     modelGroup: list[ModelGroup] = Field(default_factory=list)  # noqa: N815 — xLights XML attribute name
+
+    @field_validator("modelGroup", mode="before")
+    @classmethod
+    def normalize_singleton_collections(cls, value: Any) -> list[Any]:
+        """Normalize the XML parser's singleton child shape to a list."""
+        if value is None:
+            return []
+        return value if isinstance(value, list) else [value]
 
 
 class Settings(BaseModel):
