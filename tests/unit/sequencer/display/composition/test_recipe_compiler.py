@@ -164,7 +164,9 @@ def test_recipe_compiler_multi_layer() -> None:
                 layer_index=1,
                 layer_name="Sparkle",
                 layer_depth=VisualDepth.FOREGROUND,
-                effect_type="Sparkles",
+                # "Sparkles" has no runtime handler. Admission now rejects such
+                # recipes, so the multi-layer fixture uses the registered Twinkle.
+                effect_type="Twinkle",
                 blend_mode=BlendMode.ADD,
                 mix=0.6,
                 density=0.3,

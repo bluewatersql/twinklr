@@ -12,7 +12,7 @@ from typing import Any, Protocol, runtime_checkable
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from twinklr.core.sequencer.display.models.render_event import RenderEvent
+from twinklr.core.sequencer.display.models.render_event import EffectSubstitution, RenderEvent
 
 
 class EffectSettings(BaseModel):
@@ -26,6 +26,7 @@ class EffectSettings(BaseModel):
         effect_name: xLights effect type name for the <Effect> tag.
         requires_assets: List of asset paths this effect depends on.
         warnings: Non-fatal warnings from rendering.
+        effect_substitution: Structured effect fallback/resolution provenance.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -39,6 +40,10 @@ class EffectSettings(BaseModel):
     warnings: list[str] = Field(
         default_factory=list,
         description="Non-fatal rendering warnings",
+    )
+    effect_substitution: EffectSubstitution | None = Field(
+        default=None,
+        description="Structured effect fallback/resolution provenance",
     )
 
 

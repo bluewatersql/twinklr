@@ -22,6 +22,7 @@ from twinklr.core.sequencer.display.composition.engine import (
 from twinklr.core.sequencer.display.composition.palette_resolver import (
     PaletteResolver,
 )
+from twinklr.core.sequencer.display.composition.recipe_compiler import RecipeCompiler
 from twinklr.core.sequencer.display.composition.template_compiler import (
     TemplateCompiler,
 )
@@ -59,6 +60,7 @@ class RenderResult(BaseModel):
         warnings: All warnings from composition and rendering.
         missing_assets: Asset paths that were not found.
         xsq_trace_entries: Per-effect trace metadata for XSQ sidecar generation.
+        fallback_substitutions: Number of visible effect-type substitutions.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -71,6 +73,7 @@ class RenderResult(BaseModel):
     warnings: list[str] = Field(default_factory=list)
     missing_assets: list[str] = Field(default_factory=list)
     xsq_trace_entries: list[XSQTraceEntry] = Field(default_factory=list)
+    fallback_substitutions: int = Field(default=0, ge=0)
 
 
 class DisplayRenderer:
@@ -119,8 +122,18 @@ class DisplayRenderer:
         self._choreo_graph = choreo_graph
         self._xlights_mapping = xlights_mapping or XLightsMapping()
         self._config = config or RenderConfig()
-        self._handlers = handler_registry or load_builtin_handlers()
         self._template_compiler = template_compiler
+        if isinstance(template_compiler, RecipeCompiler):
+            self._handlers = (
+                handler_registry
+                if handler_registry is not None
+                else template_compiler.handler_registry
+            )
+            template_compiler.use_handler_registry(self._handlers)
+        else:
+            self._handlers = (
+                handler_registry if handler_registry is not None else load_builtin_handlers()
+            )
 
         # Build palette resolver from catalog
         if palette_catalog is None:
@@ -214,6 +227,7 @@ class DisplayRenderer:
             warnings=all_warnings,
             missing_assets=write_result.missing_assets,
             xsq_trace_entries=write_result.trace_entries,
+            fallback_substitutions=write_result.fallback_substitutions,
         )
 
         logger.info(
@@ -231,6 +245,7 @@ def build_display_xsq_trace_sidecar_payload(render_result: RenderResult) -> dict
     return {
         "schema_version": "display-xsq-trace.v1",
         "entry_count": len(render_result.xsq_trace_entries),
+        "fallback_substitutions": render_result.fallback_substitutions,
         "entries": render_result.xsq_trace_entries,
     }
 

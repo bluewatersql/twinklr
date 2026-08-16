@@ -11,13 +11,6 @@ from twinklr.core.sequencer.vocabulary import GPBlendMode, LaneKind, VisualDepth
 class TestLayerAllocator:
     """Tests for the LayerAllocator."""
 
-    def test_default_procedural_layers(self) -> None:
-        """Simple allocate still uses backward-compatible mapping."""
-        allocator = LayerAllocator()
-        assert allocator.allocate(LaneKind.BASE) == 0
-        assert allocator.allocate(LaneKind.RHYTHM) == 2
-        assert allocator.allocate(LaneKind.ACCENT) == 4
-
     def test_sub_layer_allocation(self) -> None:
         """Each (lane, depth) pair gets a unique layer index."""
         allocator = LayerAllocator()

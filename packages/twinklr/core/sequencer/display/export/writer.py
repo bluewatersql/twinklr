@@ -9,7 +9,7 @@ via the existing XSQExporter.
 from __future__ import annotations
 
 import logging
-from typing import TypedDict
+from typing import NotRequired, TypedDict
 
 from twinklr.core.formats.xlights.sequence.models.xsq import (
     ColorPalette,
@@ -27,7 +27,7 @@ from twinklr.core.sequencer.display.export.effectdb_registry import (
     EffectDBRegistry,
 )
 from twinklr.core.sequencer.display.models.palette import ResolvedPalette
-from twinklr.core.sequencer.display.models.render_event import RenderEvent
+from twinklr.core.sequencer.display.models.render_event import EffectSubstitution, RenderEvent
 from twinklr.core.sequencer.display.models.render_plan import (
     RenderGroupPlan,
     RenderLayerPlan,
@@ -37,6 +37,14 @@ from twinklr.core.sequencer.display.palette.builder import build_palette_string
 from twinklr.core.sequencer.display.palette.registry import PaletteDBRegistry
 
 logger = logging.getLogger(__name__)
+
+
+class EffectSubstitutionTrace(TypedDict):
+    """Structured effect substitution recorded on one trace entry."""
+
+    requested_effect_type: str
+    substituted_effect_type: str
+    reason: str
 
 
 class XSQTraceEntry(TypedDict):
@@ -54,6 +62,7 @@ class XSQTraceEntry(TypedDict):
     effect_name: str
     start_ms: int
     end_ms: int
+    fallback_substitution: NotRequired[EffectSubstitutionTrace]
 
 
 class WriteResult:
@@ -66,6 +75,7 @@ class WriteResult:
         palette_entries: Number of palette entries registered.
         warnings: Non-fatal warnings from rendering.
         missing_assets: Asset paths that were not found.
+        fallback_substitutions: Number of visible effect-type substitutions.
     """
 
     def __init__(self) -> None:
@@ -75,6 +85,7 @@ class WriteResult:
         self.palette_entries: int = 0
         self.warnings: list[str] = []
         self.missing_assets: list[str] = []
+        self.fallback_substitutions: int = 0
         self.trace_entries: list[XSQTraceEntry] = []
 
 
@@ -225,6 +236,8 @@ class XSQWriter:
         # Collect warnings and missing assets
         result.warnings.extend(settings.warnings)
         result.missing_assets.extend(settings.requires_assets)
+        if settings.effect_substitution is not None:
+            result.fallback_substitutions += 1
 
         # 2. Augment with cross-cutting T_ keys
         augmented = self._augment_settings(
@@ -261,6 +274,7 @@ class XSQWriter:
             element_name=element_name,
             layer_index=layer_index,
             effect_name=settings.effect_name,
+            effect_substitution=settings.effect_substitution,
         )
 
     @staticmethod
@@ -271,25 +285,31 @@ class XSQWriter:
         element_name: str,
         layer_index: int,
         effect_name: str,
+        effect_substitution: EffectSubstitution | None = None,
     ) -> None:
         """Append a trace sidecar entry for a written effect."""
         source = event.source
-        result.trace_entries.append(
-            {
-                "event_id": event.event_id,
-                "placement_id": source.placement_id,
-                "placement_index": source.placement_index,
-                "section_id": source.section_id,
-                "lane": source.lane.value,
-                "group_id": source.group_id,
-                "template_id": source.template_id,
-                "element_name": element_name,
-                "layer_index": layer_index,
-                "effect_name": effect_name,
-                "start_ms": event.start_ms,
-                "end_ms": event.end_ms,
+        trace_entry: XSQTraceEntry = {
+            "event_id": event.event_id,
+            "placement_id": source.placement_id,
+            "placement_index": source.placement_index,
+            "section_id": source.section_id,
+            "lane": source.lane.value,
+            "group_id": source.group_id,
+            "template_id": source.template_id,
+            "element_name": element_name,
+            "layer_index": layer_index,
+            "effect_name": effect_name,
+            "start_ms": event.start_ms,
+            "end_ms": event.end_ms,
+        }
+        if effect_substitution is not None:
+            trace_entry["fallback_substitution"] = {
+                "requested_effect_type": effect_substitution.requested_effect_type,
+                "substituted_effect_type": effect_substitution.substituted_effect_type,
+                "reason": effect_substitution.reason,
             }
-        )
+        result.trace_entries.append(trace_entry)
 
     @staticmethod
     def _augment_settings(

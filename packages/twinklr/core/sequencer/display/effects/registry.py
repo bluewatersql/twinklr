@@ -13,7 +13,7 @@ from twinklr.core.sequencer.display.effects.protocol import (
     EffectSettings,
     RenderContext,
 )
-from twinklr.core.sequencer.display.models.render_event import RenderEvent
+from twinklr.core.sequencer.display.models.render_event import EffectSubstitution, RenderEvent
 
 logger = logging.getLogger(__name__)
 
@@ -93,6 +93,7 @@ class HandlerRegistry:
             ValueError: If no handler found and no default set.
         """
         handler = self._handlers.get(event.effect_type)
+        substitution = event.effect_substitution
 
         if handler is None:
             if self._default is not None:
@@ -101,6 +102,11 @@ class HandlerRegistry:
                     event.effect_type,
                     self._default.effect_type,
                 )
+                substitution = EffectSubstitution(
+                    requested_effect_type=event.effect_type,
+                    substituted_effect_type=self._default.effect_type,
+                    reason="unregistered effect type",
+                )
                 handler = self._default
             else:
                 raise ValueError(
@@ -108,7 +114,21 @@ class HandlerRegistry:
                     f"and no default handler set"
                 )
 
-        return handler.build_settings(event, ctx)
+        settings = handler.build_settings(event, ctx)
+        if substitution is None:
+            return settings
+
+        warning = (
+            f"Effect type '{substitution.requested_effect_type}' substituted with "
+            f"'{substitution.substituted_effect_type}' for template "
+            f"'{event.source.template_id}': {substitution.reason}"
+        )
+        return settings.model_copy(
+            update={
+                "warnings": [*settings.warnings, warning],
+                "effect_substitution": substitution,
+            }
+        )
 
     @property
     def registered_types(self) -> list[str]:

@@ -13,6 +13,11 @@ correct xLights layer.
 Supports dual-layer rendering: when a placement has resolved_asset_ids
 (from the asset resolution step), the engine emits both a procedural
 effect event AND a Pictures overlay event on adjacent layers.
+
+Blend precedence is deliberately **lane wins**: ``LanePlan.blend_mode``
+overrides recipe-layer blend metadata for every emitted sub-layer in that
+lane.  This keeps the planner's lane-level composition intent uniform across
+BASE, RHYTHM, and ACCENT and independent of recipe or iteration order.
 """
 
 from __future__ import annotations
@@ -207,7 +212,7 @@ class CompositionEngine:
                 element_layers[element_name][layer_idx] = resolved
 
         # Build RenderPlan from accumulated data
-        groups = self._build_groups(element_layers)
+        groups = self._build_groups(element_layers, diagnostics)
 
         plan = RenderPlan(
             render_id=str(uuid4()),
@@ -255,21 +260,14 @@ class CompositionEngine:
 
         for lane_plan in section.lane_plans:
             lane = lane_plan.lane
-            layer_idx = self._layer_allocator.allocate(lane)
-            blend_mode = LayerAllocator.resolve_blend_mode(lane_plan.blend_mode)
-
-            # Track blend mode per element/layer
-            for target_id in self._collect_target_ids(lane_plan.coordination_plans):
-                element_name = self._target_resolver.resolve(target_id)
-                key = (element_name, layer_idx)
-                if key not in self._layer_blend_modes:
-                    self._layer_blend_modes[key] = blend_mode
+            lane_blend_mode = LayerAllocator.resolve_blend_mode(lane_plan.blend_mode)
 
             for coord_plan in lane_plan.coordination_plans:
                 self._compose_coordination(
                     coord_plan=coord_plan,
                     section=section,
                     lane=lane,
+                    lane_blend_mode=lane_blend_mode,
                     section_palette=section_palette,
                     section_start_bar=section_start_bar,
                     section_end_ms=section_end_ms,
@@ -282,6 +280,7 @@ class CompositionEngine:
         coord_plan: CoordinationPlan,
         section: SectionCoordinationPlan,
         lane: LaneKind,
+        lane_blend_mode: str,
         section_palette: ResolvedPalette,
         section_start_bar: int,
         section_end_ms: int | None,
@@ -302,6 +301,7 @@ class CompositionEngine:
             coord_plan: Coordination plan with placements.
             section: Parent section (for context).
             lane: Lane kind for intensity resolution.
+            lane_blend_mode: xLights layer method selected by the lane plan.
             section_palette: Resolved palette for this section.
             section_start_bar: 0-indexed song bar where this section starts.
             section_end_ms: Section end boundary for clamping (None = no clamp).
@@ -371,8 +371,13 @@ class CompositionEngine:
             for ce in compiled_effects:
                 sub_layer = self._layer_allocator.allocate_sub_layer(lane, ce.visual_depth)
                 blend_key = (element_name, sub_layer)
-                if blend_key not in self._layer_blend_modes:
-                    self._layer_blend_modes[blend_key] = ce.layer_blend_mode
+                self._register_blend_mode(
+                    key=blend_key,
+                    blend_mode=lane_blend_mode,
+                    section=section,
+                    group_id=placement.target.id,
+                    diagnostics=diagnostics,
+                )
                 if element_name not in element_layers:
                     element_layers[element_name] = {}
                 if sub_layer not in element_layers[element_name]:
@@ -395,8 +400,13 @@ class CompositionEngine:
                         element_layers.setdefault(element_name, {})[overlay_layer_idx] = []
                     element_layers[element_name][overlay_layer_idx].extend(overlay_events)
                     overlay_key = (element_name, overlay_layer_idx)
-                    if overlay_key not in self._layer_blend_modes:
-                        self._layer_blend_modes[overlay_key] = "Normal"
+                    self._register_blend_mode(
+                        key=overlay_key,
+                        blend_mode=lane_blend_mode,
+                        section=section,
+                        group_id=placement.target.id,
+                        diagnostics=diagnostics,
+                    )
 
     def _expand_window(
         self,
@@ -989,35 +999,48 @@ class CompositionEngine:
 
         return resolved
 
-    @staticmethod
-    def _collect_target_ids(
-        coordination_plans: list[CoordinationPlan],
-    ) -> list[str]:
-        """Collect all target IDs referenced in coordination plans.
+    def _register_blend_mode(
+        self,
+        *,
+        key: tuple[str, int],
+        blend_mode: str,
+        section: SectionCoordinationPlan,
+        group_id: str,
+        diagnostics: list[CompositionDiagnostic],
+    ) -> None:
+        """Register a lane blend in the emitted sub-layer index space.
 
-        Args:
-            coordination_plans: List of coordination plans.
-
-        Returns:
-            List of unique target IDs.
+        One xLights layer can only carry one method in the current RenderPlan
+        model. If different sections request conflicting lane modes for the same
+        element/sub-layer, the first request remains deterministic and the later
+        unhonoured request is made visible.
         """
-        seen: set[str] = set()
-        result: list[str] = []
-        for cp in coordination_plans:
-            for t in cp.targets:
-                if t.id not in seen:
-                    seen.add(t.id)
-                    result.append(t.id)
-        return result
+        existing = self._layer_blend_modes.get(key)
+        if existing is None:
+            self._layer_blend_modes[key] = blend_mode
+        elif existing != blend_mode:
+            diagnostics.append(
+                CompositionDiagnostic(
+                    level="warning",
+                    message=(
+                        f"Lane blend mode '{blend_mode}' cannot be honoured for element "
+                        f"'{key[0]}' sub-layer {key[1]}; that layer already uses '{existing}'"
+                    ),
+                    source_section=section.section_id,
+                    source_group=group_id,
+                )
+            )
 
     def _build_groups(
         self,
         element_layers: dict[str, dict[int, list[RenderEvent]]],
+        diagnostics: list[CompositionDiagnostic],
     ) -> list[RenderGroupPlan]:
         """Build RenderGroupPlan list from accumulated data.
 
         Args:
             element_layers: element_name → layer_index → events.
+            diagnostics: Accumulator for unhonoured blend-mode warnings.
 
         Returns:
             List of RenderGroupPlan.
@@ -1051,6 +1074,22 @@ class CompositionEngine:
                 )
 
             if layers:
+                first_layer = layers[0]
+                if first_layer.blend_mode != "Normal":
+                    first_event = first_layer.events[0]
+                    diagnostics.append(
+                        CompositionDiagnostic(
+                            level="warning",
+                            message=(
+                                f"Lane blend mode '{first_layer.blend_mode}' cannot be honoured "
+                                f"for element '{element_name}' sub-layer "
+                                f"{first_layer.layer_index}: it becomes emitted base layer 0 "
+                                "after layer compaction"
+                            ),
+                            source_section=first_event.source.section_id,
+                            source_group=first_event.source.group_id,
+                        )
+                    )
                 groups.append(
                     RenderGroupPlan(
                         element_name=element_name,

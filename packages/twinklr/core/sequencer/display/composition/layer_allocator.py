@@ -44,23 +44,11 @@ _BLEND_MODE_MAP: dict[GPBlendMode, str] = {
     GPBlendMode.ALPHA_OVER: "1 reveals 2",
 }
 
-# Backward-compatible simple lane map (for callers that haven't migrated)
-_COMPAT_LAYER_MAP: dict[LaneKind, int] = {
-    LaneKind.BASE: 0,
-    LaneKind.RHYTHM: 2,
-    LaneKind.ACCENT: 4,
-}
-
 
 class LayerAllocator:
     """Allocates xLights layer indices for lanes and visual depths.
 
-    Supports two allocation strategies:
-
-    1. **Simple** (``allocate``): backward-compatible single layer per
-       lane.  Used for code paths that haven't migrated to the
-       template compiler yet.
-    2. **Sub-layer** (``allocate_sub_layer``): one layer per
+    Uses one allocation strategy: ``allocate_sub_layer`` assigns one layer per
        ``(lane, VisualDepth)`` pair.  Used by the template compiler
        path where templates emit multiple effects at different depths.
 
@@ -71,31 +59,6 @@ class LayerAllocator:
         RHYTHM: layers 6-11
         ACCENT: layers 12-17
     """
-
-    def __init__(
-        self,
-        layer_map: dict[LaneKind, int] | None = None,
-    ) -> None:
-        """Initialize the allocator.
-
-        Args:
-            layer_map: Custom lane-to-layer mapping for simple allocation.
-                Defaults to BASE=0, RHYTHM=2, ACCENT=4.
-        """
-        self._layer_map = layer_map or dict(_COMPAT_LAYER_MAP)
-
-    def allocate(self, lane: LaneKind) -> int:
-        """Get the simple procedural layer index for a lane.
-
-        Backward-compatible: returns a single layer per lane.
-
-        Args:
-            lane: Lane kind (BASE/RHYTHM/ACCENT).
-
-        Returns:
-            xLights layer index (0-based).
-        """
-        return self._layer_map.get(lane, 0)
 
     def allocate_sub_layer(
         self,

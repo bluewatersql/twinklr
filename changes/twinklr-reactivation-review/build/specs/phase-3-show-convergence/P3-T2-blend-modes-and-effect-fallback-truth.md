@@ -349,3 +349,99 @@ unregistered types. *Mitigation*: land the validation with a clear error message
 run it against whatever tracked catalog exists after P1K-T3; if a tracked catalog
 contains an unregistered type, that is a finding to report, not a reason to weaken the
 check to a warning.
+
+## Implementation handoff — 2026-08-16 (author pass; independent verification pending)
+
+The owner explicitly authorized P3-T2 before the outstanding Phase 1P/2P/2K empirical
+exits. This exception covers P3-T2 only: it does not waive those exits or authorize
+P3-T3 or later Phase 3 work.
+
+### Implemented contract
+
+- Chose and implemented **lane wins** precedence. `LanePlan.blend_mode` now applies to
+  every procedural and asset-overlay sub-layer emitted by BASE, RHYTHM, or ACCENT,
+  independent of recipe metadata and lane iteration order. The module docstring and
+  [durable decision](../../../../../memories/decisions/lane-blend-mode-overrides-recipe.md)
+  record the rule and rejected alternative.
+- Deleted the legacy `LayerAllocator.allocate` / `_COMPAT_LAYER_MAP` space after grep
+  confirmed zero remaining production callers. `_layer_blend_modes` is written and read
+  only with actual `allocate_sub_layer` / overlay indices.
+- A non-Normal mode compacted into emitted xLights layer 0 produces a
+  `CompositionDiagnostic`, because a base layer has nothing beneath it to blend with.
+  Conflicting time-separated requests for one physical element/sub-layer likewise keep
+  a deterministic first method and diagnose the later unhonoured request.
+- `RecipeCompiler` resolves placeholder types, validates every resolved layer against
+  its `HandlerRegistry`, and rejects the entire recipe before constructing any
+  `RenderEvent` when a type is unregistered. Errors name the offending type, recipe,
+  section/placement, and closest registered types.
+- `DisplayRenderer` binds `RecipeCompiler` to the exact registry instance used for
+  runtime dispatch, including caller-supplied custom registries. Direct compiler use
+  defaults to the built-in runtime registry.
+- Placeholder resolution and the retained default-handler path carry a structured
+  `EffectSubstitution`. Dispatch appends a human-readable `EffectSettings.warning`;
+  `XSQWriter` copies the structured record into the affected trace entry and increments
+  `WriteResult.fallback_substitutions`; `RenderResult` and the sidecar payload expose the
+  same count. The existing registry log warning remains.
+- Existing registry fallback tests were deliberately strengthened to require structured
+  substitution/warning data. The old multi-layer recipe test's unregistered `Sparkles`
+  fixture was changed to the registered `Twinkle`; unknown types are now covered only by
+  the explicit rejection/fallback tests.
+
+### TDD and author verification evidence
+
+- Before production edits, the new contract slice was **8 failed / 0 passed**. It
+  discriminated RHYTHM/ACCENT structural loss, nonuniform precedence, cross-section
+  contamination, the missing unhonoured diagnostic, missing registry admission, and
+  missing warning/trace/count propagation.
+- Post-fix focused P3-T2 plus directly affected registry/compiler tests: **27 passed**.
+- Complete composition suite: **168 passed**. Complete display suite: **423 passed**.
+- Display export regression suite: **30 passed**.
+- Golden render/export gate: **73 passed / 8 skipped**; no golden artifact changed.
+- Ruff format: **1,342 files clean**; Ruff lint with `--no-cache`: clean; mypy:
+  **718 source files clean**.
+- Full tests: **5,261 passed / 39 skipped / 9 warnings** in 96.00 seconds.
+
+`make validate` was attempted and correctly stopped at its clean-worktree guard because
+this author handoff necessarily contains uncommitted changes. Its check-only
+formatter/linter/type-checker and full-test equivalents above all passed.
+
+No network, live provider, paid API, xLights, or audio operation was performed.
+Independent verification is required before integration; this author does not approve
+their own work.
+
+### File manifest
+
+Production:
+
+- `packages/twinklr/core/sequencer/display/composition/engine.py`
+- `packages/twinklr/core/sequencer/display/composition/layer_allocator.py`
+- `packages/twinklr/core/sequencer/display/composition/recipe_compiler.py`
+- `packages/twinklr/core/sequencer/display/effects/protocol.py`
+- `packages/twinklr/core/sequencer/display/effects/registry.py`
+- `packages/twinklr/core/sequencer/display/export/writer.py`
+- `packages/twinklr/core/sequencer/display/models/render_event.py`
+- `packages/twinklr/core/sequencer/display/renderer.py`
+
+Tests:
+
+- `tests/unit/sequencer/display/composition/test_blend_modes.py`
+- `tests/unit/sequencer/display/composition/test_layer_allocator.py`
+- `tests/unit/sequencer/display/composition/test_recipe_compiler.py`
+- `tests/unit/sequencer/display/effects/test_registry.py`
+- `tests/unit/sequencer/display/test_effect_type_validation.py`
+- `tests/unit/sequencer/display/test_writer_warnings.py`
+
+Campaign truth and decision record:
+
+- `changes/ACTIVE.md`
+- `changes/twinklr-reactivation-review/build/plan/06-phase-3-show-convergence.md`
+- `changes/twinklr-reactivation-review/build/plan/HANDOFF.md`
+- this specification
+- `context/current-state.md`
+- `memories/INDEX.md`
+- `memories/decisions/lane-blend-mode-overrides-recipe.md`
+
+Still open by explicit non-goal: parameter range validation/settings escaping,
+`resolved_color`, `timing_offset_beats`, layer `mix` consumption beyond its existing
+compiler behavior, and moving-head changes. P3-T5/P3-T8 and the remaining display review
+tasks continue to own those boundaries.

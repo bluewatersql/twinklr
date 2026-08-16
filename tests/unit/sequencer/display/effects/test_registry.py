@@ -62,6 +62,9 @@ class TestHandlerRegistry:
         event = _make_event("UnknownEffect")
         settings = reg.dispatch(event, _make_ctx())
         assert settings.effect_name == "On"
+        assert settings.effect_substitution is not None
+        assert settings.effect_substitution.requested_effect_type == "UnknownEffect"
+        assert any("UnknownEffect" in warning for warning in settings.warnings)
 
     def test_registered_types(self) -> None:
         reg = HandlerRegistry()
@@ -115,3 +118,4 @@ class TestLoadBuiltinHandlers:
         event = _make_event("Galaxy")
         settings = reg.dispatch(event, _make_ctx())
         assert settings.effect_name == "On"
+        assert settings.effect_substitution is not None

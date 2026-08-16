@@ -39,6 +39,16 @@ class RenderEventSource(BaseModel):
     placement_index: int = 0
 
 
+class EffectSubstitution(BaseModel):
+    """Structured provenance for an effect-type substitution."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    requested_effect_type: str = Field(description="Effect type originally requested")
+    substituted_effect_type: str = Field(description="Effect type actually rendered")
+    reason: str = Field(description="Why the substitution was necessary")
+
+
 class RenderEvent(BaseModel):
     """A single effect placement in the render plan.
 
@@ -57,6 +67,7 @@ class RenderEvent(BaseModel):
         intensity: Normalized intensity (0.0-1.0).
         transition_in: Optional incoming transition.
         transition_out: Optional outgoing transition.
+        effect_substitution: Structured provenance when effect_type was substituted.
         source: Traceability back to the planning origin.
     """
 
@@ -102,6 +113,10 @@ class RenderEvent(BaseModel):
             "to the static slider value."
         ),
     )
+    effect_substitution: EffectSubstitution | None = Field(
+        default=None,
+        description="Structured provenance for an effect-type substitution",
+    )
     source: RenderEventSource = Field(
         description="Traceability to planning origin",
     )
@@ -113,6 +128,7 @@ class RenderEvent(BaseModel):
 
 
 __all__ = [
+    "EffectSubstitution",
     "RenderEvent",
     "RenderEventSource",
 ]
