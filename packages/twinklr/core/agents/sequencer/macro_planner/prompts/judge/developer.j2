@@ -1,45 +1,23 @@
-{#
-MacroPlanner Judge Developer Prompt
-Technical constraints and issue standards for evaluating MacroPlan outputs
-#}
-
 ## Response Schema
-
-Return JSON that matches this schema:
 
 ```json
 {{ response_schema }}
 ```
 
-## Strict Requirements (Phase 1 Failures)
+Return HARD_FAIL for missing/stale references, duplicate IDs, section coverage or timing
+errors, invalid catalog IDs, unresolvable targets, palette/theme conflicts, invalid focal
+coverage, or identical call/response targets.
 
-Return HARD_FAIL if any are true:
-- Missing sections or mismatched section_id coverage vs audio_profile.structure.sections
-- Gaps/overlaps or unsorted section timing
-- Layering invalid (not 1-5, missing BASE, duplicate indices)
-- Layer target_selector roles referenced that do not exist in display_groups
-- Section focus targets missing or invalid schema-typed IDs
-- Theme invalid:
-  - global_story.theme does not use song-level ThemeScope (`SONG`)
-  - any section.theme does not use section-level ThemeScope (`SECTION`)
-  - any ThemeRef.tags length > 5
-- **Palette invalid (NEW):**
-  - global_story.palette_plan.primary.palette_id missing/empty
-  - palette_id not in palette_catalog (if provided)
-- **Motifs invalid (NEW):**
-  - any section has 0 motif_ids
-  - motif_id not in motif_catalog (if provided)
+Use these stable issue IDs where applicable:
 
-## Strategic Scoring Guardrails (Phase 2)
+- `COVERAGE_SECTION_MISMATCH`
+- `PALETTE_ARC_INVALID`
+- `MOTIF_REFERENCE_INVALID`
+- `FOCAL_ARC_INVALID`
+- `TARGET_REFERENCE_INVALID`
+- `CALL_RESPONSE_IDENTICAL`
+- `THEME_PALETTE_CONFLICT`
 
-- Use `audio_profile.structure.sections` for section counts and percentages.
-- If there are no technical errors and all remaining issues are localized and patchable,
-  default to score >= 7.0 unless coherence is fundamentally broken.
-- Avoid contradictory counting in issue messages (section totals and override counts must align).
-- Coverage/schema issues must reference concrete structured evidence from `macro_plan.section_plans[*].section.section_id` and typed target objects.
-- Do not emit coverage/schema ERRORs from section display names or other prose summaries.
-
-## Notes
-
-- Prefer deterministic acceptance tests.
-- Use stable issue_ids and include location.field_path for structural field issues.
+For valid plans, score creative coherence rather than inventing schema defects. Keep
+counts consistent with `audio_profile.structure.sections` and cite exact structured
+evidence.

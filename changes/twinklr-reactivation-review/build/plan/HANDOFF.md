@@ -1,7 +1,11 @@
 # Build-campaign handoff — current execution state
 
-_Last updated: 2026-08-16 after P3-T3 owner approval and independent verification under
-the owner's explicit sequencing exception. Maintained by the orchestrating agent; update this file at every
+_Last updated: 2026-08-16 after P3-T4 live attempt 1 was rejected by the provider's
+schema validator and the harness conservatively committed its full `$1.66` reservation.
+P3-T4 live acceptance remains open, but the remaining `$0.09` task budget cannot fund
+another audited attempt. Offline schema remediation and fresh independent verification
+remain pending under the owner's explicit sequencing exception. Maintained by the
+orchestrating agent; update this file at every
 pause or phase boundary._
 
 ## What this campaign is
@@ -22,7 +26,7 @@ their authoring moment; this handoff owns the current campaign status.
 | 1P — Render truth | **IMPLEMENTATION MERGED AND VERIFIED** (12/12); **phase exit not complete** | The recorded human judgment and empirical xLights acceptance evidence remain pending; see [02-phase-1p-render-truth.md](02-phase-1p-render-truth.md). |
 | 2P — Creative quality | **OFFLINE IMPLEMENTATION MERGED AND VERIFIED** (13/13); **phase exit not complete** | The owner accepted T1/T8/T9 on 2026-08-16. T6 calibration/live evidence, T13/D1 evidence, and other live checks remain pending; see [04-phase-2p-creative-quality.md](04-phase-2p-creative-quality.md). |
 | 2K — Catalog growth | **TOOLING IMPLEMENTATION MERGED AND VERIFIED** (4/4); **phase exit not complete** | Tooling is ready, but coverage/corpus/curation/style exit criteria require the author's real layout, corpus, preferences, and judgments; see [05-phase-2k-catalog-growth.md](05-phase-2k-catalog-growth.md). |
-| 3 — Show convergence | **P3-T1/P3-T2 MERGED; P3-T3 VERIFIED AND APPROVED FOR INTEGRATION** (3/8); P3-T4 authorized next | On 2026-08-16 the owner explicitly authorized P3-T1 through P3-T3 before the outstanding empirical exits, accepted the P3-T3 `twinklr display` command and offline file-only layout source, and then authorized P3-T4 as the next offline task. P3-T1 landed at `5eebcb2`; P3-T2 landed at `5365f70`. These narrow sequencing exceptions do not waive any Phase 1P/2P/2K exit criterion. |
+| 3 — Show convergence | **P3-T1/P3-T2/P3-T3 MERGED; P3-T4 LIVE ACCEPTANCE OPEN AFTER SAFE PROVIDER REJECTION** (3/8 integrated) | P3-T3 landed at `33cce57`. The owner accepted P3-T4's exact contract/invariants and AC2 amendment. Its only funded live attempt reached the provider once and was rejected with HTTP 400 `invalid_json_schema`: `ThemeRef.scope` carried a `$ref` with a sibling `description`. No retry or fallback occurred; usage was unavailable, so the harness committed `$1.66`. Only `$0.09` remains under the `$1.75` task cap, which is insufficient for another `$1.66` reservation. The general schema remediation is author-complete offline but P3-T4 remains unverified and unintegrated; P3-T5 remains unauthorized. P3-T1 landed at `5eebcb2`; P3-T2 landed at `5365f70`. These narrow sequencing exceptions do not waive any Phase 1P/2P/2K exit criterion. |
 | 4 — Compounding | **NOT STARTED** | No Phase 4 implementation has started. |
 
 The overall `twinklr-reactivation-review` change remains **ACTIVE**. Finishing an
@@ -34,7 +38,46 @@ offline implementation lane is not the same as satisfying its phase exit criteri
   [context/current-state.md](../../../../context/current-state.md); do not fork its
   rolling snapshot into this execution handoff.
 - No implementation or test failure is being carried as an accepted baseline.
+- The prior P3-T4 author snapshot was formally rejected, then its first remediation was
+  narrowly rejected for reinterpreting `PlanTarget.ZONE` as physical `DisplayZone`.
+  The frozen author snapshot restores the established `ChoreoTag` contract. Fresh gates:
+  focused `494 passed`; Ruff and formatting clean; mypy clean across 720 source files;
+  immutable goldens `73 passed, 8 skipped`; relevant broad suite `5238 passed, 39
+  skipped`. The immediately preceding coverage-enabled full run passed `5236/39` at
+  87%. These are author evidence only; fresh independent verification is still required.
 - Nothing was pushed as part of this milestone.
+- The dedicated P3-T4 owner probe harness passed its safety audit and uses
+  the shipped prompt/runner/orchestrator and production external validator, fails closed
+  before a call, enforces one request per attempt and three attempts total, applies a
+  frozen USD cap, and atomically writes owner-local evidence outside the repository.
+  Offline safety tests pass. Owner live attempt 1 made exactly one provider request and
+  received HTTP 400 `invalid_json_schema` because `ThemeRef.scope` contained `$ref`
+  beside `description`. There was no retry or fallback.
+- After the harness audit's four safety findings, the remediation now uses one canonical
+  tamper-evident global ledger, serialized-request preauthorization, pre-await provider
+  entry accounting, exact response-metadata validation, and a transitive source/input
+  manifest. Fresh author gates: harness `37 passed`; focused regression `534 passed`;
+  goldens `73 passed, 8 skipped`; full `5276 passed, 39 skipped`; Ruff/format/mypy clean.
+  Those were prerequisite author findings rather than live acceptance evidence.
+- The `$1.75` allowance is enforced as one cumulative P3-T4 task budget. Each attempt
+  reserves `$1.66`; exact metered cost replaces it only when trustworthy response
+  metadata exists. The owner must independently supply the frozen input, catalog, and
+  serialized-request hashes, and local `data/templates/` overlays are disabled.
+- Missing, zero-default, partial, inconsistent, or out-of-bound token usage never releases
+  an attempt's `$1.66` reservation; it is recorded as unavailable and blocks another
+  worst-case reservation under the cumulative `$1.75` cap.
+- Attempt 1 had no trustworthy usage, so its full `$1.66` reservation is permanently
+  committed. The `$0.09` remaining task budget cannot fund another attempt. The canonical
+  owner-local ledger and evidence are preserved outside the repository; live acceptance
+  remains open rather than being inferred from the offline schema fix.
+- The post-attempt general `$ref` remediation has fresh author evidence: the three
+  pre-fix discriminators now pass; strict/provider/contract/harness `122 passed`; complete
+  P3-T4 planning/provider surface `638 passed`; Ruff/format/mypy clean (`723` source
+  files); immutable goldens `73 passed, 8 skipped`; full offline suite `5280 passed, 39
+  skipped`. Remediated source-manifest hash is
+  `d424435c62c4486c6c0ed1fc77029b46109edb00575a4e53ce934f1f0b451f08`; serialized
+  request hash is `ca9147ba044b347d036a222f0e32b1073e674b5be6efd1387d264e9ecce361c0`
+  (`38236` bytes). This remains author evidence pending independent verification.
 
 ### Phase 2P offline implementation record
 
@@ -126,9 +169,12 @@ The remaining empirical checks are also pending:
 5. Reassess Phase 1P, 2P, and 2K exit criteria explicitly; do not mark a phase complete
    merely because its code/tooling is merged.
 
-P3-T1 and P3-T2 are complete and independently verified. P3-T3 is independently verified,
-its owner decisions are accepted, and integration is authorized. The owner's latest
-continuation authorizes P3-T4 next; P3-T5 and later still require separate authorization
+P3-T1 and P3-T2 are complete and independently verified. P3-T3 is merged at `33cce57`
+after independent verification and owner acceptance. P3-T4's contract/invariants and
+AC2 amendment are owner-accepted. Live attempt 1 was safely rejected at the provider
+schema boundary, and the conservative reservation leaves insufficient budget for a
+second attempt. Its general offline schema remediation awaits independent verification;
+P3-T4 remains unverified and unintegrated. P3-T5 and later still require separate authorization
 while the earlier empirical exits remain open. P3-T2 deliberately leaves
 `resolved_color`, `timing_offset_beats`, and parameter-range/settings escaping work to
 their existing P3-T5/P3-T8 or display-review owners; it does not silently close them.

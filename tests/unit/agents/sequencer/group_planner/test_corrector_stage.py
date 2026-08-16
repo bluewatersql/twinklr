@@ -261,6 +261,17 @@ class TestCorrectorStageReassembly:
 
         corrected_chorus = _make_section(
             "chorus_1", template_id="gtpl_accent_sparkle", start_ms=None, end_ms=None
+        ).model_copy(
+            update={
+                "theme": ThemeRef(
+                    theme_id="hallucinated.theme",
+                    scope=ThemeScope.SECTION,
+                    tags=[],
+                    palette_id=None,
+                ),
+                "palette": PaletteRef(palette_id="hallucinated.palette"),
+                "motif_ids": [],
+            }
         )
         correction = CorrectionResult(corrected_sections=[corrected_chorus])
         affected = {"chorus_1"}
@@ -278,7 +289,14 @@ class TestCorrectorStageReassembly:
         assert chorus.lane_plans[0].coordination_plans[0].placements[0].template_id == (
             "gtpl_accent_sparkle"
         )
-        # Timing restored from original
+        # Every macro-owned field is restored from the original.
+        original_chorus = next(
+            s for s in three_section_plan_set.section_plans if s.section_id == "chorus_1"
+        )
+        assert chorus.section_id == original_chorus.section_id
+        assert chorus.theme == original_chorus.theme
+        assert chorus.palette == original_chorus.palette
+        assert chorus.motif_ids == original_chorus.motif_ids
         assert chorus.start_ms == 10000
         assert chorus.end_ms == 20000
 
@@ -424,13 +442,13 @@ class TestCorrectorStageValidation:
 
         assert not stage._validate_corrected_plan(plan_set, ["chorus_1"], mock_context)
 
-    def test_validate_fails_for_empty_motif_ids(
+    def test_validate_accepts_empty_motif_ids(
         self,
         sample_choreo_graph: ChoreographyGraph,
         sample_template_catalog: TemplateCatalog,
         mock_context: PipelineContext,
     ) -> None:
-        """Validation catches empty motif_ids on modified section."""
+        """Motif-free macro sections remain valid after correction."""
         section = _make_section("chorus_1")
         section.motif_ids = []
 
@@ -444,7 +462,7 @@ class TestCorrectorStageValidation:
             template_catalog=sample_template_catalog,
         )
 
-        assert not stage._validate_corrected_plan(plan_set, ["chorus_1"], mock_context)
+        assert stage._validate_corrected_plan(plan_set, ["chorus_1"], mock_context)
 
 
 class TestCorrectorStageContextShaping:

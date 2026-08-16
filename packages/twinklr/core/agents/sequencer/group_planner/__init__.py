@@ -5,8 +5,9 @@ choreography plans across display groups.
 """
 
 from twinklr.core.agents.sequencer.group_planner.context import (
-    GroupPlanningContext,
+    MacroSectionPlanningInput,
     SectionPlanningContext,
+    project_macro_section,
 )
 from twinklr.core.agents.sequencer.group_planner.holistic import (
     HOLISTIC_JUDGE_SPEC,
@@ -112,14 +113,14 @@ __all__ = [
     # Orchestrator
     "GroupPlannerOrchestrator",
     "GroupPlannerStage",
-    # Context
-    "GroupPlanningContext",
     "GroupPosition",
     "HolisticEvaluation",
     "HolisticEvaluator",
     "HolisticEvaluatorStage",
     "LaneKind",
     "LanePlan",
+    # Context
+    "MacroSectionPlanningInput",
     "PlacementWindow",
     "SectionBounds",
     "SectionCoordinationPlan",
@@ -143,4 +144,5 @@ __all__ = [
     "get_holistic_judge_spec",
     "get_planner_spec",
     "get_section_judge_spec",
+    "project_macro_section",
 ]

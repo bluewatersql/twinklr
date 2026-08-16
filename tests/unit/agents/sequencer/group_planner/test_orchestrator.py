@@ -6,7 +6,11 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from twinklr.core.agents.sequencer.group_planner.context import SectionPlanningContext
+from twinklr.core.agents.audio.profile.models import SongSectionRef
+from twinklr.core.agents.sequencer.group_planner.context import (
+    SectionPlanningContext,
+    project_macro_section,
+)
 from twinklr.core.agents.sequencer.group_planner.orchestrator import (
     GroupPlannerOrchestrator,
 )
@@ -15,7 +19,21 @@ from twinklr.core.agents.sequencer.group_planner.timing import (
     SectionBounds,
     TimingContext,
 )
-from twinklr.core.sequencer.planning import LanePlan, SectionCoordinationPlan
+from twinklr.core.sequencer.planning import (
+    FocalAssignment,
+    FocalRole,
+    FocalRoleKind,
+    LanePlan,
+    MacroPlan,
+    MacroSection,
+    MotifEvolution,
+    MotifThread,
+    PaletteRef,
+    PaletteRoleRef,
+    PaletteStop,
+    PaletteTransition,
+    SectionCoordinationPlan,
+)
 from twinklr.core.sequencer.templates.group.catalog import (
     TemplateCatalog,
     TemplateInfo,
@@ -31,11 +49,14 @@ from twinklr.core.sequencer.templates.group.models.choreography import (
 from twinklr.core.sequencer.templates.group.models.coordination import PlanTarget
 from twinklr.core.sequencer.timing import TimeRef
 from twinklr.core.sequencer.vocabulary import (
+    ChoreographyStyle,
     CoordinationMode,
     EffectDuration,
+    EnergyTarget,
     GroupTemplateType,
     GroupVisualIntent,
     LaneKind,
+    MotionDensity,
     PlanningTimeRef,
 )
 from twinklr.core.sequencer.vocabulary.choreography import TargetType
@@ -124,8 +145,8 @@ def sample_section_context(
         energy_target="MED",
         motion_density="MED",
         choreography_style="HYBRID",
-        primary_focus_targets=["HERO"],
-        secondary_targets=["ARCHES"],
+        lead_targets=["HERO"],
+        support_targets=["ARCHES"],
         notes=None,
         choreo_graph=sample_choreo_graph,
         template_catalog=sample_template_catalog,
@@ -250,3 +271,122 @@ class TestGroupPlannerOrchestrator:
         assert variables["energy_target"] == "MED"
         assert "display_graph" in variables
         assert "template_catalog" in variables
+
+    @pytest.mark.asyncio
+    async def test_cache_key_tracks_typed_macro_projection(
+        self,
+        mock_provider: MagicMock,
+        sample_section_context: SectionPlanningContext,
+    ) -> None:
+        """Palette, motif, and focal projection data participate in cache identity."""
+        target = PlanTarget(type=TargetType.GROUP, id="HERO_1")
+        section = MacroSection(
+            section=SongSectionRef(section_id="verse_1", name="verse", start_ms=0, end_ms=2000),
+            energy_target=EnergyTarget.MED,
+            motion_density=MotionDensity.MED,
+            choreography_style=ChoreographyStyle.HYBRID,
+            palette_role=PaletteRoleRef(stop_id="main", override=None),
+            theme=DEFAULT_THEME,
+            motif_ids=["pulse"],
+            focal_roles=[FocalRole(target=target, role=FocalRoleKind.LEAD)],
+            call_response_pairs=[],
+            coordination_intent=CoordinationMode.UNIFIED,
+            notes="Typed group-planner macro guidance for this section.",
+        )
+        plan = MacroPlan(
+            sections=[section],
+            palette_arc=[
+                PaletteStop(
+                    stop_id="main",
+                    palette=PaletteRef(
+                        palette_id="core.christmas_traditional",
+                        role=None,
+                        intensity=None,
+                        variant=None,
+                    ),
+                    applies_from_section_id="verse_1",
+                    transition=PaletteTransition.HOLD,
+                )
+            ],
+            motif_continuity=[
+                MotifThread(
+                    motif_id="pulse",
+                    section_ids=["verse_1"],
+                    evolution=MotifEvolution.INTRODUCE,
+                    description="A pulse motif for this section.",
+                )
+            ],
+            focal_arc=[FocalAssignment(section_id="verse_1", lead_target=target)],
+        )
+        context = sample_section_context.model_copy(
+            update={"macro_input": project_macro_section(plan, section)}
+        )
+        changed_projection = context.macro_input.model_copy(
+            update={
+                "resolved_palette": PaletteRef(
+                    palette_id="core.ice_blue",
+                    role=None,
+                    intensity=None,
+                    variant=None,
+                )
+            }
+        )
+        changed = context.model_copy(update={"macro_input": changed_projection})
+        orchestrator = GroupPlannerOrchestrator(provider=mock_provider)
+
+        assert await orchestrator.get_cache_key(context) != await orchestrator.get_cache_key(
+            changed
+        )
+
+    def test_validator_stamps_macro_owned_fields_before_heuristics(
+        self,
+        mock_provider: MagicMock,
+        sample_section_context: SectionPlanningContext,
+        sample_section_plan: SectionCoordinationPlan,
+    ) -> None:
+        """LLM metadata drift is normalized before every validation path."""
+        target = PlanTarget(type=TargetType.GROUP, id="HERO_1")
+        macro_section = MacroSection(
+            section=SongSectionRef(section_id="verse_1", name="verse", start_ms=0, end_ms=2000),
+            energy_target=EnergyTarget.MED,
+            motion_density=MotionDensity.MED,
+            choreography_style=ChoreographyStyle.HYBRID,
+            palette_role=PaletteRoleRef(stop_id="main", override=None),
+            theme=DEFAULT_THEME,
+            motif_ids=[],
+            focal_roles=[FocalRole(target=target, role=FocalRoleKind.LEAD)],
+            call_response_pairs=[],
+            coordination_intent=CoordinationMode.UNIFIED,
+            notes="Typed metadata must remain authoritative through validation.",
+        )
+        macro_plan = MacroPlan(
+            sections=[macro_section],
+            palette_arc=[
+                PaletteStop(
+                    stop_id="main",
+                    palette=PaletteRef(palette_id="core.christmas_traditional"),
+                    applies_from_section_id="verse_1",
+                    transition=PaletteTransition.HOLD,
+                )
+            ],
+            motif_continuity=[],
+            focal_arc=[FocalAssignment(section_id="verse_1", lead_target=target)],
+        )
+        context = sample_section_context.model_copy(
+            update={"macro_input": project_macro_section(macro_plan, macro_section)}
+        )
+        drifted = sample_section_plan.model_copy(
+            update={
+                "section_id": "hallucinated",
+                "theme": DEFAULT_THEME.model_copy(update={"theme_id": "theme.wrong"}),
+                "palette": PaletteRef(palette_id="core.wrong"),
+                "motif_ids": ["wrong"],
+            }
+        )
+
+        GroupPlannerOrchestrator(provider=mock_provider)._build_validator(context)(drifted)
+
+        assert drifted.section_id == "verse_1"
+        assert drifted.theme == DEFAULT_THEME
+        assert drifted.palette == macro_plan.palette_for_section("verse_1")
+        assert drifted.motif_ids == []

@@ -21,12 +21,9 @@ variables:
     - macro_plan_summary
     - expected_section_ids
     - completeness_check
-    - global_theme_id
-    - global_palette_id
-    - global_theme_tags
-    - global_palette_primary
-    - global_palette_alternates
-    - story_notes
+    - macro_palette_arc
+    - macro_motif_continuity
+    - macro_focal_arc
     - section_theme_summary
     - learning_context
     - lyric_context

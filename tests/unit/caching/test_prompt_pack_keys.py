@@ -132,8 +132,8 @@ def section_context() -> SectionPlanningContext:
         energy_target="MED",
         motion_density="MED",
         choreography_style="HYBRID",
-        primary_focus_targets=["HERO"],
-        secondary_targets=["ARCHES"],
+        lead_targets=["HERO"],
+        support_targets=["ARCHES"],
         notes=None,
         choreo_graph=ChoreographyGraph(
             graph_id="test",

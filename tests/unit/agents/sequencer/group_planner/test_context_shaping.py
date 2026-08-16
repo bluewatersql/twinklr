@@ -6,8 +6,6 @@ for efficient LLM consumption.
 
 from __future__ import annotations
 
-from typing import Any
-
 import pytest
 
 from twinklr.core.agents.sequencer.group_planner.context import SectionPlanningContext
@@ -36,9 +34,6 @@ TemplateInfo.model_rebuild()
 # ============================================================================
 # Test Models & Fixtures
 # ============================================================================
-
-
-# Layer intents are dicts, not Pydantic models
 
 
 def make_choreo_group(group_id: str, role: str) -> ChoreoGroup:
@@ -116,23 +111,6 @@ def section_context() -> SectionPlanningContext:
         beats_per_bar=4,
     )
 
-    # Create layer intents (some targeting section roles, some not)
-    # layer_intents are dicts with target_selector containing roles
-    layer_intents: list[dict[str, Any]] = [
-        {
-            "layer_index": 0,
-            "target_selector": {"roles": ["MEGA_TREE", "HERO"]},  # ← Relevant
-        },
-        {
-            "layer_index": 1,
-            "target_selector": {"roles": ["ARCHES"]},  # ← Relevant
-        },
-        {
-            "layer_index": 2,
-            "target_selector": {"roles": ["FLOODS"]},  # ← NOT relevant
-        },
-    ]
-
     # Build section context
     return SectionPlanningContext(
         section_id="chorus_1",
@@ -142,13 +120,12 @@ def section_context() -> SectionPlanningContext:
         energy_target="HIGH",
         motion_density="BUSY",
         choreography_style="ABSTRACT",
-        primary_focus_targets=["MEGA_TREE", "HERO"],
-        secondary_targets=["ARCHES"],
+        lead_targets=["MEGA_TREE", "HERO"],
+        support_targets=["ARCHES"],
         notes="Big chorus moment",
         choreo_graph=choreo_graph,
         template_catalog=template_catalog,
         timing_context=timing_context,
-        layer_intents=layer_intents,  # type: ignore[arg-type]
     )
 
 
@@ -173,8 +150,8 @@ def test_shape_planner_context_basic_fields(section_context: SectionPlanningCont
     assert result["energy_target"] == "HIGH"
     assert result["motion_density"] == "BUSY"
     assert result["choreography_style"] == "ABSTRACT"
-    assert result["primary_focus_targets"] == ["MEGA_TREE", "HERO"]
-    assert result["secondary_targets"] == ["ARCHES"]
+    assert result["lead_targets"] == ["MEGA_TREE", "HERO"]
+    assert result["support_targets"] == ["ARCHES"]
     assert result["notes"] == "Big chorus moment"
 
 
@@ -237,24 +214,6 @@ def test_shape_planner_context_simplifies_template_catalog(
     assert "category" not in sweep
 
 
-def test_shape_planner_context_filters_layer_intents(
-    section_context: SectionPlanningContext,
-) -> None:
-    """Test layer intent filtering to only relevant layers."""
-    result = shape_planner_context(section_context)
-
-    layer_intents = result["layer_intents"]
-
-    # Should include layers 0 and 1 (target MEGA_TREE/HERO/ARCHES)
-    # Should exclude layer 2 (targets FLOODS which is not in section)
-    assert len(layer_intents) == 2
-
-    # layer_intents are dicts returned from shape_planner_context
-    # Verify layer indices (access as dict keys)
-    assert layer_intents[0]["layer_index"] == 0  # Targets MEGA_TREE, HERO
-    assert layer_intents[1]["layer_index"] == 1  # Targets ARCHES
-
-
 def test_shape_planner_context_excludes_timing_context(
     section_context: SectionPlanningContext,
 ) -> None:
@@ -264,39 +223,12 @@ def test_shape_planner_context_excludes_timing_context(
     assert "timing_context" not in result
 
 
-def test_shape_planner_context_empty_layer_intents(
+def test_shape_planner_context_all_lead_and_support_targets(
     section_context: SectionPlanningContext,
 ) -> None:
-    """Test handles None/empty layer_intents gracefully."""
-    section_context.layer_intents = None  # type: ignore[assignment]
-
-    result = shape_planner_context(section_context)
-
-    assert "layer_intents" in result
-    assert result["layer_intents"] == []
-
-
-def test_shape_planner_context_layer_without_target_selector(
-    section_context: SectionPlanningContext,
-) -> None:
-    """Test handles layers without target_selector attribute."""
-    section_context.layer_intents = [  # type: ignore[assignment]
-        {"layer_index": 5}  # No target_selector
-    ]
-
-    result = shape_planner_context(section_context)
-
-    # Should not crash, should filter out layer without target_selector
-    assert result["layer_intents"] == []
-
-
-def test_shape_planner_context_all_roles_primary_and_secondary(
-    section_context: SectionPlanningContext,
-) -> None:
-    """Test includes both primary_focus_targets and secondary_targets."""
-    # Modify context to have distinct primary and secondary
-    section_context.primary_focus_targets = ["MEGA_TREE"]
-    section_context.secondary_targets = ["HERO", "ARCHES"]
+    """Test includes both lead and support targets."""
+    section_context.lead_targets = ["MEGA_TREE"]
+    section_context.support_targets = ["HERO", "ARCHES"]
 
     result = shape_planner_context(section_context)
 
@@ -333,8 +265,8 @@ def test_shape_section_judge_context_basic_fields(
     assert result["energy_target"] == "HIGH"
     assert result["motion_density"] == "BUSY"
     assert result["choreography_style"] == "ABSTRACT"
-    assert result["primary_focus_targets"] == ["MEGA_TREE", "HERO"]
-    assert result["secondary_targets"] == ["ARCHES"]
+    assert result["lead_targets"] == ["MEGA_TREE", "HERO"]
+    assert result["support_targets"] == ["ARCHES"]
 
 
 def test_shape_section_judge_context_filters_groups_by_role(
@@ -380,7 +312,6 @@ def test_shape_section_judge_context_excludes_unnecessary_fields(
 
     # Should exclude
     assert "timing_context" not in result
-    assert "layer_intents" not in result
     assert "notes" not in result  # Excluded for judge
 
 
@@ -530,14 +461,14 @@ def test_shape_holistic_judge_context_display_graph_minimal(
     choreo_graph: ChoreographyGraph,
     template_catalog: TemplateCatalog,
 ) -> None:
-    """Test display_graph includes groups_by_role, groups_by_tag, groups_by_split."""
+    """Test display_graph exposes targetable ChoreoTag zones and splits."""
     result = shape_holistic_judge_context(
         group_plan_set, choreo_graph, template_catalog, macro_plan_summary=None
     )
 
     dg = result["display_graph"]
 
-    # Should have groups_by_role, groups_by_tag, groups_by_split
+    # Target expansion uses ChoreoTag membership.
     assert "groups_by_role" in dg
     assert "groups_by_tag" in dg
     assert "groups_by_split" in dg
@@ -576,8 +507,8 @@ def test_shape_holistic_judge_context_macro_plan_summary_provided(
 ) -> None:
     """Test includes macro_plan_summary when provided."""
     summary = {
-        "global_story": "A festive Christmas journey",
-        "theme": "Holiday magic",
+        "palette_arc": [{"stop_id": "opening"}],
+        "motif_continuity": [{"motif_id": "sparkles"}],
     }
 
     result = shape_holistic_judge_context(
@@ -610,12 +541,12 @@ def test_shape_holistic_judge_context_serialization(
 # ============================================================================
 
 
-def test_shape_planner_context_empty_primary_focus(
+def test_shape_planner_context_empty_lead_targets(
     section_context: SectionPlanningContext,
 ) -> None:
-    """Test handles empty primary_focus_targets."""
-    section_context.primary_focus_targets = []
-    section_context.secondary_targets = ["HERO"]
+    """Test handles empty lead targets."""
+    section_context.lead_targets = []
+    section_context.support_targets = ["HERO"]
 
     result = shape_planner_context(section_context)
 
@@ -627,12 +558,12 @@ def test_shape_planner_context_empty_primary_focus(
     assert result["priority_roles"] == ["HERO"]
 
 
-def test_shape_planner_context_empty_secondary_targets(
+def test_shape_planner_context_empty_support_targets(
     section_context: SectionPlanningContext,
 ) -> None:
-    """Test handles empty secondary_targets."""
-    section_context.primary_focus_targets = ["MEGA_TREE"]
-    section_context.secondary_targets = []
+    """Test handles empty support targets."""
+    section_context.lead_targets = ["MEGA_TREE"]
+    section_context.support_targets = []
 
     result = shape_planner_context(section_context)
 
@@ -648,8 +579,8 @@ def test_shape_planner_context_no_matching_groups(
     section_context: SectionPlanningContext,
 ) -> None:
     """Test handles case where no groups match target roles."""
-    section_context.primary_focus_targets = ["NONEXISTENT_ROLE"]
-    section_context.secondary_targets = []
+    section_context.lead_targets = ["NONEXISTENT_ROLE"]
+    section_context.support_targets = []
 
     result = shape_planner_context(section_context)
 
@@ -676,8 +607,8 @@ def test_shape_section_judge_context_no_matching_groups(
     section_context: SectionPlanningContext,
 ) -> None:
     """Judge keeps full groups even when section target roles are unknown."""
-    section_context.primary_focus_targets = ["NONEXISTENT"]
-    section_context.secondary_targets = []
+    section_context.lead_targets = ["NONEXISTENT"]
+    section_context.support_targets = []
 
     result = shape_section_judge_context(section_context)
 
@@ -719,7 +650,7 @@ def test_shape_holistic_judge_context_expected_section_ids_from_macro_plan(
 ) -> None:
     """Test expected_section_ids are extracted from macro_plan_summary."""
     summary = {
-        "global_story": {"theme": {"theme_id": "test"}},
+        "palette_arc": [{"stop_id": "opening"}],
         "expected_section_ids": ["intro", "verse_1", "chorus_1", "verse_2", "outro"],
     }
 
@@ -760,7 +691,7 @@ def test_shape_holistic_judge_context_expected_section_ids_empty_summary(
         group_plan_set,
         choreo_graph,
         template_catalog,
-        macro_plan_summary={"global_story": {"theme": "test"}},
+        macro_plan_summary={"palette_arc": [{"stop_id": "opening"}]},
     )
 
     assert result["expected_section_ids"] == []

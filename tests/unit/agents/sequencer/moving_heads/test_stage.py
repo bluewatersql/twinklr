@@ -194,6 +194,7 @@ class TestMovingHeadStageExecute:
         context.job_config.agent.max_iterations = 3
         context.job_config.agent.plan_agent = AgentConfig()
         context.job_config.agent.judge_agent = AgentConfig()
+        context.get_state.return_value = None
         context.set_state = MagicMock()
         context.add_metric = MagicMock()
         return context
@@ -206,7 +207,7 @@ class TestMovingHeadStageExecute:
         - audio: SongBundle (from AudioAnalysisStage, for BeatGrid)
         - profile: AudioProfileModel (from AudioProfileStage)
         - lyrics: LyricContextModel | None (from LyricsStage, optional)
-        - macro: list[MacroSectionPlan] | None (from MacroPlannerStage)
+        - macro: list[MacroSection] | None (fan-out payload from MacroPlannerStage)
         """
         # Create mock audio bundle with features for BeatGrid
         audio_bundle = MagicMock()

@@ -82,7 +82,7 @@ class ChoreoGroup(BaseModel):
         description="Fraction of total display pixels (0.0-1.0)",
     )
 
-    # Choreographic grouping (zone membership only)
+    # Targetable choreography-zone membership.
     tags: list[ChoreoTag] = Field(default_factory=list)
 
     # Split partition membership

@@ -1,220 +1,61 @@
-{#
-MacroPlanner Judge User Prompt
-Provides the MacroPlan to evaluate along with song context
-#}
-# Song Information
+# Evaluation Context
 
-**Title:** {{ audio_profile.song_identity.title or "Untitled" }}
-**Artist:** {{ audio_profile.song_identity.artist or "Unknown" }}
-**Duration:** {{ (audio_profile.song_identity.duration_ms / 1000) | round(1) }}s
-**BPM:** {{ audio_profile.song_identity.bpm | round(1) }}
-**Energy:** {{ audio_profile.energy_profile.macro_energy.value }}
+Song: {{ audio_profile.song_identity.title or "Untitled" }} by {{ audio_profile.song_identity.artist or "Unknown" }}
 
-{% if lyric_context is defined and lyric_context %}
-**Lyric Context Available:** Yes
-- **Themes:** {{ lyric_context.themes | join(", ") }}
-- **Mood Arc:** {{ lyric_context.mood_arc }}
-- **Has Narrative:** {{ "Yes" if lyric_context.has_narrative else "No" }}
-- **Key Phrases:** {{ lyric_context.key_phrases | length }} identified
-- **Vocal Coverage:** {{ (lyric_context.vocal_coverage_pct * 100) | round(0) }}%{% if lyric_context.timed_word_coverage_pct is defined and lyric_context.timed_word_coverage_pct is not none %} (timed words: {{ (lyric_context.timed_word_coverage_pct * 100) | round(0) }}%){% endif %}
-{% endif %}
-
-## Song Structure
-
-**Expected section count:** {{ audio_profile.structure.sections | length }}
-
+Expected sections:
 {% for section in audio_profile.structure.sections %}
-- **{{ section.name }}** ({{ section.section_id }}) - {{ (section.start_ms / 1000) | round(1) }}s to {{ (section.end_ms / 1000) | round(1) }}s{% if (section.end_ms - section.start_ms) < 2000 %} ⚡ pickup{% endif %}
-
+- {{ section.section_id }}: {{ section.start_ms }}ms–{{ section.end_ms }}ms
 {% endfor %}
 
-## Display Layout
-
-Available concrete display group IDs:
+Valid group IDs:
 {% for group in display_groups %}
-- **{{ group.id }}** ({{ group.model_count }} models)
+- {{ group.id }}
 {% endfor %}
-
-Layer targets must match this exact list.
-
 {% if available_zone_ids is defined and available_zone_ids %}
-Available zone IDs:
-{% for zone in available_zone_ids %}
-- **{{ zone }}**
-{% endfor %}
+Valid zones: {{ available_zone_ids | join(', ') }}
 {% endif %}
-
 {% if available_split_ids is defined and available_split_ids %}
-Available split IDs:
-{% for split in available_split_ids %}
-- **{{ split }}**
-{% endfor %}
+Valid splits: {{ available_split_ids | join(', ') }}
 {% endif %}
 
-Focus targets must be typed objects using a type allowed by the injected schema, with IDs from the corresponding context lists.
-
----
-
-# Available Catalogs
-
-{% if theme_catalog is defined and theme_catalog %}
-## Theme Catalog (Valid theme_ids)
-
-{% for t in theme_catalog %}
-- **{{ t.theme_id }}** — {{ t.title }}
-{% endfor %}
-{% else %}
-**Theme Catalog:** Not provided (cannot validate theme_ids)
-{% endif %}
-
-{% if palette_catalog is defined and palette_catalog %}
-## Palette Catalog (Valid palette_ids)
-
-{% for p in palette_catalog %}
-- **{{ p.id }}** — {{ p.title }}{% if p.description %} - {{ p.description }}{% endif %}
-{% endfor %}
-{% else %}
-**Palette Catalog:** Not provided (cannot validate palette_ids)
-{% endif %}
-
-{% if motif_catalog is defined and motif_catalog %}
-## Motif Catalog (Valid motif_ids)
-
-{% for m in motif_catalog %}
-- **{{ m.id }}** (energy: {{ m.energy }}){% if m.description %} - {{ m.description }}{% endif %}
-{% endfor %}
-{% else %}
-**Motif Catalog:** Not provided (cannot validate motif_ids)
-{% endif %}
-
----
-
-# MacroPlan to Evaluate
-
-{% if previous_verdicts is defined and previous_verdicts %}
-**Iteration {{ iteration + 1 }}** - Evaluating refined plan. Check if previous feedback was addressed.
-{% elif iteration > 1 %}
-**Iteration {{ iteration }}** - Evaluating refined plan. Check if previous feedback was addressed.
-{% else %}
-**Iteration 1** - Initial plan evaluation. Provide comprehensive feedback to guide refinement.
-{% endif %}
-
-{% if previous_verdicts is defined and previous_verdicts %}
-## Prior Judge History
-
-{% for verdict in previous_verdicts %}
-- Iteration {{ verdict.iteration + 1 }}: **{{ verdict.status }}**, score {{ verdict.score }}
-  - {{ verdict.feedback_for_planner }}
-{% endfor %}
-{% if previous_issues is defined and previous_issues %}
-### Outstanding Prior Issues
-{% for issue in previous_issues %}
-- **{{ issue.issue_id }}** ({{ issue.severity }}): {{ issue.message }}
-{% endfor %}
-{% endif %}
-{% if previous_revision_requests is defined and previous_revision_requests %}
-### Prior Revision Requests
-{% for request in previous_revision_requests %}
-- Focus: {{ request.focus_areas | join(', ') }}
-  - Requested fixes: {{ request.specific_fixes | join('; ') }}
-{% endfor %}
-{% endif %}
-{% endif %}
-
-## Global Story
-
-**Theme ID:** {{ macro_plan.global_story.theme.theme_id }}
-**Theme Scope:** {{ macro_plan.global_story.theme.scope.value if macro_plan.global_story.theme.scope is defined else macro_plan.global_story.theme.scope }}
-**Theme Tags:** {{ macro_plan.global_story.theme.tags | join(', ') if macro_plan.global_story.theme.tags else "None" }}
-
-{% if macro_plan.global_story.palette_plan is defined and macro_plan.global_story.palette_plan %}
-**Palette Plan (structured field global_story.palette_plan):**
-- Primary: {{ macro_plan.global_story.palette_plan.primary.palette_id }} (role: {{ macro_plan.global_story.palette_plan.primary.role.value }}, intensity: {{ macro_plan.global_story.palette_plan.primary.intensity }})
-{% if macro_plan.global_story.palette_plan.alternates %}
-- Alternates: {{ macro_plan.global_story.palette_plan.alternates | map(attribute='palette_id') | join(', ') }}
-{% else %}
-- Alternates: None
-{% endif %}
-{% else %}
-**Palette Plan:** ❌ MISSING (ERROR: global_story.palette_plan.primary.palette_id is required)
-{% endif %}
-
-**Story Notes:** {{ macro_plan.global_story.story_notes }}
-**Pacing Notes:** {{ macro_plan.global_story.pacing_notes }}
-
-## Layering Plan
-
-**Layer Count:** {{ macro_plan.layering_plan.layers | length }}
-
-{% for layer in macro_plan.layering_plan.layers %}
-- **Layer {{ layer.layer_index }}** ({{ layer.layer_role.value }}, {{ layer.blend_mode.value }} blend)
-  - **Usage Notes:** {{ layer.usage_notes }}
-  - **Timing:** {{ layer.timing_driver.value }}
-  - **Targets:** {{ layer.target_selector.roles | join(', ') }}
-  - **Intensity Bias:** {{ layer.intensity_bias }}
+Valid palettes:
+{% for palette in palette_catalog | default([]) %}
+- {{ palette.id }}
 {% endfor %}
 
-## Section Plans
-
-**Plan provides {{ macro_plan.section_plans | length }} section plans** (expected: {{ audio_profile.structure.sections | length }}).
-
-Use `section.section_id` as the canonical section identifier for coverage checks.
-Primary/Secondary Focus lines below are human-readable projections of typed target objects; schema validity must be judged from the structured plan data.
-
-{% for section in macro_plan.section_plans %}
-### {{ section.section.name }} ({{ section.section.section_id }}) ({{ (section.section.start_ms / 1000) | round(1) }}s - {{ (section.section.end_ms / 1000) | round(1) }}s){% if (section.section.end_ms - section.section.start_ms) < 2000 %} ⚡ PICKUP (< 2s){% endif %}
-
-- **Theme ID:** {{ section.theme.theme_id }}
-- **Theme Scope:** {{ section.theme.scope.value if section.theme.scope else 'MISSING' }}
-- **Theme Tags:** {{ section.theme.tags | join(', ') if section.theme.tags else 'None' }}
-
-{% if section.palette is defined and section.palette %}
-- **Palette Override:** {{ section.palette.palette_id }}
-{% else %}
-- **Palette Override:** None (inherit global)
-{% endif %}
-
-{% if section.motif_ids is defined and section.motif_ids %}
-- **Motif IDs:** {{ section.motif_ids | join(', ') }}
-{% else %}
-- **Motif IDs:** MISSING
-{% endif %}
-
-- **Energy Target:** {{ section.energy_target.value }}
-- **Motion Density:** {{ section.motion_density.value }}
-- **Choreography Style:** {{ section.choreography_style.value }}
-- **Primary Focus:**
-{% if section.primary_focus_targets %}
-{% for target in section.primary_focus_targets %}
-  - {{ target.type.value if target.type is defined and target.type.value is defined else target.type }}:{{ target.id }}
-{% endfor %}
-{% else %}
-  - None
-{% endif %}
-- **Secondary Targets:**
-{% if section.secondary_targets %}
-{% for target in section.secondary_targets %}
-  - {{ target.type.value if target.type is defined and target.type.value is defined else target.type }}:{{ target.id }}
-{% endfor %}
-{% else %}
-  - None
-{% endif %}
-- **Notes:** {{ section.notes }}
-
+Valid motifs:
+{% for motif in motif_catalog | default([]) %}
+- {{ motif.id }}
 {% endfor %}
 
----
+# Typed MacroPlan
 
-# Your Task
+Palette arc:
+{% for stop in macro_plan.palette_arc %}
+- {{ stop.stop_id }} from {{ stop.applies_from_section_id }}: {{ stop.palette.palette_id }} via {{ stop.transition.value }}
+{% endfor %}
 
-Evaluate this MacroPlan for a Christmas light show. Assess:
-1. **Technical Validity**: Section coverage, layer architecture, target validity, palette plan, motif_ids
-2. **Strategic Quality**: Story coherence, section appropriateness, bold impact, contrast, motif/palette cohesion
-3. **Actionability**: Are section notes clear enough for group planners?
+Motif continuity:
+{% for thread in macro_plan.motif_continuity %}
+- {{ thread.motif_id }} [{{ thread.evolution.value }}]: {{ thread.section_ids | join(', ') }} — {{ thread.description }}
+{% endfor %}
 
-Provide a score (0-10), a schema-valid verdict status, structured issues, and constructive feedback.
+Focal arc:
+{% for assignment in macro_plan.focal_arc %}
+- {{ assignment.section_id }}: {{ assignment.lead_target.type.value }}:{{ assignment.lead_target.id }}
+{% endfor %}
 
-Use the approval threshold {{ approval_score_threshold | default(7.0) }} and soft-fail
-threshold {{ soft_fail_score_threshold | default(5.0) }} supplied for this run.
+Sections ({{ macro_plan.sections | length }}):
+{% for section in macro_plan.sections %}
+## {{ section.section.section_id }} ({{ section.section.start_ms }}ms–{{ section.section.end_ms }}ms)
+- energy={{ section.energy_target.value }}, density={{ section.motion_density.value }}, style={{ section.choreography_style.value }}
+- palette stop={{ section.palette_role.stop_id }}{% if section.palette_role.override %}, override={{ section.palette_role.override.palette_id }}{% endif %}
+- theme={{ section.theme.theme_id }}, theme palette={{ section.theme.palette_id or "null" }}
+- motifs={{ section.motif_ids | join(', ') }}
+- focal roles:{% for focal in section.focal_roles %} {{ focal.role.value }}={{ focal.target.type.value }}:{{ focal.target.id }}{% endfor %}
+- call/response:{% for pair in section.call_response_pairs %} {{ pair.call.type.value }}:{{ pair.call.id }} -> {{ pair.response.type.value }}:{{ pair.response.id }} ({{ pair.step_duration }} {{ pair.step_unit.value }}){% else %} none{% endfor %}
+- coordination={{ section.coordination_intent.value }}
+- notes={{ section.notes }}
+{% endfor %}
 
-**Remember**: This is a **Christmas light show** for residential displays. Bold, impactful designs win. Subtle concepts get lost.
+Evaluate technical validity and strategic quality. Return the complete structured verdict.

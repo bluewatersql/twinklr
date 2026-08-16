@@ -113,7 +113,7 @@ def build_display_pipeline(
             ),
             inputs=["macro"],
             pattern=ExecutionPattern.FAN_OUT,
-            input_type="MacroSectionPlan",
+            input_type="MacroSection",
             output_type="SectionCoordinationPlan",
             description="Generate section coordination plans (parallel per section)",
         ),

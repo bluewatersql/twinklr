@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Any
 
 from twinklr.core.agents.sequencer.group_planner.context import (
     SectionPlanningContext,
+    project_macro_section,
 )
 from twinklr.core.agents.sequencer.group_planner.orchestrator import (
     GroupPlannerOrchestrator,
@@ -25,12 +26,11 @@ if TYPE_CHECKING:
         StoryBeat,
     )
     from twinklr.core.agents.sequencer.group_planner.timing import TimingContext
-    from twinklr.core.agents.shared.judge.controller import IterationResult
     from twinklr.core.audio.models.song_bundle import SongBundle
     from twinklr.core.feature_engineering.loader import FEArtifactBundle
     from twinklr.core.pipeline.context import PipelineContext
     from twinklr.core.pipeline.result import StageResult
-    from twinklr.core.sequencer.planning import MacroSectionPlan
+    from twinklr.core.sequencer.planning import MacroSection
     from twinklr.core.sequencer.templates.group.catalog import TemplateCatalog
     from twinklr.core.sequencer.templates.group.models.choreography import ChoreographyGraph
     from twinklr.core.sequencer.templates.group.recipe_catalog import RecipeCatalog
@@ -42,7 +42,7 @@ class GroupPlannerStage:
     """Pipeline stage for group planning (per-section).
 
     Designed for FAN_OUT execution pattern. Each invocation processes
-    one MacroSectionPlan, builds its own SectionPlanningContext independently,
+    one MacroSection, builds its own SectionPlanningContext independently,
     and returns one SectionCoordinationPlan.
 
     Constructor args (configuration):
@@ -53,7 +53,7 @@ class GroupPlannerStage:
         - audio_bundle: SongBundle (for building timing_context)
         - audio_profile: AudioProfileModel (optional, for enhanced context)
         - lyric_context: LyricContextModel (optional, for narrative context)
-        - macro_plan: MacroPlan (for global_story, layering_plan)
+        - macro_plan: Full typed MacroPlan
 
     Usage with FAN_OUT:
         StageDefinition(
@@ -63,16 +63,16 @@ class GroupPlannerStage:
                 template_catalog=template_catalog,
             ),
             pattern=ExecutionPattern.FAN_OUT,
-            inputs=["sections"],  # List[MacroSectionPlan]
+            inputs=["sections"],  # List[MacroSection]
         )
 
     The pipeline executor will:
-    1. Receive list of MacroSectionPlan from upstream
+    1. Receive list of MacroSection from upstream
     2. Execute this stage once per section (in parallel)
     3. Each invocation builds its context independently (precisely scoped)
     4. Collect results into list of SectionCoordinationPlan
 
-    Input: MacroSectionPlan (single section from MacroPlan)
+    Input: MacroSection (single section from MacroPlan)
     Output: SectionCoordinationPlan
     """
 
@@ -109,16 +109,16 @@ class GroupPlannerStage:
 
     async def execute(
         self,
-        input: MacroSectionPlan,
+        input: MacroSection,
         context: PipelineContext,
     ) -> StageResult[SectionCoordinationPlan]:
         """Generate section coordination plan.
 
-        Builds SectionPlanningContext from the MacroSectionPlan and
+        Builds SectionPlanningContext from the MacroSection and
         shared context in PipelineContext.state, then runs the orchestrator.
 
         Args:
-            input: MacroSectionPlan for one section
+            input: MacroSection for one section
             context: Pipeline context with provider, config, and shared state
 
         Returns:
@@ -156,35 +156,11 @@ class GroupPlannerStage:
             )
             pipeline_run_id = context.get_state("pipeline_run_id")
 
-            def extract_plan(
-                r: IterationResult[SectionCoordinationPlan],
-            ) -> SectionCoordinationPlan:
-                """Extract plan from result and stamp section timing.
-
-                When deserialized from cache, IterationResult is loaded without
-                the generic type parameter, so plan may be a raw dict instead
-                of a SectionCoordinationPlan. Validate explicitly.
-
-                Also stamps start_ms/end_ms from the audio profile onto the
-                plan (the LLM doesn't produce these — they come from the
-                MacroSectionPlan's SongSectionRef).
-                """
-                if r.plan is None:
-                    raise ValueError("IterationResult.plan is None")
-                if isinstance(r.plan, dict):
-                    plan = SectionCoordinationPlan.model_validate(r.plan)
-                else:
-                    plan = r.plan
-                # Stamp section timing from audio profile (not produced by LLM)
-                plan.start_ms = input.section.start_ms
-                plan.end_ms = input.section.end_ms
-                return plan
-
             return await execute_step(
                 stage_name=f"{self.name}_{section_id}",
                 context=context,
                 compute=lambda: orchestrator.run(section_context, run_id=pipeline_run_id),
-                result_extractor=extract_plan,
+                result_extractor=lambda result: self._extract_plan_result(result, section_context),
                 result_type=IterationResult,
                 cache_key_fn=lambda: orchestrator.get_cache_key(section_context),
                 cache_version="1",
@@ -198,13 +174,29 @@ class GroupPlannerStage:
             logger.exception(f"Section {section_id} planning failed", exc_info=e)
             return failure_result(str(e), stage_name=self.name)
 
+    @staticmethod
+    def _extract_plan_result(
+        result: Any,
+        section_context: SectionPlanningContext,
+    ) -> SectionCoordinationPlan:
+        """Normalize fresh or cached results and stamp authoritative macro fields."""
+        if result.plan is None:
+            raise ValueError("IterationResult.plan is None")
+        plan = (
+            SectionCoordinationPlan.model_validate(result.plan)
+            if isinstance(result.plan, dict)
+            else result.plan
+        )
+        GroupPlannerOrchestrator._stamp_macro_owned_fields(plan, section_context)
+        return plan
+
     def _build_section_context(
-        self, input: MacroSectionPlan, context: PipelineContext
+        self, input: MacroSection, context: PipelineContext
     ) -> SectionPlanningContext:
         """Build section planning context from input and pipeline state.
 
         Args:
-            input: MacroSectionPlan for this section
+            input: MacroSection for this section
             context: Pipeline context with shared state
 
         Returns:
@@ -229,9 +221,25 @@ class GroupPlannerStage:
             section_end_ms=input.section.end_ms,
         )
 
-        # Extract layer intents and global palette context from macro plan
-        layer_intents = self._extract_layer_intents(macro_plan)
-        global_palette_id = self._extract_global_palette_id(macro_plan)
+        from twinklr.core.sequencer.planning import FocalRoleKind, MacroPlan
+
+        if macro_plan is None:
+            raise ValueError("Missing 'macro_plan' in context.state")
+        normalized_macro = MacroPlan.model_validate(
+            macro_plan.model_dump() if hasattr(macro_plan, "model_dump") else macro_plan,
+            context={"choreo_graph": self.choreo_graph},
+        )
+        macro_section = next(
+            (
+                section
+                for section in normalized_macro.sections
+                if section.section.section_id == input.section.section_id
+            ),
+            None,
+        )
+        if macro_section is None:
+            raise ValueError(f"MacroPlan has no section '{input.section.section_id}'")
+        macro_input = project_macro_section(normalized_macro, macro_section)
 
         # Build section-scoped lyric context
         section_lyric_context = self._build_section_lyric_context(
@@ -241,35 +249,39 @@ class GroupPlannerStage:
             end_ms=input.section.end_ms,
         )
 
-        # Build SectionPlanningContext from MacroSectionPlan + constructor args
-        resolved_primary_targets = self._resolve_focus_targets(input.primary_focus_targets)
-        resolved_secondary_targets = self._resolve_focus_targets(input.secondary_targets)
-        typed_primary_targets = self._serialize_focus_targets(input.primary_focus_targets)
-        typed_secondary_targets = self._serialize_focus_targets(input.secondary_targets)
+        lead_focal_targets = [
+            role.target for role in macro_section.focal_roles if role.role == FocalRoleKind.LEAD
+        ]
+        support_focal_targets = [
+            role.target for role in macro_section.focal_roles if role.role == FocalRoleKind.SUPPORT
+        ]
+        resolved_lead_targets = self._resolve_focus_targets(lead_focal_targets)
+        resolved_support_targets = self._resolve_focus_targets(support_focal_targets)
+        typed_lead_targets = self._serialize_focus_targets(lead_focal_targets)
+        typed_support_targets = self._serialize_focus_targets(support_focal_targets)
 
         fe_fields = self._extract_fe_fields(section_id=input.section.section_id)
 
         return SectionPlanningContext(
-            section_id=input.section.section_id,
-            section_name=input.section.name,
-            start_ms=input.section.start_ms,
-            end_ms=input.section.end_ms,
-            energy_target=input.energy_target.value,
-            motion_density=input.motion_density.value,
-            choreography_style=input.choreography_style.value,
-            primary_focus_targets=resolved_primary_targets,
-            primary_focus_targets_typed=typed_primary_targets,
-            secondary_targets=resolved_secondary_targets,
-            secondary_targets_typed=typed_secondary_targets,
-            notes=input.notes,
+            macro_input=macro_input,
+            section_id=macro_section.section.section_id,
+            section_name=macro_section.section.name,
+            start_ms=macro_section.section.start_ms,
+            end_ms=macro_section.section.end_ms,
+            energy_target=macro_section.energy_target.value,
+            motion_density=macro_section.motion_density.value,
+            choreography_style=macro_section.choreography_style.value,
+            lead_targets=resolved_lead_targets,
+            lead_targets_typed=typed_lead_targets,
+            support_targets=resolved_support_targets,
+            support_targets_typed=typed_support_targets,
+            notes=macro_section.notes,
             choreo_graph=self.choreo_graph,
             template_catalog=self.template_catalog,
             timing_context=timing_context,
-            layer_intents=layer_intents,
-            theme=input.theme,
-            motif_ids=input.motif_ids,
-            palette=input.palette.model_dump() if input.palette else None,
-            global_palette_id=global_palette_id,
+            theme=macro_section.theme,
+            motif_ids=macro_section.motif_ids,
+            palette=macro_input.resolved_palette.model_dump(mode="json"),
             lyric_context=section_lyric_context,
             recipe_catalog=self.recipe_catalog,
             **fe_fields,
@@ -625,35 +637,6 @@ class GroupPlannerStage:
 
         # Timestamp fallback — phrase timestamp is within section bounds
         return bool(start_ms <= phrase.timestamp_ms < end_ms)
-
-    def _extract_layer_intents(self, macro_plan: MacroSectionPlan | None) -> list[dict[str, Any]]:
-        """Extract layer intents from macro plan.
-
-        Args:
-            macro_plan: MacroPlan with optional layering_plan
-
-        Returns:
-            List of layer intent dicts (empty if no layering plan)
-        """
-        layer_intents: list[dict[str, Any]] = []
-        if macro_plan and hasattr(macro_plan, "layering_plan") and macro_plan.layering_plan:
-            layer_intents = [layer.model_dump() for layer in macro_plan.layering_plan.layers]
-        return layer_intents
-
-    def _extract_global_palette_id(self, macro_plan: Any | None) -> str | None:
-        """Extract MacroPlan.global_story.palette_plan.primary.palette_id."""
-        if macro_plan is None:
-            return None
-        global_story = getattr(macro_plan, "global_story", None)
-        if global_story is None:
-            return None
-        palette_plan = getattr(global_story, "palette_plan", None)
-        if palette_plan is None:
-            return None
-        primary = getattr(palette_plan, "primary", None)
-        if primary is None:
-            return None
-        return getattr(primary, "palette_id", None)
 
 
 class GroupPlanAggregatorStage:

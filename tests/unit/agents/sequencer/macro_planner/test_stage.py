@@ -89,9 +89,10 @@ def test_handle_state_normalizes_cached_plan_to_model(display_groups):
     stage = MacroPlannerStage(display_groups=display_groups)
     context = MagicMock()
     normalized_plan = MacroPlan.model_construct(
-        global_story=MagicMock(),
-        layering_plan=MagicMock(),
-        section_plans=[],
+        sections=[],
+        palette_arc=[],
+        motif_continuity=[],
+        focal_arc=[],
     )
     result = {
         "success": True,

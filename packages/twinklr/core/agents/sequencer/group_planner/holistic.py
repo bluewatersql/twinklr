@@ -267,7 +267,7 @@ class HolisticEvaluator:
             group_plan_set: Complete set of section plans to evaluate
             choreo_graph: Choreography graph configuration
             template_catalog: Available templates
-            macro_plan_summary: Optional summary from MacroPlan (global_story, etc.)
+            macro_plan_summary: Optional typed summary from MacroPlan
             lyric_context: Optional LyricContextModel for narrative calibration
 
         Returns:

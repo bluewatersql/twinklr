@@ -131,10 +131,14 @@ V2 Migration: Uses structured context from MovingHeadPlanningContext
 
 The MacroPlanner has defined the following strategic guidance for each section. **Align your template selections with these targets:**
 
-| Section | Energy | Motion | Style | Palette | Motifs |
-|---------|--------|--------|-------|---------|--------|
+**Song palette arc:** {{ macro_palette_arc }}
+**Motif continuity:** {{ macro_motif_continuity }}
+**Focal arc:** {{ macro_focal_arc }}
+
+| Section | Energy | Motion | Style | Palette | Motifs | Coordination |
+|---------|--------|--------|-------|---------|--------|--------------|
 {% for mp in macro_plan %}
-| {{ mp.section_id }} | {{ mp.energy_target }} | {{ mp.motion_density }} | {{ mp.choreography_style }} | {{ mp.palette_id | default('-') }} | {{ mp.motif_ids | join(', ') if mp.motif_ids else '-' }} |
+| {{ mp.section_id }} | {{ mp.energy_target }} | {{ mp.motion_density }} | {{ mp.choreography_style }} | {{ mp.palette_id | default('-') }} | {{ mp.motif_ids | join(', ') if mp.motif_ids else '-' }} | {{ mp.coordination_intent }} |
 {% endfor %}
 
 {% for mp in macro_plan %}

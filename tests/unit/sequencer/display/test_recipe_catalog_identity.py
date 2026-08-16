@@ -57,7 +57,7 @@ def _section_context(
         energy_target="LOW",
         motion_density="SPARSE",
         choreography_style="ABSTRACT",
-        primary_focus_targets=["ARCHES"],
+        lead_targets=["ARCHES"],
         choreo_graph=ChoreographyGraph(
             graph_id="layout",
             groups=[ChoreoGroup(id="ARCHES", role="ARCHES")],

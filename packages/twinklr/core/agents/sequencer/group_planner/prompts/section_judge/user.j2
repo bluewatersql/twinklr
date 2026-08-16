@@ -13,9 +13,9 @@ CATEGORICAL PLANNING VERSION
 **Energy Target:** {{ energy_target }}
 **Motion Density:** {{ motion_density }}
 **Choreography Style:** {{ choreography_style }}
-**Primary Focus Targets:** {{ primary_focus_targets | join(", ") }}
-{% if secondary_targets %}
-**Secondary Targets:** {{ secondary_targets | join(", ") }}
+**Lead Targets:** {{ lead_targets | join(", ") }}
+{% if support_targets %}
+**Support Targets:** {{ support_targets | join(", ") }}
 {% endif %}
 
 ## Section Theme + Palette + Motifs
@@ -61,8 +61,8 @@ CATEGORICAL PLANNING VERSION
 ## Available Zones (valid zone targets)
 
 {% if display_graph.groups_by_tag is defined %}
-{% for tag, group_ids in display_graph.groups_by_tag.items() %}
-- **{{ tag }}**: {{ group_ids | join(", ") }}
+{% for zone, group_ids in display_graph.groups_by_tag.items() %}
+- **{{ zone }}**: {{ group_ids | join(", ") }}
 {% endfor %}
 {% endif %}
 
@@ -111,7 +111,7 @@ matches section energy ({{ energy_target }}) and duration matches musical intent
 - if the selected mode's schema arm requires expansion, window+config must be present and valid
 - theme must be SECTION-scoped; tags <= 5
 - palette must be present with palette_id
-- motif_ids must be present and non-empty
+- motif_ids must exactly equal the macro input; an empty list is valid
 
 2) **Quality Assessment**
 - templates appropriate for lanes + section intent

@@ -13,6 +13,10 @@ from twinklr.core.agents.assets.models import (
     AssetStatus,
     CatalogEntry,
 )
+from twinklr.core.agents.audio.profile.models import SongSectionRef
+
+# Import resolves GroupPlanSet's intentional forward reference for isolated test runs.
+from twinklr.core.agents.sequencer.group_planner.holistic import HolisticEvaluation  # noqa: F401
 from twinklr.core.formats.xlights.sequence.models.xsq import (
     SequenceHead,
     XSequence,
@@ -31,7 +35,19 @@ from twinklr.core.sequencer.planning.group_plan import (
     LanePlan,
     SectionCoordinationPlan,
 )
-from twinklr.core.sequencer.planning.models import PaletteRef
+from twinklr.core.sequencer.planning.models import (
+    FocalAssignment,
+    FocalRole,
+    FocalRoleKind,
+    MacroPlan,
+    MacroSection,
+    MotifEvolution,
+    MotifThread,
+    PaletteRef,
+    PaletteRoleRef,
+    PaletteStop,
+    PaletteTransition,
+)
 from twinklr.core.sequencer.templates.group.models.choreography import (
     ChoreographyGraph,
     ChoreoGroup,
@@ -46,10 +62,13 @@ from twinklr.core.sequencer.theming.enums import ThemeScope
 from twinklr.core.sequencer.timing.beat_grid import BeatGrid
 from twinklr.core.sequencer.vocabulary import (
     BackgroundMode,
+    ChoreographyStyle,
     CoordinationMode,
     EffectDuration,
+    EnergyTarget,
     IntensityLevel,
     LaneKind,
+    MotionDensity,
     PlanningTimeRef,
 )
 from twinklr.core.sequencer.vocabulary.choreography import TargetType
@@ -272,6 +291,55 @@ class TestAssetResolutionStage:
 
 class TestDisplayRenderStage:
     """Tests for the DisplayRenderStage."""
+
+    def test_section_boundaries_consume_typed_macro_plan(self) -> None:
+        """The display seam reads the full typed plan stored by MacroPlannerStage."""
+        target = PlanTarget(type=TargetType.GROUP, id="MEGA_TREE_1")
+        section = MacroSection(
+            section=SongSectionRef(
+                section_id="intro",
+                name="Intro",
+                start_ms=250,
+                end_ms=4_250,
+            ),
+            energy_target=EnergyTarget.MED,
+            motion_density=MotionDensity.MED,
+            choreography_style=ChoreographyStyle.HYBRID,
+            palette_role=PaletteRoleRef(stop_id="opening", override=None),
+            theme=ThemeRef(
+                theme_id="theme.holiday.traditional",
+                scope=ThemeScope.SECTION,
+            ),
+            motif_ids=["sparkles"],
+            focal_roles=[FocalRole(target=target, role=FocalRoleKind.LEAD)],
+            call_response_pairs=[],
+            coordination_intent=CoordinationMode.UNIFIED,
+            notes="Display boundary regression.",
+        )
+        plan = MacroPlan(
+            sections=[section],
+            palette_arc=[
+                PaletteStop(
+                    stop_id="opening",
+                    palette=PaletteRef(palette_id="core.christmas_traditional"),
+                    applies_from_section_id="intro",
+                    transition=PaletteTransition.HOLD,
+                )
+            ],
+            motif_continuity=[
+                MotifThread(
+                    motif_id="sparkles",
+                    section_ids=["intro"],
+                    evolution=MotifEvolution.INTRODUCE,
+                    description="Opening sparkle motif.",
+                )
+            ],
+            focal_arc=[FocalAssignment(section_id="intro", lead_target=target)],
+        )
+        context = _make_context()
+        context.set_state("macro_plan", plan)
+
+        assert DisplayRenderStage._extract_section_boundaries(context) == [("intro", 250, 4_250)]
 
     @pytest.mark.asyncio
     async def test_basic_render(self) -> None:

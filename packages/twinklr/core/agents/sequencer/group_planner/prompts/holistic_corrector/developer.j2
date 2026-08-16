@@ -25,7 +25,7 @@ unambiguously, use its description conservatively rather than inventing identifi
 1. Every returned section must have:
    - `section_id`: unchanged from input
    - `theme`: valid ThemeRef with scope SECTION
-   - `motif_ids`: non-empty list
+   - `motif_ids`: unchanged from input (an empty list is valid)
    - `palette`: valid PaletteRef with palette_id
    - `lane_plans`: non-empty list of LanePlans
    - no framework fields (`schema_version`, `start_ms`, `end_ms`, `resolved_asset_ids`)

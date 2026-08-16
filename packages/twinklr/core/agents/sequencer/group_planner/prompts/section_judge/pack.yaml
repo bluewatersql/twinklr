@@ -17,8 +17,8 @@ variables:
     - energy_target
     - motion_density
     - choreography_style
-    - primary_focus_targets
-    - secondary_targets
+    - lead_targets
+    - support_targets
 
     # validation context
     - display_graph
@@ -33,7 +33,7 @@ variables:
     - learning_context
 
     # NEW: optional deterministic id validation
-    - motif_catalog          # MotifSpec list/mapping or simple set of ids
+    - motif_catalog          # motif catalog or simple set of ids
     - palette_catalog        # palette list/mapping or simple set of ids
 
 metadata:

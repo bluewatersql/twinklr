@@ -11,6 +11,14 @@ from pydantic import BaseModel, ConfigDict, Field, field_serializer
 
 from twinklr.core.agents.sequencer.group_planner.timing import TimingContext
 from twinklr.core.feature_engineering.models.vocabulary import VocabularyExtensions
+from twinklr.core.sequencer.planning import (
+    FocalAssignment,
+    MacroPlan,
+    MacroSection,
+    MotifThread,
+    PaletteRef,
+    PaletteStop,
+)
 from twinklr.core.sequencer.templates.group.catalog import (
     TemplateCatalog,
     TemplateInfo,
@@ -20,6 +28,49 @@ from twinklr.core.sequencer.templates.group.recipe import EffectRecipe
 from twinklr.core.sequencer.templates.group.recipe_catalog import RecipeCatalog
 from twinklr.core.sequencer.theming import ThemeRef
 from twinklr.core.sequencer.vocabulary import LaneKind
+
+
+class MacroSectionPlanningInput(BaseModel):
+    """Lossless typed macro projection consumed by one group-planner section."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    macro_section: MacroSection
+    palette_stop: PaletteStop
+    resolved_palette: PaletteRef
+    motif_threads: list[MotifThread]
+    focal_assignment: FocalAssignment
+
+    def reader_projection(self) -> dict[str, Any]:
+        """Return the section contract through canonical named readers."""
+        return {
+            "macro_section": MacroPlan.section_reader_projection(self.macro_section),
+            "palette_stop": MacroPlan.palette_stop_reader_projection(self.palette_stop),
+            "resolved_palette": MacroPlan.palette_reader_projection(self.resolved_palette),
+            "motif_threads": [
+                MacroPlan.motif_thread_reader_projection(item) for item in self.motif_threads
+            ],
+            "focal_assignment": MacroPlan.focal_assignment_reader_projection(self.focal_assignment),
+        }
+
+
+def project_macro_section(plan: MacroPlan, section: MacroSection) -> MacroSectionPlanningInput:
+    """Project the full macro contract without converting its intent to strings."""
+    section_id = section.section.section_id
+    palette_stop = next(
+        stop for stop in plan.palette_arc if stop.stop_id == section.palette_role.stop_id
+    )
+    motif_threads = [
+        thread for thread in plan.motif_continuity if thread.motif_id in section.motif_ids
+    ]
+    focal_assignment = next(item for item in plan.focal_arc if item.section_id == section_id)
+    return MacroSectionPlanningInput(
+        macro_section=section,
+        palette_stop=palette_stop,
+        resolved_palette=plan.palette_for_section(section_id),
+        motif_threads=motif_threads,
+        focal_assignment=focal_assignment,
+    )
 
 
 class SectionPlanningContext(BaseModel):
@@ -33,6 +84,11 @@ class SectionPlanningContext(BaseModel):
 
     model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
 
+    macro_input: MacroSectionPlanningInput | None = Field(
+        default=None,
+        description="Typed macro contract projection for this section",
+    )
+
     # Section identity (from MacroPlan)
     section_id: str = Field(description="Section identifier (e.g., 'verse_1')")
     section_name: str = Field(description="Section type name (e.g., 'verse')")
@@ -45,20 +101,20 @@ class SectionPlanningContext(BaseModel):
     energy_target: str = Field(description="Energy target (LOW, MED, HIGH, BUILD, etc.)")
     motion_density: str = Field(description="Motion density (SPARSE, MED, BUSY)")
     choreography_style: str = Field(description="Choreography style (IMAGERY, ABSTRACT, HYBRID)")
-    primary_focus_targets: list[str] = Field(
-        description="Primary concrete group IDs resolved from macro targets"
+    lead_targets: list[str] = Field(
+        description="Concrete group IDs resolved from LEAD macro focal roles"
     )
-    primary_focus_targets_typed: list[dict[str, Any]] = Field(
+    lead_targets_typed: list[dict[str, Any]] = Field(
         default_factory=list,
-        description="Primary macro focus targets in typed form (group/zone/split)",
+        description="LEAD macro focal targets in typed form (group/zone/split)",
     )
-    secondary_targets: list[str] = Field(
+    support_targets: list[str] = Field(
         default_factory=list,
-        description="Secondary concrete group IDs resolved from macro targets",
+        description="Concrete group IDs resolved from SUPPORT macro focal roles",
     )
-    secondary_targets_typed: list[dict[str, Any]] = Field(
+    support_targets_typed: list[dict[str, Any]] = Field(
         default_factory=list,
-        description="Secondary macro focus targets in typed form (group/zone/split)",
+        description="SUPPORT macro focal targets in typed form (group/zone/split)",
     )
     notes: str | None = Field(default=None, description="Section-specific notes from MacroPlan")
 
@@ -67,32 +123,22 @@ class SectionPlanningContext(BaseModel):
     template_catalog: TemplateCatalog = Field(description="Available templates")
     timing_context: TimingContext = Field(description="Timing resolution context")
 
-    # Optional layer intent from MacroPlan (if provided)
-    layer_intents: list[dict[str, Any]] = Field(
-        default_factory=list,
-        description="Layer intents from MacroPlan layering_plan (optional)",
-    )
-
-    # Theme from MacroSectionPlan (required for section coordination)
+    # Theme from MacroSection (required for section coordination)
     theme: ThemeRef | None = Field(
         default=None,
         description="Theme reference from MacroPlan for this section",
     )
 
-    # Motifs from MacroSectionPlan (required for template selection)
+    # Motifs from MacroSection (required for template selection)
     motif_ids: list[str] = Field(
         default_factory=list,
         description="Motif IDs from MacroPlan for this section",
     )
 
-    # Palette override from MacroSectionPlan (optional)
+    # Resolved palette from the typed macro precedence rule.
     palette: dict[str, Any] | None = Field(
         default=None,
-        description="Palette override from MacroPlan for this section",
-    )
-    global_palette_id: str | None = Field(
-        default=None,
-        description="Global primary palette_id from MacroPlan.global_story.palette_plan.primary",
+        description="Resolved PaletteRef from MacroPlan for this section",
     )
 
     # Lyric/narrative context (optional, from lyrics analysis)
@@ -186,125 +232,3 @@ class SectionPlanningContext(BaseModel):
         if self.recipe_catalog is None:
             return []
         return self.recipe_catalog.list_by_lane(lane)
-
-
-class GroupPlanningContext(BaseModel):
-    """Aggregate context for GroupPlanner orchestration.
-
-    Holds shared resources and provides factory method for
-    creating per-section SectionPlanningContext instances.
-    """
-
-    model_config = ConfigDict(extra="forbid")
-
-    choreo_graph: ChoreographyGraph = Field(description="Choreography graph configuration")
-    template_catalog: TemplateCatalog = Field(description="Available templates")
-    timing_context: TimingContext = Field(description="Timing resolution context")
-
-    # Optional global strategy from MacroPlan
-    global_story: dict[str, Any] | None = Field(
-        default=None,
-        description="Global story from MacroPlan (theme, motifs, etc.)",
-    )
-    layering_plan: dict[str, Any] | None = Field(
-        default=None,
-        description="Layering plan from MacroPlan",
-    )
-
-    def build_section_contexts(
-        self,
-        section_plans: list[dict[str, Any]],
-    ) -> list[SectionPlanningContext]:
-        """Build SectionPlanningContext for each section in MacroPlan.
-
-        Args:
-            section_plans: List of section_plan dicts from MacroPlan
-
-        Returns:
-            List of SectionPlanningContext, one per section
-        """
-        contexts: list[SectionPlanningContext] = []
-
-        # Extract layer intents if layering_plan provided
-        layer_intents: list[dict[str, Any]] = []
-        if self.layering_plan and "layers" in self.layering_plan:
-            layer_intents = self.layering_plan["layers"]
-
-        for section_plan in section_plans:
-            section_info = section_plan.get("section", {})
-
-            # Extract theme reference if provided
-            theme_data = section_plan.get("theme")
-            theme: ThemeRef | None = None
-            if theme_data:
-                if isinstance(theme_data, ThemeRef):
-                    theme = theme_data
-                elif isinstance(theme_data, dict):
-                    theme = ThemeRef.model_validate(theme_data)
-
-            resolved_primary = self._resolve_focus_targets(
-                section_plan.get("primary_focus_targets", [])
-            )
-            resolved_secondary = self._resolve_focus_targets(
-                section_plan.get("secondary_targets", [])
-            )
-
-            ctx = SectionPlanningContext(
-                section_id=section_info.get("section_id", "unknown"),
-                section_name=section_info.get("name", "unknown"),
-                start_ms=section_info.get("start_ms", 0),
-                end_ms=section_info.get("end_ms", 0),
-                energy_target=section_plan.get("energy_target", "MED"),
-                motion_density=section_plan.get("motion_density", "MED"),
-                choreography_style=section_plan.get("choreography_style", "HYBRID"),
-                primary_focus_targets=resolved_primary,
-                secondary_targets=resolved_secondary,
-                notes=section_plan.get("notes"),
-                choreo_graph=self.choreo_graph,
-                template_catalog=self.template_catalog,
-                timing_context=self.timing_context,
-                layer_intents=layer_intents,
-                theme=theme,
-                motif_ids=section_plan.get("motif_ids", []),
-                palette=section_plan.get("palette"),
-                global_palette_id=None,
-            )
-            contexts.append(ctx)
-
-        return contexts
-
-    def _resolve_focus_targets(self, targets: list[Any]) -> list[str]:
-        """Resolve typed macro focus targets to concrete group IDs."""
-        resolved: list[str] = []
-        for target in targets:
-            if isinstance(target, dict):
-                ttype = target.get("type")
-                tid = target.get("id")
-            else:
-                ttype = getattr(target, "type", None)
-                tid = getattr(target, "id", None)
-                if ttype is not None and hasattr(ttype, "value"):
-                    ttype = ttype.value
-            if not ttype or not tid:
-                continue
-
-            if ttype == "group":
-                resolved.append(str(tid))
-            elif ttype == "zone":
-                for tag, ids in self.choreo_graph.groups_by_tag.items():
-                    if getattr(tag, "value", str(tag)) == tid:
-                        resolved.extend(ids)
-                        break
-            elif ttype == "split":
-                for split, ids in self.choreo_graph.groups_by_split.items():
-                    if getattr(split, "value", str(split)) == tid:
-                        resolved.extend(ids)
-                        break
-
-        seen: set[str] = set()
-        result: list[str] = []
-        for gid in resolved:
-            if gid not in seen:
-                seen.add(gid)
-                result.append(gid)
-        return result

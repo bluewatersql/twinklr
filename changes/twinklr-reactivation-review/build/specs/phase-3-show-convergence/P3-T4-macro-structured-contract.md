@@ -359,11 +359,244 @@ uv run pytest tests/ -q      # no NEW failures vs the verification.md baseline
 uv run pytest tests/golden -v
 ```
 
-LOCAL-ONLY: one live macro-planner call to confirm the model can actually produce the
-new schema (structured-outputs shape, cross-reference validity). **Test budget: at most
-3 live macro-planner calls on one song, at the configured planner model.** Everything
-else runs against fixtures at $0. Record the live call's outcome (accepted / repaired /
-refused) in the PR body — a contract the model cannot fill is a contract defect.
+## Implementation handoff — 2026-08-16
+
+Status: **exact contract/invariants and AC2 amendment owner-accepted; live attempt 1
+safely rejected by the provider schema validator; general offline schema remediation
+frozen pending fresh independent verification; live acceptance open and not integrated.** Author worktree:
+`/tmp/twinklr-p3t4.next`, based on
+`33cce57`. The author did not perform the owner live call and has not performed xLights,
+audio, commit, or integration action. The canonical owner-local ledger/evidence remains
+outside this repository and was not modified during remediation.
+
+### Red-first evidence
+
+The first executable contract test failed during collection because
+`CallResponsePair` and the new contract did not exist. Expanding the focused surface
+then produced 57 failures and 28 errors across 448 tests, discriminating the legacy
+list-shaped state, stale group contexts, flattened moving-head input, and prompt
+vocabulary. After migration, the focused contract/macro/group/MH/display surface is
+455 passed. The first broad-suite run then exposed 13 failures and 10 errors in stale
+integration, cache, prompt-matrix, taxonomy, and recipe fixtures; the exact affected
+subset passed 43 tests after deliberate migration, and the complete suite then passed.
+
+### Implemented contract and seams
+
+- Replaced the legacy macro/story/layer/focus models with the exact four-field
+  `MacroPlan` and typed sub-models; added intrinsic cross-reference, ordering, focal,
+  palette/theme, call/response, and optional choreography-graph validation.
+- Added external audio/catalog/layout heuristics and wired the actual palette and motif
+  catalogs into validation.
+- Retained the full typed plan in pipeline state, used only `sections` for fan-out, and
+  atomically canonicalized section IDs plus palette, motif, and focal references.
+- Added a lossless typed group projection and made group prompt/cache identity consume
+  it. Unknown typed targets fail loudly.
+- Changed moving-head planning to retain the full typed plan; song-level palette,
+  motif, and focal edits affect both prompt derivation and cache identity.
+- Changed holistic summary/prompt/cache handling to preserve the full typed contract.
+- Replaced legacy macro planner/judge prompts and removed live legacy field readers.
+  Existing display/MH output behavior and goldens are intentionally unchanged.
+
+### Owner decisions and explicit boundary
+
+The exact shape and invariants are recorded in
+[`typed-macro-coordination-contract.md`](../../../../../memories/decisions/typed-macro-coordination-contract.md)
+with `status: accepted`. On 2026-08-16 the owner accepted the exact four-field contract,
+its recorded invariants, and the AC2 amendment: P3-T4 must prove recursive
+mutation-discriminating typed/by-name projection, prompt, cache, and validation readers;
+P3-T5 remains the first emitted-display behavioral consumer of `call_response_pairs` and
+`coordination_intent`. No fake sink or expected-fail test was added. The owner authorized
+only P3-T4's capped live macro probe (at most three attempts, additionally constrained
+by one cumulative `$1.75` task budget). Attempt 1 ran after harness-audit GO and failed
+safely as recorded below; live acceptance remains open.
+
+### Superseded verification snapshot
+
+The counts below preceded formal verifier rejection and are historical only. They are
+not current acceptance evidence; the remediated snapshot must record fresh gates.
+
+- focused contract/macro/group/MH/display: `455 passed in 1.43s`
+- repository formatting/lint: `1343 files already formatted`; Ruff `All checks passed!`
+- mypy: `Success: no issues found in 721 source files`
+- immutable goldens: `73 passed, 8 skipped in 2.06s`; no regeneration or byte change
+- full offline suite without coverage: `5229 passed, 39 skipped in 79.27s`
+- canonical coverage-enabled suite: `5229 passed, 39 skipped in 96.77s`, 87% total
+  coverage
+- `git diff --check`: clean
+
+`make validate` itself was not runnable in the author worktree because its first guard
+requires no uncommitted changes, while the executor was explicitly forbidden to commit
+or stash. It exited before executing a gate. Its four component commands were therefore
+run directly and all passed as recorded above. Installing the optional Anthropic extra
+temporarily made mypy report four errors in the unchanged base provider's optional
+import fallback; removing that optional environment-only package restored the canonical
+clean 721-file result without a source change.
+
+### Formal-rejection remediation snapshot
+
+The verifier's executable defects were reproduced before remediation: the initial
+adversarial subset produced `6 failed, 3 passed`, then passed `9/9` after exact audio
+section equality, bidirectional motif membership, theme/tag catalog checks, deterministic
+group metadata stamping, empty-motif support, corrector preservation, and target
+semantics were fixed. Replacing the whole-model AC2 assertion with the recursive named
+leaf registry first produced `2 failed`; the mutation-discriminating readers then passed
+`2/2` and are used by group, moving-head, and holistic prompt/cache derivation.
+
+Fresh frozen author gates:
+
+- focused contract/macro/group/MH/display: `494 passed in 1.85s`
+- repository formatting/lint: `1343 files already formatted`; Ruff `All checks passed!`
+- mypy: `Success: no issues found in 720 source files`
+- immutable goldens: `73 passed, 8 skipped in 2.09s`; no regeneration or byte change
+- full coverage-enabled suite: `5236 passed, 39 skipped in 99.22s`, 87% total coverage
+- no live/network/paid provider, xLights, audio, commit, or integration action
+
+AC2 is owner-amended: P3-T4's boundary is recursive mutation-discriminating typed/by-name
+projection, prompt, cache, and validation consumption of every contract leaf. P3-T5
+remains the first emitted-behavior consumer for `call_response_pairs` and
+`coordination_intent` and remains unauthorized. This amendment resolves P3-T4's prior
+binding contradiction without authorizing P3-T5 or inventing a fake behavioral sink.
+
+### Narrow ChoreoTag re-review remediation
+
+A narrow re-review correctly rejected the first remediation's global reinterpretation of
+`PlanTarget(type=ZONE)` as physical `GroupPosition.zone` / `DisplayZone`. The established
+contract is `ChoreoTag`: `HOUSE`, `YARD`, `ROOF`, and `PERIMETER` select groups through
+`ChoreoGroup.tags`. Physical spatial zones remain separate metadata and are neither
+advertised nor accepted as plan-target zones merely because they exist on a position.
+
+Red-first evidence was `5 failed, 3 passed`: legacy `HOUSE` tag expansion returned no
+groups, a physical `HOUSE` position was incorrectly selected, physical-only `ACCENT`
+was accepted, unified expansion failed, and macro validation rejected the tag target.
+After restoring ChoreoTag-derived advertisement, validation, prompt summaries, focus
+resolution, and expansion, the discriminator passed `8/8`. The recursive leaf registry
+is additionally derived from Pydantic model annotations, so adding any nested contract
+leaf without a named reader now fails mechanically.
+
+Fresh post-re-review gates:
+
+- focused contract/macro/group/MH/display: `494 passed in 1.85s`
+- repository formatting/lint: `1343 files already formatted`; Ruff clean
+- mypy: `Success: no issues found in 720 source files`
+- immutable goldens: `73 passed, 8 skipped in 2.11s`
+- relevant broad suite without coverage: `5238 passed, 39 skipped in 77.14s`
+- `git diff --check`: clean
+
+LOCAL-ONLY: on 2026-08-16 the owner authorized this P3-T4 probe only: confirm that the
+configured planner model can produce the new schema (structured-outputs shape and
+cross-reference validity). **Hard cap: at most 3 live macro-planner attempts on one
+song.** The authorization does not cover P3-T5, xLights, audio mutation, or any other
+live task. Attempt 1 was executed only after the orchestrator's harness-audit GO and was
+rejected at the provider schema boundary as recorded below. Record each attempt and the
+final outcome (accepted / repaired / refused); a contract the model cannot fill is a
+contract defect.
+
+The dedicated harness is now implemented at
+`twinklr.core.agents.sequencer.macro_planner.live_probe`, with CLI module
+`twinklr.cli.p3_t4_macro_probe` and the tracked one-song
+descriptor `tests/fixtures/p3_t4_macro_probe/context.json`. It invokes the shipped macro
+prompt through `AsyncAgentRunner`, builds prompt variables through
+`MacroPlannerOrchestrator`, and runs the same external audio/catalog/target-graph
+validator as production. Its frozen identity is model `gpt-5.6-sol`, default endpoint
+`https://api.openai.com/v1`, schema hash
+`5f0f842f98d7a27dec1d0f5eebe9f6549bb9ddb95930e1b4e47960cbea7d18d8`, provider
+response-format schema hash
+`b814e8b70cbfbacdaa2e5752cefc001249f03bfcd111245bc2d6b2006641b012`, and prompt hash
+`166a109923323ef7df0a62a0424677782a5033102e748f4007fa9cdfd0a9038e`.
+
+The CLI fails nonzero unless `--live`, `OPENAI_API_KEY`, exact audited HEAD and transitive
+source-tree hashes, and sufficient explicit USD preauthorization are all present. It
+uses the single canonical owner ledger under `~/.local/state/twinklr/owner-probes/`;
+callers cannot select a second path to reset the cap. The ledger is locked nonblocking,
+tamper-evident, rejects symlinks, counts identity changes toward the same three-attempt
+limit, and becomes terminal after a success. Each invocation is pinned to one provider attempt,
+zero SDK retries, no compatibility fallback, and zero schema repair requests. A durable
+atomic evidence record is written before the request (so a crash consumes the attempt),
+and no fourth task attempt is permitted. The evidence records source/input/prompt/schema
+identity, command/timestamps, response identity/mode, exact token classes, frozen-price
+cost, external validation, and outcome. The rendered serialized request is hashed and size-bounded before provider
+construction; its conservative token bound plus the frozen output budget must fit the
+USD cap. Provider entry is counted before awaiting transport, and success requires exact
+response ID/model/json-schema mode/schema hash/finish/fallback metadata. The provider
+captures the service-reported response model; a requested-model fallback is marked as
+non-actual and cannot pass the probe. Offline
+fake-provider tests cover fail-before-call, global cap/terminal success/tampering,
+request bounds, exact single-request transport settings, wrong response metadata,
+transport failure counts, and both passing and failing evidence.
+
+### Live attempt 1 and schema-boundary remediation — 2026-08-16
+
+After explicit GO, the audited harness entered the provider exactly once. OpenAI returned
+HTTP 400 `invalid_json_schema` at the schema path for `ThemeRef.scope`: the emitted node
+combined `$ref` with the annotation sibling `description`, which the provider forbids.
+No provider retry, JSON-object fallback, or schema repair request occurred. Provider usage
+was unavailable, so the canonical ledger correctly retained the complete `$1.66`
+reservation. The remaining `$0.09` under the cumulative `$1.75` task cap cannot authorize
+another `$1.66` worst-case reservation, even though the separate three-attempt count was
+not reached. The failed evidence and ledger are owner-local and must remain untouched.
+
+The offline remediation is a general machine transform in `schema_utils`, not a
+MacroPlan-specific edit. Every `$ref` node is reduced to the reference alone when its
+siblings are non-semantic annotations (`description`, `title`, `default`, and the other
+standard annotation keywords); a semantic constraint sibling fails loudly rather than
+being discarded. Recursive tests audit every registered response root, discriminate the
+exact `MacroPlan -> ThemeRef.scope` case, and assert the OpenAI provider sends the exact
+normalized format whose hash also participates in cache identity. The remediated
+serialized request hash is
+`ca9147ba044b347d036a222f0e32b1073e674b5be6efd1387d264e9ecce361c0`
+at `38236` bytes. This offline result does not satisfy live acceptance; that criterion
+remains open with no further attempt funded under the accepted cap.
+
+The frozen request budget is temperature `0.7`, reasoning effort `high`, timeout `60s`,
+maximum output `8000` tokens, and a conservative serialized prompt/request ceiling of
+`70000` bytes/tokens. Frozen conservative pricing is `$10/M` prompt and `$60/M` for each
+reasoning/completion class. Its worst-case preauthorization is `$1.66`; the hard
+cumulative budget for the entire P3-T4 task is `$1.75`, not `$1.75` per attempt. The
+canonical ledger records actual, reserved, and committed spend and refuses a next
+attempt unless committed spend plus another `$1.66` reservation fits under `$1.75`.
+The reservation converts to actual spend only when response metadata supplies
+provider-marked explicit, nonnegative, nonzero, internally consistent
+prompt/reasoning/completion/total usage that agrees with runner attribution and stays
+within the frozen bounds. Missing, default-zero,
+partial, inconsistent, or out-of-bound usage is recorded as `usage_unavailable`; the full
+`$1.66` remains committed permanently.
+
+The eventual GO command must invoke the frozen environment with
+`uv run --locked python -m twinklr.cli.p3_t4_macro_probe ...`; the CLI's required arguments are `--live`,
+`--expected-source-sha`, `--expected-source-tree-hash`, `--expected-input-hash`,
+`--expected-catalog-hash`, `--expected-request-hash`, and `--preauthorize-usd`.
+The harness additionally verifies the frozen Python/OpenAI/Pydantic versions from the
+tracked probe descriptor before provider construction. It strictly loads and hashes the
+tracked `catalog/templates/` store and refuses any ignored `data/templates/` overlay.
+`source_tree_hash` is the digest of the explicit transitive `source_files` manifest in
+the evidence, not a claim to hash every dirty-worktree byte. Probe identity relies on
+that audited manifest plus the separate input, catalog, and serialized-request pins.
+
+Fresh post-harness-remediation offline gates (2026-08-16): dedicated adversarial harness
+`37 passed`; focused macro contract/harness `60 passed`; relevant
+macro/group/moving-head/display/provider regression `534 passed`; immutable goldens `73 passed,
+8 skipped`; repository Ruff clean and `1346 files already formatted`; mypy clean across
+`722 source files`; full suite `5276 passed, 39 skipped`. Earlier broad runs exposed and
+then drove fixes for model-literal centralization and core logging policy; the quoted full
+repo-hygiene policy failures and drove fixes; the quoted full result is the fresh post-fix
+rerun. No live provider was contacted by any gate.
+
+Fresh post-attempt schema-remediation gates (2026-08-16): the three red discriminators
+failed before the transform (registered-root `$ref` sibling, semantic-sibling fail-loud,
+and exact MacroPlan `ThemeRef.scope`) and pass after it. Strict-schema/provider/contract/
+harness focused suite: `122 passed`; complete P3-T4 planning/provider surface: `638
+passed`; immutable goldens: `73 passed, 8 skipped`; Ruff clean and `1346 files already
+formatted`; mypy clean across `723 source files`; full offline suite: `5280 passed, 39
+skipped`. Frozen remediated identities are source SHA `33cce5793fe5465c9d097dc131e8d08ec42f72b5`,
+explicit transitive source-manifest hash
+`d424435c62c4486c6c0ed1fc77029b46109edb00575a4e53ce934f1f0b451f08`, schema hash
+`5f0f842f98d7a27dec1d0f5eebe9f6549bb9ddb95930e1b4e47960cbea7d18d8`, response-schema
+hash `b814e8b70cbfbacdaa2e5752cefc001249f03bfcd111245bc2d6b2006641b012`, prompt hash
+`166a109923323ef7df0a62a0424677782a5033102e748f4007fa9cdfd0a9038e`, input hash
+`b85ffec41c133f9ccbe3c1af0e91ec4ca861360e9224150cd8f0614c1a24d261`, catalog hash
+`35c62d4ab3534e8d9a026fa699caeab739d279fec91e2be56fc98ad220a4bf5e`, and serialized
+request hash `ca9147ba044b347d036a222f0e32b1073e674b5be6efd1387d264e9ecce361c0`
+(`38236` bytes). All gates were locked and offline; no second provider call was made.
 
 ## Effort & risk
 

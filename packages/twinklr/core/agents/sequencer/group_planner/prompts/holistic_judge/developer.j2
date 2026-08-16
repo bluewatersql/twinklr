@@ -40,9 +40,9 @@ Before evaluating holistic quality, verify the plan set is **technically sound**
   - Concrete group IDs must come from the display graph.
   - Aggregate target IDs must come from the matching populated target-type context.
     They are valid and expanded by the renderer; do not reject them.
-- Palette/motif ids are present where required:
+- Palette/motif ids match the macro-owned values:
   - Every SectionCoordinationPlan has plan.palette.palette_id
-  - Every SectionCoordinationPlan has plan.motif_ids (>=1)
+  - Every SectionCoordinationPlan copies plan.motif_ids exactly; empty is valid
 
 **If technically invalid**
 - Return the schema-defined terminal-failure status immediately with critical
@@ -55,7 +55,7 @@ Evaluate **cross-section quality** across these dimensions:
 1. **story_coherence** (25%): cohesive story + thematic throughline
 2. **energy_arc** (25%): build/peak/release placement
 3. **visual_variety** (20%): contrast vs repetition across sections
-   - **Calibrate against song structure and MacroPlan intent.** If `global_story.motifs` or `pacing_notes` designate certain motifs as signature or recurring (e.g., “always-on”), score variety within that constraint — not as if the signature motif were absent. A plan that uses 2–3 motifs consistently as show identity should not score below 6.5 on this dimension for motif repetition alone.
+   - **Calibrate against song structure and MacroPlan intent.** If `motif_continuity` designates motifs as recurring, score variety within that constraint — not as if the signature motif were absent. A plan that uses 2–3 motifs consistently as show identity should not score below 6.5 on this dimension for motif repetition alone.
    - For narrative ballads, traditional standards, or songs with a distinct genre identity (see `genre_markers` in the Song Narrative Context), repeating structural elements across sections reflects intentional show identity. Assess variety on: template diversity within motifs, group rotation, spatial contrast (different zones/splits), and section-specific staging choices.
    - Reserve scores below 6.0 for plans where the *same template on the same group* repeats across unrelated sections with no staging variation whatsoever.
 4. **transitions** (15%): smoothness between adjacent sections

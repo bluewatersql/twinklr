@@ -275,61 +275,15 @@ class HolisticEvaluatorStage:
 def _extract_macro_plan_summary(
     macro_plan: object | None,
 ) -> dict[str, object]:
-    """Extract macro plan summary for holistic judge context.
-
-    Handles both Pydantic model and dict (from cache deserialization).
-
-    Extracts:
-    - global_story: Theme, motifs, pacing notes
-    - expected_section_ids: Ordered list of section IDs from MacroPlan
-      so the holistic judge can verify completeness against the canonical
-      section list rather than guessing.
-
-    Args:
-        macro_plan: MacroPlan from context state, or None
-
-    Returns:
-        Summary dict with global_story and expected_section_ids
-    """
+    """Extract a lossless typed-macro summary for holistic judge/cache context."""
     if macro_plan is None:
         return {}
+    from twinklr.core.sequencer.planning import MacroPlan
 
-    summary: dict[str, object] = {}
-
-    if isinstance(macro_plan, dict):
-        global_story = macro_plan.get("global_story")
-    else:
-        global_story = getattr(macro_plan, "global_story", None)
-
-    if global_story is not None:
-        if isinstance(global_story, dict):
-            summary["global_story"] = global_story
-        else:
-            summary["global_story"] = global_story.model_dump()
-
-    # Extract expected section IDs from MacroPlan.section_plans
-    expected_ids: list[str] = []
-    if isinstance(macro_plan, dict):
-        section_plans = macro_plan.get("section_plans", [])
-        if section_plans:
-            for sp in section_plans:
-                if isinstance(sp, dict):
-                    section = sp.get("section", {})
-                    if isinstance(section, dict):
-                        sid = section.get("section_id")
-                        if sid:
-                            expected_ids.append(sid)
-    else:
-        section_plans = getattr(macro_plan, "section_plans", None)
-        if section_plans:
-            for sp in section_plans:
-                section = getattr(sp, "section", None)
-                if section is not None:
-                    sid = getattr(section, "section_id", None)
-                    if sid:
-                        expected_ids.append(sid)
-
-    if expected_ids:
-        summary["expected_section_ids"] = expected_ids
-
-    return summary
+    normalized = MacroPlan.model_validate(
+        macro_plan.model_dump() if hasattr(macro_plan, "model_dump") else macro_plan
+    )
+    return {
+        "macro_plan": normalized.reader_projection(),
+        "expected_section_ids": [item.section.section_id for item in normalized.sections],
+    }

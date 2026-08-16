@@ -31,6 +31,8 @@ class ResponseMetadata:
     response_id: str | None = None
     token_usage: TokenUsage = field(default_factory=TokenUsage)
     model: str | None = None
+    actual_model_present: bool = False
+    token_usage_is_explicit: bool = False
     finish_reason: str | None = None
     conversation_id: str | None = None
     structured_output_mode: str | None = None

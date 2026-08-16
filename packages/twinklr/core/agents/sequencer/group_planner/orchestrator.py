@@ -260,8 +260,8 @@ class GroupPlannerOrchestrator:
         Raises:
             ValueError: If section context is invalid
         """
-        if not section_context.primary_focus_targets:
-            raise ValueError("Section must have at least one primary_focus_target")
+        if not section_context.lead_targets:
+            raise ValueError("Section must have at least one LEAD target")
 
         logger.debug(
             f"Starting GroupPlanner orchestration for section: {section_context.section_id}"
@@ -461,6 +461,8 @@ class GroupPlannerOrchestrator:
 
         def validate(plan: SectionCoordinationPlan) -> list[str]:
             """Validate plan and return list of error messages."""
+            self._stamp_macro_owned_fields(plan, section_context)
+
             # Deterministic ID normalization to recover common alias drift
             # (e.g., MATRICES -> MATRIX) without spending an iteration.
             self._normalize_group_target_ids(plan, section_context)
@@ -493,6 +495,23 @@ class GroupPlannerOrchestrator:
             return errors
 
         return validate
+
+    @staticmethod
+    def _stamp_macro_owned_fields(
+        plan: SectionCoordinationPlan,
+        section_context: SectionPlanningContext,
+    ) -> None:
+        """Overwrite LLM drift with authoritative typed macro metadata."""
+        macro_input = section_context.macro_input
+        if macro_input is None:
+            return
+        section = macro_input.macro_section
+        plan.section_id = section.section.section_id
+        plan.theme = section.theme
+        plan.palette = macro_input.resolved_palette
+        plan.motif_ids = list(section.motif_ids)
+        plan.start_ms = section.section.start_ms
+        plan.end_ms = section.section.end_ms
 
     def _normalize_group_target_ids(
         self,

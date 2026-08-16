@@ -33,7 +33,7 @@ class MovingHeadStage:
         - "audio": SongBundle (from AudioAnalysisStage, for BeatGrid)
         - "profile": AudioProfileModel (from AudioProfileStage)
         - "lyrics": LyricContextModel | None (from LyricsStage, optional)
-        - "macro": list[MacroSectionPlan] (from MacroPlannerStage)
+        - "macro": list[MacroSection] (from MacroPlannerStage; full plan is in state)
     Output: ChoreographyPlan
 
     State stored:
@@ -50,7 +50,7 @@ class MovingHeadStage:
         ...     "audio": song_bundle,  # from AudioAnalysisStage
         ...     "profile": audio_profile,
         ...     "lyrics": lyric_context,  # optional, may be None
-        ...     "macro": macro_section_plans,  # from MacroPlannerStage
+        ...     "macro": macro_sections,  # fan-out payload from MacroPlannerStage
         ... }
         >>> result = await stage.execute(input, context)
         >>> if result.success:
@@ -106,7 +106,7 @@ class MovingHeadStage:
                 - "audio": SongBundle (from AudioAnalysisStage)
                 - "profile": AudioProfileModel (from AudioProfileStage)
                 - "lyrics": LyricContextModel | None (from LyricsStage, optional)
-                - "macro": list[MacroSectionPlan] | None (from MacroPlannerStage)
+                - "macro": list[MacroSection] | None (from MacroPlannerStage)
             context: Pipeline context with provider and config
 
         Returns:
@@ -144,10 +144,19 @@ class MovingHeadStage:
             audio_bundle = input["audio"]  # SongBundle from AudioAnalysisStage
             audio_profile = input["profile"]
             lyric_context = input.get("lyrics")  # May be None (conditional stage)
-            macro_plan = input.get("macro")  # list[MacroSectionPlan] from MacroPlannerStage
+            from twinklr.core.sequencer.planning import MacroPlan
+
+            macro_state = context.get_state("macro_plan")
+            macro_plan = (
+                MacroPlan.model_validate(
+                    macro_state.model_dump() if hasattr(macro_state, "model_dump") else macro_state
+                )
+                if macro_state is not None
+                else None
+            )
             if self.section_id is not None:
-                audio_profile, lyric_context, macro_plan = self._select_section_inputs(
-                    audio_profile, lyric_context, macro_plan, self.section_id
+                audio_profile, lyric_context, _ = self._select_section_inputs(
+                    audio_profile, lyric_context, input.get("macro"), self.section_id
                 )
 
             # Build BeatGrid from audio bundle for downstream rendering

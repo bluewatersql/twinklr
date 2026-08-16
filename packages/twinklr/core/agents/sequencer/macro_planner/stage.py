@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from twinklr.core.pipeline.context import PipelineContext
     from twinklr.core.pipeline.result import StageResult
-    from twinklr.core.sequencer.planning import MacroSectionPlan
+    from twinklr.core.sequencer.planning import MacroSection
 
 logger = logging.getLogger(__name__)
 
@@ -27,10 +27,10 @@ class MacroPlannerStage:
     Input: dict with keys:
         - "profile": AudioProfileModel
         - "lyrics": LyricContextModel | None
-    Output: list[MacroSectionPlan] (for direct FAN_OUT to GroupPlanner)
+    Output: list[MacroSection] (for direct FAN_OUT to GroupPlanner)
 
     State stored:
-        - "macro_plan": Full MacroPlan (for global_story, layering_plan access)
+        - "macro_plan": Full typed MacroPlan for downstream planners
         - "audio_profile": AudioProfileModel (for GroupPlannerStage)
         - "lyric_context": LyricContextModel | None (for GroupPlannerStage)
 
@@ -39,7 +39,7 @@ class MacroPlannerStage:
         >>> input = {"profile": audio_profile, "lyrics": lyric_context}
         >>> result = await stage.execute(input, context)
         >>> if result.success:
-        ...     sections = result.output  # list[MacroSectionPlan] for FAN_OUT
+        ...     sections = result.output  # list[MacroSection] for FAN_OUT
     """
 
     def __init__(
@@ -65,7 +65,7 @@ class MacroPlannerStage:
         self,
         input: dict[str, Any],
         context: PipelineContext,
-    ) -> StageResult[list[MacroSectionPlan]]:
+    ) -> StageResult[list[MacroSection]]:
         """Generate macro plan and return section list for FAN_OUT.
 
         Args:
@@ -73,7 +73,7 @@ class MacroPlannerStage:
             context: Pipeline context with provider and config
 
         Returns:
-            StageResult containing list[MacroSectionPlan] for direct FAN_OUT
+            StageResult containing list[MacroSection] for direct FAN_OUT
 
         Side Effects:
             - Stores "macro_plan" in context.state (full MacroPlan for downstream)
@@ -117,7 +117,7 @@ class MacroPlannerStage:
                 llm_logger=context.llm_logger,
             )
 
-            def extract_sections(r: Any) -> list[MacroSectionPlan]:
+            def extract_sections(r: Any) -> list[MacroSection]:
                 """Extract section plans from IterationResult."""
                 from twinklr.core.agents.shared.judge.controller import IterationResult
                 from twinklr.core.sequencer.planning import MacroPlan
@@ -128,7 +128,7 @@ class MacroPlannerStage:
                     raise ValueError("IterationResult.plan is None")
 
                 normalized_plan = MacroPlan.model_validate(plan)
-                result: list[MacroSectionPlan] = normalized_plan.section_plans
+                result: list[MacroSection] = normalized_plan.sections
                 return result
 
             # Execute with caching and automatic metrics/state handling
@@ -180,4 +180,4 @@ class MacroPlannerStage:
         plan = normalized_result.plan
         if plan:
             normalized_plan = MacroPlan.model_validate(plan)
-            context.add_metric("section_count", len(normalized_plan.section_plans))
+            context.add_metric("section_count", len(normalized_plan.sections))

@@ -82,7 +82,7 @@ def build_common_stages(
                 ),
                 inputs=["profile", "lyrics"],
                 input_type="dict[str, Any]",
-                output_type="list[MacroSectionPlan]",
+                output_type="list[MacroSection]",
                 description="Generate high-level choreography strategy",
             )
         )

@@ -118,51 +118,55 @@ def _macro_plan() -> dict[str, Any]:
         "end_ms": 8_000,
     }
     return {
-        "global_story": {
-            "theme": {"theme_id": "theme.winter", "scope": {"value": "SONG"}, "tags": ["snow"]},
-            "palette_plan": {
-                "primary": {
-                    "palette_id": "core.winter",
-                    "role": {"value": "PRIMARY"},
-                    "intensity": 0.8,
-                },
-                "alternates": [{"palette_id": "core.peppermint"}],
-            },
-            "motifs": ["snowfall"],
-            "pacing_notes": "Grow toward the hook.",
-            "story_notes": "The display moves from cool distance to warm arrival.",
-        },
-        "layering_plan": {
-            "layers": [
-                {
-                    "layer_index": 0,
-                    "layer_role": {"value": "BASE"},
-                    "blend_mode": {"value": "NORMAL"},
-                    "timing_driver": {"value": "BARS"},
-                    "target_selector": {"roles": ["front"]},
-                    "intensity_bias": 0.7,
-                    "usage_notes": "Sustain the foundation.",
-                }
-            ]
-        },
-        "section_plans": [
+        "sections": [
             {
                 "section": section_ref,
-                "section_id": "chorus_1",
-                "name": "chorus",
                 "energy_target": {"value": "HIGH"},
                 "motion_density": {"value": "BUSY"},
                 "choreography_style": {"value": "HYBRID"},
+                "palette_role": {"stop_id": "winter", "override": None},
                 "theme": {
                     "theme_id": "theme.winter",
                     "scope": {"value": "SECTION"},
                     "tags": ["snow"],
+                    "palette_id": "core.winter",
                 },
-                "palette": {"palette_id": "core.winter"},
                 "motif_ids": ["snowfall"],
-                "primary_focus_targets": [{"type": {"value": "group"}, "id": "front"}],
-                "secondary_targets": [{"type": {"value": "zone"}, "id": "house"}],
+                "focal_roles": [
+                    {
+                        "target": {"type": {"value": "group"}, "id": "front"},
+                        "role": {"value": "LEAD"},
+                    },
+                    {
+                        "target": {"type": {"value": "zone"}, "id": "house"},
+                        "role": {"value": "SUPPORT"},
+                    },
+                ],
+                "call_response_pairs": [],
+                "coordination_intent": {"value": "UNIFIED"},
                 "notes": "Open wide at the hook.",
+            }
+        ],
+        "palette_arc": [
+            {
+                "stop_id": "winter",
+                "palette": {"palette_id": "core.winter"},
+                "applies_from_section_id": "chorus_1",
+                "transition": {"value": "HOLD"},
+            }
+        ],
+        "motif_continuity": [
+            {
+                "motif_id": "snowfall",
+                "section_ids": ["chorus_1"],
+                "evolution": {"value": "INTRODUCE"},
+                "description": "Snowfall grows toward the hook.",
+            }
+        ],
+        "focal_arc": [
+            {
+                "section_id": "chorus_1",
+                "lead_target": {"type": {"value": "group"}, "id": "front"},
             }
         ],
     }
@@ -330,22 +334,43 @@ def _pack_cases() -> list[tuple[str, Path, str, dict[str, Any]]]:
         "display_graph_zones": [{"zone": "house", "group_ids": ["front"]}],
         "end_ms": 8_000,
         "energy_target": "HIGH",
-        "layer_intents": [
-            {
-                "layer_index": 0,
-                "layer_role": "BASE",
-                "intensity_bias": 0.7,
-                "target_selector": {"roles": ["front"], "coordination": "unified"},
-                "timing_driver": "bars",
-                "usage_notes": "Sustain.",
-            }
-        ],
         "motif_catalog_summary": "snowfall: Falling snow.",
         "motif_ids": ["snowfall"],
+        "macro_input": {
+            "macro_section": {
+                "coordination_intent": "CALL_RESPONSE",
+                "call_response_pairs": [
+                    {
+                        "call": {"type": "group", "id": "front"},
+                        "response": {"type": "zone", "id": "house"},
+                        "step_unit": "BEAT",
+                        "step_duration": 1,
+                    }
+                ],
+            },
+            "palette_stop": {
+                "stop_id": "winter",
+                "applies_from_section_id": "chorus_1",
+                "transition": "CROSSFADE",
+            },
+            "resolved_palette": {"palette_id": "core.winter", "role": "PRIMARY"},
+            "motif_threads": [
+                {
+                    "motif_id": "snowfall",
+                    "section_ids": ["chorus_1"],
+                    "evolution": "INTRODUCE",
+                    "description": "Snowfall grows toward the hook.",
+                }
+            ],
+            "focal_assignment": {
+                "section_id": "chorus_1",
+                "lead_target": {"type": "group", "id": "front"},
+            },
+        },
         "motion_density": "BUSY",
         "notes": "Open wide at the hook.",
         "palette_ref_json": '{"palette_id":"core.winter"}',
-        "primary_focus_targets": ["front"],
+        "lead_targets": ["front"],
         "propensity_hints": {
             "affinities": [{"effect_family": "wave", "frequency": 3, "model_type": "moving_head"}]
         },
@@ -361,7 +386,7 @@ def _pack_cases() -> list[tuple[str, Path, str, dict[str, Any]]]:
                 }
             ]
         },
-        "secondary_targets": ["house"],
+        "support_targets": ["house"],
         "section_duration_bars": 4,
         "section_duration_beats": 16,
         "section_id": "chorus_1",
@@ -420,8 +445,12 @@ def _pack_cases() -> list[tuple[str, Path, str, dict[str, Any]]]:
         "group_hierarchy": {"front": ["left_head", "right_head"]},
         "group_plan_set": {"plan_set_id": "show-1", "section_plans": []},
         "macro_plan_summary": {
-            "global_story": {"motifs": ["snowfall"], "pacing_notes": "Grow toward the hook."}
+            "macro_plan": deepcopy(base["macro_plan"]),
+            "expected_section_ids": ["chorus_1"],
         },
+        "macro_palette_arc": deepcopy(base["macro_plan"]["palette_arc"]),
+        "macro_motif_continuity": deepcopy(base["macro_plan"]["motif_continuity"]),
+        "macro_focal_arc": deepcopy(base["macro_plan"]["focal_arc"]),
         "section_count": 1,
         "section_ids": ["chorus_1"],
         "section_theme_summary": [
@@ -491,9 +520,13 @@ def _pack_cases() -> list[tuple[str, Path, str, dict[str, Any]]]:
                 "choreography_style": "ABSTRACT",
                 "palette_id": "core.holiday",
                 "motif_ids": ["hook"],
+                "coordination_intent": "UNIFIED",
                 "notes": "Keep movement expansive.",
             }
         ],
+        "macro_palette_arc": deepcopy(base["macro_plan"]["palette_arc"]),
+        "macro_motif_continuity": deepcopy(base["macro_plan"]["motif_continuity"]),
+        "macro_focal_arc": deepcopy(base["macro_plan"]["focal_arc"]),
         "plan": {"sections": [], "overall_strategy": "Build to the hook."},
         "preserve_elements": ["Broad hook sweep"],
         "previous_feedback": ["Keep the hook broad."],
@@ -617,7 +650,10 @@ def test_all_refinement_templates_render_with_populated_context() -> None:
         refinement_variables = deepcopy(variables)
         refinement_variables["iteration"] = 1
         rendered = PromptPackLoader(base_path=path).load_and_render(pack, refinement_variables)
-        assert "Refinement Request" in rendered["user"], case_id
+        expected_heading = (
+            "Revise the Typed MacroPlan" if case_id == "macro_planner" else "Refinement Request"
+        )
+        assert expected_heading in rendered["user"], case_id
 
 
 def test_populated_matrix_covers_every_runtime_pack() -> None:

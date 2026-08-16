@@ -20,8 +20,8 @@ def get_planner_spec(
     """Get MacroPlanner agent specification.
 
     The MacroPlanner is conversational and strategic, generating high-level
-    choreography plans focusing on global story, section energy, and layering
-    architecture for Christmas light shows.
+    choreography plans focusing on typed palette, motif, focal, and section
+    coordination intent for Christmas light shows.
 
     Args:
         config: Per-role model, sampling, and reasoning configuration.
@@ -60,7 +60,7 @@ def get_judge_spec(
     """Get MacroPlanner judge agent specification.
 
     The judge is stateless and analytical, evaluating MacroPlans for
-    strategic coherence, section appropriateness, layer architecture clarity,
+    strategic coherence, section appropriateness, cross-section continuity,
     and bold impactful design suitable for Christmas light shows.
 
     Args:

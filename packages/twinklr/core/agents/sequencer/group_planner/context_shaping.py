@@ -158,20 +158,18 @@ def shape_planner_context(section_context: SectionPlanningContext) -> dict[str, 
     **SECTION-FOCUSED + TOKEN-OPTIMIZED**:
     - Groups: Full display graph (ensures sufficient targets for all lanes)
     - Templates: Simplified to {ID, name, lanes} (descriptions dropped, saves ~40% tokens)
-    - Layer intents: Filtered to only layers targeting these roles
 
     Token savings example (chorus section):
-    - Before: ~75K tokens (full templates + full layer intents)
-    - After: ~45K-55K tokens (minimal templates + filtered layer intents)
+    - Before: ~75K tokens (full templates and display metadata)
+    - After: ~45K-55K tokens (minimal templates)
 
     Analyzed from planner/user.j2:
     - Uses: section_id, section_name, start_ms, end_ms
     - Uses: energy_target, motion_density, choreography_style
-    - Uses: primary_focus_targets, secondary_targets, notes
+    - Uses: lead_targets, support_targets, notes
     - Uses: choreo_graph.groups (full graph)
     - Uses: choreo_graph.groups_by_role (full graph)
     - Uses: template_catalog.entries (SIMPLIFIED to ID/name/lanes)
-    - Uses: layer_intents (FILTERED to relevant layers)
     - Does NOT use: timing_context (not referenced in prompt)
 
     Args:
@@ -182,7 +180,7 @@ def shape_planner_context(section_context: SectionPlanningContext) -> dict[str, 
     """
     # Priority roles from MacroPlan intent (used for emphasis guidance in prompts)
     # Keep this list explicit even though the full display graph is provided.
-    all_target_roles = section_context.primary_focus_targets + section_context.secondary_targets
+    all_target_roles = section_context.lead_targets + section_context.support_targets
 
     # Keep full display graph for planning so the model has sufficient targets
     # for all lanes without artificial scarcity.
@@ -195,23 +193,6 @@ def shape_planner_context(section_context: SectionPlanningContext) -> dict[str, 
         f"{len(section_context.choreo_graph.groups)} groups (full graph), "
         f"{len(section_context.template_catalog.entries)} templates (simplified)"
     )
-
-    # Filter layer_intents to only layers targeting these roles
-    # layer_intents can be either dicts or objects with target_selector
-    filtered_layer_intents: list[Any] = []
-    if section_context.layer_intents:
-        for layer in section_context.layer_intents:
-            # Handle both dict and object access patterns
-            if isinstance(layer, dict):
-                target_selector = layer.get("target_selector", {})
-                layer_target_roles = target_selector.get("roles", [])
-            elif hasattr(layer, "target_selector") and hasattr(layer.target_selector, "roles"):
-                layer_target_roles = layer.target_selector.roles
-            else:
-                continue
-
-            if any(role in all_target_roles for role in layer_target_roles):
-                filtered_layer_intents.append(layer)
 
     # Filter and simplify template catalog
     # 1. Filter by section intent (energy, density, motifs) to reduce options
@@ -261,7 +242,19 @@ def shape_planner_context(section_context: SectionPlanningContext) -> dict[str, 
         "graph_id": section_context.choreo_graph.graph_id,
         "groups": [g.model_dump() for g in planner_groups],
         "groups_by_role": planner_groups_by_role,
+        "groups_by_tag": {
+            tag.value: ids for tag, ids in section_context.choreo_graph.groups_by_tag.items()
+        },
+        "groups_by_split": {
+            split.value: ids for split, ids in section_context.choreo_graph.groups_by_split.items()
+        },
     }
+
+    macro_input = (
+        section_context.macro_input.reader_projection()
+        if section_context.macro_input is not None
+        else None
+    )
 
     # Prepare theme context if theme is available
     theme_ref_json: str = "{}"
@@ -289,21 +282,11 @@ def shape_planner_context(section_context: SectionPlanningContext) -> dict[str, 
 
     # Prepare palette context.
     # Priority:
-    # 1) Section explicit palette override from MacroSectionPlan
-    # 2) Section ThemeRef palette_id (if explicitly set)
-    # 3) Macro global primary palette
-    # Do NOT auto-fallback to theme default palette here; that can introduce
-    # unintended palette churn not explicitly requested by MacroPlan.
+    # The macro projection has already resolved override > active palette stop.
     palette_ref_json: str = "{}"
     if section_context.palette:
         # Section has explicit palette override
         palette_ref_json = json.dumps(section_context.palette, indent=2)
-    elif section_context.theme and section_context.theme.palette_id:
-        # Use theme's palette override
-        palette_ref_json = json.dumps({"palette_id": section_context.theme.palette_id}, indent=2)
-    elif section_context.global_palette_id:
-        # Use macro global primary palette as default
-        palette_ref_json = json.dumps({"palette_id": section_context.global_palette_id}, indent=2)
 
     # Build taxonomy dict, enriched with FE compound terms if available
     base_taxonomy = get_taxonomy_dict()
@@ -383,17 +366,17 @@ def shape_planner_context(section_context: SectionPlanningContext) -> dict[str, 
         "energy_target": section_context.energy_target,
         "motion_density": section_context.motion_density,
         "choreography_style": section_context.choreography_style,
-        "primary_focus_targets": section_context.primary_focus_targets,
-        "primary_focus_targets_typed": section_context.primary_focus_targets_typed,
-        "secondary_targets": section_context.secondary_targets,
-        "secondary_targets_typed": section_context.secondary_targets_typed,
+        "lead_targets": section_context.lead_targets,
+        "lead_targets_typed": section_context.lead_targets_typed,
+        "support_targets": section_context.support_targets,
+        "support_targets_typed": section_context.support_targets_typed,
         "priority_roles": all_target_roles,
         "notes": section_context.notes,
         # Section-scoped shared context (FILTERED + SIMPLIFIED)
         "display_graph": section_choreo_graph,
         "template_catalog": simplified_catalog,  # Filtered catalog (planner + judge)
         "template_catalog_full": full_catalog_simplified,  # Full catalog for ID validation
-        "layer_intents": filtered_layer_intents,  # Only relevant layers
+        "macro_input": macro_input,
         # Spatial planning context
         "display_graph_zones": display_graph_zones,
         "display_graph_spatial": display_graph_spatial,
@@ -575,7 +558,7 @@ def shape_section_judge_context(
     Returns:
         Shaped context dict for section judge (excluding plan)
     """
-    all_target_roles = section_context.primary_focus_targets + section_context.secondary_targets
+    all_target_roles = section_context.lead_targets + section_context.support_targets
     groups_by_role = dict(section_context.choreo_graph.groups_by_role)
 
     # Full catalog simplified for ID validation
@@ -657,10 +640,10 @@ def shape_section_judge_context(
         "energy_target": section_context.energy_target,
         "motion_density": section_context.motion_density,
         "choreography_style": section_context.choreography_style,
-        "primary_focus_targets": section_context.primary_focus_targets,
-        "primary_focus_targets_typed": section_context.primary_focus_targets_typed,
-        "secondary_targets": section_context.secondary_targets,
-        "secondary_targets_typed": section_context.secondary_targets_typed,
+        "lead_targets": section_context.lead_targets,
+        "lead_targets_typed": section_context.lead_targets_typed,
+        "support_targets": section_context.support_targets,
+        "support_targets_typed": section_context.support_targets_typed,
         "priority_roles": all_target_roles,
         # Section-scoped shared context
         "display_graph": {
@@ -681,7 +664,7 @@ def shape_section_judge_context(
         "motif_catalog": theming_catalog[
             "motifs"
         ],  # For validating motif_ids and checking template support
-        # Excluded: layer_intents, notes
+        # Excluded: notes
     }
 
 
@@ -767,8 +750,8 @@ def shape_holistic_judge_context(
 ) -> dict[str, Any]:
     """Shape context for HolisticJudge agent (cross-section evaluation).
 
-    Provides theme/palette data for cross-section continuity evaluation:
-    - Global theme ID and palette from macro_plan_summary.global_story
+    Provides typed macro data for cross-section continuity evaluation:
+    - Palette arc, motif continuity, focal arc, and section intent
     - Per-section theme IDs and palette overrides
     - Color story narrative (if provided)
     - Lyric/narrative context for calibrating variety + utilization scores
@@ -777,7 +760,7 @@ def shape_holistic_judge_context(
     - Uses: group_plan_set (serialized to JSON)
     - Uses: section_count, section_ids (computed from plan set)
     - Uses: choreo_graph.groups_by_role (NOT full groups)
-    - Uses: macro_plan_summary.global_story (theme, motifs, pacing_notes)
+    - Uses: macro_plan_summary.macro_plan (the complete typed contract)
     - Uses: lyric_context (narrative summary for score calibration)
     - Does NOT use: template_catalog, timing_context
 
@@ -794,34 +777,9 @@ def shape_holistic_judge_context(
     # Serialize for Jinja2 tojson filter
     group_plan_set_dict = group_plan_set.model_dump()
 
-    # Extract global theme context for explicit display
-    # Handle both dict and string formats for global_story
-    global_story = (macro_plan_summary or {}).get("global_story", {})
-    if isinstance(global_story, str):
-        # Legacy format: global_story is a string
-        global_story = {}
-    global_theme = global_story.get("theme", {}) if isinstance(global_story, dict) else {}
-    global_theme_id = global_theme.get("theme_id") if isinstance(global_theme, dict) else None
-    global_palette_id = global_theme.get("palette_id") if isinstance(global_theme, dict) else None
-    global_theme_tags = global_theme.get("tags", []) if isinstance(global_theme, dict) else []
-    story_notes = global_story.get("story_notes", "") if isinstance(global_story, dict) else ""
-
-    # Extract palette_plan if available
-    palette_plan = global_story.get("palette_plan", {}) if isinstance(global_story, dict) else {}
-    global_palette_primary = (
-        palette_plan.get("primary", {}).get("palette_id")
-        if isinstance(palette_plan, dict)
-        else None
-    )
-    global_palette_alternates = (
-        [
-            alt.get("palette_id")
-            for alt in palette_plan.get("alternates", [])
-            if isinstance(alt, dict)
-        ]
-        if isinstance(palette_plan, dict)
-        else []
-    )
+    macro_contract = (macro_plan_summary or {}).get("macro_plan", {})
+    if not isinstance(macro_contract, dict):
+        macro_contract = {}
 
     # Extract section theme summaries for cross-section analysis
     section_theme_summary = []
@@ -865,13 +823,9 @@ def shape_holistic_judge_context(
         "expected_section_ids": expected_section_ids,
         "completeness_check": completeness_check,
         "macro_plan_summary": macro_plan_summary or {},
-        # Explicitly extracted theme/palette context for holistic evaluation
-        "global_theme_id": global_theme_id,
-        "global_palette_id": global_palette_id,
-        "global_theme_tags": global_theme_tags,
-        "global_palette_primary": global_palette_primary,
-        "global_palette_alternates": global_palette_alternates,
-        "story_notes": story_notes,
+        "macro_palette_arc": macro_contract.get("palette_arc", []),
+        "macro_motif_continuity": macro_contract.get("motif_continuity", []),
+        "macro_focal_arc": macro_contract.get("focal_arc", []),
         "section_theme_summary": section_theme_summary,
         # Lyric/narrative context — used to calibrate variety + utilization scoring
         "lyric_context": _shape_lyric_context_summary(lyric_context),

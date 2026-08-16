@@ -6,8 +6,8 @@ updated: 2026-08-16
 
 # Twinklr — Current State
 
-_Repository evidence and active sequencing verified 2026-08-16 after P3-T2 integration
-at `5365f70`._
+_Repository evidence and active sequencing verified 2026-08-16 after P3-T3 integration
+at `33cce57`._
 
 Twinklr is an AI-powered choreography engine: audio file in, xLights artifacts out — a
 fresh `.xsq`, standalone `.xtiming` timing tracks, and an `.xmap` mapping hint, which the
@@ -72,11 +72,15 @@ See [product/overview.md](product/overview.md).
 
 ## Quality-gate state
 
-At integrated snapshot `5365f70`, fresh validation evidence is **5,261 passed,
-39 skipped**, clean Ruff formatting and lint, and mypy success across **718 source
-files**. The skips cover explicit optional/local-only boundaries rather than accepted
-implementation regressions. This document owns the canonical current repository and
-quality-gate snapshot; the campaign handoff links here instead of duplicating it.
+The latest complete broad-gate evidence remains the P3-T2 snapshot at `5365f70`:
+**5,261 passed, 39 skipped**, clean Ruff formatting and lint, and mypy success across
+**718 source files**. P3-T3 was subsequently independently verified and merged at
+`33cce57`; its final verification replayed the deterministic cross-coordination event-ID
+collision, 170 display-composition tests, 441 display/integration tests, 73 golden tests
+with 8 skips, clean Ruff, and clean mypy across 721 source files. The skips cover explicit
+optional/local-only boundaries rather than accepted implementation regressions. This
+document owns the canonical current repository and quality-gate snapshot; the campaign
+handoff links here instead of duplicating it.
 
 The review baseline at `aa8d325` did fail its own gates. That is historical evidence,
 not the current state; its fully classified record is preserved in
@@ -90,10 +94,15 @@ implementations, and Phase 2K's four tooling implementations are merged and inde
 verified, but their owner/live exit criteria are not complete. On 2026-08-16 the owner
 accepted the P2P-T1/T8/T9 recommendations and authorized P3-T1, P3-T2, and P3-T3 before
 the outstanding empirical exits. P3-T1 is merged and independently verified at
-`5eebcb2`; P3-T2 is merged and independently verified at `5365f70`; P3-T3 is
-independently verified and approved for integration, including the canonical
-`twinklr display` command and offline file-only layout input. The owner's latest
-continuation authorizes P3-T4 as the next offline task only. These sequencing exceptions
+`5eebcb2`; P3-T2 is merged and independently verified at `5365f70`; P3-T3 is merged at
+`33cce57` after independent verification and owner acceptance of the canonical
+`twinklr display` command and offline file-only layout input. The owner accepted P3-T4's
+exact contract/invariants and AC2 amendment and authorized only its capped macro probe.
+The audited harness made one live request on 2026-08-16; OpenAI rejected the schema
+because `ThemeRef.scope` combined `$ref` with sibling `description`. No retry/fallback
+occurred, usage was unavailable, and the conservative `$1.66` commitment leaves only
+`$0.09`, insufficient for another audited attempt. Offline schema remediation is frozen,
+but live acceptance remains open. These sequencing exceptions
 do not waive the earlier exits. Phase 4 has not started.
 
 The authoritative current task/gate list is the campaign

@@ -15,7 +15,11 @@ References system prompt rules and existing conversation context.
 - **Musical Length:** {{ section_duration_bars }} bars ({{ section_duration_beats }} beats) — bars 1-{{ available_bars }}
 - **Hard Bar Limit:** bar {{ section_max_bar }}
 - **Energy Target:** {{ energy_target }}
-- **Primary Targets:** {{ primary_focus_targets | join(", ") }}
+- **Lead Targets:** {{ lead_targets | join(", ") }}
+{% if macro_input %}
+- **Coordination Intent:** {{ macro_input.macro_section.coordination_intent }}
+- **Focal Assignment:** {{ macro_input.focal_assignment.lead_target.type }}:`{{ macro_input.focal_assignment.lead_target.id }}`
+{% endif %}
 {% if section_duration_bars < 1 %}
 ⚠️ **VERY SHORT SECTION:** Only bar 1 beat 1 with the briefest schema-valid duration. Skip sustained and rhythmic layers.
 {% elif section_duration_bars < 2 %}

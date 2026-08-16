@@ -43,11 +43,7 @@ from twinklr.core.sequencer.planning.group_plan import (
     CorrectionResult,
     SectionCoordinationPlan,
 )
-from twinklr.core.sequencer.planning.models import (
-    LayeringPlan,
-    MacroPlan,
-    PalettePlan,
-)
+from twinklr.core.sequencer.planning.models import MacroPlan
 from twinklr.core.sequencer.vocabulary import intensity as intensity_vocabulary
 
 RESPONSE_MODELS: tuple[type[BaseModel], ...] = (
@@ -312,8 +308,6 @@ def test_plan_section_either_or_invariant() -> None:
 @pytest.mark.parametrize(
     ("model", "deleted_fields"),
     [
-        (PalettePlan, {"transition_notes"}),
-        (LayeringPlan, {"strategy_notes"}),
         (CorrectionResult, {"correction_notes"}),
         (AudioProfileModel, {"agent_id", "schema_version"}),
         (Structure, {"notes"}),
@@ -327,7 +321,14 @@ def test_plan_section_either_or_invariant() -> None:
         (JudgeVerdict, {"overall_assessment", "score_breakdown"}),
         (Issue, {"estimated_effort", "suggested_action", "scope"}),
         (HolisticEvaluation, {"score_breakdown", "recommendations"}),
-        (MacroPlan, {"asset_requirements"}),
+        (
+            MacroPlan,
+            {
+                "asset_requirements",
+                "global_story",
+                "layering_plan",
+            },
+        ),
     ],
 )
 def test_deleted_fields_are_gone(model: type[BaseModel], deleted_fields: set[str]) -> None:

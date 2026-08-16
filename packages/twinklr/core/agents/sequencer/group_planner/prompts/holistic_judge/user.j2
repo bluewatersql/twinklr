@@ -39,8 +39,8 @@ Expected {{ completeness_check.expected_count }} sections, found {{ completeness
 {% if display_graph.groups_by_tag is defined and display_graph.groups_by_tag %}
 ## Available Zones (valid zone targets)
 
-{% for tag, group_ids in display_graph.groups_by_tag.items() %}
-- **{{ tag }}**: {{ group_ids | join(", ") }}
+{% for zone, group_ids in display_graph.groups_by_tag.items() %}
+- **{{ zone }}**: {{ group_ids | join(", ") }}
 {% endfor %}
 {% endif %}
 
@@ -86,38 +86,24 @@ When a parent group is used in a section, all its children are implicitly covere
 *Use this context when calibrating `visual_variety` and `resource_utilization` scores. For songs with a named protagonist, a single hero prop dominating multiple sections is narrative intent. For genre-defining motifs (e.g., "signature" or "always-on" motifs in the MacroPlan), recurring use reflects intentional show identity.*
 
 {% endif %}
-{% if macro_plan_summary and macro_plan_summary.global_story %}
+{% if macro_plan_summary and macro_plan_summary.macro_plan %}
 
-## Macro Plan Theme & Palette Summary
+## Typed Macro Contract Summary
 
-{% if global_theme_id %}
-**Global Theme ID:** {{ global_theme_id }}
-{% endif %}
-{% if global_palette_id %}
-**Global Palette Override:** {{ global_palette_id }}
-{% endif %}
-{% if global_theme_tags %}
-**Global Theme Tags:** {{ global_theme_tags | join(", ") }}
-{% endif %}
-
-{% if global_palette_primary %}
-**Global Palette:** {{ global_palette_primary }}{% if global_palette_alternates %} (alternates: {{ global_palette_alternates | join(", ") }}){% endif %}
-{% endif %}
-
-{% if story_notes %}
-**Story Notes:** {{ story_notes }}
-{% endif %}
-
-{% if macro_plan_summary.global_story.motifs %}
-**Global Motifs:**
-{% for motif in macro_plan_summary.global_story.motifs %}
-- {{ motif }}
+**Palette Arc:**
+{% for stop in macro_palette_arc %}
+- {{ stop.stop_id }} from {{ stop.applies_from_section_id }}: {{ stop.palette.palette_id }} ({{ stop.transition }})
 {% endfor %}
-{% endif %}
 
-{% if macro_plan_summary.global_story.pacing_notes %}
-**Pacing Notes:** {{ macro_plan_summary.global_story.pacing_notes }}
-{% endif %}
+**Motif Continuity:**
+{% for thread in macro_motif_continuity %}
+- {{ thread.motif_id }} / {{ thread.evolution }} / sections={{ thread.section_ids | join(", ") }}: {{ thread.description }}
+{% endfor %}
+
+**Focal Arc:**
+{% for focal in macro_focal_arc %}
+- {{ focal.section_id }}: {{ focal.lead_target.type }}:{{ focal.lead_target.id }}
+{% endfor %}
 
 ## Section Theme Distribution
 

@@ -66,7 +66,7 @@ def _make_minimal_section_context(
         energy_target="LOW",
         motion_density="SPARSE",
         choreography_style="ABSTRACT",
-        primary_focus_targets=["MEGA_TREE_01"],
+        lead_targets=["MEGA_TREE_01"],
         choreo_graph=choreo_graph,
         template_catalog=template_catalog,
         timing_context=timing_context,

@@ -29,9 +29,30 @@ Rules and energy recipes live in system.j2 — NOT restated here.
 **Motion Density:** {{ motion_density }}
 **Choreography Style:** {{ choreography_style }}
 
-**Primary Focus Targets:** {{ primary_focus_targets | join(", ") }}
-{% if secondary_targets %}
-**Secondary Targets:** {{ secondary_targets | join(", ") }}
+{% if macro_input %}
+### Typed Coordination Contract (read-only; P3-T5 owns emitted coordination behavior)
+
+**Active Palette Stop:** `{{ macro_input.palette_stop.stop_id }}` from `{{ macro_input.palette_stop.applies_from_section_id }}` via {{ macro_input.palette_stop.transition }}
+**Resolved Palette:** `{{ macro_input.resolved_palette.palette_id }}`{% if macro_input.resolved_palette.role %} ({{ macro_input.resolved_palette.role }}){% endif %}
+**Focal Assignment:** {{ macro_input.focal_assignment.lead_target.type }}:`{{ macro_input.focal_assignment.lead_target.id }}`
+**Coordination Intent:** {{ macro_input.macro_section.coordination_intent }}
+{% if macro_input.macro_section.call_response_pairs %}
+**Call / Response:**
+{% for pair in macro_input.macro_section.call_response_pairs %}
+- {{ pair.call.type }}:`{{ pair.call.id }}` → {{ pair.response.type }}:`{{ pair.response.id }}` every {{ pair.step_duration }} {{ pair.step_unit }}
+{% endfor %}
+{% endif %}
+{% if macro_input.motif_threads %}
+**Motif Threads:**
+{% for thread in macro_input.motif_threads %}
+- `{{ thread.motif_id }}` ({{ thread.evolution }}, sections={{ thread.section_ids | join(", ") }}): {{ thread.description }}
+{% endfor %}
+{% endif %}
+{% endif %}
+
+**Lead Targets:** {{ lead_targets | join(", ") }}
+{% if support_targets %}
+**Support Targets:** {{ support_targets | join(", ") }}
 {% endif %}
 
 {% if notes %}
@@ -59,7 +80,7 @@ Rules and energy recipes live in system.j2 — NOT restated here.
 
 Prefer templates with matching `motif.*` affinity tags to enhance variety and thematic coherence.
 {% else %}
-**ERROR:** Motif IDs missing from MacroPlan
+**Motif IDs:** none for this motif-free section; copy the empty array exactly.
 {% endif %}
 
 {% if motif_catalog_summary %}
@@ -70,7 +91,7 @@ Motif Catalog (reference):
 ## Available Display Groups
 
 {% for group in display_graph.groups %}
-- **{{ group.id }}** (role: {{ group.role }}){% if group.element_kind is defined and group.element_kind %} [{{ group.element_kind }}]{% endif %}, {{ group.fixture_count }} model{{ "s" if group.fixture_count != 1 else "" }}{% if group.pixel_fraction is defined and group.pixel_fraction > 0 %}, {{ (group.pixel_fraction * 100) | round(0) | int }}% of display{% endif %}{% if group.prominence is defined and group.prominence %} ({{ group.prominence }}){% endif %} detail: {{ group.detail_capability }}{% if group.tags is defined and group.tags %} zones: {{ group.tags | join(", ") }}{% endif %}{% if group.split_membership is defined and group.split_membership %} splits: {{ group.split_membership | join(", ") }}{% endif %}
+- **{{ group.id }}** (role: {{ group.role }}){% if group.element_kind is defined and group.element_kind %} [{{ group.element_kind }}]{% endif %}, {{ group.fixture_count }} model{{ "s" if group.fixture_count != 1 else "" }}{% if group.pixel_fraction is defined and group.pixel_fraction > 0 %}, {{ (group.pixel_fraction * 100) | round(0) | int }}% of display{% endif %}{% if group.prominence is defined and group.prominence %} ({{ group.prominence }}){% endif %} detail: {{ group.detail_capability }}{% if group.tags is defined and group.tags %} tags: {{ group.tags | join(", ") }}{% endif %}{% if group.split_membership is defined and group.split_membership %} splits: {{ group.split_membership | join(", ") }}{% endif %}
 
 {% if (group.position is defined and group.position) or (group.arrangement is defined and group.arrangement) %}  Layout: {% if group.arrangement is defined and group.arrangement %}{{ group.arrangement }}{% endif %}{% if group.position is defined and group.position %}{% if group.position.horizontal is defined %} — {{ group.position.horizontal }}{% endif %}{% if group.position.vertical is defined %} / {{ group.position.vertical }}{% endif %}{% if group.position.depth is defined and group.position.depth != "NEAR" %} / {{ group.position.depth }}{% endif %}{% if group.position.zone is defined and group.position.zone %} [{{ group.position.zone }}]{% endif %}{% endif %}
 
@@ -133,22 +154,6 @@ Motif Catalog (reference):
   {% if entry.tags %}- Tags: {{ entry.tags | join(", ") }}{% endif %}
 {% endif %}
 {% endfor %}
-
-{% if layer_intents %}
-## Layer Intent (from MacroPlan)
-
-{% for layer in layer_intents %}
-**Layer {{ layer.layer_index }}: {{ layer.layer_role }}**
-- Targets: {{ layer.target_selector.roles | join(", ") }}
-- Coordination: {{ layer.target_selector.coordination }}
-- Timing Driver: {{ layer.timing_driver }}
-- Intensity Bias: {{ layer.intensity_bias }}
-{% if layer.usage_notes %}
-- Notes: {{ layer.usage_notes }}
-{% endif %}
-
-{% endfor %}
-{% endif %}
 
 {% if lyric_context %}
 ## Narrative Context (from Lyrics Analysis)
@@ -231,7 +236,7 @@ Create a SectionCoordinationPlan for **{{ section_name }} ({{ section_id }})**.
 
 **Follow the {{ energy_target }} ENERGY RECIPE from the system prompt.**
 **Copy theme, palette, and motif_ids exactly from above.**
-**Primary targets for ACCENT:** {{ primary_focus_targets | join(", ") }}
+**Lead targets for ACCENT:** {{ lead_targets | join(", ") }}
 **Available bars:** 1 to {{ available_bars }} (hard limit: bar {{ section_max_bar }})
 
 {% if lyric_context %}

@@ -5,7 +5,6 @@ from __future__ import annotations
 import pytest
 
 from twinklr.core.agents.sequencer.group_planner.context import (
-    GroupPlanningContext,
     SectionPlanningContext,
 )
 from twinklr.core.agents.sequencer.group_planner.timing import (
@@ -97,8 +96,8 @@ def sample_macro_section() -> dict:
             "end_ms": 2000,
         },
         "energy_target": "MED",
-        "primary_focus_targets": ["HERO"],
-        "secondary_targets": ["ARCHES"],
+        "lead_targets": ["HERO"],
+        "support_targets": ["ARCHES"],
         "choreography_style": "HYBRID",
         "motion_density": "MED",
         "notes": "Standard verse section",
@@ -124,8 +123,8 @@ class TestSectionPlanningContext:
             energy_target="MED",
             motion_density="MED",
             choreography_style="HYBRID",
-            primary_focus_targets=["HERO"],
-            secondary_targets=["ARCHES"],
+            lead_targets=["HERO"],
+            support_targets=["ARCHES"],
             notes="Standard verse section",
             choreo_graph=sample_choreo_graph,
             template_catalog=sample_template_catalog,
@@ -134,7 +133,7 @@ class TestSectionPlanningContext:
 
         assert ctx.section_id == "verse_1"
         assert ctx.energy_target == "MED"
-        assert ctx.primary_focus_targets == ["HERO"]
+        assert ctx.lead_targets == ["HERO"]
 
     def test_get_target_groups(
         self,
@@ -152,18 +151,18 @@ class TestSectionPlanningContext:
             energy_target="MED",
             motion_density="MED",
             choreography_style="HYBRID",
-            primary_focus_targets=["HERO"],
-            secondary_targets=["ARCHES"],
+            lead_targets=["HERO"],
+            support_targets=["ARCHES"],
             notes=None,
             choreo_graph=sample_choreo_graph,
             template_catalog=sample_template_catalog,
             timing_context=sample_timing_context,
         )
 
-        primary_groups = ctx.get_target_groups(ctx.primary_focus_targets)
+        primary_groups = ctx.get_target_groups(ctx.lead_targets)
         assert "HERO_1" in primary_groups
 
-        secondary_groups = ctx.get_target_groups(ctx.secondary_targets)
+        secondary_groups = ctx.get_target_groups(ctx.support_targets)
         assert "ARCHES_1" in secondary_groups
 
     def test_templates_for_lane(
@@ -181,8 +180,8 @@ class TestSectionPlanningContext:
             energy_target="MED",
             motion_density="MED",
             choreography_style="HYBRID",
-            primary_focus_targets=["HERO"],
-            secondary_targets=[],
+            lead_targets=["HERO"],
+            support_targets=[],
             notes=None,
             choreo_graph=sample_choreo_graph,
             template_catalog=sample_template_catalog,
@@ -196,59 +195,3 @@ class TestSectionPlanningContext:
         accent_templates = ctx.templates_for_lane(LaneKind.ACCENT)
         assert len(accent_templates) == 1
         assert accent_templates[0].template_id == "gtpl_accent_flash"
-
-
-class TestGroupPlanningContext:
-    """Tests for GroupPlanningContext (aggregate)."""
-
-    def test_build_section_contexts(
-        self,
-        sample_choreo_graph: ChoreographyGraph,
-        sample_template_catalog: TemplateCatalog,
-        sample_timing_context: TimingContext,
-    ) -> None:
-        """build_section_contexts creates list of SectionPlanningContext."""
-        # Mock MacroPlan section_plans structure
-        section_plans = [
-            {
-                "section": {
-                    "section_id": "verse_1",
-                    "name": "verse",
-                    "start_ms": 0,
-                    "end_ms": 2000,
-                },
-                "energy_target": "MED",
-                "primary_focus_targets": ["HERO"],
-                "secondary_targets": ["ARCHES"],
-                "choreography_style": "HYBRID",
-                "motion_density": "MED",
-                "notes": "Verse section",
-            },
-            {
-                "section": {
-                    "section_id": "chorus_1",
-                    "name": "chorus",
-                    "start_ms": 2000,
-                    "end_ms": 4000,
-                },
-                "energy_target": "HIGH",
-                "primary_focus_targets": ["HERO", "ARCHES"],
-                "secondary_targets": [],
-                "choreography_style": "ABSTRACT",
-                "motion_density": "BUSY",
-                "notes": "Chorus section",
-            },
-        ]
-
-        ctx = GroupPlanningContext(
-            choreo_graph=sample_choreo_graph,
-            template_catalog=sample_template_catalog,
-            timing_context=sample_timing_context,
-        )
-
-        section_contexts = ctx.build_section_contexts(section_plans)
-
-        assert len(section_contexts) == 2
-        assert section_contexts[0].section_id == "verse_1"
-        assert section_contexts[1].section_id == "chorus_1"
-        assert section_contexts[1].energy_target == "HIGH"

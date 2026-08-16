@@ -257,8 +257,8 @@ class HolisticCorrectorStage:
         """Splice corrected sections back into the original GroupPlanSet.
 
         Guards against hallucinated section_ids that weren't in the
-        affected set.  Preserves timing fields (start_ms, end_ms) from
-        the original sections since the LLM doesn't produce them.
+        affected set. Preserves macro-owned identity, theme, palette, motifs,
+        and timing from the original sections.
 
         Args:
             original: Original GroupPlanSet
@@ -291,14 +291,17 @@ class HolisticCorrectorStage:
             corrected_by_id[section.section_id] = section
 
         # Rebuild section_plans: use corrected version where available,
-        # original otherwise. Preserve timing from originals.
+        # original otherwise. Preserve the full macro-owned contract.
         merged_sections = []
         for orig_section in original.section_plans:
             if orig_section.section_id in corrected_by_id:
                 corrected_section = corrected_by_id[orig_section.section_id]
-                # Restore timing fields the LLM doesn't produce
                 corrected_section = corrected_section.model_copy(
                     update={
+                        "section_id": orig_section.section_id,
+                        "theme": orig_section.theme,
+                        "palette": orig_section.palette,
+                        "motif_ids": list(orig_section.motif_ids),
                         "start_ms": orig_section.start_ms,
                         "end_ms": orig_section.end_ms,
                     }
@@ -343,8 +346,7 @@ class HolisticCorrectorStage:
         """Validate corrected plan with heuristic checks.
 
         Catches structural regressions the corrector LLM may introduce:
-        empty lane_plans, empty motif_ids, and coordination_plans with
-        empty targets lists.
+        empty lane_plans and coordination_plans with empty targets lists.
 
         Returns True if the plan passes basic structural validation.
         """
@@ -358,10 +360,6 @@ class HolisticCorrectorStage:
 
             if not section.lane_plans:
                 logger.error("Modified section %s has no lane_plans", section.section_id)
-                return False
-
-            if not section.motif_ids:
-                logger.error("Modified section %s has empty motif_ids", section.section_id)
                 return False
 
             for lane_plan in section.lane_plans:

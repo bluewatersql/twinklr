@@ -341,7 +341,7 @@ class DisplayRenderStage:
         if not isinstance(macro_plan, MacroPlan):
             raise TypeError("context.state['macro_plan'] must be MacroPlan")
 
-        section_plans = macro_plan.section_plans
+        section_plans = macro_plan.sections
 
         boundaries: list[tuple[str, int, int]] = []
         for sp in section_plans:

@@ -227,7 +227,7 @@ def test_user_prompt_with_iteration_feedback(
     )
 
     # Should show iteration and revision context
-    assert "2" in output  # Iteration number
+    assert "Iteration 3" in output
     assert "energy contrast" in output.lower() or "SOFT_FAIL" in output
 
 
@@ -251,10 +251,10 @@ def test_developer_prompt_includes_constraints(jinja_env: Environment):
     template = jinja_env.get_template("planner/developer.j2")
     output = template.render(taxonomy=get_taxonomy_dict())
 
-    # Should mention key constraints
-    assert "BASE" in output
-    assert "NORMAL" in output or "ADD" in output
-    assert "5" in output or "max" in output.lower()
+    assert "palette_arc" in output
+    assert "motif_continuity" in output
+    assert "focal_arc" in output
+    assert "exactly one" in output
 
 
 def test_developer_prompt_injects_enums_from_taxonomy(jinja_env: Environment):
@@ -263,9 +263,9 @@ def test_developer_prompt_injects_enums_from_taxonomy(jinja_env: Environment):
     output = template.render(taxonomy=get_taxonomy_dict())
 
     # Should list key enums
-    assert "LayerRole" in output or "RHYTHM" in output
     assert "EnergyTarget" in output or "LOW" in output or "HIGH" in output
     assert "TargetType" in output or "group" in output or "zone" in output
+    assert "CoordinationMode" in output or "UNIFIED" in output
 
 
 def test_pack_yaml_valid():

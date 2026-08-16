@@ -89,6 +89,9 @@ def build_planner_variables(
         "lyric_context": context.lyric_context if iteration == 0 else None,
         # Macro plan guidance (always include for coordination)
         "macro_plan": prompt_context["macro_plan"],
+        "macro_palette_arc": prompt_context["macro_palette_arc"],
+        "macro_motif_continuity": prompt_context["macro_motif_continuity"],
+        "macro_focal_arc": prompt_context["macro_focal_arc"],
         # Feedback (for refinement iterations)
         "feedback": feedback,
         "revision_focus": revision_focus,
@@ -132,6 +135,9 @@ def build_judge_variables(
         "audio_profile": context.audio_profile,
         # Macro plan guidance (enriched with palette/motifs for alignment validation)
         "macro_plan": prompt_context["macro_plan"],
+        "macro_palette_arc": prompt_context["macro_palette_arc"],
+        "macro_motif_continuity": prompt_context["macro_motif_continuity"],
+        "macro_focal_arc": prompt_context["macro_focal_arc"],
     }
     variables.update(iteration_context.judge_prompt_history())
 
@@ -234,9 +240,7 @@ class MovingHeadPlannerOrchestrator:
             "lyric_context": (
                 context.lyric_context.model_dump() if context.lyric_context else None
             ),
-            "macro_plan": (
-                [sp.model_dump() for sp in context.macro_plan] if context.macro_plan else None
-            ),
+            "macro_plan": context.macro_plan.model_dump() if context.macro_plan else None,
             "fixtures": {
                 "count": context.fixtures.count,
                 "groups": context.fixtures.groups,

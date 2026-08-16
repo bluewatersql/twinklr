@@ -181,6 +181,10 @@ class AsyncAgentRunner:
                 "model": response_metadata.model or spec.model,
                 **self._usage_metadata(call_usages),
             }
+            if response_metadata.response_id is not None:
+                metadata["response_id"] = response_metadata.response_id
+            if response_metadata.finish_reason is not None:
+                metadata["finish_reason"] = response_metadata.finish_reason
             if response_metadata.structured_output_mode is not None:
                 metadata["structured_output_mode"] = response_metadata.structured_output_mode
             if response_metadata.structured_output_fallback_reason is not None:
@@ -368,10 +372,10 @@ class AsyncAgentRunner:
 
         if isinstance(variables.get("motif_ids"), list):
             summary["motifs"] = len(variables["motif_ids"])
-        if isinstance(variables.get("primary_focus_targets"), list):
-            summary["primary_focus_targets"] = len(variables["primary_focus_targets"])
-        if isinstance(variables.get("secondary_targets"), list):
-            summary["secondary_targets"] = len(variables["secondary_targets"])
+        if isinstance(variables.get("lead_targets"), list):
+            summary["lead_targets"] = len(variables["lead_targets"])
+        if isinstance(variables.get("support_targets"), list):
+            summary["support_targets"] = len(variables["support_targets"])
         # Plan payload size for judge calls
         if "plan" in variables:
             try:

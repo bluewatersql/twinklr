@@ -465,7 +465,15 @@ class OpenAIProvider:
                 metadata=ResponseMetadata(
                     response_id=getattr(response, "id", None),
                     token_usage=token_usage,
-                    model=model,
+                    model=(
+                        response.model
+                        if isinstance(getattr(response, "model", None), str) and response.model
+                        else model
+                    ),
+                    actual_model_present=(
+                        isinstance(getattr(response, "model", None), str) and bool(response.model)
+                    ),
+                    token_usage_is_explicit=self._has_explicit_response_token_usage(response),
                     finish_reason=getattr(response, "status", None),
                     structured_output_mode=(
                         "json_object_fallback"
@@ -612,6 +620,25 @@ class OpenAIProvider:
         )
 
     @staticmethod
+    def _has_explicit_response_token_usage(response: Any) -> bool:
+        usage = getattr(response, "usage", None)
+        if usage is None:
+            return False
+        prompt = getattr(usage, "prompt_tokens", None)
+        if not isinstance(prompt, int):
+            prompt = getattr(usage, "input_tokens", None)
+        completion = getattr(usage, "completion_tokens", None)
+        if not isinstance(completion, int):
+            completion = getattr(usage, "output_tokens", None)
+        total = getattr(usage, "total_tokens", None)
+        details = getattr(usage, "output_tokens_details", None)
+        reasoning = getattr(details, "reasoning_tokens", None) if details is not None else None
+        return all(
+            isinstance(value, int) and not isinstance(value, bool)
+            for value in (prompt, completion, reasoning, total)
+        )
+
+    @staticmethod
     def _should_retry_async_error(error: Exception, attempt: int, max_attempts: int) -> bool:
         """Determine whether async request should be retried."""
         if attempt >= max_attempts - 1:
@@ -694,7 +721,9 @@ class OpenAIProvider:
                 metadata=ResponseMetadata(
                     response_id=response.metadata.response_id,
                     token_usage=response.metadata.token_usage,
-                    model=model,
+                    model=response.metadata.model or model,
+                    actual_model_present=response.metadata.actual_model_present,
+                    token_usage_is_explicit=response.metadata.token_usage_is_explicit,
                     conversation_id=conversation_id,
                     finish_reason=response.metadata.finish_reason,
                     structured_output_mode=response.metadata.structured_output_mode,

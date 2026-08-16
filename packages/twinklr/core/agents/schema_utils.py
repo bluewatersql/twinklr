@@ -32,6 +32,18 @@ STRICT_SCHEMA_UNSUPPORTED_KEYWORDS = frozenset(
         "then",
     }
 )
+STRICT_SCHEMA_REF_ANNOTATION_KEYWORDS = frozenset(
+    {
+        "$comment",
+        "default",
+        "deprecated",
+        "description",
+        "examples",
+        "readOnly",
+        "title",
+        "writeOnly",
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -125,21 +137,39 @@ def strict_schema_stats(schema: dict[str, Any]) -> StrictSchemaStats:
     )
 
 
-def _normalize_supported_schema(value: Any) -> Any:
+def _normalize_supported_schema(value: Any, _path: tuple[str, ...] = ()) -> Any:
     """Recursively normalize Pydantic output without hand-editing model schemas."""
     if isinstance(value, list):
-        return [_normalize_supported_schema(item) for item in value]
+        return [
+            _normalize_supported_schema(item, (*_path, str(index)))
+            for index, item in enumerate(value)
+        ]
     if not isinstance(value, dict):
         return value
 
     if "oneOf" in value and "anyOf" in value:
         raise ValueError("JSON Schema node cannot contain both oneOf and anyOf")
 
+    if "$ref" in value:
+        siblings = set(value) - {"$ref"}
+        semantic_siblings = siblings - STRICT_SCHEMA_REF_ANNOTATION_KEYWORDS
+        if semantic_siblings:
+            location = "/".join(_path) or "<root>"
+            raise ValueError(
+                f"JSON Schema $ref at {location} has semantic sibling keywords: "
+                + ", ".join(sorted(semantic_siblings))
+            )
+        # OpenAI requires reference nodes to contain no sibling keywords.  Pydantic
+        # commonly attaches field annotations such as ``description`` to a ref;
+        # dropping those annotations does not alter validation semantics.
+        return {"$ref": value["$ref"]}
+
     normalized: dict[str, Any] = {}
     for key, child in value.items():
         if key == "discriminator":
             continue
-        normalized["anyOf" if key == "oneOf" else key] = _normalize_supported_schema(child)
+        normalized_key = "anyOf" if key == "oneOf" else key
+        normalized[normalized_key] = _normalize_supported_schema(child, (*_path, normalized_key))
     return normalized
 
 
@@ -211,6 +241,8 @@ def _validate_strict_schema(schema: dict[str, Any]) -> None:
         raise ValueError("Structured Outputs response root must be an object, not anyOf")
 
     for node in _iter_schema_nodes(schema):
+        if "$ref" in node and set(node) != {"$ref"}:
+            raise ValueError("Every Structured Outputs $ref node must have no sibling keywords")
         unsupported = STRICT_SCHEMA_UNSUPPORTED_KEYWORDS.intersection(node)
         if unsupported:
             raise ValueError(

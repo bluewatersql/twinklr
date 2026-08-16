@@ -45,7 +45,28 @@ from twinklr.core.agents.sequencer.moving_heads.orchestrator import (
 )
 from twinklr.core.agents.shared.judge.controller import IterationContext
 from twinklr.core.agents.shared.judge.models import JudgeVerdict, VerdictStatus
+from twinklr.core.sequencer.planning import (
+    FocalAssignment,
+    FocalRole,
+    FocalRoleKind,
+    MacroPlan,
+    MacroSection,
+    MotifEvolution,
+    MotifThread,
+    PaletteRef,
+    PaletteRoleRef,
+    PaletteStop,
+    PaletteTransition,
+)
+from twinklr.core.sequencer.templates.group.models import PlanTarget
+from twinklr.core.sequencer.theming import ThemeRef, ThemeScope
 from twinklr.core.sequencer.timing.beat_grid import BeatGrid
+from twinklr.core.sequencer.vocabulary import (
+    ChoreographyStyle,
+    CoordinationMode,
+    EnergyTarget,
+    TargetType,
+)
 
 
 def create_test_audio_profile() -> AudioProfileModel:
@@ -110,6 +131,60 @@ def create_test_audio_profile() -> AudioProfileModel:
         lyric_profile=lyric_profile,
         creative_guidance=creative_guidance,
         planner_hints=PlannerHints(),
+    )
+
+
+def create_test_macro_plan(profile: AudioProfileModel) -> MacroPlan:
+    """Create a valid full macro contract for cache/prompt seam tests."""
+    target = PlanTarget(type=TargetType.GROUP, id="MEGA_TREE")
+    sections = [
+        MacroSection(
+            section=section,
+            energy_target=EnergyTarget.MED,
+            motion_density=MotionDensity.MED,
+            choreography_style=ChoreographyStyle.HYBRID,
+            palette_role=PaletteRoleRef(stop_id="main", override=None),
+            theme=ThemeRef(
+                theme_id="theme.abstract.neon",
+                scope=ThemeScope.SECTION,
+                tags=[],
+                palette_id=None,
+            ),
+            motif_ids=["pulse"],
+            focal_roles=[FocalRole(target=target, role=FocalRoleKind.LEAD)],
+            call_response_pairs=[],
+            coordination_intent=CoordinationMode.UNIFIED,
+            notes="Typed moving-head macro guidance for this song section.",
+        )
+        for section in profile.structure.sections
+    ]
+    return MacroPlan(
+        sections=sections,
+        palette_arc=[
+            PaletteStop(
+                stop_id="main",
+                palette=PaletteRef(
+                    palette_id="core.christmas_traditional",
+                    role=None,
+                    intensity=None,
+                    variant=None,
+                ),
+                applies_from_section_id=sections[0].section.section_id,
+                transition=PaletteTransition.HOLD,
+            )
+        ],
+        motif_continuity=[
+            MotifThread(
+                motif_id="pulse",
+                section_ids=[item.section.section_id for item in sections],
+                evolution=MotifEvolution.RESTATE,
+                description="A recurring whole-song pulse motif.",
+            )
+        ],
+        focal_arc=[
+            FocalAssignment(section_id=item.section.section_id, lead_target=target)
+            for item in sections
+        ],
     )
 
 
@@ -306,6 +381,46 @@ class TestMovingHeadPlannerOrchestrator:
         # Same context should produce same key
         assert key1 == key2
         assert len(key1) == 64  # SHA256 hex digest
+
+    @pytest.mark.asyncio
+    async def test_cache_and_prompt_track_song_level_macro_arcs(
+        self, mock_provider: MagicMock, planning_context: MovingHeadPlanningContext
+    ) -> None:
+        """Top-level-only macro edits survive prompt projection and invalidate cache."""
+        orchestrator = MovingHeadPlannerOrchestrator(provider=mock_provider)
+        plan = create_test_macro_plan(planning_context.audio_profile)
+        baseline = planning_context.model_copy(update={"macro_plan": plan})
+        baseline_key = await orchestrator.get_cache_key(baseline)
+        baseline_prompt = baseline.for_prompt()
+
+        palette_plan = plan.model_copy(
+            update={
+                "palette_arc": [
+                    plan.palette_arc[0].model_copy(
+                        update={"transition": PaletteTransition.CROSSFADE}
+                    )
+                ]
+            }
+        )
+        motif_plan = plan.model_copy(
+            update={
+                "motif_continuity": [
+                    plan.motif_continuity[0].model_copy(
+                        update={"description": "A varied recurring whole-song pulse motif."}
+                    )
+                ]
+            }
+        )
+        focal_plan = plan.model_copy(update={"focal_arc": list(reversed(plan.focal_arc))})
+
+        for changed_plan in (palette_plan, motif_plan, focal_plan):
+            changed = planning_context.model_copy(update={"macro_plan": changed_plan})
+            assert await orchestrator.get_cache_key(changed) != baseline_key
+
+        projection = plan.reader_projection()
+        assert baseline_prompt["macro_palette_arc"] == projection["palette_arc"]
+        assert baseline_prompt["macro_motif_continuity"] == projection["motif_continuity"]
+        assert baseline_prompt["macro_focal_arc"] == projection["focal_arc"]
 
     @pytest.mark.asyncio
     async def test_cache_key_tracks_iteration_and_threshold_config(

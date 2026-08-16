@@ -124,7 +124,7 @@ class TestExpandTargetGroup:
 class TestExpandTargetZone:
     """Tests for zone target expansion."""
 
-    def test_zone_resolves_to_tagged_groups(self) -> None:
+    def test_zone_resolves_to_choreography_tag_groups(self) -> None:
         graph = _make_graph(
             _make_group("OUTLINE", tags=[ChoreoTag.HOUSE]),
             _make_group("WINDOWS", tags=[ChoreoTag.HOUSE]),
@@ -138,6 +138,18 @@ class TestExpandTargetZone:
         graph = _make_graph(_make_group("ARCHES", tags=[ChoreoTag.YARD]))
         expander = TargetExpander(graph)
         assert expander.expand_target(_zone_target("HOUSE")) == []
+
+    def test_physical_display_zone_does_not_define_plan_target_zone(self) -> None:
+        graph = _make_graph(
+            _make_group("TAGGED", tags=[ChoreoTag.HOUSE], zone=DisplayZone.YARD),
+            _make_group("POSITIONED", zone=DisplayZone.HOUSE),
+        )
+        assert TargetExpander(graph).expand_target(_zone_target("HOUSE")) == ["TAGGED"]
+
+    def test_physical_accent_zone_is_not_advertised_as_targetable(self) -> None:
+        graph = _make_graph(_make_group("ACCENTED", zone=DisplayZone.ACCENT))
+        with pytest.raises(ValueError, match="not a valid ChoreoTag"):
+            TargetExpander(graph).expand_target(_zone_target("ACCENT"))
 
     def test_invalid_zone_raises(self) -> None:
         graph = _make_graph(_make_group("ARCHES"))

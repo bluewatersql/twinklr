@@ -16,7 +16,7 @@ from twinklr.core.agents.audio.profile.models import (
     AudioProfileModel,
     SongSectionRef,
 )
-from twinklr.core.sequencer.planning import MacroSectionPlan
+from twinklr.core.sequencer.planning import MacroPlan
 from twinklr.core.sequencer.timing.beat_grid import BeatGrid
 
 logger = logging.getLogger(__name__)
@@ -94,9 +94,9 @@ class MovingHeadPlanningContext(BaseModel):
 
     # MacroPlan integration - coordinates with overall show strategy
     # Contains per-section energy targets, motion density, choreography style
-    macro_plan: list[MacroSectionPlan] | None = Field(
+    macro_plan: MacroPlan | None = Field(
         default=None,
-        description="MacroPlan section outputs for coordination (energy targets, motion density, style per section)",
+        description="Full typed MacroPlan coordination contract",
     )
 
     macro_planning_enabled: bool = Field(
@@ -120,7 +120,7 @@ class MovingHeadPlanningContext(BaseModel):
     @property
     def has_macro_plan(self) -> bool:
         """Check if macro plan is available for coordination."""
-        return self.macro_plan is not None and len(self.macro_plan) > 0
+        return self.macro_plan is not None and bool(self.macro_plan.sections)
 
     @property
     def song_title(self) -> str | None:
@@ -244,25 +244,16 @@ class MovingHeadPlanningContext(BaseModel):
 
         # Macro plan guidance per section (if available)
         macro_guidance = None
+        macro_contract = None
         if self.macro_plan:
-            macro_guidance = [
-                {
-                    "section_id": sp.section.section_id,
-                    "energy_target": sp.energy_target.value
-                    if hasattr(sp.energy_target, "value")
-                    else str(sp.energy_target),
-                    "motion_density": sp.motion_density.value
-                    if hasattr(sp.motion_density, "value")
-                    else str(sp.motion_density),
-                    "choreography_style": sp.choreography_style.value
-                    if hasattr(sp.choreography_style, "value")
-                    else str(sp.choreography_style),
-                    "palette_id": (sp.palette.palette_id if sp.palette else None),
-                    "motif_ids": sp.motif_ids,
-                    "notes": sp.notes,
-                }
-                for sp in self.macro_plan
-            ]
+            macro_contract = self.macro_plan.reader_projection()
+            macro_guidance = macro_contract["sections"]
+            for section in macro_guidance:
+                section_id = section["section"]["section_id"]
+                section["section_id"] = section_id
+                section["palette_id"] = self.macro_plan.palette_for_section(
+                    str(section_id)
+                ).palette_id
 
         # Template descriptions for prompt enrichment
         template_descs = None
@@ -278,6 +269,11 @@ class MovingHeadPlanningContext(BaseModel):
             "available_templates": self.available_templates,
             "template_descriptions": template_descs,
             "macro_plan": macro_guidance,
+            "macro_palette_arc": macro_contract["palette_arc"] if macro_contract else None,
+            "macro_motif_continuity": (
+                macro_contract["motif_continuity"] if macro_contract else None
+            ),
+            "macro_focal_arc": macro_contract["focal_arc"] if macro_contract else None,
         }
 
     @staticmethod

@@ -1,44 +1,56 @@
-"""Planning models - macro-level choreography planning.
+"""Typed macro-level choreography contract.
 
-Models for strategic planning at the macro (song/section) level.
+The macro planner owns cross-element creative intent.  Downstream planners receive
+these models as data; deterministic renderers continue to own exact timing and effect
+math.
 """
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from __future__ import annotations
+
+from enum import StrEnum
+from typing import TYPE_CHECKING, Any
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from twinklr.core.agents.audio.profile.models import SongSectionRef
 from twinklr.core.sequencer.templates.group.models.coordination import PlanTarget
 from twinklr.core.sequencer.theming import ThemeRef, ThemeScope
 from twinklr.core.sequencer.vocabulary import (
-    BlendMode,
     ChoreographyStyle,
+    CoordinationMode,
     EnergyTarget,
-    LayerRole,
     MotionDensity,
-    TimingDriver,
+    StepUnit,
+    TargetType,
 )
 from twinklr.core.sequencer.vocabulary.visual import PaletteRole
 
+if TYPE_CHECKING:
+    from pydantic import ValidationInfo
+
+    from twinklr.core.sequencer.templates.group.models.choreography import ChoreographyGraph
+
 
 class PaletteRef(BaseModel):
-    model_config = {"extra": "forbid"}
+    """Reference to a catalog palette without embedding color values."""
 
-    palette_id: str = Field(..., description="Palette ID")
+    model_config = ConfigDict(extra="forbid", frozen=True)
 
+    palette_id: str = Field(min_length=1, description="Palette catalog ID")
     role: PaletteRole | None = Field(
-        description="Optional usage role (e.g. PRIMARY, ACCENT, WARM, COOL)",
+        description="Optional usage role (PRIMARY, ACCENT, WARM, or COOL)"
     )
     intensity: float | None = Field(
         ge=0.0,
         le=1.0,
         description="Optional global intensity scaler for this palette usage",
     )
-    variant: str | None = Field(
-        description="Optional palette variant key (e.g. 'a', 'b', 'night', 'day')",
-    )
+    variant: str | None = Field(description="Optional palette variant key")
 
     @model_validator(mode="before")
     @classmethod
     def _normalize_legacy_input(cls, value: object) -> object:
+        """Keep catalog-created PaletteRefs strict-schema compatible."""
         if not isinstance(value, dict):
             return value
         normalized = dict(value)
@@ -47,356 +59,466 @@ class PaletteRef(BaseModel):
         return normalized
 
 
-class PalettePlan(BaseModel):
-    model_config = {"extra": "forbid"}
+class PaletteTransition(StrEnum):
+    """How a palette stop enters at its first section."""
 
-    # Primary palette for the show
-    primary: PaletteRef = Field(..., description="Default palette for the song")
-
-    # Optional alternates allowed for variation (still theme-consistent)
-    alternates: list[PaletteRef] = Field(max_length=6)
-
-    @model_validator(mode="before")
-    @classmethod
-    def _normalize_legacy_input(cls, value: object) -> object:
-        if not isinstance(value, dict):
-            return value
-        normalized = dict(value)
-        normalized.setdefault("alternates", [])
-        return normalized
+    HOLD = "HOLD"
+    CROSSFADE = "CROSSFADE"
+    CUT = "CUT"
 
 
-class MotifSpec(BaseModel):
-    model_config = {"extra": "forbid"}
+class MotifEvolution(StrEnum):
+    """How a recurring motif changes over its declared sections."""
 
-    motif_id: str = Field(..., description="Stable id e.g. 'candy_cane_swirl'")
-    tags: list[str] = Field(max_length=8)  # used for template matching
-    description: str = Field(..., min_length=10, max_length=300)
-
-    # Optional: where it should appear
-    preferred_energy: list[EnergyTarget] = Field()
-    usage_notes: str = Field(max_length=500)
-
-    @model_validator(mode="before")
-    @classmethod
-    def _normalize_legacy_input(cls, value: object) -> object:
-        if not isinstance(value, dict):
-            return value
-        normalized = dict(value)
-        normalized.setdefault("tags", [])
-        normalized.setdefault("preferred_energy", [])
-        normalized.setdefault("usage_notes", "")
-        return normalized
+    INTRODUCE = "INTRODUCE"
+    RESTATE = "RESTATE"
+    VARY = "VARY"
+    RESOLVE = "RESOLVE"
 
 
-class GlobalStory(BaseModel):
-    """Global story arc for entire sequence.
+class FocalRoleKind(StrEnum):
+    """A target's visual responsibility within one section."""
 
-    Defines the overarching theme, recurring motifs, pacing strategy,
-    and color palette for the complete Christmas light show.
+    LEAD = "LEAD"
+    SUPPORT = "SUPPORT"
+    REST = "REST"
+
+
+class PaletteStop(BaseModel):
+    """One ordered palette/theme stop in the song-level color arc."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    stop_id: str = Field(min_length=1)
+    palette: PaletteRef
+    applies_from_section_id: str = Field(min_length=1)
+    transition: PaletteTransition
+
+
+class PaletteRoleRef(BaseModel):
+    """Palette selection for a section.
+
+    ``override`` has precedence when present.  Otherwise the referenced
+    ``PaletteStop.palette`` is authoritative.
     """
 
-    model_config = {"extra": "forbid"}
+    model_config = ConfigDict(extra="forbid", frozen=True)
 
-    theme: ThemeRef = Field(..., description="Global default theme reference for the song")
-    story_notes: str = Field(
-        ..., description="Overarching narrative/theme notes (prose)", min_length=10
+    stop_id: str = Field(min_length=1)
+    override: PaletteRef | None = Field(
+        description="Section palette override; null means use the referenced arc stop"
     )
-    motifs: list[MotifSpec] = Field(
-        ...,
-        description="3-5 recurring visual/musical motifs throughout the show",
-        min_length=3,
-        max_length=10,
-    )
-    pacing_notes: str = Field(
-        ..., description="How energy builds/releases across the song", min_length=20
-    )
-    palette_plan: PalettePlan = Field(
-        ..., description="Global palette plan with primary and optional alternates"
-    )
+
+
+class MotifThread(BaseModel):
+    """A recurring motif and the sections through which it evolves."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    motif_id: str = Field(min_length=1)
+    section_ids: list[str] = Field(min_length=1)
+    evolution: MotifEvolution
+    description: str
+
+    @field_validator("section_ids")
+    @classmethod
+    def _unique_section_ids(cls, value: list[str]) -> list[str]:
+        if len(value) != len(set(value)):
+            raise ValueError("MotifThread.section_ids must be unique")
+        return value
+
+
+class FocalRole(BaseModel):
+    """A target's lead, support, or rest role in one section."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    target: PlanTarget
+    role: FocalRoleKind
+
+
+class FocalAssignment(BaseModel):
+    """Song-level statement of the lead target for one section."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    section_id: str = Field(min_length=1)
+    lead_target: PlanTarget
+
+
+class CallResponsePair(BaseModel):
+    """Typed call-and-response relationship between two display targets."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    call: PlanTarget
+    response: PlanTarget
+    step_unit: StepUnit
+    step_duration: int = Field(ge=1)
+
+    @model_validator(mode="after")
+    def _distinct_targets(self) -> CallResponsePair:
+        if self.call == self.response:
+            raise ValueError("CallResponsePair call and response must differ")
+        return self
+
+
+class MacroSection(BaseModel):
+    """Strategic typed contract for one audio section.
+
+    ``notes`` is intentionally prose.  Every other member is structured input for
+    downstream planning.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    section: SongSectionRef
+    energy_target: EnergyTarget
+    motion_density: MotionDensity
+    choreography_style: ChoreographyStyle
+    palette_role: PaletteRoleRef
+    theme: ThemeRef
+    motif_ids: list[str] = Field(max_length=5)
+    focal_roles: list[FocalRole] = Field(min_length=1)
+    call_response_pairs: list[CallResponsePair]
+    coordination_intent: CoordinationMode
+    notes: str = Field(min_length=20, description="Planner-facing prose guidance")
 
     @field_validator("theme")
     @classmethod
-    def validate_theme_scope(cls, v: ThemeRef) -> ThemeRef:
-        # GlobalStory theme must always be SONG scoped
-        if v.scope != ThemeScope.SONG:
-            raise ValueError("GlobalStory.theme.scope must be ThemeScope.SONG")
-        # keep global tags tight
-        if len(v.tags) > 5:
-            raise ValueError("GlobalStory.theme.tags must have at most 5 items")
+    def _section_theme(cls, value: ThemeRef) -> ThemeRef:
+        if value.scope != ThemeScope.SECTION:
+            raise ValueError("MacroSection.theme.scope must be ThemeScope.SECTION")
+        return value
 
-        if len(set(v.tags)) != len(v.tags):
-            raise ValueError("GlobalStory.theme.tags must not contain duplicates")
-
-        return v
-
-
-class MacroSectionPlan(BaseModel):
-    """Strategic plan for one song section.
-
-    Defines energy target, choreography style, motion density, and target
-    selection for a single section of the song.
-    """
-
-    model_config = {"extra": "forbid"}
-
-    section: SongSectionRef = Field(..., description="Reference to audio section")
-    theme: ThemeRef = Field(..., description="Section theme reference")
-    energy_target: EnergyTarget = Field(..., description="Target energy level for section")
-    primary_focus_targets: list[PlanTarget] = Field(
-        ...,
-        description=(
-            "Main display targets for section intent using typed targets "
-            "(group/zone/split). At least one target is required."
-        ),
-        min_length=1,
-        max_length=8,
-    )
-    secondary_targets: list[PlanTarget] = Field(
-        description="Supporting typed targets (group/zone/split)",
-        max_length=12,
-    )
-    choreography_style: ChoreographyStyle = Field(
-        ..., description="Visual approach (IMAGERY, ABSTRACT, HYBRID)"
-    )
-
-    palette: PaletteRef | None = Field(
-        description="Optional palette override for this section; if None use global primary",
-    )
-
-    motif_ids: list[str] = Field(
-        description="Motifs to emphasize in this section (references GlobalStory.motifs[*].motif_id)",
-        max_length=5,
-    )
-
-    motion_density: MotionDensity = Field(..., description="Activity level (SPARSE, MED, BUSY)")
-    notes: str = Field(..., description="Strategic notes for this section", min_length=20)
-
-    @model_validator(mode="before")
+    @field_validator("motif_ids")
     @classmethod
-    def _normalize_legacy_input(cls, value: object) -> object:
-        if not isinstance(value, dict):
-            return value
-        normalized = dict(value)
-        normalized.setdefault("secondary_targets", [])
-        normalized.setdefault("palette", None)
-        normalized.setdefault("motif_ids", [])
-        return normalized
+    def _unique_motif_ids(cls, value: list[str]) -> list[str]:
+        if len(value) != len(set(value)):
+            raise ValueError("MacroSection.motif_ids must be unique")
+        return value
 
-    @field_validator("primary_focus_targets", "secondary_targets")
+    @field_validator("focal_roles")
     @classmethod
-    def validate_focus_targets(cls, v: list[PlanTarget]) -> list[PlanTarget]:
-        """Validate typed focus targets are unique by (type,id)."""
-        seen: set[tuple[str, str]] = set()
-        for target in v:
-            key = (target.type.value, target.id)
-            if key in seen:
-                raise ValueError(f"Duplicate focus target: {target.type.value}:{target.id}")
-            seen.add(key)
-        return v
-
-    @field_validator("theme")
-    @classmethod
-    def validate_section_theme_scope(cls, v: ThemeRef) -> ThemeRef:
-        if v.scope != ThemeScope.SECTION:
-            raise ValueError("MacroSectionPlan.theme.scope must be ThemeScope.SECTION")
-        if len(v.tags) > 5:
-            raise ValueError("MacroSectionPlan.theme.tags must have at most 5 items")
-        if len(set(v.tags)) != len(v.tags):
-            raise ValueError("MacroSectionPlan.theme.tags must not contain duplicates")
-        return v
-
-
-class TargetSelector(BaseModel):
-    """Defines which targets a layer should affect.
-
-    Supports multiple targets for coordinated impact (not 1:1).
-    """
-
-    model_config = {"extra": "forbid"}
-
-    roles: list[str] = Field(
-        ...,
-        description="Concrete display group IDs (e.g. OUTLINE, MEGA_TREE, WREATHS, MATRIX)",
-        min_length=1,
-        max_length=10,
-    )
-    coordination: str = Field(
-        description="How targets work together (unified, complementary, independent)",
-    )
-
-    @model_validator(mode="before")
-    @classmethod
-    def _normalize_legacy_input(cls, value: object) -> object:
-        if not isinstance(value, dict):
-            return value
-        normalized = dict(value)
-        normalized.setdefault("coordination", "unified")
-        return normalized
-
-    @field_validator("roles")
-    @classmethod
-    def validate_roles_non_empty(cls, v: list[str]) -> list[str]:
-        """Validate role ids are non-empty strings."""
-        cleaned = [role.strip() for role in v if role and role.strip()]
-        if len(cleaned) != len(v):
-            raise ValueError("roles must not contain empty values")
-        return cleaned
-
-
-class LayerSpec(BaseModel):
-    """Specification for a single layer in composition.
-
-    Defines the role, targets, blend mode, timing, and intensity for one
-    layer in the choreography architecture.
-    """
-
-    model_config = {"extra": "forbid"}
-
-    layer_index: int = Field(..., ge=0, le=4, description="Layer index (0-4, lower = back)")
-    layer_role: LayerRole = Field(
-        ..., description="Layer role (BASE, RHYTHM, ACCENT, FILL, TEXTURE)"
-    )
-    target_selector: TargetSelector = Field(
-        ..., description="Which display groups this layer affects"
-    )
-    blend_mode: BlendMode = Field(..., description="How layer combines with others (NORMAL, ADD)")
-    timing_driver: TimingDriver = Field(..., description="Musical timing this layer follows")
-    intensity_bias: float = Field(
-        ge=0.0, le=1.5, description="Global intensity multiplier for this layer"
-    )
-    usage_notes: str = Field(..., description="Strategic guidance for GroupPlanner", min_length=10)
-
-    @model_validator(mode="before")
-    @classmethod
-    def _normalize_legacy_input(cls, value: object) -> object:
-        if not isinstance(value, dict):
-            return value
-        normalized = dict(value)
-        normalized.setdefault("intensity_bias", 1.0)
-        return normalized
-
-
-class LayeringPlan(BaseModel):
-    """Complete layering architecture for the sequence.
-
-    Validates the collection of layers with composition rules:
-    - Exactly one BASE layer required
-    - No duplicate layer indices
-    - BASE layer must use NORMAL blend
-    - 1-5 layers total
-    """
-
-    model_config = {"extra": "forbid"}
-
-    layers: list[LayerSpec] = Field(
-        ..., description="Layer specifications", min_length=1, max_length=5
-    )
-
-    @field_validator("layers")
-    @classmethod
-    def validate_layer_composition(cls, v: list[LayerSpec]) -> list[LayerSpec]:
-        """Validate layer composition rules."""
-        # Check for exactly one BASE layer
-        base_layers = [layer for layer in v if layer.layer_role == LayerRole.BASE]
-        if len(base_layers) != 1:
-            raise ValueError("Must have exactly one BASE layer")
-
-        # Check for duplicate indices
-        indices = [layer.layer_index for layer in v]
-        if len(indices) != len(set(indices)):
-            raise ValueError("Duplicate layer index found")
-
-        # Validate BASE layer uses NORMAL blend
-        base_layer = base_layers[0]
-        if base_layer.blend_mode != BlendMode.NORMAL:
-            raise ValueError("BASE layer must use NORMAL blend mode")
-
-        return v
+    def _unique_focal_targets(cls, value: list[FocalRole]) -> list[FocalRole]:
+        keys = [(item.target.type, item.target.id) for item in value]
+        if len(keys) != len(set(keys)):
+            raise ValueError("MacroSection.focal_roles targets must be unique")
+        return value
 
 
 class MacroPlan(BaseModel):
-    """Complete strategic plan for entire sequence.
+    """Slim song-level cross-element coordination contract.
 
-    Root schema that ties together global story, layering architecture,
-    and per-section plans.
-
-    Validates:
-    - No gaps or overlaps between sections
-    - Sections sorted by start_ms
-    - No duplicate section IDs
+    Palette precedence is deterministic: a section's ``palette_role.override`` wins;
+    otherwise its referenced ``palette_arc`` stop supplies the palette.
     """
 
-    model_config = {"extra": "forbid"}
+    model_config = ConfigDict(extra="forbid")
 
-    global_story: GlobalStory = Field(..., description="Overarching theme and narrative")
-    layering_plan: LayeringPlan = Field(..., description="Complete layering architecture")
-    section_plans: list[MacroSectionPlan] = Field(
-        ..., description="Per-section strategic plans", min_length=1
-    )
+    sections: list[MacroSection] = Field(min_length=1)
+    palette_arc: list[PaletteStop] = Field(min_length=1)
+    motif_continuity: list[MotifThread]
+    focal_arc: list[FocalAssignment]
 
-    @field_validator("section_plans")
-    @classmethod
-    def validate_section_coverage(cls, v: list[MacroSectionPlan]) -> list[MacroSectionPlan]:
-        """Validate section timing coverage.
+    @model_validator(mode="after")
+    def _validate_contract(self, info: ValidationInfo) -> MacroPlan:
+        section_ids = [item.section.section_id for item in self.sections]
+        self._validate_unique(section_ids, "section_id")
+        self._validate_section_coverage()
 
-        Ensures:
-        - No duplicate section IDs
-        - Sections sorted by start_ms
-        - No gaps between sections
-        - No overlaps between sections
-        """
-        if len(v) == 0:
-            return v
+        known_sections = set(section_ids)
+        palette_ids = [item.stop_id for item in self.palette_arc]
+        self._validate_unique(palette_ids, "palette stop_id")
+        known_palette_stops = set(palette_ids)
+        for stop in self.palette_arc:
+            if stop.applies_from_section_id not in known_sections:
+                raise ValueError(
+                    "Palette stop "
+                    f"'{stop.stop_id}' references unknown section "
+                    f"'{stop.applies_from_section_id}'"
+                )
 
-        # Check for duplicate section IDs
-        section_ids = [plan.section.section_id for plan in v]
-        seen: set[str] = set()
-        duplicates: list[str] = []
-        for sid in section_ids:
-            if sid in seen:
-                duplicates.append(sid)
-            seen.add(sid)
-        if duplicates:
+        section_order = {section_id: index for index, section_id in enumerate(section_ids)}
+        stop_positions = [section_order[item.applies_from_section_id] for item in self.palette_arc]
+        if stop_positions[0] != 0:
+            raise ValueError("The first palette stop must start at the first section")
+        if stop_positions != sorted(stop_positions):
+            raise ValueError("palette_arc stops must follow section order")
+        if len(stop_positions) != len(set(stop_positions)):
+            raise ValueError("Only one palette stop may begin at a section")
+        active_stop_by_section: dict[str, str] = {}
+        active_stop_id = self.palette_arc[0].stop_id
+        stop_by_position = {
+            section_order[item.applies_from_section_id]: item.stop_id for item in self.palette_arc
+        }
+        for index, section_id in enumerate(section_ids):
+            active_stop_id = stop_by_position.get(index, active_stop_id)
+            active_stop_by_section[section_id] = active_stop_id
+
+        motif_ids = [item.motif_id for item in self.motif_continuity]
+        self._validate_unique(motif_ids, "motif_id")
+        known_motifs = set(motif_ids)
+        for thread in self.motif_continuity:
+            unknown_sections = set(thread.section_ids) - known_sections
+            if unknown_sections:
+                raise ValueError(
+                    f"Motif '{thread.motif_id}' references unknown section(s): "
+                    f"{sorted(unknown_sections)}"
+                )
+            for section_id in thread.section_ids:
+                section = next(
+                    item for item in self.sections if item.section.section_id == section_id
+                )
+                if thread.motif_id not in section.motif_ids:
+                    raise ValueError(
+                        f"Motif '{thread.motif_id}' declares section '{section_id}', but that "
+                        "section does not reference the motif"
+                    )
+
+        for item in self.sections:
+            section_id = item.section.section_id
+            if item.palette_role.stop_id not in known_palette_stops:
+                raise ValueError(
+                    f"Section '{section_id}' references unknown palette stop "
+                    f"'{item.palette_role.stop_id}'"
+                )
+            expected_stop = active_stop_by_section[section_id]
+            if item.palette_role.stop_id != expected_stop:
+                raise ValueError(
+                    f"Section '{section_id}' palette stop '{item.palette_role.stop_id}' "
+                    f"is not the active stop '{expected_stop}'"
+                )
+            for motif_id in item.motif_ids:
+                if motif_id not in known_motifs:
+                    raise ValueError(
+                        f"Section '{section_id}' references unknown motif '{motif_id}'"
+                    )
+                thread = next(
+                    motif for motif in self.motif_continuity if motif.motif_id == motif_id
+                )
+                if section_id not in thread.section_ids:
+                    raise ValueError(
+                        f"Section '{section_id}' references motif '{motif_id}', but the motif "
+                        "thread does not declare that section"
+                    )
+            resolved_palette = self._palette_for_role(item.palette_role)
+            if item.theme.palette_id not in (None, resolved_palette.palette_id):
+                raise ValueError(
+                    f"Section '{section_id}' theme palette_id '{item.theme.palette_id}' "
+                    f"conflicts with typed palette role '{resolved_palette.palette_id}'"
+                )
+
+        focal_section_ids = [item.section_id for item in self.focal_arc]
+        self._validate_unique(focal_section_ids, "focal_arc section_id")
+        missing_focal_sections = known_sections - set(focal_section_ids)
+        unknown_focal_sections = set(focal_section_ids) - known_sections
+        if missing_focal_sections or unknown_focal_sections:
             raise ValueError(
-                f"Duplicate section_id found: {duplicates}. "
-                f"Each section_id must be unique (e.g., 'chorus_1', 'chorus_2', not 'chorus')."
+                "focal_arc must contain exactly one assignment per section; "
+                f"missing={sorted(missing_focal_sections)}, "
+                f"unknown={sorted(unknown_focal_sections)}"
             )
+        assignment_by_section = {item.section_id: item for item in self.focal_arc}
+        for item in self.sections:
+            leads = [role.target for role in item.focal_roles if role.role == FocalRoleKind.LEAD]
+            if len(leads) != 1:
+                raise ValueError(
+                    f"Section '{item.section.section_id}' must declare exactly one LEAD focal role"
+                )
+            assignment = assignment_by_section[item.section.section_id]
+            if assignment.lead_target != leads[0]:
+                raise ValueError(
+                    f"Section '{item.section.section_id}' focal_arc lead_target must equal "
+                    "its one LEAD focal role"
+                )
 
-        # Check sections are sorted by start_ms
-        start_times = [plan.section.start_ms for plan in v]
-        if start_times != sorted(start_times):
+        graph = (info.context or {}).get("choreo_graph") if info.context else None
+        if graph is not None:
+            self._validate_targets_against_graph(graph)
+        return self
+
+    @staticmethod
+    def _validate_unique(values: list[str], label: str) -> None:
+        duplicates = sorted({value for value in values if values.count(value) > 1})
+        if duplicates:
+            raise ValueError(f"Duplicate {label}: {duplicates}")
+
+    def _validate_section_coverage(self) -> None:
+        starts = [item.section.start_ms for item in self.sections]
+        if starts != sorted(starts):
             raise ValueError("Sections not sorted by start_ms")
-
-        # Check for gaps and overlaps
-        for i in range(len(v) - 1):
-            current = v[i]
-            next_section = v[i + 1]
-
+        for current, following in zip(self.sections, self.sections[1:], strict=False):
             current_end = current.section.end_ms
-            next_start = next_section.section.start_ms
-
+            next_start = following.section.start_ms
             if current_end < next_start:
                 raise ValueError(
-                    f"Gap detected between sections '{current.section.section_id}' "
-                    f"and '{next_section.section.section_id}': "
-                    f"{current_end}ms to {next_start}ms"
+                    f"Gap detected between sections '{current.section.section_id}' and "
+                    f"'{following.section.section_id}': {current_end}ms to {next_start}ms"
                 )
-            elif current_end > next_start:
+            if current_end > next_start:
                 raise ValueError(
-                    f"Overlap detected between sections '{current.section.section_id}' "
-                    f"and '{next_section.section.section_id}': "
-                    f"current ends at {current_end}ms, next starts at {next_start}ms"
+                    f"Overlap detected between sections '{current.section.section_id}' and "
+                    f"'{following.section.section_id}': current ends at {current_end}ms, "
+                    f"next starts at {next_start}ms"
                 )
 
-        return v
+    def _validate_targets_against_graph(self, graph: ChoreographyGraph) -> None:
+        targets = [assignment.lead_target for assignment in self.focal_arc]
+        for section in self.sections:
+            targets.extend(role.target for role in section.focal_roles)
+            for pair in section.call_response_pairs:
+                targets.extend((pair.call, pair.response))
+
+        for target in targets:
+            if not self._target_exists(target, graph):
+                raise ValueError(
+                    f"Macro target '{target.type.value}:{target.id}' does not resolve "
+                    "against the choreography graph"
+                )
+
+    @staticmethod
+    def _target_exists(target: PlanTarget, graph: ChoreographyGraph) -> bool:
+        if target.type == TargetType.GROUP:
+            return graph.get_group(target.id) is not None
+        if target.type == TargetType.ZONE:
+            return any(tag.value == target.id for tag in graph.groups_by_tag)
+        if target.type == TargetType.SPLIT:
+            return any(split.value == target.id for split in graph.groups_by_split)
+        return False
+
+    def palette_for_section(self, section_id: str) -> PaletteRef:
+        """Resolve the documented section-override-over-song-arc precedence."""
+        section = next(
+            (item for item in self.sections if item.section.section_id == section_id),
+            None,
+        )
+        if section is None:
+            raise KeyError(f"Unknown macro section '{section_id}'")
+        return self._palette_for_role(section.palette_role)
+
+    def reader_projection(self) -> dict[str, Any]:
+        """Return every contract leaf through explicit, by-name reads.
+
+        This is the canonical downstream prompt/cache projection. It deliberately
+        avoids ``model_dump`` so a new schema field cannot become transport-only.
+        """
+        return {
+            "sections": [self.section_reader_projection(item) for item in self.sections],
+            "palette_arc": [self.palette_stop_reader_projection(item) for item in self.palette_arc],
+            "motif_continuity": [
+                self.motif_thread_reader_projection(item) for item in self.motif_continuity
+            ],
+            "focal_arc": [self.focal_assignment_reader_projection(item) for item in self.focal_arc],
+        }
+
+    @staticmethod
+    def target_reader_projection(target: PlanTarget) -> dict[str, str]:
+        """Read every typed target leaf by name."""
+        return {"type": target.type.value, "id": target.id}
+
+    @staticmethod
+    def palette_reader_projection(palette: PaletteRef | None) -> dict[str, Any]:
+        """Read every palette leaf, retaining a stable nullable shape."""
+        return {
+            "palette_id": palette.palette_id if palette is not None else None,
+            "role": palette.role.value
+            if palette is not None and palette.role is not None
+            else None,
+            "intensity": palette.intensity if palette is not None else None,
+            "variant": palette.variant if palette is not None else None,
+        }
+
+    @classmethod
+    def section_reader_projection(cls, section: MacroSection) -> dict[str, Any]:
+        """Read every per-section contract leaf by name."""
+        return {
+            "section": {
+                "section_id": section.section.section_id,
+                "name": section.section.name,
+                "start_ms": section.section.start_ms,
+                "end_ms": section.section.end_ms,
+            },
+            "energy_target": section.energy_target.value,
+            "motion_density": section.motion_density.value,
+            "choreography_style": section.choreography_style.value,
+            "palette_role": {
+                "stop_id": section.palette_role.stop_id,
+                "override": cls.palette_reader_projection(section.palette_role.override),
+            },
+            "theme": {
+                "theme_id": section.theme.theme_id,
+                "scope": section.theme.scope.value,
+                "tags": list(section.theme.tags),
+                "palette_id": section.theme.palette_id,
+            },
+            "motif_ids": list(section.motif_ids),
+            "focal_roles": [
+                {
+                    "target": cls.target_reader_projection(item.target),
+                    "role": item.role.value,
+                }
+                for item in section.focal_roles
+            ],
+            "call_response_pairs": [
+                {
+                    "call": cls.target_reader_projection(item.call),
+                    "response": cls.target_reader_projection(item.response),
+                    "step_unit": item.step_unit.value,
+                    "step_duration": item.step_duration,
+                }
+                for item in section.call_response_pairs
+            ],
+            "coordination_intent": section.coordination_intent.value,
+            "notes": section.notes,
+        }
+
+    @classmethod
+    def palette_stop_reader_projection(cls, stop: PaletteStop) -> dict[str, Any]:
+        """Read every palette-stop contract leaf by name."""
+        return {
+            "stop_id": stop.stop_id,
+            "palette": cls.palette_reader_projection(stop.palette),
+            "applies_from_section_id": stop.applies_from_section_id,
+            "transition": stop.transition.value,
+        }
+
+    @staticmethod
+    def motif_thread_reader_projection(thread: MotifThread) -> dict[str, Any]:
+        """Read every motif-thread contract leaf by name."""
+        return {
+            "motif_id": thread.motif_id,
+            "section_ids": list(thread.section_ids),
+            "evolution": thread.evolution.value,
+            "description": thread.description,
+        }
+
+    @classmethod
+    def focal_assignment_reader_projection(cls, item: FocalAssignment) -> dict[str, Any]:
+        """Read every focal-assignment contract leaf by name."""
+        return {
+            "section_id": item.section_id,
+            "lead_target": cls.target_reader_projection(item.lead_target),
+        }
+
+    def _palette_for_role(self, palette_role: PaletteRoleRef) -> PaletteRef:
+        if palette_role.override is not None:
+            return palette_role.override
+        stop = next(item for item in self.palette_arc if item.stop_id == palette_role.stop_id)
+        return stop.palette
 
 
 __all__ = [
-    "GlobalStory",
-    "LayerSpec",
-    "LayeringPlan",
+    "CallResponsePair",
+    "FocalAssignment",
+    "FocalRole",
+    "FocalRoleKind",
     "MacroPlan",
-    "MacroSectionPlan",
-    "TargetSelector",
+    "MacroSection",
+    "MotifEvolution",
+    "MotifThread",
+    "PaletteRef",
+    "PaletteRoleRef",
+    "PaletteStop",
+    "PaletteTransition",
 ]

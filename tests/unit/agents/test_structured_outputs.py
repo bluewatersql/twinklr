@@ -29,7 +29,10 @@ from twinklr.core.agents.schema_utils import (
     STRICT_SCHEMA_ENUM_LIMIT,
     STRICT_SCHEMA_MAX_DEPTH,
     STRICT_SCHEMA_PROPERTY_LIMIT,
+    _normalize_supported_schema,
+    response_schema_hash,
     strict_json_schema,
+    strict_response_format,
     strict_schema_stats,
 )
 from twinklr.core.agents.sequencer.group_planner.holistic import get_holistic_judge_spec
@@ -63,6 +66,7 @@ from twinklr.core.sequencer.planning.group_plan import (
     PlacementWindowResponse,
     SectionCoordinationResponse,
 )
+from twinklr.core.sequencer.planning.models import MacroPlan
 from twinklr.core.sequencer.templates.group.models.coordination import PlanTarget
 from twinklr.core.sequencer.theming import ThemeRef, ThemeScope
 from twinklr.core.sequencer.vocabulary import (
@@ -143,6 +147,21 @@ def test_all_registered_response_roots_are_strict_compatible() -> None:
             properties = node.get("properties", {})
             assert node.get("additionalProperties") is False, (model.__name__, node)
             assert set(node.get("required", ())) == set(properties), (model.__name__, node)
+
+
+def test_all_registered_strict_roots_have_bare_ref_nodes() -> None:
+    """OpenAI rejects a $ref that carries even annotation siblings."""
+    for model in {spec.response_model for spec in _registered_specs()}:
+        for node in _walk_json(strict_json_schema(model)):
+            if "$ref" in node:
+                assert set(node) == {"$ref"}, (model.__name__, node)
+
+
+def test_ref_normalization_fails_loud_on_semantic_siblings() -> None:
+    with pytest.raises(ValueError, match=r"\$ref.*minLength"):
+        _normalize_supported_schema(
+            {"$ref": "#/$defs/NamedValue", "description": "annotation", "minLength": 1}
+        )
 
 
 def test_machine_derived_schema_normalizes_discriminated_union_to_supported_anyof() -> None:
@@ -294,14 +313,47 @@ async def test_agent_calls_use_machine_derived_strict_json_schema() -> None:
         )
 
     request = client.responses.create.call_args.kwargs
-    assert request["text"]["format"] == {
-        "type": "json_schema",
-        "name": "StrictSample",
-        "schema": StrictSample.model_json_schema(),
-        "strict": True,
-    }
+    assert request["text"]["format"] == strict_response_format(StrictSample)
+    for node in _walk_json(request["text"]["format"]["schema"]):
+        if "$ref" in node:
+            assert set(node) == {"$ref"}
+    assert result.metadata.response_schema_hash == response_schema_hash(StrictSample)
     assert result.metadata.structured_output_mode == "json_schema"
     assert result.metadata.response_schema_hash is not None
+
+
+@pytest.mark.asyncio
+async def test_provider_sends_exact_normalized_macro_schema() -> None:
+    response = MagicMock(
+        output_text="{}",
+        id="resp_macro_schema",
+        model="gpt-5.6-sol",
+        status="completed",
+        usage=None,
+    )
+
+    with (
+        patch("twinklr.core.agents.providers.openai.OpenAIClient"),
+        patch("twinklr.core.agents.providers.openai.AsyncOpenAI") as async_openai,
+    ):
+        client = MagicMock()
+        client.responses.create = AsyncMock(return_value=response)
+        async_openai.return_value = client
+        provider = OpenAIProvider(api_key="test-key")
+        result = await provider.generate_json_async(
+            messages=[{"role": "user", "content": "plan"}],
+            model="gpt-5.6-sol",
+            response_model=MacroPlan,
+            provider_max_attempts=1,
+            allow_json_object_fallback=False,
+        )
+
+    sent = client.responses.create.call_args.kwargs["text"]["format"]
+    assert sent == strict_response_format(MacroPlan)
+    assert sent["schema"]["$defs"]["ThemeRef"]["properties"]["scope"] == {
+        "$ref": "#/$defs/ThemeScope"
+    }
+    assert result.metadata.response_schema_hash == response_schema_hash(MacroPlan)
 
 
 @pytest.mark.asyncio

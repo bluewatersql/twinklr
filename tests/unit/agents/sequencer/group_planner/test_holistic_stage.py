@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from twinklr.core.agents.audio.profile.models import SongSectionRef
 from twinklr.core.agents.logging import NullLLMCallLogger
 from twinklr.core.agents.providers.base import LLMProvider
 from twinklr.core.agents.sequencer.group_planner.holistic import (
@@ -20,8 +21,17 @@ from twinklr.core.caching.backends.null import NullCache
 from twinklr.core.config.models import AppConfig, JobConfig
 from twinklr.core.pipeline.context import PipelineContext
 from twinklr.core.sequencer.planning import (
+    FocalAssignment,
+    FocalRole,
+    FocalRoleKind,
     GroupPlanSet,
     LanePlan,
+    MacroPlan,
+    MacroSection,
+    PaletteRef,
+    PaletteRoleRef,
+    PaletteStop,
+    PaletteTransition,
     SectionCoordinationPlan,
 )
 from twinklr.core.sequencer.templates.group.catalog import TemplateCatalog
@@ -36,9 +46,12 @@ from twinklr.core.sequencer.templates.group.models.choreography import (
 from twinklr.core.sequencer.templates.group.models.coordination import PlanTarget
 from twinklr.core.sequencer.theming import ThemeRef, ThemeScope
 from twinklr.core.sequencer.vocabulary import (
+    ChoreographyStyle,
     CoordinationMode,
     EffectDuration,
+    EnergyTarget,
     LaneKind,
+    MotionDensity,
     PlanningTimeRef,
 )
 from twinklr.core.sequencer.vocabulary.choreography import TargetType
@@ -58,6 +71,43 @@ _TEST_THEME = ThemeRef(
     tags=["test"],
     palette_id=None,
 )
+
+
+@pytest.fixture
+def sample_macro_plan() -> MacroPlan:
+    """Minimal valid typed macro contract."""
+    target = PlanTarget(type=TargetType.GROUP, id="HERO_1")
+    section = MacroSection(
+        section=SongSectionRef(section_id="verse_1", name="Verse", start_ms=0, end_ms=10_000),
+        energy_target=EnergyTarget.MED,
+        motion_density=MotionDensity.MED,
+        choreography_style=ChoreographyStyle.HYBRID,
+        palette_role=PaletteRoleRef(stop_id="main", override=None),
+        theme=_TEST_THEME,
+        motif_ids=[],
+        focal_roles=[FocalRole(target=target, role=FocalRoleKind.LEAD)],
+        call_response_pairs=[],
+        coordination_intent=CoordinationMode.UNIFIED,
+        notes="Typed holistic macro guidance for the section.",
+    )
+    return MacroPlan(
+        sections=[section],
+        palette_arc=[
+            PaletteStop(
+                stop_id="main",
+                palette=PaletteRef(
+                    palette_id="core.christmas_traditional",
+                    role=None,
+                    intensity=None,
+                    variant=None,
+                ),
+                applies_from_section_id="verse_1",
+                transition=PaletteTransition.HOLD,
+            )
+        ],
+        motif_continuity=[],
+        focal_arc=[FocalAssignment(section_id="verse_1", lead_target=target)],
+    )
 
 
 @pytest.fixture
@@ -158,49 +208,30 @@ def approved_evaluation() -> HolisticEvaluation:
 class TestExtractMacroPlanSummary:
     """Tests for _extract_macro_plan_summary helper."""
 
-    def test_extract_expected_section_ids_from_pydantic_model(self) -> None:
+    def test_extract_expected_section_ids_from_pydantic_model(
+        self, sample_macro_plan: MacroPlan
+    ) -> None:
         """Extract expected section IDs from a Pydantic MacroPlan model."""
         from twinklr.core.agents.sequencer.group_planner.holistic_stage import (
             _extract_macro_plan_summary,
         )
 
-        mock_section_1 = MagicMock()
-        mock_section_1.section = MagicMock()
-        mock_section_1.section.section_id = "intro"
-
-        mock_section_2 = MagicMock()
-        mock_section_2.section = MagicMock()
-        mock_section_2.section.section_id = "chorus_1"
-
-        mock_macro_plan = MagicMock()
-        mock_macro_plan.global_story = MagicMock()
-        mock_macro_plan.global_story.model_dump.return_value = {"theme": "test"}
-        mock_macro_plan.section_plans = [mock_section_1, mock_section_2]
-
-        summary = _extract_macro_plan_summary(mock_macro_plan)
+        summary = _extract_macro_plan_summary(sample_macro_plan)
 
         assert "expected_section_ids" in summary
-        assert summary["expected_section_ids"] == ["intro", "chorus_1"]
+        assert summary["expected_section_ids"] == ["verse_1"]
+        assert summary["macro_plan"] == sample_macro_plan.reader_projection()
 
-    def test_extract_expected_section_ids_from_dict(self) -> None:
+    def test_extract_expected_section_ids_from_dict(self, sample_macro_plan: MacroPlan) -> None:
         """Extract expected section IDs from a dict (cached) MacroPlan."""
         from twinklr.core.agents.sequencer.group_planner.holistic_stage import (
             _extract_macro_plan_summary,
         )
 
-        macro_plan_dict = {
-            "global_story": {"theme": "test"},
-            "section_plans": [
-                {"section": {"section_id": "verse_1"}},
-                {"section": {"section_id": "chorus_1"}},
-                {"section": {"section_id": "outro"}},
-            ],
-        }
-
-        summary = _extract_macro_plan_summary(macro_plan_dict)
+        summary = _extract_macro_plan_summary(sample_macro_plan.model_dump(mode="json"))
 
         assert "expected_section_ids" in summary
-        assert summary["expected_section_ids"] == ["verse_1", "chorus_1", "outro"]
+        assert summary["expected_section_ids"] == ["verse_1"]
 
     def test_extract_expected_section_ids_none_macro_plan(self) -> None:
         """Return empty dict when macro_plan is None."""
@@ -210,25 +241,6 @@ class TestExtractMacroPlanSummary:
 
         summary = _extract_macro_plan_summary(None)
         assert summary == {}
-
-    def test_extract_expected_section_ids_no_section_plans(self) -> None:
-        """Handle MacroPlan without section_plans gracefully."""
-        from twinklr.core.agents.sequencer.group_planner.holistic_stage import (
-            _extract_macro_plan_summary,
-        )
-
-        mock_macro_plan = MagicMock()
-        mock_macro_plan.global_story = MagicMock()
-        mock_macro_plan.global_story.model_dump.return_value = {"theme": "test"}
-        mock_macro_plan.section_plans = None
-        # Simulate getattr returning None
-        del mock_macro_plan.section_plans
-        mock_macro_plan.configure_mock(section_plans=None)
-
-        summary = _extract_macro_plan_summary(mock_macro_plan)
-
-        assert "global_story" in summary
-        assert summary.get("expected_section_ids", []) == []
 
 
 class TestHolisticEvaluatorStage:
@@ -395,6 +407,7 @@ class TestHolisticEvaluatorStage:
         sample_group_plan_set: GroupPlanSet,
         approved_evaluation: HolisticEvaluation,
         mock_context: PipelineContext,
+        sample_macro_plan: MacroPlan,
     ) -> None:
         """execute() reads macro_plan from context state and passes to evaluator."""
         stage = HolisticEvaluatorStage(
@@ -402,11 +415,7 @@ class TestHolisticEvaluatorStage:
             template_catalog=sample_template_catalog,
         )
 
-        mock_global_story = MagicMock()
-        mock_global_story.model_dump.return_value = {"theme": "Holiday magic"}
-        mock_macro_plan = MagicMock()
-        mock_macro_plan.global_story = mock_global_story
-        mock_context.set_state("macro_plan", mock_macro_plan)
+        mock_context.set_state("macro_plan", sample_macro_plan)
 
         with (
             patch.object(
@@ -427,4 +436,6 @@ class TestHolisticEvaluatorStage:
         assert result.success is True
         call_kwargs = mock_evaluate.call_args.kwargs
         assert "macro_plan_summary" in call_kwargs
-        assert "global_story" in call_kwargs["macro_plan_summary"]
+        assert (
+            call_kwargs["macro_plan_summary"]["macro_plan"] == sample_macro_plan.reader_projection()
+        )

@@ -399,6 +399,7 @@ async def test_generate_json_async_separates_reasoning_tokens() -> None:
     response = MagicMock()
     response.output_text = '{"ok": true}'
     response.id = "resp_reasoning"
+    response.model = "gpt-5.6-sol-2026-08-01"
     response.usage = MagicMock(
         input_tokens=10,
         output_tokens=15,
@@ -425,6 +426,40 @@ async def test_generate_json_async_separates_reasoning_tokens() -> None:
     assert result.metadata.token_usage.reasoning_tokens == 9
     assert result.metadata.token_usage.completion_tokens == 6
     assert result.metadata.token_usage.total_tokens == 25
+    assert result.metadata.model == "gpt-5.6-sol-2026-08-01"
+    assert result.metadata.actual_model_present is True
+    assert result.metadata.token_usage_is_explicit is True
+
+
+@pytest.mark.asyncio
+async def test_generate_json_async_marks_requested_model_fallback_as_not_actual() -> None:
+    response = MagicMock()
+    response.output_text = '{"ok": true}'
+    response.id = "resp_no_model"
+    response.model = None
+    response.usage = MagicMock(
+        input_tokens=10,
+        output_tokens=2,
+        total_tokens=12,
+        output_tokens_details=MagicMock(reasoning_tokens=0),
+    )
+
+    with (
+        patch("twinklr.core.agents.providers.openai.OpenAIClient"),
+        patch("twinklr.core.agents.providers.openai.AsyncOpenAI") as mock_async_openai,
+    ):
+        mock_client = MagicMock()
+        mock_client.responses.create = AsyncMock(return_value=response)
+        mock_async_openai.return_value = mock_client
+        provider = OpenAIProvider(api_key="test-key")
+        result = await provider.generate_json_async(
+            messages=[{"role": "user", "content": "hello"}],
+            model="configured-model",
+        )
+
+    assert result.metadata.model == "configured-model"
+    assert result.metadata.actual_model_present is False
+    assert result.metadata.token_usage_is_explicit is True
 
 
 @pytest.mark.asyncio

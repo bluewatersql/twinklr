@@ -1,6 +1,6 @@
 pack_id: macro_planner.v2
-version: 2.1.0
-description: Strategic planning prompts for MacroPlanner agent (theme + palette + motifs)
+version: 3.0.0
+description: Typed palette, motif, focal, and section coordination prompts
 
 templates:
   system: system.j2
@@ -15,8 +15,7 @@ variables:
     - taxonomy                # Dict of enum names to value lists (auto-injected)
     - theme_catalog           # List of ThemeDefinition summaries (theme_id, title)
 
-    # NEW (required going forward)
-    - motif_catalog           # MotifCatalog (MotifSpec list + mapping). MacroPlanner chooses motif_ids from this.
+    - motif_catalog           # Motif catalog. MacroPlanner chooses motif_ids from this.
     - palette_catalog         # List of PaletteDefinition summaries OR list of valid palette_ids (+ optional metadata)
 
   optional:
@@ -25,11 +24,10 @@ variables:
     - feedback                # Judge feedback from previous iteration (str)
     - learning_context        # Historical learning context from past jobs (common issues to avoid)
 
-    # Optional helpers (nice to have)
     - default_palette_id      # If theme has a default palette; can be derived upstream
     - allowed_palette_ids     # If you want to constrain palette choices per run (subset of palette_catalog)
     - motif_policy            # Cohesion constraints (e.g. min motifs per section, recurrence targets)
-    - available_group_ids     # Concrete display group IDs for layer/focus target validation
+    - available_group_ids     # Concrete display group IDs for typed target validation
     - available_zone_ids      # Available zone IDs for typed zone targets
     - available_split_ids     # Available split IDs for typed split targets
 

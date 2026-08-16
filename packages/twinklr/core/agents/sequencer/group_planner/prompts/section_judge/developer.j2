@@ -65,7 +65,7 @@ Before evaluating coordination quality, verify the plan is **technically sound**
 #### Palette + Motifs Validity
 - `plan.palette` must be present and include `palette_id`
 - If `palette_catalog` is provided, `plan.palette.palette_id` must exist in it
-- `plan.motif_ids` must be present and non-empty (>= 1)
+- `plan.motif_ids` must exactly match the macro input; empty is valid
 - If `motif_catalog` is provided, every motif_id must exist in it
 - **Motif Alignment (Quality Factor)**: Templates should align with the declared motifs when possible.
 

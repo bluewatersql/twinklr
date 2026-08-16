@@ -32,6 +32,7 @@ from twinklr.core.agents.shared.judge.feedback import FeedbackManager
 from twinklr.core.agents.spec import AgentSpec
 from twinklr.core.agents.taxonomy_utils import get_theming_catalog_dict, get_theming_ids
 from twinklr.core.sequencer.planning import MacroPlan
+from twinklr.core.sequencer.vocabulary.choreography import ChoreoTag
 
 logger = logging.getLogger(__name__)
 
@@ -209,75 +210,10 @@ class MacroPlannerOrchestrator:
         else:
             logger.debug("  ⏭️  No lyric context (musical analysis only)")
 
-        # Prepare initial variables for planner
-        # Get theming catalog for theme/palette/tag/motif selection
-        theming_catalog = get_theming_catalog_dict()
-        theming_ids = get_theming_ids()
+        initial_variables = self.build_planner_variables(planning_context)
 
-        initial_variables = {
-            "audio_profile": audio_profile,
-            "display_groups": planning_context.display_groups,
-            # Theme catalog: theme_id + title for selection
-            "theme_catalog": [
-                {"theme_id": t["id"], "title": t["title"]} for t in theming_catalog["themes"]
-            ],
-            # Palette catalog: for palette override validation
-            "palette_catalog": theming_catalog["palettes"],
-            # Tag catalog: for valid tag selection
-            "tag_catalog": theming_catalog["tags"],
-            # Motif catalog: for motif selection and energy matching
-            "motif_catalog": theming_catalog["motifs"],
-            # ID lists for validation
-            "theming_ids": theming_ids,
-        }
-
-        # Derive typed targeting catalogs for macro section intent (group/zone/split)
-        available_group_ids: list[str] = []
-        available_zones: set[str] = set()
-        available_splits: set[str] = set()
-        for group in planning_context.display_groups:
-            gid = str(group.get("id") or "").strip()
-            if gid:
-                available_group_ids.append(gid)
-
-            zone = group.get("zone")
-            if zone:
-                available_zones.add(str(zone))
-            tags = group.get("tags") or group.get("zones") or []
-            if isinstance(tags, list):
-                available_zones.update(str(tag) for tag in tags if tag)
-
-            splits = group.get("split_membership") or group.get("splits") or []
-            if isinstance(splits, list):
-                available_splits.update(str(split) for split in splits if split)
-
-        initial_variables["available_group_ids"] = available_group_ids
-        initial_variables["available_zone_ids"] = sorted(available_zones)
-        initial_variables["available_split_ids"] = sorted(available_splits)
-
-        # Add lyric context if available
-        if planning_context.lyric_context:
-            initial_variables["lyric_context"] = planning_context.lyric_context
-
-        # Define validator function (converts heuristic validator to callable)
         def validator(plan: MacroPlan) -> list[str]:
-            """Validate plan and return list of error messages."""
-            # Deterministic repair: canonicalize section ids by audio timing so
-            # generic labels like "verse"/"chorus" don't cause avoidable failures.
-            self._canonicalize_section_ids(plan, audio_profile)
-            issues = self.heuristic_validator.validate(
-                plan,
-                audio_profile,
-                display_groups=planning_context.display_groups,
-            )
-
-            # Return only ERROR severity issues as strings
-            errors = [
-                f"{issue.category.value}: {issue.message}"
-                for issue in issues
-                if issue.severity.name == "ERROR"
-            ]
-            return errors
+            return self.validate_external_contract(plan, planning_context)
 
         # Run iteration loop
         result = await self.controller.run(
@@ -305,43 +241,118 @@ class MacroPlannerOrchestrator:
 
         return result
 
-    def _canonicalize_section_ids(self, plan: MacroPlan, audio_profile: object) -> None:
-        """Normalize MacroPlan section ids to canonical audio structure ids.
+    def build_planner_variables(self, planning_context: PlanningContext) -> dict[str, object]:
+        """Build the shipped planner prompt context (also used by the owner probe)."""
+        audio_profile = planning_context.audio_profile
+        theming_catalog = get_theming_catalog_dict()
+        theming_ids = get_theming_ids()
 
-        Uses exact timing bounds first, then ordered fallback when counts match.
-        """
+        initial_variables = {
+            "audio_profile": audio_profile,
+            "display_groups": planning_context.display_groups,
+            # Theme catalog: theme_id + title for selection
+            "theme_catalog": [
+                {"theme_id": t["id"], "title": t["title"]} for t in theming_catalog["themes"]
+            ],
+            # Palette catalog: for palette override validation
+            "palette_catalog": theming_catalog["palettes"],
+            # Tag catalog: for valid tag selection
+            "tag_catalog": theming_catalog["tags"],
+            # Motif catalog: for motif selection and energy matching
+            "motif_catalog": theming_catalog["motifs"],
+            # ID lists for validation
+            "theming_ids": theming_ids,
+        }
+
+        # Derive typed targeting catalogs for macro section intent (group/zone/split)
+        available_group_ids: list[str] = []
+        available_zones: set[str] = set()
+        available_splits: set[str] = set()
+        targetable_zone_ids = {tag.value for tag in ChoreoTag}
+        for group in planning_context.display_groups:
+            gid = str(group.get("id") or "").strip()
+            if gid:
+                available_group_ids.append(gid)
+
+            for tag in group.get("tags") or []:
+                tag_id = str(tag)
+                if tag_id in targetable_zone_ids:
+                    available_zones.add(tag_id)
+
+            splits = group.get("split_membership") or group.get("splits") or []
+            if isinstance(splits, list):
+                available_splits.update(str(split) for split in splits if split)
+
+        initial_variables["available_group_ids"] = available_group_ids
+        initial_variables["available_zone_ids"] = sorted(available_zones)
+        initial_variables["available_split_ids"] = sorted(available_splits)
+
+        # Add lyric context if available
+        if planning_context.lyric_context:
+            initial_variables["lyric_context"] = planning_context.lyric_context
+        return initial_variables
+
+    def validate_external_contract(
+        self, plan: MacroPlan, planning_context: PlanningContext
+    ) -> list[str]:
+        """Run the production audio/catalog/graph validator used after schema parsing."""
+        audio_profile = planning_context.audio_profile
+        theming_catalog = get_theming_catalog_dict()
+        theming_ids = get_theming_ids()
+        self._canonicalize_section_ids(plan, audio_profile)
+        issues = self.heuristic_validator.validate(
+            plan,
+            audio_profile,
+            motif_by_id={item["id"]: item for item in theming_catalog["motifs"]},
+            palette_ids={item["id"] for item in theming_catalog["palettes"]},
+            theme_ids=set(theming_ids["theme_ids"]),
+            tag_ids=set(theming_ids["tag_ids"]),
+            display_groups=planning_context.display_groups,
+        )
+        return [
+            f"{issue.category.value}: {issue.message}"
+            for issue in issues
+            if issue.severity.name == "ERROR"
+        ]
+
+    def _canonicalize_section_ids(self, plan: MacroPlan, audio_profile: object) -> None:
+        """Atomically normalize section IDs and every internal cross-reference."""
         sections = getattr(getattr(audio_profile, "structure", None), "sections", None)
         if not sections:
             return
 
         expected = list(sections)
         by_bounds = {(int(s.start_ms), int(s.end_ms)): s for s in expected}
-
-        # Pass 1: exact timing match
-        for section_plan in plan.section_plans:
+        remap: dict[str, tuple[str, str]] = {}
+        for section_plan in plan.sections:
             key = (int(section_plan.section.start_ms), int(section_plan.section.end_ms))
             match = by_bounds.get(key)
             if match is not None:
-                section_plan.section = section_plan.section.model_copy(
-                    update={"section_id": str(match.section_id), "name": str(match.name)}
+                remap[section_plan.section.section_id] = (
+                    str(match.section_id),
+                    str(match.name),
                 )
-
-        # Pass 2: ordered fallback when section count matches
-        if len(plan.section_plans) != len(expected):
+        if not remap:
             return
 
-        sorted_plan = sorted(
-            plan.section_plans, key=lambda sp: (sp.section.start_ms, sp.section.end_ms)
-        )
-        sorted_expected = sorted(expected, key=lambda s: (s.start_ms, s.end_ms))
-        for plan_section, expected_section in zip(sorted_plan, sorted_expected, strict=False):
-            if (
-                abs(int(plan_section.section.start_ms) - int(expected_section.start_ms)) <= 1
-                and abs(int(plan_section.section.end_ms) - int(expected_section.end_ms)) <= 1
-            ):
-                plan_section.section = plan_section.section.model_copy(
-                    update={
-                        "section_id": str(expected_section.section_id),
-                        "name": str(expected_section.name),
-                    }
-                )
+        data = plan.model_dump()
+        for item in data["sections"]:
+            old_id = item["section"]["section_id"]
+            if old_id in remap:
+                item["section"]["section_id"], item["section"]["name"] = remap[old_id]
+        for stop in data["palette_arc"]:
+            old_id = stop["applies_from_section_id"]
+            stop["applies_from_section_id"] = remap.get(old_id, (old_id, ""))[0]
+        for thread in data["motif_continuity"]:
+            thread["section_ids"] = [
+                remap.get(section_id, (section_id, ""))[0] for section_id in thread["section_ids"]
+            ]
+        for assignment in data["focal_arc"]:
+            old_id = assignment["section_id"]
+            assignment["section_id"] = remap.get(old_id, (old_id, ""))[0]
+
+        normalized = MacroPlan.model_validate(data)
+        plan.sections = normalized.sections
+        plan.palette_arc = normalized.palette_arc
+        plan.motif_continuity = normalized.motif_continuity
+        plan.focal_arc = normalized.focal_arc

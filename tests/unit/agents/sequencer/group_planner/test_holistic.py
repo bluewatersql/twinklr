@@ -366,10 +366,53 @@ class TestHolisticEvaluator:
             group_plan_set=sample_group_plan_set,
             choreo_graph=sample_choreo_graph,
             template_catalog=sample_template_catalog,
-            macro_plan_summary={"global_story": {"theme": "Test theme"}},
+            macro_plan_summary={
+                "macro_plan": {
+                    "palette_arc": [{"stop_id": "main"}],
+                    "motif_continuity": [],
+                    "focal_arc": [],
+                }
+            },
         )
 
         assert "group_plan_set" in variables
         assert "display_graph" in variables
         assert "section_count" in variables
         assert variables["section_count"] == 2
+
+    @pytest.mark.asyncio
+    async def test_cache_key_tracks_typed_macro_summary(
+        self,
+        sample_group_plan_set: GroupPlanSet,
+        sample_choreo_graph: ChoreographyGraph,
+        sample_template_catalog: TemplateCatalog,
+    ) -> None:
+        """Song-level macro-only changes invalidate holistic evaluation cache."""
+        evaluator = HolisticEvaluator(provider=MagicMock())
+        baseline = {
+            "macro_plan": {
+                "palette_arc": [{"stop_id": "main", "transition": "HOLD"}],
+                "motif_continuity": [{"motif_id": "pulse"}],
+                "focal_arc": [{"section_id": "verse_1"}],
+            }
+        }
+        changed = {
+            "macro_plan": {
+                **baseline["macro_plan"],
+                "palette_arc": [{"stop_id": "main", "transition": "CROSSFADE"}],
+            }
+        }
+
+        base_key = await evaluator.get_cache_key(
+            sample_group_plan_set,
+            sample_choreo_graph,
+            sample_template_catalog,
+            baseline,
+        )
+        changed_key = await evaluator.get_cache_key(
+            sample_group_plan_set,
+            sample_choreo_graph,
+            sample_template_catalog,
+            changed,
+        )
+        assert base_key != changed_key

@@ -1,88 +1,18 @@
-{#
-MacroPlanner User Prompt - REFINEMENT ONLY
-Used for iteration 2+ to avoid resending full context.
-References existing conversation context (song, display, structure).
+# Revise the Typed MacroPlan
 
-Token Optimization: Reduced context on refinement iterations.
-#}
-# Refinement Request: MacroPlan
-
-## Iteration {{ iteration + 1 }} Feedback
+Iteration {{ iteration + 1 }} feedback:
 
 {{ feedback }}
 
-## Key Reminders (from initial context)
-
-- **Song**: {{ audio_profile.song_identity.title or "Untitled" }} by {{ audio_profile.song_identity.artist or "Unknown" }}
-- **Duration**: {{ (audio_profile.song_identity.duration_ms / 1000) | round(1) }}s
-- **BPM**: {{ audio_profile.song_identity.bpm | round(1) }}
-- **Sections**: {{ audio_profile.structure.sections | length }}
-- **Overall Energy**: {{ audio_profile.energy_profile.macro_energy.value }}
-
-{% if revision_request %}
-## Revision Priority: {{ revision_request.priority }}
-
-{% if revision_request.focus_areas %}
-**Focus Areas:** {{ revision_request.focus_areas | join(", ") }}
-{% endif %}
-
-{% if revision_request.specific_fixes %}
-**Fixes Required:**
-{% for fix in revision_request.specific_fixes[:10] %}
+{% if revision_request is defined and revision_request %}
+Priority: {{ revision_request.priority }}
+{% for fix in revision_request.specific_fixes | default([]) %}
 - {{ fix }}
 {% endfor %}
-{% if revision_request.specific_fixes | length > 10 %}
-- ... and {{ revision_request.specific_fixes | length - 10 }} more issues
-{% endif %}
 {% endif %}
 
-{% if revision_request.avoid %}
-**Avoid:**
-{% for item in revision_request.avoid %}
-- {{ item }}
-{% endfor %}
-{% endif %}
-{% endif %}
-
-## Section Structure (Quick Reference)
-
-{% for section in audio_profile.structure.sections %}
-- **{{ section.name }}** ({{ section.section_id }}) - {{ (section.start_ms / 1000) | round(1) }}s to {{ (section.end_ms / 1000) | round(1) }}s
-{% endfor %}
-
-## Theme Catalog (Allowed IDs)
-
-Use only these theme_ids (do not invent):
-{% for t in theme_catalog %}
-- {{ t.theme_id }}
-{% endfor %}
-
-## Critical Reminders
-
-1. **Theme Selection**: Use ONLY theme_ids from the catalog above
-2. **Section Coverage**: Plan all {{ audio_profile.structure.sections | length }} sections
-3. **Section IDs are strict**: Keep exact IDs from structure (e.g., `verse_4`, not `verse`)
-4. **Target IDs are strict**:
-   - `layering_plan.layers[*].target_selector.roles` must be concrete display group IDs only
-   - `section_plans[*].primary_focus_targets` and `secondary_targets` must be schema-valid typed target objects
-   - `primary_focus_targets` must contain at least one typed target object
-5. **Layer Architecture**: Maintain distinct foundational, rhythmic, and accent structure
-6. **Story Coherence**: Keep global theme consistent across sections
-7. **Theme Override Discipline**: Keep theme overrides limited and intentional (target <=25-35% of sections unless one explicit contiguous scene block)
-8. **Palette Plan**: Global primary palette required; use valid palette_ids only; section overrides must say exactly where they apply
-9. **Motif Balance**: 3-8 total motifs; 2-4 "core" motifs in 70%+ of sections; 1-3 "spice" motifs in 2-4 sections only
-10. **Schema**: Return valid MacroPlan JSON per developer prompt
-
-## Instructions
-
-1. Address all highest-severity issues first, then lower-severity issues that block score >= {{ approval_score_threshold | default(7.0) }}
-2. Keep structure that worked - only fix flagged issues
-3. Maintain global story coherence while addressing feedback
-4. If feedback includes `THEME_SHIFT_OVERUSED`, reduce theme overrides and keep any remaining overrides in one bounded scene block
-5. If feedback includes palette override warnings, specify exact target/layer scope in notes for each overridden section
-6. If feedback includes motif cohesion warnings, explicitly state core motifs + where spice motifs are allowed
-7. Keep global_story.theme unless feedback requires a theme change
-8. Ensure all palette_ids, motif_ids, and target IDs are from provided catalogs/layout
-9. Return complete revised MacroPlan
-
-Remember: Bold impact, main character energy, coordinated wow moments!
+Keep all valid work, but return the complete revised four-field MacroPlan. Preserve exact
+audio section IDs/timestamps and repair references atomically across `sections`,
+`palette_arc`, `motif_continuity`, and `focal_arc`. Use only supplied catalog and display
+IDs. Recheck active palette stops, one matching LEAD per section, motif references, and
+distinct call/response targets before responding.

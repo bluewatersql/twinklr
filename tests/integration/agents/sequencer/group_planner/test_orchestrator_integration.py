@@ -124,8 +124,8 @@ def sample_section_context(
         energy_target="MED",
         motion_density="MED",
         choreography_style="HYBRID",
-        primary_focus_targets=["HERO"],
-        secondary_targets=["ARCHES"],
+        lead_targets=["HERO"],
+        support_targets=["ARCHES"],
         notes=None,
         choreo_graph=sample_choreo_graph,
         template_catalog=sample_template_catalog,
@@ -237,12 +237,12 @@ class TestGroupPlannerOrchestratorIntegration:
         assert variables["start_ms"] == 0
         assert variables["end_ms"] == 4000
         assert variables["energy_target"] == "MED"
-        assert variables["primary_focus_targets"] == ["HERO"]
+        assert variables["lead_targets"] == ["HERO"]
         assert "display_graph" in variables
         assert "template_catalog" in variables
         # timing_context explicitly excluded via context shaping (not used in prompt)
         assert "timing_context" not in variables
-        assert "layer_intents" in variables
+        assert "macro_input" in variables
 
     def test_orchestrator_validator_catches_invalid_template(
         self,
@@ -324,8 +324,8 @@ class TestGroupPlannerOrchestratorIntegration:
             energy_target="MED",
             motion_density="MED",
             choreography_style="HYBRID",
-            primary_focus_targets=[],  # Empty - invalid!
-            secondary_targets=[],
+            lead_targets=[],  # Empty - invalid!
+            support_targets=[],
             notes=None,
             choreo_graph=sample_choreo_graph,
             template_catalog=sample_template_catalog,
@@ -334,5 +334,5 @@ class TestGroupPlannerOrchestratorIntegration:
 
         orchestrator = GroupPlannerOrchestrator(provider=mock_provider)
 
-        with pytest.raises(ValueError, match="primary_focus_target"):
+        with pytest.raises(ValueError, match="LEAD target"):
             await orchestrator.run(section_context=invalid_context)
