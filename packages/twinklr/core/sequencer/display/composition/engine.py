@@ -25,6 +25,7 @@ from twinklr.core.sequencer.display.composition.layer_allocator import (
 )
 from twinklr.core.sequencer.display.composition.models import (
     CompiledEffect,
+    ExpandedPlacement,
 )
 from twinklr.core.sequencer.display.composition.palette_resolver import (
     PaletteResolver,
@@ -77,12 +78,9 @@ from twinklr.core.sequencer.templates.group.models.coordination import (
 from twinklr.core.sequencer.timing.beat_grid import BeatGrid
 from twinklr.core.sequencer.vocabulary import (
     CoordinationMode,
-    EffectDuration,
     IntensityLevel,
     LaneKind,
-    PlanningTimeRef,
     StepUnit,
-    TimingHint,
 )
 from twinklr.core.sequencer.vocabulary.choreography import TargetType
 from twinklr.core.sequencer.vocabulary.coordination import SpatialIntent
@@ -186,6 +184,9 @@ class CompositionEngine:
         Returns:
             RenderPlan intermediate representation.
         """
+        # Every compose call is an independent run.  Blend decisions use first-wins
+        # within a run, so stale entries must never survive into the next one.
+        self._layer_blend_modes.clear()
         diagnostics: list[CompositionDiagnostic] = []
 
         # Accumulator: element_name → layer_index → list[RenderEvent]
@@ -316,7 +317,7 @@ class CompositionEngine:
                 "Pass template_compiler to DisplayRenderer or CompositionEngine."
             )
         # Expand SEQUENCED/CALL_RESPONSE/RIPPLE windows into placements
-        placements = list(coord_plan.placements)
+        placements: list[GroupPlacement | ExpandedPlacement] = list(coord_plan.placements)
 
         if (
             not placements
@@ -329,13 +330,17 @@ class CompositionEngine:
                 CoordinationMode.RIPPLE,
             }
         ):
-            placements = self._expand_window(
-                window=coord_plan.window,
-                config=coord_plan.config,
-                coordination_mode=coord_plan.coordination_mode,
-                section=section,
-                lane=lane,
-                diagnostics=diagnostics,
+            placements.clear()
+            placements.extend(
+                self._expand_window(
+                    window=coord_plan.window,
+                    config=coord_plan.config,
+                    coordination_mode=coord_plan.coordination_mode,
+                    section=section,
+                    lane=lane,
+                    section_start_bar=section_start_bar,
+                    diagnostics=diagnostics,
+                )
             )
 
         if not placements:
@@ -343,7 +348,13 @@ class CompositionEngine:
 
         overlay_layer_idx = self._layer_allocator.allocate_overlay(lane)
 
-        for idx, placement in enumerate(placements):
+        for idx, candidate in enumerate(placements):
+            if isinstance(candidate, ExpandedPlacement):
+                placement = candidate.placement
+                expanded_timing = (candidate.start_ms, candidate.end_ms)
+            else:
+                placement = candidate
+                expanded_timing = None
             compiled_effects = self._compose_placement_compiled(
                 placement=placement,
                 section=section,
@@ -353,6 +364,7 @@ class CompositionEngine:
                 section_end_ms=section_end_ms,
                 placement_index=idx,
                 diagnostics=diagnostics,
+                expanded_timing=expanded_timing,
             )
             element_name = self._target_resolver.resolve(placement.target.id)
 
@@ -393,8 +405,9 @@ class CompositionEngine:
         coordination_mode: CoordinationMode,
         section: SectionCoordinationPlan,
         lane: LaneKind,
+        section_start_bar: int,
         diagnostics: list[CompositionDiagnostic],
-    ) -> list[GroupPlacement]:
+    ) -> list[ExpandedPlacement]:
         """Expand a window into per-group placements by coordination mode.
 
         Dispatches to mode-specific expansion logic:
@@ -409,31 +422,33 @@ class CompositionEngine:
             coordination_mode: How groups relate to each other.
             section: Parent section for context.
             lane: Lane kind.
+            section_start_bar: Absolute song bar anchoring section-relative refs.
             diagnostics: Accumulator.
 
         Returns:
-            List of expanded GroupPlacement objects.
+            List of internal millisecond-native ExpandedPlacement objects.
         """
-        # Resolve window boundaries to ms (section-relative).
-        # _compose_placement handles the section offset, so we
-        # work in section-relative time here.
-        window_start_ms = self._timing_resolver.resolve_start_ms(window.start)
-        window_end_ms = self._timing_resolver.resolve_start_ms(window.end)
+        # Work in absolute fractional-beat coordinates. The section anchor is part of
+        # the coordinate before any local BeatGrid interpolation occurs.
+        window_start_beat = self._timing_resolver.resolve_beat_position(
+            window.start, section_start_bar
+        )
+        window_end_beat = self._timing_resolver.resolve_beat_position(window.end, section_start_bar)
 
-        if window_end_ms <= window_start_ms:
+        if window_end_beat <= window_start_beat:
             diagnostics.append(
                 CompositionDiagnostic(
                     level="warning",
                     message=(
                         f"Window has zero/negative duration "
-                        f"(start={window_start_ms}, end={window_end_ms})"
+                        f"(start_beat={window_start_beat}, end_beat={window_end_beat})"
                     ),
                     source_section=section.section_id,
                 )
             )
             return []
 
-        step_ms = self._resolve_step_ms(config.step_unit, config.step_duration)
+        step_beats = self._resolve_step_beats(config.step_unit, config.step_duration)
 
         if len(config.group_order) == 0:
             return []
@@ -465,68 +480,67 @@ class CompositionEngine:
 
         if coordination_mode == CoordinationMode.RIPPLE:
             return self._expand_ripple(
-                window, effective_config, step_ms, window_start_ms, window_end_ms
+                window, effective_config, step_beats, window_start_beat, window_end_beat
             )
         if coordination_mode == CoordinationMode.CALL_RESPONSE:
             return self._expand_call_response(
-                window, effective_config, step_ms, window_start_ms, window_end_ms
+                window, effective_config, step_beats, window_start_beat, window_end_beat
             )
 
         # Default: SEQUENCED
         return self._expand_sequenced(
-            window, effective_config, step_ms, window_start_ms, window_end_ms
+            window, effective_config, step_beats, window_start_beat, window_end_beat
         )
 
     def _expand_sequenced(
         self,
         window: PlacementWindow,
         config: CoordinationConfig,
-        step_ms: int,
-        window_start_ms: int,
-        window_end_ms: int,
-    ) -> list[GroupPlacement]:
+        step_beats: float,
+        window_start_beat: float,
+        window_end_beat: float,
+    ) -> list[ExpandedPlacement]:
         """SEQUENCED: non-overlapping round-robin slots.
 
-        Each group gets a time slot of ``step_ms``, then the next group
+        Each group gets a time slot of ``step_beats``, then the next group
         takes over. Groups cycle through in order across the window.
         """
-        placements: list[GroupPlacement] = []
+        placements: list[ExpandedPlacement] = []
         group_count = len(config.group_order)
 
         for group_idx, group_id in enumerate(config.group_order):
-            group_offset_ms = group_idx * step_ms
-            current_ms = window_start_ms + group_offset_ms
+            group_offset_beats = group_idx * step_beats
+            current_beat = window_start_beat + group_offset_beats
             slot_idx = 0
 
-            while current_ms < window_end_ms:
-                slot_duration_ms = step_ms * group_count
-                slot_end_ms = min(current_ms + slot_duration_ms, window_end_ms)
+            while current_beat < window_end_beat:
+                slot_end_beat = min(current_beat + step_beats, window_end_beat)
 
-                if slot_end_ms <= current_ms:
+                if slot_end_beat <= current_beat:
                     break
 
-                start_ref = self._ms_to_planning_ref(current_ms)
-                duration = self._ms_to_duration(slot_end_ms - current_ms)
-
                 placements.append(
-                    GroupPlacement(
-                        placement_id=f"seq_{group_id}_{slot_idx}",
-                        target=PlanTarget(type=TargetType.GROUP, id=group_id),
-                        template_id=window.template_id,
-                        start=start_ref,
-                        duration=duration,
-                        param_overrides=dict(window.param_overrides),
-                        intensity=window.intensity,
+                    ExpandedPlacement(
+                        placement=GroupPlacement(
+                            placement_id=f"seq_{group_id}_{slot_idx}",
+                            target=PlanTarget(type=TargetType.GROUP, id=group_id),
+                            template_id=window.template_id,
+                            start=window.start,
+                            param_overrides=dict(window.param_overrides),
+                            intensity=window.intensity,
+                        ),
+                        start_ms=self._timing_resolver.resolve_beat_position_ms(current_beat),
+                        end_ms=self._timing_resolver.resolve_beat_position_ms(slot_end_beat),
                     )
                 )
 
-                current_ms += slot_duration_ms
+                current_beat += step_beats * group_count
                 slot_idx += 1
 
         logger.debug(
-            "Expanded SEQUENCED window: %d groups × %d step_ms → %d placements",
+            "Expanded SEQUENCED window: %d groups × %.1f step beats → %d placements",
             group_count,
-            step_ms,
+            step_beats,
             len(placements),
         )
         return placements
@@ -535,70 +549,70 @@ class CompositionEngine:
         self,
         window: PlacementWindow,
         config: CoordinationConfig,
-        step_ms: int,
-        window_start_ms: int,
-        window_end_ms: int,
-    ) -> list[GroupPlacement]:
+        step_beats: float,
+        window_start_beat: float,
+        window_end_beat: float,
+    ) -> list[ExpandedPlacement]:
         """RIPPLE: overlapping wave propagation across groups.
 
-        Each group plays the full ``step_ms`` duration, but starts
-        ``phase_offset * step_ms`` after the previous group. When
+        Each group plays the full ``step_beats`` duration, but starts
+        ``phase_offset * step_beats`` after the previous group. When
         ``phase_offset`` < 1.0, groups overlap in time — creating
         a ripple/wave visual that propagates across the display.
 
         With ``phase_offset=0.0``, falls back to SEQUENCED spacing
         (one step per group, no overlap).
         """
-        placements: list[GroupPlacement] = []
+        placements: list[ExpandedPlacement] = []
         group_count = len(config.group_order)
 
-        # Phase offset between consecutive groups (in ms)
-        offset_ms = int(config.phase_offset * step_ms)
-        if offset_ms <= 0:
+        # Phase offset between consecutive groups in fractional beats.
+        offset_beats = config.phase_offset * step_beats
+        if offset_beats <= 0:
             # Fallback: no overlap → use SEQUENCED spacing
-            offset_ms = step_ms
+            offset_beats = step_beats
 
         # Wave period: time between the start of consecutive waves.
-        # One wave = all groups staggered by offset_ms.
-        wave_period_ms = max(step_ms, offset_ms * group_count)
+        # One wave = all groups staggered by offset_beats.
+        wave_period_beats = max(step_beats, offset_beats * group_count)
 
         wave_idx = 0
         while True:
-            wave_start_ms = window_start_ms + wave_idx * wave_period_ms
-            if wave_start_ms >= window_end_ms:
+            wave_start_beat = window_start_beat + wave_idx * wave_period_beats
+            if wave_start_beat >= window_end_beat:
                 break
 
             for group_idx, group_id in enumerate(config.group_order):
-                start_ms = wave_start_ms + group_idx * offset_ms
+                start_beat = wave_start_beat + group_idx * offset_beats
 
-                if start_ms >= window_end_ms:
+                if start_beat >= window_end_beat:
                     break
 
-                end_ms = min(start_ms + step_ms, window_end_ms)
-                if end_ms <= start_ms:
+                end_beat = min(start_beat + step_beats, window_end_beat)
+                if end_beat <= start_beat:
                     break
-
-                start_ref = self._ms_to_planning_ref(start_ms)
-                duration = self._ms_to_duration(end_ms - start_ms)
 
                 placements.append(
-                    GroupPlacement(
-                        placement_id=f"rpl_{group_id}_{wave_idx}",
-                        target=PlanTarget(type=TargetType.GROUP, id=group_id),
-                        template_id=window.template_id,
-                        start=start_ref,
-                        duration=duration,
-                        param_overrides=dict(window.param_overrides),
-                        intensity=window.intensity,
+                    ExpandedPlacement(
+                        placement=GroupPlacement(
+                            placement_id=f"rpl_{group_id}_{wave_idx}",
+                            target=PlanTarget(type=TargetType.GROUP, id=group_id),
+                            template_id=window.template_id,
+                            start=window.start,
+                            param_overrides=dict(window.param_overrides),
+                            intensity=window.intensity,
+                        ),
+                        start_ms=self._timing_resolver.resolve_beat_position_ms(start_beat),
+                        end_ms=self._timing_resolver.resolve_beat_position_ms(end_beat),
                     )
                 )
 
             wave_idx += 1
 
         logger.debug(
-            "Expanded RIPPLE window: %d groups × %dms offset → %d placements",
+            "Expanded RIPPLE window: %d groups × %.2f-beat offset → %d placements",
             group_count,
-            offset_ms,
+            offset_beats,
             len(placements),
         )
         return placements
@@ -607,51 +621,52 @@ class CompositionEngine:
         self,
         window: PlacementWindow,
         config: CoordinationConfig,
-        step_ms: int,
-        window_start_ms: int,
-        window_end_ms: int,
-    ) -> list[GroupPlacement]:
+        step_beats: float,
+        window_start_beat: float,
+        window_end_beat: float,
+    ) -> list[ExpandedPlacement]:
         """CALL_RESPONSE: alternating A/B group teams.
 
         Groups are split into two teams based on position in
         ``group_order``: even-indexed groups form team A ("call"),
         odd-indexed form team B ("response"). Teams take turns,
-        each active for ``step_ms`` before the other team responds.
+        each active for ``step_beats`` before the other team responds.
         """
-        placements: list[GroupPlacement] = []
+        placements: list[ExpandedPlacement] = []
 
         a_groups = [g for i, g in enumerate(config.group_order) if i % 2 == 0]
         b_groups = [g for i, g in enumerate(config.group_order) if i % 2 == 1]
 
-        current_ms = window_start_ms
+        current_beat = window_start_beat
         slot_idx = 0
         is_a_turn = True
 
-        while current_ms < window_end_ms:
+        while current_beat < window_end_beat:
             active_groups = a_groups if is_a_turn else b_groups
-            slot_end_ms = min(current_ms + step_ms, window_end_ms)
+            slot_end_beat = min(current_beat + step_beats, window_end_beat)
 
-            if slot_end_ms <= current_ms:
+            if slot_end_beat <= current_beat:
                 break
 
-            start_ref = self._ms_to_planning_ref(current_ms)
-            duration = self._ms_to_duration(slot_end_ms - current_ms)
             prefix = "cr_a" if is_a_turn else "cr_b"
 
             for group_id in active_groups:
                 placements.append(
-                    GroupPlacement(
-                        placement_id=f"{prefix}_{group_id}_{slot_idx}",
-                        target=PlanTarget(type=TargetType.GROUP, id=group_id),
-                        template_id=window.template_id,
-                        start=start_ref,
-                        duration=duration,
-                        param_overrides=dict(window.param_overrides),
-                        intensity=window.intensity,
+                    ExpandedPlacement(
+                        placement=GroupPlacement(
+                            placement_id=f"{prefix}_{group_id}_{slot_idx}",
+                            target=PlanTarget(type=TargetType.GROUP, id=group_id),
+                            template_id=window.template_id,
+                            start=window.start,
+                            param_overrides=dict(window.param_overrides),
+                            intensity=window.intensity,
+                        ),
+                        start_ms=self._timing_resolver.resolve_beat_position_ms(current_beat),
+                        end_ms=self._timing_resolver.resolve_beat_position_ms(slot_end_beat),
                     )
                 )
 
-            current_ms += step_ms
+            current_beat += step_beats
             is_a_turn = not is_a_turn
             slot_idx += 1
 
@@ -663,84 +678,25 @@ class CompositionEngine:
         )
         return placements
 
-    def _resolve_step_ms(self, step_unit: StepUnit, step_duration: int) -> int:
-        """Resolve a step unit and duration to milliseconds.
+    def _resolve_step_beats(self, step_unit: StepUnit, step_duration: int) -> float:
+        """Resolve a step unit and duration to a beat span.
 
         Args:
             step_unit: BEAT, BAR, or PHRASE.
             step_duration: Number of step units.
 
         Returns:
-            Step size in milliseconds.
+            Step size in beats.
         """
-        ms_per_beat = 60_000.0 / self._beat_grid.tempo_bpm
-        beats_per_bar = self._beat_grid.beats_per_bar
-
         if step_unit == StepUnit.BEAT:
-            return int(ms_per_beat * step_duration)
+            return float(step_duration)
         elif step_unit == StepUnit.BAR:
-            return int(ms_per_beat * beats_per_bar * step_duration)
+            return float(self._beat_grid.beats_per_bar * step_duration)
         elif step_unit == StepUnit.PHRASE:
             # Phrase = 4 bars by convention
-            return int(ms_per_beat * beats_per_bar * 4 * step_duration)
+            return float(self._beat_grid.beats_per_bar * 4 * step_duration)
         else:
-            return int(ms_per_beat * step_duration)
-
-    def _ms_to_planning_ref(self, ms: float) -> PlanningTimeRef:
-        """Convert milliseconds to a PlanningTimeRef (bar/beat).
-
-        Args:
-            ms: Time in milliseconds.
-
-        Returns:
-            PlanningTimeRef with 1-indexed bar and beat.
-        """
-        ms_per_beat = 60_000.0 / self._beat_grid.tempo_bpm
-        beats_per_bar = self._beat_grid.beats_per_bar
-
-        total_beats = ms / ms_per_beat
-        bar_0 = int(total_beats // beats_per_bar)
-        beat_in_bar = int(total_beats % beats_per_bar)
-
-        return PlanningTimeRef(
-            bar=bar_0 + 1,  # 1-indexed
-            beat=beat_in_bar + 1,  # 1-indexed
-            timing_hint=TimingHint.ON_BEAT,
-        )
-
-    def _ms_to_duration(self, duration_ms: float) -> EffectDuration:
-        """Map a millisecond duration to the nearest EffectDuration category.
-
-        Boundaries are aligned with the vocabulary ranges in
-        ``DURATION_BEATS``, using midpoints between consecutive
-        categories as thresholds:
-
-        - HIT: 1-2 beats → <=3 beats
-        - BURST: 4 beats → <=6 beats
-        - PHRASE: 8-16 beats → <=16 beats
-        - EXTENDED: 16-32 beats → <=32 beats
-        - SECTION: anything longer
-
-        Args:
-            duration_ms: Duration in milliseconds.
-
-        Returns:
-            Closest EffectDuration category.
-        """
-        ms_per_beat = 60_000.0 / self._beat_grid.tempo_bpm
-
-        beats = duration_ms / ms_per_beat
-
-        if beats <= 3:
-            return EffectDuration.HIT
-        elif beats <= 6:
-            return EffectDuration.BURST
-        elif beats <= 16:
-            return EffectDuration.PHRASE
-        elif beats <= 32:
-            return EffectDuration.EXTENDED
-        else:
-            return EffectDuration.SECTION
+            return float(step_duration)
 
     def _compose_placement_compiled(
         self,
@@ -752,6 +708,7 @@ class CompositionEngine:
         section_end_ms: int | None,
         placement_index: int,
         diagnostics: list[CompositionDiagnostic],
+        expanded_timing: tuple[float, float] | None = None,
     ) -> list[CompiledEffect]:
         """Compose a placement via the TemplateCompiler (multi-layer path).
 
@@ -781,16 +738,24 @@ class CompositionEngine:
         """
         assert self._template_compiler is not None  # caller guarantees
 
-        # Resolve timing
-        start_ms = self._timing_resolver.resolve_start_ms(
-            placement.start,
-            section_start_bar=section_start_bar,
-        )
-        end_ms = self._timing_resolver.resolve_end_ms(
-            start_ms=start_ms,
-            duration=placement.duration,
-            section_end_ms=section_end_ms,
-        )
+        # Planner-authored placements retain their categorical resolver path.
+        # Expanded placements already carry exact absolute milliseconds.
+        if expanded_timing is None:
+            start_ms = self._timing_resolver.resolve_start_ms(
+                placement.start,
+                section_start_bar=section_start_bar,
+            )
+            end_ms = self._timing_resolver.resolve_end_ms(
+                start_ms=start_ms,
+                duration=placement.duration,
+                section_end_ms=section_end_ms,
+            )
+        else:
+            start_ms, end_ms = self._timing_resolver.resolve_native_range(
+                expanded_timing[0],
+                expanded_timing[1],
+                section_end_ms=section_end_ms,
+            )
 
         if end_ms <= start_ms:
             diagnostics.append(
@@ -990,34 +955,37 @@ class CompositionEngine:
             return events
 
         resolved: list[RenderEvent] = []
+        allocated_ids = {event.event_id for event in events}
 
-        for i, event in enumerate(events):
-            if i + 1 < len(events):
-                next_event = events[i + 1]
-                if event.end_ms > next_event.start_ms:
-                    # Trim current event to next event's start
-                    trimmed_end = next_event.start_ms
-                    if trimmed_end > event.start_ms:
-                        # Create trimmed copy (frozen model, must reconstruct)
-                        event = RenderEvent(
-                            event_id=event.event_id,
-                            start_ms=event.start_ms,
-                            end_ms=trimmed_end,
-                            effect_type=event.effect_type,
-                            parameters=event.parameters,
-                            buffer_style=event.buffer_style,
-                            buffer_transform=event.buffer_transform,
-                            palette=event.palette,
-                            intensity=event.intensity,
-                            transition_in=event.transition_in,
-                            transition_out=event.transition_out,
-                            source=event.source,
-                        )
-                    else:
-                        # Event fully eclipsed, skip it
-                        continue
+        def allocate_tail_id(base_id: str) -> str:
+            candidate = base_id
+            suffix = 2
+            while candidate in allocated_ids:
+                candidate = f"{base_id}_{suffix}"
+                suffix += 1
+            allocated_ids.add(candidate)
+            return candidate
 
-            resolved.append(event)
+        # Later events win.  Subtract each incoming interval from every survivor;
+        # retaining both the head and tail prevents a short accent from deleting the
+        # rest of a long base event.
+        for event in sorted(events, key=lambda value: value.start_ms):
+            survivors: list[RenderEvent] = []
+            for prior in resolved:
+                if prior.end_ms <= event.start_ms or prior.start_ms >= event.end_ms:
+                    survivors.append(prior)
+                    continue
+
+                if prior.start_ms < event.start_ms:
+                    survivors.append(prior.model_copy(update={"end_ms": event.start_ms}))
+                if prior.end_ms > event.end_ms:
+                    tail_id = allocate_tail_id(f"{prior.event_id}__trim_tail_{event.event_id}")
+                    survivors.append(
+                        prior.model_copy(update={"event_id": tail_id, "start_ms": event.end_ms})
+                    )
+
+            survivors.append(event)
+            resolved = sorted(survivors, key=lambda value: (value.start_ms, value.event_id))
 
         return resolved
 

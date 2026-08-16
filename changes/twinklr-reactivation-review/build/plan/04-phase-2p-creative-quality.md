@@ -6,11 +6,13 @@ scored by the vision-eval harness — then the deterministic-vs-LLM comparison r
 a validation gate inside the committed direction. Proposal M2; D1/D4/D6/D8/D10/D11 +
 parts of D2._
 
-> **Status — 2026-08-14:** all 13 deterministic/offline implementations are merged
+> **Status — 2026-08-16:** all 13 deterministic/offline implementations are merged
 > and independently verified at integrated snapshot `6b2b34a`. This is an **offline
 > implementation milestone, not Phase 2P completion**. Live xLights/provider checks,
-> owner reviews for T1/T6/T8/T9, owner-accepted vision calibration, the real three-arm
-> run and blind human review, and the resulting T13/D1 decision evidence remain pending. The current snapshot and
+> the T6/T13 owner gates, owner-accepted vision calibration, the real three-arm run and
+> blind human review, and the resulting T13/D1 decision evidence remain pending. The
+> owner accepted the T1 schema contract, T8 DSP-retention recommendation, and T9
+> iteration/threshold policy on 2026-08-16. The current snapshot and
 > continuation order are owned by [HANDOFF.md](HANDOFF.md); dated appendices in task
 > specs remain evidence snapshots from their authoring/review moment.
 
@@ -68,14 +70,14 @@ This record does not satisfy the phase exit criteria. In particular:
 - P2P-T6 still needs the live one-song proof and an owner-accepted, hash-pinned N≥5
   calibration artifact, plus owner review of the rubric and cost budget.
 - P2P-T1's field/vocabulary/deletion contract, P2P-T8's DSP-retention recommendation,
-  and P2P-T9's iteration/threshold semantics still require their specified owner reviews.
+  and P2P-T9's iteration/threshold semantics were accepted by the owner on 2026-08-16.
 - P2P-T13 still needs the owner-local N≥8 / exactly-5N experiment, blinded human
   ranking, and independent evidence review. No D1 verdict or result artifact exists.
 - The bounded local-only T5, T7, T10/T11, and T12 empirical checks remain pending as
   enumerated in [HANDOFF.md](HANDOFF.md) and their owning specs.
 
-P2P-T8's fixed offline gate recommends retaining the current custom DSP default because
+P2P-T8's fixed offline gate retains the current custom DSP default because
 neither optional model arm supplied complete admissible evidence. The runtime default
-remains DSP, but the adoption decision is pending explicit owner review. The active
-pending-owner record is
+remains DSP; the owner accepted the adoption recommendation on 2026-08-16. The accepted
+decision record is
 [keep-dsp-after-mir-ab.md](../../../../memories/decisions/keep-dsp-after-mir-ab.md).

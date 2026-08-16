@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from itertools import pairwise
 from pathlib import Path
 
 from twinklr.core.sequencer.display.composition.engine import (
@@ -124,6 +125,42 @@ def _make_xlights_mapping() -> XLightsMapping:
 
 class TestSequencedExpansion:
     """Tests for SEQUENCED coordination mode."""
+
+    def test_sequenced_slots_are_disjoint(self) -> None:
+        """Every emitted slot is disjoint across the sequenced window."""
+        from .p3_t1_fixtures import events_by_start, make_engine, make_window_plan
+
+        events = [
+            event
+            for _, event in events_by_start(
+                make_engine().compose(
+                    make_window_plan(
+                        CoordinationMode.SEQUENCED,
+                        group_ids=["G0", "G1", "G2"],
+                        step_duration=2,
+                    )
+                )
+            )
+        ]
+
+        assert all(left.end_ms <= right.start_ms for left, right in pairwise(events))
+
+    def test_sequenced_round_robin_order(self) -> None:
+        """SEQUENCED cycles group order and gives every group one step."""
+        from .p3_t1_fixtures import events_by_start, make_engine, make_window_plan
+
+        events = events_by_start(
+            make_engine().compose(
+                make_window_plan(
+                    CoordinationMode.SEQUENCED,
+                    group_ids=["G0", "G1", "G2"],
+                    step_duration=1,
+                )
+            )
+        )
+
+        assert [name for name, _ in events[:6]] == ["G0", "G1", "G2", "G0", "G1", "G2"]
+        assert [event.duration_ms for _, event in events[:6]] == [500] * 6
 
     def test_sequenced_creates_staggered_placements(self) -> None:
         """SEQUENCED with 3 groups and 2-beat step creates staggered events."""

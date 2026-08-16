@@ -5,7 +5,6 @@ from __future__ import annotations
 import pytest
 
 from twinklr.core.sequencer.display.composition.section_map import (
-    _find_nearest_bar_index,
     build_section_bar_map,
 )
 from twinklr.core.sequencer.timing.beat_grid import BeatGrid
@@ -36,50 +35,6 @@ def _make_beat_grid(
         beats_per_bar=beats_per_bar,
         duration_ms=num_bars * ms_per_bar,
     )
-
-
-# ── _find_nearest_bar_index ──────────────────────────────────────────
-
-
-class TestFindNearestBarIndex:
-    """Tests for the internal _find_nearest_bar_index helper."""
-
-    def test_exact_match(self) -> None:
-        """Returns exact index when time matches a bar boundary."""
-        bars = [0.0, 2000.0, 4000.0, 6000.0]
-        assert _find_nearest_bar_index(bars, 2000.0) == 1
-
-    def test_snaps_to_nearest_below(self) -> None:
-        """Snaps to the nearest bar below when closer."""
-        bars = [0.0, 2000.0, 4000.0, 6000.0]
-        # 2400 is closer to 2000 than 4000
-        assert _find_nearest_bar_index(bars, 2400.0) == 1
-
-    def test_snaps_to_nearest_above(self) -> None:
-        """Snaps to the nearest bar above when closer."""
-        bars = [0.0, 2000.0, 4000.0, 6000.0]
-        # 3800 is closer to 4000 than 2000
-        assert _find_nearest_bar_index(bars, 3800.0) == 2
-
-    def test_first_boundary(self) -> None:
-        """Time before first bar returns index 0."""
-        bars = [100.0, 2100.0, 4100.0]
-        assert _find_nearest_bar_index(bars, 0.0) == 0
-
-    def test_last_boundary(self) -> None:
-        """Time past last bar returns last index."""
-        bars = [0.0, 2000.0, 4000.0]
-        assert _find_nearest_bar_index(bars, 99999.0) == 2
-
-    def test_empty_boundaries(self) -> None:
-        """Empty boundaries returns 0."""
-        assert _find_nearest_bar_index([], 1000.0) == 0
-
-    def test_equidistant_prefers_earlier(self) -> None:
-        """When equidistant, prefers the earlier bar (<=)."""
-        bars = [0.0, 2000.0, 4000.0]
-        # 1000 is exactly equidistant between 0 and 2000
-        assert _find_nearest_bar_index(bars, 1000.0) == 0
 
 
 # ── build_section_bar_map ────────────────────────────────────────────
@@ -187,3 +142,20 @@ class TestBuildSectionBarMap:
         grid = _make_beat_grid()
         with pytest.raises(ValueError, match="sections must not be empty"):
             build_section_bar_map([], grid)
+
+
+def test_build_section_bar_map_delegates_to_beat_grid(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Section mapping uses BeatGrid's canonical nearest-bar authority."""
+    grid = _make_beat_grid()
+    calls: list[float] = []
+    original = BeatGrid.nearest_bar_index
+
+    def recording_nearest(self: BeatGrid, time_ms: float) -> int:
+        calls.append(time_ms)
+        return original(self, time_ms)
+
+    monkeypatch.setattr(BeatGrid, "nearest_bar_index", recording_nearest)
+
+    build_section_bar_map([("section", 100, 1900)], grid)
+
+    assert calls == [100.0, 1900.0]

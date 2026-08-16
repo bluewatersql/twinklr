@@ -392,5 +392,12 @@ repair-request payload, not the request count.
   changes. Its check-only equivalents above all passed; the orchestrator should run
   the wrapper after committing/integrating.
 
-No live or paid API call was made. Owner review remains required for the retained
-iteration policy and the wired configurable approval-threshold semantics.
+No live or paid API call was made. At this authoring snapshot, owner review remained
+required for the retained iteration policy and the wired configurable
+approval-threshold semantics; the later decision is recorded below.
+
+## Owner decision — 2026-08-16
+
+The owner explicitly accepted retained iterative judging, configurable approval
+threshold semantics, and `max_iterations=0` behavior. This satisfies P2P-T9's
+decision-bearing review; it does not satisfy the still-pending Phase 2P empirical exits.

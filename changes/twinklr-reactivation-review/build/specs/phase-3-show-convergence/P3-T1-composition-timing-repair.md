@@ -402,3 +402,90 @@ executes in CI.
 display/composition/section_map.py keeps the last private nearest-bar
 implementation (_find_nearest_bar_index) — route it through
 BeatGrid.nearest_bar_index as part of this task's grid unification.
+
+## Implementation handoff — 2026-08-16 (pending independent verification)
+
+The owner explicitly authorized this task before the outstanding Phase 1P/2P/2K
+empirical exits. That narrow sequencing exception covers P3-T1 only; it does not waive
+any exit criterion or authorize P3-T2.
+
+### Implemented contract
+
+- Added the internal `ExpandedPlacement` composition IR. Planner-facing
+  `GroupPlacement` remains unchanged and expanded SEQUENCED/RIPPLE/CALL_RESPONSE
+  schedules now retain exact absolute millisecond bounds through compilation.
+- Expansion operates in absolute fractional-beat coordinates. Section-relative planning
+  references are anchored with `section_start_bar` before scheduling; every integer or
+  fractional start/end is then mapped through its local adjacent BeatGrid boundaries.
+  Out-of-range beat coordinates clamp to the first/last boundary, matching planner start
+  behavior, and native output shares the existing 20 ms snap/clamp policy.
+- BEAT/BAR/PHRASE units convert to beat spans (1 / `beats_per_bar` / four bars).
+  Nominal- or average-tempo arithmetic and the
+  `_ms_to_planning_ref`/`_ms_to_duration` expansion round trip were removed.
+- SEQUENCED now emits the specified `[start + (i*N + g)*step, +step)` slots. TRIM uses
+  incremental later-wins subtraction and deterministic tail IDs, preserving all frozen
+  `RenderEvent` fields via `model_copy`. `compose()` clears `_layer_blend_modes` at entry.
+- `section_map` delegates nearest-bar decisions to `BeatGrid.nearest_bar_index` and
+  retains the prior concrete-boundary clamp.
+
+### TDD and verification evidence
+
+- Before production edits, the isolated existing composition suite had **38 failures /
+  115 passes**, all the known `GroupPlanSet` → `HolisticEvaluation` import-order forward
+  reference. A focused-test `conftest.py` loads the production holistic resolver, matching
+  full-suite import order; no production planning-model change was made for that unrelated
+  baseline.
+- With that baseline routed, the new discriminating pre-fix slice was **7 failed / 6
+  passed**: BeatGrid drift, sub-beat ripple, 3/5-beat duration preservation, TRIM tail
+  coverage, compose-state reset, SEQUENCED disjointness, and section-map delegation.
+  Post-fix the same slice is **13 passed**.
+- Independent verification rejected the first author pass because average step lengths
+  did not follow local irregular boundaries after a mapped section offset, and generated
+  TRIM tail IDs could collide with source IDs. The remediation-first slice reproduced
+  both blockers at **5 failed / 7 passed**. It is now **13 passed**, covering irregular
+  mapped/unmapped starts, local half-beat interpolation, endpoint clamping, beat-span
+  units, and collisions with both the base generated ID and its `_2` suffix.
+- Complete composition: **163 passed**. Complete display: **411 passed**.
+- Golden render/export gate: **73 passed / 8 skipped**; no golden artifact changed.
+- Ruff format: **1,339 files clean**; Ruff lint: clean; mypy: **718 source files clean**.
+- Full tests: **5,249 passed / 39 skipped / 9 warnings** in 76.57 seconds.
+- `make validate` was attempted and correctly stopped at the clean-worktree guard because
+  this author handoff necessarily contains uncommitted changes. Its check-only
+  formatter/linter/type-checker and full-test equivalents above all passed.
+
+No live provider, paid API, xLights, audio, git, commit, or push operation was performed.
+Independent verification and orchestrator-owned integration remain pending.
+
+### File manifest
+
+Production:
+
+- `packages/twinklr/core/sequencer/display/composition/engine.py`
+- `packages/twinklr/core/sequencer/display/composition/models.py`
+- `packages/twinklr/core/sequencer/display/composition/section_map.py`
+- `packages/twinklr/core/sequencer/display/composition/timing_resolver.py`
+
+Corpus-independent tests:
+
+- `tests/unit/sequencer/display/composition/conftest.py`
+- `tests/unit/sequencer/display/composition/p3_t1_fixtures.py`
+- `tests/unit/sequencer/display/composition/test_engine_state.py`
+- `tests/unit/sequencer/display/composition/test_expansion_ms_native.py`
+- `tests/unit/sequencer/display/composition/test_overlap_resolution.py`
+- `tests/unit/sequencer/display/composition/test_section_offset.py`
+- `tests/unit/sequencer/display/composition/test_section_map.py`
+- `tests/unit/sequencer/display/composition/test_sequenced.py`
+
+Campaign truth and owner decisions:
+
+- `changes/ACTIVE.md`
+- `changes/twinklr-reactivation-review/build/plan/04-phase-2p-creative-quality.md`
+- `changes/twinklr-reactivation-review/build/plan/06-phase-3-show-convergence.md`
+- `changes/twinklr-reactivation-review/build/plan/HANDOFF.md`
+- `changes/twinklr-reactivation-review/build/specs/phase-2p-creative-quality/P2P-T1-plan-schema-v2.md`
+- `changes/twinklr-reactivation-review/build/specs/phase-2p-creative-quality/P2P-T8-mir-ab-and-adoption.md`
+- `changes/twinklr-reactivation-review/build/specs/phase-2p-creative-quality/P2P-T9-judge-feedback-repair.md`
+- this specification
+- `context/current-state.md`
+- `memories/INDEX.md`
+- `memories/decisions/keep-dsp-after-mir-ab.md`

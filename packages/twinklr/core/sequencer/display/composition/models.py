@@ -10,6 +10,7 @@ from __future__ import annotations
 from pydantic import BaseModel, ConfigDict, Field
 
 from twinklr.core.sequencer.display.models.render_event import RenderEvent
+from twinklr.core.sequencer.templates.group.models.coordination import GroupPlacement
 from twinklr.core.sequencer.vocabulary import VisualDepth
 
 
@@ -37,6 +38,21 @@ class CompiledEffect(BaseModel):
         default="Normal",
         description="xLights T_CHOICE_LayerMethod value for this sub-layer",
     )
+
+
+class ExpandedPlacement(BaseModel):
+    """Internal placement whose expansion timing stays exact in milliseconds.
+
+    Planner-authored :class:`GroupPlacement` objects remain categorical.  Coordination
+    expansion wraps one with absolute millisecond bounds so the composition
+    engine never round-trips its deterministic schedule through planner vocabulary.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    placement: GroupPlacement
+    start_ms: float = Field(ge=0)
+    end_ms: float = Field(ge=0)
 
 
 class TemplateCompileError(Exception):
@@ -76,5 +92,6 @@ class TemplateCompileError(Exception):
 
 __all__ = [
     "CompiledEffect",
+    "ExpandedPlacement",
     "TemplateCompileError",
 ]

@@ -1,13 +1,13 @@
 ---
 type: context
 area: overview
-updated: 2026-08-14
+updated: 2026-08-16
 ---
 
 # Twinklr — Current State
 
-_Verified 2026-08-14 from the integrated build-campaign snapshot `6b2b34a` and a fresh
-full quality-gate run._
+_Repository evidence verified 2026-08-14 from integrated snapshot `6b2b34a` and a fresh
+full quality-gate run; owner decisions and active sequencing updated 2026-08-16._
 
 Twinklr is an AI-powered choreography engine: audio file in, xLights artifacts out — a
 fresh `.xsq`, standalone `.xtiming` timing tracks, and an `.xmap` mapping hint, which the
@@ -20,9 +20,9 @@ See [product/overview.md](product/overview.md).
 - **Audio analysis pipeline** — deterministic rhythm, energy, structure, harmonic,
   lyrics, phoneme, and viseme analysis. Rhythm/structure production is behind explicit,
   source-versioned adapters with a five-fixture offline A/B harness. The runtime default
-  remains custom DSP; P2P-T8's fixed offline gate recommends retaining it because the
-  optional model arms did not produce complete admissible evidence, but owner review of
-  that adoption recommendation is pending. Opt-in Demucs stems can add drum, bass, and
+  remains custom DSP; the owner accepted P2P-T8's fixed-gate retention recommendation
+  on 2026-08-16 because the optional model arms did not produce complete admissible
+  evidence. Opt-in Demucs stems can add drum, bass, and
   vocal-derived features with content/model-aware caching and explicit full-mix fallback.
   `packages/twinklr/core/audio/`
 - **Audio profiling and lyrics agents** — musical interpretation, lyric MomentCues,
@@ -82,15 +82,16 @@ not the current state; its fully classified record is preserved in
 The [twinklr-reactivation-review build campaign](../changes/ACTIVE.md) remains active.
 Phases 0 and 1K are complete. Phase 1P's implementation tasks, Phase 2P's 13 offline
 implementations, and Phase 2K's four tooling implementations are merged and independently
-verified, but their owner/live exit criteria are not complete. Phases 3 and 4 have not
-started; Phase 3 waits for prior phase exits unless the owner explicitly reassesses
-sequencing.
+verified, but their owner/live exit criteria are not complete. On 2026-08-16 the owner
+accepted the P2P-T1/T8/T9 recommendations and authorized P3-T1 authoring before the
+outstanding empirical exits. That narrow sequencing exception does not waive those exits
+or authorize later Phase 3 tasks. Phase 4 has not started.
 
 The authoritative current task/gate list is the campaign
 [HANDOFF.md](../changes/twinklr-reactivation-review/build/plan/HANDOFF.md). Most notably,
-there is no Phase 1P human/xLights exit evidence, owner-approved P2P-T8 adoption decision,
-owner-accepted vision calibration, real three-arm comparison, D1 verdict, or real-data
-Phase 2K exit evidence yet. Do not infer those outcomes from offline fixtures or
+there is no Phase 1P human/xLights exit evidence, owner-accepted vision calibration,
+real three-arm comparison, D1 verdict, or real-data Phase 2K exit evidence yet. Do not
+infer those outcomes from offline fixtures or
 implementation tests.
 
 ## Key constraints

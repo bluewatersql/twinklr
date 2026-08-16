@@ -1,7 +1,7 @@
 # Build-campaign handoff — current execution state
 
-_Last updated: 2026-08-14 after the Phase 2P offline-build and Phase 2K tooling-build
-milestone. Maintained by the orchestrating agent; update this file at every pause or
+_Last updated: 2026-08-16 during P3-T1 authoring under the owner's explicit sequencing
+exception. Maintained by the orchestrating agent; update this file at every pause or
 phase boundary._
 
 ## What this campaign is
@@ -20,9 +20,9 @@ their authoring moment; this handoff owns the current campaign status.
 | 0 — Foundation honesty | **COMPLETE** (7/7) | Completion record in [01-phase-0-foundation.md](01-phase-0-foundation.md) |
 | 1K — Knowledge edges | **COMPLETE** (5/5) | Completion record in [03-phase-1k-knowledge-edges.md](03-phase-1k-knowledge-edges.md) |
 | 1P — Render truth | **IMPLEMENTATION MERGED AND VERIFIED** (12/12); **phase exit not complete** | The recorded human judgment and empirical xLights acceptance evidence remain pending; see [02-phase-1p-render-truth.md](02-phase-1p-render-truth.md). |
-| 2P — Creative quality | **OFFLINE IMPLEMENTATION MERGED AND VERIFIED** (13/13); **phase exit not complete** | Live checks plus the T1/T6/T8/T9/T13 owner decisions remain pending; see [04-phase-2p-creative-quality.md](04-phase-2p-creative-quality.md). |
+| 2P — Creative quality | **OFFLINE IMPLEMENTATION MERGED AND VERIFIED** (13/13); **phase exit not complete** | The owner accepted T1/T8/T9 on 2026-08-16. T6 calibration/live evidence, T13/D1 evidence, and other live checks remain pending; see [04-phase-2p-creative-quality.md](04-phase-2p-creative-quality.md). |
 | 2K — Catalog growth | **TOOLING IMPLEMENTATION MERGED AND VERIFIED** (4/4); **phase exit not complete** | Tooling is ready, but coverage/corpus/curation/style exit criteria require the author's real layout, corpus, preferences, and judgments; see [05-phase-2k-catalog-growth.md](05-phase-2k-catalog-growth.md). |
-| 3 — Show convergence | **NOT STARTED** | Do not start until prior phase exits are satisfied or the owner explicitly reassesses sequencing. |
+| 3 — Show convergence | **P3-T1 AUTHORED; INDEPENDENT VERIFICATION PENDING** | On 2026-08-16 the owner explicitly authorized P3-T1 before the outstanding empirical exits. This narrow sequencing exception does not waive any Phase 1P/2P/2K exit criterion and does not authorize later Phase 3 tasks. |
 | 4 — Compounding | **NOT STARTED** | No Phase 4 implementation has started. |
 
 The overall `twinklr-reactivation-review` change remains **ACTIVE**. Finishing an
@@ -44,8 +44,8 @@ vision/sync evaluation, opt-in stems, fixed-gate MIR A/B, iterative-judge repair
 retargeting, strict structured outputs, live-injection workflow, and the deterministic
 selector/three-arm experiment harness. P2P-T8's precommitted offline gate recommends
 retaining the current DSP default because neither optional model candidate produced
-complete admissible local evidence. The runtime default remains `dsp`, but the adoption
-decision still requires owner review; see the active pending-owner
+complete admissible local evidence. The runtime default remains `dsp`; the owner accepted
+that recommendation on 2026-08-16. See the accepted
 [MIR decision record](../../../../memories/decisions/keep-dsp-after-mir-ab.md).
 
 P2P-T13 produced an evidence-preserving experiment implementation, **not an experiment
@@ -80,22 +80,16 @@ improvise their runbooks here.
 
 ### Phase 2P
 
-Decision-bearing reviews are requirements, not implied approvals from merge:
+The owner accepted the P2P-T1 schema contract, P2P-T8 DSP-retention recommendation,
+and P2P-T9 iteration/threshold policy on 2026-08-16. The remaining decision-bearing
+reviews and evidence gates are requirements, not implied approvals from merge:
 
-1. [P2P-T1](../specs/phase-2p-creative-quality/P2P-T1-plan-schema-v2.md): review the
-   final `PlanSection` v2 field list, intensity/color vocabulary, and dead-field
-   deletion list.
-2. [P2P-T6](../specs/phase-2p-creative-quality/P2P-T6-vision-judge-and-sync-metrics.md):
+1. [P2P-T6](../specs/phase-2p-creative-quality/P2P-T6-vision-judge-and-sync-metrics.md):
    review the four-category rubric and criteria, calibration outcome, and
    per-song cost budget. First run the capped one-song live provider/xLights proof and
    complete an owner-accepted, hash-pinned blinded calibration with at least five
    independent shows.
-3. [P2P-T8](../specs/phase-2p-creative-quality/P2P-T8-mir-ab-and-adoption.md): review
-   the fixed-gate A/B evidence and the recommendation to retain DSP; owner approval of
-   that adoption decision is not yet recorded.
-4. [P2P-T9](../specs/phase-2p-creative-quality/P2P-T9-judge-feedback-repair.md): review
-   the retained iterative-judging policy and configurable `success_threshold` semantics.
-5. [P2P-T13](../specs/phase-2p-creative-quality/P2P-T13-three-arm-comparison.md): only
+2. [P2P-T13](../specs/phase-2p-creative-quality/P2P-T13-three-arm-comparison.md): only
    after accepted T6 calibration, freeze a manifest of at least eight
    songs, run exactly 5N sequences within the frozen cost caps, complete the blinded
    human ranking, independently verify the evidence, and then have the owner review the
@@ -103,12 +97,12 @@ Decision-bearing reviews are requirements, not implied approvals from merge:
 
 The remaining empirical checks are also pending:
 
-6. P2P-T5: exercise preview rendering against the owner's windowed xLights instance.
-7. P2P-T7: run real Demucs separation on supported Apple Silicon hardware and observe
+3. P2P-T5: exercise preview rendering against the owner's windowed xLights instance.
+4. P2P-T7: run real Demucs separation on supported Apple Silicon hardware and observe
    MPS/CPU-fallback behavior.
-8. P2P-T10/P2P-T11: run the bounded live model-retarget and structured-output probes;
+5. P2P-T10/P2P-T11: run the bounded live model-retarget and structured-output probes;
    record evidence before promoting any provider conclusion.
-9. P2P-T12: run live injection only against an expendable scratch sequence and discard
+6. P2P-T12: run live injection only against an expendable scratch sequence and discard
    it afterward.
 
 ### Phase 2K
@@ -124,14 +118,17 @@ The remaining empirical checks are also pending:
 
 ## Continuation order
 
-1. Complete the Phase 1P human-judgment and empirical xLights exit evidence.
-2. Complete the P2P-T1/T6/T8/T9 owner reviews, including the T6 calibration gate.
-3. Run the P2P-T13 owner protocol and record a D1 outcome only if its evidence validates.
-4. Complete the Phase 2K owner-data sessions and coverage exit criteria.
-5. Reassess Phase 1P, 2P, and 2K exit criteria explicitly; do not mark a phase complete
+1. Independently verify and integrate P3-T1 under the owner's 2026-08-16 sequencing
+   exception. Do not infer authorization for P3-T2 or other Phase 3 tasks.
+2. Complete the Phase 1P human-judgment and empirical xLights exit evidence.
+3. Complete the P2P-T6 owner review and calibration gate; T1/T8/T9 were accepted on
+   2026-08-16.
+4. Run the P2P-T13 owner protocol and record a D1 outcome only if its evidence validates.
+5. Complete the Phase 2K owner-data sessions and coverage exit criteria.
+6. Reassess Phase 1P, 2P, and 2K exit criteria explicitly; do not mark a phase complete
    merely because its code/tooling is merged.
-6. Start Phase 3 only after prior phase exits are satisfied, unless the owner explicitly
-   reassesses and authorizes different sequencing. Phase 4 remains downstream of Phase 3.
+
+Phase 4 remains downstream of Phase 3.
 
 ## Binding orchestration rules
 

@@ -7,6 +7,7 @@ to concrete start_ms/end_ms values using the BeatGrid.
 from __future__ import annotations
 
 import logging
+import math
 
 from twinklr.core.sequencer.timing.beat_grid import BeatGrid
 from twinklr.core.sequencer.vocabulary import EffectDuration, PlanningTimeRef
@@ -48,21 +49,57 @@ class TimingResolver:
         Returns:
             Start time in milliseconds, snapped to 20ms grid.
         """
-        # Section-relative bar → song-absolute bar (0-indexed)
+        return self._snap_to_grid(self.resolve_start_ms_exact(time_ref, section_start_bar))
+
+    def resolve_start_ms_exact(
+        self,
+        time_ref: PlanningTimeRef,
+        section_start_bar: int = 0,
+    ) -> float:
+        """Resolve a planning reference against the BeatGrid without snapping.
+
+        This is the unsnapped primitive beneath planner-authored
+        :meth:`resolve_start_ms`; coordination expansion schedules in beat coordinates
+        and calls :meth:`resolve_beat_position_ms` for fractional positions directly.
+        """
+        beat_position = self.resolve_beat_position(time_ref, section_start_bar)
+        return self.resolve_beat_position_ms(beat_position)
+
+    def resolve_beat_position(
+        self,
+        time_ref: PlanningTimeRef,
+        section_start_bar: int = 0,
+    ) -> float:
+        """Convert a planning reference to a clamped absolute beat coordinate."""
         song_bar_0 = (time_ref.bar - 1) + section_start_bar
         beat_within_bar = time_ref.beat - 1
+        absolute_beat = float(song_bar_0 * self._beat_grid.beats_per_bar + beat_within_bar)
+        max_beat = max(len(self._beat_grid.beat_boundaries) - 1, 0)
+        return min(max(absolute_beat, 0.0), float(max_beat))
 
-        # Calculate absolute beat index
-        beats_per_bar = self._beat_grid.beats_per_bar
-        absolute_beat = (song_bar_0 * beats_per_bar) + beat_within_bar
+    def resolve_beat_position_ms(self, beat_position: float) -> float:
+        """Map an absolute fractional beat coordinate through local grid boundaries.
 
-        # Clamp to available beats
-        max_beat = len(self._beat_grid.beat_boundaries) - 1
-        absolute_beat = min(absolute_beat, max_beat)
-        absolute_beat = max(absolute_beat, 0)
+        Coordinates inside the grid interpolate between their adjacent detected beat
+        boundaries. Coordinates outside it clamp to the first or last boundary, matching
+        the existing planner-authored start-time endpoint policy.
+        """
+        boundaries = self._beat_grid.beat_boundaries
+        if not boundaries:
+            logger.warning("BeatGrid has no beat boundaries; falling back to average beat duration")
+            return max(beat_position, 0.0) * self._beat_grid.ms_per_beat
 
-        ms = self._beat_grid.get_beat_time_ms(absolute_beat)
-        return self._snap_to_grid(ms)
+        last_index = len(boundaries) - 1
+        if beat_position <= 0.0:
+            return boundaries[0]
+        if beat_position >= last_index:
+            return boundaries[last_index]
+
+        lower_index = math.floor(beat_position)
+        fraction = beat_position - lower_index
+        lower_ms = boundaries[lower_index]
+        upper_ms = boundaries[lower_index + 1]
+        return lower_ms + fraction * (upper_ms - lower_ms)
 
     def resolve_end_ms(
         self,
@@ -121,6 +158,34 @@ class TimingResolver:
         if clamped:
             return self._snap_down_to_grid(end_ms)
         return self._snap_to_grid(end_ms)
+
+    def resolve_native_range(
+        self,
+        start_ms: float,
+        end_ms: float,
+        *,
+        section_end_ms: int | None = None,
+    ) -> tuple[int, int]:
+        """Snap and clamp an already-resolved millisecond interval.
+
+        Coordination expansion has already made the timing decision, so this path
+        deliberately performs no categorical duration or bar/beat conversion.  It
+        shares the existing 20 ms grid policy and floors a clamped end to avoid
+        overshooting the section or sequence boundary.
+        """
+        sequence_end_ms = int(self._beat_grid.duration_ms)
+        clamped_start = max(0.0, min(start_ms, float(sequence_end_ms)))
+        end_limit_ms = sequence_end_ms
+        if section_end_ms is not None:
+            end_limit_ms = min(end_limit_ms, section_end_ms)
+        clamped_end = max(0.0, min(end_ms, float(end_limit_ms)))
+
+        resolved_start = self._snap_to_grid(clamped_start)
+        if clamped_end < end_ms:
+            resolved_end = self._snap_down_to_grid(clamped_end)
+        else:
+            resolved_end = self._snap_to_grid(clamped_end)
+        return resolved_start, resolved_end
 
     @staticmethod
     def _resolve_beat_count(duration: EffectDuration, bias: float = 0.5) -> int:

@@ -8,7 +8,7 @@ memory — those are machine-local supplemental caches (see the memory protocol 
 
 - **[decisions/](decisions/)** — durable architectural/engineering decisions and their rationale
   - [llm-plans-intent-renderer-implements-precision.md](decisions/llm-plans-intent-renderer-implements-precision.md) — accepted boundary; includes the dated narrow-channel baseline and the 2026-08-14 schema-v2 implementation resolution (D1 comparison still pending)
-  - [keep-dsp-after-mir-ab.md](decisions/keep-dsp-after-mir-ab.md) — active pending-owner P2P-T8 recommendation: retain the current DSP rhythm/structure default because model arms did not produce complete local evidence
+  - [keep-dsp-after-mir-ab.md](decisions/keep-dsp-after-mir-ab.md) — accepted P2P-T8 decision: retain the current DSP rhythm/structure default because model arms did not produce complete local evidence
 - **[learnings/](learnings/)** — non-obvious discoveries from previous work
   - [reactivation-review-2026-08.md](learnings/reactivation-review-2026-08.md) — historical `aa8d325` review conclusions (readiness, verified defect classes, external facts, strengths), with a pointer to current campaign truth
   - [known-test-failures.md](learnings/known-test-failures.md) — historical gate baseline at `aa8d325` (2026-08-13): 120 failures classified; superseded by the green integrated campaign gate

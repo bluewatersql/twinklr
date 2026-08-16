@@ -1,18 +1,19 @@
 ---
 type: decision
-status: active
+status: accepted
 created: 2026-08-14
-updated: 2026-08-14
+updated: 2026-08-16
 confidence: confirmed
 tags: [audio, mir, beat-grid, evaluation]
 ---
 
 # Keep the Current DSP as the MIR Default After P2P-T8
 
-_Pending the owner's required review of the gate outcome. Provenance: the accepted
+_Accepted by the owner on 2026-08-16. Provenance: the accepted
 [P2P-T8 specification](../../changes/twinklr-reactivation-review/build/specs/phase-2p-creative-quality/P2P-T8-mir-ab-and-adoption.md),
 the committed fixture manifest at `tests/fixtures/mir/manifest.json`, and the offline
-harness `python -m twinklr.core.audio.mir.benchmark --report` on 2026-08-14._
+harness `python -m twinklr.core.audio.mir.benchmark --report` on 2026-08-14, and the
+owner's explicit approval of the P2P-T8 recommendation on 2026-08-16._
 
 ## Decision
 

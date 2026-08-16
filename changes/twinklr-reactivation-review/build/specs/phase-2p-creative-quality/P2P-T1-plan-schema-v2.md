@@ -364,3 +364,9 @@ consumer rather than re-adding defaults. Second risk: deleting a field the sweep
 called dead but a whole-model dump renders — mitigated by the mandatory
 dump-enumeration step (§3, procedure step 1), which is exactly how the original
 33→20 miscount happened.
+
+## Owner decision — 2026-08-16
+
+The owner explicitly accepted the implemented schema-v2 field list, unified
+intensity/color vocabulary, and dead-field deletion contract. This satisfies P2P-T1's
+decision-bearing review; it does not satisfy the still-pending Phase 2P empirical exits.

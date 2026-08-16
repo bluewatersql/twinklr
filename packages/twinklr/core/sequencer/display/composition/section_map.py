@@ -8,7 +8,6 @@ TimingResolver to convert section-relative bar/beat references
 
 from __future__ import annotations
 
-import bisect
 from dataclasses import dataclass
 
 from twinklr.core.sequencer.timing.beat_grid import BeatGrid
@@ -76,8 +75,14 @@ def build_section_bar_map(
     result: dict[str, SectionBarRange] = {}
 
     for section_id, raw_start_ms, raw_end_ms in sections:
-        start_bar = _find_nearest_bar_index(beat_grid.bar_boundaries, float(raw_start_ms))
-        end_bar = _find_nearest_bar_index(beat_grid.bar_boundaries, float(raw_end_ms))
+        start_bar = beat_grid.nearest_bar_index(float(raw_start_ms))
+        end_bar = beat_grid.nearest_bar_index(float(raw_end_ms))
+
+        # ``nearest_bar_index`` can extrapolate beyond the detected grid.  A section
+        # map owns concrete detected boundaries, so clamp before indexing them.
+        last_bar = max(len(beat_grid.bar_boundaries) - 1, 0)
+        start_bar = min(start_bar, last_bar)
+        end_bar = min(end_bar, last_bar)
 
         # Guarantee end_bar >= start_bar
         end_bar = max(end_bar, start_bar)
@@ -94,37 +99,6 @@ def build_section_bar_map(
         )
 
     return result
-
-
-def _find_nearest_bar_index(bar_boundaries: list[float], time_ms: float) -> int:
-    """Find the index of the bar boundary nearest to *time_ms*.
-
-    Uses binary search for efficiency.
-
-    Args:
-        bar_boundaries: Sorted list of bar start times in ms.
-        time_ms: Target time in ms.
-
-    Returns:
-        0-indexed bar boundary index.
-    """
-    if not bar_boundaries:
-        return 0
-
-    idx = bisect.bisect_left(bar_boundaries, time_ms)
-
-    if idx == 0:
-        return 0
-    if idx >= len(bar_boundaries):
-        return len(bar_boundaries) - 1
-
-    # Compare distances to neighbours
-    before = bar_boundaries[idx - 1]
-    after = bar_boundaries[idx]
-
-    if abs(time_ms - before) <= abs(time_ms - after):
-        return idx - 1
-    return idx
 
 
 __all__ = [

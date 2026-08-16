@@ -329,8 +329,9 @@ track where the answer is exact by construction" that this spec's risk section r
 
 **Status:** implemented; the fixed gate rejected both model candidates because a
 complete five-fixture result could not be produced offline under the repository's
-declared dependency constraints. The default remains `dsp`. Independent verifier and
-owner review remain required; this executor does not self-approve.
+declared dependency constraints. The default remains `dsp`. At this authoring snapshot,
+independent verifier and owner review remained required; the later owner decision is
+recorded below.
 
 ### Pre-committed gate applied
 
@@ -512,3 +513,11 @@ stash, commit, or bypass that guard. `make check-all` ran the formatter, linter,
 type-checker, and full coverage suite that follow the guard, and passed. No live or
 paid API call was made, no commit was created, and independent verification remains
 pending.
+
+## Owner decision — 2026-08-16
+
+The owner explicitly accepted the fixed-gate recommendation to retain the custom DSP
+rhythm and structure defaults. The accepted decision remains bounded by the recorded
+evidence: unavailable optional-model metrics are not empirical losses. This satisfies
+P2P-T8's decision-bearing review but does not satisfy the remaining Phase 2P live,
+calibration, or three-arm exits.
