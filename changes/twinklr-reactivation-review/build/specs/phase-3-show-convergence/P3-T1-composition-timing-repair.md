@@ -403,7 +403,7 @@ display/composition/section_map.py keeps the last private nearest-bar
 implementation (_find_nearest_bar_index) — route it through
 BeatGrid.nearest_bar_index as part of this task's grid unification.
 
-## Implementation handoff — 2026-08-16 (pending independent verification)
+## Implementation handoff — 2026-08-16 (independently verified and integrated)
 
 The owner explicitly authorized this task before the outstanding Phase 1P/2P/2K
 empirical exits. That narrow sequencing exception covers P3-T1 only; it does not waive
@@ -453,8 +453,9 @@ any exit criterion or authorize P3-T2.
   this author handoff necessarily contains uncommitted changes. Its check-only
   formatter/linter/type-checker and full-test equivalents above all passed.
 
-No live provider, paid API, xLights, audio, git, commit, or push operation was performed.
-Independent verification and orchestrator-owned integration remain pending.
+No live provider, paid API, xLights, or audio operation was performed. Independent
+verification approved the remediated snapshot, and the orchestrator integrated it at
+`5eebcb2`. No push was performed.
 
 ### File manifest
 

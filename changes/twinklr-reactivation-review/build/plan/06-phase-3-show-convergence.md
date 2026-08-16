@@ -10,9 +10,9 @@ the tracked catalog + macro arc + layout; evaluation results + human judgments
 recorded for display output; assets pipeline optionally enriching Pictures effects.
 
 > **Sequencing exception — 2026-08-16:** the owner explicitly authorized P3-T1 before
-> the outstanding Phase 1P/2P/2K empirical exits. P3-T1 is authored and pending
-> independent verification. This exception does not waive those exits and does not
-> authorize P3-T2 or any other Phase 3 task.
+> the outstanding Phase 1P/2P/2K empirical exits. P3-T1 is merged and independently
+> verified at `5eebcb2`. This exception does not waive those exits and does not authorize
+> P3-T2 or any other Phase 3 task.
 
 ## Lanes
 

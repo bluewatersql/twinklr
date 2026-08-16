@@ -1,6 +1,6 @@
 # Build-campaign handoff — current execution state
 
-_Last updated: 2026-08-16 during P3-T1 authoring under the owner's explicit sequencing
+_Last updated: 2026-08-16 after P3-T1 integration under the owner's explicit sequencing
 exception. Maintained by the orchestrating agent; update this file at every pause or
 phase boundary._
 
@@ -22,7 +22,7 @@ their authoring moment; this handoff owns the current campaign status.
 | 1P — Render truth | **IMPLEMENTATION MERGED AND VERIFIED** (12/12); **phase exit not complete** | The recorded human judgment and empirical xLights acceptance evidence remain pending; see [02-phase-1p-render-truth.md](02-phase-1p-render-truth.md). |
 | 2P — Creative quality | **OFFLINE IMPLEMENTATION MERGED AND VERIFIED** (13/13); **phase exit not complete** | The owner accepted T1/T8/T9 on 2026-08-16. T6 calibration/live evidence, T13/D1 evidence, and other live checks remain pending; see [04-phase-2p-creative-quality.md](04-phase-2p-creative-quality.md). |
 | 2K — Catalog growth | **TOOLING IMPLEMENTATION MERGED AND VERIFIED** (4/4); **phase exit not complete** | Tooling is ready, but coverage/corpus/curation/style exit criteria require the author's real layout, corpus, preferences, and judgments; see [05-phase-2k-catalog-growth.md](05-phase-2k-catalog-growth.md). |
-| 3 — Show convergence | **P3-T1 AUTHORED; INDEPENDENT VERIFICATION PENDING** | On 2026-08-16 the owner explicitly authorized P3-T1 before the outstanding empirical exits. This narrow sequencing exception does not waive any Phase 1P/2P/2K exit criterion and does not authorize later Phase 3 tasks. |
+| 3 — Show convergence | **P3-T1 MERGED AND INDEPENDENTLY VERIFIED** (1/8); later tasks not authorized | On 2026-08-16 the owner explicitly authorized P3-T1 before the outstanding empirical exits; it landed at `5eebcb2`. This narrow sequencing exception does not waive any Phase 1P/2P/2K exit criterion and does not authorize later Phase 3 tasks. |
 | 4 — Compounding | **NOT STARTED** | No Phase 4 implementation has started. |
 
 The overall `twinklr-reactivation-review` change remains **ACTIVE**. Finishing an
@@ -118,15 +118,16 @@ The remaining empirical checks are also pending:
 
 ## Continuation order
 
-1. Independently verify and integrate P3-T1 under the owner's 2026-08-16 sequencing
-   exception. Do not infer authorization for P3-T2 or other Phase 3 tasks.
-2. Complete the Phase 1P human-judgment and empirical xLights exit evidence.
-3. Complete the P2P-T6 owner review and calibration gate; T1/T8/T9 were accepted on
+1. Complete the Phase 1P human-judgment and empirical xLights exit evidence.
+2. Complete the P2P-T6 owner review and calibration gate; T1/T8/T9 were accepted on
    2026-08-16.
-4. Run the P2P-T13 owner protocol and record a D1 outcome only if its evidence validates.
-5. Complete the Phase 2K owner-data sessions and coverage exit criteria.
-6. Reassess Phase 1P, 2P, and 2K exit criteria explicitly; do not mark a phase complete
+3. Run the P2P-T13 owner protocol and record a D1 outcome only if its evidence validates.
+4. Complete the Phase 2K owner-data sessions and coverage exit criteria.
+5. Reassess Phase 1P, 2P, and 2K exit criteria explicitly; do not mark a phase complete
    merely because its code/tooling is merged.
+
+P3-T1 is complete. P3-T2 and every other later Phase 3 task still require separate
+authorization while the earlier empirical exits remain open.
 
 Phase 4 remains downstream of Phase 3.
 

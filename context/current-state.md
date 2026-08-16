@@ -6,8 +6,8 @@ updated: 2026-08-16
 
 # Twinklr — Current State
 
-_Repository evidence verified 2026-08-14 from integrated snapshot `6b2b34a` and a fresh
-full quality-gate run; owner decisions and active sequencing updated 2026-08-16._
+_Repository evidence and active sequencing verified 2026-08-16 after P3-T1 integration
+at `5eebcb2`._
 
 Twinklr is an AI-powered choreography engine: audio file in, xLights artifacts out — a
 fresh `.xsq`, standalone `.xtiming` timing tracks, and an `.xmap` mapping hint, which the
@@ -43,7 +43,9 @@ See [product/overview.md](product/overview.md).
 - **Rendering and compilation** — moving-head templates resolve schema-v2 intensity,
   color, shutter, gobo, and moment-cue intent into exact fixture behavior. Python
   factories and validated JSON `TemplateDoc` files coexist in one collision-safe
-  registry. The display sequencer renders RGB/pixel effects.
+  registry. The display sequencer renders RGB/pixel effects; its coordination expansion
+  now preserves local BeatGrid timing, sub-beat offsets, exact round-robin slots, and
+  gap-free overlap resolution.
   `packages/twinklr/core/sequencer/`, `packages/twinklr/core/curves/`
 - **Evaluation tooling** — checkpoint/evaluation writing, deterministic beat/effect sync
   metrics, ffmpeg frame/contact-sheet preparation, a strict four-category vision judge,
@@ -67,7 +69,7 @@ See [product/overview.md](product/overview.md).
 
 ## Quality-gate state
 
-At integrated snapshot `6b2b34a`, fresh `make validate` evidence is **5,239 passed,
+At integrated snapshot `5eebcb2`, fresh validation evidence is **5,249 passed,
 39 skipped**, clean Ruff formatting and lint, and mypy success across **718 source
 files**. The skips cover explicit optional/local-only boundaries rather than accepted
 implementation regressions. This document owns the canonical current repository and
@@ -83,9 +85,10 @@ The [twinklr-reactivation-review build campaign](../changes/ACTIVE.md) remains a
 Phases 0 and 1K are complete. Phase 1P's implementation tasks, Phase 2P's 13 offline
 implementations, and Phase 2K's four tooling implementations are merged and independently
 verified, but their owner/live exit criteria are not complete. On 2026-08-16 the owner
-accepted the P2P-T1/T8/T9 recommendations and authorized P3-T1 authoring before the
-outstanding empirical exits. That narrow sequencing exception does not waive those exits
-or authorize later Phase 3 tasks. Phase 4 has not started.
+accepted the P2P-T1/T8/T9 recommendations and authorized P3-T1 before the outstanding
+empirical exits. P3-T1 is merged and independently verified at `5eebcb2`. That narrow
+sequencing exception does not waive those exits or authorize later Phase 3 tasks. Phase 4
+has not started.
 
 The authoritative current task/gate list is the campaign
 [HANDOFF.md](../changes/twinklr-reactivation-review/build/plan/HANDOFF.md). Most notably,
