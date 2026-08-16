@@ -9,8 +9,9 @@ tags: [macro-planner, coordination, palette, motifs, focal-arc]
 
 # Typed Macro Coordination Contract
 
-_Accepted by the owner on 2026-08-16, including the exact invariants and AC2 amendment.
-Acceptance does not itself integrate P3-T4 or authorize P3-T5._
+_Accepted by the owner on 2026-08-16, including the exact invariants and AC2 amendment;
+independently approved offline/in code and integrated at `558153c`. The owner's later
+“continue” authorizes P3-T5 as the next offline task only._
 
 ## Decision
 
@@ -69,8 +70,9 @@ applied and the discrepancy is surfaced for owner review.
   prompts, validation, and cache keys, but P3-T5 remains the binding plan's first
   emitted-display behavioral consumer of those fields. The owner amended AC2 so P3-T4's
   acceptance boundary is its recursive mutation-discriminating typed/by-name projection,
-  prompt, validation, and cache consumption; this does not authorize P3-T5 or substitute
-  a fake emitted-behavior sink.
+  prompt, validation, and cache consumption; this amendment did not itself authorize
+  P3-T5 or substitute a fake emitted-behavior sink. The owner's later “continue” now
+  authorizes P3-T5 as the next offline task only, without authorizing live work or P3-T6+.
 - The owner authorized only the bounded live macro-planner probe, capped at three
   attempts and one cumulative `$1.75` task budget. After harness-audit GO, attempt 1
   reached OpenAI exactly once and received HTTP 400 `invalid_json_schema` because the
@@ -78,7 +80,8 @@ applied and the discrepancy is surfaced for owner review.
   fallback, or schema repair occurred. Provider usage was unavailable, so the audited
   ledger conservatively committed the complete `$1.66` reservation. The remaining
   `$0.09` cannot fund another `$1.66` reservation; live acceptance remains open despite
-  the subsequent offline schema remediation.
+  the subsequently integrated and offline-verified schema remediation. No further
+  P3-T4 live attempt is authorized.
 
 ## Related
 

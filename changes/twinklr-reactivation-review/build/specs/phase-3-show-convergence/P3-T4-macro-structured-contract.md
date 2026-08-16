@@ -361,7 +361,7 @@ uv run pytest tests/golden -v
 
 ## Implementation handoff — 2026-08-16
 
-Status: **exact contract/invariants and AC2 amendment owner-accepted; live attempt 1
+Status at author freeze (historical): **exact contract/invariants and AC2 amendment owner-accepted; live attempt 1
 safely rejected by the provider schema validator; general offline schema remediation
 frozen pending fresh independent verification; live acceptance open and not integrated.** Author worktree:
 `/tmp/twinklr-p3t4.next`, based on
@@ -597,6 +597,18 @@ hash `b814e8b70cbfbacdaa2e5752cefc001249f03bfcd111245bc2d6b2006641b012`, prompt 
 `35c62d4ab3534e8d9a026fa699caeab739d279fec91e2be56fc98ad220a4bf5e`, and serialized
 request hash `ca9147ba044b347d036a222f0e32b1073e674b5be6efd1387d264e9ecce361c0`
 (`38236` bytes). All gates were locked and offline; no second provider call was made.
+
+### Integration record — 2026-08-16
+
+The owner-approved exact contract/invariants and AC2 amendment, including the general
+post-attempt `$ref` remediation, received independent offline and code approvals and were
+integrated at `558153c`. This closes P3-T4's implementation/offline-verification boundary,
+not its live acceptance boundary. Attempt 1 remains the only authorized live evidence:
+HTTP 400 `invalid_json_schema`, no retry/fallback/schema repair, usage unavailable, full
+`$1.66` reservation committed, and `$0.09` remaining. Live acceptance remains open and
+no further P3-T4 live attempt is authorized. The owner's latest “continue” separately
+authorizes P3-T5 as the next offline task only; it does not waive earlier empirical exits
+or authorize P3-T5 live work, P3-T6+, or any paid/local empirical action.
 
 ## Effort & risk
 

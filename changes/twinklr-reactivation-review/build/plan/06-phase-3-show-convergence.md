@@ -9,13 +9,15 @@ display show importable into xLights (or injected live); the display planner con
 the tracked catalog + macro arc + layout; evaluation results + human judgments
 recorded for display output; assets pipeline optionally enriching Pictures effects.
 
-> **Sequencing exception — 2026-08-16:** the owner explicitly authorized P3-T1 through
-> P3-T3 before the outstanding Phase 1P/2P/2K empirical exits, then accepted P3-T3's
-> canonical display command and offline file-only layout source. P3-T1 is merged and
-> independently verified at `5eebcb2`; P3-T2 is merged and independently verified at
-> `5365f70`; P3-T3 is independently verified and approved for integration. The owner's
-> latest continuation authorizes P3-T4 as the next offline task only. These exceptions do
-> not waive the earlier exits or authorize P3-T5 and later tasks.
+> **Sequencing exception — 2026-08-16:** P3-T1/P3-T2/P3-T3 are merged and independently
+> verified at `5eebcb2`, `5365f70`, and `33cce57`. The owner accepted P3-T4's exact
+> contract/invariants and AC2 amendment; independent offline/code reviews approved the
+> implementation and general `$ref` remediation, integrated at `558153c`. P3-T4 live
+> acceptance remains open after one HTTP 400 `invalid_json_schema`; no retry/fallback
+> occurred, usage was unavailable, `$1.66` is committed, and `$0.09` remains. No further
+> P3-T4 live attempt is authorized. The owner's latest “continue” authorizes P3-T5 as the
+> next offline task only. These exceptions do not waive the Phase 1P/2P/2K exits or
+> authorize P3-T5 live work, P3-T6+, or any paid/local empirical action.
 
 ## Lanes
 

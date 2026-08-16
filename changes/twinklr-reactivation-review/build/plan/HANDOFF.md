@@ -1,10 +1,11 @@
 # Build-campaign handoff — current execution state
 
-_Last updated: 2026-08-16 after P3-T4 live attempt 1 was rejected by the provider's
-schema validator and the harness conservatively committed its full `$1.66` reservation.
-P3-T4 live acceptance remains open, but the remaining `$0.09` task budget cannot fund
-another audited attempt. Offline schema remediation and fresh independent verification
-remain pending under the owner's explicit sequencing exception. Maintained by the
+_Last updated: 2026-08-16 after P3-T4 was independently approved offline/in code and
+integrated at `558153c`. Its one live attempt remains rejected at the provider schema
+boundary; `$1.66` is committed and the remaining `$0.09` cannot fund another audited
+attempt. Live acceptance remains open and no further P3-T4 live attempt is authorized.
+The owner's latest “continue” authorizes P3-T5 as the next offline task only under the
+existing sequencing exception. Maintained by the
 orchestrating agent; update this file at every
 pause or phase boundary._
 
@@ -26,7 +27,7 @@ their authoring moment; this handoff owns the current campaign status.
 | 1P — Render truth | **IMPLEMENTATION MERGED AND VERIFIED** (12/12); **phase exit not complete** | The recorded human judgment and empirical xLights acceptance evidence remain pending; see [02-phase-1p-render-truth.md](02-phase-1p-render-truth.md). |
 | 2P — Creative quality | **OFFLINE IMPLEMENTATION MERGED AND VERIFIED** (13/13); **phase exit not complete** | The owner accepted T1/T8/T9 on 2026-08-16. T6 calibration/live evidence, T13/D1 evidence, and other live checks remain pending; see [04-phase-2p-creative-quality.md](04-phase-2p-creative-quality.md). |
 | 2K — Catalog growth | **TOOLING IMPLEMENTATION MERGED AND VERIFIED** (4/4); **phase exit not complete** | Tooling is ready, but coverage/corpus/curation/style exit criteria require the author's real layout, corpus, preferences, and judgments; see [05-phase-2k-catalog-growth.md](05-phase-2k-catalog-growth.md). |
-| 3 — Show convergence | **P3-T1/P3-T2/P3-T3 MERGED; P3-T4 LIVE ACCEPTANCE OPEN AFTER SAFE PROVIDER REJECTION** (3/8 integrated) | P3-T3 landed at `33cce57`. The owner accepted P3-T4's exact contract/invariants and AC2 amendment. Its only funded live attempt reached the provider once and was rejected with HTTP 400 `invalid_json_schema`: `ThemeRef.scope` carried a `$ref` with a sibling `description`. No retry or fallback occurred; usage was unavailable, so the harness committed `$1.66`. Only `$0.09` remains under the `$1.75` task cap, which is insufficient for another `$1.66` reservation. The general schema remediation is author-complete offline but P3-T4 remains unverified and unintegrated; P3-T5 remains unauthorized. P3-T1 landed at `5eebcb2`; P3-T2 landed at `5365f70`. These narrow sequencing exceptions do not waive any Phase 1P/2P/2K exit criterion. |
+| 3 — Show convergence | **P3-T1/P3-T2/P3-T3/P3-T4 MERGED; P3-T5 AUTHORIZED NEXT OFFLINE** (4/8 integrated) | P3-T4's owner-approved contract and general `$ref` fix were independently approved offline/in code and integrated at `558153c`. Live attempt 1 remains rejected with HTTP 400 `invalid_json_schema`; no retry/fallback occurred, usage was unavailable, `$1.66` is committed, and only `$0.09` remains. Live acceptance is open and no further P3-T4 live attempt is authorized. The latest “continue” authorizes P3-T5 offline implementation only; it does not waive Phase 1P/2P/2K exits or authorize live work or P3-T6+. P3-T3 landed at `33cce57`, P3-T2 at `5365f70`, and P3-T1 at `5eebcb2`. |
 | 4 — Compounding | **NOT STARTED** | No Phase 4 implementation has started. |
 
 The overall `twinklr-reactivation-review` change remains **ACTIVE**. Finishing an
@@ -77,7 +78,9 @@ offline implementation lane is not the same as satisfying its phase exit criteri
   skipped`. Remediated source-manifest hash is
   `d424435c62c4486c6c0ed1fc77029b46109edb00575a4e53ce934f1f0b451f08`; serialized
   request hash is `ca9147ba044b347d036a222f0e32b1073e674b5be6efd1387d264e9ecce361c0`
-  (`38236` bytes). This remains author evidence pending independent verification.
+  (`38236` bytes). Independent offline/code reviews approved the remediated candidate,
+  which was integrated at `558153c`. This does not convert the failed probe into live
+  acceptance.
 
 ### Phase 2P offline implementation record
 
@@ -161,21 +164,22 @@ The remaining empirical checks are also pending:
 
 ## Continuation order
 
-1. Complete the Phase 1P human-judgment and empirical xLights exit evidence.
-2. Complete the P2P-T6 owner review and calibration gate; T1/T8/T9 were accepted on
+1. Execute P3-T5 as the next offline task under the owner's narrow sequencing exception;
+   do not perform live/paid/local empirical work and do not start P3-T6+.
+2. Complete the Phase 1P human-judgment and empirical xLights exit evidence.
+3. Complete the P2P-T6 owner review and calibration gate; T1/T8/T9 were accepted on
    2026-08-16.
-3. Run the P2P-T13 owner protocol and record a D1 outcome only if its evidence validates.
-4. Complete the Phase 2K owner-data sessions and coverage exit criteria.
-5. Reassess Phase 1P, 2P, and 2K exit criteria explicitly; do not mark a phase complete
+4. Run the P2P-T13 owner protocol and record a D1 outcome only if its evidence validates.
+5. Complete the Phase 2K owner-data sessions and coverage exit criteria.
+6. Reassess Phase 1P, 2P, and 2K exit criteria explicitly; do not mark a phase complete
    merely because its code/tooling is merged.
 
-P3-T1 and P3-T2 are complete and independently verified. P3-T3 is merged at `33cce57`
-after independent verification and owner acceptance. P3-T4's contract/invariants and
-AC2 amendment are owner-accepted. Live attempt 1 was safely rejected at the provider
-schema boundary, and the conservative reservation leaves insufficient budget for a
-second attempt. Its general offline schema remediation awaits independent verification;
-P3-T4 remains unverified and unintegrated. P3-T5 and later still require separate authorization
-while the earlier empirical exits remain open. P3-T2 deliberately leaves
+P3-T1/P3-T2/P3-T3 are complete and independently verified. P3-T4's owner-approved
+contract/invariants, AC2 amendment, and general schema remediation were independently
+approved offline/in code and integrated at `558153c`. Its failed live attempt leaves
+live acceptance open, with no budget or authorization for another attempt. P3-T5 alone
+is authorized next for offline implementation while the earlier empirical exits remain
+open; P3-T6+ remains unauthorized. P3-T2 deliberately leaves
 `resolved_color`, `timing_offset_beats`, and parameter-range/settings escaping work to
 their existing P3-T5/P3-T8 or display-review owners; it does not silently close them.
 

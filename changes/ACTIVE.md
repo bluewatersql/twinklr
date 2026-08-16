@@ -19,20 +19,21 @@ _Last updated: 2026-08-16._
   on 2026-08-16. P3-T1 is merged and independently verified at `5eebcb2`; P3-T2 is
   merged and independently verified at `5365f70`; P3-T3 is merged at `33cce57` after
   independent verification and owner acceptance of its canonical `twinklr display`
-  command and offline file-only layout source. P3-T4 has a remediated frozen offline
-  author snapshot after formal verifier rejection. On 2026-08-16 the owner accepted the
+  command and offline file-only layout source. On 2026-08-16 the owner accepted the
   exact four-field contract, its invariants, and the AC2 amendment that treats P3-T4's
   recursive typed/by-name readers as the task boundary while reserving emitted behavior
-  for P3-T5. The owner also authorized only the capped P3-T4 live macro probe (at most
+  for P3-T5. P3-T4 was independently approved offline and in code review, then integrated
+  at `558153c`. The owner also authorized only the capped P3-T4 live macro probe (at most
   three attempts, subject to one cumulative `$1.75` cap). The dedicated fail-closed
   harness passed audit. Its first live attempt made one request and was safely rejected
   by OpenAI with HTTP 400 `invalid_json_schema` because `ThemeRef.scope` had a `$ref`
   sibling `description`; no retry or fallback occurred. Usage was unavailable, so the
   full `$1.66` reservation remains committed and the remaining `$0.09` cannot fund a
-  second attempt. A general offline `$ref` normalization fix is frozen for verification,
-  but live acceptance remains open. P3-T4 still
-  requires fresh independent verification and is not integrated. P3-T5 remains
-  unauthorized.
+  second attempt. The general `$ref` normalization fix is integrated and offline-verified,
+  but live acceptance remains open. No further P3-T4 live attempt is authorized. The
+  owner's latest “continue” separately authorizes P3-T5 as the next offline task only;
+  it does not waive the outstanding Phase 1P/2P/2K exits or authorize P3-T5 live work,
+  P3-T6+, or any paid/local empirical action.
   Phase 4 has not started. The overall change
   therefore remains active.
   Live execution state, process rules, and pending owner actions:
