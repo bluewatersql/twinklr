@@ -6,8 +6,8 @@ updated: 2026-08-16
 
 # Twinklr — Current State
 
-_Repository evidence and active sequencing reviewed 2026-08-16 during the authorized
-P3-T2 author pass; independent verification/integration is pending._
+_Repository evidence and active sequencing verified 2026-08-16 after P3-T2 integration
+at `5365f70`._
 
 Twinklr is an AI-powered choreography engine: audio file in, xLights artifacts out — a
 fresh `.xsq`, standalone `.xtiming` timing tracks, and an `.xmap` mapping hint, which the
@@ -45,11 +45,10 @@ See [product/overview.md](product/overview.md).
   factories and validated JSON `TemplateDoc` files coexist in one collision-safe
   registry. The display sequencer renders RGB/pixel effects; its coordination expansion
   now preserves local BeatGrid timing, sub-beat offsets, exact round-robin slots, and
-  gap-free overlap resolution. The P3-T2 author snapshot also applies lane blend intent
+  gap-free overlap resolution. P3-T2 also applies lane blend intent
   uniformly in the emitted sub-layer space, validates recipe effect types against the
   exact runtime registry before event construction, and makes every retained effect
-  substitution visible in warnings, trace entries, and counts; independent verification
-  remains pending.
+  substitution visible in warnings, trace entries, and counts.
   `packages/twinklr/core/sequencer/`, `packages/twinklr/core/curves/`
 - **Evaluation tooling** — checkpoint/evaluation writing, deterministic beat/effect sync
   metrics, ffmpeg frame/contact-sheet preparation, a strict four-category vision judge,
@@ -73,7 +72,7 @@ See [product/overview.md](product/overview.md).
 
 ## Quality-gate state
 
-At integrated snapshot `5eebcb2`, fresh validation evidence is **5,249 passed,
+At integrated snapshot `5365f70`, fresh validation evidence is **5,261 passed,
 39 skipped**, clean Ruff formatting and lint, and mypy success across **718 source
 files**. The skips cover explicit optional/local-only boundaries rather than accepted
 implementation regressions. This document owns the canonical current repository and
@@ -91,7 +90,7 @@ implementations, and Phase 2K's four tooling implementations are merged and inde
 verified, but their owner/live exit criteria are not complete. On 2026-08-16 the owner
 accepted the P2P-T1/T8/T9 recommendations and authorized P3-T1 and then P3-T2 before the
 outstanding empirical exits. P3-T1 is merged and independently verified at `5eebcb2`;
-P3-T2's author pass awaits independent verification/integration. That narrow sequencing
+P3-T2 is merged and independently verified at `5365f70`. That narrow sequencing
 exception does not waive those exits or authorize P3-T3 or later Phase 3 tasks. Phase 4
 has not started.
 

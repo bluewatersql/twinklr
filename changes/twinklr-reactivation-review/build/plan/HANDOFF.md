@@ -1,7 +1,7 @@
 # Build-campaign handoff — current execution state
 
-_Last updated: 2026-08-16 after the P3-T2 author pass under the owner's explicit
-sequencing exception. Maintained by the orchestrating agent; update this file at every
+_Last updated: 2026-08-16 after P3-T2 integration under the owner's explicit sequencing
+exception. Maintained by the orchestrating agent; update this file at every
 pause or phase boundary._
 
 ## What this campaign is
@@ -22,7 +22,7 @@ their authoring moment; this handoff owns the current campaign status.
 | 1P — Render truth | **IMPLEMENTATION MERGED AND VERIFIED** (12/12); **phase exit not complete** | The recorded human judgment and empirical xLights acceptance evidence remain pending; see [02-phase-1p-render-truth.md](02-phase-1p-render-truth.md). |
 | 2P — Creative quality | **OFFLINE IMPLEMENTATION MERGED AND VERIFIED** (13/13); **phase exit not complete** | The owner accepted T1/T8/T9 on 2026-08-16. T6 calibration/live evidence, T13/D1 evidence, and other live checks remain pending; see [04-phase-2p-creative-quality.md](04-phase-2p-creative-quality.md). |
 | 2K — Catalog growth | **TOOLING IMPLEMENTATION MERGED AND VERIFIED** (4/4); **phase exit not complete** | Tooling is ready, but coverage/corpus/curation/style exit criteria require the author's real layout, corpus, preferences, and judgments; see [05-phase-2k-catalog-growth.md](05-phase-2k-catalog-growth.md). |
-| 3 — Show convergence | **P3-T1 MERGED/VERIFIED; P3-T2 AUTHOR PASS COMPLETE** (1/8 verified, 1 pending verification); P3-T3+ not authorized | On 2026-08-16 the owner explicitly authorized P3-T1 and then P3-T2 before the outstanding empirical exits. P3-T1 landed at `5eebcb2`; P3-T2 awaits independent verification/integration. This narrow sequencing exception does not waive any Phase 1P/2P/2K exit criterion. |
+| 3 — Show convergence | **P3-T1 AND P3-T2 MERGED/VERIFIED** (2/8); P3-T3+ not authorized | On 2026-08-16 the owner explicitly authorized P3-T1 and then P3-T2 before the outstanding empirical exits. P3-T1 landed at `5eebcb2`; P3-T2 landed at `5365f70`. This narrow sequencing exception does not waive any Phase 1P/2P/2K exit criterion. |
 | 4 — Compounding | **NOT STARTED** | No Phase 4 implementation has started. |
 
 The overall `twinklr-reactivation-review` change remains **ACTIVE**. Finishing an
@@ -126,8 +126,8 @@ The remaining empirical checks are also pending:
 5. Reassess Phase 1P, 2P, and 2K exit criteria explicitly; do not mark a phase complete
    merely because its code/tooling is merged.
 
-P3-T1 is complete. P3-T2's author pass is complete and must be independently verified
-before integration. P3-T3 and every later Phase 3 task still require separate
+P3-T1 and P3-T2 are complete and independently verified. P3-T3 and every later Phase 3
+task still require separate
 authorization while the earlier empirical exits remain open. P3-T2 deliberately leaves
 `resolved_color`, `timing_offset_beats`, and parameter-range/settings escaping work to
 their existing P3-T5/P3-T8 or display-review owners; it does not silently close them.

@@ -409,6 +409,18 @@ No network, live provider, paid API, xLights, or audio operation was performed.
 Independent verification is required before integration; this author does not approve
 their own work.
 
+## Independent verification record — 2026-08-16
+
+Two read-only verifier lanes approved the frozen author snapshot before integration at
+`5365f70`. Fresh evidence was **32 focused passed**, **168 composition passed**, **423
+display passed**, **30 export passed**, **73 golden passed / 8 skipped**, and **5,261 full
+suite passed / 39 skipped / 9 warnings**, with Ruff format/lint and mypy clean across 718
+source files. Adversarial probes covered custom and empty registries, exact-name typo
+rejection, explicit versus substituted `On`, atomic multi-layer admission, reused-writer
+counts, trace/sidecar parity, all six lane-order permutations, compacted layer-zero
+diagnostics, cross-section conflicts, overlays, and compatibility of pre-P3-T2 payloads.
+No blocker remained. P3-T3 and later work remain separately gated.
+
 ### File manifest
 
 Production:

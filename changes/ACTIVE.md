@@ -16,8 +16,8 @@ _Last updated: 2026-08-16._
   live calibration and three-arm evidence (the owner accepted T1/T8/T9 on 2026-08-16);
   Phase 2K needs real-layout, real-corpus, human-curation, and preferred-style evidence.
   The owner explicitly authorized P3-T1 and then P3-T2 before those empirical exits on
-  2026-08-16. P3-T1 is merged and independently verified at `5eebcb2`; P3-T2's author
-  implementation is complete and awaits independent verification/integration. This
+  2026-08-16. P3-T1 is merged and independently verified at `5eebcb2`; P3-T2 is merged
+  and independently verified at `5365f70`. This
   narrow exception does not authorize P3-T3 or later Phase 3 tasks. Phase 4 has not
   started. The overall change
   therefore remains active.
