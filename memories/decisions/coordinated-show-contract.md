@@ -9,8 +9,8 @@ tags: [show, coordination, moving-heads, display, beat-grid, xlights]
 
 # Coordinated Show Contract
 
-_The owner accepted all nine P3-T5 decisions on 2026-08-16 and approved the final
-offline candidate for integration. This record does not authorize P3-T6 or live work._
+_The owner accepted all nine P3-T5 decisions on 2026-08-16; the final offline candidate
+was integrated at `f006468`. This record does not authorize P3-T6 or live work._
 
 ## Decision
 
@@ -70,8 +70,8 @@ general export unification forward.
   the MH and display branches at one final in-memory XSequence barrier.
 - Cached/fresh coordination is idempotent; compiler IDs containing `|coord-` remain raw
   unless they have the exact coordinator-owned terminal suffix.
-- The accepted offline implementation does not constitute P3-T4 live acceptance or any
-  Phase 1P/2P/2K empirical exit.
+- The implementation integrated at `f006468` does not constitute P3-T4 live acceptance
+  or any Phase 1P/2P/2K empirical exit.
 - P3-T6 and later Phase 3 work require separate owner authorization.
 
 ## Related

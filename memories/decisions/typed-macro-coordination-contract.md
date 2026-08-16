@@ -11,8 +11,7 @@ tags: [macro-planner, coordination, palette, motifs, focal-arc]
 
 _Accepted by the owner on 2026-08-16, including the exact invariants and AC2 amendment;
 independently approved offline/in code and integrated at `558153c`. The owner later
-accepted P3-T5's emitted-behavior policy and approved that offline candidate for
-integration._
+accepted P3-T5's emitted-behavior policy, which was integrated at `f006468`._
 
 ## Decision
 

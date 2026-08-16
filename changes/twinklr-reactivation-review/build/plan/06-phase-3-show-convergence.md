@@ -16,8 +16,8 @@ recorded for display output; assets pipeline optionally enriching Pictures effec
 > acceptance remains open after one HTTP 400 `invalid_json_schema`; no retry/fallback
 > occurred, usage was unavailable, `$1.66` is committed, and `$0.09` remains. No further
 > P3-T4 live attempt is authorized. The owner subsequently accepted all nine P3-T5
-> decisions and approved the final offline candidate for integration. P3-T5 is not yet
-> counted as integrated. These exceptions do not waive the Phase 1P/2P/2K exits, close
+> decisions, and P3-T5 was integrated at `f006468`. Phase 3 now has five of eight tasks
+> integrated. These exceptions do not waive the Phase 1P/2P/2K exits, close
 > P3-T4 live acceptance, or authorize P3-T5 live work, P3-T6+, or any paid/local
 > empirical action.
 
@@ -44,14 +44,13 @@ recorded for display output; assets pipeline optionally enriching Pictures effec
 
 ## Implementation status — 2026-08-16
 
-- P3-T1 through P3-T4 are integrated at the commits recorded in the campaign handoff.
-- P3-T5's final offline candidate passed its focused, golden, static, and full-suite
-  author gates. The owner accepted its nine recorded decisions and approved it for
-  integration.
+- P3-T1 through P3-T5 are integrated at the commits recorded in the campaign handoff;
+  P3-T5 is integrated at `f006468` after passing its focused, golden, static, and
+  full-suite author gates and receiving owner acceptance of its nine recorded decisions.
 - P3-T4 live acceptance remains open after the single capped attempt; no further attempt
   is authorized or fundable within the approved task cap.
 - P3-T6 and later tasks remain unauthorized. The Phase 1P/2P/2K empirical exits remain
-  open and are not implied by P3-T5 approval.
+  open and are not implied by P3-T5 integration.
 
 ## Notes for spec authors
 

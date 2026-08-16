@@ -31,10 +31,10 @@ _Last updated: 2026-08-16._
   full `$1.66` reservation remains committed and the remaining `$0.09` cannot fund a
   second attempt. The general `$ref` normalization fix is integrated and offline-verified,
   but live acceptance remains open. No further P3-T4 live attempt is authorized. The
-  owner subsequently accepted all nine P3-T5 decisions and approved the final offline
-  candidate for integration. P3-T5 is not yet counted as integrated. This approval does
-  not waive the outstanding Phase 1P/2P/2K exits, close P3-T4 live acceptance, or
-  authorize P3-T5 live work, P3-T6+, or any paid/local empirical action.
+  owner subsequently accepted all nine P3-T5 decisions, and P3-T5 was integrated at
+  `f006468`. Phase 3 now has five of eight tasks integrated. This integration does not
+  waive the outstanding Phase 1P/2P/2K exits, close P3-T4 live acceptance, or authorize
+  P3-T5 live work, P3-T6+, or any paid/local empirical action.
   Phase 4 has not started. The overall change
   therefore remains active.
   Live execution state, process rules, and pending owner actions:

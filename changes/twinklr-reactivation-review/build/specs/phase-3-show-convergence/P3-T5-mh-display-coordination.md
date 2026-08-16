@@ -296,13 +296,13 @@ prefix per branch, doubling LLM cost on the one path the owner will actually use
 token attribution is only trustworthy after P1P-T9 / P2P-T9 (CC-4: the profile∥lyrics
 gather race), so assert on **stage executions**, not on token totals.
 
-## Implementation and owner-acceptance record — 2026-08-16
+## Implementation, owner acceptance, and integration record — 2026-08-16
 
 The implementation was authored in an isolated P3-T5 worktree based on `3f1f236`, with
 separate adversarial and verifier passes. No provider, network, audio processor, xLights
 process, or live/paid surface was used. After the final remediation and gate evidence
-below, the owner explicitly accepted all nine decisions and approved P3-T5 for
-integration. This approval does not itself mark P3-T5 integrated.
+below, the owner explicitly accepted all nine decisions. P3-T5 was subsequently
+integrated at `f006468`.
 
 ### Accepted owner decisions
 
@@ -429,10 +429,10 @@ non-dedicated overlap-masking case. Parameterized tracked/local/FE-style compile
 containing `|coord-` now coordinate normally and remain identical on a second pass. The
 fresh gates above include this third remediation.
 
-### Approval boundary
+### Integration boundary
 
-P3-T5 is approved for integration with the nine decisions above as its binding contract.
-The approval does not waive the open Phase 1P/2P/2K empirical exits, does not convert
+P3-T5 is integrated at `f006468` with the nine decisions above as its binding contract.
+The integration does not waive the open Phase 1P/2P/2K empirical exits, does not convert
 P3-T4's failed live probe into live acceptance, and does not authorize another P3-T4
 attempt. P3-T6 and later Phase 3 implementation remain unauthorized. No P3-T5 live,
 paid, xLights, owner-audio, or owner-layout work was performed or inferred from the
