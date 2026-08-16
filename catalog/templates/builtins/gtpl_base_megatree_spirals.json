@@ -1,0 +1,68 @@
+{
+  "recipe_id": "gtpl_base_megatree_spirals",
+  "name": "Megatree Spirals",
+  "description": "Deterministic spiral-class base treatment for tree and matrix hero targets in coordinated show output.",
+  "recipe_version": "1.0.0",
+  "effect_family": "spirals",
+  "template_type": "BASE",
+  "visual_intent": "ABSTRACT",
+  "tags": [
+    "spiral",
+    "megatree",
+    "seed"
+  ],
+  "timing": {
+    "bars_min": 1,
+    "bars_max": 8,
+    "beats_per_bar": 4,
+    "loop_len_ms": null,
+    "emphasize_downbeats": true
+  },
+  "palette_spec": {
+    "mode": "FULL_SPECTRUM",
+    "palette_roles": [
+      "primary",
+      "accent"
+    ]
+  },
+  "layers": [
+    {
+      "layer_index": 0,
+      "layer_name": "spiral_base",
+      "layer_depth": "BACKGROUND",
+      "effect_type": "Spirals",
+      "blend_mode": "NORMAL",
+      "mix": 1.0,
+      "params": {
+        "rotation": {
+          "value": 50,
+          "expr": null,
+          "min_val": null,
+          "max_val": null
+        },
+        "thickness": {
+          "value": 40,
+          "expr": null,
+          "min_val": null,
+          "max_val": null
+        }
+      },
+      "motion": [
+        "ROLL"
+      ],
+      "density": 0.7,
+      "color_source": "palette_primary",
+      "timing_offset_beats": null
+    }
+  ],
+  "provenance": {
+    "source": "builtin",
+    "curator_notes": "P3-T5 tracked deterministic recipe for the combined-show golden."
+  },
+  "style_markers": {
+    "complexity": 0.4,
+    "energy_affinity": "HIGH"
+  },
+  "model_affinities": [],
+  "motif_compatibility": []
+}

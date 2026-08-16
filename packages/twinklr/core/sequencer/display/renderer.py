@@ -39,6 +39,7 @@ from twinklr.core.sequencer.display.models.palette import ResolvedPalette
 from twinklr.core.sequencer.display.models.render_plan import RenderPlan
 from twinklr.core.sequencer.display.xlights_mapping import XLightsMapping
 from twinklr.core.sequencer.planning.group_plan import GroupPlanSet
+from twinklr.core.sequencer.planning.models import MacroPlan
 from twinklr.core.sequencer.templates.group.models.choreography import (
     ChoreographyGraph,
 )
@@ -152,6 +153,9 @@ class DisplayRenderer:
         asset_base_path: Path | None = None,
         catalog_index: dict[str, object] | None = None,
         section_boundaries: list[tuple[str, int, int]] | None = None,
+        macro_plan: MacroPlan | None = None,
+        moving_head_target_ids: set[str] | None = None,
+        coordination_graph: ChoreographyGraph | None = None,
     ) -> RenderResult:
         """Render a GroupPlanSet into an XSequence.
 
@@ -199,6 +203,18 @@ class DisplayRenderer:
             xlights_mapping=self._xlights_mapping,
         )
         render_plan = engine.compose(plan_set)
+        if macro_plan is not None:
+            from twinklr.core.sequencer.show_coordination import (
+                coordinate_display_render_plan,
+            )
+
+            render_plan = coordinate_display_render_plan(
+                render_plan,
+                macro_plan,
+                self._beat_grid,
+                coordination_graph or self._choreo_graph,
+                moving_head_target_ids=moving_head_target_ids or set(),
+            )
 
         # Stage 2: XSQ Writing (includes effect handler dispatch)
         render_ctx = RenderContext(

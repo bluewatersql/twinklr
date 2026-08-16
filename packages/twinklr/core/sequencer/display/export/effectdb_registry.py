@@ -24,7 +24,12 @@ class EffectDBRegistry:
         True
     """
 
-    def __init__(self, *, reserve_zero: bool = True) -> None:
+    def __init__(
+        self,
+        *,
+        reserve_zero: bool = True,
+        initial_entries: list[str] | None = None,
+    ) -> None:
         """Initialize the registry.
 
         Args:
@@ -34,7 +39,11 @@ class EffectDBRegistry:
         self._entries: list[str] = []
         self._index: dict[str, int] = {}
 
-        if reserve_zero:
+        for idx, entry in enumerate(initial_entries or []):
+            self._entries.append(entry)
+            self._index.setdefault(entry, idx)
+
+        if reserve_zero and not self._entries:
             self._entries.append("")
             self._index[""] = 0
 

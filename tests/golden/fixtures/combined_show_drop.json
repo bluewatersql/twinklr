@@ -1,0 +1,24 @@
+{
+  "media_file": "combined-show.wav",
+  "duration_ms": 4400,
+  "effects": {
+    "Dmx MH1": {
+      "type": "DMX",
+      "ranges": [[500, 1100], [1600, 2200], [2700, 3300], [3800, 4400]],
+      "settings": "B_CHOICE_BufferStyle=Per Model Default,E_CHECKBOX_INVDMX1=0,E_CHECKBOX_INVDMX2=0,E_CHECKBOX_INVDMX3=0,E_CHECKBOX_INVDMX4=0,E_NOTEBOOK1=Channels 1-16,E_SLIDER_DMX1=180,E_SLIDER_DMX2=90,E_SLIDER_DMX3=200,E_SLIDER_DMX4=90",
+      "palette": null
+    },
+    "Mega Tree": {
+      "type": "Spirals",
+      "ranges": [[0, 500], [1100, 1600], [2200, 2700], [3300, 3800]],
+      "settings": "E_SLIDER_Spirals_Count=3,E_SLIDER_Spirals_Movement=1.0,E_SLIDER_Spirals_Rotation=50,E_SLIDER_Spirals_Thickness=40,E_CHECKBOX_Spirals_Blend=0,E_CHECKBOX_Spirals_3D=0,E_CHECKBOX_Spirals_Grow=0,E_CHECKBOX_Spirals_Shrink=0,B_CHOICE_BufferStyle=Per Model Default",
+      "palette": "C_BUTTON_Palette1=#00E5FF,C_BUTTON_Palette2=#2979FF,C_BUTTON_Palette3=#7C4DFF,C_BUTTON_Palette4=#FFFFFF,C_BUTTON_Palette5=#000000,C_BUTTON_Palette6=#000000,C_BUTTON_Palette7=#000000,C_BUTTON_Palette8=#000000,C_CHECKBOX_Palette1=1,C_CHECKBOX_Palette2=1,C_CHECKBOX_Palette3=1,C_CHECKBOX_Palette4=1,C_SLIDER_Brightness=80"
+    },
+    "Yard Arches": {
+      "type": "SingleStrand",
+      "ranges": [[0, 500], [1100, 1600], [2200, 2700], [3300, 3800]],
+      "settings": "E_CHOICE_Chase_Type1=Left-Right,E_SLIDER_Chase_Speed1=50,E_CHECKBOX_Chase_Color2Color1=1,E_SLIDER_Chase_Group_All=1,E_SLIDER_Chase_Rotations=1.0,E_CHOICE_Fade_Type=None,E_CHOICE_SingleStrand_Colors=Palette,B_CHOICE_BufferStyle=Per Model Default",
+      "palette": "C_BUTTON_Palette1=#00E5FF,C_BUTTON_Palette2=#2979FF,C_BUTTON_Palette3=#7C4DFF,C_BUTTON_Palette4=#FFFFFF,C_BUTTON_Palette5=#000000,C_BUTTON_Palette6=#000000,C_BUTTON_Palette7=#000000,C_BUTTON_Palette8=#000000,C_CHECKBOX_Palette1=1,C_CHECKBOX_Palette2=1,C_CHECKBOX_Palette3=1,C_CHECKBOX_Palette4=1,C_SLIDER_Brightness=80"
+    }
+  }
+}

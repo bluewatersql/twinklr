@@ -48,8 +48,9 @@ P3-T4 delivers the typed fields that carry it: `focal_arc` / `focal_roles`
 (LEAD/SUPPORT/REST per section), `call_response_pairs` (explicit "X calls, Y answers"
 with `step_unit` + `step_duration`), `coordination_intent` (`CoordinationMode`), and
 `palette_arc` / `palette_role`. **This task is the first consumer of those fields on
-both back-ends** — P3-T4's acceptance criterion #2 ("zero unread fields") depends on
-this task landing.
+both back-ends' emitted output.** P3-T4 owns the recursive typed/by-name projection,
+prompt, cache, and validation readers; its amended acceptance criterion #2 does not
+depend on this task landing.
 
 ### The grid situation this task inherits
 
@@ -95,9 +96,10 @@ same `BeatGrid` instance from pipeline state, and neither re-derives beat timing
 2. **Shared BeatGrid, by identity.** Both branches read the same `BeatGrid` object from
    pipeline state. A test asserts identity (`is`), not equality — the failure mode CF-2
    documents is two grids that *look* similar and drift.
-3. **Shared layout.** One `ChoreographyGraph` + `XLightsMapping` (from P3-T3's layout
-   source) serves both branches; the moving-head fixture rig and the display elements
-   are two views of one show, not two configurations.
+3. **Shared layout.** One parsed layout produces the canonical full macro graph, one
+   `XLightsMapping`, exact dedicated-MH ownership, and the non-MH display partition.
+   The moving-head fixture rig and display elements are two ownership views of one
+   show, not separately invented configurations.
 4. **Coordination fields are consumed on both sides.** Specifically:
    - `focal_roles` / `focal_arc`: the section's LEAD target gets the dominant treatment
      in both renderers; REST targets are demonstrably quieter (fewer/lower-intensity
@@ -106,8 +108,8 @@ same `BeatGrid` instance from pipeline state, and neither re-derives beat timing
      renderers alternate on the pair's `step_unit`/`step_duration` — the call's effects
      and the response's effects do not overlap in time.
    - `coordination_intent`: the section's `CoordinationMode` reaches the display
-     composition path (it already has the enum) **and** biases the MH template/segment
-     selection for that section.
+     composition path **and** changes emitted MH segment/timing structure for that
+     section without changing the existing MH template-selection algorithm.
    - `palette_arc` / `palette_role`: both renderers resolve colour from the same stop,
      so a section's MH colour intent and display palette agree.
 5. **Section-level coordination is provable from the output.** The golden artifact for
@@ -123,9 +125,10 @@ same `BeatGrid` instance from pipeline state, and neither re-derives beat timing
 
 **Non-goals**
 
-- Do **not** unify the export writers here — that is P3-T6 (Lane X), which merges after
-  P3-T2. If T6 has landed, use it; if not, keep the two writers and make them write
-  into the same `XSequence`, and note the seam.
+- Do **not** unify the export writers here — that is P3-T6 (Lane X). P3-T5 pulls forward
+  only unconditional positional registry seeding/preservation so display append cannot
+  corrupt existing MH references. General export-core merge, quantization, trace,
+  injection, and layer policy remain P3-T6.
 - Do **not** change composition math, template selection algorithms, or DMX channel
   policy.
 - Do **not** build the evaluation of the combined show — P3-T8.
@@ -199,11 +202,12 @@ From `changes/twinklr-reactivation-review/build/plan/06-phase-3-show-convergence
      the pair are time-disjoint within the section, alternating on the declared step.
    - `coordination_intent`: changing a section's mode from `UNIFIED` to `SEQUENCED` in
      the plan fixture changes the emitted display timing pattern for that section (and
-     the MH selection for that section) — a fixture-diff test.
+     the emitted MH segment/timing structure, without changing its selected template) —
+     a fixture-diff test.
    - `palette_role`: the MH colour intent and the display palette for a section resolve
      from the same `PaletteStop` (assert on the resolved values).
-5. P3-T4's "zero unread fields" test passes with every coordination field now having a
-   named reader.
+5. P3-T4's recursive typed/by-name reader test remains green, and every behavioral
+   coordination field additionally reaches an emitted-output assertion here.
 6. Display-only and MH-only runs still work and produce output identical to what they
    produced before this task (given the same plan fixture).
 7. No new grid: `grep -rn "60_000.0 /\|60000 /" packages/twinklr/core/sequencer/` shows
@@ -225,22 +229,20 @@ Golden-diff expectations (**this is the task's headline artifact**):
 
 ## Tests
 
-1. `tests/integration/test_combined_show_pipeline.py::test_single_run_drives_both`
-   (marked `@pytest.mark.integration`) — fake provider, deterministic plan fixture;
-   asserts stage-execution counts, shared grid identity, and both outputs present.
-2. `…::test_stages_execute_once` — the shared-prefix guarantee.
-3. `tests/unit/sequencer/test_focal_roles_consumed.py` — LEAD/SUPPORT/REST assertion on
-   emitted events, both renderers.
-4. `tests/unit/sequencer/test_call_response_across_parts.py` — time-disjoint
-   alternation for an MH↔display pair.
-5. `tests/unit/sequencer/test_coordination_intent_reaches_both.py` — the
-   fixture-diff test for `UNIFIED` vs `SEQUENCED`.
-6. `tests/unit/sequencer/test_shared_palette_stop.py` — MH colour intent and display
-   palette resolve from one stop.
-7. `tests/golden/test_combined_show_golden.py` — the committed combined artifact, with
-   the five drop-section assertions above.
-8. Regression: `tests/golden/` MH and display goldens unchanged; display-only and
-   MH-only integration tests still pass.
+1. `tests/integration/test_combined_show_pipeline.py` — shared-prefix execution counts,
+   BeatGrid identity, one sequence, real macro-derived MH colour, and a real two-section
+   segmented/transition-enabled MH render.
+2. `tests/unit/sequencer/test_show_coordination.py` — focal budgets, call/response,
+   coordination-mode emission, palette projection, flattened/transition identities,
+   cache idempotence, and irregular-grid property matrices.
+3. `tests/unit/pipeline/test_show_pipeline_wiring.py` — canonical graph/partition and
+   fail-closed layout/fixture ownership reconciliation.
+4. `tests/unit/cli/test_show_command.py` — additive command plus catalog/FE/style input
+   and absence/error behavior.
+5. `tests/golden/test_combined_show_golden.py` — the committed normalized XSequence and
+   trace-sidecar artifacts with the drop-section assertions above.
+6. Regression: the immutable `tests/golden/` suite plus display-only and MH-only wiring/
+   integration tests remain green.
 
 All tests must run from a clean clone against the tracked catalog (P1K-T3) and a fake
 LLM provider. No test may require `data/templates`.
@@ -293,3 +295,145 @@ prefix per branch, doubling LLM cost on the one path the owner will actually use
 *Mitigation*: acceptance criterion #1 asserts execution counts. Note that per-stage
 token attribution is only trustworthy after P1P-T9 / P2P-T9 (CC-4: the profile∥lyrics
 gather race), so assert on **stage executions**, not on token totals.
+
+## Implementation and owner-acceptance record — 2026-08-16
+
+The implementation was authored in an isolated P3-T5 worktree based on `3f1f236`, with
+separate adversarial and verifier passes. No provider, network, audio processor, xLights
+process, or live/paid surface was used. After the final remediation and gate evidence
+below, the owner explicitly accepted all nine decisions and approved P3-T5 for
+integration. This approval does not itself mark P3-T5 integrated.
+
+### Accepted owner decisions
+
+The owner accepted all nine on 2026-08-16:
+
+1. The additive combined surface is `twinklr show`; `twinklr run` and `twinklr display`
+   retain their branch-only behavior.
+2. One parsed layout produces the canonical macro graph. A dedicated fixture group is
+   reconciled by exact active direct membership, and the display planner receives the
+   non-MH partition. Missing, inactive, extra, nested, overlapping, or ambiguous
+   ownership fails before provider work. Duplicate declarations anywhere in the raw
+   model or model-group collections, duplicate dedicated-group members, and slash-
+   qualified submodel references are rejected before any map/set collapse or whole-
+   model comparison. The layout-derived group ID remains canonical; no synthetic
+   `MOVING_HEADS` target is invented for differently named layout groups.
+3. Focal-role normalization is deterministic at the emitted boundary: display
+   aggregate activation budgets are weighted `LEAD=1.0`, `SUPPORT=0.65`, `REST=0.15`
+   per concrete target regardless of unequal event counts; MH categorical projections
+   are `INTENSE`, `SMOOTH`, and `SLOW` respectively. For each section/target, raw
+   activation is `sum(intensity * duration_ms)`; the common base is the minimum
+   `raw / role_weight`, and every target scales down to `base * role_weight`.
+   Unmentioned targets default to SUPPORT.
+4. The effective palette stop/section override is resolved once. Display receives its
+   ordered colors, while MH receives the closest fixture-neutral wheel preset using a
+   stable declared RGB table and declaration-order tie break.
+5. Expanded call/response teams are call-first, grid-derived, clipped, disjoint, and
+   deep-copied. A concrete target reused across pairs, reversed/self-overlap after
+   expansion, or an empty/unknown target fails closed. Unpaired targets retain
+   full-section SUPPORT behavior, and a section too short to contain both phases fails
+   explicitly for BEAT, BAR, and PHRASE steps. Typed pairs are valid if and only if the
+   section coordination intent is `CALL_RESPONSE`; either half of that equivalence
+   missing fails closed.
+6. The acceptance phrase “MH selection” is interpreted as emitted segment/timing
+   structure. The candidate does not change the MH template-selection algorithm, in
+   accordance with this task's non-goal.
+7. One original tracked `Spirals` recipe is added solely to make the required combined
+   golden honest and clean-clone reproducible.
+8. The narrow EffectDB/palette positional-preservation prerequisite is pulled forward
+   from P3-T6 because appending display output otherwise corrupts MH references. This
+   candidate does not add P3-T6 quantization, trace unification, injection unification,
+   or a general arbitrary-document merge policy.
+9. The combined command preserves P3-T3's effective-catalog edge: tracked recipes are
+   overlaid by optional local extensions and then FE-promoted recipes; FE/style inputs
+   reach the planner, empty/missing catalogs fail before provider work, and planner/
+   renderer recipe IDs must match exactly.
+
+### Implemented seams and evidence
+
+- `show_coordination.py` is the post-plan/pre-export deterministic sink for every P3-T4
+  behavioral field. It derives immutable windows only from the exact shared `BeatGrid`,
+  expands GROUP/ZONE/SPLIT teams, is idempotent for fresh/cache-hit branch outputs, and
+  preserves provider-authored plans through deep copies.
+- Compiler identities are reconciled explicitly: flattened `section|segment` names and
+  generated transition source/target IDs resolve to their parent macro sections. Real
+  transition-enabled segmented rendering is covered end to end; no bare iterator
+  failure remains.
+- Macro-derived MH intent is revalidated as explicit schema-v2 intent rather than
+  retaining the legacy-omission marker, so an effective cyan palette override emits the
+  fixture's cyan DMX value instead of coincidentally matching a template default.
+- Display idempotence recognizes only the coordinator-owned terminal event suffix
+  `|coord-<digits>`. Raw RecipeCompiler IDs terminate in a SHA-256 digest, so local,
+  tracked, or FE-promoted template IDs containing `|coord-` remain ordinary inputs and
+  still pass through coordination.
+- The real combined definition composes the existing display/MH definitions, executes
+  `audio/profile/lyrics/macro` once, plans both branches, and joins them at one final
+  render barrier. The barrier compiles MH in memory, builds one sequence, then appends
+  coordinated display effects.
+- `MovingHeadStage` now reuses `context.state['beat_grid']` by identity. The prior
+  reconstruction is covered by a discriminator that patches `from_song_features` to
+  fail if called.
+- The registry regression snapshots MH `ref -> settings` and palette positions before
+  display append and requires exact resolution afterward.
+- The combined integration runs the actual AudioAnalysisStage on irregular fixture
+  boundaries, deterministic provider-boundary fixtures, the real MH compiler, and the
+  real display renderer. It asserts one execution of each common stage, one sequence,
+  and the exact same grid object through both renderers.
+- The accepted normalized golden contains actual `DMX` effects resolving to pan/tilt/
+  dimmer/color settings, actual `Spirals` on Mega Tree, and actual `SingleStrand` chase
+  on Yard Arches, with call/response windows disjoint on irregular detected beats. Its
+  trace sidecar pins every coordinated display event, source template, target, layer,
+  and emitted interval.
+
+Fresh author gates after the final changes:
+
+- final CLI/coordinator/ownership/integration/golden approval focus: `54 passed`
+- catalog/CLI/display/show definition regression: `64 passed`
+- immutable golden suite: `74 passed, 8 skipped`
+- full offline suite: `5337 passed, 38 skipped` (9 existing deprecation warnings)
+- Ruff format: `1356 files already formatted`; Ruff lint clean
+- mypy: success across `728 source files`
+- `git diff --check`: clean
+- nominal-tempo math grep: one pre-existing display timing-resolver occurrence; no
+  increase
+
+The first broad run exposed one expected catalog-coverage fixture delta after adding the
+sixth tracked recipe (`2/15 -> 3/15` cells); its deterministic expectation was updated,
+and the two subsequent full runs passed. An all-extras environment also exposed the
+pre-existing optional-Anthropic mypy import pattern; the canonical/default verifier
+environment (and main baseline) omits that optional provider extra and passes. Neither
+finding is carried as an accepted implementation failure.
+
+Independent review initially rejected an earlier candidate after reproducing sparse-target
+deletion, flattened/transition identity crashes, event-count role inversion, call-only
+short sections, a missing P3-T3 catalog edge, and a non-discriminating manually supplied
+MH golden color. The remediation added seven failing coordination discriminators and
+five failing catalog/CLI discriminators before implementation. All are green in the
+fresh gates above.
+
+A second independent review then exposed role aggregation by category rather than by
+concrete target, permissive pair/mode mismatches, and lossy normalization of duplicate
+or submodel-qualified dedicated-group members. Six coordinator and two ownership
+discriminators failed before the second remediation. Parameterized 2/7/100-event
+support-target cases now prove exact per-target role ratios and idempotence; mode/pair
+equivalence and raw whole-model membership are fail-closed. The final fresh gates above
+include this second remediation; a subsequent adversarial pass produced the third
+remediation below.
+
+A third adversarial pass found two further lossy-normalization hazards: duplicate model
+or model-group declarations outside the dedicated group could be hidden by later maps,
+and the display idempotence test treated any `|coord-` substring as coordinator
+provenance. Three layout and three recipe-ID discriminators failed before remediation.
+Global duplicate-name checks now precede every collection collapse, including the
+non-dedicated overlap-masking case. Parameterized tracked/local/FE-style compiler IDs
+containing `|coord-` now coordinate normally and remain identical on a second pass. The
+fresh gates above include this third remediation.
+
+### Approval boundary
+
+P3-T5 is approved for integration with the nine decisions above as its binding contract.
+The approval does not waive the open Phase 1P/2P/2K empirical exits, does not convert
+P3-T4's failed live probe into live acceptance, and does not authorize another P3-T4
+attempt. P3-T6 and later Phase 3 implementation remain unauthorized. No P3-T5 live,
+paid, xLights, owner-audio, or owner-layout work was performed or inferred from the
+offline fixtures.

@@ -19,8 +19,10 @@ Usage:
 from twinklr.core.pipeline.definitions.common import build_common_stages
 from twinklr.core.pipeline.definitions.display import build_display_pipeline
 from twinklr.core.pipeline.definitions.moving_heads import build_moving_heads_pipeline
+from twinklr.core.pipeline.definitions.show import build_combined_show_pipeline
 
 __all__ = [
+    "build_combined_show_pipeline",
     "build_common_stages",
     "build_display_pipeline",
     "build_moving_heads_pipeline",

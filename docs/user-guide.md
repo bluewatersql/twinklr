@@ -271,6 +271,29 @@ Use `--fe-output-dir DIR` to apply persisted feature-engineering context. Add
 The display command may omit `--app-config`; Twinklr then uses application defaults.
 If you supply the flag, its file must exist and validate.
 
+To plan and render moving heads and the RGB/pixel display from one macro arc, use the
+additive combined command:
+
+```bash
+uv run twinklr show \
+  --audio path/to/song.mp3 \
+  --layout path/to/xlights_rgbeffects.xml \
+  --fixture-config path/to/fixture_config.json \
+  --config path/to/job_config.json \
+  --out artifacts
+```
+
+`twinklr show` runs analysis, profile, lyrics, and macro planning once, then plans the
+two backends in parallel and writes their effects into one sequence. The fixture
+config's `xlights_group` must name one dedicated layout group whose active direct model
+members exactly match every fixture's `xlights_model_name`. Missing, inactive, extra,
+nested, or multiply-owned members fail before provider work. The existing
+`twinklr run` and `twinklr display` commands remain the branch-only iteration paths.
+Like `display`, `show` accepts `--fe-output-dir DIR` and an optional `--style NAME`.
+Its effective recipe catalog layers tracked recipes, optional local extensions, then
+FE-promoted recipes; an absent/empty catalog or planner/renderer ID mismatch fails
+before provider work.
+
 ### Data-form moving-head templates
 
 Moving-head templates can be supplied as strict JSON `TemplateDoc` files without

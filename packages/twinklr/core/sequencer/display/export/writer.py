@@ -129,8 +129,17 @@ class XSQWriter:
             WriteResult with statistics and warnings.
         """
         result = WriteResult()
-        effectdb_reg = EffectDBRegistry(reserve_zero=True)
-        palette_reg = PaletteDBRegistry()
+        # P3-T5 appends display effects to the moving-head sequence. Seed both
+        # registries from that sequence so every existing numeric reference keeps
+        # resolving to the same settings/palette after the append. Full exporter
+        # unification remains P3-T6; this is the narrow correctness prerequisite.
+        effectdb_reg = EffectDBRegistry(
+            reserve_zero=True,
+            initial_entries=sequence.effect_db.entries,
+        )
+        palette_reg = PaletteDBRegistry(
+            initial_entries=[palette.settings for palette in sequence.color_palettes],
+        )
 
         # Process each element group
         for group_plan in render_plan.groups:

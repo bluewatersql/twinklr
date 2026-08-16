@@ -30,7 +30,7 @@ mining or promotion.
 ## Current contents (P0-T2 seed subset)
 
 As of P0-T2 (structural test repair), this directory holds a **minimal
-seed set of 5 hand-authored `builtin` recipes** — not the full ~37-recipe
+seed set of 6 hand-authored `builtin` recipes** — not the full ~37-recipe
 production catalog — chosen to be the smallest set that lets
 `test_engine.py`/`test_sequenced.py`/`test_renderer_overlay.py` assert real
 composition-engine behavior (effect-type keyword resolution, multi-lane
@@ -39,6 +39,7 @@ asset-overlay wiring) on every checkout, with no corpus-generation step:
 
 | recipe_id | lane | purpose |
 |---|---|---|
+| `gtpl_base_megatree_spirals` | BASE | tracked spiral-class effect for the P3-T5 coordinated-show golden |
 | `gtpl_base_wash_split` | BASE | ambient wash keyword resolution, timing/palette/overlay tests |
 | `gtpl_rhythm_chase_single` | RHYTHM | "chase" keyword resolution, SEQUENCED/RIPPLE/CALL_RESPONSE expansion |
 | `gtpl_rhythm_alternate_ab` | RHYTHM | explicit `effect_map.py` override (SingleStrand) |

@@ -22,9 +22,12 @@ class PaletteDBRegistry:
         True
     """
 
-    def __init__(self) -> None:
+    def __init__(self, *, initial_entries: list[str] | None = None) -> None:
         self._entries: list[str] = []
         self._index: dict[str, int] = {}
+        for idx, entry in enumerate(initial_entries or []):
+            self._entries.append(entry)
+            self._index.setdefault(entry, idx)
 
     def register(self, palette_string: str) -> int:
         """Register a palette string, returning its index.

@@ -309,6 +309,45 @@ class TestMovingHeadStageExecute:
         state_keys = [call[0][0] for call in calls]
         assert "mh_planning_context" in state_keys
 
+    @pytest.mark.asyncio
+    async def test_execute_reuses_audio_stage_beat_grid_by_identity(
+        self, stage: MovingHeadStage, mock_context: MagicMock, valid_input: dict
+    ) -> None:
+        """The combined branch must never reconstruct the authoritative grid."""
+        from twinklr.core.sequencer.timing.beat_grid import BeatGrid
+
+        shared_grid = BeatGrid(
+            bar_boundaries=[0.0, 2_000.0],
+            beat_boundaries=[0.0, 500.0, 1_010.0, 1_490.0, 2_000.0],
+            eighth_boundaries=[float(i * 250) for i in range(9)],
+            sixteenth_boundaries=[float(i * 125) for i in range(17)],
+            tempo_bpm=120.0,
+            beats_per_bar=4,
+            duration_ms=2_000.0,
+        )
+        mock_context.get_state.side_effect = lambda key, default=None: (
+            shared_grid if key == "beat_grid" else default
+        )
+
+        with (
+            patch(
+                "twinklr.core.sequencer.timing.beat_grid.BeatGrid.from_song_features",
+                side_effect=AssertionError("must reuse AudioAnalysisStage grid"),
+            ),
+            patch(
+                "twinklr.core.pipeline.execution.execute_step",
+                new=AsyncMock(return_value=MagicMock(success=True)),
+            ),
+        ):
+            await stage.execute(valid_input, mock_context)
+
+        planning_context = next(
+            call.args[1]
+            for call in mock_context.set_state.call_args_list
+            if call.args[0] == "mh_planning_context"
+        )
+        assert planning_context.beat_grid is shared_grid
+
 
 class TestMovingHeadStageStateHandler:
     """Tests for MovingHeadStage state handler."""

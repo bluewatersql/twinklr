@@ -30,6 +30,7 @@ from twinklr.cli.recipe_builder_cmd import (
     add_curate_catalog_subparser,
     run_curate_catalog_command,
 )
+from twinklr.cli.show_cmd import add_show_subparser, run_show_command
 from twinklr.cli.template_cmd import (
     add_template_subparsers,
     run_template_export_command,
@@ -632,6 +633,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     add_review_staged_recipes_subparser(sub)
     add_template_subparsers(sub)
     add_display_subparser(sub)
+    add_show_subparser(sub)
 
     # Registered only so `twinklr --help` lists it; `main()` dispatches "eval-report"
     # to click before argparse ever parses its arguments (see below — argparse's
@@ -709,6 +711,8 @@ def main() -> None:
         sys.exit(run_template_validate_command(args))
     elif args.cmd == "display":
         run_display_command(args)
+    elif args.cmd == "show":
+        run_show_command(args)
 
 
 if __name__ == "__main__":

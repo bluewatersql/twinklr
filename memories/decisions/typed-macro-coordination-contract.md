@@ -10,8 +10,9 @@ tags: [macro-planner, coordination, palette, motifs, focal-arc]
 # Typed Macro Coordination Contract
 
 _Accepted by the owner on 2026-08-16, including the exact invariants and AC2 amendment;
-independently approved offline/in code and integrated at `558153c`. The owner's later
-“continue” authorizes P3-T5 as the next offline task only._
+independently approved offline/in code and integrated at `558153c`. The owner later
+accepted P3-T5's emitted-behavior policy and approved that offline candidate for
+integration._
 
 ## Decision
 
@@ -70,9 +71,9 @@ applied and the discrepancy is surfaced for owner review.
   prompts, validation, and cache keys, but P3-T5 remains the binding plan's first
   emitted-display behavioral consumer of those fields. The owner amended AC2 so P3-T4's
   acceptance boundary is its recursive mutation-discriminating typed/by-name projection,
-  prompt, validation, and cache consumption; this amendment did not itself authorize
-  P3-T5 or substitute a fake emitted-behavior sink. The owner's later “continue” now
-  authorizes P3-T5 as the next offline task only, without authorizing live work or P3-T6+.
+  prompt, validation, and cache consumption; this amendment did not substitute a fake
+  emitted-behavior sink. P3-T5 now supplies that emitted consumer under the separately
+  accepted coordinated-show contract, without authorizing live work or P3-T6+.
 - The owner authorized only the bounded live macro-planner probe, capped at three
   attempts and one cumulative `$1.75` task budget. After harness-audit GO, attempt 1
   reached OpenAI exactly once and received HTTP 400 `invalid_json_schema` because the
@@ -88,3 +89,4 @@ applied and the discrepancy is surfaced for owner review.
 - [P3-T4 specification](../../changes/twinklr-reactivation-review/build/specs/phase-3-show-convergence/P3-T4-macro-structured-contract.md)
 - [Phase 3 plan](../../changes/twinklr-reactivation-review/build/plan/06-phase-3-show-convergence.md)
 - [LLM intent / deterministic precision boundary](llm-plans-intent-renderer-implements-precision.md)
+- [Coordinated show contract](coordinated-show-contract.md)

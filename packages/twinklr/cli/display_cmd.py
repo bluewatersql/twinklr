@@ -168,6 +168,7 @@ def export_display_artifacts(
     *,
     artifact_dir: Path,
     song_name: str,
+    artifact_kind: str = "display",
 ) -> tuple[Path, Path]:
     """Persist the pipeline's in-memory sequence and deterministic trace sidecar."""
     if not isinstance(render_output, dict):
@@ -178,7 +179,7 @@ def export_display_artifacts(
         raise TypeError("display_render.sequence must be an XSequence")
     if not isinstance(render_result, RenderResult):
         raise TypeError("display_render.render_result must be a RenderResult")
-    xsq_path = artifact_dir / f"{song_name}_twinklr_display.xsq"
+    xsq_path = artifact_dir / f"{song_name}_twinklr_{artifact_kind}.xsq"
     XSQExporter().export(sequence, xsq_path)
     return xsq_path, write_display_xsq_trace_sidecar(xsq_path, render_result)
 

@@ -97,7 +97,7 @@ def test_default_catalog_paths_are_clean_clone_safe() -> None:
         local_catalog_dir=default_local_catalog_dir(),
         song_name="song",
     )
-    assert len(wiring.recipe_catalog.recipes) == 5
+    assert len(wiring.recipe_catalog.recipes) == 6
 
 
 def test_catalog_layers_tracked_local_then_fe_promoted(tmp_path: Path) -> None:
@@ -105,7 +105,7 @@ def test_catalog_layers_tracked_local_then_fe_promoted(tmp_path: Path) -> None:
     tracked_recipes = {
         recipe.recipe_id: recipe for recipe in RecipeCatalog.from_store(tracked_store).recipes
     }
-    assert len(tracked_recipes) == 5
+    assert len(tracked_recipes) == 6
     recipe_id = "gtpl_base_wash_split"
     local = tmp_path / "local"
     (local / "custom").mkdir(parents=True)
@@ -139,7 +139,7 @@ def test_catalog_layers_tracked_local_then_fe_promoted(tmp_path: Path) -> None:
         song_name="song",
     )
 
-    assert len(wiring.recipe_catalog.recipes) == 5
+    assert len(wiring.recipe_catalog.recipes) == 6
     assert wiring.recipe_catalog.get_recipe(recipe_id).name == "FE Promoted Override"
     planner = _planner_stage(wiring)
     render = next(

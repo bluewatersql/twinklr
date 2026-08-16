@@ -374,3 +374,70 @@ class TestTraceMetadata:
                 palette, intensity=0.5, effect_name=effect_name
             )
             assert result.brightness == 50, f"Failed for {effect_name}"
+
+
+def test_append_preserves_existing_effectdb_and_palette_references() -> None:
+    """Appending display effects must not invalidate moving-head references."""
+    from twinklr.core.formats.xlights.sequence.models.xsq import (
+        ColorPalette,
+        Effect,
+        EffectDB,
+        SequenceHead,
+        XSequence,
+    )
+    from twinklr.core.sequencer.display.effects.handlers import load_builtin_handlers
+    from twinklr.core.sequencer.display.effects.protocol import RenderContext
+    from twinklr.core.sequencer.display.models.render_plan import (
+        RenderGroupPlan,
+        RenderLayerPlan,
+        RenderPlan,
+    )
+
+    sequence = XSequence(
+        head=SequenceHead(
+            version="2024.01",
+            media_file="song.wav",
+            sequence_duration_ms=2_000,
+        ),
+        effect_db=EffectDB(entries=["", "MH_SETTINGS"]),
+        color_palettes=[ColorPalette(settings="MH_PALETTE")],
+    )
+    sequence.add_effect(
+        "Moving Heads",
+        Effect(
+            effect_type="DMX",
+            start_time_ms=0,
+            end_time_ms=1_000,
+            ref=1,
+            palette="0",
+        ),
+    )
+    plan = RenderPlan(
+        render_id="append",
+        duration_ms=2_000,
+        groups=[
+            RenderGroupPlan(
+                element_name="Mega Tree",
+                layers=[
+                    RenderLayerPlan(
+                        layer_index=0,
+                        layer_role=LaneKind.BASE,
+                        events=[_make_event()],
+                    )
+                ],
+            )
+        ],
+    )
+    writer = XSQWriter(
+        handler_registry=load_builtin_handlers(),
+        render_context=RenderContext(sequence_duration_ms=2_000),
+    )
+
+    writer.write(plan, sequence)
+
+    mh_effect = sequence.get_element("Moving Heads").layers[0].effects[0]  # type: ignore[union-attr]
+    assert mh_effect.ref == 1
+    assert sequence.effect_db.get(mh_effect.ref) == "MH_SETTINGS"
+    assert sequence.color_palettes[int(mh_effect.palette)].settings == "MH_PALETTE"
+    assert sequence.effect_db.entries[:2] == ["", "MH_SETTINGS"]
+    assert sequence.color_palettes[0].settings == "MH_PALETTE"

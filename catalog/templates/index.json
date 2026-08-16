@@ -1,6 +1,19 @@
 {
   "entries": [
     {
+      "recipe_id": "gtpl_base_megatree_spirals",
+      "name": "Megatree Spirals",
+      "template_type": "BASE",
+      "visual_intent": "ABSTRACT",
+      "tags": [
+        "spiral",
+        "megatree",
+        "seed"
+      ],
+      "source": "builtin",
+      "file": "builtins/gtpl_base_megatree_spirals.json"
+    },
+    {
       "recipe_id": "gtpl_base_wash_split",
       "name": "Base Wash Split",
       "template_type": "BASE",

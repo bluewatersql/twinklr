@@ -84,6 +84,7 @@ class GroupPlannerStage:
         fe_bundle: FEArtifactBundle | None = None,
         max_iterations: int = 3,
         min_pass_score: float = 7.0,
+        macro_choreo_graph: ChoreographyGraph | None = None,
     ) -> None:
         """Initialize group planner stage.
 
@@ -101,6 +102,7 @@ class GroupPlannerStage:
         self.fe_bundle = fe_bundle
         self.max_iterations = max_iterations
         self.min_pass_score = min_pass_score
+        self.macro_choreo_graph = macro_choreo_graph or choreo_graph
 
     @property
     def name(self) -> str:
@@ -227,7 +229,7 @@ class GroupPlannerStage:
             raise ValueError("Missing 'macro_plan' in context.state")
         normalized_macro = MacroPlan.model_validate(
             macro_plan.model_dump() if hasattr(macro_plan, "model_dump") else macro_plan,
-            context={"choreo_graph": self.choreo_graph},
+            context={"choreo_graph": self.macro_choreo_graph},
         )
         macro_section = next(
             (
@@ -257,8 +259,20 @@ class GroupPlannerStage:
         ]
         resolved_lead_targets = self._resolve_focus_targets(lead_focal_targets)
         resolved_support_targets = self._resolve_focus_targets(support_focal_targets)
-        typed_lead_targets = self._serialize_focus_targets(lead_focal_targets)
-        typed_support_targets = self._serialize_focus_targets(support_focal_targets)
+        typed_lead_targets = self._serialize_focus_targets(
+            [target for target in lead_focal_targets if self._resolve_focus_targets([target])]
+        )
+        typed_support_targets = self._serialize_focus_targets(
+            [target for target in support_focal_targets if self._resolve_focus_targets([target])]
+        )
+        # A macro LEAD may belong exclusively to the MH backend.  The display planner
+        # still needs a concrete local focus; promote its highest available SUPPORT
+        # while the full macro contract remains intact in ``macro_input``.
+        if not resolved_lead_targets and resolved_support_targets:
+            resolved_lead_targets = resolved_support_targets
+            typed_lead_targets = typed_support_targets
+            resolved_support_targets = []
+            typed_support_targets = []
 
         fe_fields = self._extract_fe_fields(section_id=input.section.section_id)
 
@@ -403,7 +417,8 @@ class GroupPlannerStage:
                 continue
 
             if ttype == TargetType.GROUP:
-                resolved.append(str(tid))
+                if self.choreo_graph.get_group(str(tid)) is not None:
+                    resolved.append(str(tid))
             elif ttype == TargetType.ZONE:
                 for tag, ids in self.choreo_graph.groups_by_tag.items():
                     if getattr(tag, "value", str(tag)) == tid:

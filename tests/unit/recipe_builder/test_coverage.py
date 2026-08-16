@@ -190,9 +190,9 @@ def test_catalog_coverage_command_writes_json_without_mutating_catalog(tmp_path:
     report = json.loads(output_path.read_text(encoding="utf-8"))
     assert report["summary"] == {
         "total_cells": 15,
-        "covered_cells": 2,
-        "gap_cells": 13,
-        "coverage_ratio": 2 / 15,
+        "covered_cells": 3,
+        "gap_cells": 12,
+        "coverage_ratio": 3 / 15,
         "exit_criterion_met": False,
     }
     assert report["report_header"]["excluded_roles"] == ["TRANSITION", "SPECIAL"]

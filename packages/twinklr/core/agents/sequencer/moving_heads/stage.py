@@ -162,8 +162,13 @@ class MovingHeadStage:
             # Build BeatGrid from audio bundle for downstream rendering
             from twinklr.core.sequencer.timing.beat_grid import BeatGrid
 
-            beat_grid = BeatGrid.from_song_features(audio_bundle.features)
-            context.set_state("beat_grid", beat_grid)
+            beat_grid = context.get_state("beat_grid")
+            if beat_grid is None:
+                beat_grid = BeatGrid.from_song_features(
+                    audio_bundle.features,
+                    duration_ms=getattr(getattr(audio_bundle, "timing", None), "duration_ms", None),
+                )
+                context.set_state("beat_grid", beat_grid)
             logger.debug(
                 f"Built beat_grid: tempo={beat_grid.tempo_bpm} BPM, "
                 f"total_bars={beat_grid.total_bars}"

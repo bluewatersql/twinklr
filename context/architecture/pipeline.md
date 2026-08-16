@@ -1,7 +1,7 @@
 ---
 type: context
 area: architecture
-updated: 2026-08-14
+updated: 2026-08-16
 ---
 
 # Pipeline Architecture
@@ -14,8 +14,8 @@ Audio File (.mp3)
      ▼
 1. Audio Analysis (deterministic)      tempo, beats, energy, sections, lyrics, phonemes
 2. Audio Profiling (LLM)               musical interpretation, creative guidance, mood arc
-3. Multi-Agent Planning (LLM)          planner → validator → judge iterative refinement
-4. Rendering & Compilation (det.)      templates → curves → DMX values → fixture segments
+3. Multi-Agent Planning (LLM)          one macro → MH + display planning branches
+4. Rendering & Compilation (det.)      shared BeatGrid → coordinated effects → one XSequence
      │
      ▼
 Delivery: fresh .xsq + .xtiming tracks + .xmap mapping hint
@@ -36,7 +36,12 @@ Delivery: fresh .xsq + .xtiming tracks + .xmap mapping hint
 | API clients | `api/` | HTTP (sync+async), OpenAI LLM client, AcoustID/MusicBrainz |
 | Caching | `caching/` | FSCache (async), sync variants, null cache |
 
-The CLI package (`packages/twinklr/cli/`) wires the end-to-end `twinklr run` workflow.
+The CLI package (`packages/twinklr/cli/`) exposes branch-only `twinklr run` / `twinklr
+display` workflows and the additive `twinklr show` convergence workflow. The combined
+pipeline executes the common audio/profile/lyrics/macro prefix once, then joins the MH
+and display branches at one in-memory render barrier. The binding ownership, focal,
+palette, call/response, and catalog policy is recorded in the
+[coordinated-show decision](../../memories/decisions/coordinated-show-contract.md).
 
 ## Execution semantics
 

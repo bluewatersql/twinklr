@@ -154,6 +154,10 @@ class DisplayRenderStage:
         choreo_graph: ChoreographyGraph | None = None,
         xlights_mapping: XLightsMapping | None = None,
         recipe_catalog: object | None = None,
+        *,
+        coordinate_show: bool = False,
+        moving_head_target_ids: set[str] | None = None,
+        coordination_graph: ChoreographyGraph | None = None,
     ) -> None:
         """Initialize the stage with optional pre-configured dependencies.
 
@@ -168,6 +172,9 @@ class DisplayRenderStage:
         self._choreo_graph = choreo_graph
         self._xlights_mapping = xlights_mapping
         self._recipe_catalog = recipe_catalog
+        self._coordinate_show = coordinate_show
+        self._moving_head_target_ids = moving_head_target_ids or set()
+        self._coordination_graph = coordination_graph
 
     @property
     def name(self) -> str:
@@ -286,6 +293,13 @@ class DisplayRenderStage:
                 asset_base_path=asset_base_path,
                 catalog_index=catalog_index,
                 section_boundaries=section_boundaries,
+                macro_plan=(
+                    MacroPlan.model_validate(context.get_state("macro_plan"))
+                    if self._coordinate_show
+                    else None
+                ),
+                moving_head_target_ids=self._moving_head_target_ids,
+                coordination_graph=self._coordination_graph,
             )
 
             # Track metrics

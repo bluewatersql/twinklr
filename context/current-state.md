@@ -6,8 +6,8 @@ updated: 2026-08-16
 
 # Twinklr — Current State
 
-_Repository evidence and active sequencing verified 2026-08-16 after P3-T4 integration
-at `558153c`._
+_Repository evidence and active sequencing verified 2026-08-16 for the owner-approved
+P3-T5 integration candidate; P3-T4 remains integrated at `558153c`._
 
 Twinklr is an AI-powered choreography engine: audio file in, xLights artifacts out — a
 fresh `.xsq`, standalone `.xtiming` timing tracks, and an `.xmap` mapping hint, which the
@@ -66,17 +66,19 @@ See [product/overview.md](product/overview.md).
   guarded `inject`/`regenerate` workflows that plan against the open layout and own only
   reserved Twinklr layers. Live xLights acceptance remains an explicit local-only gate.
   `packages/twinklr/core/formats/xlights/`, `packages/twinklr/core/api/xlights/`
-- **CLI** — `twinklr run` executes the moving-head pipeline end to end; live iteration,
-  catalog coverage, and recipe-builder command surfaces expose the corresponding guarded
-  workflows. `packages/twinklr/cli/`
+- **CLI** — `twinklr run` and `twinklr display` retain branch-only iteration, while
+  `twinklr show` runs one common planning prefix and emits coordinated MH + display
+  effects into one sequence after strict layout/fixture ownership reconciliation. Live
+  iteration, catalog coverage, and recipe-builder command surfaces expose the other
+  guarded workflows. `packages/twinklr/cli/`
 
 ## Quality-gate state
 
-The latest complete broad-gate evidence is the remediated P3-T4 snapshot subsequently
-approved by independent offline/code review and integrated at `558153c`: **5,280 passed,
-39 skipped**, 73 golden tests passed with 8 skipped, clean Ruff formatting/lint, and mypy
-success across **723 source files**. P3-T3 was previously independently verified and
-merged at `33cce57`. The skips cover explicit
+The latest complete broad-gate evidence is the owner-approved P3-T5 integration
+candidate: **5,337 passed, 38 skipped**, 74 golden tests passed with 8 skipped, clean
+Ruff formatting/lint, and mypy success across **728 source files**. P3-T4 remains
+integrated at `558153c`; P3-T3 was previously independently verified and merged at
+`33cce57`. The skips cover explicit
 optional/local-only boundaries rather than accepted implementation regressions. This
 document owns the canonical current repository and quality-gate snapshot; the campaign
 handoff links here instead of duplicating it.
@@ -102,9 +104,10 @@ because `ThemeRef.scope` combined `$ref` with sibling `description`. No retry/fa
 occurred, usage was unavailable, and the conservative `$1.66` commitment leaves only
 `$0.09`, insufficient for another audited attempt. The general schema remediation is
 integrated and offline-verified at `558153c`, but live acceptance remains open and no
-further P3-T4 live attempt is authorized. The owner's latest “continue” authorizes P3-T5
-as the next offline task only; it does not waive the earlier exits or authorize P3-T5
-live work or P3-T6+. Phase 4 has not started.
+further P3-T4 live attempt is authorized. The owner accepted all nine P3-T5 decisions
+and approved the final offline candidate for integration. P3-T5 is not yet counted as
+integrated; this approval does not waive the earlier exits, close P3-T4 live acceptance,
+or authorize P3-T5 live work or P3-T6+. Phase 4 has not started.
 
 The authoritative current task/gate list is the campaign
 [HANDOFF.md](../changes/twinklr-reactivation-review/build/plan/HANDOFF.md). Most notably,

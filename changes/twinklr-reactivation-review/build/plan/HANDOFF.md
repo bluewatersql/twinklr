@@ -1,11 +1,10 @@
 # Build-campaign handoff — current execution state
 
-_Last updated: 2026-08-16 after P3-T4 was independently approved offline/in code and
-integrated at `558153c`. Its one live attempt remains rejected at the provider schema
-boundary; `$1.66` is committed and the remaining `$0.09` cannot fund another audited
-attempt. Live acceptance remains open and no further P3-T4 live attempt is authorized.
-The owner's latest “continue” authorizes P3-T5 as the next offline task only under the
-existing sequencing exception. Maintained by the
+_Last updated: 2026-08-16 after the owner accepted all nine P3-T5 decisions and approved
+the final offline candidate for integration. P3-T4's one live attempt remains rejected
+at the provider schema boundary; `$1.66` is committed and the remaining `$0.09` cannot
+fund another audited attempt. Live acceptance remains open and no further P3-T4 live
+attempt is authorized. P3-T6+ remains unauthorized. Maintained by the
 orchestrating agent; update this file at every
 pause or phase boundary._
 
@@ -27,7 +26,7 @@ their authoring moment; this handoff owns the current campaign status.
 | 1P — Render truth | **IMPLEMENTATION MERGED AND VERIFIED** (12/12); **phase exit not complete** | The recorded human judgment and empirical xLights acceptance evidence remain pending; see [02-phase-1p-render-truth.md](02-phase-1p-render-truth.md). |
 | 2P — Creative quality | **OFFLINE IMPLEMENTATION MERGED AND VERIFIED** (13/13); **phase exit not complete** | The owner accepted T1/T8/T9 on 2026-08-16. T6 calibration/live evidence, T13/D1 evidence, and other live checks remain pending; see [04-phase-2p-creative-quality.md](04-phase-2p-creative-quality.md). |
 | 2K — Catalog growth | **TOOLING IMPLEMENTATION MERGED AND VERIFIED** (4/4); **phase exit not complete** | Tooling is ready, but coverage/corpus/curation/style exit criteria require the author's real layout, corpus, preferences, and judgments; see [05-phase-2k-catalog-growth.md](05-phase-2k-catalog-growth.md). |
-| 3 — Show convergence | **P3-T1/P3-T2/P3-T3/P3-T4 MERGED; P3-T5 AUTHORIZED NEXT OFFLINE** (4/8 integrated) | P3-T4's owner-approved contract and general `$ref` fix were independently approved offline/in code and integrated at `558153c`. Live attempt 1 remains rejected with HTTP 400 `invalid_json_schema`; no retry/fallback occurred, usage was unavailable, `$1.66` is committed, and only `$0.09` remains. Live acceptance is open and no further P3-T4 live attempt is authorized. The latest “continue” authorizes P3-T5 offline implementation only; it does not waive Phase 1P/2P/2K exits or authorize live work or P3-T6+. P3-T3 landed at `33cce57`, P3-T2 at `5365f70`, and P3-T1 at `5eebcb2`. |
+| 3 — Show convergence | **P3-T1/P3-T2/P3-T3/P3-T4 MERGED; P3-T5 OWNER-ACCEPTED AND APPROVED FOR INTEGRATION** (4/8 integrated) | The owner accepted P3-T5's nine binding decisions after its offline review/remediation rounds; integration is the next repository action. This does not waive Phase 1P/2P/2K exits, close P3-T4 live acceptance, or authorize P3-T6+. P3-T4 is integrated at `558153c`, P3-T3 at `33cce57`, P3-T2 at `5365f70`, and P3-T1 at `5eebcb2`. |
 | 4 — Compounding | **NOT STARTED** | No Phase 4 implementation has started. |
 
 The overall `twinklr-reactivation-review` change remains **ACTIVE**. Finishing an
@@ -39,6 +38,12 @@ offline implementation lane is not the same as satisfying its phase exit criteri
   [context/current-state.md](../../../../context/current-state.md); do not fork its
   rolling snapshot into this execution handoff.
 - No implementation or test failure is being carried as an accepted baseline.
+- The owner-approved P3-T5 candidate has fresh final author evidence: focused
+  CLI/coordination/ownership/integration/golden `54 passed`; immutable goldens `74 passed,
+  8 skipped`; full offline suite `5337 passed, 38 skipped`; Ruff/format clean; mypy
+  clean across 728 source files; `git diff --check` clean. The owner accepted all nine
+  recorded decisions and approved integration. No live/provider/xLights/audio work was
+  performed, and P3-T6 remains unauthorized.
 - The prior P3-T4 author snapshot was formally rejected, then its first remediation was
   narrowly rejected for reinterpreting `PlanTarget.ZONE` as physical `DisplayZone`.
   The frozen author snapshot restores the established `ChoreoTag` contract. Fresh gates:
@@ -164,8 +169,8 @@ The remaining empirical checks are also pending:
 
 ## Continuation order
 
-1. Execute P3-T5 as the next offline task under the owner's narrow sequencing exception;
-   do not perform live/paid/local empirical work and do not start P3-T6+.
+1. Integrate the owner-accepted P3-T5 candidate; do not perform live/paid/local empirical
+   work and do not start P3-T6+.
 2. Complete the Phase 1P human-judgment and empirical xLights exit evidence.
 3. Complete the P2P-T6 owner review and calibration gate; T1/T8/T9 were accepted on
    2026-08-16.
@@ -177,9 +182,9 @@ The remaining empirical checks are also pending:
 P3-T1/P3-T2/P3-T3 are complete and independently verified. P3-T4's owner-approved
 contract/invariants, AC2 amendment, and general schema remediation were independently
 approved offline/in code and integrated at `558153c`. Its failed live attempt leaves
-live acceptance open, with no budget or authorization for another attempt. P3-T5 alone
-is authorized next for offline implementation while the earlier empirical exits remain
-open; P3-T6+ remains unauthorized. P3-T2 deliberately leaves
+live acceptance open, with no budget or authorization for another attempt. P3-T5's nine
+decisions and final offline candidate are owner-accepted and approved for integration
+while the earlier empirical exits remain open; P3-T6+ remains unauthorized. P3-T2 deliberately leaves
 `resolved_color`, `timing_offset_beats`, and parameter-range/settings escaping work to
 their existing P3-T5/P3-T8 or display-review owners; it does not silently close them.
 

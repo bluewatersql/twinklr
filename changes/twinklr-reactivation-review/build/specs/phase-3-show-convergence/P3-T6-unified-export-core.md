@@ -148,8 +148,11 @@ unseeded registry over a populated one is silent corruption.
   `EffectDBRegistry` (74) + `PaletteDBRegistry` (62). Genuinely shared: the `XSequence`
   model and `XSQExporter` (~740 lines).
 - MH: no EffectDB dedup — N segments produce N entries even when identical.
-- Display: dedup, but wholesale replacement of `effect_db` and `color_palettes` on
-  write, and layer placement starting at compacted index 0.
+- Display: dedup and layer placement starting at compacted index 0. P3-T5 pulled
+  unconditional EffectDB/palette seeding and positional preservation forward as the
+  narrow prerequisite for safe combined append; the general shared export core,
+  arbitrary-document merge/layer policy, MH dedup, trace/injection unification, and
+  common grid/stamp policy remain this task.
 - Two version stamps, two declared grids, one path that ignores its own declaration.
 - Palette index 0 emitted as an absent attribute.
 
@@ -161,7 +164,7 @@ unseeded registry over a populated one is silent corruption.
    settings-string *builders* stay separate (DMX-channel output and buffer-effect
    output really are different problems — the review says so); the **registry, layer,
    emission, and trace** halves are shared.
-2. **Seeded, always.** The core is constructed with the target `XSequence`'s existing
+2. **Seeded, always (P3-T5 prerequisite already landed).** The core is constructed with the target `XSequence`'s existing
    `EffectDB` entries and `ColorPalettes` pre-loaded, so any index it hands out is
    unique across old and new content and no pre-existing `ref=`/`palette=` reference is
    invalidated. `_sync_*` merges rather than replaces (or, equivalently, the registry's

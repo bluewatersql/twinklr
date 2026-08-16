@@ -437,6 +437,13 @@ with a one-time CPU retry on MPS failure.
 - **Display graph is layout-derived** — `twinklr display --layout xlights_rgbeffects.xml`
   builds deterministic planner groups and mappings from the user's file. The parser's
   four-entry top-level allow-list remains a known limitation.
+- **Combined graph is ownership-partitioned** — `twinklr show` parses one layout once,
+  strictly reconciles the fixture rig to its dedicated xLights group, exposes the full
+  graph to the macro planner, and gives the display planner only the non-MH partition.
+  A final barrier compiles MH segments in memory and appends display effects to the same
+  `XSequence`; the general writer/export unification remains P3-T6 scope. The effective
+  display recipe catalog layers tracked, optional local, then FE-promoted entries and
+  preflights exact planner/renderer ID parity before execution.
 - **Feature engineering pipeline** — `packages/twinklr/core/feature_engineering/` and `packages/twinklr/core/feature_store/` provide an offline analysis pipeline separate from the main CLI workflow. See `docs/pipeline_guide.md` for details.
 - **Display sequencer** — `packages/twinklr/core/sequencer/display/` is wired through
   the offline-first `twinklr display` command. Its catalog is strictly preflighted and

@@ -55,6 +55,7 @@ def build_display_pipeline(
     enable_holistic_corrector: bool = True,
     enable_assets: bool = False,
     xlights_mapping: XLightsMapping | None = None,
+    macro_choreo_graph: ChoreographyGraph | None = None,
 ) -> PipelineDefinition:
     """Build the display sequencer pipeline.
 
@@ -110,6 +111,7 @@ def build_display_pipeline(
                 fe_bundle=fe_bundle,
                 max_iterations=max_iterations,
                 min_pass_score=min_pass_score,
+                macro_choreo_graph=macro_choreo_graph,
             ),
             inputs=["macro"],
             pattern=ExecutionPattern.FAN_OUT,
