@@ -26,6 +26,7 @@ Thumbs.db
 .omc/
 .omc-workspace
 .remember/
+.opencode/
 
 # === Python ===
 __pycache__/
