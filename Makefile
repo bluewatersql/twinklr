@@ -10,6 +10,8 @@ YELLOW := \033[0;33m
 RED := \033[0;31m
 NC := \033[0m # No Color
 
+VENV ?= .venv
+
 #############################################################################
 # Help
 #############################################################################
@@ -228,6 +230,13 @@ clean: ## Clean build artifacts and caches
 	find . -type f -name "*.swo" -delete 2>/dev/null || true
 	find . -type f -name "*~" -delete 2>/dev/null || true
 	find . -type d -name ".ipynb_checkpoints" -exec rm -rf {} + 2>/dev/null || true
+	find . \( -path ./.git -o -path ./$(VENV) \) -prune -o -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
+	find . \( -path ./.git -o -path ./$(VENV) \) -prune -o -type f -name '*.py[cod]' -delete 2>/dev/null || true
+	find . \( -path ./.git -o -path ./$(VENV) \) -prune -o -type f -name '*$$py.class' -delete 2>/dev/null || true
+	find . \( -path ./.git -o -path ./$(VENV) \) -prune -o -type f -name '.DS_Store' -delete 2>/dev/null || true
+	find . \( -path ./.git -o -path ./$(VENV) \) -prune -o -type f \( -name '*.swp' -o -name '*.swo' -o -name '*~' \) -delete 2>/dev/null || true
+	find . \( -path ./.git -o -path ./$(VENV) \) -prune -o -type d \( -name '.omc' -o -name '.remember' -o -name '.remeber' -o -name '.memories' -o -name '.memory' -o -name '.agent-local' \) -exec rm -rf {} + 2>/dev/null || true
+	find . \( -path ./.git -o -path ./$(VENV) \) -prune -o -type f -name 'MEMORY.md' -delete 2>/dev/null || true
 	@echo "$(GREEN)✓ Cleanup complete$(NC)"
 
 clean-cache: ## Clean application caches (audio, step cache, logs, etc)
