@@ -20,7 +20,6 @@ from twinklr.core.sequencer.models.template import (
     BaseTiming,
     Color,
     Dimmer,
-    Geometry,
     Gobo,
     Movement,
     PhaseOffset,
@@ -69,12 +68,6 @@ REMOVED_CONFIG_PATHS = (
     "fixture.fixtures.config.orientation.tilt_up_dmx",
     "fixture.fixtures.config.orientation.tilt_above_horizon_deg",
     "fixture.fixtures.config.orientation.resting_position",
-    "fixture.base_config.limits.avoid_backward",
-    "fixture.fixtures.config.limits.avoid_backward",
-    "fixture.fixtures.config.position.pan_offset_deg",
-    "fixture.fixtures.config.position.tilt_offset_deg",
-    "fixture.fixtures.position.pan_offset_deg",
-    "fixture.fixtures.position.tilt_offset_deg",
     "template.template.steps.entry_transition",
     "template.template.steps.exit_transition",
     "template.template.steps.priority",
@@ -84,14 +77,12 @@ REMOVED_CONFIG_PATHS = (
     "template.template.steps.movement.amplitude_override",
     "template.template.steps.movement.frequency_override",
     "template.template.steps.movement.center_offset_override",
-    "template.template.steps.geometry.aim_zone",
     "template.template.steps.color.params",
     "template.template.steps.shutter.params",
     "template.template.steps.gobo.params",
     "template.template.roles",
     "template.template.repeat.repeatable",
     "template.template.steps.dimmer.cycles",
-    "job.timeline_tracks.sections",
 )
 
 
@@ -202,19 +193,6 @@ def test_removed_config_path_is_absent_from_public_schema(config_path: str) -> N
             },
             "tilt_up_dmx",
         ),
-        (
-            {
-                "group_id": "heads",
-                "fixtures": [
-                    {
-                        "fixture_id": "MH1",
-                        "xlights_model_name": "Dmx MH1",
-                        "position": {"position_index": 1, "pan_offset_deg": 10.0},
-                    }
-                ],
-            },
-            "pan_offset_deg",
-        ),
     ),
 )
 def test_retired_fixture_config_fails_loudly_with_migration_message(
@@ -230,7 +208,6 @@ def test_retired_fixture_config_fails_loudly_with_migration_message(
         (PhaseOffset, {"group": "ALL"}, "group"),
         (TemplateStep, {"priority": 1}, "priority"),
         (Movement, {"amplitude_override": 0.5}, "amplitude_override"),
-        (Geometry, {"aim_zone": "SKY"}, "aim_zone"),
         (Color, {"preset": "WHITE", "params": {"probe": 1}}, "params"),
         (Shutter, {"pattern": "OPEN", "params": {"probe": 1}}, "params"),
         (Gobo, {"pattern": "OPEN", "params": {"probe": 1}}, "params"),
@@ -284,7 +261,6 @@ def test_retired_template_config_fails_loudly_with_migration_message(
             {"agent": {"recipe_generation_agent": {"model": "probe"}}},
             "recipe_generation_agent",
         ),
-        (JobConfig, {"timeline_tracks": {"sections": False}}, "sections"),
         (
             AppConfig,
             {"audio_processing": {"enhancements": {"phoneme_enable_g2p_fallback": False}}},

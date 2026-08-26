@@ -222,6 +222,33 @@ class TestBuildTimelineTracks:
         assert section_track.markers[0].end_time_ms == 2000
         assert section_track.markers[1].name == "verse_1"
 
+    @pytest.mark.parametrize(
+        ("enabled", "expected_names"),
+        [(True, ["Twinklr Sections"]), (False, [])],
+        ids=["sections-enabled", "sections-disabled"],
+    )
+    def test_sections_config_gates_public_track_builder(
+        self,
+        enabled: bool,
+        expected_names: list[str],
+    ) -> None:
+        from twinklr.core.formats.xlights.sequence.timeline import (
+            TimelineTracksConfig,
+            build_timeline_tracks,
+        )
+
+        tracks = build_timeline_tracks(
+            config=TimelineTracksConfig(
+                beats=False,
+                bars=False,
+                sections=enabled,
+                lyrics=False,
+            ),
+            sections=[("intro", 0, 1000)],
+        )
+
+        assert [track.name for track in tracks] == expected_names
+
     def test_multiple_tracks_combined(
         self,
         simple_beat_grid: BeatGrid,

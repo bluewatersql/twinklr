@@ -15,7 +15,13 @@ from twinklr.core.sequencer.models.context import (
     SectionRenderIntent,
     TemplateCompileContext,
 )
-from twinklr.core.sequencer.models.enum import ChaseOrder, Intensity, TemplateCategory, TimingMode
+from twinklr.core.sequencer.models.enum import (
+    AimZone,
+    ChaseOrder,
+    Intensity,
+    TemplateCategory,
+    TimingMode,
+)
 from twinklr.core.sequencer.models.template import (
     BaseTiming,
     Dimmer,
@@ -526,3 +532,45 @@ def test_phase_offset_order_changes_compiled_fixture_schedule() -> None:
 
     assert compile_offsets(ChaseOrder.LEFT_TO_RIGHT) == {"MH1": 0.0, "MH2": 0.5}
     assert compile_offsets(ChaseOrder.RIGHT_TO_LEFT) == {"MH1": 0.5, "MH2": 0.0}
+
+
+@pytest.mark.parametrize("aim_zone", [AimZone.CROWD, AimZone.SKY], ids=["crowd", "sky"])
+def test_geometry_aim_zone_reaches_compiled_segment_metadata(aim_zone: AimZone) -> None:
+    document = _doc()
+    document.template.steps[0].geometry = Geometry(
+        geometry_type=GeometryType.ROLE_POSE,
+        aim_zone=aim_zone,
+    )
+    config = FixtureConfig(
+        fixture_id="MH1",
+        dmx_mapping=DmxMapping(pan_channel=1, tilt_channel=2, dimmer_channel=3),
+    )
+    fixture = FixtureContext(
+        fixture_id="MH1",
+        role="OUTER_LEFT",
+        calibration={"fixture_config": config},
+    )
+    registries = create_default_registries()
+    context = TemplateCompileContext(
+        section_id="section",
+        template_id=document.template.template_id,
+        fixtures=[fixture],
+        beat_grid=BeatGrid.from_tempo(tempo_bpm=120, total_bars=2),
+        start_bar=1,
+        duration_bars=1,
+        curve_registry=CurveRegistry(),
+        geometry_registry=registries["geometry"],
+        movement_registry=registries["movement"],
+        dimmer_registry=registries["dimmer"],
+        color_registry=registries["color"],
+        shutter_registry=registries["shutter"],
+        gobo_registry=registries["gobo"],
+    )
+
+    result = compile_template(document.template, context)
+
+    assert result.segments
+    assert all(
+        json.loads(segment.metadata["geometry_params"])["aim_zone"] == aim_zone.value
+        for segment in result.segments
+    )

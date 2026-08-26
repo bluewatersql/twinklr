@@ -50,16 +50,27 @@ class FixturePosition(BaseModel):
         default=1, ge=1, le=10, description="Position number on this mount (1st, 2nd, etc.)"
     )
 
-    @model_validator(mode="before")
-    @classmethod
-    def reject_removed_fields(cls, value: object) -> object:
-        if isinstance(value, dict):
-            removed = sorted({"pan_offset_deg", "tilt_offset_deg"} & value.keys())
-            if removed:
-                raise ValueError(
-                    f"fixture-position fields {removed} were removed because they never affected output"
-                )
-        return value
+    pan_offset_deg: float = Field(
+        default=0.0,
+        description="Pan offset in degrees (positive = stage right, negative = stage left)",
+    )
+    tilt_offset_deg: float = Field(
+        default=0.0, description="Tilt offset in degrees (positive = up, negative = down)"
+    )
+
+    def apply_offset(self, pose: Pose) -> Pose:
+        """Apply this fixture's mounting offset to a target pose."""
+        return Pose(
+            pan_deg=pose.pan_deg + self.pan_offset_deg,
+            tilt_deg=pose.tilt_deg + self.tilt_offset_deg,
+        )
+
+    def remove_offset(self, pose: Pose) -> Pose:
+        """Remove this fixture's mounting offset from an actual pose."""
+        return Pose(
+            pan_deg=pose.pan_deg - self.pan_offset_deg,
+            tilt_deg=pose.tilt_deg - self.tilt_offset_deg,
+        )
 
 
 class FixtureConfig(BaseModel):
@@ -197,6 +208,15 @@ class FixtureConfig(BaseModel):
         tilt_dmx = max(self.limits.tilt_min, min(self.limits.tilt_max, tilt_dmx))
 
         return (pan_dmx, tilt_dmx)
+
+    def is_pose_safe(self, pose: Pose) -> bool:
+        """Return whether a physical pose satisfies DMX and backward-pointing limits."""
+        pan_dmx, tilt_dmx = self.degrees_to_dmx(pose)
+        if not (self.limits.pan_min <= pan_dmx <= self.limits.pan_max):
+            return False
+        if not (self.limits.tilt_min <= tilt_dmx <= self.limits.tilt_max):
+            return False
+        return not (self.limits.avoid_backward and abs(pose.pan_deg) > 90)
 
     def clamp_pan(self, value: int) -> int:
         """Clamp pan DMX value to movement limits.

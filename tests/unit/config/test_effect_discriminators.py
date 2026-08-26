@@ -296,6 +296,8 @@ FIXTURE_EFFECT_PATHS = tuple(
     if path.startswith("fixture.")
     and disposition.kind is ConfigDispositionKind.EFFECT_TEST
     and path != _FIXTURE_INVARIANT_PATH
+    and disposition.test_nodeid is not None
+    and "test_fixture_field_changes_shipped_behavior_snapshot" in disposition.test_nodeid
 )
 
 

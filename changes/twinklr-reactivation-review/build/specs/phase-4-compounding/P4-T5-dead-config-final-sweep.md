@@ -217,12 +217,13 @@ absence and disposition, and uses pytest collection to reject invented nodeids.
 P4-T6 should consume the registry's `REMOVED` records rather than maintain a
 second deletion list.
 
-This task removed the verified-zero-consumer App/Job/audio fields, fixture
-compatibility fields, fixture physical leaves, and template leaves recorded in
-the registry. Representative old configuration fails loudly with targeted
-migration messages. Live relative DMX mappings, inversions, calibration, fixture
-names/groups, template phase mode/spread/wrap/order, timing offset, and fixed
-policy literals have behavioral or invariant evidence.
+This task removed only the verified-zero-consumer App/Job/audio, fixture, and
+template fields recorded as `REMOVED` in the registry. Representative old
+configuration for those paths fails loudly with targeted migration messages.
+Live relative DMX mappings, inversions, calibration, fixture names/groups,
+position offsets, movement safety, template phase mode/spread/wrap/order and aim
+zone, timeline section gating, timing offset, and fixed policy literals have
+behavioral or invariant evidence.
 
 `PhaseOffset.order` was initially classified as dead, but compiler inspection and
 a red-first output discriminator proved it changes per-fixture schedules. It was
@@ -252,3 +253,27 @@ matrix (all passing); Ruff and formatting are clean; mypy reports no issues in 7
 source files. The final frozen commit identity and fresh full `make validate` evidence
 belong in the task handoff after the gate completes; this specification does not
 self-approve the candidate.
+
+### Verifier rejection and remediation
+
+The subsequent frozen candidate `a2fe16e` is also preserved as rejected evidence.
+It incorrectly classified four live behavior clusters as removable based on an
+incomplete consumer audit:
+
+- `FixturePosition.pan_offset_deg` / `tilt_offset_deg` and the public
+  `apply_offset` / `remove_offset` conversions;
+- `MovementLimits.avoid_backward` and public `FixtureConfig.is_pose_safe` safety
+  behavior, through both base-config and fixture-instance schema paths;
+- `TimelineTracksConfig.sections`, which gates section emission when the public
+  timeline builder receives section data; and
+- `Geometry.aim_zone`, which is forwarded into compiled geometry parameters and
+  emitted segment metadata.
+
+The remediation restored those schema fields and public seams, removed their
+false `REMOVED` and migration-rejection records, and registered exact
+path-specific `EFFECT_TEST` node IDs. Red-first discriminators covered both
+fixture alternatives for each position offset, both configuration sources for
+backward safety, enabled and disabled timeline section emission, and two
+non-default aim zones reaching compiled metadata. The replacement candidate
+still requires fresh full gates and independent verification; this execution
+record does not approve it.

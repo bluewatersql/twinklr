@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import logging
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field
 
 from twinklr.core.audio.models.lyrics import LyricsBundle
 from twinklr.core.audio.models.phonemes import PhonemeBundle
@@ -31,6 +31,7 @@ class TimelineTracksConfig(BaseModel):
     Attributes:
         beats: Include beat markers (from BeatGrid)
         bars: Include bar/downbeat markers (from BeatGrid)
+        sections: Include section boundary markers
         lyrics: Include word-level lyric markers (from LyricsBundle)
         phonemes: Include phoneme markers (from PhonemeBundle)
     """
@@ -39,17 +40,9 @@ class TimelineTracksConfig(BaseModel):
 
     beats: bool = Field(default=True, description="Include beat markers")
     bars: bool = Field(default=True, description="Include bar/downbeat markers")
+    sections: bool = Field(default=True, description="Include section boundary markers")
     lyrics: bool = Field(default=True, description="Include word-level lyric markers")
     phonemes: bool = Field(default=False, description="Include phoneme markers")
-
-    @model_validator(mode="before")
-    @classmethod
-    def reject_removed_fields(cls, value: object) -> object:
-        if isinstance(value, dict) and "sections" in value:
-            raise ValueError(
-                "timeline track field 'sections' was removed because production never supplied sections"
-            )
-        return value
 
 
 def build_timeline_tracks(
@@ -83,7 +76,7 @@ def build_timeline_tracks(
     if config.bars and beat_grid is not None:
         tracks.append(_build_bars_track(beat_grid))
 
-    if sections is not None:
+    if config.sections and sections is not None:
         tracks.append(_build_sections_track(sections))
 
     if config.lyrics and lyrics_bundle is not None and lyrics_bundle.words:

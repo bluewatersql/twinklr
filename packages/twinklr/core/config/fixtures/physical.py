@@ -67,15 +67,9 @@ class MovementLimits(BaseModel):
     pan_max: int = Field(default=190, ge=0, le=255, description="Maximum pan DMX value")
     tilt_min: int = Field(default=5, ge=0, le=255, description="Minimum tilt DMX value")
     tilt_max: int = Field(default=125, ge=0, le=255, description="Maximum tilt DMX value")
-
-    @model_validator(mode="before")
-    @classmethod
-    def reject_removed_fields(cls, value: object) -> object:
-        if isinstance(value, dict) and "avoid_backward" in value:
-            raise ValueError(
-                "movement-limit field 'avoid_backward' was removed because it never affected output"
-            )
-        return value
+    avoid_backward: bool = Field(
+        default=True, description="Prevent pointing backward (> 90° from forward)"
+    )
 
     @field_validator("pan_max")
     @classmethod

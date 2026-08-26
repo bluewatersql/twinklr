@@ -81,9 +81,112 @@ class TestDmxMapping:
 class TestMovementLimits:
     """Tests for MovementLimits model."""
 
+    @pytest.mark.parametrize("source", ["base-config", "fixture-instance"])
+    def test_avoid_backward_changes_public_pose_safety(self, source: str) -> None:
+        """Both public fixture schema paths must enforce the safety toggle."""
+
+        def configured_fixture(avoid_backward: bool) -> FixtureConfig:
+            limits = MovementLimits(avoid_backward=avoid_backward)
+            mapping = DmxMapping(pan_channel=1, tilt_channel=2, dimmer_channel=3)
+            if source == "base-config":
+                group = FixtureGroup(
+                    group_id="heads",
+                    base_config=BaseFixtureConfig(dmx_mapping=mapping, limits=limits),
+                    fixtures=[
+                        SimplifiedFixtureInstance(
+                            fixture_id="MH1",
+                            xlights_model_name="Dmx MH1",
+                        )
+                    ],
+                )
+                return group.expand_fixtures()[0].config
+            group = FixtureGroup(
+                group_id="heads",
+                fixtures=[
+                    FixtureInstance(
+                        fixture_id="MH1",
+                        xlights_model_name="Dmx MH1",
+                        config=FixtureConfig(
+                            fixture_id="MH1",
+                            dmx_mapping=mapping,
+                            limits=limits,
+                        ),
+                    )
+                ],
+            )
+            return group.expand_fixtures()[0].config
+
+        backward_pose = Pose(pan_deg=120.0, tilt_deg=0.0)
+
+        assert configured_fixture(True).is_pose_safe(backward_pose) is False
+        assert configured_fixture(False).is_pose_safe(backward_pose) is True
+
 
 class TestFixturePosition:
     """Tests for FixturePosition model."""
+
+    @pytest.mark.parametrize(
+        ("source", "pan_offset", "tilt_offset", "expected"),
+        [
+            ("fixture-instance", 15.0, 0.0, Pose(pan_deg=25.0, tilt_deg=20.0)),
+            ("fixture-instance", 0.0, -5.0, Pose(pan_deg=10.0, tilt_deg=15.0)),
+            ("simplified-fixture", 15.0, 0.0, Pose(pan_deg=25.0, tilt_deg=20.0)),
+            ("simplified-fixture", 0.0, -5.0, Pose(pan_deg=10.0, tilt_deg=15.0)),
+        ],
+        ids=[
+            "fixture-instance-pan-offset",
+            "fixture-instance-tilt-offset",
+            "simplified-fixture-pan-offset",
+            "simplified-fixture-tilt-offset",
+        ],
+    )
+    def test_offsets_change_public_pose_conversion(
+        self,
+        source: str,
+        pan_offset: float,
+        tilt_offset: float,
+        expected: Pose,
+    ) -> None:
+        position = FixturePosition(
+            pan_offset_deg=pan_offset,
+            tilt_offset_deg=tilt_offset,
+        )
+        mapping = DmxMapping(pan_channel=1, tilt_channel=2, dimmer_channel=3)
+        if source == "fixture-instance":
+            group = FixtureGroup(
+                group_id="heads",
+                fixtures=[
+                    FixtureInstance(
+                        fixture_id="MH1",
+                        xlights_model_name="Dmx MH1",
+                        config=FixtureConfig(
+                            fixture_id="MH1",
+                            dmx_mapping=mapping,
+                            position=position,
+                        ),
+                    )
+                ],
+            )
+        else:
+            group = FixtureGroup(
+                group_id="heads",
+                base_config=BaseFixtureConfig(dmx_mapping=mapping),
+                fixtures=[
+                    SimplifiedFixtureInstance(
+                        fixture_id="MH1",
+                        xlights_model_name="Dmx MH1",
+                        position=position,
+                    )
+                ],
+            )
+        effective_position = group.expand_fixtures()[0].config.position
+        assert effective_position is not None
+        target = Pose(pan_deg=10.0, tilt_deg=20.0)
+
+        actual = effective_position.apply_offset(target)
+
+        assert actual == expected
+        assert effective_position.remove_offset(actual) == target
 
 
 class TestFixtureConfig:

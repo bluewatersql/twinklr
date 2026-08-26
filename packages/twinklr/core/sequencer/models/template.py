@@ -15,6 +15,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from twinklr.core.config.poses import PanPose, TiltPose
 from twinklr.core.sequencer.models.enum import (
+    AimZone,
     ChaseOrder,
     Intensity,
     QuantizeMode,
@@ -148,6 +149,7 @@ class Geometry(BaseModel):
         params: Additional parameters for the geometry handler.
         pan_pose_by_role: Role-specific pan poses (for ROLE_POSE handler).
         tilt_pose: Tilt pose name (for ROLE_POSE handler).
+        aim_zone: Aim zone (e.g., "CROWD", "SKY").
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -158,13 +160,7 @@ class Geometry(BaseModel):
     # ROLE_POSE specific fields
     pan_pose_by_role: dict[TemplateRole, PanPose] | None = None
     tilt_pose: TiltPose = TiltPose.HORIZON
-
-    @model_validator(mode="before")
-    @classmethod
-    def reject_removed_fields(cls, value: object) -> object:
-        if isinstance(value, dict) and "aim_zone" in value:
-            raise ValueError("geometry field 'aim_zone' was removed because no handler read it")
-        return value
+    aim_zone: AimZone = AimZone.HORIZON
 
 
 class Movement(BaseModel):
