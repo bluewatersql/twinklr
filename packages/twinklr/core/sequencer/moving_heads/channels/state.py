@@ -1,28 +1,15 @@
-"""Moving-head channel IR and a legacy in-memory projection helper.
-
-``FixtureSegment``/``ChannelValue`` are the live channel-generic IR. ``ChannelState``
-is retained as a small projection utility, but it is not a second authority for the
-emitted DMX window or defaults: the live exporter uses
-``config.adapter.get_max_channel`` plus fixture-declared defaults (P1P-T6/P2P-T2).
-"""
+"""Moving-head channel intermediate representation."""
 
 from __future__ import annotations
 
 from enum import Enum
 import json
-import logging
-from typing import TYPE_CHECKING, Any, ClassVar
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from twinklr.core.curves.models import BaseCurve, CurvePoint
 from twinklr.core.sequencer.models.enum import BlendMode, ChannelName
-from twinklr.core.utils.math import clamp
-
-if TYPE_CHECKING:
-    from twinklr.core.config.fixtures import FixtureInstance
-
-logger = logging.getLogger(__name__)
 
 
 class ChannelValue(BaseModel):
@@ -219,148 +206,3 @@ class FixtureSegment(BaseModel):
             value = str(value)
 
         self.metadata[key] = value
-
-
-class ChannelState:
-    """Runtime state manager for fixture DMX channels.
-
-    This class handles the runtime application of FixtureSegment channel values
-    to actual DMX channels, including:
-    - DMX channel mapping via fixture configuration
-    - Channel inversion
-    - Value clamping
-    - Curve point tracking
-    """
-
-    _CHANNEL_ATTR: ClassVar[dict[ChannelName, str]] = {
-        ChannelName.PAN: "pan_channel",
-        ChannelName.TILT: "tilt_channel",
-        ChannelName.DIMMER: "dimmer_channel",
-        ChannelName.SHUTTER: "shutter",
-        ChannelName.COLOR: "color",
-        ChannelName.GOBO: "gobo",
-    }
-
-    def __init__(self, fixture: FixtureInstance):
-        """Initialize channel state.
-
-        Args:
-            fixture: Fixture instance for DMX channel mapping
-        """
-        self.fixture = fixture
-        self.values: dict[int, int] = {}  # DMX channel -> value
-        self.value_points: dict[int, list[CurvePoint]] = {}  # DMX channel -> curve
-
-    def _get_dmx_channel(self, channel_name: ChannelName) -> int | None:
-        """Get DMX channel number for logical channel name."""
-        mapping = self.fixture.config.dmx_mapping
-
-        attr = self._CHANNEL_ATTR.get(channel_name)
-        if not attr:
-            return None
-
-        ch = getattr(mapping, attr, None)
-
-        try:
-            if ch is None:
-                return None
-            # supports ChannelWithConfig(channel=<int-like>) and mocks
-            return int(getattr(ch, "channel", ch))
-        except (TypeError, ValueError):
-            return None
-
-    def _is_inverted(self, channel_name: ChannelName) -> bool:
-        """Check if a channel is inverted."""
-        inversions = self.fixture.config.inversions
-        inversion_map = {
-            ChannelName.PAN: inversions.pan,
-            ChannelName.TILT: inversions.tilt,
-            ChannelName.DIMMER: inversions.dimmer,
-        }
-        return inversion_map.get(channel_name, False)
-
-    def apply_channel_value(self, channel_value: ChannelValue) -> bool:
-        """Apply a ChannelValue to the state.
-
-        Args:
-            channel_value: Channel value specification to apply
-
-        Returns:
-            True if channel was applied, False if channel doesn't exist
-        """
-        dmx_channel = self._get_dmx_channel(channel_value.channel)
-        if dmx_channel is None or dmx_channel == 0:
-            logger.debug(f"Channel '{channel_value.channel}' not available on this fixture")
-            return False
-
-        # Get the DMX value (static or from curve evaluation)
-        if channel_value.static_dmx is not None:
-            dmx_value = channel_value.static_dmx
-        else:
-            # For now, just use base_dmx if available, or 0
-            # Full curve evaluation would happen elsewhere
-            dmx_value = channel_value.base_dmx or 0
-
-        # Clamp to configured range
-        dmx_value = clamp(dmx_value, channel_value.clamp_min, channel_value.clamp_max)
-
-        # Apply inversion if configured
-        if self._is_inverted(channel_value.channel):
-            dmx_value = 255 - dmx_value
-
-        # Set value curve if provided
-        if channel_value.value_points:
-            self.value_points[dmx_channel] = channel_value.value_points
-        else:
-            self.values[dmx_channel] = dmx_value
-
-        logger.debug(f"Applied {channel_value.channel} (DMX{dmx_channel}) = {dmx_value}")
-        return True
-
-    def set_channel(
-        self,
-        channel_name: ChannelName,
-        value: int | str,
-        value_points: list[CurvePoint] | None = None,
-    ) -> bool:
-        """Set a channel value by logical name (legacy interface).
-
-        Args:
-            channel_name: Logical channel name
-            value: DMX integer value (0-255)
-            value_points: Optional list of CurvePoint for smooth transitions
-
-        Returns:
-            True if channel was set, False if channel doesn't exist
-        """
-        # For now, only support integer values
-        if isinstance(value, str):
-            logger.warning(f"String value '{value}' not supported yet, skipping")
-            return False
-
-        channel_value = ChannelValue(
-            channel=channel_name,
-            static_dmx=int(value),
-            value_points=value_points,
-        )
-        return self.apply_channel_value(channel_value)
-
-    def get_channel(self, channel_name: ChannelName) -> int | None:
-        """Get current DMX value for a channel."""
-        dmx_channel = self._get_dmx_channel(channel_name)
-        if dmx_channel is None:
-            return None
-        return self.values.get(dmx_channel)
-
-    def to_dmx_dict(self) -> dict[int, int]:
-        """Get final DMX channel values."""
-        return self.values.copy()
-
-    def to_value_curves_dict(self) -> dict[int, list[CurvePoint]]:
-        """Get value curves for channels."""
-        return self.value_points.copy()
-
-    def merge(self, other: ChannelState) -> None:
-        """Merge another channel state into this one."""
-        self.values.update(other.values)
-        self.value_points.update(other.value_points)

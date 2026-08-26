@@ -1,7 +1,6 @@
 """Transition boundary detection for the moving head sequencer.
 
-This module provides functionality to detect boundaries where transitions
-may occur between sections and steps.
+This module detects boundaries between choreography-plan sections.
 """
 
 from __future__ import annotations
@@ -9,10 +8,7 @@ from __future__ import annotations
 import logging
 
 from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan
-from twinklr.core.sequencer.models.context import TemplateCompileContext
-from twinklr.core.sequencer.models.template import Template
 from twinklr.core.sequencer.models.transition import Boundary, BoundaryType
-from twinklr.core.sequencer.moving_heads.compile.scheduler import ScheduleResult
 from twinklr.core.sequencer.timing.beat_grid import BeatGrid
 
 logger = logging.getLogger(__name__)
@@ -23,8 +19,6 @@ class TransitionDetector:
 
     Identifies points in time where transitions can be applied:
     - Section boundaries: between choreography plan sections
-    - Step boundaries: between template steps
-    - Cycle boundaries: between repeat cycles (future)
     """
 
     def detect_section_boundaries(
@@ -85,92 +79,3 @@ class TransitionDetector:
 
         logger.debug(f"Detected {len(boundaries)} section boundaries")
         return boundaries
-
-    def detect_step_boundaries(
-        self,
-        template: Template,
-        schedule_result: ScheduleResult,
-        context: TemplateCompileContext,
-    ) -> list[Boundary]:
-        """Detect boundaries between steps within a template.
-
-        Args:
-            template: Template to analyze.
-            schedule_result: Scheduled step instances.
-            context: Template compilation context.
-
-        Returns:
-            List of boundaries between consecutive step instances.
-
-        Example:
-            >>> template = Template(
-            ...     steps=[
-            ...         TemplateStep(step_id="intro", ...),
-            ...         TemplateStep(step_id="main", ...),
-            ...     ]
-            ... )
-            >>> detector = TransitionDetector()
-            >>> boundaries = detector.detect_step_boundaries(
-            ...     template, schedule_result, context
-            ... )
-        """
-        boundaries: list[Boundary] = []
-
-        # Iterate through consecutive step instances
-        instances = schedule_result.instances
-        for i in range(len(instances) - 1):
-            source_instance = instances[i]
-            target_instance = instances[i + 1]
-
-            # Boundary is at the end of source step (start of target step).
-            # `ScheduledInstance` counts bars from the start of the section;
-            # `Boundary.bar_position` is absolute and 1-indexed, which is how
-            # `detect_section_boundaries` fills it and how `TransitionPlanner` reads it
-            # (`bar_span_ms(bar_position - 1.0, ...)`). This used to emit the
-            # section-relative offset under the same field name -- harmless only
-            # because nothing in production consumes step boundaries yet, and a trap
-            # for whoever enables step transitions.
-            offset_bars = source_instance.start_bars + source_instance.duration_bars
-            boundary_ms = context.bar_offset_to_ms(offset_bars)
-
-            boundary = Boundary(
-                type=BoundaryType.STEP_BOUNDARY,
-                source_id=f"{context.section_id}:{source_instance.step_id}",
-                target_id=f"{context.section_id}:{target_instance.step_id}",
-                time_ms=boundary_ms,
-                bar_position=context.start_bar + offset_bars,
-            )
-
-            boundaries.append(boundary)
-            logger.debug(
-                f"Detected step boundary: {source_instance.step_id} → "
-                f"{target_instance.step_id} at bar {context.start_bar + offset_bars:.2f} "
-                f"({boundary_ms}ms)"
-            )
-
-        logger.debug(
-            f"Detected {len(boundaries)} step boundaries in template {template.template_id}"
-        )
-        return boundaries
-
-    def detect_cycle_boundaries(
-        self,
-        template: Template,
-        schedule_result: ScheduleResult,
-        context: TemplateCompileContext,
-    ) -> list[Boundary]:
-        """Detect boundaries between repeat cycles within a template.
-
-        This is a placeholder for future cycle transition support.
-
-        Args:
-            template: Template to analyze.
-            schedule_result: Scheduled step instances.
-            context: Template compilation context.
-
-        Returns:
-            List of boundaries between repeat cycles (currently empty).
-        """
-        # TODO: Implement cycle boundary detection when cycle transitions are supported
-        logger.debug("Cycle boundary detection not yet implemented")
-        return []

@@ -30,29 +30,6 @@ class PhaseOffsetResult(BaseModel):
     spread_bars: float = Field(default=0.0)
     wrap: bool = Field(default=True)
 
-    def get_normalized(
-        self,
-        fixture_id: str,
-        step_duration_bars: float,
-        wrap: bool | None = None,
-    ) -> float:
-        """Get the normalized offset for a fixture.
-
-        Args:
-            fixture_id: The fixture ID.
-            step_duration_bars: Duration of the step in bars.
-            wrap: Whether to wrap. If None, uses the result's wrap setting.
-
-        Returns:
-            Normalized offset in [0, 1] range (or > 1 if no wrap).
-
-        Raises:
-            KeyError: If fixture_id not found.
-        """
-        offset_bars = self.offsets[fixture_id]
-        should_wrap = self.wrap if wrap is None else wrap
-        return calculate_normalized_offset(offset_bars, step_duration_bars, should_wrap)
-
 
 def calculate_fixture_offsets(
     config: PhaseOffset,
@@ -123,29 +100,3 @@ def _calculate_linear_offsets(
         spread_bars=config.spread_bars,
         wrap=config.wrap,
     )
-
-
-def calculate_normalized_offset(
-    offset_bars: float,
-    step_duration_bars: float,
-    wrap: bool = True,
-) -> float:
-    """Convert bar offset to normalized offset [0, 1].
-
-    Args:
-        offset_bars: Offset in bars.
-        step_duration_bars: Step duration in bars.
-        wrap: If True, wrap offsets > 1.0 using modulo.
-
-    Returns:
-        Normalized offset.
-    """
-    if step_duration_bars <= 0:
-        return 0.0
-
-    normalized = offset_bars / step_duration_bars
-
-    if wrap:
-        normalized = normalized % 1.0
-
-    return normalized
