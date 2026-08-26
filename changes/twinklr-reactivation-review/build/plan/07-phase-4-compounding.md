@@ -8,16 +8,21 @@ Proposal M4; D7/D12 + recorded debt-sequencing constraints._
 breaking anything (sequencing constraints honored); user guide describes only wired
 behavior; local-provider option available.
 
-**Execution status (2026-08-26):** P4-T1 through P4-T5 are independently verified and
-integrated (**5/7**). P4-T2's implementation and redirect-hardening remediation are
+**Execution status (2026-08-26):** P4-T1 through P4-T6 are independently verified and
+integrated (**6/7**). P4-T2's implementation and redirect-hardening remediation are
 integrated through `3765bd9`/`40e8e55`, but its real Ollama schema smoke remains
 unclaimed pending explicit local opt-in. P4-T3 is integrated at `bf6bba5`, P4-T4 at
-`3e7f679`, and P4-T5 at `05f24d0`. Phase exit is not satisfied; P4-T6 is next. Exact
+`3e7f679`, P4-T5 at `05f24d0`, and P4-T6 at `da8f19d`. P4-T7 full execution is
+NO-GO/deferred on its unsatisfied P2K-T2 empirical dependency and the absence of an
+accessible moving-head corpus manifest. The safe preflight is not task completion or a
+feasibility verdict. Phase exit is not declared. Exact
 task evidence remains single-owned by the
-[P4-T2](../specs/phase-4-compounding/P4-T2-local-provider-option.md) and
+[P4-T2](../specs/phase-4-compounding/P4-T2-local-provider-option.md),
 [P4-T3](../specs/phase-4-compounding/P4-T3-dead-tail-retirement-wave-1.md),
-[P4-T4](../specs/phase-4-compounding/P4-T4-duplication-collapse.md), and
-[P4-T5](../specs/phase-4-compounding/P4-T5-dead-config-final-sweep.md) task specs.
+[P4-T4](../specs/phase-4-compounding/P4-T4-duplication-collapse.md),
+[P4-T5](../specs/phase-4-compounding/P4-T5-dead-config-final-sweep.md),
+[P4-T6](../specs/phase-4-compounding/P4-T6-documentation-truth-pass.md), and
+[P4-T7](../specs/phase-4-compounding/P4-T7-mh-idiom-mining-exploration.md) task specs.
 
 ## Tasks
 
@@ -29,7 +34,7 @@ task evidence remains single-owned by the
 | P4-T4 | Duplication collapse | One OpenAI client + one retry policy (SDK `max_retries` explicit — kills the ≤9-requests amplification); one `configure_logging` (wire or delete `AppConfig.logging`); conversation-store eviction; httpx client lifecycle (aclose); scipy/penalty triplication collapse. | CC-6, P3-M-F/M-H, P2-M10/F21/F23 | P2P merged | sonnet | opus |
 | P4-T5 | Dead-config final sweep | Every remaining CC-1 member is wired-with-a-behavior-test or deleted-with-docs — no third state; acceptance = a generated knob-inventory test asserting every documented config key has an observable effect. | CC-1, RM-1.5 | P1P/P2P/P3 wiring done | sonnet | opus |
 | P4-T6 | Documentation truth pass | User guide regenerated from wired config only; six-channel claim now true (post schema-v2) or corrected; architecture docs match the shipped loop; phantom paths removed; "dozens of hours" replaced by measured numbers from the eval harness; scripts/ triage (promote/delete per P7 table). | SF-8, P7-M2/M3, measured data | P4-T5 | sonnet | opus |
-| P4-T7 | MH-idiom mining exploration (optional) | Feasibility spike: extend the miner to DMX moving-head sequences in vendor packs (the deleted-history artifact proves they exist); if propensity/idiom extraction works for MH, part 1 joins the knowledge loop (one catalog, two renderers, completed). Time-boxed; outcome = a decision memo, not a feature. | M4, D5 convergence note | P2K-T2 | opus | opus |
+| P4-T7 | MH-idiom mining exploration (optional) | Feasibility spike over an independently reverified, accessible DMX moving-head corpus; if propensity/idiom extraction works for MH, part 1 joins the knowledge loop. Time-boxed; outcome = a decision memo, not a feature. Current full-execution status: NO-GO/deferred on P2K-T2 empirical exits and an accessible MH corpus manifest. | M4, D5 convergence note | P2K-T2 | opus | opus |
 
 ## Notes for spec authors
 
@@ -39,3 +44,16 @@ task evidence remains single-owned by the
 - T5's knob-inventory test is the phase's real deliverable: it makes dead config a
   CI-detectable class forever.
 - T7 is deliberately last and optional — it must not leak scope into earlier phases.
+
+## P4-T7 safe preflight record — 2026-08-26
+
+Full execution did not start. P2K-T2 has verified tooling but still lacks the author's
+real-corpus mining run, idempotent rerun evidence, non-empty support/stability
+distributions, and owner-authored threshold decision log. A filename-only local
+preflight found no accessible MH corpus manifest and no `.xsq`, `.xsqz`, or vendor
+archive under the inspected `data/` paths. No corpus content was opened or parsed.
+
+Decision: **NO-GO / defer** until both triggers are satisfied: (1) P2K-T2's empirical
+owner-corpus exits are accepted, and (2) an accessible manifest identifies sufficient
+moving-head sequences for the time-boxed spike. This does not complete P4-T7 and does
+not answer its feasibility questions.

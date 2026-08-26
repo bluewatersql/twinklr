@@ -329,3 +329,11 @@ The previously recorded full `make validate` result remains the proportional ful
 this remediation changes documentation and its contract test only, no product source.
 The changed test is included in the 54-test focused run. The replacement freeze remains
 pending independent verification and is not integrated.
+
+## Integration record — 2026-08-26
+
+Independent re-verification approved the remediated candidate, and P4-T6 is integrated
+on main at `da8f19d`. The post-integration combined-main gate passed; its volatile counts
+are single-owned by [current-state.md](../../../../../context/current-state.md). This
+closes P4-T6 implementation without closing any owner/live/xLights/Ollama/WhisperX or
+earlier empirical boundary.

@@ -208,3 +208,22 @@ the deliverable is explicitly a memo, and the acceptance criteria explicitly for
 shipping application-code changes — if the spike produces working code, that outcome
 belongs in the memo's recommendation ("here's a working prototype, sized at X, next
 task should formalize it"), not in this task's merged diff.
+
+## Execution status — 2026-08-26: NO-GO / deferred
+
+Only a safe prerequisite preflight was performed. P2K-T2's tooling is integrated, but
+its owner/data-gated acceptance evidence is not: no accepted real-corpus mining run,
+idempotent rerun result, non-empty support/stability distributions, or owner-authored
+threshold decision log exists. A filename-only scan of the accessible local `data/`
+paths found no MH corpus manifest and no `.xsq`, `.xsqz`, or vendor archive; a scoped
+repository filename scan likewise found no moving-head corpus manifest. No corpus
+content was opened, parsed, or mined, and no network/live/provider action occurred.
+
+Full execution is therefore **NO-GO and deferred** until both prerequisites exist:
+
+1. P2K-T2's empirical owner-corpus exits are accepted.
+2. An accessible, provenance-bearing manifest identifies enough moving-head sequences
+   to ground the time-boxed experiment.
+
+This record is not the task's decision memo, does not satisfy any acceptance criterion,
+and makes no claim about MH-mining feasibility. The optional task remains incomplete.
