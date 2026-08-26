@@ -10,7 +10,15 @@ from collections import defaultdict
 import logging
 from typing import TYPE_CHECKING
 
+from twinklr.core.formats.xlights.sequence.emission import (
+    EmissionRequest,
+    EmissionSession,
+)
 from twinklr.core.formats.xlights.sequence.models.effect_placement import EffectPlacement
+from twinklr.core.formats.xlights.sequence.trace import (
+    MovingHeadEmissionTrace,
+    MovingHeadSource,
+)
 from twinklr.core.sequencer.moving_heads.export.dmx_settings_builder import (
     DmxSettingsBuilder,
 )
@@ -69,6 +77,7 @@ class XsqAdapter:
         """
         placements = []
         xlights_mapping = fixture_group.get_xlights_mapping()
+        emitter = EmissionSession(xsq) if xsq is not None else None
 
         # Separate transition and regular segments
         transition_segments = [s for s in segments if s.metadata.get("is_transition") == "true"]
@@ -81,16 +90,26 @@ class XsqAdapter:
 
         # 1. Process regular segments on layer 0
         regular_placements = self._process_segments(
-            regular_segments, xlights_mapping, fixture_group, xsq, layer_index=0
+            regular_segments, xlights_mapping, fixture_group, emitter, layer_index=0
         )
         placements.extend(regular_placements)
 
         # 2. Process transition segments on layer 1
         if transition_segments:
             transition_placements = self._process_segments(
-                transition_segments, xlights_mapping, fixture_group, xsq, layer_index=1
+                transition_segments, xlights_mapping, fixture_group, emitter, layer_index=1
             )
             placements.extend(transition_placements)
+
+        if emitter is not None:
+            records = emitter.flush()
+            if len(records) != len(placements):
+                raise RuntimeError("MH emission count diverged from adapter placements")
+            for placement, record in zip(placements, records, strict=True):
+                placement.start_ms = record.start_ms
+                placement.end_ms = record.end_ms
+                placement.layer_index = record.file_layer
+                placement.ref = record.ref
 
         logger.debug(
             f"Converted {len(segments)} segments to {len(placements)} placements "
@@ -104,7 +123,7 @@ class XsqAdapter:
         segments: list[FixtureSegment],
         xlights_mapping: dict[str, str],
         fixture_group: FixtureGroup,
-        xsq: XSequence | None,
+        emitter: EmissionSession | None,
         layer_index: int,
     ) -> list[EffectPlacement]:
         """Process segments for a specific layer.
@@ -113,7 +132,7 @@ class XsqAdapter:
             segments: Segments to process
             xlights_mapping: Fixture ID -> xLights model name mapping
             fixture_group: Fixture group
-            xsq: XSequence object for EffectDB
+            emitter: Shared renderer-neutral emission session.
             layer_index: Layer index to assign to effects
 
         Returns:
@@ -123,7 +142,7 @@ class XsqAdapter:
 
         # 1. Try to create group effects first
         group_placements, grouped_segments = self._write_group_effects(
-            segments, xlights_mapping, fixture_group, xsq, layer_index
+            segments, xlights_mapping, fixture_group, emitter, layer_index
         )
         placements.extend(group_placements)
 
@@ -135,7 +154,7 @@ class XsqAdapter:
 
         if ungrouped_segments:
             individual_placements = self._write_individual_effects(
-                ungrouped_segments, xlights_mapping, fixture_group, xsq, layer_index
+                ungrouped_segments, xlights_mapping, fixture_group, emitter, layer_index
             )
             placements.extend(individual_placements)
 
@@ -146,7 +165,7 @@ class XsqAdapter:
         segments: list[FixtureSegment],
         xlights_mapping: dict[str, str],
         fixture_group: FixtureGroup,
-        xsq: XSequence | None,
+        emitter: EmissionSession | None,
         layer_index: int,
     ) -> list[EffectPlacement]:
         """Write effects to individual fixture models.
@@ -155,7 +174,7 @@ class XsqAdapter:
             segments: FixtureSegments to write
             xlights_mapping: Fixture ID -> xLights model name mapping
             fixture_group: Fixture group
-            xsq: XSequence object for EffectDB
+            emitter: Shared renderer-neutral emission session.
             layer_index: Layer index to assign to effects
 
         Returns:
@@ -186,9 +205,23 @@ class XsqAdapter:
 
             # Convert segment to DMX settings string and add to EffectDB
             ref = 0
-            if xsq is not None:
+            if emitter is not None:
                 settings_str = self._segment_to_settings(segment, fixture)
-                ref = xsq.append_effectdb(settings_str)
+                emitter.queue(
+                    EmissionRequest(
+                        target=xlights_name,
+                        effect="DMX",
+                        settings=settings_str,
+                        palette=None,
+                        start_ms=segment.t0_ms,
+                        end_ms=segment.t1_ms,
+                        logical_layer=layer_index,
+                        label=segment.metatag,
+                        trace=self._trace_for_segments(
+                            (segment,), target=xlights_name, logical_layer=layer_index
+                        ),
+                    )
+                )
             else:
                 logger.debug("No XSQ provided, using ref=0 (no DMX channel data)")
 
@@ -213,7 +246,7 @@ class XsqAdapter:
         segments: list[FixtureSegment],
         xlights_mapping: dict[str, str],
         fixture_group: FixtureGroup,
-        xsq: XSequence | None,
+        emitter: EmissionSession | None,
         layer_index: int,
     ) -> tuple[list[EffectPlacement], list[FixtureSegment]]:
         """Write effects to group models when possible.
@@ -222,7 +255,7 @@ class XsqAdapter:
             segments: FixtureSegments to write
             xlights_mapping: Fixture ID -> xLights model name mapping
             fixture_group: Fixture group
-            xsq: XSequence object for EffectDB
+            emitter: Shared renderer-neutral emission session.
             layer_index: Layer index to assign to effects
 
         Returns:
@@ -289,9 +322,10 @@ class XsqAdapter:
                 group_xlights_name = fixture_group.xlights_semantic_groups[group_name]
 
                 # Get all segments for this group
-                group_segments = [
-                    s for s in time_range_segments if s.fixture_id in group_fixture_ids
-                ]
+                group_segments = sorted(
+                    (s for s in time_range_segments if s.fixture_id in group_fixture_ids),
+                    key=lambda item: (item.fixture_id, item.segment_id, item.step_id),
+                )
 
                 # All must be true to allow grouping:
                 # 1. There are segments in the group
@@ -304,7 +338,22 @@ class XsqAdapter:
                 ):
                     continue
 
-                # Use first segment as representative (verified identical above)
+                provenance = {
+                    (segment.section_id, segment.template_id) for segment in group_segments
+                }
+                if len(provenance) != 1:
+                    details = ", ".join(
+                        f"{segment.fixture_id}:{segment.section_id}/{segment.template_id}"
+                        for segment in group_segments
+                    )
+                    raise ValueError(
+                        "Moving-head group provenance conflict for "
+                        f"target={group_xlights_name!r}, range={t0_ms}-{t1_ms}ms: "
+                        f"{details}. Grouped contributors must share section_id and "
+                        "template_id; emission will not choose a representative silently."
+                    )
+
+                # One deterministic representative owns settings, label, and trace.
                 representative_segment = group_segments[0]
                 representative_fixture = fixture_group.get_fixture(
                     representative_segment.fixture_id
@@ -315,11 +364,27 @@ class XsqAdapter:
 
                 # Convert to DMX settings string
                 ref = 0
-                if xsq is not None:
+                if emitter is not None:
                     settings_str = self._segment_to_settings(
                         representative_segment, representative_fixture
                     )
-                    ref = xsq.append_effectdb(settings_str)
+                    emitter.queue(
+                        EmissionRequest(
+                            target=group_xlights_name,
+                            effect="DMX",
+                            settings=settings_str,
+                            palette=None,
+                            start_ms=t0_ms,
+                            end_ms=t1_ms,
+                            logical_layer=layer_index,
+                            label=representative_segment.metatag,
+                            trace=self._trace_for_segments(
+                                tuple(group_segments),
+                                target=group_xlights_name,
+                                logical_layer=layer_index,
+                            ),
+                        )
+                    )
 
                 # Create group effect with layer_index
                 placements.append(
@@ -344,6 +409,39 @@ class XsqAdapter:
                 )
 
         return placements, grouped_segments
+
+    @staticmethod
+    def _trace_for_segments(
+        segments: tuple[FixtureSegment, ...],
+        *,
+        target: str,
+        logical_layer: int,
+    ) -> MovingHeadEmissionTrace:
+        """Build deterministic provenance without collapsing grouped source identity."""
+        ordered = sorted(
+            segments,
+            key=lambda item: (item.fixture_id, item.segment_id, item.step_id),
+        )
+        representative = ordered[0]
+        sources: list[MovingHeadSource] = [
+            {
+                "fixture_id": item.fixture_id,
+                "segment_id": item.segment_id,
+                "step_id": item.step_id,
+            }
+            for item in ordered
+        ]
+        return {
+            "backend": "moving_head",
+            "event_id": (
+                f"mh:{target}:{representative.t0_ms}:{representative.t1_ms}:{logical_layer}"
+            ),
+            "section_id": representative.section_id,
+            "lane": "TRANSITION" if logical_layer else "BASE",
+            "group_id": target,
+            "template_id": representative.template_id,
+            "sources": sources,
+        }
 
     def _segments_have_identical_curves(self, segments: list[FixtureSegment]) -> bool:
         """Check if all segments have identical channel curves.

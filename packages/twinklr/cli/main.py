@@ -534,6 +534,7 @@ async def _run_pipeline_async(
                 for xtiming_path in artifacts.xtiming_paths:
                     console.print(f"   timing   {xtiming_path.name}")
                 console.print(f"   mapping  {artifacts.xmap_path.name}")
+                console.print(f"   trace    {artifacts.trace_path.name}")
             else:
                 console.print(f"   {result.outputs['render']}")
 

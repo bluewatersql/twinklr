@@ -1,6 +1,6 @@
 # Active Changes
 
-_Last updated: 2026-08-16._
+_Last updated: 2026-08-26._
 
 - **twinklr-reactivation-review** — **ACTIVE: implementation phase (build campaign).**
   The review completed 2026-08-13 (all 8 stages, adversarially verified, verdict
@@ -34,7 +34,13 @@ _Last updated: 2026-08-16._
   owner subsequently accepted all nine P3-T5 decisions, and P3-T5 was integrated at
   `f006468`. Phase 3 now has five of eight tasks integrated. This integration does not
   waive the outstanding Phase 1P/2P/2K exits, close P3-T4 live acceptance, or authorize
-  P3-T5 live work, P3-T6+, or any paid/local empirical action.
+  P3-T5 live work or any paid/local empirical action. On 2026-08-26 the owner accepted
+  P3-T6's amended offline unified-emission contract. Formal first review rejected its
+  initial snapshot; the isolated remediation subsequently received standards,
+  specification, and adversarial approval offline/in code and is approved for
+  integration. It is not integrated yet. P3-T6 empirical GUI acceptance remains open,
+  and this approval does not authorize P3-T7+, live xLights work, or any earlier
+  empirical exit.
   Phase 4 has not started. The overall change
   therefore remains active.
   Live execution state, process rules, and pending owner actions:

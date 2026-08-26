@@ -11,6 +11,7 @@ from twinklr.core.config.fixtures import FixtureGroup, FixtureInstance
 from twinklr.core.config.fixtures.dmx import DmxMapping
 from twinklr.core.config.fixtures.instances import FixtureConfig
 from twinklr.core.formats.xlights.sequence.models.xsq import TimeMarker, XSequence
+from twinklr.core.formats.xlights.sequence.trace import build_xsq_trace_payload
 from twinklr.core.sequencer.display.effects.handlers import load_builtin_handlers
 from twinklr.core.sequencer.display.effects.protocol import RenderContext
 from twinklr.core.sequencer.display.export.writer import XSQWriter
@@ -263,12 +264,10 @@ def _build_combined() -> tuple[XSequence, dict[str, object]]:
         handler_registry=load_builtin_handlers(),
         render_context=RenderContext(sequence_duration_ms=4400),
     ).write(display_plan, sequence)
-    trace = {
-        "schema_version": "display-xsq-trace.v1",
-        "entry_count": len(write_result.trace_entries),
-        "fallback_substitutions": write_result.fallback_substitutions,
-        "entries": write_result.trace_entries,
-    }
+    trace = build_xsq_trace_payload(
+        write_result.trace_entries,
+        fallback_substitutions=write_result.fallback_substitutions,
+    )
     return sequence, trace
 
 

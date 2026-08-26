@@ -480,23 +480,20 @@ def live_effects_from_segments(
         duration_ms=duration_ms,
     )
     placements = XsqAdapter().convert(segments, fixture_group, sequence)
+    traces = sequence.emission_trace_entries
+    if len(traces) != len(placements):
+        raise InjectionError("MH trace count diverged from injection placements")
     effects: list[LiveEffect] = []
-    for placement in placements:
+    for placement, trace in zip(placements, traces, strict=True):
         if placement.ref is None:
             raise InjectionError("xLights placement omitted its EffectDB settings reference")
         settings = sequence.effect_db.get(placement.ref)
         if settings is None:
             raise InjectionError(f"Missing EffectDB entry {placement.ref}")
-        section_ids = {
-            segment.section_id
-            for segment in segments
-            if segment.t0_ms == placement.start_ms and segment.t1_ms == placement.end_ms
-        }
-        if len(section_ids) != 1:
-            raise InjectionError(
-                f"Cannot assign live effect {placement.start_ms}-{placement.end_ms}ms "
-                f"to one section: {sorted(section_ids)!r}"
-            )
+        section_id = trace.get("section_id")
+        live_layer = trace.get("live_layer")
+        if not isinstance(section_id, str) or not isinstance(live_layer, int):
+            raise InjectionError("MH trace omitted section or live-layer provenance")
         effects.append(
             LiveEffect(
                 target=placement.element_name,
@@ -505,8 +502,8 @@ def live_effects_from_segments(
                 palette="",
                 start_ms=placement.start_ms,
                 end_ms=placement.end_ms,
-                section_id=next(iter(section_ids)),
-                layer=TWINKLR_LAYER_BASE + placement.layer_index,
+                section_id=section_id,
+                layer=live_layer,
             )
         )
     return tuple(sorted(effects))

@@ -6,6 +6,8 @@ bloating the .xsq file with duplicate palette entries.
 
 from __future__ import annotations
 
+from twinklr.core.formats.xlights.sequence.registry import PositionalRegistry
+
 
 class PaletteDBRegistry:
     """Registry that deduplicates palette strings and assigns indices.
@@ -23,11 +25,7 @@ class PaletteDBRegistry:
     """
 
     def __init__(self, *, initial_entries: list[str] | None = None) -> None:
-        self._entries: list[str] = []
-        self._index: dict[str, int] = {}
-        for idx, entry in enumerate(initial_entries or []):
-            self._entries.append(entry)
-            self._index.setdefault(entry, idx)
+        self._registry = PositionalRegistry(initial_entries)
 
     def register(self, palette_string: str) -> int:
         """Register a palette string, returning its index.
@@ -40,13 +38,7 @@ class PaletteDBRegistry:
         Returns:
             0-based index into the palette list.
         """
-        if palette_string in self._index:
-            return self._index[palette_string]
-
-        idx = len(self._entries)
-        self._entries.append(palette_string)
-        self._index[palette_string] = idx
-        return idx
+        return self._registry.register(palette_string)
 
     def get_entries(self) -> list[str]:
         """Return all registered palette strings in order.
@@ -54,10 +46,10 @@ class PaletteDBRegistry:
         Returns:
             Ordered list of palette strings.
         """
-        return list(self._entries)
+        return self._registry.get_entries()
 
     def __len__(self) -> int:
-        return len(self._entries)
+        return len(self._registry)
 
 
 __all__ = [

@@ -9,12 +9,17 @@ via the existing XSQExporter.
 from __future__ import annotations
 
 import logging
-from typing import NotRequired, TypedDict
 
+from twinklr.core.formats.xlights.sequence.emission import (
+    EmissionRequest,
+    EmissionSession,
+)
 from twinklr.core.formats.xlights.sequence.models.xsq import (
-    ColorPalette,
-    Effect,
     XSequence,
+)
+from twinklr.core.formats.xlights.sequence.trace import (
+    DisplayEmissionTrace,
+    EmissionTraceEntry,
 )
 from twinklr.core.sequencer.display.effects.protocol import (
     RenderContext,
@@ -23,46 +28,16 @@ from twinklr.core.sequencer.display.effects.registry import HandlerRegistry
 from twinklr.core.sequencer.display.effects.settings_builder import (
     SettingsStringBuilder,
 )
-from twinklr.core.sequencer.display.export.effectdb_registry import (
-    EffectDBRegistry,
-)
 from twinklr.core.sequencer.display.models.palette import ResolvedPalette
-from twinklr.core.sequencer.display.models.render_event import EffectSubstitution, RenderEvent
+from twinklr.core.sequencer.display.models.render_event import RenderEvent
 from twinklr.core.sequencer.display.models.render_plan import (
     RenderGroupPlan,
     RenderLayerPlan,
     RenderPlan,
 )
 from twinklr.core.sequencer.display.palette.builder import build_palette_string
-from twinklr.core.sequencer.display.palette.registry import PaletteDBRegistry
 
 logger = logging.getLogger(__name__)
-
-
-class EffectSubstitutionTrace(TypedDict):
-    """Structured effect substitution recorded on one trace entry."""
-
-    requested_effect_type: str
-    substituted_effect_type: str
-    reason: str
-
-
-class XSQTraceEntry(TypedDict):
-    """Per-effect trace record for display XSQ sidecar metadata."""
-
-    event_id: str
-    placement_id: str | None
-    placement_index: int
-    section_id: str
-    lane: str
-    group_id: str
-    template_id: str
-    element_name: str
-    layer_index: int
-    effect_name: str
-    start_ms: int
-    end_ms: int
-    fallback_substitution: NotRequired[EffectSubstitutionTrace]
 
 
 class WriteResult:
@@ -86,7 +61,7 @@ class WriteResult:
         self.warnings: list[str] = []
         self.missing_assets: list[str] = []
         self.fallback_substitutions: int = 0
-        self.trace_entries: list[XSQTraceEntry] = []
+        self.trace_entries: list[EmissionTraceEntry] = []
 
 
 class XSQWriter:
@@ -133,30 +108,19 @@ class XSQWriter:
         # registries from that sequence so every existing numeric reference keeps
         # resolving to the same settings/palette after the append. Full exporter
         # unification remains P3-T6; this is the narrow correctness prerequisite.
-        effectdb_reg = EffectDBRegistry(
-            reserve_zero=True,
-            initial_entries=sequence.effect_db.entries,
-        )
-        palette_reg = PaletteDBRegistry(
-            initial_entries=[palette.settings for palette in sequence.color_palettes],
-        )
+        emitter = EmissionSession(sequence)
 
         # Process each element group
         for group_plan in render_plan.groups:
             self._write_group(
                 group_plan=group_plan,
-                sequence=sequence,
-                effectdb_reg=effectdb_reg,
-                palette_reg=palette_reg,
+                emitter=emitter,
                 result=result,
             )
-
-        # Sync registries to XSequence
-        self._sync_effectdb(effectdb_reg, sequence)
-        self._sync_palettes(palette_reg, sequence)
-
-        result.effectdb_entries = len(effectdb_reg)
-        result.palette_entries = len(palette_reg)
+        emitter.flush()
+        result.trace_entries = list(sequence.emission_trace_entries)
+        result.effectdb_entries = len(sequence.effect_db.entries)
+        result.palette_entries = len(sequence.color_palettes)
 
         logger.info(
             "XSQWriter: wrote %d effects on %d elements (%d effectdb, %d palettes, %d warnings)",
@@ -172,9 +136,7 @@ class XSQWriter:
     def _write_group(
         self,
         group_plan: RenderGroupPlan,
-        sequence: XSequence,
-        effectdb_reg: EffectDBRegistry,
-        palette_reg: PaletteDBRegistry,
+        emitter: EmissionSession,
         result: WriteResult,
     ) -> None:
         """Write a single element group into the sequence.
@@ -187,13 +149,10 @@ class XSQWriter:
 
         Args:
             group_plan: Render plan for one element.
-            sequence: XSequence to mutate.
-            effectdb_reg: EffectDB dedup registry.
-            palette_reg: Palette dedup registry.
+            emitter: Shared renderer-neutral emission session.
             result: Result accumulator.
         """
         element_name = group_plan.element_name
-        sequence.ensure_element(element_name)
         result.elements_created += 1
 
         # Layers are already sorted by layer_index from the engine.
@@ -205,9 +164,7 @@ class XSQWriter:
                     element_name=element_name,
                     layer_index=compact_idx,
                     layer_plan=layer_plan,
-                    sequence=sequence,
-                    effectdb_reg=effectdb_reg,
-                    palette_reg=palette_reg,
+                    emitter=emitter,
                     result=result,
                 )
 
@@ -217,9 +174,7 @@ class XSQWriter:
         element_name: str,
         layer_index: int,
         layer_plan: RenderLayerPlan,
-        sequence: XSequence,
-        effectdb_reg: EffectDBRegistry,
-        palette_reg: PaletteDBRegistry,
+        emitter: EmissionSession,
         result: WriteResult,
     ) -> None:
         """Write a single render event as an xLights Effect.
@@ -234,9 +189,7 @@ class XSQWriter:
             element_name: Target element name.
             layer_index: Target layer index.
             layer_plan: Parent layer plan (carries blend_mode).
-            sequence: XSequence to mutate.
-            effectdb_reg: EffectDB dedup registry.
-            palette_reg: Palette dedup registry.
+            emitter: Shared renderer-neutral emission session.
             result: Result accumulator.
         """
         # 1. Dispatch to handler → E_/B_ keys
@@ -256,69 +209,40 @@ class XSQWriter:
             blend_mode=layer_plan.blend_mode,
         )
 
-        # 3. Register augmented settings in EffectDB
-        effectdb_idx = effectdb_reg.register(augmented)
-
-        # 4. Build and register palette (with intensity-based brightness)
+        # 3. Build palette (with intensity-based brightness)
         palette = self._apply_intensity_brightness(
             event.palette, event.intensity, settings.effect_name
         )
         palette_string = build_palette_string(palette)
-        palette_idx = palette_reg.register(palette_string)
-
-        # 5. Create Effect and add to sequence
-        effect = Effect(
-            effect_type=settings.effect_name,
-            start_time_ms=event.start_ms,
-            end_time_ms=event.end_ms,
-            palette=str(palette_idx),
-            ref=effectdb_idx,
-        )
-
-        sequence.add_effect(element_name, effect, layer_index=layer_index)
-        result.effects_written += 1
-        self._append_trace_entry(
-            result=result,
-            event=event,
-            element_name=element_name,
-            layer_index=layer_index,
-            effect_name=settings.effect_name,
-            effect_substitution=settings.effect_substitution,
-        )
-
-    @staticmethod
-    def _append_trace_entry(
-        *,
-        result: WriteResult,
-        event: RenderEvent,
-        element_name: str,
-        layer_index: int,
-        effect_name: str,
-        effect_substitution: EffectSubstitution | None = None,
-    ) -> None:
-        """Append a trace sidecar entry for a written effect."""
-        source = event.source
-        trace_entry: XSQTraceEntry = {
+        trace: DisplayEmissionTrace = {
+            "backend": "display",
             "event_id": event.event_id,
-            "placement_id": source.placement_id,
-            "placement_index": source.placement_index,
-            "section_id": source.section_id,
-            "lane": source.lane.value,
-            "group_id": source.group_id,
-            "template_id": source.template_id,
-            "element_name": element_name,
-            "layer_index": layer_index,
-            "effect_name": effect_name,
-            "start_ms": event.start_ms,
-            "end_ms": event.end_ms,
+            "placement_id": event.source.placement_id,
+            "placement_index": event.source.placement_index,
+            "section_id": event.source.section_id,
+            "lane": event.source.lane.value,
+            "group_id": event.source.group_id,
+            "template_id": event.source.template_id,
         }
-        if effect_substitution is not None:
-            trace_entry["fallback_substitution"] = {
-                "requested_effect_type": effect_substitution.requested_effect_type,
-                "substituted_effect_type": effect_substitution.substituted_effect_type,
-                "reason": effect_substitution.reason,
+        if settings.effect_substitution is not None:
+            trace["fallback_substitution"] = {
+                "requested_effect_type": settings.effect_substitution.requested_effect_type,
+                "substituted_effect_type": settings.effect_substitution.substituted_effect_type,
+                "reason": settings.effect_substitution.reason,
             }
-        result.trace_entries.append(trace_entry)
+        emitter.queue(
+            EmissionRequest(
+                target=element_name,
+                effect=settings.effect_name,
+                settings=augmented,
+                palette=palette_string,
+                start_ms=event.start_ms,
+                end_ms=event.end_ms,
+                logical_layer=layer_index,
+                trace=trace,
+            )
+        )
+        result.effects_written += 1
 
     @staticmethod
     def _augment_settings(
@@ -419,41 +343,8 @@ class XSQWriter:
         effective = max(0, min(100, int(base_brightness * intensity)))
         return palette.model_copy(update={"brightness": effective})
 
-    def _sync_effectdb(
-        self,
-        effectdb_reg: EffectDBRegistry,
-        sequence: XSequence,
-    ) -> None:
-        """Sync the EffectDB registry entries into the XSequence.
-
-        Replaces the XSequence's EffectDB with the registry contents.
-
-        Args:
-            effectdb_reg: Populated EffectDB registry.
-            sequence: XSequence to update.
-        """
-        from twinklr.core.formats.xlights.sequence.models.xsq import EffectDB
-
-        sequence.effect_db = EffectDB(entries=effectdb_reg.get_entries())
-
-    def _sync_palettes(
-        self,
-        palette_reg: PaletteDBRegistry,
-        sequence: XSequence,
-    ) -> None:
-        """Sync the palette registry entries into the XSequence.
-
-        Replaces the XSequence's color_palettes with registry contents.
-
-        Args:
-            palette_reg: Populated palette registry.
-            sequence: XSequence to update.
-        """
-        sequence.color_palettes = [ColorPalette(settings=s) for s in palette_reg.get_entries()]
-
 
 __all__ = [
     "WriteResult",
-    "XSQTraceEntry",
     "XSQWriter",
 ]

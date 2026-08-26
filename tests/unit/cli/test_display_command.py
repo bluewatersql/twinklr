@@ -91,7 +91,7 @@ def test_export_writes_required_xsq_and_trace_layout(tmp_path: Path) -> None:
     assert trace_path.is_file()
     trace = json.loads(trace_path.read_text(encoding="utf-8"))
     assert trace == {
-        "schema_version": "display-xsq-trace.v1",
+        "schema_version": "twinklr-xsq-trace.v2",
         "entry_count": 0,
         "fallback_substitutions": 0,
         "entries": [],

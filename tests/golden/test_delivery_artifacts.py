@@ -9,6 +9,7 @@ because it wrote `media_file=""`.
 
 from __future__ import annotations
 
+import json
 import xml.etree.ElementTree as ET
 
 import pytest
@@ -42,12 +43,17 @@ def delivery(tmp_path_factory: pytest.TempPathFactory) -> DeliveryArtifacts:
     return pipeline.artifacts
 
 
-def test_run_writes_all_three_deliverables(delivery: DeliveryArtifacts) -> None:
-    """A run produces the sequence, the timing tracks and the mapping hint."""
+def test_run_writes_delivery_and_backend_neutral_trace(delivery: DeliveryArtifacts) -> None:
+    """Standalone run ships effects, timing, mapping, and MH provenance."""
     assert delivery.xsq_path.exists()
     assert delivery.xmap_path.exists()
+    assert delivery.trace_path.exists()
     assert delivery.xtiming_paths, "no .xtiming written"
     assert all(path.exists() for path in delivery.xtiming_paths)
+    trace = json.loads(delivery.trace_path.read_text(encoding="utf-8"))
+    assert trace["schema_version"] == "twinklr-xsq-trace.v2"
+    assert trace["entries"]
+    assert {row["backend"] for row in trace["entries"]} == {"moving_head"}
 
 
 def test_fresh_xsq_reparses(delivery: DeliveryArtifacts) -> None:

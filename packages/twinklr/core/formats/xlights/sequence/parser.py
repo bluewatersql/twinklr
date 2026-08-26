@@ -140,6 +140,7 @@ class XSQParser:
         element_effects = self._parse_element_effects(root)
 
         return XSequence(
+            document_origin="parsed",
             base_channel=base_channel,
             chan_ctrl_basic=chan_ctrl_basic,
             chan_ctrl_color=chan_ctrl_color,

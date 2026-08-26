@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from twinklr.core.sequencer.display.export.writer import WriteResult, XSQWriter
+import pytest
+
+from twinklr.core.sequencer.display.export.writer import XSQWriter
 from twinklr.core.sequencer.display.models.palette import (
     ResolvedPalette,
     TransitionSpec,
@@ -312,48 +314,7 @@ class TestApplyIntensityBrightness:
         assert result.colors == ["#FF0000", "#00FF00"]
 
 
-class TestTraceMetadata:
-    """Tests for XSQWriter trace sidecar metadata helpers."""
-
-    def test_append_trace_entry_includes_placement_origin(self) -> None:
-        """Trace entries record placement/source and xLights placement context."""
-        event = RenderEvent(
-            event_id="evt_trace",
-            start_ms=100,
-            end_ms=400,
-            effect_type="Bars",
-            parameters={},
-            palette=_DEFAULT_PALETTE,
-            source=RenderEventSource(
-                section_id="intro",
-                lane=LaneKind.RHYTHM,
-                group_id="CANDY_STRIPES",
-                template_id="tmpl_bars",
-                placement_index=2,
-                placement_id="placement_1",
-            ),
-        )
-        result = WriteResult()
-
-        XSQWriter._append_trace_entry(
-            result=result,
-            event=event,
-            element_name="Candy Canes",
-            layer_index=1,
-            effect_name="Bars",
-        )
-
-        assert len(result.trace_entries) == 1
-        trace = result.trace_entries[0]
-        assert trace["placement_id"] == "placement_1"
-        assert trace["section_id"] == "intro"
-        assert trace["lane"] == "RHYTHM"
-        assert trace["group_id"] == "CANDY_STRIPES"
-        assert trace["element_name"] == "Candy Canes"
-        assert trace["layer_index"] == 1
-        assert trace["start_ms"] == 100
-        assert trace["end_ms"] == 400
-
+class TestIntensityCoverage:
     def test_works_for_all_non_on_effect_types(self) -> None:
         """Brightness is applied for every non-On effect type."""
         palette = _DEFAULT_PALETTE
@@ -398,6 +359,7 @@ def test_append_preserves_existing_effectdb_and_palette_references() -> None:
             version="2024.01",
             media_file="song.wav",
             sequence_duration_ms=2_000,
+            sequence_timing="20 ms",
         ),
         effect_db=EffectDB(entries=["", "MH_SETTINGS"]),
         color_palettes=[ColorPalette(settings="MH_PALETTE")],
@@ -412,6 +374,12 @@ def test_append_preserves_existing_effectdb_and_palette_references() -> None:
             palette="0",
         ),
     )
+    sequence.add_effect(
+        "Mega Tree",
+        Effect(effect_type="On", start_time_ms=0, end_time_ms=100, ref=1, palette="0"),
+        layer_index=2,
+    )
+    original_layers = sequence.get_element("Mega Tree").model_copy(deep=True).layers  # type: ignore[union-attr]
     plan = RenderPlan(
         render_id="append",
         duration_ms=2_000,
@@ -441,3 +409,53 @@ def test_append_preserves_existing_effectdb_and_palette_references() -> None:
     assert sequence.color_palettes[int(mh_effect.palette)].settings == "MH_PALETTE"
     assert sequence.effect_db.entries[:2] == ["", "MH_SETTINGS"]
     assert sequence.color_palettes[0].settings == "MH_PALETTE"
+    tree = sequence.get_element("Mega Tree")
+    assert tree is not None
+    assert tree.layers[:3] == original_layers
+    assert len(tree.layers[3].effects) == 1
+
+
+def test_quantization_overlap_fails_without_any_sequence_mutation() -> None:
+    """Display batching prevalidates before elements, layers, or registries are touched."""
+    from twinklr.core.formats.xlights.sequence.fresh import build_fresh_sequence
+    from twinklr.core.sequencer.display.effects.handlers import load_builtin_handlers
+    from twinklr.core.sequencer.display.effects.protocol import RenderContext
+    from twinklr.core.sequencer.display.models.render_plan import (
+        RenderGroupPlan,
+        RenderLayerPlan,
+        RenderPlan,
+    )
+
+    first = _make_event().model_copy(update={"event_id": "first", "start_ms": 0, "end_ms": 1})
+    second = _make_event().model_copy(update={"event_id": "second", "start_ms": 1, "end_ms": 2})
+    plan = RenderPlan(
+        render_id="atomic-failure",
+        duration_ms=1_000,
+        groups=[
+            RenderGroupPlan(
+                element_name="New Element",
+                layers=[
+                    RenderLayerPlan(
+                        layer_index=0,
+                        layer_role=LaneKind.BASE,
+                        events=[first, second],
+                    )
+                ],
+            )
+        ],
+    )
+    sequence = build_fresh_sequence(media_file="song.wav", duration_ms=1_000)
+    source_before = plan.model_copy(deep=True)
+    before = sequence.model_copy(deep=True)
+    bytes_before = sequence.model_dump_json().encode()
+    writer = XSQWriter(
+        handler_registry=load_builtin_handlers(),
+        render_context=RenderContext(sequence_duration_ms=1_000),
+    )
+
+    with pytest.raises(ValueError, match="quantization creates an overlap"):
+        writer.write(plan, sequence)
+
+    assert plan == source_before
+    assert sequence == before
+    assert sequence.model_dump_json().encode() == bytes_before

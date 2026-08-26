@@ -24,11 +24,11 @@ from twinklr.core.config.fixtures import FixtureGroup
 from twinklr.core.formats.xlights.sequence.exporter import XSQExporter
 from twinklr.core.formats.xlights.sequence.fresh import build_fresh_sequence
 from twinklr.core.formats.xlights.sequence.models.xsq import (
-    Effect,
     TimeMarker,
     TimingTrack,
     XSequence,
 )
+from twinklr.core.formats.xlights.sequence.trace import write_xsq_trace_sidecar
 from twinklr.core.formats.xlights.sequence.xmap import XMAP_SUFFIX, write_xmap
 from twinklr.core.formats.xlights.sequence.xtiming import export_timing_tracks
 from twinklr.core.sequencer.moving_heads.channels.state import FixtureSegment
@@ -46,11 +46,12 @@ class DeliveryArtifacts:
     xsq_path: Path
     xtiming_paths: tuple[Path, ...]
     xmap_path: Path
+    trace_path: Path
     model_names: tuple[str, ...]
 
     @property
     def all_paths(self) -> tuple[Path, ...]:
-        return (self.xsq_path, *self.xtiming_paths, self.xmap_path)
+        return (self.xsq_path, *self.xtiming_paths, self.xmap_path, self.trace_path)
 
 
 def build_sequence(
@@ -97,19 +98,6 @@ def build_sequence(
         xsq.add_timing_layer(timing_name=track.name, markers=track.markers)
 
     placements = XsqAdapter().convert(segments, fixture_group, xsq)
-    for placement in placements:
-        xsq.add_effect(
-            element_name=placement.element_name,
-            effect=Effect(
-                effect_type=placement.effect_name,
-                start_time_ms=placement.start_ms,
-                end_time_ms=placement.end_ms,
-                ref=placement.ref,
-                label=placement.effect_label or "",
-                palette=str(placement.palette) if placement.palette else "",
-            ),
-            layer_index=placement.layer_index,
-        )
 
     logger.debug(
         "Built fresh sequence: %d segments, %d placements, %d models",
@@ -165,6 +153,7 @@ def export_delivery(
     )
 
     XSQExporter().export(xsq, output_path, pretty=True)
+    trace_path = write_xsq_trace_sidecar(output_path, xsq.emission_trace_entries)
 
     xtiming_paths = export_timing_tracks(
         xsq.timing_tracks, output_dir=output_path.parent, stem=output_path.stem
@@ -182,5 +171,6 @@ def export_delivery(
         xsq_path=output_path,
         xtiming_paths=tuple(xtiming_paths),
         xmap_path=xmap_path,
+        trace_path=trace_path,
         model_names=tuple(model_names),
     )

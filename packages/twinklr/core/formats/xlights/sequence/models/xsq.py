@@ -6,11 +6,12 @@ with full validation and type safety.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from twinklr.core.formats.xlights.sequence.models.effect_placement import EffectPlacement
+from twinklr.core.formats.xlights.sequence.trace import EmissionTraceEntry
 
 
 class TimeMarker(BaseModel):
@@ -207,6 +208,16 @@ class XSequence(BaseModel):
     timing_tracks: list[TimingTrack] = Field(default_factory=list, description="Timing tracks")
     element_effects: list[ElementEffects] = Field(
         default_factory=list, description="Element effects"
+    )
+    emission_trace_entries: list[EmissionTraceEntry] = Field(
+        default_factory=list,
+        exclude=True,
+        description="Renderer-neutral runtime provenance; exported to the trace sidecar",
+    )
+    document_origin: Literal["fresh", "parsed", "in_memory"] = Field(
+        default="in_memory",
+        exclude=True,
+        description="Guards fresh-only emission from rewriting parsed user documents",
     )
 
     model_config = ConfigDict(extra="ignore")

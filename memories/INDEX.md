@@ -12,6 +12,7 @@ memory — those are machine-local supplemental caches (see the memory protocol 
   - [lane-blend-mode-overrides-recipe.md](decisions/lane-blend-mode-overrides-recipe.md) — accepted P3-T2 precedence: lane blend intent uniformly overrides recipe blend metadata in the emitted sub-layer space
   - [typed-macro-coordination-contract.md](decisions/typed-macro-coordination-contract.md) — accepted P3-T4 decision: exact four-field typed macro contract, palette/focal precedence, amended AC2 typed-reader boundary, and P3-T5 behavioral-consumption ownership
   - [coordinated-show-contract.md](decisions/coordinated-show-contract.md) — accepted P3-T5 decisions: one combined command/graph/BeatGrid, concrete-target focal budgets, strict ownership and call/response policy, shared palette projection, safe registry preservation, and the retained P3-T3 catalog edge
+  - [unified-xlights-emission-contract.md](decisions/unified-xlights-emission-contract.md) — reported owner acceptance of the active, unintegrated P3-T6 package; exact rules remain in its specification
 - **[learnings/](learnings/)** — non-obvious discoveries from previous work
   - [reactivation-review-2026-08.md](learnings/reactivation-review-2026-08.md) — historical `aa8d325` review conclusions (readiness, verified defect classes, external facts, strengths), with a pointer to current campaign truth
   - [known-test-failures.md](learnings/known-test-failures.md) — historical gate baseline at `aa8d325` (2026-08-13): 120 failures classified; superseded by the green integrated campaign gate

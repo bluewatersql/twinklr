@@ -374,3 +374,70 @@ currently unquantized; snapping to 20 ms shifts them by up to 10 ms. That is int
 (the file's own declaration demands it) but it is a behavior change on the mature path.
 *Mitigation*: the LOCAL-ONLY save-and-diff check tells us what xLights would have done
 anyway; if xLights rewrites times regardless, our snapping is strictly closer to truth.
+
+## Owner-approved amendment and author handoff — 2026-08-26
+
+The owner authorized this task for **offline implementation and independent verification
+only** and replaced the stale recommendations above with this binding package:
+
+1. Effects use one 20 ms grid with positive-duration preservation; timing tracks and
+   sequence duration remain source-exact.
+2. Fresh output retains the `2026.15` version stamp.
+3. Palette index zero is emitted explicitly; populated palette indices never shift.
+4. EffectDB index zero remains reserved on fresh output and identical non-empty settings
+   deduplicate without moving seeded entries.
+5. Export remains fresh-only and rejects mutation through an `XSequence` parsed from a
+   user document.
+6. Physical file layers start above every occupied layer; renderer logical layers remain
+   unchanged for blend semantics.
+7. One deep renderer-neutral emission module lives under
+   `formats/xlights/sequence`; display and moving heads remain settings adapters.
+8. File output uses positional references, while the same resolved request supplies the
+   live payload at reserved layers 99+; this task adds no live command or call.
+9. Trace schema `twinklr-xsq-trace.v2` carries display and moving-head provenance, and
+   standalone `run` gains the trace sidecar.
+10. The task remains $0/offline-only; palette application and xLights save/rewrite
+    behavior remain pending local empirical acceptance.
+
+The follow-up audit made two refinements binding before broad implementation:
+
+- a grouped moving-head trace records a deterministic ordered list of every contributing
+  `fixture_id` / `segment_id` / `step_id`, plus the emitted group target;
+- nearest-20 ms half-up endpoint snapping and one-grid positive-duration repair are
+  accepted only after the complete renderer batch is prevalidated by target/logical
+  layer. A quantization-created overlap fails before mutation; effects are never silently
+  reordered or merged.
+
+### Frozen remediation candidate
+
+The candidate is isolated on `codex/p3t6-unified-export` from base `e1ed146`. The initial
+RED was the absent public `formats.xlights.sequence.emission` seam. Vertical GREEN then
+covered seeded registries, deduplication, occupied-layer offset, file/live topology,
+explicit palette zero, trace-v2, adjacent/sub-grid/transition timing, grouped MH source
+provenance, fresh-only rejection, and standalone trace delivery.
+
+Formal first review rejected that snapshot. Six review discriminators were then captured
+RED: non-20 ms heads and a fresh timing override were accepted; a seeded nonempty
+EffectDB index zero shifted; writer failure mutated the sequence before batch validation;
+group ordering selected a different representative; and mixed section/template
+provenance grouped silently. Remediation makes the 20 ms head sole, fails closed on
+nonempty index zero, removes trace-v1 display types, keeps display sequence mutation
+behind complete batch validation, and gives grouped MH settings/label/trace one
+deterministic representative with ordered typed sources and shared-provenance rejection.
+The approved queue/flush emission interface did not require redesign; removing eager
+display element creation closed the atomicity defect.
+
+Implementation routes both `XSQWriter` and `XsqAdapter` through `EmissionSession`; the
+DMX and display settings builders remain separate. `live_effects_from_segments` consumes
+the same resolved settings/times/live-layer provenance without issuing a request. The
+combined golden adds four real MH provenance rows and retains its eight display rows.
+The display golden changes only from `50 ms` to `20 ms` plus explicit `palette="0"`.
+
+The remediated offline/code candidate subsequently received independent standards,
+specification, and adversarial approval and is approved for integration. It is not
+integrated yet; empirical xLights GUI acceptance remains open, and P3-T7+ remains
+unauthorized.
+
+Current author evidence, exact manifest, digest, and review status are volatile execution
+truth owned by the campaign [HANDOFF](../../plan/HANDOFF.md). This specification retains
+only the accepted contract and stable remediation notes.

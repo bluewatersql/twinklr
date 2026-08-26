@@ -6,6 +6,8 @@ Avoids bloating the .xsq file with duplicate effect entries.
 
 from __future__ import annotations
 
+from twinklr.core.formats.xlights.sequence.registry import PositionalRegistry
+
 
 class EffectDBRegistry:
     """Registry that deduplicates EffectDB settings strings.
@@ -36,16 +38,10 @@ class EffectDBRegistry:
             reserve_zero: If True, index 0 is reserved with an empty string
                 (matching xLights convention).
         """
-        self._entries: list[str] = []
-        self._index: dict[str, int] = {}
-
-        for idx, entry in enumerate(initial_entries or []):
-            self._entries.append(entry)
-            self._index.setdefault(entry, idx)
-
-        if reserve_zero and not self._entries:
-            self._entries.append("")
-            self._index[""] = 0
+        self._registry = PositionalRegistry(
+            initial_entries,
+            reserve_empty_zero=reserve_zero,
+        )
 
     def register(self, settings_string: str) -> int:
         """Register a settings string, returning its index.
@@ -58,13 +54,7 @@ class EffectDBRegistry:
         Returns:
             0-based index into the EffectDB.
         """
-        if settings_string in self._index:
-            return self._index[settings_string]
-
-        idx = len(self._entries)
-        self._entries.append(settings_string)
-        self._index[settings_string] = idx
-        return idx
+        return self._registry.register(settings_string)
 
     def get_entries(self) -> list[str]:
         """Return all registered settings strings in order.
@@ -72,10 +62,10 @@ class EffectDBRegistry:
         Returns:
             Ordered list of settings strings.
         """
-        return list(self._entries)
+        return self._registry.get_entries()
 
     def __len__(self) -> int:
-        return len(self._entries)
+        return len(self._registry)
 
 
 __all__ = [

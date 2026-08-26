@@ -10,7 +10,7 @@
     <album />
     <MusicURL />
     <comment />
-    <sequenceTiming>50 ms</sequenceTiming>
+    <sequenceTiming>20 ms</sequenceTiming>
     <sequenceType>Media</sequenceType>
     <sequenceDuration>8.000</sequenceDuration>
     <imageDir />
@@ -31,7 +31,7 @@
   <ElementEffects>
     <Element type="model" name="Yard Arches">
       <EffectLayer>
-        <Effect name="Color Wash" startTime="520" endTime="6520" ref="1" />
+        <Effect name="Color Wash" startTime="520" endTime="6520" palette="0" ref="1" />
       </EffectLayer>
     </Element>
   </ElementEffects>

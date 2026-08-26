@@ -300,8 +300,8 @@ class XSQExporter:
             "endTime": str(effect.end_time_ms),
         }
 
-        # Add palette if not default
-        if effect.palette and effect.palette != "0":
+        # Palette index zero is a real positional reference, not an omission marker.
+        if effect.palette:
             attribs["palette"] = effect.palette
 
         # Add protected flag if True
