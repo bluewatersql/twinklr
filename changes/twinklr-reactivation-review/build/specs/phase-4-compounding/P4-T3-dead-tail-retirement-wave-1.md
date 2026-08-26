@@ -312,3 +312,32 @@ CONDITIONAL colour/gobo/shutter row — deleting it wrongly would either break P
 2P's widened-channel work (if it turned out to be wired) or silently foreclose a
 reversible product option; mitigation is the explicit re-verification instruction
 above, and defaulting to "leave it, flag it" over "guess and delete" when uncertain.
+
+## Implementation record — 2026-08-26
+
+Status: **frozen author candidate; pending independent verification and integration**.
+Branch `codex/p4t3-dead-tail` is based on `591d1d3`. The required migration-before-
+deletion ordering is explicit in commits `22fcd7e` then `8922db6`; the remaining
+ordered implementation commits are `8cbd788`, `ef72fe3`, `955fab1`, `aca0936`,
+`b96d10b`, and `381f47c`.
+
+Current-tree re-verification required four narrow corrections to the baseline inventory:
+
+- `movement_curve_to_dmx` is retained because
+  `moving_heads/export/dmx_settings_builder.py` now calls it for offset-centered
+  pan/tilt export.
+- The color, gobo, and shutter libraries are retained because `handlers/wheels.py`,
+  templates, planning models, and show coordination consume them.
+- `GroupPosition` was relocated to `models/position.py` before the zero-caller legacy
+  display hierarchy was deleted; its public re-export and production callers remain.
+- `Intensity.amplitude`, `INTENSITY_MAP`, and `resolve_intensity` were already absent at
+  the task baseline. No synthetic edit was made. Conversely, the zero-caller
+  `FakeFileSystemSync` and `FileSystemSync` protocol were removed with the same
+  async-only filesystem retirement after owner authorization.
+
+Fresh author evidence after Group F/G: focused retirement regression **474 passed, 2
+skipped**; touched-domain mypy **136 source files clean**; full suite **5220 passed, 38
+skipped** at 88% coverage. The 42 warnings are the repository's existing SQLite
+resource/deprecation warnings, not new test failures. Final `make validate`, static
+deleted-symbol evidence, and the frozen candidate digest are recorded by the author
+after this documentation commit; independent approval remains deliberately separate.
