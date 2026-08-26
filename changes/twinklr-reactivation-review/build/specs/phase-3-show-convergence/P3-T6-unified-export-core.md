@@ -434,9 +434,8 @@ combined golden adds four real MH provenance rows and retains its eight display 
 The display golden changes only from `50 ms` to `20 ms` plus explicit `palette="0"`.
 
 The remediated offline/code candidate subsequently received independent standards,
-specification, and adversarial approval and is approved for integration. It is not
-integrated yet; empirical xLights GUI acceptance remains open, and P3-T7+ remains
-unauthorized.
+specification, and adversarial approval and was integrated at `c9620db`. Empirical
+xLights GUI acceptance remains open, and P3-T7+ remains unauthorized.
 
 Current author evidence, exact manifest, digest, and review status are volatile execution
 truth owned by the campaign [HANDOFF](../../plan/HANDOFF.md). This specification retains

@@ -6,10 +6,9 @@ updated: 2026-08-26
 
 # Twinklr — Current State
 
-_Repository evidence and active sequencing verified 2026-08-26. P3-T5 remains the
-latest integrated Phase 3 task at `f006468`; P3-T6's first author snapshot was rejected
-and its offline remediation is independently approved for integration but not integrated
-yet._
+_Repository evidence and active sequencing verified 2026-08-26. P3-T6 is the latest
+integrated Phase 3 task at `c9620db`; its offline/code candidate is independently
+approved, while empirical xLights GUI acceptance remains open._
 
 Twinklr is an AI-powered choreography engine: audio file in, xLights artifacts out — a
 fresh `.xsq`, standalone `.xtiming` timing tracks, and an `.xmap` mapping hint, which the
@@ -66,7 +65,9 @@ See [product/overview.md](product/overview.md).
 - **xLights delivery and iteration clients** — self-contained `.xsq`, standalone
   `.xtiming`, and `.xmap` output; a pinned automation client for preview rendering; and
   guarded `inject`/`regenerate` workflows that plan against the open layout and own only
-  reserved Twinklr layers. Live xLights acceptance remains an explicit local-only gate.
+  reserved Twinklr layers. Display and moving-head output now share one renderer-neutral
+  emission core for positional registries, effect timing, layer translation, and trace
+  provenance. Live xLights acceptance remains an explicit local-only gate.
   `packages/twinklr/core/formats/xlights/`, `packages/twinklr/core/api/xlights/`
 - **CLI** — `twinklr run` and `twinklr display` retain branch-only iteration, while
   `twinklr show` runs one common planning prefix and emits coordinated MH + display
@@ -76,11 +77,10 @@ See [product/overview.md](product/overview.md).
 
 ## Quality-gate state
 
-The latest complete broad-gate evidence is the P3-T5 candidate integrated at `f006468`:
-**5,337 passed, 38 skipped**, 74 golden tests passed with 8 skipped, clean Ruff
-formatting/lint, and mypy success across **728 source files**. P3-T4 remains
-integrated at `558153c`; P3-T3 was previously independently verified and merged at
-`33cce57`. The skips cover explicit
+The latest complete broad-gate evidence is the P3-T6 candidate integrated at `c9620db`:
+**5,352 passed, 38 skipped**, 74 golden tests passed with 8 skipped, clean Ruff
+formatting/lint, and mypy success across **731 source files**. P3-T5 remains integrated
+at `f006468`; P3-T4 at `558153c`; P3-T3 at `33cce57`. The skips cover explicit
 optional/local-only boundaries rather than accepted implementation regressions. This
 document owns the canonical current repository and quality-gate snapshot; the campaign
 handoff links here instead of duplicating it.
@@ -107,14 +107,13 @@ occurred, usage was unavailable, and the conservative `$1.66` commitment leaves 
 `$0.09`, insufficient for another audited attempt. The general schema remediation is
 integrated and offline-verified at `558153c`, but live acceptance remains open and no
 further P3-T4 live attempt is authorized. The owner accepted all nine P3-T5 decisions,
-and P3-T5 was integrated at `f006468`, bringing Phase 3 to five of eight tasks
-integrated. This integration does not waive the earlier exits, close P3-T4 live
-acceptance, or authorize P3-T5 live work. On 2026-08-26 the owner accepted P3-T6's
-offline unified-emission contract. Formal first review rejected the initial snapshot;
-standards, specification, and adversarial review then approved the isolated remediation
-offline/in code for integration. It is not integrated yet, and its empirical xLights GUI
-acceptance remains open. The approval does not authorize live xLights, P3-T7+, or any
-earlier empirical exit. Phase 4 has not started.
+and P3-T5 was integrated at `f006468`. On 2026-08-26 the owner accepted P3-T6's offline
+unified-emission contract. Formal first review rejected the initial snapshot; standards,
+specification, and adversarial review then approved the remediation offline/in code, and
+it was integrated at `c9620db`, bringing Phase 3 to six of eight tasks integrated. P3-T6
+empirical xLights GUI acceptance remains open. These integrations do not waive the
+earlier exits, close P3-T4 live acceptance, authorize live xLights work, or authorize
+P3-T7+. Phase 4 has not started.
 
 The authoritative current task/gate list is the campaign
 [HANDOFF.md](../changes/twinklr-reactivation-review/build/plan/HANDOFF.md). Most notably,

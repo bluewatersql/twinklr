@@ -3,23 +3,23 @@ type: decision
 status: accepted
 created: 2026-08-26
 updated: 2026-08-26
-confidence: reported
+confidence: confirmed
 tags: [xlights, export, emission, trace, moving-heads, display]
 ---
 
 # Unified xLights Emission Contract
 
-_The owner accepted this P3-T6 offline contract on 2026-08-26. Acceptance authorizes
-implementation and independent verification, not integration, live xLights work, or
-P3-T7+._
+_The owner accepted this P3-T6 offline contract on 2026-08-26. After independent
+standards, specification, and adversarial approval, it was integrated at `c9620db`.
+Empirical xLights GUI acceptance remains open, and P3-T7+ remains unauthorized._
 
 ## Decision
 
-The owner accepted the amended offline P3-T6 package on 2026-08-26. While the change is
-active and unintegrated, the [P3-T6 specification](../../changes/twinklr-reactivation-review/build/specs/phase-3-show-convergence/P3-T6-unified-export-core.md)
-is the sole source for its exact rules, implementation status, and empirical boundary.
-This record preserves only the decision provenance; confirmation and promotion of the
-resulting architecture remain deferred until integration.
+Twinklr uses one renderer-neutral xLights emission core for display and moving-head
+effects while each renderer retains its own settings adapter. The accepted package's
+exact behavioral rules and empirical boundary remain in the
+[P3-T6 specification](../../changes/twinklr-reactivation-review/build/specs/phase-3-show-convergence/P3-T6-unified-export-core.md);
+current repository and campaign status remain in `context/` and the campaign handoff.
 
 ## Related
 

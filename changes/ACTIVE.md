@@ -32,15 +32,14 @@ _Last updated: 2026-08-26._
   second attempt. The general `$ref` normalization fix is integrated and offline-verified,
   but live acceptance remains open. No further P3-T4 live attempt is authorized. The
   owner subsequently accepted all nine P3-T5 decisions, and P3-T5 was integrated at
-  `f006468`. Phase 3 now has five of eight tasks integrated. This integration does not
+  `f006468`. P3-T6's remediated candidate then received independent standards,
+  specification, and adversarial approval offline/in code and was integrated at
+  `c9620db`. Phase 3 now has six of eight tasks integrated. These integrations do not
   waive the outstanding Phase 1P/2P/2K exits, close P3-T4 live acceptance, or authorize
   P3-T5 live work or any paid/local empirical action. On 2026-08-26 the owner accepted
-  P3-T6's amended offline unified-emission contract. Formal first review rejected its
-  initial snapshot; the isolated remediation subsequently received standards,
-  specification, and adversarial approval offline/in code and is approved for
-  integration. It is not integrated yet. P3-T6 empirical GUI acceptance remains open,
-  and this approval does not authorize P3-T7+, live xLights work, or any earlier
-  empirical exit.
+  P3-T6's amended offline unified-emission contract. Its empirical xLights GUI
+  acceptance remains open, and its integration does not authorize P3-T7+, live xLights
+  work, or any earlier empirical exit.
   Phase 4 has not started. The overall change
   therefore remains active.
   Live execution state, process rules, and pending owner actions:

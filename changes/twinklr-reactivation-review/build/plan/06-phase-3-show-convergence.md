@@ -16,10 +16,12 @@ recorded for display output; assets pipeline optionally enriching Pictures effec
 > acceptance remains open after one HTTP 400 `invalid_json_schema`; no retry/fallback
 > occurred, usage was unavailable, `$1.66` is committed, and `$0.09` remains. No further
 > P3-T4 live attempt is authorized. The owner subsequently accepted all nine P3-T5
-> decisions, and P3-T5 was integrated at `f006468`. Phase 3 now has five of eight tasks
-> integrated. These exceptions do not waive the Phase 1P/2P/2K exits, close
-> P3-T4 live acceptance, or authorize P3-T5 live work, P3-T6+, or any paid/local
-> empirical action.
+> decisions, and P3-T5 was integrated at `f006468`. P3-T6's remediated offline/code
+> candidate received independent standards, specification, and adversarial approval and
+> was integrated at `c9620db`. Phase 3 now has six of eight tasks integrated. P3-T6
+> empirical xLights GUI acceptance remains open. These exceptions do not waive the Phase
+> 1P/2P/2K exits, close P3-T4 live acceptance, authorize live work, authorize P3-T7+, or
+> authorize any paid/local empirical action.
 
 ## Lanes
 
@@ -42,15 +44,15 @@ recorded for display output; assets pipeline optionally enriching Pictures effec
 | P3-T7 | Assets revival (D13) | Reactivate `agents/assets` for Pictures-effect imagery on `gpt-image-2`: fix the verified defects (non-atomic error-swallowing catalog = the real re-bill mechanism; cross-song reuse-key collisions; gather without return_exceptions discarding paid siblings); provider-framework integration; per-run spend cap + cache. | D13, P3-F28/M-J/K/L | P2P-T10 | sonnet | opus |
 | P3-T8 | Show-level evaluation | Vision-eval harness extended to display/combined shows (rubric gains coordination-across-parts criteria); first recorded combined-show evaluation + human judgment; results flow into the loop (D5's fourth arm begins). | D11, D5(d) | P3-T5, P2P-T6 | sonnet | opus |
 
-## Implementation status — 2026-08-16
+## Implementation status — 2026-08-26
 
-- P3-T1 through P3-T5 are integrated at the commits recorded in the campaign handoff;
-  P3-T5 is integrated at `f006468` after passing its focused, golden, static, and
-  full-suite author gates and receiving owner acceptance of its nine recorded decisions.
+- P3-T1 through P3-T6 are integrated at the commits recorded in the campaign handoff;
+  P3-T6 is integrated at `c9620db` after independent standards, specification, and
+  adversarial approval offline/in code.
 - P3-T4 live acceptance remains open after the single capped attempt; no further attempt
   is authorized or fundable within the approved task cap.
-- P3-T6 and later tasks remain unauthorized. The Phase 1P/2P/2K empirical exits remain
-  open and are not implied by P3-T5 integration.
+- P3-T6 empirical xLights GUI acceptance remains open. P3-T7+ remains unauthorized. The
+  Phase 1P/2P/2K empirical exits remain open and are not implied by P3-T6 integration.
 
 ## Notes for spec authors
 
