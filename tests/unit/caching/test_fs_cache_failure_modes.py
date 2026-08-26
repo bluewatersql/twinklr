@@ -1,9 +1,9 @@
 """Failure-mode coverage for FSCache (P1-F29: these paths were unexercised).
 
-Covers TTL expiry, meta/key mismatch, corrupted artifacts and a missing commit
-marker — each must degrade to a miss rather than returning stale or invalid data.
-These live here rather than in ``tests/unit/io/test_sync_adapter.py`` because
-that file's coverage hangs off ``FSCacheSync``, which a later debt task deletes.
+Covers the public async cache lifecycle plus TTL expiry, meta/key mismatch,
+corrupted artifacts and a missing commit marker. Failure modes must degrade to a
+miss rather than returning stale or invalid data. This is the canonical home for
+``FSCache`` coverage; it does not route through a synchronous compatibility wrapper.
 """
 
 from __future__ import annotations
@@ -55,6 +55,33 @@ async def test_store_then_load_round_trips(cache: FSCache) -> None:
     assert loaded is not None
     assert loaded.value == "planned"
     assert loaded.count == 3
+
+
+async def test_store_makes_entry_exist(cache: FSCache) -> None:
+    key = _key()
+    assert await cache.exists(key) is False
+
+    await cache.store(key, SampleArtifact(value="stored"))
+
+    assert await cache.exists(key) is True
+
+
+async def test_load_returns_none_on_miss(cache: FSCache) -> None:
+    assert await cache.load(_key(), SampleArtifact) is None
+
+
+async def test_invalidate_removes_entry(cache: FSCache) -> None:
+    key = _key()
+    await cache.store(key, SampleArtifact(value="temporary"))
+
+    await cache.invalidate(key)
+
+    assert await cache.exists(key) is False
+
+
+async def test_initialize_is_idempotent(cache: FSCache) -> None:
+    await cache.initialize()
+    await cache.initialize()
 
 
 async def test_key_is_stable_across_cache_instances(fs: FakeFileSystem) -> None:
