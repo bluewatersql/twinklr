@@ -7,7 +7,6 @@ All reads fail.
 from pathlib import Path
 
 from twinklr.core.io.models import AbsolutePath, WriteResult
-from twinklr.core.io.sync_adapter import SyncAdapter
 
 
 class NullFileSystem:
@@ -63,15 +62,3 @@ class NullFileSystem:
 
     async def rmdir(self, path: AbsolutePath, recursive: bool = False) -> None:
         """No-op (async)."""
-
-
-class NullFileSystemSync(SyncAdapter):
-    """Synchronous wrapper around NullFileSystem.
-
-    Delegates all method calls to a NullFileSystem instance via SyncAdapter.
-    Maintains full backward compatibility: class name and public API are unchanged.
-    """
-
-    def __init__(self) -> None:
-        """Initialize with a NullFileSystem instance."""
-        super().__init__(NullFileSystem())

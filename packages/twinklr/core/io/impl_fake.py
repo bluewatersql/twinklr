@@ -138,7 +138,7 @@ class FakeFileSystemSync:
     Synchronous wrapper around FakeFileSystem.
 
     Since fake operations are instant, this is a thin wrapper
-    using asyncio.run() for consistency with RealFileSystemSync.
+    using asyncio.run(). It exists only as a lightweight test helper.
     """
 
     def __init__(self) -> None:

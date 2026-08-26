@@ -11,7 +11,6 @@ from pydantic import BaseModel, ValidationError
 
 from twinklr.core.caching.models import CacheKey, CacheMeta
 from twinklr.core.io import AbsolutePath, FileSystem
-from twinklr.core.io.sync_adapter import SyncAdapter
 from twinklr.core.io.utils import sanitize_path_component
 
 T = TypeVar("T", bound=BaseModel)
@@ -231,29 +230,3 @@ class FSCache:
         entry_dir = self._entry_dir(key)
         if await self.fs.exists(entry_dir):
             await self.fs.rmdir(entry_dir, recursive=True)
-
-
-class FSCacheSync(SyncAdapter):
-    """Synchronous wrapper around FSCache.
-
-    Delegates all method calls to an FSCache instance via SyncAdapter.
-    Uses asyncio.run() to execute async operations in blocking mode.
-    Cache initializes lazily on first use.
-    TTL is configured at initialization time.
-    Maintains full backward compatibility: class name and public API are unchanged.
-    """
-
-    def __init__(
-        self,
-        fs: FileSystem,
-        root: AbsolutePath,
-        ttl_seconds: float | None = None,
-    ) -> None:
-        """Initialize sync cache wrapper.
-
-        Args:
-            fs: Async filesystem implementation
-            root: Absolute path to cache root directory
-            ttl_seconds: Optional TTL in seconds for cache expiration
-        """
-        super().__init__(FSCache(fs, root, ttl_seconds))

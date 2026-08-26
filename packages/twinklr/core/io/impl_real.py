@@ -15,7 +15,6 @@ import aiofiles
 import aiofiles.os
 
 from twinklr.core.io.models import AbsolutePath, WriteResult
-from twinklr.core.io.sync_adapter import SyncAdapter
 
 
 class RealFileSystem:
@@ -130,17 +129,3 @@ class RealFileSystem:
             await loop.run_in_executor(None, shutil.rmtree, str(path))
         else:
             await aiofiles.os.rmdir(path)
-
-
-class RealFileSystemSync(SyncAdapter):
-    """Synchronous wrapper around RealFileSystem.
-
-    Delegates all method calls to a RealFileSystem instance via SyncAdapter.
-    Uses asyncio.run() to execute async operations in blocking mode.
-    Suitable for simple scripts, tests, and non-async contexts.
-    Maintains full backward compatibility: class name and public API are unchanged.
-    """
-
-    def __init__(self) -> None:
-        """Initialize with a RealFileSystem instance."""
-        super().__init__(RealFileSystem())

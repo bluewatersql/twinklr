@@ -53,19 +53,3 @@ class CacheMeta(BaseModel):
     ttl_seconds: float | None = Field(
         default=None, description="TTL in seconds (for expiration checking)"
     )
-
-
-class CacheOptions(BaseModel):
-    """
-    Per-call cache behavior configuration.
-    """
-
-    enabled: bool = Field(default=True, description="Global cache toggle for this call")
-    force: bool = Field(
-        default=False,
-        description="Ignore cache and recompute (still stores if enabled)",
-    )
-    ttl_seconds: float | None = Field(
-        default=None,
-        description="Optional TTL (rarely needed for deterministic steps)",
-    )

@@ -160,7 +160,6 @@ module = [
     "twinklr.core.feature_store.*",
     "twinklr.core.feature_engineering.*",
     "twinklr.core.agents.providers.anthropic",
-    "twinklr.core.io.sync_adapter",
 ]
 disallow_untyped_defs = true
 disallow_incomplete_defs = true

@@ -1,6 +1,6 @@
 """Filesystem abstraction layer for Twinklr.
 
-Provides safe, testable, async-first filesystem operations with sync convenience wrappers.
+Provides safe, testable, async-first filesystem operations.
 
 Example (async):
     >>> from twinklr.core.io import RealFileSystem, absolute_path
@@ -9,17 +9,11 @@ Example (async):
     >>> await fs.write_text(path, "Hello, world!")
     >>> content = await fs.read_text(path)
 
-Example (sync):
-    >>> from twinklr.core.io import RealFileSystemSync, absolute_path
-    >>> fs = RealFileSystemSync()
-    >>> path = fs.join(absolute_path("/tmp"), "cache", "test.txt")
-    >>> fs.write_text(path, "Hello, world!")
-    >>> content = fs.read_text(path)
 """
 
 from twinklr.core.io.impl_fake import FakeFileSystem, FakeFileSystemSync
-from twinklr.core.io.impl_null import NullFileSystem, NullFileSystemSync
-from twinklr.core.io.impl_real import RealFileSystem, RealFileSystemSync
+from twinklr.core.io.impl_null import NullFileSystem
+from twinklr.core.io.impl_real import RealFileSystem
 from twinklr.core.io.models import (
     AbsolutePath,
     RelativePath,
@@ -40,11 +34,8 @@ __all__ = [
     "FileSystem",
     "FileSystemSync",
     "NullFileSystem",
-    "NullFileSystemSync",
     # Async implementations
     "RealFileSystem",
-    # Sync wrappers
-    "RealFileSystemSync",
     "RelativePath",
     # Result types
     "WriteResult",

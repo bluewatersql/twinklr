@@ -13,7 +13,7 @@ Key features:
 - Graceful error handling
 """
 
-from twinklr.core.caching.backends.fs import FSCache, FSCacheSync
+from twinklr.core.caching.backends.fs import FSCache
 from twinklr.core.caching.backends.null import NullCache, NullCacheSync
 from twinklr.core.caching.fingerprint import compute_fingerprint
 from twinklr.core.caching.identity import (
@@ -21,7 +21,7 @@ from twinklr.core.caching.identity import (
     derive_session_id,
     hash_file_content,
 )
-from twinklr.core.caching.models import CacheKey, CacheMeta, CacheOptions
+from twinklr.core.caching.models import CacheKey, CacheMeta
 from twinklr.core.caching.protocols import Cache, CacheSync
 
 __all__ = [
@@ -29,11 +29,9 @@ __all__ = [
     "Cache",
     "CacheKey",
     "CacheMeta",
-    "CacheOptions",
     "CacheSync",
     # Backends
     "FSCache",
-    "FSCacheSync",
     "NullCache",
     "NullCacheSync",
     # Utils

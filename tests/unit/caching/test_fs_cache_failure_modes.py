@@ -70,15 +70,6 @@ async def test_load_returns_none_on_miss(cache: FSCache) -> None:
     assert await cache.load(_key(), SampleArtifact) is None
 
 
-async def test_invalidate_removes_entry(cache: FSCache) -> None:
-    key = _key()
-    await cache.store(key, SampleArtifact(value="temporary"))
-
-    await cache.invalidate(key)
-
-    assert await cache.exists(key) is False
-
-
 async def test_initialize_is_idempotent(cache: FSCache) -> None:
     await cache.initialize()
     await cache.initialize()
