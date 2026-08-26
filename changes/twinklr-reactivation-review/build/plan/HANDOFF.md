@@ -1,8 +1,11 @@
 # Build-campaign handoff — current execution state
 
 _Last updated: 2026-08-26 after all eight Phase 3 offline task implementations and
-P4-T1 through P4-T6 were independently verified and integrated; P4-T7's repository-only
-preflight is independently approved and integrated, while P4-T7 itself remains NO-GO.
+P4-T1 through P4-T6 were independently verified and integrated. P2K-T2's offline
+owner-run readiness remediation was independently approved on the Standards and Spec
+axes and integrated at `03b75e9`; its empirical owner-corpus exits remain open. P4-T7's
+repository-only preflight is independently approved and integrated, while P4-T7 itself
+remains optional, incomplete, and NO-GO.
 P3-T6 empirical xLights GUI acceptance remains
 open, with all GUI dates/checks deferred until a meaningful end-to-end show is fully
 working.
@@ -36,9 +39,9 @@ their authoring moment; this handoff owns the current campaign status.
 | 1K — Knowledge edges | **COMPLETE** (5/5) | Completion record in [03-phase-1k-knowledge-edges.md](03-phase-1k-knowledge-edges.md) |
 | 1P — Render truth | **IMPLEMENTATION MERGED AND VERIFIED** (12/12); **phase exit not complete** | The recorded human judgment and empirical xLights acceptance evidence remain pending; see [02-phase-1p-render-truth.md](02-phase-1p-render-truth.md). |
 | 2P — Creative quality | **OFFLINE IMPLEMENTATION MERGED AND VERIFIED** (13/13); **phase exit not complete** | The owner accepted T1/T8/T9 on 2026-08-16. T6 calibration/live evidence, T13/D1 evidence, and other live checks remain pending; see [04-phase-2p-creative-quality.md](04-phase-2p-creative-quality.md). |
-| 2K — Catalog growth | **TOOLING IMPLEMENTATION MERGED AND VERIFIED** (4/4); **phase exit not complete** | Tooling is ready, but coverage/corpus/curation/style exit criteria require the author's real layout, corpus, preferences, and judgments; see [05-phase-2k-catalog-growth.md](05-phase-2k-catalog-growth.md). |
+| 2K — Catalog growth | **TOOLING IMPLEMENTATION MERGED AND VERIFIED** (4/4); **phase exit not complete** | P2K-T2's Standards+Spec-approved offline owner-run readiness contract is integrated at `03b75e9`. The real owner-corpus run, unchanged-corpus idempotent rerun evidence, non-empty distributions, and exactly eight owner decisions remain open; see [05-phase-2k-catalog-growth.md](05-phase-2k-catalog-growth.md). |
 | 3 — Show convergence | **P3-T1–P3-T8 OFFLINE IMPLEMENTATIONS MERGED** (8/8 integrated); **EMPIRICAL EXITS OPEN** | P3-T7 is integrated at `70b3305`; its one-shot image proof passed with one request, zero retry, zero-call cache replay, and `$0.00622` measured cost. P3-T6 is integrated at `c9620db`; its xLights gate remains deferred. P3-T8 is integrated at `82438cf`; preview/live-judge/human/calibration/real-record evidence remains deferred. P3-T4 exhausted two failed audited attempts, `$3.320000` is committed, no third is authorized, and live acceptance remains open. Earlier commits: P3-T5 `f006468`; P3-T4 `558153c`; P3-T3 `33cce57`; P3-T2 `5365f70`; P3-T1 `5eebcb2`. |
-| 4 — Compounding | **IMPLEMENTATION IN PROGRESS** (6/7 integrated) | P4-T1 is integrated at `56d9aa0`; P4-T2 is integrated through `3765bd9`/`40e8e55`; P4-T3 through P4-T5 are integrated at `bf6bba5`, `3e7f679`, and `05f24d0`; P4-T6 is independently verified and integrated at `da8f19d`. P4-T2's real Ollama smoke remains unclaimed pending explicit local opt-in. P4-T7's independently approved repository-only preflight is integrated at `c79566e`, but full execution remains NO-GO/deferred on P2K-T2's owner-corpus empirical exits and an accessible, provenance-bearing MH corpus manifest. The preflight is not P4-T7 completion or a feasibility verdict. Exact records: [P4-T2](../specs/phase-4-compounding/P4-T2-local-provider-option.md), [P4-T3](../specs/phase-4-compounding/P4-T3-dead-tail-retirement-wave-1.md), [P4-T4](../specs/phase-4-compounding/P4-T4-duplication-collapse.md), [P4-T5](../specs/phase-4-compounding/P4-T5-dead-config-final-sweep.md), [P4-T6](../specs/phase-4-compounding/P4-T6-documentation-truth-pass.md), and [P4-T7](../specs/phase-4-compounding/P4-T7-mh-idiom-mining-exploration.md). |
+| 4 — Compounding | **IMPLEMENTATION IN PROGRESS** (6/7 integrated) | P4-T1 is integrated at `56d9aa0`; P4-T2 is integrated through `3765bd9`/`40e8e55`; P4-T3 through P4-T5 are integrated at `bf6bba5`, `3e7f679`, and `05f24d0`; P4-T6 is independently verified and integrated at `da8f19d`. P4-T2's real Ollama smoke remains unclaimed pending explicit local opt-in. P4-T7's independently approved repository-only preflight is integrated at `c79566e`, but full execution remains optional, incomplete, and NO-GO/deferred pending accepted P2K-T2 owner-corpus evidence and an accepted, sufficient private MH corpus manifest. The preflight is not P4-T7 completion or a feasibility verdict. Exact records: [P4-T2](../specs/phase-4-compounding/P4-T2-local-provider-option.md), [P4-T3](../specs/phase-4-compounding/P4-T3-dead-tail-retirement-wave-1.md), [P4-T4](../specs/phase-4-compounding/P4-T4-duplication-collapse.md), [P4-T5](../specs/phase-4-compounding/P4-T5-dead-config-final-sweep.md), [P4-T6](../specs/phase-4-compounding/P4-T6-documentation-truth-pass.md), and [P4-T7](../specs/phase-4-compounding/P4-T7-mh-idiom-mining-exploration.md). |
 
 The overall `twinklr-reactivation-review` change remains **ACTIVE**. Finishing an
 offline implementation lane is not the same as satisfying its phase exit criteria.
@@ -306,7 +309,7 @@ verified remediation is integrated at `bf6bba5`. P4-T4 is independently verified
 integrated at `3e7f679`; P4-T5 is independently verified and integrated at `05f24d0`;
 and P4-T6 is independently verified and integrated at `da8f19d`, bringing Phase 4 to
 six of seven tasks integrated. P4-T7 full execution is NO-GO/deferred pending P2K-T2's
-owner-corpus empirical exits and an accessible, provenance-bearing moving-head corpus
+owner-corpus empirical exits and an accepted, sufficient private moving-head corpus
 manifest. Its independently approved repository-only preflight is integrated at
 `c79566e`; the preflight is not completion and makes no feasibility verdict. P4-T2's
 real Ollama schema smoke remains unclaimed pending explicit local opt-in. Optional
@@ -426,9 +429,14 @@ distribution, MH, and owner-command integration suites; changed-document relativ
 with formatting unchanged across `1361` files, Ruff clean, mypy clean across `721` source
 files, and `5637 passed, 39 skipped` with 43 resource warnings. The disposable worktree's
 undeclared optional Anthropic extra was removed before this gate so it matched the declared
-development environment; no provider source was changed. The rebased replacement is not
-self-approved or integrated, and none of the owner-data empirical exits were executed or
-claimed.
+development environment; no provider source was changed. Independent Standards and Spec
+review approved the rebased replacement, including the superseding
+exactly-eight-decision clarification, and it was fast-forward integrated on `main` at
+`03b75e9`. None of the owner-data empirical exits were executed or claimed: the real
+owner-corpus run, unchanged-corpus idempotent rerun evidence, non-empty distributions,
+and exactly eight owner decisions remain open. P4-T7 remains optional, incomplete, and
+NO-GO pending accepted P2K evidence plus an accepted, sufficient private MH corpus
+manifest.
 
 ## Binding orchestration rules
 

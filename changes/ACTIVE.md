@@ -68,10 +68,12 @@ _Last updated: 2026-08-26._
   local opt-in. P4-T7's independently approved repository-only preflight is integrated
   at `c79566e`; it corrects the unsupported vendor-history premise and records the exact
   corpus-gated re-entry and isolated-offline boundaries. P4-T7 full execution remains
-  NO-GO/deferred because its P2K-T2 owner-corpus empirical exits remain open and no
-  accessible, provenance-bearing moving-head corpus manifest exists. The integrated
-  preflight is not P4-T7 completion and makes no feasibility verdict; Phase 4 remains
-  six of seven tasks integrated and no Phase 4 completion is claimed.
+  NO-GO/deferred. P2K-T2's independently Standards- and Spec-approved offline-readiness
+  hardening is integrated at `03b75e9`, but its real owner-corpus run, unchanged-corpus
+  idempotent rerun evidence, non-empty distributions, and exactly eight owner decisions
+  remain open; no accepted, sufficient private moving-head corpus manifest exists. The
+  integrated preflight is not P4-T7 completion and makes no feasibility verdict; Phase
+  4 remains six of seven tasks integrated and no Phase 4 completion is claimed.
   Optional WhisperX runtime audio execution remains owner-deferred against the current
   default FFmpeg 9; see the
   [active task spec](twinklr-reactivation-review/build/specs/phase-4-compounding/P4-T1-ml-chain-python-bump.md).

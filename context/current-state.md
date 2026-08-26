@@ -77,9 +77,10 @@ See [product/overview.md](product/overview.md).
 
 ## Quality-gate state
 
-The latest accepted integrated baseline is main `da8f19d`: `make validate` formatted
-**1,355 files**, completed with **5,601 passed, 39 skipped** at **89% coverage**, clean
-Ruff lint, and mypy success across **719 source files** after P4-T6 integration.
+The latest accepted integrated baseline is main `03b75e9`: exact-tip `make validate`
+left **1,361 files** unchanged, completed with **5,637 passed, 39 skipped** and 43
+resource warnings at **89% coverage**, clean Ruff lint, and mypy success across **721
+source files** after P2K-T2 offline-readiness integration.
 The skips cover explicit optional/local-only boundaries rather than accepted
 implementation regressions. Exact task contracts and durable verification evidence are
 owned by the [P4-T1](../changes/twinklr-reactivation-review/build/specs/phase-4-compounding/P4-T1-ml-chain-python-bump.md),
@@ -163,8 +164,12 @@ truth pass is integrated at `da8f19d`. P4-T7's independently approved repository
 preflight is integrated at `c79566e`; it corrects the unsupported vendor-history premise
 and records the exact corpus-gated re-entry contract and isolated offline plan. P4-T7
 full execution remains a current **NO-GO** and is deferred: its P2K-T2 dependency still
-lacks the owner-corpus empirical run and threshold-decision exits, and no accessible,
-provenance-bearing moving-head corpus manifest exists to ground the optional spike. The
+lacks the owner-corpus empirical run, unchanged-corpus idempotent rerun evidence,
+non-empty distributions, and exactly eight owner threshold decisions, and no accepted,
+sufficient private moving-head corpus manifest exists to ground the optional spike.
+P2K-T2's independently Standards- and Spec-approved offline-readiness hardening is
+integrated at `03b75e9`; it supplies strict evidence and combined P2K/MH re-entry
+contracts, not those empirical outcomes. The
 integrated preflight is not P4-T7 completion and makes no feasibility verdict. Phase 4
 therefore remains six of seven tasks integrated. Under the owner override, optional
 WhisperX/TorchCodec runtime execution remains deferred and unavailable against the

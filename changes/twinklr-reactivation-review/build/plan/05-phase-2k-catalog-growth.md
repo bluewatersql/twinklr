@@ -44,3 +44,15 @@ their outcomes. Phase exit still requires zero layout coverage gaps, an idempote
 corpus run plus owner-authored threshold decision log, live generation/admission
 sessions, and owner-declared style fingerprints with refreshed propensity verified in
 the planner path. None of those taste- or private-data-bearing results is claimed here.
+
+## P2K-T2 offline-readiness hardening — 2026-08-26
+
+Independent Standards and Spec review approved the strict offline-readiness remediation,
+and it is integrated at `03b75e9`. The integration adds fail-closed owner-run path safety,
+typed provenance/evidence contracts, exact staged-artifact and decision bindings, the
+exactly-eight-entry `OWNER_DECISIONS.json` contract, and a redacted combined P2K/MH
+re-entry binding. It accessed no owner corpus or private MH data and does not satisfy an
+empirical exit.
+
+P2K-T2 remains open for the real owner-corpus run, the unchanged-corpus idempotent rerun
+evidence, non-empty empirical distributions, and exactly eight completed owner decisions.

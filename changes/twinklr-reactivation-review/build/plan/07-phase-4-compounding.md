@@ -14,7 +14,7 @@ integrated through `3765bd9`/`40e8e55`, but its real Ollama schema smoke remains
 unclaimed pending explicit local opt-in. P4-T3 is integrated at `bf6bba5`, P4-T4 at
 `3e7f679`, P4-T5 at `05f24d0`, and P4-T6 at `da8f19d`. P4-T7 full execution is
 NO-GO/deferred on its unsatisfied P2K-T2 empirical dependency and the absence of an
-accessible, provenance-bearing moving-head corpus manifest. Its independently approved
+accepted, sufficient private moving-head corpus manifest. Its independently approved
 repository-only preflight is integrated at `c79566e`; that preflight is not task
 completion and makes no feasibility verdict. Phase exit is not declared. Exact
 task evidence remains single-owned by the
@@ -35,7 +35,7 @@ task evidence remains single-owned by the
 | P4-T4 | Duplication collapse | One OpenAI client + one retry policy (SDK `max_retries` explicit — kills the ≤9-requests amplification); one `configure_logging` (wire or delete `AppConfig.logging`); conversation-store eviction; httpx client lifecycle (aclose); scipy/penalty triplication collapse. | CC-6, P3-M-F/M-H, P2-M10/F21/F23 | P2P merged | sonnet | opus |
 | P4-T5 | Dead-config final sweep | Every remaining CC-1 member is wired-with-a-behavior-test or deleted-with-docs — no third state; acceptance = a generated knob-inventory test asserting every documented config key has an observable effect. | CC-1, RM-1.5 | P1P/P2P/P3 wiring done | sonnet | opus |
 | P4-T6 | Documentation truth pass | User guide regenerated from wired config only; six-channel claim now true (post schema-v2) or corrected; architecture docs match the shipped loop; phantom paths removed; "dozens of hours" replaced by measured numbers from the eval harness; scripts/ triage (promote/delete per P7 table). | SF-8, P7-M2/M3, measured data | P4-T5 | sonnet | opus |
-| P4-T7 | MH-idiom mining exploration (optional) | Feasibility spike over an independently reverified, accessible DMX moving-head corpus; if propensity/idiom extraction works for MH, part 1 joins the knowledge loop. Time-boxed; outcome = a decision memo, not a feature. Current full-execution status: NO-GO/deferred on P2K-T2 empirical exits and an accessible MH corpus manifest. | M4, D5 convergence note | P2K-T2 | opus | opus |
+| P4-T7 | MH-idiom mining exploration (optional) | Feasibility spike over an independently reverified, accepted, sufficient private DMX moving-head corpus; if propensity/idiom extraction works for MH, part 1 joins the knowledge loop. Time-boxed; outcome = a decision memo, not a feature. Current full-execution status: NO-GO/deferred on P2K-T2 empirical exits and an accepted, sufficient private MH manifest. | M4, D5 convergence note | P2K-T2 | opus | opus |
 
 ## Notes for spec authors
 
@@ -65,3 +65,10 @@ records reusable seams and structural walls, and pins the exact five re-entry ar
 plus the isolated 165-minute/180-minute-capped offline plan. Approval applies only to
 that prerequisite document; P4-T7 remains optional, incomplete, corpus-gated, and
 NO-GO/deferred, with no feasibility verdict.
+
+P2K-T2's independently Standards- and Spec-approved offline-readiness hardening is
+integrated at `03b75e9`. It makes the re-entry evidence contract executable and strict;
+it does not provide the real owner-corpus run, unchanged-corpus idempotent rerun evidence,
+non-empty distributions, or exactly eight owner decisions. P4-T7 also still lacks an
+accepted, sufficient private MH manifest. Phase 4 therefore remains **6/7**, P4-T7
+remains optional/incomplete/**NO-GO**, and P4-T2's real Ollama smoke remains unclaimed.
