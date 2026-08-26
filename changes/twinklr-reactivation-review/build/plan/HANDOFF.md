@@ -412,15 +412,23 @@ same 43 resource warnings. The rejected candidate was not self-approved or integ
 The replacement remediation requires fresh independent verification after its own clean
 freeze.
 
-Replacement author implementation commit `9059ff7` remediates all six formal blockers;
-the following documentation-only commit records its freeze. Fresh adversarial evidence is
-`41 passed` across the strict evidence, output-safety, distribution, MH, and owner-command
-integration suites. The clean-tree repository gate passed with formatting unchanged across
-`1361` files, Ruff clean, mypy clean across `721` source files, and `5637 passed, 39
-skipped` with 43 resource warnings. The disposable worktree's undeclared optional
-Anthropic extra was removed before this gate so it matched the declared development
-environment; no provider source was changed. This replacement is not self-approved or
-integrated, and none of the owner-data empirical exits were executed or claimed.
+Replacement author implementation commit `9059ff7` remediated all six formal blockers;
+both independent review axes approved its documentation freeze `86e1a6b`. After approval,
+the replacement was rebased onto exact `main` base `bc7e270`; rebased implementation
+commit `9536206` preserves the approved behavior, and the following documentation-only
+commit records the new freeze. The sole logical conflict preserved all repository-preflight
+identities/history and its incomplete/NO-GO boundary while adding the approved combined
+P2K+MH evidence binding.
+
+Fresh rebased evidence is `41 passed` across the strict evidence, output-safety,
+distribution, MH, and owner-command integration suites; changed-document relative links,
+`git diff --check`, Ruff, and focused mypy are clean. The clean-tree repository gate passed
+with formatting unchanged across `1361` files, Ruff clean, mypy clean across `721` source
+files, and `5637 passed, 39 skipped` with 43 resource warnings. The disposable worktree's
+undeclared optional Anthropic extra was removed before this gate so it matched the declared
+development environment; no provider source was changed. The rebased replacement is not
+self-approved or integrated, and none of the owner-data empirical exits were executed or
+claimed.
 
 ## Binding orchestration rules
 
