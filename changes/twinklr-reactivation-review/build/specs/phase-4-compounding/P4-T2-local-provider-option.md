@@ -223,3 +223,13 @@ independent verification and makes no live/local provider call.
 TDD red evidence was explicit: before the redirect policy fix, the 307 discriminator
 observed 21 requests (one loopback request followed by repeated requests to the remote
 origin). After the fix it observes exactly one loopback request and zero remote requests.
+
+### Integration closeout — 2026-08-26
+
+Independent verification approved the redirect-hardening remediation, and the task's
+implementation history is integrated through `3765bd9` plus remediation `40e8e55`.
+The earlier rejection remains authoritative for the pre-remediation freeze; `40e8e55`
+closes that defect by failing redirects closed and standardizing the explicit opt-in.
+No provider request, model pull, or local model execution was part of this closeout.
+Real Ollama schema validity remains unclaimed until an operator explicitly runs the
+local-only smoke with `TWINKLR_RUN_LOCAL_OLLAMA_TESTS=1`.

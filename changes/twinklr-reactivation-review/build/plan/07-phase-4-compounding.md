@@ -8,6 +8,14 @@ Proposal M4; D7/D12 + recorded debt-sequencing constraints._
 breaking anything (sequencing constraints honored); user guide describes only wired
 behavior; local-provider option available.
 
+**Execution status (2026-08-26):** P4-T1, P4-T2, and P4-T3 are independently verified
+and integrated (**3/7**). P4-T2's implementation and redirect-hardening remediation are
+integrated through `3765bd9`/`40e8e55`, but its real Ollama schema smoke remains
+unclaimed pending explicit local opt-in. P4-T3 is integrated at `bf6bba5`. Phase exit is
+not satisfied; P4-T4 is next. Exact evidence remains single-owned by the
+[P4-T2](../specs/phase-4-compounding/P4-T2-local-provider-option.md) and
+[P4-T3](../specs/phase-4-compounding/P4-T3-dead-tail-retirement-wave-1.md) task specs.
+
 ## Tasks
 
 | ID | Title | What (summary) | Evidence | Deps | Executor | Verifier |

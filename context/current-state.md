@@ -7,7 +7,7 @@ updated: 2026-08-26
 # Twinklr — Current State
 
 _Repository evidence and active sequencing verified 2026-08-26. All eight Phase 3
-offline implementations and one of seven Phase 4 tasks are integrated; Phase 3 and the
+offline implementations and three of seven Phase 4 tasks are integrated; Phase 3 and the
 earlier empirical exits remain open._
 
 Twinklr is an AI-powered choreography engine: audio file in, xLights artifacts out — a
@@ -77,12 +77,15 @@ See [product/overview.md](product/overview.md).
 
 ## Quality-gate state
 
-The latest accepted integrated baseline is main `56d9aa0`: `make validate` completed
-with **5,453 passed, 38 skipped**, clean Ruff formatting/lint, and mypy success across
-**738 source files** after P4-T1 integration. The skips cover explicit optional/local-
-only boundaries rather than accepted implementation regressions. P4-T1's exact contract
-and verification evidence are owned by its
-[task spec](../changes/twinklr-reactivation-review/build/specs/phase-4-compounding/P4-T1-ml-chain-python-bump.md).
+The latest accepted integrated baseline is main `bf6bba5`: `make validate` formatted
+**1,349 files**, completed with **5,233 passed, 39 skipped** at **88% coverage**, clean
+Ruff lint, and mypy success across **722 source files** after P4-T2 and P4-T3 integration.
+The skips cover explicit optional/local-only boundaries rather than accepted
+implementation regressions. Exact task contracts and durable verification evidence are
+owned by the [P4-T1](../changes/twinklr-reactivation-review/build/specs/phase-4-compounding/P4-T1-ml-chain-python-bump.md),
+[P4-T2](../changes/twinklr-reactivation-review/build/specs/phase-4-compounding/P4-T2-local-provider-option.md),
+and [P4-T3](../changes/twinklr-reactivation-review/build/specs/phase-4-compounding/P4-T3-dead-tail-retirement-wave-1.md)
+specs.
 
 The review baseline at `aa8d325` did fail its own gates. That is historical evidence,
 not the current state; its fully classified record is preserved in
@@ -139,13 +142,19 @@ implementation now independently verifies file-backed provenance, rebuilds deter
 reports, shares provider request limits, and handles contact-sheet grounding. It is
 independently approved offline, but supplies no xLights evidence, visual-judge output,
 human judgment, calibration, real completed record, or empirical acceptance outcome.
-Phase 4 has one of seven tasks integrated. P4-T1 landed at `56d9aa0` after independent
+Phase 4 has three of seven tasks integrated. P4-T1 landed at `56d9aa0` after independent
 approval and clean-main verification; it coordinates the Python 3.13/ML-chain
-modernization and removes the orphaned diarization and unused dependency surfaces. Under
-the owner override, optional WhisperX/TorchCodec runtime execution remains deferred and
-unavailable against the current default FFmpeg 9. The exact contract and verification
-evidence live only in the
-[P4-T1 task spec](../changes/twinklr-reactivation-review/build/specs/phase-4-compounding/P4-T1-ml-chain-python-bump.md).
+modernization and removes the orphaned diarization and unused dependency surfaces. P4-T2
+is integrated through implementation `3765bd9` and redirect-hardening remediation
+`40e8e55`; its offline provider path is verified, but real Ollama schema validity remains
+unclaimed pending the explicit local-only opt-in smoke. P4-T3's independently verified
+dead-tail retirement is integrated at `bf6bba5`, with migration/unwiring sequencing and
+live-caller retentions preserved. Under the owner override, optional WhisperX/TorchCodec
+runtime execution remains deferred and unavailable against the current default FFmpeg 9.
+Exact contracts and verification evidence live in the [P4-T1](../changes/twinklr-reactivation-review/build/specs/phase-4-compounding/P4-T1-ml-chain-python-bump.md),
+[P4-T2](../changes/twinklr-reactivation-review/build/specs/phase-4-compounding/P4-T2-local-provider-option.md),
+and [P4-T3](../changes/twinklr-reactivation-review/build/specs/phase-4-compounding/P4-T3-dead-tail-retirement-wave-1.md)
+task specs.
 
 The authoritative current task/gate list is the campaign
 [HANDOFF.md](../changes/twinklr-reactivation-review/build/plan/HANDOFF.md). Most notably,

@@ -362,3 +362,11 @@ audited probe hashes the complete prompt pack, its offline expected prompt ident
 refreshed to `47dbc1d79c38ea2f23d5d2a5d3368aefc0be51fb142dcf9e3c707abd97b500b9`;
 this does not reopen the exhausted live-attempt cap. This remediation does not expand
 scope; the candidate remains pending fresh independent verification.
+
+### Integration closeout — 2026-08-26
+
+Fresh independent verification approved the remediation and its tracked-script/import
+audit. The ordered retirement, retained live surfaces, and remediation are integrated on
+main at `bf6bba5`. The historical `282ed6d` rejection remains authoritative evidence for
+the stale demo import; the integrated state includes its tested repair and the associated
+documentation-truth fixes.
