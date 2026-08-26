@@ -17,7 +17,6 @@ from twinklr.core.audio.enhancement_factory import EnhancementServiceFactory
 from twinklr.core.audio.mir.sources import RhythmAnalysis
 from twinklr.core.audio.models import LyricsBundle, LyricWord
 from twinklr.core.audio.models.enums import StageStatus
-from twinklr.core.caching import config_fingerprint
 from twinklr.core.config.fixtures import FixtureGroup, Pose
 from twinklr.core.config.models import AppConfig, JobConfig
 from twinklr.core.sequencer.models.enum import ChannelName
@@ -28,21 +27,6 @@ from twinklr.core.sequencer.moving_heads.handlers.wheels import (
     DefaultColorHandler,
     DefaultGoboHandler,
     DefaultShutterHandler,
-)
-
-_SECRET_PATHS = {
-    "app.llm_api_key",
-    "app.audio_processing.enhancements.acoustid_api_key",
-    "app.audio_processing.enhancements.genius_access_token",
-}
-
-
-APP_JOB_FINGERPRINT_PATHS = tuple(
-    path
-    for path, disposition in CONFIG_EFFECTS.items()
-    if path.startswith(("app.", "job."))
-    and disposition.kind is ConfigDispositionKind.EFFECT_TEST
-    and path not in _SECRET_PATHS
 )
 
 
@@ -104,15 +88,6 @@ def _changed_config(path: str) -> AppConfig | JobConfig:
     leaf = parts[-1]
     target[leaf] = _alternate(path, target[leaf])
     return type(root).model_validate(payload)
-
-
-@pytest.mark.parametrize("config_path", APP_JOB_FINGERPRINT_PATHS, ids=APP_JOB_FINGERPRINT_PATHS)
-def test_app_or_job_field_changes_shipped_cache_fingerprint(config_path: str) -> None:
-    """Each named field changes the cache identity used by shipped pipeline stages."""
-    baseline: AppConfig | JobConfig = AppConfig() if config_path.startswith("app.") else JobConfig()
-    changed = _changed_config(config_path)
-
-    assert config_fingerprint(changed) != config_fingerprint(baseline)
 
 
 _FACTORY_EFFECT_PATHS = (

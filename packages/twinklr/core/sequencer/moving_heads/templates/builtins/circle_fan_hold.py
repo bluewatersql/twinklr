@@ -90,7 +90,7 @@ def make_template() -> TemplateDoc:
                 step_patches={
                     "main": StepPatch(
                         movement={"intensity": "SMOOTH", "cycles": 0.5},
-                        dimmer={"dimmer_type": "pulse", "cycles": 1.0},
+                        dimmer={"dimmer_type": "pulse"},
                     ),
                 },
             ),
@@ -100,7 +100,7 @@ def make_template() -> TemplateDoc:
                 step_patches={
                     "main": StepPatch(
                         movement={"intensity": "INTENSE", "cycles": 2.0},
-                        dimmer={"dimmer_type": "pulse", "cycles": 4.0},
+                        dimmer={"dimmer_type": "pulse"},
                     ),
                 },
             ),

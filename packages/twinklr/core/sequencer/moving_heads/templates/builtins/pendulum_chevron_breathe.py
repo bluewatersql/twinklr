@@ -111,7 +111,7 @@ def make_template() -> TemplateDoc:
                 step_patches={
                     "main": StepPatch(
                         movement={"intensity": "DRAMATIC", "cycles": 2.0},
-                        dimmer={"min_norm": 0.10, "max_norm": 1.00, "cycles": 2.0},
+                        dimmer={"min_norm": 0.10, "max_norm": 1.00},
                     ),
                 },
             ),

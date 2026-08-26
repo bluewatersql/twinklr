@@ -97,7 +97,7 @@ def make_template() -> TemplateDoc:
                 name="Gentle",
                 step_patches={
                     "main": StepPatch(
-                        dimmer={"cycles": 2.0, "intensity": "SMOOTH", "min_norm": 0.30},
+                        dimmer={"intensity": "SMOOTH", "min_norm": 0.30},
                     ),
                 },
             ),
@@ -106,7 +106,7 @@ def make_template() -> TemplateDoc:
                 name="Intense",
                 step_patches={
                     "main": StepPatch(
-                        dimmer={"cycles": 8.0, "intensity": "INTENSE", "min_norm": 0.05},
+                        dimmer={"intensity": "INTENSE", "min_norm": 0.05},
                     ),
                 },
             ),

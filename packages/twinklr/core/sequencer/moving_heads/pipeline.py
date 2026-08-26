@@ -74,6 +74,11 @@ palette role, including PRIMARY, remains an actionable renderer request.
 """
 
 
+def _log_applied_preset_name(name: str) -> None:
+    """Emit the selected preset's user-facing name through the shipped renderer logger."""
+    logger.debug("Applying preset: %s", name)
+
+
 def _compute_section_duration_ms(start_bar: int, end_bar: int, beat_grid: BeatGrid) -> int:
     """Compute the duration of a section in milliseconds.
 
@@ -223,7 +228,7 @@ class RenderingPipeline:
                     preset = next(
                         p for p in template_doc.presets if p.preset_id == section.preset_id
                     )
-                    logger.debug(f"Applying preset: {preset.name}")
+                    _log_applied_preset_name(preset.name)
                 except StopIteration:
                     # Preset not found - try to infer intensity from preset_id
                     from twinklr.core.sequencer.models.template import StepPatch, TemplatePreset

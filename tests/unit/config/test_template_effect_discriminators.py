@@ -47,6 +47,7 @@ from twinklr.core.sequencer.moving_heads.libraries.geometry import GeometryType
 from twinklr.core.sequencer.moving_heads.libraries.gobo import GoboPattern
 from twinklr.core.sequencer.moving_heads.libraries.movement import MovementType
 from twinklr.core.sequencer.moving_heads.libraries.shutter import ShutterPattern
+from twinklr.core.sequencer.moving_heads.pipeline import _log_applied_preset_name
 from twinklr.core.sequencer.moving_heads.templates.library import TemplateRegistry
 from twinklr.core.sequencer.timing.beat_grid import BeatGrid
 
@@ -474,16 +475,11 @@ def test_template_preset_name_changes_shipped_pipeline_log(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     """The human-facing preset name is retained only because the renderer logs it."""
-    # The pipeline's preset-selection branch emits the selected name.  Pin the
-    # exact data dependency without making a provider call.
+    # Exercise the same shipped helper called by the preset-selection branch.
     baseline = _rich_doc().presets[0]
     changed = baseline.model_copy(update={"name": "Changed Preset"})
     with caplog.at_level("DEBUG"):
-        import logging
-
-        logging.getLogger("twinklr.core.sequencer.moving_heads.pipeline").debug(
-            "Applying preset: %s", changed.name
-        )
+        _log_applied_preset_name(changed.name)
 
     assert baseline.name not in caplog.text
     assert changed.name in caplog.text
