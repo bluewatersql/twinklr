@@ -176,3 +176,29 @@ Mitigation: the LOCAL-ONLY smoke test is the acceptance gate for this specific r
 if it fails, the task's exit is "documented gap + fallback path exists," not "silently
 ship a broken local mode." Do not claim local-provider support works end-to-end
 without having actually run the smoke test at least once.
+
+## Implementation handoff — 2026-08-26 candidate
+
+Re-audit found that Ollama now documents a non-stateful `/v1/responses` endpoint (added
+in v0.13.3), but its supported Responses fields still omit structured `text.format`.
+Its `/v1/chat/completions` compatibility surface explicitly supports
+`response_format`, so the accepted capability-based Chat Completions route remains the
+documented choice rather than a provider-name special case.
+
+The offline candidate adds an `OllamaProvider` with explicit capabilities, an internal
+ignored `ollama` SDK credential, loopback-only base-URL validation, and a distinct Chat
+Completions response-format wrapper derived from the same normalized Pydantic schema as
+the cloud Responses wrapper. `AsyncAgentRunner` forwards strict schemas, the bounded
+provider-attempt policy, and logical schema repair based on capabilities. OpenAI cloud
+retains `/v1/responses`; run/display/show credential gates now inspect loaded provider
+configuration instead of hard-coding `OPENAI_API_KEY` before configuration is read.
+
+MockTransport coverage pins exact endpoint and body shape, cloud non-regression,
+schema/hash metadata, usage/finish handling, local credential semantics, loopback
+rejection, assistant-safe conversation windows, one-transport-request truncation, the
+runner's bounded Pydantic repair, and pre-transport vision rejection. The `local_only`
+`MacroPlan` smoke requires `TWINKLR_OLLAMA_SMOKE=1`, an explicitly named already-pulled
+model, one provider attempt, no schema repair, no fallback, and a 60-second timeout. No
+provider/network call, model installation, or model pull was made while building this
+candidate. Real local schema validity therefore remains unclaimed pending the explicit
+operator smoke.

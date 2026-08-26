@@ -184,6 +184,37 @@ async def test_omitted_app_config_uses_loader_defaults(
     loader.assert_called_once_with(None)
 
 
+@pytest.mark.asyncio
+async def test_local_provider_reaches_display_wiring_without_openai_key(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    local_config = AppConfig(
+        llm_provider="ollama",
+        llm_base_url="http://127.0.0.1:11434/v1",
+        llm_api_key="",
+    )
+    with (
+        patch("twinklr.cli.display_cmd.load_app_config", return_value=local_config),
+        patch("twinklr.cli.display_cmd.load_job_config", return_value=JobConfig()),
+        patch(
+            "twinklr.cli.display_cmd.prepare_display_pipeline",
+            side_effect=ValueError("stop after provider preflight"),
+        ) as prepare,
+    ):
+        exit_code = await run_display_pipeline_async(
+            audio_path=tmp_path / "song.wav",
+            layout_path=tmp_path / "layout.xml",
+            output_dir=tmp_path / "out",
+            app_config_path=None,
+            job_config_path=tmp_path / "job.json",
+        )
+
+    assert exit_code == 1
+    prepare.assert_called_once()
+
+
 def test_export_failure_is_not_silenced(tmp_path: Path) -> None:
     sequence = build_fresh_sequence(media_file="song.wav", duration_ms=1000)
     render_result = RenderResult(render_plan=RenderPlan(render_id="fixture", duration_ms=1000))

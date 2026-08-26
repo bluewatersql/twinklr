@@ -8,6 +8,7 @@ import pytest
 
 from twinklr.cli.main import build_arg_parser
 from twinklr.cli.show_cmd import run_show_command, run_show_pipeline_async
+from twinklr.core.config.models import AppConfig, JobConfig
 from twinklr.core.feature_engineering.loader import FEArtifactBundle
 
 
@@ -37,6 +38,41 @@ def test_show_command_requires_layout_and_fixture_config() -> None:
     assert args.config == "job.json"
     assert args.fe_output_dir == "fe"
     assert args.style == "bright"
+
+
+@pytest.mark.asyncio
+async def test_local_provider_reaches_show_wiring_without_openai_key(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    local_config = AppConfig(
+        llm_provider="ollama",
+        llm_base_url="http://127.0.0.1:11434/v1",
+        llm_api_key="",
+    )
+    with (
+        patch("twinklr.cli.show_cmd.load_app_config", return_value=local_config),
+        patch("twinklr.cli.show_cmd.load_job_config", return_value=JobConfig()),
+        patch("twinklr.cli.show_cmd.load_fixture_group"),
+        patch("twinklr.cli.show_cmd.load_builtin_templates"),
+        patch("twinklr.cli.show_cmd.list_templates", return_value=[]),
+        patch(
+            "twinklr.cli.show_cmd.prepare_combined_show_pipeline",
+            side_effect=ValueError("stop after provider preflight"),
+        ) as prepare,
+    ):
+        exit_code = await run_show_pipeline_async(
+            audio_path=tmp_path / "song.wav",
+            layout_path=tmp_path / "layout.xml",
+            fixture_config_path=tmp_path / "fixtures.json",
+            output_dir=tmp_path / "out",
+            app_config_path=None,
+            job_config_path=tmp_path / "job.json",
+        )
+
+    assert exit_code == 1
+    prepare.assert_called_once()
 
 
 def test_show_command_rejects_missing_fe_output_before_execution(tmp_path: Path) -> None:

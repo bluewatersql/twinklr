@@ -9,7 +9,6 @@ import argparse
 import asyncio
 import json
 import logging
-import os
 from pathlib import Path
 import sys
 from uuid import uuid4
@@ -36,6 +35,7 @@ from twinklr.cli.template_cmd import (
     run_template_export_command,
     run_template_validate_command,
 )
+from twinklr.core.agents.providers.factory import validate_llm_provider_config
 from twinklr.core.api.xlights import (
     GetModelsRequest,
     InjectionPartialError,
@@ -309,23 +309,14 @@ async def _run_pipeline_async(
     Returns:
         Exit code (0 for success, 1 for failure)
     """
-    # Check API key
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        console.print("[red]ERROR: OPENAI_API_KEY environment variable not set[/red]")
-        console.print("\nTo run Twinklr:")
-        console.print("  export OPENAI_API_KEY='your-key-here'")
-        console.print("  twinklr run --audio <file> --config <job_config>")
-        return 1
-
-    console.print("[green]✅ OpenAI API key found[/green]")
-
     # Load configuration
     console.print("[bold]Loading configuration...[/bold]")
     try:
         app_config = load_app_config(app_config_path)
+        validate_llm_provider_config(app_config)
         job_config = load_job_config(job_config_path)
         console.print("[green]✅ Configuration loaded[/green]")
+        console.print(f"   Provider: {app_config.llm_provider}")
         console.print(f"   Model: {job_config.agent.plan_agent.model}")
         console.print(f"   Max iterations: {job_config.agent.max_iterations}")
     except Exception as e:

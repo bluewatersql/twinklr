@@ -14,6 +14,7 @@ from twinklr.core.agents.logging import LLMCallLogger, NullLLMCallLogger
 from twinklr.core.agents.prompts import PromptPackLoader
 from twinklr.core.agents.providers.base import (
     LLMProvider,
+    ProviderCapabilities,
     ProviderType,
     ResponseMetadata,
     TokenUsage,
@@ -653,7 +654,18 @@ class AsyncAgentRunner:
         }
         if spec.response_model is not dict:
             kwargs["response_model"] = spec.response_model
-        if self.provider.provider_type == ProviderType.OPENAI:
+        advertised_capabilities = getattr(self.provider, "capabilities", None)
+        capabilities = (
+            advertised_capabilities
+            if isinstance(advertised_capabilities, ProviderCapabilities)
+            else None
+        )
+        supports_openai_options = (
+            capabilities.supports_openai_request_options
+            if capabilities is not None
+            else self.provider.provider_type == ProviderType.OPENAI
+        )
+        if supports_openai_options:
             kwargs.update(
                 normalized_openai_generation_config(
                     model=spec.model,
@@ -663,8 +675,10 @@ class AsyncAgentRunner:
             )
             kwargs["provider_max_attempts"] = spec.provider_max_attempts
             kwargs["allow_json_object_fallback"] = spec.allow_json_object_fallback
-            if input_image_urls:
+            if input_image_urls and (capabilities is None or capabilities.supports_vision_inputs):
                 kwargs["input_image_urls"] = input_image_urls
+            elif input_image_urls:
+                raise RunError("Configured provider does not support vision image inputs")
         else:
             if spec.temperature is not None:
                 kwargs["temperature"] = spec.temperature

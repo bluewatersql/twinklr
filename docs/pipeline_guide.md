@@ -788,7 +788,6 @@ an explicitly supplied path must exist and parse successfully.
 
 ```json
 {
-  "llm_api_key": "$OPENAI_API_KEY",
   "llm_provider": "openai",
   "output_dir": "output",
   "cache_dir": ".cache",
@@ -803,6 +802,13 @@ an explicitly supplied path must exist and parse successfully.
   }
 }
 ```
+
+OpenAI reads `OPENAI_API_KEY` when `llm_api_key` is omitted. To opt into a running local
+Ollama server instead, set `llm_provider` to `"ollama"` and `llm_base_url` to a loopback
+OpenAI-compatible URL such as `http://127.0.0.1:11434/v1`; no API key is required. Set
+the local model name on the relevant `agent.*_agent.model` roles in `job_config.json`.
+Structured local calls use `/v1/chat/completions`; cloud OpenAI retains
+`/v1/responses`.
 
 ### Job Config (`job_config.json`)
 
@@ -1002,9 +1008,11 @@ None of these targets touch the feature store, profiles, or FE output.
 
 ### Sequencer Pipeline
 
-**Problem: "OPENAI_API_KEY not set"**
+**Problem: "OpenAI provider requires an API key"**
 - Export the key: `export OPENAI_API_KEY="sk-..."`
 - Or set it in your `config.json` under `llm_api_key`.
+- For a keyless local run, explicitly configure `llm_provider: "ollama"` and a loopback
+  `llm_base_url`; merely changing the base URL does not disable cloud credential checks.
 
 **Problem: Low judge scores (< 70)**
 - Increase `max_iterations` in job config to give the planner more attempts.

@@ -5,11 +5,11 @@ from __future__ import annotations
 import argparse
 import asyncio
 import logging
-import os
 from pathlib import Path
 
 from rich.console import Console
 
+from twinklr.core.agents.providers.factory import validate_llm_provider_config
 from twinklr.core.caching import derive_session_id
 from twinklr.core.config.loader import load_app_config, load_job_config
 from twinklr.core.feature_engineering.loader import FEArtifactBundle, load_fe_artifacts
@@ -93,11 +93,9 @@ async def run_display_pipeline_async(
     session_id: str | None = None,
 ) -> int:
     """Run the existing display pipeline and export its in-memory sequence."""
-    if not os.getenv("OPENAI_API_KEY"):
-        console.print("[red]ERROR: OPENAI_API_KEY environment variable not set[/red]")
-        return 1
     try:
         app_config = load_app_config(app_config_path)
+        validate_llm_provider_config(app_config)
         job_config = load_job_config(job_config_path)
         fe_bundle = load_display_fe_bundle(fe_output_dir, style_name=style_name)
         song_name = clean_audio_filename(audio_path.stem)

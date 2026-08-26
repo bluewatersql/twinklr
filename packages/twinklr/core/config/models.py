@@ -7,8 +7,9 @@ import logging
 import os
 from pathlib import Path
 from typing import Literal, Self
+from urllib.parse import urlsplit
 
-from pydantic import BaseModel, ConfigDict, Field, SecretStr
+from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator, model_validator
 
 from twinklr.core.config.poses import PoseConfig
 from twinklr.core.curves.library import CurveLibrary
@@ -556,6 +557,29 @@ class AppConfig(ConfigBase):
     llm_base_url: str = Field(
         default="https://api.openai.com/v1", description="LLM base URL to use for API calls"
     )
+
+    @field_validator("llm_provider")
+    @classmethod
+    def normalize_llm_provider(cls, value: str) -> str:
+        """Make provider selection stable while retaining factory validation."""
+        normalized = value.strip().lower()
+        if not normalized:
+            raise ValueError("llm_provider must not be empty")
+        return normalized
+
+    @model_validator(mode="after")
+    def validate_local_provider_endpoint(self) -> Self:
+        """Keep the opt-in Ollama transport on the operator's own machine."""
+        if self.llm_provider != "ollama":
+            return self
+        parsed = urlsplit(self.llm_base_url)
+        if parsed.scheme not in {"http", "https"} or parsed.hostname not in {
+            "localhost",
+            "127.0.0.1",
+            "::1",
+        }:
+            raise ValueError("Ollama llm_base_url must be an HTTP(S) loopback endpoint")
+        return self
 
     @classmethod
     def default_path(cls) -> Path:

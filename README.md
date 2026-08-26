@@ -81,7 +81,7 @@ make install
 
 # Set up environment
 cp .env.example .env
-# Edit .env and add your OPENAI_API_KEY
+# For the default cloud provider, export OPENAI_API_KEY in your shell
 ```
 
 For full audio features including WhisperX transcription:
@@ -213,8 +213,8 @@ All commits must pass:
 
 | File | Purpose |
 |---|---|
-| `.env` | API keys (`OPENAI_API_KEY` required, plus optional keys for AcoustID, Genius, HuggingFace) |
-| `config.json` | App settings — cache directories, audio processing options, logging |
+| `.env` | API keys (`OPENAI_API_KEY` for the default cloud provider, plus optional AcoustID, Genius, and HuggingFace keys) |
+| `config.json` | App settings — provider/base URL, cache directories, audio processing options, logging |
 | `job_config.json` | Job settings — agent config (iterations, model, token budget), fixture config path, checkpoints |
 | `fixture_config.json` | Moving head definitions — fixture names, DMX channels, physical positions |
 

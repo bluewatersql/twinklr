@@ -83,15 +83,17 @@ Checks that both packages are importable and the CLI responds to `--help`.
 
 ## Environment Setup
 
-### Required: OpenAI API Key
+### Provider credentials
 
-The pipeline requires an OpenAI API key for LLM agent calls:
+The default OpenAI provider requires an API key for LLM agent calls:
 
 ```bash
 export OPENAI_API_KEY='your-key-here'
 ```
 
-The CLI checks for `OPENAI_API_KEY` at startup and exits with an error if it is not set.
+The CLI validates credentials after loading `config.json`. The opt-in local Ollama
+provider does not require `OPENAI_API_KEY`; remote OpenAI and Anthropic providers still
+fail before pipeline execution when their configured key is empty.
 `.env.example` lists the variables Twinklr reads, but nothing in the codebase loads a
 `.env` file automatically — export the variable in your shell (or set it in your shell
 profile) rather than relying on a `.env` file.
@@ -102,7 +104,7 @@ _Source: `packages/twinklr/cli/main.py:158-163`_
 
 | Variable | Purpose |
 |---|---|
-| `OPENAI_API_KEY` | **Required.** LLM provider API key |
+| `OPENAI_API_KEY` | Required when `llm_provider` is `"openai"` |
 | `GENIUS_ACCESS_TOKEN` | Genius lyrics lookup (set `enable_lyrics_lookup: true` in config) |
 | `ACOUSTID_API_KEY` | AcoustID audio fingerprinting (set `enable_acoustid: true` in config) |
 | `HF_TOKEN` | HuggingFace token for WhisperX model downloads |
@@ -113,7 +115,8 @@ _Source: `packages/twinklr/cli/main.py:158-163`_
 make env-check
 ```
 
-Verifies that `uv` is installed, Python is available, and `OPENAI_API_KEY` is set in the current shell environment.
+Verifies that `uv` and Python are available. Its API-key check applies to the default
+OpenAI setup; Ollama configuration is validated when the CLI loads `config.json`.
 
 ---
 
@@ -131,7 +134,7 @@ Key fields and defaults:
 |---|---|---|
 | `output_dir` | `"artifacts"` | Base output directory |
 | `cache_dir` | `"data/audio_cache"` | Audio analysis cache |
-| `llm_provider` | `"openai"` | LLM provider name |
+| `llm_provider` | `"openai"` | LLM provider name (`"openai"`, `"anthropic"`, or opt-in `"ollama"`) |
 | `llm_base_url` | `"https://api.openai.com/v1"` | LLM API base URL |
 | `audio_processing.hop_length` | `512` | Librosa hop length |
 | `audio_processing.frame_length` | `2048` | Librosa frame length |
@@ -142,7 +145,9 @@ Key fields and defaults:
 | `audio_processing.structure_source` | `"dsp"` | Section source (`"dsp"` or isolated-runtime `"allinone"`) |
 | `logging.level` | `"INFO"` | Log level |
 
-The `llm_api_key` field is populated from the `OPENAI_API_KEY` environment variable automatically.
+The `llm_api_key` field is populated from the `OPENAI_API_KEY` environment variable
+automatically. Ollama supplies the SDK's required-but-ignored local placeholder
+internally, so no key belongs in local configuration.
 
 Minimal example:
 
@@ -152,6 +157,52 @@ Minimal example:
   "llm_provider": "openai"
 }
 ```
+
+For a running local Ollama server, use a loopback OpenAI-compatible endpoint:
+
+```json
+{
+  "llm_provider": "ollama",
+  "llm_base_url": "http://127.0.0.1:11434/v1"
+}
+```
+
+Model selection remains in the role settings in `job_config.json`; there is no inert
+app-level model override. Set each role you intend to run, for example:
+
+```json
+{
+  "agent": {
+    "plan_agent": {"model": "qwen3.5:27b"},
+    "judge_agent": {"model": "qwen3.5:27b"},
+    "profile_agent": {"model": "qwen3.5:27b"},
+    "lyrics_agent": {"model": "qwen3.5:27b"},
+    "refinement_agent": {"model": "qwen3.5:27b"}
+  }
+}
+```
+
+Local structured requests use `/v1/chat/completions` with a JSON-schema
+`response_format`; OpenAI cloud requests continue to use `/v1/responses`. Local mode is
+opt-in and limited to loopback URLs. Image/vision stages are not supported by this local
+adapter.
+
+#### Explicit local schema smoke
+
+The repository includes a `local_only` test against Twinklr's real `MacroPlan` schema.
+It does not install Ollama or pull a model. After you separately install Ollama, start it,
+and pull a model of your choice, authorize exactly one local request with:
+
+```bash
+TWINKLR_OLLAMA_SMOKE=1 \
+TWINKLR_OLLAMA_MODEL=qwen3.5:27b \
+TWINKLR_OLLAMA_BASE_URL=http://127.0.0.1:11434/v1 \
+uv run pytest tests/local_only/test_ollama_structured_outputs.py -q --no-cov
+```
+
+The smoke disables SDK retries, provider transport retries beyond the single request,
+schema repair, and JSON-object fallback. Passing it proves schema validity for that
+specific installed model; it is not a choreography-quality benchmark.
 
 ### `job_config.json` (Job Config)
 
@@ -510,9 +561,10 @@ _Source: `Makefile` targets `test-audio`, `test-audio-whisperx`, `test-audio-all
 
 ## Troubleshooting
 
-### `OPENAI_API_KEY environment variable not set`
+### OpenAI provider requires an API key
 
-Export the environment variable: `export OPENAI_API_KEY='your-key-here'`. The CLI checks for this at startup.
+For the default cloud provider, export `OPENAI_API_KEY='your-key-here'` or set
+`llm_api_key` in `config.json`. A local Ollama configuration needs neither.
 
 ### `Config file not found`
 

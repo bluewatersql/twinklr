@@ -4,12 +4,12 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import os
 from pathlib import Path
 
 from rich.console import Console
 
 from twinklr.cli.display_cmd import export_display_artifacts, load_display_fe_bundle
+from twinklr.core.agents.providers.factory import validate_llm_provider_config
 from twinklr.core.caching import derive_session_id
 from twinklr.core.config.loader import load_app_config, load_fixture_group, load_job_config
 from twinklr.core.pipeline import PipelineContext, PipelineExecutor
@@ -69,11 +69,9 @@ async def run_show_pipeline_async(
 ) -> int:
     """Run the shared-prefix DAG and export its one in-memory sequence."""
 
-    if not os.getenv("OPENAI_API_KEY"):
-        console.print("[red]ERROR: OPENAI_API_KEY environment variable not set[/red]")
-        return 1
     try:
         app_config = load_app_config(app_config_path)
+        validate_llm_provider_config(app_config)
         job_config = load_job_config(job_config_path)
         fixture_group = load_fixture_group(fixture_config_path)
         fe_bundle = load_display_fe_bundle(fe_output_dir, style_name=style_name)

@@ -17,6 +17,16 @@ class ProviderType(StrEnum):
 
     OPENAI = "openai"
     ANTHROPIC = "anthropic"
+    OLLAMA = "ollama"
+
+
+@dataclass(frozen=True)
+class ProviderCapabilities:
+    """Behavioral capabilities used for request routing."""
+
+    supports_responses_structured_output: bool = False
+    supports_openai_request_options: bool = False
+    supports_vision_inputs: bool = False
 
 
 @dataclass(frozen=True)
@@ -92,6 +102,11 @@ class LLMProvider(Protocol):
     @property
     def provider_type(self) -> ProviderType:
         """Provider type identifier."""
+        ...
+
+    @property
+    def capabilities(self) -> ProviderCapabilities:
+        """Behavioral request capabilities; callers must not route by provider name."""
         ...
 
     def generate_json(

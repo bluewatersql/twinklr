@@ -26,6 +26,7 @@ from twinklr.core.agents.providers.base import (
     ImageQuality,
     ImageSize,
     LLMResponse,
+    ProviderCapabilities,
     ProviderType,
     ResponseMetadata,
     TokenUsage,
@@ -37,10 +38,15 @@ from twinklr.core.agents.providers.errors import (
     RecoverableLLMProviderError,
     RecoverableResponseReason,
 )
-from twinklr.core.agents.schema_utils import response_schema_hash, strict_response_format
+from twinklr.core.agents.schema_utils import (
+    chat_completions_response_format,
+    response_schema_hash,
+    strict_response_format,
+)
 from twinklr.core.api.llm.openai.client import OpenAIClient
 
 if TYPE_CHECKING:
+    import httpx
     from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
@@ -90,6 +96,7 @@ class OpenAIProvider:
         session_id: str | None = None,
         timeout: float = 300.0,
         base_url: str | None = None,
+        http_client: httpx.AsyncClient | None = None,
     ):
         """Initialize OpenAI provider.
 
@@ -104,6 +111,7 @@ class OpenAIProvider:
             timeout=timeout,
             base_url=base_url,
             max_retries=SDK_MAX_RETRIES,
+            http_client=http_client,
         )
         self._sync_client = OpenAIClient(api_key=api_key, timeout=timeout)
 
@@ -121,6 +129,15 @@ class OpenAIProvider:
     def provider_type(self) -> ProviderType:
         """Provider type identifier."""
         return ProviderType.OPENAI
+
+    @property
+    def capabilities(self) -> ProviderCapabilities:
+        """OpenAI cloud uses strict structured output through Responses."""
+        return ProviderCapabilities(
+            supports_responses_structured_output=True,
+            supports_openai_request_options=True,
+            supports_vision_inputs=True,
+        )
 
     @property
     def supports_image_generation(self) -> bool:
@@ -450,11 +467,28 @@ class OpenAIProvider:
                 response_format = {"type": "json_object"}
             else:
                 response_format = strict_response_format(cast("type[BaseModel]", response_model))
-            request_params: dict[str, Any] = {
-                "model": model,
-                "input": self._attach_input_images(messages, input_image_urls),
-                "text": {"format": response_format},
-            }
+            if self.capabilities.supports_responses_structured_output:
+                request_params: dict[str, Any] = {
+                    "model": model,
+                    "input": self._attach_input_images(messages, input_image_urls),
+                    "text": {"format": response_format},
+                }
+            else:
+                if input_image_urls:
+                    raise LLMProviderError(
+                        "Configured provider does not support vision image inputs"
+                    )
+                request_params = {
+                    "model": model,
+                    "messages": messages,
+                    "response_format": (
+                        {"type": "json_object"}
+                        if response_model is None
+                        else chat_completions_response_format(
+                            cast("type[BaseModel]", response_model)
+                        )
+                    ),
+                }
 
             allowed_kwargs = {
                 key: value for key, value in kwargs.items() if key in allowed_request_kwargs
@@ -466,12 +500,23 @@ class OpenAIProvider:
                 reasoning_effort=reasoning_effort,
             )
             normalized_reasoning_effort = normalized_generation.pop("reasoning_effort", None)
-            if normalized_reasoning_effort is not None:
+            if (
+                normalized_reasoning_effort is not None
+                and self.capabilities.supports_responses_structured_output
+            ):
                 request_params["reasoning"] = {"effort": normalized_reasoning_effort}
+            elif normalized_reasoning_effort is not None:
+                request_params["reasoning_effort"] = normalized_reasoning_effort
             request_params.update(normalized_generation)
             max_tokens = allowed_kwargs.pop("max_tokens", None)
-            if max_tokens is not None and "max_output_tokens" not in allowed_kwargs:
-                allowed_kwargs["max_output_tokens"] = max_tokens
+            if max_tokens is not None:
+                token_field = (
+                    "max_output_tokens"
+                    if self.capabilities.supports_responses_structured_output
+                    else "max_tokens"
+                )
+                if token_field not in allowed_kwargs:
+                    allowed_kwargs[token_field] = max_tokens
             timeout_seconds = allowed_kwargs.pop("timeout_seconds", None)
             if timeout_seconds is not None:
                 allowed_kwargs["timeout"] = timeout_seconds
@@ -482,7 +527,7 @@ class OpenAIProvider:
             # requests for one logical call (not the former implicit 3 x 3).
             fallback_reason: str | None = None
             try:
-                response = await self._create_response_with_retries(
+                response = await self._create_structured_response_with_retries(
                     request_params, max_attempts=provider_max_attempts
                 )
             except APIStatusError as error:
@@ -498,8 +543,11 @@ class OpenAIProvider:
                     model,
                     fallback_reason,
                 )
-                request_params["text"] = {"format": {"type": "json_object"}}
-                response = await self._create_response_with_retries(
+                if self.capabilities.supports_responses_structured_output:
+                    request_params["text"] = {"format": {"type": "json_object"}}
+                else:
+                    request_params["response_format"] = {"type": "json_object"}
+                response = await self._create_structured_response_with_retries(
                     request_params, max_attempts=provider_max_attempts
                 )
 
@@ -520,7 +568,7 @@ class OpenAIProvider:
                 raise recoverable
 
             # Extract response content
-            content = response.output_text
+            content = self._response_content(response)
             if not content:
                 raise RecoverableLLMProviderError(
                     reason="empty_response",
@@ -553,7 +601,7 @@ class OpenAIProvider:
                         isinstance(getattr(response, "model", None), str) and bool(response.model)
                     ),
                     token_usage_is_explicit=self._has_explicit_response_token_usage(response),
-                    finish_reason=getattr(response, "status", None),
+                    finish_reason=self._response_finish_reason(response),
                     structured_output_mode=(
                         "json_object_fallback"
                         if fallback_reason is not None
@@ -604,18 +652,43 @@ class OpenAIProvider:
         ]
         return copied
 
-    async def _create_response_with_retries(
+    async def _create_structured_response_with_retries(
         self, request_params: dict[str, Any], *, max_attempts: int
     ) -> Any:
-        """Create one response with the single explicit transient retry layer."""
+        """Create one capability-routed response with one explicit retry layer."""
         for attempt in range(max_attempts):
             try:
-                return await self._async_client.responses.create(**request_params)
+                if self.capabilities.supports_responses_structured_output:
+                    return await self._async_client.responses.create(**request_params)
+                return await self._async_client.chat.completions.create(**request_params)
             except Exception as error:
                 if not self._should_retry_async_error(error, attempt, max_attempts):
                     raise
                 await asyncio.sleep(0.5 * (2**attempt))
         raise LLMProviderError("No response received from OpenAI API")
+
+    @staticmethod
+    def _response_content(response: Any) -> str | None:
+        """Read JSON text from either supported OpenAI-compatible transport."""
+        output_text = getattr(response, "output_text", None)
+        if isinstance(output_text, str):
+            return output_text
+        choices = getattr(response, "choices", None)
+        if isinstance(choices, (list, tuple)) and choices:
+            content = getattr(choices[0].message, "content", None)
+            return content if isinstance(content, str) else None
+        return None
+
+    @staticmethod
+    def _response_finish_reason(response: Any) -> str | None:
+        status = getattr(response, "status", None)
+        if isinstance(status, str):
+            return status
+        choices = getattr(response, "choices", None)
+        if isinstance(choices, (list, tuple)) and choices:
+            reason = getattr(choices[0], "finish_reason", None)
+            return reason if isinstance(reason, str) else None
+        return None
 
     @staticmethod
     def _strict_rejection_reason(error: APIStatusError) -> str | None:
@@ -650,6 +723,25 @@ class OpenAIProvider:
         response: Any, token_usage: TokenUsage
     ) -> RecoverableLLMProviderError | None:
         """Classify response-level outcomes that merit another logical call."""
+        choices = getattr(response, "choices", None)
+        if isinstance(choices, (list, tuple)) and choices:
+            finish_reason = str(getattr(choices[0], "finish_reason", "") or "").lower()
+            if finish_reason in {"length", "content_filter"}:
+                return RecoverableLLMProviderError(
+                    reason=(
+                        "content_filter" if finish_reason == "content_filter" else "truncation"
+                    ),
+                    message=f"Chat completion stopped with {finish_reason}",
+                    token_usage=token_usage,
+                )
+            message = getattr(choices[0], "message", None)
+            if getattr(message, "refusal", None):
+                return RecoverableLLMProviderError(
+                    reason="refusal",
+                    message="Chat completion refused the structured response",
+                    token_usage=token_usage,
+                )
+
         status = getattr(response, "status", None)
         details = getattr(response, "incomplete_details", None)
         detail_reason = str(getattr(details, "reason", "") or "").lower()
@@ -690,6 +782,8 @@ class OpenAIProvider:
         if total_tokens == 0:
             total_tokens = prompt_tokens + completion_tokens
         output_details = getattr(usage, "output_tokens_details", None)
+        if output_details is None:
+            output_details = getattr(usage, "completion_tokens_details", None)
         reasoning_tokens = _as_int(getattr(output_details, "reasoning_tokens", 0))
         return TokenUsage(
             prompt_tokens=prompt_tokens,
@@ -711,6 +805,8 @@ class OpenAIProvider:
             completion = getattr(usage, "output_tokens", None)
         total = getattr(usage, "total_tokens", None)
         details = getattr(usage, "output_tokens_details", None)
+        if details is None:
+            details = getattr(usage, "completion_tokens_details", None)
         reasoning = getattr(details, "reasoning_tokens", None) if details is not None else None
         return all(
             isinstance(value, int) and not isinstance(value, bool)

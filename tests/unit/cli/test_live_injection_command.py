@@ -69,7 +69,7 @@ async def test_run_pipeline_reports_structured_partial_injection_failure(
         recovery="Inspect reserved layers, then re-run safely.",
     )
 
-    app_config = AppConfig()
+    app_config = AppConfig(llm_api_key="offline-test-key")
     job_config = JobConfig(write_checkpoint=False)
     fixture_group = MagicMock()
     fixture_group.expand_fixtures.return_value = [MagicMock()]

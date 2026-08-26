@@ -113,6 +113,19 @@ def strict_response_format(model: type[BaseModel]) -> dict[str, Any]:
     }
 
 
+def chat_completions_response_format(model: type[BaseModel]) -> dict[str, Any]:
+    """Build the Chat Completions strict format from the same Pydantic schema.
+
+    Chat Completions nests the schema descriptor under ``json_schema`` while
+    Responses accepts that descriptor directly as ``text.format``.
+    """
+    response_format = strict_response_format(model)
+    return {
+        "type": "json_schema",
+        "json_schema": {key: response_format[key] for key in ("name", "schema", "strict")},
+    }
+
+
 def strict_json_schema(model: type[BaseModel]) -> dict[str, Any]:
     """Derive and validate the OpenAI-supported subset of a Pydantic schema.
 

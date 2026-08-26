@@ -14,6 +14,7 @@ from twinklr.core.agents.providers.base import (
     ImageQuality,
     ImageSize,
     LLMResponse,
+    ProviderCapabilities,
     ProviderType,
     ResponseMetadata,
     TokenUsage,
@@ -96,6 +97,11 @@ class AnthropicProvider:
             ProviderType.ANTHROPIC
         """
         return ProviderType.ANTHROPIC
+
+    @property
+    def capabilities(self) -> ProviderCapabilities:
+        """Anthropic does not use the OpenAI-compatible structured request path."""
+        return ProviderCapabilities()
 
     @property
     def supports_image_generation(self) -> bool:
