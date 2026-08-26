@@ -73,15 +73,7 @@ class TwinklrSession:
         self.session_id = session_id or str(uuid4())
         self.project_root = resolve_project_root(self.app_config, fallback=project_root)
 
-        # Set up project/artifact management
-        self.project_name = self.job_config.project_name or "twinklr_project"
-        self.artifact_dir = (
-            Path(self.job_config.output_dir or self.app_config.output_dir) / self.project_name
-        )
-
-        logger.debug(
-            f"Session initialized: project={self.project_name}, artifacts={self.artifact_dir}"
-        )
+        logger.debug(f"Session initialized: session_id={self.session_id}")
 
     @staticmethod
     def _resolve_config(value: Any, config_cls: type[T]) -> T:

@@ -39,7 +39,6 @@ def build_phoneme_bundle(
     duration_ms: int,
     words: list[LyricWord],
     mapping_version: str,
-    enable_g2p_en: bool = True,
     min_phoneme_ms: int = 30,
     vowel_weight: float = 2.0,
     consonant_weight: float = 1.0,
@@ -61,7 +60,6 @@ def build_phoneme_bundle(
         duration_ms: Total song duration in milliseconds.
         words: List of LyricWord with text, start_ms, end_ms.
         mapping_version: Viseme mapping version string.
-        enable_g2p_en: Whether to use g2p_en for conversion.
         min_phoneme_ms: Minimum phoneme duration; words shorter collapse.
         vowel_weight: Relative weight for vowel duration.
         consonant_weight: Relative weight for consonant duration.

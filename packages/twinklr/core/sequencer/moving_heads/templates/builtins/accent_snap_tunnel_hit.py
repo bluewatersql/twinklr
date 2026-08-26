@@ -29,7 +29,6 @@ from twinklr.core.sequencer.moving_heads.libraries.geometry import GeometryType
 from twinklr.core.sequencer.moving_heads.libraries.gobo import GoboPattern
 from twinklr.core.sequencer.moving_heads.libraries.movement import MovementType
 from twinklr.core.sequencer.moving_heads.templates.library import register_template
-from twinklr.core.sequencer.moving_heads.templates.utils import TemplateRoleHelper
 
 
 @register_template(aliases=["Accent Snap Tunnel Hit", "accent snap tunnel hit"])
@@ -40,9 +39,7 @@ def make_template() -> TemplateDoc:
             version=1,
             name="Accent Snap Tunnel Hit",
             category=TemplateCategory.HIGH_ENERGY,
-            roles=TemplateRoleHelper.IN_OUT_LEFT_RIGHT,
             repeat=RepeatContract(
-                repeatable=True,
                 mode=RepeatMode.PING_PONG,
                 cycle_bars=4.0,
                 loop_step_ids=["main"],
@@ -78,7 +75,6 @@ def make_template() -> TemplateDoc:
                         intensity=Intensity.INTENSE,
                         min_norm=0.10,
                         max_norm=1.00,
-                        cycles=4.0,
                     ),
                     gobo=Gobo(pattern=GoboPattern.PRISM),
                 )

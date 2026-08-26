@@ -154,7 +154,6 @@ def apply_preset(
         version=template.version,
         name=template.name,
         category=template.category,
-        roles=list(template.roles),
         repeat=template.repeat,
         defaults=new_defaults,
         steps=new_steps,

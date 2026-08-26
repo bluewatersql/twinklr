@@ -9,9 +9,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from pydantic import BaseModel
 import pytest
 
-from twinklr.core.caching import config_fingerprint, derive_session_id
+from twinklr.core.caching import CacheKey, config_fingerprint, derive_session_id
+from twinklr.core.caching.backends.fs import FSCache
+from twinklr.core.caching.backends.null import NullCache
 from twinklr.core.config.models import AppConfig, JobConfig
 from twinklr.core.config.paths import PROJECT_ROOT_ENV_VAR, resolve_project_root
 from twinklr.core.io import absolute_path, anchored_path
@@ -176,6 +179,37 @@ class TestCacheRootAnchoring:
         assert from_project == from_elsewhere
         assert Path(from_project) == project_root / "data" / "cache" / "agent"
 
+    @pytest.mark.parametrize(
+        ("config_path", "project_root", "cache_dir", "expected_parts"),
+        (
+            (
+                "app.project_root",
+                "configured-root",
+                "audio-cache",
+                ("configured-root", "audio-cache"),
+            ),
+            ("app.cache_dir", None, "changed-audio-cache", ("changed-audio-cache",)),
+        ),
+        ids=("app.project_root", "app.cache_dir"),
+    )
+    def test_app_cache_path_changes_audio_analyzer_cache_root(
+        self,
+        tmp_path: Path,
+        config_path: str,
+        project_root: str | None,
+        cache_dir: str,
+        expected_parts: tuple[str, ...],
+    ) -> None:
+        from twinklr.core.audio.analyzer import AudioAnalyzer
+
+        configured_root = tmp_path / project_root if project_root else tmp_path
+        configured_root.mkdir(exist_ok=True)
+        config = _app_config(project_root=str(configured_root), cache_dir=cache_dir)
+        analyzer = AudioAnalyzer(config, _job_config())
+
+        assert Path(analyzer.cache.root) == configured_root / cache_dir, config_path
+        assert all(part in Path(analyzer.cache.root).parts for part in expected_parts)
+
     def test_project_root_precedence(self, tmp_path: Path, monkeypatch) -> None:
         configured = tmp_path / "configured"
         fallback = tmp_path / "fallback"
@@ -212,3 +246,74 @@ class TestCacheRootAnchoring:
 
         with pytest.raises(ValueError, match="root must be absolute"):
             anchored_path("data/cache", "relative/root")
+
+
+@pytest.mark.parametrize(
+    ("config_path", "cache_payload", "expected_type", "expected_suffix"),
+    (
+        ("job.agent.agent_cache", {"enabled": False}, NullCache, None),
+        ("job.agent.agent_cache.enabled", {"enabled": False}, NullCache, None),
+        (
+            "job.agent.agent_cache.cache_path",
+            {"enabled": True, "cache_path": "changed-cache"},
+            FSCache,
+            "changed-cache",
+        ),
+    ),
+    ids=(
+        "job.agent.agent_cache",
+        "job.agent.agent_cache.enabled",
+        "job.agent.agent_cache.cache_path",
+    ),
+)
+def test_agent_cache_field_changes_session_cache_owner(
+    tmp_path: Path,
+    config_path: str,
+    cache_payload: dict[str, object],
+    expected_type: type[object],
+    expected_suffix: str | None,
+) -> None:
+    job = _job_config(agent={"agent_cache": cache_payload, "llm_logging": {"enabled": False}})
+    cache = TwinklrSession(
+        app_config=_app_config(project_root=str(tmp_path)), job_config=job, session_id="probe"
+    ).agent_cache
+
+    assert isinstance(cache, expected_type), config_path
+    if expected_suffix is not None:
+        assert Path(cache.root).name == expected_suffix  # type: ignore[union-attr]
+
+
+class _CacheProbe(BaseModel):
+    value: str
+
+
+@pytest.mark.asyncio
+async def test_agent_cache_ttl_changes_real_session_expiry(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    job = _job_config(
+        agent={
+            "agent_cache": {
+                "enabled": True,
+                "cache_path": "ttl-cache",
+                "ttl_seconds": 10.0,
+            },
+            "llm_logging": {"enabled": False},
+        }
+    )
+    cache = TwinklrSession(
+        app_config=_app_config(project_root=str(tmp_path)), job_config=job, session_id="probe"
+    ).agent_cache
+    assert isinstance(cache, FSCache)
+    key = CacheKey(
+        domain="probe",
+        session_id="probe",
+        step_id="step",
+        step_version="1",
+        input_fingerprint="input",
+    )
+    monkeypatch.setattr("twinklr.core.caching.backends.fs.time.time", lambda: 100.0)
+    await cache.store(key, _CacheProbe(value="fresh"))
+    monkeypatch.setattr("twinklr.core.caching.backends.fs.time.time", lambda: 111.0)
+
+    assert await cache.load(key, _CacheProbe) is None

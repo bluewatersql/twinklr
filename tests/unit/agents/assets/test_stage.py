@@ -123,6 +123,17 @@ def _runner_result() -> AgentResult:
     )
 
 
+def test_job_image_model_changes_asset_client_request_owner(tmp_path: Path) -> None:
+    context = _context(tmp_path)
+    context.session.job_config = JobConfig(
+        agent=AgentOrchestrationConfig(image_model="configured-image-model")
+    )
+
+    client = AssetCreationStage(AssetGenerationConfig())._build_image_client(context)
+
+    assert client.model == "configured-image-model"
+
+
 def test_name() -> None:
     assert AssetCreationStage().name == "asset_creation"
 
@@ -150,6 +161,41 @@ async def test_dry_run_reports_without_provider_calls(tmp_path: Path) -> None:
     assert summary.request_budget.reserved_usd == pytest.approx(0.20)
     assert summary.request_budget.actual_image_usd is None
     context.provider.generate_image_async.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("config_path", "payload"),
+    (
+        ("job.assets", {"enabled": True, "dry_run": True}),
+        ("job.assets.enabled", {"enabled": True, "dry_run": True}),
+        ("job.assets.dry_run", {"enabled": True, "dry_run": True}),
+        (
+            "job.assets.asset_base_path",
+            {"enabled": True, "dry_run": True, "asset_base_path": "custom-assets"},
+        ),
+    ),
+    ids=(
+        "job.assets",
+        "job.assets.enabled",
+        "job.assets.dry_run",
+        "job.assets.asset_base_path",
+    ),
+)
+async def test_asset_config_field_changes_asset_creation_stage_behavior(
+    tmp_path: Path, config_path: str, payload: dict[str, object]
+) -> None:
+    """Each configurable asset path changes the production stage result or output root."""
+    context = _context(tmp_path)
+    config = AssetGenerationConfig.model_validate(payload)
+    result = await AssetCreationStage(config).execute(_plan(), context)
+
+    assert result.success, config_path
+    summary = context.get_state("asset_run_summary")
+    assert isinstance(summary, AssetRunSummary)
+    assert summary.dry_run
+    if config_path == "job.assets.asset_base_path":
+        assert Path(context.get_state("asset_base_path")).name == "custom-assets"
 
 
 @pytest.mark.asyncio

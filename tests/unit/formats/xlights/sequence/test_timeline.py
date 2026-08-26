@@ -96,7 +96,7 @@ class TestBuildTimelineTracks:
             build_timeline_tracks,
         )
 
-        config = TimelineTracksConfig(beats=True, bars=False, sections=False, lyrics=False)
+        config = TimelineTracksConfig(beats=True, bars=False, lyrics=False)
         tracks = build_timeline_tracks(config=config, beat_grid=simple_beat_grid)
 
         beat_tracks = [t for t in tracks if t.name == "Twinklr Beats"]
@@ -119,7 +119,7 @@ class TestBuildTimelineTracks:
             build_timeline_tracks,
         )
 
-        config = TimelineTracksConfig(beats=False, bars=True, sections=False, lyrics=False)
+        config = TimelineTracksConfig(beats=False, bars=True, lyrics=False)
         tracks = build_timeline_tracks(config=config, beat_grid=simple_beat_grid)
 
         bar_tracks = [t for t in tracks if t.name == "Twinklr Bars"]
@@ -141,7 +141,7 @@ class TestBuildTimelineTracks:
             build_timeline_tracks,
         )
 
-        config = TimelineTracksConfig(beats=False, bars=False, sections=False, lyrics=True)
+        config = TimelineTracksConfig(beats=False, bars=False, lyrics=True)
         tracks = build_timeline_tracks(config=config, lyrics_bundle=sample_lyrics)
 
         lyric_tracks = [t for t in tracks if t.name == "Twinklr Lyrics"]
@@ -161,9 +161,7 @@ class TestBuildTimelineTracks:
             build_timeline_tracks,
         )
 
-        config = TimelineTracksConfig(
-            beats=False, bars=False, sections=False, lyrics=False, phonemes=True
-        )
+        config = TimelineTracksConfig(beats=False, bars=False, lyrics=False, phonemes=True)
         tracks = build_timeline_tracks(config=config, phoneme_bundle=sample_phonemes)
 
         phoneme_tracks = [t for t in tracks if t.name == "Twinklr Phonemes"]
@@ -183,9 +181,7 @@ class TestBuildTimelineTracks:
             build_timeline_tracks,
         )
 
-        config = TimelineTracksConfig(
-            beats=False, bars=False, sections=False, lyrics=False, phonemes=False
-        )
+        config = TimelineTracksConfig(beats=False, bars=False, lyrics=False, phonemes=False)
         tracks = build_timeline_tracks(config=config, beat_grid=simple_beat_grid)
         assert tracks == []
 
@@ -196,9 +192,7 @@ class TestBuildTimelineTracks:
             build_timeline_tracks,
         )
 
-        config = TimelineTracksConfig(
-            beats=True, bars=True, lyrics=True, phonemes=True, sections=True
-        )
+        config = TimelineTracksConfig(beats=True, bars=True, lyrics=True, phonemes=True)
         # No data provided at all
         tracks = build_timeline_tracks(config=config)
         assert tracks == []
@@ -210,7 +204,7 @@ class TestBuildTimelineTracks:
             build_timeline_tracks,
         )
 
-        config = TimelineTracksConfig(beats=False, bars=False, sections=True, lyrics=False)
+        config = TimelineTracksConfig(beats=False, bars=False, lyrics=False)
         sections = [
             ("intro", 0, 2000),
             ("verse_1", 2000, 6000),
@@ -256,12 +250,11 @@ class TestTimelineTracksConfig:
     """Tests for TimelineTracksConfig defaults."""
 
     def test_default_config(self) -> None:
-        """Default config enables beats, bars, sections, lyrics but not phonemes."""
+        """Default config enables beats, bars, lyrics but not phonemes."""
         from twinklr.core.formats.xlights.sequence.timeline import TimelineTracksConfig
 
         config = TimelineTracksConfig()
         assert config.beats is True
         assert config.bars is True
-        assert config.sections is True
         assert config.lyrics is True
         assert config.phonemes is False

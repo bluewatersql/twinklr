@@ -7,6 +7,7 @@ transition planning (with real durations), and XSQ export with timeline tracks.
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -27,6 +28,7 @@ from twinklr.core.config.models import JobConfig
 from twinklr.core.formats.xlights.sequence.models.xsq import TimingTrack
 from twinklr.core.sequencer.models.enum import ChannelName, Intensity
 from twinklr.core.sequencer.models.template import Color
+from twinklr.core.sequencer.models.transition import TransitionRegistry
 from twinklr.core.sequencer.moving_heads.compile.intent_resolution import apply_template_intent
 from twinklr.core.sequencer.moving_heads.export.dmx_settings_builder import DmxSettingsBuilder
 from twinklr.core.sequencer.moving_heads.libraries.color import ColorPreset
@@ -386,6 +388,25 @@ class TestTransitionPlanning:
         )
         assert rp.job_config.transitions.enabled is False
 
+    @pytest.mark.parametrize("enabled", (True, False), ids=("enabled", "disabled"))
+    def test_transition_enabled_changes_render_detector_call(
+        self, enabled: bool, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The public config gate controls the production render detector call."""
+        job = JobConfig.model_validate({"transitions": {"enabled": enabled}})
+        pipeline = RenderingPipeline(
+            choreography_plan=_make_plan(),
+            beat_grid=_make_beat_grid(),
+            fixture_group=_make_fixture_group(),
+            job_config=job,
+        )
+        detector = MagicMock(return_value=TransitionRegistry())
+        monkeypatch.setattr(pipeline, "_detect_and_plan_transitions", detector)
+        monkeypatch.setattr(pipeline, "iterate_plan_sections", lambda _plan: iter(()))
+
+        assert pipeline.render() == []
+        assert detector.called is enabled
+
     def test_segmented_sections_transition_detection_uses_flattened_ids(self) -> None:
         """Segmented plans should produce transition IDs compatible with flattened section keys."""
         job = JobConfig()
@@ -528,3 +549,68 @@ class TestExportDelivery:
             "test.beats.xtiming",
         }
         assert all(path.exists() for path in rp.artifacts.all_paths)
+
+    @pytest.mark.parametrize(
+        ("config_path", "payload"),
+        (
+            (
+                "job.timeline_tracks",
+                {"beats": False, "bars": False, "lyrics": False, "phonemes": True},
+            ),
+            ("job.timeline_tracks.beats", {"beats": False}),
+            ("job.timeline_tracks.bars", {"bars": False}),
+            ("job.timeline_tracks.lyrics", {"lyrics": False}),
+            ("job.timeline_tracks.phonemes", {"phonemes": True}),
+        ),
+        ids=(
+            "job.timeline_tracks",
+            "job.timeline_tracks.beats",
+            "job.timeline_tracks.bars",
+            "job.timeline_tracks.lyrics",
+            "job.timeline_tracks.phonemes",
+        ),
+    )
+    def test_timeline_config_field_changes_rendering_stage_delivery_layers(
+        self, tmp_path: Path, config_path: str, payload: dict[str, bool]
+    ) -> None:
+        """Each timeline knob changes layers emitted by the production stage/delivery path."""
+        from twinklr.core.agents.sequencer.moving_heads.rendering_stage import (
+            MovingHeadRenderingStage,
+        )
+        from twinklr.core.formats.xlights.sequence.models.xsq import TimeMarker
+
+        audio_bundle = SimpleNamespace(
+            lyrics=SimpleNamespace(words=[SimpleNamespace(text="word", start_ms=100, end_ms=200)]),
+            phonemes=SimpleNamespace(
+                phonemes=[SimpleNamespace(text="W", start_ms=100, end_ms=150)]
+            ),
+        )
+
+        def delivery_snapshot(job: JobConfig, name: str) -> set[str]:
+            context = MagicMock()
+            context.job_config = job
+            context.get_state.return_value = audio_bundle
+            tracks = MovingHeadRenderingStage._build_timeline_tracks(
+                _make_beat_grid(bars=4), context
+            )
+            output_dir = tmp_path / name
+            output_dir.mkdir()
+            pipeline = RenderingPipeline(
+                choreography_plan=_make_plan([("intro", 1, 4, "sweep_lr_fan_hold")]),
+                beat_grid=_make_beat_grid(bars=4),
+                fixture_group=_make_fixture_group(4),
+                job_config=job,
+                output_path=output_dir / "test.xsq",
+                timeline_tracks=tracks,
+                media_file="song.mp3",
+            )
+            pipeline._export_delivery([], [TimeMarker(name="intro", time_ms=0, end_time_ms=4000)])
+            assert pipeline.artifacts is not None
+            return {path.name for path in pipeline.artifacts.xtiming_paths}
+
+        baseline = delivery_snapshot(JobConfig(), "baseline")
+        changed = delivery_snapshot(
+            JobConfig.model_validate({"timeline_tracks": payload}), "changed"
+        )
+
+        assert changed != baseline, config_path

@@ -50,13 +50,8 @@ class LLMLoggingConfig(BaseModel):
 
     log_level: str = Field(
         default="standard",
-        pattern="^(minimal|standard|full)$",
-        description=(
-            "Log detail level: "
-            "'minimal' (metrics only), "
-            "'standard' (prompts + responses), "
-            "'full' (+ full context)"
-        ),
+        pattern="^(standard|full)$",
+        description=("Log detail level: 'standard' (prompts + responses), 'full' (+ full context)"),
     )
 
     format: str = Field(
@@ -96,6 +91,26 @@ class AgentOrchestrationConfig(BaseModel):
         description="Minimum judge score to accept plan, 0-100 (the single configured scale)",
     )
 
+    @model_validator(mode="before")
+    @classmethod
+    def reject_removed_fields(cls, value: object) -> object:
+        if isinstance(value, dict):
+            removed = sorted(
+                {
+                    "enforce_token_budget",
+                    "recipe_generation_agent",
+                    "token_budget",
+                    "token_buffer_pct",
+                    "vision_judge_agent",
+                }
+                & value.keys()
+            )
+            if removed:
+                raise ValueError(
+                    f"agent fields {removed} were removed because they never affected execution"
+                )
+        return value
+
     # Per-agent configurations. Planning is quality-critical; judges evaluate rather
     # than create, so they use the lower-cost model and deliberate low effort.
     plan_agent: AgentConfig = Field(
@@ -131,12 +146,6 @@ class AgentOrchestrationConfig(BaseModel):
     asset_enricher_agent: AgentConfig = Field(
         default_factory=lambda: AgentConfig(
             model="gpt-5.6-terra", reasoning_effort="low", temperature=0.6
-        )
-    )
-
-    recipe_generation_agent: AgentConfig = Field(
-        default_factory=lambda: AgentConfig(
-            model="gpt-5.6-sol", reasoning_effort="high", temperature=0.9
         )
     )
 
@@ -293,6 +302,27 @@ class AudioEnhancementConfig(BaseModel):
 
     model_config = ConfigDict(extra="ignore")  # Forward compatibility
 
+    @model_validator(mode="before")
+    @classmethod
+    def reject_removed_fields(cls, value: object) -> object:
+        if isinstance(value, dict):
+            removed = sorted(
+                {
+                    "http_circuit_breaker_threshold",
+                    "http_circuit_breaker_timeout_s",
+                    "metadata_merge_policy_version",
+                    "metadata_min_confidence_warn",
+                    "phoneme_enable_g2p_fallback",
+                }
+                & value.keys()
+            )
+            if removed:
+                raise ValueError(
+                    f"audio enhancement fields {removed} were removed because they never "
+                    "affected output"
+                )
+        return value
+
     # Feature flags (gradual rollout support)
     enable_metadata: bool = Field(
         default=True, description="Enable metadata enrichment (embedded tags + providers)"
@@ -347,9 +377,6 @@ class AudioEnhancementConfig(BaseModel):
     )
 
     # Phonemes
-    phoneme_enable_g2p_fallback: bool = Field(
-        default=True, description="Use g2p_en for words not in CMUdict"
-    )
     phoneme_min_duration_ms: int = Field(
         default=30, ge=10, description="Minimum phoneme duration (ms)"
     )
@@ -431,6 +458,15 @@ class AudioProcessingConfig(BaseModel):
         description="Audio enhancement features (metadata, lyrics, phonemes)",
     )
 
+    @model_validator(mode="before")
+    @classmethod
+    def reject_removed_fields(cls, value: object) -> object:
+        if isinstance(value, dict) and "cache_enabled" in value:
+            raise ValueError(
+                "audio processing field 'cache_enabled' was removed because no cache read it"
+            )
+        return value
+
     def model_post_init(self, __context: object) -> None:
         """Validate audio processing parameters."""
         if self.hop_length > self.frame_length:
@@ -473,7 +509,6 @@ class AppConfig(ConfigBase):
             "Falls back to $TWINKLR_PROJECT_ROOT, then the current working directory."
         ),
     )
-    output_dir: str = "artifacts"
     cache_dir: str = "data/audio_cache"
     audio_processing: AudioProcessingConfig = AudioProcessingConfig()
     logging: LoggingConfig = LoggingConfig()
@@ -486,6 +521,17 @@ class AppConfig(ConfigBase):
     llm_base_url: str = Field(
         default="https://api.openai.com/v1", description="LLM base URL to use for API calls"
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def reject_removed_fields(cls, value: object) -> object:
+        if isinstance(value, dict):
+            removed = sorted({"output_dir", "planning"} & value.keys())
+            if removed:
+                raise ValueError(
+                    f"application fields {removed} were removed because no runtime read them"
+                )
+        return value
 
     @field_validator("llm_provider")
     @classmethod
@@ -572,15 +618,33 @@ class TransitionConfig(BaseModel):
 class JobConfig(ConfigBase):
     """Job/task-specific configuration.
 
-    This represents a specific sequencing job with fixture configuration,
-    musical assumptions, and planner settings.
-
-    Schema version 3.0 adds:
-    - Pose configuration (custom poses + overrides)
-    - Planner feature flags (DMX channel control)
+    This represents one sequencing job: its fixture source, agent settings,
+    asset policy, output identity, transition behavior, and timeline tracks.
     """
 
     model_config = ConfigDict(extra="ignore")
+
+    @model_validator(mode="before")
+    @classmethod
+    def reject_removed_fields(cls, value: object) -> object:
+        if isinstance(value, dict):
+            removed = sorted(
+                {
+                    "assumptions",
+                    "debug",
+                    "include_notes_track",
+                    "output_dir",
+                    "planner_features",
+                    "pose_config",
+                    "project_name",
+                }
+                & value.keys()
+            )
+            if removed:
+                raise ValueError(
+                    f"job fields {removed} were removed because they never affected execution"
+                )
+        return value
 
     schema_version: Literal["3.0"] = "3.0"
 
@@ -588,9 +652,6 @@ class JobConfig(ConfigBase):
 
     agent: AgentOrchestrationConfig = Field(default_factory=lambda: _get_agent_config_default())
     assets: AssetGenerationConfig = Field(default_factory=AssetGenerationConfig)
-    output_dir: str | None = None
-    project_name: str | None = None
-
     write_checkpoint: bool = Field(
         default=True,
         description=(

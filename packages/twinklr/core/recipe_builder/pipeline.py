@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Any
 
 from twinklr.core.agents.providers.base import LLMProvider
-from twinklr.core.config.models import AgentConfig, AgentOrchestrationConfig
+from twinklr.core.config.models import AgentConfig
 from twinklr.core.recipe_builder.admission import admit_candidates, write_staged_outputs
 from twinklr.core.recipe_builder.coverage import load_coverage_gap_opportunities
 from twinklr.core.recipe_builder.enrichment import generate_enrichments
@@ -27,7 +27,10 @@ from twinklr.core.recipe_builder.evidence import (
     load_catalog,
     load_fe_evidence,
 )
-from twinklr.core.recipe_builder.generation import generate_candidates
+from twinklr.core.recipe_builder.generation import (
+    default_recipe_generation_config,
+    generate_candidates,
+)
 from twinklr.core.recipe_builder.models import (
     AdmissionReport,
     CatalogAnalysis,
@@ -62,9 +65,7 @@ class PipelineConfig:
     synthetic_fallback: bool = False
     dry_run: bool = False
     llm_provider: LLMProvider | None = None
-    generation_agent: AgentConfig = field(
-        default_factory=lambda: AgentOrchestrationConfig().recipe_generation_agent
-    )
+    generation_agent: AgentConfig = field(default_factory=default_recipe_generation_config)
     coverage_report_path: Path | None = None
     max_opportunities: int = 10
     phases: tuple[str, ...] = field(default_factory=lambda: ALL_PHASES)

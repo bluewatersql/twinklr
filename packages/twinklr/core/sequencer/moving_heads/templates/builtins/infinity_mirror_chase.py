@@ -27,7 +27,6 @@ from twinklr.core.sequencer.moving_heads.libraries.dimmer import DimmerType
 from twinklr.core.sequencer.moving_heads.libraries.geometry import GeometryType
 from twinklr.core.sequencer.moving_heads.libraries.movement import MovementType
 from twinklr.core.sequencer.moving_heads.templates.library import register_template
-from twinklr.core.sequencer.moving_heads.templates.utils import TemplateRoleHelper
 
 
 @register_template(aliases=["Infinity Mirror Chase", "infinity mirror chase"])
@@ -38,9 +37,7 @@ def make_template() -> TemplateDoc:
             version=1,
             name="Infinity Mirror Chase",
             category=TemplateCategory.MEDIUM_ENERGY,
-            roles=TemplateRoleHelper.IN_OUT_LEFT_RIGHT,
             repeat=RepeatContract(
-                repeatable=True,
                 mode=RepeatMode.JOINER,
                 cycle_bars=4.0,
                 loop_step_ids=["main"],
@@ -77,7 +74,6 @@ def make_template() -> TemplateDoc:
                         intensity=Intensity.SMOOTH,
                         min_norm=0.20,
                         max_norm=1.00,
-                        cycles=2.0,
                     ),
                 )
             ],

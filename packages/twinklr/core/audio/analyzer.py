@@ -539,7 +539,6 @@ class AudioAnalyzer:
                 duration_ms=duration_ms,
                 words=words,
                 mapping_version=enhancements.viseme_mapping_version,
-                enable_g2p_en=enhancements.phoneme_enable_g2p_fallback,
                 min_phoneme_ms=enhancements.phoneme_min_duration_ms,
                 vowel_weight=enhancements.phoneme_vowel_weight,
                 consonant_weight=enhancements.phoneme_consonant_weight,
@@ -806,6 +805,7 @@ class AudioAnalyzer:
             "schema_version": "2.4",
             "audio_path": audio_path,
             "sr": sr,
+            "hop_length": hop_length,
             "duration_s": duration,
             "tempo_bpm": tempo_bpm,
             "beats_s": beats_s,
@@ -940,6 +940,7 @@ class AudioAnalyzer:
             stem_features,
             full_mix_beat_confidence=rhythm.beat_confidence,
         )
+        result["hop_length"] = hop_length
         stem_rhythm = dict(result["rhythm"])
         result.update(
             {

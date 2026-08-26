@@ -30,20 +30,12 @@
         "main"
       ],
       "mode": "PING_PONG",
-      "remainder_policy": "HOLD_LAST_POSE",
-      "repeatable": true
+      "remainder_policy": "HOLD_LAST_POSE"
     },
-    "roles": [
-      "OUTER_LEFT",
-      "INNER_LEFT",
-      "INNER_RIGHT",
-      "OUTER_RIGHT"
-    ],
     "steps": [
       {
         "color": null,
         "dimmer": {
-          "cycles": 8.0,
           "dimmer_type": "pulse",
           "intensity": "INTENSE",
           "max_norm": 1.0,
@@ -64,7 +56,6 @@
           "params": {}
         },
         "shutter": {
-          "params": {},
           "pattern": "strobe_fast"
         },
         "step_id": "main",
@@ -78,9 +69,9 @@
           },
           "phase_offset": {
             "mode": "GROUP_ORDER",
+            "order": "LEFT_TO_RIGHT",
             "spread_bars": 0.5,
-            "wrap": true,
-            "order": "LEFT_TO_RIGHT"
+            "wrap": true
           }
         }
       }

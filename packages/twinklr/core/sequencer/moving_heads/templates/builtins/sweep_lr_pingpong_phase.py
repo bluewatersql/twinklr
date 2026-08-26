@@ -30,7 +30,6 @@ from twinklr.core.sequencer.moving_heads.libraries.movement import MovementType
 from twinklr.core.sequencer.moving_heads.templates.library import register_template
 from twinklr.core.sequencer.moving_heads.templates.utils import (
     PoseByRoleHelper,
-    TemplateRoleHelper,
 )
 
 
@@ -42,9 +41,7 @@ def make_template() -> TemplateDoc:
             version=1,
             name="Sweep LR Ping Pong Phase",
             category=TemplateCategory.MEDIUM_ENERGY,
-            roles=TemplateRoleHelper.IN_OUT_LEFT_RIGHT,
             repeat=RepeatContract(
-                repeatable=True,
                 mode=RepeatMode.PING_PONG,
                 cycle_bars=4.0,
                 loop_step_ids=["main"],
@@ -83,7 +80,6 @@ def make_template() -> TemplateDoc:
                         intensity=Intensity.SMOOTH,
                         min_norm=0.10,
                         max_norm=1.00,
-                        cycles=2.0,
                     ),
                 )
             ],

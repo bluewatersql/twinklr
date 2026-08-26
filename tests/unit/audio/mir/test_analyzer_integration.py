@@ -84,6 +84,55 @@ def test_short_audio_dsp_path_reports_truthful_source_provenance(tmp_path: Path)
     }
 
 
+@pytest.mark.parametrize(
+    ("config_path", "rhythm", "structure", "expected"),
+    (
+        (
+            "app.audio_processing.rhythm_source",
+            RhythmSourceName.BEAT_THIS,
+            StructureSourceName.DSP,
+            ("rhythm", RhythmSourceName.BEAT_THIS),
+        ),
+        (
+            "app.audio_processing.structure_source",
+            RhythmSourceName.DSP,
+            StructureSourceName.ALLINONE,
+            ("structure", StructureSourceName.ALLINONE),
+        ),
+    ),
+    ids=(
+        "app.audio_processing.rhythm_source",
+        "app.audio_processing.structure_source",
+    ),
+)
+def test_audio_source_field_changes_production_factory_selection(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    config_path: str,
+    rhythm: RhythmSourceName,
+    structure: StructureSourceName,
+    expected: tuple[str, object],
+) -> None:
+    """Each source selector reaches its matching production source factory."""
+    captured: dict[str, object] = {}
+
+    def rhythm_factory(name: object) -> DSPSource:
+        captured["rhythm"] = name
+        return DSPSource()
+
+    def structure_factory(name: object) -> DSPSource:
+        captured["structure"] = name
+        return DSPSource()
+
+    monkeypatch.setattr("twinklr.core.audio.analyzer.create_rhythm_source", rhythm_factory)
+    monkeypatch.setattr("twinklr.core.audio.analyzer.create_structure_source", structure_factory)
+    analyzer = _analyzer_with_sources(rhythm, structure)
+
+    analyzer._process_audio(str(_write_short_audio(tmp_path)))
+
+    assert captured[expected[0]] == expected[1], config_path
+
+
 def test_short_audio_selected_beat_this_fails_loudly_when_unavailable(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

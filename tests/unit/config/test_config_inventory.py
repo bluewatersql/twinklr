@@ -18,15 +18,21 @@ from twinklr.core.config.models import AppConfig, JobConfig
 from twinklr.core.sequencer.models.enum import QuantizeMode, TimingMode
 from twinklr.core.sequencer.models.template import (
     BaseTiming,
+    Color,
+    Dimmer,
     Geometry,
+    Gobo,
     Movement,
     PhaseOffset,
+    RepeatContract,
+    Shutter,
     TemplateDoc,
     TemplateStep,
 )
 
 REMOVED_CONFIG_PATHS = (
     "app.audio_processing.cache_enabled",
+    "app.output_dir",
     "app.planning",
     "job.include_notes_track",
     "job.debug",
@@ -35,12 +41,16 @@ REMOVED_CONFIG_PATHS = (
     "job.agent.token_budget",
     "job.agent.token_buffer_pct",
     "job.agent.vision_judge_agent",
+    "job.agent.recipe_generation_agent",
     "job.pose_config",
     "job.planner_features",
+    "job.output_dir",
+    "job.project_name",
     "app.audio_processing.enhancements.metadata_merge_policy_version",
     "app.audio_processing.enhancements.metadata_min_confidence_warn",
     "app.audio_processing.enhancements.http_circuit_breaker_threshold",
     "app.audio_processing.enhancements.http_circuit_breaker_timeout_s",
+    "app.audio_processing.enhancements.phoneme_enable_g2p_fallback",
     "fixture.base_config.dmx_universe",
     "fixture.base_config.channel_count",
     "fixture.base_config.capabilities",
@@ -75,6 +85,13 @@ REMOVED_CONFIG_PATHS = (
     "template.template.steps.movement.frequency_override",
     "template.template.steps.movement.center_offset_override",
     "template.template.steps.geometry.aim_zone",
+    "template.template.steps.color.params",
+    "template.template.steps.shutter.params",
+    "template.template.steps.gobo.params",
+    "template.template.roles",
+    "template.template.repeat.repeatable",
+    "template.template.steps.dimmer.cycles",
+    "job.timeline_tracks.sections",
 )
 
 
@@ -214,6 +231,12 @@ def test_retired_fixture_config_fails_loudly_with_migration_message(
         (TemplateStep, {"priority": 1}, "priority"),
         (Movement, {"amplitude_override": 0.5}, "amplitude_override"),
         (Geometry, {"aim_zone": "SKY"}, "aim_zone"),
+        (Color, {"preset": "WHITE", "params": {"probe": 1}}, "params"),
+        (Shutter, {"pattern": "OPEN", "params": {"probe": 1}}, "params"),
+        (Gobo, {"pattern": "OPEN", "params": {"probe": 1}}, "params"),
+        (TemplateDoc, {"template": {"roles": ["OUTER_LEFT"]}}, "roles"),
+        (RepeatContract, {"repeatable": False}, "repeatable"),
+        (Dimmer, {"cycles": 2.0}, "cycles"),
     ),
 )
 def test_retired_template_config_fails_loudly_with_migration_message(
@@ -221,6 +244,77 @@ def test_retired_template_config_fails_loudly_with_migration_message(
 ) -> None:
     with pytest.raises(ValidationError, match=rf"{retired_key}.*removed|removed.*{retired_key}"):
         model.model_validate(payload)
+
+
+@pytest.mark.parametrize(
+    ("model", "payload", "retired_key"),
+    (
+        (AppConfig, {"planning": {"enabled": True}}, "planning"),
+        (AppConfig, {"output_dir": "artifacts"}, "output_dir"),
+        (
+            AppConfig,
+            {"audio_processing": {"cache_enabled": False}},
+            "cache_enabled",
+        ),
+        (JobConfig, {"include_notes_track": True}, "include_notes_track"),
+        (JobConfig, {"debug": True}, "debug"),
+        (JobConfig, {"assumptions": {"beats_per_bar": 3}}, "assumptions"),
+        (JobConfig, {"pose_config": {"poses": {}}}, "pose_config"),
+        (JobConfig, {"planner_features": {"enabled": True}}, "planner_features"),
+        (JobConfig, {"output_dir": "artifacts"}, "output_dir"),
+        (JobConfig, {"project_name": "probe"}, "project_name"),
+        (
+            JobConfig,
+            {"agent": {"enforce_token_budget": True}},
+            "enforce_token_budget",
+        ),
+        (JobConfig, {"agent": {"token_budget": 1234}}, "token_budget"),
+        (
+            JobConfig,
+            {"agent": {"token_buffer_pct": 0.25}},
+            "token_buffer_pct",
+        ),
+        (
+            JobConfig,
+            {"agent": {"vision_judge_agent": {"model": "probe"}}},
+            "vision_judge_agent",
+        ),
+        (
+            JobConfig,
+            {"agent": {"recipe_generation_agent": {"model": "probe"}}},
+            "recipe_generation_agent",
+        ),
+        (JobConfig, {"timeline_tracks": {"sections": False}}, "sections"),
+        (
+            AppConfig,
+            {"audio_processing": {"enhancements": {"phoneme_enable_g2p_fallback": False}}},
+            "phoneme_enable_g2p_fallback",
+        ),
+        *(
+            (
+                AppConfig,
+                {"audio_processing": {"enhancements": {retired_key: 1}}},
+                retired_key,
+            )
+            for retired_key in (
+                "metadata_merge_policy_version",
+                "metadata_min_confidence_warn",
+                "http_circuit_breaker_threshold",
+                "http_circuit_breaker_timeout_s",
+            )
+        ),
+    ),
+)
+def test_retired_app_and_job_config_fails_loudly_without_forbidding_future_keys(
+    model: type[BaseModel], payload: dict[str, object], retired_key: str
+) -> None:
+    with pytest.raises(ValidationError, match=rf"{retired_key}.*removed|removed.*{retired_key}"):
+        model.model_validate(payload)
+
+
+def test_unrelated_future_app_and_job_keys_remain_forward_compatible() -> None:
+    assert AppConfig.model_validate({"future_extension": {"enabled": True}}) == AppConfig()
+    assert JobConfig.model_validate({"future_extension": {"enabled": True}}) == JobConfig()
 
 
 def test_fixed_policy_config_paths_are_invariant() -> None:
@@ -279,8 +373,10 @@ def _enumerate_config_paths(
         for field_name, field in model.model_fields.items():
             path = f"{prefix}.{field_name}"
             paths.add(path)
-            for nested in _nested_models(field.annotation):
-                walk(path, nested, (*ancestors, model))
+            nested_models = _nested_models(field.annotation)
+            for nested in nested_models:
+                nested_path = f"{path}[{nested.__name__}]" if len(nested_models) > 1 else path
+                walk(nested_path, nested, (*ancestors, model))
 
     for prefix, model in roots.items():
         walk(prefix, model, ())
@@ -297,6 +393,19 @@ def test_every_external_config_path_has_an_accountable_disposition() -> None:
     assert registered == declared, (
         f"unregistered={sorted(declared - registered)}; stale={sorted(registered - declared)}"
     )
+
+
+def test_union_alternatives_have_distinct_type_qualified_paths() -> None:
+    """A set-backed inventory must not collapse same-named fields across union branches."""
+    declared = _enumerate_config_paths()
+
+    assert "fixture.fixtures[FixtureInstance].fixture_id" in declared
+    assert "fixture.fixtures[SimplifiedFixtureInstance].fixture_id" in declared
+    assert "fixture.fixtures[FixtureInstance].xlights_model_name" in declared
+    assert "fixture.fixtures[SimplifiedFixtureInstance].xlights_model_name" in declared
+    assert "fixture.fixtures[FixtureInstance].config" in declared
+    assert "fixture.fixtures[SimplifiedFixtureInstance].config_overrides" in declared
+    assert "fixture.fixtures.fixture_id" not in declared
 
 
 def test_removed_registry_paths_are_absent_and_handed_to_p4_t6() -> None:

@@ -15,6 +15,8 @@ from pathlib import Path
 import pytest
 
 from twinklr.core.agents.logging.async_file_logger import TRACE, AsyncFileLogger
+from twinklr.core.config.models import AppConfig, JobConfig
+from twinklr.core.session import TwinklrSession
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -39,6 +41,83 @@ _PROMPTS = {
 }
 
 _CONTEXT: dict = {"section_id": "chorus_1", "energy": 0.9}
+
+
+async def _session_log_snapshot(
+    tmp_path: Path, name: str, logging_payload: dict[str, object]
+) -> tuple[tuple[str, ...], str]:
+    log_path = tmp_path / name
+    payload = {"enabled": True, "log_path": str(log_path), "format": "json"}
+    payload.update(logging_payload)
+    job = JobConfig.model_validate({"agent": {"llm_logging": payload}})
+    session = TwinklrSession(app_config=AppConfig(), job_config=job, session_id=f"session-{name}")
+    logger = session.llm_logger
+    call_id = await logger.start_call_async(
+        agent_name="probe",
+        agent_mode="plan",
+        iteration=1,
+        model="probe-model",
+        temperature=0.2,
+        prompts={"user": "contact secret@example.com"},
+        context={"secret": "secret@example.com"},
+    )
+    await logger.complete_call_async(
+        call_id,
+        raw_response={"secret": "secret@example.com"},
+        validated_response=None,
+        validation_errors=[],
+        tokens_used=1,
+        prompt_tokens=1,
+        completion_tokens=0,
+        duration_seconds=0.1,
+        success=True,
+        repair_attempts=0,
+    )
+    files = tuple(sorted(path.name for path in log_path.rglob("*.*")))
+    text = "\n".join(path.read_text() for path in log_path.rglob("*.*"))
+    return files, text
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("config_path", "changed_payload"),
+    (
+        ("job.agent.llm_logging", {"enabled": False}),
+        ("job.agent.llm_logging.enabled", {"enabled": False}),
+        ("job.agent.llm_logging.log_path", {"log_path": "__replace__"}),
+        ("job.agent.llm_logging.log_level", {"log_level": "full"}),
+        ("job.agent.llm_logging.format", {"format": "yaml"}),
+        ("job.agent.llm_logging.sanitize", {"sanitize": False}),
+    ),
+    ids=(
+        "job.agent.llm_logging",
+        "job.agent.llm_logging.enabled",
+        "job.agent.llm_logging.log_path",
+        "job.agent.llm_logging.log_level",
+        "job.agent.llm_logging.format",
+        "job.agent.llm_logging.sanitize",
+    ),
+)
+async def test_llm_logging_field_changes_actual_session_log_output(
+    tmp_path: Path, config_path: str, changed_payload: dict[str, object]
+) -> None:
+    """Each logging knob changes a completed call's real file output."""
+    baseline = await _session_log_snapshot(tmp_path, "baseline", {})
+    if changed_payload.get("log_path") == "__replace__":
+        changed_payload = {"log_path": str(tmp_path / "explicit-log-root")}
+    changed = await _session_log_snapshot(tmp_path, "changed", changed_payload)
+
+    assert changed != baseline, config_path
+    if config_path == "job.agent.llm_logging.log_path":
+        assert (tmp_path / "explicit-log-root").is_dir()
+    elif config_path == "job.agent.llm_logging.log_level":
+        assert '"context_full"' in changed[1]
+        assert '"context_full"' not in baseline[1]
+    elif config_path == "job.agent.llm_logging.format":
+        assert any(name.endswith(".yaml") for name in changed[0])
+    elif config_path == "job.agent.llm_logging.sanitize":
+        assert "secret@example.com" in changed[1]
+        assert "secret@example.com" not in baseline[1]
 
 
 # ---------------------------------------------------------------------------

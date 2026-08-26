@@ -17,7 +17,7 @@ import uuid
 from pydantic import ValidationError
 
 from twinklr.core.agents.providers.base import LLMProvider
-from twinklr.core.config.models import AgentConfig, AgentOrchestrationConfig
+from twinklr.core.config.models import AgentConfig
 from twinklr.core.recipe_builder.evidence import format_analysis_for_prompt
 from twinklr.core.recipe_builder.models import (
     CatalogAnalysis,
@@ -45,6 +45,15 @@ from twinklr.core.sequencer.vocabulary import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def default_recipe_generation_config() -> AgentConfig:
+    """Return the recipe-builder-owned LLM request policy."""
+    return AgentConfig(
+        model="gpt-5.6-sol",
+        reasoning_effort="high",
+        temperature=0.9,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -664,5 +673,5 @@ def generate_candidates(
         analysis=analysis,
         catalog_recipes=catalog_recipes,
         provider=provider,
-        config=config or AgentOrchestrationConfig().recipe_generation_agent,
+        config=config or default_recipe_generation_config(),
     )

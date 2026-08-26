@@ -44,7 +44,6 @@ from twinklr.core.sequencer.moving_heads.templates.library import (
     get_template,
     validate_repeat_contract,
 )
-from twinklr.core.sequencer.moving_heads.templates.utils import TemplateRoleHelper
 
 
 def _step(step_id: str, *, offset_bars: float, duration_bars: float) -> TemplateStep:
@@ -70,9 +69,7 @@ def _doc(*, cycle_bars: float, loop_step_ids: list[str], steps: list[TemplateSte
             version=1,
             name="Fixture Under Test",
             category=TemplateCategory.MEDIUM_ENERGY,
-            roles=TemplateRoleHelper.IN_OUT_LEFT_RIGHT,
             repeat=RepeatContract(
-                repeatable=True,
                 mode=RepeatMode.JOINER,
                 cycle_bars=cycle_bars,
                 loop_step_ids=loop_step_ids,

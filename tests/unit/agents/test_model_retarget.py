@@ -33,6 +33,7 @@ from twinklr.core.agents.sequencer.moving_heads.specs import (
     get_planner_spec as get_mh_planner_spec,
 )
 from twinklr.core.config.models import AgentConfig, AgentOrchestrationConfig
+from twinklr.core.recipe_builder.generation import default_recipe_generation_config
 
 
 class RecordingProvider:
@@ -66,6 +67,61 @@ def _role_specs(config: AgentOrchestrationConfig):
         get_mh_judge_spec(config=config.judge_agent),
         get_section_judge_spec(config=config.judge_agent),
     )
+
+
+_ROLE_SPEC_FACTORIES = {
+    "plan_agent": get_macro_planner_spec,
+    "judge_agent": get_macro_judge_spec,
+    "refinement_agent": get_holistic_corrector_spec,
+    "profile_agent": get_audio_profile_spec,
+    "lyrics_agent": get_lyrics_spec,
+    "asset_enricher_agent": build_enricher_spec,
+}
+_ROLE_EFFECT_PATHS = tuple(
+    f"job.agent.{role}{suffix}"
+    for role in _ROLE_SPEC_FACTORIES
+    for suffix in (
+        "",
+        ".model",
+        ".reasoning_effort",
+        ".temperature",
+        ".max_tokens",
+        ".timeout_seconds",
+    )
+)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("config_path", _ROLE_EFFECT_PATHS, ids=_ROLE_EFFECT_PATHS)
+async def test_each_agent_role_field_changes_its_shipped_request(
+    config_path: str, tmp_path: Path
+) -> None:
+    """A role's field changes the request observed by the provider boundary."""
+    _, _, role, *field_parts = config_path.split(".")
+    field = field_parts[0] if field_parts else "model"
+    baseline_config = getattr(AgentOrchestrationConfig(), role)
+    if field == "temperature":
+        baseline_config = baseline_config.model_copy(
+            update={"model": "gpt-4.1", "temperature": 0.2}
+        )
+    values = {
+        "model": "configured-role-model",
+        "reasoning_effort": "low" if baseline_config.reasoning_effort != "low" else "high",
+        "temperature": 1.25,
+        "max_tokens": 1234,
+        "timeout_seconds": 17,
+    }
+    baseline = _ROLE_SPEC_FACTORIES[role](config=baseline_config)
+    changed = _ROLE_SPEC_FACTORIES[role](
+        config=baseline_config.model_copy(update={field: values[field]})
+    )
+    provider = RecordingProvider()
+    runner = AsyncAgentRunner(provider=provider, prompt_base_path=tmp_path)
+    await runner._call_oneshot_async(baseline, [{"role": "user", "content": "test"}])
+    await runner._call_oneshot_async(changed, [{"role": "user", "content": "test"}])
+
+    assert provider.calls[0] != provider.calls[1]
+    assert provider.calls[1][field] == values[field]
 
 
 @pytest.mark.asyncio
@@ -173,7 +229,7 @@ def test_role_defaults_choose_current_models_and_deliberate_effort() -> None:
 def test_recipe_generation_docs_match_central_default() -> None:
     """Both published guides report the configured recipe-generation tier and effort."""
     root = Path(__file__).parents[3]
-    recipe_config = AgentOrchestrationConfig().recipe_generation_agent
+    recipe_config = default_recipe_generation_config()
     expected = f"`{recipe_config.model}`, {recipe_config.reasoning_effort} reasoning"
 
     assert expected in (root / "docs/developer-guide.md").read_text()
@@ -190,14 +246,19 @@ def test_no_hardcoded_legacy_model_literals() -> None:
 
 
 def test_current_model_literals_are_centralized() -> None:
-    """Current model IDs have a single Python source of truth in config models."""
+    """Current model IDs live in their owning configuration modules."""
     root = Path(__file__).parents[3]
     current_ids = ("gpt-5.6-sol", "gpt-5.6-terra", "gpt-image-2")
-    allowed = root / "packages/twinklr/core/config/models.py"
+    allowed = {
+        root / "packages/twinklr/core/config/models.py",
+        root / "packages/twinklr/core/recipe_builder/generation.py",
+    }
     duplicates: list[Path] = []
     for directory in (root / "packages", root / "scripts"):
         for path in directory.rglob("*.py"):
-            if path != allowed and any(model_id in path.read_text() for model_id in current_ids):
+            if path not in allowed and any(
+                model_id in path.read_text() for model_id in current_ids
+            ):
                 duplicates.append(path)
     assert duplicates == []
 

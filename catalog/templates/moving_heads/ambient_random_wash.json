@@ -32,23 +32,14 @@
         "main"
       ],
       "mode": "JOINER",
-      "remainder_policy": "HOLD_LAST_POSE",
-      "repeatable": true
+      "remainder_policy": "HOLD_LAST_POSE"
     },
-    "roles": [
-      "OUTER_LEFT",
-      "INNER_LEFT",
-      "INNER_RIGHT",
-      "OUTER_RIGHT"
-    ],
     "steps": [
       {
         "color": {
-          "params": {},
           "preset": "blue"
         },
         "dimmer": {
-          "cycles": 1.0,
           "dimmer_type": "hold",
           "intensity": "SMOOTH",
           "max_norm": 0.9,
@@ -80,9 +71,9 @@
           },
           "phase_offset": {
             "mode": "NONE",
+            "order": "LEFT_TO_RIGHT",
             "spread_bars": 0.0,
-            "wrap": true,
-            "order": "LEFT_TO_RIGHT"
+            "wrap": true
           }
         }
       }

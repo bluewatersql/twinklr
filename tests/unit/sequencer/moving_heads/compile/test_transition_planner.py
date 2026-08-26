@@ -144,6 +144,70 @@ class TestTransitionPlannerBasic:
         assert plan.hint.duration_bars == config.default_duration_bars
         assert plan.hint.curve == config.default_curve
 
+    @pytest.mark.parametrize(
+        ("config_path", "payload", "snapshot"),
+        (
+            (
+                "job.transitions",
+                {"default_duration_bars": 1.5},
+                lambda planner, plan: plan.overlap_duration_ms,
+            ),
+            (
+                "job.transitions.default_duration_bars",
+                {"default_duration_bars": 1.5},
+                lambda planner, plan: plan.overlap_duration_ms,
+            ),
+            (
+                "job.transitions.default_mode",
+                {"default_mode": TransitionMode.MORPH},
+                lambda planner, plan: plan.hint.mode,
+            ),
+            (
+                "job.transitions.default_curve",
+                {"default_curve": "linear"},
+                lambda planner, plan: plan.hint.curve,
+            ),
+            (
+                "job.transitions.min_section_duration_bars",
+                {"min_section_duration_bars": 3.0},
+                lambda planner, plan: planner.validate_transition_feasibility(
+                    plan, source_duration_ms=5000, target_duration_ms=5000
+                ),
+            ),
+            (
+                "job.transitions.allow_overlaps",
+                {"allow_overlaps": False},
+                lambda planner, plan: planner.adjust_section_timing(plan, 40000, 40000),
+            ),
+            (
+                "job.transitions.per_channel_defaults",
+                {"per_channel_defaults": {"pan": TransitionStrategy.SNAP}},
+                lambda planner, plan: plan.channel_strategies,
+            ),
+        ),
+        ids=(
+            "job.transitions",
+            "job.transitions.default_duration_bars",
+            "job.transitions.default_mode",
+            "job.transitions.default_curve",
+            "job.transitions.min_section_duration_bars",
+            "job.transitions.allow_overlaps",
+            "job.transitions.per_channel_defaults",
+        ),
+    )
+    def test_transition_config_field_changes_planned_behavior(
+        self, beat_grid, boundary, config_path, payload, snapshot
+    ):
+        """Each transition knob changes its own production planner behavior."""
+        baseline_planner = TransitionPlanner(TransitionConfig(), beat_grid)
+        changed_planner = TransitionPlanner(TransitionConfig.model_validate(payload), beat_grid)
+        baseline = baseline_planner.plan_transition(boundary, None, ["fixture_1"])
+        changed = changed_planner.plan_transition(boundary, None, ["fixture_1"])
+
+        assert snapshot(changed_planner, changed) != snapshot(baseline_planner, baseline), (
+            config_path
+        )
+
     def test_plan_generates_transition_id(self, planner, boundary):
         """Test that planner generates transition ID automatically."""
         plan = planner.plan_transition(

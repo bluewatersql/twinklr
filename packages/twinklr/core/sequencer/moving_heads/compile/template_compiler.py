@@ -260,7 +260,7 @@ def _resolve_target_fixtures(
 
     Args:
         step: The step whose target group is being resolved.
-        template: The template being compiled (its roles are the fallback vocabulary).
+        template: The template being compiled.
         context: Compile context carrying the rig's fixtures.
 
     Returns:
@@ -278,7 +278,7 @@ def _resolve_target_fixtures(
         if role not in rig_roles:
             rig_roles.append(role)
 
-    available_roles = rig_roles or list(template.roles)
+    available_roles = rig_roles
 
     try:
         target_roles = resolve_semantic_group(step.target, available_roles)

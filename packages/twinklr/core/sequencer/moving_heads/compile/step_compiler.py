@@ -122,7 +122,7 @@ def compile_step(
     dimmer_result = dimmer_handler.generate(
         params=dimmer_params,
         n_samples=context.n_samples,
-        cycles=step.dimmer.cycles,
+        cycles=1.0,
         intensity=step.dimmer.intensity,
         min_norm=step.dimmer.min_norm,
         max_norm=step.dimmer.max_norm,
@@ -138,7 +138,7 @@ def compile_step(
     ):
         if axis is None:
             continue
-        axis_params = dict(axis.params)
+        axis_params: dict[str, Any] = {}
         axis_params["calibration"] = context.calibration
         axis_params[key] = getattr(axis, key)
         handler = registry.get(getattr(axis, key).value)

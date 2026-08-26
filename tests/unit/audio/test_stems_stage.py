@@ -58,6 +58,72 @@ def test_stems_stage_disabled_by_default() -> None:
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("config_path", "config"),
+    (
+        ("app.audio_processing.enhancements.stems", StemSeparationConfig(enabled=True)),
+        (
+            "app.audio_processing.enhancements.stems.enabled",
+            StemSeparationConfig(enabled=True),
+        ),
+        (
+            "app.audio_processing.enhancements.stems.model_name",
+            StemSeparationConfig(enabled=True, model_name="htdemucs_ft"),
+        ),
+    ),
+    ids=(
+        "app.audio_processing.enhancements.stems",
+        "app.audio_processing.enhancements.stems.enabled",
+        "app.audio_processing.enhancements.stems.model_name",
+    ),
+)
+async def test_stem_config_field_changes_public_separation_result(
+    tmp_path: Path, config_path: str, config: StemSeparationConfig
+) -> None:
+    """Each stem execution knob changes the public separation result."""
+    audio = tmp_path / f"{config_path.rsplit('.', 1)[-1]}.wav"
+    audio.write_bytes(b"audio")
+    cache = FSCache(RealFileSystem(), absolute_path(tmp_path / "cache"))
+    stems = _synthetic_stems()
+    stems["vocals"][len(stems["vocals"]) // 2 :] = 0.0
+    separator = StubSeparator(stems)
+
+    baseline = await analyze_stems(audio, cache, StemSeparationConfig(), separator=separator)
+    changed = await analyze_stems(audio, cache, config, separator=separator)
+
+    assert changed.model_dump(mode="json") != baseline.model_dump(mode="json"), config_path
+    if config_path.endswith("model_name"):
+        assert changed.model_name == "htdemucs_ft"
+
+
+@pytest.mark.asyncio
+async def test_stem_threshold_changes_public_vocal_gate(tmp_path: Path) -> None:
+    """The non-default vocal threshold changes the shipped downstream gate."""
+    audio = tmp_path / "threshold.wav"
+    audio.write_bytes(b"audio")
+    baseline_cache = FSCache(RealFileSystem(), absolute_path(tmp_path / "baseline-cache"))
+    changed_cache = FSCache(RealFileSystem(), absolute_path(tmp_path / "changed-cache"))
+    stems = _synthetic_stems()
+    stems["vocals"][len(stems["vocals"]) // 2 :] = 0.0
+    separator = StubSeparator(stems)
+    baseline = await analyze_stems(
+        audio,
+        baseline_cache,
+        StemSeparationConfig(enabled=True, vocal_presence_threshold=0.1),
+        separator=separator,
+    )
+    changed = await analyze_stems(
+        audio,
+        changed_cache,
+        StemSeparationConfig(enabled=True, vocal_presence_threshold=0.9),
+        separator=separator,
+    )
+
+    assert changed.vocal_gate_open is False
+    assert baseline.vocal_gate_open is True
+
+
+@pytest.mark.asyncio
 async def test_stems_cache_key_is_audio_hash_plus_model(tmp_path: Path) -> None:
     """Same audio/model hits; changing either explicit key input misses."""
     first_audio = tmp_path / "first.wav"

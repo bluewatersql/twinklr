@@ -107,7 +107,6 @@ class TestAudioProcessingConfigWithEnhancements:
         data = {
             "hop_length": 512,
             "frame_length": 2048,
-            "cache_enabled": True,
             "enhancements": {
                 "enable_metadata": True,
                 "enable_lyrics": True,

@@ -27,7 +27,6 @@ from twinklr.core.sequencer.moving_heads.libraries.dimmer import DimmerType
 from twinklr.core.sequencer.moving_heads.libraries.geometry import GeometryType
 from twinklr.core.sequencer.moving_heads.libraries.movement import MovementType
 from twinklr.core.sequencer.moving_heads.templates.library import register_template
-from twinklr.core.sequencer.moving_heads.templates.utils import TemplateRoleHelper
 
 
 @register_template(aliases=["Pop Lock Spotlight Blackout", "pop lock spotlight blackout"])
@@ -38,9 +37,7 @@ def make_template() -> TemplateDoc:
             version=1,
             name="Pop Lock Spotlight Blackout",
             category=TemplateCategory.HIGH_ENERGY,
-            roles=TemplateRoleHelper.IN_OUT_LEFT_RIGHT,
             repeat=RepeatContract(
-                repeatable=True,
                 mode=RepeatMode.PING_PONG,
                 cycle_bars=4.0,
                 loop_step_ids=["main"],
@@ -75,7 +72,6 @@ def make_template() -> TemplateDoc:
                         dimmer_type=DimmerType.BLACKOUT,
                         min_norm=0.0,
                         max_norm=1.0,
-                        cycles=1.0,
                     ),
                 )
             ],

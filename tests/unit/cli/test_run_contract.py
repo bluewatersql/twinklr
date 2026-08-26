@@ -129,7 +129,7 @@ def test_success_threshold_from_config_single_scale() -> None:
     `agent.success_threshold`, so the documented config field had no effect on the
     shipped path whatever it was set to.
     """
-    job_config = JobConfig(project_name="p")
+    job_config = JobConfig()
     job_config.agent.success_threshold = 85
 
     pipeline, _, _ = _pipeline_for(build_fixture_group(RIGS["mh4_minimal"]), job_config)
@@ -137,7 +137,7 @@ def test_success_threshold_from_config_single_scale() -> None:
 
     # The field itself is the range validation: 0-100, rejected outside it.
     with pytest.raises(ValueError):
-        JobConfig(project_name="p").agent.__class__(success_threshold=101)
+        JobConfig().agent.__class__(success_threshold=101)
 
 
 def test_empty_rig_is_reported_not_crashed() -> None:

@@ -63,7 +63,7 @@ class AsyncFileLogger:
         Args:
             output_dir: Base output directory
             run_id: Unique run identifier
-            log_level: Log level ("minimal", "standard", "full")
+            log_level: Log level ("standard" or "full")
             format: Output format ("yaml", "json")
             sanitize: Whether to sanitize sensitive data
             log_full_prompts: If True, log full prompt content at DEBUG level.

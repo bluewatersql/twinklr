@@ -27,7 +27,6 @@ from twinklr.core.sequencer.moving_heads.libraries.dimmer import DimmerType
 from twinklr.core.sequencer.moving_heads.libraries.geometry import GeometryType
 from twinklr.core.sequencer.moving_heads.libraries.movement import MovementType
 from twinklr.core.sequencer.moving_heads.templates.library import register_template
-from twinklr.core.sequencer.moving_heads.templates.utils import TemplateRoleHelper
 
 
 @register_template(aliases=["Fan Iris Tilt Bias Breathe", "fan iris tilt bias breathe"])
@@ -38,9 +37,7 @@ def make_template() -> TemplateDoc:
             version=1,
             name="Fan Iris Tilt Bias Breathe",
             category=TemplateCategory.LOW_ENERGY,
-            roles=TemplateRoleHelper.IN_OUT_LEFT_RIGHT,
             repeat=RepeatContract(
-                repeatable=True,
                 mode=RepeatMode.PING_PONG,
                 cycle_bars=4.0,
                 loop_step_ids=["main"],
@@ -75,7 +72,6 @@ def make_template() -> TemplateDoc:
                         intensity=Intensity.SMOOTH,
                         min_norm=0.20,
                         max_norm=0.90,
-                        cycles=1.0,
                     ),
                 )
             ],

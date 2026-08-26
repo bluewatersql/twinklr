@@ -9,7 +9,6 @@ import pytest
 from twinklr.core.sequencer.models.enum import (
     SemanticGroupType,
     TemplateCategory,
-    TemplateRole,
 )
 from twinklr.core.sequencer.models.template import TemplateDoc
 from twinklr.core.sequencer.moving_heads.templates import (
@@ -83,7 +82,6 @@ def test_templates_have_complete_metadata():
         assert template.version >= 1
         assert template.name
         assert template.category in TemplateCategory
-        assert len(template.roles) > 0
         assert len(template.steps) > 0
 
         # Metadata
@@ -128,21 +126,6 @@ def test_templates_have_tags():
 # ============================================================================
 
 
-def test_templates_have_valid_roles():
-    """Verify template roles are valid."""
-    templates = list_templates()
-
-    for info in templates:
-        doc = get_template(info.template_id)
-
-        # Each template should have at least one role
-        assert len(doc.template.roles) > 0
-
-        # All roles should be valid enum values
-        for role in doc.template.roles:
-            assert role in TemplateRole
-
-
 def test_templates_have_steps():
     """Verify templates have at least one step."""
     templates = list_templates()
@@ -167,10 +150,9 @@ def test_templates_have_repeat_contracts():
     for info in templates:
         doc = get_template(info.template_id)
 
-        if doc.template.repeat and doc.template.repeat.repeatable:
-            # Repeatable templates should specify loop_step_ids
+        if doc.template.repeat:
             assert len(doc.template.repeat.loop_step_ids) > 0, (
-                f"Repeatable template {info.template_id} has no loop_step_ids"
+                f"Template {info.template_id} has no loop_step_ids"
             )
 
             # Verify loop_step_ids reference actual steps
@@ -191,9 +173,6 @@ def test_sweep_lr_fan_pulse_template():
     assert doc is not None
     assert doc.template.name == "Sweep LR Fan Pulse"
     assert doc.template.category == TemplateCategory.MEDIUM_ENERGY
-    assert len(doc.template.roles) == 4
-    assert TemplateRole.OUTER_LEFT in doc.template.roles
-    assert TemplateRole.OUTER_RIGHT in doc.template.roles
 
 
 def test_bounce_fan_pulse_template():

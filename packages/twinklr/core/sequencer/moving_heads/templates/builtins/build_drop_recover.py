@@ -30,7 +30,6 @@ from twinklr.core.sequencer.moving_heads.libraries.movement import MovementType
 from twinklr.core.sequencer.moving_heads.templates.library import register_template
 from twinklr.core.sequencer.moving_heads.templates.utils import (
     PoseByRoleHelper,
-    TemplateRoleHelper,
 )
 
 
@@ -42,14 +41,12 @@ def make_template() -> TemplateDoc:
             version=1,
             name="Build Drop Recover",
             category=TemplateCategory.HIGH_ENERGY,
-            roles=TemplateRoleHelper.IN_OUT_LEFT_RIGHT,
             # The cycle is the whole three-phase arc: build (bars 0-2), drop (2-4),
             # recover (4-6). It used to name only "drop", which is the sole step the
             # scheduler instantiates, so the template advertised an arc and rendered
             # a 2-bar accent loop. JOINER, not PING_PONG: an arc played backwards is
             # recover -> drop -> build.
             repeat=RepeatContract(
-                repeatable=True,
                 mode=RepeatMode.JOINER,
                 cycle_bars=6.0,
                 loop_step_ids=["build", "drop", "recover"],
@@ -87,7 +84,6 @@ def make_template() -> TemplateDoc:
                         intensity=Intensity.SMOOTH,
                         min_norm=0.10,
                         max_norm=1.00,
-                        cycles=1.0,
                     ),
                 ),
                 TemplateStep(
@@ -118,7 +114,6 @@ def make_template() -> TemplateDoc:
                         intensity=Intensity.INTENSE,
                         min_norm=0.05,
                         max_norm=1.00,
-                        cycles=8.0,
                     ),
                 ),
                 TemplateStep(
@@ -146,7 +141,6 @@ def make_template() -> TemplateDoc:
                         intensity=Intensity.SMOOTH,
                         min_norm=0.10,
                         max_norm=1.00,
-                        cycles=1.0,
                     ),
                 ),
             ],

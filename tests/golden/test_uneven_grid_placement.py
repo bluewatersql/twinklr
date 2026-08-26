@@ -69,7 +69,7 @@ def test_effect_start_matches_bars_timing_track(uneven_render: RenderResult) -> 
     """
     grid = build_uneven_beat_grid()
     tracks = build_timeline_tracks(
-        TimelineTracksConfig(beats=False, bars=True, sections=False, lyrics=False),
+        TimelineTracksConfig(beats=False, bars=True, lyrics=False),
         beat_grid=grid,
     )
     bars_track = next(track for track in tracks if track.name == "Twinklr Bars")

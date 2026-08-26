@@ -26,7 +26,6 @@ from twinklr.core.sequencer.moving_heads.libraries.dimmer import DimmerType
 from twinklr.core.sequencer.moving_heads.libraries.geometry import GeometryType
 from twinklr.core.sequencer.moving_heads.libraries.movement import MovementType
 from twinklr.core.sequencer.moving_heads.templates.library import register_template
-from twinklr.core.sequencer.moving_heads.templates.utils import TemplateRoleHelper
 
 
 @register_template(aliases=["Ambient Random Wash", "ambient random wash"])
@@ -37,9 +36,7 @@ def make_template() -> TemplateDoc:
             version=1,
             name="Ambient Random Wash",
             category=TemplateCategory.LOW_ENERGY,
-            roles=TemplateRoleHelper.IN_OUT_LEFT_RIGHT,
             repeat=RepeatContract(
-                repeatable=True,
                 mode=RepeatMode.JOINER,
                 cycle_bars=8.0,
                 loop_step_ids=["main"],
@@ -68,7 +65,6 @@ def make_template() -> TemplateDoc:
                         intensity=Intensity.SMOOTH,
                         min_norm=0.60,
                         max_norm=0.90,
-                        cycles=1.0,
                     ),
                     color=Color(preset=ColorPreset.BLUE),
                 )

@@ -54,7 +54,7 @@ def create_llm_logger(
 
     Environment Variables:
         TWINKLR_DISABLE_LLM_LOGGING: Set to "1" or "true" to disable logging
-        TWINKLR_LLM_LOG_LEVEL: Override log level ("minimal", "standard", "full")
+        TWINKLR_LLM_LOG_LEVEL: Override log level ("standard" or "full")
         TWINKLR_LLM_LOG_FORMAT: Override format ("yaml", "json")
 
     Args:
@@ -62,7 +62,7 @@ def create_llm_logger(
         output_dir: Output directory for log files
         session_id: Session identifier (for multi-user isolation)
         run_id: Unique run identifier (deprecated, use session_id)
-        log_level: Detail level ("minimal", "standard", "full")
+        log_level: Detail level ("standard" or "full")
         format: Output format ("yaml", "json")
         sanitize: Sanitize sensitive data from logs
 
@@ -93,7 +93,7 @@ def create_llm_logger(
         enabled = False
 
     env_level = os.environ.get("TWINKLR_LLM_LOG_LEVEL")
-    if env_level and env_level in ("minimal", "standard", "full"):
+    if env_level and env_level in ("standard", "full"):
         log_level = env_level
 
     env_format = os.environ.get("TWINKLR_LLM_LOG_FORMAT")

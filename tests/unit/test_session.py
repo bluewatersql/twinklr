@@ -7,6 +7,7 @@ from unittest.mock import patch
 
 import pytest
 
+from twinklr.core.agents.providers.factory import create_llm_provider
 from twinklr.core.config.models import AppConfig, JobConfig
 from twinklr.core.session import TwinklrSession
 
@@ -47,6 +48,36 @@ def test_llm_provider_dispatches_from_app_config() -> None:
         _ = session.llm_provider
 
     mock_provider_factory.assert_called_once()
+
+
+@pytest.mark.parametrize(
+    ("config_path", "payload", "expected"),
+    (
+        ("app.llm_api_key", {"llm_api_key": "changed-key"}, ("api_key", "changed-key")),
+        (
+            "app.llm_base_url",
+            {"llm_base_url": "https://changed.local/v1"},
+            ("base_url", "https://changed.local/v1"),
+        ),
+    ),
+    ids=("app.llm_api_key", "app.llm_base_url"),
+)
+def test_provider_field_changes_constructor_request(
+    config_path: str, payload: dict[str, str], expected: tuple[str, str]
+) -> None:
+    config = AppConfig.model_validate({**_make_app_config().model_dump(mode="python"), **payload})
+    with patch("twinklr.core.agents.providers.factory.OpenAIProvider") as constructor:
+        create_llm_provider(config, "session")
+
+    assert constructor.call_args.kwargs[expected[0]] == expected[1], config_path
+
+
+def test_provider_selection_changes_constructor_branch() -> None:
+    config = _make_app_config().model_copy(update={"llm_provider": "anthropic"})
+    with patch("twinklr.core.agents.providers.anthropic.AnthropicProvider") as constructor:
+        create_llm_provider(config, "session")
+
+    constructor.assert_called_once()
 
 
 def test_llm_provider_unknown_value_raises() -> None:

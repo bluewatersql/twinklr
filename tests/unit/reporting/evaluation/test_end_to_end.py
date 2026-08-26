@@ -58,7 +58,7 @@ async def test_eval_report_runs_on_written_checkpoint(tmp_path: Path) -> None:
     # 1. Write a checkpoint exactly as a real pipeline run would, at the stage seam.
     stage = MovingHeadStage(fixture_count=4, available_templates=["sweep_lr_fan_hold"])
     session = TwinklrSession(
-        job_config=JobConfig(project_name="e2e_probe"),
+        job_config=JobConfig(),
         session_id="e2e-probe-session",
         project_root=tmp_path,
     )

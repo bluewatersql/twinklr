@@ -56,7 +56,6 @@ from twinklr.core.sequencer.moving_heads.templates.library import (
     InvalidTemplateError,
     TemplateRegistry,
 )
-from twinklr.core.sequencer.moving_heads.templates.utils import TemplateRoleHelper
 from twinklr.core.sequencer.timing.beat_grid import BeatGrid
 
 
@@ -94,9 +93,7 @@ def _doc(
             version=1,
             name=template_id.replace("_", " ").title(),
             category=TemplateCategory.MEDIUM_ENERGY,
-            roles=TemplateRoleHelper.IN_OUT_LEFT_RIGHT,
             repeat=RepeatContract(
-                repeatable=True,
                 mode=RepeatMode.JOINER,
                 cycle_bars=cycle_bars,
                 loop_step_ids=["main"],

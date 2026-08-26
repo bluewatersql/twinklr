@@ -104,26 +104,31 @@ class RepeatContract(BaseModel):
     Defines how a template section loops during playback.
 
     Attributes:
-        repeatable: Whether this section can be repeated.
         mode: How to repeat (PING_PONG or JOINER).
         cycle_bars: Duration of one complete cycle, in bars.
-        loop_step_ids: Which steps are included in the loop (required when repeatable=True).
+        loop_step_ids: Which steps are included in the loop.
         remainder_policy: What to do with time remaining after last full cycle.
     """
 
     model_config = ConfigDict(extra="forbid")
 
-    repeatable: bool = True
     mode: RepeatMode = RepeatMode.PING_PONG
     cycle_bars: float
     loop_step_ids: list[str] = Field(default_factory=list)
     remainder_policy: RemainderPolicy = RemainderPolicy.HOLD_LAST_POSE
 
+    @model_validator(mode="before")
+    @classmethod
+    def reject_removed_fields(cls, value: object) -> object:
+        if isinstance(value, dict) and "repeatable" in value:
+            raise ValueError("repeat field 'repeatable' was removed because scheduling ignored it")
+        return value
+
     @model_validator(mode="after")
     def _validate_loop_step_ids(self) -> "RepeatContract":
-        """Validate loop_step_ids has at least 1 item when repeatable=True."""
-        if self.repeatable and len(self.loop_step_ids) == 0:
-            raise ValueError("loop_step_ids must have at least 1 item when repeatable=True")
+        """A repeat schedule must declare at least one loop step."""
+        if len(self.loop_step_ids) == 0:
+            raise ValueError("loop_step_ids must have at least 1 item")
         return self
 
 
@@ -217,8 +222,14 @@ class Dimmer(BaseModel):
     intensity: Intensity = Intensity.SMOOTH
     min_norm: float = 0.0
     max_norm: float = 1.0
-    cycles: float = 1.0
     params: dict[str, Any] = Field(default_factory=dict)
+
+    @model_validator(mode="before")
+    @classmethod
+    def reject_removed_fields(cls, value: object) -> object:
+        if isinstance(value, dict) and "cycles" in value:
+            raise ValueError("dimmer field 'cycles' was removed because handlers ignored it")
+        return value
 
     @model_validator(mode="after")
     def _validate_range(self) -> "Dimmer":
@@ -234,7 +245,13 @@ class Color(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     preset: ColorPreset
-    params: dict[str, Any] = Field(default_factory=dict)
+
+    @model_validator(mode="before")
+    @classmethod
+    def reject_removed_fields(cls, value: object) -> object:
+        if isinstance(value, dict) and "params" in value:
+            raise ValueError("color field 'params' was removed because no handler read it")
+        return value
 
 
 class Shutter(BaseModel):
@@ -243,7 +260,13 @@ class Shutter(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     pattern: ShutterPattern
-    params: dict[str, Any] = Field(default_factory=dict)
+
+    @model_validator(mode="before")
+    @classmethod
+    def reject_removed_fields(cls, value: object) -> object:
+        if isinstance(value, dict) and "params" in value:
+            raise ValueError("shutter field 'params' was removed because no handler read it")
+        return value
 
 
 class Gobo(BaseModel):
@@ -252,7 +275,13 @@ class Gobo(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     pattern: GoboPattern
-    params: dict[str, Any] = Field(default_factory=dict)
+
+    @model_validator(mode="before")
+    @classmethod
+    def reject_removed_fields(cls, value: object) -> object:
+        if isinstance(value, dict) and "params" in value:
+            raise ValueError("gobo field 'params' was removed because no handler read it")
+        return value
 
 
 class StepTiming(BaseModel):
@@ -412,7 +441,6 @@ class Template(BaseModel):
     name: str
     category: TemplateCategory
 
-    roles: list[TemplateRole] = Field(default_factory=list)
     repeat: RepeatContract
     defaults: dict[str, Any] = Field(default_factory=dict)
     steps: list["TemplateStep"] = Field(default_factory=list)
@@ -422,6 +450,10 @@ class Template(BaseModel):
     @classmethod
     def _set_default_metadata(cls, data: dict[str, Any]) -> dict[str, Any]:
         """Set default metadata if not provided."""
+        if isinstance(data, dict) and "roles" in data:
+            raise ValueError(
+                "template field 'roles' was removed because fixture context is the role authority"
+            )
         if isinstance(data, dict) and data.get("metadata") is None:
             data["metadata"] = {}
         return data

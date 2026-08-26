@@ -30,7 +30,6 @@ from twinklr.core.sequencer.moving_heads.libraries.movement import MovementType
 from twinklr.core.sequencer.moving_heads.templates.library import register_template
 from twinklr.core.sequencer.moving_heads.templates.utils import (
     PoseByRoleHelper,
-    TemplateRoleHelper,
 )
 
 
@@ -43,13 +42,11 @@ def make_template() -> TemplateDoc:
             version=2,
             name="Intro Main Outro Phrase",
             category=TemplateCategory.MEDIUM_ENERGY,
-            roles=TemplateRoleHelper.IN_OUT_LEFT_RIGHT,
             # The cycle is the whole phrase: intro (bars 0-2), main (2-6), outro (6-8).
             # It used to name only "main", so the FADE_IN entry and FADE_OUT exit --
             # the point of the template -- were never scheduled. JOINER, not
             # PING_PONG: a phrase does not play outro -> main -> intro.
             repeat=RepeatContract(
-                repeatable=True,
                 mode=RepeatMode.JOINER,
                 cycle_bars=8.0,
                 loop_step_ids=["intro", "main", "outro"],
@@ -82,7 +79,6 @@ def make_template() -> TemplateDoc:
                         intensity=Intensity.SMOOTH,
                         min_norm=0.10,
                         max_norm=1.00,
-                        cycles=1.0,
                     ),
                 ),
                 TemplateStep(
@@ -115,7 +111,6 @@ def make_template() -> TemplateDoc:
                         intensity=Intensity.DRAMATIC,
                         min_norm=0.15,
                         max_norm=1.00,
-                        cycles=2.0,
                     ),
                 ),
                 TemplateStep(
@@ -143,7 +138,6 @@ def make_template() -> TemplateDoc:
                         intensity=Intensity.SMOOTH,
                         min_norm=0.10,
                         max_norm=1.00,
-                        cycles=1.0,
                     ),
                 ),
             ],

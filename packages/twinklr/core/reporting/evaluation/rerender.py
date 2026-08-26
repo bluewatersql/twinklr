@@ -104,10 +104,7 @@ async def rerender_plan(
     from twinklr.core.config.models import AppConfig, JobConfig
 
     # Create job_config first
-    job_config = JobConfig(
-        project_name="eval_report",
-        fixture_config_path=str(fixture_config_path),
-    )
+    job_config = JobConfig(fixture_config_path=str(fixture_config_path))
 
     # Create minimal configs for audio analysis
     app_config = AppConfig.load_or_default()

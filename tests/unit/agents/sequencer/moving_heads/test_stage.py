@@ -440,7 +440,7 @@ class TestMovingHeadStageCheckpointWriter:
         from twinklr.core.session import TwinklrSession
 
         session = TwinklrSession(
-            job_config=JobConfig(project_name="stage_test", write_checkpoint=write_checkpoint),
+            job_config=JobConfig(write_checkpoint=write_checkpoint),
             session_id="stage-test-session",
             project_root=tmp_path,
         )
@@ -515,7 +515,7 @@ class TestMovingHeadStageCheckpointWriter:
         from twinklr.core.session import TwinklrSession
 
         session = TwinklrSession(
-            job_config=JobConfig(project_name="stage_test"),
+            job_config=JobConfig(),
             session_id="stage-test-session",
             project_root=tmp_path,
         )

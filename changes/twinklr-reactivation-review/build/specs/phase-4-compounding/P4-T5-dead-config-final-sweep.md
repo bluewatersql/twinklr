@@ -8,8 +8,9 @@ Verifier: opus · Depends on: P1P/P2P/P3 wiring done (per
 
 ## Objective
 
-Resolve every remaining CC-1 dead-configuration member to exactly one of two states —
-**wired-with-a-behavior-test** or **deleted-with-docs-corrected** — and ship a
+Resolve every remaining CC-1 dead-configuration member to exactly one of three states —
+**wired-with-a-behavior-test**, **fixed-policy-with-an-invariant-test**, or
+**deleted-with-a-P4-T6 documentation disposition** — and ship a
 generated knob-inventory test that walks every declared config field and fails CI if
 that field has neither a registered observable-effect test nor a registered removal
 record. This test is the phase's real deliverable: it turns "dead config" from a
@@ -235,7 +236,19 @@ integration, this registry consumes its observable CLI logging and HTTP
 retry/timeout evidence and records its two circuit-breaker deletions. The remaining
 `job.agent.llm_logging.sanitize` forwarding gap was fixed red-first in P4-T5.
 
-Pre-reconciliation evidence: the full offline suite passed with 5,303 tests and 39
-skips; Ruff passed; mypy reported no issues in 721 source files. The frozen commit
-identity and fresh post-reconciliation `make validate` evidence are recorded in the
-task handoff.
+The first post-P4-T4 candidate, `607bf19`, is preserved as rejected evidence. Its
+registry used generic smoke/fingerprint pointers, collapsed fixture union alternatives,
+allowed representative removed App/Job keys to be silently ignored, and overstated its
+handoff evidence. None of that candidate's passing counts constitutes acceptance.
+
+The remediated implementation type-qualifies union alternatives, validates every pytest
+node ID by collection, and gives each live canonical path an exact non-default mutation
+at a shipped seam. App/Job migration validators reject only the specifically removed
+keys, preserving unrelated forward-compatible extras. Confirmed-zero-reader App/Job,
+audio, fixture, and template leaves are absent from schema and retained as `REMOVED`
+ledger entries for P4-T6; fixed literals use `INVARIANT_TEST` rather than fabricated
+effects. Fresh focused evidence is 106 inventory/collection tests plus the behavioral
+matrix (all passing); Ruff and formatting are clean; mypy reports no issues in 719
+source files. The final frozen commit identity and fresh full `make validate` evidence
+belong in the task handoff after the gate completes; this specification does not
+self-approve the candidate.
