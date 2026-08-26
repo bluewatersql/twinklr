@@ -305,18 +305,43 @@ async def test_transition_preserves_attempt_one_and_seals_authorization(
     )
 
 
-def test_dirty_committed_manifest_is_rejected(tmp_path: Path) -> None:
-    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
-    subprocess.run(["git", "config", "user.email", "probe@example.invalid"], cwd=tmp_path)
-    subprocess.run(["git", "config", "user.name", "Probe Test"], cwd=tmp_path)
-    tracked = tmp_path / "tracked.txt"
+def _clean_git_repo(tmp_path: Path) -> Path:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
+    subprocess.run(["git", "config", "user.email", "probe@example.invalid"], cwd=repo)
+    subprocess.run(["git", "config", "user.name", "Probe Test"], cwd=repo)
+    tracked = repo / "tracked.txt"
     tracked.write_text("clean\n")
-    subprocess.run(["git", "add", "tracked.txt"], cwd=tmp_path, check=True)
-    subprocess.run(["git", "commit", "-qm", "fixture"], cwd=tmp_path, check=True)
-    REAL_ASSERT_CLEAN_COMMITTED_MANIFEST(tmp_path)
+    subprocess.run(["git", "add", "tracked.txt"], cwd=repo, check=True)
+    subprocess.run(["git", "commit", "-qm", "fixture"], cwd=repo, check=True)
+    return repo
+
+
+def test_dirty_committed_manifest_is_rejected(tmp_path: Path) -> None:
+    repo = _clean_git_repo(tmp_path)
+    REAL_ASSERT_CLEAN_COMMITTED_MANIFEST(repo)
+    tracked = repo / "tracked.txt"
     tracked.write_text("dirty\n")
     with pytest.raises(ProbePreflightError, match="clean committed"):
-        REAL_ASSERT_CLEAN_COMMITTED_MANIFEST(tmp_path)
+        REAL_ASSERT_CLEAN_COMMITTED_MANIFEST(repo)
+
+
+@pytest.mark.parametrize(
+    "relative_path",
+    [
+        Path("sitecustomize.py"),
+        Path("packages/twinklr/core/agents/providers/untracked_provider.py"),
+    ],
+)
+def test_untracked_execution_inputs_are_rejected(tmp_path: Path, relative_path: Path) -> None:
+    repo = _clean_git_repo(tmp_path)
+    REAL_ASSERT_CLEAN_COMMITTED_MANIFEST(repo)
+    candidate = repo / relative_path
+    candidate.parent.mkdir(parents=True, exist_ok=True)
+    candidate.write_text("raise RuntimeError('must never affect the probe')\n")
+    with pytest.raises(ProbePreflightError, match="clean committed"):
+        REAL_ASSERT_CLEAN_COMMITTED_MANIFEST(repo)
 
 
 def _valid_plan(root: Path) -> dict[str, Any]:

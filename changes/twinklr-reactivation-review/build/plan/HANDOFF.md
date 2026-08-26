@@ -143,6 +143,16 @@ offline implementation lane is not the same as satisfying its phase exit criteri
   clean; mypy clean across `731` source files; and `git diff --check` clean. No
   provider/network/live call was made. Independent audit remains required before the
   single authorized request.
+- Independent review rejected amendment candidate `f0557b9`: its clean-manifest
+  preflight excluded untracked files, allowing a root `sitecustomize.py` or a file under
+  a transitive source root to bypass the gate. Two discriminators failed before the fix
+  and pass after changing the preflight to `--untracked-files=all`. The rejected commit
+  is preserved as audit history; its pins are invalid for execution. No provider/live
+  call or canonical-ledger mutation occurred. Fresh remediation gates and pins must be
+  recorded from the follow-up clean commit before independent re-review.
+  Fresh remediation author gates are harness `52 passed`, full offline suite `5367
+  passed, 38 skipped`, `1361` files already formatted, Ruff clean, mypy clean across
+  `731` source files, and `git diff --check` clean.
 
 ### Phase 2P offline implementation record
 

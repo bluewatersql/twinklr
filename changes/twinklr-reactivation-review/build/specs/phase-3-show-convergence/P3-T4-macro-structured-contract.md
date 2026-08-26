@@ -644,6 +644,25 @@ passed`; repository format `1361 files already formatted`; Ruff clean; mypy clea
 `731 source files`; full offline suite `5365 passed, 38 skipped`; `git diff --check`
 clean. No provider/network/live call was made by any gate.
 
+#### Independent preflight rejection and remediation
+
+Independent review rejected candidate `f0557b9` because its clean-manifest check used
+`git status --untracked-files=no`. An untracked repository-root `sitecustomize.py` or an
+untracked file beneath a transitive source root could therefore influence Python import
+or probe behavior without failing preflight. The rejected commit remains audit history
+and is not an executable candidate.
+
+Two public-seam discriminators reproduced the bypass (`2 failed`): one root bootstrap
+file and one file under `packages/twinklr/core/agents/providers/`. The remediation uses
+`--untracked-files=all`, and both discriminators now pass. Ignored owner-local files
+remain governed by the existing explicit overlay checks; every non-ignored untracked
+path now makes the repository manifest dirty. No provider/network/live call or canonical
+ledger mutation occurred during review or remediation.
+
+Fresh remediation author gates: dedicated harness `52 passed`; repository format `1361
+files already formatted`; Ruff clean; mypy clean across `731 source files`; full offline
+suite `5367 passed, 38 skipped`; `git diff --check` clean.
+
 ## Effort & risk
 
 **Size: L.** Design-bearing, touches the schema seam three other tasks build on.

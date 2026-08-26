@@ -217,7 +217,7 @@ def _integrity_key(path: Path) -> bytes:
 
 def _assert_clean_committed_manifest(repo_root: Path) -> None:
     result = subprocess.run(
-        ["git", "status", "--porcelain=v1", "--untracked-files=no"],
+        ["git", "status", "--porcelain=v1", "--untracked-files=all"],
         cwd=repo_root,
         check=True,
         capture_output=True,
