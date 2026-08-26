@@ -55,16 +55,20 @@ from twinklr.core.sequencer.planning import MacroPlan
 from twinklr.core.sequencer.templates.group.store import TemplateStore
 
 PROBE_ID = "P3-T4-owner-macro-probe-v1"
+AUTHORIZATION_ID = "p3-t4-second-attempt-owner-approved-2026-08-26"
+EXPECTED_PRIOR_LEDGER_HASH = "97c38f6c4bd2facc7bfc0488a991ac79e0d454e04fb177728317224a32babcdc"
+EXPECTED_PRIOR_ATTEMPT_HASH = "29802ebe121b5284e33d201bf79df7ee6901bf33204765ca5b43487a6d33b562"
 DEFAULT_ENDPOINT = "https://api.openai.com/v1"
 EXPECTED_SCHEMA_HASH = "5f0f842f98d7a27dec1d0f5eebe9f6549bb9ddb95930e1b4e47960cbea7d18d8"
 EXPECTED_RESPONSE_SCHEMA_HASH = "b814e8b70cbfbacdaa2e5752cefc001249f03bfcd111245bc2d6b2006641b012"
 EXPECTED_PROMPT_HASH = "166a109923323ef7df0a62a0424677782a5033102e748f4007fa9cdfd0a9038e"
 DEFAULT_FIXTURE = Path("tests/fixtures/p3_t4_macro_probe/context.json")
-MAX_TASK_ATTEMPTS = 3
+MAX_TASK_ATTEMPTS = 2
 MAX_OUTPUT_TOKENS = 8_000
 MAX_PROMPT_TOKENS = 70_000
 MAX_SERIALIZED_REQUEST_BYTES = 70_000
-HARD_USD_CAP = Decimal("1.75")
+HARD_USD_CAP = Decimal("3.32")
+SECOND_ATTEMPT_PREAUTHORIZATION = Decimal("1.660000")
 PRICE_INPUT_PER_M = Decimal("10.00")
 PRICE_REASONING_PER_M = Decimal("60.00")
 PRICE_COMPLETION_PER_M = Decimal("60.00")
@@ -83,6 +87,9 @@ class ProbeRequest:
     expected_input_hash: str
     expected_catalog_hash: str
     expected_request_hash: str
+    authorization_id: str
+    expected_prior_ledger_hash: str
+    expected_prior_attempt_hash: str
     preauthorize_usd: Decimal
     opt_in: bool
     api_key: str | None
@@ -208,6 +215,18 @@ def _integrity_key(path: Path) -> bytes:
     return key
 
 
+def _assert_clean_committed_manifest(repo_root: Path) -> None:
+    result = subprocess.run(
+        ["git", "status", "--porcelain=v1", "--untracked-files=no"],
+        cwd=repo_root,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    if result.stdout.strip():
+        raise ProbePreflightError("probe requires a clean committed source manifest")
+
+
 def _assert_regular_owner_file(path: Path, mode: int, label: str) -> None:
     info = path.lstat()
     if not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid():
@@ -288,6 +307,74 @@ def _spend_summary(document: dict[str, Any]) -> dict[str, str]:
         "reserved_usd": str(reserved),
         "committed_usd": str(actual + reserved),
         "task_cap_usd": str(HARD_USD_CAP),
+    }
+
+
+def _unsigned_ledger_hash(document: dict[str, Any]) -> str:
+    return _sha(
+        _canonical(
+            {key: value for key, value in document.items() if key != "integrity_hmac_sha256"}
+        )
+    )
+
+
+def _validate_prior_history(document: dict[str, Any], request: ProbeRequest) -> None:
+    if request.authorization_id != AUTHORIZATION_ID:
+        raise ProbePreflightError("second-attempt owner authorization ID does not match")
+    if request.expected_prior_ledger_hash != EXPECTED_PRIOR_LEDGER_HASH:
+        raise ProbePreflightError("owner-audited prior ledger hash input does not match")
+    if request.expected_prior_attempt_hash != EXPECTED_PRIOR_ATTEMPT_HASH:
+        raise ProbePreflightError("owner-audited prior attempt hash input does not match")
+    if _unsigned_ledger_hash(document) != EXPECTED_PRIOR_LEDGER_HASH:
+        raise ProbePreflightError("canonical prior ledger hash does not match owner audit")
+    attempts = document.get("attempts")
+    if not isinstance(attempts, list) or len(attempts) != 1:
+        raise ProbePreflightError("exactly one canonical prior attempt is required")
+    prior = attempts[0]
+    if _sha(_canonical(prior)) != EXPECTED_PRIOR_ATTEMPT_HASH:
+        raise ProbePreflightError("canonical prior attempt hash does not match owner audit")
+    expected = {
+        "attempt": 1,
+        "outcome": "failed",
+        "provider_request_count": 1,
+        "logical_request_count": 0,
+        "reserved_cost_usd": "1.660000",
+    }
+    if any(prior.get(field) != value for field, value in expected.items()):
+        raise ProbePreflightError("canonical prior attempt facts do not match owner audit")
+    if "actual_cost_usd" in prior:
+        raise ProbePreflightError("canonical prior attempt unexpectedly records actual cost")
+    if "usage_unavailable" not in prior:
+        raise ProbePreflightError("canonical prior attempt must record unavailable usage")
+    if prior.get("usage") != {
+        "prompt_tokens": 0,
+        "reasoning_tokens": 0,
+        "completion_tokens": 0,
+        "total_tokens": 0,
+    }:
+        raise ProbePreflightError("canonical prior attempt must record zero unavailable usage")
+    if any(item.get("outcome") == "passed" for item in attempts):
+        raise ProbePreflightError("canonical prior history unexpectedly contains success")
+    recomputed = {
+        "actual_usd": "0",
+        "reserved_usd": "1.660000",
+        "committed_usd": "1.660000",
+        "task_cap_usd": "1.75",
+    }
+    if document.get("spend") != recomputed:
+        raise ProbePreflightError("canonical prior spend does not match recomputed owner audit")
+
+
+def _authorization_amendment() -> dict[str, str]:
+    return {
+        "authorization_id": AUTHORIZATION_ID,
+        "authorized_on": "2026-08-26",
+        "prior_unsigned_ledger_sha256": EXPECTED_PRIOR_LEDGER_HASH,
+        "prior_attempt_sha256": EXPECTED_PRIOR_ATTEMPT_HASH,
+        "additional_attempts": "1",
+        "additional_preauthorization_usd": str(SECOND_ATTEMPT_PREAUTHORIZATION),
+        "new_max_task_attempts": str(MAX_TASK_ATTEMPTS),
+        "new_hard_total_task_usd": str(HARD_USD_CAP),
     }
 
 
@@ -478,6 +565,7 @@ def _identity(repo_root: Path, fixture: Path) -> tuple[dict[str, Any], PlanningC
             "hard_total_task_usd": str(HARD_USD_CAP),
             "worst_case_usd": str(_preauthorized_worst_cost()),
         },
+        "owner_authorization": _authorization_amendment(),
     }
     return identity, context
 
@@ -494,9 +582,14 @@ async def run_probe(
         raise ProbePreflightError("explicit --live opt-in is required")
     if not request.api_key:
         raise ProbePreflightError("OPENAI_API_KEY is required")
+    _assert_clean_committed_manifest(request.repo_root.resolve())
     state_root, evidence, key_path = _canonical_state_paths()
     if state_root.resolve().is_relative_to(request.repo_root.resolve()):
         raise ProbePreflightError("canonical owner-state directory must be outside the repository")
+    if state_root.is_symlink():
+        raise ProbePreflightError("canonical owner-state directory must not be a symlink")
+    if not state_root.exists() or not evidence.exists() or not key_path.exists():
+        raise ProbePreflightError("existing canonical ledger and integrity key are required")
     _assert_safe_state_path(state_root)
     lock_path = state_root / "probe.lock"
     if lock_path.is_symlink() or evidence.is_symlink():
@@ -559,34 +652,23 @@ async def _run_probe_locked(
         }
     )
     worst = _preauthorized_worst_cost()
-    if (
-        worst > HARD_USD_CAP
-        or request.preauthorize_usd < worst
-        or request.preauthorize_usd > HARD_USD_CAP
-    ):
+    if worst != SECOND_ATTEMPT_PREAUTHORIZATION or request.preauthorize_usd != worst:
         raise ProbePreflightError(
-            f"preauthorization must cover ${worst} without exceeding hard cap ${HARD_USD_CAP}"
+            f"preauthorization must equal the owner-approved ${SECOND_ATTEMPT_PREAUTHORIZATION}"
         )
 
-    document: dict[str, Any]
-    if evidence.exists():
-        _assert_regular_owner_file(evidence, 0o600, "probe ledger")
-        document = json.loads(evidence.read_text(encoding="utf-8"))
-        _verify_seal(document, integrity_key)
-    else:
-        document = {"probe_id": PROBE_ID, "attempts": []}
-    if any(item.get("outcome") == "passed" for item in document["attempts"]):
-        raise ProbePreflightError("terminal successful probe already recorded")
+    _assert_regular_owner_file(evidence, 0o600, "probe ledger")
+    document: dict[str, Any] = json.loads(evidence.read_text(encoding="utf-8"))
+    _verify_seal(document, integrity_key)
     if len(document["attempts"]) >= MAX_TASK_ATTEMPTS:
-        raise ProbePreflightError("hard task-attempt cap of 3 is exhausted")
-    prior_spend = _spend_summary(document)
-    if Decimal(prior_spend["committed_usd"]) + worst > HARD_USD_CAP:
-        raise ProbePreflightError(
-            "total P3-T4 task budget cannot reserve the next worst-case attempt"
-        )
+        raise ProbePreflightError("hard task-attempt cap of 2 is exhausted; no third attempt")
+    _validate_prior_history(document, request)
+    prior_spend = Decimal("1.660000")
+    if prior_spend + worst != HARD_USD_CAP:
+        raise ProbePreflightError("owner-approved cumulative P3-T4 task budget is inconsistent")
 
     attempt: dict[str, Any] = {
-        "attempt": len(document["attempts"]) + 1,
+        "attempt": 2,
         "command": request.command,
         "identity": identity,
         "started_at": datetime.now(UTC).isoformat(),
@@ -603,6 +685,7 @@ async def _run_probe_locked(
         "provider_request_count": 0,
         "logical_request_count": 0,
     }
+    document["authorization_amendments"] = [_authorization_amendment()]
     document["attempts"].append(attempt)
     document["spend"] = _spend_summary(document)
     _atomic_write(evidence, _seal(document, integrity_key))  # a crash still consumes the attempt

@@ -29,8 +29,12 @@ _Last updated: 2026-08-26._
   by OpenAI with HTTP 400 `invalid_json_schema` because `ThemeRef.scope` had a `$ref`
   sibling `description`; no retry or fallback occurred. Usage was unavailable, so the
   full `$1.66` reservation remains committed and the remaining `$0.09` cannot fund a
-  second attempt. The general `$ref` normalization fix is integrated and offline-verified,
-  but live acceptance remains open. No further P3-T4 live attempt is authorized. The
+  second attempt. The general `$ref` normalization fix is integrated and offline-verified.
+  On 2026-08-26 the owner authorized exactly one second audited request under
+  authorization `p3-t4-second-attempt-owner-approved-2026-08-26`, with exact additional
+  `$1.660000` preauthorization, a `$3.32` cumulative hard cap, and a two-attempt lifetime
+  cap. Its fail-closed amendment is an unexecuted candidate pending independent audit;
+  no third attempt is authorized and live acceptance remains open. The
   owner subsequently accepted all nine P3-T5 decisions, and P3-T5 was integrated at
   `f006468`. P3-T6's remediated candidate then received independent standards,
   specification, and adversarial approval offline/in code and was integrated at
@@ -38,8 +42,10 @@ _Last updated: 2026-08-26._
   waive the outstanding Phase 1P/2P/2K exits, close P3-T4 live acceptance, or authorize
   P3-T5 live work or any paid/local empirical action. On 2026-08-26 the owner accepted
   P3-T6's amended offline unified-emission contract. Its empirical xLights GUI
-  acceptance remains open, and its integration does not authorize P3-T7+, live xLights
-  work, or any earlier empirical exit.
+  acceptance remains open. The owner authorized P3-T7+ and task-bounded live/paid work
+  on 2026-08-26. All xLights GUI dates/checks remain deferred until a meaningful,
+  fully working end-to-end show exists; their empirical gates and all earlier empirical
+  exits remain open.
   Phase 4 has not started. The overall change
   therefore remains active.
   Live execution state, process rules, and pending owner actions:

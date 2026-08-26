@@ -14,14 +14,17 @@ recorded for display output; assets pipeline optionally enriching Pictures effec
 > contract/invariants and AC2 amendment; independent offline/code reviews approved the
 > implementation and general `$ref` remediation, integrated at `558153c`. P3-T4 live
 > acceptance remains open after one HTTP 400 `invalid_json_schema`; no retry/fallback
-> occurred, usage was unavailable, `$1.66` is committed, and `$0.09` remains. No further
-> P3-T4 live attempt is authorized. The owner subsequently accepted all nine P3-T5
+> occurred and usage was unavailable, so `$1.660000` remains committed. On 2026-08-26
+> the owner authorized exactly one second audited request under a new `$3.32` cumulative
+> cap; no third attempt is authorized. The owner subsequently accepted all nine P3-T5
 > decisions, and P3-T5 was integrated at `f006468`. P3-T6's remediated offline/code
 > candidate received independent standards, specification, and adversarial approval and
 > was integrated at `c9620db`. Phase 3 now has six of eight tasks integrated. P3-T6
-> empirical xLights GUI acceptance remains open. These exceptions do not waive the Phase
-> 1P/2P/2K exits, close P3-T4 live acceptance, authorize live work, authorize P3-T7+, or
-> authorize any paid/local empirical action.
+> empirical xLights GUI acceptance remains open. The owner authorized P3-T7+ and its
+> task-bounded live/paid work on 2026-08-26. All xLights GUI dates/checks remain deferred
+> until there is a meaningful, fully working end-to-end show; the gates remain open and
+> are not waived. These exceptions do not waive the Phase 1P/2P/2K exits or close P3-T4
+> live acceptance.
 
 ## Lanes
 
@@ -49,9 +52,12 @@ recorded for display output; assets pipeline optionally enriching Pictures effec
 - P3-T1 through P3-T6 are integrated at the commits recorded in the campaign handoff;
   P3-T6 is integrated at `c9620db` after independent standards, specification, and
   adversarial approval offline/in code.
-- P3-T4 live acceptance remains open after the single capped attempt; no further attempt
-  is authorized or fundable within the approved task cap.
-- P3-T6 empirical xLights GUI acceptance remains open. P3-T7+ remains unauthorized. The
+- P3-T4 live acceptance remains open after attempt 1. Exactly one second audited request
+  is owner-authorized under the sealed-history, two-attempt, `$3.32` contract; no third
+  attempt is authorized.
+- P3-T6 empirical xLights GUI acceptance remains open, with its date deferred until a
+  meaningful end-to-end show is fully working. P3-T7+ and task-bounded live/paid work
+  are owner-authorized. The
   Phase 1P/2P/2K empirical exits remain open and are not implied by P3-T6 integration.
 
 ## Notes for spec authors

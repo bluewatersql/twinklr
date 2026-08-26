@@ -1,11 +1,13 @@
 # Build-campaign handoff — current execution state
 
 _Last updated: 2026-08-26 after P3-T6's independently approved offline/code candidate
-was integrated at `c9620db`. P3-T6 empirical xLights GUI acceptance remains open.
-P3-T4's one live attempt remains rejected
-at the provider schema boundary; `$1.66` is committed and the remaining `$0.09` cannot
-fund another audited attempt. Live acceptance remains open and no further P3-T4 live
-attempt is authorized. P3-T7+ remains unauthorized. Maintained by the
+was integrated at `c9620db`. P3-T6 empirical xLights GUI acceptance remains open, with
+all GUI dates/checks deferred until a meaningful end-to-end show is fully working.
+P3-T4's first live attempt remains rejected at the provider schema boundary with
+`$1.660000` committed. The owner authorized exactly one second audited request under a
+two-attempt, `$3.32` cumulative contract; its fail-closed amendment is an unexecuted
+candidate pending independent audit and no third attempt is authorized. P3-T7+ and
+task-bounded live/paid work are authorized. Maintained by the
 orchestrating agent; update this file at every
 pause or phase boundary._
 
@@ -27,7 +29,7 @@ their authoring moment; this handoff owns the current campaign status.
 | 1P — Render truth | **IMPLEMENTATION MERGED AND VERIFIED** (12/12); **phase exit not complete** | The recorded human judgment and empirical xLights acceptance evidence remain pending; see [02-phase-1p-render-truth.md](02-phase-1p-render-truth.md). |
 | 2P — Creative quality | **OFFLINE IMPLEMENTATION MERGED AND VERIFIED** (13/13); **phase exit not complete** | The owner accepted T1/T8/T9 on 2026-08-16. T6 calibration/live evidence, T13/D1 evidence, and other live checks remain pending; see [04-phase-2p-creative-quality.md](04-phase-2p-creative-quality.md). |
 | 2K — Catalog growth | **TOOLING IMPLEMENTATION MERGED AND VERIFIED** (4/4); **phase exit not complete** | Tooling is ready, but coverage/corpus/curation/style exit criteria require the author's real layout, corpus, preferences, and judgments; see [05-phase-2k-catalog-growth.md](05-phase-2k-catalog-growth.md). |
-| 3 — Show convergence | **P3-T1–P3-T6 MERGED AND INDEPENDENTLY APPROVED OFFLINE/IN CODE** (6/8 integrated) | P3-T6's standards-, specification-, and adversarial-approved candidate was integrated at `c9620db`. Its empirical xLights GUI acceptance remains open. This does not waive Phase 1P/2P/2K exits, close P3-T4 live acceptance, authorize live work, or authorize P3-T7+. Earlier commits: P3-T5 `f006468`; P3-T4 `558153c`; P3-T3 `33cce57`; P3-T2 `5365f70`; P3-T1 `5eebcb2`. |
+| 3 — Show convergence | **P3-T1–P3-T6 MERGED AND INDEPENDENTLY APPROVED OFFLINE/IN CODE** (6/8 integrated) | P3-T6 is integrated at `c9620db`; its empirical xLights gate remains open and deferred to the meaningful end-to-end milestone. P3-T7+ and task-bounded live/paid work are authorized. P3-T4 has exactly one second audited request authorized; live acceptance remains open. Earlier commits: P3-T5 `f006468`; P3-T4 `558153c`; P3-T3 `33cce57`; P3-T2 `5365f70`; P3-T1 `5eebcb2`. |
 | 4 — Compounding | **NOT STARTED** | No Phase 4 implementation has started. |
 
 The overall `twinklr-reactivation-review` change remains **ACTIVE**. Finishing an
@@ -88,7 +90,8 @@ offline implementation lane is not the same as satisfying its phase exit criteri
   clean across 728 source files; `git diff --check` clean. The owner accepted all nine
   recorded decisions before integration at `f006468`. No live/provider/xLights/audio
   work was performed. P3-T6 is integrated at `c9620db`; its empirical GUI acceptance
-  remains open, and P3-T7+ is unauthorized.
+  remains open and deferred to the meaningful end-to-end milestone. P3-T7+ and its
+  task-bounded live/paid work are authorized.
 - The prior P3-T4 author snapshot was formally rejected, then its first remediation was
   narrowly rejected for reinterpreting `PlanTarget.ZONE` as physical `DisplayZone`.
   The frozen author snapshot restores the established `ChoreoTag` contract. Fresh gates:
@@ -99,7 +102,7 @@ offline implementation lane is not the same as satisfying its phase exit criteri
 - Nothing was pushed as part of this milestone.
 - The dedicated P3-T4 owner probe harness passed its safety audit and uses
   the shipped prompt/runner/orchestrator and production external validator, fails closed
-  before a call, enforces one request per attempt and three attempts total, applies a
+  before a call, enforces one request per attempt and now two attempts total, applies a
   frozen USD cap, and atomically writes owner-local evidence outside the repository.
   Offline safety tests pass. Owner live attempt 1 made exactly one provider request and
   received HTTP 400 `invalid_json_schema` because `ThemeRef.scope` contained `$ref`
@@ -110,17 +113,20 @@ offline implementation lane is not the same as satisfying its phase exit criteri
   manifest. Fresh author gates: harness `37 passed`; focused regression `534 passed`;
   goldens `73 passed, 8 skipped`; full `5276 passed, 39 skipped`; Ruff/format/mypy clean.
   Those were prerequisite author findings rather than live acceptance evidence.
-- The `$1.75` allowance is enforced as one cumulative P3-T4 task budget. Each attempt
-  reserves `$1.66`; exact metered cost replaces it only when trustworthy response
-  metadata exists. The owner must independently supply the frozen input, catalog, and
-  serialized-request hashes, and local `data/templates/` overlays are disabled.
+- The owner-authorized second-attempt amendment raises the cumulative P3-T4 hard cap to
+  exactly `$3.32`: attempt 1's committed `$1.660000` plus exactly one additional
+  `$1.660000` preauthorization. It binds authorization
+  `p3-t4-second-attempt-owner-approved-2026-08-26` to the preserved HMAC-sealed ledger,
+  prior unsigned-ledger hash `97c38f6c...babcdc`, and prior-attempt hash
+  `29802ebe...3b562`. Missing/reset/tampered history fails closed; no third attempt is
+  authorized regardless of outcome or metered cost.
 - Missing, zero-default, partial, inconsistent, or out-of-bound token usage never releases
-  an attempt's `$1.66` reservation; it is recorded as unavailable and blocks another
-  worst-case reservation under the cumulative `$1.75` cap.
-- Attempt 1 had no trustworthy usage, so its full `$1.66` reservation is permanently
-  committed. The `$0.09` remaining task budget cannot fund another attempt. The canonical
-  owner-local ledger and evidence are preserved outside the repository; live acceptance
-  remains open rather than being inferred from the offline schema fix.
+  an attempt's `$1.66` reservation; it is recorded as unavailable.
+- Attempt 1 had no trustworthy usage, so its full `$1.660000` reservation is permanently
+  committed. The canonical owner-local ledger and attempt-1 object must remain unchanged.
+  The amendment candidate atomically seals its authorization and in-progress attempt 2,
+  requires a clean committed source manifest, and has not made a provider call. Live
+  acceptance remains open rather than being inferred from the offline schema fix.
 - The post-attempt general `$ref` remediation has fresh author evidence: the three
   pre-fix discriminators now pass; strict/provider/contract/harness `122 passed`; complete
   P3-T4 planning/provider surface `638 passed`; Ruff/format/mypy clean (`723` source
@@ -131,6 +137,12 @@ offline implementation lane is not the same as satisfying its phase exit criteri
   (`38236` bytes). Independent offline/code reviews approved the remediated candidate,
   which was integrated at `558153c`. This does not convert the failed probe into live
   acceptance.
+- The unexecuted second-attempt amendment candidate has fresh offline author evidence:
+  adversarial harness `50 passed`; broader planning/provider/schema regression `408
+  passed`; full suite `5365 passed, 38 skipped`; `1361` files already formatted; Ruff
+  clean; mypy clean across `731` source files; and `git diff --check` clean. No
+  provider/network/live call was made. Independent audit remains required before the
+  single authorized request.
 
 ### Phase 2P offline implementation record
 
@@ -214,22 +226,28 @@ The remaining empirical checks are also pending:
 
 ## Continuation order
 
-1. Complete the Phase 1P human-judgment and empirical xLights exit evidence.
-2. Complete the P2P-T6 owner review and calibration gate; T1/T8/T9 were accepted on
-   2026-08-16.
-3. Run the P2P-T13 owner protocol and record a D1 outcome only if its evidence validates.
-4. Complete the Phase 2K owner-data sessions and coverage exit criteria.
-5. Reassess Phase 1P, 2P, and 2K exit criteria explicitly; do not mark a phase complete
+1. Independently audit the P3-T4 second-attempt amendment; only after GO, recompute its
+   clean-commit pins and execute exactly one request. Record the sealed result and close
+   the harness permanently to a third attempt.
+2. Continue P3-T7 and later authorized implementation, including task-bounded live/paid
+   work only through each task's recorded caps and evidence protocol.
+3. Continue non-GUI end-to-end work toward one meaningful fully working show. Defer all
+   xLights GUI dates/checks until that milestone; deferral does not satisfy or waive them.
+4. Complete the P2P-T6/P2P-T13 and Phase 2K owner-data protocols when their prerequisites
+   are met. Record no empirical outcome without its evidence.
+5. Reassess Phase 1P, 2P, 2K, and Phase 3 exits explicitly; do not mark a phase complete
    merely because its code/tooling is merged.
 
 P3-T1/P3-T2/P3-T3 are complete and independently verified. P3-T4's owner-approved
 contract/invariants, AC2 amendment, and general schema remediation were independently
 approved offline/in code and integrated at `558153c`. Its failed live attempt leaves
-live acceptance open, with no budget or authorization for another attempt. P3-T5's nine
+live acceptance open. Exactly one second audited request is authorized under the sealed
+two-attempt/`$3.32` contract; no third attempt is authorized. P3-T5's nine
 decisions are owner-accepted and its offline candidate is integrated at `f006468` while
 the earlier empirical exits remain open. P3-T6 is independently approved offline/in code
-and integrated at `c9620db`; its empirical GUI acceptance is open, and P3-T7+ remains
-unauthorized. P3-T2 deliberately leaves
+and integrated at `c9620db`; its empirical GUI acceptance is open and deferred until a
+meaningful end-to-end show is fully working. P3-T7+ and task-bounded live/paid work are
+authorized. P3-T2 deliberately leaves
 `resolved_color`, `timing_offset_beats`, and parameter-range/settings escaping work to
 their existing P3-T5/P3-T8 or display-review owners; it does not silently close them.
 

@@ -106,14 +106,21 @@ because `ThemeRef.scope` combined `$ref` with sibling `description`. No retry/fa
 occurred, usage was unavailable, and the conservative `$1.66` commitment leaves only
 `$0.09`, insufficient for another audited attempt. The general schema remediation is
 integrated and offline-verified at `558153c`, but live acceptance remains open and no
-further P3-T4 live attempt is authorized. The owner accepted all nine P3-T5 decisions,
+further P3-T4 live attempt was then authorized. On 2026-08-26 the owner approved exactly
+one second audited request: authorization
+`p3-t4-second-attempt-owner-approved-2026-08-26`, exact `$1.660000` additional
+preauthorization, `$3.32` cumulative hard cap, and two-attempt lifetime cap. The
+fail-closed amendment is an unexecuted candidate pending independent audit; no third
+attempt is authorized. The owner accepted all nine P3-T5 decisions,
 and P3-T5 was integrated at `f006468`. On 2026-08-26 the owner accepted P3-T6's offline
 unified-emission contract. Formal first review rejected the initial snapshot; standards,
 specification, and adversarial review then approved the remediation offline/in code, and
 it was integrated at `c9620db`, bringing Phase 3 to six of eight tasks integrated. P3-T6
-empirical xLights GUI acceptance remains open. These integrations do not waive the
-earlier exits, close P3-T4 live acceptance, authorize live xLights work, or authorize
-P3-T7+. Phase 4 has not started.
+empirical xLights GUI acceptance remains open. The owner authorized P3-T7+ and
+task-bounded live/paid work on 2026-08-26. xLights GUI dates/checks remain deferred until
+a meaningful end-to-end show is fully working; the empirical gates remain open. These
+integrations and authorizations do not waive the earlier exits or close P3-T4 live
+acceptance. Phase 4 has not started.
 
 The authoritative current task/gate list is the campaign
 [HANDOFF.md](../changes/twinklr-reactivation-review/build/plan/HANDOFF.md). Most notably,
