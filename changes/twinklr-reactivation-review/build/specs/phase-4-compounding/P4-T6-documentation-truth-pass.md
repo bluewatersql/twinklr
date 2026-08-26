@@ -297,3 +297,20 @@ make validate:
 No xLights GUI, provider, paid, audio, or live action was performed during P4-T6.
 The original phrases retained above remain historical task evidence; current-truth
 scopes (`README.md`, `docs/`, and `context/`) were checked separately.
+
+### Independent-verifier rejection and narrow remediation — 2026-08-26
+
+The independent verifier rejected candidate `827c8b6` because
+`docs/user-guide.md` still described the moving-head loop as
+`planner -> validator -> judge`. That remaining label contradicted both shipped behavior
+and the corrected architecture documentation. The narrow remediation replaces it with
+`planner -> deterministic heuristics -> judge` and adds a document-contract assertion
+that rejects the stale phrase while requiring the shipped one. No other behavior or
+documentation scope changed. A new candidate identity and focused evidence supersede the
+rejected freeze; independent re-verification remains required.
+
+The same remediation audit also corrected the context index's matching validator label,
+made the README distinguish optional ML package installation from the currently deferred
+and FFmpeg-9-unavailable WhisperX/TorchCodec runtime, and replaced two volatile user-guide
+line-number citations with stable path-and-symbol references. Contract assertions cover
+all three current-truth seams and verify that cited Python paths exist.

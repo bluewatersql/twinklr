@@ -99,7 +99,8 @@ fail before pipeline execution when their configured key is empty.
 `.env` file automatically — export the variable in your shell (or set it in your shell
 profile) rather than relying on a `.env` file.
 
-_Source: `packages/twinklr/cli/main.py:158-163`_
+_Source: `packages/twinklr/cli/main.py` (`build_run_pipeline`) and
+`packages/twinklr/core/agents/providers/factory.py` (`validate_llm_provider_config`)_
 
 ### Optional: Additional API Keys
 
@@ -295,7 +296,8 @@ Defines the physical moving head fixtures — names, DMX channels, and positions
 
 Each fixture's `dmx_mapping` also declares the value the render exports for that channel when the choreography never writes to it: `shutter_default` (0-255, defaults to `255` — open), and `color_map`/`gobo_map`'s `"open"` entry for color and gobo. A channel the mapping does not declare at all (e.g. `shutter_channel: null`) is omitted from the exported settings string rather than defaulted.
 
-_Source: `packages/twinklr/cli/main.py:50-59` (`_resolve_fixture_config_path`), `packages/twinklr/core/config/fixtures/dmx.py` (`DmxMapping`)_
+_Source: `packages/twinklr/cli/main.py` (`_resolve_fixture_config_path`) and
+`packages/twinklr/core/config/fixtures/dmx.py` (`DmxMapping`)_
 
 ---
 
@@ -475,7 +477,7 @@ The `twinklr run` command executes the moving heads pipeline with these stages:
 2. **Audio Profiling** (`profile`) — LLM generates musical interpretation and creative guidance from the analysis.
 3. **Lyrics Analysis** (`lyrics`) — conditional stage; runs only if lyrics are detected. Produces narrative and thematic context.
 4. **Macro Planning** (`macro`) — LLM generates a high-level choreography strategy across all display groups.
-5. **Moving Head Planning** (`moving_heads`) — multi-agent loop (planner -> validator -> judge) generates a `ChoreographyPlan` with template selections and parameters per section.
+5. **Moving Head Planning** (`moving_heads`) — multi-agent loop (planner -> deterministic heuristics -> judge) generates a `ChoreographyPlan` with template selections and parameters per section.
 6. **Rendering** (`render`) — compiles the plan into DMX values, curve data, and fixture segments, then writes the delivery: a fresh `.xsq`, one `.xtiming` per timing track, and an `.xmap`.
 
 _Source: `packages/twinklr/core/pipeline/definitions/moving_heads.py` and `common.py`_

@@ -341,6 +341,19 @@ passed`; Ruff and `git diff --check` are clean. Independent verification approve
 final remediation, which is integrated at `05f24d0`. The current combined-main gate is
 single-owned by [context/current-state.md](../../../../context/current-state.md).
 
+P4-T6 candidate `827c8b6` completed the documentation truth pass and full validation but
+was independently rejected for one residual stale label in `docs/user-guide.md`: the
+moving-head loop still said `planner -> validator -> judge`. The author remediation
+changes that exact wording to `planner -> deterministic heuristics -> judge` and adds a
+document-contract regression assertion. The replacement candidate remains pending
+independent re-verification and is not integrated.
+
+The remediation audit also aligns `context/INDEX.md` with the heuristic loop, makes the
+README distinguish installable optional ML dependencies from the still-deferred and
+FFmpeg-9-unavailable WhisperX/TorchCodec runtime, and replaces the user guide's stale
+credential/fixture line-number citations with stable symbol references. Regression
+assertions protect these statements and cited Python paths.
+
 ## Binding orchestration rules
 
 - Use executor/verifier separation; an author never approves their own work.

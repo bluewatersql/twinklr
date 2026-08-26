@@ -14,7 +14,7 @@ Durable, current project truth. Each document is a concise summary that links in
 ## Architecture
 
 - [architecture/pipeline.md](architecture/pipeline.md) — the four-stage pipeline and subsystem map
-- [architecture/multi-agent-planning.md](architecture/multi-agent-planning.md) — planner/validator/judge loop, categorical planning, schema auto-injection
+- [architecture/multi-agent-planning.md](architecture/multi-agent-planning.md) — planner/heuristics/judge loop, categorical planning, schema auto-injection
 
 ## Engineering
 

@@ -58,7 +58,7 @@ Audio File (.mp3)
 
 ## Features
 
-- **Full Audio Analysis** — tempo, beat grid, energy dynamics, section detection, harmonic content, lyrics with multi-source fallback (embedded tags, LRCLib, Genius, WhisperX)
+- **Full Audio Analysis** — tempo, beat grid, energy dynamics, section detection, harmonic content, and lyrics with multi-source fallback (embedded tags, LRCLib, Genius, and optional WhisperX; its runtime remains deferred and unavailable with the default FFmpeg 9)
 - **Multi-Agent Orchestration** — iterative planner/heuristic/judge loop with structured feedback and automatic refinement
 - **Categorical Planning** — LLM reasons in semantic terms (WHISPER/SOFT/MED/STRONG/PEAK intensity, HIT/BURST/PHRASE/EXTENDED/SECTION duration) while the renderer maps to precise DMX values
 - **Template Library** — pre-built choreography units (fan formations, sweeps, chases, pulses) with presets and phase offsets for fixture-to-fixture coordination
@@ -94,6 +94,10 @@ For full audio features including WhisperX transcription:
 ```bash
 make install-dev   # Includes ML dependencies (~2GB+)
 ```
+
+This installs the optional ML packages but does not establish WhisperX runtime readiness:
+WhisperX/TorchCodec execution remains owner-deferred and unavailable with Twinklr's
+current default FFmpeg 9.
 
 For optional cached Demucs stem features on supported systems:
 
