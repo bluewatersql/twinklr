@@ -79,10 +79,11 @@ not by an automated check.
 
 ## Target behavior
 
-- Every config field declared anywhere in `config/models.py` (and any other
-  Pydantic config model reachable from `AppConfig`/`JobConfig`) is in exactly one of
-  two states: **wired** (a test proves changing the field's value changes observable
-  program behavior) or **removed** (the field no longer exists, and if it was
+- Every field under the explicitly enumerated external Pydantic roots `AppConfig`,
+  `JobConfig`, `FixtureGroup`, and `TemplateDoc` is in exactly one of three states:
+  **wired** (a test proves changing the field's value changes observable program
+  behavior), **invariant** (a test proves the fixed policy literal and rejects
+  alternatives), or **removed** (the field no longer exists, and if it was
   documented, the doc is corrected — coordinate with P4-T6).
 - A generated test (see Implementation approach) enumerates every currently-declared
   config field and fails if a field has neither a registered effect-test reference
@@ -98,23 +99,24 @@ the final wired/removed list to P4-T6.
 
 **The knob-inventory test mechanism (this task's core deliverable):**
 
-1. **Enumeration**: write a helper that walks every Pydantic model reachable from
-   `AppConfig` and `JobConfig` (recursive `model_fields` introspection over nested
-   models — `AgentConfig`, `AgentOrchestrationConfig`, `IterationConfig`, template
-   `BaseTiming`, fixture/channel config, etc.) and produces a flat list of
-   `(model_name, field_name)` pairs. This is the "every documented config key"
-   surface — it must be driven by the Pydantic schema itself (source of truth),
-   not a hand-maintained list that can drift from the schema the way
-   `docs/user-guide.md` drifted from the code.
+1. **Enumeration**: write a helper that recursively walks the explicit external
+   roots `AppConfig`, `JobConfig`, `FixtureGroup`, and `TemplateDoc` using
+   `model_fields` introspection over nested and union models, and produces canonical
+   full paths. Repeated roles and fixture alternatives remain distinct paths. This
+   is the accounted external surface — it must be driven by the Pydantic schema
+   itself (source of truth), not a hand-maintained list that can drift from the
+   schema the way `docs/user-guide.md` drifted from the code.
 2. **Registry**: a single file (e.g.
    `tests/config_effects_registry.py` or a YAML/TOML sidecar — executor's choice,
    but it must be a single source checked into the tree, not scattered
-   annotations) mapping each `(model_name, field_name)` pair to one of:
+   annotations) mapping each canonical full path to one of:
    - `EFFECT_TEST = "tests.path.to.test_function_name"` — a pointer to an existing
      test that sets the field to a non-default value and asserts an observable
      difference (log line, emitted DMX byte, API request body shape, cache-key
      content, exception raised, etc. — whatever "observable effect" means for that
      field).
+   - `INVARIANT_TEST = "tests.path.to.test_function_name"` — a pointer to an
+     existing test proving a fixed policy literal and rejection of alternatives.
    - `REMOVED = "<task-id>, <date>, <one-line reason>"` — for fields deleted before
      this test existed, or fields this task itself removes (in which case the field
      also physically no longer exists in `config/models.py`, so it drops out of the
@@ -124,11 +126,13 @@ the final wired/removed list to P4-T6.
      finds cleaner, document the choice).
 3. **The generated test**: a single parametrized pytest test
    (`test_every_config_field_has_a_registered_effect` or similar) that iterates the
-   enumeration from step 1 and asserts each `(model_name, field_name)` pair has a
+   enumeration from step 1 and asserts each canonical full path has a
    registry entry from step 2. This test does NOT re-run every effect test itself
    (that would just be "run the test suite") — its job is **completeness**: every
-   live field has *some* accountable record, so a newly-added config field with no
-   effect test and no removal record fails CI immediately, by name, rather than
+   live field has *some* accountable record, every referenced pytest nodeid really
+   collects, and every removal is absent with a P4-T6 disposition. A newly-added
+   config field with no effect/invariant test and no removal record fails CI by
+   name, rather than
    accumulating silently the way CC-1's ~20 members did.
 4. **Populate the registry** for every currently-live field using this task's own
    wiring work (each field this task wires gets a real effect test written and
@@ -144,7 +148,7 @@ an empty/incomplete registry just produces a big red list with no context.
 
 ## Acceptance criteria
 
-- No config field reachable from `AppConfig`/`JobConfig` remains in a state where it
+- No config field under the four explicit external roots remains in a state where it
   is documented or silently present but has zero/broken behavioral effect — for
   every member in the table above (and any additional ones the enumeration surfaces
   that weren't in the review's original ~20), the state is wired-with-test or
@@ -190,3 +194,48 @@ Mitigation: the per-member table above states known overlaps explicitly and
 instructs re-verification/coordination rather than blind re-fixing; the generated
 test is scoped to *completeness of accounting*, not to re-implementing every wiring
 decision from scratch inside this one task.
+
+## Execution record (2026-08-26)
+
+The implemented inventory deliberately narrows and makes explicit the external
+configuration roots that this task can prove: `AppConfig`, `JobConfig`,
+`FixtureGroup`, and `TemplateDoc`. It walks their complete recursive Pydantic
+schemas and records canonical full paths, including distinct repeated agent roles
+and fixture alternatives. This replaces the original `(model_name, field_name)`
+proposal, which could incorrectly allow one role's evidence to bless another.
+
+The checked-in registry has three dispositions:
+
+- `EFFECT_TEST`: a real, collectable pytest node proving observable behavior;
+- `INVARIANT_TEST`: a real, collectable pytest node proving a fixed policy literal;
+- `REMOVED`: an absent schema path with the disposition that P4-T6 must remove any
+  stale published documentation.
+
+The inventory test checks exact schema/registry equality, validates removal
+absence and disposition, and uses pytest collection to reject invented nodeids.
+P4-T6 should consume the registry's `REMOVED` records rather than maintain a
+second deletion list.
+
+This task removed the verified-zero-consumer App/Job/audio fields, fixture
+compatibility fields, fixture physical leaves, and template leaves recorded in
+the registry. Representative old configuration fails loudly with targeted
+migration messages. Live relative DMX mappings, inversions, calibration, fixture
+names/groups, template phase mode/spread/wrap/order, timing offset, and fixed
+policy literals have behavioral or invariant evidence.
+
+`PhaseOffset.order` was initially classified as dead, but compiler inspection and
+a red-first output discriminator proved it changes per-fixture schedules. It was
+restored and registered as live evidence. This correction is retained here to
+prevent future grep-only reclassification.
+
+Generic pipeline `FAN_OUT` items now use the same stage retry/timeout policy as
+sequential stages, with public behavioral discriminators for both knobs. Provider
+retry/logging/HTTP configuration remains P4-T4-owned. After approved P4-T4
+integration, this registry consumes its observable CLI logging and HTTP
+retry/timeout evidence and records its two circuit-breaker deletions. The remaining
+`job.agent.llm_logging.sanitize` forwarding gap was fixed red-first in P4-T5.
+
+Pre-reconciliation evidence: the full offline suite passed with 5,303 tests and 39
+skips; Ruff passed; mypy reported no issues in 721 source files. The frozen commit
+identity and fresh post-reconciliation `make validate` evidence are recorded in the
+task handoff.

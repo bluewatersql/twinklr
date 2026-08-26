@@ -15,12 +15,14 @@ from twinklr.core.sequencer.models.context import (
     SectionRenderIntent,
     TemplateCompileContext,
 )
-from twinklr.core.sequencer.models.enum import Intensity, TemplateCategory, TimingMode
+from twinklr.core.sequencer.models.enum import ChaseOrder, Intensity, TemplateCategory, TimingMode
 from twinklr.core.sequencer.models.template import (
     BaseTiming,
     Dimmer,
     Geometry,
     Movement,
+    PhaseOffset,
+    PhaseOffsetMode,
     RemainderPolicy,
     RepeatContract,
     RepeatMode,
@@ -480,3 +482,50 @@ def test_axis_template_data_form_emits_byte_identical_settings(template_id: str)
     data_doc = load_template_document(DEFAULT_DATA_TEMPLATE_DIR / f"{template_id}.json")
 
     assert _emitted_settings(data_doc) == _emitted_settings(python_doc)
+
+
+def test_phase_offset_order_changes_compiled_fixture_schedule() -> None:
+    document = _doc()
+    step = document.template.steps[0]
+    config = FixtureConfig(
+        fixture_id="MH1",
+        dmx_mapping=DmxMapping(pan_channel=1, tilt_channel=2, dimmer_channel=3),
+    )
+    fixtures = [
+        FixtureContext(fixture_id="MH1", role="OUTER_LEFT", calibration={"fixture_config": config}),
+        FixtureContext(
+            fixture_id="MH2", role="OUTER_RIGHT", calibration={"fixture_config": config}
+        ),
+    ]
+    registries = create_default_registries()
+
+    def compile_offsets(order: ChaseOrder) -> dict[str, float]:
+        step.timing.phase_offset = PhaseOffset(
+            mode=PhaseOffsetMode.GROUP_ORDER,
+            order=order,
+            spread_bars=0.5,
+        )
+        context = TemplateCompileContext(
+            section_id="section",
+            template_id=document.template.template_id,
+            fixtures=fixtures,
+            beat_grid=BeatGrid.from_tempo(tempo_bpm=120, total_bars=3),
+            start_bar=1,
+            duration_bars=1,
+            curve_registry=CurveRegistry(),
+            geometry_registry=registries["geometry"],
+            movement_registry=registries["movement"],
+            dimmer_registry=registries["dimmer"],
+            color_registry=registries["color"],
+            shutter_registry=registries["shutter"],
+            gobo_registry=registries["gobo"],
+            intent=SectionRenderIntent(),
+        )
+        result = compile_template(document.template, context)
+        return {
+            segment.fixture_id: float(segment.metadata["phase_offset_norm"])
+            for segment in result.segments
+        }
+
+    assert compile_offsets(ChaseOrder.LEFT_TO_RIGHT) == {"MH1": 0.0, "MH2": 0.5}
+    assert compile_offsets(ChaseOrder.RIGHT_TO_LEFT) == {"MH1": 0.5, "MH2": 0.0}

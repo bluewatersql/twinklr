@@ -58,7 +58,7 @@ from twinklr.core.agents.sequencer.moving_heads.specs import (
     get_planner_spec as get_moving_head_planner_spec,
 )
 from twinklr.core.agents.spec import AgentSpec
-from twinklr.core.config.models import AgentOrchestrationConfig
+from twinklr.core.config.models import get_vision_judge_agent_default
 from twinklr.core.reporting.evaluation.vision_judge import get_vision_judge_spec
 from twinklr.core.sequencer.planning.group_plan import (
     CoordinationPlanResponse,
@@ -428,7 +428,7 @@ async def test_strict_rejection_does_not_fallback_when_disabled() -> None:
     "spec",
     [
         _probe_spec(),
-        get_vision_judge_spec(AgentOrchestrationConfig().vision_judge_agent),
+        get_vision_judge_spec(get_vision_judge_agent_default()),
     ],
     ids=["p3-macro-probe", "vision-eval"],
 )

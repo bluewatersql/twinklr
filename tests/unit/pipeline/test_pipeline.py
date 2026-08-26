@@ -340,6 +340,81 @@ async def test_fan_out_any_failure_fails_stage(mock_context):
 
 
 @pytest.mark.asyncio
+async def test_fan_out_retry_config_changes_item_outcome(mock_context):
+    """A FAN_OUT item's transient failure is retried under the declared stage policy."""
+
+    class FailOncePerItemStage:
+        def __init__(self) -> None:
+            self.attempts: dict[str, int] = {}
+
+        @property
+        def name(self) -> str:
+            return "fail_once_per_item"
+
+        async def execute(self, input: Any, context: PipelineContext) -> StageResult[str]:
+            item = str(input)
+            self.attempts[item] = self.attempts.get(item, 0) + 1
+            if self.attempts[item] == 1:
+                return failure_result("transient", stage_name=self.name)
+            return success_result(f"processed:{item}", stage_name=self.name)
+
+    consumer = FailOncePerItemStage()
+    pipeline = PipelineDefinition(
+        name="fanout_retry",
+        stages=[
+            StageDefinition("producer", MockStage("producer", ["a", "b"])),
+            StageDefinition(
+                "consumer",
+                consumer,
+                pattern=ExecutionPattern.FAN_OUT,
+                inputs=["producer"],
+                retry_config=RetryConfig(max_attempts=2, initial_delay_ms=0),
+            ),
+        ],
+    )
+
+    result = await PipelineExecutor().execute(pipeline, "initial", mock_context)
+
+    assert result.success is True
+    assert result.outputs["consumer"] == ["processed:a", "processed:b"]
+    assert consumer.attempts == {"a": 2, "b": 2}
+
+
+@pytest.mark.asyncio
+async def test_fan_out_timeout_changes_item_outcome(mock_context):
+    """FAN_OUT applies the declared timeout independently to every item."""
+
+    class SlowStage:
+        @property
+        def name(self) -> str:
+            return "slow"
+
+        async def execute(self, input: Any, context: PipelineContext) -> StageResult[str]:
+            await asyncio.sleep(0.05)
+            return success_result(str(input), stage_name=self.name)
+
+    pipeline = PipelineDefinition(
+        name="fanout_timeout",
+        stages=[
+            StageDefinition("producer", MockStage("producer", ["a", "b"])),
+            StageDefinition(
+                "consumer",
+                SlowStage(),
+                pattern=ExecutionPattern.FAN_OUT,
+                inputs=["producer"],
+                timeout_ms=1,
+            ),
+        ],
+    )
+
+    result = await PipelineExecutor().execute(pipeline, "initial", mock_context)
+
+    assert result.success is False
+    assert result.stage_results["consumer"].metadata == {"successes": 0, "failures": 2}
+    assert "Stage timeout after 1ms" in (result.stage_results["consumer"].error or "")
+
+
+@pytest.mark.asyncio
 async def test_stage_failure_stops_pipeline(mock_context):
     """Test that stage failure stops pipeline (execution is unconditionally fail-fast)."""
     pipeline = PipelineDefinition(

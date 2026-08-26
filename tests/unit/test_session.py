@@ -61,6 +61,21 @@ def test_llm_provider_unknown_value_raises() -> None:
     assert "Unknown LLM provider" in str(exc_info.value)
 
 
+def test_llm_logging_sanitize_reaches_logger_factory() -> None:
+    """The job's sanitization policy must configure the shipped session logger."""
+    job_config = JobConfig.model_validate(
+        {"agent": {"llm_logging": {"enabled": True, "sanitize": False}}}
+    )
+
+    with patch("twinklr.core.session.create_llm_logger") as logger_factory:
+        session = TwinklrSession(
+            app_config=_make_app_config(), job_config=job_config, session_id="s1"
+        )
+        _ = session.llm_logger
+
+    assert logger_factory.call_args.kwargs["sanitize"] is False
+
+
 def test_session_id_strategy_random_default(tmp_path: Path) -> None:
     """Session defaults to random UUID strategy when explicit ID absent."""
     app_config_path = tmp_path / "config.json"

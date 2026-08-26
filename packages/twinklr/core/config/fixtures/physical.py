@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class PanTiltRange(BaseModel):
@@ -20,19 +20,6 @@ class PanTiltRange(BaseModel):
     )
     tilt_range_deg: float = Field(
         default=270.0, gt=0, le=360, description="Total tilt range in degrees"
-    )
-
-
-class RestingPosition(BaseModel):
-    """Default idle position for the fixture."""
-
-    model_config = ConfigDict(frozen=True)
-
-    pan_dmx: int = Field(default=128, ge=0, le=255, description="Resting pan DMX value")
-    tilt_dmx: int = Field(default=22, ge=0, le=255, description="Resting tilt DMX value")
-    description: str = Field(
-        default="Default position when fixtures are idle/dimmed",
-        description="Human-readable description",
     )
 
 
@@ -52,17 +39,19 @@ class Orientation(BaseModel):
     tilt_zero_dmx: int = Field(
         default=22, ge=0, le=255, description="DMX value at horizon/level (0°)"
     )
-    tilt_up_dmx: int = Field(default=112, ge=0, le=255, description="DMX value when pointing up")
 
-    # Physical calibration
-    tilt_above_horizon_deg: float = Field(
-        default=25.0, description="Degrees above horizon at tilt_up_dmx"
-    )
-
-    # Resting position
-    resting_position: RestingPosition = Field(
-        default_factory=RestingPosition, description="Default idle position"
-    )
+    @model_validator(mode="before")
+    @classmethod
+    def reject_removed_fields(cls, value: object) -> object:
+        if isinstance(value, dict):
+            removed = sorted(
+                {"tilt_up_dmx", "tilt_above_horizon_deg", "resting_position"} & value.keys()
+            )
+            if removed:
+                raise ValueError(
+                    f"orientation fields {removed} were removed because they never affected output"
+                )
+        return value
 
 
 class MovementLimits(BaseModel):
@@ -78,9 +67,15 @@ class MovementLimits(BaseModel):
     pan_max: int = Field(default=190, ge=0, le=255, description="Maximum pan DMX value")
     tilt_min: int = Field(default=5, ge=0, le=255, description="Minimum tilt DMX value")
     tilt_max: int = Field(default=125, ge=0, le=255, description="Maximum tilt DMX value")
-    avoid_backward: bool = Field(
-        default=True, description="Prevent pointing backward (> 90° from forward)"
-    )
+
+    @model_validator(mode="before")
+    @classmethod
+    def reject_removed_fields(cls, value: object) -> object:
+        if isinstance(value, dict) and "avoid_backward" in value:
+            raise ValueError(
+                "movement-limit field 'avoid_backward' was removed because it never affected output"
+            )
+        return value
 
     @field_validator("pan_max")
     @classmethod

@@ -207,6 +207,7 @@ class TwinklrSession:
                     session_id=self.session_id,
                     log_level=self.job_config.agent.llm_logging.log_level,
                     format=self.job_config.agent.llm_logging.format,
+                    sanitize=self.job_config.agent.llm_logging.sanitize,
                 )
             else:
                 self._llm_logger = NullLLMCallLogger()

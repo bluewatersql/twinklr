@@ -77,9 +77,6 @@ def compile_step(
         geometry_params["pan_pose_by_role"] = step.geometry.pan_pose_by_role
     if step.geometry.tilt_pose:
         geometry_params["tilt_pose"] = step.geometry.tilt_pose
-    if step.geometry.aim_zone:
-        geometry_params["aim_zone"] = step.geometry.aim_zone
-
     # Resolve geometry
     geometry_result = geometry_handler.resolve(
         fixture_id=context.fixture_id,

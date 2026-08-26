@@ -9,15 +9,12 @@ These models define how choreography is structured and executed.
 """
 
 from enum import StrEnum
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from twinklr.core.config.poses import PanPose, TiltPose
-from twinklr.core.curves.library import CurveLibrary
 from twinklr.core.sequencer.models.enum import (
-    AimZone,
-    BlendMode,
     ChaseOrder,
     Intensity,
     QuantizeMode,
@@ -25,7 +22,6 @@ from twinklr.core.sequencer.models.enum import (
     TemplateCategory,
     TemplateRole,
     TimingMode,
-    TransitionMode,
 )
 from twinklr.core.sequencer.moving_heads.libraries.color import ColorPreset
 from twinklr.core.sequencer.moving_heads.libraries.dimmer import DimmerType
@@ -51,10 +47,6 @@ class PhaseOffsetMode(StrEnum):
     GROUP_ORDER = "GROUP_ORDER"
 
 
-class Distribution(StrEnum):
-    LINEAR = "LINEAR"
-
-
 class BaseTiming(BaseModel):
     """Base timing specification for a template element.
 
@@ -68,8 +60,8 @@ class BaseTiming(BaseModel):
     """
 
     model_config = ConfigDict(extra="forbid")
-    mode: TimingMode = TimingMode.MUSICAL
-    quantize_type: QuantizeMode = QuantizeMode.DOWNBEAT
+    mode: Literal[TimingMode.MUSICAL] = TimingMode.MUSICAL
+    quantize_type: Literal[QuantizeMode.DOWNBEAT] = QuantizeMode.DOWNBEAT
     start_offset_bars: float
     duration_bars: float
 
@@ -82,28 +74,28 @@ class PhaseOffset(BaseModel):
 
     Attributes:
         mode: How to apply phase offsets.
-        group: Which fixture group to apply offsets to (required for GROUP_ORDER).
-        order: Chase order name (e.g., "LEFT_TO_RIGHT").
         spread_bars: Total spread across all fixtures, in bars.
-        distribution: How to distribute offsets (currently only LINEAR).
         wrap: Whether to wrap offsets that exceed 1.0.
     """
 
     model_config = ConfigDict(extra="forbid")
 
     mode: PhaseOffsetMode = PhaseOffsetMode.NONE
-    group: SemanticGroupType = SemanticGroupType.ALL
     order: ChaseOrder = ChaseOrder.LEFT_TO_RIGHT
     spread_bars: float = 0.0
-    distribution: Distribution = Distribution.LINEAR
     wrap: bool = True
 
-    @model_validator(mode="after")
-    def _validate_group_required(self) -> "PhaseOffset":
-        """Validate group is required when mode=GROUP_ORDER."""
-        if self.mode == PhaseOffsetMode.GROUP_ORDER and self.group is None:
-            raise ValueError("group required when mode=GROUP_ORDER")
-        return self
+    @model_validator(mode="before")
+    @classmethod
+    def reject_removed_fields(cls, value: object) -> object:
+        if isinstance(value, dict):
+            removed = sorted({"group", "distribution"} & value.keys())
+            if removed:
+                raise ValueError(
+                    f"phase-offset fields {removed} were removed because ordered fixture IDs "
+                    "already determine the linear distribution"
+                )
+        return value
 
 
 class RepeatContract(BaseModel):
@@ -151,7 +143,6 @@ class Geometry(BaseModel):
         params: Additional parameters for the geometry handler.
         pan_pose_by_role: Role-specific pan poses (for ROLE_POSE handler).
         tilt_pose: Tilt pose name (for ROLE_POSE handler).
-        aim_zone: Aim zone (e.g., "CROWD", "SKY").
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -162,7 +153,13 @@ class Geometry(BaseModel):
     # ROLE_POSE specific fields
     pan_pose_by_role: dict[TemplateRole, PanPose] | None = None
     tilt_pose: TiltPose = TiltPose.HORIZON
-    aim_zone: AimZone = AimZone.HORIZON
+
+    @model_validator(mode="before")
+    @classmethod
+    def reject_removed_fields(cls, value: object) -> object:
+        if isinstance(value, dict) and "aim_zone" in value:
+            raise ValueError("geometry field 'aim_zone' was removed because no handler read it")
+        return value
 
 
 class Movement(BaseModel):
@@ -176,9 +173,6 @@ class Movement(BaseModel):
         intensity: Movement intensity preset (e.g., "SMOOTH", "FAST").
         cycles: Number of movement cycles in the step duration.
         params: Additional parameters for the movement handler.
-        amplitude_override: Optional amplitude override [0, 1].
-        frequency_override: Optional frequency override [0, 10].
-        center_offset_override: Optional center offset override [0, 1].
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -188,10 +182,19 @@ class Movement(BaseModel):
     cycles: float = 1.0
     params: dict[str, Any] = Field(default_factory=dict)
 
-    # Categorical parameter overrides
-    amplitude_override: float | None = Field(default=None, ge=0.0, le=1.0)
-    frequency_override: float | None = Field(default=None, ge=0.0, le=10.0)
-    center_offset_override: float | None = Field(default=None, ge=0.0, le=1.0)
+    @model_validator(mode="before")
+    @classmethod
+    def reject_removed_fields(cls, value: object) -> object:
+        if isinstance(value, dict):
+            removed = sorted(
+                {"amplitude_override", "frequency_override", "center_offset_override"}
+                & value.keys()
+            )
+            if removed:
+                raise ValueError(
+                    f"movement fields {removed} were removed because they never affected output"
+                )
+        return value
 
 
 class Dimmer(BaseModel):
@@ -270,24 +273,6 @@ class StepTiming(BaseModel):
     )
 
 
-class Transition(BaseModel):
-    """Transition specification for a template step.
-
-    Defines how to transition between steps.
-
-    Attributes:
-        mode: Transition mode (e.g., "CROSSFADE", "SNAP").
-        duration_bars: Transition duration in bars.
-        curve: Transition curve (e.g., "sine", "linear").
-    """
-
-    model_config = ConfigDict(extra="forbid")
-
-    mode: TransitionMode = TransitionMode.CROSSFADE
-    duration_bars: float = 0.0
-    curve: CurveLibrary = CurveLibrary.LINEAR
-
-
 class TemplateStep(BaseModel):
     """A single step in a template.
 
@@ -305,10 +290,6 @@ class TemplateStep(BaseModel):
         geometry: Spatial formation specification.
         movement: Motion specification.
         dimmer: Brightness specification.
-        entry_transition: Transition when entering this step.
-        exit_transition: Transition when exiting this step.
-        priority: Priority for conflict resolution.
-        blend_mode: How to blend this step with others.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -322,10 +303,19 @@ class TemplateStep(BaseModel):
     color: Color | None = None
     shutter: Shutter | None = None
     gobo: Gobo | None = None
-    entry_transition: Transition | None = None
-    exit_transition: Transition | None = None
-    priority: int = 0
-    blend_mode: BlendMode = BlendMode.OVERRIDE
+
+    @model_validator(mode="before")
+    @classmethod
+    def reject_removed_fields(cls, value: object) -> object:
+        if isinstance(value, dict):
+            removed = sorted(
+                {"entry_transition", "exit_transition", "priority", "blend_mode"} & value.keys()
+            )
+            if removed:
+                raise ValueError(
+                    f"template-step fields {removed} were removed because they never affected output"
+                )
+        return value
 
 
 # =============================================================================

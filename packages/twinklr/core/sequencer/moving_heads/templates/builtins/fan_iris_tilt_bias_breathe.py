@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from twinklr.core.sequencer.models.enum import (
+    ChaseOrder,
     Intensity,
     QuantizeMode,
     TemplateCategory,
@@ -8,9 +9,7 @@ from twinklr.core.sequencer.models.enum import (
 )
 from twinklr.core.sequencer.models.template import (
     BaseTiming,
-    ChaseOrder,
     Dimmer,
-    Distribution,
     Geometry,
     Movement,
     PhaseOffset,
@@ -62,7 +61,6 @@ def make_template() -> TemplateDoc:
                             mode=PhaseOffsetMode.GROUP_ORDER,
                             order=ChaseOrder.OUTSIDE_IN,
                             spread_bars=0.5,
-                            distribution=Distribution.LINEAR,
                             wrap=True,
                         ),
                     ),

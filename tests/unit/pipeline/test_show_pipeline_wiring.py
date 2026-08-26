@@ -48,8 +48,6 @@ def _fixture_group() -> FixtureGroup:
                 fixture_id=fixture_id,
                 config=FixtureConfig(
                     fixture_id=fixture_id,
-                    dmx_start_address=1 + index * 16,
-                    channel_count=16,
                     dmx_mapping=DmxMapping(pan_channel=1, tilt_channel=2, dimmer_channel=3),
                 ),
                 xlights_model_name=f"Dmx {fixture_id}",

@@ -3,16 +3,10 @@
 from __future__ import annotations
 
 import json
-import logging
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import numpy as np
-
-if TYPE_CHECKING:
-    from twinklr.core.config.models import JobConfig
-
-logger = logging.getLogger(__name__)
 
 
 def _json_default(obj: Any) -> Any:
@@ -64,15 +58,3 @@ def read_json(path: str | Path) -> dict[str, Any]:
     if not isinstance(data, dict):
         raise ValueError(f"Expected JSON object, got {type(data).__name__}")
     return data
-
-
-def write_log(job_config: JobConfig, name: str, data: dict[str, Any]) -> None:
-    """Write a log entry to the job configuration output directory.
-
-    Args:
-        job_config: Job configuration
-        name: Name of the log entry
-        data: Dictionary to write to the log
-    """
-    if job_config.debug:
-        write_json(f"{job_config.output_dir}/{name}_{job_config.project_name}.json", data)

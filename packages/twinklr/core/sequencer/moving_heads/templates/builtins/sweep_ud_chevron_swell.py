@@ -2,17 +2,15 @@ from __future__ import annotations
 
 from twinklr.core.config.poses import PanPose, TiltPose
 from twinklr.core.sequencer.models.enum import (
+    ChaseOrder,
     Intensity,
     QuantizeMode,
-    SemanticGroupType,
     TemplateCategory,
     TimingMode,
 )
 from twinklr.core.sequencer.models.template import (
     BaseTiming,
-    ChaseOrder,
     Dimmer,
-    Distribution,
     Geometry,
     Movement,
     PhaseOffset,
@@ -64,10 +62,8 @@ def make_template() -> TemplateDoc:
                         ),
                         phase_offset=PhaseOffset(
                             mode=PhaseOffsetMode.GROUP_ORDER,
-                            group=SemanticGroupType.ALL,
                             order=ChaseOrder.LEFT_TO_RIGHT,
                             spread_bars=1.0,
-                            distribution=Distribution.LINEAR,
                             wrap=True,
                         ),
                     ),

@@ -20,32 +20,22 @@ class ShutterMap(BaseModel):
     strobe_fast: int = Field(default=190, ge=0, le=255, description="Fast strobe")
 
 
-class DmxChannelConfig(BaseModel):
-    """Configuration for a single DMX channel."""
-
-    model_config = ConfigDict(frozen=True)
-
-    channel_min: int = Field(default=0, ge=0, le=255, description="Minimum channel value")
-    channel_max: int = Field(default=255, ge=0, le=255, description="Maximum channel value")
-    channel_default: int = Field(default=0, ge=0, le=255, description="Default channel value")
-    channel_inverted: bool = Field(default=False, description="Invert channel value")
-    channel_value_map: dict[str, int] = Field(
-        default_factory=dict, description="Value map for channel"
-    )
-    channel_calibration: dict[str, dict] = Field(
-        default_factory=dict, description="Calibration for channel"
-    )
-
-
 class ChannelWithConfig(BaseModel):
-    """Channel number with optional configuration."""
+    """A DMX channel number accepted by the fixture-file schema."""
 
     model_config = ConfigDict(frozen=True)
 
     channel: int = Field(..., ge=1, le=512, description="DMX channel number")
-    config: DmxChannelConfig = Field(
-        default_factory=DmxChannelConfig, description="Channel configuration"
-    )
+
+    @model_validator(mode="before")
+    @classmethod
+    def reject_removed_channel_config(cls, value: object) -> object:
+        if isinstance(value, dict) and "config" in value:
+            raise ValueError(
+                "fixture channel 'config' was removed because it never affected output; "
+                "keep only the relative 'channel' number"
+            )
+        return value
 
 
 class ChannelInversions(BaseModel):
@@ -171,24 +161,12 @@ class DmxMapping(BaseModel):
         assert self._pan_channel_obj is not None
         return self._pan_channel_obj.channel
 
-    @property
-    def pan_config(self) -> DmxChannelConfig:
-        """Pan channel configuration."""
-        assert self._pan_channel_obj is not None
-        return self._pan_channel_obj.config
-
     # Tilt properties
     @property
     def tilt(self) -> int:
         """Tilt channel number."""
         assert self._tilt_channel_obj is not None
         return self._tilt_channel_obj.channel
-
-    @property
-    def tilt_config(self) -> DmxChannelConfig:
-        """Tilt channel configuration."""
-        assert self._tilt_channel_obj is not None
-        return self._tilt_channel_obj.config
 
     # Dimmer properties
     @property
@@ -197,22 +175,11 @@ class DmxMapping(BaseModel):
         assert self._dimmer_channel_obj is not None
         return self._dimmer_channel_obj.channel
 
-    @property
-    def dimmer_config(self) -> DmxChannelConfig:
-        """Dimmer channel configuration."""
-        assert self._dimmer_channel_obj is not None
-        return self._dimmer_channel_obj.config
-
     # Pan fine properties
     @property
     def pan_fine(self) -> int | None:
         """Pan fine channel number."""
         return self._pan_fine_channel_obj.channel if self._pan_fine_channel_obj else None
-
-    @property
-    def pan_fine_config(self) -> DmxChannelConfig | None:
-        """Pan fine channel configuration."""
-        return self._pan_fine_channel_obj.config if self._pan_fine_channel_obj else None
 
     # Tilt fine properties
     @property
@@ -220,21 +187,11 @@ class DmxMapping(BaseModel):
         """Tilt fine channel number."""
         return self._tilt_fine_channel_obj.channel if self._tilt_fine_channel_obj else None
 
-    @property
-    def tilt_fine_config(self) -> DmxChannelConfig | None:
-        """Tilt fine channel configuration."""
-        return self._tilt_fine_channel_obj.config if self._tilt_fine_channel_obj else None
-
     # Shutter properties
     @property
     def shutter(self) -> int | None:
         """Shutter channel number."""
         return self._shutter_channel_obj.channel if self._shutter_channel_obj else None
-
-    @property
-    def shutter_config(self) -> DmxChannelConfig | None:
-        """Shutter channel configuration."""
-        return self._shutter_channel_obj.config if self._shutter_channel_obj else None
 
     # Color properties
     @property
@@ -242,18 +199,8 @@ class DmxMapping(BaseModel):
         """Color wheel channel number."""
         return self._color_channel_obj.channel if self._color_channel_obj else None
 
-    @property
-    def color_config(self) -> DmxChannelConfig | None:
-        """Color wheel channel configuration."""
-        return self._color_channel_obj.config if self._color_channel_obj else None
-
     # Gobo properties
     @property
     def gobo(self) -> int | None:
         """Gobo wheel channel number."""
         return self._gobo_channel_obj.channel if self._gobo_channel_obj else None
-
-    @property
-    def gobo_config(self) -> DmxChannelConfig | None:
-        """Gobo wheel channel configuration."""
-        return self._gobo_channel_obj.config if self._gobo_channel_obj else None

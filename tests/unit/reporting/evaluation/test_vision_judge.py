@@ -11,7 +11,7 @@ from twinklr.core.agents.prompts import PromptPackLoader
 from twinklr.core.agents.providers.base import ProviderType
 from twinklr.core.agents.result import AgentResult
 from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan
-from twinklr.core.config.models import AgentOrchestrationConfig
+from twinklr.core.config.models import get_vision_judge_agent_default
 from twinklr.core.reporting.evaluation.vision_evaluation import plan_structure
 from twinklr.core.reporting.evaluation.vision_judge import (
     BudgetExceededError,
@@ -44,8 +44,8 @@ def test_rubric_has_no_sync_criterion() -> None:
         "color_palette_coherence",
         "variety_and_pacing",
     }
-    spec = get_vision_judge_spec(AgentOrchestrationConfig().vision_judge_agent)
-    assert spec.model == AgentOrchestrationConfig().vision_judge_agent.model
+    spec = get_vision_judge_spec(get_vision_judge_agent_default())
+    assert spec.model == get_vision_judge_agent_default().model
     assert spec.max_schema_repair_attempts == 0
     assert spec.provider_max_attempts == 1
     assert spec.allow_json_object_fallback is False
@@ -106,7 +106,7 @@ async def test_cost_estimate_blocks_over_cap_before_provider_call(tmp_path: Path
     with pytest.raises(BudgetExceededError, match="per-song"):
         await judge_frames(
             runner=runner,
-            agent_config=AgentOrchestrationConfig().vision_judge_agent,
+            agent_config=get_vision_judge_agent_default(),
             frames=[_frame(tmp_path)],
             structure_text="non-empty structure",
             section_names={"chorus"},
@@ -146,7 +146,7 @@ async def test_judge_uses_provider_framework_images_and_exact_usage(tmp_path: Pa
 
     judged = await judge_frames(
         runner=runner,
-        agent_config=AgentOrchestrationConfig().vision_judge_agent.model_copy(
+        agent_config=get_vision_judge_agent_default().model_copy(
             update={"model": "configured-mini-tier"}
         ),
         frames=[_frame(tmp_path)],
@@ -189,7 +189,7 @@ async def test_failed_attempt_usage_is_settled_before_error(tmp_path: Path) -> N
     with pytest.raises(RuntimeError, match="capability rejected"):
         await judge_frames(
             runner=runner,
-            agent_config=AgentOrchestrationConfig().vision_judge_agent,
+            agent_config=get_vision_judge_agent_default(),
             frames=[_frame(tmp_path)],
             structure_text="chorus",
             section_names={"chorus"},
@@ -215,7 +215,7 @@ async def test_request_image_count_and_encoded_bytes_are_hard_limited(tmp_path: 
     with pytest.raises(BudgetExceededError, match="1,500-image"):
         await judge_frames(
             runner=runner,
-            agent_config=AgentOrchestrationConfig().vision_judge_agent,
+            agent_config=get_vision_judge_agent_default(),
             frames=[frame] * 1501,
             structure_text="chorus",
             section_names={"chorus"},
@@ -232,7 +232,7 @@ async def test_request_image_count_and_encoded_bytes_are_hard_limited(tmp_path: 
     ):
         await judge_frames(
             runner=runner,
-            agent_config=AgentOrchestrationConfig().vision_judge_agent,
+            agent_config=get_vision_judge_agent_default(),
             frames=[frame],
             structure_text="chorus",
             section_names={"chorus"},
@@ -267,7 +267,7 @@ async def test_grounding_rejects_generic_and_unknown_citations(tmp_path: Path) -
     with pytest.raises(RuntimeError, match="unknown frame 999"):
         await judge_frames(
             runner=runner,
-            agent_config=AgentOrchestrationConfig().vision_judge_agent,
+            agent_config=get_vision_judge_agent_default(),
             frames=[_frame(tmp_path)],
             structure_text="chorus",
             section_names={"chorus"},
@@ -295,7 +295,7 @@ async def test_grounding_rejects_generic_and_unknown_citations(tmp_path: Path) -
     with pytest.raises(RuntimeError, match="real section name"):
         await judge_frames(
             runner=runner,
-            agent_config=AgentOrchestrationConfig().vision_judge_agent,
+            agent_config=get_vision_judge_agent_default(),
             frames=[_frame(tmp_path)],
             structure_text="chorus",
             section_names={"chorus"},

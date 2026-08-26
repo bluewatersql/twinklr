@@ -137,8 +137,6 @@ def _fixture_group() -> FixtureGroup:
     group = FixtureGroup(group_id="MOVING_HEADS", xlights_group="Moving Heads")
     config = FixtureConfig(
         fixture_id="MH1",
-        dmx_start_address=1,
-        channel_count=16,
         dmx_mapping=DmxMapping(pan_channel=1, tilt_channel=2, dimmer_channel=3, color_channel=4),
     )
     group.add_fixture(

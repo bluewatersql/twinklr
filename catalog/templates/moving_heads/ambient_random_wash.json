@@ -43,7 +43,6 @@
     ],
     "steps": [
       {
-        "blend_mode": "override",
         "color": {
           "params": {},
           "preset": "blue"
@@ -56,10 +55,7 @@
           "min_norm": 0.6,
           "params": {}
         },
-        "entry_transition": null,
-        "exit_transition": null,
         "geometry": {
-          "aim_zone": "HORIZON",
           "geometry_type": "wall_wash",
           "pan_pose_by_role": null,
           "params": {},
@@ -67,15 +63,11 @@
         },
         "gobo": null,
         "movement": {
-          "amplitude_override": null,
-          "center_offset_override": null,
           "cycles": 0.5,
-          "frequency_override": null,
           "intensity": "SLOW",
           "movement_type": "random_walk",
           "params": {}
         },
-        "priority": 0,
         "shutter": null,
         "step_id": "main",
         "target": "ALL",
@@ -87,12 +79,10 @@
             "start_offset_bars": 0.0
           },
           "phase_offset": {
-            "distribution": "LINEAR",
-            "group": "ALL",
             "mode": "NONE",
-            "order": "LEFT_TO_RIGHT",
             "spread_bars": 0.0,
-            "wrap": true
+            "wrap": true,
+            "order": "LEFT_TO_RIGHT"
           }
         }
       }

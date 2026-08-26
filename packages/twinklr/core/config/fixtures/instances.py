@@ -7,7 +7,6 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from twinklr.core.config.fixtures.capabilities import FixtureCapabilities, MovementSpeed
 from twinklr.core.config.fixtures.dmx import ChannelInversions, DmxMapping
 from twinklr.core.config.fixtures.physical import MovementLimits, Orientation, PanTiltRange
 from twinklr.core.config.poses import STANDARD_POSES, PoseLibrary
@@ -51,48 +50,16 @@ class FixturePosition(BaseModel):
         default=1, ge=1, le=10, description="Position number on this mount (1st, 2nd, etc.)"
     )
 
-    # Default aim offset from "forward" (0, 0)
-    pan_offset_deg: float = Field(
-        default=0.0,
-        description="Pan offset in degrees (positive = stage right, negative = stage left)",
-    )
-    tilt_offset_deg: float = Field(
-        default=0.0, description="Tilt offset in degrees (positive = up, negative = down)"
-    )
-
-    def apply_offset(self, pose: Pose) -> Pose:
-        """Apply mounting offset to a target pose.
-
-        Use this when you want a fixture to aim at a specific target,
-        and need to calculate the actual pose accounting for its mounting position.
-
-        Args:
-            pose: Target pose (where you want the fixture to aim)
-
-        Returns:
-            Actual pose accounting for mounting offset
-        """
-        return Pose(
-            pan_deg=pose.pan_deg + self.pan_offset_deg,
-            tilt_deg=pose.tilt_deg + self.tilt_offset_deg,
-        )
-
-    def remove_offset(self, pose: Pose) -> Pose:
-        """Remove mounting offset to get relative pose.
-
-        Use this when you have a fixture's actual pose and want to
-        know where it's aiming relative to "forward".
-
-        Args:
-            pose: Actual fixture pose
-
-        Returns:
-            Relative pose (where the fixture is actually aiming)
-        """
-        return Pose(
-            pan_deg=pose.pan_deg - self.pan_offset_deg,
-            tilt_deg=pose.tilt_deg - self.tilt_offset_deg,
-        )
+    @model_validator(mode="before")
+    @classmethod
+    def reject_removed_fields(cls, value: object) -> object:
+        if isinstance(value, dict):
+            removed = sorted({"pan_offset_deg", "tilt_offset_deg"} & value.keys())
+            if removed:
+                raise ValueError(
+                    f"fixture-position fields {removed} were removed because they never affected output"
+                )
+        return value
 
 
 class FixtureConfig(BaseModel):
@@ -108,10 +75,6 @@ class FixtureConfig(BaseModel):
     fixture_id: str = Field(..., description="Unique fixture identifier (e.g., 'MH1', 'MH2')")
 
     # DMX configuration
-    dmx_universe: int = Field(default=1, ge=1, le=64, description="DMX universe number")
-    dmx_start_address: int = Field(default=1, ge=1, le=512, description="Starting DMX address")
-    channel_count: int = Field(default=16, ge=1, le=128, description="Number of DMX channels used")
-
     dmx_mapping: DmxMapping = Field(..., description="DMX channel assignments")
     inversions: ChannelInversions = Field(
         default_factory=ChannelInversions, description="Channel inversion flags"
@@ -128,17 +91,30 @@ class FixtureConfig(BaseModel):
         default_factory=MovementLimits, description="Safety movement limits"
     )
 
-    capabilities: FixtureCapabilities = Field(
-        default_factory=FixtureCapabilities, description="Feature capabilities"
-    )
-    movement_speed: MovementSpeed = Field(
-        default_factory=MovementSpeed, description="Movement speed specifications"
-    )
-
     # Position (optional - for fixtures with physical offsets)
     position: FixturePosition | None = Field(
         default=None, description="Physical mounting position and offsets"
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def reject_removed_fields(cls, value: object) -> object:
+        if isinstance(value, dict):
+            removed = sorted(
+                {
+                    "dmx_universe",
+                    "dmx_start_address",
+                    "channel_count",
+                    "capabilities",
+                    "movement_speed",
+                }
+                & value.keys()
+            )
+            if removed:
+                raise ValueError(
+                    f"fixture fields {removed} were removed because they never affected output"
+                )
+        return value
 
     def get_standard_pose(self, pose_id: str) -> Pose:
         """Get a standard pose by ID.
@@ -221,26 +197,6 @@ class FixtureConfig(BaseModel):
         tilt_dmx = max(self.limits.tilt_min, min(self.limits.tilt_max, tilt_dmx))
 
         return (pan_dmx, tilt_dmx)
-
-    def is_pose_safe(self, pose: Pose) -> bool:
-        """Check if a pose is within safety limits.
-
-        Args:
-            pose: Pose to check
-
-        Returns:
-            True if pose is safe, False otherwise
-        """
-        pan_dmx, tilt_dmx = self.degrees_to_dmx(pose)
-
-        # Check DMX limits
-        if not (self.limits.pan_min <= pan_dmx <= self.limits.pan_max):
-            return False
-        if not (self.limits.tilt_min <= tilt_dmx <= self.limits.tilt_max):
-            return False
-
-        # Check backward pointing if avoided
-        return not (self.limits.avoid_backward and abs(pose.pan_deg) > 90)
 
     def clamp_pan(self, value: int) -> int:
         """Clamp pan DMX value to movement limits.

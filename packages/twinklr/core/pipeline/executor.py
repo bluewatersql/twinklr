@@ -316,7 +316,16 @@ class PipelineExecutor:
             input_list = list(stage_input) if isinstance(stage_input, tuple) else stage_input
             return await self._execute_fan_out(stage_def, input_list, context)
 
-        # Execute with retry and timeout
+        return await self._execute_with_stage_policy(stage_def, stage_input, context)
+
+    async def _execute_with_stage_policy(
+        self,
+        stage_def: StageDefinition,
+        stage_input: Any,
+        context: PipelineContext,
+    ) -> StageResult[Any]:
+        """Execute one stage invocation with its declared retry and timeout policy."""
+        stage_name = stage_def.stage.name
         retry_config = stage_def.retry_config
         max_attempts = retry_config.max_attempts if retry_config else 1
 
@@ -402,13 +411,13 @@ class PipelineExecutor:
 
             async def execute_with_limit(inp: Any) -> StageResult[Any]:
                 async with semaphore:
-                    result: StageResult[Any] = await stage_def.stage.execute(inp, context)
+                    result = await self._execute_with_stage_policy(stage_def, inp, context)
                     return result
 
             tasks = [execute_with_limit(inp) for inp in inputs]
         else:
             # Unlimited concurrency
-            tasks = [stage_def.stage.execute(inp, context) for inp in inputs]
+            tasks = [self._execute_with_stage_policy(stage_def, inp, context) for inp in inputs]
 
         results = await asyncio.gather(*tasks, return_exceptions=True)
 

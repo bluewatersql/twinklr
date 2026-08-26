@@ -11,7 +11,6 @@ from urllib.parse import urlsplit
 
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator, model_validator
 
-from twinklr.core.config.poses import PoseConfig
 from twinklr.core.curves.library import CurveLibrary
 from twinklr.core.formats.xlights.sequence.timeline import TimelineTracksConfig
 from twinklr.core.sequencer.models.enum import TransitionMode
@@ -90,21 +89,6 @@ class AgentOrchestrationConfig(BaseModel):
         default=3, ge=0, description="Maximum judge/iterate loops (0=skip judge)"
     )
 
-    token_budget: int = Field(
-        default=75000, gt=0, description="Total token budget for orchestration"
-    )
-
-    enforce_token_budget: bool = Field(
-        default=False, description="Hard stop if token budget exceeded (vs warning)"
-    )
-
-    token_buffer_pct: float = Field(
-        default=0.2,
-        ge=0.0,
-        le=1.0,
-        description="Buffer percentage for token predictions (e.g., 0.2 = 20%)",
-    )
-
     success_threshold: int = Field(
         default=70,
         ge=0,
@@ -124,20 +108,6 @@ class AgentOrchestrationConfig(BaseModel):
         default_factory=lambda: AgentConfig(
             model="gpt-5.6-terra", reasoning_effort="low", temperature=0.3
         )
-    )
-
-    vision_judge_agent: AgentConfig = Field(
-        default_factory=lambda: AgentConfig(
-            model="gpt-5.6-luna",
-            reasoning_effort="low",
-            temperature=0.2,
-            max_tokens=3000,
-            timeout_seconds=180,
-        ),
-        description=(
-            "Mini-cost-tier vision evaluator. Kept separate from the terra plan judges "
-            "because image-token cost is the controlling constraint."
-        ),
     )
 
     refinement_agent: AgentConfig = Field(
@@ -220,6 +190,17 @@ def _get_cache_default(cache_type: str) -> CacheConfig:
     return CacheConfig(enabled=True, cache_path=f"data/cache/{cache_type}", ttl_seconds=None)
 
 
+def get_vision_judge_agent_default() -> AgentConfig:
+    """Return the fixed evaluation default; this is not a job-configured role."""
+    return AgentConfig(
+        model="gpt-5.6-luna",
+        reasoning_effort="low",
+        temperature=0.2,
+        max_tokens=3000,
+        timeout_seconds=180,
+    )
+
+
 # NOTE (P1P-T6): `ChannelDefaults` (job-level named shutter/color/gobo states) and
 # `JobConfig.is_channel_enabled` used to live here, declared and validated but never
 # read by anything. P0-T7 deliberately left them in place, reserved for this task to
@@ -285,12 +266,6 @@ class ConfigBase(BaseModel):
             path = cls.default_path()
         raw = load_config(path)
         return cls.model_validate(raw)
-
-
-class AssumptionsConfig(BaseModel):
-    """Music theory assumptions for beat-aligned planning."""
-
-    beats_per_bar: int = Field(default=4, ge=1, le=12)
 
 
 class StemSeparationConfig(BaseModel):
@@ -420,16 +395,6 @@ class AudioEnhancementConfig(BaseModel):
     http_timeout_s: float = Field(
         default=30.0, ge=1.0, description="HTTP request timeout (seconds)"
     )
-    # Metadata merge policy
-    metadata_merge_policy_version: str = Field(
-        default="1.0", description="Metadata merge policy version"
-    )
-    metadata_min_confidence_warn: float = Field(
-        default=0.55,
-        ge=0.0,
-        le=1.0,
-        description="Minimum confidence before warning",
-    )
 
 
 class RhythmSourceName(StrEnum):
@@ -451,7 +416,6 @@ class AudioProcessingConfig(BaseModel):
 
     hop_length: int = Field(default=512, ge=64, le=2048)
     frame_length: int = Field(default=2048, ge=512, le=8192)
-    cache_enabled: bool = True
     rhythm_source: RhythmSourceName = Field(
         default=RhythmSourceName.DSP,
         description="Producer for the beats/downbeats consumed through BeatGrid",
@@ -491,38 +455,11 @@ class AudioProcessingConfig(BaseModel):
             )
 
 
-class PlanningContextConfig(BaseModel):
-    """LLM context building configuration (token budget constraints)."""
-
-    max_beats: int = Field(default=600, ge=100, le=2000)
-    max_energy_points: int = Field(default=768, ge=100, le=2000)
-    max_spectral_points: int = Field(default=256, ge=50, le=1000)
-    max_transients: int = Field(default=20, ge=5, le=100)
-    max_sections: int = Field(default=12, ge=4, le=50)
-
-
 class LoggingConfig(BaseModel):
     """Logging configuration."""
 
     level: str = Field(default="INFO", pattern="^(DEBUG|INFO|WARNING|ERROR|CRITICAL)$")
     format: str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-
-
-class PlannerFeatures(BaseModel):
-    """Feature flags for planner DMX channel control.
-
-    Controls which DMX channels the planner handles beyond the core
-    pan/tilt/dimmer channels (which are always enabled).
-    """
-
-    enable_shutter: bool = Field(default=True, description="Enable shutter/strobe planning")
-
-    enable_color: bool = Field(
-        default=True,
-        description="Enable color planning",
-    )
-
-    enable_gobo: bool = Field(default=True, description="Enable gobo selection planning")
 
 
 class AppConfig(ConfigBase):
@@ -539,7 +476,6 @@ class AppConfig(ConfigBase):
     output_dir: str = "artifacts"
     cache_dir: str = "data/audio_cache"
     audio_processing: AudioProcessingConfig = AudioProcessingConfig()
-    planning: PlanningContextConfig = PlanningContextConfig()
     logging: LoggingConfig = LoggingConfig()
 
     llm_api_key: SecretStr = Field(
@@ -646,10 +582,7 @@ class JobConfig(ConfigBase):
 
     model_config = ConfigDict(extra="ignore")
 
-    schema_version: str = "3.0"
-    include_notes_track: bool = True
-    debug: bool = True
-    assumptions: AssumptionsConfig = AssumptionsConfig()
+    schema_version: Literal["3.0"] = "3.0"
 
     fixture_config_path: str = "fixture_config.json"
 
@@ -664,22 +597,6 @@ class JobConfig(ConfigBase):
             "Write the final moving-heads ChoreographyPlan to "
             "<output_dir>/checkpoints/plans/final.json after planning completes. "
             "Consumed by `twinklr eval-report`."
-        ),
-    )
-
-    pose_config: PoseConfig = Field(
-        default_factory=PoseConfig,
-        description=(
-            "Pose configuration for semantic position abstraction. "
-            "Standard poses loaded by default, supports custom poses and overrides."
-        ),
-    )
-
-    planner_features: PlannerFeatures = Field(
-        default_factory=PlannerFeatures,
-        description=(
-            "Feature flags for planner DMX channel control. "
-            "Controls which channels beyond pan/tilt/dimmer are planned."
         ),
     )
 

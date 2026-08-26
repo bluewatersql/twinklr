@@ -120,7 +120,6 @@ class TestClassifySongEnergyProfile:
 
         params = result["parameters"]
         assert "min_build_bars" in params
-        assert "gradient_percentile" in params
         assert "min_energy_gain" in params
         assert "detect_drops_independent" in params
         assert "drop_gradient_percentile" in params

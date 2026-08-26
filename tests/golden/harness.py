@@ -143,8 +143,6 @@ def build_fixture_group(rig: RigSpec) -> FixtureGroup:
         fixture_id = f"MH{index + 1}"
         config = FixtureConfig(
             fixture_id=fixture_id,
-            dmx_start_address=1 + index * 16,
-            channel_count=16,
             dmx_mapping=DmxMapping(
                 pan_channel=rig.pan_channel,
                 tilt_channel=rig.tilt_channel,

@@ -38,12 +38,6 @@ PRESETS: dict[str, SectioningPreset] = {
         peak_delta=0.08,  # slightly less sensitive (baseline already adds coverage)
         pre_avg=12,
         post_avg=12,
-        context_weights={
-            "drops_weight": 0.9,
-            "builds_weight": 0.7,
-            "vocals_weight": 0.25,
-            "chords_weight": 0.2,
-        },
     ),
     "pop": SectioningPreset(
         genre="pop",
@@ -54,12 +48,6 @@ PRESETS: dict[str, SectioningPreset] = {
         peak_delta=0.075,  # reduce micro peaks; hybrid baseline handles regularity
         pre_avg=10,
         post_avg=10,
-        context_weights={
-            "drops_weight": 0.5,
-            "builds_weight": 0.6,
-            "vocals_weight": 0.75,
-            "chords_weight": 0.4,
-        },
     ),
     "country": SectioningPreset(
         genre="country",
@@ -70,12 +58,6 @@ PRESETS: dict[str, SectioningPreset] = {
         peak_delta=0.085,  # LESS sensitive now (baseline already gives you structure)
         pre_avg=12,
         post_avg=12,
-        context_weights={
-            "drops_weight": 0.2,
-            "builds_weight": 0.4,
-            "vocals_weight": 0.85,
-            "chords_weight": 0.65,
-        },
     ),
     "christmas_classic": SectioningPreset(
         genre="christmas_classic",
@@ -86,12 +68,6 @@ PRESETS: dict[str, SectioningPreset] = {
         peak_delta=0.08,
         pre_avg=12,
         post_avg=12,
-        context_weights={
-            "drops_weight": 0.15,
-            "builds_weight": 0.3,
-            "vocals_weight": 0.75,
-            "chords_weight": 0.75,
-        },
     ),
     "christmas_modern": SectioningPreset(
         genre="christmas_modern",
@@ -102,12 +78,6 @@ PRESETS: dict[str, SectioningPreset] = {
         peak_delta=0.075,
         pre_avg=10,
         post_avg=10,
-        context_weights={
-            "drops_weight": 0.55,
-            "builds_weight": 0.55,
-            "vocals_weight": 0.75,
-            "chords_weight": 0.5,
-        },
     ),
     "rock": SectioningPreset(
         genre="rock",
@@ -118,12 +88,6 @@ PRESETS: dict[str, SectioningPreset] = {
         peak_delta=0.08,
         pre_avg=12,
         post_avg=12,
-        context_weights={
-            "drops_weight": 0.35,
-            "builds_weight": 0.45,
-            "vocals_weight": 0.65,
-            "chords_weight": 0.55,
-        },
     ),
     "hiphop": SectioningPreset(
         genre="hiphop",
@@ -134,12 +98,6 @@ PRESETS: dict[str, SectioningPreset] = {
         peak_delta=0.09,  # less sensitive (repetition + subtle changes)
         pre_avg=12,
         post_avg=12,
-        context_weights={
-            "drops_weight": 0.25,
-            "builds_weight": 0.35,
-            "vocals_weight": 0.85,  # lyrical structure
-            "chords_weight": 0.35,
-        },
     ),
     "metal": SectioningPreset(
         genre="metal",
@@ -150,12 +108,6 @@ PRESETS: dict[str, SectioningPreset] = {
         peak_delta=0.09,
         pre_avg=12,
         post_avg=12,
-        context_weights={
-            "drops_weight": 0.30,
-            "builds_weight": 0.55,
-            "vocals_weight": 0.55,
-            "chords_weight": 0.45,
-        },
     ),
     "ballad": SectioningPreset(
         genre="ballad",
@@ -166,12 +118,6 @@ PRESETS: dict[str, SectioningPreset] = {
         peak_delta=0.095,  # avoid over-seg on subtle timbre shifts
         pre_avg=14,
         post_avg=14,
-        context_weights={
-            "drops_weight": 0.15,
-            "builds_weight": 0.35,
-            "vocals_weight": 0.90,
-            "chords_weight": 0.70,
-        },
     ),
     "instrumental": SectioningPreset(
         genre="instrumental",
@@ -182,12 +128,6 @@ PRESETS: dict[str, SectioningPreset] = {
         peak_delta=0.085,
         pre_avg=12,
         post_avg=12,
-        context_weights={
-            "drops_weight": 0.35,
-            "builds_weight": 0.50,
-            "vocals_weight": 0.05,
-            "chords_weight": 0.75,  # harmony/texture drives structure
-        },
     ),
     "default": SectioningPreset(
         genre="default",
@@ -198,12 +138,6 @@ PRESETS: dict[str, SectioningPreset] = {
         peak_delta=0.085,
         pre_avg=12,
         post_avg=12,
-        context_weights={
-            "drops_weight": 0.40,
-            "builds_weight": 0.45,
-            "vocals_weight": 0.60,
-            "chords_weight": 0.50,
-        },
     ),
 }
 

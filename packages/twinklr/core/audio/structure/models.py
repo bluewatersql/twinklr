@@ -48,17 +48,6 @@ class SectioningPreset(BaseModel):
     pre_avg: int = Field(..., ge=1, description="Pre-smoothing window in beats")
     post_avg: int = Field(..., ge=1, description="Post-smoothing window in beats")
 
-    # Context weights (how much to trust external context)
-    context_weights: dict[str, float] = Field(
-        default_factory=lambda: {
-            "drops_weight": 0.5,
-            "builds_weight": 0.4,
-            "vocals_weight": 0.5,
-            "chords_weight": 0.3,
-        },
-        description="Weights for context enhancement (0=ignore, 1=trust fully)",
-    )
-
     @field_validator("max_sections")
     @classmethod
     def max_gte_min(cls, v: int, info) -> int:
@@ -67,13 +56,4 @@ class SectioningPreset(BaseModel):
             raise ValueError(
                 f"max_sections ({v}) must be >= min_sections ({info.data['min_sections']})"
             )
-        return v
-
-    @field_validator("context_weights")
-    @classmethod
-    def validate_weights(cls, v: dict[str, float]) -> dict[str, float]:
-        """Validate that weights are in [0, 1]."""
-        for key, weight in v.items():
-            if not 0.0 <= weight <= 1.0:
-                raise ValueError(f"Weight '{key}' must be in [0, 1], got {weight}")
         return v

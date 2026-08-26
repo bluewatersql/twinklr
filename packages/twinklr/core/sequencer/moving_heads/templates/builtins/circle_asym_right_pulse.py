@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from twinklr.core.config.poses import TiltPose
 from twinklr.core.sequencer.models.enum import (
+    ChaseOrder,
     Intensity,
     QuantizeMode,
     TemplateCategory,
@@ -9,7 +10,6 @@ from twinklr.core.sequencer.models.enum import (
 )
 from twinklr.core.sequencer.models.template import (
     BaseTiming,
-    ChaseOrder,
     Dimmer,
     Geometry,
     Movement,

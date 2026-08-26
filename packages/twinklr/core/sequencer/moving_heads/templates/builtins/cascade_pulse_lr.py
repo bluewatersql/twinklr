@@ -7,7 +7,6 @@ from twinklr.core.sequencer.models.enum import (
     QuantizeMode,
     TemplateCategory,
     TimingMode,
-    TransitionMode,
 )
 from twinklr.core.sequencer.models.template import (
     BaseTiming,
@@ -26,7 +25,6 @@ from twinklr.core.sequencer.models.template import (
     TemplateMetadata,
     TemplatePreset,
     TemplateStep,
-    Transition,
 )
 from twinklr.core.sequencer.moving_heads.libraries.dimmer import DimmerType
 from twinklr.core.sequencer.moving_heads.libraries.geometry import GeometryType
@@ -88,7 +86,6 @@ def make_template() -> TemplateDoc:
                         max_norm=1.00,
                         cycles=4.0,
                     ),
-                    exit_transition=Transition(mode=TransitionMode.CROSSFADE, duration_bars=0.25),
                 )
             ],
             metadata=TemplateMetadata(

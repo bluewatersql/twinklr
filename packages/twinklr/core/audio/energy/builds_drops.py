@@ -64,7 +64,6 @@ def detect_builds_and_drops(
     logger.debug(
         f"Using profile '{profile_info['profile']}': "
         f"min_build_bars={params['min_build_bars']}, "
-        f"gradient_percentile={params['gradient_percentile']}, "
         f"min_energy_gain={params['min_energy_gain']}"
     )
 

@@ -40,7 +40,6 @@ def _rig(*names: str) -> FixtureGroup:
                 fixture_id=fixture_id,
                 config=FixtureConfig(
                     fixture_id=fixture_id,
-                    dmx_start_address=1 + index * 16,
                     dmx_mapping=DmxMapping(
                         pan_channel=11,
                         tilt_channel=13,

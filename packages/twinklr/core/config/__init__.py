@@ -3,18 +3,15 @@
 from twinklr.core.config.fixtures import (
     ChannelInversions,
     DmxMapping,
-    FixtureCapabilities,
     FixtureConfig,
     FixtureGroup,
     FixtureGroupBuilder,
     FixtureInstance,
     FixturePosition,
     MovementLimits,
-    MovementSpeed,
     Orientation,
     PanTiltRange,
     Pose,
-    RestingPosition,
     ShutterMap,
 )
 from twinklr.core.config.loader import (
@@ -30,7 +27,6 @@ from twinklr.core.config.models import (
     AudioProcessingConfig,
     JobConfig,
     LoggingConfig,
-    PlanningContextConfig,
     RhythmSourceName,
     StructureSourceName,
 )
@@ -42,7 +38,6 @@ __all__ = [
     "AudioProcessingConfig",
     "ChannelInversions",
     "DmxMapping",
-    "FixtureCapabilities",
     "FixtureConfig",
     # Fixture config
     "FixtureGroup",
@@ -53,12 +48,9 @@ __all__ = [
     "JobConfig",
     "LoggingConfig",
     "MovementLimits",
-    "MovementSpeed",
     "Orientation",
     "PanTiltRange",
-    "PlanningContextConfig",
     "Pose",
-    "RestingPosition",
     "RhythmSourceName",
     "ShutterMap",
     "StructureSourceName",

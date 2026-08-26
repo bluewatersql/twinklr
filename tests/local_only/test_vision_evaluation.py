@@ -13,7 +13,7 @@ import pytest
 
 from twinklr.core.agents.async_runner import AsyncAgentRunner
 from twinklr.core.agents.providers.openai import OpenAIProvider
-from twinklr.core.config.models import AgentOrchestrationConfig
+from twinklr.core.config.models import get_vision_judge_agent_default
 from twinklr.core.reporting.evaluation.collect import extract_plan, load_checkpoint
 from twinklr.core.reporting.evaluation.sync_metrics import beat_grid_from_xsq
 from twinklr.core.reporting.evaluation.vision_evaluation import evaluate_preview
@@ -44,7 +44,7 @@ async def test_end_to_end_score_one_song(tmp_path: Path) -> None:
     plan = extract_plan(load_checkpoint(Path(checkpoint)))
     result = await evaluate_preview(
         runner=runner,
-        agent_config=AgentOrchestrationConfig().vision_judge_agent,
+        agent_config=get_vision_judge_agent_default(),
         preview_path=Path(preview),
         artifact_path=Path(xsq),
         plan=plan,

@@ -141,42 +141,36 @@ def _get_profile_parameters(profile: str, energy_cv: float, gradient_std: float)
     base_params = {
         "high_energy": {
             "min_build_bars": 4,
-            "gradient_percentile": 60,
             "min_energy_gain": 0.15,
             "detect_drops_independent": True,
             "drop_gradient_percentile": 10,
         },
         "low_energy_stable": {
             "min_build_bars": 2,
-            "gradient_percentile": 35,  # Very sensitive
             "min_energy_gain": 0.05,  # Small changes matter
             "detect_drops_independent": True,
             "drop_gradient_percentile": 20,
         },
         "slow_gentle": {
             "min_build_bars": 2,
-            "gradient_percentile": 30,  # Very sensitive
             "min_energy_gain": 0.04,  # Tiny changes matter
             "detect_drops_independent": True,
             "drop_gradient_percentile": 25,
         },
         "highly_dynamic": {
             "min_build_bars": 3,
-            "gradient_percentile": 50,
             "min_energy_gain": 0.12,
             "detect_drops_independent": True,
             "drop_gradient_percentile": 15,
         },
         "moderate_low": {
             "min_build_bars": 2,
-            "gradient_percentile": 40,
             "min_energy_gain": 0.07,
             "detect_drops_independent": True,
             "drop_gradient_percentile": 20,
         },
         "moderate": {
             "min_build_bars": 3,
-            "gradient_percentile": 50,
             "min_energy_gain": 0.10,
             "detect_drops_independent": True,
             "drop_gradient_percentile": 15,
@@ -188,7 +182,6 @@ def _get_profile_parameters(profile: str, energy_cv: float, gradient_std: float)
     # Fine-tune based on actual characteristics
     # If song is particularly stable, be more sensitive
     if energy_cv < 0.25:
-        params["gradient_percentile"] = max(25, params["gradient_percentile"] - 10)
         params["min_energy_gain"] *= 0.7
 
     # If song has very little gradient variation, be more lenient

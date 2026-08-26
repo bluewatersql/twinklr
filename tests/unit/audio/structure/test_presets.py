@@ -27,7 +27,6 @@ class TestPresets:
         assert preset.min_sections == 10  # Updated from refactor
         assert preset.max_sections == 16
         assert preset.min_len_beats == 24  # Longer for drops
-        assert preset.context_weights["drops_weight"] > 0.7  # Drops important
 
     def test_pop_preset(self):
         """Test pop preset has balanced settings."""
@@ -35,22 +34,18 @@ class TestPresets:
         assert preset.genre == "pop"
         assert preset.min_sections == 8  # Updated from refactor
         assert preset.max_sections == 14
-        assert preset.context_weights["vocals_weight"] > 0.6  # Vocals important
 
     def test_country_preset(self):
         """Test country preset has higher vocal weight."""
         preset = PRESETS["country"]
         assert preset.genre == "country"
         assert preset.peak_delta < 0.09  # More sensitive (updated threshold)
-        assert preset.context_weights["vocals_weight"] > 0.7
-        assert preset.context_weights["chords_weight"] > 0.5
 
     def test_christmas_classic_preset(self):
         """Test classic Christmas preset."""
         preset = PRESETS["christmas_classic"]
         assert preset.genre == "christmas_classic"
         assert preset.min_len_beats <= 20  # Shorter sections (updated threshold)
-        assert preset.context_weights["chords_weight"] > 0.6  # Harmonic structure
 
     def test_christmas_modern_preset(self):
         """Test modern Christmas preset is pop-like."""

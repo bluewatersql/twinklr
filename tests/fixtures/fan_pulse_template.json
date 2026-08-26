@@ -4,17 +4,35 @@
     "version": 1,
     "name": "Fan Pulse",
     "category": "movement",
-    "roles": ["FRONT_LEFT", "FRONT_RIGHT", "BACK_LEFT", "BACK_RIGHT"],
+    "roles": [
+      "FRONT_LEFT",
+      "FRONT_RIGHT",
+      "BACK_LEFT",
+      "BACK_RIGHT"
+    ],
     "groups": {
-      "all": ["FRONT_LEFT", "FRONT_RIGHT", "BACK_LEFT", "BACK_RIGHT"],
-      "fronts": ["FRONT_LEFT", "FRONT_RIGHT"],
-      "backs": ["BACK_LEFT", "BACK_RIGHT"]
+      "all": [
+        "FRONT_LEFT",
+        "FRONT_RIGHT",
+        "BACK_LEFT",
+        "BACK_RIGHT"
+      ],
+      "fronts": [
+        "FRONT_LEFT",
+        "FRONT_RIGHT"
+      ],
+      "backs": [
+        "BACK_LEFT",
+        "BACK_RIGHT"
+      ]
     },
     "repeat": {
       "repeatable": true,
       "mode": "PING_PONG",
       "cycle_bars": 4.0,
-      "loop_step_ids": ["main"],
+      "loop_step_ids": [
+        "main"
+      ],
       "remainder_policy": "HOLD_LAST_POSE"
     },
     "defaults": {
@@ -32,11 +50,9 @@
           },
           "phase_offset": {
             "mode": "GROUP_ORDER",
-            "group": "all",
-            "order": "LEFT_TO_RIGHT",
             "spread_bars": 0.5,
-            "distribution": "LINEAR",
-            "wrap": true
+            "wrap": true,
+            "order": "LEFT_TO_RIGHT"
           }
         },
         "geometry": {
@@ -48,8 +64,7 @@
             "BACK_LEFT": "CENTER",
             "BACK_RIGHT": "CENTER"
           },
-          "tilt_pose": "HORIZON",
-          "aim_zone": "CROWD"
+          "tilt_pose": "HORIZON"
         },
         "movement": {
           "movement_id": "SWEEP_LR",
@@ -70,8 +85,15 @@
       }
     ],
     "metadata": {
-      "tags": ["energetic", "sweep", "chase"],
-      "energy_range": [60, 100],
+      "tags": [
+        "energetic",
+        "sweep",
+        "chase"
+      ],
+      "energy_range": [
+        60,
+        100
+      ],
       "description": "Fan formation with left-right sweep and pulsing dimmer"
     }
   },

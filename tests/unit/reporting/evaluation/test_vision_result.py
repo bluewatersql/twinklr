@@ -11,7 +11,7 @@ import pytest
 
 from twinklr.core.agents.result import AgentResult
 from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan
-from twinklr.core.config.models import AgentOrchestrationConfig
+from twinklr.core.config.models import get_vision_judge_agent_default
 from twinklr.core.reporting.evaluation.calibration import (
     CalibrationBatch,
     OwnerCalibrationArtifact,
@@ -340,7 +340,7 @@ async def test_deterministic_preflight_fails_before_paid_call(tmp_path: Path) ->
     ):
         await evaluate_preview(
             runner=runner,
-            agent_config=AgentOrchestrationConfig().vision_judge_agent,
+            agent_config=get_vision_judge_agent_default(),
             preview_path=preview,
             artifact_path=artifact,
             plan=plan,
@@ -415,7 +415,7 @@ async def test_combined_record_hashes_preview_plan_and_config(tmp_path: Path) ->
     ):
         result = await evaluate_preview(
             runner=runner,
-            agent_config=AgentOrchestrationConfig().vision_judge_agent,
+            agent_config=get_vision_judge_agent_default(),
             preview_path=preview,
             artifact_path=artifact,
             plan=plan,

@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import pytest
 
-from twinklr.core.config.fixtures.dmx import DmxMapping
+from twinklr.core.config.fixtures.dmx import ChannelInversions, DmxMapping
 from twinklr.core.config.fixtures.instances import FixtureConfig, FixtureInstance
 from twinklr.core.sequencer.models.enum import ChannelName
 from twinklr.core.sequencer.moving_heads.channels.state import ChannelValue, FixtureSegment
@@ -125,6 +125,37 @@ def test_written_channels_unchanged() -> None:
     assert sliders[11] == 77
     assert sliders[13] == 88
     assert sliders[15] == 200
+
+
+def test_inversions_and_16bit_flag_change_emitted_settings() -> None:
+    mapping = DmxMapping(
+        pan_channel=1,
+        tilt_channel=2,
+        dimmer_channel=3,
+        pan_fine_channel=4,
+        tilt_fine_channel=5,
+        use_16bit_pan_tilt=True,
+        shutter_channel=6,
+        color_channel=7,
+        gobo_channel=8,
+    )
+    config = FixtureConfig(
+        fixture_id="MH1",
+        dmx_mapping=mapping,
+        inversions=ChannelInversions(
+            pan=True,
+            tilt=True,
+            dimmer=True,
+            shutter=True,
+            color=True,
+            gobo=True,
+        ),
+    )
+    fixture = FixtureInstance(fixture_id="MH1", config=config, xlights_model_name="Dmx MH1")
+
+    settings = DmxSettingsBuilder(fixture).build_settings_string(_segment(_pan_tilt_dimmer()))
+
+    assert all(f"E_CHECKBOX_INVDMX{channel}=1" in settings for channel in range(1, 9))
 
 
 def test_color_gobo_defaults_from_fixture_map() -> None:

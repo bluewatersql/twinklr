@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 
 from twinklr.core.config.fixtures import (
+    BaseFixtureConfig,
     ChannelInversions,
     DmxMapping,
     FixtureConfig,
@@ -15,6 +16,18 @@ from twinklr.core.config.fixtures import (
     MovementLimits,
     PanTiltRange,
     Pose,
+    ShutterMap,
+    SimplifiedFixtureInstance,
+)
+from twinklr.core.config.fixtures.physical import Orientation
+from twinklr.core.sequencer.models.enum import ChannelName
+from twinklr.core.sequencer.models.moving_heads.rig import rig_profile_from_fixture_group
+from twinklr.core.sequencer.moving_heads.channels.state import ChannelValue, FixtureSegment
+from twinklr.core.sequencer.moving_heads.export.dmx_settings_builder import DmxSettingsBuilder
+from twinklr.core.sequencer.moving_heads.handlers.wheels import (
+    DefaultColorHandler,
+    DefaultGoboHandler,
+    DefaultShutterHandler,
 )
 
 
@@ -72,17 +85,6 @@ class TestMovementLimits:
 class TestFixturePosition:
     """Tests for FixturePosition model."""
 
-    def test_remove_offset(self) -> None:
-        """Test removing position offset from a pose."""
-        position = FixturePosition(pan_offset_deg=30.0, tilt_offset_deg=-5.0)
-        actual = Pose(pan_deg=30.0, tilt_deg=-5.0)  # Fixture's actual pose
-
-        relative = position.remove_offset(actual)
-
-        # Relative to "forward"
-        assert relative.pan_deg == 0.0
-        assert relative.tilt_deg == 0.0
-
 
 class TestFixtureConfig:
     """Tests for FixtureConfig model."""
@@ -95,30 +97,21 @@ class TestFixtureConfig:
         )
 
         assert config.fixture_id == "MH1"
-        assert config.dmx_universe == 1  # Default
-        assert config.dmx_start_address == 1  # Default
-        assert config.channel_count == 16  # Default
 
     def test_config_full(self) -> None:
         """Test fixture config with all fields."""
         config = FixtureConfig(
             fixture_id="MH1",
-            dmx_universe=2,
-            dmx_start_address=17,
-            channel_count=18,
             dmx_mapping=DmxMapping(pan_channel=11, tilt_channel=13, dimmer_channel=15),
             inversions=ChannelInversions(pan=True, tilt=False),
             pan_tilt_range=PanTiltRange(pan_range_deg=540.0, tilt_range_deg=270.0),
-            position=FixturePosition(pan_offset_deg=30.0),
+            position=FixturePosition(position_index=3),
         )
 
         assert config.fixture_id == "MH1"
-        assert config.dmx_universe == 2
-        assert config.dmx_start_address == 17
-        assert config.channel_count == 18
         assert config.inversions.pan is True
         assert config.position is not None
-        assert config.position.pan_offset_deg == 30.0
+        assert config.position.position_index == 3
 
     def test_get_standard_pose(self) -> None:
         """Test getting standard pose from config."""
@@ -161,6 +154,21 @@ class TestFixtureConfig:
         assert 120 <= pan_dmx <= 136  # Near 128
         assert 18 <= tilt_dmx <= 26  # Near 22
 
+    def test_calibration_fields_change_output_dmx(self) -> None:
+        mapping = DmxMapping(pan_channel=11, tilt_channel=13, dimmer_channel=15)
+        default = FixtureConfig(fixture_id="default", dmx_mapping=mapping)
+        calibrated = FixtureConfig(
+            fixture_id="calibrated",
+            dmx_mapping=mapping,
+            pan_tilt_range=PanTiltRange(pan_range_deg=360.0, tilt_range_deg=180.0),
+            orientation=Orientation(pan_front_dmx=100, tilt_zero_dmx=40),
+            limits=MovementLimits(pan_min=60, pan_max=170, tilt_min=10, tilt_max=120),
+        )
+
+        pose = Pose(pan_deg=90.0, tilt_deg=45.0)
+        assert default.degrees_to_dmx(pose) != calibrated.degrees_to_dmx(pose)
+        assert calibrated.degrees_to_dmx(Pose(pan_deg=170.0, tilt_deg=90.0)) == (170, 120)
+
     def test_dmx_to_degrees_with_inversion(self) -> None:
         """Test DMX to degrees conversion with channel inversion."""
         config = FixtureConfig(
@@ -172,22 +180,6 @@ class TestFixtureConfig:
         # With pan inverted, positive DMX offset = negative degrees
         pose = config.dmx_to_degrees(pan_dmx=148, tilt_dmx=22)  # 20 DMX above center
         assert pose.pan_deg < 0  # Should be negative
-
-    def test_is_pose_safe(self) -> None:
-        """Test pose safety checking."""
-        config = FixtureConfig(
-            fixture_id="MH1",
-            dmx_mapping=DmxMapping(pan_channel=11, tilt_channel=13, dimmer_channel=15),
-            limits=MovementLimits(avoid_backward=True),
-        )
-
-        # Forward is safe
-        forward = Pose(pan_deg=0.0, tilt_deg=0.0)
-        assert config.is_pose_safe(forward) is True
-
-        # Looking backward is unsafe (avoid_backward=True)
-        backward = Pose(pan_deg=150.0, tilt_deg=0.0)
-        assert config.is_pose_safe(backward) is False
 
 
 class TestFixtureInstance:
@@ -302,6 +294,135 @@ class TestFixtureGroup:
         fixture_ids = [f.fixture_id for f in group]
         assert fixture_ids == ["MH1", "MH2", "MH3"]
 
+    def test_position_index_changes_rig_order(self) -> None:
+        mapping = DmxMapping(pan_channel=11, tilt_channel=13, dimmer_channel=15)
+        group = FixtureGroup(
+            group_id="heads",
+            fixtures=[
+                FixtureInstance(
+                    fixture_id="MH1",
+                    config=FixtureConfig(
+                        fixture_id="MH1",
+                        dmx_mapping=mapping,
+                        position=FixturePosition(position_index=2),
+                    ),
+                    xlights_model_name="Dmx MH1",
+                ),
+                FixtureInstance(
+                    fixture_id="MH2",
+                    config=FixtureConfig(
+                        fixture_id="MH2",
+                        dmx_mapping=mapping,
+                        position=FixturePosition(position_index=1),
+                    ),
+                    xlights_model_name="Dmx MH2",
+                ),
+            ],
+        )
+
+        rig = rig_profile_from_fixture_group(group)
+
+        assert [fixture.fixture_id for fixture in rig.fixtures] == ["MH2", "MH1"]
+
+    def test_base_config_and_override_change_expanded_fixture_behavior(self) -> None:
+        group = FixtureGroup(
+            group_id="heads",
+            base_config=BaseFixtureConfig(
+                dmx_mapping=DmxMapping(
+                    pan_channel=1,
+                    tilt_channel=2,
+                    dimmer_channel=3,
+                    pan_fine_channel=4,
+                    tilt_fine_channel=5,
+                    use_16bit_pan_tilt=True,
+                    shutter_channel=6,
+                    shutter_default=211,
+                    shutter_map=ShutterMap(
+                        closed=10,
+                        open=200,
+                        strobe_slow=61,
+                        strobe_medium=121,
+                        strobe_fast=181,
+                    ),
+                    color_channel=7,
+                    color_map={"open": 9, "red": 19},
+                    gobo_channel=8,
+                    gobo_map={"open": 11, "circles": 21},
+                ),
+                inversions=ChannelInversions(
+                    pan=True,
+                    tilt=True,
+                    dimmer=True,
+                    shutter=True,
+                    color=True,
+                    gobo=True,
+                ),
+                pan_tilt_range=PanTiltRange(pan_range_deg=360.0, tilt_range_deg=180.0),
+                orientation=Orientation(pan_front_dmx=100, tilt_zero_dmx=40),
+                limits=MovementLimits(pan_min=60, pan_max=170, tilt_min=10, tilt_max=120),
+            ),
+            fixtures=[
+                SimplifiedFixtureInstance(
+                    fixture_id="MH1",
+                    xlights_model_name="Dmx MH1",
+                    position=FixturePosition(position_index=2),
+                    config_overrides={"inversions": {"pan": True}},
+                ),
+                SimplifiedFixtureInstance(
+                    fixture_id="MH2",
+                    xlights_model_name="Dmx MH2",
+                    position=FixturePosition(position_index=1),
+                ),
+            ],
+        )
+
+        expanded, inherited = group.expand_fixtures()
+        rig = rig_profile_from_fixture_group(group)
+        segment = FixtureSegment(
+            section_id="s",
+            segment_id="seg",
+            step_id="step",
+            template_id="tmpl",
+            fixture_id="MH1",
+            t0_ms=0,
+            t1_ms=1000,
+            channels={
+                ChannelName.PAN: ChannelValue(channel=ChannelName.PAN, static_dmx=100),
+                ChannelName.TILT: ChannelValue(channel=ChannelName.TILT, static_dmx=100),
+                ChannelName.DIMMER: ChannelValue(channel=ChannelName.DIMMER, static_dmx=200),
+            },
+        )
+        settings = DmxSettingsBuilder(inherited).build_settings_string(segment)
+        calibration = {"fixture_config": inherited.config}
+
+        assert expanded.config.dmx_to_degrees(pan_dmx=148, tilt_dmx=22).pan_deg < 0
+        assert inherited.config.degrees_to_dmx(Pose(pan_deg=-170.0, tilt_deg=-90.0)) == (170, 120)
+        assert rig.rig_id == "heads"
+        assert [fixture.fixture_id for fixture in rig.fixtures] == ["MH2", "MH1"]
+        assert group.get_xlights_mapping()["MH1"] == "Dmx MH1"
+        assert all(f"E_CHECKBOX_INVDMX{channel}=1" in settings for channel in range(1, 9))
+        assert "E_SLIDER_DMX6=211" in settings
+        assert "E_SLIDER_DMX7=9" in settings
+        assert "E_SLIDER_DMX8=11" in settings
+        assert (
+            DefaultColorHandler()
+            .generate({"preset": "red", "calibration": calibration}, 4)
+            .static_dmx
+            == 19
+        )
+        assert (
+            DefaultGoboHandler()
+            .generate({"pattern": "circles", "calibration": calibration}, 4)
+            .static_dmx
+            == 21
+        )
+        assert (
+            DefaultShutterHandler()
+            .generate({"pattern": "strobe_medium", "calibration": calibration}, 4)
+            .static_dmx
+            == 121
+        )
+
 
 class TestFixtureGroupBuilder:
     """Tests for FixtureGroupBuilder."""
@@ -339,27 +460,23 @@ class TestFixtureGroupBuilder:
             [
                 (
                     "MH1",
-                    1,
                     "Dmx MH1",
-                    FixturePosition(position_index=1, pan_offset_deg=-30.0),
+                    FixturePosition(position_index=1),
                 ),
                 (
                     "MH2",
-                    17,
                     "Dmx MH2",
-                    FixturePosition(position_index=2, pan_offset_deg=-10.0),
+                    FixturePosition(position_index=2),
                 ),
                 (
                     "MH3",
-                    33,
                     "Dmx MH3",
-                    FixturePosition(position_index=3, pan_offset_deg=10.0),
+                    FixturePosition(position_index=3),
                 ),
                 (
                     "MH4",
-                    49,
                     "Dmx MH4",
-                    FixturePosition(position_index=4, pan_offset_deg=30.0),
+                    FixturePosition(position_index=4),
                 ),
             ]
         )
@@ -367,18 +484,16 @@ class TestFixtureGroupBuilder:
         assert len(group) == 4
         assert group.group_id == "MOVING_HEADS"
 
-        # Check each fixture has correct DMX address and position
+        # Check each fixture has the expected position.
         mh1 = group.get_fixture("MH1")
         assert mh1 is not None
-        assert mh1.config.dmx_start_address == 1
         assert mh1.config.position is not None
-        assert mh1.config.position.pan_offset_deg == -30.0
+        assert mh1.config.position.position_index == 1
 
         mh4 = group.get_fixture("MH4")
         assert mh4 is not None
-        assert mh4.config.dmx_start_address == 49
         assert mh4.config.position is not None
-        assert mh4.config.position.pan_offset_deg == 30.0
+        assert mh4.config.position.position_index == 4
 
 
 class TestIntegrationScenarios:
@@ -389,9 +504,6 @@ class TestIntegrationScenarios:
         # 1. Create base config
         base_config = FixtureConfig(
             fixture_id="BASE",
-            dmx_universe=1,
-            dmx_start_address=1,
-            channel_count=16,
             dmx_mapping=DmxMapping(
                 pan_channel=11,
                 tilt_channel=13,
@@ -413,27 +525,23 @@ class TestIntegrationScenarios:
             [
                 (
                     "MH1",
-                    1,
                     "Dmx MH1",
-                    FixturePosition(position_index=1, pan_offset_deg=-30.0, tilt_offset_deg=-5.0),
+                    FixturePosition(position_index=1),
                 ),
                 (
                     "MH2",
-                    17,
                     "Dmx MH2",
-                    FixturePosition(position_index=2, pan_offset_deg=-10.0, tilt_offset_deg=-5.0),
+                    FixturePosition(position_index=2),
                 ),
                 (
                     "MH3",
-                    33,
                     "Dmx MH3",
-                    FixturePosition(position_index=3, pan_offset_deg=10.0, tilt_offset_deg=-5.0),
+                    FixturePosition(position_index=3),
                 ),
                 (
                     "MH4",
-                    49,
                     "Dmx MH4",
-                    FixturePosition(position_index=4, pan_offset_deg=30.0, tilt_offset_deg=-5.0),
+                    FixturePosition(position_index=4),
                 ),
             ]
         )
@@ -447,56 +555,13 @@ class TestIntegrationScenarios:
             center_pose = fixture.config.get_standard_pose("center")
             assert center_pose.pan_deg == 0.0
 
-            # Apply position offset
-            if fixture.config.position:
-                actual = fixture.config.position.apply_offset(center_pose)
-                dmx = fixture.config.degrees_to_dmx(actual)
-
-                # Should get different DMX values due to offsets
-                assert isinstance(dmx[0], int)
-                assert isinstance(dmx[1], int)
-
-    def test_pose_workflow(self) -> None:
-        """Test complete pose conversion workflow."""
-        config = FixtureConfig(
-            fixture_id="MH1",
-            dmx_mapping=DmxMapping(pan_channel=11, tilt_channel=13, dimmer_channel=15),
-            position=FixturePosition(pan_offset_deg=30.0),
-        )
-
-        # 1. Get standard pose
-        center = config.get_standard_pose("center")
-
-        # 2. Apply position offset (where fixture actually needs to be)
-        actual_pose = config.position.apply_offset(center)  # type: ignore[union-attr]
-        assert actual_pose.pan_deg == 30.0
-
-        # 3. Convert to DMX
-        pan_dmx, tilt_dmx = config.degrees_to_dmx(actual_pose)
-
-        # 4. Convert back to degrees
-        reconstructed = config.dmx_to_degrees(pan_dmx, tilt_dmx)
-
-        # 5. Remove offset to get relative aim
-        relative = config.position.remove_offset(reconstructed)  # type: ignore[union-attr]
-
-        # Should be close to original forward pose
-        assert abs(relative.pan_deg) < 5.0  # Allow some DMX quantization error
-
     def test_safety_limits_workflow(self) -> None:
         """Test safety checking workflow."""
         config = FixtureConfig(
             fixture_id="MH1",
             dmx_mapping=DmxMapping(pan_channel=11, tilt_channel=13, dimmer_channel=15),
-            limits=MovementLimits(
-                pan_min=50, pan_max=190, tilt_min=5, tilt_max=125, avoid_backward=True
-            ),
+            limits=MovementLimits(pan_min=50, pan_max=190, tilt_min=5, tilt_max=125),
         )
 
-        # Safe poses
-        assert config.is_pose_safe(Pose(pan_deg=0.0, tilt_deg=0.0)) is True
-        assert config.is_pose_safe(Pose(pan_deg=45.0, tilt_deg=30.0)) is True
-
-        assert config.is_pose_safe(Pose(pan_deg=120.0, tilt_deg=0.0)) is False
-
-        assert config.is_pose_safe(Pose(pan_deg=180.0, tilt_deg=100.0)) is False
+        assert config.degrees_to_dmx(Pose(pan_deg=-180.0, tilt_deg=-90.0)) == (50, 5)
+        assert config.degrees_to_dmx(Pose(pan_deg=170.0, tilt_deg=90.0)) == (190, 107)

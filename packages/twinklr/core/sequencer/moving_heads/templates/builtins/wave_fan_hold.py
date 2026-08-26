@@ -10,7 +10,6 @@ from twinklr.core.sequencer.models.enum import (
 from twinklr.core.sequencer.models.template import (
     BaseTiming,
     Dimmer,
-    Distribution,
     Geometry,
     Movement,
     PhaseOffset,
@@ -65,7 +64,6 @@ def make_template() -> TemplateDoc:
                             mode=PhaseOffsetMode.GROUP_ORDER,
                             order=ChaseOrder.LEFT_TO_RIGHT,
                             spread_bars=1.0,
-                            distribution=Distribution.LINEAR,
                             wrap=True,
                         ),
                     ),

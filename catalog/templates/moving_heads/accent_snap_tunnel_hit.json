@@ -41,7 +41,6 @@
     ],
     "steps": [
       {
-        "blend_mode": "override",
         "color": null,
         "dimmer": {
           "cycles": 4.0,
@@ -51,10 +50,7 @@
           "min_norm": 0.1,
           "params": {}
         },
-        "entry_transition": null,
-        "exit_transition": null,
         "geometry": {
-          "aim_zone": "HORIZON",
           "geometry_type": "tunnel_cone",
           "pan_pose_by_role": null,
           "params": {},
@@ -65,15 +61,11 @@
           "pattern": "prism"
         },
         "movement": {
-          "amplitude_override": null,
-          "center_offset_override": null,
           "cycles": 4.0,
-          "frequency_override": null,
           "intensity": "INTENSE",
           "movement_type": "accent_snap",
           "params": {}
         },
-        "priority": 0,
         "shutter": null,
         "step_id": "main",
         "target": "ALL",
@@ -85,12 +77,10 @@
             "start_offset_bars": 0.0
           },
           "phase_offset": {
-            "distribution": "LINEAR",
-            "group": "ALL",
             "mode": "GROUP_ORDER",
-            "order": "INSIDE_OUT",
             "spread_bars": 0.5,
-            "wrap": true
+            "wrap": true,
+            "order": "INSIDE_OUT"
           }
         }
       }

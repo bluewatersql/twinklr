@@ -22,6 +22,10 @@ def _calibration(mapping: DmxMapping) -> dict[str, object]:
     ("handler", "params", "expected"),
     [
         (DefaultColorHandler(), {"preset": "red"}, 18),
+        (DefaultShutterHandler(), {"pattern": "closed"}, 0),
+        (DefaultShutterHandler(), {"pattern": "open"}, 255),
+        (DefaultShutterHandler(), {"pattern": "strobe_slow"}, 64),
+        (DefaultShutterHandler(), {"pattern": "strobe_medium"}, 127),
         (DefaultShutterHandler(), {"pattern": "strobe_fast"}, 190),
         (DefaultGoboHandler(), {"pattern": "circles"}, 20),
     ],

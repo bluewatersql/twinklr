@@ -7,9 +7,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from twinklr.core.config.fixtures.capabilities import FixtureCapabilities, MovementSpeed
 from twinklr.core.config.fixtures.dmx import ChannelInversions, DmxMapping
 from twinklr.core.config.fixtures.instances import FixtureConfig, FixtureInstance, FixturePosition
 from twinklr.core.config.fixtures.physical import MovementLimits, Orientation, PanTiltRange
@@ -27,9 +26,6 @@ class BaseFixtureConfig(BaseModel):
     model_config = ConfigDict(frozen=False)
 
     # DMX configuration (shared across all fixtures)
-    dmx_universe: int = Field(default=1, ge=1, le=64, description="DMX universe number")
-    channel_count: int = Field(default=16, ge=1, le=128, description="Number of DMX channels used")
-
     # DMX channel assignments (shared mapping)
     dmx_mapping: DmxMapping = Field(..., description="DMX channel assignments")
     inversions: ChannelInversions = Field(
@@ -47,12 +43,18 @@ class BaseFixtureConfig(BaseModel):
         default_factory=MovementLimits, description="Safety movement limits"
     )
 
-    capabilities: FixtureCapabilities = Field(
-        default_factory=FixtureCapabilities, description="Feature capabilities"
-    )
-    movement_speed: MovementSpeed = Field(
-        default_factory=MovementSpeed, description="Movement speed specifications"
-    )
+    @model_validator(mode="before")
+    @classmethod
+    def reject_removed_fields(cls, value: object) -> object:
+        if isinstance(value, dict):
+            removed = sorted(
+                {"dmx_universe", "channel_count", "capabilities", "movement_speed"} & value.keys()
+            )
+            if removed:
+                raise ValueError(
+                    f"fixture fields {removed} were removed because they never affected output"
+                )
+        return value
 
 
 class SimplifiedFixtureInstance(BaseModel):
@@ -65,7 +67,6 @@ class SimplifiedFixtureInstance(BaseModel):
     model_config = ConfigDict(frozen=False)
 
     fixture_id: str = Field(..., description="Unique fixture identifier (e.g., 'MH1')")
-    dmx_start_address: int = Field(..., ge=1, le=512, description="Starting DMX address")
     xlights_model_name: str = Field(..., description="xLights model name (e.g., 'Dmx MH1')")
 
     # Position is the only section that varies per fixture
@@ -78,6 +79,15 @@ class SimplifiedFixtureInstance(BaseModel):
         default_factory=dict,
         description="Override specific base_config values (e.g., {'dmx_universe': 2})",
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def reject_removed_fields(cls, value: object) -> object:
+        if isinstance(value, dict) and "dmx_start_address" in value:
+            raise ValueError(
+                "fixture field 'dmx_start_address' was removed because export uses relative channels"
+            )
+        return value
 
 
 class FixtureGroup(BaseModel):
@@ -154,7 +164,6 @@ class FixtureGroup(BaseModel):
 
             # Add fixture-specific values
             config_dict["fixture_id"] = fixture.fixture_id
-            config_dict["dmx_start_address"] = fixture.dmx_start_address
             config_dict["position"] = fixture.position
 
             full_config = FixtureConfig.model_validate(config_dict)
@@ -232,19 +241,19 @@ class FixtureGroupBuilder(BaseModel):
     xlights_group: str = Field(..., description="xLights group name")
     base_config: FixtureConfig = Field(..., description="Base configuration to clone")
 
-    def build(self, fixtures: list[tuple[str, int, str, FixturePosition]]) -> FixtureGroup:
+    def build(self, fixtures: list[tuple[str, str, FixturePosition]]) -> FixtureGroup:
         """Build a fixture group from a list of fixture specs.
 
         Args:
-            fixtures: List of (fixture_id, dmx_addr, xlights_name, position) tuples
+            fixtures: List of (fixture_id, xlights_name, position) tuples
 
         Returns:
             Configured FixtureGroup
         """
         group = FixtureGroup(group_id=self.group_id, xlights_group=self.xlights_group)
 
-        for fixture_id, dmx_addr, xlights_name, position in fixtures:
-            config = self._clone_config(fixture_id, dmx_addr, position)
+        for fixture_id, xlights_name, position in fixtures:
+            config = self._clone_config(fixture_id, position)
             group.add_fixture(
                 FixtureInstance(
                     fixture_id=fixture_id, config=config, xlights_model_name=xlights_name
@@ -253,15 +262,12 @@ class FixtureGroupBuilder(BaseModel):
 
         return group
 
-    def _clone_config(
-        self, fixture_id: str, dmx_addr: int, position: FixturePosition
-    ) -> FixtureConfig:
+    def _clone_config(self, fixture_id: str, position: FixturePosition) -> FixtureConfig:
         """Clone base config with customizations."""
         # Use model_copy() to properly clone the config with updates
         return self.base_config.model_copy(
             update={
                 "fixture_id": fixture_id,
-                "dmx_start_address": dmx_addr,
                 "position": position,
             }
         )
