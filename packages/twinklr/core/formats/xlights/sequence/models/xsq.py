@@ -10,7 +10,6 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from twinklr.core.formats.xlights.sequence.models.effect_placement import EffectPlacement
 from twinklr.core.formats.xlights.sequence.trace import EmissionTraceEntry
 
 
@@ -353,41 +352,6 @@ class XSequence(BaseModel):
             List of effect settings strings
         """
         return self.effect_db.entries.copy()
-
-    def iter_effect_placements(self) -> list[Any]:
-        """Iterate all effect placements in the sequence.
-
-        Returns:
-            List of EffectPlacement objects (for backward compatibility)
-        """
-
-        placements = []
-        for element in self.element_effects:
-            for layer in element.layers:
-                for effect in layer.effects:
-                    placements.append(
-                        EffectPlacement(
-                            element_name=element.element_name,
-                            effect_name=effect.effect_type,
-                            start_ms=effect.start_time_ms,
-                            end_ms=effect.end_time_ms,
-                            effect_label=effect.label,
-                            ref=effect.ref,
-                            palette=int(effect.palette) if effect.palette.isdigit() else 0,
-                        )
-                    )
-        return placements
-
-    def effect_type_histogram(self) -> dict[str, int]:
-        """Get histogram of effect types.
-
-        Returns:
-            Dictionary mapping effect type names to counts
-        """
-        hist: dict[str, int] = {}
-        for placement in self.iter_effect_placements():
-            hist[placement.effect_name] = hist.get(placement.effect_name, 0) + 1
-        return hist
 
     def get_version(self) -> str:
         """Get xLights version from sequence head.
