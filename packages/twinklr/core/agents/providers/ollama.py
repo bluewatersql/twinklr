@@ -5,6 +5,8 @@ from __future__ import annotations
 import asyncio
 from typing import TYPE_CHECKING, Any
 
+from openai import DefaultAsyncHttpxClient
+
 from twinklr.core.agents.providers.base import (
     LLMResponse,
     ProviderCapabilities,
@@ -27,12 +29,17 @@ class OllamaProvider(OpenAIProvider):
         timeout: float = 300.0,
         http_client: httpx.AsyncClient | None = None,
     ) -> None:
+        resolved_http_client = http_client or DefaultAsyncHttpxClient(follow_redirects=False)
+        # A caller may inject a shared client for observability/testing. The local
+        # provider must still own redirect policy because POST redirects can replay
+        # the complete prompt and response schema to another origin.
+        resolved_http_client.follow_redirects = False
         super().__init__(
             api_key="ollama",
             session_id=session_id,
             timeout=timeout,
             base_url=base_url,
-            http_client=http_client,
+            http_client=resolved_http_client,
         )
 
     @property

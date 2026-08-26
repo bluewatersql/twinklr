@@ -194,7 +194,7 @@ It does not install Ollama or pull a model. After you separately install Ollama,
 and pull a model of your choice, authorize exactly one local request with:
 
 ```bash
-TWINKLR_OLLAMA_SMOKE=1 \
+TWINKLR_RUN_LOCAL_OLLAMA_TESTS=1 \
 TWINKLR_OLLAMA_MODEL=qwen3.5:27b \
 TWINKLR_OLLAMA_BASE_URL=http://127.0.0.1:11434/v1 \
 uv run pytest tests/local_only/test_ollama_structured_outputs.py -q --no-cov

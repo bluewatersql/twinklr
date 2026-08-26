@@ -161,8 +161,10 @@ uv run ruff check .
 LOCAL-ONLY (not run by the verifier in CI; run manually with Ollama installed and a
 target model pulled, e.g. `ollama pull qwen3.5:27b`):
 ```bash
-TWINKLR_PROVIDER=ollama TWINKLR_OLLAMA_BASE_URL=http://localhost:11434/v1 \
-  uv run pytest tests/integration/ -v -k ollama_smoke  # exact marker/path per executor's test placement
+TWINKLR_RUN_LOCAL_OLLAMA_TESTS=1 \
+TWINKLR_OLLAMA_MODEL=qwen3.5:27b \
+TWINKLR_OLLAMA_BASE_URL=http://127.0.0.1:11434/v1 \
+  uv run pytest tests/local_only/test_ollama_structured_outputs.py -q --no-cov
 ```
 
 ## Effort & risk
@@ -197,8 +199,27 @@ MockTransport coverage pins exact endpoint and body shape, cloud non-regression,
 schema/hash metadata, usage/finish handling, local credential semantics, loopback
 rejection, assistant-safe conversation windows, one-transport-request truncation, the
 runner's bounded Pydantic repair, and pre-transport vision rejection. The `local_only`
-`MacroPlan` smoke requires `TWINKLR_OLLAMA_SMOKE=1`, an explicitly named already-pulled
-model, one provider attempt, no schema repair, no fallback, and a 60-second timeout. No
-provider/network call, model installation, or model pull was made while building this
-candidate. Real local schema validity therefore remains unclaimed pending the explicit
-operator smoke.
+`MacroPlan` smoke requires `TWINKLR_RUN_LOCAL_OLLAMA_TESTS=1`, an explicitly named
+already-pulled model, one provider attempt, no schema repair, no fallback, and a
+60-second timeout. No provider/network call, model installation, or model pull was made
+while building this candidate. Real local schema validity therefore remains unclaimed
+pending the explicit operator smoke.
+
+### Independent rejection and remediation
+
+Independent verification rejected commit `3765bd9`: although `AppConfig` restricted the
+initial Ollama URL to loopback, a redirect-following HTTP client could replay the full
+POST prompt and schema to a remote `Location`. The same review required the canonical
+smoke opt-in name `TWINKLR_RUN_LOCAL_OLLAMA_TESTS` rather than the candidate's shorter
+name. That freeze is rejected evidence, not an approved candidate.
+
+The follow-up remediation forces `follow_redirects=False` on both the production local
+client and any injected local HTTP client. A MockTransport discriminator returns a 307
+to a remote origin and proves there is exactly one loopback request, the remote origin
+receives no request body, and the provider fails closed. Code, test, and documentation
+now use only `TWINKLR_RUN_LOCAL_OLLAMA_TESTS`. This remediation remains pending fresh
+independent verification and makes no live/local provider call.
+
+TDD red evidence was explicit: before the redirect policy fix, the 307 discriminator
+observed 21 requests (one loopback request followed by repeated requests to the remote
+origin). After the fix it observes exactly one loopback request and zero remote requests.

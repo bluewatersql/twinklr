@@ -18,8 +18,8 @@ from twinklr.core.sequencer.planning import MacroPlan
 @pytest.mark.local_only
 @pytest.mark.asyncio
 async def test_ollama_returns_schema_valid_macro_plan() -> None:
-    if os.getenv("TWINKLR_OLLAMA_SMOKE") != "1":
-        pytest.skip("set TWINKLR_OLLAMA_SMOKE=1 to authorize one local Ollama request")
+    if os.getenv("TWINKLR_RUN_LOCAL_OLLAMA_TESTS") != "1":
+        pytest.skip("set TWINKLR_RUN_LOCAL_OLLAMA_TESTS=1 to authorize one local Ollama request")
 
     base_url = os.getenv("TWINKLR_OLLAMA_BASE_URL", "http://127.0.0.1:11434/v1")
     model = os.getenv("TWINKLR_OLLAMA_MODEL")

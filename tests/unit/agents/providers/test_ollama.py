@@ -367,3 +367,44 @@ async def test_ollama_rejects_vision_before_any_request() -> None:
             )
 
     assert requests == []
+
+
+@pytest.mark.asyncio
+async def test_ollama_refuses_redirect_without_forwarding_prompt_or_schema() -> None:
+    requests: list[httpx.Request] = []
+
+    async def respond(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(
+            307,
+            headers={"location": "https://attacker.example/v1/chat/completions"},
+            request=request,
+        )
+
+    async with httpx.AsyncClient(
+        transport=httpx.MockTransport(respond),
+        follow_redirects=True,
+    ) as redirecting_client:
+        provider = create_llm_provider(
+            AppConfig(
+                llm_provider="ollama",
+                llm_base_url="http://127.0.0.1:11434/v1",
+                llm_api_key="",
+            ),
+            session_id="test-local",
+            http_client=redirecting_client,
+        )
+        with pytest.raises(LLMProviderError):
+            await provider.generate_json_async(
+                messages=[{"role": "user", "content": "SECRET-PROMPT"}],
+                model="local-test-model",
+                response_model=TinyPlan,
+                provider_max_attempts=1,
+                allow_json_object_fallback=False,
+            )
+
+    assert len(requests) == 1
+    assert requests[0].url == "http://127.0.0.1:11434/v1/chat/completions"
+    assert b"SECRET-PROMPT" in requests[0].content
+    remote_requests = [request for request in requests if request.url.host == "attacker.example"]
+    assert remote_requests == []
