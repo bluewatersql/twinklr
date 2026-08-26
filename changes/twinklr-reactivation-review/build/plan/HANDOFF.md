@@ -8,7 +8,9 @@ and attempt 2 with HTTP 400 because `temperature` is unsupported by `gpt-5.6-sol
 Exactly one provider request and no retry/fallback/schema repair occurred in each;
 `$3.320000` is committed, the two-attempt cap is exhausted, no third attempt is
 authorized, and live acceptance remains open. P3-T7+ and
-task-bounded live/paid work are authorized. Maintained by the
+task-bounded live/paid work are authorized. P3-T8's remediated offline implementation
+is independently approved; its GUI preview, live judge, human review, calibration, and
+real completed record remain deferred to that end-to-end milestone. Maintained by the
 orchestrating agent; update this file at every
 pause or phase boundary._
 
@@ -30,7 +32,7 @@ their authoring moment; this handoff owns the current campaign status.
 | 1P — Render truth | **IMPLEMENTATION MERGED AND VERIFIED** (12/12); **phase exit not complete** | The recorded human judgment and empirical xLights acceptance evidence remain pending; see [02-phase-1p-render-truth.md](02-phase-1p-render-truth.md). |
 | 2P — Creative quality | **OFFLINE IMPLEMENTATION MERGED AND VERIFIED** (13/13); **phase exit not complete** | The owner accepted T1/T8/T9 on 2026-08-16. T6 calibration/live evidence, T13/D1 evidence, and other live checks remain pending; see [04-phase-2p-creative-quality.md](04-phase-2p-creative-quality.md). |
 | 2K — Catalog growth | **TOOLING IMPLEMENTATION MERGED AND VERIFIED** (4/4); **phase exit not complete** | Tooling is ready, but coverage/corpus/curation/style exit criteria require the author's real layout, corpus, preferences, and judgments; see [05-phase-2k-catalog-growth.md](05-phase-2k-catalog-growth.md). |
-| 3 — Show convergence | **P3-T1–P3-T6 MERGED AND INDEPENDENTLY APPROVED OFFLINE/IN CODE** (6/8 integrated) | P3-T6 is integrated at `c9620db`; its empirical xLights gate remains open and deferred to the meaningful end-to-end milestone. P3-T7+ and task-bounded live/paid work are authorized. P3-T4 exhausted its two audited attempts; both failed safely, `$3.320000` is committed, no third attempt is authorized, and live acceptance remains open. Earlier commits: P3-T5 `f006468`; P3-T4 `558153c`; P3-T3 `33cce57`; P3-T2 `5365f70`; P3-T1 `5eebcb2`. |
+| 3 — Show convergence | **P3-T1–P3-T6 MERGED; P3-T8 OFFLINE IMPLEMENTATION INDEPENDENTLY APPROVED** (6/8 integrated before this merge); **P3-T7+ AUTHORIZED** | P3-T6 is integrated at `c9620db`; its empirical xLights gate remains open and deferred to the meaningful end-to-end milestone. P3-T8's remediated offline implementation passed independent review; its preview, live visual judge, human review, calibration, and real completed record remain deferred and no empirical outcome is implied. P3-T7 implementation/live proof remains separately gated. P3-T4 exhausted its two audited attempts; both failed safely, `$3.320000` is committed, no third attempt is authorized, and live acceptance remains open. Earlier commits: P3-T5 `f006468`; P3-T4 `558153c`; P3-T3 `33cce57`; P3-T2 `5365f70`; P3-T1 `5eebcb2`. |
 | 4 — Compounding | **NOT STARTED** | No Phase 4 implementation has started. |
 
 The overall `twinklr-reactivation-review` change remains **ACTIVE**. Finishing an
@@ -42,6 +44,18 @@ offline implementation lane is not the same as satisfying its phase exit criteri
   [context/current-state.md](../../../../context/current-state.md); do not fork its
   rolling snapshot into this execution handoff.
 - No implementation or test failure is being carried as an accepted baseline.
+- The P3-T8 first offline snapshot was formally rejected. Its remediated candidate on
+  `codex/p3t8-evaluation` from `1ecea0c` verifies all completed-record evidence before
+  report/join consumption, shares the provider hard-limit preflight with rubric-v1,
+  expands contact-sheet grounding ranges, and covers unmatched/non-spanning/ambiguous-
+  ownership metrics adversarially. Fresh author gates: rejection core **25 passed**;
+  evaluation/CLI/integration focus **163 passed**; immutable goldens **74 passed, 8
+  skipped**; full offline suite **5,390 passed, 38 skipped** at 88%; Ruff/format and
+  `git diff --check` clean; mypy clean across **737 source files**. Frozen 24-file
+  implementation/test/prompt manifest SHA-256:
+  `b75fcc9f565cb77888946f8f8da5a0ec4983176d2ef140460ac7584fe2b860a0`.
+  This candidate awaits independent verification; no acceptance is self-awarded and no
+  live/provider/xLights/audio work or completed real record was created.
 - The P3-T6 remediation candidate on `codex/p3t6-unified-export` from `e1ed146`
   passed the complete offline suite: **5352 passed, 38 skipped** at 88% coverage;
   immutable goldens **74 passed, 8 skipped**; review-focused **38 passed**; broader

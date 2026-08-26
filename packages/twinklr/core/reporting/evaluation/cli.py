@@ -11,33 +11,39 @@ import click
 
 from twinklr.core.reporting.evaluation.config import EvalConfig
 from twinklr.core.reporting.evaluation.generator import generate_evaluation_report
+from twinklr.core.reporting.evaluation.show_record import load_show_evaluation_record
 
 logger = logging.getLogger(__name__)
 
 
 @click.command("eval-report")
+@click.argument(
+    "record",
+    required=False,
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+)
 @click.option(
     "--checkpoint",
     type=click.Path(exists=True, path_type=Path),
-    required=True,
+    required=False,
     help="Path to checkpoint JSON file",
 )
 @click.option(
     "--audio",
     type=click.Path(exists=True, path_type=Path),
-    required=True,
+    required=False,
     help="Path to audio file (MP3)",
 )
 @click.option(
     "--fixture",
     type=click.Path(exists=True, path_type=Path),
-    required=True,
+    required=False,
     help="Path to fixture configuration JSON",
 )
 @click.option(
     "--out",
     type=click.Path(path_type=Path),
-    required=True,
+    required=False,
     help="Output directory for report artifacts",
 )
 @click.option(
@@ -52,14 +58,15 @@ logger = logging.getLogger(__name__)
     help="Logging level",
 )
 def eval_report_cli(
-    checkpoint: Path,
-    audio: Path,
-    fixture: Path,
-    out: Path,
+    record: Path | None,
+    checkpoint: Path | None,
+    audio: Path | None,
+    fixture: Path | None,
+    out: Path | None,
     config: Path | None,
     log_level: str,
 ) -> None:
-    """Generate evaluation report from checkpoint.
+    """Read a completed show record, or generate a legacy checkpoint report.
 
     This command re-renders a choreography plan through the sequencing pipeline,
     analyzes the resulting curves, and generates a comprehensive evaluation report
@@ -72,6 +79,31 @@ def eval_report_cli(
             --fixture fixture_config.json \\
             --out artifacts/my_song/eval_reports/run_001
     """
+    if record is not None:
+        if any(value is not None for value in (checkpoint, audio, fixture, out, config)):
+            raise click.UsageError(
+                "a completed show record cannot be combined with checkpoint report options"
+            )
+        completed = load_show_evaluation_record(record)
+        click.echo(completed.model_dump_json(indent=2))
+        return
+    missing = [
+        name
+        for name, value in (
+            ("--checkpoint", checkpoint),
+            ("--audio", audio),
+            ("--fixture", fixture),
+            ("--out", out),
+        )
+        if value is None
+    ]
+    if missing:
+        raise click.UsageError("legacy checkpoint reports require " + ", ".join(missing))
+    assert checkpoint is not None
+    assert audio is not None
+    assert fixture is not None
+    assert out is not None
+
     # Configure logging
     logging.basicConfig(
         level=getattr(logging, log_level),

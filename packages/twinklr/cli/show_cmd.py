@@ -18,8 +18,12 @@ from twinklr.core.pipeline.display_wiring import (
     tracked_catalog_dir,
 )
 from twinklr.core.pipeline.show_wiring import prepare_combined_show_pipeline
+from twinklr.core.reporting.evaluation.show_manifest import write_show_evaluation_manifest
+from twinklr.core.sequencer.display.xlights_mapping import XLightsMapping
 from twinklr.core.sequencer.moving_heads.templates import load_builtin_templates
 from twinklr.core.sequencer.moving_heads.templates.library import list_templates
+from twinklr.core.sequencer.planning import MacroPlan
+from twinklr.core.sequencer.templates.group.models.choreography import ChoreographyGraph
 from twinklr.core.session import TwinklrSession
 from twinklr.core.utils.formatting import clean_audio_filename
 
@@ -120,17 +124,38 @@ async def run_show_pipeline_async(
         console.print(f"[red]Combined show pipeline failed: {result.failed_stages}[/red]")
         return 1
     try:
+        render_output = result.outputs.get("show_render")
         xsq_path, trace_path = export_display_artifacts(
-            result.outputs.get("show_render"),
+            render_output,
             artifact_dir=artifact_dir,
             song_name=song_name,
             artifact_kind="show",
+        )
+        if not isinstance(render_output, dict):
+            raise TypeError("show_render output must be an object")
+        evaluation_contract = render_output.get("evaluation_contract")
+        if not isinstance(evaluation_contract, dict):
+            raise TypeError("show_render evaluation_contract must be an object")
+        manifest_path = Path(f"{xsq_path}.evaluation.json")
+        write_show_evaluation_manifest(
+            path=manifest_path,
+            xsq_path=xsq_path,
+            trace_path=trace_path,
+            macro_plan=MacroPlan.model_validate(evaluation_contract.get("macro_plan")),
+            choreography_graph=ChoreographyGraph.model_validate(
+                evaluation_contract.get("choreography_graph")
+            ),
+            xlights_mapping=XLightsMapping.model_validate(
+                evaluation_contract.get("xlights_mapping")
+            ),
+            moving_head_target_ids=set(evaluation_contract.get("moving_head_target_ids", [])),
         )
     except (OSError, TypeError, ValueError) as error:
         console.print(f"[red]Combined show returned an invalid render payload: {error}[/red]")
         return 1
     console.print(f"[green]Coordinated sequence:[/green] {xsq_path}")
     console.print(f"[green]Render trace:[/green] {trace_path}")
+    console.print(f"[green]Evaluation manifest:[/green] {manifest_path}")
     return 0
 
 

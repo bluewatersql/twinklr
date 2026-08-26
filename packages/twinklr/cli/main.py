@@ -52,6 +52,10 @@ from twinklr.core.config.models import JobConfig
 from twinklr.core.pipeline import PipelineContext, PipelineExecutor
 from twinklr.core.pipeline.definition import PipelineDefinition
 from twinklr.core.pipeline.definitions import build_moving_heads_pipeline
+from twinklr.core.reporting.evaluation.show_cli import (
+    add_show_eval_subparser,
+    run_show_eval_command,
+)
 from twinklr.core.sequencer.display.xlights_mapping import (
     XLightsGroupMapping,
     XLightsMapping,
@@ -635,6 +639,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     add_template_subparsers(sub)
     add_display_subparser(sub)
     add_show_subparser(sub)
+    add_show_eval_subparser(sub)
 
     # Registered only so `twinklr --help` lists it; `main()` dispatches "eval-report"
     # to click before argparse ever parses its arguments (see below — argparse's
@@ -714,6 +719,8 @@ def main() -> None:
         run_display_command(args)
     elif args.cmd == "show":
         run_show_command(args)
+    elif args.cmd == "show-eval":
+        sys.exit(run_show_eval_command(args))
 
 
 if __name__ == "__main__":

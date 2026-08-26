@@ -38,6 +38,7 @@ class CombinedShowRenderStage:
     ) -> None:
         self._fixture_group = fixture_group
         self._graph = choreo_graph
+        self._xlights_mapping = xlights_mapping
         self._moving_head_target_ids = set(moving_head_target_ids)
         self._available_templates = list(available_templates)
         self._display_stage = DisplayRenderStage(
@@ -138,6 +139,12 @@ class CombinedShowRenderStage:
                     "moving_head_plan": coordinated_mh,
                     "moving_head_segments": tuple(segments),
                     "beat_grid": beat_grid,
+                    "evaluation_contract": {
+                        "macro_plan": macro_plan,
+                        "choreography_graph": self._graph,
+                        "xlights_mapping": self._xlights_mapping,
+                        "moving_head_target_ids": sorted(self._moving_head_target_ids),
+                    },
                 },
                 stage_name=self.name,
             )

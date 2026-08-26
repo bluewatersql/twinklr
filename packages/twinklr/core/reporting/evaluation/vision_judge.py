@@ -300,7 +300,8 @@ def _actual_cost(result: AgentResult, config: VisionJudgeConfig) -> float:
     ) / 1_000_000
 
 
-def _validate_request_payload(frames: list[FrameInput], *, structure_text: str) -> None:
+def validate_vision_request_payload(frames: list[FrameInput], *, context_text: str) -> None:
+    """Apply provider hard limits before reservation or provider execution."""
     if len(frames) > MAX_REQUEST_IMAGES:
         raise BudgetExceededError(
             f"Vision request has {len(frames)} images, exceeding the 1,500-image hard limit"
@@ -310,7 +311,7 @@ def _validate_request_payload(frames: list[FrameInput], *, structure_text: str) 
     )
     encoded_bytes = (
         sum(_encoded_image_bytes(frame.path) for frame in frames)
-        + len(structure_text.encode("utf-8"))
+        + len(context_text.encode("utf-8"))
         + manifest_bytes
     )
     if encoded_bytes > MAX_REQUEST_BYTES:
@@ -318,6 +319,11 @@ def _validate_request_payload(frames: list[FrameInput], *, structure_text: str) 
             f"Vision request is {encoded_bytes / 1024 / 1024:.2f} MiB encoded, exceeding "
             "the 512 MiB hard limit"
         )
+
+
+def _validate_request_payload(frames: list[FrameInput], *, structure_text: str) -> None:
+    """Preserved rubric-v1 compatibility wrapper."""
+    validate_vision_request_payload(frames, context_text=structure_text)
 
 
 def _encoded_image_bytes(path: Path) -> int:
@@ -332,17 +338,7 @@ def _validate_grounding(
     frames: list[FrameInput],
     section_names: set[str],
 ) -> None:
-    allowed_frames: set[int] = set()
-    for frame in frames:
-        label = frame.label or f"Frame {frame.index}"
-        matches = list(re.finditer(r"\bFrames?\s+(\d+)(?:\s*[–-]\s*(\d+))?", label, re.I))
-        if not matches:
-            allowed_frames.add(frame.index)
-        for match in matches:
-            start = int(match.group(1))
-            end = int(match.group(2) or start)
-            allowed_frames.update(range(min(start, end), max(start, end) + 1))
-
+    allowed_frames = supplied_frame_indices(frames)
     normalized_sections = {name.casefold() for name in section_names}
     for field_name in VisionRubricResponse.model_fields:
         justification = getattr(rubric, field_name).justification
@@ -365,6 +361,21 @@ def _validate_grounding(
             raise RuntimeError(
                 f"{field_name} justification must cite a supplied frame or real section name"
             )
+
+
+def supplied_frame_indices(frames: list[FrameInput]) -> set[int]:
+    """Expand direct and contact-sheet range labels to their supplied frame indices."""
+    allowed_frames: set[int] = set()
+    for frame in frames:
+        label = frame.label or f"Frame {frame.index}"
+        matches = list(re.finditer(r"\bFrames?\s+(\d+)(?:\s*[–-]\s*(\d+))?", label, re.I))
+        if not matches:
+            allowed_frames.add(frame.index)
+        for match in matches:
+            start = int(match.group(1))
+            end = int(match.group(2) or start)
+            allowed_frames.update(range(min(start, end), max(start, end) + 1))
+    return allowed_frames
 
 
 def build_structure_text(

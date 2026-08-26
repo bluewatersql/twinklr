@@ -128,7 +128,12 @@ empirical xLights GUI acceptance remains open. The owner authorized P3-T7+ and
 task-bounded live/paid work on 2026-08-26. xLights GUI dates/checks remain deferred until
 a meaningful end-to-end show is fully working; the empirical gates remain open. These
 integrations and authorizations do not waive the earlier exits or close P3-T4 live
-acceptance. Phase 4 has not started.
+acceptance. P3-T8's first offline candidate was formally rejected; its remediated
+implementation now independently verifies file-backed provenance, rebuilds deterministic
+reports, shares provider request limits, and handles contact-sheet grounding. It is
+independently approved offline, but supplies no xLights evidence, visual-judge output,
+human judgment, calibration, real completed record, or empirical acceptance outcome.
+Phase 4 has not started.
 
 The authoritative current task/gate list is the campaign
 [HANDOFF.md](../changes/twinklr-reactivation-review/build/plan/HANDOFF.md). Most notably,
