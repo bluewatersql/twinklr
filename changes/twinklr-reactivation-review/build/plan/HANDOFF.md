@@ -9,9 +9,9 @@ Exactly one provider request and no retry/fallback/schema repair occurred in eac
 `$3.320000` is committed, the two-attempt cap is exhausted, no third attempt is
 authorized, and live acceptance remains open. P3-T7+ and
 task-bounded live/paid work are authorized. P3-T7 is independently approved offline/in
-code; its live proof remains exactly one image-provider request with no retry followed by
-a zero-call cache replay, and `$0.20` is an estimate/reservation rather than a hard spend
-guarantee. P3-T8's remediated offline implementation is integrated at `82438cf`; its GUI preview, live judge, human review, calibration, and
+code and integrated at `70b3305`. Its one-shot live proof passed with one request, no
+retry, a valid 1024×1024 PNG, a zero-call scoped cache replay, and measured cost
+`$0.00622`; the terminal sealed ledger forbids another attempt. P3-T8's remediated offline implementation is integrated at `82438cf`; its GUI preview, live judge, human review, calibration, and
 real completed record remain deferred to that end-to-end milestone. Maintained by the
 orchestrating agent; update this file at every
 pause or phase boundary._
@@ -34,7 +34,7 @@ their authoring moment; this handoff owns the current campaign status.
 | 1P — Render truth | **IMPLEMENTATION MERGED AND VERIFIED** (12/12); **phase exit not complete** | The recorded human judgment and empirical xLights acceptance evidence remain pending; see [02-phase-1p-render-truth.md](02-phase-1p-render-truth.md). |
 | 2P — Creative quality | **OFFLINE IMPLEMENTATION MERGED AND VERIFIED** (13/13); **phase exit not complete** | The owner accepted T1/T8/T9 on 2026-08-16. T6 calibration/live evidence, T13/D1 evidence, and other live checks remain pending; see [04-phase-2p-creative-quality.md](04-phase-2p-creative-quality.md). |
 | 2K — Catalog growth | **TOOLING IMPLEMENTATION MERGED AND VERIFIED** (4/4); **phase exit not complete** | Tooling is ready, but coverage/corpus/curation/style exit criteria require the author's real layout, corpus, preferences, and judgments; see [05-phase-2k-catalog-growth.md](05-phase-2k-catalog-growth.md). |
-| 3 — Show convergence | **P3-T1–P3-T8 OFFLINE IMPLEMENTATIONS MERGED** (8/8 integrated); **EMPIRICAL EXITS OPEN** | P3-T6 is integrated at `c9620db`; its xLights gate remains deferred. P3-T8 is integrated at `82438cf`; preview/live-judge/human/calibration/real-record evidence remains deferred. P3-T7's independently approved code is in the current integration; its one-request/no-retry image proof and zero-call cache replay remain pending. P3-T4 exhausted two failed audited attempts, `$3.320000` is committed, no third is authorized, and live acceptance remains open. Earlier commits: P3-T5 `f006468`; P3-T4 `558153c`; P3-T3 `33cce57`; P3-T2 `5365f70`; P3-T1 `5eebcb2`. |
+| 3 — Show convergence | **P3-T1–P3-T8 OFFLINE IMPLEMENTATIONS MERGED** (8/8 integrated); **EMPIRICAL EXITS OPEN** | P3-T7 is integrated at `70b3305`; its one-shot image proof passed with one request, zero retry, zero-call cache replay, and `$0.00622` measured cost. P3-T6 is integrated at `c9620db`; its xLights gate remains deferred. P3-T8 is integrated at `82438cf`; preview/live-judge/human/calibration/real-record evidence remains deferred. P3-T4 exhausted two failed audited attempts, `$3.320000` is committed, no third is authorized, and live acceptance remains open. Earlier commits: P3-T5 `f006468`; P3-T4 `558153c`; P3-T3 `33cce57`; P3-T2 `5365f70`; P3-T1 `5eebcb2`. |
 | 4 — Compounding | **NOT STARTED** | No Phase 4 implementation has started. |
 
 The overall `twinklr-reactivation-review` change remains **ACTIVE**. Finishing an
@@ -271,9 +271,8 @@ The remaining empirical checks are also pending:
 
 1. Preserve P3-T4's sealed two-attempt ledger and permanent no-third-attempt boundary;
    do not infer live acceptance from the offline provider-capability fix.
-2. Audit and, only after a fresh GO, execute P3-T7's one-request/no-retry image proof
-   followed by a zero-provider-call scoped cache replay. Treat `$0.20` as an estimate,
-   not a guaranteed spend cap.
+2. Preserve P3-T7's terminal sealed one-shot ledger and accepted proof evidence; never
+   rerun the image proof. Continue only through later tasks' separately audited caps.
 3. Continue non-GUI end-to-end work toward one meaningful fully working show. Defer all
    xLights GUI dates/checks until that milestone; deferral does not satisfy or waive them.
 4. Complete the P2P-T6/P2P-T13 and Phase 2K owner-data protocols when their prerequisites
@@ -291,8 +290,9 @@ decisions are owner-accepted and its offline candidate is integrated at `f006468
 the earlier empirical exits remain open. P3-T6 is independently approved offline/in code
 and integrated at `c9620db`; its empirical GUI acceptance is open and deferred until a
 meaningful end-to-end show is fully working. P3-T7's independently approved code and
-P3-T8's independently approved offline evaluation code are integrated; their empirical
-proofs remain open. P3-T7+ and task-bounded live/paid work are authorized. P3-T2 deliberately leaves
+P3-T8's independently approved offline evaluation code are integrated. P3-T7's one-shot
+asset proof passed; P3-T8's GUI/live/human evidence remains deferred. P3-T7+ and
+task-bounded live/paid work are authorized. P3-T2 deliberately leaves
 `resolved_color`, `timing_offset_beats`, and parameter-range/settings escaping work to
 their existing P3-T5/P3-T8 or display-review owners; it does not silently close them.
 

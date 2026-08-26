@@ -21,13 +21,16 @@ tests, and review make no live
 or paid call. The owner also authorized P3-T7+ work while deferring all xLights GUI
 dates until Twinklr has a meaningful, fully working end-to-end path.
 
-**Remediation author candidate — 2026-08-26.** The implementation now uses the typed configuration
+**Integrated and empirically verified — 2026-08-26.** The implementation uses the typed configuration
 above in both `display` and `show`, routes image generation through the public provider
 capability on `gpt-image-2`, and implements strict atomic/incremental catalogs,
 song-scoped reuse, safe relative paths, partial-result preservation, the one-request
 policy and conservative cost accounting, dry-run reporting, and the dead-scaffolding/demo
-cleanup. This is author
-evidence only until independent review; the approved live proof has not run.
+cleanup. Independent offline review approved the final freeze, integrated at `70b3305`.
+The separately audited one-shot proof then produced one valid 1024×1024 PNG through
+exactly one `gpt-image-2` request with no retry; scoped replay was a cache hit with no
+additional provider call. Complete usage measured 68 input and 196 image-output tokens,
+priced at `$0.00622`. The owner-local sealed ledger is terminal; never rerun this proof.
 
 ## Objective
 

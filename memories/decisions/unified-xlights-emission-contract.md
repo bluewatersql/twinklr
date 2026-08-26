@@ -11,7 +11,8 @@ tags: [xlights, export, emission, trace, moving-heads, display]
 
 _The owner accepted this P3-T6 offline contract on 2026-08-26. After independent
 standards, specification, and adversarial approval, it was integrated at `c9620db`.
-Empirical xLights GUI acceptance remains open, and P3-T7+ remains unauthorized._
+Empirical xLights GUI acceptance remains open. P3-T7+ was later authorized; current
+campaign status is owned by the handoff rather than this decision record._
 
 ## Decision
 

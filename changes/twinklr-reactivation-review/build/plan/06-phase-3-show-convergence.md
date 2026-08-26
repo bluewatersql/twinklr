@@ -66,8 +66,9 @@ recorded for display output; assets pipeline optionally enriching Pictures effec
   model-capability remediation does not reopen that boundary.
 - P3-T6 empirical xLights GUI acceptance remains open, with its date deferred until a
   meaningful end-to-end show is fully working. P3-T7+ and task-bounded live/paid work
-  are owner-authorized. P3-T7's one-request/no-retry image proof and zero-call cache replay
-  remain pending; `$0.20` is an estimate/reservation, not a hard spend guarantee. P3-T8's
+  are owner-authorized. P3-T7's one-request/no-retry image proof passed with a valid
+  1024×1024 PNG, a zero-call scoped cache replay, and measured cost `$0.00622`; its
+  terminal sealed ledger forbids another attempt. P3-T8's
   preview/live-judge/human/calibration evidence remains deferred. The
   Phase 1P/2P/2K empirical exits remain open and are not implied by P3-T6 integration.
 

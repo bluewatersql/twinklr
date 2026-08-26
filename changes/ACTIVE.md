@@ -54,9 +54,10 @@ _Last updated: 2026-08-26._
   P3-T5 live work or any paid/local empirical action. On 2026-08-26 the owner accepted
   P3-T6's amended offline unified-emission contract. Its empirical xLights GUI
   acceptance remains open. The owner authorized P3-T7+ and task-bounded live/paid work
-  on 2026-08-26. P3-T7's live proof remains separately gated to exactly one
-  `gpt-image-2` request with no retry and a zero-call cache replay; `$0.20` is an
-  estimate/reservation, not a guaranteed hard spend cap. All xLights GUI dates/checks remain deferred until a meaningful,
+  on 2026-08-26. P3-T7's audited live proof then passed with exactly one
+  `gpt-image-2` request, no retry, a zero-call scoped cache replay, and measured cost
+  `$0.00622`; the sealed owner-local ledger permanently blocks another attempt. All
+  xLights GUI dates/checks remain deferred until a meaningful,
   fully working end-to-end show exists; their empirical gates and all earlier empirical
   exits remain open.
   Phase 4 has not started. The overall change

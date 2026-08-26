@@ -129,9 +129,10 @@ was integrated at `82438cf`. P3-T7's final corrected freeze
 approved offline/in code and included in the current integration, bringing Phase 3 to
 eight of eight offline task implementations integrated. P3-T6
 empirical xLights GUI acceptance remains open. The owner authorized P3-T7+ and
-task-bounded live/paid work on 2026-08-26. P3-T7's empirical proof remains separately
-gated to one `gpt-image-2` request with no retry followed by a zero-call cache replay;
-`$0.20` is an estimate/reservation rather than a guaranteed hard spend cap. xLights GUI dates/checks remain deferred until
+task-bounded live/paid work on 2026-08-26. P3-T7's audited empirical proof passed with
+one `gpt-image-2` request, no retry, a valid 1024×1024 PNG, and a scoped cache replay
+that made zero additional provider calls. Complete usage priced to `$0.00622`; the
+sealed owner-local ledger is terminal and forbids another attempt. xLights GUI dates/checks remain deferred until
 a meaningful end-to-end show is fully working; the empirical gates remain open. These
 integrations and authorizations do not waive the earlier exits or close P3-T4 live
 acceptance. P3-T8's first offline candidate was formally rejected; its remediated
