@@ -276,3 +276,13 @@ profiling boundary and stop criteria, exact temporal-alignment symbol, relative 
 Markdown whitespace, docs-only scope, and the original five-artifact/time/non-verdict
 contracts. This freeze awaits a new independent evidence review. It is not approval,
 P4-T7 execution, completion, or integration.
+
+### Repository-only preflight closeout — 2026-08-26
+
+Independent evidence review approved the remediated repository-only preflight, which is
+integrated on `main` at `c79566e`. Approval is limited to the prerequisite audit and its
+re-entry/safety contract. P4-T7 full execution remains **NO-GO / deferred** until the
+five re-entry artifacts exist, including accepted P2K-T2 owner-corpus evidence and an
+accessible, provenance-bearing MH corpus manifest. P4-T7 remains optional and
+incomplete; no corpus was analyzed and no feasibility verdict exists. Phase 4 remains
+six of seven tasks integrated.

@@ -159,12 +159,14 @@ separate generic pipeline replay controls. P4-T5's independently verified config
 accountability sweep is integrated at `05f24d0`; its generated registry accounts for
 every external App, Job, FixtureGroup, and TemplateDoc path with an exact effect test,
 invariant test, or removal disposition. P4-T6's independently verified documentation
-truth pass is integrated at `da8f19d`. P4-T7 full execution is a current **NO-GO** and
-is deferred: its P2K-T2 dependency still lacks the owner-corpus empirical run and
-threshold-decision exits, and safe filename-only preflight found no accessible
-moving-head corpus manifest or sequence archive to ground the optional spike. This is a
-prerequisite decision, not P4-T7 completion or a feasibility verdict. Under the owner
-override, optional
+truth pass is integrated at `da8f19d`. P4-T7's independently approved repository-only
+preflight is integrated at `c79566e`; it corrects the unsupported vendor-history premise
+and records the exact corpus-gated re-entry contract and isolated offline plan. P4-T7
+full execution remains a current **NO-GO** and is deferred: its P2K-T2 dependency still
+lacks the owner-corpus empirical run and threshold-decision exits, and no accessible,
+provenance-bearing moving-head corpus manifest exists to ground the optional spike. The
+integrated preflight is not P4-T7 completion and makes no feasibility verdict. Phase 4
+therefore remains six of seven tasks integrated. Under the owner override, optional
 WhisperX/TorchCodec runtime execution remains deferred and unavailable against the
 current default FFmpeg 9.
 Exact contracts and verification evidence live in the [P4-T1](../changes/twinklr-reactivation-review/build/specs/phase-4-compounding/P4-T1-ml-chain-python-bump.md),

@@ -14,8 +14,9 @@ integrated through `3765bd9`/`40e8e55`, but its real Ollama schema smoke remains
 unclaimed pending explicit local opt-in. P4-T3 is integrated at `bf6bba5`, P4-T4 at
 `3e7f679`, P4-T5 at `05f24d0`, and P4-T6 at `da8f19d`. P4-T7 full execution is
 NO-GO/deferred on its unsatisfied P2K-T2 empirical dependency and the absence of an
-accessible moving-head corpus manifest. The safe preflight is not task completion or a
-feasibility verdict. Phase exit is not declared. Exact
+accessible, provenance-bearing moving-head corpus manifest. Its independently approved
+repository-only preflight is integrated at `c79566e`; that preflight is not task
+completion and makes no feasibility verdict. Phase exit is not declared. Exact
 task evidence remains single-owned by the
 [P4-T2](../specs/phase-4-compounding/P4-T2-local-provider-option.md),
 [P4-T3](../specs/phase-4-compounding/P4-T3-dead-tail-retirement-wave-1.md),
@@ -57,3 +58,10 @@ Decision: **NO-GO / defer** until both triggers are satisfied: (1) P2K-T2's empi
 owner-corpus exits are accepted, and (2) an accessible manifest identifies sufficient
 moving-head sequences for the time-boxed spike. This does not complete P4-T7 and does
 not answer its feasibility questions.
+
+The follow-on repository-only preflight was independently approved and integrated at
+`c79566e`. It corrects the plan row's unsupported deleted-vendor-history premise,
+records reusable seams and structural walls, and pins the exact five re-entry artifacts
+plus the isolated 165-minute/180-minute-capped offline plan. Approval applies only to
+that prerequisite document; P4-T7 remains optional, incomplete, corpus-gated, and
+NO-GO/deferred, with no feasibility verdict.

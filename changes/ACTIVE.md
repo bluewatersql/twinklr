@@ -65,10 +65,13 @@ _Last updated: 2026-08-26._
   P4-T3 is integrated at `bf6bba5`; P4-T4 is integrated at `3e7f679`; P4-T5 is
   integrated at `05f24d0`; and P4-T6 is integrated at `da8f19d`, each after independent
   verification. P4-T2's real Ollama schema smoke remains unclaimed pending explicit
-  local opt-in. P4-T7 full execution is NO-GO/deferred because its P2K-T2 owner-corpus
-  empirical exits remain open and safe preflight found no accessible moving-head corpus
-  manifest. That preflight is not P4-T7 completion or a feasibility verdict, and no
-  Phase 4 completion is claimed.
+  local opt-in. P4-T7's independently approved repository-only preflight is integrated
+  at `c79566e`; it corrects the unsupported vendor-history premise and records the exact
+  corpus-gated re-entry and isolated-offline boundaries. P4-T7 full execution remains
+  NO-GO/deferred because its P2K-T2 owner-corpus empirical exits remain open and no
+  accessible, provenance-bearing moving-head corpus manifest exists. The integrated
+  preflight is not P4-T7 completion and makes no feasibility verdict; Phase 4 remains
+  six of seven tasks integrated and no Phase 4 completion is claimed.
   Optional WhisperX runtime audio execution remains owner-deferred against the current
   default FFmpeg 9; see the
   [active task spec](twinklr-reactivation-review/build/specs/phase-4-compounding/P4-T1-ml-chain-python-bump.md).
