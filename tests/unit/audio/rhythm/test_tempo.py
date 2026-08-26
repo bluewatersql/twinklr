@@ -8,6 +8,12 @@ import pytest
 from twinklr.core.audio.rhythm.tempo import detect_tempo_changes
 
 
+def test_package_exports_live_tempo_change_detector() -> None:
+    from twinklr.core.audio.rhythm import detect_tempo_changes as exported_detector
+
+    assert exported_detector is detect_tempo_changes
+
+
 class TestDetectTempoChanges:
     """Tests for detect_tempo_changes function."""
 

@@ -1,11 +1,6 @@
 """Structure analysis module."""
 
-from twinklr.core.audio.structure.models import (
-    Section,
-    SectionDiagnostics,
-    SectioningPreset,
-    SectionLabel,
-)
+from twinklr.core.audio.structure.models import SectioningPreset
 from twinklr.core.audio.structure.presets import (
     PRESETS,
     get_preset,
@@ -21,9 +16,6 @@ __all__ = [
     # Presets
     "PRESETS",
     # Models
-    "Section",
-    "SectionDiagnostics",
-    "SectionLabel",
     "SectioningPreset",
     "detect_song_sections",
     "get_preset",

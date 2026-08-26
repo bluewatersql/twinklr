@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Any
 from unittest.mock import MagicMock
 
 import numpy as np
@@ -234,85 +233,6 @@ def mock_app_config() -> MagicMock:
 def mock_job_config() -> MagicMock:
     """Mocked JobConfig for audio tests."""
     return MagicMock()
-
-
-# ============================================================================
-# Result Structure Fixtures
-# ============================================================================
-
-
-@pytest.fixture
-def sample_song_features() -> dict[str, Any]:
-    """Sample song features dict matching schema"""
-    return {
-        "schema_version": "2.3",
-        "audio_path": "/test/audio.mp3",
-        "sr": 22050,
-        "duration_s": 180.0,
-        "tempo_bpm": 120.0,
-        "beats_s": [0.5 * i for i in range(360)],  # 360 beats at 120 BPM
-        "bars_s": [2.0 * i for i in range(90)],  # 90 bars
-        "time_signature": {
-            "time_signature": "4/4",
-            "confidence": 0.8,
-            "method": "accent_pattern",
-        },
-        "assumptions": {"time_signature": "4/4", "beats_per_bar": 4},
-        "rhythm": {
-            "beat_confidence": 0.8,
-            "downbeats": list(range(0, 360, 4)),
-            "downbeat_meta": {"phase_confidence": 0.7},
-        },
-        "key": {"key": "C", "mode": "major", "confidence": 0.75},
-        "energy": {
-            "rms_norm": [0.5] * 100,
-            "times_s": [0.1 * i for i in range(100)],
-            "phrase_level": [0.5] * 100,
-        },
-        "spectral": {
-            "brightness": [0.5] * 100,
-            "statistics": {"brightness_variance": 500},
-        },
-        "dynamics": {"statistics": {"dynamic_range": 0.4, "transient_density": 2.0}},
-        "structure": {
-            "sections": [
-                {"section_id": 0, "start_s": 0.0, "end_s": 30.0, "label": "intro"},
-                {"section_id": 1, "start_s": 30.0, "end_s": 60.0, "label": "verse"},
-                {"section_id": 2, "start_s": 60.0, "end_s": 90.0, "label": "chorus"},
-                {"section_id": 3, "start_s": 90.0, "end_s": 120.0, "label": "verse"},
-                {"section_id": 4, "start_s": 120.0, "end_s": 150.0, "label": "chorus"},
-                {"section_id": 5, "start_s": 150.0, "end_s": 180.0, "label": "outro"},
-            ],
-            "boundary_times_s": [0.0, 30.0, 60.0, 90.0, 120.0, 150.0, 180.0],
-        },
-        "builds_drops": {
-            "builds": [{"start_s": 50.0, "end_s": 60.0, "energy_gain": 0.3}],
-            "drops": [{"time_s": 60.0, "energy_before": 0.9, "energy_after": 0.3}],
-            "statistics": {"build_count": 1, "drop_count": 1},
-        },
-        "vocals": {
-            "vocal_segments": [{"start_s": 30.0, "end_s": 90.0, "avg_probability": 0.8}],
-            "statistics": {"vocal_coverage_pct": 33.3},
-        },
-        "chords": {
-            "chords": [{"chord": "C:maj", "time_s": 0.0}],
-            "statistics": {"chord_change_count": 20, "major_pct": 0.7},
-        },
-        "pitch": {"statistics": {"pitch_std": 100.0, "voiced_proportion": 0.5}},
-        "tension": {
-            "tension_curve": [0.5] * 100,
-            "statistics": {"avg_tension": 0.5, "tension_variance": 0.1, "peak_count": 5},
-        },
-        "tempo_analysis": {"is_stable": True, "average_tempo_bpm": 120.0},
-        "extensions": {
-            "timeline": {
-                "t_sec": [0.1 * i for i in range(100)],
-                "energy": [0.5] * 100,
-                "hpss_perc_ratio": [0.1] * 100,
-            },
-            "composites": {"show_intensity": [0.5] * 100},
-        },
-    }
 
 
 # ============================================================================
