@@ -298,3 +298,18 @@ the two P4-T7 prerequisites re-enter through one redacted evidence document. No 
 manifest or private artifact is
 tracked. Until the owner supplies and validates such a manifest and P2K-T2's empirical
 exits are accepted, the NO-GO above is unchanged.
+
+### Superseding P2K re-entry clarification — 2026-08-26
+
+The active contract supersedes two stale phrases in the otherwise approved historical
+[repository preflight memo](P4-T7-repository-preflight.md). Re-entry artifact 4 is the
+strict `OWNER_DECISIONS.json` required by the current P2K evidence schema: it contains
+exactly one dated keep/change/defer decision and rationale for each of the eight retained
+numeric values. It is not a five-entry Markdown decision log. The former anti-affinity
+constant was verified as dead configuration and removed; it is not a live threshold,
+decision, or sensitivity item in artifact 3 or artifact 4.
+
+This clarification governs future P4-T7 admission while preserving the linked memo as
+historical evidence of the approved repository-only preflight. It does not alter the
+five-artifact structure, admit execution, satisfy an empirical exit, complete P4-T7, or
+change its **NO-GO / deferred** status.
