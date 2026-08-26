@@ -5,9 +5,38 @@ Testing stage gating, confidence scoring, and sufficiency decisions.
 
 import pytest
 
-from twinklr.core.audio.lyrics.pipeline import LyricsPipeline, LyricsPipelineConfig
+from twinklr.core.audio.lyrics.pipeline import (
+    LyricsPipeline,
+    LyricsPipelineConfig,
+    _quality_adjusted_confidence,
+)
 from twinklr.core.audio.models import StageStatus
-from twinklr.core.audio.models.lyrics import LyricsSourceKind
+from twinklr.core.audio.models.lyrics import LyricsQuality, LyricsSourceKind
+
+
+def test_shared_quality_penalty_delta_preserves_existing_formula() -> None:
+    quality = LyricsQuality(
+        timed_word_coverage_pct=0.5,
+        overlap_violations=9,
+        out_of_bounds_violations=3,
+        large_gaps_count=9,
+    )
+
+    assert _quality_adjusted_confidence(
+        0.8,
+        quality=quality,
+        has_words=True,
+        min_coverage_pct=0.8,
+    ) == pytest.approx(0.3)
+    assert (
+        _quality_adjusted_confidence(
+            0.8,
+            quality=quality,
+            has_words=False,
+            min_coverage_pct=0.8,
+        )
+        == 0.8
+    )
 
 
 class TestLyricsPipeline:

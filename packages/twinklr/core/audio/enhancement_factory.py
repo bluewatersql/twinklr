@@ -8,10 +8,13 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+import httpx
+
 from twinklr.core.api.audio.acoustid import AcoustIDClient
 from twinklr.core.api.audio.musicbrainz import MusicBrainzClient
 from twinklr.core.api.audio.rate_limit import AsyncRateLimiter
 from twinklr.core.api.http import AsyncApiClient, HttpClientConfig
+from twinklr.core.api.http.retry import RetryPolicy
 from twinklr.core.audio.lyrics.pipeline import LyricsPipeline, LyricsPipelineConfig
 from twinklr.core.audio.lyrics.providers.genius import GeniusClient
 from twinklr.core.audio.lyrics.providers.lrclib import LRCLibClient
@@ -37,8 +40,28 @@ class EnhancementServiceFactory:
         lyrics_pipeline = factory.create_lyrics_pipeline(app_config)
     """
 
-    @staticmethod
-    def create_metadata_pipeline(config: AppConfig) -> MetadataPipeline | None:
+    def __init__(self) -> None:
+        self._http_clients: list[AsyncApiClient] = []
+
+    def _create_http_client(self, config: AppConfig, *, base_url: str) -> AsyncApiClient:
+        enhancements = config.audio_processing.enhancements
+        client = AsyncApiClient(
+            config=HttpClientConfig(
+                base_url=base_url,
+                timeout=httpx.Timeout(enhancements.http_timeout_s),
+            ),
+            retry_policy=RetryPolicy(max_attempts=enhancements.http_max_retries + 1),
+        )
+        self._http_clients.append(client)
+        return client
+
+    async def aclose(self) -> None:
+        """Close every transport pool created by this factory."""
+        clients, self._http_clients = self._http_clients, []
+        for client in clients:
+            await client.aclose()
+
+    def create_metadata_pipeline(self, config: AppConfig) -> MetadataPipeline | None:
         """Create configured metadata pipeline if enabled.
 
         Args:
@@ -59,8 +82,7 @@ class EnhancementServiceFactory:
             or config.audio_processing.enhancements.enable_musicbrainz
         ):
             # Create async HTTP client for API calls
-            http_config = HttpClientConfig(base_url="http://localhost")
-            http_client = AsyncApiClient(config=http_config)
+            http_client = self._create_http_client(config, base_url="http://localhost")
 
             # Initialize AcoustID client if enabled
             if config.audio_processing.enhancements.enable_acoustid:
@@ -84,6 +106,7 @@ class EnhancementServiceFactory:
                             config.audio_processing.enhancements.musicbrainz_rate_limit_rps
                         )
                     ),
+                    timeout_s=config.audio_processing.enhancements.musicbrainz_timeout_s,
                 )
 
         # Create pipeline config
@@ -99,8 +122,7 @@ class EnhancementServiceFactory:
             musicbrainz_client=musicbrainz_client,
         )
 
-    @staticmethod
-    def create_lyrics_pipeline(config: AppConfig) -> LyricsPipeline | None:
+    def create_lyrics_pipeline(self, config: AppConfig) -> LyricsPipeline | None:
         """Create configured lyrics pipeline if enabled.
 
         Args:
@@ -118,8 +140,10 @@ class EnhancementServiceFactory:
         if config.audio_processing.enhancements.enable_lyrics_lookup:
             # Create async HTTP client for API calls
             # Providers use absolute URLs, so base_url is just a placeholder
-            http_config = HttpClientConfig(base_url="https://api.placeholder.local")
-            http_client = AsyncApiClient(config=http_config)
+            http_client = self._create_http_client(
+                config,
+                base_url="https://api.placeholder.local",
+            )
 
             # LRCLib (always available, no API key needed)
             providers["lrclib"] = LRCLibClient(http_client=http_client)

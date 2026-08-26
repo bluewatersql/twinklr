@@ -420,13 +420,6 @@ class AudioEnhancementConfig(BaseModel):
     http_timeout_s: float = Field(
         default=30.0, ge=1.0, description="HTTP request timeout (seconds)"
     )
-    http_circuit_breaker_threshold: int = Field(
-        default=5, ge=1, description="Circuit breaker failure threshold"
-    )
-    http_circuit_breaker_timeout_s: float = Field(
-        default=60.0, ge=1.0, description="Circuit breaker reset timeout (seconds)"
-    )
-
     # Metadata merge policy
     metadata_merge_policy_version: str = Field(
         default="1.0", description="Metadata merge policy version"

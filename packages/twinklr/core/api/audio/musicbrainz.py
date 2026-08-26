@@ -15,6 +15,8 @@ every call site inherits the pacing.
 import logging
 from typing import Any
 
+import httpx
+
 from twinklr.core.api.audio.errors import ProviderFailureCategory, ProviderLookupError
 from twinklr.core.api.audio.models import MusicBrainzRecording, MusicBrainzRelease
 from twinklr.core.api.audio.rate_limit import AsyncRateLimiter
@@ -60,6 +62,7 @@ class MusicBrainzClient:
         http_client: AsyncApiClient,
         user_agent: str | None,
         rate_limiter: AsyncRateLimiter | None = None,
+        timeout_s: float = 10.0,
     ):
         """Initialize MusicBrainz client.
 
@@ -77,6 +80,7 @@ class MusicBrainzClient:
         self.http_client = http_client
         self.user_agent = user_agent
         self.rate_limiter = rate_limiter or AsyncRateLimiter(rate_per_second=DEFAULT_RATE_LIMIT_RPS)
+        self.timeout = httpx.Timeout(timeout_s)
 
     async def lookup_recording(self, *, mbid: str) -> MusicBrainzRecording:
         """Look up recording by MusicBrainz ID (async).
@@ -96,12 +100,8 @@ class MusicBrainzClient:
             "fmt": "json",
             "inc": "artists+releases+isrcs",  # Include related data
         }
-        # httpx normalizes header names to lower case, and the framework merges
-        # request headers over the client defaults with a plain dict update. Use
-        # the normalized casing so this replaces the default User-Agent rather
-        # than being appended to it — MusicBrainz requires an identifying agent.
         headers = {
-            "user-agent": self.user_agent,
+            "User-Agent": self.user_agent,
         }
 
         try:
@@ -113,6 +113,7 @@ class MusicBrainzClient:
                     url,
                     params=params,
                     headers=headers,
+                    timeout=self.timeout,
                 )
 
             # get() returns an undecoded httpx.Response; decoding is a separate step

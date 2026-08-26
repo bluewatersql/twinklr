@@ -8,18 +8,15 @@ from typing import Any
 import librosa
 import numpy as np
 
-from twinklr.core.audio.utils import as_float_list, frames_to_time, normalize_to_0_1
+from twinklr.core.audio.utils import (
+    HAS_SCIPY,
+    as_float_list,
+    frames_to_time,
+    normalize_to_0_1,
+    scipy_gaussian_filter1d,
+)
 
 logger = logging.getLogger(__name__)
-
-# Check for scipy
-try:
-    from scipy.ndimage import gaussian_filter1d
-
-    HAS_SCIPY = True
-except ImportError:
-    HAS_SCIPY = False
-    logger.warning("scipy not available, energy smoothing will use basic smoothing")
 
 
 def extract_smoothed_energy(
@@ -43,9 +40,9 @@ def extract_smoothed_energy(
     rms_norm = normalize_to_0_1(rms)
 
     if HAS_SCIPY:
-        rms_beat = gaussian_filter1d(rms_norm, sigma=2).astype(np.float32)
-        rms_phrase = gaussian_filter1d(rms_norm, sigma=10).astype(np.float32)
-        rms_section = gaussian_filter1d(rms_norm, sigma=50).astype(np.float32)
+        rms_beat = scipy_gaussian_filter1d(rms_norm, sigma=2).astype(np.float32)
+        rms_phrase = scipy_gaussian_filter1d(rms_norm, sigma=10).astype(np.float32)
+        rms_section = scipy_gaussian_filter1d(rms_norm, sigma=50).astype(np.float32)
     else:
 
         def smooth(arr: np.ndarray, window: int) -> np.ndarray:

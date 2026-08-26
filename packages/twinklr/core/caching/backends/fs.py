@@ -111,9 +111,11 @@ class FSCache:
                 # Check if expired
                 now = time.time()
                 if now > (meta.created_at + self._ttl_seconds):
+                    await self._evict_entry(key)
                     return False  # Expired
 
             except (FileNotFoundError, ValidationError, ValueError):
+                await self._evict_entry(key)
                 return False  # Corrupted meta → treat as miss
 
         return True
@@ -227,6 +229,12 @@ class FSCache:
     async def invalidate(self, key: CacheKey) -> None:
         """Invalidate cache entry by removing directory (async)."""
         await self.initialize()  # Lazy initialization
+        entry_dir = self._entry_dir(key)
+        if await self.fs.exists(entry_dir):
+            await self.fs.rmdir(entry_dir, recursive=True)
+
+    async def _evict_entry(self, key: CacheKey) -> None:
+        """Best-effort physical cleanup for expired/corrupt cache entries."""
         entry_dir = self._entry_dir(key)
         if await self.fs.exists(entry_dir):
             await self.fs.rmdir(entry_dir, recursive=True)

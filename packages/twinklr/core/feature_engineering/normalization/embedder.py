@@ -61,8 +61,8 @@ class OpenAIEmbedder:
     """Embedder using the OpenAI embeddings API via an existing twinklr client.
 
     Args:
-        client: An ``OpenAIClient`` instance whose ``.client`` attribute is
-            the raw ``openai.OpenAI`` object.
+        client: An adapter whose ``.client`` attribute is a raw synchronous
+            OpenAI-compatible SDK client.
         model: Embedding model name.
     """
 

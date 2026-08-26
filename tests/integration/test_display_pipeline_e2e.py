@@ -157,6 +157,7 @@ async def test_display_pipeline_deterministic_fixture_matches_first_golden(tmp_p
     )
     analyzer = MagicMock()
     analyzer.analyze = AsyncMock(return_value=bundle)
+    analyzer.aclose = AsyncMock()
 
     async def run_once(directory: Path):
         session = MagicMock()

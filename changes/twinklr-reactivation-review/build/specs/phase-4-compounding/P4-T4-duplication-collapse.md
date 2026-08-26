@@ -8,11 +8,53 @@ Phase: 4-compounding · Lane: duplication (touches `api/llm/openai/client.py`,
 sonnet · Verifier: opus · Depends on: P2P merged (per
 `changes/twinklr-reactivation-review/build/plan/07-phase-4-compounding.md` task table)
 
+## Execution amendment (2026-08-26)
+
+The pre-implementation audit found that this specification conflated two distinct
+retry domains. P4-T4 owns the single **LLM-provider transport** policy only.
+`StageDefinition.retry_config` and `timeout_ms` are generic pipeline replay controls;
+they remain intact and P4-T5 owns making FAN_OUT honor them. The accepted request
+budget is consequently expressed by path, not by the stale historical “up to nine”
+comparison: a provider transport attempt budget is exactly `N` (`1 <= N <= 3`), a
+runner schema-repair path has at most two logical calls, strict-format rejection
+with fallback is exactly `1 + N`, and capped P3 probe/evaluation specs remain exactly
+one request with fallback disabled. P3-M-G's response/schema-repair behavior is not
+changed by this task.
+
+Implementation decisions for this candidate are: retire the legacy synchronous
+`OpenAIClient`; use the existing `RetryPolicy` as the sole provider transport-policy
+implementation with SDK retries disabled, `Retry-After`, terminal non-429 4xx, and a
+wall-clock deadline; wire `AgentSpec.timeout_seconds` into both the SDK request and
+that deadline; retain `AppConfig.logging` and wire it through the shipped CLI; bound
+OpenAI/Ollama histories with an LRU of 100 (configurable at construction) and clear
+them on reset; make `AudioAnalyzer` own and close every enhancement HTTP pool from
+both shipped call paths; centralize the optional SciPy adapter and lyrics quality
+penalty delta; and close the header-merge/cache-identity/expired-entry backlog items.
+For the six audio HTTP fields, rate limit, HTTP retry count, HTTP timeout, and
+MusicBrainz timeout are wired with effect tests; the two circuit-breaker fields are
+deleted because no circuit-breaker implementation exists.
+
+### Verifier rejection and remediation (2026-08-26)
+
+The first candidate (`c370e02`) was rejected for two blocking behavioral defects.
+First, its retry deadline was checked only between attempts, so a single slow
+operation could complete successfully after the wall-clock budget. The remediated
+policy wraps every attempt in the remaining budget, raises a deterministic
+`RetryDeadlineExceededError` only when that policy scope expires, gives later
+attempts only the time still available, preserves an operation's own `TimeoutError`,
+and propagates external cancellation without classification or retry. Second, the
+initial penalty extraction accidentally word-gated WhisperX-align quality penalties;
+the historical align path applies its low-coverage penalty even for an empty word
+list (current base arithmetic `0.85 - 0.10 = 0.75`), while finalize/transcribe stay
+word-gated. Red-first path regressions now pin both distinctions. This amended
+candidate requires a fresh independent verification; the rejected hash is not an
+approval point.
+
 ## Objective
 
 Collapse five independently-verified duplication classes (CC-6) into single
-implementations: one retry policy replacing four independently-configured retry
-layers (with the OpenAI SDK's own default retries explicitly disabled), one
+implementations: one LLM provider transport policy replacing the duplicate SDK,
+legacy-client, and provider-local layers (with SDK retries explicitly disabled), one
 `configure_logging` (wired or `AppConfig.logging` deleted), conversation-store
 eviction, httpx client lifecycle (`aclose()` on teardown), and the triplicated
 `HAS_SCIPY` fallback pattern centralized into one helper.
@@ -141,14 +183,10 @@ times; the lyrics-pipeline penalty-scoring logic is copy-pasted three times.
 
 ## Target behavior
 
-- Exactly one retry policy governs LLM calls; `OpenAI(...)` and `AsyncOpenAI(...)`
-  are both constructed with `max_retries=0` so the SDK never retries underneath the
-  application policy. The pipeline/stage-level retry layer
-  (`pipeline/definition.py`/`executor.py`) and the provider-level inline loop
-  (`agents/providers/openai.py`) collapse into one policy object with a single
-  configured attempt count and a wall-clock deadline; `api/http/retry.py`'s
-  `RetryPolicy` is either that one surviving policy or is explicitly retired in
-  favor of it — pick one, don't keep both under different names.
+- Exactly one retry policy governs LLM provider transport calls. The sole
+  `AsyncOpenAI(...)` client is constructed with `max_retries=0`; the retired sync
+  client and provider-local retry loop no longer create additional layers.
+  Generic pipeline replay remains a separate orchestration concern for P4-T5.
 - One `configure_logging` remains, wired so `AppConfig.logging`'s level/format
   settings actually take effect on the shipped CLI path — OR `AppConfig.logging`
   and the dead `config/loader.py::configure_logging` are deleted together with a
@@ -181,15 +219,9 @@ task's file list.
   already has jittered backoff, `Retry-After` handling, idempotent-methods-only
   logic per `foundation-and-orchestration.md:405-406`) or replace all four with
   `stamina`/`tenacity` per the review's own suggestion — either is acceptable;
-  document the choice. Set `max_retries=0` explicitly on both `OpenAI(...)`
-  (`api/llm/openai/client.py:140`) and `AsyncOpenAI(...)`
-  (`agents/providers/openai.py:67`) constructors. Reconcile the three disagreeing
-  timeouts (`300.0` at `providers/openai.py:56`, `120.0` at
-  `llm/openai/client.py:128`, unwired `AgentConfig.timeout_seconds=60` at
-  `config/models.py:30`) into one — either wire `timeout_seconds` through and use it
-  everywhere, or pick one hardcoded value and delete the other two plus the unwired
-  config field (coordinate with CC-1/P4-T5 if `timeout_seconds` is in that task's
-  dead-config sweep).
+  document the choice. Retire the unused sync client, set `max_retries=0` on the
+  sole `AsyncOpenAI(...)` constructor, and use the already-threaded
+  `AgentSpec.timeout_seconds` as both the SDK request timeout and policy deadline.
 - Logging collapse: trace both `configure_logging` call graphs first
   (`config/loader.py:144-157`'s only importer per the finding is the
   `core.config` re-export at `config/__init__.py:21,44` — confirm this is still
@@ -205,13 +237,12 @@ task's file list.
 
 - `git grep -n "max_retries"` shows `OpenAI(...)` and `AsyncOpenAI(...)` both pass
   `max_retries=0` explicitly.
-- Exactly one retry-policy implementation remains in the codebase (or a named
-  external library replaces all four); `pipeline/definition.py`/`executor.py`'s
-  stage-level retry and `agents/providers/openai.py`'s inline loop no longer exist
-  as separate mechanisms.
-- A test issuing a request that fails validation 3 times (schema-repair path)
-  results in a bounded, single-digit total HTTP request count — not up to 9. Assert
-  the exact count the collapsed policy produces.
+- Exactly one LLM provider transport-policy implementation remains;
+  `pipeline/definition.py`/`executor.py` generic replay is explicitly excluded.
+- Request-count tests assert the current exact matrix: transient provider failures
+  make `N <= 3` requests; one strict rejection plus exhausted fallback makes
+  `1 + N`; the runner's one allowed schema repair makes at most two logical calls;
+  capped P3 probe/evaluation specs make exactly one request with fallback disabled.
 - Exactly one `configure_logging` function exists in the codebase; `AppConfig.logging`
   is either observably wired (a test proves changing `AppConfig.logging.level`
   changes emitted log output) or is deleted along with its dead sibling.
@@ -224,14 +255,14 @@ task's file list.
 - `HAS_SCIPY` has exactly one definition site (`utils.py`); the three former
   redefinition sites import it instead.
 - `lyrics/pipeline.py`'s three penalty-scoring call sites all invoke the same
-  extracted helper; a test with a fixed input asserts identical penalty output from
-  all three call paths (regression-pins the "no behavior change" requirement).
+  extracted helper; a fixed-input test pins the identical shared quality-penalty
+  delta while preserving each path's distinct base and align-mismatch penalty.
 
 ## Tests
 
 TDD where behavior is definable in advance:
-- Failing-first test for the request-count bound (currently ≤9, target: assert the
-  new bound explicitly) before touching the retry code.
+- Failing-first discriminators for the exact request-count matrix above before
+  changing provider retry ownership.
 - Failing-first test for conversation-store growth-then-eviction before adding the
   eviction mechanism.
 - Failing-first test for `aclose()` being called on teardown before wiring the
@@ -249,7 +280,7 @@ uv run pytest tests/unit/audio/ -v -k "scipy or penalty or HAS_SCIPY"
 uv run pytest tests/ -v
 uv run mypy .
 uv run ruff check .
-git grep -n "max_retries" packages/twinklr/core/api/llm/openai/client.py packages/twinklr/core/agents/providers/openai.py
+git grep -n "max_retries" packages/twinklr/core/agents/providers/openai.py
 git grep -n "def configure_logging"
 ```
 

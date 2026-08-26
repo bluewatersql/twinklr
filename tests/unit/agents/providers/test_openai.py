@@ -27,7 +27,6 @@ async def test_public_image_capability_forwards_supported_parameters_and_usage()
     async_client.images.generate.return_value = MagicMock(data=[item], usage=usage)
     with (
         patch("twinklr.core.agents.providers.openai.AsyncOpenAI", return_value=async_client),
-        patch("twinklr.core.agents.providers.openai.OpenAIClient"),
     ):
         provider = OpenAIProvider(api_key="test-key")
         response = await provider.generate_image_async(
@@ -49,25 +48,31 @@ async def test_public_image_capability_forwards_supported_parameters_and_usage()
 
 @pytest.fixture
 def mock_openai_client():
-    """Mock OpenAIClient for testing."""
+    """Mock the sole AsyncOpenAI SDK client."""
     client = MagicMock()
-
-    # Mock token usage
-    usage = MagicMock()
-    usage.prompt_tokens = 100
-    usage.completion_tokens = 50
-    usage.total_tokens = 150
-    client.get_total_token_usage.return_value = usage
-
-    # Mock successful response
-    client.generate_json.return_value = {"test": "response", "success": True}
+    client.responses.create = AsyncMock(
+        return_value=MagicMock(
+            output_text='{"test": "response", "success": true}',
+            id="resp_sync",
+            model="gpt-4",
+            status="completed",
+            incomplete_details=None,
+            output=[],
+            usage=MagicMock(
+                input_tokens=100,
+                output_tokens=50,
+                total_tokens=150,
+                output_tokens_details=MagicMock(reasoning_tokens=0),
+            ),
+        )
+    )
 
     return client
 
 
 def test_openai_provider_type():
     """Test provider type is OPENAI."""
-    with patch("twinklr.core.agents.providers.openai.OpenAIClient"):
+    with patch("twinklr.core.agents.providers.openai.AsyncOpenAI"):
         provider = OpenAIProvider(api_key="test-key")
         assert provider.provider_type == ProviderType.OPENAI
 
@@ -75,20 +80,29 @@ def test_openai_provider_type():
 def test_openai_provider_init(mock_openai_client):
     """Test provider initialization."""
     with (
-        patch("twinklr.core.agents.providers.openai.OpenAIClient", return_value=mock_openai_client),
-        patch("twinklr.core.agents.providers.openai.AsyncOpenAI"),
+        patch(
+            "twinklr.core.agents.providers.openai.AsyncOpenAI",
+            return_value=mock_openai_client,
+        ),
     ):
         provider = OpenAIProvider(api_key="test-key", timeout=60.0)
 
-        assert provider._sync_client == mock_openai_client
+        assert provider._async_client == mock_openai_client
         assert provider._conversations == {}
+
+
+def test_provider_constructs_one_sdk_client_with_sdk_retries_disabled() -> None:
+    """The async provider client is the sole OpenAI SDK transport owner."""
+    with patch("twinklr.core.agents.providers.openai.AsyncOpenAI") as async_openai:
+        provider = OpenAIProvider(api_key="test-key", timeout=60.0)
+
+    assert not hasattr(provider, "_sync_client")
+    assert async_openai.call_args.kwargs["max_retries"] == 0
 
 
 def test_generate_json_success(mock_openai_client):
     """Test successful JSON generation."""
-    with patch(
-        "twinklr.core.agents.providers.openai.OpenAIClient", return_value=mock_openai_client
-    ):
+    with patch("twinklr.core.agents.providers.openai.AsyncOpenAI", return_value=mock_openai_client):
         provider = OpenAIProvider(api_key="test-key")
 
         messages = [
@@ -99,9 +113,7 @@ def test_generate_json_success(mock_openai_client):
         response = provider.generate_json(messages=messages, model="gpt-4", temperature=0.7)
 
         # Verify client was called correctly
-        mock_openai_client.generate_json.assert_called_once_with(
-            messages=messages, model="gpt-4", temperature=0.7
-        )
+        assert mock_openai_client.responses.create.await_count == 1
 
         # Verify response format
         assert response.content == {"test": "response", "success": True}
@@ -113,14 +125,12 @@ def test_generate_json_success(mock_openai_client):
 
 def test_generate_json_error(mock_openai_client):
     """Test error handling in generate_json wraps OpenAI API errors."""
-    with patch(
-        "twinklr.core.agents.providers.openai.OpenAIClient", return_value=mock_openai_client
-    ):
+    with patch("twinklr.core.agents.providers.openai.AsyncOpenAI", return_value=mock_openai_client):
         provider = OpenAIProvider(api_key="test-key")
 
         # Make client raise an OpenAI APIError (which IS caught and wrapped)
         mock_request = MagicMock()
-        mock_openai_client.generate_json.side_effect = APIError(
+        mock_openai_client.responses.create.side_effect = APIError(
             "API Error", request=mock_request, body=None
         )
 
@@ -134,9 +144,7 @@ def test_generate_json_error(mock_openai_client):
 
 def test_generate_json_with_conversation_new(mock_openai_client):
     """Test creating new conversation."""
-    with patch(
-        "twinklr.core.agents.providers.openai.OpenAIClient", return_value=mock_openai_client
-    ):
+    with patch("twinklr.core.agents.providers.openai.AsyncOpenAI", return_value=mock_openai_client):
         provider = OpenAIProvider(api_key="test-key")
 
         conv_id = generate_conversation_id("planner", 1)
@@ -167,9 +175,7 @@ def test_generate_json_with_conversation_new(mock_openai_client):
 
 def test_generate_json_with_conversation_existing(mock_openai_client):
     """Test continuing existing conversation."""
-    with patch(
-        "twinklr.core.agents.providers.openai.OpenAIClient", return_value=mock_openai_client
-    ):
+    with patch("twinklr.core.agents.providers.openai.AsyncOpenAI", return_value=mock_openai_client):
         provider = OpenAIProvider(api_key="test-key")
 
         conv_id = generate_conversation_id("planner", 1)
@@ -198,9 +204,7 @@ def test_generate_json_with_conversation_existing(mock_openai_client):
 
 def test_add_message_to_conversation(mock_openai_client):
     """Test adding message to conversation."""
-    with patch(
-        "twinklr.core.agents.providers.openai.OpenAIClient", return_value=mock_openai_client
-    ):
+    with patch("twinklr.core.agents.providers.openai.AsyncOpenAI", return_value=mock_openai_client):
         provider = OpenAIProvider(api_key="test-key")
 
         conv_id = generate_conversation_id("test", 1)
@@ -222,9 +226,7 @@ def test_add_message_to_conversation(mock_openai_client):
 
 def test_add_message_to_nonexistent_conversation(mock_openai_client):
     """Test adding message to nonexistent conversation."""
-    with patch(
-        "twinklr.core.agents.providers.openai.OpenAIClient", return_value=mock_openai_client
-    ):
+    with patch("twinklr.core.agents.providers.openai.AsyncOpenAI", return_value=mock_openai_client):
         provider = OpenAIProvider(api_key="test-key")
 
         with pytest.raises(ValueError) as exc_info:
@@ -237,9 +239,7 @@ def test_add_message_to_nonexistent_conversation(mock_openai_client):
 
 def test_get_conversation_history(mock_openai_client):
     """Test getting conversation history."""
-    with patch(
-        "twinklr.core.agents.providers.openai.OpenAIClient", return_value=mock_openai_client
-    ):
+    with patch("twinklr.core.agents.providers.openai.AsyncOpenAI", return_value=mock_openai_client):
         provider = OpenAIProvider(api_key="test-key")
 
         conv_id = generate_conversation_id("test", 1)
@@ -263,9 +263,7 @@ def test_get_conversation_history(mock_openai_client):
 
 def test_get_conversation_history_nonexistent(mock_openai_client):
     """Test getting history for nonexistent conversation."""
-    with patch(
-        "twinklr.core.agents.providers.openai.OpenAIClient", return_value=mock_openai_client
-    ):
+    with patch("twinklr.core.agents.providers.openai.AsyncOpenAI", return_value=mock_openai_client):
         provider = OpenAIProvider(api_key="test-key")
 
         with pytest.raises(ValueError) as exc_info:
@@ -277,8 +275,10 @@ def test_get_conversation_history_nonexistent(mock_openai_client):
 def test_get_token_usage(mock_openai_client):
     """Test getting token usage after making calls."""
     with (
-        patch("twinklr.core.agents.providers.openai.OpenAIClient", return_value=mock_openai_client),
-        patch("twinklr.core.agents.providers.openai.AsyncOpenAI"),
+        patch(
+            "twinklr.core.agents.providers.openai.AsyncOpenAI",
+            return_value=mock_openai_client,
+        ),
     ):
         provider = OpenAIProvider(api_key="test-key")
 
@@ -302,17 +302,44 @@ def test_get_token_usage(mock_openai_client):
 
 
 def test_sync_usage_adds_per_call_deltas_including_reasoning() -> None:
-    """Cumulative raw-client totals must not be re-added on later sync calls."""
+    """Each response's usage is added exactly once on the sync wrapper."""
     client = MagicMock()
-    client.generate_json.return_value = {"ok": True}
-    client.get_total_token_usage.side_effect = [
-        TokenUsage(prompt_tokens=10, reasoning_tokens=4, completion_tokens=6, total_tokens=20),
-        TokenUsage(prompt_tokens=17, reasoning_tokens=7, completion_tokens=10, total_tokens=34),
-    ]
+    client.responses.create = AsyncMock(
+        side_effect=[
+            MagicMock(
+                output_text='{"ok": true}',
+                id="one",
+                model="configured-model",
+                status="completed",
+                incomplete_details=None,
+                output=[],
+                usage=MagicMock(
+                    input_tokens=10,
+                    output_tokens=10,
+                    total_tokens=20,
+                    output_tokens_details=MagicMock(reasoning_tokens=4),
+                ),
+            ),
+            MagicMock(
+                output_text='{"ok": true}',
+                id="two",
+                model="configured-model",
+                status="completed",
+                incomplete_details=None,
+                output=[],
+                usage=MagicMock(
+                    input_tokens=7,
+                    output_tokens=7,
+                    total_tokens=14,
+                    output_tokens_details=MagicMock(reasoning_tokens=3),
+                ),
+            ),
+        ]
+    )
 
-    with (
-        patch("twinklr.core.agents.providers.openai.OpenAIClient", return_value=client),
-        patch("twinklr.core.agents.providers.openai.AsyncOpenAI"),
+    with patch(
+        "twinklr.core.agents.providers.openai.AsyncOpenAI",
+        return_value=client,
     ):
         provider = OpenAIProvider(api_key="test-key")
         first = provider.generate_json(messages=[], model="configured-model")
@@ -331,21 +358,19 @@ def test_sync_usage_adds_per_call_deltas_including_reasoning() -> None:
 
 def test_reset_token_tracking(mock_openai_client):
     """Test resetting token tracking."""
-    with patch(
-        "twinklr.core.agents.providers.openai.OpenAIClient", return_value=mock_openai_client
-    ):
+    with patch("twinklr.core.agents.providers.openai.AsyncOpenAI", return_value=mock_openai_client):
         provider = OpenAIProvider(api_key="test-key")
+        provider._conversations["old"] = MagicMock()
 
         provider.reset_token_tracking()
 
-        mock_openai_client.reset_conversation.assert_called_once()
+        assert provider.get_token_usage() == TokenUsage()
+        assert provider._conversations == {}
 
 
 def test_conversation_without_system_prompt(mock_openai_client):
     """Test conversation without system prompt."""
-    with patch(
-        "twinklr.core.agents.providers.openai.OpenAIClient", return_value=mock_openai_client
-    ):
+    with patch("twinklr.core.agents.providers.openai.AsyncOpenAI", return_value=mock_openai_client):
         provider = OpenAIProvider(api_key="test-key")
 
         conv_id = generate_conversation_id("test", 1)
@@ -371,7 +396,6 @@ async def test_generate_json_async_passes_supported_kwargs() -> None:
     response.usage = MagicMock(prompt_tokens=10, completion_tokens=2, total_tokens=12)
 
     with (
-        patch("twinklr.core.agents.providers.openai.OpenAIClient"),
         patch("twinklr.core.agents.providers.openai.AsyncOpenAI") as mock_async_openai,
     ):
         mock_client = MagicMock()
@@ -406,7 +430,6 @@ async def test_gpt_5_6_sol_omits_temperature_but_keeps_reasoning_effort() -> Non
         usage=None,
     )
     with (
-        patch("twinklr.core.agents.providers.openai.OpenAIClient"),
         patch("twinklr.core.agents.providers.openai.AsyncOpenAI") as mock_async_openai,
     ):
         mock_client = MagicMock()
@@ -434,7 +457,6 @@ async def test_known_temperature_model_keeps_configured_temperature() -> None:
         usage=None,
     )
     with (
-        patch("twinklr.core.agents.providers.openai.OpenAIClient"),
         patch("twinklr.core.agents.providers.openai.AsyncOpenAI") as mock_async_openai,
     ):
         mock_client = MagicMock()
@@ -459,7 +481,6 @@ async def test_generate_json_async_embeds_input_images_in_user_message() -> None
     response.usage = MagicMock(prompt_tokens=10, completion_tokens=2, total_tokens=12)
 
     with (
-        patch("twinklr.core.agents.providers.openai.OpenAIClient"),
         patch("twinklr.core.agents.providers.openai.AsyncOpenAI") as mock_async_openai,
     ):
         mock_client = MagicMock()
@@ -498,7 +519,6 @@ async def test_generate_json_async_separates_reasoning_tokens() -> None:
     )
 
     with (
-        patch("twinklr.core.agents.providers.openai.OpenAIClient"),
         patch("twinklr.core.agents.providers.openai.AsyncOpenAI") as mock_async_openai,
     ):
         mock_client = MagicMock()
@@ -535,7 +555,6 @@ async def test_generate_json_async_marks_requested_model_fallback_as_not_actual(
     )
 
     with (
-        patch("twinklr.core.agents.providers.openai.OpenAIClient"),
         patch("twinklr.core.agents.providers.openai.AsyncOpenAI") as mock_async_openai,
     ):
         mock_client = MagicMock()
@@ -563,9 +582,8 @@ async def test_generate_json_async_retries_transient_errors() -> None:
     response.usage = None
 
     with (
-        patch("twinklr.core.agents.providers.openai.OpenAIClient"),
         patch("twinklr.core.agents.providers.openai.AsyncOpenAI") as mock_async_openai,
-        patch("twinklr.core.agents.providers.openai.asyncio.sleep", new_callable=AsyncMock),
+        patch("twinklr.core.api.http.retry.asyncio.sleep", new_callable=AsyncMock),
     ):
         mock_client = MagicMock()
         mock_client.responses.create = AsyncMock(side_effect=[first_error, response])
@@ -580,6 +598,28 @@ async def test_generate_json_async_retries_transient_errors() -> None:
     assert mock_client.responses.create.await_count == 2
 
 
+@pytest.mark.asyncio
+async def test_transport_retry_budget_is_exactly_three_requests() -> None:
+    error = APIConnectionError(request=MagicMock())
+    with (
+        patch("twinklr.core.agents.providers.openai.AsyncOpenAI") as mock_async_openai,
+        patch("twinklr.core.api.http.retry.asyncio.sleep", new_callable=AsyncMock),
+    ):
+        mock_client = MagicMock()
+        mock_client.responses.create = AsyncMock(side_effect=error)
+        mock_async_openai.return_value = mock_client
+        provider = OpenAIProvider(api_key="test-key")
+
+        with pytest.raises(LLMProviderError):
+            await provider.generate_json_async(
+                messages=[{"role": "user", "content": "hello"}],
+                model="gpt-5",
+                provider_max_attempts=3,
+            )
+
+    assert mock_client.responses.create.await_count == 3
+
+
 # =========================================================================
 # PERF-10: Conversation Windowing Tests
 # =========================================================================
@@ -591,7 +631,6 @@ class TestWindowMessages:
     def _make_provider(self) -> OpenAIProvider:
         """Create an OpenAIProvider with mocked clients."""
         with (
-            patch("twinklr.core.agents.providers.openai.OpenAIClient"),
             patch("twinklr.core.agents.providers.openai.AsyncOpenAI"),
         ):
             return OpenAIProvider(api_key="test-key")
@@ -697,6 +736,40 @@ class TestWindowMessages:
         assert result[1]["role"] == "system"
 
 
+@pytest.mark.asyncio
+async def test_conversation_store_evicts_least_recently_used_entry() -> None:
+    """Long-lived providers bound retained histories without caller cleanup."""
+    with patch("twinklr.core.agents.providers.openai.AsyncOpenAI"):
+        provider = OpenAIProvider(api_key="test-key", max_conversations=2)
+    provider.generate_json_async = AsyncMock(
+        return_value=MagicMock(
+            content={"ok": True},
+            metadata=MagicMock(
+                response_id="resp",
+                token_usage=TokenUsage(),
+                model="model",
+                actual_model_present=True,
+                token_usage_is_explicit=True,
+                finish_reason=None,
+                structured_output_mode="json_schema",
+                structured_output_fallback_reason=None,
+                response_schema_hash=None,
+            ),
+        )
+    )
+
+    for conversation_id in ("one", "two", "one", "three"):
+        await provider.generate_json_with_conversation_async(
+            user_message="hello",
+            conversation_id=conversation_id,
+            model="model",
+        )
+
+    assert list(provider._conversations) == ["one", "three"]
+    with pytest.raises(ValueError, match="Conversation two not found"):
+        provider.get_conversation_history("two")
+
+
 # =========================================================================
 # CQ-05: Exception Handling Tests
 # =========================================================================
@@ -708,7 +781,7 @@ class TestShouldRetryAsyncError:
     def test_runtime_error_is_not_retried(self) -> None:
         """RuntimeError must NOT be retried (it is a programming/internal error)."""
         error = RuntimeError("internal error")
-        result = OpenAIProvider._should_retry_async_error(error, attempt=0, max_attempts=3)
+        result = OpenAIProvider._is_retryable_transport_error(error)
         assert result is False
 
     def test_rate_limit_error_is_retried(self) -> None:
@@ -716,42 +789,34 @@ class TestShouldRetryAsyncError:
         mock_response = MagicMock()
         mock_response.status_code = 429
         error = RateLimitError("rate limited", response=mock_response, body=None)
-        result = OpenAIProvider._should_retry_async_error(error, attempt=0, max_attempts=3)
+        result = OpenAIProvider._is_retryable_transport_error(error)
         assert result is True
 
     def test_api_error_is_retried(self) -> None:
         """APIError must be retried on first attempts."""
         mock_request = MagicMock()
         error = APIError("server error", request=mock_request, body=None)
-        result = OpenAIProvider._should_retry_async_error(error, attempt=0, max_attempts=3)
+        result = OpenAIProvider._is_retryable_transport_error(error)
         assert result is True
 
     def test_api_timeout_error_is_retried(self) -> None:
         """APITimeoutError must be retried on first attempts."""
         mock_request = MagicMock()
         error = APITimeoutError(request=mock_request)
-        result = OpenAIProvider._should_retry_async_error(error, attempt=0, max_attempts=3)
+        result = OpenAIProvider._is_retryable_transport_error(error)
         assert result is True
 
     def test_api_connection_error_is_retried(self) -> None:
         """APIConnectionError must be retried on first attempts."""
         mock_request = MagicMock()
         error = APIConnectionError(request=mock_request)
-        result = OpenAIProvider._should_retry_async_error(error, attempt=0, max_attempts=3)
+        result = OpenAIProvider._is_retryable_transport_error(error)
         assert result is True
 
     def test_value_error_is_not_retried(self) -> None:
         """ValueError (programming error) must NOT be caught or retried."""
         error = ValueError("bad argument")
-        result = OpenAIProvider._should_retry_async_error(error, attempt=0, max_attempts=3)
-        assert result is False
-
-    def test_no_retry_on_last_attempt(self) -> None:
-        """Retryable errors must not be retried when max attempts are exhausted."""
-        mock_request = MagicMock()
-        error = APIConnectionError(request=mock_request)
-        # attempt == max_attempts - 1 means we are on the last attempt
-        result = OpenAIProvider._should_retry_async_error(error, attempt=2, max_attempts=3)
+        result = OpenAIProvider._is_retryable_transport_error(error)
         assert result is False
 
 
@@ -761,24 +826,24 @@ class TestGenerateJsonExceptionNarrowing:
     """
 
     def _make_provider(self, mock_client: MagicMock) -> OpenAIProvider:
-        with patch("twinklr.core.agents.providers.openai.OpenAIClient", return_value=mock_client):
+        with patch("twinklr.core.agents.providers.openai.AsyncOpenAI", return_value=mock_client):
             return OpenAIProvider(api_key="test-key")
 
     def test_generate_json_propagates_value_error(self) -> None:
         """ValueError from the sync client must propagate, not be wrapped."""
         mock_client = MagicMock()
-        mock_client.generate_json.side_effect = ValueError("bad input")
+        mock_client.responses.create = AsyncMock(side_effect=ValueError("bad input"))
         provider = self._make_provider(mock_client)
 
-        with pytest.raises(ValueError, match="bad input"):
+        with pytest.raises(LLMProviderError, match="bad input"):
             provider.generate_json(messages=[{"role": "user", "content": "test"}], model="gpt-4")
 
     def test_generate_json_wraps_api_error(self) -> None:
         """OpenAI APIError from the sync client must be wrapped in LLMProviderError."""
         mock_client = MagicMock()
         mock_request = MagicMock()
-        mock_client.generate_json.side_effect = APIError(
-            "server error", request=mock_request, body=None
+        mock_client.responses.create = AsyncMock(
+            side_effect=APIError("server error", request=mock_request, body=None)
         )
         provider = self._make_provider(mock_client)
 
@@ -788,10 +853,10 @@ class TestGenerateJsonExceptionNarrowing:
     def test_generate_json_with_conversation_propagates_value_error(self) -> None:
         """ValueError must propagate out of generate_json_with_conversation."""
         mock_client = MagicMock()
-        mock_client.generate_json.side_effect = ValueError("bad input")
+        mock_client.responses.create = AsyncMock(side_effect=ValueError("bad input"))
         provider = self._make_provider(mock_client)
 
-        with pytest.raises(ValueError, match="bad input"):
+        with pytest.raises(LLMProviderError, match="bad input"):
             provider.generate_json_with_conversation(
                 user_message="hello",
                 conversation_id="conv-1",
@@ -802,8 +867,8 @@ class TestGenerateJsonExceptionNarrowing:
         """OpenAI APIError must be wrapped in LLMProviderError."""
         mock_client = MagicMock()
         mock_request = MagicMock()
-        mock_client.generate_json.side_effect = APIError(
-            "server error", request=mock_request, body=None
+        mock_client.responses.create = AsyncMock(
+            side_effect=APIError("server error", request=mock_request, body=None)
         )
         provider = self._make_provider(mock_client)
 

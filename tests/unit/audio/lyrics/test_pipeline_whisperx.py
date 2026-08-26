@@ -128,6 +128,29 @@ class TestWhisperXAlignStage:
         # Confidence should have -0.10 penalty for high mismatch
         assert bundle.source.confidence < 0.85  # Base confidence
 
+    def test_empty_align_preserves_low_coverage_penalty(self, tmp_path):
+        """Align historically penalizes empty timing output even without words."""
+        audio_path = str(tmp_path / "song.mp3")
+        (tmp_path / "song.mp3").write_text("mock")
+        whisperx = MockWhisperXService(
+            align_result=WhisperXAlignResult(words=[], mismatch_ratio=0.0, metadata={})
+        )
+        pipeline = LyricsPipeline(
+            config=LyricsPipelineConfig(),
+            providers={},
+            whisperx_service=whisperx,
+        )
+
+        bundle = pipeline._try_whisperx_align(
+            audio_path=audio_path,
+            lyrics_text="reference text",
+            duration_ms=1000,
+            warnings=[],
+        )
+
+        assert bundle is not None
+        assert bundle.source.confidence == pytest.approx(0.75)
+
     def test_transcribe_triggered_when_no_lyrics(self, tmp_path):
         """Transcribe should trigger when no lyrics found from any source."""
         audio_path = str(tmp_path / "song.mp3")

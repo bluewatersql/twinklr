@@ -43,6 +43,7 @@ from twinklr.core.agents.sequencer.group_planner.specs import (
 from twinklr.core.agents.sequencer.group_planner.specs import (
     get_planner_spec as get_group_planner_spec,
 )
+from twinklr.core.agents.sequencer.macro_planner.live_probe import _probe_spec
 from twinklr.core.agents.sequencer.macro_planner.specs import (
     get_judge_spec as get_macro_judge_spec,
 )
@@ -57,6 +58,8 @@ from twinklr.core.agents.sequencer.moving_heads.specs import (
     get_planner_spec as get_moving_head_planner_spec,
 )
 from twinklr.core.agents.spec import AgentSpec
+from twinklr.core.config.models import AgentOrchestrationConfig
+from twinklr.core.reporting.evaluation.vision_judge import get_vision_judge_spec
 from twinklr.core.sequencer.planning.group_plan import (
     CoordinationPlanResponse,
     CorrectionResponse,
@@ -298,7 +301,6 @@ async def test_agent_calls_use_machine_derived_strict_json_schema() -> None:
     )
 
     with (
-        patch("twinklr.core.agents.providers.openai.OpenAIClient"),
         patch("twinklr.core.agents.providers.openai.AsyncOpenAI") as async_openai,
     ):
         client = MagicMock()
@@ -333,7 +335,6 @@ async def test_provider_sends_exact_normalized_macro_schema() -> None:
     )
 
     with (
-        patch("twinklr.core.agents.providers.openai.OpenAIClient"),
         patch("twinklr.core.agents.providers.openai.AsyncOpenAI") as async_openai,
     ):
         client = MagicMock()
@@ -372,7 +373,6 @@ async def test_strict_rejection_falls_back_to_json_object_and_records_it() -> No
     )
 
     with (
-        patch("twinklr.core.agents.providers.openai.OpenAIClient"),
         patch("twinklr.core.agents.providers.openai.AsyncOpenAI") as async_openai,
     ):
         client = MagicMock()
@@ -404,7 +404,6 @@ async def test_strict_rejection_does_not_fallback_when_disabled() -> None:
     )
 
     with (
-        patch("twinklr.core.agents.providers.openai.OpenAIClient"),
         patch("twinklr.core.agents.providers.openai.AsyncOpenAI") as async_openai,
     ):
         client = MagicMock()
@@ -425,6 +424,41 @@ async def test_strict_rejection_does_not_fallback_when_disabled() -> None:
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "spec",
+    [
+        _probe_spec(),
+        get_vision_judge_spec(AgentOrchestrationConfig().vision_judge_agent),
+    ],
+    ids=["p3-macro-probe", "vision-eval"],
+)
+async def test_capped_probe_and_eval_specs_make_exactly_one_request(spec: Any) -> None:
+    rejection = BadRequestError(
+        "Unsupported text.format json_schema",
+        response=MagicMock(status_code=400, headers={}),
+        body={"error": {"message": "json_schema is unsupported for this model"}},
+    )
+    with patch("twinklr.core.agents.providers.openai.AsyncOpenAI") as async_openai:
+        client = MagicMock()
+        client.responses.create = AsyncMock(side_effect=rejection)
+        async_openai.return_value = client
+        provider = OpenAIProvider(api_key="test-key")
+
+        with pytest.raises(LLMProviderError):
+            await provider.generate_json_async(
+                messages=[{"role": "user", "content": "bounded"}],
+                model=spec.model,
+                response_model=spec.response_model,
+                provider_max_attempts=spec.provider_max_attempts,
+                allow_json_object_fallback=spec.allow_json_object_fallback,
+            )
+
+    assert spec.provider_max_attempts == 1
+    assert spec.allow_json_object_fallback is False
+    assert client.responses.create.await_count == 1
+
+
+@pytest.mark.asyncio
 async def test_invalid_strict_schema_400_propagates_without_fallback() -> None:
     error_response = MagicMock(status_code=400, headers={})
     rejection = BadRequestError(
@@ -440,7 +474,6 @@ async def test_invalid_strict_schema_400_propagates_without_fallback() -> None:
     )
 
     with (
-        patch("twinklr.core.agents.providers.openai.OpenAIClient"),
         patch("twinklr.core.agents.providers.openai.AsyncOpenAI") as async_openai,
     ):
         client = MagicMock()
@@ -474,7 +507,6 @@ async def test_unsupported_temperature_400_is_terminal_without_retry_or_fallback
     )
 
     with (
-        patch("twinklr.core.agents.providers.openai.OpenAIClient"),
         patch("twinklr.core.agents.providers.openai.AsyncOpenAI") as async_openai,
     ):
         client = MagicMock()
@@ -556,7 +588,6 @@ async def test_recoverable_response_failures_are_retried(
 
 def test_openai_sdk_retries_are_explicitly_disabled() -> None:
     with (
-        patch("twinklr.core.agents.providers.openai.OpenAIClient"),
         patch("twinklr.core.agents.providers.openai.AsyncOpenAI") as async_openai,
     ):
         OpenAIProvider(api_key="test-key")
@@ -594,9 +625,8 @@ async def test_worst_case_request_count_is_bounded_at_eight(tmp_path) -> None:
     )
 
     with (
-        patch("twinklr.core.agents.providers.openai.OpenAIClient"),
         patch("twinklr.core.agents.providers.openai.AsyncOpenAI") as async_openai,
-        patch("twinklr.core.agents.providers.openai.asyncio.sleep", new_callable=AsyncMock),
+        patch("twinklr.core.api.http.retry.asyncio.sleep", new_callable=AsyncMock),
     ):
         client = MagicMock()
         client.responses.create = AsyncMock(
@@ -763,7 +793,6 @@ async def test_openai_classifies_recoverable_response_outcomes(response, reason:
         output_tokens_details=MagicMock(reasoning_tokens=2),
     )
     with (
-        patch("twinklr.core.agents.providers.openai.OpenAIClient"),
         patch("twinklr.core.agents.providers.openai.AsyncOpenAI") as async_openai,
     ):
         client = MagicMock()

@@ -541,12 +541,16 @@ async def _run_pipeline_async(
 
 def run_pipeline(args: argparse.Namespace) -> None:
     """Run the full Twinklr pipeline."""
-    configure_logging(level="INFO")
-
     audio_path = Path(args.audio).resolve()
     output_dir = Path(args.out).resolve()
     app_config_path = Path(args.app_config).resolve()
     job_config_path = Path(args.config).resolve()
+
+    app_config = load_app_config(app_config_path)
+    configure_logging(
+        level=app_config.logging.level,
+        format_string=app_config.logging.format,
+    )
 
     # Validate inputs
     if not audio_path.exists():

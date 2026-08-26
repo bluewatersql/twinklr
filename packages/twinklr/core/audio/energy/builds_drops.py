@@ -11,14 +11,8 @@ from typing import Any
 
 import numpy as np
 
-try:
-    from scipy.ndimage import gaussian_filter1d
-
-    HAS_SCIPY = True
-except ImportError:
-    HAS_SCIPY = False
-
 from twinklr.core.audio.energy.profiling import classify_song_energy_profile
+from twinklr.core.audio.utils import HAS_SCIPY, scipy_gaussian_filter1d
 
 logger = logging.getLogger(__name__)
 
@@ -79,7 +73,7 @@ def detect_builds_and_drops(
     window = max(5, min(window, 50))
 
     if HAS_SCIPY:
-        energy_smooth = gaussian_filter1d(energy_curve, sigma=window / 3)
+        energy_smooth = scipy_gaussian_filter1d(energy_curve, sigma=window / 3)
     else:
         energy_smooth = np.convolve(energy_curve, np.ones(window) / window, mode="same")
 

@@ -65,9 +65,11 @@ class AudioAnalysisStage:
 
             # Create analyzer with configs from context
             analyzer = AudioAnalyzer(context.app_config, context.job_config)
-
-            # Analyze with caching (force_reprocess=False by default)
-            bundle = await analyzer.analyze(input, force_reprocess=False)
+            try:
+                # Analyze with caching (force_reprocess=False by default)
+                bundle = await analyzer.analyze(input, force_reprocess=False)
+            finally:
+                await analyzer.aclose()
 
             validation_error = self._validate_meaningful_features(bundle)
             if validation_error is not None:

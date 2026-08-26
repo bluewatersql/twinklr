@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+from collections import OrderedDict
 import json
 import logging
 import threading
@@ -43,7 +44,7 @@ from twinklr.core.agents.schema_utils import (
     response_schema_hash,
     strict_response_format,
 )
-from twinklr.core.api.llm.openai.client import OpenAIClient
+from twinklr.core.api.http.retry import RetryPolicy
 
 if TYPE_CHECKING:
     import httpx
@@ -97,6 +98,7 @@ class OpenAIProvider:
         timeout: float = 300.0,
         base_url: str | None = None,
         http_client: httpx.AsyncClient | None = None,
+        max_conversations: int = 100,
     ):
         """Initialize OpenAI provider.
 
@@ -113,17 +115,27 @@ class OpenAIProvider:
             max_retries=SDK_MAX_RETRIES,
             http_client=http_client,
         )
-        self._sync_client = OpenAIClient(api_key=api_key, timeout=timeout)
-
+        self._retry_policy = RetryPolicy(
+            max_attempts=PROVIDER_MAX_ATTEMPTS,
+            base_delay_s=0.5,
+            max_delay_s=2.0,
+            jitter=0.0,
+            allow_non_idempotent=True,
+            deadline_s=timeout,
+        )
         self.session_id = session_id or "default"
 
         # Thread-safe token tracking
         self._token_lock = threading.Lock()
         self._total_tokens = TokenUsage()
-        self._sync_usage_snapshot = TokenUsage()
 
-        # Conversation state
-        self._conversations: dict[str, Conversation] = {}
+        if max_conversations < 1:
+            raise ValueError("max_conversations must be at least 1")
+
+        # Bound retained histories for long-lived/batch provider instances. Ollama
+        # inherits this store and therefore gets the same lifecycle behavior.
+        self._max_conversations = max_conversations
+        self._conversations: OrderedDict[str, Conversation] = OrderedDict()
 
     @property
     def provider_type(self) -> ProviderType:
@@ -186,7 +198,7 @@ class OpenAIProvider:
         )
 
     # =========================================================================
-    # Sync Methods (Backward Compatible - use sync client)
+    # Sync Methods (Backward Compatible - thin wrappers over the async client)
     # =========================================================================
 
     def generate_json(
@@ -196,55 +208,15 @@ class OpenAIProvider:
         temperature: float | None = None,
         **kwargs: Any,
     ) -> LLMResponse:
-        """Generate JSON using sync client (backward compatible).
-
-        Note: The existing OpenAIClient already handles:
-        - Retry logic with exponential backoff
-        - OpenAI SDK calls
-        - JSON parsing
-        - Error handling
-        """
-        try:
-            generation_config = normalized_openai_generation_config(
-                model=model,
-                temperature=temperature,
-                reasoning_effort=kwargs.pop("reasoning_effort", None),
-            )
-            response_data = self._sync_client.generate_json(
+        """Generate JSON through the sole async SDK client."""
+        return asyncio.run(
+            self.generate_json_async(
                 messages=messages,
                 model=model,
-                temperature=generation_config.pop("temperature", None),
-                **generation_config,
+                temperature=temperature,
                 **kwargs,
             )
-
-            cumulative_usage = self._sync_client.get_total_token_usage()
-            usage = self._sync_usage_delta(cumulative_usage)
-
-            # Update thread-safe token tracking
-            self._update_token_usage(
-                prompt_tokens=usage.prompt_tokens,
-                reasoning_tokens=usage.reasoning_tokens,
-                completion_tokens=usage.completion_tokens,
-                total_tokens=usage.total_tokens,
-            )
-
-            return LLMResponse(
-                content=response_data,
-                metadata=ResponseMetadata(
-                    token_usage=TokenUsage(
-                        prompt_tokens=usage.prompt_tokens,
-                        reasoning_tokens=usage.reasoning_tokens,
-                        completion_tokens=usage.completion_tokens,
-                        total_tokens=usage.total_tokens,
-                    ),
-                    model=model,
-                ),
-            )
-
-        except (APIError, RateLimitError, APIConnectionError, APITimeoutError, APIStatusError) as e:
-            logger.error(f"OpenAI API error: {e}")
-            raise LLMProviderError(f"Provider error: {e}") from e
+        )
 
     def generate_json_with_conversation(
         self,
@@ -255,64 +227,17 @@ class OpenAIProvider:
         temperature: float | None = None,
         **kwargs: Any,
     ) -> LLMResponse:
-        """Generate JSON with conversation support (sync)."""
-        try:
-            if conversation_id in self._conversations:
-                conversation = self._conversations[conversation_id]
-                conversation.messages.append({"role": "user", "content": user_message})
-            else:
-                messages: list[dict[str, str]] = []
-                if system_prompt:
-                    messages.append({"role": "developer", "content": system_prompt})
-                messages.append({"role": "user", "content": user_message})
-
-                conversation = Conversation(id=conversation_id, messages=messages)
-                self._conversations[conversation_id] = conversation
-
-            windowed = self._window_messages(conversation.messages)
-            generation_config = normalized_openai_generation_config(
+        """Generate conversational JSON through the sole async SDK client."""
+        return asyncio.run(
+            self.generate_json_with_conversation_async(
+                user_message=user_message,
+                conversation_id=conversation_id,
                 model=model,
+                system_prompt=system_prompt,
                 temperature=temperature,
-                reasoning_effort=kwargs.pop("reasoning_effort", None),
-            )
-            response_data = self._sync_client.generate_json(
-                messages=windowed,
-                model=model,
-                temperature=generation_config.pop("temperature", None),
-                **generation_config,
                 **kwargs,
             )
-
-            conversation.messages.append(
-                {"role": "assistant", "content": json.dumps(response_data)}
-            )
-
-            cumulative_usage = self._sync_client.get_total_token_usage()
-            usage = self._sync_usage_delta(cumulative_usage)
-
-            self._update_token_usage(
-                prompt_tokens=usage.prompt_tokens,
-                reasoning_tokens=usage.reasoning_tokens,
-                completion_tokens=usage.completion_tokens,
-                total_tokens=usage.total_tokens,
-            )
-
-            response_metadata = ResponseMetadata(
-                token_usage=TokenUsage(
-                    prompt_tokens=usage.prompt_tokens,
-                    reasoning_tokens=usage.reasoning_tokens,
-                    completion_tokens=usage.completion_tokens,
-                    total_tokens=usage.total_tokens,
-                ),
-                model=model,
-                conversation_id=conversation_id,
-            )
-
-            return LLMResponse(content=response_data, metadata=response_metadata)
-
-        except (APIError, RateLimitError, APIConnectionError, APITimeoutError, APIStatusError) as e:
-            logger.error(f"OpenAI API error: {e}")
-            raise LLMProviderError(f"Provider error: {e}") from e
+        )
 
     def add_message_to_conversation(self, conversation_id: str, role: str, content: str) -> None:
         """Add message to conversation."""
@@ -328,35 +253,23 @@ class OpenAIProvider:
 
         return self._conversations[conversation_id].messages.copy()
 
+    def _remember_conversation(self, conversation: Conversation) -> None:
+        """Insert/touch a conversation and evict the least recently used history."""
+        self._conversations[conversation.id] = conversation
+        self._conversations.move_to_end(conversation.id)
+        while len(self._conversations) > self._max_conversations:
+            self._conversations.popitem(last=False)
+
     def get_token_usage(self) -> TokenUsage:
         """Get cumulative token usage (thread-safe)."""
         with self._token_lock:
             return self._total_tokens
 
     def reset_token_tracking(self) -> None:
-        """Reset token tracking (thread-safe)."""
+        """Reset token tracking and release retained conversation histories."""
         with self._token_lock:
             self._total_tokens = TokenUsage()
-            self._sync_usage_snapshot = TokenUsage()
-        self._sync_client.reset_conversation()
-
-    def _sync_usage_delta(self, cumulative: Any) -> TokenUsage:
-        """Return the current sync call's usage from the client's cumulative totals."""
-        current = TokenUsage(
-            prompt_tokens=_as_int(getattr(cumulative, "prompt_tokens", 0)),
-            reasoning_tokens=_as_int(getattr(cumulative, "reasoning_tokens", 0)),
-            completion_tokens=_as_int(getattr(cumulative, "completion_tokens", 0)),
-            total_tokens=_as_int(getattr(cumulative, "total_tokens", 0)),
-        )
-        previous = self._sync_usage_snapshot
-        delta = TokenUsage(
-            prompt_tokens=max(0, current.prompt_tokens - previous.prompt_tokens),
-            reasoning_tokens=max(0, current.reasoning_tokens - previous.reasoning_tokens),
-            completion_tokens=max(0, current.completion_tokens - previous.completion_tokens),
-            total_tokens=max(0, current.total_tokens - previous.total_tokens),
-        )
-        self._sync_usage_snapshot = current
-        return delta
+        self._conversations.clear()
 
     def _update_token_usage(
         self, prompt_tokens: int, reasoning_tokens: int, completion_tokens: int, total_tokens: int
@@ -522,9 +435,9 @@ class OpenAIProvider:
                 allowed_kwargs["timeout"] = timeout_seconds
             request_params.update(allowed_kwargs)
 
-            # SDK retries are disabled at client construction.  Therefore the
-            # only transient layer is this bounded loop: at most three HTTP
-            # requests for one logical call (not the former implicit 3 x 3).
+            # SDK retries are disabled at client construction. The shared
+            # transport policy therefore owns the only provider attempt budget:
+            # at most three HTTP requests for one logical call.
             fallback_reason: str | None = None
             try:
                 response = await self._create_structured_response_with_retries(
@@ -655,17 +568,24 @@ class OpenAIProvider:
     async def _create_structured_response_with_retries(
         self, request_params: dict[str, Any], *, max_attempts: int
     ) -> Any:
-        """Create one capability-routed response with one explicit retry layer."""
-        for attempt in range(max_attempts):
-            try:
-                if self.capabilities.supports_responses_structured_output:
-                    return await self._async_client.responses.create(**request_params)
-                return await self._async_client.chat.completions.create(**request_params)
-            except Exception as error:
-                if not self._should_retry_async_error(error, attempt, max_attempts):
-                    raise
-                await asyncio.sleep(0.5 * (2**attempt))
-        raise LLMProviderError("No response received from OpenAI API")
+        """Create one capability-routed response under the shared retry policy."""
+
+        async def create() -> Any:
+            if self.capabilities.supports_responses_structured_output:
+                return await self._async_client.responses.create(**request_params)
+            return await self._async_client.chat.completions.create(**request_params)
+
+        return await self._retry_policy.execute_async(
+            create,
+            is_retryable=self._is_retryable_transport_error,
+            max_attempts=max_attempts,
+            deadline_s=(
+                float(request_params["timeout"])
+                if isinstance(request_params.get("timeout"), (int, float))
+                and not isinstance(request_params.get("timeout"), bool)
+                else None
+            ),
+        )
 
     @staticmethod
     def _response_content(response: Any) -> str | None:
@@ -814,11 +734,8 @@ class OpenAIProvider:
         )
 
     @staticmethod
-    def _should_retry_async_error(error: Exception, attempt: int, max_attempts: int) -> bool:
-        """Determine whether async request should be retried."""
-        if attempt >= max_attempts - 1:
-            return False
-
+    def _is_retryable_transport_error(error: Exception) -> bool:
+        """Classify provider transport errors; the shared policy owns budgeting."""
         if (
             isinstance(error, APIStatusError)
             and 400 <= error.status_code < 500
@@ -864,6 +781,7 @@ class OpenAIProvider:
         try:
             if conversation_id in self._conversations:
                 conversation = self._conversations[conversation_id]
+                self._remember_conversation(conversation)
                 conversation.messages.append({"role": "user", "content": user_message})
             else:
                 messages: list[dict[str, str]] = []
@@ -872,7 +790,7 @@ class OpenAIProvider:
                 messages.append({"role": "user", "content": user_message})
 
                 conversation = Conversation(id=conversation_id, messages=messages)
-                self._conversations[conversation_id] = conversation
+                self._remember_conversation(conversation)
 
             # Apply sliding window to limit token growth
             windowed = self._window_messages(conversation.messages)

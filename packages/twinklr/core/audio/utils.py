@@ -2,7 +2,24 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import numpy as np
+
+try:
+    from scipy.ndimage import gaussian_filter1d as _gaussian_filter1d
+except ImportError:
+    _gaussian_filter1d = None
+
+HAS_SCIPY = _gaussian_filter1d is not None
+
+
+def scipy_gaussian_filter1d(values: np.ndarray, *, sigma: float) -> np.ndarray:
+    """Apply SciPy Gaussian smoothing when the optional dependency is present."""
+    if _gaussian_filter1d is None:
+        raise RuntimeError("scipy is not available")
+    result: Any = _gaussian_filter1d(values, sigma=sigma)
+    return np.asarray(result)
 
 
 def normalize_to_0_1(arr: np.ndarray) -> np.ndarray:
@@ -132,11 +149,13 @@ def cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
 
 
 __all__ = [
+    "HAS_SCIPY",
     "align_to_length",
     "as_float_list",
     "cosine_similarity",
     "frames_to_time",
     "normalize_to_0_1",
     "safe_divide",
+    "scipy_gaussian_filter1d",
     "time_to_frames",
 ]

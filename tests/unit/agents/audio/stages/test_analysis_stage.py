@@ -79,6 +79,7 @@ async def test_audio_analysis_failure(mock_context):
         assert result.success is False
         assert "File not found" in result.error
         assert result.stage_name == "audio_analysis"
+        mock_analyzer.aclose.assert_awaited_once()
 
 
 @pytest.mark.asyncio
@@ -117,6 +118,7 @@ async def test_audio_analysis_succeeds_for_meaningful_features(mock_context):
 
         assert result.success is True
         assert result.output is not None
+        mock_analyzer.aclose.assert_awaited_once()
 
 
 @pytest.mark.asyncio

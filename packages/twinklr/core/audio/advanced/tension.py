@@ -7,14 +7,12 @@ from typing import Any
 
 import numpy as np
 
-from twinklr.core.audio.utils import as_float_list, normalize_to_0_1
-
-try:
-    from scipy.ndimage import gaussian_filter1d
-
-    HAS_SCIPY = True
-except ImportError:
-    HAS_SCIPY = False
+from twinklr.core.audio.utils import (
+    HAS_SCIPY,
+    as_float_list,
+    normalize_to_0_1,
+    scipy_gaussian_filter1d,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -107,7 +105,7 @@ def compute_tension_curve(
 
     # Smooth tension curve
     if HAS_SCIPY:
-        tension_smooth = gaussian_filter1d(tension, sigma=5).astype(np.float32)
+        tension_smooth = scipy_gaussian_filter1d(tension, sigma=5).astype(np.float32)
     else:
         window = 11
         tension_smooth = np.convolve(tension, np.ones(window) / window, mode="same").astype(

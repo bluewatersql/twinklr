@@ -141,22 +141,6 @@ def load_app_config(path: str | Path | None = None) -> AppConfig:
     return config
 
 
-def configure_logging(config: AppConfig | None = None) -> None:
-    """Configure Python logging from app config.
-
-    Args:
-        config: AppConfig instance (loads default if None)
-    """
-    if config is None:
-        config = load_app_config()
-
-    logging.basicConfig(
-        level=getattr(logging, config.logging.level),
-        format=config.logging.format,
-        force=True,  # Override any existing configuration
-    )
-
-
 def load_job_config(path: str | Path) -> JobConfig:
     """Load and validate job/task configuration.
 

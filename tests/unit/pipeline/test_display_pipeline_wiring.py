@@ -324,6 +324,7 @@ async def test_audio_stage_preserves_irregular_detected_beat_grid() -> None:
     bundle.lyrics = None
     analyzer = MagicMock()
     analyzer.analyze = AsyncMock(return_value=bundle)
+    analyzer.aclose = AsyncMock()
     session = MagicMock()
     session.app_config = MagicMock()
     session.job_config = MagicMock()

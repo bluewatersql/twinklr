@@ -24,7 +24,7 @@ _CHUNK_BYTES = 1024 * 1024
 SESSION_ID_LENGTH = 16
 """Hex characters kept from the derived digest (64 bits of collision space)."""
 
-ENVIRONMENT_CONFIG_KEYS = ("project_root", "output_dir", "llm_api_key")
+ENVIRONMENT_CONFIG_KEYS = ("project_root", "output_dir", "cache_dir", "llm_api_key")
 """Top-level config keys describing *where* a run happens rather than what it
 produces. Excluded from the derived ID so relocating a checkout or rotating a
 key does not orphan the cache."""

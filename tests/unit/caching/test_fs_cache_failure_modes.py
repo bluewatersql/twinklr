@@ -132,6 +132,7 @@ async def test_expired_entry_is_a_miss(fs: FakeFileSystem) -> None:
     await fs.write_text(meta_path, aged.model_dump_json())
 
     assert await cache.exists(key) is False
+    assert await fs.exists(cache._entry_dir(key)) is False
     assert await cache.load(key, SampleArtifact) is None
 
 

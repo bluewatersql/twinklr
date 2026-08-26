@@ -137,6 +137,15 @@ class TestDerivedSessionId:
             audio_path=audio_file, configs=configs_there
         )
 
+    def test_session_id_ignores_cache_directory(self, audio_file: Path) -> None:
+        """Moving the machine-local cache must not fork semantic cache identity."""
+        first = (_app_config(cache_dir="/tmp/cache-one"), _job_config())
+        second = (_app_config(cache_dir="/tmp/cache-two"), _job_config())
+
+        assert derive_session_id(audio_path=audio_file, configs=first) == derive_session_id(
+            audio_path=audio_file, configs=second
+        )
+
     def test_config_fingerprint_masks_secrets(self) -> None:
         fingerprint = config_fingerprint(_app_config(llm_api_key="super-secret"))
         assert "super-secret" not in fingerprint

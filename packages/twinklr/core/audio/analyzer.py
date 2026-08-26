@@ -134,6 +134,16 @@ class AudioAnalyzer:
         self.metadata_pipeline = self.service_factory.create_metadata_pipeline(app_config)
         self.lyrics_pipeline = self.service_factory.create_lyrics_pipeline(app_config)
 
+    async def __aenter__(self) -> AudioAnalyzer:
+        return self
+
+    async def __aexit__(self, exc_type: object, exc: object, tb: object) -> None:
+        await self.aclose()
+
+    async def aclose(self) -> None:
+        """Release enhancement HTTP pools owned by this analyzer."""
+        await self.service_factory.aclose()
+
     async def analyze(
         self,
         audio_path: str,

@@ -112,8 +112,8 @@ async def rerender_plan(
     # Create minimal configs for audio analysis
     app_config = AppConfig.load_or_default()
 
-    analyzer = AudioAnalyzer(app_config=app_config, job_config=job_config)
-    song_bundle = await analyzer.analyze(str(audio_path))
+    async with AudioAnalyzer(app_config=app_config, job_config=job_config) as analyzer:
+        song_bundle = await analyzer.analyze(str(audio_path))
 
     # Build beat grid from features dict
     logger.debug("Building beat grid")

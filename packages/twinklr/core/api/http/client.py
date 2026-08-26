@@ -37,10 +37,10 @@ T = TypeVar("T")
 
 
 def _merge_headers(base: Mapping[str, str], extra: Mapping[str, str] | None) -> dict[str, str]:
-    """Merge base headers with request-specific headers."""
-    out = dict(base)
+    """Merge headers case-insensitively with request-specific values winning."""
+    out = {key.lower(): value for key, value in base.items()}
     if extra:
-        out.update(extra)
+        out.update({key.lower(): value for key, value in extra.items()})
     return out
 
 

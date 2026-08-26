@@ -62,3 +62,17 @@ def test_sync_retry_after_429() -> None:
         resp = c.get("/v1/rate")
         assert resp.status_code == 200
         assert calls["n"] == 2
+
+
+def test_request_header_override_is_case_insensitive() -> None:
+    observed: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        observed.extend(request.headers.get_list("user-agent"))
+        return httpx.Response(200)
+
+    cfg = HttpClientConfig(base_url="https://example.test", user_agent="base-agent")
+    with ApiClient(cfg, transport=httpx.MockTransport(handler)) as client:
+        client.get("/", headers={"User-Agent": "request-agent"})
+
+    assert observed == ["request-agent"]

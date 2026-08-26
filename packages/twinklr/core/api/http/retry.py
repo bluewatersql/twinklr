@@ -1,8 +1,18 @@
 from __future__ import annotations
 
+import asyncio
+from collections.abc import Awaitable, Callable
 import random
+from time import monotonic as _monotonic
+from typing import TypeVar
 
 from pydantic import BaseModel, Field, field_validator
+
+T = TypeVar("T")
+
+
+class RetryDeadlineExceededError(TimeoutError):
+    """The shared wall-clock budget expired before an operation completed."""
 
 
 class RetryPolicy(BaseModel):
@@ -34,6 +44,7 @@ class RetryPolicy(BaseModel):
     retry_on_status: tuple[int, ...] = (429, 500, 502, 503, 504)
     retry_methods: tuple[str, ...] = ("GET", "HEAD", "OPTIONS", "DELETE")
     allow_non_idempotent: bool = False
+    deadline_s: float | None = Field(default=300.0, gt=0.0)
 
     @field_validator("max_delay_s")
     @classmethod
@@ -73,6 +84,61 @@ class RetryPolicy(BaseModel):
             jitter_value: float = random.uniform(-spread, spread)
             delay = max(0.0, delay + jitter_value)
         return delay
+
+    async def execute_async(
+        self,
+        operation: Callable[[], Awaitable[T]],
+        *,
+        is_retryable: Callable[[Exception], bool],
+        max_attempts: int | None = None,
+        deadline_s: float | None = None,
+    ) -> T:
+        """Run one async operation under this policy's attempt/deadline budget."""
+        attempts = self.max_attempts if max_attempts is None else max_attempts
+        if not 1 <= attempts <= self.max_attempts:
+            raise ValueError(f"max_attempts must be between 1 and {self.max_attempts}")
+
+        effective_deadline = self.deadline_s if deadline_s is None else deadline_s
+        if effective_deadline is not None and effective_deadline <= 0:
+            raise ValueError("deadline_s must be greater than 0")
+        deadline_at = None if effective_deadline is None else _monotonic() + effective_deadline
+        for attempt in range(1, attempts + 1):
+            try:
+                if deadline_at is None:
+                    return await operation()
+                remaining = deadline_at - _monotonic()
+                if remaining <= 0:
+                    raise RetryDeadlineExceededError(
+                        f"Retry deadline exceeded after {effective_deadline:.3f} seconds"
+                    )
+                timeout_scope = asyncio.timeout(remaining)
+                try:
+                    async with timeout_scope:
+                        return await operation()
+                except TimeoutError as error:
+                    if not timeout_scope.expired():
+                        raise
+                    raise RetryDeadlineExceededError(
+                        f"Retry deadline exceeded after {effective_deadline:.3f} seconds"
+                    ) from error
+            except Exception as error:
+                if attempt >= attempts or not is_retryable(error):
+                    raise
+                response = getattr(error, "response", None)
+                headers = getattr(response, "headers", None)
+                retry_after = None
+                if headers is not None:
+                    retry_after = parse_retry_after_seconds(headers.get("Retry-After"))
+                delay = retry_after if retry_after is not None else self.compute_delay(attempt)
+                if effective_deadline is not None:
+                    assert deadline_at is not None
+                    remaining = deadline_at - _monotonic()
+                    if remaining <= 0 or delay >= remaining:
+                        raise
+                    delay = min(delay, remaining)
+                await asyncio.sleep(delay)
+
+        raise RuntimeError("retry policy exhausted without returning or raising")
 
 
 def parse_retry_after_seconds(value: str | None) -> float | None:

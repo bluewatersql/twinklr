@@ -18,7 +18,6 @@ from twinklr.core.config.fixtures import (
     ShutterMap,
 )
 from twinklr.core.config.loader import (
-    configure_logging,
     load_app_config,
     load_config,
     load_fixture_group,
@@ -63,7 +62,6 @@ __all__ = [
     "RhythmSourceName",
     "ShutterMap",
     "StructureSourceName",
-    "configure_logging",
     "load_app_config",
     # Loaders
     "load_config",

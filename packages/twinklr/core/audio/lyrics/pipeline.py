@@ -14,9 +14,33 @@ from twinklr.core.audio.lyrics.quality import compute_quality_metrics
 from twinklr.core.audio.lyrics.whisperx_models import WhisperXConfig
 from twinklr.core.audio.lyrics.whisperx_service import WhisperXService
 from twinklr.core.audio.models import StageStatus
-from twinklr.core.audio.models.lyrics import LyricsBundle, LyricsSource, LyricsSourceKind
+from twinklr.core.audio.models.lyrics import (
+    LyricsBundle,
+    LyricsQuality,
+    LyricsSource,
+    LyricsSourceKind,
+)
 
 logger = logging.getLogger(__name__)
+
+
+def _quality_adjusted_confidence(
+    confidence: float,
+    *,
+    quality: LyricsQuality | None,
+    has_words: bool,
+    min_coverage_pct: float,
+    apply_without_words: bool = False,
+) -> float:
+    """Apply the one shared timing-quality penalty delta and clamp to [0, 1]."""
+    if quality is not None and (has_words or apply_without_words):
+        if quality.timed_word_coverage_pct < min_coverage_pct:
+            confidence -= 0.10
+        confidence -= min(quality.overlap_violations * 0.05, 0.20)
+        confidence -= min(quality.out_of_bounds_violations * 0.05, 0.20)
+        if quality.large_gaps_count > 8:
+            confidence -= 0.05
+    return max(0.0, min(1.0, confidence))
 
 
 class LyricsPipelineConfig(BaseModel):
@@ -352,26 +376,12 @@ class LyricsPipeline:
         # Start with provider confidence if available, otherwise base
         confidence = provider_confidence if provider_confidence is not None else base_conf
 
-        # Apply quality penalties (if quality available and we have word timing)
-        if quality and words:
-            # Penalty for low coverage
-            if quality.timed_word_coverage_pct < self.config.min_coverage_pct:
-                confidence -= 0.10
-
-            # Penalty for overlap violations (cap at -0.20)
-            overlap_penalty = min(quality.overlap_violations * 0.05, 0.20)
-            confidence -= overlap_penalty
-
-            # Penalty for out of bounds (cap at -0.20)
-            oob_penalty = min(quality.out_of_bounds_violations * 0.05, 0.20)
-            confidence -= oob_penalty
-
-            # Penalty for large gaps
-            if quality.large_gaps_count > 8:
-                confidence -= 0.05
-
-        # Clamp to [0, 1]
-        confidence = max(0.0, min(1.0, confidence))
+        confidence = _quality_adjusted_confidence(
+            confidence,
+            quality=quality,
+            has_words=bool(words),
+            min_coverage_pct=self.config.min_coverage_pct,
+        )
 
         # Build source
         source = LyricsSource(
@@ -460,18 +470,13 @@ class LyricsPipeline:
             if result.mismatch_ratio > self.config.mismatch_threshold:
                 confidence -= 0.10
 
-            # Quality penalties
-            if quality.timed_word_coverage_pct < self.config.min_coverage_pct:
-                confidence -= 0.10
-            overlap_penalty = min(quality.overlap_violations * 0.05, 0.20)
-            confidence -= overlap_penalty
-            oob_penalty = min(quality.out_of_bounds_violations * 0.05, 0.20)
-            confidence -= oob_penalty
-            if quality.large_gaps_count > 8:
-                confidence -= 0.05
-
-            # Clamp [0, 1]
-            confidence = max(0.0, min(1.0, confidence))
+            confidence = _quality_adjusted_confidence(
+                confidence,
+                quality=quality,
+                has_words=bool(result.words),
+                min_coverage_pct=self.config.min_coverage_pct,
+                apply_without_words=True,
+            )
 
             source = LyricsSource(
                 kind=LyricsSourceKind.WHISPERX_ALIGN,
@@ -545,19 +550,12 @@ class LyricsPipeline:
             base_conf = self.BASE_CONFIDENCE[LyricsSourceKind.WHISPERX_TRANSCRIBE]
             confidence = base_conf
 
-            # Quality penalties (if available and we have word timing)
-            if quality and result.words:
-                if quality.timed_word_coverage_pct < self.config.min_coverage_pct:
-                    confidence -= 0.10
-                overlap_penalty = min(quality.overlap_violations * 0.05, 0.20)
-                confidence -= overlap_penalty
-                oob_penalty = min(quality.out_of_bounds_violations * 0.05, 0.20)
-                confidence -= oob_penalty
-                if quality.large_gaps_count > 8:
-                    confidence -= 0.05
-
-            # Clamp [0, 1]
-            confidence = max(0.0, min(1.0, confidence))
+            confidence = _quality_adjusted_confidence(
+                confidence,
+                quality=quality,
+                has_words=bool(result.words),
+                min_coverage_pct=self.config.min_coverage_pct,
+            )
 
             source = LyricsSource(
                 kind=LyricsSourceKind.WHISPERX_TRANSCRIBE,
