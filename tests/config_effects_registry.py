@@ -2533,6 +2533,14 @@ for _fixture_path, _fixture_disposition in tuple(CONFIG_EFFECTS.items()):
     if _fixture_path.startswith("fixture.") and (
         _fixture_disposition.kind is ConfigDispositionKind.EFFECT_TEST
     ):
+        if _fixture_disposition.test_nodeid and any(
+            marker in _fixture_disposition.test_nodeid
+            for marker in (
+                "test_avoid_backward_changes_public_pose_safety",
+                "test_offsets_change_public_pose_conversion",
+            )
+        ):
+            continue
         CONFIG_EFFECTS[_fixture_path] = ConfigDisposition(
             ConfigDispositionKind.EFFECT_TEST,
             "tests/unit/config/test_effect_discriminators.py::"
@@ -2558,6 +2566,12 @@ _TEMPLATE_METADATA_PATHS = {
 for _template_path, _template_disposition in tuple(CONFIG_EFFECTS.items()):
     if not _template_path.startswith("template.") or (
         _template_disposition.kind is not ConfigDispositionKind.EFFECT_TEST
+    ):
+        continue
+    if (
+        _template_disposition.test_nodeid
+        and "test_geometry_aim_zone_reaches_compiled_segment_metadata"
+        in _template_disposition.test_nodeid
     ):
         continue
     if _template_path in _TEMPLATE_REGISTRATION_PATHS:
@@ -2822,53 +2836,3 @@ CONFIG_EFFECTS["job.agent"] = ConfigDisposition(
     "test_job_config_controls_display_planner_iterations_and_threshold",
     "configured agent object changes shipped planner iteration and threshold wiring",
 )
-
-# Verifier-remediated public behaviors. Keep these exact path-specific nodeids
-# after the broad fixture/template registry rewrites above.
-for _path, _nodeid, _note in (
-    (
-        "fixture.base_config.limits.avoid_backward",
-        "tests/unit/config/test_fixtures.py::TestMovementLimits::test_avoid_backward_changes_public_pose_safety[base-config]",
-        "base config changes expanded fixture pose safety",
-    ),
-    (
-        "fixture.fixtures[FixtureInstance].config.limits.avoid_backward",
-        "tests/unit/config/test_fixtures.py::TestMovementLimits::test_avoid_backward_changes_public_pose_safety[fixture-instance]",
-        "fixture instance config changes public pose safety",
-    ),
-    (
-        "fixture.fixtures[FixtureInstance].config.position.pan_offset_deg",
-        "tests/unit/config/test_fixtures.py::TestFixturePosition::test_offsets_change_public_pose_conversion[fixture-instance-pan-offset]",
-        "fixture-instance pan offset changes public pose conversion",
-    ),
-    (
-        "fixture.fixtures[FixtureInstance].config.position.tilt_offset_deg",
-        "tests/unit/config/test_fixtures.py::TestFixturePosition::test_offsets_change_public_pose_conversion[fixture-instance-tilt-offset]",
-        "fixture-instance tilt offset changes public pose conversion",
-    ),
-    (
-        "fixture.fixtures[SimplifiedFixtureInstance].position.pan_offset_deg",
-        "tests/unit/config/test_fixtures.py::TestFixturePosition::test_offsets_change_public_pose_conversion[simplified-fixture-pan-offset]",
-        "simplified fixture pan offset survives expansion and changes pose conversion",
-    ),
-    (
-        "fixture.fixtures[SimplifiedFixtureInstance].position.tilt_offset_deg",
-        "tests/unit/config/test_fixtures.py::TestFixturePosition::test_offsets_change_public_pose_conversion[simplified-fixture-tilt-offset]",
-        "simplified fixture tilt offset survives expansion and changes pose conversion",
-    ),
-    (
-        "job.timeline_tracks.sections",
-        "tests/unit/formats/xlights/sequence/test_timeline.py::TestBuildTimelineTracks::test_sections_config_gates_public_track_builder[sections-disabled]",
-        "false disables section emission through the public track builder",
-    ),
-    (
-        "template.template.steps.geometry.aim_zone",
-        "tests/unit/sequencer/moving_heads/templates/test_data_loader.py::test_geometry_aim_zone_reaches_compiled_segment_metadata[crowd]",
-        "non-default aim zone reaches compiled geometry parameters and segment metadata",
-    ),
-):
-    CONFIG_EFFECTS[_path] = ConfigDisposition(
-        ConfigDispositionKind.EFFECT_TEST,
-        _nodeid,
-        _note,
-    )

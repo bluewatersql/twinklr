@@ -81,6 +81,16 @@ class TestDmxMapping:
 class TestMovementLimits:
     """Tests for MovementLimits model."""
 
+    def test_pose_safety_checks_raw_dmx_before_output_clamping(self) -> None:
+        fixture = FixtureConfig(
+            fixture_id="MH1",
+            dmx_mapping=DmxMapping(pan_channel=1, tilt_channel=2, dimmer_channel=3),
+            limits=MovementLimits(pan_min=100, pan_max=150, avoid_backward=False),
+        )
+
+        assert fixture.is_pose_safe(Pose(pan_deg=0.0, tilt_deg=0.0)) is True
+        assert fixture.is_pose_safe(Pose(pan_deg=60.0, tilt_deg=0.0)) is False
+
     @pytest.mark.parametrize("source", ["base-config", "fixture-instance"])
     def test_avoid_backward_changes_public_pose_safety(self, source: str) -> None:
         """Both public fixture schema paths must enforce the safety toggle."""

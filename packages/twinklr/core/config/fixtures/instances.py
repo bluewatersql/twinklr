@@ -191,17 +191,7 @@ class FixtureConfig(BaseModel):
         Returns:
             Tuple of (pan_dmx, tilt_dmx) values
         """
-        # Apply inversions
-        pan_deg = -pose.pan_deg if self.inversions.pan else pose.pan_deg
-        tilt_deg = -pose.tilt_deg if self.inversions.tilt else pose.tilt_deg
-
-        # Convert to DMX
-        pan_dmx = int(
-            self.orientation.pan_front_dmx + (pan_deg / self.pan_tilt_range.pan_range_deg) * 255.0
-        )
-        tilt_dmx = int(
-            self.orientation.tilt_zero_dmx + (tilt_deg / self.pan_tilt_range.tilt_range_deg) * 255.0
-        )
+        pan_dmx, tilt_dmx = self._degrees_to_raw_dmx(pose)
 
         # Apply limits
         pan_dmx = max(self.limits.pan_min, min(self.limits.pan_max, pan_dmx))
@@ -209,9 +199,23 @@ class FixtureConfig(BaseModel):
 
         return (pan_dmx, tilt_dmx)
 
+    def _degrees_to_raw_dmx(self, pose: Pose) -> tuple[int, int]:
+        """Map a physical pose to DMX without applying safety-limit clamping."""
+        pan_deg = -pose.pan_deg if self.inversions.pan else pose.pan_deg
+        tilt_deg = -pose.tilt_deg if self.inversions.tilt else pose.tilt_deg
+
+        pan_dmx = int(
+            self.orientation.pan_front_dmx + (pan_deg / self.pan_tilt_range.pan_range_deg) * 255.0
+        )
+        tilt_dmx = int(
+            self.orientation.tilt_zero_dmx + (tilt_deg / self.pan_tilt_range.tilt_range_deg) * 255.0
+        )
+
+        return (pan_dmx, tilt_dmx)
+
     def is_pose_safe(self, pose: Pose) -> bool:
         """Return whether a physical pose satisfies DMX and backward-pointing limits."""
-        pan_dmx, tilt_dmx = self.degrees_to_dmx(pose)
+        pan_dmx, tilt_dmx = self._degrees_to_raw_dmx(pose)
         if not (self.limits.pan_min <= pan_dmx <= self.limits.pan_max):
             return False
         if not (self.limits.tilt_min <= tilt_dmx <= self.limits.tilt_max):
