@@ -249,3 +249,17 @@ and the diff contains only the two active-change Markdown files. No corpus conte
 network, provider, xLights, audio, application code, or prototype was accessed or
 changed. This candidate is pending independent evidence review and is not P4-T7
 approval, execution, completion, or integration.
+
+### Independent preflight review — 2026-08-26: REJECTED / remediated
+
+Independent evidence review rejected freeze `2fff098d03aac7b192d9fb0163f75b23224c0df1`.
+The re-entry report contract omitted `distinct_pack_count`, adaptive effective
+thresholds, full sensitivity across P2K-T2's five named review line items, and the
+explicit `promotion.py`/`config.py` discrepancy. The dormant experiment also failed to
+protect owner archives from `ingest_zip`'s destructive sibling
+`<archive_stem>_extracted` lifecycle, and its timing-alignment seam lacked the exact
+`feature_engineering.alignment.TemporalAlignmentEngine` citation.
+
+The linked repository preflight now corrects those three gaps. The rejected identity
+remains rejected; remediation does not approve the preflight, admit P4-T7 execution, or
+change the existing NO-GO/deferred status.

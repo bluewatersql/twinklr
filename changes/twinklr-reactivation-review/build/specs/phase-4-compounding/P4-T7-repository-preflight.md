@@ -40,7 +40,7 @@ These are code-shape observations, not evidence that the seams work on an MH cor
 | Generic sequence parsing | Parses non-timing xLights elements, layers, effect timing/type, attributes, EffectDB references, and raw palette data without filtering by display model category. | `formats.xlights.sequence.parser.XSQParser`; `profiling.effects.extractor.extract_effect_events` |
 | Structured EffectDB preservation | Retains the raw settings string and parses namespaced parameters into typed values while preserving partial/failure status. | `profiling.effects.effectdb_parser.parse_effectdb_settings`; `profiling.models.events.EffectEventRecord` |
 | DMX layout recognition | Recognizes xLights DMX fixture types and can profile channel count, node names, color-wheel entries, and pan/tilt motor metadata when a companion RGB-effects layout exists. | `profiling.layout.classifier.DMX_MODEL_TYPES`; `profiling.layout.profiler._extract_dmx_profile`; `profiling.models.layout.DmxFixtureProfile` |
-| Stable event-to-corpus plumbing | Content-addressed package/sequence/event identities, timing alignment, phrase records, and target-local temporal grouping already exist. | `profiling.identity`; `feature_engineering.phrase_encoder.PhraseEncoder`; `feature_engineering.stack_detector.EffectStackDetector` |
+| Stable event-to-corpus plumbing | Content-addressed package/sequence/event identities, timing alignment, phrase records, and target-local temporal grouping already exist. | `profiling.identity`; `feature_engineering.alignment.TemporalAlignmentEngine`; `feature_engineering.phrase_encoder.PhraseEncoder`; `feature_engineering.stack_detector.EffectStackDetector` |
 
 ## Structural walls visible without corpus access
 
@@ -62,9 +62,17 @@ their hashes/paths agree. Tool availability alone does not substitute for any ar
    paths, and zero live-catalog mutation.
 2. **`P2K-T2-idempotent-rerun-record`** — before/after store counts and corpus hashes
    proving an unchanged second run creates no duplicate identities or rows.
-3. **`P2K-T2-nonempty-distribution-report`** — real, non-zero candidate histograms for
-   `support_count` and `cross_pack_stability`, including sensitivity at the configured
-   thresholds and nearby values.
+3. **`P2K-T2-nonempty-distribution-report`** — real, non-zero distributions across
+   every mined candidate for `support_count`, `cross_pack_stability`, and
+   `distinct_pack_count`; the `effective_min_support` and `effective_min_stability`
+   actually applied by adaptive promotion; and pass/fail sensitivity at each configured
+   value plus at least two nearby values for every numeric threshold/cap in P2K-T2's
+   five named review line items: (1) configured promotion support/stability, (2)
+   `PromotionPipeline.run()`'s hardcoded support/stability defaults, (3) propensity
+   minimum support/anti-affinity, (4) the target-role score cutoff, and (5) the
+   per-family/per-cluster caps. It must explicitly preserve for owner resolution the
+   `promotion.py` defaults (`5`/`0.3`) versus `config.py` configured values
+   (`2`/`0.015`) discrepancy rather than silently reconciling it.
 4. **`P2K-T2-owner-threshold-decision-log`** — five dated owner-authored keep/change/
    defer entries required by P2K-T2, with any accepted code change separately landed.
 5. **`P4-T7-MH-corpus-manifest`** — provenance-bearing inventory of the proposed MH
@@ -77,11 +85,18 @@ their hashes/paths agree. Tool availability alone does not substitute for any ar
 This plan is dormant until all five re-entry artifacts pass preflight. It authorizes no
 future action by itself.
 
+`SequencePackProfiler` delegates to `ingest_zip`, which creates—and deletes if already
+present—a sibling `<archive_stem>_extracted` directory. Therefore an owner archive must
+never be profiled in place. Before any profiler/parser call, each selected archive must
+be copied into a newly created, task-owned isolated scratch root, and the source and copy
+SHA-256 values must match. Only the verified scratch copy may be passed to the profiler;
+its sibling extraction directory must also resolve inside that same scratch root.
+
 | Elapsed | Work | Required output |
 |---|---|---|
 | 0–15 min | Verify the five artifacts, hashes, local-only scope, and scratch output boundary. | Admission checklist or immediate stop record. |
-| 15–35 min | Use the MH manifest—not filename guesses—to select at most five sequences. Require at least three sequences from two independently hashed packs and at least two distinct DMX fixture/layout profiles. | Hash-pinned sample table. |
-| 35–80 min | Run existing profiler/parser entrypoints offline against only the capped sample; write outputs to disposable scratch storage. | Per-sequence parse status and counts, with no raw payload copied into Git. |
+| 15–35 min | Use the MH manifest—not filename guesses—to select at most five sequences. Require at least three sequences from two independently hashed packs and at least two distinct DMX fixture/layout profiles. Copy only the selected archives into a newly created task-owned isolated scratch root, then hash-verify every copy against its manifest-qualified source. | Hash-pinned source/copy sample table and scratch-root boundary. |
+| 35–80 min | Run existing profiler/parser entrypoints offline only against the hash-verified scratch copies. Confirm each generated `<archive_stem>_extracted` sibling resolves inside the task-owned scratch root; write every other output there as well. | Per-sequence parse status and counts, with no raw payload copied into Git. |
 | 80–125 min | Trace whether extracted records retain enough channel/layout meaning to express one candidate idiom shape. Analysis stays in scratch/notebook notes; do not modify product code or keep a prototype. | Seam/wall evidence table with exact fields lost or retained. |
 | 125–165 min | Draft the P4-T7 decision memo against all five target questions, including an inconclusive result when required. | Reviewable memo plus evidence hashes. |
 | 165–180 min | Administrative evidence packaging only. No new archive, parse, adapter, or analysis work may start. | Hard stop by minute 180. |
@@ -91,6 +106,9 @@ future action by itself.
 Stop and record the named reason immediately if any condition occurs:
 
 - any re-entry artifact is missing, stale, inaccessible, or hash-inconsistent;
+- task-owned isolated scratch storage cannot be provisioned, a source/copy hash differs,
+  a profiler input resolves outside that scratch root, or a generated sibling extraction
+  directory would resolve outside it;
 - the manifest-qualified sample has fewer than three sequences, fewer than two
   independently hashed packs, or fewer than two distinct DMX fixture/layout profiles;
 - fewer than two sampled sequences join parsed effects to a `DmxFixtureProfile`;
