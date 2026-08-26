@@ -275,5 +275,6 @@ path-specific `EFFECT_TEST` node IDs. Red-first discriminators covered both
 fixture alternatives for each position offset, both configuration sources for
 backward safety, enabled and disabled timeline section emission, and two
 non-default aim zones reaching compiled metadata. The replacement candidate
-still requires fresh full gates and independent verification; this execution
-record does not approve it.
+passed its fresh full `make validate` gate with 5,591 tests passing and 39
+skipped, plus clean formatting, Ruff, and mypy (719 source files). It still
+requires independent verification; this execution record does not approve it.
