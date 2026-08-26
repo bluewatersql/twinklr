@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import threading
-from typing import Any
+from typing import Any, cast
 
 from twinklr.core.agents.providers.base import (
     ImageBackground,
@@ -26,8 +26,8 @@ from twinklr.core.agents.providers.errors import LLMProviderError
 try:
     from anthropic import Anthropic, AsyncAnthropic
 except ImportError:  # pragma: no cover
-    Anthropic = None  # type: ignore[misc, assignment]
-    AsyncAnthropic = None  # type: ignore[misc, assignment]
+    Anthropic = cast("Any", None)
+    AsyncAnthropic = cast("Any", None)
 
 logger = logging.getLogger(__name__)
 
@@ -72,8 +72,8 @@ class AnthropicProvider:
                 "Install it with: pip install 'twinklr-core[anthropic]'"
             )
 
-        self._sync_client: Anthropic = Anthropic(api_key=api_key, timeout=timeout)
-        self._async_client: AsyncAnthropic = AsyncAnthropic(api_key=api_key, timeout=timeout)
+        self._sync_client: Any = Anthropic(api_key=api_key, timeout=timeout)
+        self._async_client: Any = AsyncAnthropic(api_key=api_key, timeout=timeout)
         self.default_model = default_model
         self.session_id = session_id or "default"
 
