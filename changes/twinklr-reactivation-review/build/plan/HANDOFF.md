@@ -1,11 +1,14 @@
 # Build-campaign handoff — current execution state
 
-_Last updated: 2026-08-26 after P3-T6's independently approved offline/code candidate
-was integrated at `c9620db`. P3-T6 empirical xLights GUI acceptance remains open.
+_Last updated: 2026-08-26 during the authorized P3-T7+ continuation after P3-T6's
+independently approved offline/code candidate was integrated at `c9620db`. P3-T6
+empirical xLights GUI acceptance remains open.
 P3-T4's one live attempt remains rejected
 at the provider schema boundary; `$1.66` is committed and the remaining `$0.09` cannot
 fund another audited attempt. Live acceptance remains open and no further P3-T4 live
-attempt is authorized. P3-T7+ remains unauthorized. Maintained by the
+attempt is authorized. The owner has now authorized P3-T7+ work and directed every
+xLights-GUI date to remain deferred until a meaningful, fully working end-to-end show
+exists. Maintained by the
 orchestrating agent; update this file at every
 pause or phase boundary._
 
@@ -27,7 +30,7 @@ their authoring moment; this handoff owns the current campaign status.
 | 1P — Render truth | **IMPLEMENTATION MERGED AND VERIFIED** (12/12); **phase exit not complete** | The recorded human judgment and empirical xLights acceptance evidence remain pending; see [02-phase-1p-render-truth.md](02-phase-1p-render-truth.md). |
 | 2P — Creative quality | **OFFLINE IMPLEMENTATION MERGED AND VERIFIED** (13/13); **phase exit not complete** | The owner accepted T1/T8/T9 on 2026-08-16. T6 calibration/live evidence, T13/D1 evidence, and other live checks remain pending; see [04-phase-2p-creative-quality.md](04-phase-2p-creative-quality.md). |
 | 2K — Catalog growth | **TOOLING IMPLEMENTATION MERGED AND VERIFIED** (4/4); **phase exit not complete** | Tooling is ready, but coverage/corpus/curation/style exit criteria require the author's real layout, corpus, preferences, and judgments; see [05-phase-2k-catalog-growth.md](05-phase-2k-catalog-growth.md). |
-| 3 — Show convergence | **P3-T1–P3-T6 MERGED AND INDEPENDENTLY APPROVED OFFLINE/IN CODE** (6/8 integrated) | P3-T6's standards-, specification-, and adversarial-approved candidate was integrated at `c9620db`. Its empirical xLights GUI acceptance remains open. This does not waive Phase 1P/2P/2K exits, close P3-T4 live acceptance, authorize live work, or authorize P3-T7+. Earlier commits: P3-T5 `f006468`; P3-T4 `558153c`; P3-T3 `33cce57`; P3-T2 `5365f70`; P3-T1 `5eebcb2`. |
+| 3 — Show convergence | **P3-T1–P3-T6 MERGED AND INDEPENDENTLY APPROVED OFFLINE/IN CODE** (6/8 integrated); **P3-T7+ AUTHORIZED** | P3-T6's standards-, specification-, and adversarial-approved candidate was integrated at `c9620db`. Its empirical xLights GUI acceptance remains open. P3-T8's first offline candidate was formally rejected; file-backed provenance replay, shared provider preflight, range-aware grounding, and metrics adversarial remediation now have fresh author gates and await independent verification. All xLights-GUI evidence, live visual judging, human review, calibration, and a committed real completed record remain intentionally unscheduled until a meaningful end-to-end show exists. No acceptance date or outcome is implied. Earlier commits: P3-T5 `f006468`; P3-T4 `558153c`; P3-T3 `33cce57`; P3-T2 `5365f70`; P3-T1 `5eebcb2`. |
 | 4 — Compounding | **NOT STARTED** | No Phase 4 implementation has started. |
 
 The overall `twinklr-reactivation-review` change remains **ACTIVE**. Finishing an
@@ -39,6 +42,18 @@ offline implementation lane is not the same as satisfying its phase exit criteri
   [context/current-state.md](../../../../context/current-state.md); do not fork its
   rolling snapshot into this execution handoff.
 - No implementation or test failure is being carried as an accepted baseline.
+- The P3-T8 first offline snapshot was formally rejected. Its remediated candidate on
+  `codex/p3t8-evaluation` from `1ecea0c` verifies all completed-record evidence before
+  report/join consumption, shares the provider hard-limit preflight with rubric-v1,
+  expands contact-sheet grounding ranges, and covers unmatched/non-spanning/ambiguous-
+  ownership metrics adversarially. Fresh author gates: rejection core **25 passed**;
+  evaluation/CLI/integration focus **163 passed**; immutable goldens **74 passed, 8
+  skipped**; full offline suite **5,390 passed, 38 skipped** at 88%; Ruff/format and
+  `git diff --check` clean; mypy clean across **737 source files**. Frozen 24-file
+  implementation/test/prompt manifest SHA-256:
+  `b75fcc9f565cb77888946f8f8da5a0ec4983176d2ef140460ac7584fe2b860a0`.
+  This candidate awaits independent verification; no acceptance is self-awarded and no
+  live/provider/xLights/audio work or completed real record was created.
 - The P3-T6 remediation candidate on `codex/p3t6-unified-export` from `e1ed146`
   passed the complete offline suite: **5352 passed, 38 skipped** at 88% coverage;
   immutable goldens **74 passed, 8 skipped**; review-focused **38 passed**; broader
@@ -88,7 +103,7 @@ offline implementation lane is not the same as satisfying its phase exit criteri
   clean across 728 source files; `git diff --check` clean. The owner accepted all nine
   recorded decisions before integration at `f006468`. No live/provider/xLights/audio
   work was performed. P3-T6 is integrated at `c9620db`; its empirical GUI acceptance
-  remains open, and P3-T7+ is unauthorized.
+  remains open. The later P3-T7+ authorization does not close that empirical gate.
 - The prior P3-T4 author snapshot was formally rejected, then its first remediation was
   narrowly rejected for reinterpreting `PlanTarget.ZONE` as physical `DisplayZone`.
   The frozen author snapshot restores the established `ChoreoTag` contract. Fresh gates:
@@ -228,8 +243,9 @@ approved offline/in code and integrated at `558153c`. Its failed live attempt le
 live acceptance open, with no budget or authorization for another attempt. P3-T5's nine
 decisions are owner-accepted and its offline candidate is integrated at `f006468` while
 the earlier empirical exits remain open. P3-T6 is independently approved offline/in code
-and integrated at `c9620db`; its empirical GUI acceptance is open, and P3-T7+ remains
-unauthorized. P3-T2 deliberately leaves
+and integrated at `c9620db`; its empirical GUI acceptance is open. P3-T7+ is now
+authorized, with every xLights-GUI date deferred to a meaningful end-to-end milestone.
+P3-T2 deliberately leaves
 `resolved_color`, `timing_offset_beats`, and parameter-range/settings escaping work to
 their existing P3-T5/P3-T8 or display-review owners; it does not silently close them.
 

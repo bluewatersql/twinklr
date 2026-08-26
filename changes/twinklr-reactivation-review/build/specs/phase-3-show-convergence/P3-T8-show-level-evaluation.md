@@ -316,3 +316,80 @@ combined output is thin (catalog coverage, per P2K's exit criteria), the first
 evaluation measures the catalog rather than the coordination. *Mitigation*: report it as
 such. A low score with a correct explanation is a valid result and feeds D5's fourth arm
 exactly as intended; a low score reported as a harness failure is not.
+
+## Implementation handoff — 2026-08-26 offline boundary
+
+The owner authorized P3-T7+ and directed the campaign to continue, while explicitly
+deferring every xLights-GUI date until there is a meaningful, fully working end-to-end
+show. This implementation therefore establishes the complete **offline** P3-T8 boundary
+without manufacturing the task's empirical exit:
+
+- `ShowEvaluationManifest` is written beside the show XSQ and trace-v2 sidecar. It
+  preserves today's complete `MacroPlan`, `ChoreographyGraph`, `XLightsMapping`,
+  moving-head ownership, capability, and content hashes; strict loading rejects old
+  traces, unknown backends, count drift, duplicate mappings, and hash drift.
+- `ShowDeterministicReport` combines the existing musical-grid metrics with schedule-
+  derived cross-part metrics. Typed targets expand through the current graph, xLights
+  names normalize through the current mapping, duplicate trace rows do not double-count,
+  and unmatched/missing/non-spanning evidence remains explicit rather than becoming a
+  zero.
+- Rubric-v2 preserves the four P2P-T6 categories and adds the five higher-is-better
+  cross-part readability criteria. Display-only evidence is strict N/A. The prompt guard
+  keeps deterministic scoring out of the visual evaluator, while the payload includes
+  current focal, pair, palette, section, and trace claims before the provider seam.
+- A completed `ShowEvaluationRecord` is a separate strict type that requires visual
+  provenance, provider identity, sampled-frame hashes, a real human judgment, and a
+  derived agreement line. The offline command cannot create or masquerade as this
+  completed record. Recipe joins accept only strict completed records.
+- `twinklr show-eval` is file-only and deterministic. `twinklr eval-report` retains its
+  checkpoint options and additionally accepts a positional completed show record.
+
+No xLights process, provider, audio, live endpoint, or paid request was used for this
+offline implementation. No combined visual score, human judgment, calibration result,
+committed real evaluation record, empirical acceptance, or schedule is implied. Those
+artifacts remain intentionally unscheduled until the owner identifies the meaningful
+end-to-end milestone.
+
+Superseded first-snapshot author evidence from the isolated `codex/p3t8-evaluation`
+worktree based on
+`1ecea0c`: Ruff format/check clean; mypy clean across **737 source files**; evaluation
+unit suite **142 passed**; deterministic integration **2 passed**; related evaluation,
+show CLI/wiring, and combined-pipeline focus **171 passed**; immutable goldens
+**74 passed, 8 skipped**; full offline suite **5,374 passed, 38 skipped** at 88% coverage;
+and `git diff --check` clean. This is author evidence, not independent approval or
+empirical acceptance. Frozen 21-file implementation/test/prompt manifest SHA-256:
+`e093ce924c82e674dac1961627ea8db5d9280a8e21390741b1e188d4199d6ab0`.
+
+### Formal first review and remediation — 2026-08-26
+
+Formal review rejected the first offline snapshot. Its public completed-record loader
+trusted authored provenance values without resolving, hash-checking, and replaying the
+referenced evidence. Rubric-v2 also had not reused the rubric-v1 provider hard-limit
+preflight, and contact-sheet grounding treated only the sheet's synthetic index as
+supplied truth.
+
+The remediation is file-backed and remains offline. A completed record now requires
+repository/record-relative preview, sampled-frame, rendered-prompt, and show-manifest
+files; verifies every digest; strictly reloads the manifest and XSQ/trace dependencies;
+rebuilds the deterministic report; and rejects stored claims that differ from that
+rebuild before `eval-report` or recipe joining can succeed. Tests prove the former
+fixture-only shape fails and one fully relative temporary evidence bundle reloads and
+joins. No fake completed record is committed.
+
+Rubric-v1 and rubric-v2 now share the 1,500-image/512-MiB encoded request preflight,
+executed before budget reservation or provider entry. Contact-sheet labels such as
+`Frames 1–12` expand supplied grounding truth. Added deterministic adversarial coverage
+keeps unmatched windows explicit, names non-spanning exclusions, permits unknown moving-
+head fixture fallback only for one owner, and fails ambiguity with multiple owners.
+
+Fresh remediation author evidence: the rejection/adversarial core is **25 passed**;
+evaluation/CLI/integration focus is **163 passed**; Ruff formatting/check and
+`git diff --check` are clean; mypy is clean across **737 source files**; immutable
+goldens are **74 passed, 8 skipped**; and the full offline suite is **5,390 passed,
+38 skipped** at 88% coverage. Frozen 24-file implementation/test/prompt manifest
+SHA-256: `b75fcc9f565cb77888946f8f8da5a0ec4983176d2ef140460ac7584fe2b860a0`.
+This is author evidence, not independent approval. Formal rejection remains the current
+review outcome until a separate verifier evaluates the remediated snapshot. The empirical
+deferral is unchanged: xLights-GUI evidence, live visual judging, human review,
+calibration, and a committed real completed record remain intentionally unscheduled until
+a meaningful end-to-end show exists. No acceptance date or outcome is implied.

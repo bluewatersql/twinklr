@@ -551,6 +551,15 @@ def _pack_cases() -> list[tuple[str, Path, str, dict[str, Any]]]:
         "time_signature": "4/4",
         "total_bars": 8,
     }
+    show_vision = {
+        "capability": '{"has_display":true,"has_moving_heads":true,"cross_part_applicable":true}',
+        "claims_json": (
+            '{"focal_arc":[{"section_id":"chorus_1","lead_target":"front"}],'
+            '"sections":[{"section_id":"chorus_1"}]}'
+        ),
+        "trace_summary_json": ('{"display":{"entry_count":4},"moving_head":{"entry_count":4}}'),
+        "frame_manifest": "Frame 1: 0 ms\nFrame 2: 6000 ms",
+    }
     return [
         (
             "asset_prompt_enricher",
@@ -602,6 +611,12 @@ def _pack_cases() -> list[tuple[str, Path, str, dict[str, Any]]]:
             AGENT_ROOT / "sequencer" / "moving_heads" / "prompts",
             "judge",
             moving,
+        ),
+        (
+            "show_vision_judge",
+            AGENT_ROOT / "prompts",
+            "show_vision_judge",
+            show_vision,
         ),
     ]
 
@@ -664,7 +679,7 @@ def test_populated_matrix_covers_every_runtime_pack() -> None:
         for system_prompt in AGENT_ROOT.glob("**/prompts/*/system.j2")
     }
 
-    assert len(discovered) == 11
+    assert len(discovered) == 12
     assert covered == discovered
 
 

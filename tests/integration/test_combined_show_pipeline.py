@@ -269,6 +269,11 @@ async def test_single_run_drives_both_with_one_grid_by_identity(tmp_path: Path) 
     output = result.outputs["show_render"]
     assert output["beat_grid"] is grid
     assert output["sequence"] is context.get_state("sequence")
+    evaluation_contract = output["evaluation_contract"]
+    assert evaluation_contract["macro_plan"] == macro
+    assert evaluation_contract["choreography_graph"] == wiring.choreo_graph
+    assert evaluation_contract["xlights_mapping"] == wiring.xlights_mapping
+    assert evaluation_contract["moving_head_target_ids"] == sorted(wiring.moving_head_target_ids)
     element_types = {
         element.element_name: {
             effect.effect_type for layer in element.layers for effect in layer.effects

@@ -111,9 +111,16 @@ and P3-T5 was integrated at `f006468`. On 2026-08-26 the owner accepted P3-T6's 
 unified-emission contract. Formal first review rejected the initial snapshot; standards,
 specification, and adversarial review then approved the remediation offline/in code, and
 it was integrated at `c9620db`, bringing Phase 3 to six of eight tasks integrated. P3-T6
-empirical xLights GUI acceptance remains open. These integrations do not waive the
-earlier exits, close P3-T4 live acceptance, authorize live xLights work, or authorize
-P3-T7+. Phase 4 has not started.
+empirical xLights GUI acceptance remains open. On 2026-08-26 the owner subsequently
+authorized P3-T7+ work and directed all xLights-GUI dates to remain deferred until a
+meaningful, fully working end-to-end show exists. That authorization permits the
+offline P3-T8 evaluation boundary to proceed; it does not supply xLights evidence,
+visual-judge output, human judgment, calibration, a completed real evaluation record,
+or an empirical acceptance outcome. P3-T8's first offline candidate was formally rejected
+because completed-record provenance was trusted rather than replay-verified and rubric-v2
+did not reuse the provider request hard-limit preflight; its file-backed, shared-preflight
+remediation is in author verification and is not independently approved. Earlier exits
+remain open. Phase 4 has not started.
 
 The authoritative current task/gate list is the campaign
 [HANDOFF.md](../changes/twinklr-reactivation-review/build/plan/HANDOFF.md). Most notably,
