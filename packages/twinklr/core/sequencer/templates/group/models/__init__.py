@@ -5,7 +5,7 @@ Re-exports all models for backward compatibility with existing imports from
 
 Models are organized into submodules by concern:
 - template: Template definition models (GroupPlanTemplate, LayerRecipe, etc.)
-- display: Display graph models (DisplayGraph, DisplayGroup, GroupPosition)
+- position: Categorical position metadata shared by choreography consumers
 - coordination: Coordination models (GroupPlacement, CoordinationPlan, etc.)
 
 Planning output models (SectionCoordinationPlan, GroupPlanSet, etc.) should be
@@ -24,12 +24,7 @@ from twinklr.core.sequencer.templates.group.models.coordination import (
     PlacementWindow,
     PlanTarget,
 )
-from twinklr.core.sequencer.templates.group.models.display import (
-    DisplayGraph,
-    DisplayGroup,
-    ElementType,
-    GroupPosition,
-)
+from twinklr.core.sequencer.templates.group.models.position import GroupPosition
 from twinklr.core.sequencer.templates.group.models.template import (
     AssetSlot,
     AssetSlotDefaults,
@@ -76,10 +71,6 @@ __all__ = [
     # Enums (re-exported for convenience)
     "CoordinationMode",
     "CoordinationPlan",
-    # Display models (legacy — being replaced by ChoreographyGraph)
-    "DisplayGraph",
-    "DisplayGroup",
-    "ElementType",
     "GPBlendMode",
     "GPTimingDriver",
     "GroupConstraints",

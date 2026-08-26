@@ -467,7 +467,7 @@ class CompositionEngine:
 
         # Apply spatial ordering when SpatialIntent is specified.
         # Reorders group_order based on categorical GroupPosition metadata
-        # from the DisplayGraph so that e.g. L2R sweeps groups left-to-right
+        # from the ChoreographyGraph so that e.g. L2R sweeps groups left-to-right
         # regardless of the planner-specified order.
         group_order = list(config.group_order)
         if config.spatial_intent != SpatialIntent.NONE:

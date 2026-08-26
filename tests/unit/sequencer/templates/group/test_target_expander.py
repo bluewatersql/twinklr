@@ -17,7 +17,7 @@ from twinklr.core.sequencer.templates.group.models.coordination import (
     PlacementWindow,
     PlanTarget,
 )
-from twinklr.core.sequencer.templates.group.models.display import GroupPosition
+from twinklr.core.sequencer.templates.group.models.position import GroupPosition
 from twinklr.core.sequencer.templates.group.target_expander import TargetExpander
 from twinklr.core.sequencer.vocabulary import (
     CoordinationMode,

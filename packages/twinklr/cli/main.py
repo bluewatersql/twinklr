@@ -69,7 +69,7 @@ from twinklr.core.sequencer.templates.group.models.choreography import (
     ChoreographyGraph,
     ChoreoGroup,
 )
-from twinklr.core.sequencer.templates.group.models.display import GroupPosition
+from twinklr.core.sequencer.templates.group.models.position import GroupPosition
 from twinklr.core.sequencer.vocabulary.display import (
     DisplayElementKind,
     DisplayProminence,

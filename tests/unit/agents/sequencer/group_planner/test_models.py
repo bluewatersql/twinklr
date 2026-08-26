@@ -15,8 +15,6 @@ from twinklr.core.sequencer.templates.group.catalog import (
 from twinklr.core.sequencer.templates.group.models import (
     CoordinationConfig,
     CoordinationPlan,
-    DisplayGraph,
-    DisplayGroup,
     GroupPlacement,
     PlacementWindow,
 )
@@ -87,47 +85,6 @@ class TestTimeRef:
         """MS kind with bar field should raise validation error."""
         with pytest.raises(ValueError, match=r"bar.*None"):
             TimeRef(kind=TimeRefKind.MS, offset_ms=5000, bar=1)
-
-
-class TestDisplayGraph:
-    """Tests for DisplayGraph model."""
-
-    def test_groups_by_role_computed(self) -> None:
-        """groups_by_role returns mapping of role -> group_ids."""
-        graph = DisplayGraph(
-            display_id="test_display",
-            display_name="Test Display",
-            groups=[
-                DisplayGroup(group_id="HERO_1", role="HERO", display_name="Hero 1"),
-                DisplayGroup(group_id="HERO_2", role="HERO", display_name="Hero 2"),
-                DisplayGroup(group_id="ARCHES_1", role="ARCHES", display_name="Arches"),
-            ],
-        )
-        by_role = graph.groups_by_role
-        assert by_role["HERO"] == ["HERO_1", "HERO_2"]
-        assert by_role["ARCHES"] == ["ARCHES_1"]
-
-    def test_get_group_by_id(self) -> None:
-        """get_group returns group by ID or None."""
-        graph = DisplayGraph(
-            display_id="test_display",
-            display_name="Test Display",
-            groups=[
-                DisplayGroup(group_id="HERO_1", role="HERO", display_name="Hero 1"),
-            ],
-        )
-        assert graph.get_group("HERO_1") is not None
-        assert graph.get_group("HERO_1").display_name == "Hero 1"
-        assert graph.get_group("NONEXISTENT") is None
-
-    def test_requires_at_least_one_group(self) -> None:
-        """DisplayGraph must have at least one group."""
-        with pytest.raises(ValueError):
-            DisplayGraph(
-                display_id="empty",
-                display_name="Empty",
-                groups=[],
-            )
 
 
 class TestTemplateCatalog:

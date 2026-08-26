@@ -22,7 +22,7 @@ import random
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field
 
-from twinklr.core.sequencer.templates.group.models.display import GroupPosition
+from twinklr.core.sequencer.templates.group.models.position import GroupPosition
 from twinklr.core.sequencer.vocabulary.choreography import ChoreoTag, SplitDimension
 from twinklr.core.sequencer.vocabulary.coordination import SpatialIntent
 from twinklr.core.sequencer.vocabulary.display import (

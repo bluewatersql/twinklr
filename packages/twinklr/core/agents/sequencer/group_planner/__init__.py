@@ -64,11 +64,7 @@ from twinklr.core.sequencer.templates.group.models.coordination import (
     GroupPlacement,
     PlacementWindow,
 )
-from twinklr.core.sequencer.templates.group.models.display import (
-    DisplayGraph,
-    DisplayGroup,
-    GroupPosition,
-)
+from twinklr.core.sequencer.templates.group.models.position import GroupPosition
 from twinklr.core.sequencer.timing import TimeRef
 from twinklr.core.sequencer.vocabulary import (
     CoordinationMode,
@@ -102,8 +98,6 @@ __all__ = [
     # Holistic Evaluation
     "CrossSectionIssue",
     "Deviation",
-    "DisplayGraph",
-    "DisplayGroup",
     "GPBlendMode",
     "GPTimingDriver",
     "GroupPlacement",
