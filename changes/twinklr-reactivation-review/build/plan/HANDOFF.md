@@ -401,9 +401,10 @@ declared variety minima, and sufficiency, then emits redacted aggregate evidence
 Fresh author evidence before the documentation-only freeze record: focused owner-run/MH/
 threshold suites `20 passed`; related style/promotion/role suites `37 passed`; Ruff
 `--no-cache` clean; focused mypy clean across eight source files; `git diff --check` clean;
-and full pytest `5617 passed, 39 skipped` with 43 existing resource warnings. A clean-tree
-`make validate` is the remaining author gate. This candidate is not self-approved or
-integrated.
+and full pytest `5617 passed, 39 skipped` with 43 existing resource warnings. The
+subsequent clean-tree `make validate` also passed: `1358` files unchanged by formatting,
+Ruff clean, mypy clean across `720` source files, and `5617 passed, 39 skipped` with the
+same 43 resource warnings. This candidate is not self-approved or integrated.
 
 ## Binding orchestration rules
 
