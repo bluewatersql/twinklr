@@ -36,6 +36,9 @@ EXCLUDED_FAMILIES: frozenset[str] = frozenset(
     }
 )
 
+PROMOTION_RUN_DEFAULT_MIN_SUPPORT = 5
+PROMOTION_RUN_DEFAULT_MIN_STABILITY = 0.3
+
 
 def _adaptive_stability(
     median_distinct_pack_count: float,
@@ -100,8 +103,8 @@ class PromotionPipeline:
         self,
         candidates: list[MinedTemplate],
         *,
-        min_support: int = 5,
-        min_stability: float = 0.3,
+        min_support: int = PROMOTION_RUN_DEFAULT_MIN_SUPPORT,
+        min_stability: float = PROMOTION_RUN_DEFAULT_MIN_STABILITY,
         clusters: list[dict[str, Any]] | None = None,
         motif_catalog: MotifCatalog | None = None,
         propensity_index: PropensityIndex | None = None,

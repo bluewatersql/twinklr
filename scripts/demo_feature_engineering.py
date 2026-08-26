@@ -12,6 +12,8 @@ import hashlib
 import json
 from pathlib import Path
 import shlex
+import sqlite3
+import subprocess
 import sys
 import time
 from typing import Any, Literal, cast
@@ -28,17 +30,33 @@ from twinklr.core.profiling.unify import CorpusBuildOptions, ProfileCorpusBuilde
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_OUTPUT_DIR = ROOT / "data" / "features" / "demo_feature_engineering"
 _MUSIC_INDEX_PATH = ROOT / "data" / "music" / "music_library_index.json"
+_UNIFIED_CORPUS_FILES = ("sequence_index.jsonl", "corpus_manifest.json", "lineage_index.jsonl")
+_PROFILE_IDENTITY_FILES = (
+    "sequence_metadata.json",
+    "lineage_index.json",
+    "base_effect_events.json",
+    "enriched_effect_events.json",
+    "effect_statistics.json",
+)
+_TOOL_PATHS = (
+    "scripts/demo_feature_engineering.py",
+    "scripts/report_quality_gate_distributions.py",
+    "packages/twinklr/core/feature_engineering/quality_gate_distributions.py",
+)
 
 
-def _load_music_library_index() -> MusicLibraryIndex | None:
+def _load_music_library_index(path: Path | None = _MUSIC_INDEX_PATH) -> MusicLibraryIndex | None:
     """Load the pre-built music library index if available."""
-    if not _MUSIC_INDEX_PATH.exists():
+    if path is None:
+        print("  [info] Music library index explicitly disabled.")
+        return None
+    if not path.exists():
         print(
-            f"  [info] No music library index at {_MUSIC_INDEX_PATH.relative_to(ROOT)}\n"
+            f"  [info] No music library index at {path}\n"
             "         Run: uv run python scripts/build/build_music_library_index.py"
         )
         return None
-    index = MusicLibraryIndex.model_validate_json(_MUSIC_INDEX_PATH.read_text())
+    index = MusicLibraryIndex.model_validate_json(path.read_text())
     tagged = sum(1 for e in index.entries if e.title)
     print(
         f"  [info] Loaded music library index: {len(index.entries)} files ({tagged} with metadata)"
@@ -82,13 +100,92 @@ def _ensure_corpus(corpus_dir: Path) -> Path:
     return cast("Path", best.output_dir)
 
 
+def _require_explicit_unified_corpus(corpus_dir: Path) -> list[dict[str, Any]]:
+    """Validate the owner-run corpus contract without falling back to global data."""
+    missing = [name for name in _UNIFIED_CORPUS_FILES if not (corpus_dir / name).is_file()]
+    if missing:
+        raise ValueError(
+            "--owner-mining-run requires an explicit unified corpus containing "
+            + ", ".join(_UNIFIED_CORPUS_FILES)
+            + f"; missing {', '.join(missing)} under {corpus_dir}"
+        )
+    rows = _read_jsonl(corpus_dir / "sequence_index.jsonl")
+    if not rows:
+        raise ValueError("explicit unified corpus sequence_index.jsonl is empty")
+    lineage_rows = _read_jsonl(corpus_dir / "lineage_index.jsonl")
+    if not lineage_rows:
+        raise ValueError("explicit unified corpus lineage_index.jsonl is empty")
+    logical: set[tuple[str, str]] = set()
+    content: set[str] = set()
+    for row in rows:
+        key = (str(row.get("package_id", "")), str(row.get("sequence_file_id", "")))
+        if not all(key):
+            raise ValueError("unified corpus row is missing package_id or sequence_file_id")
+        if key in logical:
+            raise ValueError(f"duplicate logical sequence identity: {key[0]}/{key[1]}")
+        logical.add(key)
+        sequence_sha = str(row.get("sequence_sha256", ""))
+        if not sequence_sha:
+            raise ValueError(f"unified corpus row {key[0]}/{key[1]} lacks sequence_sha256")
+        if sequence_sha in content:
+            raise ValueError(f"duplicate sequence content identity: {sequence_sha}")
+        content.add(sequence_sha)
+        profile_path = Path(str(row.get("profile_path", ""))).resolve()
+        if not profile_path.is_dir():
+            raise ValueError(f"profile path does not exist for {key[0]}/{key[1]}: {profile_path}")
+        missing_profile = [
+            name for name in _PROFILE_IDENTITY_FILES if not (profile_path / name).is_file()
+        ]
+        if missing_profile:
+            raise ValueError(
+                f"profile {profile_path} is incomplete; missing {', '.join(missing_profile)}"
+            )
+        metadata = _read_json(profile_path / "sequence_metadata.json")
+        metadata_identity = (
+            str(metadata.get("package_id", "")),
+            str(metadata.get("sequence_file_id", "")),
+            str(metadata.get("sequence_sha256", "")),
+        )
+        if metadata_identity != (*key, sequence_sha):
+            raise ValueError(f"profile identity disagrees with unified index for {key[0]}/{key[1]}")
+    lineage_identities = {
+        (str(row.get("package_id", "")), str(row.get("sequence_file_id", "")))
+        for row in lineage_rows
+    }
+    if len(lineage_rows) != len(lineage_identities):
+        raise ValueError("lineage_index.jsonl contains duplicate logical identities")
+    if lineage_identities != logical:
+        raise ValueError("lineage_index.jsonl identities disagree with sequence_index.jsonl")
+    return rows
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run feature-engineering demo with reporting.")
+    parser.add_argument(
+        "--owner-mining-run",
+        action="store_true",
+        help=(
+            "Enable the fail-closed P2K-T2 owner evidence contract: explicit unified corpus, "
+            "dedicated output, SQLite identity verification, and complete provenance."
+        ),
+    )
     parser.add_argument(
         "--corpus-dir",
         type=Path,
         default=Path("data/profiles/corpus/v0_effectdb_structured_1"),
         help="Unified profile corpus dir (required unless --skip-build).",
+    )
+    music_group = parser.add_mutually_exclusive_group()
+    music_group.add_argument(
+        "--music-library-index",
+        type=Path,
+        default=None,
+        help="Explicit music-library index used by owner mode.",
+    )
+    music_group.add_argument(
+        "--no-music-library-index",
+        action="store_true",
+        help="Explicitly declare that the owner run has no music-library index.",
     )
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
     parser.add_argument(
@@ -259,6 +356,190 @@ def _tree_snapshot(root: Path) -> dict[str, object]:
     }
 
 
+def _canonical_sha256(value: object) -> str:
+    payload = json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def _git_output(*args: str) -> str:
+    completed = subprocess.run(
+        ["git", *args], cwd=ROOT, check=True, capture_output=True, text=False
+    )
+    return completed.stdout.decode("utf-8", errors="strict").strip()
+
+
+def _source_provenance() -> dict[str, object]:
+    tracked_diff = subprocess.run(
+        ["git", "diff", "--binary", "HEAD", "--"],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+    ).stdout
+    tools: dict[str, object] = {}
+    for relative in _TOOL_PATHS:
+        path = ROOT / relative
+        tools[relative] = {
+            "path": str(path),
+            "exists": path.is_file(),
+            "sha256": _sha256_file(path) if path.is_file() else None,
+        }
+    return {
+        "source": {
+            "git_commit": _git_output("rev-parse", "HEAD"),
+            "git_tree": _git_output("rev-parse", "HEAD^{tree}"),
+            "tracked_diff_sha256": hashlib.sha256(tracked_diff).hexdigest(),
+        },
+        "tools": tools,
+    }
+
+
+def _input_provenance(
+    corpus_dir: Path,
+    rows: Sequence[dict[str, Any]],
+    music_index_path: Path | None,
+) -> dict[str, object]:
+    corpus_files = {
+        name: {
+            "path": str((corpus_dir / name).resolve()),
+            "size_bytes": (corpus_dir / name).stat().st_size,
+            "sha256": _sha256_file(corpus_dir / name),
+        }
+        for name in _UNIFIED_CORPUS_FILES
+    }
+    profiles: list[dict[str, object]] = []
+    for row in sorted(
+        rows, key=lambda item: (str(item["package_id"]), str(item["sequence_file_id"]))
+    ):
+        profile_path = Path(str(row["profile_path"])).resolve()
+        snapshot = _tree_snapshot(profile_path)
+        profiles.append(
+            {
+                "package_id": str(row["package_id"]),
+                "sequence_file_id": str(row["sequence_file_id"]),
+                "sequence_sha256": str(row["sequence_sha256"]),
+                "path": str(profile_path),
+                "tree_sha256": snapshot["sha256"],
+                "file_count": snapshot["file_count"],
+                "files": snapshot["files"],
+            }
+        )
+    music = {
+        "path": str(music_index_path) if music_index_path is not None else None,
+        "exists": music_index_path is not None,
+        "size_bytes": music_index_path.stat().st_size if music_index_path is not None else None,
+        "sha256": _sha256_file(music_index_path) if music_index_path is not None else None,
+        "explicitly_disabled": music_index_path is None,
+    }
+    fingerprint_material = {
+        "corpus_tree_sha256": _tree_snapshot(corpus_dir)["sha256"],
+        "corpus_files": corpus_files,
+        "profiles": profiles,
+        "music_library_index": music,
+    }
+    return {
+        "corpus": {
+            "path": str(corpus_dir),
+            "tree_sha256": fingerprint_material["corpus_tree_sha256"],
+            "files": corpus_files,
+            "input_fingerprint_sha256": _canonical_sha256(fingerprint_material),
+        },
+        "profiles": profiles,
+        "music_library_index": music,
+    }
+
+
+def _validate_owner_output_dir(
+    *,
+    output_dir: Path,
+    feature_store_db: Path | None,
+    previous_manifest: dict[str, Any] | None,
+    input_fingerprint: str,
+) -> None:
+    if feature_store_db is None:
+        raise ValueError("--owner-mining-run requires --feature-store-db")
+    try:
+        feature_store_db.resolve().relative_to(output_dir.resolve())
+    except ValueError as exc:
+        raise ValueError(
+            "--owner-mining-run requires the SQLite store inside its dedicated output directory"
+        ) from exc
+    if not output_dir.exists():
+        return
+    if previous_manifest is None:
+        raise ValueError(
+            "--owner-mining-run requires a dedicated new output directory; refusing to clean "
+            f"unowned existing path {output_dir}"
+        )
+    prior_output = previous_manifest.get("output_dir")
+    prior_provenance = previous_manifest.get("provenance")
+    prior_corpus = prior_provenance.get("corpus") if isinstance(prior_provenance, dict) else None
+    prior_fingerprint = (
+        prior_corpus.get("input_fingerprint_sha256") if isinstance(prior_corpus, dict) else None
+    )
+    if prior_output != str(output_dir.resolve()) or prior_fingerprint != input_fingerprint:
+        raise ValueError(
+            "existing owner mining output is not an exact rerun of the same input fingerprint"
+        )
+
+
+_STORE_TABLES = (
+    "phrases",
+    "templates",
+    "template_assignments",
+    "stacks",
+    "transitions",
+    "recipes",
+    "taxonomy",
+    "propensity",
+    "profiles",
+)
+_VOLATILE_STORE_COLUMNS = {"profiled_at", "fe_completed_at", "updated_at"}
+
+
+def _store_entity_integrity(db_path: Path) -> dict[str, object]:
+    """Hash stable entity keys and row content from a closed SQLite feature store."""
+    connection = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+    try:
+        result: dict[str, object] = {}
+        for table in _STORE_TABLES:
+            columns = connection.execute(f"PRAGMA table_info({table})").fetchall()
+            names = [str(row[1]) for row in columns]
+            key_names = [
+                str(row[1]) for row in sorted(columns, key=lambda item: int(item[5])) if int(row[5])
+            ]
+            content_names = [name for name in names if name not in _VOLATILE_STORE_COLUMNS]
+            query_names = list(dict.fromkeys([*key_names, *content_names]))
+            rows = connection.execute(
+                f"SELECT {', '.join(query_names)} FROM {table} ORDER BY {', '.join(key_names)}"
+            ).fetchall()
+            key_indexes = [query_names.index(name) for name in key_names]
+            content_indexes = [query_names.index(name) for name in content_names]
+            keys = [[row[index] for index in key_indexes] for row in rows]
+            content = [[row[index] for index in content_indexes] for row in rows]
+            result[table] = {
+                "row_count": len(rows),
+                "key_columns": key_names,
+                "key_sha256": _canonical_sha256(keys),
+                "content_sha256": _canonical_sha256(content),
+            }
+        duplicates = connection.execute(
+            "SELECT package_id, sequence_file_id, COUNT(*) FROM profiles "
+            "GROUP BY package_id, sequence_file_id HAVING COUNT(*) > 1"
+        ).fetchall()
+    finally:
+        connection.close()
+    return {
+        "tables": result,
+        "duplicate_identity_count": len(duplicates),
+        "aggregate_key_sha256": _canonical_sha256(
+            {name: value["key_sha256"] for name, value in result.items()}  # type: ignore[index]
+        ),
+        "aggregate_content_sha256": _canonical_sha256(
+            {name: value["content_sha256"] for name, value in result.items()}  # type: ignore[index]
+        ),
+    }
+
+
 def _store_snapshot(db_path: Path | None, backend: str) -> dict[str, object]:
     """Read actual feature-store row counts without creating a missing store."""
     if db_path is None or backend != "sqlite":
@@ -289,6 +570,7 @@ def _store_snapshot(db_path: Path | None, backend: str) -> dict[str, object]:
         "size_bytes": resolved.stat().st_size,
         "sha256": _sha256_file(resolved),
         "stats": stats,
+        "entity_integrity": _store_entity_integrity(resolved),
     }
 
 
@@ -337,6 +619,7 @@ def _write_mining_run_manifest(
     store_after: dict[str, object],
     catalog_before: dict[str, object],
     catalog_after: dict[str, object],
+    provenance: dict[str, object],
 ) -> Path:
     """Record measured reproducibility, idempotency, and catalog-safety evidence."""
     artifact_snapshot = _tree_snapshot(output_dir)
@@ -351,7 +634,80 @@ def _write_mining_run_manifest(
     has_prior_measurement = prior_stats is not None
     before_matches_prior = has_prior_measurement and before_stats == prior_stats
     after_matches_before = before_stats is not None and after_stats == before_stats
-    verified_unchanged_rerun = before_matches_prior and after_matches_before
+    prior_integrity = prior_after.get("entity_integrity") if isinstance(prior_after, dict) else None
+    before_integrity = store_before.get("entity_integrity")
+    after_integrity = store_after.get("entity_integrity")
+    prior_provenance = previous_manifest.get("provenance") if previous_manifest else None
+    prior_corpus = prior_provenance.get("corpus") if isinstance(prior_provenance, dict) else None
+    current_corpus = provenance.get("corpus")
+    prior_input_fingerprint = (
+        prior_corpus.get("input_fingerprint_sha256") if isinstance(prior_corpus, dict) else None
+    )
+    current_input_fingerprint = (
+        current_corpus.get("input_fingerprint_sha256") if isinstance(current_corpus, dict) else None
+    )
+    input_fingerprint_matches_previous = (
+        prior_input_fingerprint is not None and prior_input_fingerprint == current_input_fingerprint
+    )
+    prior_source = prior_provenance.get("source") if isinstance(prior_provenance, dict) else None
+    prior_tools = prior_provenance.get("tools") if isinstance(prior_provenance, dict) else None
+    source_provenance_matches_previous = (
+        isinstance(prior_source, dict)
+        and prior_source == provenance.get("source")
+        and isinstance(prior_tools, dict)
+        and prior_tools == provenance.get("tools")
+    )
+    prior_before_keys = (
+        prior_integrity.get("aggregate_key_sha256") if isinstance(prior_integrity, dict) else None
+    )
+    before_keys = (
+        before_integrity.get("aggregate_key_sha256") if isinstance(before_integrity, dict) else None
+    )
+    after_keys = (
+        after_integrity.get("aggregate_key_sha256") if isinstance(after_integrity, dict) else None
+    )
+    prior_before_content = (
+        prior_integrity.get("aggregate_content_sha256")
+        if isinstance(prior_integrity, dict)
+        else None
+    )
+    before_content = (
+        before_integrity.get("aggregate_content_sha256")
+        if isinstance(before_integrity, dict)
+        else None
+    )
+    after_content = (
+        after_integrity.get("aggregate_content_sha256")
+        if isinstance(after_integrity, dict)
+        else None
+    )
+    entity_key_digests_match = (
+        prior_before_keys is not None and prior_before_keys == before_keys == after_keys
+    )
+    entity_content_digests_match = (
+        prior_before_content is not None and prior_before_content == before_content == after_content
+    )
+    duplicate_identity_count = (
+        int(after_integrity.get("duplicate_identity_count", -1))
+        if isinstance(after_integrity, dict)
+        else -1
+    )
+    verified_unchanged_rerun = (
+        before_matches_prior
+        and after_matches_before
+        and input_fingerprint_matches_previous
+        and source_provenance_matches_previous
+        and entity_key_digests_match
+        and entity_content_digests_match
+        and duplicate_identity_count == 0
+    )
+    verification_status = (
+        "verified"
+        if verified_unchanged_rerun
+        else "changed"
+        if has_prior_measurement
+        else "needs_identical_second_run"
+    )
     exact_command = shlex.join([sys.executable, *sys.argv])
     payload = {
         "schema_version": "mining_run_manifest_v1",
@@ -367,6 +723,7 @@ def _write_mining_run_manifest(
         },
         "output_dir": str(output_dir.resolve()),
         "sequence_count": sequence_count,
+        "provenance": provenance,
         "candidate_staging": {
             "recursive_artifacts": artifact_snapshot,
             "note": "FE output is staged under this run directory; promotion into a live catalog is not performed by this command.",
@@ -380,8 +737,13 @@ def _write_mining_run_manifest(
                 "current_run_after_stats": after_stats,
                 "before_matches_previous_after": before_matches_prior,
                 "after_matches_before": after_matches_before,
+                "input_fingerprint_matches_previous": input_fingerprint_matches_previous,
+                "source_provenance_matches_previous": source_provenance_matches_previous,
+                "entity_key_digests_match": entity_key_digests_match,
+                "entity_content_digests_match": entity_content_digests_match,
+                "duplicate_identity_count": duplicate_identity_count,
                 "verified_unchanged_rerun": verified_unchanged_rerun,
-                "status": "verified" if verified_unchanged_rerun else "needs_identical_second_run",
+                "status": verification_status,
             },
         },
         "feature_store": {
@@ -916,6 +1278,18 @@ def _write_markdown(
 def main() -> int:
     args = parse_args()
     output_dir = args.output_dir.resolve()
+    if args.owner_mining_run and args.skip_build:
+        print("ERROR: --owner-mining-run cannot be combined with --skip-build", file=sys.stderr)
+        return 2
+    if args.owner_mining_run and not (
+        args.music_library_index is not None or args.no_music_library_index
+    ):
+        print(
+            "ERROR: --owner-mining-run requires either --music-library-index or "
+            "--no-music-library-index",
+            file=sys.stderr,
+        )
+        return 2
     if args.skip_build and args.style_groups is not None:
         print(
             "ERROR: --style-groups cannot be used with --skip-build; grouped fingerprint "
@@ -937,7 +1311,17 @@ def main() -> int:
         if args.corpus_dir is None:
             print("ERROR: --corpus-dir is required unless --skip-build is set.")
             return 2
-        corpus_dir = _ensure_corpus(args.corpus_dir.resolve())
+        requested_corpus_dir = args.corpus_dir.resolve()
+        owner_corpus_rows: list[dict[str, Any]] | None = None
+        if args.owner_mining_run:
+            try:
+                owner_corpus_rows = _require_explicit_unified_corpus(requested_corpus_dir)
+            except ValueError as exc:
+                print(f"ERROR: {exc}", file=sys.stderr)
+                return 2
+            corpus_dir = requested_corpus_dir
+        else:
+            corpus_dir = _ensure_corpus(requested_corpus_dir)
         feature_store_db = (
             args.feature_store_db.resolve() if args.feature_store_db is not None else None
         )
@@ -954,6 +1338,52 @@ def main() -> int:
         previous_manifest = (
             _read_json(previous_manifest_path) if previous_manifest_path.exists() else None
         )
+        source_provenance = _source_provenance()
+        if owner_corpus_rows is not None:
+            music_index_path = (
+                args.music_library_index.resolve() if args.music_library_index is not None else None
+            )
+            if music_index_path is not None and not music_index_path.is_file():
+                print(
+                    f"ERROR: explicit music-library index does not exist: {music_index_path}",
+                    file=sys.stderr,
+                )
+                return 2
+            input_provenance = _input_provenance(corpus_dir, owner_corpus_rows, music_index_path)
+        else:
+            music_index_path = _MUSIC_INDEX_PATH
+            input_provenance = {
+                "corpus": {
+                    "path": str(corpus_dir),
+                    "sequence_index_sha256": _sha256_file(corpus_dir / "sequence_index.jsonl"),
+                    "input_fingerprint_sha256": _sha256_file(corpus_dir / "sequence_index.jsonl"),
+                },
+                "profiles": [],
+                "music_library_index": {
+                    "path": str(_MUSIC_INDEX_PATH),
+                    "exists": _MUSIC_INDEX_PATH.is_file(),
+                    "sha256": (
+                        _sha256_file(_MUSIC_INDEX_PATH) if _MUSIC_INDEX_PATH.is_file() else None
+                    ),
+                },
+            }
+        provenance = {**source_provenance, **input_provenance}
+        if args.owner_mining_run:
+            if feature_store_backend != "sqlite":
+                print("ERROR: --owner-mining-run requires the sqlite backend", file=sys.stderr)
+                return 2
+            try:
+                _validate_owner_output_dir(
+                    output_dir=output_dir,
+                    feature_store_db=feature_store_db,
+                    previous_manifest=previous_manifest,
+                    input_fingerprint=str(
+                        cast("dict[str, object]", provenance["corpus"])["input_fingerprint_sha256"]
+                    ),
+                )
+            except ValueError as exc:
+                print(f"ERROR: {exc}", file=sys.stderr)
+                return 2
         live_catalog_dir = ROOT / "catalog" / "templates"
         catalog_before = _tree_snapshot(live_catalog_dir)
         store_before = _store_snapshot(feature_store_db, feature_store_backend)
@@ -973,7 +1403,7 @@ def main() -> int:
                 db_path=feature_store_db,
             )
 
-        music_index = _load_music_library_index()
+        music_index = _load_music_library_index(music_index_path)
         effective_options = FeatureEngineeringPipelineOptions(
             template_min_instance_count=args.template_min_instance_count,
             template_min_distinct_pack_count=args.template_min_distinct_pack_count,
@@ -1006,6 +1436,13 @@ def main() -> int:
             f" in {build_elapsed:.1f}s."
         )
         store_after = _store_snapshot(feature_store_db, feature_store_backend)
+        if owner_corpus_rows is not None:
+            after_input = _input_provenance(corpus_dir, owner_corpus_rows, music_index_path)
+            if (
+                cast("dict[str, object]", after_input["corpus"])["input_fingerprint_sha256"]
+                != cast("dict[str, object]", provenance["corpus"])["input_fingerprint_sha256"]
+            ):
+                raise RuntimeError("owner mining input changed while the run was executing")
         catalog_after = _tree_snapshot(live_catalog_dir)
         manifest_path = _write_mining_run_manifest(
             output_dir=output_dir,
@@ -1019,6 +1456,7 @@ def main() -> int:
             store_after=store_after,
             catalog_before=catalog_before,
             catalog_after=catalog_after,
+            provenance=provenance,
         )
         print(f"  Wrote staged mining-run manifest: {manifest_path}")
         if catalog_before != catalog_after:

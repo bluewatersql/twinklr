@@ -286,3 +286,12 @@ five re-entry artifacts exist, including accepted P2K-T2 owner-corpus evidence a
 accessible, provenance-bearing MH corpus manifest. P4-T7 remains optional and
 incomplete; no corpus was analyzed and no feasibility verdict exists. Phase 4 remains
 six of seven tasks integrated.
+
+An offline readiness candidate now provides
+`scripts/validate_mh_corpus_manifest.py` and the private
+`twinklr.mh-corpus-manifest.v1` schema. The owner can declare explicit minimum sequence,
+vendor, fixture-family, and fixture-role variety; validation checks duplicate identities,
+source-file hashes, and the declaration without parsing sequence content, then emits a
+redacted manifest-hash/count evidence file. No owner manifest or private artifact is
+tracked. Until the owner supplies and validates such a manifest and P2K-T2's empirical
+exits are accepted, the NO-GO above is unchanged.

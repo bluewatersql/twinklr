@@ -10,6 +10,7 @@ Commands below assume the repository root and `uv run python`.
 |---|---|
 | `validation/validate_artifacts.py` | Validates moving-head/display plans and XSQ artifacts. See [`validation/README.md`](validation/README.md). It is tested, but neither Make nor CI invokes the entry point. |
 | `validation/validate_agent_artifacts.py` | Runs saved-response schema and prompt checks. It is tested, but neither Make nor CI invokes the entry point. |
+| `validate_mh_corpus_manifest.py` | Validates the owner-local P4-T7 corpus prerequisite and emits redacted hash/count evidence; it never parses sequence content. |
 | `validation/test_prompt_validation.py` | Manual prompt-validation harness invoked by `validate_agent_artifacts.py`. Despite its filename, pytest collects no tests from it. |
 | `validation/test_schema_validation.py` | Manual saved-response schema harness invoked by `validate_agent_artifacts.py`. Despite its filename, pytest collects no tests from it. |
 
@@ -57,7 +58,7 @@ module's help/docstring before use and provide the named local inputs.
 |---|---|
 | `demo_display_renderer.py` | Local group plan and audio-profile artifacts; writes a demo XSQ. |
 | `demo_eval_report.py` | Local audio, checkpoint, fixture config, and rendered XSQ under `artifacts/`/`data/`. |
-| `demo_feature_engineering.py` | Local music index/corpus under gitignored `data/`; writes FE artifacts. |
+| `demo_feature_engineering.py` | Local music index/corpus under gitignored `data/`; writes FE artifacts. Its explicit `--owner-mining-run` mode fail-closes on unified-corpus provenance, output ownership, duplicate identity, and unchanged-rerun evidence. |
 | `demo_moving_heads_pipeline.py` | Local audio/config plus configured provider access; writes moving-head artifacts. |
 | `demo_profiling.py` | Local vendor archives under `data/vendor_packages` or explicit inputs. |
 | `demo_recipe_pipeline.py` | Synthetic mode works without a corpus; `--load-fe-data` requires local FE artifacts. |

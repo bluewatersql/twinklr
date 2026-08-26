@@ -13,7 +13,13 @@ from collections.abc import Iterable, Mapping, Sequence
 
 from twinklr.core.feature_engineering.config import FeatureEngineeringPipelineOptions
 from twinklr.core.feature_engineering.models.templates import MinedTemplate
-from twinklr.core.feature_engineering.promotion import EXCLUDED_FAMILIES
+from twinklr.core.feature_engineering.promotion import (
+    EXCLUDED_FAMILIES,
+    PROMOTION_RUN_DEFAULT_MIN_STABILITY,
+    PROMOTION_RUN_DEFAULT_MIN_SUPPORT,
+)
+from twinklr.core.feature_engineering.propensity import PROPENSITY_MIN_SUPPORT
+from twinklr.core.feature_engineering.taxonomy.target_roles import TARGET_ROLE_SCORE_CUTOFF
 
 _SUPPORT_BUCKETS: tuple[tuple[str, int, int | None], ...] = (
     ("1", 1, 1),
@@ -60,6 +66,25 @@ def _sensitivity(
     ]
 
 
+def _review_points(
+    configured: int | float, reference: Sequence[int | float]
+) -> tuple[int | float, ...]:
+    """Return configured plus two nearby points, preserving the accepted defaults."""
+    if configured in reference and len(set(reference)) == 3:
+        return tuple(sorted(set(reference)))
+    if isinstance(configured, int):
+        lower: int | float = max(1, configured - 1)
+        upper: int | float = configured + 1
+        if lower == configured:
+            upper = configured + 2
+    else:
+        lower = max(0.0, configured * 0.5)
+        upper = min(1.0, configured * 1.5)
+        if lower == configured:
+            upper = min(1.0, configured + 0.05)
+    return tuple(sorted({lower, configured, upper}))
+
+
 def _combined_gate_sensitivity(
     candidates: Sequence[MinedTemplate],
     *,
@@ -102,6 +127,66 @@ def _family_cap_sensitivity(
     ]
 
 
+def _cluster_cap_sensitivity(
+    candidates: Sequence[MinedTemplate],
+    memberships: Sequence[Sequence[str]],
+    caps: Sequence[int],
+    *,
+    multi_layer_min_per_cluster: int,
+) -> list[dict[str, int]]:
+    """Evaluate cluster caps from the same pre-dedup population as promotion."""
+    rows: list[dict[str, int]] = []
+    for cap in caps:
+        kept = len(
+            _apply_cluster_cap(
+                candidates,
+                memberships,
+                cap=cap,
+                multi_layer_min_per_cluster=multi_layer_min_per_cluster,
+            )
+        )
+        rows.append({"cap": cap, "would_keep": kept, "would_cap": len(candidates) - kept})
+    return rows
+
+
+def _apply_cluster_cap(
+    candidates: Sequence[MinedTemplate],
+    memberships: Sequence[Sequence[str]],
+    *,
+    cap: int,
+    multi_layer_min_per_cluster: int,
+) -> tuple[MinedTemplate, ...]:
+    """Mirror promotion's deterministic cluster selection for review evidence."""
+    by_id = {candidate.template_id: candidate for candidate in candidates}
+    clustered_ids: set[str] = set()
+    kept_ids: set[str] = set()
+    for member_ids in memberships:
+        members = [by_id[member_id] for member_id in member_ids if member_id in by_id]
+        if not members:
+            continue
+        clustered_ids.update(member.template_id for member in members)
+        ranked = sorted(members, key=lambda member: -member.support_count)
+        selected = list(ranked[:cap])
+        selected_multi = sum(member.layer_count >= 2 for member in selected)
+        if selected_multi < multi_layer_min_per_cluster:
+            already_selected = {member.template_id for member in selected}
+            remaining_multi = sorted(
+                (
+                    member
+                    for member in ranked
+                    if member.layer_count >= 2 and member.template_id not in already_selected
+                ),
+                key=lambda member: (-member.layer_count, -member.support_count),
+            )
+            selected.extend(remaining_multi[: multi_layer_min_per_cluster - selected_multi])
+        kept_ids.update(member.template_id for member in selected)
+    return tuple(
+        candidate
+        for candidate in candidates
+        if candidate.template_id not in clustered_ids or candidate.template_id in kept_ids
+    )
+
+
 def _effective_value(
     report: Mapping[str, object] | None, key: str, fallback: int | float
 ) -> int | float:
@@ -118,15 +203,23 @@ def build_quality_gate_distribution_report(
     *,
     options: FeatureEngineeringPipelineOptions,
     promotion_report: Mapping[str, object] | None,
-    role_scores: Sequence[float] = (),
+    role_scores: Sequence[float] | None = None,
+    propensity_pair_supports: Sequence[int] | None = None,
+    cluster_memberships: Sequence[Sequence[str]] | None = None,
+    mining_run_provenance: Mapping[str, object] | None = None,
 ) -> dict[str, object]:
     """Build a serialisable, non-mutating quality-gate review report.
 
-    ``MinedTemplate`` contains the inputs for promotion thresholds but not raw
-    propensity pair observations. Propensity sensitivity is therefore marked
-    unavailable rather than inferred from the censored emitted index. Current
-    target-role artifacts retain the separate unclamped pre-assignment score.
+    Propensity evidence must come from uncensored effect phrases, never the
+    already-gated affinity index. Cluster-cap evidence likewise requires the
+    emitted cluster membership catalog. Missing evidence fails closed.
     """
+    if propensity_pair_supports is None:
+        raise ValueError("Raw propensity pair-support evidence is required")
+    if cluster_memberships is None:
+        raise ValueError("Raw cluster-membership evidence is required")
+    if role_scores is None:
+        raise ValueError("Raw target-role score evidence is required")
     support_counts = tuple(candidate.support_count for candidate in candidates)
     stability_scores = tuple(candidate.cross_pack_stability for candidate in candidates)
     pack_counts = tuple(candidate.distinct_pack_count for candidate in candidates)
@@ -161,43 +254,119 @@ def build_quality_gate_distribution_report(
     )
     gate_passes = (*single_layer_passes, *multi_layer_passes)
 
+    propensity_sensitivity = _sensitivity(
+        propensity_pair_supports, _review_points(PROPENSITY_MIN_SUPPORT, (2, 3, 5))
+    )
     propensity_review: dict[str, object] = {
         "min_support": {
-            "configured": 3,
-            "status": "unavailable_from_emitted_index",
-            "sensitivity": [],
-            "limitation": "The emitted affinity index is censored at the current support gate. Its affinity corpus_support values include only passing pairs, while anti-affinity corpus_support is family_total + model_total rather than pair support; neither is a valid raw 2/3/5 population.",
-        },
-        "anti_affinity_threshold": {
-            "configured": 0.05,
-            "status": "unwired_constant",
-            "current_behavior": "PropensityMiner.mine emits anti-affinities only for zero co-occurrence and does not consult this constant.",
-            "owner_action_required": "Resolve whether the constant should be removed as dead configuration or wired in through a separately approved behavior change.",
+            "configured": PROPENSITY_MIN_SUPPORT,
+            "source": "uncensored effect/model pair support from effect phrases",
+            "status": "available",
+            "sensitivity": propensity_sensitivity,
         },
     }
     role_review: dict[str, object] = {
-        "configured": 0.35,
+        "configured": TARGET_ROLE_SCORE_CUTOFF,
         "source": "unclamped pre-assignment target-role scores",
         "status": "available" if role_scores else "requires_current_top_role_score_artifacts",
-        "sensitivity": _sensitivity(role_scores, (0.25, 0.35, 0.45)),
+        "sensitivity": _sensitivity(role_scores, (0.25, TARGET_ROLE_SCORE_CUTOFF, 0.45)),
     }
     support_sensitivity = _combined_gate_sensitivity(
         single_layer,
         field="support_count",
-        thresholds=(2, 3, 5),
+        thresholds=_review_points(configured_support, (2, 3, 5)),
         held_support=effective_support,
         held_stability=effective_stability,
     )
     stability_sensitivity = _combined_gate_sensitivity(
         single_layer,
         field="cross_pack_stability",
-        thresholds=(0.015, 0.05, 0.3),
+        thresholds=_review_points(configured_stability, (0.015, 0.05, 0.3)),
         held_support=effective_support,
         held_stability=effective_stability,
     )
+    cluster_sensitivity = _cluster_cap_sensitivity(
+        gate_passes,
+        cluster_memberships,
+        tuple(
+            int(value)
+            for value in _review_points(options.recipe_promotion_max_per_cluster, (1, 2, 3))
+        ),
+        multi_layer_min_per_cluster=options.recipe_promotion_multi_layer_min_per_cluster,
+    )
+    post_cluster = _apply_cluster_cap(
+        gate_passes,
+        cluster_memberships,
+        cap=options.recipe_promotion_max_per_cluster,
+        multi_layer_min_per_cluster=options.recipe_promotion_multi_layer_min_per_cluster,
+    )
+    family_sensitivity = _family_cap_sensitivity(
+        post_cluster,
+        tuple(
+            int(value)
+            for value in _review_points(options.recipe_promotion_max_per_family, (5, 10, 15))
+        ),
+    )
+    direct_support_sensitivity = _combined_gate_sensitivity(
+        single_layer,
+        field="support_count",
+        thresholds=_review_points(PROMOTION_RUN_DEFAULT_MIN_SUPPORT, (2, 3, 5)),
+        held_support=PROMOTION_RUN_DEFAULT_MIN_SUPPORT,
+        held_stability=PROMOTION_RUN_DEFAULT_MIN_STABILITY,
+    )
+    direct_stability_sensitivity = _combined_gate_sensitivity(
+        single_layer,
+        field="cross_pack_stability",
+        thresholds=_review_points(PROMOTION_RUN_DEFAULT_MIN_STABILITY, (0.015, 0.05, 0.3)),
+        held_support=PROMOTION_RUN_DEFAULT_MIN_SUPPORT,
+        held_stability=PROMOTION_RUN_DEFAULT_MIN_STABILITY,
+    )
+    numeric_values = {
+        "recipe_promotion_min_support": {
+            "configured": configured_support,
+            "status": "available",
+            "sensitivity": support_sensitivity,
+        },
+        "recipe_promotion_min_stability": {
+            "configured": configured_stability,
+            "status": "available",
+            "sensitivity": stability_sensitivity,
+        },
+        "promotion_run_default_min_support": {
+            "configured": PROMOTION_RUN_DEFAULT_MIN_SUPPORT,
+            "status": "available",
+            "sensitivity": direct_support_sensitivity,
+        },
+        "promotion_run_default_min_stability": {
+            "configured": PROMOTION_RUN_DEFAULT_MIN_STABILITY,
+            "status": "available",
+            "sensitivity": direct_stability_sensitivity,
+        },
+        "propensity_min_support": {
+            "configured": PROPENSITY_MIN_SUPPORT,
+            "status": "available",
+            "sensitivity": propensity_sensitivity,
+        },
+        "target_role_score_cutoff": {
+            "configured": TARGET_ROLE_SCORE_CUTOFF,
+            "status": "available",
+            "sensitivity": role_review["sensitivity"],
+        },
+        "recipe_promotion_max_per_family": {
+            "configured": options.recipe_promotion_max_per_family,
+            "status": "available",
+            "sensitivity": family_sensitivity,
+        },
+        "recipe_promotion_max_per_cluster": {
+            "configured": options.recipe_promotion_max_per_cluster,
+            "status": "available",
+            "sensitivity": cluster_sensitivity,
+        },
+    }
 
     return {
-        "schema_version": "quality_gate_distribution_report_v1",
+        "schema_version": "quality_gate_distribution_report_v2",
+        "mining_run_provenance": dict(mining_run_provenance or {}),
         "candidate_count": len(candidates),
         "histograms": {
             "support_count": _bucket_counts(support_counts, _SUPPORT_BUCKETS),
@@ -247,7 +416,10 @@ def build_quality_gate_distribution_report(
             ),
         },
         "promotion_default_discrepancy": {
-            "pipeline_run_defaults": {"min_support": 5, "min_stability": 0.3},
+            "pipeline_run_defaults": {
+                "min_support": PROMOTION_RUN_DEFAULT_MIN_SUPPORT,
+                "min_stability": PROMOTION_RUN_DEFAULT_MIN_STABILITY,
+            },
             "configured_pipeline_values": {
                 "min_support": configured_support,
                 "min_stability": configured_stability,
@@ -255,6 +427,7 @@ def build_quality_gate_distribution_report(
             "owner_action_required": "Resolve whether direct PromotionPipeline.run defaults should remain intentionally different from configured pipeline values.",
         },
         "threshold_review": {
+            "numeric_values": numeric_values,
             "recipe_promotion": {
                 "static_configured": {
                     "min_support": configured_support,
@@ -273,15 +446,12 @@ def build_quality_gate_distribution_report(
             "target_role_score_cutoff": role_review,
             "recipe_promotion_caps": {
                 "max_per_family": {"configured": options.recipe_promotion_max_per_family},
-                "max_per_family_sensitivity": _family_cap_sensitivity(
-                    gate_passes, (5, options.recipe_promotion_max_per_family, 15)
-                ),
-                "max_per_family_equivalence": "Upper bound before cluster dedup; exact family-cap impact requires the run's cluster catalog and dedup result.",
+                "max_per_family_sensitivity": family_sensitivity,
+                "max_per_family_equivalence": "Exact post-cluster-dedup population at the configured cluster cap.",
                 "max_per_cluster": {
                     "configured": options.recipe_promotion_max_per_cluster,
-                    "status": "unavailable_without_cluster_catalog",
-                    "sensitivity": [],
-                    "limitation": "Nearby cap values cannot be evaluated from templates alone because cluster membership and multi-layer minimum retention affect survivors.",
+                    "status": "available",
+                    "sensitivity": cluster_sensitivity,
                 },
             },
         },

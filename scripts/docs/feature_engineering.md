@@ -3,139 +3,21 @@
 > **Canonical guide**: See [`docs/pipeline_guide.md`](../../docs/pipeline_guide.md) for the
 > comprehensive pipeline reference. This file is a quick-reference summary.
 
-## 0) Unified Pipeline (Recommended)
+## Supported feature-engineering entry point
 
-The unified build pipeline runs the complete workflow in a single command:
-discover vendor packages → profile → feature-engineer → report.
+The historical `scripts/build/` orchestrator was removed. There is no supported
+zero-argument discover/profile/mine command in the current tree. Build a unified profile
+corpus with the profiling workflow first, then pass that corpus explicitly to the
+feature-engineering demo. A unified corpus contains `sequence_index.jsonl`,
+`corpus_manifest.json`, and `lineage_index.jsonl`; each indexed profile contains the
+five profile identity/artifact files checked by owner-run mode.
 
-Script:
-- `scripts/build/build_pipeline.py`
-
-### Quick Start
-
-```bash
-# Full run with defaults (zero arguments required)
-python scripts/build/build_pipeline.py
-```
-
-### Common Options
-
-```bash
-# Force full reprocessing (delete store, reprofile, re-run FE)
-python scripts/build/build_pipeline.py --force
-
-# Skip profiling (use existing profiles only)
-python scripts/build/build_pipeline.py --skip-profiling
-
-# Skip audio analysis (faster)
-python scripts/build/build_pipeline.py --skip-audio
-```
-
-### How It Works
-
-1. **Discover**: Finds `*.zip` and `*.xsqz` packages under `data/vendor_sequences`
-2. **Profile**: Runs `SequencePackProfiler` on each package (skips if profile already exists)
-3. **Feature Engineer**: Builds unified corpus, then runs `FeatureEngineeringPipeline` with store-driven incremental processing
-4. **Report**: Prints summary of processed sequences
-
-State is tracked in a SQLite feature store (`data/features/twinklr.db` by default). Running the pipeline twice skips all work. Adding a new vendor package processes only that package.
-
-### Default Paths
-
-| Setting | Default |
-|---------|---------|
-| Vendor packages | `data/vendor_sequences` |
-| Profile output | `data/profiles` |
-| FE output | `data/features/feature_engineering` |
-| Feature store | `data/features/twinklr.db` |
-
-## Canonical CLI Flow
-
-**Recommended**: Use `scripts/build/build_pipeline.py` (Section 0) for the full workflow.
-
-The steps below describe the individual scripts for advanced use cases:
-1. Build unified profile corpus from `data/profiles`.
-2. Build feature-engineering artifacts from that corpus.
-3. Optionally run the demo report over the feature output.
-
-## 1) Build Unified Profile Corpus
-
-> **Note**: For end-to-end workflows, prefer `scripts/build/build_pipeline.py` which handles corpus building internally. Use this script only for standalone corpus builds.
-
-Script:
-- `scripts/build/build_profile_corpus.py`
-
-Example:
-
-```bash
-python scripts/build/build_profile_corpus.py
-```
-
-Expected corpus artifacts:
-- `sequence_index.jsonl`
-- `corpus_manifest.json`
-- `quality_report.json`
-
-## 2) Build Feature Engineering Artifacts
-
-> **Note**: For end-to-end workflows, prefer `scripts/build/build_pipeline.py` which handles profiling and corpus building before FE. Use this script when starting from an existing corpus.
-
-Canonical script:
-- `scripts/build/build_feature_engineering.py`
-
-Example:
-
-```bash
-python scripts/build/build_feature_engineering.py
-```
-
-Optional audio analysis:
-
-```bash
-python scripts/build/build_feature_engineering.py \
-  --skip-audio-analysis
-```
-
-Default quality gates for unknown coverage are intentionally strict:
-- `--quality-max-unknown-effect-family-ratio 0.02`
-- `--quality-max-unknown-motion-ratio 0.02`
-- `--quality-max-single-unknown-effect-type-ratio 0.01`
-
-Root output artifacts include:
-- `content_templates.json`
-- `orchestration_templates.json`
-- `transition_graph.json`
-- `layering_features.parquet|jsonl`
-- `color_narrative.parquet|jsonl`
-- `quality_report.json`
-- `unknown_diagnostics.json`
-- `template_retrieval_index.json`
-- `template_diagnostics.json`
-- `motif_catalog.json`
-- `cluster_candidates.json`
-- `cluster_review_queue.jsonl`
-- `taxonomy_model_bundle.json`
-- `taxonomy_eval_report.json`
-- `retrieval_ann_index.json`
-- `retrieval_eval_report.json`
-- `planner_adapter_payloads/sequencer_adapter_payloads.jsonl`
-- `planner_adapter_acceptance.json`
-- `feature_store_manifest.json`
-
-Per sequence output includes:
-- `audio_discovery.json`
-- `feature_bundle.json`
-- `aligned_events.parquet|jsonl`
-- `effect_phrases.parquet|jsonl`
-- `phrase_taxonomy.parquet|jsonl`
-- `target_roles.parquet|jsonl`
-
-## 3) Run Demo Reporting
+## Run feature engineering and demo reporting
 
 Script:
 - `scripts/demo_feature_engineering.py`
 
-Build + report:
+Exploratory build + report:
 
 ```bash
 python scripts/demo_feature_engineering.py \
@@ -164,16 +46,19 @@ The demo surfaces:
 - transition graph summary
 - quality gate summary
 
-### Owner mining and threshold-review session
+## Owner mining and threshold-review session
 
 The feature-engineering output directory is a **staging area**, not the live
 recipe catalog. For an owner-local corpus session, run the demo with a dedicated
 output directory and SQLite feature store, then run it a second time unchanged
-before reviewing thresholds. The two runs must leave feature-store row counts
-unchanged; content-hash identity is the prerequisite for trusting support counts.
+before reviewing thresholds. Owner mode requires an explicit unified corpus and refuses
+an existing output directory unless its prior manifest proves that it owns the same path
+and exact corpus/profile/music input fingerprint. It never falls back to global data.
 
 ```bash
 uv run python scripts/demo_feature_engineering.py \
+  --owner-mining-run \
+  --no-music-library-index \
   --corpus-dir <author-local-corpus> \
   --output-dir <staged-mining-run> \
   --feature-store-db <staged-mining-run>/feature-store.sqlite
@@ -181,6 +66,8 @@ uv run python scripts/demo_feature_engineering.py \
 # Repeat the exact same command. The embedded store is preserved while staged
 # artifacts are rebuilt, and the second manifest must report status=verified.
 uv run python scripts/demo_feature_engineering.py \
+  --owner-mining-run \
+  --no-music-library-index \
   --corpus-dir <author-local-corpus> \
   --output-dir <staged-mining-run> \
   --feature-store-db <staged-mining-run>/feature-store.sqlite
@@ -189,17 +76,81 @@ uv run python scripts/report_quality_gate_distributions.py \
   --run-dir <staged-mining-run>
 ```
 
-The first command writes `mining_run_manifest.json` with the corpus path, staged
-artifact hashes, exact effective options and rerun command, before/after
-feature-store row counts, and measured live-catalog hashes. The identical second
-run must record `verified_unchanged_rerun: true` before its distributions are
-trusted. The reporting command writes JSON and Markdown
-distribution reports plus `OWNER_DECISION_LOG_TEMPLATE.md`. The template is not a
-decision: the owner records keep/change/defer and rationale for every threshold
-after reviewing the empirical report. Neither command promotes a candidate or
-modifies `catalog/templates/`.
+The manifest binds the corpus manifest/index/lineage, every indexed profile tree, the
+optional local music index, tool files, Git commit/tree/diff, staged artifact hashes, and
+stable feature-store entity-key/content digests. Duplicate logical identities or content
+digests fail before mining. The second run must record
+`verified_unchanged_rerun: true`; row counts alone are not sufficient.
 
-### Owner-selected style fingerprints
+Use `--music-library-index <absolute-or-relative-path>` instead of
+`--no-music-library-index` when music metadata participates in the run. Owner mode requires
+one of those declarations so a hidden global index cannot change the result.
+
+The reporting command fails unless that rerun and live-catalog immutability are proven.
+It writes JSON/Markdown distributions, `OWNER_DECISION_LOG_TEMPLATE.md`, and
+the owner decision template. The owner must fill one dated keep/change/defer decision and
+rationale for every numeric value, then finalize the hash binding:
+
+```bash
+uv run python scripts/report_quality_gate_distributions.py \
+  --run-dir <staged-mining-run> \
+  --bind-owner-decisions
+```
+
+Finalization rejects blank, malformed, missing, or extra decisions and writes
+`quality_gate_evidence_manifest.json`. The final manifest hashes the mining manifest,
+candidate catalogs, promotion report, distribution reports, and completed decision file.
+No command promotes a candidate or modifies `catalog/templates/`.
+
+## Moving-head corpus prerequisite
+
+P4-T7 remains deferred until the owner creates a private, gitignored or out-of-repository
+`twinklr.mh-corpus-manifest.v1` file and explicitly declares sufficiency. Validate only
+its file identities and provenance, without parsing sequence content:
+
+```json
+{
+  "schema_version": "twinklr.mh-corpus-manifest.v1",
+  "corpus_id": "<owner-local-id>",
+  "created_at_utc": "<ISO-8601 timestamp>",
+  "entries": [{
+    "package_id": "<stable package id>",
+    "sequence_file_id": "<stable sequence id>",
+    "vendor": "<source vendor>",
+    "source_kind": "owner_local_vendor_archive",
+    "archive_path": "<absolute path>",
+    "archive_sha256": "<64 hex characters>",
+    "sequence_path": "<absolute path>",
+    "sequence_sha256": "<64 hex characters>",
+    "fixture_families": ["<family>"],
+    "fixture_roles": ["<role>"]
+  }],
+  "sufficiency": {
+    "decision": "sufficient",
+    "declared_by": "<owner>",
+    "declared_at_utc": "<ISO-8601 timestamp>",
+    "minimum_sequences": 1,
+    "minimum_vendors": 1,
+    "minimum_fixture_families": 1,
+    "minimum_fixture_roles": 1,
+    "rationale": "<why this corpus is or is not enough for the time-boxed spike>"
+  }
+}
+```
+
+```bash
+uv run python scripts/validate_mh_corpus_manifest.py \
+  --manifest <owner-local-mh-manifest.json> \
+  --evidence-out <owner-local-output>/mh-corpus-evidence.json \
+  --require-sufficient
+```
+
+The shareable evidence file contains the private manifest hash, aggregate variety counts,
+declared minima, and the sufficiency decision; it omits paths, vendors, sequence IDs,
+fixture labels, source digests, owner identity, and rationale text. This validator does
+not satisfy P4-T7 by itself.
+
+## Owner-selected style fingerprints
 
 Style groups are owner declarations, never inferred from corpus content.
 `--style-groups <declaration.json>` is the sole explicit action for a per-style
@@ -244,7 +195,7 @@ corpus. A grouped output has no implicit default style: omitting `style_name`
 raises with the available group names, and consumers select one explicitly with
 `load_fe_artifacts(output_dir, style_name="Warm Pop")`.
 
-## 4) Query Template Retrieval
+## Query template retrieval
 
 Script:
 - `scripts/query_template_retrieval.py`

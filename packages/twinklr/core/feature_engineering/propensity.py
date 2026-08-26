@@ -12,11 +12,9 @@ from twinklr.core.feature_engineering.models.propensity import (
     PropensityIndex,
 )
 
-# Minimum corpus support to emit an affinity/anti-affinity.
-_MIN_SUPPORT = 3
-
-# Frequency threshold below which a pair is considered anti-affinity.
-_ANTI_AFFINITY_THRESHOLD = 0.05
+# Minimum corpus support to emit an affinity/anti-affinity and the authoritative
+# value surfaced by the owner threshold-review contract.
+PROPENSITY_MIN_SUPPORT = 3
 
 
 class PropensityMiner:
@@ -55,7 +53,7 @@ class PropensityMiner:
                 family_total = family_counts[family]
                 model_total = model_counts[model_type]
 
-                if count >= _MIN_SUPPORT:
+                if count >= PROPENSITY_MIN_SUPPORT:
                     # Frequency: how often this effect appears on this model
                     # relative to all appearances of this effect.
                     frequency = count / family_total if family_total > 0 else 0.0
@@ -72,7 +70,11 @@ class PropensityMiner:
                             corpus_support=count,
                         )
                     )
-                elif count == 0 and family_total >= _MIN_SUPPORT and model_total >= _MIN_SUPPORT:
+                elif (
+                    count == 0
+                    and family_total >= PROPENSITY_MIN_SUPPORT
+                    and model_total >= PROPENSITY_MIN_SUPPORT
+                ):
                     # Anti-affinity: effect family exists, model exists,
                     # but they never appear together.
                     anti_affinities.append(
@@ -92,3 +94,13 @@ class PropensityMiner:
     def _extract_model_type(target_name: str) -> str | None:
         """Extract model type from target name using pattern matching."""
         return extract_model_type(target_name)
+
+
+def uncensored_pair_supports(phrases: tuple[EffectPhrase, ...]) -> tuple[int, ...]:
+    """Return raw positive effect/model pair counts before the support gate."""
+    pair_counts: dict[tuple[str, str], int] = defaultdict(int)
+    for phrase in phrases:
+        model_type = extract_model_type(phrase.target_name)
+        if model_type is not None:
+            pair_counts[(phrase.effect_family, model_type)] += 1
+    return tuple(pair_counts[key] for key in sorted(pair_counts))

@@ -14,6 +14,8 @@ from twinklr.core.feature_engineering.models.taxonomy import (
     TargetRoleAssignment,
 )
 
+TARGET_ROLE_SCORE_CUTOFF = 0.35
+
 
 @dataclass(frozen=True)
 class TargetRoleAssignerOptions:
@@ -188,7 +190,7 @@ class TargetRoleAssigner:
             ),
             reverse=True,
         )
-        if ranked and ranked[0][1] >= 0.35:
+        if ranked and ranked[0][1] >= TARGET_ROLE_SCORE_CUTOFF:
             role, role_score = ranked[0]
             role_reason_keys = tuple(sorted(reasons.get(role, [])))
 

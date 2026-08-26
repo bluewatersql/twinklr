@@ -27,7 +27,7 @@ of them exists.
   over the author's local corpus with content-hash identity; mined candidates
   staged; quality-gate thresholds reviewed against real support/stability
   distributions (the hand-tuned constants get their first empirical look)."
-- **The hand-tuned constants list (verified, all four sites)**:
+- **The numeric review contract (verified across four sites)**:
   1. `recipe_promotion_min_support: int = 2`,
      `recipe_promotion_min_stability: float = 0.015`
      (`packages/twinklr/core/feature_engineering/config.py:135-136`) — the
@@ -41,9 +41,11 @@ of them exists.
      it was not previously flagged in the review (P6) as a discrepancy, only each
      number individually as "empirically tuned... with no comment citing how they
      were chosen."
-  3. `_MIN_SUPPORT = 3` and `_ANTI_AFFINITY_THRESHOLD = 0.05` in
-     `feature_engineering/propensity.py:39,42` — corpus support required to emit a
-     propensity affinity/anti-affinity at all.
+  3. `PROPENSITY_MIN_SUPPORT = 3` in `feature_engineering/propensity.py` — corpus
+     support required to emit a propensity affinity. The former
+     `_ANTI_AFFINITY_THRESHOLD = 0.05` was a dead literal: anti-affinity emission
+     never read it. The offline readiness amendment removes that literal and pins
+     its absence instead of fabricating sensitivity evidence.
   4. The `0.35` role-score cutoff in `TargetRoleAssigner._assign_one()`
      (`feature_engineering/taxonomy/target_roles.py:191`, `if ranked and
      ranked[0][1] >= 0.35:`).
@@ -123,7 +125,9 @@ Two deliverables, run as one owner session using tooling this task builds/harden
    - The full histogram of `support_count` and `cross_pack_stability` across ALL
      mined `MinedTemplate` candidates (not just the ones that passed), bucketed
      coarsely enough to be readable by eye.
-   - For each of the 5 hand-tuned constants listed above: the configured value, the
+   - For every numeric value in the five review groups listed above (eight values:
+     configured support/stability, direct-run support/stability, propensity support,
+     target-role cutoff, and two caps): the configured value, the
      count of candidates that would pass/fail at that exact value, and — where
      adjacent values are meaningfully different — how the pass/fail count changes
      at a couple of nearby values (e.g. `min_support` at 2/3/5, `min_stability` at
@@ -138,7 +142,7 @@ Two deliverables, run as one owner session using tooling this task builds/harden
    - The `promotion.py:103-104` vs `config.py:135-136` discrepancy (5/0.3 vs 2/0.015)
      called out explicitly as a line item for the owner to resolve, not silently
      reconciled by the agent.
-3. **A decision log** (a dated Markdown file, one entry per constant reviewed)
+3. **A decision log** (a dated Markdown file, one entry per numeric value reviewed)
    recording: the constant, its current value, the empirical distribution evidence
    from (2), the owner's decision (keep / change to X / defer — needs more corpus),
    and the reasoning. This is a human-authored artifact captured during the session,
@@ -179,7 +183,7 @@ Two deliverables, run as one owner session using tooling this task builds/harden
 - [ ] The distribution report shows real histograms (not zero-candidate/empty
   output) for `support_count` and `cross_pack_stability` across all mined
   candidates.
-- [ ] Each of the 5 named constants has a corresponding entry in the distribution
+- [ ] Each of the eight retained numeric values has a corresponding entry in the distribution
   report showing pass/fail sensitivity at the configured value and at least two
   nearby values.
 - [ ] The `promotion.py` vs `config.py` default discrepancy is called out explicitly
@@ -201,7 +205,7 @@ Two deliverables, run as one owner session using tooling this task builds/harden
   an identical tiny fixture corpus (already used by P1K-T1's own tests if
   available — reuse rather than build a second fixture) and assert row counts in the
   feature store do not grow on the second run.
-- No test asserts a "correct" value for any of the 5 constants — that is the
+- No test asserts a "correct" value for any retained numeric value — that is the
   owner's decision, not a pinned behavior.
 
 ## Verification commands
@@ -226,3 +230,31 @@ owner's local session. Secondary risk: conflating "build the reporting tool" wit
 "decide the thresholds" — the acceptance criteria above are written to keep those
 separated; a verifier should reject any diff that changes `config.py` constants
 without an accompanying dated decision-log entry.
+
+## Offline owner-run readiness amendment — 2026-08-26
+
+The owner authorized an offline-only hardening pass before the private corpus session.
+This amendment does not satisfy the empirical acceptance criteria above and does not
+authorize corpus, network, provider, or live-catalog access.
+
+- Owner mode now requires an explicit unified corpus and a new output directory on the
+  first run. A rerun is allowed only when the prior manifest owns the same resolved output
+  and exact input fingerprint. There is no global-corpus fallback.
+- The run manifest binds corpus/index/lineage, profile trees, optional music-index state,
+  tool files, Git commit/tree/diff, and stable feature-store entity keys and contents.
+  Duplicate logical or content identity fails before mining.
+- Threshold reporting fails until an unchanged-corpus rerun and live-catalog immutability
+  are proven. It requires uncensored phrase supports, target-role scores, and cluster
+  memberships, and emits configured-plus-two-nearby sensitivity for each retained value.
+- The dead anti-affinity literal is removed; it is not promoted into the owner decision
+  log. The decision template contains exactly one dated decision and rationale for each
+  of the eight retained numeric values.
+- `quality_gate_evidence_manifest.json` hashes the mining manifest, staged candidates,
+  promotion report, distribution reports, and decision file. The owner reruns reporting
+  with `--bind-owner-decisions` after completing the decision file; finalization rejects
+  a missing date, decision, or rationale before binding its content.
+- A separate owner-local MH manifest validator is ready for the P4-T7 prerequisite. Its
+  public evidence output is redacted and does not make P4-T7 ready or complete.
+
+The real owner-corpus run, identical rerun, non-empty distributions, completed owner
+decision log, and independent verification remain outstanding.

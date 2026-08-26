@@ -7,12 +7,23 @@ from pathlib import Path
 import subprocess
 import sys
 
+import pytest
+
+from scripts.report_quality_gate_distributions import (
+    _require_complete_owner_decisions,
+    _require_verified_mining_manifest,
+)
 from twinklr.core.feature_engineering.config import FeatureEngineeringPipelineOptions
+from twinklr.core.feature_engineering.models.clustering import (
+    TemplateClusterCandidate,
+    TemplateClusterCatalog,
+)
 from twinklr.core.feature_engineering.models.templates import (
     MinedTemplate,
     TemplateCatalog,
     TemplateKind,
 )
+import twinklr.core.feature_engineering.propensity as propensity_module
 from twinklr.core.feature_engineering.quality_gate_distributions import (
     build_quality_gate_distribution_report,
 )
@@ -45,6 +56,23 @@ def _candidate(
     )
 
 
+def test_threshold_review_rejects_unverified_mining_or_incomplete_decisions(
+    tmp_path: Path,
+) -> None:
+    with pytest.raises(ValueError, match="verified_unchanged_rerun=true"):
+        _require_verified_mining_manifest({})
+
+    decision_path = tmp_path / "OWNER_DECISION_LOG_TEMPLATE.md"
+    decision_path.write_text(
+        "# Owner quality-gate decision log\n\n## min_support\n\n"
+        "- Date (YYYY-MM-DD):\n- Owner decision: keep / change to … / defer\n- Rationale:\n",
+        encoding="utf-8",
+    )
+    report = {"threshold_review": {"numeric_values": {"min_support": {}}}}
+    with pytest.raises(ValueError, match="requires a YYYY-MM-DD date"):
+        _require_complete_owner_decisions(decision_path, report)
+
+
 def test_distribution_report_has_hand_computed_histograms_and_sensitivity() -> None:
     """All candidates contribute to readable distributions and gate sensitivity."""
     candidates = [
@@ -58,6 +86,9 @@ def test_distribution_report_has_hand_computed_histograms_and_sensitivity() -> N
         candidates,
         options=FeatureEngineeringPipelineOptions(),
         promotion_report={"effective_min_support": 2, "effective_min_stability": 0.05},
+        role_scores=(),
+        propensity_pair_supports=(1, 2, 3, 5),
+        cluster_memberships=(),
     )
 
     assert report["candidate_count"] == 4
@@ -112,6 +143,8 @@ def test_distribution_report_exposes_low_pack_ratio_risk_and_cap_impact() -> Non
         options=FeatureEngineeringPipelineOptions(),
         promotion_report={"effective_min_support": 2, "effective_min_stability": 0.05},
         role_scores=(0.2, 0.35, 1.05),
+        propensity_pair_supports=(1, 2, 3, 5),
+        cluster_memberships=(("low-pack", "high-pack", "other"),),
     )
 
     risk = report["low_pack_ratio_risk"]
@@ -122,15 +155,18 @@ def test_distribution_report_exposes_low_pack_ratio_risk_and_cap_impact() -> Non
     }
     caps = report["threshold_review"]["recipe_promotion_caps"]
     assert caps["max_per_family_sensitivity"] == [
-        {"cap": 5, "would_keep": 3, "would_cap": 0},
-        {"cap": 10, "would_keep": 3, "would_cap": 0},
-        {"cap": 15, "would_keep": 3, "would_cap": 0},
+        {"cap": 5, "would_keep": 2, "would_cap": 0},
+        {"cap": 10, "would_keep": 2, "would_cap": 0},
+        {"cap": 15, "would_keep": 2, "would_cap": 0},
     ]
     assert caps["max_per_cluster"] == {
         "configured": 2,
-        "status": "unavailable_without_cluster_catalog",
-        "sensitivity": [],
-        "limitation": "Nearby cap values cannot be evaluated from templates alone because cluster membership and multi-layer minimum retention affect survivors.",
+        "status": "available",
+        "sensitivity": [
+            {"cap": 1, "would_keep": 1, "would_cap": 2},
+            {"cap": 2, "would_keep": 2, "would_cap": 1},
+            {"cap": 3, "would_keep": 3, "would_cap": 0},
+        ],
     }
     assert report["threshold_review"]["target_role_score_cutoff"] == {
         "configured": 0.35,
@@ -142,13 +178,88 @@ def test_distribution_report_exposes_low_pack_ratio_risk_and_cap_impact() -> Non
             {"threshold": 0.45, "pass_count": 1, "fail_count": 2},
         ],
     }
-    assert (
-        report["threshold_review"]["propensity"]["anti_affinity_threshold"]["status"]
-        == "unwired_constant"
-    )
     propensity_support = report["threshold_review"]["propensity"]["min_support"]
-    assert propensity_support["status"] == "unavailable_from_emitted_index"
-    assert propensity_support["sensitivity"] == []
+    assert propensity_support == {
+        "configured": 3,
+        "source": "uncensored effect/model pair support from effect phrases",
+        "status": "available",
+        "sensitivity": [
+            {"threshold": 2, "pass_count": 3, "fail_count": 1},
+            {"threshold": 3, "pass_count": 2, "fail_count": 2},
+            {"threshold": 5, "pass_count": 1, "fail_count": 3},
+        ],
+    }
+    assert "anti_affinity_threshold" not in report["threshold_review"]["propensity"]
+
+    numeric = report["threshold_review"]["numeric_values"]
+    assert tuple(numeric) == (
+        "recipe_promotion_min_support",
+        "recipe_promotion_min_stability",
+        "promotion_run_default_min_support",
+        "promotion_run_default_min_stability",
+        "propensity_min_support",
+        "target_role_score_cutoff",
+        "recipe_promotion_max_per_family",
+        "recipe_promotion_max_per_cluster",
+    )
+    assert all(row["status"] == "available" for row in numeric.values())
+    assert all(len(row["sensitivity"]) == 3 for row in numeric.values())
+
+
+def test_report_requires_uncensored_evidence_for_every_retained_numeric_value() -> None:
+    """No owner-review contract can silently contain an unavailable sensitivity row."""
+    candidate = _candidate("one", support=3, packs=2, stability=0.1)
+
+    for kwargs, message in (
+        ({"propensity_pair_supports": None, "cluster_memberships": ()}, "propensity"),
+        ({"propensity_pair_supports": (3,), "cluster_memberships": None}, "cluster"),
+    ):
+        try:
+            build_quality_gate_distribution_report(
+                [candidate],
+                options=FeatureEngineeringPipelineOptions(),
+                promotion_report=None,
+                role_scores=(0.35,),
+                **kwargs,
+            )
+        except ValueError as exc:
+            assert message in str(exc).lower()
+        else:
+            raise AssertionError("missing raw threshold evidence must fail closed")
+
+
+def test_dead_anti_affinity_threshold_is_not_part_of_runtime_or_review_contract() -> None:
+    """Zero co-occurrence behavior must not masquerade as a numeric review knob."""
+    assert not hasattr(propensity_module, "_ANTI_AFFINITY_THRESHOLD")
+
+
+def test_numeric_contract_always_includes_the_actual_configured_value() -> None:
+    """Loaded run options, not default literals, own configured review points."""
+    options = FeatureEngineeringPipelineOptions(
+        recipe_promotion_min_support=4,
+        recipe_promotion_min_stability=0.1,
+        recipe_promotion_max_per_family=8,
+        recipe_promotion_max_per_cluster=4,
+    )
+    report = build_quality_gate_distribution_report(
+        [_candidate("one", support=5, packs=3, stability=0.3)],
+        options=options,
+        promotion_report={"effective_min_support": 4, "effective_min_stability": 0.1},
+        role_scores=(0.35,),
+        propensity_pair_supports=(3,),
+        cluster_memberships=(),
+    )
+
+    numeric = report["threshold_review"]["numeric_values"]
+    for name in (
+        "recipe_promotion_min_support",
+        "recipe_promotion_min_stability",
+        "recipe_promotion_max_per_family",
+        "recipe_promotion_max_per_cluster",
+    ):
+        row = numeric[name]
+        key = "cap" if "max_per" in name else "threshold"
+        assert row["configured"] in {item[key] for item in row["sensitivity"]}
 
 
 def test_exact_gate_accounts_for_excluded_families_and_multi_layer_rules() -> None:
@@ -164,6 +275,9 @@ def test_exact_gate_accounts_for_excluded_families_and_multi_layer_rules() -> No
         candidates,
         options=FeatureEngineeringPipelineOptions(),
         promotion_report={"effective_min_support": 2, "effective_min_stability": 0.3},
+        role_scores=(),
+        propensity_pair_supports=(3,),
+        cluster_memberships=(),
     )
 
     assert report["candidate_population"] == {
@@ -207,6 +321,71 @@ def test_report_command_writes_staged_review_material(tmp_path: Path) -> None:
         json.dumps({"effective_min_support": 2, "effective_min_stability": 0.05}),
         encoding="utf-8",
     )
+    mining_manifest = {
+        "provenance": {
+            "source": {"git_commit": "abc123", "git_tree": "tree123"},
+            "corpus": {"input_fingerprint_sha256": "input-hash"},
+        },
+        "content_hash_identity": {"verification": {"verified_unchanged_rerun": True}},
+        "live_catalog_immutability": {"unchanged": True},
+    }
+    (tmp_path / "mining_run_manifest.json").write_text(
+        json.dumps(mining_manifest), encoding="utf-8"
+    )
+    (tmp_path / "effect_phrases.jsonl").write_text(
+        "\n".join(
+            json.dumps(
+                {
+                    "schema_version": "v1",
+                    "phrase_id": f"p-{index}",
+                    "package_id": "pack",
+                    "sequence_file_id": "sequence",
+                    "effect_event_id": f"event-{index}",
+                    "effect_type": "Bars",
+                    "effect_family": "bars",
+                    "motion_class": "sweep",
+                    "color_class": "palette",
+                    "energy_class": "mid",
+                    "continuity_class": "rhythmic",
+                    "spatial_class": "single_target",
+                    "source": "effect_type_map",
+                    "map_confidence": 1.0,
+                    "target_name": "MegaTree",
+                    "layer_index": 0,
+                    "start_ms": index * 100,
+                    "end_ms": index * 100 + 100,
+                    "duration_ms": 100,
+                    "param_signature": "x",
+                }
+            )
+            for index in range(3)
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    cluster_catalog = TemplateClusterCatalog(
+        schema_version="v1",
+        clusterer_version="test",
+        min_cluster_size=2,
+        similarity_threshold=0.8,
+        total_templates=2,
+        total_clusters=1,
+        clusters=(
+            TemplateClusterCandidate(
+                cluster_id="cluster-1",
+                cluster_size=2,
+                mean_similarity=0.9,
+                dominant_effect_family="bars",
+                member_template_ids=("one", "two"),
+            ),
+        ),
+    )
+    (tmp_path / "cluster_candidates.json").write_text(
+        json.dumps(cluster_catalog.model_dump(mode="json")), encoding="utf-8"
+    )
+    (tmp_path / "target_roles.jsonl").write_text(
+        json.dumps({"top_role_score": 0.35}) + "\n", encoding="utf-8"
+    )
     root = Path(__file__).parents[3]
 
     completed = subprocess.run(
@@ -225,6 +404,8 @@ def test_report_command_writes_staged_review_material(tmp_path: Path) -> None:
     assert "quality_gate_distribution_report.json" in completed.stdout
     report = json.loads((tmp_path / "quality_gate_distribution_report.json").read_text())
     assert report["candidate_count"] == 2
+    expected_provenance = mining_manifest["provenance"]
+    assert report["mining_run_provenance"] == expected_provenance
     markdown = (tmp_path / "quality_gate_distribution_report.md").read_text()
     assert "## Full candidate distributions" in markdown
     assert "## Single-layer promotion sensitivity" in markdown
@@ -232,8 +413,47 @@ def test_report_command_writes_staged_review_material(tmp_path: Path) -> None:
     assert "## Promotion caps" in markdown
     assert "0.015-0.049" in markdown
     assert "| threshold | pass | fail |" in markdown
-    assert "unavailable_from_emitted_index" in markdown
-    assert "Upper bound before cluster dedup" in markdown
+    assert "uncensored effect/model pair support" in markdown
+    assert "Cluster-cap sensitivity" in markdown
     template = tmp_path / "OWNER_DECISION_LOG_TEMPLATE.md"
-    assert "Owner decision" in template.read_text(encoding="utf-8")
+    template_text = template.read_text(encoding="utf-8")
+    assert template_text.count("- Date (YYYY-MM-DD):") == 8
+    assert template_text.count("- Owner decision:") == 8
+    assert template_text.count("- Rationale:") == 8
+    assert not (tmp_path / "quality_gate_evidence_manifest.json").exists()
+    template.write_text(
+        template_text.replace("- Date (YYYY-MM-DD):", "- Date (YYYY-MM-DD): 2026-08-26")
+        .replace("- Owner decision: keep / change to … / defer", "- Owner decision: defer")
+        .replace("- Rationale:", "- Rationale: Awaiting the private owner corpus."),
+        encoding="utf-8",
+    )
+    subprocess.run(
+        [
+            sys.executable,
+            "scripts/report_quality_gate_distributions.py",
+            "--run-dir",
+            str(tmp_path),
+            "--bind-owner-decisions",
+        ],
+        cwd=root,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    evidence_manifest = json.loads(
+        (tmp_path / "quality_gate_evidence_manifest.json").read_text(encoding="utf-8")
+    )
+    assert evidence_manifest["schema_version"] == "quality_gate_evidence_manifest_v1"
+    assert evidence_manifest["mining_run_provenance"] == expected_provenance
+    bound_names = {row["path"] for row in evidence_manifest["artifacts"]}
+    assert bound_names == {
+        "mining_run_manifest.json",
+        "content_templates.json",
+        "promotion_report.json",
+        "quality_gate_distribution_report.json",
+        "quality_gate_distribution_report.md",
+        "OWNER_DECISION_LOG_TEMPLATE.md",
+    }
+    assert all(len(row["sha256"]) == 64 for row in evidence_manifest["artifacts"])
+    assert "quality_gate_evidence_manifest.json" not in bound_names
     assert not (tmp_path / "recipe_catalog.json").exists()
