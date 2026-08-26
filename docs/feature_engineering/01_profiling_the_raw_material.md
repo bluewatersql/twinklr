@@ -282,64 +282,6 @@ The XML isn’t lying, exactly.
 
 It’s just leaving out the part you actually needed.
 
-## Fingerprint First, Ask Expensive Questions Later
-
-One of the more practical things we built wasn’t fancy at all. It was just a cheap structural summary of a sequence so we could answer basic triage questions before running heavier processing.
-
-That’s `SequenceAnalyzer.fingerprint()`.
-
-I have a soft spot for this one because it embodies a very healthy engineering instinct: don’t spend real money answering a question a $5 summary could have answered first.
-
-The method parses a sequence, estimates duration, bins activity over time, collects an effect histogram, extracts timing tracks, and captures xLights metadata. That’s enough to do duplicate detection, near-duplicate spotting, and outlier hunting before we ask more expensive stages to get involved.
-
-Here’s the guts of the activity proxy:
-
-```python
-def fingerprint(self, xsq_path: str, *, bin_s: float = 1.0) -> dict[str, Any]:
-    sequence = XSQParser().parse(xsq_path)
-    placements = list(sequence.iter_effect_placements())
-
-    duration_s = sequence.get_sequence_duration_s() or 0.0
-    if duration_s <= 0:
-        duration_s = max((p.end_ms for p in placements), default=0) / 1000.0
-
-    n_bins = max(1, int(math.ceil(duration_s / bin_s)))
-    bins = [0] * n_bins
-
-    for p in placements:
-        st = int(p.start_ms / 1000.0 / bin_s)
-        en = int(p.end_ms / 1000.0 / bin_s)
-        st = max(0, min(n_bins - 1, st))
-        en = max(0, min(n_bins - 1, en))
-        for i in range(st, en + 1):
-            bins[i] += 1
-
-    return {
-        "duration_s": duration_s,
-        "activity_proxy": bins,
-        "effect_histogram": sequence.effect_type_histogram(),
-        "timing_tracks": sequence.list_timing_tracks(),
-    }
-```
-
-It is gloriously unsexy.
-
-And useful as hell.
-
-![Annotated data visualization showing effect activity proxy over time with side histogram and callouts for duplicate detection, near-duplicate spotting, and outlier sequences](assets/illustrations/ILL-01-05.png)
-
-The activity proxy is basically “how many effects are active in each time bin?” Not perceptual brightness. Not rendered complexity. Just structural density. But that alone catches a lot.
-
-Two packs with nearly identical duration, timing tracks, and activity shapes are often duplicates or minor edits. A sequence with a bizarrely flat histogram and almost no timing markers tends to be either extremely simple, partially broken, or exported from a workflow we need to treat separately. A pack with 14 timing tracks named variations of `Beat`, `Beat-1`, `Beat_NEW`, and `actual beat final` is, if nothing else, a cry for help.
-
-We also keep xLights version metadata when available, because weird parser behavior often turns out to correlate with version boundaries. “Why does this subset parse differently?” has a very annoying habit of becoming “oh, these all came from the same older export path.”
-
-This is one of those nice callbacks to Part 0. Not every useful artifact is sophisticated. Some are just guardrails. Fingerprints don’t choreograph anything. They stop us from wasting time, double-counting corpus data, and drawing big conclusions from packs that are obviously oddballs.
-
-Which is not glamorous.
-
-But neither is debugging a duplicate-induced style bias three posts from now.
-
 ## The Feature Store: Because Reprocessing 200 Packs for One New Zip Is How You Lose Friends
 
 At some point every data pipeline has to choose between being incremental or being a lifestyle problem.
