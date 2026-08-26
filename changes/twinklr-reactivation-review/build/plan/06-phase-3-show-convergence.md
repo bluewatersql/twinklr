@@ -14,14 +14,22 @@ recorded for display output; assets pipeline optionally enriching Pictures effec
 > contract/invariants and AC2 amendment; independent offline/code reviews approved the
 > implementation and general `$ref` remediation, integrated at `558153c`. P3-T4 live
 > acceptance remains open after one HTTP 400 `invalid_json_schema`; no retry/fallback
-> occurred, usage was unavailable, `$1.66` is committed, and `$0.09` remains. No further
-> P3-T4 live attempt is authorized. The owner subsequently accepted all nine P3-T5
+> occurred and usage was unavailable, so `$1.660000` remains committed. On 2026-08-26
+> the owner authorized exactly one second audited request under a new `$3.32` cumulative
+> cap. Attempt 2 made one provider request and received HTTP 400 because `temperature`
+> is unsupported by `gpt-5.6-sol`; no retry/fallback/logical request/schema repair or
+> usage metadata occurred. Both `$1.660000` reservations remain committed, the
+> two-attempt cap is exhausted, no third attempt is authorized, and live acceptance
+> remains open. Offline capability normalization removes temperature for this model
+> without creating another live attempt. The owner subsequently accepted all nine P3-T5
 > decisions, and P3-T5 was integrated at `f006468`. P3-T6's remediated offline/code
 > candidate received independent standards, specification, and adversarial approval and
 > was integrated at `c9620db`. Phase 3 now has six of eight tasks integrated. P3-T6
-> empirical xLights GUI acceptance remains open. These exceptions do not waive the Phase
-> 1P/2P/2K exits, close P3-T4 live acceptance, authorize live work, authorize P3-T7+, or
-> authorize any paid/local empirical action.
+> empirical xLights GUI acceptance remains open. The owner authorized P3-T7+ and its
+> task-bounded live/paid work on 2026-08-26. All xLights GUI dates/checks remain deferred
+> until there is a meaningful, fully working end-to-end show; the gates remain open and
+> are not waived. These exceptions do not waive the Phase 1P/2P/2K exits or close P3-T4
+> live acceptance.
 
 ## Lanes
 
@@ -49,9 +57,14 @@ recorded for display output; assets pipeline optionally enriching Pictures effec
 - P3-T1 through P3-T6 are integrated at the commits recorded in the campaign handoff;
   P3-T6 is integrated at `c9620db` after independent standards, specification, and
   adversarial approval offline/in code.
-- P3-T4 live acceptance remains open after the single capped attempt; no further attempt
-  is authorized or fundable within the approved task cap.
-- P3-T6 empirical xLights GUI acceptance remains open. P3-T7+ remains unauthorized. The
+- P3-T4 live acceptance remains open after two failed audited requests. Attempt 2 was
+  terminal HTTP 400 unsupported `temperature`, with one provider request and no retry,
+  fallback, logical request, schema repair, or usage metadata. `$3.320000` is committed,
+  the two-attempt cap is exhausted, and no third attempt is authorized. The offline
+  model-capability remediation does not reopen that boundary.
+- P3-T6 empirical xLights GUI acceptance remains open, with its date deferred until a
+  meaningful end-to-end show is fully working. P3-T7+ and task-bounded live/paid work
+  are owner-authorized. The
   Phase 1P/2P/2K empirical exits remain open and are not implied by P3-T6 integration.
 
 ## Notes for spec authors

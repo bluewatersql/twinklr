@@ -27,7 +27,7 @@ class AgentConfig(BaseModel):
         description="Explicit GPT-5.6 reasoning effort; never rely on the provider default",
     )
 
-    temperature: float = Field(
+    temperature: float | None = Field(
         default=0.7, ge=0.0, le=2.0, description="LLM temperature (0=deterministic, 2=creative)"
     )
 

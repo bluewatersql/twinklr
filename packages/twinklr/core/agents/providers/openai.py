@@ -23,6 +23,7 @@ from twinklr.core.agents.providers.base import (
     ResponseMetadata,
     TokenUsage,
 )
+from twinklr.core.agents.providers.capabilities import normalized_openai_generation_config
 from twinklr.core.agents.providers.conversation import Conversation
 from twinklr.core.agents.providers.errors import (
     LLMProviderError,
@@ -129,8 +130,17 @@ class OpenAIProvider:
         - Error handling
         """
         try:
+            generation_config = normalized_openai_generation_config(
+                model=model,
+                temperature=temperature,
+                reasoning_effort=kwargs.pop("reasoning_effort", None),
+            )
             response_data = self._sync_client.generate_json(
-                messages=messages, model=model, temperature=temperature, **kwargs
+                messages=messages,
+                model=model,
+                temperature=generation_config.pop("temperature", None),
+                **generation_config,
+                **kwargs,
             )
 
             cumulative_usage = self._sync_client.get_total_token_usage()
@@ -185,8 +195,17 @@ class OpenAIProvider:
                 self._conversations[conversation_id] = conversation
 
             windowed = self._window_messages(conversation.messages)
+            generation_config = normalized_openai_generation_config(
+                model=model,
+                temperature=temperature,
+                reasoning_effort=kwargs.pop("reasoning_effort", None),
+            )
             response_data = self._sync_client.generate_json(
-                messages=windowed, model=model, temperature=temperature, **kwargs
+                messages=windowed,
+                model=model,
+                temperature=generation_config.pop("temperature", None),
+                **generation_config,
+                **kwargs,
             )
 
             conversation.messages.append(
@@ -379,17 +398,19 @@ class OpenAIProvider:
                 "text": {"format": response_format},
             }
 
-            # GPT-5.6 supports temperature.  We intentionally send it for every
-            # configured model instead of guessing from a substring in its name.
-            if temperature is not None:
-                request_params["temperature"] = temperature
-
             allowed_kwargs = {
                 key: value for key, value in kwargs.items() if key in allowed_request_kwargs
             }
             reasoning_effort = allowed_kwargs.pop("reasoning_effort", None)
-            if reasoning_effort is not None:
-                request_params["reasoning"] = {"effort": reasoning_effort}
+            normalized_generation = normalized_openai_generation_config(
+                model=model,
+                temperature=temperature,
+                reasoning_effort=reasoning_effort,
+            )
+            normalized_reasoning_effort = normalized_generation.pop("reasoning_effort", None)
+            if normalized_reasoning_effort is not None:
+                request_params["reasoning"] = {"effort": normalized_reasoning_effort}
+            request_params.update(normalized_generation)
             max_tokens = allowed_kwargs.pop("max_tokens", None)
             if max_tokens is not None and "max_output_tokens" not in allowed_kwargs:
                 allowed_kwargs["max_output_tokens"] = max_tokens

@@ -605,10 +605,97 @@ post-attempt `$ref` remediation, received independent offline and code approvals
 integrated at `558153c`. This closes P3-T4's implementation/offline-verification boundary,
 not its live acceptance boundary. Attempt 1 remains the only authorized live evidence:
 HTTP 400 `invalid_json_schema`, no retry/fallback/schema repair, usage unavailable, full
-`$1.66` reservation committed, and `$0.09` remaining. Live acceptance remains open and
-no further P3-T4 live attempt is authorized. The owner's latest “continue” separately
-authorizes P3-T5 as the next offline task only; it does not waive earlier empirical exits
-or authorize P3-T5 live work, P3-T6+, or any paid/local empirical action.
+`$1.66` reservation committed, and `$0.09` remaining. At that 2026-08-16 boundary, live
+acceptance remained open and no further P3-T4 live attempt was authorized. The owner's
+then-current “continue” separately authorized P3-T5 as the next offline task only; it did
+not waive earlier empirical exits or authorize P3-T5 live work, P3-T6+, or any paid/local
+empirical action. The 2026-08-26 amendment below supersedes only that live-attempt and
+downstream-authorization state.
+
+### Owner-authorized second-attempt amendment — 2026-08-26
+
+The owner authorized exactly one additional audited P3-T4 live request under
+authorization ID `p3-t4-second-attempt-owner-approved-2026-08-26`. This amendment sets
+an exact two-attempt lifetime cap and raises the cumulative hard cap to `$3.32`:
+attempt 1's permanently committed `$1.660000` plus exactly one new `$1.660000`
+preauthorization. It does not authorize a third attempt under any outcome or metered
+cost.
+
+The amendment is bound to the existing canonical owner ledger and integrity key. Before
+attempt 2 can be recorded, the harness requires the prior unsigned-ledger hash
+`97c38f6c4bd2facc7bfc0488a991ac79e0d454e04fb177728317224a32babcdc` and prior-attempt
+hash `29802ebe121b5284e33d201bf79df7ee6901bf33204765ca5b43487a6d33b562`, then verifies
+one failed attempt, one provider entry, no logical retry, unavailable usage, no success,
+and recomputed `$1.660000` committed spend. Missing/reset/resealed-but-changed history
+fails closed and can never initialize a fresh ledger. The sealed authorization amendment
+and in-progress attempt 2 are one atomic transition; attempt 1's canonical object remains
+unchanged. The source manifest must also be clean and committed before any request.
+
+The amendment implementation and offline adversarial suite were independently audited
+after the clean-manifest remediation below. The CLI adds required authorization ID,
+prior-ledger-hash, and prior-attempt-hash inputs alongside the existing identity pins.
+Its single authorized execution and sealed outcome are recorded below.
+
+Fresh offline author gates for the pre-execution amendment candidate: dedicated adversarial
+harness `50 passed`; broader macro/group/provider/schema/coordination regression `408
+passed`; repository format `1361 files already formatted`; Ruff clean; mypy clean across
+`731 source files`; full offline suite `5365 passed, 38 skipped`; `git diff --check`
+clean. No provider/network/live call was made by any gate.
+
+#### Independent preflight rejection and remediation
+
+Independent review rejected candidate `f0557b9` because its clean-manifest check used
+`git status --untracked-files=no`. An untracked repository-root `sitecustomize.py` or an
+untracked file beneath a transitive source root could therefore influence Python import
+or probe behavior without failing preflight. The rejected commit remains audit history
+and is not an executable candidate.
+
+Two public-seam discriminators reproduced the bypass (`2 failed`): one root bootstrap
+file and one file under `packages/twinklr/core/agents/providers/`. The remediation uses
+`--untracked-files=all`, and both discriminators now pass. Ignored owner-local files
+remain governed by the existing explicit overlay checks; every non-ignored untracked
+path now makes the repository manifest dirty. No provider/network/live call or canonical
+ledger mutation occurred during review or remediation.
+
+Fresh remediation author gates: dedicated harness `52 passed`; repository format `1361
+files already formatted`; Ruff clean; mypy clean across `731 source files`; full offline
+suite `5367 passed, 38 skipped`; `git diff --check` clean.
+
+### Live attempt 2 and provider-capability remediation — 2026-08-26
+
+After independent audit and clean-commit preflight, the amendment executed its one
+authorized request. OpenAI returned HTTP 400 `invalid_request_error` with parameter
+`temperature`: `temperature` is not supported by `gpt-5.6-sol`. The sealed attempt-2
+record contains exactly one provider entry, zero logical requests, zero retries, zero
+JSON-object fallbacks, zero schema repairs, no response metadata, and unavailable usage.
+The full second `$1.660000` reservation therefore remains committed. Together with
+attempt 1, canonical spend is `$3.320000` reserved and committed, with no trustworthy
+actual usage. The two-attempt lifetime cap is exhausted. No third attempt is authorized
+under any outcome, remediation, price change, or later invocation; live acceptance
+remains open.
+
+The offline root-cause remediation makes `temperature` optional through `AgentConfig`,
+`AgentSpec`, logging, and runner/orchestrator seams and centralizes OpenAI optional
+generation parameters in an explicit model-capability policy. `gpt-5.6-sol` now omits
+temperature while retaining its configured reasoning effort; known
+temperature-supporting models still receive their configured temperature. The runner,
+provider request, serialized request evidence, and probe identity all consume the same
+normalized configuration, preventing audit identity from diverging from actual provider
+parameters. A provider HTTP 400 for an unsupported parameter remains terminal even when
+provider retries and JSON-object fallback are otherwise enabled.
+
+TDD discriminators captured the pre-fix failures at the public provider, runner, and
+probe serialization/identity seams, then passed with the shared normalization. Further
+tests pin optional config/spec temperature, a known temperature-supporting model, the
+preserved reasoning-effort parameter, and the one-request terminal unsupported-parameter
+path. No provider/network/live call or canonical-ledger mutation occurred while
+authoring or testing this remediation. It is offline remediation only and cannot convert
+either failed request into live acceptance or create attempt 3.
+
+Fresh post-call remediation gates: provider/runner/config/probe focused suite `149
+passed`; full offline suite `5373 passed, 38 skipped`; repository format `1362 files
+already formatted`; Ruff clean; mypy clean across `732 source files`; and `git diff
+--check` clean.
 
 ## Effort & risk
 

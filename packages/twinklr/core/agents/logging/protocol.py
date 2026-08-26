@@ -49,7 +49,7 @@ class LLMCallLogger(Protocol):
         agent_mode: str,
         iteration: int | None,
         model: str,
-        temperature: float,
+        temperature: float | None,
         prompts: dict[str, Any],
         context: dict[str, Any],
         **metadata: Any,

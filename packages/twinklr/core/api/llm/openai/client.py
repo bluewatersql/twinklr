@@ -348,8 +348,7 @@ class OpenAIClient:
                 "text": text_param,
             }
 
-            # Temperature handling is explicit rather than inferred from a model-id
-            # substring.  The GPT-5.6 targets support the configured value.
+            # Callers normalize model capabilities before reaching this transport.
             if temperature is not None:
                 request_params["temperature"] = temperature
 

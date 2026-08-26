@@ -42,7 +42,7 @@ class AudioProfileOrchestrator:
         provider: LLMProvider,
         *,
         model: str | None = None,
-        temperature: float = 0.2,
+        temperature: float | None = 0.2,
         reasoning_effort: str = "medium",
         max_tokens: int = AgentConfig().max_tokens,
         timeout_seconds: int = AgentConfig().timeout_seconds,
