@@ -247,3 +247,53 @@ missed), this task will faithfully propagate that gap into the docs. Mitigation:
 confirm P4-T5's acceptance criteria (the generated knob-inventory test passing) hold
 before starting Item 1, and treat any inconsistency discovered while writing docs as
 a signal to go back to P4-T5's ledger, not to paper over it with prose.
+
+## Candidate freeze record — 2026-08-26
+
+Execution candidate `62a15de` plus documentation-contract correction `92f97fa` was
+authored from exact base `d517bca97ca46db3a5e138aa74376e9947d2f15e` on isolated
+branch `codex/p4t6-doc-truth`. This record freezes the authoring result for an
+independent verifier; it is not self-approval or integration authorization.
+
+- The user guide now uses an explicitly curated public-facing table. Every row carries
+  its canonical P4-T5 ledger path, and a parity test rejects missing, removed, or
+  evidence-free entries. The table intentionally does not dump all 290 `EFFECT_TEST`
+  and 7 `INVARIANT_TEST` registry records, many of which are nested/internal paths.
+- The channel claim now reports the grep/test-backed scope: 37 built-in Python moving-
+  head templates, all 37 declaring dimmer, with one direct declaration each for color,
+  shutter, and gobo. Pan/tilt are emitted from movement geometry, and schema-v2 intent
+  can override color or add shutter/gobo intervals. A parity test locks these counts.
+- Current architecture/provider documentation describes the heuristic-plus-judge loop,
+  OpenAI Responses path, opt-in loopback Ollama structured path, and legacy/direct
+  Anthropic path without claiming a successful real Ollama MacroPlan smoke.
+  `context/current-state.md` was rechecked and already described the current loop, so it
+  required no edit.
+- The deleted `scripts/build/` workflow is retained only as clearly historical,
+  ABANDON-candidate material. The new scripts index accounts for all 31 tracked Python
+  files and two Markdown files under `scripts/`; a parity test rejects omissions.
+  Audit also corrected the stale premise that `demo_sequencer_pipeline.py` is the sole
+  production caller: it is now a compatibility shim. The zero-reference paid
+  `utils/video_demo.py` remains code-quarantined and unsupported; it was neither run,
+  promoted, nor deleted.
+- The unsourced time-savings claim is retracted pending accepted P2P-T6 evidence. No
+  replacement timing or cost number was invented.
+- The stale test requiring public documentation of removed
+  `job.agent.recipe_generation_agent` was replaced with the current contract: published
+  guides must not expose that internal recipe-generation tooling as a JobConfig role.
+
+Fresh proportional evidence on the committed candidate:
+
+```text
+focused documentation/model contract tests: 50 passed
+P4-T5 config inventory: 96 passed
+make validate:
+  ruff format: 1355 files unchanged
+  ruff check: all checks passed
+  mypy: no issues in 719 source files
+  pytest: 5597 passed, 39 skipped, 42 warnings
+  total coverage: 89%
+```
+
+No xLights GUI, provider, paid, audio, or live action was performed during P4-T6.
+The original phrases retained above remain historical task evidence; current-truth
+scopes (`README.md`, `docs/`, and `context/`) were checked separately.
