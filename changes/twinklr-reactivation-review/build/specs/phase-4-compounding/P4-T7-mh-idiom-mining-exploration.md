@@ -263,3 +263,16 @@ protect owner archives from `ingest_zip`'s destructive sibling
 The linked repository preflight now corrects those three gaps. The rejected identity
 remains rejected; remediation does not approve the preflight, admit P4-T7 execution, or
 change the existing NO-GO/deferred status.
+
+### Remediated repository-only preflight freeze — 2026-08-26
+
+The remediated author candidate is
+`88f26840b8ae1c9c2853dfe8629f9a18100768a3`, still based exactly on
+`63293f608b3c0564297a140f87e10b44df547163`. Its base-to-candidate diff SHA-256 is
+`a2936e37a96c4a080e7af5b8f625c63162c1b10f5a5557767a63e3000bdd8c5b`.
+
+Proportional checks pass for the corrected P2K-T2 distribution contract, isolated-copy
+profiling boundary and stop criteria, exact temporal-alignment symbol, relative links,
+Markdown whitespace, docs-only scope, and the original five-artifact/time/non-verdict
+contracts. This freeze awaits a new independent evidence review. It is not approval,
+P4-T7 execution, completion, or integration.
