@@ -341,3 +341,19 @@ skipped** at 88% coverage. The 42 warnings are the repository's existing SQLite
 resource/deprecation warnings, not new test failures. Final `make validate`, static
 deleted-symbol evidence, and the frozen candidate digest are recorded by the author
 after this documentation commit; independent approval remains deliberately separate.
+
+### Independent rejection and remediation — 2026-08-26
+
+Independent verification **rejected** frozen snapshot `282ed6d`: the tracked
+`scripts/demo_display_renderer.py` still imported `GroupPosition` from the deleted
+`templates.group.models.display` module, so its `--help` path raised
+`ModuleNotFoundError`. The package and test caller audit had missed tracked first-party
+scripts.
+
+Remediation commit `3c564a9` adds a subprocess smoke discriminator at
+`tests/unit/scripts/test_demo_display_renderer.py` and points the demo at the surviving
+`models.position.GroupPosition`. The discriminator failed before the import repair and
+passes afterward. A tracked `scripts/`/`examples/` audit and a repository-wide Python
+import audit find no remaining imports of any deleted display, curve, resolver, or
+rendering module. This remediation does not expand scope; the candidate remains pending
+fresh independent verification.
