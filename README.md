@@ -21,7 +21,12 @@
 ---
 ## What is Twinklr?
 
-Twinklr is a choreography engine that takes an audio file and automatically generates synchronized moving head sequences for Christmas light displays. Instead of spending dozens of hours manually programming pan angles, tilt curves, and dimmer patterns in xLights, Twinklr does it in minutes.
+Twinklr is a choreography engine that takes an audio file and generates synchronized
+moving-head and RGB/pixel sequences for Christmas light displays. It automates repeatable
+analysis, planning, and rendering work while leaving the result editable in xLights.
+End-to-end authoring-time savings have not yet been measured; that remains part of the
+owner-gated
+[P2P-T6 evaluation protocol](changes/twinklr-reactivation-review/build/specs/phase-2p-creative-quality/P2P-T6-vision-judge-and-sync-metrics.md).
 
 The core insight: **LLMs plan creative intent; deterministic code handles precision.** The AI decides *what* should happen ("fan formation with building intensity during the chorus"), and the rendering engine handles *how* ("pan fixture 3 to 127.5 degrees over 2,400 milliseconds with a sine-eased curve"). This separation is what makes the system reliable.
 
@@ -39,7 +44,7 @@ Audio File (.mp3)
 │     Musical interpretation, creative guidance, mood arc  │
 ├─────────────────────────────────────────────────────────┤
 │  3. Multi-Agent Planning (LLM)                          │
-│     Planner → Validator → Judge (iterative refinement)  │
+│     Planner → heuristics → Judge (iterative refinement) │
 ├─────────────────────────────────────────────────────────┤
 │  4. Rendering & Compilation (deterministic)             │
 │     Templates → curves → DMX values → fixture segments  │
@@ -54,7 +59,7 @@ Audio File (.mp3)
 ## Features
 
 - **Full Audio Analysis** — tempo, beat grid, energy dynamics, section detection, harmonic content, lyrics with multi-source fallback (embedded tags, LRCLib, Genius, WhisperX)
-- **Multi-Agent Orchestration** — iterative planner/validator/judge loop with structured feedback and automatic refinement
+- **Multi-Agent Orchestration** — iterative planner/heuristic/judge loop with structured feedback and automatic refinement
 - **Categorical Planning** — LLM reasons in semantic terms (WHISPER/SOFT/MED/STRONG/PEAK intensity, HIT/BURST/PHRASE/EXTENDED/SECTION duration) while the renderer maps to precise DMX values
 - **Template Library** — pre-built choreography units (fan formations, sweeps, chases, pulses) with presets and phase offsets for fixture-to-fixture coordination
 - **Schema Auto-Injection** — Pydantic models generate the JSON schemas shown to the LLM, eliminating prompt/schema drift
@@ -67,7 +72,8 @@ Audio File (.mp3)
 
 - **Python 3.13** (3.14 is not supported)
 - **[uv](https://github.com/astral-sh/uv)** (package manager)
-- **OpenAI API key** (for agent orchestration)
+- **OpenAI API key** for the default cloud path, or a separately installed loopback
+  Ollama server for the opt-in local adapter
 
 ### Installation
 
@@ -79,9 +85,8 @@ cd twinklr
 # Install dependencies
 make install
 
-# Set up environment
-cp .env.example .env
-# For the default cloud provider, export OPENAI_API_KEY in your shell
+# Review .env.example, then export values in your shell (Twinklr does not auto-load .env)
+export OPENAI_API_KEY='your-key-here'
 ```
 
 For full audio features including WhisperX transcription:
@@ -118,7 +123,7 @@ twinklr/
 │   │   ├── agents/              # Multi-agent orchestration
 │   │   │   ├── audio/           # Audio & lyrics profiling agents
 │   │   │   ├── sequencer/       # Planner, group planner agents
-│   │   │   ├── providers/       # LLM provider adapters (OpenAI)
+│   │   │   ├── providers/       # OpenAI/Ollama + legacy Anthropic adapters
 │   │   │   ├── shared/          # Judge, iteration controller
 │   │   │   └── logging/         # LLM call logging
 │   │   ├── audio/               # Audio analysis pipeline
@@ -174,9 +179,9 @@ The choreography planner uses an iterative refinement loop:
 
 1. **Planner** generates a `ChoreographyPlan` (template + preset per song section)
 2. **Heuristic Validator** checks structural validity (fast, free)
-3. **LLM Validator** checks semantic quality (template appropriateness, coordination)
-4. **Judge** scores the plan (0-10) and decides: approve, soft-fail (revise), or hard-fail (redo)
-5. Structured feedback loops back to the planner for the next iteration
+3. **Judge** scores the plan (0-10) and decides: approve, soft-fail (revise), or hard-fail (redo)
+4. Structured feedback and the judge's prior verdict history loop back to the planner
+   for the next iteration
 
 Plans that score 7.0+ are approved. The loop runs up to 3 iterations by default.
 
@@ -213,19 +218,21 @@ All commits must pass:
 
 | File | Purpose |
 |---|---|
-| `.env` | API keys (`OPENAI_API_KEY` for the default cloud provider, plus optional AcoustID, Genius, and HuggingFace keys) |
+| Shell environment | API keys (`OPENAI_API_KEY` for the default cloud provider, plus optional AcoustID, Genius, and HuggingFace keys); `.env.example` is a reference and `.env` is not auto-loaded |
 | `config.json` | App settings — provider/base URL, cache directories, audio processing options, logging |
-| `job_config.json` | Job settings — agent config (iterations, model, token budget), fixture config path, checkpoints |
+| `job_config.json` | Job settings — agent iterations/models, fixture config path, transitions, timing tracks, assets, and final-plan checkpoint writing |
 | `fixture_config.json` | Moving head definitions — fixture names, DMX channels, physical positions |
 
-Copy `.env.example` to `.env` to get started. Config files are gitignored; create them from the documented schemas.
+Review `.env.example` and export the values you need in your shell. Config files are
+gitignored; create them from the documented schemas.
 
 ## Tech Stack
 
 - **Python 3.13** with strict type hints
 - **[uv](https://github.com/astral-sh/uv)** for package management (workspace with core + cli packages)
 - **[Pydantic V2](https://docs.pydantic.dev/)** for all data validation (LLM outputs, configs, models)
-- **[OpenAI API](https://platform.openai.com/)** for agent orchestration (Responses API with structured outputs)
+- **[OpenAI API](https://platform.openai.com/)** for the verified cloud structured-output
+  path, with an opt-in loopback Ollama Chat Completions adapter for local models
 - **[librosa](https://librosa.org/)** for audio analysis and feature extraction
 - **[Jinja2](https://jinja.palletsprojects.com/)** for prompt templating
 - **[Rich](https://rich.readthedocs.io/)** for CLI output

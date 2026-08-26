@@ -1,14 +1,14 @@
 ---
 type: context
 area: architecture
-updated: 2026-08-14
+updated: 2026-08-26
 ---
 
 # Multi-Agent Planning
 
-_Updated 2026-08-14 from the integrated Phase 2P implementation. The separate "LLM
-validator" role documented before the reactivation review remains removed; deterministic
-heuristics plus the LLM judge form the live validation loop._
+_Updated from the integrated Phase 2P implementation and re-verified during P4-T6. The
+former separate semantic-validation role is not part of the shipped system;
+deterministic heuristics plus the LLM judge form the live validation loop._
 
 The choreography planner is an iterative refinement loop over structured Pydantic models:
 
@@ -17,8 +17,8 @@ The choreography planner is an iterative refinement loop over structured Pydanti
    MomentCue intent.
 2. **Heuristic validation** checks structural validity (fast, free); on the display
    path five deterministic auto-repair passes fix common LLM mistakes before scoring.
-3. **Judge** scores 0–10 and decides: approve (≥ 7.0, enforced by a model validator
-   that reconciles status to score), soft-fail (revise), or hard-fail (redo).
+3. **Judge** scores 0–10 and decides: approve (≥ 7.0 by default), soft-fail (revise),
+   or hard-fail (redo). `JudgeVerdict` validation reconciles verdict status to score.
    Structured feedback loops back to the planner. Up to 3 iterations by default.
 
 The moving-head renderer now resolves schema-v2 intensity, color, shutter, gobo, and
@@ -46,8 +46,9 @@ pending; implementation fixtures are not decision evidence.
   tracked `catalog/templates/` data home but not yet a schema: one catalog with two
   renderers is the recorded convergence direction, not current behavior.
 - **Schema auto-injection and enforcement** — Pydantic response models generate both the
-  JSON schemas embedded in prompts and the OpenAI Responses API strict `json_schema`
-  request. A general provider transform converts Pydantic discriminated-union `oneOf`
+  JSON schemas embedded in prompts and provider requests. OpenAI uses the Responses API
+  strict `json_schema` path; opt-in loopback Ollama uses Chat Completions with JSON-schema
+  `response_format`. A general provider transform converts Pydantic discriminated-union `oneOf`
   to supported nested `anyOf` and removes discriminator metadata; Pydantic still
   enforces the branch semantics after generation. Unsupported schema keywords and the
   provider's 5,000-property/10-level/1,000-enum ceilings fail locally before a request.
@@ -64,10 +65,11 @@ pending; implementation fixtures are not decision evidence.
 ## Where things live
 
 - Agent orchestration: `packages/twinklr/core/agents/` (audio/lyrics profiling,
-  sequencer planners, shared judge/iteration controller, OpenAI provider adapter)
-- OpenAI is the required provider for registered strict-output agent roles. Anthropic is
-  still configurable for legacy/direct calls but is rejected loudly for those roles
-  until it has an equivalent schema-enforcement implementation.
+  sequencer planners, shared judge/iteration controller, provider adapters)
+- OpenAI is the verified cloud strict-output path. Ollama is opt-in, loopback-only, and
+  routes structured calls through `/v1/chat/completions`; its real `MacroPlan` validity
+  remains unclaimed pending the explicit local smoke. Anthropic is still configurable
+  for legacy/direct calls but is rejected loudly for registered strict-output roles.
 - Runtime prompt packs: `packages/twinklr/core/**/prompts/` (Jinja2 — application source,
   distinct from the root `prompts/` agent-workflow library)
 - Deep reference: [docs/audio_profile/index.md](../../docs/audio_profile/index.md) series

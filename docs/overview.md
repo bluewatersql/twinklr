@@ -13,7 +13,10 @@ The core design principle: **LLMs plan creative intent; deterministic code handl
 
 ## Goals
 
-- Reduce the time to create moving head choreography from dozens of hours of manual xLights programming to minutes of automated generation.
+- Automate repeatable analysis, planning, and rendering work while keeping the result
+  editable in xLights. End-to-end authoring-time savings have not yet been measured; the
+  pending evaluation protocol is tracked in
+  [`P2P-T6`](../changes/twinklr-reactivation-review/build/specs/phase-2p-creative-quality/P2P-T6-vision-judge-and-sync-metrics.md).
 - Produce musically-coherent, beat-aligned sequences that respond to the structure and energy of each song.
 - Output native xLights `.xsq` files that can be imported and refined in the standard xLights editor.
 
@@ -21,13 +24,21 @@ The core design principle: **LLMs plan creative intent; deterministic code handl
 
 Twinklr currently supports:
 
-- **Moving head fixtures** — pan, tilt, dimmer, shutter, color, and gobo channels via the sequencer pipeline (`packages/twinklr/core/sequencer/moving_heads/`).
+- **Moving head fixtures** — the renderer can emit pan, tilt, dimmer, shutter, color,
+  and gobo when the fixture maps those channels. In the 37 Python builtins, every
+  template declares dimmer behavior and one template each declares color, shutter, or
+  gobo directly; pan/tilt come from geometry and movement handlers, while schema-v2
+  section intent can override color and add timed shutter/gobo events. See
+  `packages/twinklr/core/sequencer/moving_heads/templates/builtins/` and
+  `packages/twinklr/core/sequencer/moving_heads/compile/intent_resolution.py`.
 - **Display sequencer** — RGB/pixel effects for outline, tree, and other display elements (`packages/twinklr/core/sequencer/display/`).
 - **Feature engineering pipeline** — audio profiling, feature extraction, and feature store for offline analysis (`packages/twinklr/core/feature_engineering/`, `packages/twinklr/core/feature_store/`).
 - **Catalog and curation tooling** — layout-aware coverage reports, corpus quality evidence, coverage-targeted recipe generation, explicit human admission logs, and style/propensity artifacts. Real author-layout/corpus curation remains an owner-driven phase exit, not a bundled catalog claim.
 - **Evaluation and iteration tooling** — deterministic sync metrics, calibrated-vision contracts, a guarded three-arm comparison harness, xLights preview automation, and reserved-layer live injection/regeneration. Their live/provider/human evidence gates remain explicit and local-only.
 
-The primary CLI workflow (`twinklr run`) executes the moving heads sequencer pipeline end-to-end.
+The CLI provides branch-specific `twinklr run` (moving heads) and `twinklr display`
+(RGB/pixel) workflows plus `twinklr show`, which plans both branches from one shared
+prefix and emits one coordinated sequence.
 
 ---
 
@@ -85,7 +96,7 @@ _Source: `packages/twinklr/core/audio/`_
 
 Deterministic audio feature extraction powered by [librosa](https://librosa.org/):
 
-- **Rhythm** — tempo detection, beat grid, downbeats, and selectable source adapters (`audio/rhythm/`, `audio/mir/`); custom DSP remains the runtime default, while owner review of the fixed-gate recommendation to retain it is pending
+- **Rhythm** — tempo detection, beat grid, downbeats, and selectable source adapters (`audio/rhythm/`, `audio/mir/`); custom DSP remains the owner-accepted runtime default after the fixed-gate comparison produced no complete admissible optional-model evidence
 - **Energy** — RMS envelope, energy dynamics, builds and drops (`audio/energy/`)
 - **Structure** — section boundary detection, segment labeling (`audio/structure/`)
 - **Harmonic** — key detection, chord analysis, chroma features (`audio/harmonic/`)
@@ -112,15 +123,18 @@ Plans scoring at least the configured threshold are approved (7.0 by default). T
 runs up to 3 planner/judge cycles by default; `max_iterations=0` plans once, runs
 heuristics, and skips the judge.
 
-Registered OpenAI roles use validated strict structured outputs with bounded refusal,
-truncation, malformed-response, and repair handling. Exact model/reasoning settings and
-prompt/schema fingerprints participate in cache identity.
+Registered cloud roles use OpenAI `/v1/responses` strict structured outputs with bounded
+refusal, truncation, malformed-response, and repair handling. The opt-in loopback Ollama
+adapter uses `/v1/chat/completions` with JSON-schema `response_format`; its real
+`MacroPlan` smoke remains an explicit local-only check, not a claimed result. Exact
+model/reasoning settings and prompt/schema fingerprints participate in cache identity.
 
 Agent sub-packages:
 
 - `agents/audio/` — audio profiling and lyrics stages
 - `agents/sequencer/` — moving head planner, macro planner, group planner
-- `agents/providers/` — LLM provider adapters (OpenAI)
+- `agents/providers/` — OpenAI and loopback Ollama structured-output adapters, plus the
+  legacy/direct Anthropic adapter
 - `agents/shared/` — judge, iteration controller, validation
 - `agents/logging/` — LLM call logging for observability
 
@@ -150,7 +164,7 @@ Pydantic V2 models with a `ConfigBase` class providing `load_or_default()` for f
 | Config | Default File | Purpose |
 |---|---|---|
 | `AppConfig` | `config.json` | App-level settings: LLM provider, API key, cache dirs, audio processing, logging |
-| `JobConfig` | `job_config.json` | Job-specific: agent orchestration, fixture config path, pose config, planner features, transitions, channel defaults |
+| `JobConfig` | `job_config.json` | Job-specific: agent orchestration, fixture config path, asset policy, transitions, timing tracks, and final-plan checkpoint writing |
 
 Schema version is 3.0 (`JobConfig.schema_version`). Config files are not committed to the repo — create them from the documented field defaults in `packages/twinklr/core/config/models.py`.
 
@@ -172,6 +186,10 @@ Created by the CLI with explicit configs, or via `TwinklrSession.from_directory(
 ## Constraints and Non-Goals
 
 - **xLights-only output** — Twinklr targets `.xsq` files for xLights. Other lighting control formats are not currently supported.
-- **OpenAI strict-output roles** — registered agent roles currently require the OpenAI provider's strict structured-output implementation. Legacy/direct Anthropic configuration exists but is not equivalent for those roles.
+- **Structured-output provider scope** — OpenAI is the verified cloud path. Ollama is an
+  opt-in loopback-only adapter whose real-schema smoke is still pending. Legacy/direct
+  Anthropic configuration is not equivalent for registered strict-output roles.
 - **No live DMX control** — Twinklr generates sequence effects. Its guarded xLights workflow can inject/regenerate reserved layers in an open sequence, but it is not a real-time lighting controller.
-- **Display pipeline convergence remains active work** — display rendering and catalog context exist, but the primary `twinklr run` workflow remains moving-head focused. Phase 3 owns the combined show path and display CLI convergence.
+- **Empirical show acceptance remains open** — the combined `twinklr show` path is
+  implemented, but xLights GUI, vision, and human-judgment gates remain deferred until a
+  meaningful end-to-end show exists.

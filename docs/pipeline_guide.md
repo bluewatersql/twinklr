@@ -1,5 +1,12 @@
 # Twinklr Pipeline Guide
 
+> **Historical subsystem — ABANDON candidate.** The unified corpus/feature-engineering
+> entry point under `scripts/build/` was deleted on 2026-02-24 (`82aaf38`). This guide
+> records that subsystem's design; its `scripts/build/...` commands are not available in
+> the current checkout and must not be treated as a quick start. Current production
+> generation uses the `twinklr` CLI. The surviving exploratory tools are indexed in
+> [`scripts/README.md`](../scripts/README.md).
+
 ## Overview
 
 Twinklr's Feature Engineering (FE) system analyses a corpus of xLights
@@ -14,7 +21,7 @@ package profiles and feature-engineers only that package.
 
 This guide covers:
 
-1. [Quick start — unified pipeline](#1-quick-start--unified-pipeline)
+1. [Historical unified pipeline](#1-historical-unified-pipeline-not-runnable)
 2. [What the FE pipeline does](#2-what-the-fe-pipeline-does)
 3. [Running the pipeline](#3-running-the-pipeline)
 4. [Feature Store (SQLite)](#4-feature-store-sqlite)
@@ -28,29 +35,23 @@ This guide covers:
 
 ---
 
-## 1. Quick Start — Unified Pipeline
+## 1. Historical unified pipeline (not runnable)
 
-The recommended way to run the full workflow is a single command:
+There is currently no supported unified FE command. The deleted entry point was:
 
 ```bash
-# Full run with defaults (zero arguments required)
-uv run python scripts/build/build_pipeline.py
+# REMOVED in 82aaf38; historical reference only
+# uv run python scripts/build/build_pipeline.py
 ```
 
-This discovers vendor packages, profiles them, runs feature engineering,
-and prints a summary. State is persisted in a SQLite feature store so
-subsequent runs skip already-processed sequences.
+It discovered vendor packages, profiled them, ran feature engineering, and printed a
+summary. The following examples describe the deleted command's intended behavior; they
+cannot be executed from this repository state:
 
 ```bash
-# Second run — skips everything (no changes detected)
-uv run python scripts/build/build_pipeline.py
-
-# Add a new package, third run — processes only the new one
-cp new_package.zip data/vendor_sequences/
-uv run python scripts/build/build_pipeline.py
-
-# Force full reprocessing from scratch
-uv run python scripts/build/build_pipeline.py --force
+# REMOVED examples; historical reference only
+# uv run python scripts/build/build_pipeline.py
+# uv run python scripts/build/build_pipeline.py --force
 ```
 
 ### Pipeline Steps
@@ -71,7 +72,7 @@ uv run python scripts/build/build_pipeline.py --force
 | FE output | `data/features/feature_engineering` |
 | Feature store DB | `data/features/twinklr.db` |
 
-### CLI Reference
+### Deleted CLI reference
 
 ```
 usage: build_pipeline.py [-h]
@@ -182,14 +183,15 @@ data/features/feature_engineering/
 - `uv` package manager
 - Project dependencies installed: `uv sync`
 
-### Unified Pipeline (Recommended)
+### Unified pipeline (removed)
 
-See [Section 1](#1-quick-start--unified-pipeline) for the single-command
-workflow. This is the recommended approach for all use cases.
+See [Section 1](#1-historical-unified-pipeline-not-runnable) for the deleted command's
+record. There is no recommended unified FE command in the current checkout.
 
-### Individual Scripts (Advanced)
+### Surviving individual scripts (data-dependent)
 
-For advanced use cases, you can run the individual steps separately:
+The following surviving demos require local corpus artifacts. Their current status and
+inputs are indexed in [`scripts/README.md`](../scripts/README.md).
 
 #### Profiling Only
 
@@ -211,26 +213,23 @@ The profiler uses SHA-based skip logic: if the zip's SHA-256 matches an
 existing profile in the store (and the profile directory exists on disk),
 profiling is skipped and the cached profile is returned.
 
-#### Corpus Build Only
+#### Removed corpus-build entry point
 
-> **Note**: The unified pipeline handles corpus building internally.
-> Use this script only for standalone corpus builds.
+> **Historical note:** this script was part of the deleted `scripts/build/` subsystem
+> and is unavailable.
 
 ```bash
-uv run python scripts/build/build_profile_corpus.py
+# REMOVED: uv run python scripts/build/build_profile_corpus.py
 ```
 
-#### Feature Engineering Only
+#### Removed feature-engineering entry point
 
-> **Note**: The unified pipeline handles profiling and corpus building
-> before FE. Use this script when starting from an existing corpus.
+> **Historical note:** this script was part of the deleted `scripts/build/` subsystem
+> and is unavailable.
 
 ```bash
-uv run python scripts/build/build_feature_engineering.py
-
-# Skip audio analysis (faster)
-uv run python scripts/build/build_feature_engineering.py \
-  --skip-audio-analysis
+# REMOVED: uv run python scripts/build/build_feature_engineering.py
+# REMOVED: uv run python scripts/build/build_feature_engineering.py --skip-audio-analysis
 ```
 
 #### FE Demo Report
@@ -784,24 +783,12 @@ an explicitly supplied path must exist and parse successfully.
 
 ## 9. Configuration Reference
 
-### App Config (`config.json`)
+The App/Job examples formerly in this historical FE guide had drifted into removed
+schema fields. Use the registry-backed live reference in
+[`docs/user-guide.md`](user-guide.md#configuration-files). The FE pipeline-options table
+below describes the still-importable Python modules, not a restored unified command.
 
-```json
-{
-  "llm_provider": "openai",
-  "output_dir": "output",
-  "cache_dir": ".cache",
-  "audio_processing": {
-    "hop_length": 512,
-    "frame_length": 2048,
-    "cache_enabled": true
-  },
-  "planning": {
-    "max_beats": 1000,
-    "max_sections": 20
-  }
-}
-```
+### App Config (`config.json`)
 
 OpenAI reads `OPENAI_API_KEY` when `llm_api_key` is omitted. To opt into a running local
 Ollama server instead, set `llm_provider` to `"ollama"` and `llm_base_url` to a loopback
@@ -812,29 +799,8 @@ Structured local calls use `/v1/chat/completions`; cloud OpenAI retains
 
 ### Job Config (`job_config.json`)
 
-```json
-{
-  "schema_version": "2.0",
-  "fixture_config_path": "data/fixtures/my_fixtures.json",
-  "agent": {
-    "max_iterations": 3,
-    "success_threshold": 70,
-    "plan_agent": { "model": "gpt-4o", "temperature": 0.7 },
-    "judge_agent": { "model": "gpt-4o", "temperature": 0.3 }
-  },
-  "pose_config": { "poses": {} },
-  "planner_features": {
-    "enable_shutter": true,
-    "enable_color": true,
-    "enable_gobo": false
-  },
-  "transitions": {
-    "enabled": true,
-    "default_duration_bars": 1,
-    "default_mode": "crossfade"
-  }
-}
-```
+The live schema is version 3.0. Do not reuse the removed version-2 examples from this
+guide's history.
 
 ### FE Pipeline Options
 
@@ -872,18 +838,18 @@ Key options:
 
 ## 10. Resetting & Clean Runs
 
-### What `--force` Does
+### What the removed `--force` option did
 
-The `--force` flag on `build_pipeline.py`:
+The deleted `build_pipeline.py --force` command:
 1. Deletes the SQLite feature store DB (`data/features/twinklr.db`)
 2. Re-profiles all vendor packages (ignores SHA-based skip logic)
 
 It does **not** delete existing profile directories or FE output
 artifacts. Old per-sequence directories remain on disk.
 
-### Full Clean Reset
+### Historical full clean reset
 
-To completely reset all pipeline state and artifacts:
+The following records the deleted workflow. It is intentionally not a runnable recipe:
 
 ```bash
 # 1. Clear application caches (audio analysis, step cache)
@@ -898,8 +864,8 @@ rm -rf data/profiles/*
 # 4. Remove all FE output artifacts
 rm -rf data/features/feature_engineering/*
 
-# 5. Run the unified pipeline from scratch
-uv run python scripts/build/build_pipeline.py --force
+# 5. REMOVED: the unified pipeline command no longer exists
+# uv run python scripts/build/build_pipeline.py --force
 ```
 
 ### Partial Resets
@@ -909,7 +875,7 @@ uv run python scripts/build/build_pipeline.py --force
 ```bash
 rm -f data/features/twinklr.db
 rm -rf data/features/feature_engineering/*
-uv run python scripts/build/build_pipeline.py --force --skip-profiling
+# REMOVED: uv run python scripts/build/build_pipeline.py --force --skip-profiling
 ```
 
 **Reprocess FE via Python API (no disk cleanup):**
@@ -1106,4 +1072,6 @@ tests/
 - `_v0_check` and `*_smoke` directories are development/test artifacts and are not canonical run paths.
 - If multiple entries share the same `sequence_sha256`, feature distributions can look duplicated across package IDs.
 - The `run_corpus()` method is a legacy entry point that reads `sequence_index.jsonl`. Prefer `run()` for new workflows.
-- `scripts/build/build_profile_corpus.py` and `twinklr.core.profiling.unify` are deprecated in favour of the unified pipeline.
+- `scripts/build/build_profile_corpus.py` was deleted with the unified entry point;
+  `twinklr.core.profiling.unify` remains importable, but that does not restore the
+  historical command workflow.

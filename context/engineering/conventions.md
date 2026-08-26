@@ -47,9 +47,9 @@ historical baseline, not a current waiver; see
 
 | File | Purpose |
 |---|---|
-| `.env` (from `.env.example`) | API keys: `OPENAI_API_KEY` (required); optional `GENIUS_ACCESS_TOKEN`, `ACOUSTID_API_KEY`, `HF_TOKEN` |
+| Shell environment (`.env.example` is reference only) | API keys: `OPENAI_API_KEY` for the default cloud path; optional `GENIUS_ACCESS_TOKEN`, `ACOUSTID_API_KEY`, `HF_TOKEN`. Twinklr does not auto-load `.env`. |
 | `config.json` | App settings — cache dirs, audio processing, logging |
-| `job_config.json` | Job settings — agent iterations/model/token budget, fixture config path, checkpoints |
+| `job_config.json` | Job settings — agent iterations/models, fixture config path, assets, transitions, timing tracks, and final-plan checkpoint writing |
 | `fixture_config.json` | Moving-head definitions — names, DMX channels, physical positions |
 
 ## Documentation conventions

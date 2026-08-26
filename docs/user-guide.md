@@ -13,7 +13,8 @@ Step-by-step instructions for installing, configuring, and running Twinklr to ge
 
 - **Python 3.13** (required; 3.14 is not supported — see `pyproject.toml` `requires-python`)
 - **[uv](https://github.com/astral-sh/uv)** — Astral's fast Python package manager
-- **OpenAI API key** — required for LLM-based choreography planning
+- **Provider access** — an OpenAI API key for the default cloud path, or a separately
+  installed loopback Ollama server for the opt-in local adapter
 - **xLights** — to view and use the generated `.xsq` sequence files
 
 Optional:
@@ -128,22 +129,27 @@ Twinklr uses three JSON configuration files. None are committed to the repo — 
 
 Application-level settings shared across all jobs. Loaded by `AppConfig` in `packages/twinklr/core/config/models.py`.
 
-Key fields and defaults:
+The table is a deliberately curated user-facing subset, not a second schema. Its
+**Ledger path** column is checked against P4-T5's exhaustive config-effect registry:
+every listed path must remain declared and backed by an effect or invariant test, and a
+removed path cannot remain here. Nested expert fields remain discoverable from the
+Pydantic models; the registry accounts for all of them.
 
-| Field | Default | Description |
-|---|---|---|
-| `output_dir` | `"artifacts"` | Base output directory |
-| `cache_dir` | `"data/audio_cache"` | Audio analysis cache |
-| `llm_provider` | `"openai"` | LLM provider name (`"openai"`, `"anthropic"`, or opt-in `"ollama"`) |
-| `llm_base_url` | `"https://api.openai.com/v1"` | LLM API base URL |
-| `audio_processing.hop_length` | `512` | Librosa hop length |
-| `audio_processing.frame_length` | `2048` | Librosa frame length |
-| `audio_processing.enhancements.stems.enabled` | `false` | Opt in to cached Demucs source separation |
-| `audio_processing.enhancements.stems.model_name` | `"htdemucs"` | Demucs model name; changing it produces a clean cache miss |
-| `audio_processing.enhancements.stems.vocal_presence_threshold` | `0.05` | Minimum separated-vocal coverage that opens the WhisperX gate |
-| `audio_processing.rhythm_source` | `"dsp"` | Beat/downbeat source (`"dsp"` or optional `"beat_this"`) |
-| `audio_processing.structure_source` | `"dsp"` | Section source (`"dsp"` or isolated-runtime `"allinone"`) |
-| `logging.level` | `"INFO"` | Log level |
+| JSON field | Default | Observable effect | Ledger path |
+|---|---|---|---|
+| `project_root` | current directory | Base for relative cache and artifact paths; `TWINKLR_PROJECT_ROOT` is the fallback | `app.project_root` |
+| `cache_dir` | `"data/audio_cache"` | Changes the audio-analysis cache location | `app.cache_dir` |
+| `llm_provider` | `"openai"` | Selects the provider adapter | `app.llm_provider` |
+| `llm_base_url` | `"https://api.openai.com/v1"` | Changes the provider endpoint after provider-specific URL validation | `app.llm_base_url` |
+| `audio_processing.hop_length` | `512` | Changes analysis frame spacing | `app.audio_processing.hop_length` |
+| `audio_processing.frame_length` | `2048` | Changes analysis window length | `app.audio_processing.frame_length` |
+| `audio_processing.enhancements.stems.enabled` | `false` | Opts into cached Demucs source separation | `app.audio_processing.enhancements.stems.enabled` |
+| `audio_processing.enhancements.stems.model_name` | `"htdemucs"` | Selects the Demucs model and changes cache identity | `app.audio_processing.enhancements.stems.model_name` |
+| `audio_processing.enhancements.stems.vocal_presence_threshold` | `0.05` | Changes the separated-vocal gate for WhisperX | `app.audio_processing.enhancements.stems.vocal_presence_threshold` |
+| `audio_processing.rhythm_source` | `"dsp"` | Selects the beat/downbeat producer | `app.audio_processing.rhythm_source` |
+| `audio_processing.structure_source` | `"dsp"` | Selects the musical-section producer | `app.audio_processing.structure_source` |
+| `logging.level` | `"INFO"` | Changes CLI log filtering | `app.logging.level` |
+| `logging.format` | timestamped text | Changes the installed CLI log formatter | `app.logging.format` |
 
 The `llm_api_key` field is populated from the `OPENAI_API_KEY` environment variable
 automatically. Ollama supplies the SDK's required-but-ignored local placeholder
@@ -153,7 +159,6 @@ Minimal example:
 
 ```json
 {
-  "output_dir": "artifacts",
   "llm_provider": "openai"
 }
 ```
@@ -208,39 +213,35 @@ specific installed model; it is not a choreography-quality benchmark.
 
 Job-specific settings. Loaded by `JobConfig` in `packages/twinklr/core/config/models.py`. Schema version 3.0.
 
-Key fields and defaults:
+The same registry-backed subset policy applies here.
 
-| Field | Default | Description |
-|---|---|---|
-| `schema_version` | `"3.0"` | Config schema version |
-| `fixture_config_path` | `"fixture_config.json"` | Path to fixture definitions (relative to job config dir) |
-| `agent.max_iterations` | `3` | Max planner/judge cycles. Set `0` to run the planner once, require deterministic heuristic validation, and skip the LLM judge. |
-| `agent.success_threshold` | `70` | Minimum judge score to accept a plan, on a 0-100 scale (validated; values outside the range are rejected). This is the only configured scale: the orchestrators convert it once to 0-10, enforce it, and keep the verdict status consistent with the score. |
-| `agent.token_budget` | `75000` | Total token budget |
-| `agent.plan_agent.model` | `"gpt-5.6-sol"` | Model for macro, moving-head, and group planners |
-| `agent.plan_agent.reasoning_effort` | `"high"` | Explicit planner reasoning level; quality-focused by default |
-| `agent.judge_agent.model` | `"gpt-5.6-terra"` | Model for macro, moving-head, group, and holistic judges |
-| `agent.judge_agent.reasoning_effort` | `"low"` | Explicit judge reasoning level; judges evaluate rather than create |
-| `agent.profile_agent` | `gpt-5.6-sol`, medium reasoning | Audio-profile model, temperature, and reasoning settings |
-| `agent.lyrics_agent` | `gpt-5.6-sol`, medium reasoning | Lyrics-context model, temperature, and reasoning settings |
-| `agent.refinement_agent` | `gpt-5.6-sol`, medium reasoning | Holistic-correction model, temperature, and reasoning settings |
-| `agent.asset_enricher_agent` | `gpt-5.6-terra`, low reasoning | Image-prompt enrichment settings; this does not enable asset generation |
-| `agent.recipe_generation_agent` | `gpt-5.6-sol`, high reasoning | Recipe-builder model, temperature, reasoning, output limit, and timeout settings |
-| `agent.image_model` | `"gpt-image-2"` | OpenAI Images API target used by enabled display/show asset generation |
-| `assets.enabled` | `false` | Opt in to generated Pictures assets for `twinklr display` and `twinklr show` |
-| `assets.dry_run` | `false` | Report the capped generation set and estimate while making zero image or enrichment calls |
-| `assets.max_image_requests_per_run` | `1` | Fixed live-policy ceiling: exactly one provider request exposure per run, with no image retry |
-| `assets.estimated_image_usd_per_request` | `0.20` | Conservative internal reservation for that request; this is an estimate, not a guaranteed dollar cap |
-| `assets.image_quality` | `"low"` | Explicit supported Images API quality; P3-T7 intentionally permits only the cost-pinned `low` value |
-| `assets.asset_base_path` | `null` | Optional assets root, relative to the job config; default: the run's shared `assets/` directory |
-| `agent.<role>.max_tokens` | `50000` | Maximum output tokens forwarded on that role's requests |
-| `agent.<role>.timeout_seconds` | `60` | Per-request provider timeout |
-| `planner_features.enable_shutter` | `true` | Plan shutter/strobe |
-| `planner_features.enable_color` | `true` | Plan color changes |
-| `planner_features.enable_gobo` | `true` | Plan gobo selection |
-| `transitions.enabled` | `true` | Enable section transitions |
-| `transitions.default_duration_bars` | `0.5` | Transition length in bars |
-| `checkpoint` | `true` | Enable stage result caching |
+| JSON field | Default | Observable effect | Ledger path |
+|---|---|---|---|
+| `schema_version` | `"3.0"` | Fixed schema identity; other values fail validation | `job.schema_version` |
+| `fixture_config_path` | `"fixture_config.json"` | Selects the fixture definition loaded for planning/rendering | `job.fixture_config_path` |
+| `agent.max_iterations` | `3` | Sets planner/judge cycles; `0` plans once, runs heuristics, and skips the judge | `job.agent.max_iterations` |
+| `agent.success_threshold` | `70` | Sets the accepted judge score on the single 0-100 configured scale | `job.agent.success_threshold` |
+| `agent.plan_agent.model` | `"gpt-5.6-sol"` | Selects the macro, moving-head, and group planner model | `job.agent.plan_agent.model` |
+| `agent.plan_agent.reasoning_effort` | `"high"` | Sets planner reasoning effort and cache identity | `job.agent.plan_agent.reasoning_effort` |
+| `agent.judge_agent.model` | `"gpt-5.6-terra"` | Selects the macro, moving-head, group, and holistic judge model | `job.agent.judge_agent.model` |
+| `agent.judge_agent.reasoning_effort` | `"low"` | Sets judge reasoning effort and cache identity | `job.agent.judge_agent.reasoning_effort` |
+| `agent.profile_agent` | `gpt-5.6-sol`, medium reasoning | Controls audio-profile request settings | `job.agent.profile_agent` |
+| `agent.lyrics_agent` | `gpt-5.6-sol`, medium reasoning | Controls lyrics-context request settings | `job.agent.lyrics_agent` |
+| `agent.refinement_agent` | `gpt-5.6-sol`, medium reasoning | Controls holistic-correction request settings | `job.agent.refinement_agent` |
+| `agent.asset_enricher_agent` | `gpt-5.6-terra`, low reasoning | Controls image-prompt enrichment; does not enable generation | `job.agent.asset_enricher_agent` |
+| `agent.image_model` | `"gpt-image-2"` | Selects the Images API model when assets are enabled | `job.agent.image_model` |
+| `agent.llm_logging.enabled` | `true` | Enables or disables per-call LLM logs | `job.agent.llm_logging.enabled` |
+| `agent.agent_cache.enabled` | `true` | Enables or disables agent-result cache reuse | `job.agent.agent_cache.enabled` |
+| `assets.enabled` | `false` | Opts display/show into generated Pictures assets | `job.assets.enabled` |
+| `assets.dry_run` | `false` | Reports capped asset work without enrichment or image calls | `job.assets.dry_run` |
+| `assets.max_image_requests_per_run` | `1` | Fixed one-request policy; alternative values fail validation | `job.assets.max_image_requests_per_run` |
+| `assets.estimated_image_usd_per_request` | `0.20` | Fixed conservative reservation used by the pre-call policy | `job.assets.estimated_image_usd_per_request` |
+| `assets.image_quality` | `"low"` | Fixed supported image quality; alternatives fail validation | `job.assets.image_quality` |
+| `assets.asset_base_path` | `null` | Changes the generated-asset/catalog root | `job.assets.asset_base_path` |
+| `write_checkpoint` | `true` | Writes the final moving-head plan for `twinklr eval-report`; it does not control stage cache reuse | `job.write_checkpoint` |
+| `transitions.enabled` | `true` | Enables section transition planning | `job.transitions.enabled` |
+| `transitions.default_duration_bars` | `0.5` | Sets the fallback transition length | `job.transitions.default_duration_bars` |
+| `timeline_tracks.sections` | `true` | Includes or omits section timing markers | `job.timeline_tracks.sections` |
 
 The planner schema may describe up to four narrative assets (`maxItems=4`), but the
 enabled live path authorizes only one image-provider request and reports the rest as
@@ -578,10 +579,13 @@ Install uv from [https://github.com/astral-sh/uv](https://github.com/astral-sh/u
 
 The pipeline uses a fail-fast policy. Check the console output for the failed stage name and error message. Common causes:
 - **Audio stage**: unsupported audio format or corrupt file
-- **Agent stages**: LLM API errors, token budget exceeded, or timeout
+- **Agent stages**: provider refusal/error, configured output limit, or timeout
 - **Render stage**: invalid fixture config or missing template XSQ file
 
-Successful stages are cached when `checkpoint: true` in job config. Re-running after fixing the error will reuse cached results for completed stages.
+Agent responses are cached when `agent.agent_cache.enabled` is true (the default).
+Re-running after fixing a failure can reuse compatible cached responses. The separate
+`write_checkpoint` field controls only the final moving-head plan written for
+`twinklr eval-report`; it does not enable or disable stage caching.
 
 ### Resetting caches
 

@@ -20,7 +20,7 @@ twinklr/
 │   │   ├── agents/              # Multi-agent orchestration
 │   │   │   ├── audio/           # Audio profiling & lyrics agents
 │   │   │   ├── sequencer/       # Planner, macro planner, group planner
-│   │   │   ├── providers/       # LLM provider adapters (OpenAI)
+│   │   │   ├── providers/       # OpenAI/Ollama + legacy Anthropic adapters
 │   │   │   ├── shared/          # Judge, iteration controller, validation
 │   │   │   └── logging/         # LLM call logging
 │   │   ├── audio/               # Audio analysis pipeline
@@ -184,7 +184,6 @@ The agent system is data-driven: `AgentSpec` data objects define prompt pack, re
 **Orchestration loop** (`AgentOrchestrationConfig` defaults):
 - `max_iterations`: 3 — planner/judge cycles; 0 plans once, runs heuristics, and skips judging
 - `success_threshold`: 70 — enforced minimum judge score, 0-100, the single configured scale; `AgentOrchestrationConfig.min_pass_score` converts it once to the planners' 0-10 scale
-- `token_budget`: 75,000 — total token limit
 
 **Agent configs** (`AgentOrchestrationConfig` role defaults):
 - Planning: `gpt-5.6-sol`, high reasoning, temperature 0.7
@@ -192,7 +191,6 @@ The agent system is data-driven: `AgentSpec` data objects define prompt pack, re
 - Judges: `gpt-5.6-terra`, low reasoning, temperature 0.3
 - Holistic correction: `gpt-5.6-sol`, medium reasoning, temperature 0.3
 - Asset prompt enrichment: `gpt-5.6-terra`, low reasoning, temperature 0.6
-- Recipe generation: `gpt-5.6-sol`, high reasoning, temperature 0.9
 - Image generation: `gpt-image-2` through the provider interface (assets remain disabled
   by default; `JobConfig.assets` owns dry-run, count, dollar, quality, and root controls)
 
@@ -210,20 +208,20 @@ shared across roles or jobs.
 
 _Source: `packages/twinklr/core/config/models.py`_
 
-All configs use Pydantic V2 with `ConfigDict(extra="ignore")` for forward compatibility.
+Configs use Pydantic V2. App/Job models ignore unrelated future keys while rejecting
+named retired keys with migration errors; safety-critical nested policies such as asset
+generation use `extra="forbid"`.
 
 ```
 ConfigBase (load_or_default)
-├── AppConfig           # config.json — LLM provider, cache dirs, audio processing, logging
-└── JobConfig           # job_config.json — agent orchestration, fixtures, poses, transitions
+├── AppConfig           # config.json — provider, cache, audio processing, logging
+└── JobConfig           # job_config.json — agents, fixture path, assets, transitions
     ├── AgentOrchestrationConfig
-    │   ├── AgentConfig (plan, implementation, judge, refinement)
+    │   ├── AgentConfig (plan, judge, refinement, profile, lyrics, asset enrichment)
     │   ├── LLMLoggingConfig
     │   └── CacheConfig
-    ├── PlannerFeatures
+    ├── AssetGenerationConfig
     ├── TransitionConfig
-    ├── PoseConfig
-    ├── AssumptionsConfig
     └── TimelineTracksConfig
 ```
 
@@ -359,8 +357,7 @@ make test                 # All tests
 make test-unit            # Unit tests only
 make test-integration     # Integration tests only
 make test-cov             # With coverage report
-make coverage             # Coverage breakdown by component
-make coverage-detailed    # Detailed coverage breakdown
+# make coverage / coverage-detailed are currently broken; see Key Scripts below
 ```
 
 Test markers:
@@ -368,20 +365,25 @@ Test markers:
 - `@pytest.mark.slow` — slow tests (deselect with `-m "not slow"`)
 
 Coverage is configured for `twinklr.core` with term-missing, HTML, and JSON reports.
+Use `make test-cov`. The `make coverage` and `make coverage-detailed` recipes still
+reference a deleted helper and are known-broken until that engineering gap is resolved.
 
 ---
 
 ## Key Scripts
 
-Scripts in `scripts/` provide demo, analysis, and validation utilities:
+The complete, category-based inventory and data requirements live in
+[`scripts/README.md`](../scripts/README.md). The main entry points are:
 
 | Script | Purpose |
 |---|---|
-| `demo_moving_heads_pipeline.py` | Demo the full moving heads pipeline |
-| `demo_sequencer_pipeline.py` | Compatibility shim forwarding to `twinklr display` |
-| `test_audio_pipeline.py` | Test audio analysis on a file (used by `make test-audio`) |
-| `build_pipeline.py` | Build/feature engineering pipeline (in `scripts/build/`) |
-| `show_coverage_by_component.py` | Coverage breakdown by component (used by `make coverage`) |
+| `scripts/validation/validate_artifacts.py` | Validate generated moving-head/display plans and XSQ artifacts; not wired into Make or CI |
+| `scripts/validation/validate_agent_artifacts.py` | Run saved-response schema and prompt validation; not wired into Make or CI |
+| `scripts/demo_moving_heads_pipeline.py` | Data-dependent moving-head pipeline demo |
+| `scripts/demo_sequencer_pipeline.py` | Compatibility shim forwarding to the production `twinklr display` CLI path |
+| `scripts/test_audio_pipeline.py` | Manual audio harness used by the `make test-audio*` targets; despite its name, pytest does not collect it |
+| `scripts/build/build_pipeline.py` | **Removed** with the ABANDON-candidate unified FE entrypoint on 2026-02-24 (`82aaf38`) |
+| `scripts/show_coverage_by_component.py` | **Removed**, restorable but not restored with `git show c67bbdd^:scripts/show_coverage_by_component.py`; the two Make coverage recipes that name it are currently broken |
 
 ---
 
@@ -418,6 +420,11 @@ contract, and both pass the same registration linter.
 ### Adding a New LLM Provider
 
 Implement the `LLMProvider` interface in `packages/twinklr/core/agents/providers/` and register it in the provider factory (`create_llm_provider()`). Configure via `AppConfig.llm_provider` and `AppConfig.llm_base_url`.
+
+The shipped strict-output paths are OpenAI `/v1/responses` and opt-in loopback Ollama
+`/v1/chat/completions` with JSON-schema `response_format`. The real Ollama `MacroPlan`
+smoke remains local-only and unclaimed. Anthropic remains a legacy/direct adapter and is
+not equivalent for registered strict-output roles.
 
 ### Adding New Audio Enhancement Features
 
