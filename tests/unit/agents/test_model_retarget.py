@@ -33,7 +33,6 @@ from twinklr.core.agents.sequencer.moving_heads.specs import (
     get_planner_spec as get_mh_planner_spec,
 )
 from twinklr.core.config.models import AgentConfig, AgentOrchestrationConfig
-from twinklr.core.recipe_builder.generation import default_recipe_generation_config
 
 
 class RecordingProvider:
@@ -226,14 +225,12 @@ def test_role_defaults_choose_current_models_and_deliberate_effort() -> None:
     assert config.judge_agent.reasoning_effort == "low"
 
 
-def test_recipe_generation_docs_match_central_default() -> None:
-    """Both published guides report the configured recipe-generation tier and effort."""
+def test_published_guides_do_not_expose_internal_recipe_generation_as_agent_role() -> None:
+    """Recipe generation is internal tooling, not a public JobConfig agent role."""
     root = Path(__file__).parents[3]
-    recipe_config = default_recipe_generation_config()
-    expected = f"`{recipe_config.model}`, {recipe_config.reasoning_effort} reasoning"
 
-    assert expected in (root / "docs/developer-guide.md").read_text()
-    assert expected in (root / "docs/user-guide.md").read_text()
+    for guide in ("docs/developer-guide.md", "docs/user-guide.md"):
+        assert "recipe_generation_agent" not in (root / guide).read_text()
 
 
 def test_no_hardcoded_legacy_model_literals() -> None:
