@@ -7,7 +7,7 @@ updated: 2026-08-26
 # Twinklr — Current State
 
 _Repository evidence and active sequencing verified 2026-08-26. All eight Phase 3
-offline implementations and three of seven Phase 4 tasks are integrated; Phase 3 and the
+offline implementations and five of seven Phase 4 tasks are integrated; Phase 3 and the
 earlier empirical exits remain open._
 
 Twinklr is an AI-powered choreography engine: audio file in, xLights artifacts out — a
@@ -77,14 +77,16 @@ See [product/overview.md](product/overview.md).
 
 ## Quality-gate state
 
-The latest accepted integrated baseline is main `bf6bba5`: `make validate` formatted
-**1,349 files**, completed with **5,233 passed, 39 skipped** at **88% coverage**, clean
-Ruff lint, and mypy success across **722 source files** after P4-T2 and P4-T3 integration.
+The latest accepted integrated baseline is main `05f24d0`: `make validate` formatted
+**1,352 files**, completed with **5,593 passed, 39 skipped** at **89% coverage**, clean
+Ruff lint, and mypy success across **719 source files** after P4-T4 and P4-T5 integration.
 The skips cover explicit optional/local-only boundaries rather than accepted
 implementation regressions. Exact task contracts and durable verification evidence are
 owned by the [P4-T1](../changes/twinklr-reactivation-review/build/specs/phase-4-compounding/P4-T1-ml-chain-python-bump.md),
 [P4-T2](../changes/twinklr-reactivation-review/build/specs/phase-4-compounding/P4-T2-local-provider-option.md),
-and [P4-T3](../changes/twinklr-reactivation-review/build/specs/phase-4-compounding/P4-T3-dead-tail-retirement-wave-1.md)
+[P4-T3](../changes/twinklr-reactivation-review/build/specs/phase-4-compounding/P4-T3-dead-tail-retirement-wave-1.md),
+[P4-T4](../changes/twinklr-reactivation-review/build/specs/phase-4-compounding/P4-T4-duplication-collapse.md),
+and [P4-T5](../changes/twinklr-reactivation-review/build/specs/phase-4-compounding/P4-T5-dead-config-final-sweep.md)
 specs.
 
 The review baseline at `aa8d325` did fail its own gates. That is historical evidence,
@@ -142,18 +144,27 @@ implementation now independently verifies file-backed provenance, rebuilds deter
 reports, shares provider request limits, and handles contact-sheet grounding. It is
 independently approved offline, but supplies no xLights evidence, visual-judge output,
 human judgment, calibration, real completed record, or empirical acceptance outcome.
-Phase 4 has three of seven tasks integrated. P4-T1 landed at `56d9aa0` after independent
+Phase 4 has five of seven tasks integrated. P4-T1 landed at `56d9aa0` after independent
 approval and clean-main verification; it coordinates the Python 3.13/ML-chain
 modernization and removes the orphaned diarization and unused dependency surfaces. P4-T2
 is integrated through implementation `3765bd9` and redirect-hardening remediation
 `40e8e55`; its offline provider path is verified, but real Ollama schema validity remains
 unclaimed pending the explicit local-only opt-in smoke. P4-T3's independently verified
 dead-tail retirement is integrated at `bf6bba5`, with migration/unwiring sequencing and
-live-caller retentions preserved. Under the owner override, optional WhisperX/TorchCodec
-runtime execution remains deferred and unavailable against the current default FFmpeg 9.
+live-caller retentions preserved. P4-T4's independently verified duplication collapse is
+integrated at `3e7f679`; it consolidates provider transport retry ownership, closes HTTP
+and cache lifecycles, wires logging and surviving HTTP configuration, and preserves the
+separate generic pipeline replay controls. P4-T5's independently verified configuration
+accountability sweep is integrated at `05f24d0`; its generated registry accounts for
+every external App, Job, FixtureGroup, and TemplateDoc path with an exact effect test,
+invariant test, or removal disposition. Under the owner override, optional
+WhisperX/TorchCodec runtime execution remains deferred and unavailable against the
+current default FFmpeg 9.
 Exact contracts and verification evidence live in the [P4-T1](../changes/twinklr-reactivation-review/build/specs/phase-4-compounding/P4-T1-ml-chain-python-bump.md),
 [P4-T2](../changes/twinklr-reactivation-review/build/specs/phase-4-compounding/P4-T2-local-provider-option.md),
-and [P4-T3](../changes/twinklr-reactivation-review/build/specs/phase-4-compounding/P4-T3-dead-tail-retirement-wave-1.md)
+[P4-T3](../changes/twinklr-reactivation-review/build/specs/phase-4-compounding/P4-T3-dead-tail-retirement-wave-1.md),
+[P4-T4](../changes/twinklr-reactivation-review/build/specs/phase-4-compounding/P4-T4-duplication-collapse.md),
+and [P4-T5](../changes/twinklr-reactivation-review/build/specs/phase-4-compounding/P4-T5-dead-config-final-sweep.md)
 task specs.
 
 The authoritative current task/gate list is the campaign

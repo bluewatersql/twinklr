@@ -278,3 +278,13 @@ non-default aim zones reaching compiled metadata. The replacement candidate
 passed its fresh full `make validate` gate with 5,591 tests passing and 39
 skipped, plus clean formatting, Ruff, and mypy (719 source files). It still
 requires independent verification; this execution record does not approve it.
+
+## Integration record (2026-08-26)
+
+The later remediation chain corrected raw-DMX pose-safety evaluation, removed duplicate
+registry overrides, protected and pinned the eight restored exact effect paths, and
+aligned the campaign status with the already-integrated P4-T4 baseline. Independent
+verification approved the final candidate, which was integrated on main at `05f24d0`.
+P4-T6 may now consume the registry's `REMOVED` dispositions for the documentation truth
+pass. The current combined-main quality gate is single-owned by
+[context/current-state.md](../../../../../context/current-state.md).

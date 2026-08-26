@@ -60,8 +60,12 @@ _Last updated: 2026-08-26._
   xLights GUI dates/checks remain deferred until a meaningful,
   fully working end-to-end show exists; their empirical gates and all earlier empirical
   exits remain open.
-  Phase 4 has one of seven tasks integrated: P4-T1 landed at `56d9aa0` after
-  independent approval and clean-main verification.
+  Phase 4 has five of seven tasks integrated. P4-T1 landed at `56d9aa0`; P4-T2's
+  implementation and redirect hardening are integrated through `3765bd9`/`40e8e55`;
+  P4-T3 is integrated at `bf6bba5`; P4-T4 is integrated at `3e7f679`; and P4-T5 is
+  integrated at `05f24d0`, each after independent verification. P4-T2's real Ollama
+  schema smoke remains unclaimed pending explicit local opt-in. P4-T6 is next; Phase 4
+  exit is not yet satisfied.
   Optional WhisperX runtime audio execution remains owner-deferred against the current
   default FFmpeg 9; see the
   [active task spec](twinklr-reactivation-review/build/specs/phase-4-compounding/P4-T1-ml-chain-python-bump.md).

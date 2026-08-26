@@ -310,3 +310,11 @@ pairs (less urgent than the T9 spec assumed) but nothing ever evicts — add
 TTL/size-based eviction here alongside the conversation-store eviction this task
 already owns. Also: session-id derivation should exclude AppConfig.cache_dir
 (latent divergence if a machine-local absolute cache path is configured).
+
+## Integration record (2026-08-26)
+
+The remediated candidate received independent verification and was integrated on main at
+`3e7f679`. P4-T5 subsequently consumed its retained logging, timeout, retry, and audio
+HTTP configuration evidence without reopening P4-T4's provider-transport ownership
+decisions. The current combined-main quality gate is single-owned by
+[context/current-state.md](../../../../../context/current-state.md).
