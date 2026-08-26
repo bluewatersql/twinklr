@@ -109,9 +109,17 @@ integrated and offline-verified at `558153c`, but live acceptance remains open a
 further P3-T4 live attempt was then authorized. On 2026-08-26 the owner approved exactly
 one second audited request: authorization
 `p3-t4-second-attempt-owner-approved-2026-08-26`, exact `$1.660000` additional
-preauthorization, `$3.32` cumulative hard cap, and two-attempt lifetime cap. The
-fail-closed amendment is an unexecuted candidate pending independent audit; no third
-attempt is authorized. The owner accepted all nine P3-T5 decisions,
+preauthorization, `$3.32` cumulative hard cap, and two-attempt lifetime cap. After
+independent audit, attempt 2 made exactly one request and received HTTP 400 because
+`temperature` is unsupported by `gpt-5.6-sol`; no retry, fallback, logical request,
+schema repair, or usage metadata occurred. The ledger therefore commits both
+`$1.660000` reservations (`$3.320000` total). The lifetime cap is exhausted, no third
+attempt is authorized, and live acceptance remains open. Offline remediation now makes
+temperature optional and uses one explicit OpenAI capability normalization for actual
+provider parameters, runner dispatch, serialized request evidence, and probe identity:
+`gpt-5.6-sol` omits temperature while retaining reasoning effort, while known
+temperature-supporting models retain it. This remediation made no provider call and
+does not reopen the attempt cap. The owner accepted all nine P3-T5 decisions,
 and P3-T5 was integrated at `f006468`. On 2026-08-26 the owner accepted P3-T6's offline
 unified-emission contract. Formal first review rejected the initial snapshot; standards,
 specification, and adversarial review then approved the remediation offline/in code, and

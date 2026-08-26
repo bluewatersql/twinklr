@@ -71,6 +71,11 @@ def test_agent_spec_temperature_validation():
     spec2 = AgentSpec(name="test", prompt_pack="test", response_model=dict, temperature=2.0)
     assert spec2.temperature == 2.0
 
+    spec_without_temperature = AgentSpec(
+        name="test", prompt_pack="test", response_model=dict, temperature=None
+    )
+    assert spec_without_temperature.temperature is None
+
     # Invalid temperature
     with pytest.raises(ValidationError):
         AgentSpec(name="test", prompt_pack="test", response_model=dict, temperature=2.5)

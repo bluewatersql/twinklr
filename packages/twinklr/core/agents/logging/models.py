@@ -24,7 +24,7 @@ class LLMCallLog(BaseModel):
 
     # Model configuration
     model: str
-    temperature: float
+    temperature: float | None
 
     # Prompts
     system_prompt: str | None = None

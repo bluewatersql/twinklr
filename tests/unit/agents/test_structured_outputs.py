@@ -459,6 +459,43 @@ async def test_invalid_strict_schema_400_propagates_without_fallback() -> None:
 
 
 @pytest.mark.asyncio
+async def test_unsupported_temperature_400_is_terminal_without_retry_or_fallback() -> None:
+    error_response = MagicMock(status_code=400, headers={})
+    rejection = BadRequestError(
+        "Unsupported parameter: 'temperature' is not supported with this model.",
+        response=error_response,
+        body={
+            "error": {
+                "message": (
+                    "Unsupported parameter: 'temperature' is not supported with this model."
+                )
+            }
+        },
+    )
+
+    with (
+        patch("twinklr.core.agents.providers.openai.OpenAIClient"),
+        patch("twinklr.core.agents.providers.openai.AsyncOpenAI") as async_openai,
+    ):
+        client = MagicMock()
+        client.responses.create = AsyncMock(side_effect=rejection)
+        async_openai.return_value = client
+        provider = OpenAIProvider(api_key="test-key")
+
+        with pytest.raises(LLMProviderError, match="Unsupported parameter"):
+            await provider.generate_json_async(
+                messages=[{"role": "user", "content": "respond"}],
+                model="gpt-4.1",
+                temperature=0.4,
+                response_model=StrictSample,
+                provider_max_attempts=3,
+                allow_json_object_fallback=True,
+            )
+
+    assert client.responses.create.await_count == 1
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "reason", ["json_decode", "refusal", "truncation", "content_filter", "empty_response"]
 )

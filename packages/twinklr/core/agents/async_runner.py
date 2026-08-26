@@ -18,6 +18,7 @@ from twinklr.core.agents.providers.base import (
     ResponseMetadata,
     TokenUsage,
 )
+from twinklr.core.agents.providers.capabilities import normalized_openai_generation_config
 from twinklr.core.agents.providers.conversation import generate_conversation_id
 from twinklr.core.agents.providers.errors import (
     LLMProviderError,
@@ -562,7 +563,6 @@ class AsyncAgentRunner:
         return await self.provider.generate_json_async(
             messages=messages,
             model=spec.model,
-            temperature=spec.temperature,
             **self._provider_request_kwargs(spec, input_image_urls),
         )
 
@@ -640,7 +640,6 @@ class AsyncAgentRunner:
             conversation_id=state.conversation_id,
             model=spec.model,
             system_prompt=system_prompt,
-            temperature=spec.temperature,
             **self._provider_request_kwargs(spec),
         )
 
@@ -655,13 +654,22 @@ class AsyncAgentRunner:
         if spec.response_model is not dict:
             kwargs["response_model"] = spec.response_model
         if self.provider.provider_type == ProviderType.OPENAI:
-            kwargs["reasoning_effort"] = spec.reasoning_effort
+            kwargs.update(
+                normalized_openai_generation_config(
+                    model=spec.model,
+                    temperature=spec.temperature,
+                    reasoning_effort=spec.reasoning_effort,
+                )
+            )
             kwargs["provider_max_attempts"] = spec.provider_max_attempts
             kwargs["allow_json_object_fallback"] = spec.allow_json_object_fallback
             if input_image_urls:
                 kwargs["input_image_urls"] = input_image_urls
-        elif input_image_urls:
-            raise RunError("Configured provider does not support vision image inputs")
+        else:
+            if spec.temperature is not None:
+                kwargs["temperature"] = spec.temperature
+            if input_image_urls:
+                raise RunError("Configured provider does not support vision image inputs")
         return kwargs
 
     def _format_validation_error(self, error: ValidationError) -> str:

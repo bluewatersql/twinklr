@@ -631,14 +631,12 @@ fails closed and can never initialize a fresh ledger. The sealed authorization a
 and in-progress attempt 2 are one atomic transition; attempt 1's canonical object remains
 unchanged. The source manifest must also be clean and committed before any request.
 
-The amendment implementation and offline adversarial suite are an unexecuted candidate
-pending independent audit. No provider/network/live call was made while authoring it,
-and no attempt-2 result is claimed here. The CLI adds required authorization ID,
+The amendment implementation and offline adversarial suite were independently audited
+after the clean-manifest remediation below. The CLI adds required authorization ID,
 prior-ledger-hash, and prior-attempt-hash inputs alongside the existing identity pins.
-Live acceptance remains open until the independently approved candidate is run once and
-its sealed result is reviewed.
+Its single authorized execution and sealed outcome are recorded below.
 
-Fresh offline author gates for the unexecuted amendment candidate: dedicated adversarial
+Fresh offline author gates for the pre-execution amendment candidate: dedicated adversarial
 harness `50 passed`; broader macro/group/provider/schema/coordination regression `408
 passed`; repository format `1361 files already formatted`; Ruff clean; mypy clean across
 `731 source files`; full offline suite `5365 passed, 38 skipped`; `git diff --check`
@@ -662,6 +660,42 @@ ledger mutation occurred during review or remediation.
 Fresh remediation author gates: dedicated harness `52 passed`; repository format `1361
 files already formatted`; Ruff clean; mypy clean across `731 source files`; full offline
 suite `5367 passed, 38 skipped`; `git diff --check` clean.
+
+### Live attempt 2 and provider-capability remediation — 2026-08-26
+
+After independent audit and clean-commit preflight, the amendment executed its one
+authorized request. OpenAI returned HTTP 400 `invalid_request_error` with parameter
+`temperature`: `temperature` is not supported by `gpt-5.6-sol`. The sealed attempt-2
+record contains exactly one provider entry, zero logical requests, zero retries, zero
+JSON-object fallbacks, zero schema repairs, no response metadata, and unavailable usage.
+The full second `$1.660000` reservation therefore remains committed. Together with
+attempt 1, canonical spend is `$3.320000` reserved and committed, with no trustworthy
+actual usage. The two-attempt lifetime cap is exhausted. No third attempt is authorized
+under any outcome, remediation, price change, or later invocation; live acceptance
+remains open.
+
+The offline root-cause remediation makes `temperature` optional through `AgentConfig`,
+`AgentSpec`, logging, and runner/orchestrator seams and centralizes OpenAI optional
+generation parameters in an explicit model-capability policy. `gpt-5.6-sol` now omits
+temperature while retaining its configured reasoning effort; known
+temperature-supporting models still receive their configured temperature. The runner,
+provider request, serialized request evidence, and probe identity all consume the same
+normalized configuration, preventing audit identity from diverging from actual provider
+parameters. A provider HTTP 400 for an unsupported parameter remains terminal even when
+provider retries and JSON-object fallback are otherwise enabled.
+
+TDD discriminators captured the pre-fix failures at the public provider, runner, and
+probe serialization/identity seams, then passed with the shared normalization. Further
+tests pin optional config/spec temperature, a known temperature-supporting model, the
+preserved reasoning-effort parameter, and the one-request terminal unsupported-parameter
+path. No provider/network/live call or canonical-ledger mutation occurred while
+authoring or testing this remediation. It is offline remediation only and cannot convert
+either failed request into live acceptance or create attempt 3.
+
+Fresh post-call remediation gates: provider/runner/config/probe focused suite `149
+passed`; full offline suite `5373 passed, 38 skipped`; repository format `1362 files
+already formatted`; Ruff clean; mypy clean across `732 source files`; and `git diff
+--check` clean.
 
 ## Effort & risk
 

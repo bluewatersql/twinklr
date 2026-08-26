@@ -18,6 +18,12 @@ authorization `p3-t4-second-attempt-owner-approved-2026-08-26`, exact additional
 preauthorization `$1.660000`, cumulative hard cap `$3.32`, and lifetime attempt cap two.
 No third attempt is authorized._
 
+_Attempt 2 subsequently made exactly one provider request and received HTTP 400 because
+`temperature` is unsupported by `gpt-5.6-sol`. No retry, fallback, logical request,
+schema repair, or usage metadata occurred. Both `$1.660000` reservations remain
+committed (`$3.320000` total); the attempt cap is exhausted and live acceptance remains
+open._
+
 ## Decision
 
 `MacroPlan` has exactly four top-level fields: `sections`, `palette_arc`,
@@ -92,6 +98,13 @@ applied and the discrepancy is surfaced for owner review.
   the task specification. Missing, reset, or semantically changed history cannot create
   a fresh budget. Authorization and attempt 2 must enter the ledger atomically, and
   every later invocation fails regardless of attempt-2 outcome or metered cost.
+- The sealed attempt-2 result is terminal evidence, not acceptance: HTTP 400 unsupported
+  `temperature`, one provider request, zero logical retries, zero fallbacks, zero schema
+  repairs, and unavailable usage. Offline remediation makes temperature optional and
+  applies one explicit OpenAI model-capability normalization to runner dispatch,
+  provider parameters, serialized request evidence, and probe identity. The policy
+  omits temperature for `gpt-5.6-sol` while preserving reasoning effort and retains
+  configured temperature for known supporting models. It cannot authorize attempt 3.
 
 ## Related
 

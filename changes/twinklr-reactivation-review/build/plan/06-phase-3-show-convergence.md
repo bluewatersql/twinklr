@@ -16,7 +16,12 @@ recorded for display output; assets pipeline optionally enriching Pictures effec
 > acceptance remains open after one HTTP 400 `invalid_json_schema`; no retry/fallback
 > occurred and usage was unavailable, so `$1.660000` remains committed. On 2026-08-26
 > the owner authorized exactly one second audited request under a new `$3.32` cumulative
-> cap; no third attempt is authorized. The owner subsequently accepted all nine P3-T5
+> cap. Attempt 2 made one provider request and received HTTP 400 because `temperature`
+> is unsupported by `gpt-5.6-sol`; no retry/fallback/logical request/schema repair or
+> usage metadata occurred. Both `$1.660000` reservations remain committed, the
+> two-attempt cap is exhausted, no third attempt is authorized, and live acceptance
+> remains open. Offline capability normalization removes temperature for this model
+> without creating another live attempt. The owner subsequently accepted all nine P3-T5
 > decisions, and P3-T5 was integrated at `f006468`. P3-T6's remediated offline/code
 > candidate received independent standards, specification, and adversarial approval and
 > was integrated at `c9620db`. Phase 3 now has six of eight tasks integrated. P3-T6
@@ -52,9 +57,11 @@ recorded for display output; assets pipeline optionally enriching Pictures effec
 - P3-T1 through P3-T6 are integrated at the commits recorded in the campaign handoff;
   P3-T6 is integrated at `c9620db` after independent standards, specification, and
   adversarial approval offline/in code.
-- P3-T4 live acceptance remains open after attempt 1. Exactly one second audited request
-  is owner-authorized under the sealed-history, two-attempt, `$3.32` contract; no third
-  attempt is authorized.
+- P3-T4 live acceptance remains open after two failed audited requests. Attempt 2 was
+  terminal HTTP 400 unsupported `temperature`, with one provider request and no retry,
+  fallback, logical request, schema repair, or usage metadata. `$3.320000` is committed,
+  the two-attempt cap is exhausted, and no third attempt is authorized. The offline
+  model-capability remediation does not reopen that boundary.
 - P3-T6 empirical xLights GUI acceptance remains open, with its date deferred until a
   meaningful end-to-end show is fully working. P3-T7+ and task-bounded live/paid work
   are owner-authorized. The

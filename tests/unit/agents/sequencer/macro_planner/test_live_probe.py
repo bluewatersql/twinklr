@@ -55,7 +55,10 @@ class FakeProvider:
         self.calls: list[dict[str, Any]] = []
 
     async def generate_json_async(self, messages, model, temperature=None, **kwargs):
-        self.calls.append({"messages": messages, "model": model, **kwargs})
+        call = {"messages": messages, "model": model, **kwargs}
+        if temperature is not None:
+            call["temperature"] = temperature
+        self.calls.append(call)
         if self.error:
             raise self.error
         return LLMResponse(
@@ -188,6 +191,21 @@ def test_second_attempt_contract_is_exactly_owner_authorized() -> None:
     assert MAX_TASK_ATTEMPTS == 2
     assert Decimal("3.32") == HARD_USD_CAP
     assert _preauthorized_worst_cost() == Decimal("1.660000")
+
+
+def test_probe_serialization_and_identity_share_normalized_model_config() -> None:
+    root = Path(__file__).resolve().parents[5]
+    identity, context = _identity(root, root / DEFAULT_FIXTURE)
+    serialized, request_config = probe_module._serialized_request(
+        MacroPlannerOrchestrator(provider=object()), context
+    )
+    serialized_config = json.loads(serialized)["config"]
+
+    assert "temperature" not in request_config
+    assert request_config["reasoning_effort"] == "high"
+    assert serialized_config == request_config
+    assert "temperature" not in identity["budget"]
+    assert identity["budget"]["reasoning_effort"] == "high"
 
 
 @pytest.mark.asyncio
@@ -450,6 +468,8 @@ async def test_success_uses_one_strict_request_and_writes_evidence(
     assert len(provider.calls) == 1
     assert provider.calls[0]["provider_max_attempts"] == 1
     assert provider.calls[0]["allow_json_object_fallback"] is False
+    assert "temperature" not in provider.calls[0]
+    assert provider.calls[0]["reasoning_effort"] == "high"
     assert attempt["response"]["id"] == "resp_offline_fixture"
     persisted = json.loads(canonical_owner_state.read_text())
     assert persisted["attempts"][1]["identity"]["budget"]["schema_repairs"] == 0

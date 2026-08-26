@@ -81,6 +81,26 @@ async def test_every_agent_role_sends_explicit_reasoning_effort(tmp_path) -> Non
     assert all(call["reasoning_effort"] in {"low", "medium", "high"} for call in provider.calls)
 
 
+@pytest.mark.asyncio
+async def test_runner_normalizes_sampling_options_for_openai_model(tmp_path: Path) -> None:
+    provider = RecordingProvider()
+    runner = AsyncAgentRunner(provider=provider, prompt_base_path=tmp_path)
+    sol_spec = get_macro_planner_spec(
+        config=AgentConfig(model=AgentConfig().model, temperature=0.7, reasoning_effort="high")
+    )
+    supported_spec = get_macro_planner_spec(
+        config=AgentConfig(model="gpt-4.1", temperature=0.4, reasoning_effort="medium")
+    )
+
+    await runner._call_oneshot_async(sol_spec, [{"role": "user", "content": "test"}])
+    await runner._call_oneshot_async(supported_spec, [{"role": "user", "content": "test"}])
+
+    assert "temperature" not in provider.calls[0]
+    assert provider.calls[0]["reasoning_effort"] == "high"
+    assert provider.calls[1]["temperature"] == 0.4
+    assert provider.calls[1]["reasoning_effort"] == "medium"
+
+
 def test_model_id_comes_from_config() -> None:
     """Each role factory uses the model supplied by its role configuration."""
     custom = AgentConfig(
@@ -103,6 +123,12 @@ def test_model_id_comes_from_config() -> None:
     assert build_enricher_spec(config=custom).model == "configured-model"
     assert get_macro_planner_spec(config=custom).max_tokens == 1234
     assert get_macro_planner_spec(config=custom).timeout_seconds == 17
+
+
+def test_agent_config_allows_model_policy_to_omit_temperature() -> None:
+    config = AgentConfig(temperature=None)
+    assert config.temperature is None
+    assert get_macro_planner_spec(config=config).temperature is None
 
 
 @pytest.mark.asyncio

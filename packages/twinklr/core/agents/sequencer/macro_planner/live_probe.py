@@ -35,6 +35,7 @@ from twinklr.core.agents.providers.base import (
     ProviderType,
     ResponseMetadata,
 )
+from twinklr.core.agents.providers.capabilities import normalized_openai_generation_config
 from twinklr.core.agents.providers.openai import SDK_MAX_RETRIES, OpenAIProvider
 from twinklr.core.agents.schema_utils import (
     get_json_schema_example,
@@ -467,10 +468,14 @@ def _serialized_request(
     messages.extend(prompts.get("examples") or [])
     if prompts.get("user"):
         messages.append({"role": "user", "content": prompts["user"]})
+    generation_config = normalized_openai_generation_config(
+        model=spec.model,
+        temperature=spec.temperature,
+        reasoning_effort=spec.reasoning_effort,
+    )
     request_config = {
         "model": spec.model,
-        "temperature": spec.temperature,
-        "reasoning_effort": spec.reasoning_effort,
+        **generation_config,
         "max_output_tokens": spec.max_tokens,
         "timeout_seconds": spec.timeout_seconds,
         "provider_max_attempts": spec.provider_max_attempts,
@@ -504,6 +509,11 @@ def _identity(repo_root: Path, fixture: Path) -> tuple[dict[str, Any], PlanningC
     )
     base_spec = get_planner_spec()
     probe_spec = _probe_spec()
+    generation_config = normalized_openai_generation_config(
+        model=probe_spec.model,
+        temperature=probe_spec.temperature,
+        reasoning_effort=probe_spec.reasoning_effort,
+    )
     schema_hash = _sha(_canonical(strict_json_schema(MacroPlan)))
     prompt_hash = spec_prompt_hash(AGENTS_BASE_PATH, probe_spec)
     frozen_identity = descriptor["probe_identity"]
@@ -546,8 +556,7 @@ def _identity(repo_root: Path, fixture: Path) -> tuple[dict[str, Any], PlanningC
         "runtime": runtime,
         "budget": {
             "mode": probe_spec.mode.value,
-            "reasoning_effort": probe_spec.reasoning_effort,
-            "temperature": probe_spec.temperature,
+            **generation_config,
             "timeout_seconds": probe_spec.timeout_seconds,
             "max_output_tokens": MAX_OUTPUT_TOKENS,
             "max_prompt_tokens_for_preauthorization": MAX_PROMPT_TOKENS,

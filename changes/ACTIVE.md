@@ -33,8 +33,15 @@ _Last updated: 2026-08-26._
   On 2026-08-26 the owner authorized exactly one second audited request under
   authorization `p3-t4-second-attempt-owner-approved-2026-08-26`, with exact additional
   `$1.660000` preauthorization, a `$3.32` cumulative hard cap, and a two-attempt lifetime
-  cap. Its fail-closed amendment is an unexecuted candidate pending independent audit;
-  no third attempt is authorized and live acceptance remains open. The
+  cap. After independent audit and clean-commit preflight, attempt 2 made exactly one
+  provider request on 2026-08-26. OpenAI returned HTTP 400 because `temperature` is not
+  supported by `gpt-5.6-sol`; there was no retry, fallback, logical request, schema
+  repair, or usage metadata. Both `$1.660000` reservations are therefore committed
+  (`$3.320000` total), the two-attempt lifetime cap is exhausted, no third attempt is
+  authorized, and live acceptance remains open. An offline remediation now normalizes
+  request parameters through an explicit model-capability policy so `gpt-5.6-sol`
+  omits temperature while retaining reasoning effort; it does not create live
+  acceptance or another attempt. The
   owner subsequently accepted all nine P3-T5 decisions, and P3-T5 was integrated at
   `f006468`. P3-T6's remediated candidate then received independent standards,
   specification, and adversarial approval offline/in code and was integrated at

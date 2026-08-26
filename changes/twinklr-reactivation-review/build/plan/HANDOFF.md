@@ -3,10 +3,11 @@
 _Last updated: 2026-08-26 after P3-T6's independently approved offline/code candidate
 was integrated at `c9620db`. P3-T6 empirical xLights GUI acceptance remains open, with
 all GUI dates/checks deferred until a meaningful end-to-end show is fully working.
-P3-T4's first live attempt remains rejected at the provider schema boundary with
-`$1.660000` committed. The owner authorized exactly one second audited request under a
-two-attempt, `$3.32` cumulative contract; its fail-closed amendment is an unexecuted
-candidate pending independent audit and no third attempt is authorized. P3-T7+ and
+P3-T4's two live attempts both failed safely: attempt 1 at the provider schema boundary,
+and attempt 2 with HTTP 400 because `temperature` is unsupported by `gpt-5.6-sol`.
+Exactly one provider request and no retry/fallback/schema repair occurred in each;
+`$3.320000` is committed, the two-attempt cap is exhausted, no third attempt is
+authorized, and live acceptance remains open. P3-T7+ and
 task-bounded live/paid work are authorized. Maintained by the
 orchestrating agent; update this file at every
 pause or phase boundary._
@@ -29,7 +30,7 @@ their authoring moment; this handoff owns the current campaign status.
 | 1P — Render truth | **IMPLEMENTATION MERGED AND VERIFIED** (12/12); **phase exit not complete** | The recorded human judgment and empirical xLights acceptance evidence remain pending; see [02-phase-1p-render-truth.md](02-phase-1p-render-truth.md). |
 | 2P — Creative quality | **OFFLINE IMPLEMENTATION MERGED AND VERIFIED** (13/13); **phase exit not complete** | The owner accepted T1/T8/T9 on 2026-08-16. T6 calibration/live evidence, T13/D1 evidence, and other live checks remain pending; see [04-phase-2p-creative-quality.md](04-phase-2p-creative-quality.md). |
 | 2K — Catalog growth | **TOOLING IMPLEMENTATION MERGED AND VERIFIED** (4/4); **phase exit not complete** | Tooling is ready, but coverage/corpus/curation/style exit criteria require the author's real layout, corpus, preferences, and judgments; see [05-phase-2k-catalog-growth.md](05-phase-2k-catalog-growth.md). |
-| 3 — Show convergence | **P3-T1–P3-T6 MERGED AND INDEPENDENTLY APPROVED OFFLINE/IN CODE** (6/8 integrated) | P3-T6 is integrated at `c9620db`; its empirical xLights gate remains open and deferred to the meaningful end-to-end milestone. P3-T7+ and task-bounded live/paid work are authorized. P3-T4 has exactly one second audited request authorized; live acceptance remains open. Earlier commits: P3-T5 `f006468`; P3-T4 `558153c`; P3-T3 `33cce57`; P3-T2 `5365f70`; P3-T1 `5eebcb2`. |
+| 3 — Show convergence | **P3-T1–P3-T6 MERGED AND INDEPENDENTLY APPROVED OFFLINE/IN CODE** (6/8 integrated) | P3-T6 is integrated at `c9620db`; its empirical xLights gate remains open and deferred to the meaningful end-to-end milestone. P3-T7+ and task-bounded live/paid work are authorized. P3-T4 exhausted its two audited attempts; both failed safely, `$3.320000` is committed, no third attempt is authorized, and live acceptance remains open. Earlier commits: P3-T5 `f006468`; P3-T4 `558153c`; P3-T3 `33cce57`; P3-T2 `5365f70`; P3-T1 `5eebcb2`. |
 | 4 — Compounding | **NOT STARTED** | No Phase 4 implementation has started. |
 
 The overall `twinklr-reactivation-review` change remains **ACTIVE**. Finishing an
@@ -124,9 +125,14 @@ offline implementation lane is not the same as satisfying its phase exit criteri
   an attempt's `$1.66` reservation; it is recorded as unavailable.
 - Attempt 1 had no trustworthy usage, so its full `$1.660000` reservation is permanently
   committed. The canonical owner-local ledger and attempt-1 object must remain unchanged.
-  The amendment candidate atomically seals its authorization and in-progress attempt 2,
-  requires a clean committed source manifest, and has not made a provider call. Live
-  acceptance remains open rather than being inferred from the offline schema fix.
+  The amendment atomically sealed its authorization and in-progress attempt 2 and
+  required a clean committed source manifest before the call.
+- Attempt 2 made exactly one provider request. OpenAI returned HTTP 400
+  `invalid_request_error` because `temperature` is unsupported by `gpt-5.6-sol`. There
+  was no retry, JSON-object fallback, logical request, schema repair, response metadata,
+  or usage. Its full `$1.660000` reservation remains committed; cumulative reserved and
+  committed spend is `$3.320000`. The two-attempt cap is exhausted, no third attempt is
+  authorized, and live acceptance remains open.
 - The post-attempt general `$ref` remediation has fresh author evidence: the three
   pre-fix discriminators now pass; strict/provider/contract/harness `122 passed`; complete
   P3-T4 planning/provider surface `638 passed`; Ruff/format/mypy clean (`723` source
@@ -137,12 +143,11 @@ offline implementation lane is not the same as satisfying its phase exit criteri
   (`38236` bytes). Independent offline/code reviews approved the remediated candidate,
   which was integrated at `558153c`. This does not convert the failed probe into live
   acceptance.
-- The unexecuted second-attempt amendment candidate has fresh offline author evidence:
+- The pre-execution second-attempt amendment candidate had fresh offline author evidence:
   adversarial harness `50 passed`; broader planning/provider/schema regression `408
   passed`; full suite `5365 passed, 38 skipped`; `1361` files already formatted; Ruff
   clean; mypy clean across `731` source files; and `git diff --check` clean. No
-  provider/network/live call was made. Independent audit remains required before the
-  single authorized request.
+  provider/network/live call was made by those gates.
 - Independent review rejected amendment candidate `f0557b9`: its clean-manifest
   preflight excluded untracked files, allowing a root `sitecustomize.py` or a file under
   a transitive source root to bypass the gate. Two discriminators failed before the fix
@@ -153,6 +158,17 @@ offline implementation lane is not the same as satisfying its phase exit criteri
   Fresh remediation author gates are harness `52 passed`, full offline suite `5367
   passed, 38 skipped`, `1361` files already formatted, Ruff clean, mypy clean across
   `731` source files, and `git diff --check` clean.
+- Post-call offline root-cause remediation centralizes optional OpenAI generation
+  parameters in one explicit model-capability policy used by runner dispatch, provider
+  requests, serialized probe evidence, and probe identity. `gpt-5.6-sol` omits
+  temperature while retaining reasoning effort; known temperature-supporting models
+  keep configured temperature. Unsupported-parameter HTTP 400 remains terminal with one
+  provider request even when retry/fallback settings are enabled. TDD red evidence was
+  captured independently at the provider, runner, and probe identity seams. No
+  provider/network/live call or canonical-ledger mutation occurred during remediation,
+  and it cannot reopen the exhausted attempt cap. Fresh gates: focused `149 passed`;
+  full offline suite `5373 passed, 38 skipped`; `1362` files already formatted; Ruff
+  clean; mypy clean across `732` source files; and `git diff --check` clean.
 
 ### Phase 2P offline implementation record
 
@@ -236,9 +252,9 @@ The remaining empirical checks are also pending:
 
 ## Continuation order
 
-1. Independently audit the P3-T4 second-attempt amendment; only after GO, recompute its
-   clean-commit pins and execute exactly one request. Record the sealed result and close
-   the harness permanently to a third attempt.
+1. Independently review the P3-T4 post-call provider-capability remediation offline.
+   Preserve the sealed two-attempt ledger and permanent no-third-attempt boundary; do
+   not infer live acceptance from the fix.
 2. Continue P3-T7 and later authorized implementation, including task-bounded live/paid
    work only through each task's recorded caps and evidence protocol.
 3. Continue non-GUI end-to-end work toward one meaningful fully working show. Defer all
@@ -250,9 +266,10 @@ The remaining empirical checks are also pending:
 
 P3-T1/P3-T2/P3-T3 are complete and independently verified. P3-T4's owner-approved
 contract/invariants, AC2 amendment, and general schema remediation were independently
-approved offline/in code and integrated at `558153c`. Its failed live attempt leaves
-live acceptance open. Exactly one second audited request is authorized under the sealed
-two-attempt/`$3.32` contract; no third attempt is authorized. P3-T5's nine
+approved offline/in code and integrated at `558153c`. Both audited live attempts failed
+safely; attempt 2 was HTTP 400 unsupported `temperature` with one provider request and
+no retry/fallback/schema repair/usage. `$3.320000` is committed, the two-attempt cap is
+exhausted, live acceptance remains open, and no third attempt is authorized. P3-T5's nine
 decisions are owner-accepted and its offline candidate is integrated at `f006468` while
 the earlier empirical exits remain open. P3-T6 is independently approved offline/in code
 and integrated at `c9620db`; its empirical GUI acceptance is open and deferred until a

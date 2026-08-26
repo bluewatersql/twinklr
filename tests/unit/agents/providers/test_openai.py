@@ -9,6 +9,7 @@ from twinklr.core.agents.providers.base import ProviderType, TokenUsage
 from twinklr.core.agents.providers.conversation import generate_conversation_id
 from twinklr.core.agents.providers.errors import LLMProviderError
 from twinklr.core.agents.providers.openai import OpenAIProvider
+from twinklr.core.config.models import AgentConfig
 
 
 @pytest.fixture
@@ -358,6 +359,60 @@ async def test_generate_json_async_passes_supported_kwargs() -> None:
     assert request_kwargs["max_output_tokens"] == 120
     assert request_kwargs["reasoning"] == {"effort": "high"}
     assert request_kwargs["timeout"] == 17
+
+
+@pytest.mark.asyncio
+async def test_gpt_5_6_sol_omits_temperature_but_keeps_reasoning_effort() -> None:
+    """The terminal P3-T4 error becomes a frozen model-capability rule."""
+    response = MagicMock(
+        output_text='{"ok": true}',
+        id="resp_capability",
+        status="completed",
+        usage=None,
+    )
+    with (
+        patch("twinklr.core.agents.providers.openai.OpenAIClient"),
+        patch("twinklr.core.agents.providers.openai.AsyncOpenAI") as mock_async_openai,
+    ):
+        mock_client = MagicMock()
+        mock_client.responses.create = AsyncMock(return_value=response)
+        mock_async_openai.return_value = mock_client
+        provider = OpenAIProvider(api_key="test-key")
+        await provider.generate_json_async(
+            messages=[{"role": "user", "content": "hello"}],
+            model=AgentConfig().model,
+            temperature=0.7,
+            reasoning_effort="high",
+        )
+
+    request_kwargs = mock_client.responses.create.call_args.kwargs
+    assert "temperature" not in request_kwargs
+    assert request_kwargs["reasoning"] == {"effort": "high"}
+
+
+@pytest.mark.asyncio
+async def test_known_temperature_model_keeps_configured_temperature() -> None:
+    response = MagicMock(
+        output_text='{"ok": true}',
+        id="resp_temperature",
+        status="completed",
+        usage=None,
+    )
+    with (
+        patch("twinklr.core.agents.providers.openai.OpenAIClient"),
+        patch("twinklr.core.agents.providers.openai.AsyncOpenAI") as mock_async_openai,
+    ):
+        mock_client = MagicMock()
+        mock_client.responses.create = AsyncMock(return_value=response)
+        mock_async_openai.return_value = mock_client
+        provider = OpenAIProvider(api_key="test-key")
+        await provider.generate_json_async(
+            messages=[{"role": "user", "content": "hello"}],
+            model="gpt-4.1",
+            temperature=0.4,
+        )
+
+    assert mock_client.responses.create.call_args.kwargs["temperature"] == 0.4
 
 
 @pytest.mark.asyncio
