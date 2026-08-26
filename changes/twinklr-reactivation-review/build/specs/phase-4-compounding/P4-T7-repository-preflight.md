@@ -1,8 +1,8 @@
 # P4-T7 — Repository-only preflight
 
-Date: 2026-08-26  
-Base: `63293f608b3c0564297a140f87e10b44df547163`  
-Scope: tracked source, tests, specifications, and Git history only
+- Date: 2026-08-26
+- Base: `63293f608b3c0564297a140f87e10b44df547163`
+- Scope: tracked source, tests, specifications, and Git history only
 
 ## Result boundary
 

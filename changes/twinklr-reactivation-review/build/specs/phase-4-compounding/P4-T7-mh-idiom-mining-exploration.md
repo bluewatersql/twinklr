@@ -233,3 +233,19 @@ The subsequent repository-only audit is recorded in
 vendor-history premise, identifies reusable seams and structural walls, names the exact
 five re-entry artifacts, and caps any future admitted offline session at 180 minutes.
 That audit also is not task execution, completion, or a feasibility verdict.
+
+### Repository-only preflight candidate freeze — 2026-08-26
+
+The preflight memo authoring candidate is
+`ba75f267bb492960e7148ebf3ec0ee65338edc96`, based exactly on
+`63293f608b3c0564297a140f87e10b44df547163`. Its base-to-author diff SHA-256 is
+`30a432bb606dd98410b75eeb2ee821431a55a9dac7d0489cbb3858c00acace19`.
+
+Proportional gates passed: Markdown relative links have zero missing targets; exactly
+five re-entry artifacts are enumerated; the 165-minute analysis/180-minute absolute cap
+and non-verdict boundary are present; the all-history deleted sequence/archive query
+reproduces the single project artifact named in the memo; `git diff --check` is clean;
+and the diff contains only the two active-change Markdown files. No corpus content,
+network, provider, xLights, audio, application code, or prototype was accessed or
+changed. This candidate is pending independent evidence review and is not P4-T7
+approval, execution, completion, or integration.
