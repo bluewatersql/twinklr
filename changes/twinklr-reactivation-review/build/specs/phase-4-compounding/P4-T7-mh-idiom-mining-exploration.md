@@ -227,3 +227,9 @@ Full execution is therefore **NO-GO and deferred** until both prerequisites exis
 
 This record is not the task's decision memo, does not satisfy any acceptance criterion,
 and makes no claim about MH-mining feasibility. The optional task remains incomplete.
+
+The subsequent repository-only audit is recorded in
+[P4-T7-repository-preflight.md](P4-T7-repository-preflight.md). It corrects the phantom
+vendor-history premise, identifies reusable seams and structural walls, names the exact
+five re-entry artifacts, and caps any future admitted offline session at 180 minutes.
+That audit also is not task execution, completion, or a feasibility verdict.
