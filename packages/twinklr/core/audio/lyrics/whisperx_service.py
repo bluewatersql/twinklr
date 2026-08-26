@@ -242,8 +242,7 @@ class WhisperXImpl(WhisperXService):
             FileNotFoundError: If audio file not found
             RuntimeError: If transcription fails
         """
-        # Suppress torchaudio FFmpeg warnings BEFORE importing whisperx
-        # (WhisperX uses librosa/soundfile for audio, not FFmpeg)
+        # Suppress third-party decoder logging before importing WhisperX.
         import logging as stdlib_logging
 
         stdlib_logging.getLogger("torio._extension.utils").setLevel(stdlib_logging.ERROR)

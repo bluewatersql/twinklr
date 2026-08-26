@@ -11,7 +11,7 @@ Step-by-step instructions for installing, configuring, and running Twinklr to ge
 
 ## Prerequisites
 
-- **Python 3.12+** (required; 3.13+ is not yet supported — see `pyproject.toml` `requires-python`)
+- **Python 3.13** (required; 3.14 is not supported — see `pyproject.toml` `requires-python`)
 - **[uv](https://github.com/astral-sh/uv)** — Astral's fast Python package manager
 - **OpenAI API key** — required for LLM-based choreography planning
 - **xLights** — to view and use the generated `.xsq` sequence files
@@ -49,6 +49,10 @@ make install-dev
 ```
 
 This adds the `ml` extra group (~2GB+ for PyTorch and WhisperX). WhisperX models download automatically on first use (~150MB for the `base` model).
+
+Package installation does not establish working WhisperX transcription on the current
+default FFmpeg 9; runtime audio execution remains owner-deferred. See the active
+[P4-T1 task contract](../changes/twinklr-reactivation-review/build/specs/phase-4-compounding/P4-T1-ml-chain-python-bump.md).
 
 _Source: `Makefile` target `install-dev`_
 

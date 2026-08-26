@@ -339,10 +339,6 @@ class AudioEnhancementConfig(BaseModel):
         default=False,
         description="Enable WhisperX for lyrics transcription (requires model download)",
     )
-    enable_diarization: bool = Field(
-        default=False,
-        description="Enable speaker diarization (requires pyannote models)",
-    )
     stems: StemSeparationConfig = Field(
         default_factory=StemSeparationConfig,
         description="Optional cached source-separation stage",

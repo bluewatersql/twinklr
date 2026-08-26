@@ -2,7 +2,7 @@
 name = "twinklr-cli"
 version = "0.2.0"
 description = "Twinklr CLI - Command-line interface"
-requires-python = ">=3.10"
+requires-python = ">=3.13,<3.14"
 dependencies = [
     "twinklr-core",
     "rich>=13.7",
@@ -15,4 +15,3 @@ twinklr = "twinklr.cli.main:main"
 [build-system]
 requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
-

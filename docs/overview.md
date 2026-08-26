@@ -92,7 +92,10 @@ Deterministic audio feature extraction powered by [librosa](https://librosa.org/
 - **Phonemes** — grapheme-to-phoneme conversion, viseme mapping (`audio/phonemes/`)
 - **Optional stems** — cached Demucs-derived drum, bass, and vocal features with explicit full-mix fallback (`audio/stems.py`)
 
-Audio enhancement features (metadata enrichment, lyrics from LRCLib/Genius/WhisperX, speaker diarization) are controlled by `AudioEnhancementConfig` in `packages/twinklr/core/config/models.py`.
+Audio enhancement features (metadata enrichment and lyrics from LRCLib, Genius, or
+WhisperX) are controlled by `AudioEnhancementConfig` in
+`packages/twinklr/core/config/models.py`. Word records retain an optional neutral speaker
+label for source-provided metadata; Twinklr does not currently run a diarization stage.
 
 ### Multi-Agent Orchestration
 

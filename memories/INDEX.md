@@ -18,7 +18,7 @@ memory — those are machine-local supplemental caches (see the memory protocol 
   - [known-test-failures.md](learnings/known-test-failures.md) — historical gate baseline at `aa8d325` (2026-08-13): 120 failures classified; superseded by the green integrated campaign gate
   - [simplification-pass-2026-02.md](learnings/simplification-pass-2026-02.md) — stale auto-memory case study: a claimed simplification pass that never landed on `main`
 - **[constraints/](constraints/)** — limitations that repeatedly shape design
-  - [python-3.12-only.md](constraints/python-3.12-only.md)
+  - [Python 3.13 pin (former 3.12 constraint)](constraints/python-3.12-only.md)
 - **[patterns/](patterns/)** — known-good reusable implementation patterns
   - [code-patterns.md](patterns/code-patterns.md)
 - **[inbox/](inbox/)** — staging for candidate knowledge awaiting review/promotion

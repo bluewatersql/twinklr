@@ -133,7 +133,7 @@ After all profiles are processed, corpus-wide analysis runs:
 | **Motif Mining** | Finds recurring multi-template motifs | `enable_v2_motif_mining` |
 | **Clustering** | Groups similar templates (DBSCAN on embeddings) | `enable_v2_clustering` |
 | **Learned Taxonomy V2** | Trains and evaluates an improved taxonomy model | `enable_v2_learned_taxonomy` |
-| **ANN Retrieval** | Builds a sqlite-vec approximate nearest-neighbour index | `enable_v2_ann_retrieval` |
+| **ANN Retrieval** | Builds and evaluates the in-memory NumPy cosine-similarity index | `enable_v2_ann_retrieval` |
 | **Layering Features** | Extracts multi-layer density and depth patterns | `enable_layering_features` |
 | **Color Narrative** | Discovers colour usage patterns across sections | `enable_color_narrative` |
 | **Color Arc** | Builds palette library and section-to-palette assignments | `enable_color_arc` |
@@ -178,7 +178,7 @@ data/features/feature_engineering/
 
 ### Prerequisites
 
-- Python 3.12+
+- Python 3.13
 - `uv` package manager
 - Project dependencies installed: `uv sync`
 

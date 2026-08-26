@@ -17,12 +17,12 @@ def test_stems_extra_selects_demucs_on_arm64_and_excludes_intel_macos() -> None:
     arm = {
         "sys_platform": "darwin",
         "platform_machine": "arm64",
-        "python_full_version": "3.12.13",
+        "python_full_version": "3.13.15",
     }
     intel = {
         "sys_platform": "darwin",
         "platform_machine": "x86_64",
-        "python_full_version": "3.12.13",
+        "python_full_version": "3.13.15",
     }
 
     assert sum(requirement.marker.evaluate(arm) for requirement in requirements) == 1

@@ -1,17 +1,20 @@
 ---
 type: context
 area: engineering
-updated: 2026-08-14
+updated: 2026-08-26
 ---
 
 # Engineering Conventions
 
 ## Toolchain
 
-Python 3.12 (3.13+ unsupported —
+Python 3.13 (3.14+ unsupported —
 [constraint](../../memories/constraints/python-3.12-only.md)), uv workspace
 (`twinklr-core` + `twinklr-cli`), Pydantic V2 for all data validation, Jinja2 prompt
 templating, Rich CLI output.
+
+The optional ML runtime boundary and current owner deferral are specified by the active
+[P4-T1 task](../../changes/twinklr-reactivation-review/build/specs/phase-4-compounding/P4-T1-ml-chain-python-bump.md).
 
 ## Commands
 

@@ -23,7 +23,6 @@ class TestAudioEnhancementConfigDefaults:
         assert config.enable_musicbrainz is False
         assert config.enable_lyrics_lookup is False
         assert config.enable_whisperx is False
-        assert config.enable_diarization is False
         assert config.stems.enabled is False
         assert config.stems.model_name == "htdemucs"
 
@@ -37,7 +36,6 @@ class TestAudioEnhancementConfigDefaults:
             enable_musicbrainz=False,
             enable_lyrics_lookup=False,
             enable_whisperx=False,
-            enable_diarization=False,
         )
 
         assert config.enable_metadata is True

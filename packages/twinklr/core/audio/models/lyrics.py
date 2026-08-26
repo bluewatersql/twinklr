@@ -33,7 +33,7 @@ class LyricWord(BaseModel):
         text: Word text
         start_ms: Word start time in milliseconds
         end_ms: Word end time in milliseconds
-        speaker: Optional speaker ID (for diarization)
+        speaker: Optional source-provided speaker label
     """
 
     model_config = ConfigDict(extra="forbid")

@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/python-3.12+-blue?logo=python&logoColor=white" alt="Python 3.12+">
+  <img src="https://img.shields.io/badge/python-3.13-blue?logo=python&logoColor=white" alt="Python 3.13">
   <img src="https://img.shields.io/badge/packaging-uv-blueviolet?logo=astral&logoColor=white" alt="uv">
   <img src="https://img.shields.io/badge/linting-ruff-orange" alt="Ruff">
   <img src="https://img.shields.io/badge/types-mypy-blue" alt="mypy">
@@ -65,7 +65,7 @@ Audio File (.mp3)
 
 ### Prerequisites
 
-- **Python 3.12+**
+- **Python 3.13** (3.14 is not supported)
 - **[uv](https://github.com/astral-sh/uv)** (package manager)
 - **OpenAI API key** (for agent orchestration)
 
@@ -222,7 +222,7 @@ Copy `.env.example` to `.env` to get started. Config files are gitignored; creat
 
 ## Tech Stack
 
-- **Python 3.12+** with strict type hints
+- **Python 3.13** with strict type hints
 - **[uv](https://github.com/astral-sh/uv)** for package management (workspace with core + cli packages)
 - **[Pydantic V2](https://docs.pydantic.dev/)** for all data validation (LLM outputs, configs, models)
 - **[OpenAI API](https://platform.openai.com/)** for agent orchestration (Responses API with structured outputs)

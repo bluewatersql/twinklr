@@ -5,7 +5,7 @@ name = "twinklr"
 version = "0.2.0"
 description = "Twinklr - AI-powered lighting sequencer for xLights"
 readme = "README.md"
-requires-python = ">=3.12,<3.13"
+requires-python = ">=3.13,<3.14"
 dependencies = [
     "twinklr-core>=0.1.0",
     "twinklr-cli>=0.1.0",
@@ -26,9 +26,6 @@ dev = [
 ml = [
     "twinklr-core[ml]>=0.1.0",
 ]
-fe = [
-    "twinklr-core[fe]>=0.1.0",
-]
 stems = [
     "twinklr-core[stems]>=0.1.0",
 ]
@@ -37,6 +34,9 @@ mir = [
 ]
 mir-beats = [
     "twinklr-core[mir-beats]>=0.1.0",
+]
+normalization = [
+    "twinklr-core[normalization]>=0.1.0",
 ]
 
 [build-system]
@@ -52,13 +52,19 @@ members = [
     "packages/twinklr/cli",
 ]
 
+[tool.uv]
+required-environments = [
+    "sys_platform == 'darwin' and platform_machine == 'arm64'",
+    "sys_platform == 'linux' and platform_machine == 'x86_64'",
+]
+
 [tool.uv.sources]
 twinklr-core = { workspace = true }
 twinklr-cli = { workspace = true }
 
 [tool.ruff]
 line-length = 100
-target-version = "py312"
+target-version = "py313"
 exclude = [
     ".git",
     ".venv",
@@ -129,7 +135,7 @@ strict = true
 runtime-evaluated-base-classes = ["pydantic.BaseModel"]
 
 [tool.mypy]
-python_version = "3.12"
+python_version = "3.13"
 warn_return_any = true
 warn_unused_configs = true
 warn_unused_ignores = true

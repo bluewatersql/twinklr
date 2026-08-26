@@ -2,7 +2,7 @@
 
 Twinklr is an AI-powered choreography engine that turns an audio file into a synchronized
 [xLights](https://xlights.org) light-show sequence (`.xsq`). The core principle: **LLMs plan
-creative intent; deterministic code handles precision.** Python 3.12, uv workspace,
+creative intent; deterministic code handles precision.** Python 3.13, uv workspace,
 Pydantic V2, OpenAI Responses API.
 
 This file is the canonical bootstrap for **all** coding agents (Claude Code, Codex/ChatGPT,

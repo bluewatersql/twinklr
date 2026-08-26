@@ -329,7 +329,7 @@ _Source: `Makefile`_
 ### Quality Gates
 
 All commits must pass:
-- **Ruff** — 0 linting issues (line-length 100, target Python 3.12)
+- **Ruff** — 0 linting issues (line-length 100, target Python 3.13)
 - **mypy** — 0 type errors on new code (pydantic plugin enabled, strict on `feature_store`, `feature_engineering`, `agents.providers.anthropic`, `io.sync_adapter`)
 - **pytest** — 0 failures, coverage target >= 80% (no hard enforcement via `--cov-fail-under`)
 
@@ -339,14 +339,14 @@ _Source: `pyproject.toml` tool configuration sections_
 
 Key settings from `pyproject.toml`:
 - Line length: 100
-- Target: Python 3.12
+- Target: Python 3.13
 - Enabled rule sets: `E`, `W`, `F`, `I`, `B`, `C4`, `UP`, `TID252`, `SIM`, `PIE`, `PLR`, `TCH`, `PTH`, `ERA`, `T20`, `N`, `PERF`, `RUF`
 - Import ordering: `isort` with `twinklr` as first-party, relative parent imports banned
 - Excluded: `.git`, `.venv`, `.archive`, `__pycache__`, `data/blog/content_manager`
 
 ### mypy Configuration
 
-- Python 3.12, pydantic plugin enabled
+- Python 3.13, pydantic plugin enabled
 - `check_untyped_defs = true`, `ignore_missing_imports = true`
 - Strict mode (`disallow_untyped_defs = true`) enforced on: `feature_store.*`, `feature_engineering.*`, `agents.providers.anthropic`, `io.sync_adapter`
 

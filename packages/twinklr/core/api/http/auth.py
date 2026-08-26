@@ -64,7 +64,7 @@ class ApiKeyAuth(httpx.Auth, BaseModel):
     api_key: str = Field(repr=False)  # Don't leak secrets in repr
     prefix: str | None = None
 
-    def auth_flow(self, request: httpx.Request) -> Generator[httpx.Request, httpx.Response, None]:
+    def auth_flow(self, request: httpx.Request) -> Generator[httpx.Request, httpx.Response]:
         """Apply API key to request (sync).
 
         Args:
@@ -126,7 +126,7 @@ class BearerTokenAuth(httpx.Auth):
         """
         request.headers[self._header_name] = f"Bearer {token}"
 
-    def auth_flow(self, request: httpx.Request) -> Generator[httpx.Request, httpx.Response, None]:
+    def auth_flow(self, request: httpx.Request) -> Generator[httpx.Request, httpx.Response]:
         """Apply bearer token with auto-refresh on 401 (sync).
 
         Args:

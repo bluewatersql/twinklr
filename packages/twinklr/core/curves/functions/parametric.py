@@ -3,12 +3,27 @@
 import math
 from typing import Any
 
-import bezier
-import numpy as np
-
 from twinklr.core.curves.defaults import DEFAULT_CURVE_INTENSITY_PARAMS
 from twinklr.core.curves.models import CurvePoint
 from twinklr.core.curves.sampling import sample_uniform_grid
+
+
+def _evaluate_bezier_ordinate(control_points: tuple[float, ...], t: float) -> float:
+    """Evaluate one Bezier ordinate with the numerically stable de Casteljau algorithm."""
+    if not control_points:
+        raise ValueError("control_points cannot be empty")
+    if not 0.0 <= t <= 1.0:
+        raise ValueError("t must be in [0, 1]")
+    if t == 0.0:
+        return float(control_points[0])
+    if t == 1.0:
+        return float(control_points[-1])
+
+    values = [float(value) for value in control_points]
+    for width in range(len(values) - 1, 0, -1):
+        for index in range(width):
+            values[index] = (1.0 - t) * values[index] + t * values[index + 1]
+    return values[0]
 
 
 def generate_bezier(
@@ -34,17 +49,9 @@ def generate_bezier(
     p1 = max(0.0, min(1.0, p1))
     p2 = max(0.0, min(1.0, p2))
 
-    nodes = np.asfortranarray(
-        [
-            [0.0, 0.25, 0.75, 1.0],
-            [0.0, p1, p2, 1.0],
-        ]
-    )
-    curve = bezier.Curve(nodes, degree=3)
-
     t_grid = sample_uniform_grid(n_samples)
-    evaluated = curve.evaluate_multi(np.array(t_grid))
-    values = evaluated[1, :]
+    control_ordinates = (0.0, p1, p2, 1.0)
+    values = [_evaluate_bezier_ordinate(control_ordinates, t) for t in t_grid]
 
     return [CurvePoint(t=t, v=float(v)) for t, v in zip(t_grid, values, strict=False)]
 

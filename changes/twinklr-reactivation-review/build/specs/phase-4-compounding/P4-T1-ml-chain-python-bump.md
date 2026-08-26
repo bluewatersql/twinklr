@@ -22,6 +22,23 @@ break. Update `memories/constraints/python-3.12-only.md` to reflect the new floo
 provenance. Land the `sqlite-vec` extra removal (M7) as a zero-risk rider on the same
 pyproject edit since it touches the same file and diff review pass.
 
+### Owner amendment — current stable mutually compatible graph (2026-08-26)
+
+The owner chose the newest stable **application graph**, not independently newest
+versions of every transitive package. Official stable WhisperX remains 3.8.6 and binds
+torch/torchaudio to the 2.8 line, torchvision to the 0.23 line, TorchCodec to 0.6–0.7,
+and Python below 3.14; stable pyannote-audio is 4.0.7. Therefore this task retains
+Python `>=3.13,<3.14`, torch/torchaudio 2.8.0, WhisperX 3.8.6, and pyannote-audio 4.x.
+Torchvision 0.23.0 and TorchCodec 0.7.0 remain transitive lock results rather than new
+direct declarations. Independently raising torch or TorchCodec would be incompatible
+with current stable WhisperX and is not an upgrade of the usable application stack.
+
+The owner explicitly accepts package resolution/sync while deferring optional
+WhisperX/TorchCodec runtime audio execution against the current default FFmpeg 9.0.1,
+which the resolved stable TorchCodec does not support. This task makes no runtime-
+readiness, audio, or model-download claim. A briefly installed keg-only FFmpeg 7 was
+removed without ever being linked; default FFmpeg 9.0.1 remains healthy.
+
 ## Evidence & background
 
 **modernization.md M3** (reviews/modernization.md:63–76): whisperx 3.8.6 pins
@@ -131,9 +148,9 @@ already landed in Phase 2P per the plan's dependency).
 
 ## Acceptance criteria
 
-- `lyrics/diarization.py`, `diarization_models.py`, and `enable_diarization` no
-  longer exist in the tree; `git grep -i diariz` returns nothing outside historical
-  changes/memories documents.
+- `lyrics/diarization.py`, `diarization_models.py`, and `enable_diarization` are absent
+  from application source. Documentation and contract tests may name the retired
+  surface; direct application imports of either deleted module are zero.
 - `pyproject.toml` declares torch/torchaudio 2.8.x, whisperx 3.8.6, pyannote-audio
   4.x, Python `>=3.13`; the `fe` extra is absent.
 - `uv sync --extra dev --all-packages` succeeds from a clean checkout under Python
@@ -165,7 +182,10 @@ uv run ruff format --check .
 uv run ruff check .
 uv run mypy .
 uv run pytest tests/ -v
-git grep -in diariz -- ':!changes' ':!memories'   # expect zero application hits
+test ! -e packages/twinklr/core/audio/lyrics/diarization.py
+test ! -e packages/twinklr/core/audio/lyrics/diarization_models.py
+! git grep -n 'enable_diarization\|audio\.lyrics\.diarization\|diarization_models' -- packages/twinklr
+! git grep -n -E '^(from|import) pyannote' -- packages/twinklr
 ```
 
 No LOCAL-ONLY steps — this task has no live-API or xLights-GUI dependency. The actual
@@ -184,3 +204,106 @@ transitive requirements and other pinned packages (e.g., pydantic, ruff toolchai
 mitigate by running `uv lock` in isolation before touching application code, and by
 re-verifying the Python 3.13 floor doesn't break any other package in the workspace
 (`packages/twinklr/cli`, etc.) before merging.
+
+## Author implementation handoff — 2026-08-26
+
+Status: **offline candidate independently approved for integration; not merged or
+integrated.** Base is `0adb566885866dd6462733eea6e8594703cd48af` on isolated branch
+`codex/p4t1-python313`.
+
+Implemented:
+
+- Removed the orphaned diarization modules, their dedicated tests, and the dead
+  `enable_diarization` config field before changing dependencies. `LyricsWord.speaker`
+  remains as a neutral source-provided label.
+- Coordinated root/core/CLI on Python `>=3.13,<3.14`, Ruff `py313`, mypy 3.13, and CI
+  3.13. The lock requires macOS arm64 and Linux x86_64 environments. Ruff's Python
+  3.13 modernization also reduced the two `httpx.Auth` generator annotations to the
+  current two-parameter `Generator` form; runtime behavior is unchanged.
+- Locked the owner-amended newest stable mutually compatible graph: torch and
+  torchaudio 2.8.0, WhisperX 3.8.6, pyannote-audio 4.0.7, transitive torchvision
+  0.23.0, and transitive TorchCodec 0.7.0. No WhisperX transitive was promoted to a
+  direct declaration.
+- Removed the root/core `fe` extra and sqlite-vec from the lock; corrected the false
+  sqlite-vec ANN documentation. Added the missing root normalization-extra forwarder
+  so all required extra combinations are addressable.
+- The released `bezier` package rejected Python 3.13. With explicit owner approval,
+  replaced its one live curve call with an in-repo de Casteljau evaluator and removed
+  the dependency. Known linear/quadratic/cubic, endpoint, clamp, ordering, shape, type,
+  and invalid-input coverage is red-first. An external 3.12 parity check against the
+  old package matched 18/18 samples within `2e-16` without committing generated data.
+- Migrated the dormant P3-T4 probe fixture's frozen interpreter identity from 3.12.13
+  to 3.13.15 so its fail-closed tests remain executable. This does not change the
+  sealed owner ledger, reopen its exhausted cap, authorize a third request, or create
+  live acceptance.
+
+Owner runtime override and external-state closeout:
+
+- Package resolution/sync is accepted without claiming WhisperX runtime audio
+  readiness on the default FFmpeg 9. Stable WhisperX 3.8.6 resolves TorchCodec 0.7,
+  whose supported FFmpeg range excludes FFmpeg 9; runtime audio execution is deferred.
+- A superseded attempt briefly installed Homebrew's keg-only FFmpeg 7 without linking
+  it. It was uninstalled after the override. Homebrew auto-removal also removed its
+  Python 3.13 dependency, so validation was restored with uv-managed CPython 3.13.15.
+  Default `ffmpeg` remains healthy at 9.0.1 (`ffmpeg` formula 9.0.1_1); no downgrade or
+  relink occurred.
+- No audio, model, provider, xLights, or other live application action occurred.
+
+Fresh author evidence on uv-managed CPython 3.13.15:
+
+- `uv sync --locked --extra dev --extra ml --all-packages`: pass, 192-package lock / 165
+  installed packages.
+- Locked dry-run metadata resolution: `ml`, `ml+stems`, `ml+mir-beats`, and
+  `ml+normalization` all pass.
+- Installed metadata exactly matches torch/torchaudio 2.8.0, torchvision 0.23.0,
+  TorchCodec 0.7.0, WhisperX 3.8.6, and pyannote-audio 4.0.7.
+- Focused platform/deletion/curve/WhisperX/probe regressions: pass; P3-T4 identity lane
+  alone is 54 passed after the interpreter-fixture migration.
+- Full suite: **5,453 passed, 38 skipped**, 88% coverage. The warnings are pre-existing
+  third-party syntax, resource-lifecycle, and deprecation warnings; no failure is
+  carried.
+- Ruff format/check clean, mypy clean across **738 source files**, and
+  `git diff --check` clean.
+- `make validate` itself refuses any dirty worktree before running because it mutates
+  formatting/lint state. The same four constituent gates were run explicitly on this
+  deliberately uncommitted review freeze; the orchestrator must rerun `make validate`
+  from the committed integration candidate.
+
+### Frozen implementation/test manifest
+
+This 20-entry manifest is the sole detailed implementation boundary. Deleted entries
+are hashed as the literal `DELETED`; present entries contribute their SHA-256 line:
+
+```text
+.github/workflows/ci.yml
+packages/twinklr/cli/pyproject.toml
+packages/twinklr/core/api/http/auth.py
+packages/twinklr/core/audio/lyrics/diarization.py (DELETED)
+packages/twinklr/core/audio/lyrics/diarization_models.py (DELETED)
+packages/twinklr/core/audio/lyrics/whisperx_service.py
+packages/twinklr/core/audio/models/__init__.py
+packages/twinklr/core/audio/models/lyrics.py
+packages/twinklr/core/config/models.py
+packages/twinklr/core/curves/functions/parametric.py
+packages/twinklr/core/pyproject.toml
+pyproject.toml
+tests/fixtures/p3_t4_macro_probe/context.json
+tests/unit/audio/lyrics/test_diarization_models.py (DELETED)
+tests/unit/audio/lyrics/test_diarization_service.py (DELETED)
+tests/unit/audio/test_stems_dependencies.py
+tests/unit/config/test_audio_enhancement_config.py
+tests/unit/curves/functions/test_parametric.py
+uv.lock
+tests/unit/test_p4_t1_contract.py
+```
+
+Manifest SHA-256:
+`e5e4ba3a613af01707745957e2f5673d91bcd82680a935775f253136c1ca434c`.
+The reproducible recipe, run from the worktree root with the entries above in order, is:
+
+```bash
+for file in "${files[@]}"; do
+  printf '%s\n' "$file"
+  if [ -f "$file" ]; then shasum -a 256 "$file"; else printf 'DELETED\n'; fi
+done | shasum -a 256
+```

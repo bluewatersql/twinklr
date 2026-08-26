@@ -35,7 +35,7 @@ their authoring moment; this handoff owns the current campaign status.
 | 2P — Creative quality | **OFFLINE IMPLEMENTATION MERGED AND VERIFIED** (13/13); **phase exit not complete** | The owner accepted T1/T8/T9 on 2026-08-16. T6 calibration/live evidence, T13/D1 evidence, and other live checks remain pending; see [04-phase-2p-creative-quality.md](04-phase-2p-creative-quality.md). |
 | 2K — Catalog growth | **TOOLING IMPLEMENTATION MERGED AND VERIFIED** (4/4); **phase exit not complete** | Tooling is ready, but coverage/corpus/curation/style exit criteria require the author's real layout, corpus, preferences, and judgments; see [05-phase-2k-catalog-growth.md](05-phase-2k-catalog-growth.md). |
 | 3 — Show convergence | **P3-T1–P3-T8 OFFLINE IMPLEMENTATIONS MERGED** (8/8 integrated); **EMPIRICAL EXITS OPEN** | P3-T7 is integrated at `70b3305`; its one-shot image proof passed with one request, zero retry, zero-call cache replay, and `$0.00622` measured cost. P3-T6 is integrated at `c9620db`; its xLights gate remains deferred. P3-T8 is integrated at `82438cf`; preview/live-judge/human/calibration/real-record evidence remains deferred. P3-T4 exhausted two failed audited attempts, `$3.320000` is committed, no third is authorized, and live acceptance remains open. Earlier commits: P3-T5 `f006468`; P3-T4 `558153c`; P3-T3 `33cce57`; P3-T2 `5365f70`; P3-T1 `5eebcb2`. |
-| 4 — Compounding | **NOT STARTED** | No Phase 4 implementation has started. |
+| 4 — Compounding | **P4-T1 INDEPENDENTLY APPROVED FOR INTEGRATION; NOT INTEGRATED** | Exact contract, manifest, author evidence, and owner-deferred runtime boundary: [P4-T1 task spec](../specs/phase-4-compounding/P4-T1-ml-chain-python-bump.md). |
 
 The overall `twinklr-reactivation-review` change remains **ACTIVE**. Finishing an
 offline implementation lane is not the same as satisfying its phase exit criteria.
@@ -296,7 +296,9 @@ task-bounded live/paid work are authorized. P3-T2 deliberately leaves
 `resolved_color`, `timing_offset_beats`, and parameter-range/settings escaping work to
 their existing P3-T5/P3-T8 or display-review owners; it does not silently close them.
 
-Phase 4 remains downstream of Phase 3.
+Phase 4 work has started under the owner's P3-T7+ authorization. P4-T1 is independently
+approved for integration but is not integrated. Optional WhisperX/TorchCodec runtime
+execution remains owner-deferred against FFmpeg 9.
 
 ## Binding orchestration rules
 

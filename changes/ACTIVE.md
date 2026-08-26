@@ -60,7 +60,12 @@ _Last updated: 2026-08-26._
   xLights GUI dates/checks remain deferred until a meaningful,
   fully working end-to-end show exists; their empirical gates and all earlier empirical
   exits remain open.
-  Phase 4 has not started. The overall change
+  Phase 4 has started with the unmerged P4-T1 Python 3.13/ML-chain candidate, now
+  independently approved for integration but not yet integrated.
+  Optional WhisperX runtime audio execution remains owner-deferred against the current
+  default FFmpeg 9; see the
+  [active task spec](twinklr-reactivation-review/build/specs/phase-4-compounding/P4-T1-ml-chain-python-bump.md).
+  The overall change
   therefore remains active.
   Live execution state, process rules, and pending owner actions:
   **[build/plan/HANDOFF.md](twinklr-reactivation-review/build/plan/HANDOFF.md)**.

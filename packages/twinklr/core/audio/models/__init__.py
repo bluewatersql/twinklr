@@ -2,7 +2,7 @@
 
 This module contains Pydantic models for the audio analyzer v3.0 enhancements:
 - Metadata enrichment (embedded tags, fingerprinting, providers)
-- Lyrics resolution (embedded, lookup, WhisperX, diarization)
+- Lyrics resolution (embedded, lookup, WhisperX)
 - Phoneme/viseme generation (grapheme-to-phoneme, timing, smoothing)
 
 All models use semantic versioning:
