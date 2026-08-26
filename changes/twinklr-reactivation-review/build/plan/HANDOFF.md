@@ -305,6 +305,23 @@ integrated. P4-T2's real Ollama schema smoke remains unclaimed pending explicit 
 opt-in. Optional WhisperX/TorchCodec runtime execution remains deferred and unavailable
 against the default FFmpeg 9.
 
+P4-T5's first freeze candidate `607bf19` was independently rejected: it used generic
+fingerprint/smoke pointers instead of per-field effects, collapsed union alternatives,
+silently ignored representative removed keys, and overstated its handoff. The remediated
+candidate is based on the P4-T4 integration at `3e7f679` and implemented through
+`be4abba`, `a942820`, and `5526c23`. Its generated registry explicitly enumerates the
+external `AppConfig`, `JobConfig`, `FixtureGroup`, and `TemplateDoc` roots by canonical
+full path, type-qualifies union alternatives, and allows only `EFFECT_TEST`,
+`INVARIANT_TEST`, or `REMOVED`. The registry validator collects every cited pytest node;
+removed paths are absent from their schemas and carry the canonical P4-T6 documentation
+disposition in the registry rather than a duplicated list here. Targeted migration
+validators reject the removed App/Job, agent, audio-enhancement, fixture, and template
+keys while preserving unrelated forward-compatible extras. No provider, network, live,
+GUI, or paid call occurred. Fresh pre-handoff validation from `5526c23`: `1352` files
+already formatted; Ruff clean; mypy clean across `719` source files; `5592 passed,
+39 skipped`; and `git diff --check` clean. This is an author freeze candidate awaiting
+independent verification; it is neither self-approved nor integrated.
+
 ## Binding orchestration rules
 
 - Use executor/verifier separation; an author never approves their own work.
