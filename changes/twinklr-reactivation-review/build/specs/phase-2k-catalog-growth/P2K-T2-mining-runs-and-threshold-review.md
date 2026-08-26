@@ -142,7 +142,7 @@ Two deliverables, run as one owner session using tooling this task builds/harden
    - The `promotion.py:103-104` vs `config.py:135-136` discrepancy (5/0.3 vs 2/0.015)
      called out explicitly as a line item for the owner to resolve, not silently
      reconciled by the agent.
-3. **A decision log** (a dated Markdown file, one entry per numeric value reviewed)
+3. **A decision record** (strict JSON, one entry per numeric value reviewed)
    recording: the constant, its current value, the empirical distribution evidence
    from (2), the owner's decision (keep / change to X / defer — needs more corpus),
    and the reasoning. This is a human-authored artifact captured during the session,
@@ -153,7 +153,10 @@ Two deliverables, run as one owner session using tooling this task builds/harden
 - Tooling module: extend `scripts/demo_feature_engineering.py` or add a sibling
   `scripts/report_quality_gate_distributions.py` — whichever keeps the existing demo
   script's role (running the pipeline) separate from the new reporting role
-  (analyzing candidate distributions after a run). Do not fold distribution
+  (analyzing candidate distributions after a run). The owner edits the generated
+  `OWNER_DECISIONS.json`; schema validation requires exactly one real date, typed
+  keep/change/defer decision, and nonblank rationale for each of the eight values.
+  Do not fold distribution
   reporting into `PromotionPipeline.run()` itself — that class's job is gating, not
   reporting; build the distribution report as a separate consumer of the same
   `MinedTemplate` candidate list `PromotionPipeline.run()` already receives as input,
@@ -215,7 +218,8 @@ uv run mypy scripts/demo_feature_engineering.py scripts/report_quality_gate_dist
 uv run ruff check scripts/ packages/twinklr/core/feature_engineering/
 uv run pytest tests/unit/feature_engineering/test_quality_gate_distributions.py -q
 uv run python scripts/demo_feature_engineering.py --corpus-dir <author-local-corpus>  # LOCAL-ONLY: real vendor corpus required, not fixture-safe for CI
-uv run python scripts/report_quality_gate_distributions.py --run-dir <mining-run-output>  # LOCAL-ONLY: depends on the above
+uv run python scripts/report_quality_gate_distributions.py --run-dir <mining-run-output>  # generate report/bundle and OWNER_DECISIONS.json
+uv run python scripts/report_quality_gate_distributions.py --run-dir <mining-run-output> --bind-owner-decisions --accepted-on YYYY-MM-DD
 ```
 
 ## Effort & risk
@@ -249,12 +253,26 @@ authorize corpus, network, provider, or live-catalog access.
 - The dead anti-affinity literal is removed; it is not promoted into the owner decision
   log. The decision template contains exactly one dated decision and rationale for each
   of the eight retained numeric values.
-- `quality_gate_evidence_manifest.json` hashes the mining manifest, staged candidates,
-  promotion report, distribution reports, and decision file. The owner reruns reporting
-  with `--bind-owner-decisions` after completing the decision file; finalization rejects
-  a missing date, decision, or rationale before binding its content.
+- A strict `twinklr.quality-gate-review-bundle.v1` hashes the mining manifest, staged
+  candidates, promotion report, and distribution reports. The owner completes the
+  generated strict `OWNER_DECISIONS.json`, then reruns with `--bind-owner-decisions
+  --accepted-on YYYY-MM-DD`. Finalization re-hashes every bound artifact and rejects
+  stale, regenerated, injected, or tampered inputs before emitting the compact accepted
+  `twinklr.p2k-evidence.v2` prerequisite.
 - A separate owner-local MH manifest validator is ready for the P4-T7 prerequisite. Its
   public evidence output is redacted and does not make P4-T7 ready or complete.
 
 The real owner-corpus run, identical rerun, non-empty distributions, completed owner
 decision log, and independent verification remain outstanding.
+
+### Formal rejection and remediation record — 2026-08-26
+
+Candidate `64ce517` was rejected by both independent review axes: evidence/contract
+correctness and implementation-quality/safety. The rejection found coercive/stringly
+schemas, unsafe path-overlap and symlink cleanup behavior, a family-cap sensitivity key
+that differed from runtime promotion, incomplete staged-artifact/decision binding, and
+an unbound MH prerequisite. This remediation replaces those seams with strict Pydantic
+V2 contracts, no-follow containment checks, runtime-key sensitivity, staged snapshot and
+current-byte binding, shared digest utilities, and one redacted MH evidence document that
+binds an accepted P2K evidence hash alongside the owner's MH sufficiency declaration.
+This offline remediation still does not satisfy the empirical owner-corpus exits.

@@ -10,13 +10,23 @@ from __future__ import annotations
 
 import argparse
 from collections.abc import Mapping, Sequence
-import hashlib
+from datetime import UTC, date, datetime
 import json
 from pathlib import Path
-import re
 from typing import Any
 
 from twinklr.core.feature_engineering.config import FeatureEngineeringPipelineOptions
+from twinklr.core.feature_engineering.evidence import (
+    NUMERIC_VALUE_NAMES,
+    EvidenceArtifact,
+    MiningRunManifest,
+    OwnerDecisionRecord,
+    P2KEvidenceManifest,
+    QualityGateReviewBundle,
+    sha256_file,
+    verify_evidence_artifacts,
+    verify_staged_artifacts,
+)
 from twinklr.core.feature_engineering.models.clustering import TemplateClusterCatalog
 from twinklr.core.feature_engineering.models.phrases import EffectPhrase
 from twinklr.core.feature_engineering.models.templates import MinedTemplate, TemplateCatalog
@@ -114,157 +124,187 @@ def _load_cluster_memberships(run_dir: Path) -> tuple[tuple[str, ...], ...]:
     return tuple(cluster.member_template_ids for cluster in catalog.clusters)
 
 
-def _mining_run_provenance(manifest: Mapping[str, object] | None) -> dict[str, object]:
+def _mining_run_provenance(manifest: MiningRunManifest) -> dict[str, object]:
     """Retain source identity fields without copying owner-local paths."""
-    if manifest is None:
-        return {}
-    selected: dict[str, object] = {}
-    provenance = manifest.get("provenance")
-    if isinstance(provenance, Mapping):
-        source = provenance.get("source")
-        if isinstance(source, Mapping):
-            selected["source"] = {
-                key: source[key]
-                for key in ("git_commit", "git_tree", "tracked_diff_sha256")
-                if key in source
-            }
-        provenance_corpus = provenance.get("corpus")
-        if isinstance(provenance_corpus, Mapping):
-            selected["corpus"] = {
-                key: provenance_corpus[key]
-                for key in (
-                    "input_fingerprint_sha256",
-                    "tree_sha256",
-                    "sequence_index_sha256",
-                )
-                if key in provenance_corpus
-            }
-    for key in ("source_git_sha", "git_sha", "input_fingerprint"):
-        if key in manifest:
-            selected[key] = manifest[key]
-    corpus = manifest.get("corpus")
-    if isinstance(corpus, Mapping):
-        corpus_identity = {
-            key: corpus[key]
-            for key in ("input_fingerprint_sha256", "sequence_index_sha256")
-            if key in corpus
-        }
-        if corpus_identity:
-            selected.setdefault("corpus", corpus_identity)
-    return selected
+    return {
+        "source": manifest.provenance.source.model_dump(mode="json"),
+        "corpus": {
+            "input_fingerprint_sha256": manifest.provenance.corpus.input_fingerprint_sha256,
+            "tree_sha256": manifest.provenance.corpus.tree_sha256,
+            "sequence_index_sha256": manifest.corpus.sequence_index_sha256,
+        },
+    }
 
 
-def _require_verified_mining_manifest(manifest: Mapping[str, object]) -> None:
+def _require_verified_mining_manifest(manifest: MiningRunManifest) -> None:
     """Reject threshold review until the unchanged-corpus rerun is proven."""
-    identity = manifest.get("content_hash_identity")
-    verification = identity.get("verification") if isinstance(identity, Mapping) else None
-    if not isinstance(verification, Mapping) or not verification.get("verified_unchanged_rerun"):
+    if manifest.content_hash_identity.verification.verified_unchanged_rerun is not True:
         raise ValueError(
             "Threshold review requires mining_run_manifest.json with verified_unchanged_rerun=true"
         )
-    catalog = manifest.get("live_catalog_immutability")
-    if not isinstance(catalog, Mapping) or catalog.get("unchanged") is not True:
+    if manifest.live_catalog_immutability.unchanged is not True:
         raise ValueError("Threshold review requires measured live-catalog immutability")
 
 
-def _sha256_file(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
+def _artifact(run_dir: Path, role: str, relative: str) -> EvidenceArtifact:
+    path = run_dir / relative
+    return EvidenceArtifact.model_validate(
+        {
+            "role": role,
+            "path": relative,
+            "size_bytes": path.stat().st_size,
+            "sha256": sha256_file(path),
+        }
+    )
 
 
-def _write_evidence_manifest(run_dir: Path, *, mining_run_provenance: Mapping[str, object]) -> Path:
-    """Bind source and generated evidence without a circular self-hash."""
-    required = (
-        "mining_run_manifest.json",
-        "promotion_report.json",
-        "quality_gate_distribution_report.json",
-        "quality_gate_distribution_report.md",
-        "OWNER_DECISION_LOG_TEMPLATE.md",
+def _review_input_paths(run_dir: Path) -> tuple[str, ...]:
+    fixed = ["promotion_report.json", "cluster_candidates.json"]
+    fixed.extend(
+        name
+        for name in ("content_templates.json", "orchestration_templates.json")
+        if (run_dir / name).is_file()
     )
-    missing = [name for name in required if not (run_dir / name).is_file()]
-    if missing:
-        raise FileNotFoundError("Evidence binding requires: " + ", ".join(missing))
-    candidate_names = (
-        "content_templates.json",
-        "orchestration_templates.json",
-    )
-    if not any((run_dir / name).is_file() for name in candidate_names):
-        raise FileNotFoundError("Evidence binding requires at least one staged candidate catalog")
-    names = (
-        *required[:1],
-        "content_templates.json",
-        "orchestration_templates.json",
-        *required[1:],
-    )
+    for stem in ("effect_phrases", "target_roles"):
+        fixed.extend(
+            path.relative_to(run_dir).as_posix()
+            for suffix in ("jsonl", "parquet")
+            for path in sorted(run_dir.rglob(f"{stem}.{suffix}"))
+        )
+    return tuple(fixed)
+
+
+def _write_review_bundle(
+    run_dir: Path, manifest: MiningRunManifest, report: Mapping[str, object]
+) -> tuple[Path, QualityGateReviewBundle]:
     artifacts = [
-        {"path": name, "sha256": _sha256_file(run_dir / name)}
-        for name in names
-        if (run_dir / name).exists()
+        _artifact(run_dir, "mining_manifest", "mining_run_manifest.json"),
+        *(
+            [_artifact(run_dir, "content_candidates", "content_templates.json")]
+            if (run_dir / "content_templates.json").is_file()
+            else []
+        ),
+        *(
+            [_artifact(run_dir, "orchestration_candidates", "orchestration_templates.json")]
+            if (run_dir / "orchestration_templates.json").is_file()
+            else []
+        ),
+        _artifact(run_dir, "promotion_report", "promotion_report.json"),
+        _artifact(run_dir, "distribution_report_json", "quality_gate_distribution_report.json"),
+        _artifact(run_dir, "distribution_report_markdown", "quality_gate_distribution_report.md"),
     ]
+    bundle = QualityGateReviewBundle(
+        schema_version="twinklr.quality-gate-review-bundle.v1",
+        created_at_utc=manifest.created_at_utc,
+        mining_manifest_schema_version=manifest.schema_version,
+        mining_manifest_sha256=sha256_file(run_dir / "mining_run_manifest.json"),
+        report_schema_version="quality_gate_distribution_report_v2",
+        report_sha256=sha256_file(run_dir / "quality_gate_distribution_report.json"),
+        artifacts=artifacts,
+    )
+    if report.get("schema_version") != bundle.report_schema_version:
+        raise ValueError("distribution report schema does not match review bundle")
+    path = run_dir / "quality_gate_review_bundle.json"
+    path.write_text(bundle.model_dump_json(indent=2) + "\n", encoding="utf-8")
+    return path, bundle
+
+
+def _decision_template(
+    report: Mapping[str, object], bundle: QualityGateReviewBundle, bundle_sha256: str
+) -> str:
+    numeric_values = _mapping(_mapping(report["threshold_review"])["numeric_values"])
+    return (
+        json.dumps(
+            {
+                "schema_version": "twinklr.owner-threshold-decisions.v1",
+                "report_schema_version": bundle.report_schema_version,
+                "report_sha256": bundle.report_sha256,
+                "review_bundle_schema_version": bundle.schema_version,
+                "review_bundle_sha256": bundle_sha256,
+                "decisions": [
+                    {
+                        "name": name,
+                        "current_value": _mapping(numeric_values[name])["configured"],
+                        "decision": "<keep|change|defer>",
+                        "changed_value": None,
+                        "decided_on": "<YYYY-MM-DD>",
+                        "rationale": "<owner rationale>",
+                    }
+                    for name in NUMERIC_VALUE_NAMES
+                ],
+            },
+            indent=2,
+        )
+        + "\n"
+    )
+
+
+def _bind_owner_decisions(
+    run_dir: Path,
+    report: Mapping[str, object],
+    bundle: QualityGateReviewBundle,
+    *,
+    accepted_on: date,
+) -> Path:
+    bundle_path = run_dir / "quality_gate_review_bundle.json"
+    decision_path = run_dir / "OWNER_DECISIONS.json"
+    decisions = OwnerDecisionRecord.model_validate_json(decision_path.read_text(encoding="utf-8"))
+    verify_evidence_artifacts(bundle.artifacts, run_dir)
+    if bundle.report_schema_version != report.get("schema_version"):
+        raise ValueError("review bundle binds a stale distribution report version")
+    if decisions.report_sha256 != sha256_file(run_dir / "quality_gate_distribution_report.json"):
+        raise ValueError("owner decisions bind a stale distribution report hash")
+    if decisions.report_schema_version != report.get("schema_version"):
+        raise ValueError("owner decisions bind a stale distribution report version")
+    if decisions.review_bundle_sha256 != sha256_file(bundle_path):
+        raise ValueError("owner decisions bind a stale review-bundle hash")
+    if decisions.review_bundle_schema_version != bundle.schema_version:
+        raise ValueError("owner decisions bind a stale review-bundle version")
+    numeric_values = _mapping(_mapping(report["threshold_review"])["numeric_values"])
+    for decision in decisions.decisions:
+        if decision.current_value != _mapping(numeric_values[decision.name])["configured"]:
+            raise ValueError(f"owner decision current value is stale: {decision.name}")
+    evidence = P2KEvidenceManifest(
+        schema_version="twinklr.p2k-evidence.v2",
+        created_at_utc=datetime.now(UTC),
+        review_bundle_schema_version=bundle.schema_version,
+        review_bundle_sha256=sha256_file(bundle_path),
+        decision_schema_version=decisions.schema_version,
+        decision_sha256=sha256_file(decision_path),
+        accepted=True,
+        accepted_on=accepted_on,
+    )
     output = run_dir / "quality_gate_evidence_manifest.json"
-    payload = {
-        "schema_version": "quality_gate_evidence_manifest_v1",
-        "mining_run_provenance": dict(mining_run_provenance),
-        "artifacts": artifacts,
-    }
-    output.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    output.write_text(evidence.model_dump_json(indent=2) + "\n", encoding="utf-8")
     return output
 
 
-def _load_report_options(run_dir: Path) -> FeatureEngineeringPipelineOptions:
+def _load_report_options(manifest: MiningRunManifest) -> FeatureEngineeringPipelineOptions:
     """Recover the promotion options actually recorded by the mining command."""
-    manifest_path = run_dir / "mining_run_manifest.json"
-    if not manifest_path.exists():
-        return FeatureEngineeringPipelineOptions()
-    manifest = _read_json(manifest_path)
-    invocation = manifest.get("invocation")
-    if not isinstance(invocation, dict):
-        return FeatureEngineeringPipelineOptions()
-    effective = invocation.get("effective_options")
-    if not isinstance(effective, dict):
-        return FeatureEngineeringPipelineOptions()
-    defaults = FeatureEngineeringPipelineOptions()
+    effective = manifest.invocation.effective_options
 
-    def _number(name: str, fallback: int | float) -> int | float:
+    def _number(name: str) -> int | float:
         value = effective.get(name)
         if isinstance(value, (int, float)) and not isinstance(value, bool):
             return value
-        return fallback
+        raise ValueError(f"mining manifest effective option is missing or non-numeric: {name}")
+
+    adaptive = effective.get("recipe_promotion_adaptive_stability")
+    if type(adaptive) is not bool:
+        raise ValueError("mining manifest adaptive-stability option must be a strict boolean")
 
     return FeatureEngineeringPipelineOptions(
-        recipe_promotion_min_support=int(
-            _number("recipe_promotion_min_support", defaults.recipe_promotion_min_support)
-        ),
-        recipe_promotion_min_stability=float(
-            _number("recipe_promotion_min_stability", defaults.recipe_promotion_min_stability)
-        ),
-        recipe_promotion_adaptive_stability=bool(
-            effective.get(
-                "recipe_promotion_adaptive_stability",
-                defaults.recipe_promotion_adaptive_stability,
-            )
-        ),
-        recipe_promotion_max_per_family=int(
-            _number("recipe_promotion_max_per_family", defaults.recipe_promotion_max_per_family)
-        ),
+        recipe_promotion_min_support=int(_number("recipe_promotion_min_support")),
+        recipe_promotion_min_stability=float(_number("recipe_promotion_min_stability")),
+        recipe_promotion_adaptive_stability=adaptive,
+        recipe_promotion_max_per_family=int(_number("recipe_promotion_max_per_family")),
         recipe_promotion_multi_layer_min_support=int(
-            _number(
-                "recipe_promotion_multi_layer_min_support",
-                defaults.recipe_promotion_multi_layer_min_support,
-            )
+            _number("recipe_promotion_multi_layer_min_support")
         ),
         recipe_promotion_multi_layer_min_stability=float(
-            _number(
-                "recipe_promotion_multi_layer_min_stability",
-                defaults.recipe_promotion_multi_layer_min_stability,
-            )
+            _number("recipe_promotion_multi_layer_min_stability")
         ),
-        recipe_promotion_max_per_cluster=int(
-            _number("recipe_promotion_max_per_cluster", defaults.recipe_promotion_max_per_cluster)
-        ),
+        recipe_promotion_max_per_cluster=int(_number("recipe_promotion_max_per_cluster")),
     )
 
 
@@ -426,57 +466,6 @@ def _render_markdown(report: dict[str, object]) -> str:
     return "\n".join(lines)
 
 
-def _decision_log_template(report: Mapping[str, object]) -> str:
-    """Render one owner entry from the report's single numeric contract."""
-    review = _mapping(report["threshold_review"])
-    numeric_values = _mapping(review["numeric_values"])
-    lines = [
-        "# Owner quality-gate decision log",
-        "",
-        "Complete every entry after reviewing quality_gate_distribution_report.json.",
-        "This template is not a decision record until the owner supplies all dates, decisions, and rationales.",
-        "",
-    ]
-    for name, raw_row in numeric_values.items():
-        row = _mapping(raw_row)
-        lines.extend(
-            (
-                f"## {name}",
-                "",
-                f"- Current value: {row['configured']}",
-                "- Evidence: quality_gate_distribution_report.json",
-                "- Date (YYYY-MM-DD):",
-                "- Owner decision: keep / change to … / defer",
-                "- Rationale:",
-                "",
-            )
-        )
-    return "\n".join(lines)
-
-
-def _require_complete_owner_decisions(path: Path, report: Mapping[str, object]) -> None:
-    """Require one dated, reasoned owner decision for every numeric value."""
-    text = path.read_text(encoding="utf-8")
-    numeric_values = _mapping(_mapping(report["threshold_review"])["numeric_values"])
-    sections = dict(
-        re.findall(r"^## ([^\n]+)\n(.*?)(?=^## |\Z)", text, flags=re.MULTILINE | re.DOTALL)
-    )
-    if set(sections) != set(numeric_values):
-        raise ValueError("Owner decision log headings do not match the numeric review contract")
-    for name, body in sections.items():
-        date = re.search(r"^- Date \(YYYY-MM-DD\):\s*(\S.*?)\s*$", body, re.MULTILINE)
-        decision = re.search(r"^- Owner decision:\s*(\S.*?)\s*$", body, re.MULTILINE)
-        rationale = re.search(r"^- Rationale:\s*(\S.*?)\s*$", body, re.MULTILINE)
-        if date is None or re.fullmatch(r"\d{4}-\d{2}-\d{2}", date.group(1)) is None:
-            raise ValueError(f"Owner decision {name} requires a YYYY-MM-DD date")
-        if decision is None or not (
-            decision.group(1) in {"keep", "defer"} or decision.group(1).startswith("change to ")
-        ):
-            raise ValueError(f"Owner decision {name} must be keep, defer, or change to VALUE")
-        if rationale is None:
-            raise ValueError(f"Owner decision {name} requires a rationale")
-
-
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Report staged mining-candidate quality distributions."
@@ -488,26 +477,54 @@ def parse_args() -> argparse.Namespace:
         "--bind-owner-decisions",
         action="store_true",
         help=(
-            "Require a completed owner decision log and emit the final hash-binding "
+            "Require a completed owner decision record and emit the final hash-binding "
             "evidence manifest."
         ),
+    )
+    parser.add_argument(
+        "--accepted-on",
+        type=date.fromisoformat,
+        help="Owner acceptance date (YYYY-MM-DD); required with --bind-owner-decisions.",
     )
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
+    if args.bind_owner_decisions != (args.accepted_on is not None):
+        raise ValueError("--bind-owner-decisions and --accepted-on must be supplied together")
     run_dir = args.run_dir.resolve()
+    mining_manifest_path = run_dir / "mining_run_manifest.json"
+    if not mining_manifest_path.exists():
+        raise FileNotFoundError(f"Evidence binding requires {mining_manifest_path}")
+    mining_manifest = MiningRunManifest.model_validate_json(
+        mining_manifest_path.read_text(encoding="utf-8")
+    )
+    _require_verified_mining_manifest(mining_manifest)
+    review_inputs = _review_input_paths(run_dir)
+    verify_staged_artifacts(
+        mining_manifest.candidate_staging.recursive_artifacts,
+        run_dir,
+        required_paths=review_inputs,
+    )
+    if args.bind_owner_decisions:
+        report_path = run_dir / "quality_gate_distribution_report.json"
+        bundle_path = run_dir / "quality_gate_review_bundle.json"
+        report = _read_json(report_path)
+        bundle = QualityGateReviewBundle.model_validate_json(
+            bundle_path.read_text(encoding="utf-8")
+        )
+        if bundle.report_sha256 != sha256_file(report_path):
+            raise ValueError("review bundle does not match current distribution report")
+        evidence_path = _bind_owner_decisions(run_dir, report, bundle, accepted_on=args.accepted_on)
+        print(f"Evidence manifest: {evidence_path}")
+        return 0
+
     candidates = _load_candidates(run_dir)
     promotion_path = run_dir / "promotion_report.json"
     if not promotion_path.exists():
         raise FileNotFoundError(f"Applied-threshold review requires {promotion_path}")
     promotion_report = _read_json(promotion_path)
-    mining_manifest_path = run_dir / "mining_run_manifest.json"
-    if not mining_manifest_path.exists():
-        raise FileNotFoundError(f"Evidence binding requires {mining_manifest_path}")
-    mining_manifest = _read_json(mining_manifest_path)
-    _require_verified_mining_manifest(mining_manifest)
     provenance = _mining_run_provenance(mining_manifest)
     role_scores = _load_target_role_scores(run_dir)
     if not role_scores:
@@ -516,7 +533,7 @@ def main() -> int:
         )
     report = build_quality_gate_distribution_report(
         candidates,
-        options=_load_report_options(run_dir),
+        options=_load_report_options(mining_manifest),
         promotion_report=promotion_report,
         role_scores=role_scores,
         propensity_pair_supports=_load_propensity_pair_supports(run_dir),
@@ -525,23 +542,22 @@ def main() -> int:
     )
     json_path = run_dir / "quality_gate_distribution_report.json"
     markdown_path = run_dir / "quality_gate_distribution_report.md"
-    template_path = run_dir / "OWNER_DECISION_LOG_TEMPLATE.md"
     json_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     markdown_path.write_text(_render_markdown(report), encoding="utf-8")
+    bundle_path, bundle = _write_review_bundle(run_dir, mining_manifest, report)
+    template_path = run_dir / "OWNER_DECISIONS.json"
     if not template_path.exists():
-        template_path.write_text(_decision_log_template(report), encoding="utf-8")
+        template_path.write_text(
+            _decision_template(report, bundle, sha256_file(bundle_path)), encoding="utf-8"
+        )
     print(f"Wrote {json_path}")
     print(f"Wrote {markdown_path}")
-    print(f"Owner decision-log template: {template_path}")
-    if args.bind_owner_decisions:
-        _require_complete_owner_decisions(template_path, report)
-        evidence_path = _write_evidence_manifest(run_dir, mining_run_provenance=provenance)
-        print(f"Evidence manifest: {evidence_path}")
-    else:
-        print(
-            "Final evidence manifest deferred: complete the owner decision log and rerun "
-            "with --bind-owner-decisions."
-        )
+    print(f"Owner decision template: {template_path}")
+    print(f"Review bundle: {bundle_path}")
+    print(
+        "Final evidence manifest deferred: complete OWNER_DECISIONS.json and rerun "
+        "with --bind-owner-decisions --accepted-on YYYY-MM-DD."
+    )
     return 0
 
 

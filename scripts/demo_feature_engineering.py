@@ -19,6 +19,18 @@ import time
 from typing import Any, Literal, cast
 
 from twinklr.core.config.models import AppConfig, JobConfig
+from twinklr.core.feature_engineering.evidence import (
+    MiningRunManifest,
+    clean_owned_output_dir,
+    snapshot_tree,
+    validate_owner_run_paths,
+)
+from twinklr.core.feature_engineering.evidence import (
+    canonical_sha256 as _canonical_sha256,
+)
+from twinklr.core.feature_engineering.evidence import (
+    sha256_file as _sha256_file,
+)
 from twinklr.core.feature_engineering.models import MusicLibraryIndex
 from twinklr.core.feature_engineering.pipeline import (
     FeatureEngineeringPipeline,
@@ -324,41 +336,9 @@ def _effective_options(options: FeatureEngineeringPipelineOptions) -> dict[str, 
     }
 
 
-def _sha256_file(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
-
-
 def _tree_snapshot(root: Path) -> dict[str, object]:
-    """Measure a recursive tree using both per-file and aggregate content hashes."""
-    if not root.exists():
-        return {"root": str(root), "exists": False, "file_count": 0, "sha256": None, "files": []}
-    files: list[dict[str, object]] = []
-    aggregate = hashlib.sha256()
-    for path in sorted(candidate for candidate in root.rglob("*") if candidate.is_file()):
-        relative = path.relative_to(root).as_posix()
-        digest = _sha256_file(path)
-        size = path.stat().st_size
-        files.append({"path": relative, "size_bytes": size, "sha256": digest})
-        aggregate.update(relative.encode("utf-8"))
-        aggregate.update(b"\0")
-        aggregate.update(digest.encode("ascii"))
-        aggregate.update(b"\0")
-    return {
-        "root": str(root),
-        "exists": True,
-        "file_count": len(files),
-        "sha256": aggregate.hexdigest(),
-        "files": files,
-    }
-
-
-def _canonical_sha256(value: object) -> str:
-    payload = json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
-    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+    """Measure a recursive tree through the shared no-follow evidence utility."""
+    return snapshot_tree(root).model_dump(mode="json")
 
 
 def _git_output(*args: str) -> str:
@@ -452,17 +432,17 @@ def _validate_owner_output_dir(
     *,
     output_dir: Path,
     feature_store_db: Path | None,
-    previous_manifest: dict[str, Any] | None,
+    previous_manifest: MiningRunManifest | None,
     input_fingerprint: str,
+    protected_roots: tuple[Path, ...],
 ) -> None:
     if feature_store_db is None:
         raise ValueError("--owner-mining-run requires --feature-store-db")
-    try:
-        feature_store_db.resolve().relative_to(output_dir.resolve())
-    except ValueError as exc:
-        raise ValueError(
-            "--owner-mining-run requires the SQLite store inside its dedicated output directory"
-        ) from exc
+    validate_owner_run_paths(
+        output_dir=output_dir,
+        feature_store_db=feature_store_db,
+        protected_roots=protected_roots,
+    )
     if not output_dir.exists():
         return
     if previous_manifest is None:
@@ -470,12 +450,8 @@ def _validate_owner_output_dir(
             "--owner-mining-run requires a dedicated new output directory; refusing to clean "
             f"unowned existing path {output_dir}"
         )
-    prior_output = previous_manifest.get("output_dir")
-    prior_provenance = previous_manifest.get("provenance")
-    prior_corpus = prior_provenance.get("corpus") if isinstance(prior_provenance, dict) else None
-    prior_fingerprint = (
-        prior_corpus.get("input_fingerprint_sha256") if isinstance(prior_corpus, dict) else None
-    )
+    prior_output = previous_manifest.output_dir
+    prior_fingerprint = previous_manifest.provenance.corpus.input_fingerprint_sha256
     if prior_output != str(output_dir.resolve()) or prior_fingerprint != input_fingerprint:
         raise ValueError(
             "existing owner mining output is not an exact rerun of the same input fingerprint"
@@ -575,31 +551,16 @@ def _store_snapshot(db_path: Path | None, backend: str) -> dict[str, object]:
 
 
 def _clean_output_dir(output_dir: Path, feature_store_db: Path | None) -> None:
-    """Clear staged output while preserving an embedded SQLite store and sidecars."""
+    """Clear staged output through the shared no-follow safety boundary."""
     if output_dir == Path(output_dir.anchor):
         raise ValueError(f"Refusing to clean filesystem root as output directory: {output_dir}")
-    output_dir.mkdir(parents=True, exist_ok=True)
-    preserved: set[Path] = set()
+    preserved: list[Path] = []
     if feature_store_db is not None:
         store = feature_store_db.resolve()
         if store == output_dir:
             raise ValueError("--feature-store-db must name a file, not --output-dir itself")
-        preserved.update((store, Path(f"{store}-wal"), Path(f"{store}-shm")))
-
-    def _remove_staged(path: Path) -> None:
-        resolved = path.resolve()
-        if resolved in preserved:
-            return
-        if path.is_dir():
-            for child in path.iterdir():
-                _remove_staged(child)
-            if not any(path.iterdir()):
-                path.rmdir()
-            return
-        path.unlink()
-
-    for child in tuple(output_dir.iterdir()):
-        _remove_staged(child)
+        preserved.extend((store, Path(f"{store}-wal"), Path(f"{store}-shm")))
+    clean_owned_output_dir(output_dir, preserved_paths=tuple(preserved))
 
 
 def _stats(snapshot: object) -> object:
@@ -614,7 +575,7 @@ def _write_mining_run_manifest(
     feature_store_backend: str,
     sequence_count: int,
     options: FeatureEngineeringPipelineOptions,
-    previous_manifest: dict[str, Any] | None,
+    previous_manifest: MiningRunManifest | None,
     store_before: dict[str, object],
     store_after: dict[str, object],
     catalog_before: dict[str, object],
@@ -625,9 +586,7 @@ def _write_mining_run_manifest(
     artifact_snapshot = _tree_snapshot(output_dir)
     prior_after: object = None
     if previous_manifest is not None:
-        prior_snapshots = previous_manifest.get("feature_store_snapshots")
-        if isinstance(prior_snapshots, dict):
-            prior_after = prior_snapshots.get("after")
+        prior_after = previous_manifest.feature_store_snapshots.after
     prior_stats = _stats(prior_after)
     before_stats = _stats(store_before)
     after_stats = _stats(store_after)
@@ -637,11 +596,10 @@ def _write_mining_run_manifest(
     prior_integrity = prior_after.get("entity_integrity") if isinstance(prior_after, dict) else None
     before_integrity = store_before.get("entity_integrity")
     after_integrity = store_after.get("entity_integrity")
-    prior_provenance = previous_manifest.get("provenance") if previous_manifest else None
-    prior_corpus = prior_provenance.get("corpus") if isinstance(prior_provenance, dict) else None
+    prior_provenance = previous_manifest.provenance if previous_manifest else None
     current_corpus = provenance.get("corpus")
     prior_input_fingerprint = (
-        prior_corpus.get("input_fingerprint_sha256") if isinstance(prior_corpus, dict) else None
+        prior_provenance.corpus.input_fingerprint_sha256 if prior_provenance else None
     )
     current_input_fingerprint = (
         current_corpus.get("input_fingerprint_sha256") if isinstance(current_corpus, dict) else None
@@ -649,8 +607,8 @@ def _write_mining_run_manifest(
     input_fingerprint_matches_previous = (
         prior_input_fingerprint is not None and prior_input_fingerprint == current_input_fingerprint
     )
-    prior_source = prior_provenance.get("source") if isinstance(prior_provenance, dict) else None
-    prior_tools = prior_provenance.get("tools") if isinstance(prior_provenance, dict) else None
+    prior_source = prior_provenance.source.model_dump(mode="json") if prior_provenance else None
+    prior_tools = prior_provenance.model_dump(mode="json")["tools"] if prior_provenance else None
     source_provenance_matches_previous = (
         isinstance(prior_source, dict)
         and prior_source == provenance.get("source")
@@ -710,8 +668,8 @@ def _write_mining_run_manifest(
     )
     exact_command = shlex.join([sys.executable, *sys.argv])
     payload = {
-        "schema_version": "mining_run_manifest_v1",
-        "created_at_utc": datetime.now(UTC).isoformat(),
+        "schema_version": "twinklr.owner-mining-run.v2",
+        "created_at_utc": datetime.now(UTC),
         "invocation": {
             "exact_command": exact_command,
             "exact_rerun_command": exact_command,
@@ -757,8 +715,9 @@ def _write_mining_run_manifest(
             "unchanged": catalog_before == catalog_after,
         },
     }
+    manifest = MiningRunManifest.model_validate(payload)
     path = output_dir / "mining_run_manifest.json"
-    path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    path.write_text(manifest.model_dump_json(indent=2) + "\n", encoding="utf-8")
     return path
 
 
@@ -1336,8 +1295,13 @@ def main() -> int:
             raise ValueError(f"Unsupported feature-store backend: {args.feature_store_backend}")
         previous_manifest_path = output_dir / "mining_run_manifest.json"
         previous_manifest = (
-            _read_json(previous_manifest_path) if previous_manifest_path.exists() else None
+            MiningRunManifest.model_validate_json(
+                previous_manifest_path.read_text(encoding="utf-8")
+            )
+            if args.owner_mining_run and previous_manifest_path.exists()
+            else None
         )
+        live_catalog_dir = ROOT / "catalog" / "templates"
         source_provenance = _source_provenance()
         if owner_corpus_rows is not None:
             music_index_path = (
@@ -1369,10 +1333,20 @@ def main() -> int:
             }
         provenance = {**source_provenance, **input_provenance}
         if args.owner_mining_run:
+            assert owner_corpus_rows is not None
             if feature_store_backend != "sqlite":
                 print("ERROR: --owner-mining-run requires the sqlite backend", file=sys.stderr)
                 return 2
             try:
+                profile_roots = tuple(
+                    Path(str(row["profile_path"])).resolve() for row in owner_corpus_rows
+                )
+                protected_roots = (
+                    live_catalog_dir,
+                    corpus_dir,
+                    *profile_roots,
+                    *((music_index_path,) if music_index_path is not None else ()),
+                )
                 _validate_owner_output_dir(
                     output_dir=output_dir,
                     feature_store_db=feature_store_db,
@@ -1380,11 +1354,11 @@ def main() -> int:
                     input_fingerprint=str(
                         cast("dict[str, object]", provenance["corpus"])["input_fingerprint_sha256"]
                     ),
+                    protected_roots=protected_roots,
                 )
             except ValueError as exc:
                 print(f"ERROR: {exc}", file=sys.stderr)
                 return 2
-        live_catalog_dir = ROOT / "catalog" / "templates"
         catalog_before = _tree_snapshot(live_catalog_dir)
         store_before = _store_snapshot(feature_store_db, feature_store_backend)
         _clean_output_dir(output_dir, feature_store_db)
@@ -1444,21 +1418,23 @@ def main() -> int:
             ):
                 raise RuntimeError("owner mining input changed while the run was executing")
         catalog_after = _tree_snapshot(live_catalog_dir)
-        manifest_path = _write_mining_run_manifest(
-            output_dir=output_dir,
-            corpus_dir=corpus_dir,
-            feature_store_db=feature_store_db,
-            feature_store_backend=feature_store_backend,
-            sequence_count=len(bundles),
-            options=effective_options,
-            previous_manifest=previous_manifest,
-            store_before=store_before,
-            store_after=store_after,
-            catalog_before=catalog_before,
-            catalog_after=catalog_after,
-            provenance=provenance,
-        )
-        print(f"  Wrote staged mining-run manifest: {manifest_path}")
+        manifest_path: Path | None = None
+        if args.owner_mining_run:
+            manifest_path = _write_mining_run_manifest(
+                output_dir=output_dir,
+                corpus_dir=corpus_dir,
+                feature_store_db=feature_store_db,
+                feature_store_backend=feature_store_backend,
+                sequence_count=len(bundles),
+                options=effective_options,
+                previous_manifest=previous_manifest,
+                store_before=store_before,
+                store_after=store_after,
+                catalog_before=catalog_before,
+                catalog_after=catalog_after,
+                provenance=provenance,
+            )
+            print(f"  Wrote staged mining-run manifest: {manifest_path}")
         if catalog_before != catalog_after:
             raise RuntimeError(
                 f"Live catalog changed during staged mining run; inspect {manifest_path}"

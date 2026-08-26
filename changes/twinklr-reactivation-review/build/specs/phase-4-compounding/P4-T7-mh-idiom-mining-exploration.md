@@ -292,6 +292,9 @@ An offline readiness candidate now provides
 `twinklr.mh-corpus-manifest.v1` schema. The owner can declare explicit minimum sequence,
 vendor, fixture-family, and fixture-role variety; validation checks duplicate identities,
 source-file hashes, and the declaration without parsing sequence content, then emits a
-redacted manifest-hash/count evidence file. No owner manifest or private artifact is
+redacted `twinklr.mh-corpus-evidence.v2` document. Validation also requires
+`--p2k-evidence` and binds that accepted `twinklr.p2k-evidence.v2` file's exact hash, so
+the two P4-T7 prerequisites re-enter through one redacted evidence document. No owner
+manifest or private artifact is
 tracked. Until the owner supplies and validates such a manifest and P2K-T2's empirical
 exits are accepted, the NO-GO above is unchanged.

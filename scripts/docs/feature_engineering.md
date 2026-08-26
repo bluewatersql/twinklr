@@ -87,19 +87,21 @@ Use `--music-library-index <absolute-or-relative-path>` instead of
 one of those declarations so a hidden global index cannot change the result.
 
 The reporting command fails unless that rerun and live-catalog immutability are proven.
-It writes JSON/Markdown distributions, `OWNER_DECISION_LOG_TEMPLATE.md`, and
-the owner decision template. The owner must fill one dated keep/change/defer decision and
+It writes JSON/Markdown distributions, a hash-bound review bundle, and strict
+`OWNER_DECISIONS.json`. The owner must fill one dated keep/change/defer decision and
 rationale for every numeric value, then finalize the hash binding:
 
 ```bash
 uv run python scripts/report_quality_gate_distributions.py \
   --run-dir <staged-mining-run> \
-  --bind-owner-decisions
+  --bind-owner-decisions \
+  --accepted-on YYYY-MM-DD
 ```
 
-Finalization rejects blank, malformed, missing, or extra decisions and writes
-`quality_gate_evidence_manifest.json`. The final manifest hashes the mining manifest,
-candidate catalogs, promotion report, distribution reports, and completed decision file.
+Finalization rejects blank, malformed, missing, extra, stale, regenerated, or tampered
+decisions and artifacts, then writes the compact accepted
+`quality_gate_evidence_manifest.json`. Its hashes bind the exact review bundle and
+completed decision record.
 No command promotes a candidate or modifies `catalog/templates/`.
 
 ## Moving-head corpus prerequisite
@@ -141,12 +143,14 @@ its file identities and provenance, without parsing sequence content:
 ```bash
 uv run python scripts/validate_mh_corpus_manifest.py \
   --manifest <owner-local-mh-manifest.json> \
+  --p2k-evidence <staged-mining-run>/quality_gate_evidence_manifest.json \
   --evidence-out <owner-local-output>/mh-corpus-evidence.json \
   --require-sufficient
 ```
 
-The shareable evidence file contains the private manifest hash, aggregate variety counts,
-declared minima, and the sufficiency decision; it omits paths, vendors, sequence IDs,
+The shareable evidence file contains the private manifest hash, the exact accepted P2K
+evidence hash, aggregate variety counts, declared minima, and the sufficiency decision;
+it omits paths, vendors, sequence IDs,
 fixture labels, source digests, owner identity, and rationale text. This validator does
 not satisfy P4-T7 by itself.
 

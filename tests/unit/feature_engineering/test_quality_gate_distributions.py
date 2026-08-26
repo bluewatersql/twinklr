@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 import json
 from pathlib import Path
 import subprocess
@@ -9,11 +10,9 @@ import sys
 
 import pytest
 
-from scripts.report_quality_gate_distributions import (
-    _require_complete_owner_decisions,
-    _require_verified_mining_manifest,
-)
+from scripts.report_quality_gate_distributions import _require_verified_mining_manifest
 from twinklr.core.feature_engineering.config import FeatureEngineeringPipelineOptions
+from twinklr.core.feature_engineering.evidence import MiningRunManifest, snapshot_tree
 from twinklr.core.feature_engineering.models.clustering import (
     TemplateClusterCandidate,
     TemplateClusterCatalog,
@@ -56,21 +55,90 @@ def _candidate(
     )
 
 
-def test_threshold_review_rejects_unverified_mining_or_incomplete_decisions(
-    tmp_path: Path,
-) -> None:
+def test_threshold_review_rejects_unverified_mining() -> None:
+    manifest = _mining_manifest(Path("/tmp/run"), verified=False)
     with pytest.raises(ValueError, match="verified_unchanged_rerun=true"):
-        _require_verified_mining_manifest({})
+        _require_verified_mining_manifest(manifest)
 
-    decision_path = tmp_path / "OWNER_DECISION_LOG_TEMPLATE.md"
-    decision_path.write_text(
-        "# Owner quality-gate decision log\n\n## min_support\n\n"
-        "- Date (YYYY-MM-DD):\n- Owner decision: keep / change to … / defer\n- Rationale:\n",
-        encoding="utf-8",
+
+def _mining_manifest(run_dir: Path, *, verified: bool = True) -> MiningRunManifest:
+    zero = "0" * 64
+    tree = (
+        snapshot_tree(run_dir)
+        if run_dir.exists()
+        else {"root": str(run_dir), "exists": False, "file_count": 0, "sha256": None, "files": []}
     )
-    report = {"threshold_review": {"numeric_values": {"min_support": {}}}}
-    with pytest.raises(ValueError, match="requires a YYYY-MM-DD date"):
-        _require_complete_owner_decisions(decision_path, report)
+    options = FeatureEngineeringPipelineOptions()
+    effective = {
+        name: getattr(options, name)
+        for name in (
+            "recipe_promotion_min_support",
+            "recipe_promotion_min_stability",
+            "recipe_promotion_adaptive_stability",
+            "recipe_promotion_max_per_family",
+            "recipe_promotion_multi_layer_min_support",
+            "recipe_promotion_multi_layer_min_stability",
+            "recipe_promotion_max_per_cluster",
+        )
+    }
+    return MiningRunManifest.model_validate(
+        {
+            "schema_version": "twinklr.owner-mining-run.v2",
+            "created_at_utc": datetime(2026, 8, 26, tzinfo=UTC),
+            "invocation": {
+                "exact_command": "mine",
+                "exact_rerun_command": "mine",
+                "effective_options": effective,
+            },
+            "corpus": {"path": "/private/corpus", "sequence_index_sha256": zero},
+            "output_dir": str(run_dir),
+            "sequence_count": 1,
+            "provenance": {
+                "source": {
+                    "git_commit": "a" * 40,
+                    "git_tree": "b" * 40,
+                    "tracked_diff_sha256": zero,
+                },
+                "tools": {},
+                "corpus": {
+                    "path": "/private/corpus",
+                    "tree_sha256": zero,
+                    "files": {},
+                    "input_fingerprint_sha256": zero,
+                },
+                "profiles": [],
+                "music_library_index": {
+                    "path": None,
+                    "exists": False,
+                    "size_bytes": None,
+                    "sha256": None,
+                    "explicitly_disabled": True,
+                },
+            },
+            "candidate_staging": {"recursive_artifacts": tree, "note": "staged review inputs"},
+            "content_hash_identity": {
+                "required": True,
+                "implementation": "content digest",
+                "verification": {
+                    "previous_run_after_stats": {},
+                    "current_run_before_stats": {},
+                    "current_run_after_stats": {},
+                    "before_matches_previous_after": verified,
+                    "after_matches_before": verified,
+                    "input_fingerprint_matches_previous": verified,
+                    "source_provenance_matches_previous": verified,
+                    "entity_key_digests_match": verified,
+                    "entity_content_digests_match": verified,
+                    "duplicate_identity_count": 0,
+                    "verified_unchanged_rerun": verified,
+                    "status": "verified" if verified else "changed",
+                },
+            },
+            "feature_store": {"backend": "sqlite", "path": str(run_dir / "features.db")},
+            "feature_store_snapshots": {"before": {}, "after": {}},
+            "live_catalog_immutability": {"before": tree, "after": tree, "unchanged": True},
+        }
+    )
 
 
 def test_distribution_report_has_hand_computed_histograms_and_sensitivity() -> None:
@@ -128,6 +196,27 @@ def test_distribution_report_has_hand_computed_histograms_and_sensitivity() -> N
         "min_support": 5,
         "min_stability": 0.3,
     }
+
+
+def test_family_cap_sensitivity_uses_runtime_recipe_effect_type_grouping() -> None:
+    """Deprecated and canonical family names collapse to one runtime effect type."""
+    candidates = [
+        _candidate("legacy", support=5, packs=3, stability=0.3, family="spiral"),
+        _candidate("canonical", support=5, packs=3, stability=0.3, family="spirals"),
+    ]
+
+    report = build_quality_gate_distribution_report(
+        candidates,
+        options=FeatureEngineeringPipelineOptions(recipe_promotion_max_per_family=1),
+        promotion_report={"effective_min_support": 2, "effective_min_stability": 0.05},
+        role_scores=(0.5,),
+        propensity_pair_supports=(3,),
+        cluster_memberships=(),
+    )
+
+    sensitivity = report["threshold_review"]["recipe_promotion_caps"]["max_per_family_sensitivity"]
+    configured = next(row for row in sensitivity if row["cap"] == 1)
+    assert configured == {"cap": 1, "would_keep": 1, "would_cap": 1}
 
 
 def test_distribution_report_exposes_low_pack_ratio_risk_and_cap_impact() -> None:
@@ -321,17 +410,6 @@ def test_report_command_writes_staged_review_material(tmp_path: Path) -> None:
         json.dumps({"effective_min_support": 2, "effective_min_stability": 0.05}),
         encoding="utf-8",
     )
-    mining_manifest = {
-        "provenance": {
-            "source": {"git_commit": "abc123", "git_tree": "tree123"},
-            "corpus": {"input_fingerprint_sha256": "input-hash"},
-        },
-        "content_hash_identity": {"verification": {"verified_unchanged_rerun": True}},
-        "live_catalog_immutability": {"unchanged": True},
-    }
-    (tmp_path / "mining_run_manifest.json").write_text(
-        json.dumps(mining_manifest), encoding="utf-8"
-    )
     (tmp_path / "effect_phrases.jsonl").write_text(
         "\n".join(
             json.dumps(
@@ -386,6 +464,10 @@ def test_report_command_writes_staged_review_material(tmp_path: Path) -> None:
     (tmp_path / "target_roles.jsonl").write_text(
         json.dumps({"top_role_score": 0.35}) + "\n", encoding="utf-8"
     )
+    mining_manifest = _mining_manifest(tmp_path)
+    (tmp_path / "mining_run_manifest.json").write_text(
+        mining_manifest.model_dump_json(indent=2), encoding="utf-8"
+    )
     root = Path(__file__).parents[3]
 
     completed = subprocess.run(
@@ -404,7 +486,14 @@ def test_report_command_writes_staged_review_material(tmp_path: Path) -> None:
     assert "quality_gate_distribution_report.json" in completed.stdout
     report = json.loads((tmp_path / "quality_gate_distribution_report.json").read_text())
     assert report["candidate_count"] == 2
-    expected_provenance = mining_manifest["provenance"]
+    expected_provenance = {
+        "source": mining_manifest.provenance.source.model_dump(mode="json"),
+        "corpus": {
+            "input_fingerprint_sha256": mining_manifest.provenance.corpus.input_fingerprint_sha256,
+            "tree_sha256": mining_manifest.provenance.corpus.tree_sha256,
+            "sequence_index_sha256": mining_manifest.corpus.sequence_index_sha256,
+        },
+    }
     assert report["mining_run_provenance"] == expected_provenance
     markdown = (tmp_path / "quality_gate_distribution_report.md").read_text()
     assert "## Full candidate distributions" in markdown
@@ -415,18 +504,15 @@ def test_report_command_writes_staged_review_material(tmp_path: Path) -> None:
     assert "| threshold | pass | fail |" in markdown
     assert "uncensored effect/model pair support" in markdown
     assert "Cluster-cap sensitivity" in markdown
-    template = tmp_path / "OWNER_DECISION_LOG_TEMPLATE.md"
-    template_text = template.read_text(encoding="utf-8")
-    assert template_text.count("- Date (YYYY-MM-DD):") == 8
-    assert template_text.count("- Owner decision:") == 8
-    assert template_text.count("- Rationale:") == 8
+    template = tmp_path / "OWNER_DECISIONS.json"
+    decisions = json.loads(template.read_text(encoding="utf-8"))
+    assert len(decisions["decisions"]) == 8
     assert not (tmp_path / "quality_gate_evidence_manifest.json").exists()
-    template.write_text(
-        template_text.replace("- Date (YYYY-MM-DD):", "- Date (YYYY-MM-DD): 2026-08-26")
-        .replace("- Owner decision: keep / change to … / defer", "- Owner decision: defer")
-        .replace("- Rationale:", "- Rationale: Awaiting the private owner corpus."),
-        encoding="utf-8",
-    )
+    for decision in decisions["decisions"]:
+        decision.update(
+            decision="defer", decided_on="2026-08-26", rationale="Awaiting private corpus."
+        )
+    template.write_text(json.dumps(decisions), encoding="utf-8")
     subprocess.run(
         [
             sys.executable,
@@ -434,6 +520,8 @@ def test_report_command_writes_staged_review_material(tmp_path: Path) -> None:
             "--run-dir",
             str(tmp_path),
             "--bind-owner-decisions",
+            "--accepted-on",
+            "2026-08-26",
         ],
         cwd=root,
         check=True,
@@ -443,17 +531,37 @@ def test_report_command_writes_staged_review_material(tmp_path: Path) -> None:
     evidence_manifest = json.loads(
         (tmp_path / "quality_gate_evidence_manifest.json").read_text(encoding="utf-8")
     )
-    assert evidence_manifest["schema_version"] == "quality_gate_evidence_manifest_v1"
-    assert evidence_manifest["mining_run_provenance"] == expected_provenance
-    bound_names = {row["path"] for row in evidence_manifest["artifacts"]}
+    assert evidence_manifest["schema_version"] == "twinklr.p2k-evidence.v2"
+    bundle = json.loads((tmp_path / "quality_gate_review_bundle.json").read_text())
+    bound_names = {row["path"] for row in bundle["artifacts"]}
     assert bound_names == {
         "mining_run_manifest.json",
         "content_templates.json",
         "promotion_report.json",
         "quality_gate_distribution_report.json",
         "quality_gate_distribution_report.md",
-        "OWNER_DECISION_LOG_TEMPLATE.md",
     }
-    assert all(len(row["sha256"]) == 64 for row in evidence_manifest["artifacts"])
+    assert all(len(row["sha256"]) == 64 for row in bundle["artifacts"])
     assert "quality_gate_evidence_manifest.json" not in bound_names
     assert not (tmp_path / "recipe_catalog.json").exists()
+
+    (tmp_path / "quality_gate_distribution_report.md").write_text(
+        "tampered after owner review\n", encoding="utf-8"
+    )
+    stale = subprocess.run(
+        [
+            sys.executable,
+            "scripts/report_quality_gate_distributions.py",
+            "--run-dir",
+            str(tmp_path),
+            "--bind-owner-decisions",
+            "--accepted-on",
+            "2026-08-26",
+        ],
+        cwd=root,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert stale.returncode != 0
+    assert "bound evidence artifact digest mismatch" in stale.stderr

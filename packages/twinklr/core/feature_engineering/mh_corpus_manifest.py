@@ -8,29 +8,34 @@ only aggregate counts and the owner's sufficiency decision.
 from __future__ import annotations
 
 from collections import Counter
-from datetime import datetime
+from datetime import UTC, datetime
 import hashlib
-import json
 from pathlib import Path
 import subprocess
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import Field, field_validator, model_validator
+
+from twinklr.core.feature_engineering.evidence import (
+    MHEvidenceManifest,
+    P2KEvidenceManifest,
+    Sha256Digest,
+    StrictEvidenceModel,
+    sha256_file,
+)
 
 
-class MovingHeadCorpusEntry(BaseModel):
+class MovingHeadCorpusEntry(StrictEvidenceModel):
     """One provenance-bearing owner-local moving-head sequence."""
-
-    model_config = ConfigDict(extra="forbid")
 
     package_id: str = Field(min_length=1)
     sequence_file_id: str = Field(min_length=1)
     vendor: str = Field(min_length=1)
     source_kind: Literal["owner_local_vendor_archive"]
     archive_path: Path
-    archive_sha256: str
+    archive_sha256: Sha256Digest
     sequence_path: Path
-    sequence_sha256: str
+    sequence_sha256: Sha256Digest
     fixture_families: list[str] = Field(min_length=1)
     fixture_roles: list[str] = Field(min_length=1)
 
@@ -40,16 +45,6 @@ class MovingHeadCorpusEntry(BaseModel):
         if not value.is_absolute():
             raise ValueError("owner-local source paths must be absolute")
         return value
-
-    @field_validator("archive_sha256", "sequence_sha256")
-    @classmethod
-    def _sha256_digest(cls, value: str) -> str:
-        normalized = value.lower()
-        if len(normalized) != 64 or any(
-            character not in "0123456789abcdef" for character in normalized
-        ):
-            raise ValueError("must be a 64-character SHA-256 digest")
-        return normalized
 
     @field_validator("fixture_families", "fixture_roles")
     @classmethod
@@ -62,25 +57,36 @@ class MovingHeadCorpusEntry(BaseModel):
         return normalized
 
 
-class MovingHeadCorpusSufficiency(BaseModel):
+class MovingHeadCorpusSufficiency(StrictEvidenceModel):
     """Owner decision and explicit minima for allowing the P4-T7 spike."""
-
-    model_config = ConfigDict(extra="forbid")
 
     decision: Literal["sufficient", "insufficient", "defer"]
     declared_by: str = Field(min_length=1)
     declared_at_utc: datetime
-    minimum_sequences: int = Field(ge=1)
-    minimum_vendors: int = Field(ge=1)
-    minimum_fixture_families: int = Field(ge=1)
-    minimum_fixture_roles: int = Field(ge=1)
+    minimum_sequences: Annotated[int, Field(strict=True, ge=1)]
+    minimum_vendors: Annotated[int, Field(strict=True, ge=1)]
+    minimum_fixture_families: Annotated[int, Field(strict=True, ge=1)]
+    minimum_fixture_roles: Annotated[int, Field(strict=True, ge=1)]
     rationale: str = Field(min_length=1)
 
+    @field_validator("declared_by", "rationale")
+    @classmethod
+    def _nonblank_text(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("must not be blank")
+        return value.strip()
 
-class MovingHeadCorpusManifest(BaseModel):
+    @model_validator(mode="after")
+    def _utc_declaration(self) -> MovingHeadCorpusSufficiency:
+        if self.declared_at_utc.tzinfo is None or self.declared_at_utc.utcoffset() != UTC.utcoffset(
+            self.declared_at_utc
+        ):
+            raise ValueError("declared_at_utc must be timezone-aware UTC")
+        return self
+
+
+class MovingHeadCorpusManifest(StrictEvidenceModel):
     """Private owner-local manifest consumed only by the offline validator."""
-
-    model_config = ConfigDict(extra="forbid")
 
     schema_version: Literal["twinklr.mh-corpus-manifest.v1"]
     corpus_id: str = Field(min_length=1)
@@ -88,13 +94,13 @@ class MovingHeadCorpusManifest(BaseModel):
     entries: list[MovingHeadCorpusEntry] = Field(min_length=1)
     sufficiency: MovingHeadCorpusSufficiency
 
-
-def _sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
+    @model_validator(mode="after")
+    def _utc_created(self) -> MovingHeadCorpusManifest:
+        if self.created_at_utc.tzinfo is None or self.created_at_utc.utcoffset() != UTC.utcoffset(
+            self.created_at_utc
+        ):
+            raise ValueError("created_at_utc must be timezone-aware UTC")
+        return self
 
 
 def _require_private_manifest_location(manifest_path: Path, repository_root: Path) -> None:
@@ -125,10 +131,9 @@ def _require_private_manifest_location(manifest_path: Path, repository_root: Pat
 
 def _load_manifest(path: Path) -> MovingHeadCorpusManifest:
     try:
-        raw = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as error:
+        return MovingHeadCorpusManifest.model_validate_json(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as error:
         raise ValueError(f"cannot read MH corpus manifest: {error}") from error
-    return MovingHeadCorpusManifest.model_validate(raw)
 
 
 def _validate_entry_files(entries: list[MovingHeadCorpusEntry]) -> None:
@@ -151,7 +156,7 @@ def _validate_entry_files(entries: list[MovingHeadCorpusEntry]) -> None:
         ):
             if not path.is_file():
                 raise ValueError(f"{label} source file does not exist: {path}")
-            actual = _sha256(path)
+            actual = sha256_file(path)
             if actual != expected:
                 raise ValueError(f"{label} does not match owner-local file content")
 
@@ -159,15 +164,22 @@ def _validate_entry_files(entries: list[MovingHeadCorpusEntry]) -> None:
 def validate_mh_corpus_manifest(
     manifest_path: Path,
     *,
+    p2k_evidence_path: Path,
     evidence_path: Path | None = None,
     require_sufficient: bool = False,
     repository_root: Path | None = None,
 ) -> dict[str, object]:
     """Validate private corpus evidence and optionally write a redacted digest binding."""
     manifest_path = manifest_path.resolve()
+    p2k_evidence_path = p2k_evidence_path.resolve()
     root = repository_root or Path.cwd()
     _require_private_manifest_location(manifest_path, root)
     manifest = _load_manifest(manifest_path)
+    p2k_evidence = P2KEvidenceManifest.model_validate_json(
+        p2k_evidence_path.read_text(encoding="utf-8")
+    )
+    if p2k_evidence.accepted is not True:
+        raise ValueError("P2K evidence is not owner-accepted")
     _validate_entry_files(manifest.entries)
 
     vendors = {entry.vendor for entry in manifest.entries}
@@ -194,38 +206,28 @@ def validate_mh_corpus_manifest(
         raise ValueError("owner sufficiency decision is not sufficient")
 
     rationale_sha256 = hashlib.sha256(manifest.sufficiency.rationale.encode("utf-8")).hexdigest()
-    evidence: dict[str, object] = {
-        "schema_version": "twinklr.mh-corpus-evidence.v1",
-        "manifest_sha256": _sha256(manifest_path),
-        "counts": counts,
-        "declared_minimums": minimums,
-        "sufficiency": {
-            "decision": manifest.sufficiency.decision,
-            "declared_at_utc": manifest.sufficiency.declared_at_utc.isoformat(),
-            "rationale_sha256": rationale_sha256,
-            "meets_declared_minimums": not missing,
-        },
-        "privacy": {
+    evidence = MHEvidenceManifest.model_validate(
+        {
+            "schema_version": "twinklr.mh-corpus-evidence.v2",
+            "manifest_sha256": sha256_file(manifest_path),
+            "p2k_evidence_schema_version": p2k_evidence.schema_version,
+            "p2k_evidence_sha256": sha256_file(p2k_evidence_path),
+            "p2k_accepted_on": p2k_evidence.accepted_on,
+            "counts": counts,
+            "declared_minimums": minimums,
+            "sufficiency": {
+                "decision": manifest.sufficiency.decision,
+                "declared_at_utc": manifest.sufficiency.declared_at_utc,
+                "rationale_sha256": rationale_sha256,
+                "meets_declared_minimums": not missing,
+            },
             "redacted": True,
-            "omitted": [
-                "corpus_id",
-                "package_id",
-                "sequence_file_id",
-                "vendor",
-                "source_paths",
-                "source_digests",
-                "fixture_labels",
-                "owner_identity",
-                "rationale_text",
-            ],
-        },
-    }
+        }
+    )
     if evidence_path is not None:
         evidence_path.parent.mkdir(parents=True, exist_ok=True)
-        evidence_path.write_text(
-            json.dumps(evidence, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-        )
-    return evidence
+        evidence_path.write_text(evidence.model_dump_json(indent=2) + "\n", encoding="utf-8")
+    return evidence.model_dump(mode="json")
 
 
 __all__ = [

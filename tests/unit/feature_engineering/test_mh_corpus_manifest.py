@@ -58,20 +58,43 @@ def _manifest(tmp_path: Path, *, sufficient: bool = True) -> Path:
     return manifest
 
 
+def _p2k_evidence(tmp_path: Path, *, accepted: bool = True) -> Path:
+    path = tmp_path / "p2k-evidence.json"
+    path.write_text(
+        json.dumps(
+            {
+                "schema_version": "twinklr.p2k-evidence.v2",
+                "created_at_utc": "2026-08-26T12:00:00Z",
+                "review_bundle_schema_version": "twinklr.quality-gate-review-bundle.v1",
+                "review_bundle_sha256": "1" * 64,
+                "decision_schema_version": "twinklr.owner-threshold-decisions.v1",
+                "decision_sha256": "2" * 64,
+                "accepted": accepted,
+                "accepted_on": "2026-08-26",
+            }
+        ),
+        encoding="utf-8",
+    )
+    return path
+
+
 def test_manifest_validator_hashes_owner_files_and_emits_redacted_evidence(
     tmp_path: Path,
 ) -> None:
     manifest = _manifest(tmp_path)
+    p2k_evidence = _p2k_evidence(tmp_path)
     evidence_path = tmp_path / "mh-corpus-evidence.json"
 
     evidence = validate_mh_corpus_manifest(
         manifest,
+        p2k_evidence_path=p2k_evidence,
         evidence_path=evidence_path,
         require_sufficient=True,
         repository_root=Path(__file__).parents[3],
     )
 
-    assert evidence["schema_version"] == "twinklr.mh-corpus-evidence.v1"
+    assert evidence["schema_version"] == "twinklr.mh-corpus-evidence.v2"
+    assert evidence["p2k_evidence_sha256"] == _sha256(p2k_evidence)
     assert evidence["manifest_sha256"] == _sha256(manifest)
     assert evidence["counts"] == {
         "sequences": 1,
@@ -104,6 +127,7 @@ def test_manifest_validator_rejects_invalid_or_insufficient_owner_evidence(
     message: str,
 ) -> None:
     manifest = _manifest(tmp_path)
+    p2k_evidence = _p2k_evidence(tmp_path)
     payload = json.loads(manifest.read_text(encoding="utf-8"))
     entry = payload["entries"][0]
     if mutation == "wrong_hash":
@@ -124,6 +148,7 @@ def test_manifest_validator_rejects_invalid_or_insufficient_owner_evidence(
     with pytest.raises(ValueError, match=message):
         validate_mh_corpus_manifest(
             manifest,
+            p2k_evidence_path=p2k_evidence,
             require_sufficient=True,
             repository_root=Path(__file__).parents[3],
         )
@@ -131,10 +156,49 @@ def test_manifest_validator_rejects_invalid_or_insufficient_owner_evidence(
 
 def test_manifest_validator_requires_owner_sufficiency_declaration(tmp_path: Path) -> None:
     manifest = _manifest(tmp_path, sufficient=False)
+    p2k_evidence = _p2k_evidence(tmp_path)
 
     with pytest.raises(ValueError, match="owner sufficiency decision is not sufficient"):
         validate_mh_corpus_manifest(
             manifest,
+            p2k_evidence_path=p2k_evidence,
             require_sufficient=True,
+            repository_root=Path(__file__).parents[3],
+        )
+
+
+def test_manifest_validator_requires_accepted_p2k_binding(tmp_path: Path) -> None:
+    manifest = _manifest(tmp_path)
+    p2k_evidence = _p2k_evidence(tmp_path, accepted=False)
+
+    with pytest.raises(ValueError, match="not owner-accepted"):
+        validate_mh_corpus_manifest(
+            manifest,
+            p2k_evidence_path=p2k_evidence,
+            require_sufficient=True,
+            repository_root=Path(__file__).parents[3],
+        )
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("minimum_sequences", "1"),
+        ("declared_by", "   "),
+        ("rationale", "   "),
+    ],
+)
+def test_manifest_validator_rejects_coercion_and_blank_declarations(
+    tmp_path: Path, field: str, value: object
+) -> None:
+    manifest = _manifest(tmp_path)
+    payload = json.loads(manifest.read_text(encoding="utf-8"))
+    payload["sufficiency"][field] = value
+    manifest.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(ValueError):
+        validate_mh_corpus_manifest(
+            manifest,
+            p2k_evidence_path=_p2k_evidence(tmp_path),
             repository_root=Path(__file__).parents[3],
         )

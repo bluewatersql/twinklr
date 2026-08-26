@@ -379,13 +379,15 @@ hash-verified isolated-scratch plan. Independent review approved that prerequisi
 it is integrated at `c79566e`. This approval does not admit or complete P4-T7; the task
 remains optional, incomplete, corpus-gated, and NO-GO/deferred.
 
-P2K-T2 offline owner-run readiness remediation is frozen for independent review at
-implementation commit `1b89c1b` (base `63293f6`). This is tooling readiness only: no
+P2K-T2 offline owner-run readiness candidate `64ce517` was formally rejected on both
+independent axes: evidence/contract correctness and implementation-quality/safety. Its
+earlier frozen/gate claims below are historical evidence for the rejected candidate, not
+current approval. This is tooling readiness only: no
 owner corpus, private manifest, network, provider, live catalog, or paid service was
 accessed. The real-corpus run, identical rerun, non-empty distributions, completed owner
 decisions, and P4-T7 feasibility work remain open.
 
-The candidate makes the owner path fail closed: it requires an explicit unified corpus,
+The remediation makes the owner path fail closed: it requires an explicit unified corpus,
 an explicit music-index-or-none declaration, and a new dedicated output directory; a
 rerun is allowed only when the previous manifest owns the same path and input fingerprint.
 The mining manifest binds corpus/profile/lineage/music/tool/Git provenance plus stable
@@ -393,10 +395,12 @@ feature-store entity-key/content digests and rejects duplicate logical/content i
 Threshold review requires the verified unchanged rerun, raw phrase/role/cluster evidence,
 and live-catalog immutability. Eight retained numeric values each receive the configured
 and two nearby sensitivity points; the dead anti-affinity literal is removed. Final
-`--bind-owner-decisions` validation requires one dated decision and rationale per value
-before hashing the mining manifest, candidates, reports, promotion evidence, and decision
-file. The owner-local MH validator checks provenance/file hashes, duplicate identities,
-declared variety minima, and sufficiency, then emits redacted aggregate evidence.
+`--bind-owner-decisions --accepted-on YYYY-MM-DD` validation consumes a strict JSON
+decision record with exactly one typed, dated decision and rationale per value. It checks
+the mining-time staged snapshot and current hashes for the mining manifest, candidates,
+reports, and promotion evidence before emitting accepted P2K evidence. The owner-local MH
+validator then emits one redacted aggregate document binding that accepted P2K evidence
+hash with the MH sufficiency declaration.
 
 Fresh author evidence before the documentation-only freeze record: focused owner-run/MH/
 threshold suites `20 passed`; related style/promotion/role suites `37 passed`; Ruff
@@ -404,7 +408,9 @@ threshold suites `20 passed`; related style/promotion/role suites `37 passed`; R
 and full pytest `5617 passed, 39 skipped` with 43 existing resource warnings. The
 subsequent clean-tree `make validate` also passed: `1358` files unchanged by formatting,
 Ruff clean, mypy clean across `720` source files, and `5617 passed, 39 skipped` with the
-same 43 resource warnings. This candidate is not self-approved or integrated.
+same 43 resource warnings. The rejected candidate was not self-approved or integrated.
+The replacement remediation requires fresh independent verification after its own clean
+freeze.
 
 ## Binding orchestration rules
 

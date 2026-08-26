@@ -26,7 +26,7 @@ def _seed_fixture_corpus(tmp_path: Path) -> Path:
         {
             "package_id": "content-hash-pkg",
             "sequence_file_id": "content-hash-seq",
-            "sequence_sha256": "sha256-sequence",
+            "sequence_sha256": "a" * 64,
             "media_file": "",
             "song": "Synthetic",
             "artist": "Fixture",
@@ -70,7 +70,7 @@ def _seed_fixture_corpus(tmp_path: Path) -> Path:
                 "profile_path": str(profile),
                 "package_id": "content-hash-pkg",
                 "sequence_file_id": "content-hash-seq",
-                "sequence_sha256": "sha256-sequence",
+                "sequence_sha256": "a" * 64,
             }
         )
         + "\n",
@@ -90,7 +90,7 @@ def _seed_fixture_corpus(tmp_path: Path) -> Path:
                 "package_id": "content-hash-pkg",
                 "sequence_file_id": "content-hash-seq",
                 "zip_sha256": "sha256-archive",
-                "sequence_sha256": "sha256-sequence",
+                "sequence_sha256": "a" * 64,
                 "profile_path": str(profile),
             }
         )
@@ -173,6 +173,14 @@ def test_mining_command_twice_preserves_store_and_live_catalog(tmp_path: Path) -
     assert verification["entity_content_digests_match"] is True
     assert verification["duplicate_identity_count"] == 0
     assert verification["status"] == "verified"
+
+    external = tmp_path / "outside-owned-output.txt"
+    external.write_text("must survive", encoding="utf-8")
+    (output / "injected-link").symlink_to(external)
+    escaped = subprocess.run(command, cwd=root, check=False, capture_output=True, text=True)
+    assert escaped.returncode != 0
+    assert "refusing symbolic link in owned output" in escaped.stderr
+    assert external.read_text(encoding="utf-8") == "must survive"
 
 
 def test_mining_command_rejects_non_unified_corpus_without_global_fallback(
@@ -265,6 +273,35 @@ def test_mining_command_rejects_unowned_existing_output_directory(tmp_path: Path
     assert sentinel.read_text(encoding="utf-8") == "preserve me"
 
 
+def test_mining_command_rejects_output_inside_live_catalog(tmp_path: Path) -> None:
+    root = Path(__file__).parents[3]
+    corpus = _seed_fixture_corpus(tmp_path)
+    output = root / "catalog" / "templates" / "forbidden-owner-staging"
+    assert not output.exists()
+
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "scripts/demo_feature_engineering.py",
+            "--owner-mining-run",
+            "--no-music-library-index",
+            "--corpus-dir",
+            str(corpus),
+            "--output-dir",
+            str(output),
+            "--feature-store-db",
+            str(output / "feature-store.sqlite"),
+        ],
+        cwd=root,
+        capture_output=True,
+        text=True,
+    )
+
+    assert completed.returncode == 2
+    assert "owner output overlaps protected root" in completed.stderr
+    assert not output.exists()
+
+
 def test_mining_command_rejects_duplicate_sequence_content_identity(tmp_path: Path) -> None:
     root = Path(__file__).parents[3]
     corpus = _seed_fixture_corpus(tmp_path)
@@ -273,7 +310,7 @@ def test_mining_command_rejects_duplicate_sequence_content_identity(tmp_path: Pa
         "profile_path": str(tmp_path / "profile"),
         "package_id": "other-package",
         "sequence_file_id": "other-sequence",
-        "sequence_sha256": "sha256-sequence",
+        "sequence_sha256": "a" * 64,
     }
     index_path.write_text(index_path.read_text() + json.dumps(duplicate) + "\n", encoding="utf-8")
     output = tmp_path / "duplicate-output"

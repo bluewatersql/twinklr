@@ -19,6 +19,7 @@ from twinklr.core.feature_engineering.promotion import (
     PROMOTION_RUN_DEFAULT_MIN_SUPPORT,
 )
 from twinklr.core.feature_engineering.propensity import PROPENSITY_MIN_SUPPORT
+from twinklr.core.feature_engineering.recipe_synthesizer import RecipeSynthesizer
 from twinklr.core.feature_engineering.taxonomy.target_roles import TARGET_ROLE_SCORE_CUTOFF
 
 _SUPPORT_BUCKETS: tuple[tuple[str, int, int | None], ...] = (
@@ -115,8 +116,13 @@ def _combined_gate_sensitivity(
 def _family_cap_sensitivity(
     candidates: Sequence[MinedTemplate], caps: Sequence[int]
 ) -> list[dict[str, int]]:
-    """Show the cap effect after the configured support/stability gate."""
-    by_family = Counter(candidate.effect_family for candidate in candidates)
+    """Show cap impact using the exact first-layer effect key used at runtime."""
+    synthesizer = RecipeSynthesizer()
+    runtime_keys: list[str] = []
+    for candidate in candidates:
+        recipe = synthesizer.synthesize(candidate, recipe_id=f"review:{candidate.template_id}")
+        runtime_keys.append(recipe.layers[0].effect_type.lower() if recipe.layers else "unknown")
+    by_family = Counter(runtime_keys)
     return [
         {
             "cap": cap,

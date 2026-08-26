@@ -16,6 +16,7 @@ from twinklr.core.feature_engineering.mh_corpus_manifest import validate_mh_corp
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--manifest", type=Path, required=True)
+    parser.add_argument("--p2k-evidence", type=Path, required=True)
     parser.add_argument("--evidence-out", type=Path, required=True)
     parser.add_argument(
         "--require-sufficient",
@@ -30,6 +31,7 @@ def main() -> int:
     try:
         evidence = validate_mh_corpus_manifest(
             args.manifest,
+            p2k_evidence_path=args.p2k_evidence,
             evidence_path=args.evidence_out,
             require_sufficient=args.require_sufficient,
             repository_root=Path(__file__).resolve().parents[1],
