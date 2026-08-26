@@ -19,7 +19,6 @@ from twinklr.core.sequencer.moving_heads.compile.scheduler import schedule_repea
 
 def _contract(**overrides: object) -> RepeatContract:
     kwargs: dict[str, object] = {
-        "repeatable": True,
         "mode": RepeatMode.PING_PONG,
         "cycle_bars": 4.0,
         "loop_step_ids": ["step_a", "step_b"],

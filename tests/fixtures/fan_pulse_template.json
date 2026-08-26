@@ -4,12 +4,6 @@
     "version": 1,
     "name": "Fan Pulse",
     "category": "movement",
-    "roles": [
-      "FRONT_LEFT",
-      "FRONT_RIGHT",
-      "BACK_LEFT",
-      "BACK_RIGHT"
-    ],
     "groups": {
       "all": [
         "FRONT_LEFT",
@@ -27,7 +21,6 @@
       ]
     },
     "repeat": {
-      "repeatable": true,
       "mode": "PING_PONG",
       "cycle_bars": 4.0,
       "loop_step_ids": [
@@ -79,7 +72,6 @@
           "intensity": "SMOOTH",
           "min_norm": 0.2,
           "max_norm": 1.0,
-          "cycles": 4.0,
           "params": {}
         }
       }
@@ -111,8 +103,7 @@
           },
           "dimmer": {
             "min_norm": 0.1,
-            "max_norm": 0.6,
-            "cycles": 2.0
+            "max_norm": 0.6
           }
         }
       }
@@ -130,8 +121,7 @@
           },
           "dimmer": {
             "min_norm": 0.3,
-            "max_norm": 1.0,
-            "cycles": 8.0
+            "max_norm": 1.0
           }
         }
       }
