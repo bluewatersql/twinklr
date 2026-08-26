@@ -307,20 +307,29 @@ against the default FFmpeg 9.
 
 P4-T5's first freeze candidate `607bf19` was independently rejected: it used generic
 fingerprint/smoke pointers instead of per-field effects, collapsed union alternatives,
-silently ignored representative removed keys, and overstated its handoff. The remediated
-candidate is based on the P4-T4 integration at `3e7f679` and implemented through
-`be4abba`, `a942820`, and `5526c23`. Its generated registry explicitly enumerates the
-external `AppConfig`, `JobConfig`, `FixtureGroup`, and `TemplateDoc` roots by canonical
-full path, type-qualifies union alternatives, and allows only `EFFECT_TEST`,
-`INVARIANT_TEST`, or `REMOVED`. The registry validator collects every cited pytest node;
-removed paths are absent from their schemas and carry the canonical P4-T6 documentation
-disposition in the registry rather than a duplicated list here. Targeted migration
-validators reject the removed App/Job, agent, audio-enhancement, fixture, and template
-keys while preserving unrelated forward-compatible extras. No provider, network, live,
-GUI, or paid call occurred. Fresh pre-handoff validation from `5526c23`: `1352` files
-already formatted; Ruff clean; mypy clean across `719` source files; `5592 passed,
-39 skipped`; and `git diff --check` clean. This is an author freeze candidate awaiting
-independent verification; it is neither self-approved nor integrated.
+silently ignored representative removed keys, and overstated its handoff. The next
+candidate, based on P4-T4 integration `3e7f679` and implemented through `be4abba`,
+`a942820`, `5526c23`, and freeze record `a2fe16e`, was also independently rejected. It
+incorrectly deleted live fixture position offsets and pose-safety behavior, timeline
+section gating, and template aim-zone metadata. Remediation `d95f675` restored those
+public behaviors with exact per-path tests, and `ffc7dae` recorded a fresh `5591 passed,
+39 skipped` freeze, but independent verification rejected that freeze too: the registry
+redeclared eight restored dispositions in a trailing override loop, and
+`FixtureConfig.is_pose_safe` checked already-clamped DMX values, making its limit checks
+ineffective.
+
+Source remediation `18e5d1c` removes the duplicate override declarations while preserving
+the eight canonical exact node IDs, and evaluates raw mapped DMX values before output
+clamping. A red-first public `FixtureConfig.is_pose_safe` discriminator proves an
+out-of-limit raw pose is unsafe even though `degrees_to_dmx` clamps emitted output; the
+existing base/instance `avoid_backward` discriminators remain green. The generated
+registry continues to enumerate the external `AppConfig`, `JobConfig`, `FixtureGroup`,
+and `TemplateDoc` roots by canonical full path and collects every cited pytest node.
+Fresh source-remediation gates: focused config/registry `260 passed`; `1352` files already
+formatted; Ruff clean; mypy clean across `719` source files; full suite `5592 passed,
+39 skipped`; and `git diff --check` clean. No provider, network, live, GUI, or paid call
+occurred. This remains an author refreeze pending independent verification; it is neither
+self-approved nor integrated.
 
 ## Binding orchestration rules
 
