@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from twinklr.core.config.fixtures import FixtureGroup
+from twinklr.core.config.models import AssetGenerationConfig
 from twinklr.core.pipeline import PipelineDefinition, StageDefinition
 from twinklr.core.pipeline.definitions.display import build_display_pipeline
 from twinklr.core.pipeline.definitions.moving_heads import build_moving_heads_pipeline
@@ -34,6 +35,7 @@ def build_combined_show_pipeline(
     song_name: str = "sequence",
     max_iterations: int = 3,
     min_pass_score: float = 7.0,
+    assets: AssetGenerationConfig | None = None,
 ) -> PipelineDefinition:
     """Build one DAG whose common prefix executes once before two planning branches."""
 
@@ -46,7 +48,7 @@ def build_combined_show_pipeline(
         song_name=song_name,
         max_iterations=max_iterations,
         min_pass_score=min_pass_score,
-        enable_assets=False,
+        assets=assets,
         xlights_mapping=xlights_mapping,
         macro_choreo_graph=choreo_graph,
     )

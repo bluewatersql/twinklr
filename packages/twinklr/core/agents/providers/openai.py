@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import json
 import logging
 import threading
@@ -18,6 +19,12 @@ from openai import (
 )
 
 from twinklr.core.agents.providers.base import (
+    ImageBackground,
+    ImageGenerationResponse,
+    ImageGenerationUsage,
+    ImageOutputFormat,
+    ImageQuality,
+    ImageSize,
     LLMResponse,
     ProviderType,
     ResponseMetadata,
@@ -51,6 +58,11 @@ one compatibility request before the three-attempt json_object fallback.
 def _as_int(value: Any) -> int:
     """Normalize optional SDK usage fields without accepting mock objects as counts."""
     return value if isinstance(value, int) else 0
+
+
+def _as_optional_int(value: Any) -> int | None:
+    """Preserve absent image-usage detail instead of silently pricing it as zero."""
+    return value if isinstance(value, int) and not isinstance(value, bool) else None
 
 
 class OpenAIProvider:
@@ -109,6 +121,52 @@ class OpenAIProvider:
     def provider_type(self) -> ProviderType:
         """Provider type identifier."""
         return ProviderType.OPENAI
+
+    @property
+    def supports_image_generation(self) -> bool:
+        """OpenAI exposes image generation through this provider instance."""
+        return True
+
+    async def generate_image_async(
+        self,
+        *,
+        prompt: str,
+        model: str,
+        size: ImageSize,
+        quality: ImageQuality,
+        background: ImageBackground,
+        output_format: ImageOutputFormat,
+    ) -> ImageGenerationResponse:
+        """Generate one image without exposing the provider's SDK client."""
+        response = await self._async_client.images.generate(
+            model=model,
+            prompt=prompt,
+            n=1,
+            size=size,
+            quality=quality,
+            output_format=output_format,
+            background=background,
+        )
+        if not response.data or not response.data[0].b64_json:
+            raise LLMProviderError("OpenAI image generation returned no image data")
+        usage = None
+        if response.usage is not None:
+            input_details = response.usage.input_tokens_details
+            output_details = response.usage.output_tokens_details
+            usage = ImageGenerationUsage(
+                input_tokens=_as_optional_int(response.usage.input_tokens),
+                input_text_tokens=_as_optional_int(getattr(input_details, "text_tokens", None)),
+                input_image_tokens=_as_optional_int(getattr(input_details, "image_tokens", None)),
+                output_tokens=_as_optional_int(response.usage.output_tokens),
+                output_text_tokens=_as_optional_int(getattr(output_details, "text_tokens", None)),
+                output_image_tokens=_as_optional_int(getattr(output_details, "image_tokens", None)),
+                total_tokens=_as_optional_int(response.usage.total_tokens),
+            )
+        return ImageGenerationResponse(
+            image_bytes=base64.b64decode(response.data[0].b64_json),
+            model=model,
+            usage=usage,
+        )
 
     # =========================================================================
     # Sync Methods (Backward Compatible - use sync client)

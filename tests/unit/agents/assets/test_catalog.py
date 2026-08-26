@@ -3,9 +3,14 @@
 from __future__ import annotations
 
 from pathlib import Path
+from unittest.mock import patch
+
+from PIL import Image
+import pytest
 
 from twinklr.core.agents.assets.catalog import (
     check_reuse,
+    check_reuse_by_spec_id,
     compute_prompt_hash,
     load_catalog,
     save_catalog,
@@ -103,11 +108,20 @@ class TestLoadSaveCatalog:
         assert len(loaded.entries) == 1
         assert loaded.entries[0].asset_id == "test_asset"
 
-    def test_load_corrupt_file_returns_empty(self, tmp_path: Path) -> None:
+    def test_load_corrupt_file_raises(self, tmp_path: Path) -> None:
         path = tmp_path / "bad.json"
         path.write_text("not valid json {{{")
-        catalog = load_catalog(path)
-        assert len(catalog.entries) == 0
+        with pytest.raises(ValueError, match="asset catalog"):
+            load_catalog(path)
+
+    def test_unexpected_catalog_reader_failure_propagates(self, tmp_path: Path) -> None:
+        path = tmp_path / "catalog.json"
+        path.write_text("{}", encoding="utf-8")
+        with (
+            patch.object(Path, "read_text", side_effect=RuntimeError("programmer bug")),
+            pytest.raises(RuntimeError, match="programmer bug"),
+        ):
+            load_catalog(path)
 
     def test_save_creates_parent_dirs(self, tmp_path: Path) -> None:
         path = tmp_path / "deep" / "nested" / "catalog.json"
@@ -117,10 +131,100 @@ class TestLoadSaveCatalog:
 
 
 class TestCheckReuse:
+    @pytest.mark.parametrize("lookup", ["prompt", "spec_id"])
+    @pytest.mark.parametrize("invalid_kind", ["fake", "corrupt", "zero", "jpeg", "wrong-size"])
+    def test_cached_image_must_be_valid_png_with_expected_dimensions(
+        self,
+        tmp_path: Path,
+        lookup: str,
+        invalid_kind: str,
+    ) -> None:
+        spec = _make_spec(prompt="Scoped prompt")
+        path = tmp_path / "cached.png"
+        if invalid_kind == "fake":
+            path.write_bytes(b"paid image")
+        elif invalid_kind == "corrupt":
+            path.write_bytes(b"\x89PNG\r\n\x1a\ntruncated")
+        elif invalid_kind == "zero":
+            path.write_bytes(b"")
+        elif invalid_kind == "jpeg":
+            Image.new("RGB", (256, 256)).save(path, format="JPEG")
+        else:
+            Image.new("RGB", (128, 256)).save(path, format="PNG")
+        entry = _make_entry(prompt_hash=compute_prompt_hash(spec), file_path="cached.png")
+        catalog = AssetCatalog(catalog_id="test", entries=[entry])
+
+        with pytest.raises(ValueError, match="Cached image validation failed"):
+            if lookup == "prompt":
+                check_reuse(catalog, spec, assets_dir=tmp_path, source_plan_id="plan_001")
+            else:
+                check_reuse_by_spec_id(
+                    catalog, spec, assets_dir=tmp_path, source_plan_id="plan_001"
+                )
+
+    def test_prompt_hash_reuse_is_scoped_to_source_plan(self, tmp_path: Path) -> None:
+        spec = _make_spec(prompt="Same enriched image prompt")
+        prompt_hash = compute_prompt_hash(spec)
+        relative_a = "images/textures/256x256/song-a.png"
+        relative_b = "images/textures/256x256/song-b.png"
+        for relative in (relative_a, relative_b):
+            output = tmp_path / relative
+            output.parent.mkdir(parents=True, exist_ok=True)
+            Image.new("RGB", (256, 256)).save(output, format="PNG")
+        song_a = _make_entry(asset_id="song-a:asset", prompt_hash=prompt_hash, file_path=relative_a)
+        song_a.source_plan_id = "song-a"
+        song_b = _make_entry(asset_id="song-b:asset", prompt_hash=prompt_hash, file_path=relative_b)
+        song_b.source_plan_id = "song-b"
+        catalog = AssetCatalog(catalog_id="test", entries=[song_a, song_b])
+
+        hit = check_reuse(catalog, spec, assets_dir=tmp_path, source_plan_id="song-b")
+
+        assert hit is not None
+        assert hit.asset_id == "song-b:asset"
+        assert check_reuse(catalog, spec, assets_dir=tmp_path, source_plan_id="song-c") is None
+
+    @pytest.mark.parametrize("file_path", ["/tmp/outside.png", "../outside.png"])
+    @pytest.mark.parametrize("lookup", ["prompt", "spec_id"])
+    def test_reuse_rejects_unsafe_catalog_paths(
+        self,
+        tmp_path: Path,
+        file_path: str,
+        lookup: str,
+    ) -> None:
+        spec = _make_spec(prompt="Scoped prompt")
+        entry = _make_entry(prompt_hash=compute_prompt_hash(spec), file_path=file_path)
+        catalog = AssetCatalog(catalog_id="test", entries=[entry])
+
+        with pytest.raises(ValueError, match="catalog file_path"):
+            if lookup == "prompt":
+                check_reuse(catalog, spec, assets_dir=tmp_path, source_plan_id="plan_001")
+            else:
+                check_reuse_by_spec_id(
+                    catalog, spec, assets_dir=tmp_path, source_plan_id="plan_001"
+                )
+
+    @pytest.mark.parametrize("lookup", ["prompt", "spec_id"])
+    def test_reuse_rejects_symlink_escape(self, tmp_path: Path, lookup: str) -> None:
+        root = tmp_path / "assets"
+        outside = tmp_path / "outside"
+        root.mkdir()
+        outside.mkdir()
+        (outside / "paid.png").write_bytes(b"paid")
+        (root / "escape").symlink_to(outside, target_is_directory=True)
+        spec = _make_spec(prompt="Scoped prompt")
+        entry = _make_entry(prompt_hash=compute_prompt_hash(spec), file_path="escape/paid.png")
+        catalog = AssetCatalog(catalog_id="test", entries=[entry])
+
+        with pytest.raises(ValueError, match="escapes assets root"):
+            if lookup == "prompt":
+                check_reuse(catalog, spec, assets_dir=root, source_plan_id="plan_001")
+            else:
+                check_reuse_by_spec_id(catalog, spec, assets_dir=root, source_plan_id="plan_001")
+
     def test_cache_miss(self) -> None:
         catalog = AssetCatalog(catalog_id="test")
         spec = _make_spec(prompt="New prompt")
-        assert check_reuse(catalog, spec) is None
+        assert check_reuse(catalog, spec, assets_dir=Path.cwd(), source_plan_id="plan_001") is None
 
     def test_cache_hit_with_valid_file(self, tmp_path: Path) -> None:
         spec = _make_spec(prompt="Cached prompt")
@@ -128,15 +232,15 @@ class TestCheckReuse:
 
         # Create a real file on disk
         file_path = tmp_path / "sparkles.png"
-        file_path.write_bytes(b"fake png data")
+        Image.new("RGB", (256, 256)).save(file_path, format="PNG")
 
         entry = _make_entry(
             prompt_hash=prompt_hash,
-            file_path=str(file_path),
+            file_path="sparkles.png",
         )
         catalog = AssetCatalog(catalog_id="test", entries=[entry])
 
-        result = check_reuse(catalog, spec)
+        result = check_reuse(catalog, spec, assets_dir=tmp_path, source_plan_id="plan_001")
         assert result is not None
         assert result.asset_id == "test_asset"
 
@@ -146,11 +250,11 @@ class TestCheckReuse:
 
         entry = _make_entry(
             prompt_hash=prompt_hash,
-            file_path=str(tmp_path / "missing.png"),
+            file_path="missing.png",
         )
         catalog = AssetCatalog(catalog_id="test", entries=[entry])
 
-        result = check_reuse(catalog, spec)
+        result = check_reuse(catalog, spec, assets_dir=tmp_path, source_plan_id="plan_001")
         assert result is None
 
 
@@ -162,9 +266,9 @@ class TestCheckReuseBySpecId:
         from twinklr.core.agents.assets.catalog import check_reuse_by_spec_id
 
         file_path = tmp_path / "sparkles.png"
-        file_path.write_bytes(b"fake png data")
+        Image.new("RGB", (256, 256)).save(file_path, format="PNG")
 
-        entry = _make_entry(file_path=str(file_path))
+        entry = _make_entry(file_path="sparkles.png")
         catalog = AssetCatalog(catalog_id="test", entries=[entry])
 
         # New spec with same spec_id but different/no prompt (pre-enrichment)
@@ -178,7 +282,9 @@ class TestCheckReuseBySpecId:
             height=256,
         )
 
-        result = check_reuse_by_spec_id(catalog, spec)
+        result = check_reuse_by_spec_id(
+            catalog, spec, assets_dir=tmp_path, source_plan_id="plan_001"
+        )
         assert result is not None
         assert result.asset_id == "test_asset"
 
@@ -187,9 +293,9 @@ class TestCheckReuseBySpecId:
         from twinklr.core.agents.assets.catalog import check_reuse_by_spec_id
 
         file_path = tmp_path / "sparkles.png"
-        file_path.write_bytes(b"fake png data")
+        Image.new("RGB", (256, 256)).save(file_path, format="PNG")
 
-        entry = _make_entry(file_path=str(file_path))
+        entry = _make_entry(file_path="sparkles.png")
         catalog = AssetCatalog(catalog_id="test", entries=[entry])
 
         spec = AssetSpec(
@@ -202,7 +308,9 @@ class TestCheckReuseBySpecId:
             height=256,
         )
 
-        result = check_reuse_by_spec_id(catalog, spec)
+        result = check_reuse_by_spec_id(
+            catalog, spec, assets_dir=tmp_path, source_plan_id="plan_001"
+        )
         assert result is None
 
     def test_cache_miss_different_dimensions(self, tmp_path: Path) -> None:
@@ -210,9 +318,9 @@ class TestCheckReuseBySpecId:
         from twinklr.core.agents.assets.catalog import check_reuse_by_spec_id
 
         file_path = tmp_path / "sparkles.png"
-        file_path.write_bytes(b"fake png data")
+        Image.new("RGB", (256, 256)).save(file_path, format="PNG")
 
-        entry = _make_entry(file_path=str(file_path))
+        entry = _make_entry(file_path="sparkles.png")
         catalog = AssetCatalog(catalog_id="test", entries=[entry])
 
         spec = AssetSpec(
@@ -225,14 +333,16 @@ class TestCheckReuseBySpecId:
             height=512,
         )
 
-        result = check_reuse_by_spec_id(catalog, spec)
+        result = check_reuse_by_spec_id(
+            catalog, spec, assets_dir=tmp_path, source_plan_id="plan_001"
+        )
         assert result is None
 
     def test_cache_miss_file_deleted(self, tmp_path: Path) -> None:
         """Matching spec_id but file no longer on disk returns None."""
         from twinklr.core.agents.assets.catalog import check_reuse_by_spec_id
 
-        entry = _make_entry(file_path=str(tmp_path / "deleted.png"))
+        entry = _make_entry(file_path="deleted.png")
         catalog = AssetCatalog(catalog_id="test", entries=[entry])
 
         spec = AssetSpec(
@@ -245,7 +355,9 @@ class TestCheckReuseBySpecId:
             height=256,
         )
 
-        result = check_reuse_by_spec_id(catalog, spec)
+        result = check_reuse_by_spec_id(
+            catalog, spec, assets_dir=tmp_path, source_plan_id="plan_001"
+        )
         assert result is None
 
     def test_cache_miss_failed_entry(self, tmp_path: Path) -> None:
@@ -258,7 +370,7 @@ class TestCheckReuseBySpecId:
         entry = CatalogEntry(
             asset_id="test_asset",
             spec=_make_spec(),
-            file_path=str(file_path),
+            file_path="sparkles.png",
             content_hash="sha256_content",
             status=AssetStatus.FAILED,
             width=256,
@@ -282,5 +394,7 @@ class TestCheckReuseBySpecId:
             height=256,
         )
 
-        result = check_reuse_by_spec_id(catalog, spec)
+        result = check_reuse_by_spec_id(
+            catalog, spec, assets_dir=tmp_path, source_plan_id="plan_001"
+        )
         assert result is None

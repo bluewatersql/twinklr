@@ -4,7 +4,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import StrEnum
-from typing import Any, Protocol
+from typing import Any, Literal, Protocol
+
+ImageSize = Literal["auto", "1024x1024", "1024x1536", "1536x1024"]
+ImageQuality = Literal["low", "medium", "high"]
+ImageBackground = Literal["transparent", "opaque", "auto"]
+ImageOutputFormat = Literal["png", "jpeg", "webp"]
 
 
 class ProviderType(StrEnum):
@@ -22,6 +27,28 @@ class TokenUsage:
     reasoning_tokens: int = 0
     completion_tokens: int = 0
     total_tokens: int = 0
+
+
+@dataclass(frozen=True)
+class ImageGenerationUsage:
+    """Provider-reported image token usage, when the API supplies it."""
+
+    input_tokens: int | None = None
+    input_text_tokens: int | None = None
+    input_image_tokens: int | None = None
+    output_tokens: int | None = None
+    output_text_tokens: int | None = None
+    output_image_tokens: int | None = None
+    total_tokens: int | None = None
+
+
+@dataclass(frozen=True)
+class ImageGenerationResponse:
+    """Provider-neutral bytes and metadata for one generated image."""
+
+    image_bytes: bytes
+    model: str
+    usage: ImageGenerationUsage | None = None
 
 
 @dataclass(frozen=True)
@@ -238,4 +265,22 @@ class LLMProvider(Protocol):
         Raises:
             LLMProviderError: On unrecoverable errors
         """
+        ...
+
+    @property
+    def supports_image_generation(self) -> bool:
+        """Whether this provider implements the image-generation capability."""
+        ...
+
+    async def generate_image_async(
+        self,
+        *,
+        prompt: str,
+        model: str,
+        size: ImageSize,
+        quality: ImageQuality,
+        background: ImageBackground,
+        output_format: ImageOutputFormat,
+    ) -> ImageGenerationResponse:
+        """Generate one image through the provider's public capability."""
         ...

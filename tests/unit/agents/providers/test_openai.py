@@ -12,6 +12,41 @@ from twinklr.core.agents.providers.openai import OpenAIProvider
 from twinklr.core.config.models import AgentConfig
 
 
+@pytest.mark.asyncio
+async def test_public_image_capability_forwards_supported_parameters_and_usage() -> None:
+    async_client = MagicMock()
+    async_client.images.generate = AsyncMock()
+    item = MagicMock(b64_json="aGVsbG8=")
+    usage = MagicMock(
+        input_tokens=11,
+        input_tokens_details=MagicMock(text_tokens=7, image_tokens=4),
+        output_tokens=22,
+        output_tokens_details=MagicMock(text_tokens=0, image_tokens=22),
+        total_tokens=33,
+    )
+    async_client.images.generate.return_value = MagicMock(data=[item], usage=usage)
+    with (
+        patch("twinklr.core.agents.providers.openai.AsyncOpenAI", return_value=async_client),
+        patch("twinklr.core.agents.providers.openai.OpenAIClient"),
+    ):
+        provider = OpenAIProvider(api_key="test-key")
+        response = await provider.generate_image_async(
+            prompt="snow",
+            model="gpt-image-2",
+            size="1024x1024",
+            quality="low",
+            background="opaque",
+            output_format="png",
+        )
+    assert response.image_bytes == b"hello"
+    assert response.usage is not None
+    assert response.usage.total_tokens == 33
+    assert response.usage.input_text_tokens == 7
+    assert response.usage.input_image_tokens == 4
+    assert response.usage.output_image_tokens == 22
+    assert async_client.images.generate.await_args.kwargs["quality"] == "low"
+
+
 @pytest.fixture
 def mock_openai_client():
     """Mock OpenAIClient for testing."""

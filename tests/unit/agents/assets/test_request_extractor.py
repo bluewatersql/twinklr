@@ -7,6 +7,10 @@ and narrative asset extraction.
 
 from __future__ import annotations
 
+from unittest.mock import patch
+
+import pytest
+
 from twinklr.core.agents.assets.models import AssetCategory
 from twinklr.core.agents.assets.request_extractor import (
     _build_spec_id,
@@ -163,6 +167,17 @@ class TestCollectMotifContexts:
         contexts = _collect_motif_contexts(plan)
         assert len(contexts) == 0
 
+    def test_unexpected_palette_registry_failure_propagates(self) -> None:
+        plan = _plan_set([_section(motif_ids=["sparkles"])])
+        with (
+            patch(
+                "twinklr.core.agents.assets.request_extractor.PALETTE_REGISTRY.get",
+                side_effect=RuntimeError("palette invariant broken"),
+            ),
+            pytest.raises(RuntimeError, match="palette invariant broken"),
+        ):
+            extract_asset_specs(plan)
+
 
 # ---------------------------------------------------------------------------
 # Category determination
@@ -195,12 +210,12 @@ class TestDetermineCategories:
 
 class TestBuildSpecId:
     def test_image_spec(self) -> None:
-        sid = _build_spec_id("sparkles", AssetCategory.IMAGE_TEXTURE)
-        assert sid == "asset_image_texture_sparkles"
+        sid = _build_spec_id("song-a", "sparkles", AssetCategory.IMAGE_TEXTURE)
+        assert sid.endswith("_image_texture_sparkles")
 
     def test_text_spec(self) -> None:
-        sid = _build_spec_id("song_title", AssetCategory.TEXT_BANNER)
-        assert sid == "asset_text_banner_song_title"
+        sid = _build_spec_id("song-a", "song_title", AssetCategory.TEXT_BANNER)
+        assert sid.endswith("_text_banner_song_title")
 
 
 # ---------------------------------------------------------------------------
@@ -394,7 +409,7 @@ class TestExtractNarrativeSpecs:
         d = _narrative_directive(directive_id="santa_sleigh")
         plan = _narrative_plan_set([d])
         specs = _extract_narrative_specs(plan)
-        assert specs[0].spec_id == "asset_image_cutout_santa_sleigh"
+        assert specs[0].spec_id.endswith("_image_cutout_santa_sleigh")
 
     def test_narrative_fields_populated(self) -> None:
         d = NarrativeAssetDirective(

@@ -9,7 +9,7 @@ import pytest
 
 from twinklr.core.agents.audio.stages.analysis import AudioAnalysisStage
 from twinklr.core.agents.sequencer.group_planner.stage import GroupPlannerStage
-from twinklr.core.config.models import JobConfig
+from twinklr.core.config.models import AssetGenerationConfig, JobConfig
 from twinklr.core.feature_engineering.loader import FEArtifactBundle
 from twinklr.core.pipeline.context import PipelineContext
 from twinklr.core.pipeline.display_wiring import (
@@ -284,6 +284,16 @@ def test_assets_remain_disabled() -> None:
         song_name="song",
     )
     assert all(stage.id != "asset_creation" for stage in wiring.pipeline.stages)
+
+
+def test_assets_enabled_through_typed_job_config() -> None:
+    wiring = prepare_display_pipeline(
+        layout_path=FIXTURES / "display_layout_a.xml",
+        job_config=JobConfig(assets=AssetGenerationConfig(enabled=True, dry_run=True)),
+        catalog_dir=TRACKED_CATALOG,
+        song_name="song",
+    )
+    assert any(stage.id == "asset_creation" for stage in wiring.pipeline.stages)
 
 
 def test_job_config_controls_display_planner_iterations_and_threshold() -> None:

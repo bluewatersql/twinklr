@@ -110,6 +110,7 @@ def _find_matching_entries(
     motif_id: str,
     catalog: AssetCatalog,
     preferred_category: AssetCategory,
+    source_plan_id: str | None = None,
 ) -> list[str]:
     """Search catalog for matching assets by motif_id with category preference.
 
@@ -127,7 +128,12 @@ def _find_matching_entries(
         List of matching asset_ids (may be empty).
     """
     # Find all successful entries for this motif
-    motif_entries = [e for e in catalog.find_by_motif(motif_id) if e.status != AssetStatus.FAILED]
+    motif_entries = [
+        e
+        for e in catalog.find_by_motif(motif_id)
+        if e.status != AssetStatus.FAILED
+        and (source_plan_id is None or e.source_plan_id == source_plan_id)
+    ]
 
     if not motif_entries:
         return []
@@ -155,6 +161,7 @@ def _find_matching_entries(
 def _resolve_placement(
     placement: GroupPlacement,
     catalog: AssetCatalog,
+    source_plan_id: str | None = None,
 ) -> GroupPlacement:
     """Resolve a single placement to catalog asset IDs.
 
@@ -173,7 +180,7 @@ def _resolve_placement(
     # Determine preferred category from group role
     preferred = ROLE_CATEGORY_PREFERENCE.get(placement.target.id, _DEFAULT_CATEGORY)
 
-    asset_ids = _find_matching_entries(motif_id, catalog, preferred)
+    asset_ids = _find_matching_entries(motif_id, catalog, preferred, source_plan_id)
     if not asset_ids:
         logger.debug(
             "No catalog match for motif '%s' (template=%s, target=%s)",
@@ -197,6 +204,7 @@ def _resolve_placement(
 def _resolve_coordination_plan(
     coord_plan: CoordinationPlan,
     catalog: AssetCatalog,
+    source_plan_id: str | None = None,
 ) -> CoordinationPlan:
     """Resolve all placements in a coordination plan.
 
@@ -210,7 +218,9 @@ def _resolve_coordination_plan(
     if not coord_plan.placements:
         return coord_plan
 
-    resolved_placements = [_resolve_placement(p, catalog) for p in coord_plan.placements]
+    resolved_placements = [
+        _resolve_placement(p, catalog, source_plan_id) for p in coord_plan.placements
+    ]
 
     # Only create a new plan if something changed
     if all(r is o for r, o in zip(resolved_placements, coord_plan.placements, strict=True)):
@@ -222,6 +232,7 @@ def _resolve_coordination_plan(
 def _resolve_lane_plan(
     lane_plan: LanePlan,
     catalog: AssetCatalog,
+    source_plan_id: str | None = None,
 ) -> LanePlan:
     """Resolve all coordination plans in a lane plan.
 
@@ -233,7 +244,8 @@ def _resolve_lane_plan(
         New LanePlan with resolved coordination plans.
     """
     resolved_coords = [
-        _resolve_coordination_plan(cp, catalog) for cp in lane_plan.coordination_plans
+        _resolve_coordination_plan(cp, catalog, source_plan_id)
+        for cp in lane_plan.coordination_plans
     ]
 
     if all(r is o for r, o in zip(resolved_coords, lane_plan.coordination_plans, strict=True)):
@@ -245,6 +257,7 @@ def _resolve_lane_plan(
 def _resolve_section(
     section: SectionCoordinationPlan,
     catalog: AssetCatalog,
+    source_plan_id: str | None = None,
 ) -> SectionCoordinationPlan:
     """Resolve all lane plans in a section.
 
@@ -255,7 +268,7 @@ def _resolve_section(
     Returns:
         New SectionCoordinationPlan with resolved lane plans.
     """
-    resolved_lanes = [_resolve_lane_plan(lp, catalog) for lp in section.lane_plans]
+    resolved_lanes = [_resolve_lane_plan(lp, catalog, source_plan_id) for lp in section.lane_plans]
 
     if all(r is o for r, o in zip(resolved_lanes, section.lane_plans, strict=True)):
         return section
@@ -286,7 +299,9 @@ def resolve_plan_assets(
         New GroupPlanSet with resolved_asset_ids populated on
         placements that match catalog entries.
     """
-    resolved_sections = [_resolve_section(s, catalog) for s in plan_set.section_plans]
+    resolved_sections = [
+        _resolve_section(s, catalog, plan_set.plan_set_id) for s in plan_set.section_plans
+    ]
 
     # Count resolutions for logging
     total_placements = 0

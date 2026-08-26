@@ -1,13 +1,9 @@
-"""Asset creation pipeline stage.
-
-Async-first implementation that integrates extraction, enrichment,
-generation, and cataloging into a single pipeline stage.
-Runs after the aggregate stage.
-"""
+"""Guarded asset creation pipeline stage."""
 
 from __future__ import annotations
 
 import asyncio
+from datetime import UTC, datetime
 import logging
 from pathlib import Path
 from typing import Any
@@ -16,66 +12,49 @@ from twinklr.core.agents._paths import AGENTS_BASE_PATH
 from twinklr.core.agents.assets.catalog import (
     check_reuse,
     check_reuse_by_spec_id,
+    compute_prompt_hash,
     load_catalog,
     save_catalog,
 )
-from twinklr.core.agents.assets.generator import generate_asset
+from twinklr.core.agents.assets.generator import build_output_path, generate_asset
 from twinklr.core.agents.assets.image_client import OpenAIImageClient
 from twinklr.core.agents.assets.models import (
+    AssetCatalog,
+    AssetRunSummary,
     AssetSpec,
     AssetStatus,
     CatalogEntry,
+    ImageRequestBudgetPolicy,
 )
-from twinklr.core.agents.assets.prompt_enricher import (
-    build_enricher_spec,
-    enrich_spec,
-)
+from twinklr.core.agents.assets.prompt_enricher import build_enricher_spec, enrich_spec
 from twinklr.core.agents.assets.request_extractor import extract_asset_specs
 from twinklr.core.agents.assets.text_renderer import TextRenderer
 from twinklr.core.agents.async_runner import AsyncAgentRunner
 from twinklr.core.agents.audio.lyrics.models import LyricContextModel
+from twinklr.core.config.models import AssetGenerationConfig
 from twinklr.core.pipeline.context import PipelineContext
 from twinklr.core.pipeline.result import StageResult, failure_result, success_result
 from twinklr.core.pipeline.stage import resolve_typed_input
 from twinklr.core.sequencer.planning.group_plan import GroupPlanSet
-from twinklr.core.sequencer.theming.catalog import MOTIF_REGISTRY
+from twinklr.core.sequencer.theming.catalog import MOTIF_REGISTRY, ItemNotFoundError
 
 logger = logging.getLogger(__name__)
 
 
 class AssetCreationStage:
-    """Pipeline stage: extract, enrich, generate, and catalog assets.
-
-    This is a pass-through stage: the AssetCatalog is stored in context
-    state (``asset_catalog``) and the original GroupPlanSet is returned
-    as output so downstream stages receive the plan unchanged.
-
-    Input: GroupPlanSet (or dict with key "aggregate")
-    Output: GroupPlanSet (pass-through; catalog in context state)
-
-    Example:
-        >>> stage = AssetCreationStage()
-        >>> result = await stage.execute(group_plan_set, context)
-        >>> if result.success:
-        ...     plan = result.output  # GroupPlanSet (unchanged)
-        ...     catalog = context.get_state("asset_catalog")
-    """
+    """Extract, enrich, generate, and durably catalog opt-in display assets."""
 
     def __init__(
         self,
+        config: AssetGenerationConfig | None = None,
         *,
         text_renderer: TextRenderer | None = None,
     ) -> None:
-        """Initialize asset creation stage.
-
-        Args:
-            text_renderer: Optional custom text renderer. Defaults to TextRenderer().
-        """
+        self._config = config or AssetGenerationConfig()
         self._text_renderer = text_renderer or TextRenderer()
 
     @property
     def name(self) -> str:
-        """Stage name for logging."""
         return "asset_creation"
 
     async def execute(
@@ -83,71 +62,79 @@ class AssetCreationStage:
         input: GroupPlanSet | dict[str, Any],
         context: PipelineContext,
     ) -> StageResult[GroupPlanSet]:
-        """Execute the full asset creation pipeline.
-
-        The catalog is stored in ``context.state["asset_catalog"]`` and
-        the original GroupPlanSet is returned as output (pass-through).
-
-        Args:
-            input: GroupPlanSet directly, or dict with "aggregate"
-                (GroupPlanSet) and optionally "lyrics".  When a GroupPlanSet
-                is passed directly, lyric context is read from
-                ``context.state["lyric_context"]``.
-            context: Pipeline context with provider, session, output_dir.
-
-        Returns:
-            StageResult containing the original GroupPlanSet (pass-through).
-        """
+        """Run one capped batch; retain every completed sibling in the catalog."""
         try:
+            if not self._config.enabled:
+                raise ValueError("Asset generation is disabled; set assets.enabled=true")
             plan_set, extras = resolve_typed_input(input, GroupPlanSet, "aggregate")
             lyric_context: LyricContextModel | None = extras.get("lyrics") or context.get_state(
                 "lyric_context"
             )
-
-            # Determine output paths
             assets_dir = self._resolve_assets_dir(context)
             catalog_path = assets_dir / "asset_catalog.json"
-
-            # Load existing catalog for reuse checking
             catalog = load_catalog(catalog_path)
-            source_plan_id = plan_set.plan_set_id
+            context.set_state("asset_base_path", assets_dir)
 
-            # Step 1: Extract specs
             specs = extract_asset_specs(plan_set, lyric_context)
-            logger.info("Extracted %d asset specs", len(specs))
             context.add_metric("asset_specs_total", len(specs))
-
-            # Step 2: Check reuse, separate cached vs new
-            new_specs = []
+            new_specs: list[AssetSpec] = []
             cached_entries: list[CatalogEntry] = []
-
             for spec in specs:
-                # Text specs: check reuse by prompt_hash (prompt is deterministic)
-                if spec.category.is_text() and spec.text_content:
-                    existing = check_reuse(catalog, spec)
-                    if existing:
-                        cached_entry = existing.model_copy(update={"status": AssetStatus.CACHED})
-                        cached_entries.append(cached_entry)
-                        continue
-                # Image specs: check reuse by spec_id + dimensions before enrichment.
-                # Enrichment is non-deterministic (LLM), so prompt_hash won't match
-                # across runs. spec_id is deterministic (motif_id + category).
-                elif spec.category.is_image():
-                    existing = check_reuse_by_spec_id(catalog, spec)
-                    if existing:
-                        cached_entry = existing.model_copy(update={"status": AssetStatus.CACHED})
-                        cached_entries.append(cached_entry)
-                        continue
-                new_specs.append(spec)
+                existing = (
+                    check_reuse(
+                        catalog,
+                        spec,
+                        assets_dir=assets_dir,
+                        source_plan_id=plan_set.plan_set_id,
+                    )
+                    if spec.category.is_text() and spec.text_content
+                    else (
+                        check_reuse_by_spec_id(
+                            catalog,
+                            spec,
+                            assets_dir=assets_dir,
+                            source_plan_id=plan_set.plan_set_id,
+                        )
+                        if spec.category.is_image()
+                        else None
+                    )
+                )
+                if existing is None:
+                    build_output_path(spec, assets_dir)
+                    new_specs.append(spec)
+                else:
+                    cached_entries.append(
+                        existing.model_copy(update={"status": AssetStatus.CACHED})
+                    )
 
-            logger.info(
-                "%d specs to generate, %d cached",
-                len(new_specs),
-                len(cached_entries),
+            pending_images = [spec for spec in new_specs if spec.category.is_image()]
+            pending_other = [spec for spec in new_specs if not spec.category.is_image()]
+            budget = ImageRequestBudgetPolicy(
+                max_requests=self._config.max_image_requests_per_run,
+                estimated_usd_per_request=self._config.estimated_image_usd_per_request,
             )
+            request_budget = budget.authorize(len(pending_images))
+            allowed_images = pending_images[: request_budget.authorized_requests]
+            skipped_specs = pending_images[request_budget.authorized_requests :]
+            estimated_usd = request_budget.reserved_usd
 
-            # Step 3: Enrich image specs via LLM (concurrent)
-            enricher_agent_spec = build_enricher_spec(
+            if self._config.dry_run:
+                summary = AssetRunSummary(
+                    cached=len(cached_entries),
+                    skipped=len(skipped_specs),
+                    dry_run=True,
+                    estimated_image_usd=estimated_usd,
+                    would_generate=[spec.spec_id for spec in [*allowed_images, *pending_other]],
+                    request_budget=request_budget,
+                )
+                self._publish(context, summary, catalog)
+                return success_result(plan_set, stage_name=self.name)
+
+            image_client: OpenAIImageClient | None = None
+            if allowed_images:
+                image_client = self._build_image_client(context)
+
+            enricher_spec = build_enricher_spec(
                 config=context.job_config.agent.asset_enricher_agent
             )
             runner = AsyncAgentRunner(
@@ -155,137 +142,195 @@ class AssetCreationStage:
                 prompt_base_path=AGENTS_BASE_PATH,
                 llm_logger=context.llm_logger,
             )
-
             enrichment_sem = asyncio.Semaphore(5)
-            image_specs_to_enrich = [s for s in new_specs if s.category.is_image()]
-            non_image_specs = [s for s in new_specs if not s.category.is_image()]
 
-            async def _enrich_one(spec: AssetSpec) -> AssetSpec:
+            motif_contexts: list[tuple[str | None, str | None]] = []
+            for spec in allowed_images:
+                motif_description = None
+                motif_notes = None
+                if spec.motif_id:
+                    try:
+                        motif = MOTIF_REGISTRY.get(spec.motif_id)
+                        motif_description = motif.description
+                        motif_notes = motif.usage_notes
+                    except ItemNotFoundError:
+                        logger.debug("Motif %s not in registry", spec.motif_id)
+                motif_contexts.append((motif_description, motif_notes))
+
+            async def enrich_one(
+                spec: AssetSpec,
+                motif_description: str | None,
+                motif_notes: str | None,
+            ) -> AssetSpec:
                 async with enrichment_sem:
-                    motif_desc = None
-                    motif_notes = None
-                    if spec.motif_id:
-                        try:
-                            motif_def = MOTIF_REGISTRY.get(spec.motif_id)
-                            motif_desc = motif_def.description
-                            motif_notes = motif_def.usage_notes
-                        except Exception:
-                            logger.debug("Motif %s not in registry", spec.motif_id)
                     return await enrich_spec(
                         spec,
                         runner,
-                        enricher_agent_spec,
-                        motif_description=motif_desc,
+                        enricher_spec,
+                        motif_description=motif_description,
                         motif_usage_notes=motif_notes,
                     )
 
-            enriched_images = list(
-                await asyncio.gather(*[_enrich_one(s) for s in image_specs_to_enrich])
+            enrichment_results = await asyncio.gather(
+                *(
+                    enrich_one(spec, motif_description, motif_notes)
+                    for spec, (motif_description, motif_notes) in zip(
+                        allowed_images, motif_contexts, strict=True
+                    )
+                ),
+                return_exceptions=True,
             )
-
-            # Check reuse with enriched prompts
-            enriched_specs: list[AssetSpec] = []
-            for enriched in enriched_images:
-                existing = check_reuse(catalog, enriched)
-                if existing:
-                    cached_entry = existing.model_copy(update={"status": AssetStatus.CACHED})
-                    cached_entries.append(cached_entry)
+            ready: list[AssetSpec] = list(pending_other)
+            enrichment_failures: list[CatalogEntry] = []
+            for original, result in zip(allowed_images, enrichment_results, strict=True):
+                if isinstance(result, BaseException):
+                    enrichment_failures.append(
+                        self._failed_entry(
+                            original,
+                            assets_dir,
+                            plan_set.plan_set_id,
+                            f"Prompt enrichment failed: {result}",
+                        )
+                    )
                 else:
-                    enriched_specs.append(enriched)
-            enriched_specs.extend(non_image_specs)
+                    existing = check_reuse(
+                        catalog,
+                        result,
+                        assets_dir=assets_dir,
+                        source_plan_id=plan_set.plan_set_id,
+                    )
+                    if existing is None:
+                        ready.append(result)
+                    else:
+                        cached_entries.append(
+                            existing.model_copy(update={"status": AssetStatus.CACHED})
+                        )
 
-            # Step 4: Generate assets (concurrent)
-            image_client = self._build_image_client(context)
-            generation_sem = asyncio.Semaphore(5)
+            for entry in enrichment_failures:
+                catalog.merge([entry])
+                save_catalog(catalog, catalog_path)
 
-            async def _generate_one(spec: AssetSpec) -> CatalogEntry:
-                async with generation_sem:
-                    return await generate_asset(
+            persistence_lock = asyncio.Lock()
+
+            async def generate_and_persist(spec: AssetSpec) -> CatalogEntry:
+                entry = await generate_asset(
+                    spec,
+                    assets_dir,
+                    image_client=image_client,
+                    text_renderer=self._text_renderer,
+                    source_plan_id=plan_set.plan_set_id,
+                )
+                async with persistence_lock:
+                    catalog.merge([entry])
+                    save_catalog(catalog, catalog_path)
+                return entry
+
+            generation_results = await asyncio.gather(
+                *(generate_and_persist(spec) for spec in ready), return_exceptions=True
+            )
+            generated: list[CatalogEntry] = []
+            for spec, generation_result in zip(ready, generation_results, strict=True):
+                if isinstance(generation_result, BaseException):
+                    entry = self._failed_entry(
                         spec,
                         assets_dir,
-                        image_client=image_client,
-                        text_renderer=self._text_renderer,
-                        source_plan_id=source_plan_id,
+                        plan_set.plan_set_id,
+                        f"Generation failed: {generation_result}",
                     )
+                    catalog.merge([entry])
+                    save_catalog(catalog, catalog_path)
+                    generated.append(entry)
+                else:
+                    generated.append(generation_result)
 
-            new_entries = list(await asyncio.gather(*[_generate_one(s) for s in enriched_specs]))
-
-            # Step 5: Merge into catalog
-            all_entries = cached_entries + new_entries
-            catalog.merge(all_entries)
-
-            # Step 6: Save catalog
-            save_catalog(catalog, catalog_path)
-
-            # Metrics
-            created = sum(1 for e in all_entries if e.status == AssetStatus.CREATED)
-            cached = sum(1 for e in all_entries if e.status == AssetStatus.CACHED)
-            failed = sum(1 for e in all_entries if e.status == AssetStatus.FAILED)
-            context.add_metric("assets_created", created)
-            context.add_metric("assets_cached", cached)
-            context.add_metric("assets_failed", failed)
-
-            logger.info(
-                "Asset creation complete: %d created, %d cached, %d failed",
-                created,
-                cached,
-                failed,
+            all_run_entries = [*cached_entries, *enrichment_failures, *generated]
+            generated_images = [entry for entry in generated if entry.spec.category.is_image()]
+            usage_reported_requests = sum(
+                entry.image_usage is not None for entry in generated_images
             )
-
-            # Store catalog in context state for downstream stages
-            context.set_state("asset_catalog", catalog)
-
-            # Pass-through: return the original GroupPlanSet unchanged
+            priced_images = [
+                entry.image_cost.actual_image_usd
+                for entry in generated_images
+                if entry.image_cost is not None
+            ]
+            actual_image_usd = (
+                sum(priced_images)
+                if len(priced_images) == request_budget.authorized_requests
+                and request_budget.authorized_requests > 0
+                else None
+            )
+            summary = AssetRunSummary(
+                created=sum(e.status == AssetStatus.CREATED for e in all_run_entries),
+                cached=sum(e.status == AssetStatus.CACHED for e in all_run_entries),
+                failed=sum(e.status == AssetStatus.FAILED for e in all_run_entries),
+                skipped=len(skipped_specs),
+                estimated_image_usd=estimated_usd,
+                request_budget=request_budget.with_actual_cost(
+                    actual_image_usd,
+                    usage_reported_requests=usage_reported_requests,
+                ),
+            )
+            self._publish(context, summary, catalog)
             return success_result(plan_set, stage_name=self.name)
+        except Exception as error:
+            logger.exception("Asset creation failed", exc_info=error)
+            return failure_result(str(error), stage_name=self.name)
 
-        except Exception as e:
-            logger.exception("Asset creation failed", exc_info=e)
-            return failure_result(str(e), stage_name=self.name)
+    @staticmethod
+    def _publish(context: PipelineContext, summary: AssetRunSummary, catalog: AssetCatalog) -> None:
+        context.set_state("asset_catalog", catalog)
+        context.set_state("asset_run_summary", summary)
+        context.add_metric("assets_created", summary.created)
+        context.add_metric("assets_cached", summary.cached)
+        context.add_metric("assets_failed", summary.failed)
+        context.add_metric("assets_skipped", summary.skipped)
+        context.add_metric("assets_estimated_image_usd", summary.estimated_image_usd)
 
     def _resolve_assets_dir(self, context: PipelineContext) -> Path:
-        """Resolve the shared assets directory.
-
-        Assets are stored in a shared location (sibling to per-song output dirs)
-        so they can be reused across multiple songs and workflows. The catalog
-        and generated images live outside the per-song artifact directory.
-
-        Resolution order:
-        1. output_dir.parent / "shared" / "assets" (e.g. artifacts/shared/assets/)
-        2. Path("assets") as fallback
-
-        Args:
-            context: Pipeline context.
-
-        Returns:
-            Path to shared assets/ directory.
-        """
+        configured = self._config.asset_base_path
+        if configured:
+            path = Path(configured)
+            if not path.is_absolute():
+                config_dir = context.get_state("job_config_dir")
+                path = Path(config_dir) / path if config_dir else path
+            return path.resolve()
         if context.output_dir:
             return context.output_dir.parent / "shared" / "assets"
-        return Path("assets")
+        return Path("assets").resolve()
 
-    def _build_image_client(self, context: PipelineContext) -> OpenAIImageClient | None:
-        """Build an OpenAI image client from session.
+    def _build_image_client(self, context: PipelineContext) -> OpenAIImageClient:
+        provider = context.provider
+        if not provider.supports_image_generation:
+            raise ValueError(
+                "Asset image generation requires the OpenAI provider; "
+                f"configured provider is {provider.provider_type.value}"
+            )
+        return OpenAIImageClient(
+            provider,
+            model=context.job_config.agent.image_model,
+            quality=self._config.image_quality,
+        )
 
-        Args:
-            context: Pipeline context with session.
-
-        Returns:
-            OpenAIImageClient or None if no OpenAI client available.
-        """
-        try:
-            provider = context.provider
-            if hasattr(provider, "_async_client"):
-                client = provider._async_client
-            else:
-                client = _create_openai_client()
-            return OpenAIImageClient(client, model=context.job_config.agent.image_model)
-        except Exception:
-            logger.warning("Could not create OpenAI image client")
-            return None
-
-
-def _create_openai_client() -> Any:
-    """Create an AsyncOpenAI client instance. Separated for testability."""
-    from openai import AsyncOpenAI
-
-    return AsyncOpenAI()
+    @staticmethod
+    def _failed_entry(
+        spec: AssetSpec,
+        assets_dir: Path,
+        source_plan_id: str,
+        error: str,
+    ) -> CatalogEntry:
+        output = build_output_path(spec, assets_dir)
+        return CatalogEntry(
+            asset_id=spec.spec_id,
+            spec=spec,
+            file_path=output.relative_to(assets_dir).as_posix(),
+            content_hash="",
+            status=AssetStatus.FAILED,
+            width=spec.width,
+            height=spec.height,
+            file_size_bytes=0,
+            created_at=datetime.now(UTC).isoformat(),
+            source_plan_id=source_plan_id,
+            generation_model="none",
+            prompt_hash=compute_prompt_hash(spec),
+            error=error,
+        )

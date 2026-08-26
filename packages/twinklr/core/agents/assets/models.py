@@ -12,6 +12,7 @@ Defines the core data models for the asset creation pipeline:
 
 from __future__ import annotations
 
+from decimal import Decimal
 from enum import StrEnum
 from typing import Literal
 
@@ -28,38 +29,31 @@ class AssetCategory(StrEnum):
     Attributes:
         IMAGE_TEXTURE: Tileable texture for LED matrix projection (opaque PNG).
         IMAGE_CUTOUT: Transparent overlay / icon (transparent PNG).
-        IMAGE_PLATE: Background plate (opaque PNG, v1.1).
         TEXT_BANNER: Song title or enriched text overlay (transparent PNG, PIL).
-        TEXT_LYRIC: Lyric-aligned text with timing (transparent PNG, PIL).
-        SHADER: Procedural effect spec (JSON, v1.1).
     """
 
     IMAGE_TEXTURE = "image_texture"
     IMAGE_CUTOUT = "image_cutout"
-    IMAGE_PLATE = "image_plate"
     TEXT_BANNER = "text_banner"
-    TEXT_LYRIC = "text_lyric"
-    SHADER = "shader"
 
     def is_image(self) -> bool:
         """Whether this category is an image type (generated via OpenAI Images API).
 
         Returns:
-            True for IMAGE_TEXTURE, IMAGE_CUTOUT, IMAGE_PLATE.
+            True for IMAGE_TEXTURE and IMAGE_CUTOUT.
         """
         return self in {
             AssetCategory.IMAGE_TEXTURE,
             AssetCategory.IMAGE_CUTOUT,
-            AssetCategory.IMAGE_PLATE,
         }
 
     def is_text(self) -> bool:
         """Whether this category is a text type (rendered via PIL).
 
         Returns:
-            True for TEXT_BANNER, TEXT_LYRIC.
+            True for TEXT_BANNER.
         """
-        return self in {AssetCategory.TEXT_BANNER, AssetCategory.TEXT_LYRIC}
+        return self == AssetCategory.TEXT_BANNER
 
 
 class AssetStatus(StrEnum):
@@ -97,12 +91,9 @@ class AssetSpec(BaseModel):
         background: Background mode (transparent or opaque).
         style_tags: Style tags for generation guidance.
         content_tags: Content tags describing the subject.
-        matched_template_id: Builtin template ID if matched, None if custom.
-        text_content: The text to render (text_banner / text_lyric only).
-        text_timing_ms: Timing reference for lyric alignment (text_lyric only).
+        text_content: The text to render (text_banner only).
         prompt: Enriched prompt for image generation (set by LLM enricher).
         negative_prompt: Negative prompt for image generation.
-        token_budget: Per-spec token limit for enrichment.
         narrative_subject: What to depict (narrative assets only).
         narrative_description: Rich visual description from directive (narrative assets only).
         color_guidance: Color/palette hints from narrative (narrative assets only).
@@ -114,7 +105,6 @@ class AssetSpec(BaseModel):
     # Identity
     spec_id: str = Field(min_length=1)
     category: AssetCategory
-    format: str = "png"
 
     # Source context
     motif_id: str | None = None
@@ -134,19 +124,12 @@ class AssetSpec(BaseModel):
     style_tags: list[str] = Field(default_factory=list)
     content_tags: list[str] = Field(default_factory=list)
 
-    # Builtin match
-    matched_template_id: str | None = None
-
-    # Text-specific fields (only for text_banner / text_lyric)
+    # Text-specific field (text_banner only)
     text_content: str | None = None
-    text_timing_ms: int | None = None
 
     # Enriched prompt (set by LLM enricher, image specs only)
     prompt: str | None = None
     negative_prompt: str | None = None
-
-    # Budget
-    token_budget: int | None = None
 
     # Narrative asset fields (None for effect/motif-driven assets)
     narrative_subject: str | None = None
@@ -180,6 +163,33 @@ class EnrichedPrompt(BaseModel):
     negative_prompt: str = Field(min_length=5, description="Comma-separated negative prompt")
 
 
+class ImageGenerationUsage(BaseModel):
+    """Provider-reported token usage for one generated image, when available."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    input_tokens: int | None = Field(default=None, ge=0)
+    input_text_tokens: int | None = Field(default=None, ge=0)
+    input_image_tokens: int | None = Field(default=None, ge=0)
+    output_tokens: int | None = Field(default=None, ge=0)
+    output_text_tokens: int | None = Field(default=None, ge=0)
+    output_image_tokens: int | None = Field(default=None, ge=0)
+    total_tokens: int | None = Field(default=None, ge=0)
+
+
+class ImageGenerationCost(BaseModel):
+    """Cost derived only from complete, internally consistent reported usage."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    pricing_as_of: str
+    model_snapshot: str
+    text_input_usd_per_million: float = Field(ge=0.0)
+    image_input_usd_per_million: float = Field(ge=0.0)
+    image_output_usd_per_million: float = Field(ge=0.0)
+    actual_image_usd: float = Field(ge=0.0)
+
+
 class ImageResult(BaseModel):
     """Result from a single image or text generation.
 
@@ -200,6 +210,7 @@ class ImageResult(BaseModel):
     file_size_bytes: int = Field(gt=0)
     width: int = Field(gt=0)
     height: int = Field(gt=0)
+    usage: ImageGenerationUsage | None = None
 
 
 class CatalogEntry(BaseModel):
@@ -221,7 +232,6 @@ class CatalogEntry(BaseModel):
         source_plan_id: Which GroupPlanSet produced this.
         generation_model: Which image/text model was used.
         prompt_hash: SHA-256 of generation prompt (for exact-match cache).
-        embedding: Future: prompt embedding for similarity search.
         error: Error message (only for FAILED status).
     """
 
@@ -249,10 +259,94 @@ class CatalogEntry(BaseModel):
 
     # Reuse
     prompt_hash: str
-    embedding: list[float] | None = None
+    image_usage: ImageGenerationUsage | None = None
+    image_cost: ImageGenerationCost | None = None
 
     # Error (FAILED only)
     error: str | None = None
+
+
+class ImageRequestBudgetSummary(BaseModel):
+    """Auditable pre-call reservation for one guarded image batch."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    requested_requests: int = Field(ge=0)
+    authorized_requests: int = Field(ge=0)
+    skipped_requests: int = Field(ge=0)
+    reservation_usd_per_request: float = Field(ge=0.0)
+    reserved_usd: float = Field(ge=0.0)
+    usage_reported_requests: int = Field(default=0, ge=0)
+    actual_image_usd: float | None = Field(default=None, ge=0.0)
+    actual_cost_status: Literal[
+        "unavailable", "reported_within_estimate", "reported_exceeds_estimate"
+    ] = "unavailable"
+    estimate_exceeded: bool | None = None
+
+    def with_actual_cost(
+        self,
+        actual_image_usd: float | None,
+        *,
+        usage_reported_requests: int,
+    ) -> ImageRequestBudgetSummary:
+        """Attach trustworthy actual cost without releasing the original reservation."""
+        if actual_image_usd is None:
+            return self.model_copy(
+                update={
+                    "usage_reported_requests": usage_reported_requests,
+                    "actual_image_usd": None,
+                    "actual_cost_status": "unavailable",
+                    "estimate_exceeded": None,
+                }
+            )
+        exceeded = actual_image_usd > self.reserved_usd
+        return self.model_copy(
+            update={
+                "usage_reported_requests": usage_reported_requests,
+                "actual_image_usd": actual_image_usd,
+                "actual_cost_status": (
+                    "reported_exceeds_estimate" if exceeded else "reported_within_estimate"
+                ),
+                "estimate_exceeded": exceeded,
+            }
+        )
+
+
+class ImageRequestBudgetPolicy(BaseModel):
+    """Authorize requests only when their full conservative reservation fits."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    max_requests: Literal[1] = 1
+    estimated_usd_per_request: float = Field(ge=0.20)
+
+    def authorize(self, requested_requests: int) -> ImageRequestBudgetSummary:
+        """Reserve before any await; absent cost metadata never releases funds."""
+        requested = max(0, requested_requests)
+        authorized = min(requested, self.max_requests)
+        reserved = Decimal(authorized) * Decimal(str(self.estimated_usd_per_request))
+        return ImageRequestBudgetSummary(
+            requested_requests=requested,
+            authorized_requests=authorized,
+            skipped_requests=requested - authorized,
+            reservation_usd_per_request=self.estimated_usd_per_request,
+            reserved_usd=float(reserved),
+        )
+
+
+class AssetRunSummary(BaseModel):
+    """Observable result of one guarded asset-creation run."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    created: int = 0
+    cached: int = 0
+    failed: int = 0
+    skipped: int = 0
+    dry_run: bool = False
+    estimated_image_usd: float = Field(default=0.0, ge=0.0)
+    would_generate: list[str] = Field(default_factory=list)
+    request_budget: ImageRequestBudgetSummary
 
 
 class AssetCatalog(BaseModel):
@@ -313,8 +407,8 @@ class AssetCatalog(BaseModel):
         """
         return [e for e in self.entries if e.spec.motif_id == motif_id]
 
-    def find_by_prompt_hash(self, prompt_hash: str) -> CatalogEntry | None:
-        """Find entry by exact prompt hash (for cache reuse).
+    def find_by_prompt_hash(self, prompt_hash: str, source_plan_id: str) -> CatalogEntry | None:
+        """Find entry by exact prompt hash within one plan/song identity.
 
         Args:
             prompt_hash: SHA-256 hash of the generation prompt.
@@ -323,30 +417,9 @@ class AssetCatalog(BaseModel):
             First matching CatalogEntry, or None.
         """
         for entry in self.entries:
-            if entry.prompt_hash == prompt_hash and entry.status != AssetStatus.FAILED:
-                return entry
-        return None
-
-    def find_by_spec_id(self, spec_id: str, width: int, height: int) -> CatalogEntry | None:
-        """Find entry by deterministic spec_id and dimensions.
-
-        Used for pre-enrichment reuse: matches assets by their stable
-        identity (spec_id derived from motif_id + category) without
-        requiring the enriched prompt to match.
-
-        Args:
-            spec_id: Deterministic spec identifier.
-            width: Expected output width.
-            height: Expected output height.
-
-        Returns:
-            First matching non-failed CatalogEntry, or None.
-        """
-        for entry in self.entries:
             if (
-                entry.spec.spec_id == spec_id
-                and entry.spec.width == width
-                and entry.spec.height == height
+                entry.prompt_hash == prompt_hash
+                and entry.source_plan_id == source_plan_id
                 and entry.status != AssetStatus.FAILED
             ):
                 return entry

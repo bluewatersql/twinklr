@@ -167,7 +167,7 @@ def _make_catalog_entry(asset_id: str, file_path: str, motif_id: str = "sparkles
         has_alpha=False,
         file_size_bytes=2048,
         created_at="2026-02-13T12:00:00Z",
-        source_plan_id="plan_test",
+        source_plan_id="test",
         generation_model="gpt-image-1.5",
         prompt_hash="hash_test",
     )

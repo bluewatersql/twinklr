@@ -189,6 +189,7 @@ def prepare_combined_show_pipeline(
         song_name=song_name,
         max_iterations=job_config.agent.max_iterations,
         min_pass_score=job_config.agent.min_pass_score,
+        assets=job_config.assets,
     )
     return CombinedShowWiring(
         pipeline=pipeline,

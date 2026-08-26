@@ -76,11 +76,6 @@ class TestBuildEnrichmentVariables:
         assert variables["motif_description"] == "Small bright glint shapes"
         assert variables["motif_usage_notes"] == "Use large forms"
 
-    def test_with_builtin_prompt(self) -> None:
-        spec = _make_image_spec()
-        variables = build_enrichment_variables(spec, builtin_prompt="Create a sparkle overlay...")
-        assert variables["builtin_prompt"] == "Create a sparkle overlay..."
-
     def test_scene_context_passed(self) -> None:
         spec = _make_image_spec()
         variables = build_enrichment_variables(spec)

@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from twinklr.core.agents.assets.generator import (
-    _build_output_path,
+    build_output_path,
     generate_asset,
 )
 from twinklr.core.agents.assets.models import (
@@ -56,7 +56,7 @@ def _make_mock_image_client(
 ) -> MagicMock:
     """Build a mock async image client."""
     mock_client = MagicMock()
-    mock_client._model = "test-model"
+    mock_client.model = "test-model"
     mock_client.generate = AsyncMock()
     if side_effect:
         mock_client.generate.side_effect = side_effect
@@ -68,17 +68,17 @@ def _make_mock_image_client(
 class TestBuildOutputPath:
     def test_image_texture_path(self, tmp_path: Path) -> None:
         spec = _make_image_spec()
-        path = _build_output_path(spec, tmp_path)
-        assert "images/textures/1024x1024/sparkles.png" in str(path)
+        path = build_output_path(spec, tmp_path)
+        assert "images/textures/1024x1024/sparkles-" in str(path)
 
     def test_image_cutout_path(self, tmp_path: Path) -> None:
         spec = _make_image_spec(category=AssetCategory.IMAGE_CUTOUT)
-        path = _build_output_path(spec, tmp_path)
-        assert "images/cutouts/1024x1024/sparkles.png" in str(path)
+        path = build_output_path(spec, tmp_path)
+        assert "images/cutouts/1024x1024/sparkles-" in str(path)
 
     def test_text_banner_path(self, tmp_path: Path) -> None:
         spec = _make_text_spec()
-        path = _build_output_path(spec, tmp_path)
+        path = build_output_path(spec, tmp_path)
         # Text specs use spec_id as filename (motif_id is None)
         assert "text/banners/" in str(path)
         assert path.suffix == ".png"
@@ -89,24 +89,23 @@ class TestGenerateAsset:
     async def test_image_with_mock_client(self, tmp_path: Path) -> None:
         spec = _make_image_spec()
 
-        output_path = tmp_path / "images" / "textures" / "1024x1024" / "sparkles.png"
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-
-        # Create a real image file so validation passes
         from PIL import Image
 
-        img = Image.new("RGB", (1024, 1024), "red")
-        img.save(str(output_path))
+        mock_client = _make_mock_image_client()
 
-        mock_client = _make_mock_image_client(
-            result=ImageResult(
+        async def generate_to_path(**kwargs: object) -> ImageResult:
+            output_path = Path(str(kwargs["output_path"]))
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            Image.new("RGB", (1024, 1024), "red").save(output_path)
+            return ImageResult(
                 file_path=str(output_path),
                 content_hash="sha256_abc",
                 file_size_bytes=4096,
                 width=1024,
                 height=1024,
             )
-        )
+
+        mock_client.generate.side_effect = generate_to_path
 
         entry = await generate_asset(
             spec, tmp_path, image_client=mock_client, source_plan_id="plan_1"
@@ -175,3 +174,56 @@ class TestGenerateAsset:
         entry = await generate_asset(spec, tmp_path, image_client=mock_client)
         assert entry.status == AssetStatus.FAILED
         assert "API exploded" in (entry.error or "")
+
+    @pytest.mark.asyncio
+    async def test_existing_output_short_circuits_image_call(self, tmp_path: Path) -> None:
+        spec = _make_image_spec()
+        output = build_output_path(spec, tmp_path)
+        output.parent.mkdir(parents=True)
+        from PIL import Image
+
+        Image.new("RGBA", (1024, 1024), "red").save(output, "PNG")
+        mock_client = _make_mock_image_client(side_effect=AssertionError("must not call"))
+
+        entry = await generate_asset(spec, tmp_path, image_client=mock_client)
+
+        assert entry.status == AssetStatus.CACHED
+        assert entry.file_path == output.relative_to(tmp_path).as_posix()
+        mock_client.generate.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        ("kind", "expected_error"),
+        [
+            ("zero", "empty"),
+            ("corrupt", "validation failed"),
+            ("jpeg", "expected PNG"),
+            ("wrong_dimensions", "Dimension mismatch"),
+        ],
+    )
+    async def test_invalid_existing_output_fails_without_rebilling(
+        self,
+        tmp_path: Path,
+        kind: str,
+        expected_error: str,
+    ) -> None:
+        from PIL import Image
+
+        spec = _make_image_spec()
+        output = build_output_path(spec, tmp_path)
+        output.parent.mkdir(parents=True)
+        if kind == "zero":
+            output.write_bytes(b"")
+        elif kind == "corrupt":
+            output.write_bytes(b"not an image")
+        elif kind == "jpeg":
+            Image.new("RGB", (1024, 1024), "red").save(output, "JPEG")
+        else:
+            Image.new("RGBA", (32, 32), "red").save(output, "PNG")
+        mock_client = _make_mock_image_client(side_effect=AssertionError("must not rebill"))
+
+        entry = await generate_asset(spec, tmp_path, image_client=mock_client)
+
+        assert entry.status == AssetStatus.FAILED
+        assert expected_error.lower() in (entry.error or "").lower()
+        mock_client.generate.assert_not_awaited()

@@ -289,8 +289,9 @@ class TestBuildDisplayPipeline:
         errors = pipeline.validate_pipeline()
         assert errors == [], f"Validation errors: {errors}"
 
-    def test_enable_assets_inserts_asset_creation_stage(self) -> None:
-        """When enable_assets=True, asset_creation stage is present."""
+    def test_asset_config_inserts_asset_creation_stage(self) -> None:
+        """When assets.enabled is true, asset_creation stage is present."""
+        from twinklr.core.config.models import AssetGenerationConfig
         from twinklr.core.pipeline.definitions.display import build_display_pipeline
         from twinklr.core.sequencer.display.xlights_mapping import (
             XLightsGroupMapping,
@@ -315,7 +316,7 @@ class TestBuildDisplayPipeline:
             choreo_graph=choreo_graph,
             template_catalog=catalog,
             display_groups=MOCK_DISPLAY_GROUPS,
-            enable_assets=True,
+            assets=AssetGenerationConfig(enabled=True),
             xlights_mapping=xlights_mapping,
         )
 
@@ -331,8 +332,9 @@ class TestBuildDisplayPipeline:
         errors = pipeline.validate_pipeline()
         assert errors == [], f"Validation errors: {errors}"
 
-    def test_enable_assets_without_holistic_uses_aggregate_and_asset_creation(self) -> None:
+    def test_asset_config_without_holistic_uses_aggregate_and_asset_creation(self) -> None:
         """Asset resolution consumes aggregate plan + asset creation output when holistic disabled."""
+        from twinklr.core.config.models import AssetGenerationConfig
         from twinklr.core.pipeline.definitions.display import build_display_pipeline
         from twinklr.core.sequencer.display.xlights_mapping import (
             XLightsGroupMapping,
@@ -358,7 +360,7 @@ class TestBuildDisplayPipeline:
             template_catalog=catalog,
             display_groups=MOCK_DISPLAY_GROUPS,
             enable_holistic=False,
-            enable_assets=True,
+            assets=AssetGenerationConfig(enabled=True),
             xlights_mapping=xlights_mapping,
         )
 

@@ -145,7 +145,8 @@ Pipeline factories compose stages into complete pipelines:
 - Common stages + `groups` (`GroupPlannerStage`, FAN_OUT per macro section → `SectionCoordinationPlan`) + `aggregate` (`GroupPlanAggregatorStage` → `GroupPlanSet`) + `holistic` (optional evaluation) + `holistic_corrector` (optional fixes) + `asset_creation` (optional) + `asset_resolution` + `display_render`
 - Full chain: `audio → profile + lyrics → macro → groups (FAN_OUT) → aggregate → holistic → asset_resolution → display_render`
 - Uses `FAN_OUT` execution pattern to plan each macro section in parallel
-- Configurable stages: `enable_holistic`, `enable_holistic_corrector`, `enable_assets`
+- Configurable stages: `enable_holistic`, `enable_holistic_corrector`; generated assets
+  use the typed `JobConfig.assets.enabled` opt-in and its exactly-one-request policy.
 - CLI-reachable through `twinklr display`; provider-owned planning boundaries remain
   independently testable with deterministic fixtures
 
@@ -192,7 +193,8 @@ The agent system is data-driven: `AgentSpec` data objects define prompt pack, re
 - Holistic correction: `gpt-5.6-sol`, medium reasoning, temperature 0.3
 - Asset prompt enrichment: `gpt-5.6-terra`, low reasoning, temperature 0.6
 - Recipe generation: `gpt-5.6-sol`, high reasoning, temperature 0.9
-- Image generation: `gpt-image-2` (assets remain disabled by default)
+- Image generation: `gpt-image-2` through the provider interface (assets remain disabled
+  by default; `JobConfig.assets` owns dry-run, count, dollar, quality, and root controls)
 
 Each `AgentConfig` also carries `max_tokens` and `timeout_seconds`; the runner
 forwards both to the provider. OpenAI roles send `reasoning_effort` as
@@ -447,4 +449,14 @@ with a one-time CPU retry on MPS failure.
 - **Feature engineering pipeline** — `packages/twinklr/core/feature_engineering/` and `packages/twinklr/core/feature_store/` provide an offline analysis pipeline separate from the main CLI workflow. See `docs/pipeline_guide.md` for details.
 - **Display sequencer** — `packages/twinklr/core/sequencer/display/` is wired through
   the offline-first `twinklr display` command. Its catalog is strictly preflighted and
-  shared by planner and renderer; assets remain disabled until P3-T7.
+  shared by planner and renderer; generated assets are an explicit default-off P3-T7 option.
+  The guarded image path authorizes exactly one provider request per run and never
+  retries an ambiguous/lost response. Its `$0.20` reservation is a conservative internal
+  estimate, not a guaranteed dollar cap. Complete, internally consistent reported usage
+  is priced against the dated `gpt-image-2` rate card; otherwise actual cost remains
+  unavailable and the full reservation is retained. The planner's four-item narrative
+  schema ceiling is independent of this one-request live policy.
+  Both catalog reuse routes share the same PNG/type/dimension validator as the generator
+  exists-short-circuit. Invalid cached outputs fail before enrichment/provider access;
+  valid replay is represented as cached in the run summary without mutating durable
+  CREATED provenance in the catalog.

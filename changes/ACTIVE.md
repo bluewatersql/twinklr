@@ -45,12 +45,18 @@ _Last updated: 2026-08-26._
   owner subsequently accepted all nine P3-T5 decisions, and P3-T5 was integrated at
   `f006468`. P3-T6's remediated candidate then received independent standards,
   specification, and adversarial approval offline/in code and was integrated at
-  `c9620db`. Phase 3 now has six of eight tasks integrated. These integrations do not
+  `c9620db`. P3-T8's independently approved offline implementation was integrated at
+  `82438cf`. P3-T7's final corrected freeze
+  (`2caf726b505fb6fc3e17f56165b4884ce0f33a1525f9768d6a880621e16e9192`) is
+  independently approved offline/in code and is included in the current integration.
+  Phase 3 now has all eight offline task implementations integrated. These integrations do not
   waive the outstanding Phase 1P/2P/2K exits, close P3-T4 live acceptance, or authorize
   P3-T5 live work or any paid/local empirical action. On 2026-08-26 the owner accepted
   P3-T6's amended offline unified-emission contract. Its empirical xLights GUI
   acceptance remains open. The owner authorized P3-T7+ and task-bounded live/paid work
-  on 2026-08-26. All xLights GUI dates/checks remain deferred until a meaningful,
+  on 2026-08-26. P3-T7's live proof remains separately gated to exactly one
+  `gpt-image-2` request with no retry and a zero-call cache replay; `$0.20` is an
+  estimate/reservation, not a guaranteed hard spend cap. All xLights GUI dates/checks remain deferred until a meaningful,
   fully working end-to-end show exists; their empirical gates and all earlier empirical
   exits remain open.
   Phase 4 has not started. The overall change

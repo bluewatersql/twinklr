@@ -1,7 +1,7 @@
-"""OpenAI Images API client with retry logic.
+"""Single-attempt OpenAI Images API client for the guarded asset path.
 
-Async-first implementation wrapping client.images.generate() with
-exponential backoff, error handling, base64 decoding, and SHA-256 hashing.
+Async-first implementation wrapping the provider image capability with no ambiguous
+paid-response retry, plus error handling, local resizing, and SHA-256 hashing.
 
 Supports the configured OpenAI Images API model which:
 - Returns base64 by default (no response_format needed)
@@ -13,12 +13,11 @@ Supports the configured OpenAI Images API model which:
 from __future__ import annotations
 
 import asyncio
-import base64
 import hashlib
 from io import BytesIO
 import logging
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import Literal, cast
 
 from openai import (
     APIConnectionError,
@@ -27,14 +26,11 @@ from openai import (
 )
 from PIL import Image
 
+from twinklr.core.agents.assets.models import ImageGenerationUsage as CatalogImageUsage
 from twinklr.core.agents.assets.models import ImageResult
+from twinklr.core.agents.providers.base import ImageBackground, ImageSize, LLMProvider
 from twinklr.core.config.models import AgentOrchestrationConfig
 from twinklr.core.sequencer.vocabulary import BackgroundMode
-
-if TYPE_CHECKING:
-    from openai import (
-        AsyncOpenAI,
-    )
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +41,7 @@ _RETRYABLE_ERRORS = (APIConnectionError, APITimeoutError, RateLimitError)
 _SUPPORTED_SIZES = {"1024x1024", "1024x1536", "1536x1024", "auto"}
 
 
-def _select_api_size(width: int, height: int) -> str:
+def _select_api_size(width: int, height: int) -> ImageSize:
     """Select the best API size for the target dimensions.
 
     The configured OpenAI Images API model supports 1024x1024, 1024x1536,
@@ -61,7 +57,7 @@ def _select_api_size(width: int, height: int) -> str:
     """
     exact = f"{width}x{height}"
     if exact in _SUPPORTED_SIZES:
-        return exact
+        return cast("ImageSize", exact)
 
     # Pick smallest supported size that covers the target
     if width <= 1024 and height <= 1024:
@@ -124,31 +120,29 @@ def _process_image_bytes(
 class OpenAIImageClient:
     """Async-first client for generating images via the OpenAI Images API.
 
-    Handles retry logic with async sleep, base64 decoding, local resizing,
-    file writing, and SHA-256 hashing.
+    Allows exactly one provider attempt, then handles local resizing, file writing,
+    and SHA-256 hashing.
 
     Args:
         client: AsyncOpenAI client instance.
         model: Image generation model name.
-        max_retries: Maximum retry attempts on transient errors.
-        retry_delay_s: Initial delay between retries in seconds.
-        retry_backoff: Backoff multiplier for retry delays.
     """
 
     def __init__(
         self,
-        client: AsyncOpenAI,
+        provider: LLMProvider,
         *,
         model: str | None = None,
-        max_retries: int = 3,
-        retry_delay_s: float = 2.0,
-        retry_backoff: float = 2.0,
+        quality: Literal["low", "medium", "high"] = "low",
     ) -> None:
-        self._client = client
+        self._provider = provider
         self._model = model or AgentOrchestrationConfig().image_model
-        self._max_retries = max_retries
-        self._retry_delay_s = retry_delay_s
-        self._retry_backoff = retry_backoff
+        self._quality = quality
+
+    @property
+    def model(self) -> str:
+        """Configured image model used for provenance."""
+        return self._model
 
     async def generate(
         self,
@@ -174,55 +168,48 @@ class OpenAIImageClient:
             ImageResult with file path, content hash, and dimensions.
 
         Raises:
-            RuntimeError: If all retries exhausted or non-retryable error.
+            RuntimeError: If the single provider attempt fails.
         """
         api_size = _select_api_size(width, height)
-        bg = background.value
+        bg = cast("ImageBackground", background.value)
 
-        last_error: Exception | None = None
-        delay = self._retry_delay_s
+        try:
+            response = await self._provider.generate_image_async(
+                model=self._model,
+                prompt=prompt,
+                size=api_size,
+                quality=self._quality,
+                output_format="png",
+                background=bg,
+            )
+        except _RETRYABLE_ERRORS as error:
+            raise RuntimeError(
+                f"Image generation failed after one provider attempt: {error}"
+            ) from error
+        except Exception as error:
+            raise RuntimeError(f"Image generation failed (non-retryable): {error}") from error
 
-        for attempt in range(1, self._max_retries + 1):
-            try:
-                response = await self._client.images.generate(
-                    model=self._model,
-                    prompt=prompt,
-                    n=1,
-                    size=api_size,  # type: ignore[call-overload]
-                    output_format="png",
-                    background=bg,
+        try:
+            result = await asyncio.to_thread(
+                _process_image_bytes, response.image_bytes, width, height, output_path
+            )
+        except (OSError, ValueError) as error:
+            raise RuntimeError(f"Image generation failed (non-retryable): {error}") from error
+        usage = response.usage
+        return result.model_copy(
+            update={
+                "usage": (
+                    CatalogImageUsage(
+                        input_tokens=usage.input_tokens,
+                        input_text_tokens=usage.input_text_tokens,
+                        input_image_tokens=usage.input_image_tokens,
+                        output_tokens=usage.output_tokens,
+                        output_text_tokens=usage.output_text_tokens,
+                        output_image_tokens=usage.output_image_tokens,
+                        total_tokens=usage.total_tokens,
+                    )
+                    if usage is not None
+                    else None
                 )
-
-                # The configured Images API model returns base64 in data[0].b64_json.
-                if not response.data:
-                    raise RuntimeError("API returned empty data list")
-                b64_data = response.data[0].b64_json
-                if not b64_data:
-                    raise RuntimeError("API returned empty b64_json")
-
-                raw_bytes = base64.b64decode(b64_data)
-
-                # CPU-bound resize/write — run in thread to avoid blocking
-                return await asyncio.to_thread(
-                    _process_image_bytes, raw_bytes, width, height, output_path
-                )
-
-            except _RETRYABLE_ERRORS as e:
-                last_error = e
-                logger.warning(
-                    "Image generation attempt %d/%d failed (retryable): %s",
-                    attempt,
-                    self._max_retries,
-                    e,
-                )
-                if attempt < self._max_retries:
-                    await asyncio.sleep(delay)
-                    delay *= self._retry_backoff
-
-            except Exception as e:
-                # Non-retryable — fail immediately
-                raise RuntimeError(f"Image generation failed (non-retryable): {e}") from e
-
-        raise RuntimeError(
-            f"Image generation failed after {self._max_retries} retries: {last_error}"
+            }
         )

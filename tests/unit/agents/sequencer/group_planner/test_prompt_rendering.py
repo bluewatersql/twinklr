@@ -211,6 +211,33 @@ def test_prompt_omits_fe_blocks_when_absent(
     assert "Propensity Hints" not in rendered
 
 
+def test_narrative_asset_prompt_bound_matches_response_schema(
+    section_context_without_fe: SectionPlanningContext,
+) -> None:
+    """Both rendered planner prompts state the schema's four-directive maximum."""
+    from pathlib import Path
+
+    from jinja2 import Environment, FileSystemLoader
+
+    from twinklr.core.sequencer.planning.group_plan import SectionCoordinationResponse
+
+    prompts_dir = Path(__file__).resolve().parents[5] / (
+        "packages/twinklr/core/agents/sequencer/group_planner/prompts/planner"
+    )
+    env = Environment(loader=FileSystemLoader(str(prompts_dir)))
+    variables = shape_planner_context(section_context_without_fe)
+    variables["lyric_context"] = {"summary": "A winter story"}
+    rendered_user = env.get_template("user.j2").render(**variables)
+    rendered_system = env.get_template("system.j2").render(**variables)
+    schema = SectionCoordinationResponse.model_json_schema()
+
+    assert "1-4" in rendered_user
+    assert "1-4" in rendered_system
+    assert "1-10" not in rendered_user
+    assert "1-10" not in rendered_system
+    assert schema["properties"]["narrative_assets"]["maxItems"] == 4
+
+
 def test_section_judge_high_threshold_separates_calibration_from_approval() -> None:
     """A 7.x quality calibration never claims approval below an 8.5 boundary."""
     from pathlib import Path

@@ -24,6 +24,7 @@ from twinklr.core.agents.sequencer.group_planner.stage import (
     GroupPlanAggregatorStage,
     GroupPlannerStage,
 )
+from twinklr.core.config.models import AssetGenerationConfig
 from twinklr.core.pipeline import ExecutionPattern, PipelineDefinition, StageDefinition
 from twinklr.core.pipeline.definitions.common import build_common_stages
 from twinklr.core.pipeline.display_stages import (
@@ -53,7 +54,7 @@ def build_display_pipeline(
     min_pass_score: float = 7.0,
     enable_holistic: bool = True,
     enable_holistic_corrector: bool = True,
-    enable_assets: bool = False,
+    assets: AssetGenerationConfig | None = None,
     xlights_mapping: XLightsMapping | None = None,
     macro_choreo_graph: ChoreographyGraph | None = None,
 ) -> PipelineDefinition:
@@ -67,7 +68,7 @@ def build_display_pipeline(
     the complete GroupPlanSet for cross-section quality without altering
     the plan data.
 
-    When ``enable_assets`` is True, the ``AssetCreationStage`` is inserted
+    When ``assets.enabled`` is true, the ``AssetCreationStage`` is inserted
     between holistic evaluation and asset resolution to extract, enrich,
     and generate figurative/narrative assets.
 
@@ -82,7 +83,7 @@ def build_display_pipeline(
         min_pass_score: Minimum score for section plan approval (0.0-10.0).
         enable_holistic: Include the holistic evaluation stage.
         enable_holistic_corrector: Include the holistic corrector stage (requires enable_holistic).
-        enable_assets: Include the asset creation stage (extract → enrich → generate).
+        assets: Typed opt-in and cost controls for asset generation.
         xlights_mapping: xLights element name resolution.
 
     Returns:
@@ -94,7 +95,7 @@ def build_display_pipeline(
         ...     template_catalog=catalog,
         ...     display_groups=[{"role_key": "OUTLINE", "model_count": 10, ...}],
         ...     enable_holistic=True,
-        ...     enable_assets=False,
+        ...     assets=AssetGenerationConfig(),
         ... )
         >>> result = await PipelineExecutor().execute(pipeline, audio_path, context)
     """
@@ -166,11 +167,12 @@ def build_display_pipeline(
 
     # Asset creation (if enabled) — extract, enrich, and generate assets
     resolution_inputs = [aggregate_output_id]
-    if enable_assets:
+    asset_config = assets or AssetGenerationConfig()
+    if asset_config.enabled:
         display_stages.append(
             StageDefinition(
                 id="asset_creation",
-                stage=AssetCreationStage(),
+                stage=AssetCreationStage(asset_config),
                 inputs=[aggregate_output_id],
                 input_type="GroupPlanSet",
                 output_type="GroupPlanSet",

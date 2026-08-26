@@ -83,28 +83,18 @@ class TestAssetCategory:
     def test_image_categories(self) -> None:
         assert AssetCategory.IMAGE_TEXTURE.value == "image_texture"
         assert AssetCategory.IMAGE_CUTOUT.value == "image_cutout"
-        assert AssetCategory.IMAGE_PLATE.value == "image_plate"
 
     def test_text_categories(self) -> None:
         assert AssetCategory.TEXT_BANNER.value == "text_banner"
-        assert AssetCategory.TEXT_LYRIC.value == "text_lyric"
-
-    def test_shader_category(self) -> None:
-        assert AssetCategory.SHADER.value == "shader"
 
     def test_is_image(self) -> None:
         assert AssetCategory.IMAGE_TEXTURE.is_image()
         assert AssetCategory.IMAGE_CUTOUT.is_image()
-        assert AssetCategory.IMAGE_PLATE.is_image()
         assert not AssetCategory.TEXT_BANNER.is_image()
-        assert not AssetCategory.TEXT_LYRIC.is_image()
-        assert not AssetCategory.SHADER.is_image()
 
     def test_is_text(self) -> None:
         assert AssetCategory.TEXT_BANNER.is_text()
-        assert AssetCategory.TEXT_LYRIC.is_text()
         assert not AssetCategory.IMAGE_TEXTURE.is_text()
-        assert not AssetCategory.SHADER.is_text()
 
 
 # ---------------------------------------------------------------------------
@@ -130,7 +120,6 @@ class TestAssetSpec:
         assert spec.spec_id == "asset_image_texture_sparkles"
         assert spec.category == AssetCategory.IMAGE_TEXTURE
         assert spec.motif_id == "sparkles"
-        assert spec.format == "png"
         assert spec.width == 1024
         assert spec.height == 1024
 
@@ -139,9 +128,6 @@ class TestAssetSpec:
         assert spec.prompt is None
         assert spec.negative_prompt is None
         assert spec.text_content is None
-        assert spec.text_timing_ms is None
-        assert spec.token_budget is None
-        assert spec.matched_template_id is None
         assert spec.scene_context == []
         assert spec.style_tags == []
         assert spec.content_tags == []
@@ -152,11 +138,9 @@ class TestAssetSpec:
             category=AssetCategory.TEXT_BANNER,
             motif_id=None,
             text_content="Rudolph the Red-Nosed Reindeer",
-            text_timing_ms=0,
             background=BackgroundMode.TRANSPARENT,
         )
         assert spec.text_content == "Rudolph the Red-Nosed Reindeer"
-        assert spec.text_timing_ms == 0
         assert spec.motif_id is None
 
     def test_enriched_spec(self) -> None:
@@ -267,7 +251,7 @@ class TestCatalogEntry:
         assert entry.asset_id == "asset_image_texture_sparkles"
         assert entry.status == AssetStatus.CREATED
         assert entry.error is None
-        assert entry.embedding is None
+        assert entry.image_usage is None
 
     def test_failed_entry_with_error(self) -> None:
         entry = _make_entry(
@@ -316,14 +300,14 @@ class TestAssetCatalog:
     def test_find_by_prompt_hash(self) -> None:
         entry = _make_entry(prompt_hash="exact_match_hash")
         catalog = AssetCatalog(catalog_id="cat_001", entries=[entry])
-        found = catalog.find_by_prompt_hash("exact_match_hash")
+        found = catalog.find_by_prompt_hash("exact_match_hash", "plan_001")
         assert found is not None
         assert found.asset_id == "asset_image_texture_sparkles"
 
     def test_find_by_prompt_hash_miss(self) -> None:
         entry = _make_entry(prompt_hash="abc")
         catalog = AssetCatalog(catalog_id="cat_001", entries=[entry])
-        assert catalog.find_by_prompt_hash("different_hash") is None
+        assert catalog.find_by_prompt_hash("different_hash", "plan_001") is None
 
     def test_successful_entries(self) -> None:
         e1 = _make_entry(asset_id="ok", status=AssetStatus.CREATED, prompt_hash="h1")

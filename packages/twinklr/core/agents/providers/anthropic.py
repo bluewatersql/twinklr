@@ -8,6 +8,11 @@ import threading
 from typing import Any
 
 from twinklr.core.agents.providers.base import (
+    ImageBackground,
+    ImageGenerationResponse,
+    ImageOutputFormat,
+    ImageQuality,
+    ImageSize,
     LLMResponse,
     ProviderType,
     ResponseMetadata,
@@ -21,8 +26,8 @@ from twinklr.core.agents.providers.errors import LLMProviderError
 try:
     from anthropic import Anthropic, AsyncAnthropic
 except ImportError:  # pragma: no cover
-    Anthropic = None
-    AsyncAnthropic = None
+    Anthropic = None  # type: ignore[misc, assignment]
+    AsyncAnthropic = None  # type: ignore[misc, assignment]
 
 logger = logging.getLogger(__name__)
 
@@ -91,6 +96,27 @@ class AnthropicProvider:
             ProviderType.ANTHROPIC
         """
         return ProviderType.ANTHROPIC
+
+    @property
+    def supports_image_generation(self) -> bool:
+        """Anthropic does not expose the required generated-image capability."""
+        return False
+
+    async def generate_image_async(
+        self,
+        *,
+        prompt: str,
+        model: str,
+        size: ImageSize,
+        quality: ImageQuality,
+        background: ImageBackground,
+        output_format: ImageOutputFormat,
+    ) -> ImageGenerationResponse:
+        """Fail clearly if an image request is routed to Anthropic."""
+        del prompt, model, size, quality, background, output_format
+        raise LLMProviderError(
+            "Asset image generation requires the OpenAI provider; configured provider is anthropic"
+        )
 
     # =========================================================================
     # Internal helpers

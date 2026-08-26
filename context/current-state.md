@@ -123,9 +123,15 @@ does not reopen the attempt cap. The owner accepted all nine P3-T5 decisions,
 and P3-T5 was integrated at `f006468`. On 2026-08-26 the owner accepted P3-T6's offline
 unified-emission contract. Formal first review rejected the initial snapshot; standards,
 specification, and adversarial review then approved the remediation offline/in code, and
-it was integrated at `c9620db`, bringing Phase 3 to six of eight tasks integrated. P3-T6
+it was integrated at `c9620db`. P3-T8's independently approved offline implementation
+was integrated at `82438cf`. P3-T7's final corrected freeze
+`2caf726b505fb6fc3e17f56165b4884ce0f33a1525f9768d6a880621e16e9192` is independently
+approved offline/in code and included in the current integration, bringing Phase 3 to
+eight of eight offline task implementations integrated. P3-T6
 empirical xLights GUI acceptance remains open. The owner authorized P3-T7+ and
-task-bounded live/paid work on 2026-08-26. xLights GUI dates/checks remain deferred until
+task-bounded live/paid work on 2026-08-26. P3-T7's empirical proof remains separately
+gated to one `gpt-image-2` request with no retry followed by a zero-call cache replay;
+`$0.20` is an estimate/reservation rather than a guaranteed hard spend cap. xLights GUI dates/checks remain deferred until
 a meaningful end-to-end show is fully working; the empirical gates remain open. These
 integrations and authorizations do not waive the earlier exits or close P3-T4 live
 acceptance. P3-T8's first offline candidate was formally rejected; its remediated

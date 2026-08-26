@@ -10,15 +10,11 @@ import json
 import logging
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
-
 from twinklr.core.agents._paths import AGENTS_BASE_PATH
 from twinklr.core.agents.issues import (
     Issue,
     IssueCategory,
     IssueLocation,
-    IssueSeverity,
-    TargetedAction,
 )
 from twinklr.core.agents.logging import LLMCallLogger, NullLLMCallLogger
 from twinklr.core.agents.prompts import spec_prompt_hash
@@ -28,81 +24,14 @@ from twinklr.core.agents.spec import AgentMode, AgentSpec
 from twinklr.core.agents.taxonomy_utils import get_taxonomy_dict
 from twinklr.core.config.models import AgentConfig, AgentOrchestrationConfig
 from twinklr.core.sequencer.planning import GroupPlanSet
+from twinklr.core.sequencer.planning.holistic_models import (
+    CrossSectionIssue,
+    HolisticEvaluation,
+)
 from twinklr.core.sequencer.templates.group.catalog import TemplateCatalog
 from twinklr.core.sequencer.templates.group.models.choreography import ChoreographyGraph
 
 logger = logging.getLogger(__name__)
-
-
-class CrossSectionIssue(BaseModel):
-    """Issue spanning multiple sections.
-
-    Captures problems that only become visible when viewing
-    the complete GroupPlanSet (e.g., monotony, energy arc issues).
-    """
-
-    model_config = ConfigDict(extra="forbid", frozen=True)
-
-    issue_id: str = Field(description="Stable issue identifier")
-    severity: IssueSeverity = Field(description="Issue severity")
-    affected_sections: list[str] = Field(
-        min_length=1,
-        description="Section IDs affected by this issue",
-    )
-    description: str = Field(description="Clear description of the issue")
-    recommendation: str = Field(description="High-level recommendation summary")
-    targeted_actions: list[TargetedAction] = Field(
-        description=(
-            "Structured fix actions referencing concrete section_ids, "
-            "targets (type+id), template_ids, palette_ids, and/or lanes. "
-            "Each action is a single mutation that can be applied to "
-            "a specific group plan without further interpretation."
-        ),
-    )
-
-    @model_validator(mode="before")
-    @classmethod
-    def _normalize_legacy_input(cls, value: object) -> object:
-        if not isinstance(value, dict):
-            return value
-        normalized = dict(value)
-        normalized.setdefault("targeted_actions", [])
-        return normalized
-
-
-class HolisticEvaluation(BaseModel):
-    """Result of holistic evaluation across all sections.
-
-    Captures the quality assessment of the complete GroupPlanSet,
-    focusing on cross-section coherence, energy arc, and variety.
-    """
-
-    model_config = ConfigDict(extra="forbid", frozen=True)
-
-    status: VerdictStatus = Field(description="APPROVE, SOFT_FAIL, or HARD_FAIL")
-    score: float = Field(ge=0.0, le=10.0, description="Overall quality score")
-    confidence: float = Field(ge=0.0, le=1.0, description="Confidence in evaluation")
-
-    summary: str = Field(description="Brief summary of evaluation")
-    strengths: list[str] = Field(description="Notable strengths of the plan")
-    cross_section_issues: list[CrossSectionIssue] = Field(
-        description="Issues spanning multiple sections",
-    )
-
-    @model_validator(mode="before")
-    @classmethod
-    def _normalize_legacy_input(cls, value: object) -> object:
-        if not isinstance(value, dict):
-            return value
-        normalized = dict(value)
-        normalized.setdefault("strengths", [])
-        normalized.setdefault("cross_section_issues", [])
-        return normalized
-
-    @property
-    def is_approved(self) -> bool:
-        """Check if evaluation resulted in approval."""
-        return self.status == VerdictStatus.APPROVE
 
 
 def get_holistic_judge_spec(
@@ -160,10 +89,6 @@ def get_holistic_judge_spec(
 
 # Convenience constant
 HOLISTIC_JUDGE_SPEC = get_holistic_judge_spec()
-
-# Resolve forward reference: GroupPlanSet.holistic_evaluation uses HolisticEvaluation
-# which is under TYPE_CHECKING in group_plan.py to avoid circular imports.
-GroupPlanSet.model_rebuild(_types_namespace={"HolisticEvaluation": HolisticEvaluation})
 
 
 class HolisticEvaluator:

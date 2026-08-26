@@ -4,9 +4,30 @@ Phase: 3 (Show Convergence / M3) · Lane: A (assets) · Executor: sonnet · Veri
 opus · Depends on: P2P-T10 (model retarget)
 
 ⚖ **Owner-decision-bearing.** This task turns on a paid image-generation path. The
-owner reviews: the per-run spend cap value and its default, whether the capability is
+owner reviews: the request-exposure policy and conservative estimate, whether the capability is
 opt-in or on-by-default, and the activation surface (flag/config key) that replaces
 today's dead `enable_assets` gate.
+
+**Owner decision — accepted 2026-08-26.** The capability remains default-off and is
+activated only through typed job configuration at `assets.enabled`. The accepted
+defaults are `dry_run=false`, `max_image_requests_per_run=1`, and
+`estimated_image_usd_per_request=0.20`. The planner schema's `maxItems=4` is only a
+narrative-list ceiling; it is not permission for four provider requests. The live policy
+authorizes exactly one provider request exposure with no retry. `$0.20` is a conservative
+internal estimate/reservation, not a guaranteed dollar cap, because the published token
+rates do not provide an enforceable low/1024 output-token ceiling. One later
+owner-approved live proof may expose exactly one request; implementation, automated
+tests, and review make no live
+or paid call. The owner also authorized P3-T7+ work while deferring all xLights GUI
+dates until Twinklr has a meaningful, fully working end-to-end path.
+
+**Remediation author candidate — 2026-08-26.** The implementation now uses the typed configuration
+above in both `display` and `show`, routes image generation through the public provider
+capability on `gpt-image-2`, and implements strict atomic/incremental catalogs,
+song-scoped reuse, safe relative paths, partial-result preservation, the one-request
+policy and conservative cost accounting, dry-run reporting, and the dead-scaffolding/demo
+cleanup. This is author
+evidence only until independent review; the approved live proof has not run.
 
 ## Objective
 
@@ -16,7 +37,7 @@ capability. This task fixes the three verified defects that make its paid work u
 to repeat — a catalog that silently loses the record of everything already paid for, a
 reuse key that collides across songs, and a `gather` that throws away paid siblings —
 moves the image calls inside the provider framework on `gpt-image-2`, and adds a
-per-run spend cap and a cache that actually holds.
+one-request live policy, auditable cost reporting, and a cache that actually holds.
 
 ## Evidence & background
 
@@ -38,6 +59,10 @@ scaffolding). Decision **D13**. Detail:
 > gather-without-return_exceptions), on `gpt-image-2` (deadline: image-1.5 retires
 > 2026-12-01), inside the provider framework. The "spend hazard" framing is withdrawn;
 > normal cost controls (per-run cap + cache) suffice.
+
+This quoted D13 wording is historical. The accepted operational interpretation after
+review 2 is exactly one provider request with no retry plus a cache and usage ledger;
+`$0.20` is an estimate/reservation rather than a guaranteed spend cap.
 
 ### The re-bill mechanism — use THIS one
 
@@ -120,9 +145,9 @@ unsuccessful or of an unexpected type.
 > LLM-authored list length directly determines the number of paid API calls**.
 > `Semaphore(5)` (`stage.py:197`) limits rate, not total.
 
-Verified: `sequencer/planning/group_plan.py:137` and `:186` both declare
-`narrative_assets: list[NarrativeAssetDirective] = Field(default_factory=list)` with no
-`max_length`. Both sites need the bound.
+Verified on the current tree: the section domain model, strict response DTO, and
+aggregated `GroupPlanSet` each expose a `narrative_assets` list without `max_length`.
+All three sites need the same hard bound.
 
 ### The activation path (what the flag actually is today)
 
@@ -197,12 +222,16 @@ this task is what makes flipping it safe.
 4. **No paid work is discarded.** Both gathers use `return_exceptions=True`; partial
    failures are recorded per-spec (FAILED entries with the error), the catalog is
    written, and the stage reports partial success rather than throwing away the batch.
-5. **Cost controls.**
-   - A **per-run spend cap** (config-driven, with a conservative default) counted in
-     both images and estimated dollars; when the cap would be exceeded the run stops
-     requesting and reports what it skipped.
-   - A **hard bound on image count** independent of the LLM: `narrative_assets` gains a
-     `max_length`, and the stage clamps regardless.
+5. **Request and cost controls.**
+   - A fixed **one-provider-request exposure** per run with no retry; excess planned
+     items are skipped and reported.
+   - A conservative `$0.20` estimate/reservation that is never represented as a
+     guaranteed dollar cap. Actual cost is calculated only from complete, consistent
+     reported modality usage and dated model-specific rates; uncertainty retains the
+     reservation, and over-estimate actuals are surfaced.
+   - A **four-item narrative bound** independent of the LLM: `narrative_assets` gains a
+     `max_length=4`, and the stage clamps regardless. This schema ceiling is distinct
+     from the one-request provider policy.
    - A **dry-run mode** that reports exactly what would be generated and the estimated
      cost, making zero API calls.
    - An `output_path.exists()` short-circuit before any API call.
@@ -232,7 +261,7 @@ this task is what makes flipping it safe.
 - Do **not** change how the display composition consumes resolved assets
   (`engine.py:827-910`, the Pictures overlay path) beyond what the path/relative-path
   fix requires.
-- Do **not** flip the default to on. That is the owner's decision (⚖).
+- Do **not** flip the owner-accepted default to on.
 
 ## Implementation approach
 
@@ -244,21 +273,23 @@ construction, incremental save), `generator.py` (path building, exists-check),
 deletion, relative-path semantics), `request_extractor.py` (song-scoped spec ids),
 `prompt_enricher.py` (scaffolding parameter), plus
 `packages/twinklr/core/sequencer/planning/group_plan.py` (`max_length` on
-`narrative_assets` — note there are **two** declaration sites, `:137` and `:186`, and
-both need the bound), `packages/twinklr/core/pipeline/definitions/display.py` (the
-activation surface), `packages/twinklr/cli/main.py` (the flag/config wiring), and
-`scripts/demo_asset_pipeline.py` (delete or route through the guarded path).
+`narrative_assets` — note there are **three** domain/response/aggregate declaration
+sites and all three need the bound), `packages/twinklr/core/config/models.py`, and the display/show
+definition and wiring modules (the typed activation path). The CLI already loads
+`JobConfig`, so activation needs no parallel command-line flag.
+`scripts/demo_asset_pipeline.py` is deleted so no second uncapped door remains.
 
 Design decisions already made — do not relitigate:
 
 - The re-bill mechanism is the catalog (M-L). The resize/validation story is **rejected**.
-- Cost controls are "normal" — per-run cap plus cache. D13 explicitly withdraws the
-  "spend hazard" framing; do not build an elaborate budgeting subsystem.
+- Cost controls are "normal" — one request, conservative reservation, usage ledger, and
+  cache. D13 explicitly withdraws the "spend hazard" framing; do not build an elaborate
+  budgeting subsystem.
 - `gpt-image-2`, from config, via the provider framework. The 2026-12-01 retirement of
   image-1.5 is the deadline.
-- Gating stays flag-shaped (`enable_assets`-style) but must be *reachable* and
-  *documented* — the review's criticism is that the old flag was gated off everywhere
-  while the real paid path was a script.
+- The accepted activation surface is typed `JobConfig.assets.enabled`, not a CLI flag;
+  it must be reachable from both display and show and documented. The old internal
+  boolean and the script bypass are removed.
 
 Sequencing constraints copied verbatim from `changes/twinklr-reactivation-review/build/plan/00-overview.md`:
 
@@ -292,11 +323,16 @@ From `changes/twinklr-reactivation-review/build/plan/06-phase-3-show-convergence
    two distinct assets with distinct catalog entries and distinct files.
 5. **Traversal rejected**: a `directive_id` of `"../../../../etc/cron.d/x"` raises with
    the value named; nothing is created outside the assets root.
-6. **Partial failure preserves siblings**: with 5 specs where the 3rd raises, the other
-   4 results are retained, recorded in the catalog, and reported; the stage does not
-   return a bare failure that discards them.
-7. **Cap enforced**: with the cap set to 2 and 5 specs pending, exactly 2 API calls are
-   attempted (assert on the mocked client) and the run reports 3 skipped.
+6. **Partial failure preserves siblings**: when an unexpected Nth generation task raises
+   under deterministic concurrency, every completed authorized sibling is retained,
+   recorded incrementally in the catalog, and reported; the stage does not return a bare
+   failure that discards it.
+7. **Request policy enforced**: with 4 image specs pending, the `maxItems=4` schema
+   ceiling still authorizes exactly 1 API await and reports 3 skipped. A retryable lost
+   response cannot cause a second await. The `$0.20` reservation is an estimate, not a
+   guaranteed dollar cap; complete trustworthy usage populates actual cost, missing or
+   inconsistent usage retains the reservation, and an actual cost above the estimate is
+   surfaced explicitly.
 8. **Hard bound**: a `GroupPlanSet` with 500 `narrative_assets` cannot produce 500
    requests; `max_length` rejects it at model validation and the stage clamps
    defensively.
@@ -330,9 +366,11 @@ network)" — keep that property.
    round trip (#11).
 3. `tests/unit/agents/assets/test_output_paths.py` — traversal rejection (#5),
    filename collision resistance.
-4. `tests/unit/agents/assets/test_partial_failure.py` — sibling preservation (#6).
-5. `tests/unit/agents/assets/test_spend_controls.py` — cap (#7), hard bound (#8),
-   dry-run (#9), exists short-circuit (#10).
+4. `tests/unit/agents/assets/test_stage.py` — deterministic sibling durability (#6),
+   one-request budget and lost-response safety (#7), dry-run (#9), provider ordering
+   (#12), and song-scoped replay (#4).
+5. `tests/unit/agents/assets/test_generator.py` — exists short-circuit (#10), including
+   valid PNG/type/dimension checks that never automatically rebill an invalid output.
 6. `tests/unit/agents/assets/test_client_construction.py` — provider safety (#12), model
    from config (#13).
 7. `tests/unit/pipeline/test_assets_activation.py` — activation surface (#14), default
@@ -362,9 +400,12 @@ LOCAL-ONLY, paid:
 
 - One live generation run to confirm `gpt-image-2` works end-to-end through the
   provider framework, the catalog records it, and a second run reuses the cache with
-  **zero** additional calls. **Test budget: at most 4 generated images (~$0.20 at
-  current image pricing), run once, by the owner or with explicit owner approval.** The
-  second (cache-hit) run must cost $0 — that is the point of the test.
+  **zero** additional calls. **Exposure limit: exactly one provider request, with no
+  retry, run once by the owner or with explicit owner approval.** `$0.20` is the
+  conservative internal estimate/reservation, not a guaranteed dollar cap. Record
+  trustworthy reported actual usage/cost when available; otherwise retain the full
+  reservation and mark actual cost unavailable. The cache replay must make zero provider
+  calls.
 - Record in the PR body: images generated, cost, and the cache-hit confirmation.
 
 Every other verification step is $0. No CI job may be able to reach the image API.
@@ -387,6 +428,185 @@ harden dimension validation and leave the catalog exactly as unsafe as it is.
 *Mitigation*: the corrected mechanism is quoted at the top of this spec with an explicit
 "do not implement the rejected story" instruction, and acceptance #3 pins the real one.
 
-**Third risk: the traversal fix arriving after activation.** `enable_assets=True` makes
+**Third risk: the traversal fix arriving after activation.** `assets.enabled=true` makes
 P3-F19 live. *Mitigation*: acceptance #5 is in the same task as the activation wiring;
 the capability cannot be enabled by this task's own path without the sanitizer present.
+
+## Author implementation handoff — 2026-08-26
+
+Status: **frozen author candidate; pending independent review and the separately
+approved bounded live proof.** No network, image-provider, live-LLM, or paid call was
+made in this author lane. The candidate is not committed or integrated, and this
+handoff is not self-approval.
+
+The discriminating red was captured before implementation: the new public-contract
+suite failed collection because `AssetGenerationConfig` and the public output-path
+seam did not exist, and a clean subprocess calling
+`GroupPlanSet.model_json_schema()` reproduced the Pydantic forward-reference failure.
+After the vertical slices went green, fresh author evidence was:
+
+- P3-T7-focused assets/provider/pipeline suites: **313 passed**.
+- Complete offline suite: **5364 passed, 38 skipped** in 92.81 seconds.
+- Immutable golden suite: **74 passed, 8 skipped**.
+- Ruff format check: **1362 files already formatted**; Ruff check: **clean**.
+- Mypy: **clean across 732 source files**; `git diff --check`: **clean**.
+- The `make validate` wrapper intentionally refused a dirty worktree before running
+  gates; its exact format, lint, type-check, and test commands were therefore run
+  directly and are the evidence above.
+
+Frozen implementation/test diff SHA-256 (the binary diff under `packages/`, `scripts/`,
+and `tests/`):
+`d576e14efa5bb36379fe02a5814f08b6e2fd5fd04acc81c08b486f6925bbe59c`.
+
+The verifier should first confirm the count/dollar reservation is enforced before
+enrichment and generation, provider incompatibility fails before enrichment, catalog
+writes remain atomic and incrementally serialized under partial failure, and moved-root
+relative reuse is plan/song scoped. Only after independent approval may the owner or an
+explicitly authorized live lane run the single `$0.20` proof (effectively one provider
+await under the remediated reservation policy) and its
+zero-call cache replay. xLights GUI dates remain deferred until meaningful end-to-end
+readiness.
+
+## Independent review 1 — REJECTED, 2026-08-26
+
+The first formal review rejected the frozen author snapshot. Its discriminators found
+that exact-prompt reuse could cross song boundaries; the `$0.05` estimate could not
+auditably bound an ambiguous paid image request; the image client could retry a lost
+response; catalog reuse accepted absolute, parent-traversing, and resolved-escaping
+paths; a merely existing output bypassed PNG/type/dimension validation; planner prompts
+still requested 1–10 directives against a four-item schema; and the unexpected-Nth
+durability/concurrency case lacked public-seam evidence. The old frozen digest remains
+historical rejection evidence and must not be used for integration.
+
+## Remediation author handoff — 2026-08-26
+
+Status: **remediated and frozen for independent re-review; no GO yet.** Prompt-hash
+reuse now requires `source_plan_id`; cross-song identical prompts produce distinct
+entries/files while same-song replay hits. Both reuse functions reject absolute and
+`..` paths and enforce resolved containment, including symlink escapes. The request
+budget now reserves `$0.20` per authorized image against the `$0.20` run cap, retaining
+the reservation when trustworthy cost is absent; actual provider usage remains captured
+when reported. The image client permits exactly one provider attempt, so provider awaits
+cannot exceed preauthorization. Existing outputs are reused only after PIL loads a real
+PNG with the expected dimensions; empty, corrupt, non-PNG, and wrong-size outputs fail
+without a provider await or automatic rebill. Both planner prompts now render 1–4 in
+agreement with `maxItems=4`, and deterministic concurrent unexpected-failure evidence
+proves completed siblings remain durably serialized.
+
+Remediation red evidence was captured at the public seams for unscoped prompt lookup,
+the old `$0.05`/four-call budget, retry behavior, all four invalid-existing-output
+variants, and the planner prompt/schema mismatch. Fresh green evidence:
+
+- Remediation-focused assets/provider/planner/pipeline surfaces: **302 passed**.
+- Complete offline suite: **5378 passed, 38 skipped** in 86.58 seconds.
+- Immutable goldens: **74 passed, 8 skipped**.
+- Ruff format: **1362 files already formatted**; Ruff check: **clean**.
+- Mypy: **clean across 732 source files**; `git diff --check`: **clean**.
+
+Frozen remediation implementation/test diff SHA-256:
+`7fa89199f8d2140fba490077427be238fc2e8a4c5fe2bc08825173cf8137f7fc`.
+No network, provider, live-LLM, image-generation, or paid call occurred. No commit or
+integration was made, and this author handoff is not approval. The bounded live proof
+remains pending an independent GO; under the remediated policy it may make at most one
+provider await within the already approved `$0.20` total, followed by a zero-call cache
+replay. xLights GUI dates remain deferred.
+
+## Independent review 2 — REJECTED, 2026-08-26
+
+The second formal review rejected the remediation's claim that `$0.20` was a guaranteed
+hard-dollar boundary. Official `gpt-image-2` documentation publishes modality token
+rates but no enforceable low/1024 output-token ceiling, so the owner contract is exactly
+one provider request exposure, not guaranteed spend. The review also found overly broad
+catalog/motif-registry exception handling, unreachable retry scaffolding, incomplete
+model-specific usage pricing, and insufficient N>=4 concurrent durability evidence.
+
+## Second remediation author handoff — 2026-08-26
+
+Status: **frozen for independent re-review; no GO yet.** The live path now permits
+exactly one provider await and contains no retry loop or retry configuration. `$0.20` is
+retained as a conservative estimate/reservation. Complete and internally consistent
+reported text-input, image-input, and image-output usage is priced with the dated
+`gpt-image-2-2026-04-21` rate card; missing, partial, or inconsistent usage leaves actual
+cost unavailable and retains the full reservation. A reported actual cost above the
+estimate is persisted and surfaced rather than described as compliant. Catalog and
+motif-registry catches are restricted to expected data/IO failures, while unexpected
+runtime/programmer failures propagate. A deterministic four-task barrier test proves
+the first three entries are incrementally durable before the fourth unexpected failure,
+which is also recorded.
+
+Pricing provenance: [OpenAI gpt-image-2 model page](https://developers.openai.com/api/docs/models/gpt-image-2),
+[OpenAI API pricing](https://developers.openai.com/api/docs/pricing), and the
+[OpenAI image-generation guide](https://developers.openai.com/api/docs/guides/image-generation).
+No network, provider, live-LLM, image-generation, or paid call occurred in this author
+lane. No commit or integration was made, and this handoff is not approval. Fresh gate
+evidence: exact assets/provider/template focused **280 passed**; post-compatibility
+focused **288 passed**; complete offline suite **5387 passed, 38 skipped**; immutable
+goldens **74 passed, 8 skipped**; Ruff format/check clean; mypy clean across **733 source
+files**; and `git diff --check` clean. The authoritative implementation/test diff,
+including untracked additions rendered as binary no-index diffs, has SHA-256
+`c1ddab3a0ad888aa3abd28aad721e03c642aa7c57e530e514533557945412f3d`.
+
+## Independent review 3 — REJECTED, 2026-08-26
+
+The third formal review found that both catalog reuse routes treated file existence as a
+cache hit without validating a real PNG, type, or requested dimensions; a corrupt cached
+output could therefore bypass the generator's stricter exists-short-circuit. It also
+found that zero-provider replay counted durable CREATED entries as newly created instead
+of reporting a cached run view, and that palette resolution still caught every
+`Exception`, hiding programmer/runtime failures. The preceding digest is historical
+rejection evidence and is not an integration candidate.
+
+## Third remediation author handoff — 2026-08-26
+
+Status: **frozen for independent re-review; no GO yet.** Both prompt-hash and spec-id
+reuse now call the same non-empty PNG/type/dimension validator used by the generator
+exists-short-circuit. Present-but-fake, corrupt, zero-byte, wrong-format, and
+wrong-dimension cache files fail loudly before provider or enrichment access; a genuinely
+missing file remains a cache miss. Replays use per-run CACHED copies for summary counts
+without merging them into the catalog, so durable original CREATED provenance remains
+unchanged. Palette lookup catches only the expected `ItemNotFoundError`; unexpected
+runtime/programmer failures propagate. Narrative schema/prompt limits remain four, the
+live boundary remains exactly one provider request with no retry, and `$0.20` remains a
+conservative estimate/reservation rather than guaranteed spend.
+
+Discriminating RED evidence: all ten invalid-cache combinations failed across the two
+public reuse routes; replay reported `created=2, cached=0` instead of `created=0,
+cached=2`; and unexpected palette `RuntimeError` was swallowed. Each discriminator is
+GREEN after the narrow changes. No live, network, provider, image-generation, or paid
+call occurred. No commit or integration was made, and this author handoff is not
+approval. Fresh broad gate counts and the authoritative digest are recorded in the
+campaign handoff after the final freeze: focused **298 passed**; complete offline suite
+**5399 passed, 38 skipped**; immutable goldens **74 passed, 8 skipped**; Ruff
+format/check clean; mypy clean across **733 source files**; and `git diff --check` clean.
+The authoritative implementation/test diff, including untracked additions as binary
+no-index diffs, has SHA-256
+`60707552239bae27fe00c5094d154d7b7f07994f5b3805028295645507bd1054`.
+
+## Final narrow author correction — 2026-08-26
+
+The unused unscoped `AssetCatalog.find_by_spec_id` method had no production or test
+callers and was deleted. A public contract discriminator prevents that unsafe API from
+returning; scoped reuse remains available only through the catalog functions requiring
+`source_plan_id`. The stale `<=10` section comment now matches `max_length=4`; user docs
+state exactly one request with no retry and correctly describe `$0.20` as an estimate/
+reservation rather than a guaranteed spend cap; and the active-status grammar is fixed.
+The no-unscoped-API discriminator was RED before deletion and GREEN afterward.
+
+Fresh gates: focused **299 passed**; complete offline suite **5400 passed, 38 skipped**;
+Ruff format/check clean; mypy clean across **733 source files**; and `git diff --check`
+clean. The new authoritative implementation/test diff, including untracked additions as
+binary no-index diffs, has SHA-256
+`2caf726b505fb6fc3e17f56165b4884ce0f33a1525f9768d6a880621e16e9192`.
+No live, network, provider, image-generation, or paid call occurred. No commit or
+integration was made, and this remains author evidence pending independent re-review.
+
+## Independent offline/code approval — 2026-08-26
+
+Independent verification approved the exact final corrected implementation/test freeze
+with SHA-256
+`2caf726b505fb6fc3e17f56165b4884ce0f33a1525f9768d6a880621e16e9192`.
+This approval covers offline behavior and code only. It does not integrate the branch,
+run or approve live acceptance, waive earlier empirical exits, or schedule deferred
+xLights GUI work. The separately authorized proof remains pending and is limited to
+exactly one provider request exposure with no retry followed by a zero-call cache replay;
+`$0.20` remains a conservative estimate/reservation rather than a guaranteed spend cap.

@@ -15,6 +15,7 @@ from twinklr.core.agents.assets.image_client import (
     OpenAIImageClient,
     _select_api_size,
 )
+from twinklr.core.agents.providers.base import ImageGenerationResponse
 
 
 def _make_png_b64(width: int = 1024, height: int = 1024) -> str:
@@ -25,31 +26,26 @@ def _make_png_b64(width: int = 1024, height: int = 1024) -> str:
     return base64.b64encode(buf.getvalue()).decode()
 
 
-def _mock_response(b64_data: str | None = None) -> MagicMock:
-    """Create a mock OpenAI image response with valid PNG data."""
+def _mock_response(b64_data: str | None = None) -> ImageGenerationResponse:
+    """Create a provider-neutral image response with valid PNG data."""
     if b64_data is None:
         b64_data = _make_png_b64()
-    data_item = MagicMock()
-    data_item.b64_json = b64_data
-    response = MagicMock()
-    response.data = [data_item]
-    return response
+    return ImageGenerationResponse(image_bytes=base64.b64decode(b64_data), model="test-model")
 
 
 def _make_async_client(
-    response: MagicMock | None = None,
+    response: ImageGenerationResponse | None = None,
     side_effect: Exception | list | None = None,
 ) -> MagicMock:
-    """Build a mock AsyncOpenAI client with images.generate as AsyncMock."""
-    mock_client = MagicMock()
-    mock_client.images = MagicMock()
-    mock_client.images.generate = AsyncMock()
+    """Build a mock provider with the public image capability."""
+    mock_client = MagicMock(supports_image_generation=True)
+    mock_client.generate_image_async = AsyncMock()
     if side_effect is not None:
-        mock_client.images.generate.side_effect = side_effect
+        mock_client.generate_image_async.side_effect = side_effect
     elif response is not None:
-        mock_client.images.generate.return_value = response
+        mock_client.generate_image_async.return_value = response
     else:
-        mock_client.images.generate.return_value = _mock_response()
+        mock_client.generate_image_async.return_value = _mock_response()
     return mock_client
 
 
@@ -115,10 +111,11 @@ class TestOpenAIImageClient:
         output = tmp_path / "test.png"
         await client.generate("prompt", output)
 
-        call_kwargs = mock_client.images.generate.call_args.kwargs
+        call_kwargs = mock_client.generate_image_async.call_args.kwargs
         assert "output_format" in call_kwargs
         assert call_kwargs["output_format"] == "png"
         assert "response_format" not in call_kwargs
+        assert call_kwargs["quality"] == "low"
 
     @pytest.mark.asyncio
     async def test_api_called_with_supported_size(self, tmp_path: Path) -> None:
@@ -129,12 +126,11 @@ class TestOpenAIImageClient:
         output = tmp_path / "test.png"
         await client.generate("prompt", output, width=256, height=256)
 
-        call_kwargs = mock_client.images.generate.call_args.kwargs
+        call_kwargs = mock_client.generate_image_async.call_args.kwargs
         assert call_kwargs["size"] == "1024x1024"
 
     @pytest.mark.asyncio
-    async def test_retry_on_rate_limit(self, tmp_path: Path) -> None:
-        # First call fails with rate limit, second succeeds
+    async def test_retryable_lost_response_is_never_retried(self, tmp_path: Path) -> None:
         rate_err = RateLimitError(
             message="Rate limit",
             response=MagicMock(status_code=429, headers={}),
@@ -142,35 +138,27 @@ class TestOpenAIImageClient:
         )
         mock_client = _make_async_client(side_effect=[rate_err, _mock_response()])
 
-        client = OpenAIImageClient(mock_client, max_retries=2, retry_delay_s=0.01)
+        client = OpenAIImageClient(mock_client)
         output = tmp_path / "test.png"
-        result = await client.generate("prompt", output)
-        assert result.file_path == str(output)
-        assert mock_client.images.generate.call_count == 2
+        with pytest.raises(RuntimeError, match="after one provider attempt"):
+            await client.generate("prompt", output)
+        assert mock_client.generate_image_async.await_count == 1
 
     @pytest.mark.asyncio
-    async def test_exhausted_retries_raises(self, tmp_path: Path) -> None:
-        rate_err = RateLimitError(
-            message="Rate limit",
-            response=MagicMock(status_code=429, headers={}),
-            body=None,
-        )
-        mock_client = _make_async_client(side_effect=rate_err)
-
-        client = OpenAIImageClient(mock_client, max_retries=2, retry_delay_s=0.01)
-        output = tmp_path / "test.png"
-        with pytest.raises(RuntimeError, match="failed after 2 retries"):
-            await client.generate("prompt", output)
+    async def test_more_than_one_attempt_is_rejected(self, tmp_path: Path) -> None:
+        mock_client = _make_async_client()
+        with pytest.raises(TypeError, match="max_retries"):
+            OpenAIImageClient(mock_client, max_retries=2)
 
     @pytest.mark.asyncio
     async def test_non_retryable_error_fails_immediately(self, tmp_path: Path) -> None:
         mock_client = _make_async_client(side_effect=ValueError("Bad request"))
 
-        client = OpenAIImageClient(mock_client, max_retries=3)
+        client = OpenAIImageClient(mock_client)
         output = tmp_path / "test.png"
         with pytest.raises(RuntimeError, match="non-retryable"):
             await client.generate("prompt", output)
-        assert mock_client.images.generate.call_count == 1
+        assert mock_client.generate_image_async.call_count == 1
 
     @pytest.mark.asyncio
     async def test_empty_b64_raises(self, tmp_path: Path) -> None:

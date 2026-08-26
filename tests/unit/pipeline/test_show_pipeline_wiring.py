@@ -12,7 +12,7 @@ from twinklr.core.agents.sequencer.group_planner.stage import GroupPlannerStage
 from twinklr.core.config.fixtures import FixtureGroup, FixtureInstance
 from twinklr.core.config.fixtures.dmx import DmxMapping
 from twinklr.core.config.fixtures.instances import FixtureConfig
-from twinklr.core.config.models import JobConfig
+from twinklr.core.config.models import AssetGenerationConfig, JobConfig
 from twinklr.core.feature_engineering.loader import FEArtifactBundle
 from twinklr.core.formats.xlights.layout.models.rgb_effects import (
     Layout,
@@ -98,14 +98,25 @@ def _write_layout(path: Path) -> None:
 
 
 def _prepare(layout_path: Path, **kwargs: object):
+    job_config = kwargs.pop("job_config", JobConfig())
     return prepare_combined_show_pipeline(
         layout_path=layout_path,
         fixture_group=_fixture_group(),
-        job_config=JobConfig(),
+        job_config=job_config,
         available_templates=["sweep_lr_fan_hold"],
         song_name="test_show",
         **kwargs,
     )
+
+
+def test_show_assets_enabled_through_typed_job_config(tmp_path: Path) -> None:
+    layout = tmp_path / "layout.xml"
+    _write_layout(layout)
+    wiring = _prepare(
+        layout,
+        job_config=JobConfig(assets=AssetGenerationConfig(enabled=True, dry_run=True)),
+    )
+    assert any(stage.id == "asset_creation" for stage in wiring.pipeline.stages)
 
 
 def test_dedicated_layout_group_exactly_matches_active_fixture_models() -> None:

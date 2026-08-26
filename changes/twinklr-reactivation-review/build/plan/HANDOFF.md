@@ -1,15 +1,17 @@
 # Build-campaign handoff — current execution state
 
-_Last updated: 2026-08-26 after P3-T6's independently approved offline/code candidate
-was integrated at `c9620db`. P3-T6 empirical xLights GUI acceptance remains open, with
+_Last updated: 2026-08-26 after all eight Phase 3 offline task implementations were
+integrated. P3-T6 empirical xLights GUI acceptance remains open, with
 all GUI dates/checks deferred until a meaningful end-to-end show is fully working.
 P3-T4's two live attempts both failed safely: attempt 1 at the provider schema boundary,
 and attempt 2 with HTTP 400 because `temperature` is unsupported by `gpt-5.6-sol`.
 Exactly one provider request and no retry/fallback/schema repair occurred in each;
 `$3.320000` is committed, the two-attempt cap is exhausted, no third attempt is
 authorized, and live acceptance remains open. P3-T7+ and
-task-bounded live/paid work are authorized. P3-T8's remediated offline implementation
-is independently approved; its GUI preview, live judge, human review, calibration, and
+task-bounded live/paid work are authorized. P3-T7 is independently approved offline/in
+code; its live proof remains exactly one image-provider request with no retry followed by
+a zero-call cache replay, and `$0.20` is an estimate/reservation rather than a hard spend
+guarantee. P3-T8's remediated offline implementation is integrated at `82438cf`; its GUI preview, live judge, human review, calibration, and
 real completed record remain deferred to that end-to-end milestone. Maintained by the
 orchestrating agent; update this file at every
 pause or phase boundary._
@@ -32,7 +34,7 @@ their authoring moment; this handoff owns the current campaign status.
 | 1P — Render truth | **IMPLEMENTATION MERGED AND VERIFIED** (12/12); **phase exit not complete** | The recorded human judgment and empirical xLights acceptance evidence remain pending; see [02-phase-1p-render-truth.md](02-phase-1p-render-truth.md). |
 | 2P — Creative quality | **OFFLINE IMPLEMENTATION MERGED AND VERIFIED** (13/13); **phase exit not complete** | The owner accepted T1/T8/T9 on 2026-08-16. T6 calibration/live evidence, T13/D1 evidence, and other live checks remain pending; see [04-phase-2p-creative-quality.md](04-phase-2p-creative-quality.md). |
 | 2K — Catalog growth | **TOOLING IMPLEMENTATION MERGED AND VERIFIED** (4/4); **phase exit not complete** | Tooling is ready, but coverage/corpus/curation/style exit criteria require the author's real layout, corpus, preferences, and judgments; see [05-phase-2k-catalog-growth.md](05-phase-2k-catalog-growth.md). |
-| 3 — Show convergence | **P3-T1–P3-T6 MERGED; P3-T8 OFFLINE IMPLEMENTATION INDEPENDENTLY APPROVED** (6/8 integrated before this merge); **P3-T7+ AUTHORIZED** | P3-T6 is integrated at `c9620db`; its empirical xLights gate remains open and deferred to the meaningful end-to-end milestone. P3-T8's remediated offline implementation passed independent review; its preview, live visual judge, human review, calibration, and real completed record remain deferred and no empirical outcome is implied. P3-T7 implementation/live proof remains separately gated. P3-T4 exhausted its two audited attempts; both failed safely, `$3.320000` is committed, no third attempt is authorized, and live acceptance remains open. Earlier commits: P3-T5 `f006468`; P3-T4 `558153c`; P3-T3 `33cce57`; P3-T2 `5365f70`; P3-T1 `5eebcb2`. |
+| 3 — Show convergence | **P3-T1–P3-T8 OFFLINE IMPLEMENTATIONS MERGED** (8/8 integrated); **EMPIRICAL EXITS OPEN** | P3-T6 is integrated at `c9620db`; its xLights gate remains deferred. P3-T8 is integrated at `82438cf`; preview/live-judge/human/calibration/real-record evidence remains deferred. P3-T7's independently approved code is in the current integration; its one-request/no-retry image proof and zero-call cache replay remain pending. P3-T4 exhausted two failed audited attempts, `$3.320000` is committed, no third is authorized, and live acceptance remains open. Earlier commits: P3-T5 `f006468`; P3-T4 `558153c`; P3-T3 `33cce57`; P3-T2 `5365f70`; P3-T1 `5eebcb2`. |
 | 4 — Compounding | **NOT STARTED** | No Phase 4 implementation has started. |
 
 The overall `twinklr-reactivation-review` change remains **ACTIVE**. Finishing an
@@ -54,8 +56,9 @@ offline implementation lane is not the same as satisfying its phase exit criteri
   `git diff --check` clean; mypy clean across **737 source files**. Frozen 24-file
   implementation/test/prompt manifest SHA-256:
   `b75fcc9f565cb77888946f8f8da5a0ec4983176d2ef140460ac7584fe2b860a0`.
-  This candidate awaits independent verification; no acceptance is self-awarded and no
-  live/provider/xLights/audio work or completed real record was created.
+  Independent review approved this remediated snapshot offline/in code, and it was
+  integrated at `82438cf`. No live/provider/xLights/audio work or completed real record
+  was created; those empirical requirements remain deferred.
 - The P3-T6 remediation candidate on `codex/p3t6-unified-export` from `e1ed146`
   passed the complete offline suite: **5352 passed, 38 skipped** at 88% coverage;
   immutable goldens **74 passed, 8 skipped**; review-focused **38 passed**; broader
@@ -266,11 +269,11 @@ The remaining empirical checks are also pending:
 
 ## Continuation order
 
-1. Independently review the P3-T4 post-call provider-capability remediation offline.
-   Preserve the sealed two-attempt ledger and permanent no-third-attempt boundary; do
-   not infer live acceptance from the fix.
-2. Continue P3-T7 and later authorized implementation, including task-bounded live/paid
-   work only through each task's recorded caps and evidence protocol.
+1. Preserve P3-T4's sealed two-attempt ledger and permanent no-third-attempt boundary;
+   do not infer live acceptance from the offline provider-capability fix.
+2. Audit and, only after a fresh GO, execute P3-T7's one-request/no-retry image proof
+   followed by a zero-provider-call scoped cache replay. Treat `$0.20` as an estimate,
+   not a guaranteed spend cap.
 3. Continue non-GUI end-to-end work toward one meaningful fully working show. Defer all
    xLights GUI dates/checks until that milestone; deferral does not satisfy or waive them.
 4. Complete the P2P-T6/P2P-T13 and Phase 2K owner-data protocols when their prerequisites
@@ -287,8 +290,9 @@ exhausted, live acceptance remains open, and no third attempt is authorized. P3-
 decisions are owner-accepted and its offline candidate is integrated at `f006468` while
 the earlier empirical exits remain open. P3-T6 is independently approved offline/in code
 and integrated at `c9620db`; its empirical GUI acceptance is open and deferred until a
-meaningful end-to-end show is fully working. P3-T7+ and task-bounded live/paid work are
-authorized. P3-T2 deliberately leaves
+meaningful end-to-end show is fully working. P3-T7's independently approved code and
+P3-T8's independently approved offline evaluation code are integrated; their empirical
+proofs remain open. P3-T7+ and task-bounded live/paid work are authorized. P3-T2 deliberately leaves
 `resolved_color`, `timing_offset_beats`, and parameter-range/settings escaping work to
 their existing P3-T5/P3-T8 or display-review owners; it does not silently close them.
 

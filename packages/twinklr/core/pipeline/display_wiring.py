@@ -91,7 +91,7 @@ def prepare_display_pipeline(
         song_name=song_name,
         max_iterations=job_config.agent.max_iterations,
         min_pass_score=job_config.agent.min_pass_score,
-        enable_assets=False,
+        assets=job_config.assets,
         xlights_mapping=mapping,
     )
     return DisplayPipelineWiring(

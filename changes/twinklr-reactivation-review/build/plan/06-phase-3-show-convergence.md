@@ -24,7 +24,9 @@ recorded for display output; assets pipeline optionally enriching Pictures effec
 > without creating another live attempt. The owner subsequently accepted all nine P3-T5
 > decisions, and P3-T5 was integrated at `f006468`. P3-T6's remediated offline/code
 > candidate received independent standards, specification, and adversarial approval and
-> was integrated at `c9620db`. Phase 3 now has six of eight tasks integrated. P3-T6
+> was integrated at `c9620db`. P3-T8's offline implementation was integrated at
+> `82438cf`, and P3-T7's independently approved code is included in the current
+> integration. Phase 3 now has all eight offline task implementations integrated. P3-T6
 > empirical xLights GUI acceptance remains open. The owner authorized P3-T7+ and its
 > task-bounded live/paid work on 2026-08-26. All xLights GUI dates/checks remain deferred
 > until there is a meaningful, fully working end-to-end show; the gates remain open and
@@ -54,7 +56,7 @@ recorded for display output; assets pipeline optionally enriching Pictures effec
 
 ## Implementation status — 2026-08-26
 
-- P3-T1 through P3-T6 are integrated at the commits recorded in the campaign handoff;
+- P3-T1 through P3-T8 offline task implementations are integrated at the commits recorded in the campaign handoff;
   P3-T6 is integrated at `c9620db` after independent standards, specification, and
   adversarial approval offline/in code.
 - P3-T4 live acceptance remains open after two failed audited requests. Attempt 2 was
@@ -64,7 +66,9 @@ recorded for display output; assets pipeline optionally enriching Pictures effec
   model-capability remediation does not reopen that boundary.
 - P3-T6 empirical xLights GUI acceptance remains open, with its date deferred until a
   meaningful end-to-end show is fully working. P3-T7+ and task-bounded live/paid work
-  are owner-authorized. The
+  are owner-authorized. P3-T7's one-request/no-retry image proof and zero-call cache replay
+  remain pending; `$0.20` is an estimate/reservation, not a hard spend guarantee. P3-T8's
+  preview/live-judge/human/calibration evidence remains deferred. The
   Phase 1P/2P/2K empirical exits remain open and are not implied by P3-T6 integration.
 
 ## Notes for spec authors

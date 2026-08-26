@@ -11,12 +11,13 @@ No LLM involved — purely deterministic.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import hashlib
 import logging
 
 from twinklr.core.agents.assets.models import AssetCategory, AssetSpec
 from twinklr.core.agents.audio.lyrics.models import LyricContextModel
 from twinklr.core.sequencer.planning.group_plan import GroupPlanSet
-from twinklr.core.sequencer.theming.catalog import PALETTE_REGISTRY
+from twinklr.core.sequencer.theming.catalog import PALETTE_REGISTRY, ItemNotFoundError
 from twinklr.core.sequencer.vocabulary import BackgroundMode
 
 logger = logging.getLogger(__name__)
@@ -200,7 +201,7 @@ def _determine_categories(target_roles: set[str]) -> set[AssetCategory]:
 # ---------------------------------------------------------------------------
 
 
-def _build_spec_id(motif_id: str, category: AssetCategory) -> str:
+def _build_spec_id(plan_set_id: str, motif_id: str, category: AssetCategory) -> str:
     """Build a deterministic spec ID.
 
     Args:
@@ -210,7 +211,8 @@ def _build_spec_id(motif_id: str, category: AssetCategory) -> str:
     Returns:
         Spec ID string (e.g., 'asset_image_texture_sparkles').
     """
-    return f"asset_{category.value}_{motif_id}"
+    song_scope = hashlib.sha256(plan_set_id.encode("utf-8")).hexdigest()[:12]
+    return f"asset_{song_scope}_{category.value}_{motif_id}"
 
 
 def _derive_style_tags(theme_id: str) -> list[str]:
@@ -242,7 +244,7 @@ def _background_for_category(category: AssetCategory) -> BackgroundMode:
     Returns:
         BackgroundMode (OPAQUE for textures/plates, TRANSPARENT for cutouts/text).
     """
-    if category in {AssetCategory.IMAGE_TEXTURE, AssetCategory.IMAGE_PLATE}:
+    if category == AssetCategory.IMAGE_TEXTURE:
         return BackgroundMode.OPAQUE
     return BackgroundMode.TRANSPARENT
 
@@ -297,7 +299,7 @@ def _resolve_palette_colors(palette_id: str | None) -> list[dict[str, str]]:
     try:
         palette_def = PALETTE_REGISTRY.get(palette_id)
         return [{"hex": stop.hex, "name": stop.name or "unnamed"} for stop in palette_def.stops]
-    except Exception:
+    except ItemNotFoundError:
         logger.debug("Palette '%s' not found in registry", palette_id)
         return []
 
@@ -345,7 +347,7 @@ def _extract_narrative_specs(
     Returns:
         List of narrative AssetSpec objects.
     """
-    directives = plan_set.narrative_assets
+    directives = plan_set.narrative_assets[:4]
     if not directives:
         return []
 
@@ -379,7 +381,7 @@ def _extract_narrative_specs(
         palette_colors = _resolve_palette_colors(directive_palette)
 
         spec = AssetSpec(
-            spec_id=f"asset_{directive.category}_{directive.directive_id}",
+            spec_id=_build_spec_id(plan_set.plan_set_id, directive.directive_id, category),
             category=category,
             motif_id=None,  # Narrative assets are NOT motif-driven
             theme_id="theme.narrative",
@@ -476,7 +478,7 @@ def _extract_effect_specs(
 
         for category in sorted(categories, key=lambda c: c.value):
             spec = AssetSpec(
-                spec_id=_build_spec_id(motif_id, category),
+                spec_id=_build_spec_id(plan_set.plan_set_id, motif_id, category),
                 category=category,
                 motif_id=motif_id,
                 theme_id=primary_theme,
@@ -509,7 +511,7 @@ def _extract_text_specs(plan_set: GroupPlanSet) -> list[AssetSpec]:
         primary_theme = plan_set.section_plans[0].theme.theme_id
 
     banner_spec = AssetSpec(
-        spec_id=_build_spec_id("song_title", AssetCategory.TEXT_BANNER),
+        spec_id=_build_spec_id(plan_set.plan_set_id, "song_title", AssetCategory.TEXT_BANNER),
         category=AssetCategory.TEXT_BANNER,
         motif_id=None,
         theme_id=primary_theme,

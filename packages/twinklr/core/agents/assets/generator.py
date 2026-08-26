@@ -9,12 +9,14 @@ from __future__ import annotations
 
 import asyncio
 from datetime import UTC, datetime
+import hashlib
 import logging
 from pathlib import Path
+import re
 
 from PIL import Image
 
-from twinklr.core.agents.assets.catalog import compute_prompt_hash
+from twinklr.core.agents.assets.catalog import compute_prompt_hash, validate_asset_image
 from twinklr.core.agents.assets.image_client import OpenAIImageClient
 from twinklr.core.agents.assets.models import (
     AssetCategory,
@@ -22,6 +24,7 @@ from twinklr.core.agents.assets.models import (
     AssetStatus,
     CatalogEntry,
 )
+from twinklr.core.agents.assets.pricing import calculate_image_cost
 from twinklr.core.agents.assets.text_renderer import TextRenderer
 
 logger = logging.getLogger(__name__)
@@ -30,14 +33,11 @@ logger = logging.getLogger(__name__)
 _CATEGORY_DIRS: dict[AssetCategory, str] = {
     AssetCategory.IMAGE_TEXTURE: "images/textures",
     AssetCategory.IMAGE_CUTOUT: "images/cutouts",
-    AssetCategory.IMAGE_PLATE: "images/plates",
     AssetCategory.TEXT_BANNER: "text/banners",
-    AssetCategory.TEXT_LYRIC: "text/lyrics",
-    AssetCategory.SHADER: "shaders",
 }
 
 
-def _build_output_path(spec: AssetSpec, assets_dir: Path) -> Path:
+def build_output_path(spec: AssetSpec, assets_dir: Path) -> Path:
     """Build the output file path for a spec.
 
     Structure: assets/{category_dir}/{WxH}/{filename}.png
@@ -49,42 +49,29 @@ def _build_output_path(spec: AssetSpec, assets_dir: Path) -> Path:
     Returns:
         Full output path.
     """
-    category_dir = _CATEGORY_DIRS.get(spec.category, "other")
-    filename = spec.motif_id or spec.spec_id
-    # Sanitize filename
-    filename = filename.replace(" ", "_").lower()
+    category_dir = _CATEGORY_DIRS[spec.category]
+    source = spec.motif_id or spec.spec_id
+    for identifier in (spec.spec_id, spec.motif_id):
+        if identifier is not None and (
+            Path(identifier).is_absolute()
+            or "/" in identifier
+            or "\\" in identifier
+            or ".." in identifier
+        ):
+            raise ValueError(f"Unsafe asset identifier {identifier!r}")
+    slug = re.sub(r"[^a-z0-9_-]+", "_", source.lower()).strip("_-") or "asset"
+    identity = hashlib.sha256(spec.spec_id.encode("utf-8")).hexdigest()[:12]
+    filename = f"{slug}-{identity}"
 
     if spec.category.is_image():
         # Sub-organize by dimensions
         size_dir = f"{spec.width}x{spec.height}"
-        return assets_dir / category_dir / size_dir / f"{filename}.png"
+        output = assets_dir / category_dir / size_dir / f"{filename}.png"
     else:
-        return assets_dir / category_dir / f"{filename}.png"
-
-
-def _validate_image(file_path: Path, spec: AssetSpec) -> tuple[bool, str | None]:
-    """Validate a generated image with PIL.
-
-    Checks dimensions and alpha channel presence.
-
-    Args:
-        file_path: Path to the generated image.
-        spec: The spec for expected properties.
-
-    Returns:
-        (is_valid, error_message_or_none)
-    """
-    try:
-        img = Image.open(file_path)
-        w, h = img.size
-
-        if w != spec.width or h != spec.height:
-            return False, (f"Dimension mismatch: expected {spec.width}x{spec.height}, got {w}x{h}")
-
-        return True, None
-
-    except Exception as e:
-        return False, f"Image validation failed: {e}"
+        output = assets_dir / category_dir / f"{filename}.png"
+    if not output.resolve().is_relative_to(assets_dir.resolve()):
+        raise ValueError(f"Unsafe asset identifier {source!r}")
+    return output
 
 
 def _make_failed_entry(
@@ -139,13 +126,44 @@ async def generate_asset(
     Returns:
         CatalogEntry with generation result.
     """
-    output_path = _build_output_path(spec, assets_dir)
+    output_path = build_output_path(spec, assets_dir)
+    relative_path = output_path.relative_to(assets_dir).as_posix()
     prompt_hash = compute_prompt_hash(spec)
     now = datetime.now(UTC).isoformat()
 
     try:
+        if output_path.is_file():
+            is_valid, validation_error = await asyncio.to_thread(
+                validate_asset_image, output_path, spec
+            )
+            if not is_valid:
+                return _make_failed_entry(
+                    spec,
+                    Path(relative_path),
+                    now,
+                    prompt_hash,
+                    source_plan_id,
+                    generation_model="existing-file",
+                    error=validation_error or "Existing image validation failed",
+                )
+            content = output_path.read_bytes()
+            return CatalogEntry(
+                asset_id=spec.spec_id,
+                spec=spec,
+                file_path=relative_path,
+                content_hash=hashlib.sha256(content).hexdigest(),
+                status=AssetStatus.CACHED,
+                width=spec.width,
+                height=spec.height,
+                has_alpha=False,
+                file_size_bytes=len(content),
+                created_at=now,
+                source_plan_id=source_plan_id,
+                generation_model="existing-file",
+                prompt_hash=prompt_hash,
+            )
         if spec.category.is_image():
-            return await _generate_image(
+            entry = await _generate_image(
                 spec,
                 output_path,
                 image_client,
@@ -153,8 +171,9 @@ async def generate_asset(
                 prompt_hash=prompt_hash,
                 source_plan_id=source_plan_id,
             )
+            return entry.model_copy(update={"file_path": relative_path})
         elif spec.category.is_text():
-            return await _generate_text(
+            entry = await _generate_text(
                 spec,
                 output_path,
                 text_renderer,
@@ -162,6 +181,7 @@ async def generate_asset(
                 prompt_hash=prompt_hash,
                 source_plan_id=source_plan_id,
             )
+            return entry.model_copy(update={"file_path": relative_path})
         else:
             return _make_failed_entry(
                 spec,
@@ -177,7 +197,7 @@ async def generate_asset(
         logger.error("Asset generation failed for %s: %s", spec.spec_id, e)
         return _make_failed_entry(
             spec,
-            output_path,
+            Path(relative_path),
             now,
             prompt_hash,
             source_plan_id,
@@ -227,7 +247,7 @@ async def _generate_image(
     )
 
     # Validate (CPU-bound PIL work — run in thread)
-    _is_valid, error = await asyncio.to_thread(_validate_image, output_path, spec)
+    _is_valid, error = await asyncio.to_thread(validate_asset_image, output_path, spec)
 
     # Detect alpha
     try:
@@ -243,10 +263,15 @@ async def _generate_image(
             now,
             prompt_hash,
             source_plan_id,
-            generation_model=image_client._model,
+            generation_model=image_client.model,
             error=error or "Validation failed",
         )
 
+    image_cost = (
+        calculate_image_cost(result.usage, model=image_client.model)
+        if result.usage is not None
+        else None
+    )
     return CatalogEntry(
         asset_id=spec.spec_id,
         spec=spec,
@@ -259,8 +284,10 @@ async def _generate_image(
         file_size_bytes=result.file_size_bytes,
         created_at=now,
         source_plan_id=source_plan_id,
-        generation_model=image_client._model,
+        generation_model=image_client.model,
         prompt_hash=prompt_hash,
+        image_usage=result.usage,
+        image_cost=image_cost,
     )
 
 

@@ -7,10 +7,9 @@ what the GroupPlanner agent produces, not template definitions.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from twinklr.core.sequencer.planning.holistic_models import HolisticEvaluation
 from twinklr.core.sequencer.planning.models import PaletteRef
 from twinklr.core.sequencer.templates.group.models.coordination import (
     CoordinationConfig,
@@ -32,15 +31,6 @@ from twinklr.core.sequencer.vocabulary import (
     SpillPolicy,
     StepUnit,
 )
-
-if TYPE_CHECKING:
-    # Runtime import would create a circular dependency: holistic.py imports
-    # GroupPlanSet from this module. Deferred here; model_rebuild() resolves the
-    # forward reference (see P0-T3 escalation — a bulk TC004 fix broke this at
-    # import time).
-    from twinklr.core.agents.sequencer.group_planner.holistic import (  # noqa: TC004
-        HolisticEvaluation,
-    )
 
 
 class NarrativeAssetDirective(BaseModel):
@@ -156,8 +146,8 @@ class SectionCoordinationPlan(BaseModel):
     lane_plans: list[LanePlan] = Field(min_length=1)
     deviations: list[Deviation] = Field(default_factory=list)
 
-    # Narrative asset directives for this section (per-section, ≤10)
-    narrative_assets: list[NarrativeAssetDirective] = Field(default_factory=list)
+    # Narrative asset directives for this section (per-section, ≤4)
+    narrative_assets: list[NarrativeAssetDirective] = Field(default_factory=list, max_length=4)
 
     # Optional notes for debugging/tracing
     planning_notes: str | None = None
@@ -372,7 +362,7 @@ class SectionCoordinationResponse(BaseModel):
     palette: PaletteRef | None
     lane_plans: list[LanePlanResponse] = Field(min_length=1)
     deviations: list[DeviationResponse]
-    narrative_assets: list[NarrativeAssetDirectiveResponse]
+    narrative_assets: list[NarrativeAssetDirectiveResponse] = Field(max_length=4)
     planning_notes: str | None
 
     def to_domain(self) -> SectionCoordinationPlan:
@@ -429,7 +419,7 @@ class GroupPlanSet(BaseModel):
     section_plans: list[SectionCoordinationPlan] = Field(min_length=1)
 
     # Aggregated + deduplicated narrative asset directives across all sections
-    narrative_assets: list[NarrativeAssetDirective] = Field(default_factory=list)
+    narrative_assets: list[NarrativeAssetDirective] = Field(default_factory=list, max_length=4)
 
     holistic_evaluation: HolisticEvaluation | None = Field(
         default=None,

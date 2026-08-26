@@ -16,6 +16,8 @@ from twinklr.core.formats.xlights.sequence.timeline import TimelineTracksConfig
 from twinklr.core.sequencer.models.enum import TransitionMode
 from twinklr.core.sequencer.models.transition import TransitionStrategy
 
+DEFAULT_IMAGE_MODEL = "gpt-image-2"
+
 
 class AgentConfig(BaseModel):
     """Per-agent LLM configuration."""
@@ -168,7 +170,7 @@ class AgentOrchestrationConfig(BaseModel):
     )
 
     image_model: str = Field(
-        default="gpt-image-2",
+        default=DEFAULT_IMAGE_MODEL,
         description="OpenAI Images API model; assets remain disabled unless explicitly enabled",
     )
 
@@ -191,6 +193,25 @@ class AgentOrchestrationConfig(BaseModel):
         configured threshold had no effect on the shipped path at all (P7-M1/P7-M2).
         """
         return self.success_threshold / 10.0
+
+
+class AssetGenerationConfig(BaseModel):
+    """Opt-in, per-run safety controls for generated display imagery."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    enabled: bool = False
+    dry_run: bool = False
+    max_image_requests_per_run: Literal[1] = 1
+    estimated_image_usd_per_request: float = Field(default=0.20, ge=0.20, le=0.20)
+    image_quality: Literal["low"] = "low"
+    asset_base_path: str | None = Field(
+        default=None,
+        description=(
+            "Optional assets root. Relative values resolve beside the job config; "
+            "the default is the run's shared artifacts/assets directory."
+        ),
+    )
 
 
 def _get_cache_default(cache_type: str) -> CacheConfig:
@@ -620,6 +641,7 @@ class JobConfig(ConfigBase):
     fixture_config_path: str = "fixture_config.json"
 
     agent: AgentOrchestrationConfig = Field(default_factory=lambda: _get_agent_config_default())
+    assets: AssetGenerationConfig = Field(default_factory=AssetGenerationConfig)
     output_dir: str | None = None
     project_name: str | None = None
 

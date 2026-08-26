@@ -83,14 +83,6 @@ Produce a JSON response with:
 {% if style_tags %}- **Style Tags:** {{ style_tags | join(", ") }}{% endif %}
 {% if content_tags %}- **Content Tags:** {{ content_tags | join(", ") }}{% endif %}
 
-{% if builtin_prompt %}
-## Reference Prompt (from builtin template)
-
-Use this as a starting point and enhance it with the scene context:
-
-{{ builtin_prompt }}
-{% endif %}
-
 {% if scene_context %}
 ## Scene Context
 

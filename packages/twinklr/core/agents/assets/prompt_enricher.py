@@ -68,7 +68,6 @@ def build_enrichment_variables(
     spec: AssetSpec,
     motif_description: str | None = None,
     motif_usage_notes: str | None = None,
-    builtin_prompt: str | None = None,
 ) -> dict[str, Any]:
     """Build template variables for the enricher prompt pack.
 
@@ -79,7 +78,6 @@ def build_enrichment_variables(
         spec: The AssetSpec to enrich.
         motif_description: Visual description from MotifDefinition.
         motif_usage_notes: Usage notes from MotifDefinition.
-        builtin_prompt: Assembled prompt from a matched builtin template.
 
     Returns:
         Template variables dict for Jinja2 rendering.
@@ -118,7 +116,6 @@ def build_enrichment_variables(
                 "target_roles": spec.target_roles,
                 "content_tags": spec.content_tags,
                 "scene_context": spec.scene_context,
-                "builtin_prompt": builtin_prompt,
             }
         )
 
@@ -132,7 +129,6 @@ async def enrich_spec(
     *,
     motif_description: str | None = None,
     motif_usage_notes: str | None = None,
-    builtin_prompt: str | None = None,
 ) -> AssetSpec:
     """Enrich an image spec with an LLM-generated prompt.
 
@@ -145,7 +141,6 @@ async def enrich_spec(
         enricher_spec: AgentSpec for the enricher agent.
         motif_description: Visual description from MotifDefinition.
         motif_usage_notes: Usage notes from MotifDefinition.
-        builtin_prompt: Assembled prompt from a matched builtin template.
 
     Returns:
         New AssetSpec with prompt and negative_prompt populated.
@@ -157,7 +152,6 @@ async def enrich_spec(
         spec,
         motif_description=motif_description,
         motif_usage_notes=motif_usage_notes,
-        builtin_prompt=builtin_prompt,
     )
 
     agent_result: AgentResult = await runner.run(spec=enricher_spec, variables=variables)

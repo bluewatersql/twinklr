@@ -171,7 +171,13 @@ Key fields and defaults:
 | `agent.refinement_agent` | `gpt-5.6-sol`, medium reasoning | Holistic-correction model, temperature, and reasoning settings |
 | `agent.asset_enricher_agent` | `gpt-5.6-terra`, low reasoning | Image-prompt enrichment settings; this does not enable asset generation |
 | `agent.recipe_generation_agent` | `gpt-5.6-sol`, high reasoning | Recipe-builder model, temperature, reasoning, output limit, and timeout settings |
-| `agent.image_model` | `"gpt-image-2"` | OpenAI Images API target if a future display run explicitly enables assets |
+| `agent.image_model` | `"gpt-image-2"` | OpenAI Images API target used by enabled display/show asset generation |
+| `assets.enabled` | `false` | Opt in to generated Pictures assets for `twinklr display` and `twinklr show` |
+| `assets.dry_run` | `false` | Report the capped generation set and estimate while making zero image or enrichment calls |
+| `assets.max_image_requests_per_run` | `1` | Fixed live-policy ceiling: exactly one provider request exposure per run, with no image retry |
+| `assets.estimated_image_usd_per_request` | `0.20` | Conservative internal reservation for that request; this is an estimate, not a guaranteed dollar cap |
+| `assets.image_quality` | `"low"` | Explicit supported Images API quality; P3-T7 intentionally permits only the cost-pinned `low` value |
+| `assets.asset_base_path` | `null` | Optional assets root, relative to the job config; default: the run's shared `assets/` directory |
 | `agent.<role>.max_tokens` | `50000` | Maximum output tokens forwarded on that role's requests |
 | `agent.<role>.timeout_seconds` | `60` | Per-request provider timeout |
 | `planner_features.enable_shutter` | `true` | Plan shutter/strobe |
@@ -180,6 +186,17 @@ Key fields and defaults:
 | `transitions.enabled` | `true` | Enable section transitions |
 | `transitions.default_duration_bars` | `0.5` | Transition length in bars |
 | `checkpoint` | `true` | Enable stage result caching |
+
+The planner schema may describe up to four narrative assets (`maxItems=4`), but the
+enabled live path authorizes only one image-provider request and reports the rest as
+skipped. When the provider returns complete and internally consistent modality token
+usage, Twinklr records actual image cost using the dated `gpt-image-2` rate card. Missing
+or inconsistent usage leaves actual cost unavailable and retains the full `$0.20`
+reservation; a reported cost above the estimate is surfaced explicitly.
+Cache replay validates every stored asset as a non-empty PNG with the expected
+dimensions before any enrichment or provider work. A corrupt or mismatched cached file
+fails loudly and is never rebilled automatically. Replay summaries report cached work
+for that run while preserving the catalog entry's original `created` provenance.
 
 Minimal example:
 
@@ -201,6 +218,15 @@ providers without that capability filter the option. Set all of
 changing; cache identity includes the model and reasoning level, so a retarget
 gets a fresh result rather than reusing an incompatible plan. Asset generation
 remains disabled by default; changing `agent.image_model` alone does not turn it on.
+To inspect a run without any image or enrichment calls, set
+`"assets": {"enabled": true, "dry_run": true}`. A live opt-in uses
+`"assets": {"enabled": true}` and requires the OpenAI provider. Generated files and
+the atomically updated `asset_catalog.json` land under the configured assets root;
+catalog paths remain relative so moving that root preserves cache hits. Exactly one
+provider request is authorized per run and ambiguous failures are never retried. The
+`$0.20` value is a conservative estimate/reservation, not a guaranteed hard spend cap;
+trustworthy complete usage populates actual cost, while missing or inconsistent usage
+retains the reservation and leaves actual cost unavailable.
 
 Iterative judging is retained by default. On cycle two and later, each judge sees its
 own prior verdict summaries, feedback, and issues from the current run. That history is
