@@ -7,8 +7,8 @@ updated: 2026-08-26
 # Twinklr — Current State
 
 _Repository evidence and active sequencing verified 2026-08-26. All eight Phase 3
-offline implementations are integrated; Phase 3 and the earlier empirical exits remain
-open._
+offline implementations and one of seven Phase 4 tasks are integrated; Phase 3 and the
+earlier empirical exits remain open._
 
 Twinklr is an AI-powered choreography engine: audio file in, xLights artifacts out — a
 fresh `.xsq`, standalone `.xtiming` timing tracks, and an `.xmap` mapping hint, which the
@@ -77,13 +77,12 @@ See [product/overview.md](product/overview.md).
 
 ## Quality-gate state
 
-The latest accepted integrated baseline is main `0adb566`: `make validate` completed
-with **5,459 passed, 38 skipped**, clean Ruff formatting/lint, and mypy success across
-**740 source files** after P3-T7 integration and the optional-Anthropic import fix. The
-skips cover explicit optional/local-only boundaries rather than accepted implementation
-regressions. P4-T1's unmerged author evidence is owned by its
-[active task spec](../changes/twinklr-reactivation-review/build/specs/phase-4-compounding/P4-T1-ml-chain-python-bump.md)
-and is not an integrated baseline.
+The latest accepted integrated baseline is main `56d9aa0`: `make validate` completed
+with **5,453 passed, 38 skipped**, clean Ruff formatting/lint, and mypy success across
+**738 source files** after P4-T1 integration. The skips cover explicit optional/local-
+only boundaries rather than accepted implementation regressions. P4-T1's exact contract
+and verification evidence are owned by its
+[task spec](../changes/twinklr-reactivation-review/build/specs/phase-4-compounding/P4-T1-ml-chain-python-bump.md).
 
 The review baseline at `aa8d325` did fail its own gates. That is historical evidence,
 not the current state; its fully classified record is preserved in
@@ -140,12 +139,12 @@ implementation now independently verifies file-backed provenance, rebuilds deter
 reports, shares provider request limits, and handles contact-sheet grounding. It is
 independently approved offline, but supplies no xLights evidence, visual-judge output,
 human judgment, calibration, real completed record, or empirical acceptance outcome.
-Phase 4 has started with the unmerged P4-T1 candidate, now independently approved for
-integration but not yet integrated. It coordinates the Python 3.13/ML-chain modernization
-and removes the orphaned diarization and unused dependency surfaces. Under the owner
-override, optional WhisperX runtime audio execution remains deferred against the current
-default FFmpeg 9. The exact contract, implementation manifest, and author evidence live
-only in the
+Phase 4 has one of seven tasks integrated. P4-T1 landed at `56d9aa0` after independent
+approval and clean-main verification; it coordinates the Python 3.13/ML-chain
+modernization and removes the orphaned diarization and unused dependency surfaces. Under
+the owner override, optional WhisperX/TorchCodec runtime execution remains deferred and
+unavailable against the current default FFmpeg 9. The exact contract and verification
+evidence live only in the
 [P4-T1 task spec](../changes/twinklr-reactivation-review/build/specs/phase-4-compounding/P4-T1-ml-chain-python-bump.md).
 
 The authoritative current task/gate list is the campaign

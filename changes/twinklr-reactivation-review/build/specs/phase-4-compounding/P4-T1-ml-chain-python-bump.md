@@ -207,9 +207,10 @@ re-verifying the Python 3.13 floor doesn't break any other package in the worksp
 
 ## Author implementation handoff — 2026-08-26
 
-Status: **offline candidate independently approved for integration; not merged or
-integrated.** Base is `0adb566885866dd6462733eea6e8594703cd48af` on isolated branch
-`codex/p4t1-python313`.
+Status: **independently approved and integrated at `56d9aa0`.** The candidate was based
+on `0adb566885866dd6462733eea6e8594703cd48af` in isolated branch
+`codex/p4t1-python313`; clean-main `make validate` passed after integration with 5,453
+tests passed, 38 skipped, clean Ruff format/lint, and mypy clean across 738 source files.
 
 Implemented:
 
