@@ -355,5 +355,10 @@ Remediation commit `3c564a9` adds a subprocess smoke discriminator at
 `models.position.GroupPosition`. The discriminator failed before the import repair and
 passes afterward. A tracked `scripts/`/`examples/` audit and a repository-wide Python
 import audit find no remaining imports of any deleted display, curve, resolver, or
-rendering module. This remediation does not expand scope; the candidate remains pending
-fresh independent verification.
+rendering module. The same truth pass updates the runtime macro-planner pack's stale
+`DisplayGroup` comment to the surviving `ChoreoGroup` descriptor vocabulary and removes
+the deleted `io.sync_adapter` strict-mypy claim from the developer guide. Because the
+audited probe hashes the complete prompt pack, its offline expected prompt identity was
+refreshed to `47dbc1d79c38ea2f23d5d2a5d3368aefc0be51fb142dcf9e3c707abd97b500b9`;
+this does not reopen the exhausted live-attempt cap. This remediation does not expand
+scope; the candidate remains pending fresh independent verification.

@@ -11,8 +11,8 @@ Separation of concerns:
 - **XLightsMapping** (separate module): How choreography IDs resolve
   to xLights element names for XSQ output.
 
-The ``ChoreoGroup.id`` field replaces ``DisplayGroup.group_id`` to
-avoid confusion with other group concepts in the system.  Tags use
+The ``ChoreoGroup.id`` field is the canonical group identifier, avoiding
+confusion with other group concepts in the system. Tags use
 the closed ``ChoreoTag`` enum for deterministic bidirectional resolution.
 """
 

@@ -330,7 +330,7 @@ _Source: `Makefile`_
 
 All commits must pass:
 - **Ruff** — 0 linting issues (line-length 100, target Python 3.13)
-- **mypy** — 0 type errors on new code (pydantic plugin enabled, strict on `feature_store`, `feature_engineering`, `agents.providers.anthropic`, `io.sync_adapter`)
+- **mypy** — 0 type errors on new code (pydantic plugin enabled, strict on `feature_store`, `feature_engineering`, and `agents.providers.anthropic`)
 - **pytest** — 0 failures, coverage target >= 80% (no hard enforcement via `--cov-fail-under`)
 
 _Source: `pyproject.toml` tool configuration sections_
@@ -348,7 +348,7 @@ Key settings from `pyproject.toml`:
 
 - Python 3.13, pydantic plugin enabled
 - `check_untyped_defs = true`, `ignore_missing_imports = true`
-- Strict mode (`disallow_untyped_defs = true`) enforced on: `feature_store.*`, `feature_engineering.*`, `agents.providers.anthropic`, `io.sync_adapter`
+- Strict mode (`disallow_untyped_defs = true`) enforced on: `feature_store.*`, `feature_engineering.*`, and `agents.providers.anthropic`
 
 ### Testing
 

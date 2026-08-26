@@ -10,7 +10,7 @@ templates:
 variables:
   required:
     - audio_profile           # AudioProfileModel with song analysis
-    - display_groups          # List of DisplayGroup objects with concrete group IDs and metadata
+    - display_groups          # List of ChoreoGroup descriptors with concrete IDs and metadata
     - response_schema         # JSON schema for MacroPlan (auto-injected)
     - taxonomy                # Dict of enum names to value lists (auto-injected)
     - theme_catalog           # List of ThemeDefinition summaries (theme_id, title)
