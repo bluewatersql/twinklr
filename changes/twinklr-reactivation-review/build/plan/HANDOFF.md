@@ -22,6 +22,191 @@ real completed record remain deferred to that end-to-end milestone. Maintained b
 orchestrating agent; update this file at every
 pause or phase boundary._
 
+## Next-agent handoff — 2026-08-26 session closeout
+
+Start here. This section supersedes older status prose below when the two disagree;
+older entries remain as dated audit history.
+
+### Exact repository state
+
+- Integration baseline immediately before this handoff edit: `main` at
+  `ac6ffbce12c0385e2b9b86f8f2dd1c415833b8b9`. The committed handoff itself is the next
+  documentation-only commit; use the commands below rather than treating `ac6ffbc` as
+  the post-handoff HEAD.
+- Nothing from this session was pushed. Immediately before this handoff commit, `main`
+  was 52 commits ahead of `origin/main`.
+- There is one worktree: `/Users/ondeck/work/github/twinklr`. The temporary P4-T7 and
+  P2K-T2 worktrees and their integration branches were removed after merge.
+- Historical `codex/p2k-*` and `codex/p2p-*` local branches still exist. They predate
+  this closeout and were not deleted because branch deletion was not part of the task.
+- No subagent is still doing work. Completed agent records may remain visible in the
+  orchestration UI, but there is no running worker to resume.
+- The current accepted quality snapshot is single-owned by
+  [context/current-state.md](../../../../context/current-state.md): exact-tip validation
+  for integrated source `03b75e9` left 1,361 files unchanged, Ruff clean, mypy clean
+  across 721 source files, and 5,637 passed / 39 skipped at 89% coverage. Closeout
+  `ac6ffbc` changes documentation only.
+
+Quick verification:
+
+```bash
+git status --short --branch
+git log -6 --oneline
+git worktree list
+```
+
+### Work completed in this session
+
+1. **P4-T7 repository-only prerequisite preflight**
+   - The first freeze `2fff098` was independently rejected because its P2K report gate
+     was incomplete, its future archive profiling plan could delete a sibling owner
+     directory, and it omitted the exact temporal aligner seam.
+   - Remediation `c79566e` was independently approved and integrated. It records five
+     exact re-entry artifacts, corrects the unsupported vendor-history premise, and
+     requires hash-verified archive copies in isolated task-owned scratch before any
+     future profiling.
+   - Status closeout `bc7e270` records the preflight as integrated. **P4-T7 itself is
+     still optional, incomplete, and NO-GO/deferred.** The preflight is not a corpus
+     run, task completion, prototype, or feasibility verdict.
+   - Canonical records:
+     [active P4-T7 spec](../specs/phase-4-compounding/P4-T7-mh-idiom-mining-exploration.md)
+     and [repository preflight](../specs/phase-4-compounding/P4-T7-repository-preflight.md).
+
+2. **P2K-T2 offline owner-run readiness hardening**
+   - Readiness audit found six blockers: incomplete threshold sensitivity, count-only
+     idempotence, incomplete provenance, unbound final reports, unsafe/ambiguous command
+     behavior, and no private MH-manifest contract.
+   - The first implementation freeze `64ce517` was independently rejected on both
+     Standards and Spec axes. Reviewers reproduced live-catalog-child output acceptance,
+     symlink-following cleanup, coercive manifest truthiness, runtime/report family-cap
+     mismatch, stale decision/report binding, and malformed/duplicate decisions.
+   - Remediation `9059ff7` (rebased as `9536206`) added strict Pydantic V2 evidence
+     models, protected-root/no-follow cleanup, stable entity-key/content idempotence,
+     complete configured-plus-two-nearby sensitivity for all retained numeric values,
+     runtime-accurate family grouping, current/staged artifact binding, exactly eight
+     typed owner decisions, and one redacted accepted-P2K + private-MH re-entry binding.
+   - Standards and Spec reviewers approved the replacement. The rebased integration was
+     finalized at `03b75e9`; docs closeout is `ac6ffbc`.
+   - Focused adversarial matrix: 41 passed. Clean full gate: 1,361 files unchanged,
+     Ruff clean, mypy 721, 5,637 passed / 39 skipped with 43 resource warnings.
+   - No owner corpus, private MH manifest, network, provider, live catalog, or paid
+     service was accessed. **This makes the tooling safe and reviewable; it does not
+     satisfy P2K-T2's empirical exit.**
+   - Operator runbook: [feature-engineering workflow](../../../../scripts/docs/feature_engineering.md).
+
+3. **Review and integration discipline**
+   - Every author freeze was independently reviewed; rejected snapshots remain recorded
+     as rejected rather than silently rewritten.
+   - The final P2K rebase preserved all approved P4-T7 preflight history. A narrow final
+     clarification supersedes the preflight memo's stale “five decisions” language:
+     current artifact 4 is strict `OWNER_DECISIONS.json` with exactly eight entries, and
+     the dead anti-affinity constant is not a sensitivity/decision item.
+   - No live/provider/corpus/xLights/audio action occurred during these lanes.
+
+### Current blockers and owner decisions
+
+#### 1. Strict Phase 4 exit: real local Ollama schema smoke
+
+This is the only strict Phase 4 exit blocker under the accepted contract. P4-T7 is
+optional and does not itself block phase closure; P4-T1's WhisperX/TorchCodec runtime
+deferral is an accepted non-blocking owner amendment.
+
+Read-only inspection at closeout:
+
+- Ollama is installed at `/opt/homebrew/bin/ollama`, version `0.32.9`.
+- `ollama list` contains only cloud entries: `kimi-k3:cloud`,
+  `deepseek-v4-pro:cloud`, and `glm-5.2:cloud`.
+- There is **no already-pulled local model**, so the accepted one-request local-only
+  smoke cannot run yet.
+
+Do not infer authority to download a multi-gigabyte model. The next agent needs one of
+two explicit owner choices:
+
+1. authorize pulling a named local Ollama model, then run exactly one schema smoke; or
+2. explicitly amend/waive the Phase 4 contract so offline implementation is accepted
+   and real local schema validity remains deferred.
+
+After a named model is already pulled and Ollama is running, the accepted smoke command
+is:
+
+```bash
+TWINKLR_RUN_LOCAL_OLLAMA_TESTS=1 \
+TWINKLR_OLLAMA_MODEL=<already-pulled-local-model> \
+TWINKLR_OLLAMA_BASE_URL=http://127.0.0.1:11434/v1 \
+uv run pytest tests/local_only/test_ollama_structured_outputs.py -q --no-cov
+```
+
+The test permits one provider attempt, disables fallback/repair, and proves schema
+validity only for that exact installed model. If it fails or the result is ambiguous,
+record the exact outcome and do not retry or pull another model without renewed owner
+direction. See the [P4-T2 contract](../specs/phase-4-compounding/P4-T2-local-provider-option.md).
+
+#### 2. P2K-T2 empirical owner-data exit
+
+The implementation is ready, but the following evidence still does not exist:
+
+1. a real owner-corpus mining manifest from the hardened command;
+2. an unchanged-corpus rerun with matching entity-key/content digests and no duplicate
+   identity or row growth;
+3. non-empty support, stability, distinct-pack, effective-threshold, and nearby-
+   sensitivity evidence;
+4. strict `OWNER_DECISIONS.json` containing exactly eight dated keep/change/defer
+   decisions and rationales.
+
+Do not search, open, parse, or mine private/local corpus content merely because the
+tooling is integrated. Wait for the owner to provide the explicit unified corpus path,
+music-index-or-none choice, and dedicated new output directory.
+Then follow the linked runbook exactly: run the same owner command twice, verify the
+unchanged-rerun manifest, generate reports, complete all eight decisions, bind them, and
+independently review the resulting accepted P2K evidence. Never write raw/private corpus
+or derived vendor curves into Git. A private MH manifest is a separate P4-T7 admission
+prerequisite; it is not required to complete P2K-T2's own empirical exit.
+
+#### 3. P4-T7 optional exploration
+
+Do not begin P4-T7 until all five re-entry artifacts in the active spec exist and are
+accepted. Once admitted, the plan remains capped at 165 analysis minutes / 180 absolute
+minutes and at most five sequences. The accepted sample must contain at least three
+sequences from at least two independently hashed packs and at least two distinct DMX
+fixture/layout profiles; it sets no maximum pack count or reviewed-window count. Profile
+only hash-verified copies inside newly created task-owned scratch; never profile owner
+archives in place. Missing isolation, hash equality, path containment, fixture-semantic
+join coverage, or curve-decode coverage is an immediate stop. A future result must still
+be framed as pursue-now / pursue-later / no, with evidence; the current repository has
+no such feasibility verdict.
+
+### Other boundaries that must survive every continuation
+
+- **P3-T4:** two live attempts are sealed and exhausted; `$3.320000` is committed; no
+  third attempt is authorized. Offline temperature-capability remediation does not
+  reopen the cap or create live acceptance.
+- **P3-T7:** the one-shot image proof succeeded and its sealed terminal ledger forbids
+  another run. Never rerun it.
+- **xLights GUI:** all GUI dates/checks remain deferred until a meaningful, fully
+  working end-to-end show exists. Deferral does not waive the empirical gates.
+- **P3-T8 / P2P-T6 / P2P-T13:** no real vision judgment, calibration, completed record,
+  three-arm result, or D1 verdict may be inferred from offline fixtures.
+- **WhisperX/TorchCodec:** optional runtime execution remains owner-deferred and
+  unavailable against the current default FFmpeg 9. Do not claim runtime readiness.
+- **Repository:** no push was performed. Ask before pushing. Preserve unrelated legacy
+  branches and ignored/local state unless the owner explicitly asks to remove them.
+
+### Recommended continuation order
+
+1. Read this section, [context/current-state.md](../../../../context/current-state.md),
+   [changes/ACTIVE.md](../../../ACTIVE.md), and the relevant P4-T2/P2K-T2/P4-T7 specs.
+2. Obtain the owner's explicit Ollama decision (named-model pull or empirical waiver).
+3. If a pull is authorized, record expected download/disk impact before starting, verify
+   the model is local, run the one-request smoke once, and independently audit the
+   evidence before changing Phase 4 status.
+4. If the owner instead supplies real P2K/MH inputs, follow the hardened runbook; keep all
+   private outputs outside Git and require independent evidence review before admitting
+   P4-T7.
+5. Continue non-GUI end-to-end work toward one meaningful fully working show; only then
+   schedule the deferred xLights GUI evidence.
+6. Before any phase closure, re-audit every phase exit explicitly. Merged tooling is not
+   empirical acceptance.
+
 ## What this campaign is
 
 Multi-agent execution of the accepted
