@@ -314,3 +314,18 @@ made the README distinguish optional ML package installation from the currently 
 and FFmpeg-9-unavailable WhisperX/TorchCodec runtime, and replaced two volatile user-guide
 line-number citations with stable path-and-symbol references. Contract assertions cover
 all three current-truth seams and verify that cited Python paths exist.
+
+Replacement author remediation `6dbf4fa` has the following fresh scoped evidence:
+
+```text
+documentation/model contract tests: 54 passed
+Ruff --no-cache on changed test: all checks passed
+static stale/current phrase assertions: passed
+changed-document relative link check: zero missing
+git diff --check: clean
+```
+
+The previously recorded full `make validate` result remains the proportional full gate:
+this remediation changes documentation and its contract test only, no product source.
+The changed test is included in the 54-test focused run. The replacement freeze remains
+pending independent verification and is not integrated.

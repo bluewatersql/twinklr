@@ -354,6 +354,12 @@ FFmpeg-9-unavailable WhisperX/TorchCodec runtime, and replaces the user guide's 
 credential/fixture line-number citations with stable symbol references. Regression
 assertions protect these statements and cited Python paths.
 
+Author remediation is committed at `6dbf4fa`; its fresh scoped gate is 54 documentation/
+model contract tests passing, Ruff `--no-cache` clean, stale/current phrase assertions
+clean, zero missing changed-document links, and `git diff --check` clean. The prior full
+gate remains applicable because no product source changed. Independent re-verification
+is still required.
+
 ## Binding orchestration rules
 
 - Use executor/verifier separation; an author never approves their own work.
