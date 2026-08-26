@@ -7,24 +7,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from twinklr.core.curves.models import CurvePoint
-from twinklr.core.curves.modifiers import (
-    CurveModifier,
-    bounce_curve,
-    mirror_curve,
-    ping_pong_curve,
-    repeat_curve,
-    reverse_curve,
-)
 from twinklr.core.curves.semantics import CurveKind
-
-
-@dataclass(frozen=True)
-class NativeCurveDefinition:
-    """Registry entry for curve generation."""
-
-    curve_id: str
-    default_params: dict[str, Any] | None = None
-    description: str | None = None
 
 
 @dataclass(frozen=True)
@@ -36,25 +19,7 @@ class CurveDefinition:
     kind: CurveKind
     default_samples: int
     default_params: dict[str, Any] | None = None
-    modifiers: list[CurveModifier] | None = None
     description: str | None = None
-
-
-def _apply_modifiers(points: list[CurvePoint], modifiers: list[CurveModifier]) -> list[CurvePoint]:
-    """Apply modifier transformations to curve points."""
-    result = points
-    for modifier in modifiers:
-        if modifier == CurveModifier.REVERSE:
-            result = reverse_curve(result)
-        elif modifier == CurveModifier.MIRROR:
-            result = mirror_curve(result)
-        elif modifier == CurveModifier.BOUNCE:
-            result = bounce_curve(result)
-        elif modifier == CurveModifier.PINGPONG:
-            result = ping_pong_curve(result)
-        elif modifier == CurveModifier.REPEAT:
-            result = repeat_curve(result)
-    return result
 
 
 class CurveRegistry:
@@ -135,10 +100,4 @@ class CurveRegistry:
         params.update(kwargs)
 
         sample_count = n_samples or spec.default_samples
-        points = spec.generator(sample_count, **params)
-
-        modifiers = definition.modifiers or []
-        if modifiers:
-            points = _apply_modifiers(points, modifiers)
-
-        return points
+        return spec.generator(sample_count, **params)

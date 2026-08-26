@@ -19,13 +19,7 @@ class TestCurveGenerator:
     def test_initialization(self, generator: CurveGenerator) -> None:
         """Generator initializes with registry and providers."""
         assert generator._registry is not None
-        assert generator._native is not None
         assert generator._custom is not None
-
-    def test_generate_native_spec_invalid_type_raises(self, generator: CurveGenerator) -> None:
-        """Invalid native curve type raises ValueError."""
-        with pytest.raises(ValueError, match="not a valid native curve type"):
-            generator.generate_native_spec("nonexistent")
 
     def test_generate_custom_points_linear(self, generator: CurveGenerator) -> None:
         """Generate custom linear curve points."""

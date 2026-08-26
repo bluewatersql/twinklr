@@ -1,4 +1,4 @@
-"""Native curve specification and tuning helpers."""
+"""Native xLights curve specification."""
 
 from __future__ import annotations
 
@@ -61,75 +61,3 @@ class xLightsNativeCurve(BaseModel):  # noqa: N801 — intentional xLights-brand
             parts.append(f"P4={self.p4:.2f}")
         parts.append(f"RV={'TRUE' if self.reverse else 'FALSE'}")
         return "|".join(parts) + "|"
-
-
-def generate_native_spec(
-    curve_type: NativeCurveType, params: dict[str, float] | None = None
-) -> xLightsNativeCurve:
-    """Map high-level parameters to a native curve spec."""
-    params = params or {}
-    if curve_type == NativeCurveType.SINE:
-        return xLightsNativeCurve(
-            type=curve_type, p2=params.get("amplitude", 100.0), p4=params.get("center", 128.0)
-        )
-    if curve_type == NativeCurveType.ABS_SINE:
-        return xLightsNativeCurve(
-            type=curve_type, p2=params.get("amplitude", 100.0), p4=params.get("center", 128.0)
-        )
-    if curve_type == NativeCurveType.PARABOLIC:
-        return xLightsNativeCurve(
-            type=curve_type, p2=params.get("amplitude", 100.0), p4=params.get("center", 128.0)
-        )
-    if curve_type == NativeCurveType.RAMP:
-        return xLightsNativeCurve(
-            type=curve_type, p1=params.get("min", 0.0), p2=params.get("max", 255.0)
-        )
-    if curve_type == NativeCurveType.SAW_TOOTH:
-        return xLightsNativeCurve(
-            type=curve_type, p1=params.get("min", 0.0), p2=params.get("max", 255.0)
-        )
-    if curve_type == NativeCurveType.LOGARITHMIC:
-        return xLightsNativeCurve(
-            type=curve_type, p1=params.get("min", 0.0), p2=params.get("max", 255.0)
-        )
-    if curve_type == NativeCurveType.EXPONENTIAL:
-        return xLightsNativeCurve(
-            type=curve_type, p1=params.get("min", 0.0), p2=params.get("max", 255.0)
-        )
-    if curve_type == NativeCurveType.FLAT:
-        return xLightsNativeCurve(type=curve_type, p1=params.get("value", 128.0))
-    raise ValueError(f"Unsupported native curve type: {curve_type}")
-
-
-def tune_native_spec(
-    spec: xLightsNativeCurve, min_limit: float, max_limit: float
-) -> xLightsNativeCurve:
-    """Tune native curve parameters to fit within boundaries."""
-    if spec.type in {NativeCurveType.SINE, NativeCurveType.ABS_SINE, NativeCurveType.PARABOLIC}:
-        current_min = spec.p4 - spec.p2
-        current_max = spec.p4 + spec.p2
-        if current_min >= min_limit and current_max <= max_limit:
-            return spec
-        center = (min_limit + max_limit) / 2
-        amplitude = (max_limit - min_limit) / 2
-        return spec.model_copy(update={"p2": amplitude, "p4": center})
-
-    if spec.type in {
-        NativeCurveType.RAMP,
-        NativeCurveType.SAW_TOOTH,
-        NativeCurveType.EXPONENTIAL,
-        NativeCurveType.LOGARITHMIC,
-    }:
-        new_p1 = max(spec.p1, min_limit)
-        new_p2 = min(spec.p2, max_limit)
-        if new_p1 == spec.p1 and new_p2 == spec.p2:
-            return spec
-        return spec.model_copy(update={"p1": new_p1, "p2": new_p2})
-
-    if spec.type == NativeCurveType.FLAT:
-        new_p1 = max(min_limit, min(spec.p1, max_limit))
-        if new_p1 == spec.p1:
-            return spec
-        return spec.model_copy(update={"p1": new_p1})
-
-    return spec
