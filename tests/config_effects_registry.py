@@ -2527,19 +2527,26 @@ CONFIG_EFFECTS: dict[str, ConfigDisposition] = {
     ),
 }
 
+PROTECTED_EXACT_EFFECT_PATHS = frozenset(
+    {
+        "fixture.base_config.limits.avoid_backward",
+        "fixture.fixtures[FixtureInstance].config.limits.avoid_backward",
+        "fixture.fixtures[FixtureInstance].config.position.pan_offset_deg",
+        "fixture.fixtures[FixtureInstance].config.position.tilt_offset_deg",
+        "fixture.fixtures[SimplifiedFixtureInstance].position.pan_offset_deg",
+        "fixture.fixtures[SimplifiedFixtureInstance].position.tilt_offset_deg",
+        "job.timeline_tracks.sections",
+        "template.template.steps.geometry.aim_zone",
+    }
+)
+
 # Parameterized discriminators below use the canonical path itself as the pytest ID;
 # each case mutates that exact field and observes a production expansion/export seam.
 for _fixture_path, _fixture_disposition in tuple(CONFIG_EFFECTS.items()):
     if _fixture_path.startswith("fixture.") and (
         _fixture_disposition.kind is ConfigDispositionKind.EFFECT_TEST
     ):
-        if _fixture_disposition.test_nodeid and any(
-            marker in _fixture_disposition.test_nodeid
-            for marker in (
-                "test_avoid_backward_changes_public_pose_safety",
-                "test_offsets_change_public_pose_conversion",
-            )
-        ):
+        if _fixture_path in PROTECTED_EXACT_EFFECT_PATHS:
             continue
         CONFIG_EFFECTS[_fixture_path] = ConfigDisposition(
             ConfigDispositionKind.EFFECT_TEST,
@@ -2568,11 +2575,7 @@ for _template_path, _template_disposition in tuple(CONFIG_EFFECTS.items()):
         _template_disposition.kind is not ConfigDispositionKind.EFFECT_TEST
     ):
         continue
-    if (
-        _template_disposition.test_nodeid
-        and "test_geometry_aim_zone_reaches_compiled_segment_metadata"
-        in _template_disposition.test_nodeid
-    ):
+    if _template_path in PROTECTED_EXACT_EFFECT_PATHS:
         continue
     if _template_path in _TEMPLATE_REGISTRATION_PATHS:
         _template_test = "test_template_registration_field_changes_public_registry"
@@ -2816,6 +2819,8 @@ for _timeline_path in (
     "job.timeline_tracks.lyrics",
     "job.timeline_tracks.phonemes",
 ):
+    if _timeline_path in PROTECTED_EXACT_EFFECT_PATHS:
+        continue
     CONFIG_EFFECTS[_timeline_path] = ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,
         "tests/unit/sequencer/moving_heads/test_rendering_pipeline.py::"

@@ -10,7 +10,11 @@ from typing import cast, get_args
 from pydantic import BaseModel, ValidationError
 import pytest
 
-from tests.config_effects_registry import CONFIG_EFFECTS, ConfigDispositionKind
+from tests.config_effects_registry import (
+    CONFIG_EFFECTS,
+    PROTECTED_EXACT_EFFECT_PATHS,
+    ConfigDispositionKind,
+)
 from twinklr.core.audio.energy.profiling import _get_profile_parameters
 from twinklr.core.audio.structure.models import SectioningPreset
 from twinklr.core.config.fixtures import FixtureGroup
@@ -411,6 +415,22 @@ def test_registered_effect_and_invariant_nodeids_collect() -> None:
         text=True,
     )
     assert completed.returncode == 0, completed.stdout + completed.stderr
+
+
+def test_restored_effect_paths_keep_their_exact_public_nodeids() -> None:
+    expected = {
+        "fixture.base_config.limits.avoid_backward": "tests/unit/config/test_fixtures.py::TestMovementLimits::test_avoid_backward_changes_public_pose_safety[base-config]",
+        "fixture.fixtures[FixtureInstance].config.limits.avoid_backward": "tests/unit/config/test_fixtures.py::TestMovementLimits::test_avoid_backward_changes_public_pose_safety[fixture-instance]",
+        "fixture.fixtures[FixtureInstance].config.position.pan_offset_deg": "tests/unit/config/test_fixtures.py::TestFixturePosition::test_offsets_change_public_pose_conversion[fixture-instance-pan-offset]",
+        "fixture.fixtures[FixtureInstance].config.position.tilt_offset_deg": "tests/unit/config/test_fixtures.py::TestFixturePosition::test_offsets_change_public_pose_conversion[fixture-instance-tilt-offset]",
+        "fixture.fixtures[SimplifiedFixtureInstance].position.pan_offset_deg": "tests/unit/config/test_fixtures.py::TestFixturePosition::test_offsets_change_public_pose_conversion[simplified-fixture-pan-offset]",
+        "fixture.fixtures[SimplifiedFixtureInstance].position.tilt_offset_deg": "tests/unit/config/test_fixtures.py::TestFixturePosition::test_offsets_change_public_pose_conversion[simplified-fixture-tilt-offset]",
+        "job.timeline_tracks.sections": "tests/unit/formats/xlights/sequence/test_timeline.py::TestBuildTimelineTracks::test_sections_config_gates_public_track_builder[sections-disabled]",
+        "template.template.steps.geometry.aim_zone": "tests/unit/sequencer/moving_heads/templates/test_data_loader.py::test_geometry_aim_zone_reaches_compiled_segment_metadata[crowd]",
+    }
+
+    assert frozenset(expected) == PROTECTED_EXACT_EFFECT_PATHS
+    assert {path: CONFIG_EFFECTS[path].test_nodeid for path in expected} == expected
 
 
 def test_unregistered_added_field_is_reported_by_canonical_path() -> None:

@@ -1,7 +1,8 @@
 # Build-campaign handoff — current execution state
 
 _Last updated: 2026-08-26 after all eight Phase 3 offline task implementations and
-P4-T1 through P4-T3 were integrated. P3-T6 empirical xLights GUI acceptance remains
+P4-T1 through P4-T4 were integrated. P4-T5 remains pending independent verification.
+P3-T6 empirical xLights GUI acceptance remains
 open, with all GUI dates/checks deferred until a meaningful end-to-end show is fully
 working.
 P3-T4's two live attempts both failed safely: attempt 1 at the provider schema boundary,
@@ -36,7 +37,7 @@ their authoring moment; this handoff owns the current campaign status.
 | 2P — Creative quality | **OFFLINE IMPLEMENTATION MERGED AND VERIFIED** (13/13); **phase exit not complete** | The owner accepted T1/T8/T9 on 2026-08-16. T6 calibration/live evidence, T13/D1 evidence, and other live checks remain pending; see [04-phase-2p-creative-quality.md](04-phase-2p-creative-quality.md). |
 | 2K — Catalog growth | **TOOLING IMPLEMENTATION MERGED AND VERIFIED** (4/4); **phase exit not complete** | Tooling is ready, but coverage/corpus/curation/style exit criteria require the author's real layout, corpus, preferences, and judgments; see [05-phase-2k-catalog-growth.md](05-phase-2k-catalog-growth.md). |
 | 3 — Show convergence | **P3-T1–P3-T8 OFFLINE IMPLEMENTATIONS MERGED** (8/8 integrated); **EMPIRICAL EXITS OPEN** | P3-T7 is integrated at `70b3305`; its one-shot image proof passed with one request, zero retry, zero-call cache replay, and `$0.00622` measured cost. P3-T6 is integrated at `c9620db`; its xLights gate remains deferred. P3-T8 is integrated at `82438cf`; preview/live-judge/human/calibration/real-record evidence remains deferred. P3-T4 exhausted two failed audited attempts, `$3.320000` is committed, no third is authorized, and live acceptance remains open. Earlier commits: P3-T5 `f006468`; P3-T4 `558153c`; P3-T3 `33cce57`; P3-T2 `5365f70`; P3-T1 `5eebcb2`. |
-| 4 — Compounding | **IMPLEMENTATION IN PROGRESS** (3/7 integrated) | P4-T1 is integrated at `56d9aa0`; P4-T2's implementation and redirect-hardening remediation are integrated through `3765bd9`/`40e8e55`, while its real Ollama smoke remains unclaimed pending explicit local opt-in; P4-T3's independently verified remediation is integrated at `bf6bba5`. Exact records: [P4-T2](../specs/phase-4-compounding/P4-T2-local-provider-option.md) and [P4-T3](../specs/phase-4-compounding/P4-T3-dead-tail-retirement-wave-1.md). |
+| 4 — Compounding | **IMPLEMENTATION IN PROGRESS** (4/7 integrated; P4-T5 pending review) | P4-T1 is integrated at `56d9aa0`; P4-T2's implementation and redirect-hardening remediation are integrated through `3765bd9`/`40e8e55`, while its real Ollama smoke remains unclaimed pending explicit local opt-in; P4-T3's independently verified remediation is integrated at `bf6bba5`; P4-T4 is independently verified and integrated at `3e7f679`. P4-T5 remains an author candidate pending independent verification. Exact records: [P4-T2](../specs/phase-4-compounding/P4-T2-local-provider-option.md), [P4-T3](../specs/phase-4-compounding/P4-T3-dead-tail-retirement-wave-1.md), [P4-T4](../specs/phase-4-compounding/P4-T4-duplication-collapse.md), and [P4-T5](../specs/phase-4-compounding/P4-T5-dead-config-final-sweep.md). |
 
 The overall `twinklr-reactivation-review` change remains **ACTIVE**. Finishing an
 offline implementation lane is not the same as satisfying its phase exit criteria.
@@ -300,10 +301,11 @@ their existing P3-T5/P3-T8 or display-review owners; it does not silently close 
 Phase 4 work has started under the owner's P3-T7+ authorization. P4-T1 is independently
 approved and integrated at `56d9aa0`; P4-T2's implementation and redirect-hardening
 remediation are integrated through `3765bd9`/`40e8e55`; and P4-T3's independently
-verified remediation is integrated at `bf6bba5`, bringing Phase 4 to three of seven tasks
-integrated. P4-T2's real Ollama schema smoke remains unclaimed pending explicit local
-opt-in. Optional WhisperX/TorchCodec runtime execution remains deferred and unavailable
-against the default FFmpeg 9.
+verified remediation is integrated at `bf6bba5`. P4-T4 is independently verified and
+integrated at `3e7f679`, bringing Phase 4 to four of seven tasks integrated. P4-T5 remains
+an author candidate pending independent verification. P4-T2's real Ollama schema smoke
+remains unclaimed pending explicit local opt-in. Optional WhisperX/TorchCodec runtime
+execution remains deferred and unavailable against the default FFmpeg 9.
 
 P4-T5's first freeze candidate `607bf19` was independently rejected: it used generic
 fingerprint/smoke pointers instead of per-field effects, collapsed union alternatives,
@@ -328,8 +330,14 @@ and `TemplateDoc` roots by canonical full path and collects every cited pytest n
 Fresh source-remediation gates: focused config/registry `260 passed`; `1352` files already
 formatted; Ruff clean; mypy clean across `719` source files; full suite `5592 passed,
 39 skipped`; and `git diff --check` clean. No provider, network, live, GUI, or paid call
-occurred. This remains an author refreeze pending independent verification; it is neither
-self-approved nor integrated.
+occurred. Documentation-inclusive refreeze `ce1d9d4` was then independently rejected
+because this handoff still reported Phase 4 as three of seven and omitted integrated
+P4-T4, while the registry protected exact dispositions by matching test-nodeid
+substrings. The current author remediation reports Phase 4 truthfully as four of seven
+with P4-T5 pending, protects an explicit set of all eight canonical config paths, and
+pins every path's final exact node ID. Fresh focused config/registry evidence is `261
+passed`; Ruff and `git diff --check` are clean. This candidate remains pending independent
+verification and is not self-approved or integrated.
 
 ## Binding orchestration rules
 
