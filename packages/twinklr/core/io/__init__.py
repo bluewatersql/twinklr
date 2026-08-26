@@ -11,7 +11,7 @@ Example (async):
 
 """
 
-from twinklr.core.io.impl_fake import FakeFileSystem, FakeFileSystemSync
+from twinklr.core.io.impl_fake import FakeFileSystem
 from twinklr.core.io.impl_null import NullFileSystem
 from twinklr.core.io.impl_real import RealFileSystem
 from twinklr.core.io.models import (
@@ -22,17 +22,15 @@ from twinklr.core.io.models import (
     anchored_path,
     relative_path,
 )
-from twinklr.core.io.protocols import FileSystem, FileSystemSync
+from twinklr.core.io.protocols import FileSystem
 from twinklr.core.io.utils import sanitize_path_component
 
 __all__ = [
     # Path types and constructors
     "AbsolutePath",
     "FakeFileSystem",
-    "FakeFileSystemSync",
     # Protocols
     "FileSystem",
-    "FileSystemSync",
     "NullFileSystem",
     # Async implementations
     "RealFileSystem",

@@ -1,6 +1,6 @@
 """Protocols for filesystem operations.
 
-Defines async-first FileSystem protocol and sync convenience wrapper protocol.
+Defines the async-first FileSystem protocol.
 """
 
 from typing import Protocol
@@ -15,7 +15,7 @@ class FileSystem(Protocol):
     All implementations must provide atomic write semantics and
     handle platform-specific details transparently.
 
-    Async methods are primary; sync wrappers available via FileSystemSync.
+    I/O methods are asynchronous; path joining remains synchronous.
     """
 
     # Path operations (sync - no I/O)
@@ -148,61 +148,4 @@ class FileSystem(Protocol):
             FileNotFoundError: If directory doesn't exist
             IOError: On removal failure
         """
-        ...
-
-
-class FileSystemSync(Protocol):
-    """
-    Synchronous convenience wrapper protocol.
-
-    Provides blocking versions of FileSystem operations for
-    simple scripts, tests, and non-async contexts.
-
-    Implementations typically wrap an async FileSystem and use
-    asyncio.run() to execute operations.
-    """
-
-    def join(self, base: AbsolutePath, *parts: str) -> AbsolutePath:
-        """Safely join path components (sync, no I/O)."""
-        ...
-
-    def exists(self, path: AbsolutePath) -> bool:
-        """Check if path exists (blocking)."""
-        ...
-
-    def is_file(self, path: AbsolutePath) -> bool:
-        """Check if path is a file (blocking)."""
-        ...
-
-    def is_dir(self, path: AbsolutePath) -> bool:
-        """Check if path is a directory (blocking)."""
-        ...
-
-    def read_text(self, path: AbsolutePath, encoding: str = "utf-8") -> str:
-        """Read text file (blocking)."""
-        ...
-
-    def write_text(
-        self,
-        path: AbsolutePath,
-        content: str,
-        encoding: str = "utf-8",
-    ) -> WriteResult:
-        """Write text file atomically (blocking)."""
-        ...
-
-    def mkdirs(self, path: AbsolutePath, exist_ok: bool = True) -> None:
-        """Create directory and parents (blocking)."""
-        ...
-
-    def listdir(self, path: AbsolutePath) -> list[str]:
-        """List directory contents (blocking)."""
-        ...
-
-    def remove(self, path: AbsolutePath) -> None:
-        """Remove file (blocking)."""
-        ...
-
-    def rmdir(self, path: AbsolutePath, recursive: bool = False) -> None:
-        """Remove directory (blocking)."""
         ...
