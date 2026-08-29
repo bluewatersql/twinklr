@@ -2,18 +2,25 @@
 
 _Last updated: 2026-08-29._
 
-- **post-refactor-validation** — **ACTIVE: Phase 0 done; gate green; prereqs + Phase 1
-  landed.** Comprehensive current-state code review (all 21 core subpackages, ~126K LOC) +
-  functional inventory done. The 49 `make validate` failures were root-caused as
-  environment/test-hygiene only (no refactor regressions) and fixed (`ca7ed35`); gate is
-  green (5,650 passed). Landed live-run prerequisites: P2-5 capability policy for the
-  gpt-5.6 family (`91677ab`), P2-6 session/provider `aclose()` (`8f27883`), P2-7
-  temperature in group/holistic cache keys (`5aecb9e`). **Phase 1** offline `.xsq` parity
-  harness (`2565b93`): replaying the pre-refactor `11_need_a_favor` plan through the current
-  deterministic renderer yields 264 placed effects vs the baseline's 262 — MH emission
-  sophistication preserved. Remaining: display baseline + owner-rig fidelity, then **Phase
-  3** live end-to-end run within the owner's $25 budget (pending model/cap confirmation).
-  Deep findings:
+- **post-refactor-validation** — **ACTIVE: Phase 3 live run PASSED.** Comprehensive
+  current-state code review (all 21 core subpackages, ~126K LOC) + functional inventory
+  done. The 49 `make validate` failures were root-caused as environment/test-hygiene only
+  (no refactor regressions) and fixed (`ca7ed35`). Landed live-run prerequisites: P2-5
+  capability policy for the gpt-5.6 family (`91677ab`), P2-6 session/provider `aclose()`
+  (`8f27883`), P2-7 temperature in group/holistic cache keys (`5aecb9e`). **Phase 1**
+  offline `.xsq` parity harness (`2565b93`): 264 placed effects vs the baseline's 262.
+  **Phase 3** live end-to-end MH run on `11 - Need A Favor.mp3` (public OpenAI, owner's real
+  4-MH rig) **succeeded** and emitted a valid `.xsq` that meets/exceeds the pre-refactor
+  baseline (placed effects 396 vs 262; distinct DMX settings 365 vs 262; value-curve
+  channels 1306 vs 622). Two real code bugs found & fixed en route (`08ce6d5`):
+  reasoning/temperature mutual-exclusivity (macro `gpt-5.2` 400) and zero-duration emission
+  segments aborting render; plus resolved TLS (proxy CA → `SSL_CERT_FILE`), stale
+  `fixture_config.json`/`job_config.json` schema drift, and a too-low 60s agent timeout for
+  reasoning models. Live spend ≈ $1–2 of $25.  Remaining: lift the 60s timeout default +
+  zero-width-overlap transition fix upstream (recommended), display replay-render parity,
+  then lock baseline. Live-run findings:
+  [notes/live-run-prereqs.md](post-refactor-validation/notes/live-run-prereqs.md). Deep
+  findings:
   [notes/functional-inventory.md](post-refactor-validation/notes/functional-inventory.md).
   Internal validation checkpoint
   proving the `twinklr-reactivation-review` refactoring left the engine working end to
