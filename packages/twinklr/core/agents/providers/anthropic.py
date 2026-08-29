@@ -85,6 +85,11 @@ class AnthropicProvider:
         # Conversation state
         self._conversations: dict[str, Conversation] = {}
 
+    async def aclose(self) -> None:
+        """Close the underlying Anthropic HTTP clients and their connection pools."""
+        await self._async_client.close()
+        self._sync_client.close()
+
     # =========================================================================
     # Protocol: provider_type
     # =========================================================================

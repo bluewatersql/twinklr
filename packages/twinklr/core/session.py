@@ -218,3 +218,23 @@ class TwinklrSession:
         if not hasattr(self, "_audio"):
             self._audio = AudioAnalyzer(self.app_config, self.job_config)
         return self._audio
+
+    async def aclose(self) -> None:
+        """Release lazily-created services that own network/client resources.
+
+        Closes the LLM provider's HTTP client and the audio analyzer's enhancement
+        pools, but only if they were actually created during this session. Safe to
+        call more than once.
+        """
+        provider = getattr(self, "_llm_provider", None)
+        if provider is not None:
+            await provider.aclose()
+        audio = getattr(self, "_audio", None)
+        if audio is not None:
+            await audio.aclose()
+
+    async def __aenter__(self) -> TwinklrSession:
+        return self
+
+    async def __aexit__(self, *exc_info: object) -> None:
+        await self.aclose()

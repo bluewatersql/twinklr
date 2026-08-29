@@ -137,6 +137,10 @@ class OpenAIProvider:
         self._max_conversations = max_conversations
         self._conversations: OrderedDict[str, Conversation] = OrderedDict()
 
+    async def aclose(self) -> None:
+        """Close the underlying AsyncOpenAI HTTP client and its connection pool."""
+        await self._async_client.close()
+
     @property
     def provider_type(self) -> ProviderType:
         """Provider type identifier."""

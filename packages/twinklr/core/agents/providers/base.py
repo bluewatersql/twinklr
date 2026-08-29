@@ -109,6 +109,10 @@ class LLMProvider(Protocol):
         """Behavioral request capabilities; callers must not route by provider name."""
         ...
 
+    async def aclose(self) -> None:
+        """Release any network/client resources held by the provider."""
+        ...
+
     def generate_json(
         self,
         messages: list[dict[str, str]],
