@@ -40,10 +40,20 @@ def normalized_openai_generation_config(
     temperature: float | None,
     reasoning_effort: str | None,
 ) -> dict[str, Any]:
-    """Return only model-supported optional generation parameters."""
+    """Return only model-supported optional generation parameters.
+
+    `temperature` and `reasoning` are mutually exclusive on OpenAI reasoning requests:
+    supplying `temperature` alongside a reasoning effort is a terminal HTTP 400
+    ("temperature is not supported with this model"), observed live on a `gpt-5.2` macro
+    planner whose spec also carried a reasoning effort. Whenever a reasoning effort is
+    requested we therefore drop `temperature` regardless of the model's standalone
+    temperature capability, in addition to the per-model policy (e.g. the GPT-5.6 family
+    rejects `temperature` even without a reasoning effort).
+    """
     capabilities = _capabilities_for(model)
     config: dict[str, Any] = {}
-    if capabilities.supports_temperature and temperature is not None:
+    temperature_allowed = capabilities.supports_temperature and reasoning_effort is None
+    if temperature_allowed and temperature is not None:
         config["temperature"] = temperature
     if reasoning_effort is not None:
         config["reasoning_effort"] = reasoning_effort

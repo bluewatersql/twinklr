@@ -45,6 +45,27 @@ def _segment(fixture_id: str, segment_id: str, start: int, end: int) -> FixtureS
     )
 
 
+def test_zero_duration_segments_are_skipped_not_fatal() -> None:
+    """A zero-duration segment must be dropped, not crash emission.
+
+    ``FixtureSegment`` permits ``t1_ms == t0_ms`` (its validator only rejects ``t1 < t0``),
+    but ``EmissionRequest`` requires a strictly positive duration (``0 <= start < end``).
+    A live moving-head run produced a zero-duration transition segment that terminated the
+    whole render with ``Emission requires 0 <= start_ms < end_ms``. The adapter already
+    skips other unusable segments (empty channels, unmapped fixtures); a degenerate
+    duration carries no visible effect and must be skipped the same way.
+    """
+    sequence = build_fresh_sequence(media_file="song.wav", duration_ms=1_000)
+    placements = XsqAdapter().convert(
+        [_segment("MH1", "ok", 0, 200), _segment("MH1", "zero", 200, 200)],
+        _rig(),
+        sequence,
+    )
+
+    assert len(placements) == 1
+    assert (placements[0].start_ms, placements[0].end_ms) == (0, 200)
+
+
 def test_identical_mh_settings_deduplicate_and_times_use_twenty_ms_grid() -> None:
     sequence = build_fresh_sequence(media_file="song.wav", duration_ms=1_000)
     placements = XsqAdapter().convert(

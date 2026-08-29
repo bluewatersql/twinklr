@@ -79,6 +79,21 @@ class XsqAdapter:
         xlights_mapping = fixture_group.get_xlights_mapping()
         emitter = EmissionSession(xsq) if xsq is not None else None
 
+        # Drop zero-duration segments before emission. FixtureSegment permits t1_ms == t0_ms
+        # (its validator only rejects t1 < t0), but an xLights effect requires a strictly
+        # positive duration (EmissionRequest enforces 0 <= start_ms < end_ms). A degenerate
+        # segment carries no visible effect, so skip it here — consistent with the empty-channel
+        # and unmapped-fixture skips below — rather than letting one segment abort the render.
+        usable_segments = [s for s in segments if s.t1_ms > s.t0_ms]
+        dropped = len(segments) - len(usable_segments)
+        if dropped:
+            logger.warning(
+                "Skipping %d zero-duration segment(s) (t0_ms == t1_ms); "
+                "xLights effects require positive duration",
+                dropped,
+            )
+        segments = usable_segments
+
         # Separate transition and regular segments
         transition_segments = [s for s in segments if s.metadata.get("is_transition") == "true"]
         regular_segments = [s for s in segments if s.metadata.get("is_transition") != "true"]

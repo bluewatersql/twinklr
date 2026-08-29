@@ -26,6 +26,24 @@ def test_gpt_56_family_strips_temperature_but_keeps_reasoning(model: str) -> Non
     assert config["reasoning_effort"] == "medium"
 
 
+@pytest.mark.parametrize("model", ["gpt-5.2", "gpt-5", "gpt-5-mini", "some-future-reasoner"])
+def test_reasoning_request_strips_temperature_even_for_temperature_capable_models(
+    model: str,
+) -> None:
+    """`temperature` and `reasoning` are mutually exclusive on OpenAI reasoning requests.
+
+    Sending both is a terminal HTTP 400 ("temperature is not supported with this model"),
+    observed live on the `gpt-5.2` macro planner (job-config override) whose spec also
+    carries a reasoning effort. Whenever a reasoning effort is requested, temperature must
+    be dropped regardless of the model's standalone temperature capability.
+    """
+    config = normalized_openai_generation_config(
+        model=model, temperature=0.7, reasoning_effort="high"
+    )
+    assert "temperature" not in config
+    assert config["reasoning_effort"] == "high"
+
+
 @pytest.mark.parametrize("model", ["gpt-4.1", "gpt-4o"])
 def test_non_reasoning_models_keep_temperature(model: str) -> None:
     config = normalized_openai_generation_config(
