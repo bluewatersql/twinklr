@@ -15,8 +15,6 @@ Thumbs.db
 .obsidian/
 
 # === Agent-local / session state ===
-# Shared agent knowledge is Git-tracked in AGENTS.md, CLAUDE.md, context/, changes/,
-# memories/, prompts/. Everything below is machine-local runtime state.
 .claude/
 .cursor/
 .cursorrules
@@ -45,10 +43,6 @@ htmlcov/
 dist/
 build/
 *.egg-info/
-# The reactivation campaign's plan & specs live in changes/twinklr-reactivation-review/build/
-# (tracked); packaging build/ dirs elsewhere stay ignored
-!/changes/twinklr-reactivation-review/build/
-!/changes/twinklr-reactivation-review/build/**
 
 # === Generated project data & run artifacts (never check in) ===
 data/
