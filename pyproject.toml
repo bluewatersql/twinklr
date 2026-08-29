@@ -193,3 +193,10 @@ filterwarnings = [
     "ignore:builtin type SwigPyObject has no __module__ attribute:DeprecationWarning",
     "ignore:builtin type swigvarlink has no __module__ attribute:DeprecationWarning",
 ]
+
+
+[[tool.uv.index]]
+name = "pypi"
+# url = "https://pypi.org/simple"
+url = "https://pypi-proxy.dev.databricks.com/simple/"
+default = true

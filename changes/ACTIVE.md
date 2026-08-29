@@ -1,6 +1,17 @@
 # Active Changes
 
-_Last updated: 2026-08-26._
+_Last updated: 2026-08-29._
+
+- **post-refactor-validation** — **ACTIVE: planning.** Internal validation checkpoint
+  proving the `twinklr-reactivation-review` refactoring left the engine working end to
+  end at prior-state functional level, then locking that output as the go-forward
+  regression baseline. Five phases: Phase 0 current-state code review & functional
+  inventory → offline structural regression vs. `artifacts/` baselines → CI replay E2E +
+  provider-contract smokes → authorized live end-to-end show → lock baseline + human-QA
+  readiness. Owner authorized live provider/model calls (2026-08-29). Spec:
+  [post-refactor-validation/spec.md](post-refactor-validation/spec.md); plan:
+  [post-refactor-validation/plan.md](post-refactor-validation/plan.md). Depends on and
+  produces empirical E2E evidence for the reactivation-review phase exits below.
 
 - **twinklr-reactivation-review** — **ACTIVE: implementation phase (build campaign).**
   The review completed 2026-08-13 (all 8 stages, adversarially verified, verdict

@@ -135,11 +135,11 @@ test-watch: ## Run tests in watch mode (requires pytest-watch)
 
 test-unit: ## Run unit tests only
 	@echo "$(BLUE)→ Running unit tests...$(NC)"
-	uv run pytest tests/test_value_curves.py tests/test_phase1_integration.py -v
+	uv run pytest tests/unit/ -v
 
 test-integration: ## Run integration tests only
 	@echo "$(BLUE)→ Running integration tests...$(NC)"
-	uv run pytest tests/test_e2e_value_curves.py tests/test_phase4_sequencer.py -v
+	uv run pytest tests/integration/ -v
 
 #############################################################################
 # Quality Checks (Run all before committing)
