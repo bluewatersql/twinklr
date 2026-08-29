@@ -22,9 +22,7 @@ async def test_aclose_closes_created_provider_and_audio() -> None:
     analyzer = MagicMock()
     analyzer.aclose = AsyncMock()
     with (
-        patch(
-            "twinklr.core.session.create_llm_provider", return_value=provider
-        ) as create_provider,
+        patch("twinklr.core.session.create_llm_provider", return_value=provider) as create_provider,
         patch("twinklr.core.session.AudioAnalyzer", return_value=analyzer),
     ):
         _ = session.llm_provider
