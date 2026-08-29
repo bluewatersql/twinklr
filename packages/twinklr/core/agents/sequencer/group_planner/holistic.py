@@ -163,6 +163,7 @@ class HolisticEvaluator:
             "lyric_context": _shape_lyric_context_summary(lyric_context),
             "model": self.holistic_judge_spec.model,
             "reasoning_effort": self.holistic_judge_spec.reasoning_effort,
+            "temperature": self.holistic_judge_spec.temperature,
             "prompt_packs": spec_prompt_hash(AGENTS_BASE_PATH, self.holistic_judge_spec),
         }
 

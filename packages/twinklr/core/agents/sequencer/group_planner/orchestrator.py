@@ -144,8 +144,10 @@ class GroupPlannerOrchestrator:
             "min_pass_score": self.config.approval_score_threshold,
             "planner_model": self.planner_spec.model,
             "planner_reasoning_effort": self.planner_spec.reasoning_effort,
+            "planner_temperature": self.planner_spec.temperature,
             "judge_model": self.section_judge_spec.model,
             "judge_reasoning_effort": self.section_judge_spec.reasoning_effort,
+            "judge_temperature": self.section_judge_spec.temperature,
             "prompt_packs": spec_prompt_hash(
                 AGENTS_BASE_PATH, self.planner_spec, self.section_judge_spec
             ),

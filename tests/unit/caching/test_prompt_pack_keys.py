@@ -391,6 +391,49 @@ class TestModelIdRemainsKeyed:
             moving_heads_context
         ) != await changed_mh.get_cache_key(moving_heads_context)
 
+    async def test_temperature_changes_planner_stage_cache_keys(
+        self,
+        provider: MagicMock,
+        macro_context: PlanningContext,
+        section_context: SectionPlanningContext,
+        moving_heads_context: MovingHeadPlanningContext,
+    ) -> None:
+        """Sampling temperature must be part of every planner/judge stage cache key.
+
+        Otherwise changing only temperature silently reuses a plan generated at the
+        previous temperature. Macro and moving-heads already keyed it; the group
+        planner did not until this was fixed.
+        """
+        macro = MacroPlannerOrchestrator(provider=provider)
+        changed_macro = MacroPlannerOrchestrator(
+            provider=provider,
+            planner_spec=_change_temperature(macro.planner_spec),
+            judge_spec=macro.judge_spec,
+        )
+        assert await macro.get_cache_key(macro_context) != await changed_macro.get_cache_key(
+            macro_context
+        )
+
+        group = GroupPlannerOrchestrator(provider=provider)
+        changed_group = GroupPlannerOrchestrator(
+            provider=provider,
+            planner_spec=_change_temperature(group.planner_spec),
+            section_judge_spec=group.section_judge_spec,
+        )
+        assert await group.get_cache_key(section_context) != await changed_group.get_cache_key(
+            section_context
+        )
+
+        moving_heads = MovingHeadPlannerOrchestrator(provider=provider)
+        changed_mh = MovingHeadPlannerOrchestrator(
+            provider=provider,
+            planner_spec=_change_temperature(moving_heads.planner_spec),
+            judge_spec=moving_heads.judge_spec,
+        )
+        assert await moving_heads.get_cache_key(
+            moving_heads_context
+        ) != await changed_mh.get_cache_key(moving_heads_context)
+
 
 def _retarget(spec: AgentSpec) -> AgentSpec:
     """Same spec pointed at a different model."""
@@ -401,6 +444,12 @@ def _change_reasoning(spec: AgentSpec) -> AgentSpec:
     """Same spec with a different explicit reasoning effort."""
     effort = "low" if spec.reasoning_effort != "low" else "high"
     return spec.model_copy(update={"reasoning_effort": effort})
+
+
+def _change_temperature(spec: AgentSpec) -> AgentSpec:
+    """Same spec with a different explicit sampling temperature."""
+    current = spec.temperature if spec.temperature is not None else 0.5
+    return spec.model_copy(update={"temperature": round(current + 0.1, 3)})
 
 
 class TestPromptPackHashing:
