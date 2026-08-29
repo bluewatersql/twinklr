@@ -27,6 +27,40 @@ pause or phase boundary._
 Start here. This section supersedes older status prose below when the two disagree;
 older entries remain as dated audit history.
 
+### Remaining remediation workflow — owner discussion update 2026-08-29
+
+The broad code/tooling remediation is complete. What remains is empirical validation
+and explicit owner decisions, not another unfocused implementation wave:
+
+1. **Close or explicitly defer the Phase 4 Ollama exit.** The accepted contract still
+   requires one real, local, schema-valid `MacroPlan` smoke. No local model was pulled at
+   the last inspection. The owner must either authorize downloading one named local
+   model and one smoke request, or explicitly amend Phase 4 so the offline provider path
+   is accepted while empirical local-model validity remains deferred. Until then Phase 4
+   remains six of seven.
+2. **Run the P2K-T2 owner-data protocol when inputs are supplied.** Mine the real corpus,
+   rerun it unchanged, prove content-level idempotence, produce non-empty distributions,
+   and complete exactly eight dated keep/change/defer decisions with rationales. The
+   hardened tooling is integrated; none of these empirical outcomes may be inferred.
+3. **Keep P4-T7 optional and blocked until admission evidence exists.** It needs accepted
+   P2K-T2 evidence plus an accepted, sufficient private MH manifest. Even after admission
+   it is a capped feasibility investigation, not normal product development or automatic
+   Phase 4 completion.
+4. **Reach one meaningful non-GUI end-to-end show before scheduling xLights GUI work.**
+   The deferred xLights preview, vision, calibration, and human checks should occur only
+   after that milestone; deferral does not waive them.
+5. **Finish older empirical exits with their own evidence.** Phase 1P still needs human
+   judgment and xLights acceptance; Phase 2P still needs live vision calibration and the
+   later three-arm/D1 experiment; Phase 2K still needs real-layout, curation, and style
+   evidence beyond P2K-T2; Phase 3 still has P3-T4 live acceptance plus P3-T6/P3-T8
+   GUI/vision/human evidence open. P3-T4's acceptance remains open even though its
+   lifetime cap is exhausted and no third request is authorized.
+
+Permanent boundaries remain unchanged: P3-T4 has no authorized third request; P3-T7's
+successful image proof is terminal and must never be rerun; WhisperX/TorchCodec runtime
+remains deferred under the current FFmpeg 9 environment; merged tooling and offline tests
+are not empirical acceptance.
+
 ### Exact repository state
 
 - Integration baseline immediately before this handoff edit: `main` at
@@ -188,8 +222,10 @@ no such feasibility verdict.
   three-arm result, or D1 verdict may be inferred from offline fixtures.
 - **WhisperX/TorchCodec:** optional runtime execution remains owner-deferred and
   unavailable against the current default FFmpeg 9. Do not claim runtime readiness.
-- **Repository:** no push was performed. Ask before pushing. Preserve unrelated legacy
-  branches and ignored/local state unless the owner explicitly asks to remove them.
+- **Repository:** the 2026-08-26 implementation session performed no push. On 2026-08-29
+  the owner explicitly authorized committing this discussion update to `main` and syncing
+  `main` to its configured remote. Preserve unrelated legacy branches and ignored/local
+  state unless the owner explicitly asks to remove them.
 
 ### Recommended continuation order
 
