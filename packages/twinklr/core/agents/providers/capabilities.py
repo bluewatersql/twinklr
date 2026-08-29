@@ -19,11 +19,15 @@ _OPENAI_MODEL_CAPABILITIES = {
     "gpt-4o": OpenAIModelCapabilities(supports_temperature=True),
 }
 
-# The GPT-5.6 reasoning family (sol/terra/luna and future siblings) rejects `temperature`
-# with a terminal HTTP 400 (see P3-T4 attempt 2). Match the whole family by prefix so every
-# shipped role — planner (sol), judge/asset-enricher (terra), vision judge (luna) — has
-# temperature stripped, not just the enumerated default.
-_TEMPERATURE_UNSUPPORTED_PREFIXES = ("gpt-5.6",)
+# The GPT-5 reasoning line reports `temperature` as unsupported (a terminal HTTP 400):
+# first seen on the 5.6 family (sol/terra/luna; P3-T4 attempt 2), then on a job-config
+# planner override onto a 5.2-line sibling during the first live moving-head run.
+# `temperature` and a reasoning effort are mutually exclusive for these models, so match
+# the whole line by the "gpt-5" prefix and every shipped reasoning role — planner, profile,
+# lyrics, refinement, judge, asset-enricher, vision judge — plus any operator override onto
+# a sibling reasoning model has temperature stripped while `reasoning_effort` is preserved.
+# Non-reasoning models (gpt-4.1/gpt-4o) keep temperature via the explicit map above.
+_TEMPERATURE_UNSUPPORTED_PREFIXES = ("gpt-5",)
 
 
 def _capabilities_for(model: str) -> OpenAIModelCapabilities:
@@ -42,18 +46,13 @@ def normalized_openai_generation_config(
 ) -> dict[str, Any]:
     """Return only model-supported optional generation parameters.
 
-    `temperature` and `reasoning` are mutually exclusive on OpenAI reasoning requests:
-    supplying `temperature` alongside a reasoning effort is a terminal HTTP 400
-    ("temperature is not supported with this model"), observed live on a `gpt-5.2` macro
-    planner whose spec also carried a reasoning effort. Whenever a reasoning effort is
-    requested we therefore drop `temperature` regardless of the model's standalone
-    temperature capability, in addition to the per-model policy (e.g. the GPT-5.6 family
-    rejects `temperature` even without a reasoning effort).
+    The GPT-5 reasoning line reports `temperature` as unsupported (a terminal HTTP 400),
+    so the per-model policy strips it for that whole prefix while preserving
+    `reasoning_effort`. Non-reasoning models keep `temperature`.
     """
     capabilities = _capabilities_for(model)
     config: dict[str, Any] = {}
-    temperature_allowed = capabilities.supports_temperature and reasoning_effort is None
-    if temperature_allowed and temperature is not None:
+    if capabilities.supports_temperature and temperature is not None:
         config["temperature"] = temperature
     if reasoning_effort is not None:
         config["reasoning_effort"] = reasoning_effort

@@ -35,11 +35,13 @@ advanced/technical implementation detail.
 
 ## Code bugs found and fixed (TDD, red-first)
 
-1. **`temperature`/`reasoning` mutual exclusivity** (`agents/providers/capabilities.py`).
+1. **GPT-5 line rejects `temperature`** (`agents/providers/capabilities.py`).
    Sending `temperature` alongside a reasoning effort is a terminal HTTP 400 on OpenAI
-   reasoning models. The macro planner (job-config `gpt-5.2` + spec-default `medium`
-   effort) hit this. P2-5 only stripped temperature for the `gpt-5.6` prefix; the fix now
-   drops temperature whenever a reasoning effort is present, for any model.
+   reasoning models. The macro planner (job-config planner override onto the 5.2 line +
+   spec-default `medium` effort) hit this. P2-5 only stripped temperature for the `gpt-5.6`
+   prefix; the fix broadens the model-capability prefix to the whole `gpt-5` reasoning line
+   so every sibling reasoning model has temperature stripped while `reasoning_effort` is
+   preserved. Non-reasoning models (gpt-4.1/gpt-4o) keep temperature.
 2. **Zero-duration emission segments** (`sequencer/moving_heads/export/xsq_adapter.py`).
    `FixtureSegment` permits `t1_ms == t0_ms` but `EmissionRequest` requires
    `0 <= start < end`. The transition planner produced 12 zero-width overlaps
