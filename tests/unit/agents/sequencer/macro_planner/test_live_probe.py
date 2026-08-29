@@ -39,6 +39,20 @@ REAL_CANONICAL_STATE_PATHS = probe_module._canonical_state_paths
 REAL_ASSERT_CLEAN_COMMITTED_MANIFEST = probe_module._assert_clean_committed_manifest
 
 
+@pytest.fixture(autouse=True)
+def _isolate_local_template_overlay(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Make the probe harness tests hermetic against a developer's local overlay.
+
+    The probe deliberately refuses to run when the gitignored ``data/templates/``
+    extension overlay is present (see ``_local_template_extensions_present``). These
+    offline unit tests assume a clean repository (as CI has); a developer machine that
+    carries a local overlay would otherwise trip that guard in ``_request``/``_identity``
+    before the behavior under test. Default the guard to "absent" so every test runs the
+    same way everywhere. The dedicated overlay test re-enables it explicitly.
+    """
+    monkeypatch.setattr(probe_module, "_local_template_extensions_present", lambda _root: False)
+
+
 class FakeProvider:
     provider_type = ProviderType.OPENAI
 

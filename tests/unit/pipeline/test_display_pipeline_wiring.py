@@ -86,15 +86,19 @@ def test_optional_local_catalog_overlay(tmp_path: Path) -> None:
     assert wiring.recipe_catalog.recipes
 
 
-def test_default_catalog_paths_are_clean_clone_safe() -> None:
+def test_default_catalog_paths_are_clean_clone_safe(tmp_path: Path) -> None:
     assert tracked_catalog_dir() == TRACKED_CATALOG
     assert (tracked_catalog_dir() / "index.json").is_file()
     assert default_local_catalog_dir() == REPO_ROOT / "data" / "templates"
+    # Simulate a clean clone: the gitignored `data/templates/` overlay is absent.
+    # We must NOT read the developer's real local overlay here, or the recipe count
+    # becomes machine-dependent (a populated local library would inflate it).
+    absent_local_overlay = tmp_path / "clean-clone-no-local-overlay"
     wiring = prepare_display_pipeline(
         layout_path=FIXTURES / "display_layout_a.xml",
         job_config=JobConfig(),
         catalog_dir=tracked_catalog_dir(),
-        local_catalog_dir=default_local_catalog_dir(),
+        local_catalog_dir=absent_local_overlay,
         song_name="song",
     )
     assert len(wiring.recipe_catalog.recipes) == 6
