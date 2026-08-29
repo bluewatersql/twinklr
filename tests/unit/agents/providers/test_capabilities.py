@@ -43,6 +43,9 @@ def test_unknown_model_defaults_to_sending_temperature() -> None:
 
 
 def test_none_temperature_is_never_emitted() -> None:
-    assert normalized_openai_generation_config(
-        model="gpt-4.1", temperature=None, reasoning_effort=None
-    ) == {}
+    assert (
+        normalized_openai_generation_config(
+            model="gpt-4.1", temperature=None, reasoning_effort=None
+        )
+        == {}
+    )

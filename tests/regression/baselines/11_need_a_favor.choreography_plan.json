@@ -1,0 +1,250 @@
+{
+  "sections": [
+    {
+      "section_name": "intro",
+      "start_bar": 1,
+      "end_bar": 13,
+      "section_role": "intro",
+      "energy_level": 20,
+      "template_id": "tilt_rock_wall_wash_fade",
+      "preset_id": "CHILL",
+      "modifiers": {
+        "phrase_feel": "3_4_breathing_reveals",
+        "motif_hint": "radial_rays_sparkles_light_trails"
+      },
+      "reasoning": "Low/sparse \u2018cosmic beacon\u2019 setup: gentle wall-wash tilt rock reads as distant sky motion, leaving room for stepped reveals and the mid-intro breath without over-animating.",
+      "segments": null,
+      "transition_in": null,
+      "transition_out": null
+    },
+    {
+      "section_name": "verse_1",
+      "start_bar": 14,
+      "end_bar": 27,
+      "section_role": "verse",
+      "energy_level": 45,
+      "template_id": "pendulum_chevron_breathe",
+      "preset_id": "MODERATE",
+      "modifiers": {
+        "beat_emphasis": "downbeat_1_pop_each_bar",
+        "motif_hint": "light_trails_radial_rays"
+      },
+      "reasoning": "Locks an unmistakable 3/4 sway (1-2-3) while staying mid-energy. The chevron pendulum supports the sharp energy spikes as clean downbeat accents without needing full strobe language.",
+      "segments": null,
+      "transition_in": null,
+      "transition_out": null
+    },
+    {
+      "section_name": "verse_2",
+      "start_bar": 28,
+      "end_bar": 41,
+      "section_role": "verse",
+      "energy_level": 55,
+      "template_id": "sweep_lr_chevron_breathe",
+      "preset_id": "MODERATE",
+      "modifiers": {
+        "motion_note": "slightly_wider_sweeps_than_verse_1",
+        "motif_hint": "light_trails_radial_rays_sparkles"
+      },
+      "reasoning": "Hotter verse with outward \u2018pressure\u2019: LR chevron sweep increases perceived reach while keeping a readable 3-beat breathing cadence; adds the \u2018response getting closer\u2019 feel without jumping to peak templates.",
+      "segments": null,
+      "transition_in": null,
+      "transition_out": null
+    },
+    {
+      "section_name": "instrumental_1",
+      "start_bar": 42,
+      "end_bar": 55,
+      "section_role": "instrumental",
+      "energy_level": 75,
+      "template_id": "infinity_mirror_chase",
+      "preset_id": "ENERGETIC",
+      "modifiers": {
+        "phrase_feel": "3_beat_chase_groupings",
+        "motif_hint": "light_trails_spiral"
+      },
+      "reasoning": "First sustained high-energy instrumental: mirrored infinity loops feel like \u2018sky tracking the vortex\u2019 and can read as spiral-adjacent trails while staying loop-safe and musically consistent in 3/4.",
+      "segments": null,
+      "transition_in": null,
+      "transition_out": null
+    },
+    {
+      "section_name": "verse_3",
+      "start_bar": 56,
+      "end_bar": 69,
+      "section_role": "verse",
+      "energy_level": 55,
+      "template_id": "split_lr_sweep_counter",
+      "preset_id": "MODERATE",
+      "modifiers": {
+        "accent_note": "strong_downbeat_rays",
+        "motif_hint": "radial_rays_light_trails"
+      },
+      "reasoning": "Gives moving heads a more \u2018direct ask\u2019 presence: counter-sweeps create controlled ray-like hits on bar 1, while remaining less chaotic than the upcoming peak.",
+      "segments": null,
+      "transition_in": null,
+      "transition_out": null
+    },
+    {
+      "section_name": "break",
+      "start_bar": 70,
+      "end_bar": 83,
+      "section_role": "break",
+      "energy_level": 90,
+      "template_id": "build_drop_recover",
+      "preset_id": "ENERGETIC",
+      "modifiers": {
+        "palette_hint": "spec.fire_ice",
+        "peak_window_hint": "late_section_detontation"
+      },
+      "reasoning": "Clear rebuild \u2192 detonation \u2192 release behavior matches the break\u2019s restrained start, late climb into the first major peak window, then the post-peak letdown\u2014without needing micro-segmentation.",
+      "segments": null,
+      "transition_in": null,
+      "transition_out": null
+    },
+    {
+      "section_name": "instrumental_2",
+      "start_bar": 84,
+      "end_bar": 97,
+      "section_role": "instrumental",
+      "energy_level": 60,
+      "template_id": "cascade_pulse_lr",
+      "preset_id": "MODERATE",
+      "modifiers": {
+        "mapping_note": "distinct_hits_per_stair_step",
+        "motif_hint": "light_trails_radial_rays_sparkles_residual"
+      },
+      "reasoning": "Post-peak \u2018release\u2019 with structure: LR pulse cascades can mark the staircase of hits distinctly without going full chaos, while keeping a strong base into the section end (no blackout).",
+      "segments": null,
+      "transition_in": null,
+      "transition_out": null
+    },
+    {
+      "section_name": "verse_4",
+      "start_bar": 98,
+      "end_bar": 111,
+      "section_role": "verse",
+      "energy_level": 70,
+      "template_id": "sweep_lr_fan_pulse",
+      "preset_id": "ENERGETIC",
+      "modifiers": {
+        "call_response_note": "alternate_odds_evens_on_rebounds",
+        "motif_hint": "light_trails_radial_rays"
+      },
+      "reasoning": "Punchy verse that keeps rebounding: fan sweep + pulse supports repeated \u2018answer\u2019 hits (A/B feel via fixture grouping) while staying in a build lane toward the bridge contrast.",
+      "segments": null,
+      "transition_in": null,
+      "transition_out": null
+    },
+    {
+      "section_name": "bridge",
+      "start_bar": 112,
+      "end_bar": 124,
+      "section_role": "bridge",
+      "energy_level": 40,
+      "template_id": "fan_iris_tilt_bias_breathe",
+      "preset_id": "CHILL",
+      "modifiers": {
+        "palette_hint": "core.ice_neon",
+        "strip_down_note": "single_dome_feel_then_reopen_at_end_snap",
+        "motif_hint": "spiral_sparkles"
+      },
+      "reasoning": "Deliberate carve-out: iris open/close + tilt bias reads as a cool, restrained \u2018holding breath\u2019 moment, with an easy way to re-open hard at the bridge end snap into the next instrumental.",
+      "segments": null,
+      "transition_in": null,
+      "transition_out": null
+    },
+    {
+      "section_name": "instrumental_3",
+      "start_bar": 125,
+      "end_bar": 138,
+      "section_role": "instrumental",
+      "energy_level": 92,
+      "template_id": "figure8_mirror_strobe",
+      "preset_id": "ENERGETIC",
+      "modifiers": {
+        "palette_hint": "spec.fire_ice",
+        "peak_support_note": "sustain_peak_window_not_single_flash",
+        "motif_hint": "radial_rays_sparkle_crowns"
+      },
+      "reasoning": "Second major peak window: mirrored figure-8s keep motion BUSY and readable, while strobe-like pulses punctuate internal crests without devolving into random ballyhoo fatigue.",
+      "segments": null,
+      "transition_in": null,
+      "transition_out": null
+    },
+    {
+      "section_name": "pre_chorus",
+      "start_bar": 139,
+      "end_bar": 152,
+      "section_role": "pre_chorus",
+      "energy_level": 80,
+      "template_id": "zigzag_alternating_pulse",
+      "preset_id": "ENERGETIC",
+      "modifiers": {
+        "signature_motif": "same_3_4_accent_shape_each_bar",
+        "motif_hint": "light_trails_radial_rays_pre_hit_glints"
+      },
+      "reasoning": "Tighten-the-screws section: alternating zigzag + pulse locks a consistent bar-level accent motif (great for 3/4) while still feeling like pressure is increasing into the chorus.",
+      "segments": null,
+      "transition_in": null,
+      "transition_out": null
+    },
+    {
+      "section_name": "chorus",
+      "start_bar": 153,
+      "end_bar": 167,
+      "section_role": "chorus",
+      "energy_level": 85,
+      "template_id": null,
+      "preset_id": null,
+      "modifiers": {},
+      "reasoning": "Split to honor the chorus\u2019s texture change and late collapse: sustained blaze first, then a deliberate, punctuated shutdown aligned to the documented energy cliff.",
+      "segments": [
+        {
+          "segment_id": "blaze",
+          "start_bar": 153,
+          "end_bar": 161,
+          "template_id": "dual_sweep_audience_pulse",
+          "preset_id": "ENERGETIC",
+          "modifiers": {
+            "palette_hint": "core.magma",
+            "motif_hint": "fire_radial_rays_sparkles"
+          },
+          "reasoning": "Full spectacle payoff: big dual sweeps read as massive rays, with pulses to sell the \u2018fire\u2019 hero look while staying more structured than pure chaos."
+        },
+        {
+          "segment_id": "teardown",
+          "start_bar": 162,
+          "end_bar": 167,
+          "template_id": "pop_lock_spotlight_blackout",
+          "preset_id": "MODERATE",
+          "modifiers": {
+            "collapse_note": "two_stage_shutdown_reduce_then_decisive_cut",
+            "motif_hint": "final_ray_hit_then_near_black"
+          },
+          "reasoning": "Musically justified late-collapse handling: pop-lock + blackout punctuation enables an intentional, decisive cutdown rather than a slow fade that would fight the audio."
+        }
+      ],
+      "transition_in": null,
+      "transition_out": null
+    },
+    {
+      "section_name": "outro",
+      "start_bar": 168,
+      "end_bar": 171,
+      "section_role": "outro",
+      "energy_level": 5,
+      "template_id": "hold_center_out_breathe",
+      "preset_id": "CHILL",
+      "modifiers": {
+        "end_note": "brief_afterglow_then_blackout",
+        "motif_hint": "single_wink_sparkle"
+      },
+      "reasoning": "Very short, effectively silent tail: minimal center-out breathe reads as a quick afterglow, then supports a clean end without any extended ramp.",
+      "segments": null,
+      "transition_in": null,
+      "transition_out": null
+    }
+  ],
+  "overall_strategy": "Keep moving heads as a 3/4-aware accent layer: sparse, breathy sweeps early; progressively tighter bar-level pulses and ray-like scans through the builds; then unleash busy radial-style motion in instrumentals and peak windows. Use decisive, musically-punctuated cutdowns for the chorus late-collapse and a near-immediate blackout in the outro to respect the audio\u2019s hard energy drop. (All section boundaries adjusted to eliminate inclusive-bar overlaps while preserving the provided structure intent.)"
+}

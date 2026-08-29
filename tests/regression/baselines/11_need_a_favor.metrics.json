@@ -1,0 +1,12 @@
+{
+  "element_count": 11,
+  "placed_effect_count": 262,
+  "distinct_effect_types": [
+    "DMX"
+  ],
+  "effectdb_entry_count": 262,
+  "value_curve_channel_count": 622,
+  "max_dmx_channel": 16,
+  "max_layers": 2,
+  "sequence_timing": "20 ms"
+}
