@@ -2,7 +2,13 @@
 
 _Last updated: 2026-08-29._
 
-- **post-refactor-validation** — **ACTIVE: planning.** Internal validation checkpoint
+- **post-refactor-validation** — **ACTIVE: Phase 0 complete.** Comprehensive current-state
+  code review (all 21 core subpackages, ~126K LOC) + functional inventory done; `make
+  validate` reproduced at `3d46cf6` = 49 failed / 5,588 passed / 39 skipped, and **all 49
+  failures root-caused as environment-only** (Python 3.13.15-vs-3.13.13 probe pin + owner's
+  local 132-recipe `data/templates/` overlay), **no refactor regressions**. Deep findings:
+  [notes/functional-inventory.md](post-refactor-validation/notes/functional-inventory.md).
+  Internal validation checkpoint
   proving the `twinklr-reactivation-review` refactoring left the engine working end to
   end at prior-state functional level, then locking that output as the go-forward
   regression baseline. Five phases: Phase 0 current-state code review & functional

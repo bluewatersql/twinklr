@@ -99,7 +99,10 @@ comparing current deterministic output against curated pre-refactoring baselines
 - P1-1 Select 2–3 representative baselines from `artifacts/` (candidates: `11_need_a_favor`
   MH show, `titanium…` MH show, `02_rudolph…` display show — they cover MH, display, and
   trace outputs). Promote the chosen inputs+outputs into a **tracked** fixture location
-  under this change (they are currently gitignored and could vanish).
+  under this change (they are currently gitignored and could vanish). **Note (Phase 0):**
+  these baselines were generated with the owner's **132-recipe local `data/templates/`
+  overlay**, not the 6-recipe tracked seed — a fresh comparison run must load the same
+  local catalog (and its source audio in `data/music/`) or parity will be apples-to-oranges.
 - P1-2 Define the comparison contract **on the final `.xsq` output** (the delivered
   product), not intermediate JSON. Parity-critical: element/effect structure, MH
   channel coverage and DMX richness, effect-type diversity, coordination/layering
@@ -141,6 +144,18 @@ calls, and catch the provider-contract failure classes offline.
   models that reject it via the capability policy (attempt-2 failure), strict
   structured-output schema validity. These must fail on a pre-fix/adversarial case.
 - P2-4 Document how to refresh replay fixtures when prompts/schemas change.
+- **P2-5 (from Phase 0) Fix the capability-policy gap.** `capabilities.py` only marks
+  `gpt-5.6-sol` temperature-unsafe; the `judge`/`asset_enricher` roles (`gpt-5.6-terra`)
+  and vision judge (`gpt-5.6-luna`) still send `temperature`. Add them to the policy (or
+  null their temps) with a red-first unit test — `capabilities.py` has none today. This is
+  a hard prerequisite for any live `display`/`show` run (Phase 3) or it repeats P3-T4's
+  HTTP 400.
+- **P2-6 (from Phase 0) Add LLM-provider lifecycle close.** `TwinklrSession` never
+  `aclose()`s the provider (`OpenAIProvider` holds an unclosed `AsyncOpenAI`). Add
+  cleanup before Phase 3 runs many live calls.
+- **P2-7 (from Phase 0) Close cache-key temperature gaps** in
+  `group_planner/orchestrator.py` and `holistic.py` (they omit temperature; MH/macro
+  include it) — otherwise replay determinism (P2-2) and re-runs are unreliable.
 
 **Exit:** replay E2E + contract smokes green in CI; the two P3-T4 failure classes are
 provably caught offline.

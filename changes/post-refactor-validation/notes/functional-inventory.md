@@ -268,26 +268,125 @@ Inventory complete and evidence-backed. Phase 1–4 task lists in [plan.md](../p
 with the three additions above (capability fix, metadata-based parity harness, seed-catalog
 caveat). Fresh `make validate` evidence appended below once the run completes.
 
-### Fresh gate evidence (attempted 2026-08-29)
+### Fresh gate evidence (2026-08-29, networked, commit `3d46cf6`)
 
-`make validate` was **not runnable in this session's environment**, for two reasons — both
-environmental, neither a code defect:
+`make validate` ran to completion on a clean tree. **Result: 49 failed, 5,588 passed, 39
+skipped, 88% coverage** (235s). This is **red**, but every failure is an environment/data
+artifact — **none is a refactor regression.** Note 5,588 + 49 = 5,637: the exact total the
+baseline reported as fully green at `03b75e9`, i.e. 49 tests that pass in the authoritative
+environment fail here for environmental reasons.
 
-1. **Dirty-tree guard (by design).** `make validate` (`Makefile:156`) refuses to run against
-   uncommitted changes because it mutates the tree (format/lint-fix). This Phase 0 work left
-   the tree dirty (3 new docs + the Makefile target retarget), and committing is not
-   authorized without owner go-ahead.
-2. **Offline sandbox.** The CI-equivalent non-mutating checks (`uv run --no-sync ruff
-   check`, `ruff format --check`, `pytest -m "not local_only"`) could not run: `uv run`
-   requires a network resync (pypi unreachable — `Connection refused`), and the local
-   `.venv` is bare (python 3.13.13 only; no `pytest`/`ruff`/`mypy`, `twinklr` not
-   importable). Tooling lives in uv's managed environment which needs network to populate.
+Full root-cause classification:
 
-**Scope-of-change safety:** the Phase 0 diff is documentation (`spec.md`, `plan.md`, this
-note) plus a one-line-per-target Makefile fix (`test-unit`/`test-integration` → `tests/unit/`
-/ `tests/integration/`). No Python source, config, or test file changed, so the last accepted
-gate result stands: **main `03b75e9` — 5,637 passed / 39 skipped, 89% coverage, Ruff clean,
-mypy clean across 721 files** (`context/current-state.md`); closeout `54948c0` is docs-only.
+| # | Failing tests | Root cause | Verdict |
+|---|---|---|---|
+| ~46 | `tests/unit/agents/sequencer/macro_planner/test_live_probe.py::*` | **Frozen-runtime guard.** The P3-T4 probe pins exact `python`/`openai`/`pydantic` into `tests/fixtures/p3_t4_macro_probe/context.json` and fails closed on drift (`live_probe.py:524-531`). Fixture pins **python 3.13.15**; this sandbox has **3.13.13** (openai 2.16.0 ✓, pydantic 2.12.5 ✓ — only the Python patch differs). Guard raises `ProbePreflightError("frozen python runtime identity changed")` before the intended assertion. | By-design fail-closed; **not a regression** |
+| 1 | `test_display_pipeline_wiring.py::test_default_catalog_paths_are_clean_clone_safe` | **Local catalog overlay present.** Owner's working tree has `data/templates/` (**132 index entries**); test asserts a clean clone (6 tracked recipes) but loads 133. | Environment/data artifact; **not a regression** |
+| 1 | `test_builtin_enrichment.py::...test_enrichment_is_idempotent` | Same overlay: local recipe `gtpl_accent_call_response_simple` has no effect-map entry → falls back to `On` (`effect_map.py:919`). Surfaces only because the 132-entry local catalog is loaded. | Data-dependent; a real but low-severity **mapping-coverage gap** for one local recipe, not a refactor regression |
 
-**Action for the next session (networked env):** commit these docs, then run `make validate`
-from a clean tree to capture a fresh full-gate result before Phase 1 begins.
+**Conclusion:** in the authoritative gate environment (clean clone, no `data/templates/`
+overlay, locked interpreter **Python 3.13.15**) this is the same green baseline recorded at
+`03b75e9` (5,637 passed, ~89%). The reds here are (a) a Python **patch**-version pin
+mismatch in a security harness and (b) the owner's local catalog overlay differing from a
+clean clone. Format/lint/mypy stages were not the failure point; pytest was.
+
+**Also newly learned (materially updates §7):** the owner's real runs use a **132-recipe
+local catalog**, not the 6-recipe tracked seed. Creative richness on the owner's machine is
+far higher than a clean clone — relevant to Phase 1 parity (baselines were generated with
+the full local catalog).
+
+**Recommended actions (not yet taken — owner calls):**
+- To get a green local `make validate`: run under **Python 3.13.15** (matches CI/lock), or
+  deliberately re-freeze the probe identity to the current runtime (it is a security seal —
+  owner-reviewed change only, belongs to `twinklr-reactivation-review`, not this change).
+- Treat the `test_default_catalog_paths_are_clean_clone_safe` failure as expected on any
+  populated working tree; it is a clean-clone guard, not a product check.
+- File the `gtpl_accent_call_response_simple` effect-map gap as a small catalog/mapping
+  follow-up (data-dependent, low severity).
+
+<!-- wave-2-deep-review -->
+## Deep review — wave 2 (subpackages the first pass skipped)
+
+Four additional deep subagents covered the ~12 core subpackages the breadth pass had only
+sampled (`config`, `resolvers`, `caching`, `curves`, `sequencer` infrastructure/timing/
+theming/planning/compile/handlers, `reporting` internals, `logging`, `profiling`, `io`,
+`parsers`, `api`, `assets`, `agents/shared`), plus a repo-wide dead-code sweep and an
+incompleteness scan. Reports: [sequencer core](3eb172dd-968f-4392-9cee-5de3f4d9e713),
+[config/DI/caching](99a71311-3794-4a90-9c09-8075d777bb19),
+[reporting/logging/profiling/io](6608005a-48ac-42b3-9e20-6f118c07ae60),
+[api/assets/dead-code](834be3f9-470b-4803-bff9-91431e53bfde).
+
+**Verdict:** the deterministic core after unified-emission/duplication-collapse is
+**largely WORKING** — BeatGrid timing, curve generation, template compile, handlers,
+transitions, theming/vocabulary/planning contracts, fresh `.xsq` delivery, evaluation
+sync-metrics, profiling ingest, and the `io` DI seam are real implementations, not stubs.
+The `.cursorrules` paths `sequencer/infrastructure|channels|poses` do **not** exist (timing
+→ `sequencer/timing/`, curves → `core/curves/`, poses → `config/poses.py`). DI is
+`TwinklrSession`+`PipelineContext`, **not** the `ResolverContext` the rules mention (that
+package is an empty dead shell).
+
+### Confirmed correctness risks (prioritize before/within later phases)
+
+1. **Capability-policy gap (live-run blocker) — expanded, now with full role table.**
+   `capabilities.py:18` only marks `gpt-5.6-sol` temperature-unsafe. Full role map:
+   `plan`/`refinement`/`profile`/`lyrics` = `gpt-5.6-sol` (temp stripped ✓);
+   **`judge_agent` + `asset_enricher_agent` = `gpt-5.6-terra`** and **vision judge =
+   `gpt-5.6-luna`** — all set a temperature and are **not** in the policy → temperature is
+   **sent** (`config/models.py:122,146,202`). A live `display`/`show` run invokes the judge
+   (terra) and would repeat P3-T4 attempt-2's HTTP 400 if terra/luna reject temperature.
+   **Fix (offline, TDD) before Phase 3;** add terra/luna to the policy or null their temps.
+   `capabilities.py` currently has **no unit test**.
+2. **Session never closes the LLM provider.** `TwinklrSession` (`session.py`) has no
+   `aclose`/context-manager; `OpenAIProvider` holds `AsyncOpenAI` with no close (contrast
+   `AudioAnalyzer.aclose`). Resource leak across many live runs — fix before Phase 3 volume.
+3. **Cache-key temperature gaps.** `group_planner/orchestrator.py:141` and
+   `holistic.py:158` hash model+reasoning+prompts but **omit temperature** (MH/macro
+   include it). Changing only temperature reuses a stale plan — **directly threatens the
+   determinism of the Phase 2 replay E2E**; account for it in the replay harness.
+4. **No `trace_id` anywhere** despite `.cursorrules` requiring "logging with trace_id".
+   Token tracking **is** wired (providers → `AsyncAgentRunner` → `AsyncFileLogger`), but
+   `core/logging`'s JSON/YAML/Null loggers are orphaned. Observability rule partially unmet.
+
+### Real (non-benign) code gaps in the deterministic core
+
+- `curves/functions/basic.py:163` — `generate_triangle(phase=...)` accepts but never applies
+  `phase` (TODO); phase-shifted triangles are silently unphased.
+- `moving_heads/handlers/geometry/role_pose.py:37` — handler registered as `"ROLE_POSE"`
+  but looked up as `"role_pose"`; works only via the default-handler fallback (latent break
+  if defaults are cleaned up).
+- `handlers/dimmers/default.py:116` — dimmer period uses song-average `ms_per_bar` while
+  placement uses detected bar spans → cycle-count drift under tempo change (duplication-
+  collapse remnant).
+- Transition segments are appended after section compile (`moving_heads/pipeline.py:316`)
+  without punching holes in the overlapped source/target window — possible double-coverage
+  at export under unified emission (**verify in Phase 1 `.xsq` parity**).
+- `reporting/evaluation/generator.py:327` — `max_concurrent_layers=0  # TODO: compute`
+  (summary metric never computed).
+- `io/impl_real.py:74,126` — deprecated `asyncio.get_event_loop()` (should be
+  `get_running_loop()`).
+
+### Dead code / orphans (P4-T3/T4 tail — candidates for a future cleanup wave, NOT this change)
+
+Confirmed no production callers: `EffectDBRegistry` and `PaletteDBRegistry` (duplicate the
+live `PositionalRegistry`), sync `ApiClient` + `auth.py` + `pagination.py`, several
+`XLightsAutomationClient` methods (`render_preview`/`check_sequence`/`get_views`),
+`NativeCurveType`, `core/logging` JSON/YAML/Null loggers, `agents/context` shapers
+(`BaseContextShaper.shape` raises `NotImplementedError`), FE `style_transfer`/`embeddings`/
+`music_library_indexer` (test-only), empty `api/llm/`, `utils/video_demo.py`, `PlaybackPlan`,
+`resolve_effect`, `PoseConfig`/`resolve_pose`, `is_pose_safe`/`get_standard_pose`
+(implemented, tests-only), `compute_fingerprint`. Also `AgentSpec.token_budget` is dead
+config (never read by the runner; the working budget is `IterationConfig.token_budget`).
+
+### Marker-count hotspots were mostly benign
+
+The earlier grep hotspots (`recipe_compiler.py` 7, `moving_heads/models.py` 14,
+`models/transition.py` 3, `delivery.py` 3, `three_arm.py` 6) are **false positives** on
+inspection — docstring ellipses, `tuple[...]` annotations, Pydantic validators
+(`raise ValueError`), an intentional placeholder-effect compatibility shim, and the
+`ExperimentPreconditions` fail-closed protocol gates. Not unfinished code.
+
+### Assets / recipe-builder notes
+
+Assets subsystem is opt-in with hard cost caps (`enabled=False`, ≤1 image/run, $0.20 est,
+low quality, single provider attempt) — safe. Minor: `text_lyric` documented but no
+`TEXT_LYRIC` category; `_derive_style_tags` hardcodes Christmas tags for unknown themes.
