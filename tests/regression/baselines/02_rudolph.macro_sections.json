@@ -1,0 +1,571 @@
+[
+  {
+    "section": {
+      "section_id": "intro",
+      "name": "intro",
+      "start_ms": 0,
+      "end_ms": 400
+    },
+    "theme": {
+      "theme_id": "theme.holiday.traditional",
+      "scope": "SECTION",
+      "tags": [
+        "pickup",
+        "snap_in"
+      ],
+      "palette_id": null
+    },
+    "energy_target": "LOW",
+    "primary_focus_targets": [
+      {
+        "type": "group",
+        "id": "MEGA_TREE"
+      }
+    ],
+    "secondary_targets": [
+      {
+        "type": "group",
+        "id": "OUTLINE"
+      },
+      {
+        "type": "group",
+        "id": "STARS"
+      }
+    ],
+    "choreography_style": "HYBRID",
+    "palette": null,
+    "motif_ids": [
+      "radial_rays",
+      "sparkles",
+      "candy_stripes"
+    ],
+    "motion_density": "SPARSE",
+    "notes": "Pickup only (0.0\u20130.4s): no fade-in. Hold near-dark or a single tiny \u2018spark\u2019 on MEGA_TREE/STARS, then hard snap at ~0.4s into the full chorus look so the first downbeat feels like the show turning on."
+  },
+  {
+    "section": {
+      "section_id": "chorus_1",
+      "name": "chorus",
+      "start_ms": 400,
+      "end_ms": 23800
+    },
+    "theme": {
+      "theme_id": "theme.holiday.traditional",
+      "scope": "SECTION",
+      "tags": [
+        "hero_hook",
+        "big_read"
+      ],
+      "palette_id": null
+    },
+    "energy_target": "HIGH",
+    "primary_focus_targets": [
+      {
+        "type": "group",
+        "id": "MEGA_TREE"
+      },
+      {
+        "type": "zone",
+        "id": "YARD"
+      }
+    ],
+    "secondary_targets": [
+      {
+        "type": "group",
+        "id": "OUTLINE"
+      },
+      {
+        "type": "group",
+        "id": "STARS"
+      },
+      {
+        "type": "group",
+        "id": "ARCHES"
+      },
+      {
+        "type": "group",
+        "id": "CANDY_CANES"
+      }
+    ],
+    "choreography_style": "IMAGERY",
+    "palette": null,
+    "motif_ids": [
+      "candy_stripes",
+      "radial_rays",
+      "sparkles"
+    ],
+    "motion_density": "BUSY",
+    "notes": "Establish the signature: candy_stripes drive on ARCHES/CANDY_CANES with MEGA_TREE as the hero. Use radial_rays from MEGA_TREE and/or STARS as the \u2018Rudolph nose beacon\u2019 on hook lines. When the section hits the documented energy whiplash drop (within 0.4\u201323.8s), use an explicit cut to a simpler base (OUTLINE/ICICLES steady) while keeping a single warm beacon on MEGA_TREE so the drop reads intentional, not like a glitch."
+  },
+  {
+    "section": {
+      "section_id": "break_1",
+      "name": "break",
+      "start_ms": 23800,
+      "end_ms": 39800
+    },
+    "theme": {
+      "theme_id": "theme.holiday.winter_modern",
+      "scope": "SECTION",
+      "tags": [
+        "setting.storm",
+        "contrast.reset"
+      ],
+      "palette_id": null
+    },
+    "energy_target": "RELEASE",
+    "primary_focus_targets": [
+      {
+        "type": "group",
+        "id": "SNOWFLAKES"
+      },
+      {
+        "type": "zone",
+        "id": "ROOF"
+      }
+    ],
+    "secondary_targets": [
+      {
+        "type": "group",
+        "id": "ICICLES"
+      },
+      {
+        "type": "group",
+        "id": "MATRIX"
+      },
+      {
+        "type": "group",
+        "id": "MEGA_TREE"
+      }
+    ],
+    "choreography_style": "HYBRID",
+    "palette": {
+      "palette_id": "core.mono_cool",
+      "role": "COOL",
+      "intensity": 0.9,
+      "variant": null
+    },
+    "motif_ids": [
+      "snowflakes",
+      "sparkles",
+      "radial_rays"
+    ],
+    "motion_density": "MED",
+    "notes": "Intentional scene flip to \u2018stormy night\u2019: apply core.mono_cool primarily to ROOF (ICICLES/OUTLINE) + SNOWFLAKES + MATRIX. Keep MEGA_TREE as a warm/peppermint-leaning hero beacon (radial_rays) so the story anchor stays visible. Use controlled sparkles as icy glints, not full-noise twinkle."
+  },
+  {
+    "section": {
+      "section_id": "chorus_2",
+      "name": "chorus",
+      "start_ms": 39800,
+      "end_ms": 57700
+    },
+    "theme": {
+      "theme_id": "theme.holiday.traditional",
+      "scope": "SECTION",
+      "tags": [
+        "return",
+        "bigger_beacon"
+      ],
+      "palette_id": null
+    },
+    "energy_target": "PEAK",
+    "primary_focus_targets": [
+      {
+        "type": "group",
+        "id": "MEGA_TREE"
+      },
+      {
+        "type": "group",
+        "id": "STARS"
+      }
+    ],
+    "secondary_targets": [
+      {
+        "type": "zone",
+        "id": "HOUSE"
+      },
+      {
+        "type": "group",
+        "id": "ARCHES"
+      },
+      {
+        "type": "group",
+        "id": "CANDY_CANES"
+      },
+      {
+        "type": "group",
+        "id": "WREATHS"
+      }
+    ],
+    "choreography_style": "IMAGERY",
+    "palette": null,
+    "motif_ids": [
+      "candy_stripes",
+      "radial_rays",
+      "sparkles"
+    ],
+    "motion_density": "BUSY",
+    "notes": "Big return to full classic color. Make the beacon unmistakable: radial_rays should originate from MEGA_TREE and \u2018answer\u2019 on STARS/WREATHS for call-and-response. Keep stripes bold on arches/canes to maintain the song\u2019s fast 2/4 drive."
+  },
+  {
+    "section": {
+      "section_id": "break_2",
+      "name": "break",
+      "start_ms": 57700,
+      "end_ms": 78000
+    },
+    "theme": {
+      "theme_id": "theme.holiday.peppermint",
+      "scope": "SECTION",
+      "tags": [
+        "playful",
+        "reindeer_games"
+      ],
+      "palette_id": null
+    },
+    "energy_target": "MED",
+    "primary_focus_targets": [
+      {
+        "type": "group",
+        "id": "ARCHES"
+      },
+      {
+        "type": "group",
+        "id": "CANDY_CANES"
+      }
+    ],
+    "secondary_targets": [
+      {
+        "type": "group",
+        "id": "MATRIX"
+      },
+      {
+        "type": "group",
+        "id": "WINDOWS"
+      },
+      {
+        "type": "group",
+        "id": "MEGA_TREE"
+      }
+    ],
+    "choreography_style": "HYBRID",
+    "palette": {
+      "palette_id": "core.peppermint",
+      "role": "ACCENT",
+      "intensity": 1.0,
+      "variant": null
+    },
+    "motif_ids": [
+      "candy_stripes",
+      "sparkles",
+      "radial_rays"
+    ],
+    "motion_density": "MED",
+    "notes": "Peppermint \u2018games\u2019 interlude: apply core.peppermint mainly to RHYTHM layer targets (ARCHES/CANDY_CANES/MEGA_TREE stripes) while BASE stays largely on core.christmas_traditional for readability. Use occasional beacon pops (radial_rays) as comedic punctuation rather than constant blasts."
+  },
+  {
+    "section": {
+      "section_id": "verse_1",
+      "name": "verse",
+      "start_ms": 78000,
+      "end_ms": 94000
+    },
+    "theme": {
+      "theme_id": "theme.holiday.traditional",
+      "scope": "SECTION",
+      "tags": [
+        "story",
+        "space_for_lyrics"
+      ],
+      "palette_id": null
+    },
+    "energy_target": "MED",
+    "primary_focus_targets": [
+      {
+        "type": "zone",
+        "id": "HOUSE"
+      }
+    ],
+    "secondary_targets": [
+      {
+        "type": "group",
+        "id": "WINDOWS"
+      },
+      {
+        "type": "group",
+        "id": "WREATHS"
+      },
+      {
+        "type": "group",
+        "id": "MEGA_TREE"
+      }
+    ],
+    "choreography_style": "ABSTRACT",
+    "palette": null,
+    "motif_ids": [
+      "candy_stripes",
+      "sparkles",
+      "radial_rays"
+    ],
+    "motion_density": "MED",
+    "notes": "Verse clarity: let HOUSE (OUTLINE/ICICLES/WINDOWS) carry the narrative with slower, larger candy_stripes shifts while MEGA_TREE holds a steady warm \u2018nose\u2019 presence. Sparkles are occasional, placed on WREATHS/STARS to keep attention without drowning lyrics."
+  },
+  {
+    "section": {
+      "section_id": "verse_2",
+      "name": "verse",
+      "start_ms": 94000,
+      "end_ms": 118600
+    },
+    "theme": {
+      "theme_id": "theme.holiday.traditional",
+      "scope": "SECTION",
+      "tags": [
+        "build",
+        "wider_stage"
+      ],
+      "palette_id": null
+    },
+    "energy_target": "BUILD",
+    "primary_focus_targets": [
+      {
+        "type": "zone",
+        "id": "PERIMETER"
+      },
+      {
+        "type": "group",
+        "id": "MEGA_TREE"
+      }
+    ],
+    "secondary_targets": [
+      {
+        "type": "group",
+        "id": "TREES"
+      },
+      {
+        "type": "group",
+        "id": "ARCHES"
+      },
+      {
+        "type": "group",
+        "id": "STARS"
+      }
+    ],
+    "choreography_style": "HYBRID",
+    "palette": null,
+    "motif_ids": [
+      "candy_stripes",
+      "radial_rays",
+      "light_trails"
+    ],
+    "motion_density": "BUSY",
+    "notes": "Widen from house to whole yard: introduce light_trails sweeping across TREES/ARCHES while MEGA_TREE begins more frequent beacon answers (radial_rays). This is the \u2018getting ready for the big moment\u2019 ramp\u2014more motion than verse_1 but still readable."
+  },
+  {
+    "section": {
+      "section_id": "verse_3",
+      "name": "verse",
+      "start_ms": 118600,
+      "end_ms": 132900
+    },
+    "theme": {
+      "theme_id": "theme.holiday.winter_modern",
+      "scope": "SECTION",
+      "tags": [
+        "hard_drop",
+        "night_cold"
+      ],
+      "palette_id": null
+    },
+    "energy_target": "RELEASE",
+    "primary_focus_targets": [
+      {
+        "type": "group",
+        "id": "ICICLES"
+      },
+      {
+        "type": "group",
+        "id": "SNOWFLAKES"
+      }
+    ],
+    "secondary_targets": [
+      {
+        "type": "group",
+        "id": "OUTLINE"
+      },
+      {
+        "type": "group",
+        "id": "MEGA_TREE"
+      }
+    ],
+    "choreography_style": "HYBRID",
+    "palette": {
+      "palette_id": "core.mono_cool",
+      "role": "COOL",
+      "intensity": 0.9,
+      "variant": null
+    },
+    "motif_ids": [
+      "snowflakes",
+      "sparkles",
+      "radial_rays"
+    ],
+    "motion_density": "SPARSE",
+    "notes": "Honor the documented whiplash drop inside this section (118.6\u2013132.9s): do a deliberate cut to a cold, sparse \u2018night\u2019 tableau (core.mono_cool on ICICLES/OUTLINE/SNOWFLAKES). Keep one warm beacon element alive on MEGA_TREE (radial_rays) so the audience still \u2018sees Rudolph\u2019 through the storm."
+  },
+  {
+    "section": {
+      "section_id": "verse_4",
+      "name": "verse",
+      "start_ms": 132900,
+      "end_ms": 159800
+    },
+    "theme": {
+      "theme_id": "theme.mood.triumphant",
+      "scope": "SECTION",
+      "tags": [
+        "hero_rise",
+        "lead_the_way"
+      ],
+      "palette_id": null
+    },
+    "energy_target": "BUILD",
+    "primary_focus_targets": [
+      {
+        "type": "group",
+        "id": "MEGA_TREE"
+      },
+      {
+        "type": "split",
+        "id": "HALVES_LEFT"
+      }
+    ],
+    "secondary_targets": [
+      {
+        "type": "split",
+        "id": "HALVES_RIGHT"
+      },
+      {
+        "type": "group",
+        "id": "STARS"
+      },
+      {
+        "type": "zone",
+        "id": "YARD"
+      }
+    ],
+    "choreography_style": "IMAGERY",
+    "palette": null,
+    "motif_ids": [
+      "radial_rays",
+      "light_trails",
+      "candy_stripes"
+    ],
+    "motion_density": "BUSY",
+    "notes": "Triumphant lift back to warm classic: reintroduce full core.christmas_traditional scene with MEGA_TREE as the clear leader. Use split-based staging (HALVES_LEFT then HALVES_RIGHT) to make the yard \u2018follow\u2019 the beacon in waves, setting up the big late-song peak window."
+  },
+  {
+    "section": {
+      "section_id": "instrumental",
+      "name": "instrumental",
+      "start_ms": 159800,
+      "end_ms": 186600
+    },
+    "theme": {
+      "theme_id": "theme.holiday.traditional",
+      "scope": "SECTION",
+      "tags": [
+        "finale_run",
+        "peak_stack"
+      ],
+      "palette_id": null
+    },
+    "energy_target": "PEAK",
+    "primary_focus_targets": [
+      {
+        "type": "zone",
+        "id": "YARD"
+      },
+      {
+        "type": "group",
+        "id": "MEGA_TREE"
+      }
+    ],
+    "secondary_targets": [
+      {
+        "type": "group",
+        "id": "ARCHES"
+      },
+      {
+        "type": "group",
+        "id": "TREES"
+      },
+      {
+        "type": "group",
+        "id": "STARS"
+      },
+      {
+        "type": "group",
+        "id": "MATRIX"
+      }
+    ],
+    "choreography_style": "HYBRID",
+    "palette": {
+      "palette_id": "spec.fire_ice",
+      "role": "ACCENT",
+      "intensity": 1.0,
+      "variant": null
+    },
+    "motif_ids": [
+      "light_trails",
+      "radial_rays",
+      "sparkles"
+    ],
+    "motion_density": "BUSY",
+    "notes": "Victory lap with the song\u2019s biggest movement. Keep BASE largely on core.christmas_traditional for \u2018Christmas identity\u2019, and use spec.fire_ice as an ACCENT-only punch on peaks across MEGA_TREE/ARCHES/STARS (not a full-scene recolor). Explicitly feature the detected peaks inside this section: 162.4\u2013167.5s and 172.7\u2013177.8s should get the largest radial_rays + sparkle hits with fast, clean light_trails sweeps across the yard."
+  },
+  {
+    "section": {
+      "section_id": "outro",
+      "name": "outro",
+      "start_ms": 186600,
+      "end_ms": 190400
+    },
+    "theme": {
+      "theme_id": "theme.holiday.traditional",
+      "scope": "SECTION",
+      "tags": [
+        "button_end",
+        "snap_off"
+      ],
+      "palette_id": null
+    },
+    "energy_target": "RELEASE",
+    "primary_focus_targets": [
+      {
+        "type": "group",
+        "id": "MEGA_TREE"
+      }
+    ],
+    "secondary_targets": [
+      {
+        "type": "group",
+        "id": "OUTLINE"
+      },
+      {
+        "type": "group",
+        "id": "STARS"
+      }
+    ],
+    "choreography_style": "HYBRID",
+    "palette": null,
+    "motif_ids": [
+      "radial_rays",
+      "sparkles",
+      "candy_stripes"
+    ],
+    "motion_density": "SPARSE",
+    "notes": "Fast power-down (186.6\u2013190.4s): do a final clean beacon flash (radial_rays) from MEGA_TREE with a single sparkle punctuation on STARS, then snap to black quickly (no long tail) to match the audio hitting near-zero by ~187.1s and staying there."
+  }
+]

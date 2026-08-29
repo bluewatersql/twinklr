@@ -1,0 +1,4208 @@
+{
+  "schema_version": "group-plan-set.v1",
+  "plan_set_id": "02_rudolph_the_red_nosed_reindeer_group_plan",
+  "section_plans": [
+    {
+      "schema_version": "section-coordination-plan.v1",
+      "section_id": "intro",
+      "theme": {
+        "theme_id": "theme.holiday.traditional",
+        "scope": "SECTION",
+        "tags": [
+          "pickup",
+          "snap_in"
+        ],
+        "palette_id": null
+      },
+      "motif_ids": [
+        "radial_rays",
+        "sparkles",
+        "candy_stripes"
+      ],
+      "palette": {
+        "palette_id": "core.christmas_traditional",
+        "role": null,
+        "intensity": null,
+        "variant": null
+      },
+      "lane_plans": [
+        {
+          "lane": "ACCENT",
+          "target_roles": [
+            "HERO"
+          ],
+          "timing_driver": "BEATS",
+          "blend_mode": "add",
+          "coordination_plans": [
+            {
+              "coordination_mode": "UNIFIED",
+              "targets": [
+                {
+                  "type": "group",
+                  "id": "MEGA_TREE"
+                }
+              ],
+              "placements": [
+                {
+                  "placement_id": "accent_intro_megatree_spark_hit_b1",
+                  "target": {
+                    "type": "group",
+                    "id": "MEGA_TREE"
+                  },
+                  "template_id": "gtpl_accent_motif_sparkles_hit_small",
+                  "start": {
+                    "bar": 1,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "HIT",
+                  "param_overrides": {},
+                  "intensity": "MED",
+                  "resolved_asset_ids": []
+                }
+              ],
+              "window": null,
+              "config": null
+            }
+          ]
+        }
+      ],
+      "deviations": [
+        {
+          "deviation_id": "dev_intro_skip_base_rhythm_due_to_pickup",
+          "intent_field": "lane_plans(BASE,RHYTHM)",
+          "reason": "Section is a very short pickup (< 1 bar); per section instructions, skip BASE and RHYTHM and avoid SECTION-duration beds to preserve the hard snap into the next section.",
+          "mitigation": "Use a single ACCENT HIT on MEGA_TREE at bar 1 beat 1 to create a tiny spark without implying a sustained look."
+        }
+      ],
+      "narrative_assets": [],
+      "planning_notes": "Pickup-only: keep near-dark; single small sparkles HIT on MEGA_TREE at the section start, then allow the next section to hard-snap into the full chorus look.",
+      "start_ms": 0,
+      "end_ms": 400
+    },
+    {
+      "schema_version": "section-coordination-plan.v1",
+      "section_id": "chorus_1",
+      "theme": {
+        "theme_id": "theme.holiday.traditional",
+        "scope": "SECTION",
+        "tags": [
+          "hero_hook",
+          "big_read"
+        ],
+        "palette_id": null
+      },
+      "motif_ids": [
+        "candy_stripes",
+        "radial_rays",
+        "sparkles"
+      ],
+      "palette": {
+        "palette_id": "core.christmas_traditional",
+        "role": null,
+        "intensity": null,
+        "variant": null
+      },
+      "lane_plans": [
+        {
+          "lane": "BASE",
+          "target_roles": [
+            "BACKGROUND"
+          ],
+          "timing_driver": "BARS",
+          "blend_mode": "add",
+          "coordination_plans": [
+            {
+              "coordination_mode": "UNIFIED",
+              "targets": [
+                {
+                  "type": "group",
+                  "id": "OUTLINE"
+                },
+                {
+                  "type": "group",
+                  "id": "WINDOWS"
+                }
+              ],
+              "placements": [
+                {
+                  "placement_id": "base_outline_glow_soft",
+                  "target": {
+                    "type": "group",
+                    "id": "OUTLINE"
+                  },
+                  "template_id": "gtpl_base_glow_cool",
+                  "start": {
+                    "bar": 1,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "SECTION",
+                  "param_overrides": {},
+                  "intensity": "SOFT",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "base_windows_sparkles_med",
+                  "target": {
+                    "type": "group",
+                    "id": "WINDOWS"
+                  },
+                  "template_id": "gtpl_base_motif_sparkles_ambient",
+                  "start": {
+                    "bar": 1,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "SECTION",
+                  "param_overrides": {},
+                  "intensity": "MED",
+                  "resolved_asset_ids": []
+                }
+              ],
+              "window": null,
+              "config": null
+            }
+          ]
+        },
+        {
+          "lane": "RHYTHM",
+          "target_roles": [
+            "MID"
+          ],
+          "timing_driver": "BEATS",
+          "blend_mode": "add",
+          "coordination_plans": [
+            {
+              "coordination_mode": "SEQUENCED",
+              "targets": [
+                {
+                  "type": "group",
+                  "id": "ARCHES"
+                },
+                {
+                  "type": "group",
+                  "id": "CANDY_CANES"
+                },
+                {
+                  "type": "group",
+                  "id": "TREES"
+                },
+                {
+                  "type": "group",
+                  "id": "MEGA_TREE"
+                }
+              ],
+              "placements": [],
+              "window": {
+                "start": {
+                  "bar": 1,
+                  "beat": 1,
+                  "timing_hint": "ON_BEAT"
+                },
+                "end": {
+                  "bar": 28,
+                  "beat": 1,
+                  "timing_hint": "ON_BEAT"
+                },
+                "template_id": "gtpl_rhythm_motif_candy_stripes_drive",
+                "param_overrides": {},
+                "intensity": "STRONG"
+              },
+              "config": {
+                "group_order": [
+                  "ARCHES",
+                  "CANDY_CANES",
+                  "TREES",
+                  "MEGA_TREE"
+                ],
+                "step_unit": "BEAT",
+                "step_duration": 2,
+                "phase_offset": 0.0,
+                "spill_policy": "TRUNCATE",
+                "spatial_intent": "L2R"
+              }
+            },
+            {
+              "coordination_mode": "UNIFIED",
+              "targets": [
+                {
+                  "type": "group",
+                  "id": "FLOODS"
+                }
+              ],
+              "placements": [
+                {
+                  "placement_id": "rhythm_floods_pulse_support",
+                  "target": {
+                    "type": "group",
+                    "id": "FLOODS"
+                  },
+                  "template_id": "gtpl_rhythm_sparkle_offbeat",
+                  "start": {
+                    "bar": 1,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "EXTENDED",
+                  "param_overrides": {},
+                  "intensity": "MED",
+                  "resolved_asset_ids": []
+                }
+              ],
+              "window": null,
+              "config": null
+            }
+          ]
+        },
+        {
+          "lane": "ACCENT",
+          "target_roles": [
+            "HERO"
+          ],
+          "timing_driver": "BEATS",
+          "blend_mode": "add",
+          "coordination_plans": [
+            {
+              "coordination_mode": "UNIFIED",
+              "targets": [
+                {
+                  "type": "group",
+                  "id": "MEGA_TREE"
+                }
+              ],
+              "placements": [
+                {
+                  "placement_id": "accent_megatree_beacon_1",
+                  "target": {
+                    "type": "group",
+                    "id": "MEGA_TREE"
+                  },
+                  "template_id": "gtpl_accent_motif_radial_rays_hit_big",
+                  "start": {
+                    "bar": 2,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "HIT",
+                  "param_overrides": {},
+                  "intensity": "PEAK",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "accent_megatree_beacon_2",
+                  "target": {
+                    "type": "group",
+                    "id": "MEGA_TREE"
+                  },
+                  "template_id": "gtpl_accent_motif_radial_rays_hit_big",
+                  "start": {
+                    "bar": 6,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "HIT",
+                  "param_overrides": {},
+                  "intensity": "PEAK",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "accent_megatree_beacon_3_drop",
+                  "target": {
+                    "type": "group",
+                    "id": "MEGA_TREE"
+                  },
+                  "template_id": "gtpl_accent_motif_radial_rays_hit_small",
+                  "start": {
+                    "bar": 12,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "HIT",
+                  "param_overrides": {
+                    "beacon_intent": "warm_hold"
+                  },
+                  "intensity": "STRONG",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "accent_megatree_beacon_4",
+                  "target": {
+                    "type": "group",
+                    "id": "MEGA_TREE"
+                  },
+                  "template_id": "gtpl_accent_motif_radial_rays_hit_big",
+                  "start": {
+                    "bar": 16,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "HIT",
+                  "param_overrides": {},
+                  "intensity": "PEAK",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "accent_megatree_beacon_5",
+                  "target": {
+                    "type": "group",
+                    "id": "MEGA_TREE"
+                  },
+                  "template_id": "gtpl_accent_motif_radial_rays_hit_big",
+                  "start": {
+                    "bar": 20,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "HIT",
+                  "param_overrides": {},
+                  "intensity": "PEAK",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "accent_megatree_beacon_6",
+                  "target": {
+                    "type": "group",
+                    "id": "MEGA_TREE"
+                  },
+                  "template_id": "gtpl_accent_motif_radial_rays_hit_big",
+                  "start": {
+                    "bar": 24,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "HIT",
+                  "param_overrides": {},
+                  "intensity": "PEAK",
+                  "resolved_asset_ids": []
+                }
+              ],
+              "window": null,
+              "config": null
+            },
+            {
+              "coordination_mode": "COMPLEMENTARY",
+              "targets": [
+                {
+                  "type": "group",
+                  "id": "MATRIX"
+                },
+                {
+                  "type": "group",
+                  "id": "SNOWFLAKES"
+                },
+                {
+                  "type": "group",
+                  "id": "STARS"
+                }
+              ],
+              "placements": [
+                {
+                  "placement_id": "accent_matrix_candy_hit_1",
+                  "target": {
+                    "type": "group",
+                    "id": "MATRIX"
+                  },
+                  "template_id": "gtpl_accent_motif_candy_stripes_hit_big",
+                  "start": {
+                    "bar": 3,
+                    "beat": 3,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "BURST",
+                  "param_overrides": {},
+                  "intensity": "STRONG",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "accent_snowflakes_sparkle_hit_1",
+                  "target": {
+                    "type": "group",
+                    "id": "SNOWFLAKES"
+                  },
+                  "template_id": "gtpl_accent_motif_sparkles_hit_small",
+                  "start": {
+                    "bar": 5,
+                    "beat": 3,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "HIT",
+                  "param_overrides": {},
+                  "intensity": "STRONG",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "accent_stars_hit_1",
+                  "target": {
+                    "type": "group",
+                    "id": "STARS"
+                  },
+                  "template_id": "gtpl_accent_motif_stars_hit_small",
+                  "start": {
+                    "bar": 7,
+                    "beat": 3,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "HIT",
+                  "param_overrides": {},
+                  "intensity": "STRONG",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "accent_matrix_candy_hit_2",
+                  "target": {
+                    "type": "group",
+                    "id": "MATRIX"
+                  },
+                  "template_id": "gtpl_accent_motif_candy_stripes_hit_small",
+                  "start": {
+                    "bar": 13,
+                    "beat": 3,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "BURST",
+                  "param_overrides": {
+                    "drop_simplify": true
+                  },
+                  "intensity": "MED",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "accent_snowflakes_rays_hit_2",
+                  "target": {
+                    "type": "group",
+                    "id": "SNOWFLAKES"
+                  },
+                  "template_id": "gtpl_accent_motif_radial_rays_hit_small",
+                  "start": {
+                    "bar": 17,
+                    "beat": 3,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "HIT",
+                  "param_overrides": {},
+                  "intensity": "STRONG",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "accent_stars_hit_2",
+                  "target": {
+                    "type": "group",
+                    "id": "STARS"
+                  },
+                  "template_id": "gtpl_accent_motif_stars_hit_big",
+                  "start": {
+                    "bar": 21,
+                    "beat": 3,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "HIT",
+                  "param_overrides": {},
+                  "intensity": "STRONG",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "accent_snowflakes_sparkle_hit_3",
+                  "target": {
+                    "type": "group",
+                    "id": "SNOWFLAKES"
+                  },
+                  "template_id": "gtpl_accent_motif_sparkles_hit_big",
+                  "start": {
+                    "bar": 25,
+                    "beat": 3,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "HIT",
+                  "param_overrides": {},
+                  "intensity": "STRONG",
+                  "resolved_asset_ids": []
+                }
+              ],
+              "window": null,
+              "config": null
+            }
+          ]
+        }
+      ],
+      "deviations": [],
+      "narrative_assets": [],
+      "planning_notes": "HIGH/BUSY/IMAGERY chorus: continuous candy_stripes SEQUENCED engine across ARCHES\u2192CANDY_CANES\u2192TREES\u2192MEGA_TREE (2-beat steps, L\u2192R intent). BASE keeps OUTLINE readable with cool glow and WINDOWS with soft sparkles. ACCENT reserves PEAK only for MEGA_TREE radial_rays 'beacon' hits (one group at PEAK per beat), with staggered complementary accents on MATRIX/SNOWFLAKES/STARS; a mid-section simplified moment is implied by reduced intensities/overrides while keeping MEGA_TREE beacon so any energy-whiplash drop reads intentional.",
+      "start_ms": 400,
+      "end_ms": 23800
+    },
+    {
+      "schema_version": "section-coordination-plan.v1",
+      "section_id": "break_1",
+      "theme": {
+        "theme_id": "theme.holiday.winter_modern",
+        "scope": "SECTION",
+        "tags": [
+          "setting.storm",
+          "contrast.reset"
+        ],
+        "palette_id": null
+      },
+      "motif_ids": [
+        "snowflakes",
+        "sparkles",
+        "radial_rays"
+      ],
+      "palette": {
+        "palette_id": "core.mono_cool",
+        "role": "COOL",
+        "intensity": 0.9,
+        "variant": null
+      },
+      "lane_plans": [
+        {
+          "lane": "BASE",
+          "target_roles": [
+            "BACKGROUND"
+          ],
+          "timing_driver": "BARS",
+          "blend_mode": "alpha_over",
+          "coordination_plans": [
+            {
+              "coordination_mode": "UNIFIED",
+              "targets": [
+                {
+                  "type": "group",
+                  "id": "OUTLINE"
+                },
+                {
+                  "type": "group",
+                  "id": "ICICLES"
+                },
+                {
+                  "type": "group",
+                  "id": "TREES"
+                },
+                {
+                  "type": "group",
+                  "id": "FLOODS"
+                },
+                {
+                  "type": "group",
+                  "id": "WINDOWS"
+                },
+                {
+                  "type": "group",
+                  "id": "SNOWFLAKES"
+                },
+                {
+                  "type": "group",
+                  "id": "STARS"
+                },
+                {
+                  "type": "group",
+                  "id": "MATRIX"
+                },
+                {
+                  "type": "group",
+                  "id": "MEGA_TREE"
+                }
+              ],
+              "placements": [
+                {
+                  "placement_id": "base_house_windows_cool_bokeh",
+                  "target": {
+                    "type": "group",
+                    "id": "WINDOWS"
+                  },
+                  "template_id": "gtpl_base_motif_bokeh_ambient",
+                  "start": {
+                    "bar": 1,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "SECTION",
+                  "param_overrides": {},
+                  "intensity": "WHISPER",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "base_matrix_cool_crystals",
+                  "target": {
+                    "type": "group",
+                    "id": "MATRIX"
+                  },
+                  "template_id": "gtpl_base_motif_crystals_ambient",
+                  "start": {
+                    "bar": 1,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "SECTION",
+                  "param_overrides": {},
+                  "intensity": "SOFT",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "base_megatree_anchor_radial_rays_ambient",
+                  "target": {
+                    "type": "group",
+                    "id": "MEGA_TREE"
+                  },
+                  "template_id": "gtpl_base_motif_radial_rays_ambient",
+                  "start": {
+                    "bar": 1,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "SECTION",
+                  "param_overrides": {
+                    "palette_bias": "warm_peppermint"
+                  },
+                  "intensity": "SOFT",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "base_primary_snowflakes_cool_snowflakes",
+                  "target": {
+                    "type": "group",
+                    "id": "SNOWFLAKES"
+                  },
+                  "template_id": "gtpl_base_motif_snowflakes_ambient",
+                  "start": {
+                    "bar": 1,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "SECTION",
+                  "param_overrides": {},
+                  "intensity": "SOFT",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "base_roof_stars_cool_stars",
+                  "target": {
+                    "type": "group",
+                    "id": "STARS"
+                  },
+                  "template_id": "gtpl_base_motif_stars_ambient",
+                  "start": {
+                    "bar": 1,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "SECTION",
+                  "param_overrides": {},
+                  "intensity": "WHISPER",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "base_storm_roof_house_cool_ice",
+                  "target": {
+                    "type": "group",
+                    "id": "OUTLINE"
+                  },
+                  "template_id": "gtpl_base_motif_ice_ambient",
+                  "start": {
+                    "bar": 1,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "SECTION",
+                  "param_overrides": {},
+                  "intensity": "SOFT",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "base_storm_roof_icicles_cool_ice",
+                  "target": {
+                    "type": "group",
+                    "id": "ICICLES"
+                  },
+                  "template_id": "gtpl_base_motif_ice_ambient",
+                  "start": {
+                    "bar": 1,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "SECTION",
+                  "param_overrides": {},
+                  "intensity": "SOFT",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "base_yard_floods_cool_wash_soft",
+                  "target": {
+                    "type": "group",
+                    "id": "FLOODS"
+                  },
+                  "template_id": "gtpl_base_wash_soft",
+                  "start": {
+                    "bar": 1,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "SECTION",
+                  "param_overrides": {},
+                  "intensity": "WHISPER",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "base_yard_trees_cool_snow_haze_low",
+                  "target": {
+                    "type": "group",
+                    "id": "TREES"
+                  },
+                  "template_id": "gtpl_base_snow_haze_low",
+                  "start": {
+                    "bar": 1,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "SECTION",
+                  "param_overrides": {},
+                  "intensity": "WHISPER",
+                  "resolved_asset_ids": []
+                }
+              ],
+              "window": null,
+              "config": null
+            }
+          ]
+        },
+        {
+          "lane": "RHYTHM",
+          "target_roles": [
+            "MID"
+          ],
+          "timing_driver": "BEATS",
+          "blend_mode": "add",
+          "coordination_plans": [
+            {
+              "coordination_mode": "COMPLEMENTARY",
+              "targets": [
+                {
+                  "type": "group",
+                  "id": "ARCHES"
+                },
+                {
+                  "type": "group",
+                  "id": "CANDY_CANES"
+                },
+                {
+                  "type": "group",
+                  "id": "TREES"
+                },
+                {
+                  "type": "group",
+                  "id": "MEGA_TREE"
+                }
+              ],
+              "placements": [
+                {
+                  "placement_id": "rhythm_arches_abstract_drive_release",
+                  "target": {
+                    "type": "group",
+                    "id": "ARCHES"
+                  },
+                  "template_id": "gtpl_rhythm_motif_abstract_drive",
+                  "start": {
+                    "bar": 1,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "EXTENDED",
+                  "param_overrides": {},
+                  "intensity": "SOFT",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "rhythm_canes_sparkles_drive_icy_glints",
+                  "target": {
+                    "type": "group",
+                    "id": "CANDY_CANES"
+                  },
+                  "template_id": "gtpl_rhythm_motif_sparkles_drive",
+                  "start": {
+                    "bar": 1,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "EXTENDED",
+                  "param_overrides": {
+                    "sparkle_density": "low"
+                  },
+                  "intensity": "SOFT",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "rhythm_megatree_radial_rays_drive_beacon",
+                  "target": {
+                    "type": "group",
+                    "id": "MEGA_TREE"
+                  },
+                  "template_id": "gtpl_rhythm_motif_radial_rays_drive",
+                  "start": {
+                    "bar": 1,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "EXTENDED",
+                  "param_overrides": {
+                    "palette_bias": "warm_peppermint"
+                  },
+                  "intensity": "SOFT",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "rhythm_trees_snowflakes_drive_subtle",
+                  "target": {
+                    "type": "group",
+                    "id": "TREES"
+                  },
+                  "template_id": "gtpl_rhythm_motif_snowflakes_drive",
+                  "start": {
+                    "bar": 1,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "EXTENDED",
+                  "param_overrides": {},
+                  "intensity": "SOFT",
+                  "resolved_asset_ids": []
+                }
+              ],
+              "window": null,
+              "config": null
+            }
+          ]
+        },
+        {
+          "lane": "ACCENT",
+          "target_roles": [
+            "HERO"
+          ],
+          "timing_driver": "BEATS",
+          "blend_mode": "add",
+          "coordination_plans": [
+            {
+              "coordination_mode": "UNIFIED",
+              "targets": [
+                {
+                  "type": "group",
+                  "id": "SNOWFLAKES"
+                }
+              ],
+              "placements": [
+                {
+                  "placement_id": "accent_snowflakes_hit_big_bar9",
+                  "target": {
+                    "type": "group",
+                    "id": "SNOWFLAKES"
+                  },
+                  "template_id": "gtpl_accent_motif_snowflakes_hit_big",
+                  "start": {
+                    "bar": 9,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "BURST",
+                  "param_overrides": {},
+                  "intensity": "STRONG",
+                  "resolved_asset_ids": []
+                }
+              ],
+              "window": null,
+              "config": null
+            }
+          ]
+        }
+      ],
+      "deviations": [],
+      "narrative_assets": [],
+      "planning_notes": "RELEASE: stormy-night scene flip via core.mono_cool foundation on roof/house + snowflakes + matrix. Rhythm kept SOFT/EXTENDED for readable motion without over-sparkle; MEGA_TREE maintained as warm/peppermint beacon using radial_rays. Single ACCENT burst on SNOWFLAKES (primary focus) to punctuate without turning the section into constant sparkle.",
+      "start_ms": 23800,
+      "end_ms": 39800
+    },
+    {
+      "schema_version": "section-coordination-plan.v1",
+      "section_id": "chorus_2",
+      "theme": {
+        "theme_id": "theme.holiday.traditional",
+        "scope": "SECTION",
+        "tags": [
+          "return",
+          "bigger_beacon"
+        ],
+        "palette_id": null
+      },
+      "motif_ids": [
+        "candy_stripes",
+        "radial_rays",
+        "sparkles"
+      ],
+      "palette": {
+        "palette_id": "core.christmas_traditional",
+        "role": null,
+        "intensity": null,
+        "variant": null
+      },
+      "lane_plans": [
+        {
+          "lane": "BASE",
+          "target_roles": [
+            "BACKGROUND"
+          ],
+          "timing_driver": "BARS",
+          "blend_mode": "add",
+          "coordination_plans": [
+            {
+              "coordination_mode": "UNIFIED",
+              "targets": [
+                {
+                  "type": "group",
+                  "id": "OUTLINE"
+                }
+              ],
+              "placements": [
+                {
+                  "placement_id": "base_outline_warm_scene",
+                  "target": {
+                    "type": "group",
+                    "id": "OUTLINE"
+                  },
+                  "template_id": "gtpl_base_motif_radial_rays_ambient",
+                  "start": {
+                    "bar": 1,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "SECTION",
+                  "param_overrides": {},
+                  "intensity": "SOFT",
+                  "resolved_asset_ids": []
+                }
+              ],
+              "window": null,
+              "config": null
+            },
+            {
+              "coordination_mode": "UNIFIED",
+              "targets": [
+                {
+                  "type": "group",
+                  "id": "WINDOWS"
+                }
+              ],
+              "placements": [
+                {
+                  "placement_id": "base_windows_sparkle_readability",
+                  "target": {
+                    "type": "group",
+                    "id": "WINDOWS"
+                  },
+                  "template_id": "gtpl_base_motif_sparkles_ambient",
+                  "start": {
+                    "bar": 1,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "SECTION",
+                  "param_overrides": {},
+                  "intensity": "MED",
+                  "resolved_asset_ids": []
+                }
+              ],
+              "window": null,
+              "config": null
+            }
+          ]
+        },
+        {
+          "lane": "RHYTHM",
+          "target_roles": [
+            "MID"
+          ],
+          "timing_driver": "BEATS",
+          "blend_mode": "add",
+          "coordination_plans": [
+            {
+              "coordination_mode": "SEQUENCED",
+              "targets": [
+                {
+                  "type": "group",
+                  "id": "ARCHES"
+                },
+                {
+                  "type": "group",
+                  "id": "CANDY_CANES"
+                },
+                {
+                  "type": "group",
+                  "id": "TREES"
+                },
+                {
+                  "type": "group",
+                  "id": "MEGA_TREE"
+                }
+              ],
+              "placements": [],
+              "window": {
+                "start": {
+                  "bar": 1,
+                  "beat": 1,
+                  "timing_hint": "ON_BEAT"
+                },
+                "end": {
+                  "bar": 21,
+                  "beat": 1,
+                  "timing_hint": "ON_BEAT"
+                },
+                "template_id": "gtpl_rhythm_motif_candy_stripes_drive",
+                "param_overrides": {},
+                "intensity": "STRONG"
+              },
+              "config": {
+                "group_order": [
+                  "ARCHES",
+                  "CANDY_CANES",
+                  "TREES",
+                  "MEGA_TREE"
+                ],
+                "step_unit": "BEAT",
+                "step_duration": 2,
+                "phase_offset": 0.0,
+                "spill_policy": "TRUNCATE",
+                "spatial_intent": "L2R"
+              }
+            },
+            {
+              "coordination_mode": "UNIFIED",
+              "targets": [
+                {
+                  "type": "group",
+                  "id": "ICICLES"
+                }
+              ],
+              "placements": [
+                {
+                  "placement_id": "rhythm_icicles_offbeat_sparkle",
+                  "target": {
+                    "type": "group",
+                    "id": "ICICLES"
+                  },
+                  "template_id": "gtpl_rhythm_sparkle_offbeat",
+                  "start": {
+                    "bar": 1,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "EXTENDED",
+                  "param_overrides": {},
+                  "intensity": "MED",
+                  "resolved_asset_ids": []
+                }
+              ],
+              "window": null,
+              "config": null
+            }
+          ]
+        },
+        {
+          "lane": "ACCENT",
+          "target_roles": [
+            "HERO"
+          ],
+          "timing_driver": "BEATS",
+          "blend_mode": "add",
+          "coordination_plans": [
+            {
+              "coordination_mode": "COMPLEMENTARY",
+              "targets": [
+                {
+                  "type": "group",
+                  "id": "MEGA_TREE"
+                },
+                {
+                  "type": "group",
+                  "id": "STARS"
+                },
+                {
+                  "type": "group",
+                  "id": "WREATHS"
+                }
+              ],
+              "placements": [
+                {
+                  "placement_id": "accent_megatree_beacon_rays_1",
+                  "target": {
+                    "type": "group",
+                    "id": "MEGA_TREE"
+                  },
+                  "template_id": "gtpl_accent_motif_radial_rays_hit_big",
+                  "start": {
+                    "bar": 1,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "HIT",
+                  "param_overrides": {},
+                  "intensity": "PEAK",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "accent_stars_answer_1",
+                  "target": {
+                    "type": "group",
+                    "id": "STARS"
+                  },
+                  "template_id": "gtpl_accent_motif_stars_hit_big",
+                  "start": {
+                    "bar": 1,
+                    "beat": 3,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "HIT",
+                  "param_overrides": {},
+                  "intensity": "STRONG",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "accent_wreaths_answer_1",
+                  "target": {
+                    "type": "group",
+                    "id": "WREATHS"
+                  },
+                  "template_id": "gtpl_accent_motif_sparkles_hit_small",
+                  "start": {
+                    "bar": 2,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "HIT",
+                  "param_overrides": {},
+                  "intensity": "STRONG",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "accent_megatree_beacon_rays_2",
+                  "target": {
+                    "type": "group",
+                    "id": "MEGA_TREE"
+                  },
+                  "template_id": "gtpl_accent_motif_radial_rays_hit_big",
+                  "start": {
+                    "bar": 3,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "HIT",
+                  "param_overrides": {},
+                  "intensity": "PEAK",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "accent_stars_answer_2",
+                  "target": {
+                    "type": "group",
+                    "id": "STARS"
+                  },
+                  "template_id": "gtpl_accent_motif_stars_hit_big",
+                  "start": {
+                    "bar": 3,
+                    "beat": 3,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "HIT",
+                  "param_overrides": {},
+                  "intensity": "STRONG",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "accent_wreaths_answer_2",
+                  "target": {
+                    "type": "group",
+                    "id": "WREATHS"
+                  },
+                  "template_id": "gtpl_accent_motif_sparkles_hit_small",
+                  "start": {
+                    "bar": 4,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "HIT",
+                  "param_overrides": {},
+                  "intensity": "STRONG",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "accent_megatree_beacon_rays_3",
+                  "target": {
+                    "type": "group",
+                    "id": "MEGA_TREE"
+                  },
+                  "template_id": "gtpl_accent_motif_radial_rays_hit_big",
+                  "start": {
+                    "bar": 5,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "HIT",
+                  "param_overrides": {},
+                  "intensity": "PEAK",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "accent_stars_answer_3",
+                  "target": {
+                    "type": "group",
+                    "id": "STARS"
+                  },
+                  "template_id": "gtpl_accent_motif_stars_hit_big",
+                  "start": {
+                    "bar": 5,
+                    "beat": 3,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "HIT",
+                  "param_overrides": {},
+                  "intensity": "STRONG",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "accent_wreaths_answer_3",
+                  "target": {
+                    "type": "group",
+                    "id": "WREATHS"
+                  },
+                  "template_id": "gtpl_accent_motif_sparkles_hit_small",
+                  "start": {
+                    "bar": 6,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "HIT",
+                  "param_overrides": {},
+                  "intensity": "STRONG",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "accent_megatree_beacon_rays_4",
+                  "target": {
+                    "type": "group",
+                    "id": "MEGA_TREE"
+                  },
+                  "template_id": "gtpl_accent_motif_radial_rays_hit_big",
+                  "start": {
+                    "bar": 7,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "HIT",
+                  "param_overrides": {},
+                  "intensity": "PEAK",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "accent_stars_answer_4",
+                  "target": {
+                    "type": "group",
+                    "id": "STARS"
+                  },
+                  "template_id": "gtpl_accent_motif_stars_hit_big",
+                  "start": {
+                    "bar": 7,
+                    "beat": 3,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "HIT",
+                  "param_overrides": {},
+                  "intensity": "STRONG",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "accent_wreaths_answer_4",
+                  "target": {
+                    "type": "group",
+                    "id": "WREATHS"
+                  },
+                  "template_id": "gtpl_accent_motif_sparkles_hit_small",
+                  "start": {
+                    "bar": 8,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "HIT",
+                  "param_overrides": {},
+                  "intensity": "STRONG",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "accent_megatree_beacon_rays_5",
+                  "target": {
+                    "type": "group",
+                    "id": "MEGA_TREE"
+                  },
+                  "template_id": "gtpl_accent_motif_radial_rays_hit_big",
+                  "start": {
+                    "bar": 9,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "HIT",
+                  "param_overrides": {},
+                  "intensity": "PEAK",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "accent_stars_answer_5",
+                  "target": {
+                    "type": "group",
+                    "id": "STARS"
+                  },
+                  "template_id": "gtpl_accent_motif_stars_hit_big",
+                  "start": {
+                    "bar": 9,
+                    "beat": 3,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "HIT",
+                  "param_overrides": {},
+                  "intensity": "STRONG",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "accent_wreaths_answer_5",
+                  "target": {
+                    "type": "group",
+                    "id": "WREATHS"
+                  },
+                  "template_id": "gtpl_accent_motif_sparkles_hit_small",
+                  "start": {
+                    "bar": 10,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "HIT",
+                  "param_overrides": {},
+                  "intensity": "STRONG",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "accent_megatree_beacon_rays_6",
+                  "target": {
+                    "type": "group",
+                    "id": "MEGA_TREE"
+                  },
+                  "template_id": "gtpl_accent_motif_radial_rays_hit_big",
+                  "start": {
+                    "bar": 11,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "HIT",
+                  "param_overrides": {},
+                  "intensity": "PEAK",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "accent_stars_answer_6",
+                  "target": {
+                    "type": "group",
+                    "id": "STARS"
+                  },
+                  "template_id": "gtpl_accent_motif_stars_hit_big",
+                  "start": {
+                    "bar": 11,
+                    "beat": 3,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "HIT",
+                  "param_overrides": {},
+                  "intensity": "STRONG",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "accent_wreaths_answer_6",
+                  "target": {
+                    "type": "group",
+                    "id": "WREATHS"
+                  },
+                  "template_id": "gtpl_accent_motif_sparkles_hit_small",
+                  "start": {
+                    "bar": 12,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "HIT",
+                  "param_overrides": {},
+                  "intensity": "STRONG",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "accent_megatree_beacon_rays_7",
+                  "target": {
+                    "type": "group",
+                    "id": "MEGA_TREE"
+                  },
+                  "template_id": "gtpl_accent_motif_radial_rays_hit_big",
+                  "start": {
+                    "bar": 13,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "HIT",
+                  "param_overrides": {},
+                  "intensity": "PEAK",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "accent_stars_answer_7",
+                  "target": {
+                    "type": "group",
+                    "id": "STARS"
+                  },
+                  "template_id": "gtpl_accent_motif_stars_hit_big",
+                  "start": {
+                    "bar": 13,
+                    "beat": 3,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "HIT",
+                  "param_overrides": {},
+                  "intensity": "STRONG",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "accent_wreaths_answer_7",
+                  "target": {
+                    "type": "group",
+                    "id": "WREATHS"
+                  },
+                  "template_id": "gtpl_accent_motif_sparkles_hit_small",
+                  "start": {
+                    "bar": 14,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "HIT",
+                  "param_overrides": {},
+                  "intensity": "STRONG",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "accent_megatree_beacon_rays_8",
+                  "target": {
+                    "type": "group",
+                    "id": "MEGA_TREE"
+                  },
+                  "template_id": "gtpl_accent_motif_radial_rays_hit_big",
+                  "start": {
+                    "bar": 15,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "HIT",
+                  "param_overrides": {},
+                  "intensity": "PEAK",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "accent_stars_answer_8",
+                  "target": {
+                    "type": "group",
+                    "id": "STARS"
+                  },
+                  "template_id": "gtpl_accent_motif_stars_hit_big",
+                  "start": {
+                    "bar": 15,
+                    "beat": 3,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "HIT",
+                  "param_overrides": {},
+                  "intensity": "STRONG",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "accent_wreaths_answer_8",
+                  "target": {
+                    "type": "group",
+                    "id": "WREATHS"
+                  },
+                  "template_id": "gtpl_accent_motif_sparkles_hit_small",
+                  "start": {
+                    "bar": 16,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "HIT",
+                  "param_overrides": {},
+                  "intensity": "STRONG",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "accent_megatree_beacon_rays_9",
+                  "target": {
+                    "type": "group",
+                    "id": "MEGA_TREE"
+                  },
+                  "template_id": "gtpl_accent_motif_radial_rays_hit_big",
+                  "start": {
+                    "bar": 17,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "HIT",
+                  "param_overrides": {},
+                  "intensity": "PEAK",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "accent_stars_answer_9",
+                  "target": {
+                    "type": "group",
+                    "id": "STARS"
+                  },
+                  "template_id": "gtpl_accent_motif_stars_hit_big",
+                  "start": {
+                    "bar": 17,
+                    "beat": 3,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "HIT",
+                  "param_overrides": {},
+                  "intensity": "STRONG",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "accent_wreaths_answer_9",
+                  "target": {
+                    "type": "group",
+                    "id": "WREATHS"
+                  },
+                  "template_id": "gtpl_accent_motif_sparkles_hit_small",
+                  "start": {
+                    "bar": 18,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "HIT",
+                  "param_overrides": {},
+                  "intensity": "STRONG",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "accent_megatree_beacon_rays_10",
+                  "target": {
+                    "type": "group",
+                    "id": "MEGA_TREE"
+                  },
+                  "template_id": "gtpl_accent_motif_radial_rays_hit_big",
+                  "start": {
+                    "bar": 19,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "HIT",
+                  "param_overrides": {},
+                  "intensity": "PEAK",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "accent_stars_answer_10",
+                  "target": {
+                    "type": "group",
+                    "id": "STARS"
+                  },
+                  "template_id": "gtpl_accent_motif_stars_hit_big",
+                  "start": {
+                    "bar": 19,
+                    "beat": 3,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "HIT",
+                  "param_overrides": {},
+                  "intensity": "STRONG",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "accent_wreaths_answer_10",
+                  "target": {
+                    "type": "group",
+                    "id": "WREATHS"
+                  },
+                  "template_id": "gtpl_accent_motif_sparkles_hit_small",
+                  "start": {
+                    "bar": 20,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "HIT",
+                  "param_overrides": {},
+                  "intensity": "STRONG",
+                  "resolved_asset_ids": []
+                }
+              ],
+              "window": null,
+              "config": null
+            },
+            {
+              "coordination_mode": "UNIFIED",
+              "targets": [
+                {
+                  "type": "group",
+                  "id": "MATRIX"
+                }
+              ],
+              "placements": [
+                {
+                  "placement_id": "accent_matrix_hook_burst",
+                  "target": {
+                    "type": "group",
+                    "id": "MATRIX"
+                  },
+                  "template_id": "gtpl_accent_burst_big",
+                  "start": {
+                    "bar": 21,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "BURST",
+                  "param_overrides": {},
+                  "intensity": "STRONG",
+                  "resolved_asset_ids": []
+                }
+              ],
+              "window": null,
+              "config": null
+            }
+          ]
+        }
+      ],
+      "deviations": [],
+      "narrative_assets": [],
+      "planning_notes": "PEAK chorus: BASE holds readable classic scene (outline radial ambience + window sparkles). RHYTHM uses one section-long SEQUENCED candy-stripe drive across arches\u2192canes\u2192trees\u2192mega-tree (2-beat steps) plus icicle offbeat sparkle texture. ACCENT runs a strict 2-beat call/answer: MEGA_TREE radial-rays beacon on bar downbeats (PEAK), answered by STARS (beat 3) then WREATHS (next bar beat 1), ensuring only one PEAK event per beat and no same-target overlaps.",
+      "start_ms": 39800,
+      "end_ms": 57700
+    },
+    {
+      "schema_version": "section-coordination-plan.v1",
+      "section_id": "break_2",
+      "theme": {
+        "theme_id": "theme.holiday.peppermint",
+        "scope": "SECTION",
+        "tags": [
+          "playful",
+          "reindeer_games"
+        ],
+        "palette_id": null
+      },
+      "motif_ids": [
+        "candy_stripes",
+        "sparkles",
+        "radial_rays"
+      ],
+      "palette": {
+        "palette_id": "core.peppermint",
+        "role": "ACCENT",
+        "intensity": 1.0,
+        "variant": null
+      },
+      "lane_plans": [
+        {
+          "lane": "BASE",
+          "target_roles": [
+            "BACKGROUND"
+          ],
+          "timing_driver": "BARS",
+          "blend_mode": "alpha_over",
+          "coordination_plans": [
+            {
+              "coordination_mode": "UNIFIED",
+              "targets": [
+                {
+                  "type": "group",
+                  "id": "OUTLINE"
+                },
+                {
+                  "type": "group",
+                  "id": "WINDOWS"
+                }
+              ],
+              "placements": [
+                {
+                  "placement_id": "base_outline_warm_readability",
+                  "target": {
+                    "type": "group",
+                    "id": "OUTLINE"
+                  },
+                  "template_id": "gtpl_base_motif_abstract_ambient",
+                  "start": {
+                    "bar": 1,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "SECTION",
+                  "param_overrides": {},
+                  "intensity": "SOFT",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "base_windows_soft_glow",
+                  "target": {
+                    "type": "group",
+                    "id": "WINDOWS"
+                  },
+                  "template_id": "gtpl_base_motif_bokeh_ambient",
+                  "start": {
+                    "bar": 1,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "SECTION",
+                  "param_overrides": {},
+                  "intensity": "SOFT",
+                  "resolved_asset_ids": []
+                }
+              ],
+              "window": null,
+              "config": null
+            }
+          ]
+        },
+        {
+          "lane": "RHYTHM",
+          "target_roles": [
+            "MID"
+          ],
+          "timing_driver": "BEATS",
+          "blend_mode": "add",
+          "coordination_plans": [
+            {
+              "coordination_mode": "COMPLEMENTARY",
+              "targets": [
+                {
+                  "type": "group",
+                  "id": "ARCHES"
+                },
+                {
+                  "type": "group",
+                  "id": "CANDY_CANES"
+                },
+                {
+                  "type": "group",
+                  "id": "MEGA_TREE"
+                },
+                {
+                  "type": "group",
+                  "id": "TREES"
+                }
+              ],
+              "placements": [
+                {
+                  "placement_id": "rhythm_arches_candy_stripes_drive",
+                  "target": {
+                    "type": "group",
+                    "id": "ARCHES"
+                  },
+                  "template_id": "gtpl_rhythm_motif_candy_stripes_drive",
+                  "start": {
+                    "bar": 1,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "PHRASE",
+                  "param_overrides": {},
+                  "intensity": "STRONG",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "rhythm_canes_ab_toggle",
+                  "target": {
+                    "type": "group",
+                    "id": "CANDY_CANES"
+                  },
+                  "template_id": "gtpl_rhythm_alternate_ab",
+                  "start": {
+                    "bar": 1,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "PHRASE",
+                  "param_overrides": {},
+                  "intensity": "MED",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "rhythm_megatree_candy_stripes_drive",
+                  "target": {
+                    "type": "group",
+                    "id": "MEGA_TREE"
+                  },
+                  "template_id": "gtpl_rhythm_motif_candy_stripes_drive",
+                  "start": {
+                    "bar": 1,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "PHRASE",
+                  "param_overrides": {},
+                  "intensity": "STRONG",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "rhythm_trees_sparkles_drive_support",
+                  "target": {
+                    "type": "group",
+                    "id": "TREES"
+                  },
+                  "template_id": "gtpl_rhythm_motif_sparkles_drive",
+                  "start": {
+                    "bar": 1,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "PHRASE",
+                  "param_overrides": {},
+                  "intensity": "MED",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "rhythm_arches_radial_rays_phrase_2",
+                  "target": {
+                    "type": "group",
+                    "id": "ARCHES"
+                  },
+                  "template_id": "gtpl_rhythm_motif_radial_rays_drive",
+                  "start": {
+                    "bar": 9,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "PHRASE",
+                  "param_overrides": {},
+                  "intensity": "MED",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "rhythm_canes_candy_stripes_phrase_2",
+                  "target": {
+                    "type": "group",
+                    "id": "CANDY_CANES"
+                  },
+                  "template_id": "gtpl_rhythm_motif_candy_stripes_drive",
+                  "start": {
+                    "bar": 9,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "PHRASE",
+                  "param_overrides": {},
+                  "intensity": "STRONG",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "rhythm_megatree_sparkles_phrase_2",
+                  "target": {
+                    "type": "group",
+                    "id": "MEGA_TREE"
+                  },
+                  "template_id": "gtpl_rhythm_motif_sparkles_drive",
+                  "start": {
+                    "bar": 9,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "PHRASE",
+                  "param_overrides": {},
+                  "intensity": "MED",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "rhythm_trees_ab_phrase_2",
+                  "target": {
+                    "type": "group",
+                    "id": "TREES"
+                  },
+                  "template_id": "gtpl_rhythm_alternate_ab",
+                  "start": {
+                    "bar": 9,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "PHRASE",
+                  "param_overrides": {},
+                  "intensity": "MED",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "rhythm_arches_abstract_phrase_3",
+                  "target": {
+                    "type": "group",
+                    "id": "ARCHES"
+                  },
+                  "template_id": "gtpl_rhythm_motif_abstract_drive",
+                  "start": {
+                    "bar": 17,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "PHRASE",
+                  "param_overrides": {},
+                  "intensity": "MED",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "rhythm_canes_sparkles_phrase_3",
+                  "target": {
+                    "type": "group",
+                    "id": "CANDY_CANES"
+                  },
+                  "template_id": "gtpl_rhythm_motif_sparkles_drive",
+                  "start": {
+                    "bar": 17,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "PHRASE",
+                  "param_overrides": {},
+                  "intensity": "STRONG",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "rhythm_megatree_radial_rays_phrase_3",
+                  "target": {
+                    "type": "group",
+                    "id": "MEGA_TREE"
+                  },
+                  "template_id": "gtpl_rhythm_motif_radial_rays_drive",
+                  "start": {
+                    "bar": 17,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "PHRASE",
+                  "param_overrides": {},
+                  "intensity": "STRONG",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "rhythm_trees_candy_stripes_phrase_3",
+                  "target": {
+                    "type": "group",
+                    "id": "TREES"
+                  },
+                  "template_id": "gtpl_rhythm_motif_candy_stripes_drive",
+                  "start": {
+                    "bar": 17,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "PHRASE",
+                  "param_overrides": {},
+                  "intensity": "MED",
+                  "resolved_asset_ids": []
+                }
+              ],
+              "window": null,
+              "config": null
+            }
+          ]
+        },
+        {
+          "lane": "ACCENT",
+          "target_roles": [
+            "HERO"
+          ],
+          "timing_driver": "BEATS",
+          "blend_mode": "max",
+          "coordination_plans": [
+            {
+              "coordination_mode": "UNIFIED",
+              "targets": [
+                {
+                  "type": "group",
+                  "id": "ARCHES"
+                },
+                {
+                  "type": "group",
+                  "id": "CANDY_CANES"
+                },
+                {
+                  "type": "group",
+                  "id": "MATRIX"
+                },
+                {
+                  "type": "group",
+                  "id": "MEGA_TREE"
+                }
+              ],
+              "placements": [
+                {
+                  "placement_id": "accent_arches_beacon_pop_1",
+                  "target": {
+                    "type": "group",
+                    "id": "ARCHES"
+                  },
+                  "template_id": "gtpl_accent_motif_radial_rays_hit_small",
+                  "start": {
+                    "bar": 4,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "BURST",
+                  "param_overrides": {},
+                  "intensity": "STRONG",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "accent_canes_beacon_pop_1",
+                  "target": {
+                    "type": "group",
+                    "id": "CANDY_CANES"
+                  },
+                  "template_id": "gtpl_accent_motif_radial_rays_hit_small",
+                  "start": {
+                    "bar": 8,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "BURST",
+                  "param_overrides": {},
+                  "intensity": "STRONG",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "accent_matrix_sparkles_punchline",
+                  "target": {
+                    "type": "group",
+                    "id": "MATRIX"
+                  },
+                  "template_id": "gtpl_accent_motif_sparkles_hit_big",
+                  "start": {
+                    "bar": 12,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "BURST",
+                  "param_overrides": {},
+                  "intensity": "STRONG",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "accent_megatree_candy_stripes_hit",
+                  "target": {
+                    "type": "group",
+                    "id": "MEGA_TREE"
+                  },
+                  "template_id": "gtpl_accent_motif_candy_stripes_hit_big",
+                  "start": {
+                    "bar": 16,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "BURST",
+                  "param_overrides": {},
+                  "intensity": "STRONG",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "accent_arches_sparkles_pop_2",
+                  "target": {
+                    "type": "group",
+                    "id": "ARCHES"
+                  },
+                  "template_id": "gtpl_accent_motif_sparkles_hit_small",
+                  "start": {
+                    "bar": 20,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "BURST",
+                  "param_overrides": {},
+                  "intensity": "STRONG",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "accent_canes_candy_stripes_pop_2",
+                  "target": {
+                    "type": "group",
+                    "id": "CANDY_CANES"
+                  },
+                  "template_id": "gtpl_accent_motif_candy_stripes_hit_small",
+                  "start": {
+                    "bar": 24,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "BURST",
+                  "param_overrides": {},
+                  "intensity": "STRONG",
+                  "resolved_asset_ids": []
+                }
+              ],
+              "window": null,
+              "config": null
+            }
+          ]
+        }
+      ],
+      "deviations": [],
+      "narrative_assets": [],
+      "planning_notes": "MED-energy peppermint interlude: BASE kept soft/legible on OUTLINE+WINDOWS; RHYTHM carries core.peppermint candy-stripes motion on ARCHES/CANDY_CANES/MEGA_TREE with phrase-level template swaps for variety; ACCENT uses sparse radial-ray/sparkle beacon pops (BURST, bar-spaced) as comedic punctuation.",
+      "start_ms": 57700,
+      "end_ms": 78000
+    },
+    {
+      "schema_version": "section-coordination-plan.v1",
+      "section_id": "verse_1",
+      "theme": {
+        "theme_id": "theme.holiday.traditional",
+        "scope": "SECTION",
+        "tags": [
+          "story",
+          "space_for_lyrics"
+        ],
+        "palette_id": null
+      },
+      "motif_ids": [
+        "candy_stripes",
+        "sparkles",
+        "radial_rays"
+      ],
+      "palette": {
+        "palette_id": "core.christmas_traditional",
+        "role": null,
+        "intensity": null,
+        "variant": null
+      },
+      "lane_plans": [
+        {
+          "lane": "BASE",
+          "target_roles": [
+            "BACKGROUND"
+          ],
+          "timing_driver": "BARS",
+          "blend_mode": "add",
+          "coordination_plans": [
+            {
+              "coordination_mode": "UNIFIED",
+              "targets": [
+                {
+                  "type": "group",
+                  "id": "OUTLINE"
+                },
+                {
+                  "type": "group",
+                  "id": "WINDOWS"
+                }
+              ],
+              "placements": [
+                {
+                  "placement_id": "base_outline_candy_ambient",
+                  "target": {
+                    "type": "group",
+                    "id": "OUTLINE"
+                  },
+                  "template_id": "gtpl_base_motif_candy_stripes_ambient",
+                  "start": {
+                    "bar": 1,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "SECTION",
+                  "param_overrides": {},
+                  "intensity": "SOFT",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "base_windows_warm_glow",
+                  "target": {
+                    "type": "group",
+                    "id": "WINDOWS"
+                  },
+                  "template_id": "gtpl_base_motif_bokeh_ambient",
+                  "start": {
+                    "bar": 1,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "SECTION",
+                  "param_overrides": {},
+                  "intensity": "SOFT",
+                  "resolved_asset_ids": []
+                }
+              ],
+              "window": null,
+              "config": null
+            }
+          ]
+        },
+        {
+          "lane": "RHYTHM",
+          "target_roles": [
+            "MID"
+          ],
+          "timing_driver": "BEATS",
+          "blend_mode": "add",
+          "coordination_plans": [
+            {
+              "coordination_mode": "COMPLEMENTARY",
+              "targets": [
+                {
+                  "type": "group",
+                  "id": "ARCHES"
+                },
+                {
+                  "type": "group",
+                  "id": "CANDY_CANES"
+                },
+                {
+                  "type": "group",
+                  "id": "MEGA_TREE"
+                },
+                {
+                  "type": "group",
+                  "id": "TREES"
+                }
+              ],
+              "placements": [
+                {
+                  "placement_id": "rhythm_arches_candy_drive_phrase",
+                  "target": {
+                    "type": "group",
+                    "id": "ARCHES"
+                  },
+                  "template_id": "gtpl_rhythm_motif_candy_stripes_drive",
+                  "start": {
+                    "bar": 1,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "PHRASE",
+                  "param_overrides": {},
+                  "intensity": "STRONG",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "rhythm_canes_radial_drive_phrase",
+                  "target": {
+                    "type": "group",
+                    "id": "CANDY_CANES"
+                  },
+                  "template_id": "gtpl_rhythm_motif_radial_rays_drive",
+                  "start": {
+                    "bar": 1,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "PHRASE",
+                  "param_overrides": {},
+                  "intensity": "MED",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "rhythm_megatree_abstract_drive_phrase",
+                  "target": {
+                    "type": "group",
+                    "id": "MEGA_TREE"
+                  },
+                  "template_id": "gtpl_rhythm_motif_abstract_drive",
+                  "start": {
+                    "bar": 1,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "PHRASE",
+                  "param_overrides": {},
+                  "intensity": "MED",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "rhythm_trees_alternate_ab_phrase",
+                  "target": {
+                    "type": "group",
+                    "id": "TREES"
+                  },
+                  "template_id": "gtpl_rhythm_alternate_ab",
+                  "start": {
+                    "bar": 1,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "PHRASE",
+                  "param_overrides": {},
+                  "intensity": "MED",
+                  "resolved_asset_ids": []
+                }
+              ],
+              "window": null,
+              "config": null
+            }
+          ]
+        },
+        {
+          "lane": "ACCENT",
+          "target_roles": [
+            "HERO"
+          ],
+          "timing_driver": "BEATS",
+          "blend_mode": "add",
+          "coordination_plans": [
+            {
+              "coordination_mode": "UNIFIED",
+              "targets": [
+                {
+                  "type": "group",
+                  "id": "WREATHS"
+                },
+                {
+                  "type": "group",
+                  "id": "OUTLINE"
+                },
+                {
+                  "type": "group",
+                  "id": "WINDOWS"
+                }
+              ],
+              "placements": [
+                {
+                  "placement_id": "accent_wreaths_sparkles_burst_b4",
+                  "target": {
+                    "type": "group",
+                    "id": "WREATHS"
+                  },
+                  "template_id": "gtpl_accent_motif_sparkles_hit_small",
+                  "start": {
+                    "bar": 4,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "BURST",
+                  "param_overrides": {},
+                  "intensity": "STRONG",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "accent_outline_radial_burst_b8",
+                  "target": {
+                    "type": "group",
+                    "id": "OUTLINE"
+                  },
+                  "template_id": "gtpl_accent_motif_radial_rays_hit_small",
+                  "start": {
+                    "bar": 8,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "BURST",
+                  "param_overrides": {},
+                  "intensity": "STRONG",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "accent_windows_candy_burst_b12",
+                  "target": {
+                    "type": "group",
+                    "id": "WINDOWS"
+                  },
+                  "template_id": "gtpl_accent_motif_candy_stripes_hit_small",
+                  "start": {
+                    "bar": 12,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "BURST",
+                  "param_overrides": {},
+                  "intensity": "STRONG",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "accent_wreaths_sparkles_burst_b16",
+                  "target": {
+                    "type": "group",
+                    "id": "WREATHS"
+                  },
+                  "template_id": "gtpl_accent_motif_sparkles_hit_small",
+                  "start": {
+                    "bar": 16,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "BURST",
+                  "param_overrides": {},
+                  "intensity": "STRONG",
+                  "resolved_asset_ids": []
+                }
+              ],
+              "window": null,
+              "config": null
+            }
+          ]
+        }
+      ],
+      "deviations": [],
+      "narrative_assets": [],
+      "planning_notes": "MED verse: HOUSE readability prioritized. BASE holds OUTLINE candy_stripes + WINDOWS bokeh for lyric space; RHYTHM complements with large, clean motion (arches/canes/trees) while MEGA_TREE stays steady. ACCENT uses sparse BURSTs (bar-spaced) on WREATHS/OUTLINE/WINDOWS to keep sparkles special without drowning vocals.",
+      "start_ms": 78000,
+      "end_ms": 94000
+    },
+    {
+      "schema_version": "section-coordination-plan.v1",
+      "section_id": "verse_2",
+      "theme": {
+        "theme_id": "theme.holiday.traditional",
+        "scope": "SECTION",
+        "tags": [
+          "build",
+          "wider_stage"
+        ],
+        "palette_id": null
+      },
+      "motif_ids": [
+        "candy_stripes",
+        "radial_rays",
+        "light_trails"
+      ],
+      "palette": {
+        "palette_id": "core.christmas_traditional",
+        "role": null,
+        "intensity": null,
+        "variant": null
+      },
+      "lane_plans": [
+        {
+          "lane": "BASE",
+          "target_roles": [
+            "BACKGROUND"
+          ],
+          "timing_driver": "BARS",
+          "blend_mode": "add",
+          "coordination_plans": [
+            {
+              "coordination_mode": "UNIFIED",
+              "targets": [
+                {
+                  "type": "zone",
+                  "id": "HOUSE"
+                },
+                {
+                  "type": "group",
+                  "id": "ICICLES"
+                },
+                {
+                  "type": "group",
+                  "id": "FLOODS"
+                },
+                {
+                  "type": "group",
+                  "id": "TREES"
+                }
+              ],
+              "placements": [
+                {
+                  "placement_id": "base_floods_wash_light_trails_section",
+                  "target": {
+                    "type": "group",
+                    "id": "FLOODS"
+                  },
+                  "template_id": "gtpl_base_motif_light_trails_ambient",
+                  "start": {
+                    "bar": 1,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "SECTION",
+                  "param_overrides": {},
+                  "intensity": "MED",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "base_house_candy_ambient_section",
+                  "target": {
+                    "type": "zone",
+                    "id": "HOUSE"
+                  },
+                  "template_id": "gtpl_base_motif_candy_stripes_ambient",
+                  "start": {
+                    "bar": 1,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "SECTION",
+                  "param_overrides": {},
+                  "intensity": "SOFT",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "base_icicles_shimmer_radial_section",
+                  "target": {
+                    "type": "group",
+                    "id": "ICICLES"
+                  },
+                  "template_id": "gtpl_base_shimmer_radial",
+                  "start": {
+                    "bar": 1,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "SECTION",
+                  "param_overrides": {},
+                  "intensity": "SOFT",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "base_trees_light_trails_ambient_section",
+                  "target": {
+                    "type": "group",
+                    "id": "TREES"
+                  },
+                  "template_id": "gtpl_base_motif_light_trails_ambient",
+                  "start": {
+                    "bar": 1,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "SECTION",
+                  "param_overrides": {},
+                  "intensity": "SOFT",
+                  "resolved_asset_ids": []
+                }
+              ],
+              "window": null,
+              "config": null
+            }
+          ]
+        },
+        {
+          "lane": "RHYTHM",
+          "target_roles": [
+            "MID"
+          ],
+          "timing_driver": "BEATS",
+          "blend_mode": "add",
+          "coordination_plans": [
+            {
+              "coordination_mode": "SEQUENCED",
+              "targets": [
+                {
+                  "type": "group",
+                  "id": "CANDY_CANES"
+                },
+                {
+                  "type": "group",
+                  "id": "ARCHES"
+                },
+                {
+                  "type": "group",
+                  "id": "TREES"
+                },
+                {
+                  "type": "group",
+                  "id": "MEGA_TREE"
+                }
+              ],
+              "placements": [],
+              "window": {
+                "start": {
+                  "bar": 1,
+                  "beat": 1,
+                  "timing_hint": "ON_BEAT"
+                },
+                "end": {
+                  "bar": 29,
+                  "beat": 1,
+                  "timing_hint": "ON_BEAT"
+                },
+                "template_id": "gtpl_rhythm_motif_light_trails_drive",
+                "param_overrides": {},
+                "intensity": "STRONG"
+              },
+              "config": {
+                "group_order": [
+                  "CANDY_CANES",
+                  "ARCHES",
+                  "TREES",
+                  "MEGA_TREE"
+                ],
+                "step_unit": "BAR",
+                "step_duration": 2,
+                "phase_offset": 0.0,
+                "spill_policy": "TRUNCATE",
+                "spatial_intent": "NONE"
+              }
+            }
+          ]
+        },
+        {
+          "lane": "ACCENT",
+          "target_roles": [
+            "HERO"
+          ],
+          "timing_driver": "BEATS",
+          "blend_mode": "add",
+          "coordination_plans": [
+            {
+              "coordination_mode": "UNIFIED",
+              "targets": [
+                {
+                  "type": "group",
+                  "id": "MEGA_TREE"
+                },
+                {
+                  "type": "group",
+                  "id": "ARCHES"
+                },
+                {
+                  "type": "group",
+                  "id": "CANDY_CANES"
+                },
+                {
+                  "type": "group",
+                  "id": "STARS"
+                },
+                {
+                  "type": "group",
+                  "id": "SNOWFLAKES"
+                },
+                {
+                  "type": "group",
+                  "id": "MATRIX"
+                },
+                {
+                  "type": "group",
+                  "id": "WREATHS"
+                }
+              ],
+              "placements": [
+                {
+                  "placement_id": "accent_megatree_beacon_rr_01",
+                  "target": {
+                    "type": "group",
+                    "id": "MEGA_TREE"
+                  },
+                  "template_id": "gtpl_accent_motif_radial_rays_hit_big",
+                  "start": {
+                    "bar": 2,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "HIT",
+                  "param_overrides": {},
+                  "intensity": "STRONG",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "accent_arches_light_trails_hit_01",
+                  "target": {
+                    "type": "group",
+                    "id": "ARCHES"
+                  },
+                  "template_id": "gtpl_accent_motif_light_trails_hit_small",
+                  "start": {
+                    "bar": 4,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "HIT",
+                  "param_overrides": {},
+                  "intensity": "STRONG",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "accent_canes_candy_hit_01",
+                  "target": {
+                    "type": "group",
+                    "id": "CANDY_CANES"
+                  },
+                  "template_id": "gtpl_accent_motif_candy_stripes_hit_small",
+                  "start": {
+                    "bar": 6,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "HIT",
+                  "param_overrides": {},
+                  "intensity": "STRONG",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "accent_megatree_beacon_rr_02",
+                  "target": {
+                    "type": "group",
+                    "id": "MEGA_TREE"
+                  },
+                  "template_id": "gtpl_accent_motif_radial_rays_hit_big",
+                  "start": {
+                    "bar": 8,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "HIT",
+                  "param_overrides": {},
+                  "intensity": "STRONG",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "accent_stars_rr_hit_01",
+                  "target": {
+                    "type": "group",
+                    "id": "STARS"
+                  },
+                  "template_id": "gtpl_accent_motif_radial_rays_hit_small",
+                  "start": {
+                    "bar": 10,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "HIT",
+                  "param_overrides": {},
+                  "intensity": "MED",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "accent_arches_light_trails_hit_02",
+                  "target": {
+                    "type": "group",
+                    "id": "ARCHES"
+                  },
+                  "template_id": "gtpl_accent_motif_light_trails_hit_big",
+                  "start": {
+                    "bar": 12,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "HIT",
+                  "param_overrides": {},
+                  "intensity": "STRONG",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "accent_canes_candy_hit_02",
+                  "target": {
+                    "type": "group",
+                    "id": "CANDY_CANES"
+                  },
+                  "template_id": "gtpl_accent_motif_candy_stripes_hit_big",
+                  "start": {
+                    "bar": 14,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "HIT",
+                  "param_overrides": {},
+                  "intensity": "STRONG",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "accent_megatree_beacon_rr_03",
+                  "target": {
+                    "type": "group",
+                    "id": "MEGA_TREE"
+                  },
+                  "template_id": "gtpl_accent_motif_radial_rays_hit_big",
+                  "start": {
+                    "bar": 16,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "HIT",
+                  "param_overrides": {},
+                  "intensity": "STRONG",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "accent_snowflakes_light_trails_hit_01",
+                  "target": {
+                    "type": "group",
+                    "id": "SNOWFLAKES"
+                  },
+                  "template_id": "gtpl_accent_motif_light_trails_hit_small",
+                  "start": {
+                    "bar": 18,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "HIT",
+                  "param_overrides": {},
+                  "intensity": "MED",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "accent_matrix_candy_hit_01",
+                  "target": {
+                    "type": "group",
+                    "id": "MATRIX"
+                  },
+                  "template_id": "gtpl_accent_motif_candy_stripes_hit_small",
+                  "start": {
+                    "bar": 20,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "HIT",
+                  "param_overrides": {},
+                  "intensity": "MED",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "accent_wreaths_rr_hit_01",
+                  "target": {
+                    "type": "group",
+                    "id": "WREATHS"
+                  },
+                  "template_id": "gtpl_accent_motif_radial_rays_hit_small",
+                  "start": {
+                    "bar": 22,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "HIT",
+                  "param_overrides": {},
+                  "intensity": "MED",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "accent_arches_light_trails_hit_03",
+                  "target": {
+                    "type": "group",
+                    "id": "ARCHES"
+                  },
+                  "template_id": "gtpl_accent_motif_light_trails_hit_small",
+                  "start": {
+                    "bar": 24,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "HIT",
+                  "param_overrides": {},
+                  "intensity": "STRONG",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "accent_canes_candy_hit_03",
+                  "target": {
+                    "type": "group",
+                    "id": "CANDY_CANES"
+                  },
+                  "template_id": "gtpl_accent_motif_candy_stripes_hit_small",
+                  "start": {
+                    "bar": 26,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "HIT",
+                  "param_overrides": {},
+                  "intensity": "STRONG",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "accent_megatree_beacon_rr_04",
+                  "target": {
+                    "type": "group",
+                    "id": "MEGA_TREE"
+                  },
+                  "template_id": "gtpl_accent_motif_radial_rays_hit_big",
+                  "start": {
+                    "bar": 28,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "HIT",
+                  "param_overrides": {},
+                  "intensity": "STRONG",
+                  "resolved_asset_ids": []
+                }
+              ],
+              "window": null,
+              "config": null
+            }
+          ]
+        }
+      ],
+      "deviations": [],
+      "narrative_assets": [],
+      "planning_notes": "BUILD + BUSY: BASE holds a readable house/roof/yardshell with candy_stripes + shimmer; RHYTHM is a single long SEQUENCED light_trails cascade widening from canes\u2192arches\u2192trees\u2192mega_tree every 2 bars; ACCENT punctuates with 2-bar-spaced hits, keeping MEGA_TREE as recurring radial_rays beacon answers while arches/canes get alternating light_trails/candy_stripes hits. No same-target overlaps within lanes; all timing stays within bars 1..29.",
+      "start_ms": 94000,
+      "end_ms": 118600
+    },
+    {
+      "schema_version": "section-coordination-plan.v1",
+      "section_id": "verse_3",
+      "theme": {
+        "theme_id": "theme.holiday.winter_modern",
+        "scope": "SECTION",
+        "tags": [
+          "hard_drop",
+          "night_cold"
+        ],
+        "palette_id": null
+      },
+      "motif_ids": [
+        "snowflakes",
+        "sparkles",
+        "radial_rays"
+      ],
+      "palette": {
+        "palette_id": "core.mono_cool",
+        "role": "COOL",
+        "intensity": 0.9,
+        "variant": null
+      },
+      "lane_plans": [
+        {
+          "lane": "BASE",
+          "target_roles": [
+            "BACKGROUND"
+          ],
+          "timing_driver": "BARS",
+          "blend_mode": "add",
+          "coordination_plans": [
+            {
+              "coordination_mode": "COMPLEMENTARY",
+              "targets": [
+                {
+                  "type": "group",
+                  "id": "ICICLES"
+                },
+                {
+                  "type": "group",
+                  "id": "OUTLINE"
+                },
+                {
+                  "type": "group",
+                  "id": "SNOWFLAKES"
+                },
+                {
+                  "type": "group",
+                  "id": "MEGA_TREE"
+                }
+              ],
+              "placements": [
+                {
+                  "placement_id": "base_beacon_megatree_radial_ambient",
+                  "target": {
+                    "type": "group",
+                    "id": "MEGA_TREE"
+                  },
+                  "template_id": "gtpl_base_motif_radial_rays_ambient",
+                  "start": {
+                    "bar": 1,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "SECTION",
+                  "param_overrides": {},
+                  "intensity": "SOFT",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "base_night_tableau_outline_cold",
+                  "target": {
+                    "type": "group",
+                    "id": "OUTLINE"
+                  },
+                  "template_id": "gtpl_base_motif_ice_ambient",
+                  "start": {
+                    "bar": 1,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "SECTION",
+                  "param_overrides": {},
+                  "intensity": "WHISPER",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "base_night_tableau_roof_house_yard_cold",
+                  "target": {
+                    "type": "group",
+                    "id": "ICICLES"
+                  },
+                  "template_id": "gtpl_base_motif_ice_ambient",
+                  "start": {
+                    "bar": 1,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "SECTION",
+                  "param_overrides": {},
+                  "intensity": "SOFT",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "base_night_tableau_snowflakes_ambient_cold",
+                  "target": {
+                    "type": "group",
+                    "id": "SNOWFLAKES"
+                  },
+                  "template_id": "gtpl_base_motif_snowflakes_ambient",
+                  "start": {
+                    "bar": 1,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "SECTION",
+                  "param_overrides": {},
+                  "intensity": "WHISPER",
+                  "resolved_asset_ids": []
+                }
+              ],
+              "window": null,
+              "config": null
+            }
+          ]
+        },
+        {
+          "lane": "RHYTHM",
+          "target_roles": [
+            "MID"
+          ],
+          "timing_driver": "BEATS",
+          "blend_mode": "add",
+          "coordination_plans": [
+            {
+              "coordination_mode": "UNIFIED",
+              "targets": [
+                {
+                  "type": "group",
+                  "id": "MEGA_TREE"
+                }
+              ],
+              "placements": [
+                {
+                  "placement_id": "rhythm_beacon_megatree_radial_drive_sparse",
+                  "target": {
+                    "type": "group",
+                    "id": "MEGA_TREE"
+                  },
+                  "template_id": "gtpl_rhythm_motif_radial_rays_drive",
+                  "start": {
+                    "bar": 1,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "EXTENDED",
+                  "param_overrides": {},
+                  "intensity": "SOFT",
+                  "resolved_asset_ids": []
+                }
+              ],
+              "window": null,
+              "config": null
+            }
+          ]
+        },
+        {
+          "lane": "ACCENT",
+          "target_roles": [
+            "HERO"
+          ],
+          "timing_driver": "BEATS",
+          "blend_mode": "add",
+          "coordination_plans": [
+            {
+              "coordination_mode": "UNIFIED",
+              "targets": [
+                {
+                  "type": "group",
+                  "id": "SNOWFLAKES"
+                }
+              ],
+              "placements": [
+                {
+                  "placement_id": "accent_snowflakes_single_hit_in_the_dark",
+                  "target": {
+                    "type": "group",
+                    "id": "SNOWFLAKES"
+                  },
+                  "template_id": "gtpl_accent_motif_snowflakes_hit_small",
+                  "start": {
+                    "bar": 9,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "HIT",
+                  "param_overrides": {},
+                  "intensity": "MED",
+                  "resolved_asset_ids": []
+                }
+              ],
+              "window": null,
+              "config": null
+            }
+          ]
+        }
+      ],
+      "deviations": [],
+      "narrative_assets": [],
+      "planning_notes": "RELEASE / hard-drop tableau: hold a cold, sparse night bed on ICICLES+OUTLINE+SNOWFLAKES (core.mono_cool). Keep MEGA_TREE alive as the lone beacon via radial_rays (base + soft rhythm drive). Single restrained SNOWFLAKES accent hit mid-section to avoid breaking the drop.",
+      "start_ms": 118600,
+      "end_ms": 132900
+    },
+    {
+      "schema_version": "section-coordination-plan.v1",
+      "section_id": "verse_4",
+      "theme": {
+        "theme_id": "theme.mood.triumphant",
+        "scope": "SECTION",
+        "tags": [
+          "hero_rise",
+          "lead_the_way"
+        ],
+        "palette_id": null
+      },
+      "motif_ids": [
+        "radial_rays",
+        "light_trails",
+        "candy_stripes"
+      ],
+      "palette": {
+        "palette_id": "core.christmas_traditional",
+        "role": null,
+        "intensity": null,
+        "variant": null
+      },
+      "lane_plans": [
+        {
+          "lane": "BASE",
+          "target_roles": [
+            "BACKGROUND"
+          ],
+          "timing_driver": "BARS",
+          "blend_mode": "add",
+          "coordination_plans": [
+            {
+              "coordination_mode": "UNIFIED",
+              "targets": [
+                {
+                  "type": "group",
+                  "id": "OUTLINE"
+                },
+                {
+                  "type": "group",
+                  "id": "ICICLES"
+                },
+                {
+                  "type": "group",
+                  "id": "TREES"
+                },
+                {
+                  "type": "group",
+                  "id": "FLOODS"
+                },
+                {
+                  "type": "group",
+                  "id": "WINDOWS"
+                }
+              ],
+              "placements": [
+                {
+                  "placement_id": "base_floods_candy_stripes_ambient",
+                  "target": {
+                    "type": "group",
+                    "id": "FLOODS"
+                  },
+                  "template_id": "gtpl_base_motif_candy_stripes_ambient",
+                  "start": {
+                    "bar": 1,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "SECTION",
+                  "param_overrides": {},
+                  "intensity": "SOFT",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "base_icicles_light_trails_ambient",
+                  "target": {
+                    "type": "group",
+                    "id": "ICICLES"
+                  },
+                  "template_id": "gtpl_base_motif_light_trails_ambient",
+                  "start": {
+                    "bar": 1,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "SECTION",
+                  "param_overrides": {},
+                  "intensity": "SOFT",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "base_scene_radial_rays_warm_hold",
+                  "target": {
+                    "type": "group",
+                    "id": "OUTLINE"
+                  },
+                  "template_id": "gtpl_base_motif_radial_rays_ambient",
+                  "start": {
+                    "bar": 1,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "SECTION",
+                  "param_overrides": {},
+                  "intensity": "MED",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "base_trees_radial_rays_ambient",
+                  "target": {
+                    "type": "group",
+                    "id": "TREES"
+                  },
+                  "template_id": "gtpl_base_motif_radial_rays_ambient",
+                  "start": {
+                    "bar": 1,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "SECTION",
+                  "param_overrides": {},
+                  "intensity": "SOFT",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "base_windows_shimmer_radial",
+                  "target": {
+                    "type": "group",
+                    "id": "WINDOWS"
+                  },
+                  "template_id": "gtpl_base_shimmer_radial",
+                  "start": {
+                    "bar": 1,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "SECTION",
+                  "param_overrides": {},
+                  "intensity": "SOFT",
+                  "resolved_asset_ids": []
+                }
+              ],
+              "window": null,
+              "config": null
+            }
+          ]
+        },
+        {
+          "lane": "RHYTHM",
+          "target_roles": [
+            "MID"
+          ],
+          "timing_driver": "BEATS",
+          "blend_mode": "add",
+          "coordination_plans": [
+            {
+              "coordination_mode": "SEQUENCED",
+              "targets": [
+                {
+                  "type": "split",
+                  "id": "HALVES_LEFT"
+                },
+                {
+                  "type": "split",
+                  "id": "HALVES_RIGHT"
+                }
+              ],
+              "placements": [],
+              "window": {
+                "start": {
+                  "bar": 1,
+                  "beat": 1,
+                  "timing_hint": "ON_BEAT"
+                },
+                "end": {
+                  "bar": 32,
+                  "beat": 1,
+                  "timing_hint": "ON_BEAT"
+                },
+                "template_id": "gtpl_rhythm_motif_light_trails_drive",
+                "param_overrides": {},
+                "intensity": "STRONG"
+              },
+              "config": {
+                "group_order": [
+                  "HALVES_LEFT",
+                  "HALVES_RIGHT"
+                ],
+                "step_unit": "BAR",
+                "step_duration": 2,
+                "phase_offset": 0.0,
+                "spill_policy": "TRUNCATE",
+                "spatial_intent": "L2R"
+              }
+            }
+          ]
+        },
+        {
+          "lane": "ACCENT",
+          "target_roles": [
+            "HERO"
+          ],
+          "timing_driver": "BEATS",
+          "blend_mode": "add",
+          "coordination_plans": [
+            {
+              "coordination_mode": "UNIFIED",
+              "targets": [
+                {
+                  "type": "group",
+                  "id": "MEGA_TREE"
+                },
+                {
+                  "type": "group",
+                  "id": "MATRIX"
+                },
+                {
+                  "type": "group",
+                  "id": "ICICLES"
+                },
+                {
+                  "type": "group",
+                  "id": "OUTLINE"
+                },
+                {
+                  "type": "group",
+                  "id": "FLOODS"
+                },
+                {
+                  "type": "group",
+                  "id": "TREES"
+                },
+                {
+                  "type": "group",
+                  "id": "ARCHES"
+                },
+                {
+                  "type": "group",
+                  "id": "CANDY_CANES"
+                }
+              ],
+              "placements": [
+                {
+                  "placement_id": "accent_megatree_radial_big_b1",
+                  "target": {
+                    "type": "group",
+                    "id": "MEGA_TREE"
+                  },
+                  "template_id": "gtpl_accent_motif_radial_rays_hit_big",
+                  "start": {
+                    "bar": 1,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "HIT",
+                  "param_overrides": {},
+                  "intensity": "STRONG",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "accent_outline_radial_small_b2",
+                  "target": {
+                    "type": "group",
+                    "id": "OUTLINE"
+                  },
+                  "template_id": "gtpl_accent_motif_radial_rays_hit_small",
+                  "start": {
+                    "bar": 2,
+                    "beat": 3,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "HIT",
+                  "param_overrides": {},
+                  "intensity": "STRONG",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "accent_matrix_light_trails_big_b4",
+                  "target": {
+                    "type": "group",
+                    "id": "MATRIX"
+                  },
+                  "template_id": "gtpl_accent_motif_light_trails_hit_big",
+                  "start": {
+                    "bar": 4,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "BURST",
+                  "param_overrides": {},
+                  "intensity": "STRONG",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "accent_icicles_light_trails_small_b6",
+                  "target": {
+                    "type": "group",
+                    "id": "ICICLES"
+                  },
+                  "template_id": "gtpl_accent_motif_light_trails_hit_small",
+                  "start": {
+                    "bar": 6,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "HIT",
+                  "param_overrides": {},
+                  "intensity": "STRONG",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "accent_floods_candy_small_b8",
+                  "target": {
+                    "type": "group",
+                    "id": "FLOODS"
+                  },
+                  "template_id": "gtpl_accent_motif_candy_stripes_hit_small",
+                  "start": {
+                    "bar": 8,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "HIT",
+                  "param_overrides": {},
+                  "intensity": "STRONG",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "accent_trees_radial_big_b12",
+                  "target": {
+                    "type": "group",
+                    "id": "TREES"
+                  },
+                  "template_id": "gtpl_accent_motif_radial_rays_hit_big",
+                  "start": {
+                    "bar": 12,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "BURST",
+                  "param_overrides": {},
+                  "intensity": "STRONG",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "accent_arches_candy_big_b16",
+                  "target": {
+                    "type": "group",
+                    "id": "ARCHES"
+                  },
+                  "template_id": "gtpl_accent_motif_candy_stripes_hit_big",
+                  "start": {
+                    "bar": 16,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "BURST",
+                  "param_overrides": {},
+                  "intensity": "STRONG",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "accent_candycanes_candy_small_b20",
+                  "target": {
+                    "type": "group",
+                    "id": "CANDY_CANES"
+                  },
+                  "template_id": "gtpl_accent_motif_candy_stripes_hit_small",
+                  "start": {
+                    "bar": 20,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "HIT",
+                  "param_overrides": {},
+                  "intensity": "STRONG",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "accent_megatree_light_trails_big_b24",
+                  "target": {
+                    "type": "group",
+                    "id": "MEGA_TREE"
+                  },
+                  "template_id": "gtpl_accent_motif_light_trails_hit_big",
+                  "start": {
+                    "bar": 24,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "BURST",
+                  "param_overrides": {},
+                  "intensity": "STRONG",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "accent_matrix_radial_small_b28",
+                  "target": {
+                    "type": "group",
+                    "id": "MATRIX"
+                  },
+                  "template_id": "gtpl_accent_motif_radial_rays_hit_small",
+                  "start": {
+                    "bar": 28,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "HIT",
+                  "param_overrides": {},
+                  "intensity": "STRONG",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "accent_megatree_radial_big_b32",
+                  "target": {
+                    "type": "group",
+                    "id": "MEGA_TREE"
+                  },
+                  "template_id": "gtpl_accent_motif_radial_rays_hit_big",
+                  "start": {
+                    "bar": 32,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "HIT",
+                  "param_overrides": {},
+                  "intensity": "STRONG",
+                  "resolved_asset_ids": []
+                }
+              ],
+              "window": null,
+              "config": null
+            }
+          ]
+        }
+      ],
+      "deviations": [],
+      "narrative_assets": [],
+      "planning_notes": "BUILD section with IMAGERY feel: warm traditional base scene holds for readability; rhythm uses split-based HALVES_LEFT\u2192HALVES_RIGHT sequencing (2-bar steps) to make the yard follow in waves; accents punctuate core targets with radial_rays/light_trails/candy_stripes hits, keeping MEGA_TREE as the recurring beacon and spacing BURST hits at least one bar apart per target.",
+      "start_ms": 132900,
+      "end_ms": 159800
+    },
+    {
+      "schema_version": "section-coordination-plan.v1",
+      "section_id": "instrumental",
+      "theme": {
+        "theme_id": "theme.holiday.traditional",
+        "scope": "SECTION",
+        "tags": [
+          "finale_run",
+          "peak_stack"
+        ],
+        "palette_id": null
+      },
+      "motif_ids": [
+        "light_trails",
+        "radial_rays",
+        "sparkles"
+      ],
+      "palette": {
+        "palette_id": "spec.fire_ice",
+        "role": "ACCENT",
+        "intensity": 1.0,
+        "variant": null
+      },
+      "lane_plans": [
+        {
+          "lane": "BASE",
+          "target_roles": [
+            "BACKGROUND"
+          ],
+          "timing_driver": "BARS",
+          "blend_mode": "add",
+          "coordination_plans": [
+            {
+              "coordination_mode": "UNIFIED",
+              "targets": [
+                {
+                  "type": "group",
+                  "id": "OUTLINE"
+                }
+              ],
+              "placements": [
+                {
+                  "placement_id": "base_outline_trails_ambient",
+                  "target": {
+                    "type": "group",
+                    "id": "OUTLINE"
+                  },
+                  "template_id": "gtpl_base_motif_light_trails_ambient",
+                  "start": {
+                    "bar": 1,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "SECTION",
+                  "param_overrides": {},
+                  "intensity": "SOFT",
+                  "resolved_asset_ids": []
+                }
+              ],
+              "window": null,
+              "config": null
+            },
+            {
+              "coordination_mode": "UNIFIED",
+              "targets": [
+                {
+                  "type": "group",
+                  "id": "WINDOWS"
+                }
+              ],
+              "placements": [
+                {
+                  "placement_id": "base_windows_radial_ambient",
+                  "target": {
+                    "type": "group",
+                    "id": "WINDOWS"
+                  },
+                  "template_id": "gtpl_base_motif_radial_rays_ambient",
+                  "start": {
+                    "bar": 1,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "SECTION",
+                  "param_overrides": {},
+                  "intensity": "MED",
+                  "resolved_asset_ids": []
+                }
+              ],
+              "window": null,
+              "config": null
+            }
+          ]
+        },
+        {
+          "lane": "RHYTHM",
+          "target_roles": [
+            "MID"
+          ],
+          "timing_driver": "BEATS",
+          "blend_mode": "add",
+          "coordination_plans": [
+            {
+              "coordination_mode": "SEQUENCED",
+              "targets": [
+                {
+                  "type": "group",
+                  "id": "CANDY_CANES"
+                },
+                {
+                  "type": "group",
+                  "id": "ARCHES"
+                },
+                {
+                  "type": "group",
+                  "id": "TREES"
+                },
+                {
+                  "type": "group",
+                  "id": "MEGA_TREE"
+                }
+              ],
+              "placements": [],
+              "window": {
+                "start": {
+                  "bar": 1,
+                  "beat": 1,
+                  "timing_hint": "ON_BEAT"
+                },
+                "end": {
+                  "bar": 32,
+                  "beat": 1,
+                  "timing_hint": "ON_BEAT"
+                },
+                "template_id": "gtpl_rhythm_motif_light_trails_drive",
+                "param_overrides": {},
+                "intensity": "STRONG"
+              },
+              "config": {
+                "group_order": [
+                  "CANDY_CANES",
+                  "ARCHES",
+                  "TREES",
+                  "MEGA_TREE"
+                ],
+                "step_unit": "BEAT",
+                "step_duration": 2,
+                "phase_offset": 0.0,
+                "spill_policy": "TRUNCATE",
+                "spatial_intent": "L2R"
+              }
+            },
+            {
+              "coordination_mode": "UNIFIED",
+              "targets": [
+                {
+                  "type": "group",
+                  "id": "MEGA_TREE"
+                }
+              ],
+              "placements": [],
+              "window": null,
+              "config": null
+            }
+          ]
+        },
+        {
+          "lane": "ACCENT",
+          "target_roles": [
+            "HERO"
+          ],
+          "timing_driver": "BEATS",
+          "blend_mode": "add",
+          "coordination_plans": [
+            {
+              "coordination_mode": "UNIFIED",
+              "targets": [
+                {
+                  "type": "group",
+                  "id": "MEGA_TREE"
+                },
+                {
+                  "type": "group",
+                  "id": "ARCHES"
+                },
+                {
+                  "type": "group",
+                  "id": "STARS"
+                },
+                {
+                  "type": "group",
+                  "id": "MATRIX"
+                },
+                {
+                  "type": "group",
+                  "id": "SNOWFLAKES"
+                }
+              ],
+              "placements": [
+                {
+                  "placement_id": "accent_peak1_megatree_radial_big",
+                  "target": {
+                    "type": "group",
+                    "id": "MEGA_TREE"
+                  },
+                  "template_id": "gtpl_accent_motif_radial_rays_hit_big",
+                  "start": {
+                    "bar": 4,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "HIT",
+                  "param_overrides": {},
+                  "intensity": "PEAK",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "accent_peak1_arches_sparkles_big",
+                  "target": {
+                    "type": "group",
+                    "id": "ARCHES"
+                  },
+                  "template_id": "gtpl_accent_motif_sparkles_hit_big",
+                  "start": {
+                    "bar": 4,
+                    "beat": 3,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "HIT",
+                  "param_overrides": {},
+                  "intensity": "PEAK",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "accent_peak1_stars_ice_small",
+                  "target": {
+                    "type": "group",
+                    "id": "STARS"
+                  },
+                  "template_id": "gtpl_accent_motif_ice_hit_small",
+                  "start": {
+                    "bar": 5,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "HIT",
+                  "param_overrides": {},
+                  "intensity": "PEAK",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "accent_peak1_matrix_lighttrails_big",
+                  "target": {
+                    "type": "group",
+                    "id": "MATRIX"
+                  },
+                  "template_id": "gtpl_accent_motif_light_trails_hit_big",
+                  "start": {
+                    "bar": 5,
+                    "beat": 3,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "HIT",
+                  "param_overrides": {},
+                  "intensity": "PEAK",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "accent_peak1_snowflakes_sparkles_small",
+                  "target": {
+                    "type": "group",
+                    "id": "SNOWFLAKES"
+                  },
+                  "template_id": "gtpl_accent_motif_sparkles_hit_small",
+                  "start": {
+                    "bar": 6,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "HIT",
+                  "param_overrides": {},
+                  "intensity": "PEAK",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "accent_peak2_megatree_radial_big",
+                  "target": {
+                    "type": "group",
+                    "id": "MEGA_TREE"
+                  },
+                  "template_id": "gtpl_accent_motif_radial_rays_hit_big",
+                  "start": {
+                    "bar": 16,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "HIT",
+                  "param_overrides": {},
+                  "intensity": "PEAK",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "accent_peak2_arches_lighttrails_big",
+                  "target": {
+                    "type": "group",
+                    "id": "ARCHES"
+                  },
+                  "template_id": "gtpl_accent_motif_light_trails_hit_big",
+                  "start": {
+                    "bar": 16,
+                    "beat": 3,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "HIT",
+                  "param_overrides": {},
+                  "intensity": "PEAK",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "accent_peak2_stars_fire_small",
+                  "target": {
+                    "type": "group",
+                    "id": "STARS"
+                  },
+                  "template_id": "gtpl_accent_motif_fire_hit_small",
+                  "start": {
+                    "bar": 17,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "HIT",
+                  "param_overrides": {},
+                  "intensity": "PEAK",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "accent_peak2_matrix_sparkles_big",
+                  "target": {
+                    "type": "group",
+                    "id": "MATRIX"
+                  },
+                  "template_id": "gtpl_accent_motif_sparkles_hit_big",
+                  "start": {
+                    "bar": 17,
+                    "beat": 3,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "HIT",
+                  "param_overrides": {},
+                  "intensity": "PEAK",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "accent_peak2_snowflakes_radial_small",
+                  "target": {
+                    "type": "group",
+                    "id": "SNOWFLAKES"
+                  },
+                  "template_id": "gtpl_accent_motif_radial_rays_hit_small",
+                  "start": {
+                    "bar": 18,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "HIT",
+                  "param_overrides": {},
+                  "intensity": "PEAK",
+                  "resolved_asset_ids": []
+                }
+              ],
+              "window": null,
+              "config": null
+            }
+          ]
+        }
+      ],
+      "deviations": [
+        {
+          "deviation_id": "dev-base-outline-warm-identity",
+          "intent_field": "Section Notes: Keep BASE largely on core.christmas_traditional",
+          "reason": "No explicit 'core.christmas_traditional' palette/template was provided in the available template list; BASE uses motif-driven traditional-friendly ambients instead.",
+          "mitigation": "Used clean, warm-leaning holiday motifs (light_trails + radial_rays) at SOFT/MED so the section reads as classic while reserving spec.fire_ice for ACCENT punches."
+        }
+      ],
+      "narrative_assets": [],
+      "planning_notes": "PEAK/BUSY instrumental victory lap: BASE holds readable house identity; RHYTHM runs a 2-beat SEQUENCED light_trails engine across canes\u2192arches\u2192trees\u2192mega_tree for constant motion; ACCENT schedules two peak clusters (bars ~4-6 and ~16-18) as staggered PEAK hits (radial_rays + sparkles + light_trails) while keeping only one PEAK start per beat and avoiding same-target overlap.",
+      "start_ms": 159800,
+      "end_ms": 186600
+    },
+    {
+      "schema_version": "section-coordination-plan.v1",
+      "section_id": "outro",
+      "theme": {
+        "theme_id": "theme.holiday.traditional",
+        "scope": "SECTION",
+        "tags": [
+          "button_end",
+          "snap_off"
+        ],
+        "palette_id": null
+      },
+      "motif_ids": [
+        "radial_rays",
+        "sparkles",
+        "candy_stripes"
+      ],
+      "palette": {
+        "palette_id": "core.christmas_traditional",
+        "role": null,
+        "intensity": null,
+        "variant": null
+      },
+      "lane_plans": [
+        {
+          "lane": "BASE",
+          "target_roles": [
+            "BACKGROUND"
+          ],
+          "timing_driver": "BARS",
+          "blend_mode": "add",
+          "coordination_plans": [
+            {
+              "coordination_mode": "UNIFIED",
+              "targets": [
+                {
+                  "type": "group",
+                  "id": "OUTLINE"
+                },
+                {
+                  "type": "group",
+                  "id": "ICICLES"
+                },
+                {
+                  "type": "group",
+                  "id": "TREES"
+                },
+                {
+                  "type": "group",
+                  "id": "FLOODS"
+                },
+                {
+                  "type": "group",
+                  "id": "WINDOWS"
+                }
+              ],
+              "placements": [
+                {
+                  "placement_id": "base_house_outline_soft_hold",
+                  "target": {
+                    "type": "group",
+                    "id": "OUTLINE"
+                  },
+                  "template_id": "gtpl_base_glow_warm",
+                  "start": {
+                    "bar": 1,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "SECTION",
+                  "param_overrides": {},
+                  "intensity": "WHISPER",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "base_house_windows_soft_hold",
+                  "target": {
+                    "type": "group",
+                    "id": "WINDOWS"
+                  },
+                  "template_id": "gtpl_base_glow_warm",
+                  "start": {
+                    "bar": 1,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "SECTION",
+                  "param_overrides": {},
+                  "intensity": "WHISPER",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "base_roof_icicles_soft_hold",
+                  "target": {
+                    "type": "group",
+                    "id": "ICICLES"
+                  },
+                  "template_id": "gtpl_base_glow_warm",
+                  "start": {
+                    "bar": 1,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "SECTION",
+                  "param_overrides": {},
+                  "intensity": "WHISPER",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "base_yard_floods_soft_hold",
+                  "target": {
+                    "type": "group",
+                    "id": "FLOODS"
+                  },
+                  "template_id": "gtpl_base_glow_warm",
+                  "start": {
+                    "bar": 1,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "SECTION",
+                  "param_overrides": {},
+                  "intensity": "WHISPER",
+                  "resolved_asset_ids": []
+                },
+                {
+                  "placement_id": "base_yard_trees_soft_hold",
+                  "target": {
+                    "type": "group",
+                    "id": "TREES"
+                  },
+                  "template_id": "gtpl_base_glow_warm",
+                  "start": {
+                    "bar": 1,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "SECTION",
+                  "param_overrides": {},
+                  "intensity": "WHISPER",
+                  "resolved_asset_ids": []
+                }
+              ],
+              "window": null,
+              "config": null
+            }
+          ]
+        },
+        {
+          "lane": "RHYTHM",
+          "target_roles": [
+            "MID"
+          ],
+          "timing_driver": "BEATS",
+          "blend_mode": "add",
+          "coordination_plans": []
+        },
+        {
+          "lane": "ACCENT",
+          "target_roles": [
+            "HERO"
+          ],
+          "timing_driver": "BEATS",
+          "blend_mode": "add",
+          "coordination_plans": [
+            {
+              "coordination_mode": "UNIFIED",
+              "targets": [
+                {
+                  "type": "group",
+                  "id": "MEGA_TREE"
+                }
+              ],
+              "placements": [
+                {
+                  "placement_id": "accent_megatree_final_beacon_flash",
+                  "target": {
+                    "type": "group",
+                    "id": "MEGA_TREE"
+                  },
+                  "template_id": "gtpl_accent_motif_radial_rays_hit_big",
+                  "start": {
+                    "bar": 1,
+                    "beat": 1,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "HIT",
+                  "param_overrides": {},
+                  "intensity": "STRONG",
+                  "resolved_asset_ids": []
+                }
+              ],
+              "window": null,
+              "config": null
+            },
+            {
+              "coordination_mode": "UNIFIED",
+              "targets": [
+                {
+                  "type": "group",
+                  "id": "STARS"
+                }
+              ],
+              "placements": [
+                {
+                  "placement_id": "accent_stars_single_sparkle_punct",
+                  "target": {
+                    "type": "group",
+                    "id": "STARS"
+                  },
+                  "template_id": "gtpl_accent_motif_sparkles_hit_small",
+                  "start": {
+                    "bar": 1,
+                    "beat": 3,
+                    "timing_hint": "ON_BEAT"
+                  },
+                  "duration": "HIT",
+                  "param_overrides": {},
+                  "intensity": "MED",
+                  "resolved_asset_ids": []
+                }
+              ],
+              "window": null,
+              "config": null
+            }
+          ]
+        }
+      ],
+      "deviations": [],
+      "narrative_assets": [],
+      "planning_notes": "Brief outro release: keep BASE at WHISPER for readability while audio decays; single MEGA_TREE radial_rays beacon at bar1 beat1, single STARS sparkle punctuation at bar1 beat3. No RHYTHM layer to preserve sparse, fast power-down feel; show should snap dark naturally after hits (no long tails).",
+      "start_ms": 186600,
+      "end_ms": 190400
+    }
+  ],
+  "narrative_assets": [],
+  "holistic_evaluation": null
+}

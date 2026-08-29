@@ -33,11 +33,29 @@ _MH_PLAN = _BASELINES / "11_need_a_favor.choreography_plan.json"
 _MH_META = _BASELINES / "11_need_a_favor.pipeline_metadata.json"
 _MH_METRICS = _BASELINES / "11_need_a_favor.metrics.json"
 
+# Display baseline (multi-effect-type). Its head predates the current mediaFile
+# requirement, so the tracked fixture carries a minimal mediaFile stub added for
+# parseability; effect/EffectDB content is the original pre-refactor output.
+_DISPLAY_XSQ = _BASELINES / "02_rudolph_display.xsq"
+_DISPLAY_METRICS = _BASELINES / "02_rudolph_display.metrics.json"
+
 
 def test_baseline_xsq_metrics_are_pinned() -> None:
     """Lock the pre-refactor MH `.xsq` sophistication; guard the extractor from drift."""
     pinned = json.loads(_MH_METRICS.read_text())
     actual = extract_xsq_metrics(_MH_XSQ).to_dict()
+    actual["distinct_effect_types"] = list(actual["distinct_effect_types"])
+    assert actual == pinned
+
+
+def test_display_baseline_xsq_metrics_are_pinned() -> None:
+    """Lock the pre-refactor display `.xsq` sophistication (multi-effect-type output).
+
+    Exercises the extractor on a rich RGB/pixel sequence (11 effect types, 5 layers),
+    complementing the single-modality MH baseline.
+    """
+    pinned = json.loads(_DISPLAY_METRICS.read_text())
+    actual = extract_xsq_metrics(_DISPLAY_XSQ).to_dict()
     actual["distinct_effect_types"] = list(actual["distinct_effect_types"])
     assert actual == pinned
 

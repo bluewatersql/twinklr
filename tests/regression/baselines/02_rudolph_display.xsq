@@ -1,0 +1,560 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<xsequence BaseChannel="0" ChanCtrlBasic="0" ChanCtrlColor="0" FixedPointTiming="1" ModelBlending="true">
+  <head>
+    <version>2024.01</version>
+    <author>Twinklr Display Renderer</author>
+    <author-email />
+    <author-website />
+    <song />
+    <artist />
+    <album />
+    <MusicURL />
+    <comment />
+    <sequenceTiming>20 ms</sequenceTiming>
+    <sequenceType>Media</sequenceType>
+    <sequenceDuration>190.399</sequenceDuration>
+    <mediaFile>02_rudolph_the_red_nosed_reindeer.mp3</mediaFile>
+    <imageDir />
+    <mediaFile />
+  </head>
+  <nextid>1</nextid>
+  <Jukebox />
+  <ColorPalettes>
+    <ColorPalette>C_BUTTON_Palette1=#FF1744,C_BUTTON_Palette2=#FFFFFF,C_BUTTON_Palette3=#B3E5FC,C_BUTTON_Palette4=#000000,C_BUTTON_Palette5=#000000,C_BUTTON_Palette6=#000000,C_BUTTON_Palette7=#000000,C_BUTTON_Palette8=#000000,C_CHECKBOX_Palette1=1,C_CHECKBOX_Palette2=1,C_CHECKBOX_Palette3=1,C_SLIDER_Brightness=65</ColorPalette>
+    <ColorPalette>C_BUTTON_Palette1=#E53935,C_BUTTON_Palette2=#43A047,C_BUTTON_Palette3=#F5F1E8,C_BUTTON_Palette4=#FFFFFF,C_BUTTON_Palette5=#000000,C_BUTTON_Palette6=#000000,C_BUTTON_Palette7=#000000,C_BUTTON_Palette8=#000000,C_CHECKBOX_Palette1=1,C_CHECKBOX_Palette2=1,C_CHECKBOX_Palette3=1,C_CHECKBOX_Palette4=1,C_SLIDER_Brightness=80</ColorPalette>
+    <ColorPalette>C_BUTTON_Palette1=#FFFFFF,C_BUTTON_Palette2=#B3E5FC,C_BUTTON_Palette3=#2979FF,C_BUTTON_Palette4=#000000,C_BUTTON_Palette5=#000000,C_BUTTON_Palette6=#000000,C_BUTTON_Palette7=#000000,C_BUTTON_Palette8=#000000,C_CHECKBOX_Palette1=1,C_CHECKBOX_Palette2=1,C_CHECKBOX_Palette3=1,C_SLIDER_Brightness=40</ColorPalette>
+    <ColorPalette>C_BUTTON_Palette1=#FF1744,C_BUTTON_Palette2=#FFFFFF,C_BUTTON_Palette3=#B3E5FC,C_BUTTON_Palette4=#000000,C_BUTTON_Palette5=#000000,C_BUTTON_Palette6=#000000,C_BUTTON_Palette7=#000000,C_BUTTON_Palette8=#000000,C_CHECKBOX_Palette1=1,C_CHECKBOX_Palette2=1,C_CHECKBOX_Palette3=1,C_SLIDER_Brightness=80</ColorPalette>
+    <ColorPalette>C_BUTTON_Palette1=#E53935,C_BUTTON_Palette2=#43A047,C_BUTTON_Palette3=#F5F1E8,C_BUTTON_Palette4=#FFFFFF,C_BUTTON_Palette5=#000000,C_BUTTON_Palette6=#000000,C_BUTTON_Palette7=#000000,C_BUTTON_Palette8=#000000,C_CHECKBOX_Palette1=1,C_CHECKBOX_Palette2=1,C_CHECKBOX_Palette3=1,C_CHECKBOX_Palette4=1,C_SLIDER_Brightness=90</ColorPalette>
+    <ColorPalette>C_BUTTON_Palette1=#E53935,C_BUTTON_Palette2=#43A047,C_BUTTON_Palette3=#F5F1E8,C_BUTTON_Palette4=#FFFFFF,C_BUTTON_Palette5=#000000,C_BUTTON_Palette6=#000000,C_BUTTON_Palette7=#000000,C_BUTTON_Palette8=#000000,C_CHECKBOX_Palette1=1,C_CHECKBOX_Palette2=1,C_CHECKBOX_Palette3=1,C_CHECKBOX_Palette4=1</ColorPalette>
+    <ColorPalette>C_BUTTON_Palette1=#FF1744,C_BUTTON_Palette2=#FFFFFF,C_BUTTON_Palette3=#B3E5FC,C_BUTTON_Palette4=#000000,C_BUTTON_Palette5=#000000,C_BUTTON_Palette6=#000000,C_BUTTON_Palette7=#000000,C_BUTTON_Palette8=#000000,C_CHECKBOX_Palette1=1,C_CHECKBOX_Palette2=1,C_CHECKBOX_Palette3=1,C_SLIDER_Brightness=90</ColorPalette>
+    <ColorPalette>C_BUTTON_Palette1=#E53935,C_BUTTON_Palette2=#43A047,C_BUTTON_Palette3=#F5F1E8,C_BUTTON_Palette4=#FFFFFF,C_BUTTON_Palette5=#000000,C_BUTTON_Palette6=#000000,C_BUTTON_Palette7=#000000,C_BUTTON_Palette8=#000000,C_CHECKBOX_Palette1=1,C_CHECKBOX_Palette2=1,C_CHECKBOX_Palette3=1,C_CHECKBOX_Palette4=1,C_SLIDER_Brightness=65</ColorPalette>
+    <ColorPalette>C_BUTTON_Palette1=#FFFFFF,C_BUTTON_Palette2=#B3E5FC,C_BUTTON_Palette3=#2979FF,C_BUTTON_Palette4=#000000,C_BUTTON_Palette5=#000000,C_BUTTON_Palette6=#000000,C_BUTTON_Palette7=#000000,C_BUTTON_Palette8=#000000,C_CHECKBOX_Palette1=1,C_CHECKBOX_Palette2=1,C_CHECKBOX_Palette3=1,C_SLIDER_Brightness=13</ColorPalette>
+    <ColorPalette>C_BUTTON_Palette1=#E53935,C_BUTTON_Palette2=#43A047,C_BUTTON_Palette3=#F5F1E8,C_BUTTON_Palette4=#FFFFFF,C_BUTTON_Palette5=#000000,C_BUTTON_Palette6=#000000,C_BUTTON_Palette7=#000000,C_BUTTON_Palette8=#000000,C_CHECKBOX_Palette1=1,C_CHECKBOX_Palette2=1,C_CHECKBOX_Palette3=1,C_CHECKBOX_Palette4=1,C_SLIDER_Brightness=50</ColorPalette>
+    <ColorPalette>C_BUTTON_Palette1=#E53935,C_BUTTON_Palette2=#43A047,C_BUTTON_Palette3=#F5F1E8,C_BUTTON_Palette4=#FFFFFF,C_BUTTON_Palette5=#000000,C_BUTTON_Palette6=#000000,C_BUTTON_Palette7=#000000,C_BUTTON_Palette8=#000000,C_CHECKBOX_Palette1=1,C_CHECKBOX_Palette2=1,C_CHECKBOX_Palette3=1,C_CHECKBOX_Palette4=1,C_SLIDER_Brightness=30</ColorPalette>
+    <ColorPalette>C_BUTTON_Palette1=#E53935,C_BUTTON_Palette2=#43A047,C_BUTTON_Palette3=#F5F1E8,C_BUTTON_Palette4=#FFFFFF,C_BUTTON_Palette5=#000000,C_BUTTON_Palette6=#000000,C_BUTTON_Palette7=#000000,C_BUTTON_Palette8=#000000,C_CHECKBOX_Palette1=1,C_CHECKBOX_Palette2=1,C_CHECKBOX_Palette3=1,C_CHECKBOX_Palette4=1,C_SLIDER_Brightness=15</ColorPalette>
+    <ColorPalette>C_BUTTON_Palette1=#FFFFFF,C_BUTTON_Palette2=#B3E5FC,C_BUTTON_Palette3=#2979FF,C_BUTTON_Palette4=#000000,C_BUTTON_Palette5=#000000,C_BUTTON_Palette6=#000000,C_BUTTON_Palette7=#000000,C_BUTTON_Palette8=#000000,C_CHECKBOX_Palette1=1,C_CHECKBOX_Palette2=1,C_CHECKBOX_Palette3=1,C_SLIDER_Brightness=27</ColorPalette>
+    <ColorPalette>C_BUTTON_Palette1=#FF1744,C_BUTTON_Palette2=#FFFFFF,C_BUTTON_Palette3=#B3E5FC,C_BUTTON_Palette4=#000000,C_BUTTON_Palette5=#000000,C_BUTTON_Palette6=#000000,C_BUTTON_Palette7=#000000,C_BUTTON_Palette8=#000000,C_CHECKBOX_Palette1=1,C_CHECKBOX_Palette2=1,C_CHECKBOX_Palette3=1,C_SLIDER_Brightness=30</ColorPalette>
+    <ColorPalette>C_BUTTON_Palette1=#E53935,C_BUTTON_Palette2=#43A047,C_BUTTON_Palette3=#F5F1E8,C_BUTTON_Palette4=#FFFFFF,C_BUTTON_Palette5=#000000,C_BUTTON_Palette6=#000000,C_BUTTON_Palette7=#000000,C_BUTTON_Palette8=#000000,C_CHECKBOX_Palette1=1,C_CHECKBOX_Palette2=1,C_CHECKBOX_Palette3=1,C_CHECKBOX_Palette4=1,C_SLIDER_Brightness=75</ColorPalette>
+    <ColorPalette>C_BUTTON_Palette1=#FFFFFF,C_BUTTON_Palette2=#B3E5FC,C_BUTTON_Palette3=#2979FF,C_BUTTON_Palette4=#000000,C_BUTTON_Palette5=#000000,C_BUTTON_Palette6=#000000,C_BUTTON_Palette7=#000000,C_BUTTON_Palette8=#000000,C_CHECKBOX_Palette1=1,C_CHECKBOX_Palette2=1,C_CHECKBOX_Palette3=1,C_SLIDER_Brightness=22</ColorPalette>
+    <ColorPalette>C_BUTTON_Palette1=#FFFFFF,C_BUTTON_Palette2=#B3E5FC,C_BUTTON_Palette3=#2979FF,C_BUTTON_Palette4=#000000,C_BUTTON_Palette5=#000000,C_BUTTON_Palette6=#000000,C_BUTTON_Palette7=#000000,C_BUTTON_Palette8=#000000,C_CHECKBOX_Palette1=1,C_CHECKBOX_Palette2=1,C_CHECKBOX_Palette3=1,C_SLIDER_Brightness=81</ColorPalette>
+    <ColorPalette>C_BUTTON_Palette1=#FFFFFF,C_BUTTON_Palette2=#B3E5FC,C_BUTTON_Palette3=#2979FF,C_BUTTON_Palette4=#000000,C_BUTTON_Palette5=#000000,C_BUTTON_Palette6=#000000,C_BUTTON_Palette7=#000000,C_BUTTON_Palette8=#000000,C_CHECKBOX_Palette1=1,C_CHECKBOX_Palette2=1,C_CHECKBOX_Palette3=1,C_SLIDER_Brightness=67</ColorPalette>
+  </ColorPalettes>
+  <EffectDB>
+    <Effect />
+    <Effect>E_SLIDER_Fan_Num_Blades=16,E_SLIDER_Fan_Blade_Width=42,E_SLIDER_Fan_Revolutions=276,E_SLIDER_Fan_Start_Angle=0,E_SLIDER_Fan_Start_Radius=1,E_SLIDER_Fan_End_Radius=250,E_SLIDER_Fan_CenterX=50,E_SLIDER_Fan_CenterY=50,E_SLIDER_Fan_Duration=100,E_SLIDER_Fan_Num_Elements=1,E_CHECKBOX_Fan_Blend_Edges=1,E_CHECKBOX_Fan_Reverse=0,B_CHOICE_BufferStyle=Per Model Default,T_TEXTCTRL_Fadein=0.30,T_CHOICE_In_Transition_Type=Fade,T_TEXTCTRL_Fadeout=0.30,T_CHOICE_Out_Transition_Type=Fade</Effect>
+    <Effect>E_SLIDER_Spirals_Count=4,E_SLIDER_Spirals_Movement=2.0,E_SLIDER_Spirals_Rotation=50,E_SLIDER_Spirals_Thickness=40,E_CHECKBOX_Spirals_Blend=0,E_CHECKBOX_Spirals_3D=0,E_CHECKBOX_Spirals_Grow=0,E_CHECKBOX_Spirals_Shrink=0,B_CHOICE_BufferStyle=Per Model Default,T_TEXTCTRL_Fadein=0.30,T_CHOICE_In_Transition_Type=Fade,T_TEXTCTRL_Fadeout=0.30,T_CHOICE_Out_Transition_Type=Fade</Effect>
+    <Effect>E_CHECKBOX_ColorWash_HFade=1,E_CHECKBOX_ColorWash_VFade=0,E_CHECKBOX_ColorWash_Shimmer=1,E_TEXTCTRL_ColorWash_Cycles=2.0,E_SLIDER_ColorWash_Speed=50,B_CHOICE_BufferStyle=Per Model Default,T_TEXTCTRL_Fadein=0.30,T_CHOICE_In_Transition_Type=Fade,T_TEXTCTRL_Fadeout=0.30,T_CHOICE_Out_Transition_Type=Fade</Effect>
+    <Effect>E_SLIDER_Meteors_Count=15,E_SLIDER_Meteors_Length=30,E_SLIDER_Meteors_Speed=15,E_SLIDER_Meteors_Swirl_Intensity=10,E_CHOICE_Meteors_Effect=Down,E_CHOICE_Meteors_Type=Palette,E_CHECKBOX_Meteors_UseMusic=0,B_CHOICE_BufferStyle=Per Model Default,T_TEXTCTRL_Fadein=0.30,T_CHOICE_In_Transition_Type=Fade,T_TEXTCTRL_Fadeout=0.30,T_CHOICE_Out_Transition_Type=Fade</Effect>
+    <Effect>E_SLIDER_Meteors_Count=30,E_SLIDER_Meteors_Length=15,E_SLIDER_Meteors_Speed=35,E_SLIDER_Meteors_Swirl_Intensity=30,E_CHOICE_Meteors_Effect=Explode,E_CHOICE_Meteors_Type=Palette,E_CHECKBOX_Meteors_UseMusic=0,B_CHOICE_BufferStyle=Per Model Default,T_CHOICE_LayerMethod=Max,T_TEXTCTRL_Fadeout=0.20,T_CHOICE_Out_Transition_Type=Fade</Effect>
+    <Effect>E_SLIDER_Spirals_Count=5,E_SLIDER_Spirals_Movement=4.0,E_SLIDER_Spirals_Rotation=100,E_SLIDER_Spirals_Thickness=25,E_CHECKBOX_Spirals_Blend=0,E_CHECKBOX_Spirals_3D=1,E_CHECKBOX_Spirals_Grow=0,E_CHECKBOX_Spirals_Shrink=0,B_CHOICE_BufferStyle=Per Model Default,T_CHOICE_LayerMethod=Max,T_TEXTCTRL_Fadeout=0.20,T_CHOICE_Out_Transition_Type=Fade</Effect>
+    <Effect>E_SLIDER_Number_Strobes=400,E_SLIDER_Strobe_Duration=1,E_SLIDER_Strobe_Type=3,E_CHECKBOX_Strobe_Music=0,B_CHOICE_BufferStyle=Per Model Default,T_CHOICE_LayerMethod=Max,T_TEXTCTRL_Fadeout=0.20,T_CHOICE_Out_Transition_Type=Fade</Effect>
+    <Effect>E_SLIDER_Fan_Num_Blades=12,E_SLIDER_Fan_Blade_Width=50,E_SLIDER_Fan_Revolutions=400,E_SLIDER_Fan_Start_Angle=0,E_SLIDER_Fan_Start_Radius=1,E_SLIDER_Fan_End_Radius=200,E_SLIDER_Fan_CenterX=50,E_SLIDER_Fan_CenterY=50,E_SLIDER_Fan_Duration=100,E_SLIDER_Fan_Num_Elements=1,E_CHECKBOX_Fan_Blend_Edges=1,E_CHECKBOX_Fan_Reverse=0,B_CHOICE_BufferStyle=Per Model Default,T_TEXTCTRL_Fadeout=0.20,T_CHOICE_Out_Transition_Type=Fade</Effect>
+    <Effect>E_SLIDER_Number_Strobes=200,E_SLIDER_Strobe_Duration=2,E_SLIDER_Strobe_Type=3,E_CHECKBOX_Strobe_Music=0,B_CHOICE_BufferStyle=Per Model Default,T_TEXTCTRL_Fadeout=0.20,T_CHOICE_Out_Transition_Type=Fade</Effect>
+    <Effect>E_SLIDER_Meteors_Count=20,E_SLIDER_Meteors_Length=20,E_SLIDER_Meteors_Speed=25,E_SLIDER_Meteors_Swirl_Intensity=20,E_CHOICE_Meteors_Effect=Down,E_CHOICE_Meteors_Type=Palette,E_CHECKBOX_Meteors_UseMusic=0,B_CHOICE_BufferStyle=Per Model Default,T_TEXTCTRL_Fadeout=0.20,T_CHOICE_Out_Transition_Type=Fade</Effect>
+    <Effect>E_SLIDER_Meteors_Count=30,E_SLIDER_Meteors_Length=15,E_SLIDER_Meteors_Speed=35,E_SLIDER_Meteors_Swirl_Intensity=30,E_CHOICE_Meteors_Effect=Explode,E_CHOICE_Meteors_Type=Palette,E_CHECKBOX_Meteors_UseMusic=0,B_CHOICE_BufferStyle=Per Model Default,T_TEXTCTRL_Fadeout=0.20,T_CHOICE_Out_Transition_Type=Fade</Effect>
+    <Effect>E_SLIDER_Spirals_Count=5,E_SLIDER_Spirals_Movement=4.0,E_SLIDER_Spirals_Rotation=100,E_SLIDER_Spirals_Thickness=25,E_CHECKBOX_Spirals_Blend=0,E_CHECKBOX_Spirals_3D=1,E_CHECKBOX_Spirals_Grow=0,E_CHECKBOX_Spirals_Shrink=0,B_CHOICE_BufferStyle=Per Model Default,T_TEXTCTRL_Fadeout=0.20,T_CHOICE_Out_Transition_Type=Fade</Effect>
+    <Effect>E_SLIDER_Number_Strobes=400,E_SLIDER_Strobe_Duration=1,E_SLIDER_Strobe_Type=3,E_CHECKBOX_Strobe_Music=0,B_CHOICE_BufferStyle=Per Model Default,T_TEXTCTRL_Fadeout=0.20,T_CHOICE_Out_Transition_Type=Fade</Effect>
+    <Effect>E_SLIDER_Twinkle_Count=8,E_SLIDER_Twinkle_Steps=20,E_CHECKBOX_Twinkle_Strobe=0,E_CHECKBOX_Twinkle_ReRandom=1,E_CHOICE_Twinkle_Style=New Render Method,B_CHOICE_BufferStyle=Per Model Default,T_TEXTCTRL_Fadein=0.30,T_CHOICE_In_Transition_Type=Fade,T_TEXTCTRL_Fadeout=0.30,T_CHOICE_Out_Transition_Type=Fade</Effect>
+    <Effect>E_CHOICE_Chase_Type1=Left-Right,E_SLIDER_Chase_Speed1=50,E_CHECKBOX_Chase_Color2Color1=1,E_SLIDER_Chase_Group_All=3,E_SLIDER_Chase_Rotations=1.0,E_CHOICE_Fade_Type=None,E_CHOICE_SingleStrand_Colors=Palette,B_CHOICE_BufferStyle=Per Model Default,T_TEXTCTRL_Fadein=0.30,T_CHOICE_In_Transition_Type=Fade,T_TEXTCTRL_Fadeout=0.30,T_CHOICE_Out_Transition_Type=Fade</Effect>
+    <Effect>E_SLIDER_Spirals_Count=3,E_SLIDER_Spirals_Movement=3.0,E_SLIDER_Spirals_Rotation=80,E_SLIDER_Spirals_Thickness=30,E_CHECKBOX_Spirals_Blend=0,E_CHECKBOX_Spirals_3D=0,E_CHECKBOX_Spirals_Grow=0,E_CHECKBOX_Spirals_Shrink=0,B_CHOICE_BufferStyle=Per Model Default,T_TEXTCTRL_Fadeout=0.20,T_CHOICE_Out_Transition_Type=Fade</Effect>
+    <Effect>E_CHECKBOX_ColorWash_HFade=1,E_CHECKBOX_ColorWash_VFade=0,E_CHECKBOX_ColorWash_Shimmer=0,E_TEXTCTRL_ColorWash_Cycles=1.0,E_SLIDER_ColorWash_Speed=20,B_CHOICE_BufferStyle=Per Model Default,T_TEXTCTRL_Fadein=1.00,T_CHOICE_In_Transition_Type=Fade,T_TEXTCTRL_Fadeout=1.00,T_CHOICE_Out_Transition_Type=Fade</Effect>
+    <Effect>E_SLIDER_Meteors_Count=5,E_SLIDER_Meteors_Length=40,E_SLIDER_Meteors_Speed=5,E_SLIDER_Meteors_Swirl_Intensity=0,E_CHOICE_Meteors_Effect=Down,E_CHOICE_Meteors_Type=Palette,E_CHECKBOX_Meteors_UseMusic=0,B_CHOICE_BufferStyle=Per Model Default,T_TEXTCTRL_Fadein=1.00,T_CHOICE_In_Transition_Type=Fade,T_TEXTCTRL_Fadeout=1.00,T_CHOICE_Out_Transition_Type=Fade</Effect>
+    <Effect>E_SLIDER_Spirals_Count=2,E_SLIDER_Spirals_Movement=0.5,E_SLIDER_Spirals_Rotation=10,E_SLIDER_Spirals_Thickness=60,E_CHECKBOX_Spirals_Blend=1,E_CHECKBOX_Spirals_3D=0,E_CHECKBOX_Spirals_Grow=0,E_CHECKBOX_Spirals_Shrink=0,B_CHOICE_BufferStyle=Per Model Default,T_TEXTCTRL_Fadein=1.00,T_CHOICE_In_Transition_Type=Fade,T_TEXTCTRL_Fadeout=1.00,T_CHOICE_Out_Transition_Type=Fade</Effect>
+    <Effect>E_SLIDER_Fan_Num_Blades=8,E_SLIDER_Fan_Blade_Width=60,E_SLIDER_Fan_Revolutions=100,E_SLIDER_Fan_Start_Angle=0,E_SLIDER_Fan_Start_Radius=1,E_SLIDER_Fan_End_Radius=250,E_SLIDER_Fan_CenterX=50,E_SLIDER_Fan_CenterY=50,E_SLIDER_Fan_Duration=100,E_SLIDER_Fan_Num_Elements=1,E_CHECKBOX_Fan_Blend_Edges=1,E_CHECKBOX_Fan_Reverse=0,B_CHOICE_BufferStyle=Per Model Default,T_TEXTCTRL_Fadein=1.00,T_CHOICE_In_Transition_Type=Fade,T_TEXTCTRL_Fadeout=1.00,T_CHOICE_Out_Transition_Type=Fade</Effect>
+    <Effect>E_SLIDER_Meteors_Count=5,E_SLIDER_Meteors_Length=40,E_SLIDER_Meteors_Speed=5,E_SLIDER_Meteors_Swirl_Intensity=0,E_CHOICE_Meteors_Effect=Down,E_CHOICE_Meteors_Type=Palette,E_CHECKBOX_Meteors_UseMusic=0,B_CHOICE_BufferStyle=Per Model Default,T_CHOICE_LayerMethod=Max,T_TEXTCTRL_Fadein=1.00,T_CHOICE_In_Transition_Type=Fade,T_TEXTCTRL_Fadeout=1.00,T_CHOICE_Out_Transition_Type=Fade</Effect>
+    <Effect>E_SLIDER_Twinkle_Count=3,E_SLIDER_Twinkle_Steps=40,E_CHECKBOX_Twinkle_Strobe=0,E_CHECKBOX_Twinkle_ReRandom=0,E_CHOICE_Twinkle_Style=New Render Method,B_CHOICE_BufferStyle=Per Model Default,T_TEXTCTRL_Fadein=1.00,T_CHOICE_In_Transition_Type=Fade,T_TEXTCTRL_Fadeout=1.00,T_CHOICE_Out_Transition_Type=Fade</Effect>
+    <Effect>E_SLIDER_Snowflakes_Count=50,E_SLIDER_Snowflakes_Speed=30,E_SLIDER_Snowflakes_Type=1,B_CHOICE_BufferStyle=Per Model Default,T_TEXTCTRL_Fadein=0.30,T_CHOICE_In_Transition_Type=Fade,T_TEXTCTRL_Fadeout=0.30,T_CHOICE_Out_Transition_Type=Fade</Effect>
+    <Effect>E_SLIDER_Shockwave_Start_Radius=1,E_SLIDER_Shockwave_End_Radius=250,E_SLIDER_Shockwave_Start_Width=99,E_SLIDER_Shockwave_End_Width=10,E_SLIDER_Shockwave_CenterX=50,E_SLIDER_Shockwave_CenterY=50,E_SLIDER_Shockwave_Accel=5,E_CHECKBOX_Shockwave_Blend_Edges=1,E_CHECKBOX_Shockwave_Scale=0,B_CHOICE_BufferStyle=Per Model Default,T_TEXTCTRL_Fadeout=0.20,T_CHOICE_Out_Transition_Type=Fade</Effect>
+    <Effect>E_SLIDER_Fan_Num_Blades=16,E_SLIDER_Fan_Blade_Width=42,E_SLIDER_Fan_Revolutions=276,E_SLIDER_Fan_Start_Angle=0,E_SLIDER_Fan_Start_Radius=1,E_SLIDER_Fan_End_Radius=250,E_SLIDER_Fan_CenterX=50,E_SLIDER_Fan_CenterY=50,E_SLIDER_Fan_Duration=100,E_SLIDER_Fan_Num_Elements=1,E_CHECKBOX_Fan_Blend_Edges=1,E_CHECKBOX_Fan_Reverse=0,B_CHOICE_BufferStyle=Per Model Default,T_CHOICE_LayerMethod=Max,T_TEXTCTRL_Fadein=0.30,T_CHOICE_In_Transition_Type=Fade,T_TEXTCTRL_Fadeout=0.30,T_CHOICE_Out_Transition_Type=Fade</Effect>
+    <Effect>E_SLIDER_Fan_Num_Blades=20,E_SLIDER_Fan_Blade_Width=35,E_SLIDER_Fan_Revolutions=500,E_SLIDER_Fan_Start_Angle=0,E_SLIDER_Fan_Start_Radius=1,E_SLIDER_Fan_End_Radius=250,E_SLIDER_Fan_CenterX=50,E_SLIDER_Fan_CenterY=50,E_SLIDER_Fan_Duration=100,E_SLIDER_Fan_Num_Elements=2,E_CHECKBOX_Fan_Blend_Edges=1,E_CHECKBOX_Fan_Reverse=0,B_CHOICE_BufferStyle=Per Model Default,T_CHOICE_LayerMethod=Max,T_TEXTCTRL_Fadeout=0.20,T_CHOICE_Out_Transition_Type=Fade</Effect>
+    <Effect>E_SLIDER_Fan_Num_Blades=20,E_SLIDER_Fan_Blade_Width=35,E_SLIDER_Fan_Revolutions=500,E_SLIDER_Fan_Start_Angle=0,E_SLIDER_Fan_Start_Radius=1,E_SLIDER_Fan_End_Radius=250,E_SLIDER_Fan_CenterX=50,E_SLIDER_Fan_CenterY=50,E_SLIDER_Fan_Duration=100,E_SLIDER_Fan_Num_Elements=2,E_CHECKBOX_Fan_Blend_Edges=1,E_CHECKBOX_Fan_Reverse=0,B_CHOICE_BufferStyle=Per Model Default,T_TEXTCTRL_Fadeout=0.20,T_CHOICE_Out_Transition_Type=Fade</Effect>
+    <Effect>E_CHECKBOX_ColorWash_HFade=1,E_CHECKBOX_ColorWash_VFade=0,E_CHECKBOX_ColorWash_Shimmer=0,E_TEXTCTRL_ColorWash_Cycles=1.0,E_SLIDER_ColorWash_Speed=20,B_CHOICE_BufferStyle=Per Model Default,T_CHOICE_LayerMethod=Max,T_TEXTCTRL_Fadein=1.00,T_CHOICE_In_Transition_Type=Fade,T_TEXTCTRL_Fadeout=1.00,T_CHOICE_Out_Transition_Type=Fade</Effect>
+    <Effect>E_TEXTCTRL_Eff_On_End=90,E_TEXTCTRL_Eff_On_Start=90,B_CHOICE_BufferStyle=Per Model Default,T_CHOICE_LayerMethod=Max,T_TEXTCTRL_Fadeout=0.20,T_CHOICE_Out_Transition_Type=Fade</Effect>
+    <Effect>E_TEXTCTRL_Eff_On_End=90,E_TEXTCTRL_Eff_On_Start=90,B_CHOICE_BufferStyle=Per Model Default,T_TEXTCTRL_Fadeout=0.20,T_CHOICE_Out_Transition_Type=Fade</Effect>
+    <Effect>E_TEXTCTRL_Eff_On_End=100,E_TEXTCTRL_Eff_On_Start=100,B_CHOICE_BufferStyle=Per Model Default,T_TEXTCTRL_Fadeout=0.20,T_CHOICE_Out_Transition_Type=Fade</Effect>
+    <Effect>E_SLIDER_Fire_Height=75,E_SLIDER_Fire_HueShift=0,E_TEXTCTRL_Fire_GrowthCycles=2.0,E_CHECKBOX_Fire_GrowWithMusic=1,E_CHOICE_Fire_Location=Bottom,B_CHOICE_BufferStyle=Per Model Default,T_TEXTCTRL_Fadeout=0.20,T_CHOICE_Out_Transition_Type=Fade</Effect>
+    <Effect>E_SLIDER_Snowflakes_Count=50,E_SLIDER_Snowflakes_Speed=30,E_SLIDER_Snowflakes_Type=1,B_CHOICE_BufferStyle=Per Model Default,T_TEXTCTRL_Fadein=1.00,T_CHOICE_In_Transition_Type=Fade,T_TEXTCTRL_Fadeout=1.00,T_CHOICE_Out_Transition_Type=Fade</Effect>
+    <Effect>E_SLIDER_Snowflakes_Count=200,E_SLIDER_Snowflakes_Speed=80,E_SLIDER_Snowflakes_Type=3,B_CHOICE_BufferStyle=Per Model Default,T_CHOICE_LayerMethod=Max,T_TEXTCTRL_Fadeout=0.20,T_CHOICE_Out_Transition_Type=Fade</Effect>
+    <Effect>E_SLIDER_Snowflakes_Count=200,E_SLIDER_Snowflakes_Speed=80,E_SLIDER_Snowflakes_Type=3,B_CHOICE_BufferStyle=Per Model Default,T_TEXTCTRL_Fadeout=0.20,T_CHOICE_Out_Transition_Type=Fade</Effect>
+    <Effect>E_SLIDER_Snowflakes_Count=100,E_SLIDER_Snowflakes_Speed=60,E_SLIDER_Snowflakes_Type=2,B_CHOICE_BufferStyle=Per Model Default,T_TEXTCTRL_Fadeout=0.20,T_CHOICE_Out_Transition_Type=Fade</Effect>
+    <Effect>E_CHECKBOX_ColorWash_HFade=1,E_CHECKBOX_ColorWash_VFade=1,E_CHECKBOX_ColorWash_Shimmer=0,E_TEXTCTRL_ColorWash_Cycles=1.0,E_SLIDER_ColorWash_Speed=20,B_CHOICE_BufferStyle=Per Model Default,T_TEXTCTRL_Fadein=1.00,T_CHOICE_In_Transition_Type=Fade,T_TEXTCTRL_Fadeout=1.00,T_CHOICE_Out_Transition_Type=Fade</Effect>
+    <Effect>E_SLIDER_Twinkle_Count=3,E_SLIDER_Twinkle_Steps=40,E_CHECKBOX_Twinkle_Strobe=0,E_CHECKBOX_Twinkle_ReRandom=0,E_CHOICE_Twinkle_Style=New Render Method,B_CHOICE_BufferStyle=Per Model Default,T_CHOICE_LayerMethod=Max,T_TEXTCTRL_Fadein=1.00,T_CHOICE_In_Transition_Type=Fade,T_TEXTCTRL_Fadeout=1.00,T_CHOICE_Out_Transition_Type=Fade</Effect>
+    <Effect>E_CHECKBOX_ColorWash_HFade=1,E_CHECKBOX_ColorWash_VFade=1,E_CHECKBOX_ColorWash_Shimmer=0,E_TEXTCTRL_ColorWash_Cycles=1.0,E_SLIDER_ColorWash_Speed=20,B_CHOICE_BufferStyle=Per Model Default,T_CHOICE_LayerMethod=Max,T_TEXTCTRL_Fadein=1.00,T_CHOICE_In_Transition_Type=Fade,T_TEXTCTRL_Fadeout=1.00,T_CHOICE_Out_Transition_Type=Fade</Effect>
+  </EffectDB>
+  <DisplayElements>
+    <Element type="model" name="Arches" visible="1" collapsed="0" />
+    <Element type="model" name="Candy Canes" visible="1" collapsed="0" />
+    <Element type="model" name="Floods" visible="1" collapsed="0" />
+    <Element type="model" name="HALVES_LEFT" visible="1" collapsed="0" />
+    <Element type="model" name="HALVES_RIGHT" visible="1" collapsed="0" />
+    <Element type="model" name="HOUSE" visible="1" collapsed="0" />
+    <Element type="model" name="House Outline" visible="1" collapsed="0" />
+    <Element type="model" name="Icicles" visible="1" collapsed="0" />
+    <Element type="model" name="LED Matrix" visible="1" collapsed="0" />
+    <Element type="model" name="Mega Tree" visible="1" collapsed="0" />
+    <Element type="model" name="Roof Stars" visible="1" collapsed="0" />
+    <Element type="model" name="Snowflakes" visible="1" collapsed="0" />
+    <Element type="model" name="Windows" visible="1" collapsed="0" />
+    <Element type="model" name="Wreaths" visible="1" collapsed="0" />
+    <Element type="model" name="Yard Trees" visible="1" collapsed="0" />
+  </DisplayElements>
+  <ElementEffects>
+    <Element type="model" name="Arches">
+      <EffectLayer>
+        <Effect name="Fan" startTime="64440" endTime="69600" ref="1" />
+      </EffectLayer>
+      <EffectLayer>
+        <Effect name="Spirals" startTime="1280" endTime="4720" palette="1" ref="2" />
+        <Effect name="Spirals" startTime="4720" endTime="8160" palette="1" ref="2" />
+        <Effect name="Spirals" startTime="8160" endTime="11600" palette="1" ref="2" />
+        <Effect name="Spirals" startTime="11600" endTime="15040" palette="1" ref="2" />
+        <Effect name="Spirals" startTime="15040" endTime="18480" palette="1" ref="2" />
+        <Effect name="Spirals" startTime="18480" endTime="21900" palette="1" ref="2" />
+        <Effect name="Spirals" startTime="21900" endTime="22320" palette="1" ref="2" />
+        <Effect name="Color Wash" startTime="24060" endTime="34360" palette="2" ref="3" />
+        <Effect name="Spirals" startTime="40800" endTime="44240" palette="1" ref="2" />
+        <Effect name="Spirals" startTime="44240" endTime="47680" palette="1" ref="2" />
+        <Effect name="Spirals" startTime="47680" endTime="51120" palette="1" ref="2" />
+        <Effect name="Spirals" startTime="51120" endTime="54560" palette="1" ref="2" />
+        <Effect name="Spirals" startTime="54560" endTime="56280" palette="1" ref="2" />
+        <Effect name="Spirals" startTime="57560" endTime="62720" palette="3" ref="2" />
+        <Effect name="Fan" startTime="64440" endTime="69600" ref="1" />
+        <Effect name="Color Wash" startTime="71300" endTime="76460" ref="3" />
+        <Effect name="Spirals" startTime="78180" endTime="83340" palette="1" ref="2" />
+        <Effect name="Meteors" startTime="94940" endTime="100100" palette="1" ref="4" />
+        <Effect name="Meteors" startTime="101800" endTime="106960" palette="1" ref="4" />
+        <Effect name="Meteors" startTime="108680" endTime="113840" palette="1" ref="4" />
+        <Effect name="Meteors" startTime="115560" endTime="117280" palette="1" ref="4" />
+        <Effect name="Meteors" startTime="161080" endTime="164520" palette="1" ref="4" />
+        <Effect name="Meteors" startTime="164520" endTime="167960" palette="1" ref="4" />
+        <Effect name="Meteors" startTime="167960" endTime="171400" palette="1" ref="4" />
+        <Effect name="Meteors" startTime="171400" endTime="174840" palette="1" ref="4" />
+        <Effect name="Meteors" startTime="174840" endTime="178280" palette="1" ref="4" />
+        <Effect name="Meteors" startTime="178280" endTime="181700" palette="1" ref="4" />
+        <Effect name="Meteors" startTime="181700" endTime="185140" palette="1" ref="4" />
+        <Effect name="Meteors" startTime="185140" endTime="185560" palette="1" ref="4" />
+      </EffectLayer>
+      <EffectLayer>
+        <Effect name="Meteors" startTime="103100" endTime="103520" palette="4" ref="5" />
+        <Effect name="Spirals" startTime="146060" endTime="147780" palette="4" ref="6" />
+        <Effect name="Strobe" startTime="163240" endTime="163660" palette="5" ref="7" />
+        <Effect name="Meteors" startTime="173540" endTime="173960" palette="5" ref="5" />
+      </EffectLayer>
+      <EffectLayer>
+        <Effect name="Fan" startTime="60140" endTime="61860" palette="6" ref="8" />
+        <Effect name="Strobe" startTime="73880" endTime="75600" palette="6" ref="9" />
+        <Effect name="Meteors" startTime="96220" endTime="96640" palette="4" ref="10" />
+        <Effect name="Meteors" startTime="103100" endTime="103520" palette="4" ref="11" />
+        <Effect name="Meteors" startTime="113400" endTime="113820" palette="4" ref="10" />
+        <Effect name="Spirals" startTime="146060" endTime="147780" palette="4" ref="12" />
+        <Effect name="Strobe" startTime="163240" endTime="163660" palette="5" ref="13" />
+        <Effect name="Meteors" startTime="173540" endTime="173960" palette="5" ref="11" />
+      </EffectLayer>
+    </Element>
+    <Element type="model" name="Candy Canes">
+      <EffectLayer>
+        <Effect name="Fan" startTime="78180" endTime="83340" palette="7" ref="1" />
+      </EffectLayer>
+      <EffectLayer>
+        <Effect name="Spirals" startTime="2140" endTime="5580" palette="1" ref="2" />
+        <Effect name="Spirals" startTime="5580" endTime="9020" palette="1" ref="2" />
+        <Effect name="Spirals" startTime="9020" endTime="12460" palette="1" ref="2" />
+        <Effect name="Spirals" startTime="12460" endTime="15900" palette="1" ref="2" />
+        <Effect name="Spirals" startTime="15900" endTime="19340" palette="1" ref="2" />
+        <Effect name="Spirals" startTime="19340" endTime="22760" palette="1" ref="2" />
+        <Effect name="Spirals" startTime="22760" endTime="23180" palette="1" ref="2" />
+        <Effect name="Twinkle" startTime="24060" endTime="34360" palette="2" ref="14" />
+        <Effect name="Spirals" startTime="41660" endTime="45100" palette="1" ref="2" />
+        <Effect name="Spirals" startTime="45100" endTime="48540" palette="1" ref="2" />
+        <Effect name="Spirals" startTime="48540" endTime="51980" palette="1" ref="2" />
+        <Effect name="Spirals" startTime="51980" endTime="55420" palette="1" ref="2" />
+        <Effect name="Spirals" startTime="55420" endTime="55840" palette="1" ref="2" />
+        <Effect name="SingleStrand" startTime="57560" endTime="62720" ref="15" />
+        <Effect name="Spirals" startTime="64440" endTime="69600" palette="3" ref="2" />
+        <Effect name="Twinkle" startTime="71300" endTime="76460" palette="3" ref="14" />
+        <Effect name="Fan" startTime="78180" endTime="83340" palette="7" ref="1" />
+        <Effect name="Meteors" startTime="93640" endTime="98800" palette="1" ref="4" />
+        <Effect name="Meteors" startTime="100080" endTime="105240" palette="1" ref="4" />
+        <Effect name="Meteors" startTime="106960" endTime="112120" palette="1" ref="4" />
+        <Effect name="Meteors" startTime="113840" endTime="118560" palette="1" ref="4" />
+        <Effect name="Meteors" startTime="161940" endTime="165380" palette="1" ref="4" />
+        <Effect name="Meteors" startTime="165380" endTime="168820" palette="1" ref="4" />
+        <Effect name="Meteors" startTime="168820" endTime="172260" palette="1" ref="4" />
+        <Effect name="Meteors" startTime="172260" endTime="175700" palette="1" ref="4" />
+        <Effect name="Meteors" startTime="175700" endTime="179140" palette="1" ref="4" />
+        <Effect name="Meteors" startTime="179140" endTime="182560" palette="1" ref="4" />
+        <Effect name="Meteors" startTime="182560" endTime="186000" palette="1" ref="4" />
+        <Effect name="Meteors" startTime="186000" endTime="186420" palette="1" ref="4" />
+      </EffectLayer>
+      <EffectLayer>
+        <Effect name="Spirals" startTime="104820" endTime="105240" palette="4" ref="6" />
+      </EffectLayer>
+      <EffectLayer>
+        <Effect name="Fan" startTime="63580" endTime="65300" palette="6" ref="8" />
+        <Effect name="Spirals" startTime="77320" endTime="78180" palette="6" ref="16" />
+        <Effect name="Spirals" startTime="97940" endTime="98360" palette="4" ref="16" />
+        <Effect name="Spirals" startTime="104820" endTime="105240" palette="4" ref="12" />
+        <Effect name="Spirals" startTime="115120" endTime="115540" palette="4" ref="16" />
+        <Effect name="Spirals" startTime="149500" endTime="149920" palette="4" ref="16" />
+      </EffectLayer>
+    </Element>
+    <Element type="model" name="Floods">
+      <EffectLayer>
+        <Effect name="Color Wash" startTime="24060" endTime="39520" palette="8" ref="17" />
+        <Effect name="Meteors" startTime="93640" endTime="118560" palette="9" ref="18" />
+        <Effect name="Spirals" startTime="133160" endTime="159780" palette="10" ref="19" />
+        <Effect name="Color Wash" startTime="186440" endTime="190720" palette="11" ref="17" />
+      </EffectLayer>
+      <EffectLayer>
+        <Effect name="Meteors" startTime="93640" endTime="118560" palette="9" ref="18" />
+      </EffectLayer>
+      <EffectLayer>
+        <Effect name="Twinkle" startTime="0" endTime="10300" palette="7" ref="14" />
+      </EffectLayer>
+      <EffectLayer>
+        <Effect name="Spirals" startTime="139180" endTime="139600" palette="4" ref="16" />
+      </EffectLayer>
+    </Element>
+    <Element type="model" name="HALVES_LEFT">
+      <EffectLayer>
+        <Effect name="Meteors" startTime="133160" endTime="136180" palette="1" ref="4" />
+        <Effect name="Meteors" startTime="136180" endTime="139600" palette="1" ref="4" />
+        <Effect name="Meteors" startTime="139600" endTime="143040" palette="1" ref="4" />
+        <Effect name="Meteors" startTime="143040" endTime="146480" palette="1" ref="4" />
+        <Effect name="Meteors" startTime="146480" endTime="149920" palette="1" ref="4" />
+        <Effect name="Meteors" startTime="149920" endTime="153360" palette="1" ref="4" />
+        <Effect name="Meteors" startTime="153360" endTime="156800" palette="1" ref="4" />
+        <Effect name="Meteors" startTime="156800" endTime="159780" palette="1" ref="4" />
+      </EffectLayer>
+    </Element>
+    <Element type="model" name="HALVES_RIGHT">
+      <EffectLayer>
+        <Effect name="Meteors" startTime="134460" endTime="137900" palette="1" ref="4" />
+        <Effect name="Meteors" startTime="137900" endTime="141320" palette="1" ref="4" />
+        <Effect name="Meteors" startTime="141320" endTime="144760" palette="1" ref="4" />
+        <Effect name="Meteors" startTime="144760" endTime="148200" palette="1" ref="4" />
+        <Effect name="Meteors" startTime="148200" endTime="151640" palette="1" ref="4" />
+        <Effect name="Meteors" startTime="151640" endTime="155080" palette="1" ref="4" />
+        <Effect name="Meteors" startTime="155080" endTime="158520" palette="1" ref="4" />
+        <Effect name="Meteors" startTime="158520" endTime="158940" palette="1" ref="4" />
+      </EffectLayer>
+    </Element>
+    <Element type="model" name="HOUSE">
+      <EffectLayer>
+        <Effect name="Spirals" startTime="93640" endTime="118560" palette="10" ref="19" />
+      </EffectLayer>
+    </Element>
+    <Element type="model" name="House Outline">
+      <EffectLayer>
+        <Effect name="Color Wash" startTime="0" endTime="24040" palette="10" ref="17" />
+        <Effect name="Color Wash" startTime="24060" endTime="39520" palette="12" ref="17" />
+        <Effect name="Fan" startTime="39520" endTime="57560" palette="10" ref="20" />
+        <Effect name="Color Wash" startTime="57560" endTime="78180" palette="13" ref="17" />
+        <Effect name="Spirals" startTime="78180" endTime="93640" palette="10" ref="19" />
+        <Effect name="Color Wash" startTime="118560" endTime="133160" palette="8" ref="17" />
+        <Effect name="Fan" startTime="133160" endTime="159780" palette="9" ref="20" />
+        <Effect name="Meteors" startTime="159800" endTime="186420" palette="10" ref="18" />
+        <Effect name="Color Wash" startTime="186440" endTime="190720" palette="11" ref="17" />
+      </EffectLayer>
+      <EffectLayer>
+        <Effect name="Meteors" startTime="159800" endTime="186420" palette="10" ref="21" />
+      </EffectLayer>
+      <EffectLayer>
+        <Effect name="Fan" startTime="84200" endTime="85920" palette="4" ref="8" />
+        <Effect name="Fan" startTime="134880" endTime="135300" palette="4" ref="8" />
+      </EffectLayer>
+    </Element>
+    <Element type="model" name="Icicles">
+      <EffectLayer>
+        <Effect name="Color Wash" startTime="24060" endTime="39520" palette="12" ref="17" />
+        <Effect name="Twinkle" startTime="93640" endTime="118560" palette="10" ref="22" />
+        <Effect name="Color Wash" startTime="118560" endTime="133160" palette="12" ref="17" />
+        <Effect name="Meteors" startTime="133160" endTime="159780" palette="10" ref="18" />
+        <Effect name="Color Wash" startTime="186440" endTime="190720" palette="11" ref="17" />
+      </EffectLayer>
+      <EffectLayer>
+        <Effect name="Meteors" startTime="133160" endTime="159780" palette="10" ref="18" />
+      </EffectLayer>
+      <EffectLayer>
+        <Effect name="Twinkle" startTime="39520" endTime="49820" palette="7" ref="14" />
+      </EffectLayer>
+      <EffectLayer>
+        <Effect name="Meteors" startTime="137460" endTime="137880" palette="4" ref="10" />
+      </EffectLayer>
+    </Element>
+    <Element type="model" name="LED Matrix">
+      <EffectLayer>
+        <Effect name="Color Wash" startTime="24060" endTime="39520" palette="12" ref="17" />
+      </EffectLayer>
+      <EffectLayer>
+        <Effect name="Snowflakes" startTime="24060" endTime="34360" palette="2" ref="23" />
+      </EffectLayer>
+      <EffectLayer>
+        <Effect name="Spirals" startTime="2580" endTime="4300" palette="4" ref="6" />
+        <Effect name="Strobe" startTime="67020" endTime="68740" palette="6" ref="7" />
+        <Effect name="Meteors" startTime="135740" endTime="137460" palette="4" ref="5" />
+        <Effect name="Meteors" startTime="164100" endTime="164520" palette="5" ref="5" />
+        <Effect name="Strobe" startTime="174400" endTime="174820" palette="5" ref="7" />
+      </EffectLayer>
+      <EffectLayer>
+        <Effect name="Spirals" startTime="2580" endTime="4300" palette="4" ref="12" />
+        <Effect name="Spirals" startTime="11160" endTime="12880" palette="14" ref="16" />
+        <Effect name="Shockwave" startTime="56700" endTime="57560" palette="4" ref="24" />
+        <Effect name="Strobe" startTime="67020" endTime="68740" palette="6" ref="13" />
+        <Effect name="Spirals" startTime="109960" endTime="110380" palette="14" ref="16" />
+        <Effect name="Meteors" startTime="135740" endTime="137460" palette="4" ref="11" />
+        <Effect name="Fan" startTime="156360" endTime="156780" palette="4" ref="8" />
+        <Effect name="Meteors" startTime="164100" endTime="164520" palette="5" ref="11" />
+        <Effect name="Strobe" startTime="174400" endTime="174820" palette="5" ref="13" />
+      </EffectLayer>
+    </Element>
+    <Element type="model" name="Mega Tree">
+      <EffectLayer>
+        <Effect name="Fan" startTime="24060" endTime="39520" palette="12" ref="20" />
+        <Effect name="Fan" startTime="118560" endTime="133160" palette="12" ref="20" />
+      </EffectLayer>
+      <EffectLayer>
+        <Effect name="Fan" startTime="24060" endTime="34360" palette="2" ref="25" />
+        <Effect name="Fan" startTime="71300" endTime="76460" palette="3" ref="25" />
+        <Effect name="Fan" startTime="118560" endTime="128860" palette="2" ref="25" />
+      </EffectLayer>
+      <EffectLayer>
+        <Effect name="Spirals" startTime="0" endTime="3000" palette="1" ref="2" />
+        <Effect name="Spirals" startTime="3000" endTime="6440" palette="1" ref="2" />
+        <Effect name="Spirals" startTime="6440" endTime="9880" palette="1" ref="2" />
+        <Effect name="Spirals" startTime="9880" endTime="13320" palette="1" ref="2" />
+        <Effect name="Spirals" startTime="13320" endTime="16760" palette="1" ref="2" />
+        <Effect name="Spirals" startTime="16760" endTime="20180" palette="1" ref="2" />
+        <Effect name="Spirals" startTime="20180" endTime="24040" palette="1" ref="2" />
+        <Effect name="Fan" startTime="24060" endTime="34360" palette="2" ref="1" />
+        <Effect name="Spirals" startTime="39520" endTime="42520" palette="1" ref="2" />
+        <Effect name="Spirals" startTime="42520" endTime="45960" palette="1" ref="2" />
+        <Effect name="Spirals" startTime="45960" endTime="49400" palette="1" ref="2" />
+        <Effect name="Spirals" startTime="49400" endTime="52840" palette="1" ref="2" />
+        <Effect name="Spirals" startTime="52840" endTime="57560" palette="1" ref="2" />
+        <Effect name="Spirals" startTime="57560" endTime="62720" palette="3" ref="2" />
+        <Effect name="Twinkle" startTime="64440" endTime="69600" ref="14" />
+        <Effect name="Fan" startTime="71300" endTime="76460" palette="3" ref="1" />
+        <Effect name="Color Wash" startTime="78180" endTime="83340" palette="7" ref="3" />
+        <Effect name="Meteors" startTime="98380" endTime="103540" palette="1" ref="4" />
+        <Effect name="Meteors" startTime="105240" endTime="110400" palette="1" ref="4" />
+        <Effect name="Meteors" startTime="112120" endTime="117280" palette="1" ref="4" />
+        <Effect name="Fan" startTime="118560" endTime="128860" palette="2" ref="1" />
+        <Effect name="Meteors" startTime="159800" endTime="162800" palette="1" ref="4" />
+        <Effect name="Meteors" startTime="162800" endTime="166240" palette="1" ref="4" />
+        <Effect name="Meteors" startTime="166240" endTime="169680" palette="1" ref="4" />
+        <Effect name="Meteors" startTime="169680" endTime="173120" palette="1" ref="4" />
+        <Effect name="Meteors" startTime="173120" endTime="176560" palette="1" ref="4" />
+        <Effect name="Meteors" startTime="176560" endTime="179980" palette="1" ref="4" />
+        <Effect name="Meteors" startTime="179980" endTime="183420" palette="1" ref="4" />
+        <Effect name="Meteors" startTime="183420" endTime="186420" palette="1" ref="4" />
+      </EffectLayer>
+      <EffectLayer>
+        <Effect name="Fan" startTime="860" endTime="1280" palette="5" ref="26" />
+        <Effect name="Fan" startTime="4300" endTime="4720" palette="5" ref="26" />
+        <Effect name="Fan" startTime="12880" endTime="13300" palette="5" ref="26" />
+        <Effect name="Fan" startTime="16320" endTime="16740" palette="5" ref="26" />
+        <Effect name="Fan" startTime="19760" endTime="20180" palette="5" ref="26" />
+        <Effect name="Fan" startTime="39520" endTime="39940" palette="5" ref="26" />
+        <Effect name="Fan" startTime="41240" endTime="41660" palette="5" ref="26" />
+        <Effect name="Fan" startTime="42960" endTime="43380" palette="5" ref="26" />
+        <Effect name="Fan" startTime="44680" endTime="45100" palette="5" ref="26" />
+        <Effect name="Fan" startTime="46400" endTime="46820" palette="5" ref="26" />
+        <Effect name="Fan" startTime="48120" endTime="48540" palette="5" ref="26" />
+        <Effect name="Fan" startTime="49840" endTime="50260" palette="5" ref="26" />
+        <Effect name="Fan" startTime="51540" endTime="51960" palette="5" ref="26" />
+        <Effect name="Fan" startTime="53260" endTime="53680" palette="5" ref="26" />
+        <Effect name="Fan" startTime="54980" endTime="55400" palette="5" ref="26" />
+        <Effect name="Spirals" startTime="70440" endTime="72160" palette="6" ref="6" />
+        <Effect name="Fan" startTime="94500" endTime="94920" palette="4" ref="26" />
+        <Effect name="Fan" startTime="99660" endTime="100080" palette="4" ref="26" />
+        <Effect name="Fan" startTime="106540" endTime="106960" palette="4" ref="26" />
+        <Effect name="Fan" startTime="116840" endTime="117260" palette="4" ref="26" />
+        <Effect name="Fan" startTime="133160" endTime="133580" palette="4" ref="26" />
+        <Effect name="Meteors" startTime="152920" endTime="154640" palette="4" ref="5" />
+        <Effect name="Fan" startTime="162380" endTime="162800" palette="5" ref="26" />
+        <Effect name="Fan" startTime="172680" endTime="173100" palette="5" ref="26" />
+        <Effect name="Fan" startTime="186440" endTime="186860" palette="4" ref="26" />
+      </EffectLayer>
+      <EffectLayer>
+        <Effect name="Fan" startTime="860" endTime="1280" palette="5" ref="27" />
+        <Effect name="Fan" startTime="4300" endTime="4720" palette="5" ref="27" />
+        <Effect name="Fan" startTime="9460" endTime="9880" palette="4" ref="8" />
+        <Effect name="Fan" startTime="12880" endTime="13300" palette="5" ref="27" />
+        <Effect name="Fan" startTime="16320" endTime="16740" palette="5" ref="27" />
+        <Effect name="Fan" startTime="19760" endTime="20180" palette="5" ref="27" />
+        <Effect name="Fan" startTime="39520" endTime="39940" palette="5" ref="27" />
+        <Effect name="Fan" startTime="41240" endTime="41660" palette="5" ref="27" />
+        <Effect name="Fan" startTime="42960" endTime="43380" palette="5" ref="27" />
+        <Effect name="Fan" startTime="44680" endTime="45100" palette="5" ref="27" />
+        <Effect name="Fan" startTime="46400" endTime="46820" palette="5" ref="27" />
+        <Effect name="Fan" startTime="48120" endTime="48540" palette="5" ref="27" />
+        <Effect name="Fan" startTime="49840" endTime="50260" palette="5" ref="27" />
+        <Effect name="Fan" startTime="51540" endTime="51960" palette="5" ref="27" />
+        <Effect name="Fan" startTime="53260" endTime="53680" palette="5" ref="27" />
+        <Effect name="Fan" startTime="54980" endTime="55400" palette="5" ref="27" />
+        <Effect name="Spirals" startTime="70440" endTime="72160" palette="6" ref="12" />
+        <Effect name="Fan" startTime="94500" endTime="94920" palette="4" ref="27" />
+        <Effect name="Fan" startTime="99660" endTime="100080" palette="4" ref="27" />
+        <Effect name="Fan" startTime="106540" endTime="106960" palette="4" ref="27" />
+        <Effect name="Fan" startTime="116840" endTime="117260" palette="4" ref="27" />
+        <Effect name="Fan" startTime="133160" endTime="133580" palette="4" ref="27" />
+        <Effect name="Meteors" startTime="152920" endTime="154640" palette="4" ref="11" />
+        <Effect name="Fan" startTime="162380" endTime="162800" palette="5" ref="27" />
+        <Effect name="Fan" startTime="172680" endTime="173100" palette="5" ref="27" />
+        <Effect name="Fan" startTime="186440" endTime="186860" palette="4" ref="27" />
+      </EffectLayer>
+    </Element>
+    <Element type="model" name="Roof Stars">
+      <EffectLayer>
+        <Effect name="Color Wash" startTime="24060" endTime="39520" palette="8" ref="17" />
+      </EffectLayer>
+      <EffectLayer>
+        <Effect name="Color Wash" startTime="24060" endTime="39520" palette="8" ref="28" />
+      </EffectLayer>
+      <EffectLayer>
+        <Effect name="On" startTime="18040" endTime="18460" palette="5" ref="29" />
+        <Effect name="On" startTime="40380" endTime="40800" palette="5" ref="29" />
+        <Effect name="On" startTime="42100" endTime="42520" palette="5" ref="29" />
+        <Effect name="On" startTime="43820" endTime="44240" palette="5" ref="29" />
+        <Effect name="On" startTime="45540" endTime="45960" palette="5" ref="29" />
+        <Effect name="On" startTime="47260" endTime="47680" palette="5" ref="29" />
+        <Effect name="On" startTime="48980" endTime="49400" palette="5" ref="29" />
+        <Effect name="On" startTime="50680" endTime="51100" palette="5" ref="29" />
+        <Effect name="On" startTime="52400" endTime="52820" palette="5" ref="29" />
+        <Effect name="On" startTime="54120" endTime="54540" palette="5" ref="29" />
+        <Effect name="On" startTime="55840" endTime="56260" palette="5" ref="29" />
+      </EffectLayer>
+      <EffectLayer>
+        <Effect name="On" startTime="6020" endTime="6440" palette="5" ref="30" />
+        <Effect name="On" startTime="18040" endTime="18460" palette="5" ref="30" />
+        <Effect name="On" startTime="40380" endTime="40800" palette="5" ref="30" />
+        <Effect name="On" startTime="42100" endTime="42520" palette="5" ref="30" />
+        <Effect name="On" startTime="43820" endTime="44240" palette="5" ref="30" />
+        <Effect name="On" startTime="45540" endTime="45960" palette="5" ref="30" />
+        <Effect name="On" startTime="47260" endTime="47680" palette="5" ref="30" />
+        <Effect name="On" startTime="48980" endTime="49400" palette="5" ref="30" />
+        <Effect name="On" startTime="50680" endTime="51100" palette="5" ref="30" />
+        <Effect name="On" startTime="52400" endTime="52820" palette="5" ref="30" />
+        <Effect name="On" startTime="54120" endTime="54540" palette="5" ref="30" />
+        <Effect name="On" startTime="55840" endTime="56260" palette="5" ref="30" />
+        <Effect name="Fan" startTime="101380" endTime="101800" palette="14" ref="8" />
+        <Effect name="On" startTime="163240" endTime="163660" palette="5" ref="31" />
+        <Effect name="Fire" startTime="173540" endTime="173960" palette="5" ref="32" />
+        <Effect name="Strobe" startTime="187300" endTime="187720" palette="14" ref="9" />
+      </EffectLayer>
+    </Element>
+    <Element type="model" name="Snowflakes">
+      <EffectLayer>
+        <Effect name="Snowflakes" startTime="24060" endTime="39520" palette="12" ref="33" />
+        <Effect name="Snowflakes" startTime="118560" endTime="133160" palette="8" ref="33" />
+      </EffectLayer>
+      <EffectLayer>
+        <Effect name="Snowflakes" startTime="118560" endTime="128860" palette="15" ref="23" />
+      </EffectLayer>
+      <EffectLayer>
+        <Effect name="Strobe" startTime="21480" endTime="21900" palette="4" ref="7" />
+        <Effect name="Snowflakes" startTime="30920" endTime="32640" palette="16" ref="34" />
+      </EffectLayer>
+      <EffectLayer>
+        <Effect name="Strobe" startTime="4300" endTime="4720" palette="4" ref="9" />
+        <Effect name="Fan" startTime="14600" endTime="15020" palette="4" ref="8" />
+        <Effect name="Strobe" startTime="21480" endTime="21900" palette="4" ref="13" />
+        <Effect name="Snowflakes" startTime="30920" endTime="32640" palette="16" ref="35" />
+        <Effect name="Meteors" startTime="108260" endTime="108680" palette="14" ref="10" />
+        <Effect name="Snowflakes" startTime="125440" endTime="125860" palette="17" ref="36" />
+        <Effect name="Strobe" startTime="164100" endTime="164520" palette="5" ref="9" />
+        <Effect name="Fan" startTime="174400" endTime="174820" palette="5" ref="8" />
+      </EffectLayer>
+    </Element>
+    <Element type="model" name="Windows">
+      <EffectLayer>
+        <Effect name="Twinkle" startTime="0" endTime="24040" palette="9" ref="22" />
+        <Effect name="Color Wash" startTime="24060" endTime="39520" palette="8" ref="37" />
+        <Effect name="Twinkle" startTime="39520" endTime="57560" palette="9" ref="22" />
+        <Effect name="Color Wash" startTime="57560" endTime="78180" palette="13" ref="37" />
+        <Effect name="Color Wash" startTime="78180" endTime="93640" palette="10" ref="37" />
+        <Effect name="Twinkle" startTime="133160" endTime="159780" palette="10" ref="22" />
+        <Effect name="Fan" startTime="159800" endTime="186420" palette="9" ref="20" />
+        <Effect name="Color Wash" startTime="186440" endTime="190720" palette="11" ref="17" />
+      </EffectLayer>
+      <EffectLayer>
+        <Effect name="Twinkle" startTime="0" endTime="24040" palette="9" ref="38" />
+        <Effect name="Color Wash" startTime="24060" endTime="39520" palette="8" ref="39" />
+        <Effect name="Twinkle" startTime="39520" endTime="57560" palette="9" ref="38" />
+        <Effect name="Color Wash" startTime="57560" endTime="78180" palette="13" ref="39" />
+        <Effect name="Color Wash" startTime="78180" endTime="93640" palette="10" ref="39" />
+      </EffectLayer>
+      <EffectLayer>
+        <Effect name="Spirals" startTime="87640" endTime="89360" palette="4" ref="16" />
+      </EffectLayer>
+    </Element>
+    <Element type="model" name="Wreaths">
+      <EffectLayer>
+        <Effect name="Strobe" startTime="40380" endTime="40800" palette="4" ref="9" />
+        <Effect name="Strobe" startTime="42100" endTime="42520" palette="4" ref="9" />
+        <Effect name="Strobe" startTime="43820" endTime="44240" palette="4" ref="9" />
+        <Effect name="Strobe" startTime="45540" endTime="45960" palette="4" ref="9" />
+        <Effect name="Strobe" startTime="47260" endTime="47680" palette="4" ref="9" />
+        <Effect name="Strobe" startTime="48980" endTime="49400" palette="4" ref="9" />
+        <Effect name="Strobe" startTime="50680" endTime="51100" palette="4" ref="9" />
+        <Effect name="Strobe" startTime="52400" endTime="52820" palette="4" ref="9" />
+        <Effect name="Strobe" startTime="54120" endTime="54540" palette="4" ref="9" />
+        <Effect name="Strobe" startTime="55840" endTime="56260" palette="4" ref="9" />
+        <Effect name="Strobe" startTime="58420" endTime="58840" palette="6" ref="9" />
+        <Effect name="Strobe" startTime="61860" endTime="62280" palette="6" ref="9" />
+        <Effect name="Strobe" startTime="80760" endTime="82480" palette="4" ref="9" />
+        <Effect name="Strobe" startTime="91060" endTime="92780" palette="4" ref="9" />
+        <Effect name="Fan" startTime="111680" endTime="112100" palette="14" ref="8" />
+      </EffectLayer>
+    </Element>
+    <Element type="model" name="Yard Trees">
+      <EffectLayer>
+        <Effect name="Snowflakes" startTime="24060" endTime="39520" palette="8" ref="33" />
+        <Effect name="Meteors" startTime="93640" endTime="118560" palette="10" ref="18" />
+        <Effect name="Fan" startTime="133160" endTime="159780" palette="10" ref="20" />
+        <Effect name="Color Wash" startTime="186440" endTime="190720" palette="11" ref="17" />
+      </EffectLayer>
+      <EffectLayer>
+        <Effect name="Meteors" startTime="93640" endTime="118560" palette="10" ref="18" />
+      </EffectLayer>
+      <EffectLayer>
+        <Effect name="Spirals" startTime="420" endTime="3860" palette="1" ref="2" />
+        <Effect name="Spirals" startTime="3860" endTime="7300" palette="1" ref="2" />
+        <Effect name="Spirals" startTime="7300" endTime="10740" palette="1" ref="2" />
+        <Effect name="Spirals" startTime="10740" endTime="14180" palette="1" ref="2" />
+        <Effect name="Spirals" startTime="14180" endTime="17620" palette="1" ref="2" />
+        <Effect name="Spirals" startTime="17620" endTime="21040" palette="1" ref="2" />
+        <Effect name="Spirals" startTime="21040" endTime="22760" palette="1" ref="2" />
+        <Effect name="Snowflakes" startTime="24060" endTime="34360" palette="2" ref="23" />
+        <Effect name="Spirals" startTime="39940" endTime="43380" palette="1" ref="2" />
+        <Effect name="Spirals" startTime="43380" endTime="46820" palette="1" ref="2" />
+        <Effect name="Spirals" startTime="46820" endTime="50260" palette="1" ref="2" />
+        <Effect name="Spirals" startTime="50260" endTime="53700" palette="1" ref="2" />
+        <Effect name="Spirals" startTime="53700" endTime="55420" palette="1" ref="2" />
+        <Effect name="Twinkle" startTime="57560" endTime="62720" ref="14" />
+        <Effect name="SingleStrand" startTime="64440" endTime="69600" ref="15" />
+        <Effect name="Spirals" startTime="71300" endTime="76460" ref="2" />
+        <Effect name="SingleStrand" startTime="78180" endTime="83340" palette="7" ref="15" />
+        <Effect name="Meteors" startTime="96660" endTime="101820" palette="1" ref="4" />
+        <Effect name="Meteors" startTime="103520" endTime="108680" palette="1" ref="4" />
+        <Effect name="Meteors" startTime="110400" endTime="115560" palette="1" ref="4" />
+        <Effect name="Meteors" startTime="117280" endTime="117700" palette="1" ref="4" />
+        <Effect name="Meteors" startTime="160220" endTime="163660" palette="1" ref="4" />
+        <Effect name="Meteors" startTime="163660" endTime="167100" palette="1" ref="4" />
+        <Effect name="Meteors" startTime="167100" endTime="170540" palette="1" ref="4" />
+        <Effect name="Meteors" startTime="170540" endTime="173980" palette="1" ref="4" />
+        <Effect name="Meteors" startTime="173980" endTime="177420" palette="1" ref="4" />
+        <Effect name="Meteors" startTime="177420" endTime="180840" palette="1" ref="4" />
+        <Effect name="Meteors" startTime="180840" endTime="184280" palette="1" ref="4" />
+        <Effect name="Meteors" startTime="184280" endTime="186000" palette="1" ref="4" />
+      </EffectLayer>
+      <EffectLayer>
+        <Effect name="Fan" startTime="142620" endTime="144340" palette="4" ref="26" />
+      </EffectLayer>
+      <EffectLayer>
+        <Effect name="Fan" startTime="142620" endTime="144340" palette="4" ref="27" />
+      </EffectLayer>
+    </Element>
+  </ElementEffects>
+</xsequence>
