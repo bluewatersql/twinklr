@@ -322,10 +322,10 @@ machine-local state**, not refactor regressions, and fixed:
    assertions to validate the **resolved** effect (deterministic, known, well-formed) — the
    current runtime-resolution contract.
 
-**Fresh green gate (equivalent to `make validate`, run piecewise because validate's
-dirty-tree guard blocks an uncommitted tree):** `ruff check .` clean; `ruff format --check`
-clean; `mypy .` = success across **723 source files**; `pytest tests/ -m "not local_only"
---no-cov` = **5,636 passed, 24 skipped, 15 deselected, 9 warnings**.
+**Fresh green gate — full `make validate` on a clean tree at commit `ca7ed35`:**
+**✓ All validation checks passed** — format clean, Ruff clean, mypy clean across **723
+source files**, `pytest` = **5,636 passed, 39 skipped, 43 warnings, 89% coverage** (172s).
+This is the new go-forward baseline for the post-refactor-validation change.
 
 **On the "39 skips / 40+ warnings":**
 - The **39 skips are intentional boundaries** — `local_only` (paid/live/xLights), `requires_xlights`,
@@ -342,8 +342,8 @@ recipe (`gtpl_accent_call_response_simple`) whose curated `Color Wash` effect_ty
 a repo bug; and `effect_map` has no `call_response` keyword. Optional: silence the 9
 deprecation warnings by migrating `test_unify.py` off `ProfileCorpusBuilder`.
 
-**To run `make validate` itself (green):** commit these fixes (clean tree) — the four test
-edits + one fixture value; no product source changed.
+**Committed** at `ca7ed35` (four test edits + one fixture value + this note; no product
+source changed); `make validate` verified green from the resulting clean tree.
 
 <!-- wave-2-deep-review -->
 ## Deep review — wave 2 (subpackages the first pass skipped)
