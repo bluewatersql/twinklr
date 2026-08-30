@@ -1,0 +1,2776 @@
+[
+  {
+    "description": "Simple A/B group alternation",
+    "effect_family": "singlestrand",
+    "layers": [
+      {
+        "blend_mode": "NORMAL",
+        "color_source": "palette_primary",
+        "density": 0.8,
+        "effect_type": "SingleStrand",
+        "layer_depth": "MIDGROUND",
+        "layer_index": 0,
+        "layer_name": "Alternate",
+        "mix": 1.0,
+        "motion": [
+          "PULSE"
+        ],
+        "params": {
+          "chase_type": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": "Left-Right"
+          },
+          "color_chase": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": true
+          },
+          "colors": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": "Palette"
+          },
+          "fade_type": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": "None"
+          },
+          "group_count": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 3
+          },
+          "speed": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 50
+          }
+        },
+        "timing_offset_beats": null
+      }
+    ],
+    "model_affinities": [],
+    "motif_compatibility": [],
+    "name": "Alternate - A/B",
+    "palette_spec": {
+      "mode": "DICHROME",
+      "palette_roles": [
+        "primary",
+        "accent"
+      ]
+    },
+    "provenance": {
+      "curator_notes": null,
+      "source": "builtin"
+    },
+    "recipe_id": "gtpl_rhythm_alternate_ab",
+    "recipe_version": "1.0.0",
+    "style_markers": {
+      "complexity": 0.3333333333333333,
+      "energy_affinity": "MED"
+    },
+    "tags": [
+      "ab",
+      "alternate",
+      "groups",
+      "toggle"
+    ],
+    "template_type": "RHYTHM",
+    "timing": {
+      "bars_max": 16,
+      "bars_min": 1,
+      "beats_per_bar": null,
+      "emphasize_downbeats": true,
+      "loop_len_ms": null
+    },
+    "visual_intent": "ABSTRACT"
+  },
+  {
+    "description": "Large radial burst with trailing tail",
+    "effect_family": "shockwave",
+    "layers": [
+      {
+        "blend_mode": "NORMAL",
+        "color_source": "palette_primary",
+        "density": 0.8,
+        "effect_type": "Shockwave",
+        "layer_depth": "FOREGROUND",
+        "layer_index": 0,
+        "layer_name": "Burst",
+        "mix": 1.0,
+        "motion": [
+          "RIPPLE",
+          "FADE"
+        ],
+        "params": {
+          "accel": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 5
+          },
+          "blend_edges": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": true
+          },
+          "end_radius": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 250
+          },
+          "end_width": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 10
+          },
+          "start_radius": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 1
+          },
+          "start_width": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 99
+          }
+        },
+        "timing_offset_beats": null
+      }
+    ],
+    "model_affinities": [],
+    "motif_compatibility": [],
+    "name": "Burst - Big",
+    "palette_spec": {
+      "mode": "DICHROME",
+      "palette_roles": [
+        "primary",
+        "accent"
+      ]
+    },
+    "provenance": {
+      "curator_notes": null,
+      "source": "builtin"
+    },
+    "recipe_id": "gtpl_accent_burst_big",
+    "recipe_version": "1.0.0",
+    "style_markers": {
+      "complexity": 0.3333333333333333,
+      "energy_affinity": "HIGH"
+    },
+    "tags": [
+      "big",
+      "burst",
+      "large",
+      "tail"
+    ],
+    "template_type": "ACCENT",
+    "timing": {
+      "bars_max": 4,
+      "bars_min": 1,
+      "beats_per_bar": null,
+      "emphasize_downbeats": true,
+      "loop_len_ms": null
+    },
+    "visual_intent": "ABSTRACT"
+  },
+  {
+    "description": "Big accent hit using candy stripes motif; strobe/sparkle wipe emphasis.",
+    "effect_family": "spirals",
+    "layers": [
+      {
+        "blend_mode": "NORMAL",
+        "color_source": "palette_primary",
+        "density": 0.85,
+        "effect_type": "Spirals",
+        "layer_depth": "FOREGROUND",
+        "layer_index": 0,
+        "layer_name": "Candy_stripes",
+        "mix": 1.0,
+        "motion": [
+          "WIPE"
+        ],
+        "params": {
+          "3d": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": true
+          },
+          "blend": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": false
+          },
+          "movement": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 4.0
+          },
+          "palette_count": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 5
+          },
+          "rotation": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 100
+          },
+          "thickness": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 25
+          }
+        },
+        "timing_offset_beats": null
+      },
+      {
+        "blend_mode": "ADD",
+        "color_source": "palette_primary",
+        "density": 0.6,
+        "effect_type": "Spirals",
+        "layer_depth": "BACKGROUND",
+        "layer_index": 1,
+        "layer_name": "Wash",
+        "mix": 0.7,
+        "motion": [
+          "PULSE"
+        ],
+        "params": {
+          "3d": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": true
+          },
+          "blend": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": false
+          },
+          "movement": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 4.0
+          },
+          "palette_count": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 5
+          },
+          "rotation": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 100
+          },
+          "thickness": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 25
+          }
+        },
+        "timing_offset_beats": null
+      }
+    ],
+    "model_affinities": [],
+    "motif_compatibility": [],
+    "name": "Candy Stripes - Hit (Big)",
+    "palette_spec": {
+      "mode": "FULL_SPECTRUM",
+      "palette_roles": [
+        "primary"
+      ]
+    },
+    "provenance": {
+      "curator_notes": null,
+      "source": "builtin"
+    },
+    "recipe_id": "gtpl_accent_motif_candy_stripes_hit_big",
+    "recipe_version": "1.0.0",
+    "style_markers": {
+      "complexity": 0.6666666666666666,
+      "energy_affinity": "HIGH"
+    },
+    "tags": [
+      "accent",
+      "big",
+      "candy_stripes",
+      "hit",
+      "wipe"
+    ],
+    "template_type": "ACCENT",
+    "timing": {
+      "bars_max": 8,
+      "bars_min": 1,
+      "beats_per_bar": null,
+      "emphasize_downbeats": true,
+      "loop_len_ms": null
+    },
+    "visual_intent": "GEOMETRIC"
+  },
+  {
+    "description": "Small accent hit using candy stripes motif; strobe/sparkle wipe emphasis.",
+    "effect_family": "spirals",
+    "layers": [
+      {
+        "blend_mode": "NORMAL",
+        "color_source": "palette_primary",
+        "density": 0.55,
+        "effect_type": "Spirals",
+        "layer_depth": "FOREGROUND",
+        "layer_index": 0,
+        "layer_name": "Candy_stripes",
+        "mix": 1.0,
+        "motion": [
+          "WIPE"
+        ],
+        "params": {
+          "3d": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": false
+          },
+          "blend": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": false
+          },
+          "movement": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 3.0
+          },
+          "palette_count": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 3
+          },
+          "rotation": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 80
+          },
+          "thickness": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 30
+          }
+        },
+        "timing_offset_beats": null
+      }
+    ],
+    "model_affinities": [],
+    "motif_compatibility": [],
+    "name": "Candy Stripes - Hit (Small)",
+    "palette_spec": {
+      "mode": "FULL_SPECTRUM",
+      "palette_roles": [
+        "primary"
+      ]
+    },
+    "provenance": {
+      "curator_notes": null,
+      "source": "builtin"
+    },
+    "recipe_id": "gtpl_accent_motif_candy_stripes_hit_small",
+    "recipe_version": "1.0.0",
+    "style_markers": {
+      "complexity": 0.3333333333333333,
+      "energy_affinity": "HIGH"
+    },
+    "tags": [
+      "accent",
+      "candy_stripes",
+      "hit",
+      "small",
+      "wipe"
+    ],
+    "template_type": "ACCENT",
+    "timing": {
+      "bars_max": 8,
+      "bars_min": 1,
+      "beats_per_bar": null,
+      "emphasize_downbeats": true,
+      "loop_len_ms": null
+    },
+    "visual_intent": "GEOMETRIC"
+  },
+  {
+    "description": "Small accent hit using fire motif; strobe/sparkle wipe emphasis.",
+    "effect_family": "fire",
+    "layers": [
+      {
+        "blend_mode": "NORMAL",
+        "color_source": "palette_primary",
+        "density": 0.55,
+        "effect_type": "Fire",
+        "layer_depth": "FOREGROUND",
+        "layer_index": 0,
+        "layer_name": "Fire",
+        "mix": 1.0,
+        "motion": [
+          "WIPE"
+        ],
+        "params": {
+          "grow_with_music": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": true
+          },
+          "growth_cycles": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 2.0
+          },
+          "height": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 75
+          },
+          "hue_shift": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 0
+          },
+          "location": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": "Bottom"
+          }
+        },
+        "timing_offset_beats": null
+      }
+    ],
+    "model_affinities": [],
+    "motif_compatibility": [],
+    "name": "Fire - Hit (Small)",
+    "palette_spec": {
+      "mode": "FULL_SPECTRUM",
+      "palette_roles": [
+        "primary"
+      ]
+    },
+    "provenance": {
+      "curator_notes": null,
+      "source": "builtin"
+    },
+    "recipe_id": "gtpl_accent_motif_fire_hit_small",
+    "recipe_version": "1.0.0",
+    "style_markers": {
+      "complexity": 0.3333333333333333,
+      "energy_affinity": "HIGH"
+    },
+    "tags": [
+      "accent",
+      "fire",
+      "hit",
+      "small",
+      "wipe"
+    ],
+    "template_type": "ACCENT",
+    "timing": {
+      "bars_max": 8,
+      "bars_min": 1,
+      "beats_per_bar": null,
+      "emphasize_downbeats": true,
+      "loop_len_ms": null
+    },
+    "visual_intent": "IMAGERY"
+  },
+  {
+    "description": "Big accent hit using light trails motif; strobe/sparkle wipe emphasis.",
+    "effect_family": "meteors",
+    "layers": [
+      {
+        "blend_mode": "NORMAL",
+        "color_source": "palette_primary",
+        "density": 0.85,
+        "effect_type": "Meteors",
+        "layer_depth": "FOREGROUND",
+        "layer_index": 0,
+        "layer_name": "Light_trails",
+        "mix": 1.0,
+        "motion": [
+          "WIPE"
+        ],
+        "params": {
+          "color_type": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": "Palette"
+          },
+          "count": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 30
+          },
+          "direction": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": "Explode"
+          },
+          "length": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 15
+          },
+          "speed": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 35
+          },
+          "swirl_intensity": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 30
+          }
+        },
+        "timing_offset_beats": null
+      },
+      {
+        "blend_mode": "ADD",
+        "color_source": "palette_primary",
+        "density": 0.6,
+        "effect_type": "Meteors",
+        "layer_depth": "BACKGROUND",
+        "layer_index": 1,
+        "layer_name": "Wash",
+        "mix": 0.7,
+        "motion": [
+          "PULSE"
+        ],
+        "params": {
+          "color_type": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": "Palette"
+          },
+          "count": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 30
+          },
+          "direction": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": "Explode"
+          },
+          "length": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 15
+          },
+          "speed": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 35
+          },
+          "swirl_intensity": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 30
+          }
+        },
+        "timing_offset_beats": null
+      }
+    ],
+    "model_affinities": [],
+    "motif_compatibility": [],
+    "name": "Light Trails - Hit (Big)",
+    "palette_spec": {
+      "mode": "FULL_SPECTRUM",
+      "palette_roles": [
+        "primary"
+      ]
+    },
+    "provenance": {
+      "curator_notes": null,
+      "source": "builtin"
+    },
+    "recipe_id": "gtpl_accent_motif_light_trails_hit_big",
+    "recipe_version": "1.0.0",
+    "style_markers": {
+      "complexity": 0.6666666666666666,
+      "energy_affinity": "HIGH"
+    },
+    "tags": [
+      "accent",
+      "big",
+      "hit",
+      "light_trails",
+      "wipe"
+    ],
+    "template_type": "ACCENT",
+    "timing": {
+      "bars_max": 8,
+      "bars_min": 1,
+      "beats_per_bar": null,
+      "emphasize_downbeats": true,
+      "loop_len_ms": null
+    },
+    "visual_intent": "ABSTRACT"
+  },
+  {
+    "description": "Small accent hit using light trails motif; strobe/sparkle wipe emphasis.",
+    "effect_family": "meteors",
+    "layers": [
+      {
+        "blend_mode": "NORMAL",
+        "color_source": "palette_primary",
+        "density": 0.55,
+        "effect_type": "Meteors",
+        "layer_depth": "FOREGROUND",
+        "layer_index": 0,
+        "layer_name": "Light_trails",
+        "mix": 1.0,
+        "motion": [
+          "WIPE"
+        ],
+        "params": {
+          "color_type": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": "Palette"
+          },
+          "count": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 20
+          },
+          "direction": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": "Down"
+          },
+          "length": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 20
+          },
+          "speed": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 25
+          },
+          "swirl_intensity": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 20
+          }
+        },
+        "timing_offset_beats": null
+      }
+    ],
+    "model_affinities": [],
+    "motif_compatibility": [],
+    "name": "Light Trails - Hit (Small)",
+    "palette_spec": {
+      "mode": "FULL_SPECTRUM",
+      "palette_roles": [
+        "primary"
+      ]
+    },
+    "provenance": {
+      "curator_notes": null,
+      "source": "builtin"
+    },
+    "recipe_id": "gtpl_accent_motif_light_trails_hit_small",
+    "recipe_version": "1.0.0",
+    "style_markers": {
+      "complexity": 0.3333333333333333,
+      "energy_affinity": "HIGH"
+    },
+    "tags": [
+      "accent",
+      "hit",
+      "light_trails",
+      "small",
+      "wipe"
+    ],
+    "template_type": "ACCENT",
+    "timing": {
+      "bars_max": 8,
+      "bars_min": 1,
+      "beats_per_bar": null,
+      "emphasize_downbeats": true,
+      "loop_len_ms": null
+    },
+    "visual_intent": "ABSTRACT"
+  },
+  {
+    "description": "Big accent hit using radial rays motif; strobe/sparkle wipe emphasis.",
+    "effect_family": "fan",
+    "layers": [
+      {
+        "blend_mode": "NORMAL",
+        "color_source": "palette_primary",
+        "density": 0.85,
+        "effect_type": "Fan",
+        "layer_depth": "FOREGROUND",
+        "layer_index": 0,
+        "layer_name": "Radial_rays",
+        "mix": 1.0,
+        "motion": [
+          "WIPE"
+        ],
+        "params": {
+          "blade_width": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 35
+          },
+          "blend_edges": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": true
+          },
+          "end_radius": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 250
+          },
+          "num_blades": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 20
+          },
+          "num_elements": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 2
+          },
+          "reverse": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": false
+          },
+          "revolutions": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 500
+          },
+          "start_radius": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 1
+          }
+        },
+        "timing_offset_beats": null
+      },
+      {
+        "blend_mode": "ADD",
+        "color_source": "palette_primary",
+        "density": 0.6,
+        "effect_type": "Fan",
+        "layer_depth": "BACKGROUND",
+        "layer_index": 1,
+        "layer_name": "Wash",
+        "mix": 0.7,
+        "motion": [
+          "PULSE"
+        ],
+        "params": {
+          "blade_width": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 35
+          },
+          "blend_edges": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": true
+          },
+          "end_radius": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 250
+          },
+          "num_blades": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 20
+          },
+          "num_elements": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 2
+          },
+          "reverse": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": false
+          },
+          "revolutions": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 500
+          },
+          "start_radius": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 1
+          }
+        },
+        "timing_offset_beats": null
+      }
+    ],
+    "model_affinities": [],
+    "motif_compatibility": [],
+    "name": "Radial Rays - Hit (Big)",
+    "palette_spec": {
+      "mode": "FULL_SPECTRUM",
+      "palette_roles": [
+        "primary"
+      ]
+    },
+    "provenance": {
+      "curator_notes": null,
+      "source": "builtin"
+    },
+    "recipe_id": "gtpl_accent_motif_radial_rays_hit_big",
+    "recipe_version": "1.0.0",
+    "style_markers": {
+      "complexity": 0.6666666666666666,
+      "energy_affinity": "HIGH"
+    },
+    "tags": [
+      "accent",
+      "big",
+      "hit",
+      "radial_rays",
+      "wipe"
+    ],
+    "template_type": "ACCENT",
+    "timing": {
+      "bars_max": 8,
+      "bars_min": 1,
+      "beats_per_bar": null,
+      "emphasize_downbeats": true,
+      "loop_len_ms": null
+    },
+    "visual_intent": "GEOMETRIC"
+  },
+  {
+    "description": "Small accent hit using radial rays motif; strobe/sparkle wipe emphasis.",
+    "effect_family": "fan",
+    "layers": [
+      {
+        "blend_mode": "NORMAL",
+        "color_source": "palette_primary",
+        "density": 0.55,
+        "effect_type": "Fan",
+        "layer_depth": "FOREGROUND",
+        "layer_index": 0,
+        "layer_name": "Radial_rays",
+        "mix": 1.0,
+        "motion": [
+          "WIPE"
+        ],
+        "params": {
+          "blade_width": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 50
+          },
+          "blend_edges": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": true
+          },
+          "end_radius": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 200
+          },
+          "num_blades": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 12
+          },
+          "num_elements": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 1
+          },
+          "reverse": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": false
+          },
+          "revolutions": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 400
+          },
+          "start_radius": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 1
+          }
+        },
+        "timing_offset_beats": null
+      }
+    ],
+    "model_affinities": [],
+    "motif_compatibility": [],
+    "name": "Radial Rays - Hit (Small)",
+    "palette_spec": {
+      "mode": "FULL_SPECTRUM",
+      "palette_roles": [
+        "primary"
+      ]
+    },
+    "provenance": {
+      "curator_notes": null,
+      "source": "builtin"
+    },
+    "recipe_id": "gtpl_accent_motif_radial_rays_hit_small",
+    "recipe_version": "1.0.0",
+    "style_markers": {
+      "complexity": 0.3333333333333333,
+      "energy_affinity": "HIGH"
+    },
+    "tags": [
+      "accent",
+      "hit",
+      "radial_rays",
+      "small",
+      "wipe"
+    ],
+    "template_type": "ACCENT",
+    "timing": {
+      "bars_max": 8,
+      "bars_min": 1,
+      "beats_per_bar": null,
+      "emphasize_downbeats": true,
+      "loop_len_ms": null
+    },
+    "visual_intent": "GEOMETRIC"
+  },
+  {
+    "description": "Big accent hit using snowflakes motif; strobe/sparkle wipe emphasis.",
+    "effect_family": "snowflakes",
+    "layers": [
+      {
+        "blend_mode": "NORMAL",
+        "color_source": "palette_primary",
+        "density": 0.85,
+        "effect_type": "Snowflakes",
+        "layer_depth": "FOREGROUND",
+        "layer_index": 0,
+        "layer_name": "Snowflakes",
+        "mix": 1.0,
+        "motion": [
+          "WIPE"
+        ],
+        "params": {
+          "count": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 200
+          },
+          "snowflake_type": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 3
+          },
+          "speed": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 80
+          }
+        },
+        "timing_offset_beats": null
+      },
+      {
+        "blend_mode": "ADD",
+        "color_source": "palette_primary",
+        "density": 0.6,
+        "effect_type": "Snowflakes",
+        "layer_depth": "BACKGROUND",
+        "layer_index": 1,
+        "layer_name": "Wash",
+        "mix": 0.7,
+        "motion": [
+          "PULSE"
+        ],
+        "params": {
+          "count": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 200
+          },
+          "snowflake_type": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 3
+          },
+          "speed": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 80
+          }
+        },
+        "timing_offset_beats": null
+      }
+    ],
+    "model_affinities": [],
+    "motif_compatibility": [],
+    "name": "Snowflakes - Hit (Big)",
+    "palette_spec": {
+      "mode": "ANALOGOUS",
+      "palette_roles": [
+        "primary",
+        "accent"
+      ]
+    },
+    "provenance": {
+      "curator_notes": null,
+      "source": "builtin"
+    },
+    "recipe_id": "gtpl_accent_motif_snowflakes_hit_big",
+    "recipe_version": "1.0.0",
+    "style_markers": {
+      "complexity": 0.6666666666666666,
+      "energy_affinity": "HIGH"
+    },
+    "tags": [
+      "accent",
+      "big",
+      "hit",
+      "snowflakes",
+      "wipe"
+    ],
+    "template_type": "ACCENT",
+    "timing": {
+      "bars_max": 8,
+      "bars_min": 1,
+      "beats_per_bar": null,
+      "emphasize_downbeats": true,
+      "loop_len_ms": null
+    },
+    "visual_intent": "IMAGERY"
+  },
+  {
+    "description": "Small accent hit using snowflakes motif; strobe/sparkle wipe emphasis.",
+    "effect_family": "snowflakes",
+    "layers": [
+      {
+        "blend_mode": "NORMAL",
+        "color_source": "palette_primary",
+        "density": 0.55,
+        "effect_type": "Snowflakes",
+        "layer_depth": "FOREGROUND",
+        "layer_index": 0,
+        "layer_name": "Snowflakes",
+        "mix": 1.0,
+        "motion": [
+          "WIPE"
+        ],
+        "params": {
+          "count": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 100
+          },
+          "snowflake_type": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 2
+          },
+          "speed": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 60
+          }
+        },
+        "timing_offset_beats": null
+      }
+    ],
+    "model_affinities": [],
+    "motif_compatibility": [],
+    "name": "Snowflakes - Hit (Small)",
+    "palette_spec": {
+      "mode": "ANALOGOUS",
+      "palette_roles": [
+        "primary",
+        "accent"
+      ]
+    },
+    "provenance": {
+      "curator_notes": null,
+      "source": "builtin"
+    },
+    "recipe_id": "gtpl_accent_motif_snowflakes_hit_small",
+    "recipe_version": "1.0.0",
+    "style_markers": {
+      "complexity": 0.3333333333333333,
+      "energy_affinity": "HIGH"
+    },
+    "tags": [
+      "accent",
+      "hit",
+      "small",
+      "snowflakes",
+      "wipe"
+    ],
+    "template_type": "ACCENT",
+    "timing": {
+      "bars_max": 8,
+      "bars_min": 1,
+      "beats_per_bar": null,
+      "emphasize_downbeats": true,
+      "loop_len_ms": null
+    },
+    "visual_intent": "IMAGERY"
+  },
+  {
+    "description": "Big accent hit using sparkles motif; strobe/sparkle wipe emphasis.",
+    "effect_family": "strobe",
+    "layers": [
+      {
+        "blend_mode": "NORMAL",
+        "color_source": "palette_primary",
+        "density": 0.85,
+        "effect_type": "Strobe",
+        "layer_depth": "FOREGROUND",
+        "layer_index": 0,
+        "layer_name": "Sparkles",
+        "mix": 1.0,
+        "motion": [
+          "STROBE"
+        ],
+        "params": {
+          "music_reactive": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": false
+          },
+          "num_strobes": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 400
+          },
+          "strobe_duration": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 1
+          },
+          "strobe_type": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 3
+          }
+        },
+        "timing_offset_beats": null
+      },
+      {
+        "blend_mode": "ADD",
+        "color_source": "palette_primary",
+        "density": 0.6,
+        "effect_type": "Strobe",
+        "layer_depth": "BACKGROUND",
+        "layer_index": 1,
+        "layer_name": "Wash",
+        "mix": 0.7,
+        "motion": [
+          "PULSE"
+        ],
+        "params": {
+          "music_reactive": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": false
+          },
+          "num_strobes": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 400
+          },
+          "strobe_duration": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 1
+          },
+          "strobe_type": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 3
+          }
+        },
+        "timing_offset_beats": null
+      }
+    ],
+    "model_affinities": [],
+    "motif_compatibility": [],
+    "name": "Sparkles - Hit (Big)",
+    "palette_spec": {
+      "mode": "FULL_SPECTRUM",
+      "palette_roles": [
+        "primary"
+      ]
+    },
+    "provenance": {
+      "curator_notes": null,
+      "source": "builtin"
+    },
+    "recipe_id": "gtpl_accent_motif_sparkles_hit_big",
+    "recipe_version": "1.0.0",
+    "style_markers": {
+      "complexity": 0.6666666666666666,
+      "energy_affinity": "HIGH"
+    },
+    "tags": [
+      "accent",
+      "big",
+      "hit",
+      "sparkles",
+      "strobe"
+    ],
+    "template_type": "ACCENT",
+    "timing": {
+      "bars_max": 8,
+      "bars_min": 1,
+      "beats_per_bar": null,
+      "emphasize_downbeats": true,
+      "loop_len_ms": null
+    },
+    "visual_intent": "ABSTRACT"
+  },
+  {
+    "description": "Small accent hit using sparkles motif; strobe/sparkle wipe emphasis.",
+    "effect_family": "strobe",
+    "layers": [
+      {
+        "blend_mode": "NORMAL",
+        "color_source": "palette_primary",
+        "density": 0.55,
+        "effect_type": "Strobe",
+        "layer_depth": "FOREGROUND",
+        "layer_index": 0,
+        "layer_name": "Sparkles",
+        "mix": 1.0,
+        "motion": [
+          "STROBE"
+        ],
+        "params": {
+          "music_reactive": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": false
+          },
+          "num_strobes": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 200
+          },
+          "strobe_duration": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 2
+          },
+          "strobe_type": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 3
+          }
+        },
+        "timing_offset_beats": null
+      }
+    ],
+    "model_affinities": [],
+    "motif_compatibility": [],
+    "name": "Sparkles - Hit (Small)",
+    "palette_spec": {
+      "mode": "FULL_SPECTRUM",
+      "palette_roles": [
+        "primary"
+      ]
+    },
+    "provenance": {
+      "curator_notes": null,
+      "source": "builtin"
+    },
+    "recipe_id": "gtpl_accent_motif_sparkles_hit_small",
+    "recipe_version": "1.0.0",
+    "style_markers": {
+      "complexity": 0.3333333333333333,
+      "energy_affinity": "HIGH"
+    },
+    "tags": [
+      "accent",
+      "hit",
+      "small",
+      "sparkles",
+      "strobe"
+    ],
+    "template_type": "ACCENT",
+    "timing": {
+      "bars_max": 8,
+      "bars_min": 1,
+      "beats_per_bar": null,
+      "emphasize_downbeats": true,
+      "loop_len_ms": null
+    },
+    "visual_intent": "ABSTRACT"
+  },
+  {
+    "description": "Cool static glow in blue/white tones",
+    "effect_family": "color_wash",
+    "layers": [
+      {
+        "blend_mode": "NORMAL",
+        "color_source": "palette_primary",
+        "density": 0.9,
+        "effect_type": "Color Wash",
+        "layer_depth": "BACKGROUND",
+        "layer_index": 0,
+        "layer_name": "Glow",
+        "mix": 1.0,
+        "motion": [
+          "NONE"
+        ],
+        "params": {
+          "cycles": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 1.0
+          },
+          "horizontal_fade": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": true
+          },
+          "shimmer": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": false
+          },
+          "speed": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 20
+          },
+          "vertical_fade": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": false
+          }
+        },
+        "timing_offset_beats": null
+      }
+    ],
+    "model_affinities": [],
+    "motif_compatibility": [],
+    "name": "Static Glow - Cool",
+    "palette_spec": {
+      "mode": "MONOCHROME",
+      "palette_roles": [
+        "primary"
+      ]
+    },
+    "provenance": {
+      "curator_notes": null,
+      "source": "builtin"
+    },
+    "recipe_id": "gtpl_base_glow_cool",
+    "recipe_version": "1.0.0",
+    "style_markers": {
+      "complexity": 0.3333333333333333,
+      "energy_affinity": "LOW"
+    },
+    "tags": [
+      "blue",
+      "cool",
+      "glow",
+      "static",
+      "white"
+    ],
+    "template_type": "BASE",
+    "timing": {
+      "bars_max": 64,
+      "bars_min": 4,
+      "beats_per_bar": null,
+      "emphasize_downbeats": true,
+      "loop_len_ms": null
+    },
+    "visual_intent": "ABSTRACT"
+  },
+  {
+    "description": "Warm static glow in amber/gold tones",
+    "effect_family": "color_wash",
+    "layers": [
+      {
+        "blend_mode": "NORMAL",
+        "color_source": "palette_primary",
+        "density": 0.9,
+        "effect_type": "Color Wash",
+        "layer_depth": "BACKGROUND",
+        "layer_index": 0,
+        "layer_name": "Glow",
+        "mix": 1.0,
+        "motion": [
+          "NONE"
+        ],
+        "params": {
+          "cycles": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 1.0
+          },
+          "horizontal_fade": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": true
+          },
+          "shimmer": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": false
+          },
+          "speed": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 20
+          },
+          "vertical_fade": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": false
+          }
+        },
+        "timing_offset_beats": null
+      }
+    ],
+    "model_affinities": [],
+    "motif_compatibility": [],
+    "name": "Static Glow - Warm",
+    "palette_spec": {
+      "mode": "MONOCHROME",
+      "palette_roles": [
+        "primary"
+      ]
+    },
+    "provenance": {
+      "curator_notes": null,
+      "source": "builtin"
+    },
+    "recipe_id": "gtpl_base_glow_warm",
+    "recipe_version": "1.0.0",
+    "style_markers": {
+      "complexity": 0.3333333333333333,
+      "energy_affinity": "LOW"
+    },
+    "tags": [
+      "amber",
+      "glow",
+      "gold",
+      "static",
+      "warm"
+    ],
+    "template_type": "BASE",
+    "timing": {
+      "bars_max": 64,
+      "bars_min": 4,
+      "beats_per_bar": null,
+      "emphasize_downbeats": true,
+      "loop_len_ms": null
+    },
+    "visual_intent": "ABSTRACT"
+  },
+  {
+    "description": "Ambient base look emphasizing candy stripes motif; slow shimmer/fade for continuity.",
+    "effect_family": "spirals",
+    "layers": [
+      {
+        "blend_mode": "NORMAL",
+        "color_source": "palette_primary",
+        "density": 0.8,
+        "effect_type": "Spirals",
+        "layer_depth": "BACKGROUND",
+        "layer_index": 0,
+        "layer_name": "Candy_stripes",
+        "mix": 1.0,
+        "motion": [
+          "SHIMMER"
+        ],
+        "params": {
+          "3d": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": false
+          },
+          "blend": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": true
+          },
+          "movement": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 0.5
+          },
+          "palette_count": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 2
+          },
+          "rotation": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 10
+          },
+          "thickness": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 60
+          }
+        },
+        "timing_offset_beats": null
+      }
+    ],
+    "model_affinities": [],
+    "motif_compatibility": [],
+    "name": "Candy Stripes - Ambient",
+    "palette_spec": {
+      "mode": "DICHROME",
+      "palette_roles": [
+        "primary",
+        "accent"
+      ]
+    },
+    "provenance": {
+      "curator_notes": null,
+      "source": "builtin"
+    },
+    "recipe_id": "gtpl_base_motif_candy_stripes_ambient",
+    "recipe_version": "1.0.0",
+    "style_markers": {
+      "complexity": 0.3333333333333333,
+      "energy_affinity": "LOW"
+    },
+    "tags": [
+      "ambient",
+      "base",
+      "candy_stripes",
+      "color_wash"
+    ],
+    "template_type": "BASE",
+    "timing": {
+      "bars_max": 64,
+      "bars_min": 4,
+      "beats_per_bar": null,
+      "emphasize_downbeats": true,
+      "loop_len_ms": null
+    },
+    "visual_intent": "GEOMETRIC"
+  },
+  {
+    "description": "Ambient base look emphasizing light trails motif; slow shimmer/fade for continuity.",
+    "effect_family": "meteors",
+    "layers": [
+      {
+        "blend_mode": "NORMAL",
+        "color_source": "palette_primary",
+        "density": 0.8,
+        "effect_type": "Meteors",
+        "layer_depth": "BACKGROUND",
+        "layer_index": 0,
+        "layer_name": "Light_trails",
+        "mix": 1.0,
+        "motion": [
+          "SHIMMER"
+        ],
+        "params": {
+          "color_type": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": "Palette"
+          },
+          "count": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 5
+          },
+          "direction": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": "Down"
+          },
+          "length": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 40
+          },
+          "speed": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 5
+          },
+          "swirl_intensity": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 0
+          }
+        },
+        "timing_offset_beats": null
+      },
+      {
+        "blend_mode": "ADD",
+        "color_source": "palette_primary",
+        "density": 0.35,
+        "effect_type": "Meteors",
+        "layer_depth": "FOREGROUND",
+        "layer_index": 1,
+        "layer_name": "Light_trails",
+        "mix": 0.7,
+        "motion": [
+          "SPARKLE"
+        ],
+        "params": {
+          "color_type": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": "Palette"
+          },
+          "count": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 5
+          },
+          "direction": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": "Down"
+          },
+          "length": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 40
+          },
+          "speed": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 5
+          },
+          "swirl_intensity": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 0
+          }
+        },
+        "timing_offset_beats": null
+      }
+    ],
+    "model_affinities": [],
+    "motif_compatibility": [],
+    "name": "Light Trails - Ambient",
+    "palette_spec": {
+      "mode": "FULL_SPECTRUM",
+      "palette_roles": [
+        "primary"
+      ]
+    },
+    "provenance": {
+      "curator_notes": null,
+      "source": "builtin"
+    },
+    "recipe_id": "gtpl_base_motif_light_trails_ambient",
+    "recipe_version": "1.0.0",
+    "style_markers": {
+      "complexity": 0.6666666666666666,
+      "energy_affinity": "LOW"
+    },
+    "tags": [
+      "ambient",
+      "base",
+      "color_wash",
+      "light_trails"
+    ],
+    "template_type": "BASE",
+    "timing": {
+      "bars_max": 64,
+      "bars_min": 4,
+      "beats_per_bar": null,
+      "emphasize_downbeats": true,
+      "loop_len_ms": null
+    },
+    "visual_intent": "ABSTRACT"
+  },
+  {
+    "description": "Ambient base look emphasizing radial rays motif; slow shimmer/fade for continuity.",
+    "effect_family": "fan",
+    "layers": [
+      {
+        "blend_mode": "NORMAL",
+        "color_source": "palette_primary",
+        "density": 0.8,
+        "effect_type": "Fan",
+        "layer_depth": "BACKGROUND",
+        "layer_index": 0,
+        "layer_name": "Radial_rays",
+        "mix": 1.0,
+        "motion": [
+          "SHIMMER"
+        ],
+        "params": {
+          "blade_width": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 60
+          },
+          "blend_edges": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": true
+          },
+          "end_radius": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 250
+          },
+          "num_blades": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 8
+          },
+          "num_elements": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 1
+          },
+          "reverse": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": false
+          },
+          "revolutions": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 100
+          },
+          "start_radius": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 1
+          }
+        },
+        "timing_offset_beats": null
+      }
+    ],
+    "model_affinities": [],
+    "motif_compatibility": [],
+    "name": "Radial Rays - Ambient",
+    "palette_spec": {
+      "mode": "MONOCHROME",
+      "palette_roles": [
+        "primary"
+      ]
+    },
+    "provenance": {
+      "curator_notes": null,
+      "source": "builtin"
+    },
+    "recipe_id": "gtpl_base_motif_radial_rays_ambient",
+    "recipe_version": "1.0.0",
+    "style_markers": {
+      "complexity": 0.3333333333333333,
+      "energy_affinity": "LOW"
+    },
+    "tags": [
+      "ambient",
+      "base",
+      "color_wash",
+      "radial_rays"
+    ],
+    "template_type": "BASE",
+    "timing": {
+      "bars_max": 64,
+      "bars_min": 4,
+      "beats_per_bar": null,
+      "emphasize_downbeats": true,
+      "loop_len_ms": null
+    },
+    "visual_intent": "GEOMETRIC"
+  },
+  {
+    "description": "Ambient base look emphasizing snowflakes motif; slow shimmer/fade for continuity.",
+    "effect_family": "snowflakes",
+    "layers": [
+      {
+        "blend_mode": "NORMAL",
+        "color_source": "palette_primary",
+        "density": 0.8,
+        "effect_type": "Snowflakes",
+        "layer_depth": "BACKGROUND",
+        "layer_index": 0,
+        "layer_name": "Snowflakes",
+        "mix": 1.0,
+        "motion": [
+          "SHIMMER"
+        ],
+        "params": {
+          "count": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 50
+          },
+          "snowflake_type": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 1
+          },
+          "speed": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 30
+          }
+        },
+        "timing_offset_beats": null
+      }
+    ],
+    "model_affinities": [],
+    "motif_compatibility": [],
+    "name": "Snowflakes - Ambient",
+    "palette_spec": {
+      "mode": "ANALOGOUS",
+      "palette_roles": [
+        "primary",
+        "accent"
+      ]
+    },
+    "provenance": {
+      "curator_notes": null,
+      "source": "builtin"
+    },
+    "recipe_id": "gtpl_base_motif_snowflakes_ambient",
+    "recipe_version": "1.0.0",
+    "style_markers": {
+      "complexity": 0.3333333333333333,
+      "energy_affinity": "LOW"
+    },
+    "tags": [
+      "ambient",
+      "base",
+      "color_wash",
+      "snowflakes"
+    ],
+    "template_type": "BASE",
+    "timing": {
+      "bars_max": 64,
+      "bars_min": 4,
+      "beats_per_bar": null,
+      "emphasize_downbeats": true,
+      "loop_len_ms": null
+    },
+    "visual_intent": "IMAGERY"
+  },
+  {
+    "description": "Ambient base look emphasizing sparkles motif; slow shimmer/fade for continuity.",
+    "effect_family": "twinkle",
+    "layers": [
+      {
+        "blend_mode": "NORMAL",
+        "color_source": "palette_primary",
+        "density": 0.8,
+        "effect_type": "Twinkle",
+        "layer_depth": "BACKGROUND",
+        "layer_index": 0,
+        "layer_name": "Sparkles",
+        "mix": 1.0,
+        "motion": [
+          "SHIMMER"
+        ],
+        "params": {
+          "count": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 3
+          },
+          "re_random": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": false
+          },
+          "steps": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 40
+          },
+          "strobe": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": false
+          }
+        },
+        "timing_offset_beats": null
+      },
+      {
+        "blend_mode": "ADD",
+        "color_source": "palette_primary",
+        "density": 0.35,
+        "effect_type": "Twinkle",
+        "layer_depth": "FOREGROUND",
+        "layer_index": 1,
+        "layer_name": "Sparkles",
+        "mix": 0.7,
+        "motion": [
+          "SPARKLE"
+        ],
+        "params": {
+          "count": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 3
+          },
+          "re_random": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": false
+          },
+          "steps": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 40
+          },
+          "strobe": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": false
+          }
+        },
+        "timing_offset_beats": null
+      }
+    ],
+    "model_affinities": [],
+    "motif_compatibility": [],
+    "name": "Sparkles - Ambient",
+    "palette_spec": {
+      "mode": "FULL_SPECTRUM",
+      "palette_roles": [
+        "primary"
+      ]
+    },
+    "provenance": {
+      "curator_notes": null,
+      "source": "builtin"
+    },
+    "recipe_id": "gtpl_base_motif_sparkles_ambient",
+    "recipe_version": "1.0.0",
+    "style_markers": {
+      "complexity": 0.6666666666666666,
+      "energy_affinity": "LOW"
+    },
+    "tags": [
+      "ambient",
+      "base",
+      "color_wash",
+      "sparkles"
+    ],
+    "template_type": "BASE",
+    "timing": {
+      "bars_max": 64,
+      "bars_min": 4,
+      "beats_per_bar": null,
+      "emphasize_downbeats": true,
+      "loop_len_ms": null
+    },
+    "visual_intent": "ABSTRACT"
+  },
+  {
+    "description": "Radial pulse shimmer, subtle outward motion",
+    "effect_family": "twinkle",
+    "layers": [
+      {
+        "blend_mode": "NORMAL",
+        "color_source": "palette_primary",
+        "density": 0.7,
+        "effect_type": "Twinkle",
+        "layer_depth": "BACKGROUND",
+        "layer_index": 0,
+        "layer_name": "Shimmer",
+        "mix": 1.0,
+        "motion": [
+          "RIPPLE"
+        ],
+        "params": {
+          "count": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 3
+          },
+          "re_random": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": false
+          },
+          "steps": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 40
+          },
+          "strobe": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": false
+          }
+        },
+        "timing_offset_beats": null
+      }
+    ],
+    "model_affinities": [],
+    "motif_compatibility": [],
+    "name": "Shimmer - Radial",
+    "palette_spec": {
+      "mode": "MONOCHROME",
+      "palette_roles": [
+        "primary"
+      ]
+    },
+    "provenance": {
+      "curator_notes": null,
+      "source": "builtin"
+    },
+    "recipe_id": "gtpl_base_shimmer_radial",
+    "recipe_version": "1.0.0",
+    "style_markers": {
+      "complexity": 0.3333333333333333,
+      "energy_affinity": "LOW"
+    },
+    "tags": [
+      "outward",
+      "pulse",
+      "radial",
+      "shimmer",
+      "subtle"
+    ],
+    "template_type": "BASE",
+    "timing": {
+      "bars_max": 64,
+      "bars_min": 8,
+      "beats_per_bar": null,
+      "emphasize_downbeats": true,
+      "loop_len_ms": null
+    },
+    "visual_intent": "ABSTRACT"
+  },
+  {
+    "description": "Low-density falling snow haze, subtle ambient",
+    "effect_family": "snowflakes",
+    "layers": [
+      {
+        "blend_mode": "NORMAL",
+        "color_source": "palette_primary",
+        "density": 0.3,
+        "effect_type": "Snowflakes",
+        "layer_depth": "BACKGROUND",
+        "layer_index": 0,
+        "layer_name": "Snow",
+        "mix": 1.0,
+        "motion": [
+          "FADE"
+        ],
+        "params": {
+          "count": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 50
+          },
+          "snowflake_type": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 1
+          },
+          "speed": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 30
+          }
+        },
+        "timing_offset_beats": null
+      }
+    ],
+    "model_affinities": [],
+    "motif_compatibility": [],
+    "name": "Snow Haze - Low",
+    "palette_spec": {
+      "mode": "MONOCHROME",
+      "palette_roles": [
+        "primary"
+      ]
+    },
+    "provenance": {
+      "curator_notes": null,
+      "source": "builtin"
+    },
+    "recipe_id": "gtpl_base_snow_haze_low",
+    "recipe_version": "1.0.0",
+    "style_markers": {
+      "complexity": 0.3333333333333333,
+      "energy_affinity": "LOW"
+    },
+    "tags": [
+      "ambient",
+      "falling",
+      "haze",
+      "low-density",
+      "snow"
+    ],
+    "template_type": "BASE",
+    "timing": {
+      "bars_max": 64,
+      "bars_min": 4,
+      "beats_per_bar": null,
+      "emphasize_downbeats": true,
+      "loop_len_ms": null
+    },
+    "visual_intent": "TEXTURE"
+  },
+  {
+    "description": "Rhythmic motion pattern built around candy stripes; designed for beat-synced movement.",
+    "effect_family": "spirals",
+    "layers": [
+      {
+        "blend_mode": "NORMAL",
+        "color_source": "palette_primary",
+        "density": 0.7,
+        "effect_type": "Spirals",
+        "layer_depth": "MIDGROUND",
+        "layer_index": 0,
+        "layer_name": "Candy_stripes",
+        "mix": 1.0,
+        "motion": [
+          "SWEEP"
+        ],
+        "params": {
+          "3d": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": false
+          },
+          "blend": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": false
+          },
+          "movement": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 2.0
+          },
+          "palette_count": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 4
+          },
+          "rotation": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 50
+          },
+          "thickness": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 40
+          }
+        },
+        "timing_offset_beats": null
+      }
+    ],
+    "model_affinities": [],
+    "motif_compatibility": [],
+    "name": "Candy Stripes - Drive",
+    "palette_spec": {
+      "mode": "DICHROME",
+      "palette_roles": [
+        "primary",
+        "accent"
+      ]
+    },
+    "provenance": {
+      "curator_notes": null,
+      "source": "builtin"
+    },
+    "recipe_id": "gtpl_rhythm_motif_candy_stripes_drive",
+    "recipe_version": "1.0.0",
+    "style_markers": {
+      "complexity": 0.3333333333333333,
+      "energy_affinity": "MED"
+    },
+    "tags": [
+      "candy_stripes",
+      "drive",
+      "rhythm",
+      "wave"
+    ],
+    "template_type": "RHYTHM",
+    "timing": {
+      "bars_max": 32,
+      "bars_min": 2,
+      "beats_per_bar": null,
+      "emphasize_downbeats": true,
+      "loop_len_ms": null
+    },
+    "visual_intent": "GEOMETRIC"
+  },
+  {
+    "description": "Rhythmic motion pattern built around radial rays; designed for beat-synced movement.",
+    "effect_family": "fan",
+    "layers": [
+      {
+        "blend_mode": "NORMAL",
+        "color_source": "palette_primary",
+        "density": 0.7,
+        "effect_type": "Fan",
+        "layer_depth": "MIDGROUND",
+        "layer_index": 0,
+        "layer_name": "Radial_rays",
+        "mix": 1.0,
+        "motion": [
+          "ROLL"
+        ],
+        "params": {
+          "blade_width": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 42
+          },
+          "blend_edges": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": true
+          },
+          "end_radius": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 250
+          },
+          "num_blades": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 16
+          },
+          "num_elements": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 1
+          },
+          "reverse": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": false
+          },
+          "revolutions": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 276
+          },
+          "start_radius": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 1
+          }
+        },
+        "timing_offset_beats": null
+      },
+      {
+        "blend_mode": "ADD",
+        "color_source": "palette_primary",
+        "density": 0.55,
+        "effect_type": "Fan",
+        "layer_depth": "BACKGROUND",
+        "layer_index": 1,
+        "layer_name": "Radial_rays",
+        "mix": 0.7,
+        "motion": [
+          "PULSE"
+        ],
+        "params": {
+          "blade_width": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 42
+          },
+          "blend_edges": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": true
+          },
+          "end_radius": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 250
+          },
+          "num_blades": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 16
+          },
+          "num_elements": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 1
+          },
+          "reverse": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": false
+          },
+          "revolutions": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 276
+          },
+          "start_radius": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 1
+          }
+        },
+        "timing_offset_beats": null
+      }
+    ],
+    "model_affinities": [],
+    "motif_compatibility": [],
+    "name": "Radial Rays - Drive",
+    "palette_spec": {
+      "mode": "FULL_SPECTRUM",
+      "palette_roles": [
+        "primary"
+      ]
+    },
+    "provenance": {
+      "curator_notes": null,
+      "source": "builtin"
+    },
+    "recipe_id": "gtpl_rhythm_motif_radial_rays_drive",
+    "recipe_version": "1.0.0",
+    "style_markers": {
+      "complexity": 0.6666666666666666,
+      "energy_affinity": "MED"
+    },
+    "tags": [
+      "drive",
+      "radial_rays",
+      "rhythm",
+      "wave"
+    ],
+    "template_type": "RHYTHM",
+    "timing": {
+      "bars_max": 32,
+      "bars_min": 2,
+      "beats_per_bar": null,
+      "emphasize_downbeats": true,
+      "loop_len_ms": null
+    },
+    "visual_intent": "GEOMETRIC"
+  },
+  {
+    "description": "Rhythmic motion pattern built around snowflakes; designed for beat-synced movement.",
+    "effect_family": "snowflakes",
+    "layers": [
+      {
+        "blend_mode": "NORMAL",
+        "color_source": "palette_primary",
+        "density": 0.7,
+        "effect_type": "Snowflakes",
+        "layer_depth": "MIDGROUND",
+        "layer_index": 0,
+        "layer_name": "Snowflakes",
+        "mix": 1.0,
+        "motion": [
+          "PULSE"
+        ],
+        "params": {
+          "count": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 50
+          },
+          "snowflake_type": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 1
+          },
+          "speed": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 30
+          }
+        },
+        "timing_offset_beats": null
+      }
+    ],
+    "model_affinities": [],
+    "motif_compatibility": [],
+    "name": "Snowflakes - Drive",
+    "palette_spec": {
+      "mode": "FULL_SPECTRUM",
+      "palette_roles": [
+        "primary"
+      ]
+    },
+    "provenance": {
+      "curator_notes": null,
+      "source": "builtin"
+    },
+    "recipe_id": "gtpl_rhythm_motif_snowflakes_drive",
+    "recipe_version": "1.0.0",
+    "style_markers": {
+      "complexity": 0.3333333333333333,
+      "energy_affinity": "MED"
+    },
+    "tags": [
+      "drive",
+      "rhythm",
+      "snowflakes",
+      "wave"
+    ],
+    "template_type": "RHYTHM",
+    "timing": {
+      "bars_max": 32,
+      "bars_min": 2,
+      "beats_per_bar": null,
+      "emphasize_downbeats": true,
+      "loop_len_ms": null
+    },
+    "visual_intent": "IMAGERY"
+  },
+  {
+    "description": "Rhythmic motion pattern built around sparkles; designed for beat-synced movement.",
+    "effect_family": "twinkle",
+    "layers": [
+      {
+        "blend_mode": "NORMAL",
+        "color_source": "palette_primary",
+        "density": 0.7,
+        "effect_type": "Twinkle",
+        "layer_depth": "MIDGROUND",
+        "layer_index": 0,
+        "layer_name": "Sparkles",
+        "mix": 1.0,
+        "motion": [
+          "SPARKLE"
+        ],
+        "params": {
+          "count": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 8
+          },
+          "re_random": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": true
+          },
+          "steps": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 20
+          },
+          "strobe": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": false
+          }
+        },
+        "timing_offset_beats": null
+      }
+    ],
+    "model_affinities": [],
+    "motif_compatibility": [],
+    "name": "Sparkles - Drive",
+    "palette_spec": {
+      "mode": "FULL_SPECTRUM",
+      "palette_roles": [
+        "primary"
+      ]
+    },
+    "provenance": {
+      "curator_notes": null,
+      "source": "builtin"
+    },
+    "recipe_id": "gtpl_rhythm_motif_sparkles_drive",
+    "recipe_version": "1.0.0",
+    "style_markers": {
+      "complexity": 0.3333333333333333,
+      "energy_affinity": "MED"
+    },
+    "tags": [
+      "drive",
+      "rhythm",
+      "sparkles",
+      "wave"
+    ],
+    "template_type": "RHYTHM",
+    "timing": {
+      "bars_max": 32,
+      "bars_min": 2,
+      "beats_per_bar": null,
+      "emphasize_downbeats": true,
+      "loop_len_ms": null
+    },
+    "visual_intent": "ABSTRACT"
+  },
+  {
+    "description": "Sparkle hits on offbeats",
+    "effect_family": "twinkle",
+    "layers": [
+      {
+        "blend_mode": "NORMAL",
+        "color_source": "palette_primary",
+        "density": 0.5,
+        "effect_type": "Twinkle",
+        "layer_depth": "MIDGROUND",
+        "layer_index": 0,
+        "layer_name": "Sparkle",
+        "mix": 1.0,
+        "motion": [
+          "SPARKLE"
+        ],
+        "params": {
+          "count": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 8
+          },
+          "re_random": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": true
+          },
+          "steps": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": 20
+          },
+          "strobe": {
+            "expr": null,
+            "max_val": null,
+            "min_val": null,
+            "value": false
+          }
+        },
+        "timing_offset_beats": null
+      }
+    ],
+    "model_affinities": [],
+    "motif_compatibility": [],
+    "name": "Sparkle - Offbeat",
+    "palette_spec": {
+      "mode": "DICHROME",
+      "palette_roles": [
+        "primary",
+        "accent"
+      ]
+    },
+    "provenance": {
+      "curator_notes": null,
+      "source": "builtin"
+    },
+    "recipe_id": "gtpl_rhythm_sparkle_offbeat",
+    "recipe_version": "1.0.0",
+    "style_markers": {
+      "complexity": 0.3333333333333333,
+      "energy_affinity": "MED"
+    },
+    "tags": [
+      "hit",
+      "offbeat",
+      "sparkle",
+      "syncopated"
+    ],
+    "template_type": "RHYTHM",
+    "timing": {
+      "bars_max": 16,
+      "bars_min": 1,
+      "beats_per_bar": null,
+      "emphasize_downbeats": true,
+      "loop_len_ms": null
+    },
+    "visual_intent": "ABSTRACT"
+  }
+]

@@ -1,0 +1,21 @@
+{
+  "element_count": 13,
+  "placed_effect_count": 133,
+  "distinct_effect_types": [
+    "Color Wash",
+    "Fan",
+    "Fire",
+    "Meteors",
+    "Shockwave",
+    "SingleStrand",
+    "Snowflakes",
+    "Spirals",
+    "Strobe",
+    "Twinkle"
+  ],
+  "effectdb_entry_count": 30,
+  "value_curve_channel_count": 0,
+  "max_dmx_channel": 0,
+  "max_layers": 5,
+  "sequence_timing": "20 ms"
+}
