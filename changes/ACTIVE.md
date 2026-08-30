@@ -16,9 +16,10 @@ _Last updated: 2026-08-29._
   reasoning/temperature mutual-exclusivity (macro `gpt-5.2` 400) and zero-duration emission
   segments aborting render; plus resolved TLS (proxy CA → `SSL_CERT_FILE`), stale
   `fixture_config.json`/`job_config.json` schema drift, and a too-low 60s agent timeout for
-  reasoning models. Live spend ≈ $1–2 of $25.  Remaining: lift the 60s timeout default +
-  zero-width-overlap transition fix upstream (recommended), display replay-render parity,
-  then lock baseline. Live-run findings:
+  reasoning models. Live spend ≈ $1–2 of $25. Post-run hardening landed: zero-width
+  transitions dropped upstream (`a8ce12b`) and the default agent timeout raised to 300s
+  (`d15ee03`). Remaining: display replay-render parity, then lock baseline. Live-run
+  findings:
   [notes/live-run-prereqs.md](post-refactor-validation/notes/live-run-prereqs.md). Deep
   findings:
   [notes/functional-inventory.md](post-refactor-validation/notes/functional-inventory.md).

@@ -47,8 +47,19 @@ advanced/technical implementation detail.
    `0 <= start < end`. The transition planner produced 12 zero-width overlaps
    (`overlap_start == overlap_end`) for adjacent sections, aborting the whole render. The
    adapter now skips zero-duration segments (with a warning), consistent with its existing
-   empty-channel / unmapped-fixture skips. (Upstream follow-up: the transition planner
-   should not emit zero-width overlaps in the first place.)
+   empty-channel / unmapped-fixture skips.
+
+## Follow-ups completed (2026-08-30)
+
+- **Zero-width transitions dropped upstream** (`a8ce12b`, `sequencer/moving_heads/pipeline.py`).
+  `_detect_and_plan_transitions` now skips any transition whose overlap collapses to
+  `overlap_start >= overlap_end` (snaps and zero-duration crossfades) before it is
+  registered/compiled, so no degenerate segment is produced at the source. The adapter skip
+  above remains as a defensive safety net.
+- **Default agent timeout raised to 300s** (`d15ee03`, `config/models.py`). The 60s default
+  tripped the provider retry deadline on high-effort GPT-5 reasoning calls; the new default
+  matches the retry-policy budget. Per-role overrides still apply. Recipe-builder generation
+  inherits the new default.
 
 ## Environment / config blockers resolved (no code change)
 
@@ -62,11 +73,10 @@ advanced/technical implementation detail.
   `orientation.*`). Iteratively coerced to `fixture_config.valid.json`.
 - **Stale `job_config.json`**: `schema_version` must be `'3.0'`; removed fields `debug`,
   `include_notes_track`, `planner_features`. Coerced to `job_config.live.json`.
-- **60s default agent timeout** (`AgentConfig.timeout_seconds`) is too low for `gpt-5.x`
-  reasoning models (profile alone took ~47s; macro exceeded 60s). Worked around by
-  bumping the scratch job-config agent timeouts to 300s. **Recommended code fix**: raise
-  the default (e.g. to match the 300s retry-policy default) so reasoning-model stages do
-  not flake.
+- **60s default agent timeout** (`AgentConfig.timeout_seconds`) was too low for `gpt-5.x`
+  reasoning models (profile alone took ~47s; macro exceeded 60s). Worked around during the
+  run by bumping the scratch job-config agent timeouts to 300s, then fixed at the source by
+  raising the default to 300s (`d15ee03`).
 
 ## Original provisioning note (historical)
 
