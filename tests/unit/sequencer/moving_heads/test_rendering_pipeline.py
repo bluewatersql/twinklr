@@ -26,9 +26,9 @@ from twinklr.core.config.fixtures.dmx import DmxMapping
 from twinklr.core.config.fixtures.instances import FixtureConfig, FixtureInstance
 from twinklr.core.config.models import JobConfig
 from twinklr.core.formats.xlights.sequence.models.xsq import TimingTrack
-from twinklr.core.sequencer.models.enum import ChannelName, Intensity
+from twinklr.core.sequencer.models.enum import ChannelName, Intensity, TransitionMode
 from twinklr.core.sequencer.models.template import Color
-from twinklr.core.sequencer.models.transition import TransitionRegistry
+from twinklr.core.sequencer.models.transition import TransitionHint, TransitionRegistry
 from twinklr.core.sequencer.moving_heads.compile.intent_resolution import apply_template_intent
 from twinklr.core.sequencer.moving_heads.export.dmx_settings_builder import DmxSettingsBuilder
 from twinklr.core.sequencer.moving_heads.libraries.color import ColorPreset
@@ -375,6 +375,46 @@ class TestTransitionPlanning:
         )
         registry = rp._detect_and_plan_transitions()
         assert len(registry.transitions) == 1
+
+    def test_zero_width_snap_transition_is_not_registered(self) -> None:
+        """A snap boundary (zero-width overlap) must not be registered as a transition.
+
+        A snap is an instantaneous cut with no blend region; ``_calculate_overlap`` returns
+        ``overlap_start == overlap_end``. Registering it compiles a zero-duration
+        ``FixtureSegment`` that ``EmissionRequest`` rejects (``0 <= start < end``) — a live
+        run emitted 12 such segments and aborted the render. The pipeline must drop
+        zero-width overlaps upstream so no degenerate segment is ever produced.
+        """
+        job = JobConfig()
+        job.transitions.enabled = True
+        plan = ChoreographyPlan(
+            sections=[
+                PlanSection(
+                    section_name="intro",
+                    start_bar=1,
+                    end_bar=4,
+                    template_id="sweep_lr_fan_hold",
+                ),
+                PlanSection(
+                    section_name="verse",
+                    start_bar=5,
+                    end_bar=8,
+                    template_id="pendulum_chevron_breathe",
+                    transition_in=TransitionHint(mode=TransitionMode.SNAP, duration_bars=0.0),
+                ),
+            ]
+        )
+        rp = RenderingPipeline(
+            choreography_plan=plan,
+            beat_grid=_make_beat_grid(),
+            fixture_group=_make_fixture_group(),
+            job_config=job,
+        )
+
+        registry = rp._detect_and_plan_transitions()
+
+        assert all(t.overlap_end_ms > t.overlap_start_ms for t in registry.transitions)
+        assert len(registry.transitions) == 0
 
     def test_no_transitions_when_disabled(self) -> None:
         """Transitions can be explicitly disabled."""

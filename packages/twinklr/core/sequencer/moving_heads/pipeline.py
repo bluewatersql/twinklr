@@ -456,6 +456,17 @@ class RenderingPipeline:
                 transition_id=transition_id,
             )
 
+            # A zero-width overlap (a snap, or a transition whose duration collapsed to 0)
+            # has no blend region. Compiling it would emit a zero-duration FixtureSegment
+            # that the emission layer rejects (0 <= start < end), so drop it here rather than
+            # produce a degenerate segment downstream.
+            if transition_plan.overlap_end_ms <= transition_plan.overlap_start_ms:
+                logger.debug(
+                    f"Skipping zero-width transition {transition_id}: overlap collapses at "
+                    f"{transition_plan.overlap_start_ms}ms (nothing to blend)"
+                )
+                continue
+
             # Validate feasibility using actual section durations
             is_feasible, warnings = self.transition_planner.validate_transition_feasibility(
                 transition_plan, source_duration_ms, target_duration_ms
