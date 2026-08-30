@@ -35,7 +35,14 @@ class AgentConfig(BaseModel):
 
     max_tokens: int = Field(default=50000, gt=0, description="Maximum tokens for LLM response")
 
-    timeout_seconds: int = Field(default=60, gt=0, description="Timeout for LLM API call")
+    timeout_seconds: int = Field(
+        default=300,
+        gt=0,
+        description=(
+            "Timeout for one LLM API call. Defaults to 300s to tolerate GPT-5 reasoning "
+            "latency (high-effort calls routinely exceed 60s); matches the retry-policy budget."
+        ),
+    )
 
 
 class LLMLoggingConfig(BaseModel):

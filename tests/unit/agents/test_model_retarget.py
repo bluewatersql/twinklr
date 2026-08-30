@@ -186,6 +186,18 @@ def test_agent_config_allows_model_policy_to_omit_temperature() -> None:
     assert get_macro_planner_spec(config=config).temperature is None
 
 
+def test_agent_config_default_timeout_accommodates_reasoning_models() -> None:
+    """The default per-agent timeout must tolerate GPT-5 reasoning latency.
+
+    A live moving-head run exceeded the previous 60s default at the macro planner (a
+    high-effort GPT-5 reasoning call), tripping the provider retry deadline before any
+    output. The default now matches the retry policy's own 300s budget so reasoning-model
+    stages do not flake; operators can still lower it per role.
+    """
+    assert AgentConfig().timeout_seconds == 300
+    assert get_macro_planner_spec().timeout_seconds == 300
+
+
 @pytest.mark.asyncio
 async def test_configured_model_reaches_fake_provider(tmp_path) -> None:
     """A configured role model is the one sent on every provider request."""

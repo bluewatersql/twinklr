@@ -293,7 +293,7 @@ def test_generate_candidates_uses_central_sol_tier_request_defaults(
         "temperature": 0.9,
         "reasoning_effort": "high",
         "max_tokens": 50000,
-        "timeout_seconds": 60,
+        "timeout_seconds": 300,
     }
 
 
