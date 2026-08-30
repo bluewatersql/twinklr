@@ -1,14 +1,16 @@
 ---
 type: context
 area: overview
-updated: 2026-08-26
+updated: 2026-08-30
 ---
 
 # Twinklr — Current State
 
-_Repository evidence and active sequencing verified 2026-08-26. All eight Phase 3
-offline implementations and six of seven Phase 4 tasks are integrated; Phase 3 and the
-earlier empirical exits remain open._
+_Repository evidence and active sequencing verified 2026-08-30. All eight Phase 3
+offline implementations and six of seven Phase 4 tasks are integrated. As of 2026-08-30 a
+bounded **live moving-head end-to-end show succeeded** under the post-refactor-validation
+change (see below); remaining reactivation-review empirical exits (xLights GUI acceptance,
+vision calibration, three-arm, real-data Phase 2K) stay open._
 
 Twinklr is an AI-powered choreography engine: audio file in, xLights artifacts out — a
 fresh `.xsq`, standalone `.xtiming` timing tracks, and an `.xmap` mapping hint, which the
@@ -82,7 +84,9 @@ left **1,361 files** unchanged, completed with **5,637 passed, 39 skipped** and 
 resource warnings at **89% coverage**, clean Ruff lint, and mypy success across **721
 source files** after P2K-T2 offline-readiness integration.
 The skips cover explicit optional/local-only boundaries rather than accepted
-implementation regressions. Exact task contracts and durable verification evidence are
+implementation regressions. As of 2026-08-30, after the post-refactor-validation work
+below, `make validate` is green at **5,658 passed, 39 skipped** with 89% coverage, ruff and
+mypy clean. Exact task contracts and durable verification evidence are
 owned by the [P4-T1](../changes/twinklr-reactivation-review/build/specs/phase-4-compounding/P4-T1-ml-chain-python-bump.md),
 [P4-T2](../changes/twinklr-reactivation-review/build/specs/phase-4-compounding/P4-T2-local-provider-option.md),
 [P4-T3](../changes/twinklr-reactivation-review/build/specs/phase-4-compounding/P4-T3-dead-tail-retirement-wave-1.md),
@@ -94,6 +98,28 @@ specs.
 The review baseline at `aa8d325` did fail its own gates. That is historical evidence,
 not the current state; its fully classified record is preserved in
 [known-test-failures.md](../memories/learnings/known-test-failures.md).
+
+## Post-refactor validation (2026-08-30)
+
+The [post-refactor-validation change](../changes/post-refactor-validation/spec.md) proved
+the refactored engine still works end to end and locked a regression baseline.
+
+- **Live moving-head E2E succeeded** on `11 - Need A Favor` (public OpenAI, the owner's
+  real 4-MH rig): a valid `.xsq` was emitted whose sophistication **meets or exceeds** the
+  pre-refactor baseline (placed effects 396 vs 262; distinct DMX settings 365 vs 262;
+  value-curve channels 1306 vs 622; same 20 ms grid and base+transition layering). Live
+  spend ≈ $1–2 of the $25 budget.
+- **Offline regression harness** wired into `make validate`: MH replay-render parity and a
+  hermetic display replay (resolvable subset of the `02_rudolph` plan, reproducing 10 of
+  the baseline's 11 effect types and its 5-layer depth). `tests/regression/`.
+- **Four blockers fixed en route** (all TDD): the temperature strip now covers the whole
+  `gpt-5` reasoning line (`9bd9461`); zero-duration transitions are dropped upstream
+  (`a8ce12b`); the default agent timeout is 300 s for reasoning latency (`d15ee03`); and
+  zero-duration emission segments are skipped defensively (`08ce6d5`). Environment/config
+  findings (proxy TLS CA, stale `fixture_config.json`/`job_config.json` schema drift,
+  retired display recipes) are recorded in
+  [live-run-prereqs.md](../changes/post-refactor-validation/notes/live-run-prereqs.md).
+- **QA runbook** for human-QA readiness: [docs/qa-runbook.md](../docs/qa-runbook.md).
 
 ## Active work and open boundaries
 

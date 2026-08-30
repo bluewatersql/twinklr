@@ -41,6 +41,10 @@ Welcome to the documentation for **Twinklr** — an AI-powered choreography engi
 
 > Local-only preview judging, deterministic beat/effect metrics, enforced cost caps, and the owner-blind calibration protocol.
 
+### [QA Runbook](qa-runbook.md)
+
+> Step-by-step validation: the automated safety net, a bounded live end-to-end show, output-sophistication checks against pinned baselines, and the human-QA checklist (what is automated-covered vs. what needs human eyes).
+
 ---
 
 ### [From Sound to Show: How Audio Intelligence Drives AI Choreography](audio_profile/)

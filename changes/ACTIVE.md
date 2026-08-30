@@ -18,7 +18,12 @@ _Last updated: 2026-08-29._
   `fixture_config.json`/`job_config.json` schema drift, and a too-low 60s agent timeout for
   reasoning models. Live spend ≈ $1–2 of $25. Post-run hardening landed: zero-width
   transitions dropped upstream (`a8ce12b`) and the default agent timeout raised to 300s
-  (`d15ee03`). Remaining: display replay-render parity, then lock baseline. Live-run
+  (`d15ee03`). Phase 1 display replay-render parity landed (`a40aab7`): a hermetic replay of
+  the resolvable `02_rudolph` plan subset reproduces 10 of the baseline's 11 effect types and
+  its 5-layer depth (10 of 38 plan templates were retired from the catalog since Feb 2026, so
+  the replay uses a committed self-contained recipe snapshot). Phase 4 human-QA readiness:
+  step-by-step [QA runbook](../docs/qa-runbook.md) built and validated, `current-state.md`
+  updated with the empirical evidence. Remaining: owner review/sign-off, then close. Live-run
   findings:
   [notes/live-run-prereqs.md](post-refactor-validation/notes/live-run-prereqs.md). Deep
   findings:

@@ -364,6 +364,12 @@ Test markers:
 - `@pytest.mark.integration` — integration tests (deselect with `-m "not integration"`)
 - `@pytest.mark.slow` — slow tests (deselect with `-m "not slow"`)
 
+**`.xsq` regression parity.** `tests/regression/` pins pre-refactor `.xsq` sophistication
+metrics and replays saved plans through the current deterministic renderer (moving-head and
+display) to catch drops in emission richness. It runs as part of `make validate`. For the
+end-to-end validation procedure and the human-QA checklist, see the
+[QA Runbook](qa-runbook.md).
+
 Coverage is configured for `twinklr.core` with term-missing, HTML, and JSON reports.
 Use `make test-cov`. The `make coverage` and `make coverage-detailed` recipes still
 reference a deleted helper and are known-broken until that engineering gap is resolved.

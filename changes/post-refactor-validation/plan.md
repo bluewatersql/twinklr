@@ -210,6 +210,15 @@ human QA should (and should not) do.
 
 **Exit:** baseline locked; checklist accepted; docs/indexes updated; change closed.
 
+**Status (2026-08-30):**
+- P4-1 — done. MH baseline + metrics and the display recipe snapshot + replay metrics are
+  committed as tracked fixtures under `tests/regression/baselines/`; the harness pins them.
+- P4-2 — done. Step-by-step QA runbook with the automated-vs-human coverage map built and
+  validated at [`docs/qa-runbook.md`](../../docs/qa-runbook.md).
+- P4-3 — done. [`context/current-state.md`](../../context/current-state.md) records the live
+  E2E evidence and current gate; `ACTIVE.md` updated.
+- P4-4 — pending owner review/sign-off before closing in `ACTIVE.md`.
+
 ---
 
 ## Carried inventory — partially complete / incomplete features
