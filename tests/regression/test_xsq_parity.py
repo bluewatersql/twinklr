@@ -31,7 +31,10 @@ from twinklr.core.pipeline.display_stages import DisplayRenderStage
 from twinklr.core.sequencer.display.xlights_mapping import XLightsGroupMapping, XLightsMapping
 from twinklr.core.sequencer.moving_heads.pipeline import RenderingPipeline
 from twinklr.core.sequencer.planning.group_plan import GroupPlanSet
-from twinklr.core.sequencer.templates.group.models.choreography import ChoreoGroup, ChoreographyGraph
+from twinklr.core.sequencer.templates.group.models.choreography import (
+    ChoreographyGraph,
+    ChoreoGroup,
+)
 from twinklr.core.sequencer.templates.group.recipe import EffectRecipe
 from twinklr.core.sequencer.templates.group.recipe_catalog import RecipeCatalog
 from twinklr.core.sequencer.timing.beat_grid import BeatGrid
@@ -61,7 +64,9 @@ _DISPLAY_REPLAY_METRICS = _BASELINES / "02_rudolph_display.replay.metrics.json"
 
 
 def _load_display_recipe_catalog() -> RecipeCatalog:
-    recipes = [EffectRecipe.model_validate(item) for item in json.loads(_DISPLAY_RECIPES.read_text())]
+    recipes = [
+        EffectRecipe.model_validate(item) for item in json.loads(_DISPLAY_RECIPES.read_text())
+    ]
     return RecipeCatalog(recipes)
 
 
