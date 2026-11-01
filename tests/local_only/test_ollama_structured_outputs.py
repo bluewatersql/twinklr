@@ -1,7 +1,9 @@
 """Explicit-opt-in, one-request Ollama schema-validity smoke test.
 
-This test never installs Ollama or pulls a model. See the P4-T2 task specification
-for the operator runbook.
+This test never installs Ollama or pulls a model. By default it targets the Ollama
+cloud model ``glm-5.3:cloud`` through the loopback Ollama daemon, so no local model
+weights are involved (owner decision 2026-11-01). See the P4-T2 task specification
+and ``changes/twinklr-reactivation-review/runbooks/01-ollama-cloud-smoke.md``.
 """
 
 from __future__ import annotations
@@ -14,17 +16,19 @@ from twinklr.core.agents.providers.factory import create_llm_provider
 from twinklr.core.config.models import AppConfig
 from twinklr.core.sequencer.planning import MacroPlan
 
+DEFAULT_OLLAMA_MODEL = "glm-5.3:cloud"
+
 
 @pytest.mark.local_only
 @pytest.mark.asyncio
 async def test_ollama_returns_schema_valid_macro_plan() -> None:
     if os.getenv("TWINKLR_RUN_LOCAL_OLLAMA_TESTS") != "1":
-        pytest.skip("set TWINKLR_RUN_LOCAL_OLLAMA_TESTS=1 to authorize one local Ollama request")
+        pytest.skip("set TWINKLR_RUN_LOCAL_OLLAMA_TESTS=1 to authorize one Ollama request")
 
     base_url = os.getenv("TWINKLR_OLLAMA_BASE_URL", "http://127.0.0.1:11434/v1")
-    model = os.getenv("TWINKLR_OLLAMA_MODEL")
-    if not model:
-        pytest.skip("TWINKLR_OLLAMA_MODEL must name an already-pulled local model")
+    model = os.getenv("TWINKLR_OLLAMA_MODEL") or DEFAULT_OLLAMA_MODEL
+    timeout_seconds = float(os.getenv("TWINKLR_OLLAMA_TIMEOUT_SECONDS", "300"))
+    max_tokens = int(os.getenv("TWINKLR_OLLAMA_MAX_TOKENS", "16000"))
 
     provider = create_llm_provider(
         AppConfig(llm_provider="ollama", llm_base_url=base_url, llm_api_key=""),
@@ -42,8 +46,8 @@ async def test_ollama_returns_schema_valid_macro_plan() -> None:
         ],
         model=model,
         response_model=MacroPlan,
-        max_tokens=4000,
-        timeout_seconds=60,
+        max_tokens=max_tokens,
+        timeout_seconds=timeout_seconds,
         provider_max_attempts=1,
         allow_json_object_fallback=False,
     )

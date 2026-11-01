@@ -233,3 +233,31 @@ closes that defect by failing redirects closed and standardizing the explicit op
 No provider request, model pull, or local model execution was part of this closeout.
 Real Ollama schema validity remains unclaimed until an operator explicitly runs the
 local-only smoke with `TWINKLR_RUN_LOCAL_OLLAMA_TESTS=1`.
+
+### Owner amendment — 2026-11-01: Ollama cloud, not a local model
+
+The owner amended the smoke's acceptance target. The real schema smoke must use an
+**Ollama cloud** model through the loopback daemon, not a locally pulled model. The
+project default is **`glm-5.3:cloud`**.
+
+The transport contract does not change. Requests still go only to the loopback
+`llm_base_url` (default `http://127.0.0.1:11434/v1`), redirects still fail closed, and
+the daemon forwards `:cloud` models to Ollama's hosted service.
+
+What changes is what a pass proves. A pass proves the Ollama provider and strict-schema
+path against a real model. It no longer proves offline (no-internet) operation.
+
+`tests/local_only/test_ollama_structured_outputs.py` now:
+
+- defaults `TWINKLR_OLLAMA_MODEL` to `glm-5.3:cloud`
+- reads its timeout from `TWINKLR_OLLAMA_TIMEOUT_SECONDS` (default 300 s; previously a
+  fixed 60 s)
+- reads its output budget from `TWINKLR_OLLAMA_MAX_TOKENS` (default 16000; previously a
+  fixed 4000), because thinking-model reasoning tokens share that budget
+
+These guards are unchanged: explicit opt-in, one provider attempt, no schema repair, and
+no JSON-object fallback.
+
+Operator steps:
+[runbooks/01-ollama-cloud-smoke.md](../../../runbooks/01-ollama-cloud-smoke.md). Real
+schema validity remains unclaimed until that smoke is run and recorded.

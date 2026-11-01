@@ -174,16 +174,19 @@ For a running local Ollama server, use a loopback OpenAI-compatible endpoint:
 ```
 
 Model selection remains in the role settings in `job_config.json`; there is no inert
-app-level model override. Set each role you intend to run, for example:
+app-level model override. The recommended Ollama model (and the smoke-test default) is the Ollama
+**cloud** model `glm-5.3:cloud`: the loopback daemon forwards `:cloud` requests to Ollama's hosted
+service, so no local model weights are downloaded or run (sign in once with
+`ollama signin`). Set each role you intend to run, for example:
 
 ```json
 {
   "agent": {
-    "plan_agent": {"model": "qwen3.5:27b"},
-    "judge_agent": {"model": "qwen3.5:27b"},
-    "profile_agent": {"model": "qwen3.5:27b"},
-    "lyrics_agent": {"model": "qwen3.5:27b"},
-    "refinement_agent": {"model": "qwen3.5:27b"}
+    "plan_agent": {"model": "glm-5.3:cloud"},
+    "judge_agent": {"model": "glm-5.3:cloud"},
+    "profile_agent": {"model": "glm-5.3:cloud"},
+    "lyrics_agent": {"model": "glm-5.3:cloud"},
+    "refinement_agent": {"model": "glm-5.3:cloud"}
   }
 }
 ```
@@ -196,19 +199,22 @@ adapter.
 #### Explicit local schema smoke
 
 The repository includes a `local_only` test against Twinklr's real `MacroPlan` schema.
-It does not install Ollama or pull a model. After you separately install Ollama, start it,
-and pull a model of your choice, authorize exactly one local request with:
+It does not install Ollama or pull a model. With the Ollama daemon running and signed in,
+authorize exactly one request with:
 
 ```bash
 TWINKLR_RUN_LOCAL_OLLAMA_TESTS=1 \
-TWINKLR_OLLAMA_MODEL=qwen3.5:27b \
-TWINKLR_OLLAMA_BASE_URL=http://127.0.0.1:11434/v1 \
 uv run pytest tests/local_only/test_ollama_structured_outputs.py -q --no-cov
 ```
 
-The smoke disables SDK retries, provider transport retries beyond the single request,
-schema repair, and JSON-object fallback. Passing it proves schema validity for that
-specific installed model; it is not a choreography-quality benchmark.
+The model defaults to `glm-5.3:cloud` and the base URL to `http://127.0.0.1:11434/v1`;
+override them with `TWINKLR_OLLAMA_MODEL` and `TWINKLR_OLLAMA_BASE_URL`. The request
+timeout (`TWINKLR_OLLAMA_TIMEOUT_SECONDS`, default 300) and output budget
+(`TWINKLR_OLLAMA_MAX_TOKENS`, default 16000) leave room for thinking models. The smoke
+disables SDK retries, provider transport retries beyond the single request, schema
+repair, and JSON-object fallback. Passing it proves schema validity for that specific
+model; it is not a choreography-quality benchmark. Step-by-step:
+[Ollama cloud smoke runbook](../changes/twinklr-reactivation-review/runbooks/01-ollama-cloud-smoke.md).
 
 ### `job_config.json` (Job Config)
 
