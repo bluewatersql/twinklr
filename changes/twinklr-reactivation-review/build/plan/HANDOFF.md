@@ -1,6 +1,6 @@
 # Build-campaign handoff — current execution state
 
-_Last updated: 2026-08-26 after all eight Phase 3 offline task implementations and
+_Last updated: 2026-11-01 (owner update and runbooks); previously 2026-08-26 after all eight Phase 3 offline task implementations and
 P4-T1 through P4-T6 were independently verified and integrated. P2K-T2's offline
 owner-run readiness remediation was independently approved on the Standards and Spec
 axes and integrated at `03b75e9`; its empirical owner-corpus exits remain open. P4-T7's
@@ -26,6 +26,34 @@ pause or phase boundary._
 
 Start here. This section supersedes older status prose below when the two disagree;
 older entries remain as dated audit history.
+
+### Owner update — 2026-11-01
+
+- **Ollama exit amended.** The Phase 4 schema smoke now uses Ollama **cloud**
+  (`glm-5.3:cloud`) through the loopback daemon. No local model is involved. A pass proves
+  the provider and strict-schema path, not offline operation. The P4-T2 spec has an
+  owner-amendment section, and the smoke test defaults to that model. The smoke has
+  **not** been run.
+- **Owner runbooks.** Step-by-step commands for every remaining empirical exit are in
+  [`../../runbooks/`](../../runbooks/README.md):
+  - 01: Ollama cloud smoke
+  - 02: Phase 2K, including P2K-T2
+  - 03: P4-T7
+  - 04: xLights GUI and human acceptance
+  - 05: Phase 2P/3 live evidence
+
+  Items 1–4 below map to runbooks 01–04. Item 5 is split across 02, 04 and 05. Each runbook lists the
+  tooling gaps and owner decisions it leaves open. The runbooks operationalize the specs;
+  the specs remain the authority.
+- **post-refactor-validation closed.** Its live MH run is a meaningful non-GUI end-to-end
+  show, so the MH-path xLights GUI checks can be scheduled (runbook 04). This assessment
+  needs the owner's confirmation. P3-T8 still needs a combined display+MH show. It also left a gap: there is no CI full-pipeline replay E2E (its P2-1 to P2-4 were
+  not built). See its [closeout](../../../post-refactor-validation/plan.md#closeout--2026-11-01).
+  That gap is an open follow-up and is not part of any phase exit here.
+- **P3-T4.** The owner must decide whether the post-refactor live MH run supersedes
+  P3-T4 live acceptance, or whether a new, separately specced live `display`/`show` run
+  is authorized. The sealed two-attempt ledger stays closed either way. The post-refactor
+  run covers only the MH `run` path. See runbook 05 §7.
 
 ### Remaining remediation workflow — owner discussion update 2026-08-29
 
