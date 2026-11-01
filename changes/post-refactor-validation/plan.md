@@ -1,9 +1,9 @@
 ---
 type: change
-status: active
+status: closed
 area: quality
 created: 2026-08-29
-updated: 2026-08-29
+updated: 2026-11-01
 ---
 
 # Post-refactor validation — implementation plan
@@ -217,7 +217,31 @@ human QA should (and should not) do.
   validated at [`docs/qa-runbook.md`](../../docs/qa-runbook.md).
 - P4-3 — done. [`context/current-state.md`](../../context/current-state.md) records the live
   E2E evidence and current gate; `ACTIVE.md` updated.
-- P4-4 — pending owner review/sign-off before closing in `ACTIVE.md`.
+- P4-4 — done 2026-11-01. The owner directed closeout; see *Closeout* below.
+
+## Closeout — 2026-11-01
+
+The owner directed closeout on 2026-11-01. The change met its purpose. The refactored
+engine produced a valid live end-to-end moving-head show that meets or exceeds the
+pre-refactor baseline. Offline `.xsq` parity and display replay-render regression are
+locked in `tests/regression/` and run under `make validate`.
+
+Not every planned work item was done. Each unfinished item is listed here with where it
+went, so nothing is dropped silently:
+
+| Item | Outcome | Where it went |
+|---|---|---|
+| P2-1 / P2-2 recorded-response full-pipeline replay E2E in CI | **Not implemented.** No `tests/e2e/`. Regression coverage is the Phase 1 replay-render parity harness, which stops before the live planning path. | Carried as an open follow-up in the reactivation-review [HANDOFF](../twinklr-reactivation-review/build/plan/HANDOFF.md) and in `context/current-state.md` |
+| P2-3 provider-contract smokes | **Partially covered.** There is no dedicated suite, but both P3-T4 failure classes have unit coverage: `$ref`-sibling normalization (`tests/unit/agents/test_structured_outputs.py`, `tests/unit/sequencer/planning/test_macro_contract.py`) and temperature omission for reasoning models (`tests/unit/agents/providers/test_capabilities.py`, `test_openai.py`). | Same follow-up as above |
+| P2-4 replay-fixture refresh docs | Not written, because P2-1 was not built. | Same follow-up |
+| P3-4 Ollama schema smoke | Not run. On 2026-11-01 the owner amended it to use Ollama **cloud** (`glm-5.3:cloud`) through the loopback daemon. | [runbook 01](../twinklr-reactivation-review/runbooks/01-ollama-cloud-smoke.md) |
+| P3-4 vision-judge mechanics (P2P-T6) | Not run. | [runbook 05](../twinklr-reactivation-review/runbooks/05-phase-2p-and-3-live-evidence.md) |
+| P3-5 xLights GUI acceptance | Unblocked by the live show but not performed. | [runbook 04](../twinklr-reactivation-review/runbooks/04-xlights-gui-and-human-acceptance.md) |
+
+Current truth is in [`context/current-state.md`](../../context/current-state.md). Durable
+lessons from the live run are in
+[`memories/learnings/live-provider-run-lessons.md`](../../memories/learnings/live-provider-run-lessons.md).
+Everything in this directory is now history.
 
 ---
 

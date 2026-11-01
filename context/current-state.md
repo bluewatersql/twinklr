@@ -1,7 +1,7 @@
 ---
 type: context
 area: overview
-updated: 2026-08-30
+updated: 2026-11-01
 ---
 
 # Twinklr — Current State
@@ -99,10 +99,11 @@ The review baseline at `aa8d325` did fail its own gates. That is historical evid
 not the current state; its fully classified record is preserved in
 [known-test-failures.md](../memories/learnings/known-test-failures.md).
 
-## Post-refactor validation (2026-08-30)
+## Post-refactor validation (2026-08-30; closed 2026-11-01)
 
 The [post-refactor-validation change](../changes/post-refactor-validation/spec.md) proved
-the refactored engine still works end to end and locked a regression baseline.
+the refactored engine still works end to end and locked a regression baseline. It closed
+on 2026-11-01.
 
 - **Live moving-head E2E succeeded** on `11 - Need A Favor` (public OpenAI, the owner's
   real 4-MH rig): a valid `.xsq` was emitted whose sophistication **meets or exceeds** the
@@ -120,6 +121,12 @@ the refactored engine still works end to end and locked a regression baseline.
   retired display recipes) are recorded in
   [live-run-prereqs.md](../changes/post-refactor-validation/notes/live-run-prereqs.md).
 - **QA runbook** for human-QA readiness: [docs/qa-runbook.md](../docs/qa-runbook.md).
+- **Known gap carried forward.** There is no CI end-to-end test that replays recorded
+  provider responses through the live planning path; plan items P2-1 to P2-4 were not
+  built. Regression coverage stops at render-replay parity. The two P3-T4 provider-contract
+  failure classes (`$ref` siblings, temperature on reasoning models) have unit coverage
+  only. See the change's
+  [closeout](../changes/post-refactor-validation/plan.md#closeout--2026-11-01).
 
 ## Active work and open boundaries
 
@@ -177,7 +184,10 @@ approval and clean-main verification; it coordinates the Python 3.13/ML-chain
 modernization and removes the orphaned diarization and unused dependency surfaces. P4-T2
 is integrated through implementation `3765bd9` and redirect-hardening remediation
 `40e8e55`; its offline provider path is verified, but real Ollama schema validity remains
-unclaimed pending the explicit local-only opt-in smoke. P4-T3's independently verified
+unclaimed pending the explicit opt-in smoke. On 2026-11-01 the owner amended that smoke
+to use the Ollama cloud model `glm-5.3:cloud` through the loopback daemon instead of a
+local model, so a pass no longer proves offline operation
+([runbook](../changes/twinklr-reactivation-review/runbooks/01-ollama-cloud-smoke.md)). P4-T3's independently verified
 dead-tail retirement is integrated at `bf6bba5`, with migration/unwiring sequencing and
 live-caller retentions preserved. P4-T4's independently verified duplication collapse is
 integrated at `3e7f679`; it consolidates provider transport retry ownership, closes HTTP

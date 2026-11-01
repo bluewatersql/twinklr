@@ -1,43 +1,6 @@
 # Active Changes
 
-_Last updated: 2026-08-29._
-
-- **post-refactor-validation** — **ACTIVE: Phase 3 live run PASSED.** Comprehensive
-  current-state code review (all 21 core subpackages, ~126K LOC) + functional inventory
-  done. The 49 `make validate` failures were root-caused as environment/test-hygiene only
-  (no refactor regressions) and fixed (`ca7ed35`). Landed live-run prerequisites: P2-5
-  capability policy for the gpt-5.6 family (`91677ab`), P2-6 session/provider `aclose()`
-  (`8f27883`), P2-7 temperature in group/holistic cache keys (`5aecb9e`). **Phase 1**
-  offline `.xsq` parity harness (`2565b93`): 264 placed effects vs the baseline's 262.
-  **Phase 3** live end-to-end MH run on `11 - Need A Favor.mp3` (public OpenAI, owner's real
-  4-MH rig) **succeeded** and emitted a valid `.xsq` that meets/exceeds the pre-refactor
-  baseline (placed effects 396 vs 262; distinct DMX settings 365 vs 262; value-curve
-  channels 1306 vs 622). Two real code bugs found & fixed en route (`08ce6d5`):
-  reasoning/temperature mutual-exclusivity (macro `gpt-5.2` 400) and zero-duration emission
-  segments aborting render; plus resolved TLS (proxy CA → `SSL_CERT_FILE`), stale
-  `fixture_config.json`/`job_config.json` schema drift, and a too-low 60s agent timeout for
-  reasoning models. Live spend ≈ $1–2 of $25. Post-run hardening landed: zero-width
-  transitions dropped upstream (`a8ce12b`) and the default agent timeout raised to 300s
-  (`d15ee03`). Phase 1 display replay-render parity landed (`a40aab7`): a hermetic replay of
-  the resolvable `02_rudolph` plan subset reproduces 10 of the baseline's 11 effect types and
-  its 5-layer depth (10 of 38 plan templates were retired from the catalog since Feb 2026, so
-  the replay uses a committed self-contained recipe snapshot). Phase 4 human-QA readiness:
-  step-by-step [QA runbook](../docs/qa-runbook.md) built and validated, `current-state.md`
-  updated with the empirical evidence. Remaining: owner review/sign-off, then close. Live-run
-  findings:
-  [notes/live-run-prereqs.md](post-refactor-validation/notes/live-run-prereqs.md). Deep
-  findings:
-  [notes/functional-inventory.md](post-refactor-validation/notes/functional-inventory.md).
-  Internal validation checkpoint
-  proving the `twinklr-reactivation-review` refactoring left the engine working end to
-  end at prior-state functional level, then locking that output as the go-forward
-  regression baseline. Five phases: Phase 0 current-state code review & functional
-  inventory → offline structural regression vs. `artifacts/` baselines → CI replay E2E +
-  provider-contract smokes → authorized live end-to-end show → lock baseline + human-QA
-  readiness. Owner authorized live provider/model calls (2026-08-29). Spec:
-  [post-refactor-validation/spec.md](post-refactor-validation/spec.md); plan:
-  [post-refactor-validation/plan.md](post-refactor-validation/plan.md). Depends on and
-  produces empirical E2E evidence for the reactivation-review phase exits below.
+_Last updated: 2026-11-01._
 
 - **twinklr-reactivation-review** — **ACTIVE: implementation phase (build campaign).**
   The review completed 2026-08-13 (all 8 stages, adversarially verified, verdict
@@ -93,10 +56,11 @@ _Last updated: 2026-08-29._
   acceptance remains open. The owner authorized P3-T7+ and task-bounded live/paid work
   on 2026-08-26. P3-T7's audited live proof then passed with exactly one
   `gpt-image-2` request, no retry, a zero-call scoped cache replay, and measured cost
-  `$0.00622`; the sealed owner-local ledger permanently blocks another attempt. All
-  xLights GUI dates/checks remain deferred until a meaningful,
-  fully working end-to-end show exists; their empirical gates and all earlier empirical
-  exits remain open.
+  `$0.00622`; the sealed owner-local ledger permanently blocks another attempt. The xLights
+  GUI checks were deferred until a meaningful end-to-end show existed. The
+  post-refactor-validation live MH run (2026-08-30) can now serve for the MH-path checks,
+  pending owner confirmation; see runbook 04. Their empirical gates and all earlier
+  empirical exits remain open.
   Phase 4 has six of seven tasks integrated. P4-T1 landed at `56d9aa0`; P4-T2's
   implementation and redirect hardening are integrated through `3765bd9`/`40e8e55`;
   P4-T3 is integrated at `bf6bba5`; P4-T4 is integrated at `3e7f679`; P4-T5 is
@@ -116,6 +80,11 @@ _Last updated: 2026-08-29._
   [active task spec](twinklr-reactivation-review/build/specs/phase-4-compounding/P4-T1-ml-chain-python-bump.md).
   The overall change
   therefore remains active.
+  **Owner runbooks (2026-11-01):** step-by-step commands for every remaining empirical
+  exit live in
+  [`twinklr-reactivation-review/runbooks/`](twinklr-reactivation-review/runbooks/README.md).
+  On 2026-11-01 the owner amended the Phase 4 Ollama exit to use Ollama cloud
+  (`glm-5.3:cloud`) through the loopback daemon, with no local model.
   Live execution state, process rules, and pending owner actions:
   **[build/plan/HANDOFF.md](twinklr-reactivation-review/build/plan/HANDOFF.md)**.
   Review artifacts:
@@ -123,6 +92,14 @@ _Last updated: 2026-08-29._
   [Verification record](twinklr-reactivation-review/reviews/verification.md).
   Durable truths promoted to `context/current-state.md` and
   `memories/learnings/reactivation-review-2026-08.md`.
+
+## Recently closed
+
+- **post-refactor-validation**: closed 2026-11-01. It proved the refactored engine works
+  end to end with a live MH show that meets or exceeds the pre-refactor baseline, and it
+  locked offline regression baselines. Unfinished items and where each went are listed in
+  [plan.md § Closeout](post-refactor-validation/plan.md#closeout--2026-11-01). Current
+  truth: [context/current-state.md](../context/current-state.md).
 
 When starting a new change, create `changes/<slug>/` per the conventions in
 [INDEX.md](INDEX.md) and list it here with: name, status, one-line purpose, and links to
