@@ -294,6 +294,14 @@ def _local_template_extensions_present(repo_root: Path) -> bool:
     return (repo_root / "data/templates").exists()  # local-extensions overlay
 
 
+def _runtime_identity() -> dict[str, str]:
+    return {
+        "python": platform.python_version(),
+        "openai": version("openai"),
+        "pydantic": version("pydantic"),
+    }
+
+
 def _spend_summary(document: dict[str, Any]) -> dict[str, str]:
     actual = sum(
         (Decimal(str(item.get("actual_cost_usd", "0"))) for item in document["attempts"]),
@@ -521,11 +529,7 @@ def _identity(repo_root: Path, fixture: Path) -> tuple[dict[str, Any], PlanningC
         raise ProbePreflightError("shipped planner model identity changed")
     if frozen_identity["endpoint"] != DEFAULT_ENDPOINT:
         raise ProbePreflightError("default provider endpoint identity changed")
-    runtime = {
-        "python": platform.python_version(),
-        "openai": version("openai"),
-        "pydantic": version("pydantic"),
-    }
+    runtime = _runtime_identity()
     for name, actual in runtime.items():
         if actual != frozen_identity[name]:
             raise ProbePreflightError(f"frozen {name} runtime identity changed")

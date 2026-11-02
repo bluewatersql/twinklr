@@ -36,6 +36,7 @@ from twinklr.core.agents.sequencer.macro_planner.live_probe import (
 from twinklr.core.agents.sequencer.macro_planner.orchestrator import MacroPlannerOrchestrator
 
 REAL_CANONICAL_STATE_PATHS = probe_module._canonical_state_paths
+REAL_RUNTIME_IDENTITY = probe_module._runtime_identity
 REAL_ASSERT_CLEAN_COMMITTED_MANIFEST = probe_module._assert_clean_committed_manifest
 
 
@@ -51,6 +52,22 @@ def _isolate_local_template_overlay(monkeypatch: pytest.MonkeyPatch) -> None:
     same way everywhere. The dedicated overlay test re-enables it explicitly.
     """
     monkeypatch.setattr(probe_module, "_local_template_extensions_present", lambda _root: False)
+
+
+@pytest.fixture(autouse=True)
+def _pin_frozen_runtime_identity(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Make the probe harness tests hermetic against the host's runtime versions.
+
+    The probe refuses to run when the interpreter or SDK versions differ from the frozen
+    fixture identity. That guard is correct for the owner-only live run, but these offline
+    tests would otherwise fail on any machine whose Python patch release (or SDK version)
+    has moved on. Report the frozen identity so every test runs the same way everywhere.
+    The dedicated runtime-mismatch test restores the real lookup explicitly.
+    """
+    root = Path(__file__).resolve().parents[5]
+    frozen = json.loads((root / DEFAULT_FIXTURE).read_text(encoding="utf-8"))["probe_identity"]
+    runtime = {name: frozen[name] for name in ("python", "openai", "pydantic")}
+    monkeypatch.setattr(probe_module, "_runtime_identity", lambda: dict(runtime))
 
 
 class FakeProvider:
@@ -762,6 +779,7 @@ async def test_frozen_runtime_mismatch_fails_before_provider(
 ) -> None:
     root = Path(__file__).resolve().parents[5]
     request = _request(root)
+    monkeypatch.setattr(probe_module, "_runtime_identity", REAL_RUNTIME_IDENTITY)
     monkeypatch.setattr(probe_module.platform, "python_version", lambda: "0.0.0")
     provider = FakeProvider({})
     with pytest.raises(ProbePreflightError, match="python runtime"):
