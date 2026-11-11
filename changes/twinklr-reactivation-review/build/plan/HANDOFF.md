@@ -1,6 +1,6 @@
 # Build-campaign handoff — current execution state
 
-_Last updated: 2026-11-01 (owner update and runbooks); previously 2026-08-26 after all eight Phase 3 offline task implementations and
+_Last updated: 2026-11-11 (live validation); previously 2026-11-01 (owner update and runbooks), and before that 2026-08-26 after all eight Phase 3 offline task implementations and
 P4-T1 through P4-T6 were independently verified and integrated. P2K-T2's offline
 owner-run readiness remediation was independently approved on the Standards and Spec
 axes and integrated at `03b75e9`; its empirical owner-corpus exits remain open. P4-T7's
@@ -26,6 +26,29 @@ pause or phase boundary._
 
 Start here. This section supersedes older status prose below when the two disagree;
 older entries remain as dated audit history.
+
+### Live validation — 2026-11-11
+
+- **P4-T2 Ollama cloud smoke: FAILED (capability gap).** Exactly 1 request was made to
+  `glm-5.3:cloud`. The model returned prose because Ollama Cloud does not enforce
+  structured outputs. Under the cloud amendment the strict-schema exit cannot pass.
+  **Owner decision needed:** revert to a local model for this smoke, re-scope the exit, or
+  accept this as the finding.
+  [Evidence](../../evidence/2026-11-11-p4-t2-ollama-cloud-smoke/README.md).
+- **P2P-T11 live probes: partial.** 9 requests were made.
+  - `gpt-5.6-sol` **accepts** `json_object`.
+  - The strict suite passed 5 of 8 roles.
+  - `lyrics` failed on a real schema defect: tuple `prefixItems` without `items`.
+  - `audio_profile` and `group_planner` stopped at the harness's 4,000-token cap, which
+    is inconclusive and not a schema rejection.
+
+  The lyrics defect, and a latent show-judge strict-schema defect found in the same
+  audit, are fixed and independently reviewed. **Owner decisions:** one corrected live
+  lyrics request, and the harness token cap for the two truncated roles.
+  [Evidence](../../evidence/2026-11-11-p2p-t11-live-probes/README.md).
+- **Blocked on inputs.** The restored `artifacts/` folder holds no audio, and `data/music/`
+  does not exist. That blocks the baseline live run (runbook 05 §2) and everything that
+  depends on it (§3 T6, §4 T13, runbook 04 previews), plus the P2P-T7 Demucs smoke.
 
 ### Owner update — 2026-11-01
 
