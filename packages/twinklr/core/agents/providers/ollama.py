@@ -21,7 +21,9 @@ if TYPE_CHECKING:
 # Ollama Cloud does not enforce response_format schemas, and cloud models such as
 # glm-5.3:cloud wrap their JSON in a Markdown fence.  Only a fence spanning the
 # whole response is unwrapped; anything else reaches the JSON parser unchanged.
-_WHOLE_RESPONSE_FENCE = re.compile(r"\A\s*```(?:json)?[ \t]*\n(?P<body>.*?)\s*```\s*\Z", re.DOTALL)
+_WHOLE_RESPONSE_FENCE = re.compile(
+    r"\A\s*```[A-Za-z0-9_+-]*[ \t]*\r?\n(?P<body>.*?)\s*```\s*\Z", re.DOTALL
+)
 
 
 class OllamaProvider(OpenAIProvider):
@@ -63,6 +65,26 @@ class OllamaProvider(OpenAIProvider):
     @property
     def supports_image_generation(self) -> bool:
         return False
+
+    async def generate_json_async(
+        self,
+        messages: list[dict[str, str]],
+        model: str,
+        temperature: float | None = None,
+        **kwargs: Any,
+    ) -> LLMResponse:
+        # Agent prompts carry the response schema in a developer message. Ollama's
+        # Chat Completions surface documents only system/user/assistant/tool roles,
+        # and Ollama Cloud enforces no schema, so the schema must survive as system.
+        return await super().generate_json_async(
+            messages=[
+                {**message, "role": "system"} if message["role"] == "developer" else message
+                for message in messages
+            ],
+            model=model,
+            temperature=temperature,
+            **kwargs,
+        )
 
     @staticmethod
     def _response_content(response: Any) -> str | None:

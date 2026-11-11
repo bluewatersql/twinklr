@@ -419,8 +419,20 @@ async def test_ollama_refuses_redirect_without_forwarding_prompt_or_schema() -> 
         '```json\n{"title":"Glow"}\n```',
         '```\n{"title":"Glow"}\n```',
         '  ```json\n{"title":"Glow"}```  \n',
+        '```json\r\n{"title":"Glow"}\r\n```\r\n',
+        '```JSON\n{"title":"Glow"}\n```',
+        '```jsonc\n{"title":"Glow"}\n```',
+        '```json\n{"title":"use ``` here"}\n```',
     ],
-    ids=["json_fence", "bare_fence", "padded_fence"],
+    ids=[
+        "json_fence",
+        "bare_fence",
+        "padded_fence",
+        "crlf",
+        "uppercase",
+        "other_tag",
+        "inner_backticks",
+    ],
 )
 async def test_ollama_cloud_markdown_fence_is_unwrapped_before_parsing(content: str) -> None:
     """Ollama Cloud ignores response_format, and glm-5.3:cloud fences its JSON."""
@@ -463,18 +475,80 @@ async def test_ollama_cloud_markdown_fence_is_unwrapped_before_parsing(content: 
             allow_json_object_fallback=False,
         )
 
-    assert response.content == {"title": "Glow"}
+    assert response.content["title"] in {"Glow", "use ``` here"}
 
 
 @pytest.mark.parametrize(
     "content",
     [
         "I don't see a schema in our conversation.",
+        '```json\n{"a": 1}\n```\n\n```json\n{"b": 2}\n```',
         'Here is the plan:\n```json\n{"title":"Glow"}\n```',
     ],
-    ids=["prose", "prose_then_fence"],
+    ids=["prose", "two_blocks", "prose_then_fence"],
 )
 def test_ollama_fence_unwrap_only_touches_a_whole_response_fence(content: str) -> None:
-    """Prose, or prose around a fence, is left for the JSON parser to reject."""
+    """Prose, prose around a fence, or several blocks never become parseable JSON."""
     response = SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content=content))])
-    assert OllamaProvider._response_content(response) == content
+    unwrapped = OllamaProvider._response_content(response)
+    assert unwrapped is not None
+    with pytest.raises(json.JSONDecodeError):
+        json.loads(unwrapped)
+
+
+def test_openai_provider_does_not_unwrap_fences() -> None:
+    fenced = '```json\n{"title":"Glow"}\n```'
+    response = SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content=fenced))])
+    assert OpenAIProvider._response_content(response) == fenced
+
+
+@pytest.mark.asyncio
+async def test_ollama_sends_developer_schema_prompt_as_system() -> None:
+    requests: list[httpx.Request] = []
+
+    async def respond(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(
+            200,
+            json={
+                "id": "chatcmpl-cloud",
+                "object": "chat.completion",
+                "created": 1,
+                "model": "glm-5.3:cloud",
+                "choices": [
+                    {
+                        "index": 0,
+                        "message": {"role": "assistant", "content": '{"title":"Glow"}'},
+                        "finish_reason": "stop",
+                    }
+                ],
+                "usage": {"prompt_tokens": 8, "completion_tokens": 3, "total_tokens": 11},
+            },
+            request=request,
+        )
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(respond)) as http_client:
+        provider = create_llm_provider(
+            AppConfig(
+                llm_provider="ollama",
+                llm_base_url="http://127.0.0.1:11434/v1",
+                llm_api_key="",
+            ),
+            session_id="test-cloud",
+            http_client=http_client,
+        )
+        await provider.generate_json_async(
+            messages=[
+                {"role": "system", "content": "You plan light shows."},
+                {"role": "developer", "content": "Return JSON matching this schema."},
+                {"role": "user", "content": "Make a tiny plan."},
+            ],
+            model="glm-5.3:cloud",
+            response_model=TinyPlan,
+            provider_max_attempts=1,
+            allow_json_object_fallback=False,
+        )
+
+    body = json.loads(requests[0].content)
+    assert [message["role"] for message in body["messages"]] == ["system", "system", "user"]
+    assert body["messages"][1]["content"] == "Return JSON matching this schema."

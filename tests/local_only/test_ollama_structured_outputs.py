@@ -6,7 +6,7 @@ weights are involved (owner decision 2026-11-01). See the P4-T2 task specificati
 and ``changes/twinklr-reactivation-review/runbooks/01-ollama-cloud-smoke.md``.
 
 Ollama Cloud does not enforce ``response_format`` schemas, so the prompt carries the
-schema exactly as ``AsyncAgentRunner`` injects it for every real agent call.
+same generated schema text that ``AsyncAgentRunner`` injects for every real agent call.
 """
 
 from __future__ import annotations
