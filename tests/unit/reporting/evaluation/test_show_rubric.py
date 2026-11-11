@@ -4,12 +4,14 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from pydantic import ValidationError
 import pytest
 
 from tests.unit.reporting.evaluation.show_test_support import entry, manifest, trace
 from twinklr.core.reporting.evaluation.show_judge import (
     COORDINATION_CRITERIA,
     ShowVisionRubricResponse,
+    VisualCriterionScore,
     build_show_judge_payload_from_models,
     not_applicable_cross_part,
     validate_rubric_capability,
@@ -64,3 +66,11 @@ def test_payload_contains_current_plan_claims_and_trace_summary() -> None:
         for key in ("focal_arc", "focal_roles", "call_response_pairs", "palette_stops", "sections")
     )
     assert "moving_head" in payload.trace_summary_json
+
+
+def test_visual_criterion_score_key_is_required_even_when_not_applicable() -> None:
+    """Strict Structured Outputs needs every key present, so ``score`` has no default."""
+    with pytest.raises(ValidationError):
+        VisualCriterionScore.model_validate(
+            {"applicability": "not_applicable", "justification": "display-only show"}
+        )

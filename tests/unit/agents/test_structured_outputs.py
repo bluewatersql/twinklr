@@ -9,7 +9,7 @@ from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from openai import APITimeoutError, BadRequestError
-from pydantic import BaseModel, ConfigDict, ValidationError
+from pydantic import BaseModel, ConfigDict, ValidationError, create_model
 import pytest
 
 from twinklr.core.agents._paths import AGENTS_BASE_PATH
@@ -182,6 +182,42 @@ def test_homogeneous_tuple_normalizes_to_fixed_length_items() -> None:
     assert span["items"] == {"type": "integer"}
     assert (span["minItems"], span["maxItems"]) == (2, 2)
     assert "prefixItems" not in span
+
+
+class _TupleEnd(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    value: int
+
+
+@pytest.mark.parametrize(
+    "annotation",
+    [
+        tuple[tuple[int, int], tuple[int, int]],
+        tuple[int, int] | None,
+        tuple[_TupleEnd, _TupleEnd],
+        list[tuple[float, float]],
+    ],
+    ids=["nested", "nullable", "ref", "list_of_tuples"],
+)
+def test_composite_tuples_normalize_to_strict_arrays(annotation: Any) -> None:
+    model = create_model(
+        "CompositeTuple", __config__=ConfigDict(extra="forbid"), field=(annotation, ...)
+    )
+    for node in _walk_json(strict_json_schema(model)):
+        assert "prefixItems" not in node, node
+        if node.get("type") == "array":
+            assert "items" in node, node
+
+
+def test_strict_validator_rejects_array_without_items() -> None:
+    class Empty(BaseModel):
+        model_config = ConfigDict(extra="forbid")
+
+        nothing: tuple[()]
+
+    with pytest.raises(ValueError, match="must declare items"):
+        strict_json_schema(Empty)
 
 
 def test_heterogeneous_tuple_fails_loud() -> None:
