@@ -4,6 +4,9 @@ This test never installs Ollama or pulls a model. By default it targets the Olla
 cloud model ``glm-5.3:cloud`` through the loopback Ollama daemon, so no local model
 weights are involved (owner decision 2026-11-01). See the P4-T2 task specification
 and ``changes/twinklr-reactivation-review/runbooks/01-ollama-cloud-smoke.md``.
+
+Ollama Cloud does not enforce ``response_format`` schemas, so the prompt carries the
+schema exactly as ``AsyncAgentRunner`` injects it for every real agent call.
 """
 
 from __future__ import annotations
@@ -13,6 +16,7 @@ import os
 import pytest
 
 from twinklr.core.agents.providers.factory import create_llm_provider
+from twinklr.core.agents.schema_utils import get_json_schema_example
 from twinklr.core.config.models import AppConfig
 from twinklr.core.sequencer.planning import MacroPlan
 
@@ -40,7 +44,8 @@ async def test_ollama_returns_schema_valid_macro_plan() -> None:
                 "role": "user",
                 "content": (
                     "Return one minimal valid Twinklr MacroPlan as JSON. Use one section and "
-                    "the simplest valid values permitted by the supplied schema."
+                    "the simplest valid values permitted by the supplied schema.\n\n"
+                    f"Schema:\n{get_json_schema_example(MacroPlan)}"
                 ),
             }
         ],
