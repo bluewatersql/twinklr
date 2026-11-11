@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+from dataclasses import replace
 import json
 import logging
 import threading
@@ -85,7 +87,9 @@ def _claude_schema_node(value: Any) -> Any:
     for key, child in value.items():
         if key in ("properties", "$defs"):
             node[key] = {name: _claude_schema_node(schema) for name, schema in child.items()}
-        elif (key == "minItems" and child not in (0, 1)) or (key == "format" and child not in _CLAUDE_SUPPORTED_STRING_FORMATS):
+        elif (key == "minItems" and child not in (0, 1)) or (
+            key == "format" and child not in _CLAUDE_SUPPORTED_STRING_FORMATS
+        ):
             moved[key] = child
         elif key in _CLAUDE_UNSUPPORTED_SCHEMA_KEYWORDS:
             if key != "default":
@@ -261,6 +265,9 @@ class AnthropicProvider:
         max_msgs = window_size * 2
         if len(conversation) > max_msgs:
             conversation = conversation[-max_msgs:]
+        # The Messages API rejects a conversation whose first turn is the assistant's.
+        while conversation and conversation[0]["role"] == "assistant":
+            conversation.pop(0)
 
         return system_msgs + conversation
 
@@ -309,19 +316,15 @@ class AnthropicProvider:
 
     @staticmethod
     def _response_text(response: Any) -> str:
-        """Join the final model's text blocks, skipping thinking and fallback blocks."""
-        blocks = list(getattr(response, "content", None) or [])
-        last_fallback = max(
-            (
-                index
-                for index, block in enumerate(blocks)
-                if getattr(block, "type", None) == "fallback"
-            ),
-            default=-1,
-        )
+        """Join the response's text blocks, skipping thinking and fallback markers.
+
+        After a mid-stream refusal fallback the partial text before the
+        ``fallback`` block is the prefix the fallback model continues from, so
+        every text block belongs to the final answer.
+        """
         return "".join(
             block.text
-            for block in blocks[last_fallback + 1 :]
+            for block in getattr(response, "content", None) or []
             if getattr(block, "type", "text") == "text"
             and isinstance(getattr(block, "text", None), str)
         )
@@ -350,6 +353,12 @@ class AnthropicProvider:
         if temperature is not None:
             # Sampling parameters return HTTP 400 on every current Claude model.
             logger.debug("Dropping temperature=%s for Claude model %s", temperature, model)
+
+        if not model.startswith("claude-"):
+            raise LLMProviderError(
+                f"Model {model!r} is not a Claude model; set every agent role's model "
+                "in job_config.json to a claude-* id when llm_provider is anthropic"
+            )
 
         system_text, conversation_messages = self._split_messages(messages)
         request_params: dict[str, Any] = {
@@ -390,11 +399,9 @@ class AnthropicProvider:
         )
         stop_reason = getattr(response, "stop_reason", None)
         if stop_reason == "refusal":
-            details = getattr(response, "stop_details", None)
-            category = getattr(details, "category", None)
             raise RecoverableLLMProviderError(
                 reason="refusal",
-                message=f"Claude declined the request (category={category})",
+                message="Claude declined the request (refusal fallback chain exhausted)",
                 token_usage=token_usage,
             )
         if stop_reason == "max_tokens":
@@ -531,12 +538,7 @@ class AnthropicProvider:
 
             return LLMResponse(
                 content=response.content,
-                metadata=ResponseMetadata(
-                    response_id=response.metadata.response_id,
-                    token_usage=response.metadata.token_usage,
-                    model=model,
-                    conversation_id=conversation_id,
-                ),
+                metadata=replace(response.metadata, conversation_id=conversation_id),
             )
 
         except LLMProviderError:
@@ -577,8 +579,13 @@ class AnthropicProvider:
             request_params, response_model = self._build_request(
                 messages, model, temperature, kwargs
             )
-            # Streaming keeps large max_tokens requests inside HTTP timeouts.
-            async with self._async_client.messages.stream(**request_params) as stream:
+            # Streaming keeps large max_tokens requests inside HTTP timeouts; the
+            # outer bound keeps timeout_seconds a limit on the whole call, since the
+            # HTTP timeout only bounds each read of a stream that keeps pinging.
+            async with (
+                asyncio.timeout(request_params.get("timeout")),
+                self._async_client.messages.stream(**request_params) as stream,
+            ):
                 response = await stream.get_final_message()
             return self._parse_message(response, model, response_model)
 
@@ -637,12 +644,7 @@ class AnthropicProvider:
 
             return LLMResponse(
                 content=response.content,
-                metadata=ResponseMetadata(
-                    response_id=response.metadata.response_id,
-                    token_usage=response.metadata.token_usage,
-                    model=model,
-                    conversation_id=conversation_id,
-                ),
+                metadata=replace(response.metadata, conversation_id=conversation_id),
             )
 
         except LLMProviderError:

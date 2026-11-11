@@ -510,7 +510,7 @@ def test_factory_creates_anthropic_provider() -> None:
 
     mock_config = MagicMock()
     mock_config.llm_provider = "anthropic"
-    mock_config.llm_api_key.get_secret_value.return_value = "fake-key"
+    mock_config.llm_api_key.get_secret_value.return_value = "sk-ant-fake-key"
 
     with (
         patch(
@@ -611,16 +611,17 @@ async def test_models_without_server_fallback_send_no_fallback(
     assert "extra_headers" not in request
 
 
-def test_response_text_skips_thinking_and_pre_fallback_blocks() -> None:
+def test_response_text_keeps_pre_fallback_prefix_and_skips_markers() -> None:
+    """After a mid-stream fallback the partial text is the continuation prefix."""
     from twinklr.core.agents.providers.anthropic import AnthropicProvider
 
     response = SimpleNamespace(
         content=[
             SimpleNamespace(type="thinking", thinking=""),
-            SimpleNamespace(type="text", text='{"partial": '),
+            SimpleNamespace(type="text", text='{"result": '),
             SimpleNamespace(type="fallback"),
             SimpleNamespace(type="thinking", thinking=""),
-            SimpleNamespace(type="text", text='{"result": "ok"}'),
+            SimpleNamespace(type="text", text='"ok"}'),
         ]
     )
     assert AnthropicProvider._response_text(response) == '{"result": "ok"}'
@@ -675,3 +676,69 @@ def test_app_config_uses_anthropic_key_for_anthropic_provider(
     assert AppConfig().llm_api_key.get_secret_value() == "sk-openai"
     explicit = AppConfig(llm_provider="anthropic", llm_api_key="explicit")
     assert explicit.llm_api_key.get_secret_value() == "explicit"
+
+
+def test_every_registered_response_schema_is_claude_compatible() -> None:
+    from tests.unit.agents.test_structured_outputs import _registered_specs
+    from twinklr.core.agents.providers.anthropic import (
+        _CLAUDE_SUPPORTED_STRING_FORMATS,
+        _CLAUDE_UNSUPPORTED_SCHEMA_KEYWORDS,
+        claude_json_schema,
+    )
+    from twinklr.core.agents.schema_utils import _iter_schema_nodes
+
+    for spec in _registered_specs():
+        for node in _iter_schema_nodes(claude_json_schema(spec.response_model)):
+            assert not (_CLAUDE_UNSUPPORTED_SCHEMA_KEYWORDS & node.keys()), (spec.name, node)
+            assert node.get("minItems", 0) in (0, 1), (spec.name, node)
+            if "format" in node:
+                assert node["format"] in _CLAUDE_SUPPORTED_STRING_FORMATS, (spec.name, node)
+
+
+@pytest.mark.asyncio
+async def test_conversation_window_never_starts_with_assistant(
+    mock_anthropic_clients: dict,
+) -> None:
+    provider = _make_provider(mock_anthropic_clients)
+    stream = mock_anthropic_clients["async_client"].messages.stream
+
+    for turn in range(1, 5):
+        await provider.generate_json_with_conversation_async(
+            user_message=f"U{turn}",
+            conversation_id="conv-1",
+            model="claude-opus-5-5",
+            system_prompt="Plan.",
+        )
+        messages = stream.call_args.kwargs["messages"]
+        assert messages[0]["role"] == "user", (turn, messages)
+        assert messages[-1] == {"role": "user", "content": f"U{turn}"}
+
+
+@pytest.mark.asyncio
+async def test_conversation_path_keeps_response_metadata(mock_anthropic_clients: dict) -> None:
+    provider = _make_provider(mock_anthropic_clients)
+    response = await provider.generate_json_with_conversation_async(
+        user_message="U1", conversation_id="conv-meta", model="claude-opus-5-5"
+    )
+    assert response.metadata.conversation_id == "conv-meta"
+    assert response.metadata.finish_reason == "end_turn"
+    assert response.metadata.actual_model_present
+
+
+@pytest.mark.asyncio
+async def test_non_claude_model_fails_before_any_request(mock_anthropic_clients: dict) -> None:
+    provider = _make_provider(mock_anthropic_clients)
+    with pytest.raises(LLMProviderError, match="not a Claude model"):
+        await provider.generate_json_async(
+            messages=[{"role": "user", "content": "test"}], model="gpt-5.6-sol"
+        )
+    mock_anthropic_clients["async_client"].messages.stream.assert_not_called()
+
+
+def test_factory_rejects_non_anthropic_key_for_anthropic_provider() -> None:
+    from twinklr.core.agents.providers.factory import validate_llm_provider_config
+    from twinklr.core.config.models import AppConfig
+
+    with pytest.raises(ValueError, match="sk-ant"):
+        validate_llm_provider_config(AppConfig(llm_provider="anthropic", llm_api_key="sk-openai"))
+    validate_llm_provider_config(AppConfig(llm_provider="anthropic", llm_api_key="sk-ant-x"))

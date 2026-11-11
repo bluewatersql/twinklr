@@ -18,6 +18,11 @@ def validate_llm_provider_config(app_config: AppConfig) -> None:
         api_key = app_config.llm_api_key.get_secret_value()
         if not api_key:
             raise ValueError(f"{app_config.llm_provider.title()} provider requires an API key")
+        if app_config.llm_provider == "anthropic" and not api_key.startswith("sk-ant-"):
+            raise ValueError(
+                "Anthropic provider requires an Anthropic API key (sk-ant-...); "
+                "set ANTHROPIC_API_KEY or llm_api_key accordingly"
+            )
 
 
 def create_llm_provider(
