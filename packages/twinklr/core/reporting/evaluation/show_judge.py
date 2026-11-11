@@ -86,7 +86,8 @@ class VisualCriterionScore(BaseModel):
     """A score or a strict N/A with an explicit reason."""
 
     applicability: Literal["scored", "not_applicable"]
-    score: float | None = Field(default=None, ge=0, le=10)
+    # Required but nullable: strict Structured Outputs needs every key present.
+    score: float | None = Field(ge=0, le=10)
     justification: str = Field(min_length=1, max_length=600)
 
     model_config = ConfigDict(extra="forbid", frozen=True)

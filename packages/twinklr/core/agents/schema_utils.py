@@ -29,6 +29,7 @@ STRICT_SCHEMA_UNSUPPORTED_KEYWORDS = frozenset(
         "if",
         "not",
         "oneOf",
+        "prefixItems",
         "then",
     }
 )
@@ -183,6 +184,21 @@ def _normalize_supported_schema(value: Any, _path: tuple[str, ...] = ()) -> Any:
             continue
         normalized_key = "anyOf" if key == "oneOf" else key
         normalized[normalized_key] = _normalize_supported_schema(child, (*_path, normalized_key))
+
+    # Pydantic emits fixed-length tuples as ``prefixItems`` with no ``items``;
+    # OpenAI strict mode rejects that array shape.  A homogeneous tuple keeps
+    # its exact length through minItems/maxItems, and Pydantic still validates
+    # the tuple after generation.
+    prefix_items = normalized.get("prefixItems")
+    if isinstance(prefix_items, list) and "items" not in normalized:
+        if not prefix_items or any(item != prefix_items[0] for item in prefix_items):
+            location = "/".join(_path) or "<root>"
+            raise ValueError(
+                f"JSON Schema tuple at {location} is heterogeneous; "
+                "Structured Outputs supports only homogeneous array items"
+            )
+        del normalized["prefixItems"]
+        normalized["items"] = prefix_items[0]
     return normalized
 
 
@@ -262,6 +278,8 @@ def _validate_strict_schema(schema: dict[str, Any]) -> None:
                 "Unsupported Structured Outputs JSON Schema keywords: "
                 + ", ".join(sorted(unsupported))
             )
+        if node.get("type") == "array" and "items" not in node:
+            raise ValueError("Every Structured Outputs array must declare items")
         if node.get("type") == "object" or "properties" in node:
             properties = node.get("properties", {})
             if node.get("additionalProperties") is not False:

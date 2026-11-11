@@ -59,6 +59,7 @@ from twinklr.core.agents.sequencer.moving_heads.specs import (
 )
 from twinklr.core.agents.spec import AgentSpec
 from twinklr.core.config.models import get_vision_judge_agent_default
+from twinklr.core.reporting.evaluation.show_judge import get_show_vision_judge_spec
 from twinklr.core.reporting.evaluation.vision_judge import get_vision_judge_spec
 from twinklr.core.sequencer.planning.group_plan import (
     CoordinationPlanResponse,
@@ -135,6 +136,8 @@ def _registered_specs() -> tuple[AgentSpec, ...]:
         get_moving_head_judge_spec(),
         get_macro_planner_spec(),
         get_macro_judge_spec(),
+        get_vision_judge_spec(get_vision_judge_agent_default()),
+        get_show_vision_judge_spec(get_vision_judge_agent_default()),
     )
 
 
@@ -158,6 +161,37 @@ def test_all_registered_strict_roots_have_bare_ref_nodes() -> None:
         for node in _walk_json(strict_json_schema(model)):
             if "$ref" in node:
                 assert set(node) == {"$ref"}, (model.__name__, node)
+
+
+def test_all_registered_strict_roots_declare_array_items() -> None:
+    """OpenAI rejects array schemas without items, including bare tuple prefixItems."""
+    for model in {spec.response_model for spec in _registered_specs()}:
+        for node in _walk_json(strict_json_schema(model)):
+            assert "prefixItems" not in node, (model.__name__, node)
+            if node.get("type") == "array":
+                assert "items" in node, (model.__name__, node)
+
+
+def test_homogeneous_tuple_normalizes_to_fixed_length_items() -> None:
+    class Window(BaseModel):
+        model_config = ConfigDict(extra="forbid")
+
+        span: tuple[int, int]
+
+    span = strict_json_schema(Window)["properties"]["span"]
+    assert span["items"] == {"type": "integer"}
+    assert (span["minItems"], span["maxItems"]) == (2, 2)
+    assert "prefixItems" not in span
+
+
+def test_heterogeneous_tuple_fails_loud() -> None:
+    class Mixed(BaseModel):
+        model_config = ConfigDict(extra="forbid")
+
+        pair: tuple[int, str]
+
+    with pytest.raises(ValueError, match="heterogeneous"):
+        strict_json_schema(Mixed)
 
 
 def test_ref_normalization_fails_loud_on_semantic_siblings() -> None:
