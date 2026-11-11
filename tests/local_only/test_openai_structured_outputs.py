@@ -96,7 +96,7 @@ async def test_live_strict_mode_per_agent(role_and_spec) -> None:
         model=spec.model,
         temperature=spec.temperature,
         reasoning_effort="low",
-        max_tokens=min(spec.max_tokens, 4_000),
+        max_tokens=min(spec.max_tokens, int(os.getenv("TWINKLR_LIVE_STRICT_MAX_TOKENS", "4000"))),
         timeout_seconds=spec.timeout_seconds,
         response_model=model,
         provider_max_attempts=1,
