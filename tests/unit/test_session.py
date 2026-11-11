@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import patch
 
+from pydantic import SecretStr
 import pytest
 
 from twinklr.core.agents.providers.factory import create_llm_provider
@@ -73,7 +74,9 @@ def test_provider_field_changes_constructor_request(
 
 
 def test_provider_selection_changes_constructor_branch() -> None:
-    config = _make_app_config().model_copy(update={"llm_provider": "anthropic"})
+    config = _make_app_config().model_copy(
+        update={"llm_provider": "anthropic", "llm_api_key": SecretStr("sk-ant-test")}
+    )
     with patch("twinklr.core.agents.providers.anthropic.AnthropicProvider") as constructor:
         create_llm_provider(config, "session")
 
