@@ -262,13 +262,12 @@ class DisplayRenderStage:
 
             rc = self._recipe_catalog or context.get_state("recipe_catalog")
             if rc is None:
+                from twinklr.core.pipeline import display_wiring
                 from twinklr.core.sequencer.templates.group.store import TemplateStore
 
-                _root = Path(__file__).resolve().parent.parent.parent.parent.parent
-                templates_dir = _root / "catalog" / "templates"
-                local_extensions_dir = _root / "data" / "templates"
                 template_store = TemplateStore.from_catalog_with_local_extensions(
-                    templates_dir, local_extensions_dir
+                    display_wiring.tracked_catalog_dir(),
+                    display_wiring.default_local_catalog_dir(),
                 )
                 rc = RecipeCatalog.from_store(template_store)
 

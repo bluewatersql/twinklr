@@ -21,6 +21,7 @@ from twinklr.core.formats.xlights.sequence.models.xsq import (
     SequenceHead,
     XSequence,
 )
+from twinklr.core.pipeline import display_wiring
 from twinklr.core.pipeline.context import PipelineContext
 from twinklr.core.pipeline.display_stages import (
     AssetResolutionStage,
@@ -76,6 +77,14 @@ from twinklr.core.sequencer.vocabulary.choreography import TargetType
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+
+@pytest.fixture(autouse=True)
+def _ignore_local_template_overlay(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep render tests independent of a developer's untracked data/templates overlay."""
+    monkeypatch.setattr(
+        display_wiring, "default_local_catalog_dir", lambda: tmp_path / "no-local-overlay"
+    )
 
 
 def _make_beat_grid() -> BeatGrid:

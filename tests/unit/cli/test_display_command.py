@@ -23,6 +23,15 @@ from twinklr.core.sequencer.display.models.render_plan import RenderPlan
 from twinklr.core.sequencer.display.renderer import RenderResult
 
 
+@pytest.fixture(autouse=True)
+def _ignore_local_template_overlay(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep CLI tests independent of a developer's untracked data/templates overlay."""
+    monkeypatch.setattr(
+        "twinklr.cli.display_cmd.default_local_catalog_dir",
+        lambda: tmp_path / "no-local-overlay",
+    )
+
+
 def test_command_registered_and_args() -> None:
     parser = build_arg_parser()
     args = parser.parse_args(
