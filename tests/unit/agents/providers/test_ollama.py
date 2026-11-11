@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import httpx
 from pydantic import BaseModel, ConfigDict
@@ -13,6 +14,7 @@ from twinklr.core.agents.async_runner import AsyncAgentRunner
 from twinklr.core.agents.providers.base import ProviderType
 from twinklr.core.agents.providers.errors import LLMProviderError, RecoverableLLMProviderError
 from twinklr.core.agents.providers.factory import create_llm_provider
+from twinklr.core.agents.providers.ollama import OllamaProvider
 from twinklr.core.agents.providers.openai import OpenAIProvider
 from twinklr.core.agents.spec import AgentSpec
 from twinklr.core.config.models import AppConfig
@@ -408,3 +410,71 @@ async def test_ollama_refuses_redirect_without_forwarding_prompt_or_schema() -> 
     assert b"SECRET-PROMPT" in requests[0].content
     remote_requests = [request for request in requests if request.url.host == "attacker.example"]
     assert remote_requests == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "content",
+    [
+        '```json\n{"title":"Glow"}\n```',
+        '```\n{"title":"Glow"}\n```',
+        '  ```json\n{"title":"Glow"}```  \n',
+    ],
+    ids=["json_fence", "bare_fence", "padded_fence"],
+)
+async def test_ollama_cloud_markdown_fence_is_unwrapped_before_parsing(content: str) -> None:
+    """Ollama Cloud ignores response_format, and glm-5.3:cloud fences its JSON."""
+
+    async def respond(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={
+                "id": "chatcmpl-cloud",
+                "object": "chat.completion",
+                "created": 1,
+                "model": "glm-5.3:cloud",
+                "choices": [
+                    {
+                        "index": 0,
+                        "message": {"role": "assistant", "content": content},
+                        "finish_reason": "stop",
+                    }
+                ],
+                "usage": {"prompt_tokens": 8, "completion_tokens": 3, "total_tokens": 11},
+            },
+            request=request,
+        )
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(respond)) as http_client:
+        provider = create_llm_provider(
+            AppConfig(
+                llm_provider="ollama",
+                llm_base_url="http://127.0.0.1:11434/v1",
+                llm_api_key="",
+            ),
+            session_id="test-cloud",
+            http_client=http_client,
+        )
+        response = await provider.generate_json_async(
+            messages=[{"role": "user", "content": "Make a tiny plan."}],
+            model="glm-5.3:cloud",
+            response_model=TinyPlan,
+            provider_max_attempts=1,
+            allow_json_object_fallback=False,
+        )
+
+    assert response.content == {"title": "Glow"}
+
+
+@pytest.mark.parametrize(
+    "content",
+    [
+        "I don't see a schema in our conversation.",
+        'Here is the plan:\n```json\n{"title":"Glow"}\n```',
+    ],
+    ids=["prose", "prose_then_fence"],
+)
+def test_ollama_fence_unwrap_only_touches_a_whole_response_fence(content: str) -> None:
+    """Prose, or prose around a fence, is left for the JSON parser to reject."""
+    response = SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content=content))])
+    assert OllamaProvider._response_content(response) == content

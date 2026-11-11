@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import re
 from typing import TYPE_CHECKING, Any
 
 from openai import DefaultAsyncHttpxClient
@@ -16,6 +17,11 @@ from twinklr.core.agents.providers.openai import OpenAIProvider
 
 if TYPE_CHECKING:
     import httpx
+
+# Ollama Cloud does not enforce response_format schemas, and cloud models such as
+# glm-5.3:cloud wrap their JSON in a Markdown fence.  Only a fence spanning the
+# whole response is unwrapped; anything else reaches the JSON parser unchanged.
+_WHOLE_RESPONSE_FENCE = re.compile(r"\A\s*```(?:json)?[ \t]*\n(?P<body>.*?)\s*```\s*\Z", re.DOTALL)
 
 
 class OllamaProvider(OpenAIProvider):
@@ -57,6 +63,14 @@ class OllamaProvider(OpenAIProvider):
     @property
     def supports_image_generation(self) -> bool:
         return False
+
+    @staticmethod
+    def _response_content(response: Any) -> str | None:
+        content = OpenAIProvider._response_content(response)
+        if content is None:
+            return None
+        match = _WHOLE_RESPONSE_FENCE.match(content)
+        return match.group("body") if match else content
 
     def _window_messages(
         self,
