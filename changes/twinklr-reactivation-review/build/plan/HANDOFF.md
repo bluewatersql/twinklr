@@ -29,11 +29,18 @@ older entries remain as dated audit history.
 
 ### Live validation — 2026-11-11
 
-- **P4-T2 Ollama cloud smoke: FAILED (capability gap).** Exactly 1 request was made to
-  `glm-5.3:cloud`. The model returned prose because Ollama Cloud does not enforce
-  structured outputs. Under the cloud amendment the strict-schema exit cannot pass.
-  **Owner decision needed:** revert to a local model for this smoke, re-scope the exit, or
-  accept this as the finding.
+- **P4-T2 Ollama cloud smoke: transport and parsing proven; one semantic rule open.**
+  3 cloud requests were made to `glm-5.3:cloud`.
+  - Ollama Cloud does not enforce `response_format`, so the schema must travel in the
+    prompt. The real runner already does this; the smoke now does too.
+  - Attempt 2 exposed a provider defect: it rejected fenced JSON. That is fixed in
+    `OllamaProvider`.
+  - Attempt 3 parsed schema-shaped JSON but failed the cross-field rule
+    `MacroSection.theme.scope must be SECTION`. The real planner's one schema-repair
+    attempt is designed to handle exactly this.
+
+  **Owner decision (cloud only):** accept attempt 3 as the evidence, or authorize one
+  runner-level cloud request.
   [Evidence](../../evidence/2026-11-11-p4-t2-ollama-cloud-smoke/README.md).
 - **P2P-T11 live probes: partial.** 9 requests were made.
   - `gpt-5.6-sol` **accepts** `json_object`.
