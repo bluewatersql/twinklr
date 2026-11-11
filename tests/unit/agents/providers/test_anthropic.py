@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -10,8 +11,9 @@ import pytest
 from twinklr.core.agents.async_runner import AsyncAgentRunner
 from twinklr.core.agents.providers.base import LLMResponse, ProviderType, TokenUsage
 from twinklr.core.agents.providers.conversation import generate_conversation_id
-from twinklr.core.agents.providers.errors import LLMProviderError
+from twinklr.core.agents.providers.errors import LLMProviderError, RecoverableLLMProviderError
 from twinklr.core.agents.spec import AgentSpec
+from twinklr.core.sequencer.planning.models import MacroPlan
 
 # ---------------------------------------------------------------------------
 # Helpers / fixtures
@@ -21,25 +23,30 @@ from twinklr.core.agents.spec import AgentSpec
 def _make_sync_message(
     text: str = '{"result": "ok"}', input_tokens: int = 10, output_tokens: int = 5
 ) -> MagicMock:
-    """Build a mock Anthropic sync messages.create() response."""
+    """Build a mock final Anthropic message as returned by a stream."""
     block = MagicMock()
+    block.type = "text"
     block.text = text
 
     usage = MagicMock()
     usage.input_tokens = input_tokens
     usage.output_tokens = output_tokens
+    usage.cache_creation_input_tokens = 0
+    usage.cache_read_input_tokens = 0
 
     msg = MagicMock()
     msg.content = [block]
     msg.usage = usage
     msg.id = "msg_sync_001"
+    msg.model = "claude-opus-5-5"
+    msg.stop_reason = "end_turn"
     return msg
 
 
 def _make_async_message(
     text: str = '{"result": "ok"}', input_tokens: int = 8, output_tokens: int = 4
 ) -> MagicMock:
-    """Build a mock Anthropic async messages.create() response."""
+    """Build a mock final Anthropic message for the async stream."""
     return _make_sync_message(text=text, input_tokens=input_tokens, output_tokens=output_tokens)
 
 
@@ -49,11 +56,16 @@ def mock_anthropic_clients():
     sync_msg = _make_sync_message()
     async_msg = _make_async_message()
 
+    sync_stream = MagicMock()
+    sync_stream.get_final_message.return_value = sync_msg
     mock_sync = MagicMock()
-    mock_sync.messages.create.return_value = sync_msg
+    mock_sync.messages.stream.return_value.__enter__.return_value = sync_stream
 
+    async_stream = MagicMock()
+    async_stream.get_final_message = AsyncMock(return_value=async_msg)
     mock_async = MagicMock()
-    mock_async.messages.create = AsyncMock(return_value=async_msg)
+    mock_async.messages.stream.return_value.__aenter__ = AsyncMock(return_value=async_stream)
+    mock_async.messages.stream.return_value.__aexit__ = AsyncMock(return_value=None)
 
     with (
         patch(
@@ -107,8 +119,9 @@ def test_generate_json_returns_llm_response(mock_anthropic_clients: dict) -> Non
 
     assert isinstance(result, LLMResponse)
     assert result.content == {"result": "ok"}
-    assert result.metadata.model == "claude-sonnet-4-20250514"
-    assert result.metadata.model == "claude-sonnet-4-20250514"
+    # Metadata reports the model that actually served the response.
+    assert result.metadata.model == "claude-opus-5-5"
+    assert result.metadata.actual_model_present
 
 
 def test_generate_json_token_usage(mock_anthropic_clients: dict) -> None:
@@ -134,7 +147,7 @@ def test_generate_json_extracts_system_message(mock_anthropic_clients: dict) -> 
     ]
     provider.generate_json(messages=messages, model="claude-sonnet-4-20250514")
 
-    call_kwargs = sync_client.messages.create.call_args.kwargs
+    call_kwargs = sync_client.messages.stream.call_args.kwargs
     assert call_kwargs["system"] == "You are a helpful assistant."
     # The messages list passed to the API must NOT include the system message
     for msg in call_kwargs["messages"]:
@@ -152,7 +165,7 @@ def test_generate_json_no_developer_role(mock_anthropic_clients: dict) -> None:
     ]
     provider.generate_json(messages=messages, model="claude-sonnet-4-20250514")
 
-    call_kwargs = sync_client.messages.create.call_args.kwargs
+    call_kwargs = sync_client.messages.stream.call_args.kwargs
     # 'developer' must NOT appear in the messages list sent to Anthropic
     for msg in call_kwargs.get("messages", []):
         assert msg["role"] != "developer"
@@ -161,7 +174,7 @@ def test_generate_json_no_developer_role(mock_anthropic_clients: dict) -> None:
 def test_generate_json_wraps_anthropic_error(mock_anthropic_clients: dict) -> None:
     """Anthropic API errors must be wrapped in LLMProviderError."""
     provider = _make_provider(mock_anthropic_clients)
-    mock_anthropic_clients["sync_client"].messages.create.side_effect = Exception(
+    mock_anthropic_clients["sync_client"].messages.stream.side_effect = Exception(
         "Anthropic API failure"
     )
 
@@ -190,32 +203,34 @@ async def test_generate_json_async_returns_llm_response(mock_anthropic_clients: 
 
 
 @pytest.mark.asyncio
-async def test_generate_json_async_filters_openai_reasoning_option(
+async def test_generate_json_async_maps_effort_and_drops_temperature(
     mock_anthropic_clients: dict,
 ) -> None:
-    """Portable limits are forwarded while OpenAI-only reasoning is removed."""
+    """Effort goes to output_config; sampling parameters are never sent to Claude."""
     provider = _make_provider(mock_anthropic_clients)
 
     await provider.generate_json_async(
         messages=[{"role": "user", "content": "test"}],
         model="claude-configured",
+        temperature=0.7,
         reasoning_effort="high",
         max_tokens=1234,
         timeout_seconds=17,
     )
 
-    request = mock_anthropic_clients["async_client"].messages.create.call_args.kwargs
+    request = mock_anthropic_clients["async_client"].messages.stream.call_args.kwargs
+    assert request["output_config"] == {"effort": "high"}
     assert "reasoning_effort" not in request
-    assert "reasoning" not in request
+    assert "temperature" not in request
     assert request["max_tokens"] == 1234
     assert request["timeout"] == 17
 
 
 @pytest.mark.asyncio
-async def test_async_runner_does_not_send_reasoning_to_anthropic(
+async def test_async_runner_sends_effort_to_anthropic(
     mock_anthropic_clients: dict, tmp_path: Path
 ) -> None:
-    """The runner filters provider-specific options before the integration boundary."""
+    """The runner forwards the spec's effort; the provider maps it to output_config."""
     provider = _make_provider(mock_anthropic_clients)
     runner = AsyncAgentRunner(provider=provider, prompt_base_path=tmp_path)
     spec = AgentSpec(
@@ -230,8 +245,8 @@ async def test_async_runner_does_not_send_reasoning_to_anthropic(
 
     await runner._call_oneshot_async(spec, [{"role": "user", "content": "test"}])
 
-    request = mock_anthropic_clients["async_client"].messages.create.call_args.kwargs
-    assert "reasoning_effort" not in request
+    request = mock_anthropic_clients["async_client"].messages.stream.call_args.kwargs
+    assert request["output_config"] == {"effort": "high"}
     assert "reasoning" not in request
     assert request["max_tokens"] == 2222
     assert request["timeout"] == 19
@@ -264,7 +279,7 @@ async def test_generate_json_async_extracts_system_message(mock_anthropic_client
     ]
     await provider.generate_json_async(messages=messages, model="claude-sonnet-4-20250514")
 
-    call_kwargs = async_client.messages.create.call_args.kwargs
+    call_kwargs = async_client.messages.stream.call_args.kwargs
     assert call_kwargs["system"] == "Be concise."
     for msg in call_kwargs["messages"]:
         assert msg["role"] != "system"
@@ -274,7 +289,7 @@ async def test_generate_json_async_extracts_system_message(mock_anthropic_client
 async def test_generate_json_async_wraps_error(mock_anthropic_clients: dict) -> None:
     """Anthropic async API errors must be wrapped in LLMProviderError."""
     provider = _make_provider(mock_anthropic_clients)
-    mock_anthropic_clients["async_client"].messages.create.side_effect = Exception("async failure")
+    mock_anthropic_clients["async_client"].messages.stream.side_effect = Exception("async failure")
 
     with pytest.raises(LLMProviderError, match="Provider error"):
         await provider.generate_json_async(
@@ -513,3 +528,150 @@ def test_factory_creates_anthropic_provider() -> None:
 
     assert isinstance(provider, AnthropicProvider)
     assert provider.provider_type == ProviderType.ANTHROPIC
+
+
+# ---------------------------------------------------------------------------
+# Structured outputs, refusal fallback, and stop-reason classification
+# ---------------------------------------------------------------------------
+
+
+def _walk(value: object):
+    if isinstance(value, dict):
+        yield value
+        for child in value.values():
+            yield from _walk(child)
+    elif isinstance(value, list):
+        for child in value:
+            yield from _walk(child)
+
+
+def test_claude_schema_strips_unsupported_constraints_but_keeps_enums() -> None:
+    from twinklr.core.agents.providers.anthropic import claude_json_schema
+
+    schema = claude_json_schema(MacroPlan)
+    nodes = list(_walk(schema))
+    unsupported = {"minimum", "maximum", "minLength", "maxLength", "maxItems", "default"}
+    assert not any(unsupported & node.keys() for node in nodes)
+    assert all(node.get("minItems", 0) in (0, 1) for node in nodes)
+    assert any("enum" in node for node in nodes)
+    assert all(set(node) == {"$ref"} for node in nodes if "$ref" in node)
+    assert all(
+        node.get("additionalProperties") is False for node in nodes if node.get("type") == "object"
+    )
+
+
+@pytest.mark.asyncio
+async def test_structured_request_uses_output_config_and_default_fallback(
+    mock_anthropic_clients: dict,
+) -> None:
+    provider = _make_provider(mock_anthropic_clients)
+    mock_anthropic_clients["async_msg"].content[0].text = '{"result": "ok"}'
+
+    from pydantic import BaseModel, ConfigDict
+
+    class Result(BaseModel):
+        model_config = ConfigDict(extra="forbid")
+
+        result: str
+
+    response = await provider.generate_json_async(
+        messages=[
+            {"role": "developer", "content": "Schema here."},
+            {"role": "user", "content": "test"},
+        ],
+        model="claude-opus-5-5",
+        response_model=Result,
+        reasoning_effort="medium",
+        provider_max_attempts=1,
+        allow_json_object_fallback=False,
+    )
+
+    request = mock_anthropic_clients["async_client"].messages.stream.call_args.kwargs
+    assert request["system"] == "Schema here."
+    assert request["output_config"]["effort"] == "medium"
+    assert request["output_config"]["format"]["type"] == "json_schema"
+    assert request["output_config"]["format"]["schema"]["required"] == ["result"]
+    assert request["extra_headers"] == {"anthropic-beta": "server-side-fallback-2026-07-01"}
+    assert request["extra_body"] == {"fallbacks": "default"}
+    assert response.metadata.structured_output_mode == "json_schema"
+    assert response.metadata.response_schema_hash is not None
+    assert response.metadata.finish_reason == "end_turn"
+
+
+@pytest.mark.asyncio
+async def test_models_without_server_fallback_send_no_fallback(
+    mock_anthropic_clients: dict,
+) -> None:
+    provider = _make_provider(mock_anthropic_clients)
+    await provider.generate_json_async(
+        messages=[{"role": "user", "content": "test"}], model="claude-haiku-5-5"
+    )
+    request = mock_anthropic_clients["async_client"].messages.stream.call_args.kwargs
+    assert "extra_body" not in request
+    assert "extra_headers" not in request
+
+
+def test_response_text_skips_thinking_and_pre_fallback_blocks() -> None:
+    from twinklr.core.agents.providers.anthropic import AnthropicProvider
+
+    response = SimpleNamespace(
+        content=[
+            SimpleNamespace(type="thinking", thinking=""),
+            SimpleNamespace(type="text", text='{"partial": '),
+            SimpleNamespace(type="fallback"),
+            SimpleNamespace(type="thinking", thinking=""),
+            SimpleNamespace(type="text", text='{"result": "ok"}'),
+        ]
+    )
+    assert AnthropicProvider._response_text(response) == '{"result": "ok"}'
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("stop_reason", "text", "reason"),
+    [
+        ("max_tokens", '{"result": ', "truncation"),
+        ("refusal", "", "refusal"),
+        ("end_turn", "", "empty_response"),
+        ("end_turn", "not json", "json_decode"),
+    ],
+)
+async def test_response_outcomes_are_recoverable_with_usage(
+    mock_anthropic_clients: dict, stop_reason: str, text: str, reason: str
+) -> None:
+    provider = _make_provider(mock_anthropic_clients)
+    message = mock_anthropic_clients["async_msg"]
+    message.stop_reason = stop_reason
+    message.stop_details = SimpleNamespace(category="cyber")
+    message.content[0].text = text
+
+    with pytest.raises(RecoverableLLMProviderError) as caught:
+        await provider.generate_json_async(
+            messages=[{"role": "user", "content": "test"}], model="claude-opus-5-5"
+        )
+
+    assert caught.value.reason == reason
+    assert caught.value.token_usage.total_tokens == 12
+
+
+@pytest.mark.asyncio
+async def test_unknown_request_options_fail_loudly(mock_anthropic_clients: dict) -> None:
+    provider = _make_provider(mock_anthropic_clients)
+    with pytest.raises(LLMProviderError, match="top_p"):
+        await provider.generate_json_async(
+            messages=[{"role": "user", "content": "test"}], model="claude-opus-5-5", top_p=0.9
+        )
+    mock_anthropic_clients["async_client"].messages.stream.assert_not_called()
+
+
+def test_app_config_uses_anthropic_key_for_anthropic_provider(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from twinklr.core.config.models import AppConfig
+
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-openai")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant")
+    assert AppConfig(llm_provider="anthropic").llm_api_key.get_secret_value() == "sk-ant"
+    assert AppConfig().llm_api_key.get_secret_value() == "sk-openai"
+    explicit = AppConfig(llm_provider="anthropic", llm_api_key="explicit")
+    assert explicit.llm_api_key.get_secret_value() == "explicit"

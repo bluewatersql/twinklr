@@ -888,17 +888,37 @@ async def test_openai_classifies_recoverable_response_outcomes(response, reason:
 
 
 @pytest.mark.asyncio
-async def test_anthropic_strict_contract_is_gated_loudly() -> None:
+async def test_anthropic_strict_contract_uses_claude_structured_outputs() -> None:
     from twinklr.core.agents.providers.anthropic import AnthropicProvider
 
     with (
         patch("twinklr.core.agents.providers.anthropic.Anthropic"),
-        patch("twinklr.core.agents.providers.anthropic.AsyncAnthropic"),
+        patch("twinklr.core.agents.providers.anthropic.AsyncAnthropic") as async_cls,
     ):
+        message = MagicMock()
+        message.content = [MagicMock(type="text", text='{"result": "ok", "count": 1}')]
+        message.stop_reason = "end_turn"
+        message.model = "claude-opus-5-5"
+        message.usage = MagicMock(
+            input_tokens=3,
+            output_tokens=2,
+            cache_creation_input_tokens=0,
+            cache_read_input_tokens=0,
+        )
+        stream = MagicMock()
+        stream.get_final_message = AsyncMock(return_value=message)
+        context = async_cls.return_value.messages.stream.return_value
+        context.__aenter__ = AsyncMock(return_value=stream)
+        context.__aexit__ = AsyncMock(return_value=None)
+
         provider = AnthropicProvider(api_key="test-key")
-        with pytest.raises(LLMProviderError, match=r"does not support.*strict"):
-            await provider.generate_json_async(
-                messages=[{"role": "user", "content": "respond"}],
-                model="claude",
-                response_model=StrictSample,
-            )
+        response = await provider.generate_json_async(
+            messages=[{"role": "user", "content": "respond"}],
+            model="claude-opus-5-5",
+            response_model=StrictSample,
+        )
+
+    request = async_cls.return_value.messages.stream.call_args.kwargs
+    assert request["output_config"]["format"]["schema"]["required"] == ["result", "count"]
+    assert response.content == {"result": "ok", "count": 1}
+    assert response.metadata.response_schema_hash == response_schema_hash(StrictSample)

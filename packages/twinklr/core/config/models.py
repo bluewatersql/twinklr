@@ -550,6 +550,13 @@ class AppConfig(ConfigBase):
         return normalized
 
     @model_validator(mode="after")
+    def use_anthropic_key_for_anthropic_provider(self) -> Self:
+        """Never send the OpenAI key to Anthropic when no key was configured explicitly."""
+        if self.llm_provider == "anthropic" and "llm_api_key" not in self.model_fields_set:
+            self.llm_api_key = SecretStr(os.getenv("ANTHROPIC_API_KEY", ""))
+        return self
+
+    @model_validator(mode="after")
     def validate_local_provider_endpoint(self) -> Self:
         """Keep the opt-in Ollama transport on the operator's own machine."""
         if self.llm_provider != "ollama":

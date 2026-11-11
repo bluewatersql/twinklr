@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import threading
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from twinklr.core.agents.providers.base import (
     ImageBackground,
@@ -20,17 +20,85 @@ from twinklr.core.agents.providers.base import (
     TokenUsage,
 )
 from twinklr.core.agents.providers.conversation import Conversation
-from twinklr.core.agents.providers.errors import LLMProviderError
+from twinklr.core.agents.providers.errors import LLMProviderError, RecoverableLLMProviderError
+from twinklr.core.agents.schema_utils import response_schema_hash, strict_json_schema
+
+if TYPE_CHECKING:
+    from pydantic import BaseModel
 
 # Lazy-imported at module level for type-checker friendliness.
 # The actual import happens inside __init__ so the package is optional.
 try:
     from anthropic import Anthropic, AsyncAnthropic
 except ImportError:  # pragma: no cover
-    Anthropic = cast("Any", None)
-    AsyncAnthropic = cast("Any", None)
+    Anthropic = cast("Any", None)  # type: ignore[misc,unused-ignore]
+    AsyncAnthropic = cast("Any", None)  # type: ignore[misc,unused-ignore]
 
 logger = logging.getLogger(__name__)
+
+DEFAULT_CLAUDE_MODEL = "claude-opus-5-5"
+
+# Claude structured outputs reject numeric, string-length, and most array-size
+# constraints.  They are moved into the description so the model still sees them,
+# and Pydantic re-validates every response, so no constraint is lost.
+_CLAUDE_UNSUPPORTED_SCHEMA_KEYWORDS = frozenset(
+    {
+        "default",
+        "exclusiveMaximum",
+        "exclusiveMinimum",
+        "maxItems",
+        "maxLength",
+        "maxProperties",
+        "maximum",
+        "minLength",
+        "minProperties",
+        "minimum",
+        "multipleOf",
+        "pattern",
+        "uniqueItems",
+    }
+)
+_CLAUDE_SUPPORTED_STRING_FORMATS = frozenset(
+    {"date-time", "time", "date", "duration", "email", "hostname", "uri", "ipv4", "ipv6", "uuid"}
+)
+
+# Models that accept the server-side refusal fallback ("default" routing form).
+_SERVER_SIDE_FALLBACK_MODELS = frozenset(
+    {"claude-fable-5-1", "claude-opus-5-5", "claude-opus-5", "claude-sonnet-5-5"}
+)
+_SERVER_SIDE_FALLBACK_BETA = "server-side-fallback-2026-07-01"
+
+
+def claude_json_schema(model: type[BaseModel]) -> dict[str, Any]:
+    """Derive the Claude structured-output schema from Twinklr's strict schema."""
+    return cast("dict[str, Any]", _claude_schema_node(strict_json_schema(model)))
+
+
+def _claude_schema_node(value: Any) -> Any:
+    if isinstance(value, list):
+        return [_claude_schema_node(item) for item in value]
+    if not isinstance(value, dict):
+        return value
+
+    node: dict[str, Any] = {}
+    moved: dict[str, Any] = {}
+    for key, child in value.items():
+        if key in ("properties", "$defs"):
+            node[key] = {name: _claude_schema_node(schema) for name, schema in child.items()}
+        elif (key == "minItems" and child not in (0, 1)) or (key == "format" and child not in _CLAUDE_SUPPORTED_STRING_FORMATS):
+            moved[key] = child
+        elif key in _CLAUDE_UNSUPPORTED_SCHEMA_KEYWORDS:
+            if key != "default":
+                moved[key] = child
+        else:
+            node[key] = _claude_schema_node(child)
+    if moved and "$ref" not in node:
+        constraint = ", ".join(f"{key}: {json.dumps(moved[key])}" for key in sorted(moved))
+        description = node.get("description")
+        node["description"] = (
+            f"{description}\n\n{{{constraint}}}" if description else f"{{{constraint}}}"
+        )
+    return node
 
 
 class AnthropicProvider:
@@ -54,7 +122,7 @@ class AnthropicProvider:
         self,
         *,
         api_key: str | None = None,
-        default_model: str = "claude-sonnet-4-20250514",
+        default_model: str = DEFAULT_CLAUDE_MODEL,
         session_id: str | None = None,
         timeout: float = 300.0,
     ) -> None:
@@ -217,17 +285,22 @@ class AnthropicProvider:
     def _extract_token_usage(response: Any) -> TokenUsage:
         """Extract token usage from an Anthropic API response.
 
-        Args:
-            response: Raw response object from ``anthropic.messages.create``.
-
-        Returns:
-            Populated ``TokenUsage`` dataclass.
+        Cached prompt tokens count as prompt tokens; thinking is billed inside
+        ``output_tokens`` and is not reported separately.
         """
         if not hasattr(response, "usage") or response.usage is None:
             return TokenUsage()
 
-        input_tokens = getattr(response.usage, "input_tokens", 0) or 0
-        output_tokens = getattr(response.usage, "output_tokens", 0) or 0
+        usage = response.usage
+        input_tokens = sum(
+            getattr(usage, field, 0) or 0
+            for field in (
+                "input_tokens",
+                "cache_creation_input_tokens",
+                "cache_read_input_tokens",
+            )
+        )
+        output_tokens = getattr(usage, "output_tokens", 0) or 0
         return TokenUsage(
             prompt_tokens=input_tokens,
             completion_tokens=output_tokens,
@@ -235,31 +308,135 @@ class AnthropicProvider:
         )
 
     @staticmethod
-    def _parse_response_text(response: Any) -> Any:
-        """Extract and JSON-parse the text content from an Anthropic response.
+    def _response_text(response: Any) -> str:
+        """Join the final model's text blocks, skipping thinking and fallback blocks."""
+        blocks = list(getattr(response, "content", None) or [])
+        last_fallback = max(
+            (
+                index
+                for index, block in enumerate(blocks)
+                if getattr(block, "type", None) == "fallback"
+            ),
+            default=-1,
+        )
+        return "".join(
+            block.text
+            for block in blocks[last_fallback + 1 :]
+            if getattr(block, "type", "text") == "text"
+            and isinstance(getattr(block, "text", None), str)
+        )
 
-        Args:
-            response: Raw response object from ``anthropic.messages.create``.
+    def _build_request(
+        self,
+        messages: list[dict[str, str]],
+        model: str,
+        temperature: float | None,
+        kwargs: dict[str, Any],
+    ) -> tuple[dict[str, Any], type[BaseModel] | None]:
+        """Translate Twinklr's portable request options into a Messages request."""
+        response_model = kwargs.pop("response_model", None)
+        if kwargs.pop("input_image_urls", None):
+            raise LLMProviderError("Configured provider does not support vision image inputs")
+        # OpenAI-only transport switches; Claude has no json_object fallback mode.
+        kwargs.pop("allow_json_object_fallback", None)
+        kwargs.pop("provider_max_attempts", None)
+        reasoning_effort = kwargs.pop("reasoning_effort", None)
+        timeout_seconds = kwargs.pop("timeout_seconds", None)
+        max_tokens = kwargs.pop("max_tokens", 16000)
+        if kwargs:
+            raise LLMProviderError(
+                f"Unsupported Anthropic request options: {', '.join(sorted(kwargs))}"
+            )
+        if temperature is not None:
+            # Sampling parameters return HTTP 400 on every current Claude model.
+            logger.debug("Dropping temperature=%s for Claude model %s", temperature, model)
 
-        Returns:
-            Parsed Python object (dict, list, etc.).
+        system_text, conversation_messages = self._split_messages(messages)
+        request_params: dict[str, Any] = {
+            "model": model,
+            "max_tokens": max_tokens,
+            "messages": conversation_messages,
+        }
+        if system_text:
+            request_params["system"] = system_text
+        output_config: dict[str, Any] = {}
+        if reasoning_effort is not None:
+            output_config["effort"] = reasoning_effort
+        if response_model is not None:
+            if not hasattr(response_model, "model_json_schema"):
+                raise LLMProviderError("response_model must be a Pydantic model class")
+            output_config["format"] = {
+                "type": "json_schema",
+                "schema": claude_json_schema(cast("type[BaseModel]", response_model)),
+            }
+        if output_config:
+            request_params["output_config"] = output_config
+        if timeout_seconds is not None:
+            request_params["timeout"] = timeout_seconds
+        if model in _SERVER_SIDE_FALLBACK_MODELS:
+            request_params["extra_headers"] = {"anthropic-beta": _SERVER_SIDE_FALLBACK_BETA}
+            request_params["extra_body"] = {"fallbacks": "default"}
+        return request_params, cast("type[BaseModel] | None", response_model)
 
-        Raises:
-            LLMProviderError: If the response has no text content or the text
-                is not valid JSON.
-        """
-        if not response.content:
-            raise LLMProviderError("Empty response from Anthropic API")
+    def _parse_message(
+        self, response: Any, model: str, response_model: type[BaseModel] | None
+    ) -> LLMResponse:
+        """Classify the stop reason, account usage, and parse the JSON text."""
+        token_usage = self._extract_token_usage(response)
+        self._update_token_usage(
+            prompt_tokens=token_usage.prompt_tokens,
+            completion_tokens=token_usage.completion_tokens,
+            total_tokens=token_usage.total_tokens,
+        )
+        stop_reason = getattr(response, "stop_reason", None)
+        if stop_reason == "refusal":
+            details = getattr(response, "stop_details", None)
+            category = getattr(details, "category", None)
+            raise RecoverableLLMProviderError(
+                reason="refusal",
+                message=f"Claude declined the request (category={category})",
+                token_usage=token_usage,
+            )
+        if stop_reason == "max_tokens":
+            raise RecoverableLLMProviderError(
+                reason="truncation",
+                message="Claude response truncated at max_tokens",
+                token_usage=token_usage,
+            )
 
-        text = response.content[0].text
-        if not text:
-            raise LLMProviderError("Empty text block in Anthropic response")
-
+        text = self._response_text(response)
+        if not text.strip():
+            raise RecoverableLLMProviderError(
+                reason="empty_response",
+                message="Empty text in Anthropic response",
+                token_usage=token_usage,
+            )
         try:
-            return json.loads(text)
+            response_data = json.loads(text)
         except json.JSONDecodeError as exc:
             logger.error("Failed to parse Anthropic JSON response: %s", exc)
-            raise LLMProviderError(f"Failed to parse JSON response: {exc}") from exc
+            raise RecoverableLLMProviderError(
+                reason="json_decode",
+                message=f"Failed to parse JSON response: {exc}",
+                token_usage=token_usage,
+            ) from exc
+
+        actual_model = getattr(response, "model", None)
+        return LLMResponse(
+            content=response_data,
+            metadata=ResponseMetadata(
+                response_id=getattr(response, "id", None),
+                token_usage=token_usage,
+                model=actual_model if isinstance(actual_model, str) else model,
+                actual_model_present=isinstance(actual_model, str),
+                token_usage_is_explicit=getattr(response, "usage", None) is not None,
+                finish_reason=stop_reason if isinstance(stop_reason, str) else None,
+                structured_output_mode="json_schema" if response_model is not None else None,
+                response_schema_hash=(
+                    response_schema_hash(response_model) if response_model is not None else None
+                ),
+            ),
+        )
 
     # =========================================================================
     # Sync Methods
@@ -290,40 +467,13 @@ class AnthropicProvider:
             LLMProviderError: On API errors or JSON parse failures.
         """
         try:
-            system_text, conversation_messages = self._split_messages(messages)
-            kwargs.pop("reasoning_effort", None)
-            timeout_seconds = kwargs.pop("timeout_seconds", None)
-
-            request_params: dict[str, Any] = {
-                "model": model,
-                "max_tokens": kwargs.pop("max_tokens", 4096),
-                "messages": conversation_messages,
-            }
-            if system_text:
-                request_params["system"] = system_text
-            if temperature is not None:
-                request_params["temperature"] = temperature
-            if timeout_seconds is not None:
-                request_params["timeout"] = timeout_seconds
-
-            response = self._sync_client.messages.create(**request_params, **kwargs)
-
-            response_data = self._parse_response_text(response)
-            token_usage = self._extract_token_usage(response)
-            self._update_token_usage(
-                prompt_tokens=token_usage.prompt_tokens,
-                completion_tokens=token_usage.completion_tokens,
-                total_tokens=token_usage.total_tokens,
+            request_params, response_model = self._build_request(
+                messages, model, temperature, kwargs
             )
-
-            return LLMResponse(
-                content=response_data,
-                metadata=ResponseMetadata(
-                    response_id=getattr(response, "id", None),
-                    token_usage=token_usage,
-                    model=model,
-                ),
-            )
+            # Streaming keeps large max_tokens requests inside HTTP timeouts.
+            with self._sync_client.messages.stream(**request_params) as stream:
+                response = stream.get_final_message()
+            return self._parse_message(response, model, response_model)
 
         except LLMProviderError:
             raise
@@ -423,46 +573,14 @@ class AnthropicProvider:
         Raises:
             LLMProviderError: On API errors or JSON parse failures.
         """
-        if kwargs.pop("response_model", None) is not None:
-            raise LLMProviderError(
-                "AnthropicProvider does not support Twinklr's strict structured-output "
-                "contract; choose the OpenAI provider for registered AgentSpec roles"
-            )
         try:
-            system_text, conversation_messages = self._split_messages(messages)
-            kwargs.pop("reasoning_effort", None)
-            timeout_seconds = kwargs.pop("timeout_seconds", None)
-
-            request_params: dict[str, Any] = {
-                "model": model,
-                "max_tokens": kwargs.pop("max_tokens", 4096),
-                "messages": conversation_messages,
-            }
-            if system_text:
-                request_params["system"] = system_text
-            if temperature is not None:
-                request_params["temperature"] = temperature
-            if timeout_seconds is not None:
-                request_params["timeout"] = timeout_seconds
-
-            response = await self._async_client.messages.create(**request_params, **kwargs)
-
-            response_data = self._parse_response_text(response)
-            token_usage = self._extract_token_usage(response)
-            self._update_token_usage(
-                prompt_tokens=token_usage.prompt_tokens,
-                completion_tokens=token_usage.completion_tokens,
-                total_tokens=token_usage.total_tokens,
+            request_params, response_model = self._build_request(
+                messages, model, temperature, kwargs
             )
-
-            return LLMResponse(
-                content=response_data,
-                metadata=ResponseMetadata(
-                    response_id=getattr(response, "id", None),
-                    token_usage=token_usage,
-                    model=model,
-                ),
-            )
+            # Streaming keeps large max_tokens requests inside HTTP timeouts.
+            async with self._async_client.messages.stream(**request_params) as stream:
+                response = await stream.get_final_message()
+            return self._parse_message(response, model, response_model)
 
         except LLMProviderError:
             raise

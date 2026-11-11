@@ -682,6 +682,9 @@ class AsyncAgentRunner:
         else:
             if spec.temperature is not None:
                 kwargs["temperature"] = spec.temperature
+            if self.provider.provider_type == ProviderType.ANTHROPIC:
+                # Claude reads effort from output_config.effort; the provider maps it.
+                kwargs["reasoning_effort"] = spec.reasoning_effort
             if input_image_urls:
                 raise RunError("Configured provider does not support vision image inputs")
         return kwargs
