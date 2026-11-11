@@ -62,11 +62,22 @@ Fix (branch `fix/strict-schema-live-findings`):
 - Both judge specs are added to the strict-schema registry.
 - New tests cover these cases, and they fail on the pre-fix code.
 
-## Not done (owner decision)
+## Follow-up reruns (owner-approved live requests, 2026-11-11)
 
-- **Lyrics re-verification.** One corrected live `lyrics` request would confirm the fix.
-  It would go beyond the spec's "exactly 8" strict-suite count, although it is far
-  inside the $2.00 cap.
-- **audio_profile / group_planner.** Settling these needs a harness decision. Either
-  raise the test's 4,000-token cap for those two roles (2 more requests) or accept the
-  truncation as non-schema evidence. The schemas themselves were accepted by the server.
+| Rerun | Git SHA | Requests | Result |
+|---|---|---|---|
+| lyrics, after the schema fix | `722c58d` | 1 | **PASS** in 3.8 s. The server accepted the tuple-normalized schema and the response validated ([log](lyrics-recheck.log)) |
+| group_planner, cap raised to 16,000 (`TWINKLR_LIVE_STRICT_MAX_TOKENS`, `aef9139`) | `aef9139` | 1 | **PASS** in 2.9 s ([log](truncated-roles-rerun.log)) |
+| audio_profile, cap raised to 16,000 | `aef9139` | 1 | **FAIL: runaway output.** Truncated again at `max_output_tokens` after 104 s ([log](truncated-roles-rerun.log)) |
+
+Total live requests for T11 so far: 12 (probe 1, suite 8, reruns 3), each at
+`reasoning_effort=low`.
+
+**Strict-mode outcome: 7 of 8 roles PASS.** `audio_profile` is the only open role. The
+server accepts its schema, but given "smallest plausible object" the model emits more
+than 16,000 output tokens. That points to an unbounded array or open-ended string field
+in `AudioProfileModel` that the model keeps filling, not to a schema rejection. No
+further spend was made on it. Next step: an offline look at `AudioProfileModel`'s
+unbounded fields (`maxItems` / `maxLength` coverage). Note that the real audio-profile
+agent runs with `max_tokens` 50,000 and a full prompt pack, so this probe overstates the
+risk.
