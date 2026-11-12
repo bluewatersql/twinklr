@@ -20,7 +20,7 @@ twinklr/
 │   │   ├── agents/              # Multi-agent orchestration
 │   │   │   ├── audio/           # Audio profiling & lyrics agents
 │   │   │   ├── sequencer/       # Planner, macro planner, group planner
-│   │   │   ├── providers/       # OpenAI/Ollama + legacy Anthropic adapters
+│   │   │   ├── providers/       # OpenAI, Ollama and Anthropic (Claude) adapters
 │   │   │   ├── shared/          # Judge, iteration controller, validation
 │   │   │   └── logging/         # LLM call logging
 │   │   ├── audio/               # Audio analysis pipeline
@@ -427,10 +427,16 @@ contract, and both pass the same registration linter.
 
 Implement the `LLMProvider` interface in `packages/twinklr/core/agents/providers/` and register it in the provider factory (`create_llm_provider()`). Configure via `AppConfig.llm_provider` and `AppConfig.llm_base_url`.
 
-The shipped strict-output paths are OpenAI `/v1/responses` and opt-in loopback Ollama
-`/v1/chat/completions` with JSON-schema `response_format`. The real Ollama `MacroPlan`
-smoke remains local-only and unclaimed. Anthropic remains a legacy/direct adapter and is
-not equivalent for registered strict-output roles.
+The shipped structured-output paths are:
+
+- OpenAI `/v1/responses` with strict JSON schemas.
+- Opt-in Ollama cloud through the loopback daemon, using `/v1/chat/completions` with a
+  JSON-schema `response_format` plus the schema in the prompt. Its real `MacroPlan` smoke
+  awaits an owner decision.
+- Claude via the Messages API with `output_config.format`. When Claude rejects a schema
+  as too complex to compile, which it does for every planner schema, the adapter resends
+  once with the schema carried only by the prompt. The runner then validates and repairs
+  the response as usual.
 
 ### Adding New Audio Enhancement Features
 

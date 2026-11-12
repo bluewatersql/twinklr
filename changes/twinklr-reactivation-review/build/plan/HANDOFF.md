@@ -1,6 +1,6 @@
 # Build-campaign handoff — current execution state
 
-_Last updated: 2026-11-11 (live validation); previously 2026-11-01 (owner update and runbooks), and before that 2026-08-26 after all eight Phase 3 offline task implementations and
+_Last updated: 2026-11-12 (first Claude live run); previously 2026-11-11 (live validation), 2026-11-01 (owner update and runbooks), and before that 2026-08-26 after all eight Phase 3 offline task implementations and
 P4-T1 through P4-T6 were independently verified and integrated. P2K-T2's offline
 owner-run readiness remediation was independently approved on the Standards and Spec
 axes and integrated at `03b75e9`; its empirical owner-corpus exits remain open. P4-T7's
@@ -26,6 +26,33 @@ pause or phase boundary._
 
 Start here. This section supersedes older status prose below when the two disagree;
 older entries remain as dated audit history.
+
+### Live validation — 2026-11-12 (Claude)
+
+- **Inputs restored.** `data/` is back with 9 songs. The "Blocked on inputs" bullet
+  below no longer applies. The P2P-T7 Demucs smoke passed, and the P2P-T11 reruns
+  brought strict mode to 7 of 8 roles (`audio_profile` shows runaway output on OpenAI).
+  See the 2026-11-11 evidence directories.
+- **Claude provider live.** The owner asked for Claude with live requests approved.
+  - Attempt 1 failed at the profile stage: Claude's structured outputs reject every
+    planner schema with HTTP 400 `compiled grammar is too large`. A per-schema probe
+    showed the 5 planner schemas rejected and the 8 judge, lyrics, enricher and vision
+    schemas accepted.
+  - Fixed at `f0ae0da` (branch `fix/claude-schema-complexity-fallback`, not yet merged):
+    a prompt-only resend on that rejection.
+  - [Evidence](../../evidence/2026-11-12-claude-provider-live/README.md).
+- **Baseline live run (runbook 05 §2): PASS on Claude.**
+  - `Hey Come Look At My House`, 6/6 stages, about $0.95, 0 schema repairs.
+  - The metrics are on par with the pinned MH baseline on every qa-runbook §4 axis:
+    251 effects placed against 262, and 741 value-curve channels against 622.
+  - The reference song `Need A Favor` is missing, so the comparison is indicative.
+  - The human judgment is PENDING-OWNER.
+  - [Evaluation](../../../../evaluations/2026-11-12-claude-baseline-live-run/README.md).
+- **Open:**
+  - Review item m5 is done: the docs and context no longer call Anthropic legacy.
+  - Planner schemas have no server-side guarantee on Claude; making them compile is an
+    owner design decision.
+  - The owner decisions from 2026-11-11 below remain open.
 
 ### Live validation — 2026-11-11
 

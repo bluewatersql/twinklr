@@ -1,0 +1,462 @@
+{
+  "run_id": "sess_28a1f0e95a5f4b1c",
+  "plan": {
+    "sections": [
+      {
+        "section_name": "verse_1",
+        "start_bar": 1,
+        "end_bar": 29,
+        "section_role": "verse",
+        "energy_level": 75,
+        "template_id": "bounce_fan_pulse",
+        "preset_id": null,
+        "modifiers": [],
+        "reasoning": "The song hits on frame 1, so the plan snaps in fully lit with no fade. bounce_fan_pulse sets up the radial_rays fan that announces the house, and its odd/even 2-beat pulse fits the 2/4 grid. Short shutter pulse bursts at bars 8 and 14 match the 0.8 peaks at about 6.1s and 11.0s, creating the 'hey, look' accent motif with sparse sparkle punctuation. The shutter reopens after each burst so the section settles into a steady groove. Color uses the traditional Christmas PRIMARY palette. FAST intensity gives a confident opening that stays below the break and chorus peaks.",
+        "segments": null,
+        "transition_in": {
+          "mode": "snap",
+          "duration_bars": 0.0,
+          "curve": "linear",
+          "fade_out_ratio": 0.0,
+          "per_channel_overrides": null
+        },
+        "transition_out": null,
+        "intensity": "FAST",
+        "color_intent": {
+          "selection": {
+            "kind": "PALETTE_ROLE",
+            "palette_role": "PRIMARY",
+            "explicit_color": null
+          }
+        },
+        "shutter_events": [
+          {
+            "bar": 1,
+            "beat": 1,
+            "pattern": "open",
+            "moment_cue_id": null
+          },
+          {
+            "bar": 8,
+            "beat": 1,
+            "pattern": "pulse",
+            "moment_cue_id": null
+          },
+          {
+            "bar": 11,
+            "beat": 1,
+            "pattern": "open",
+            "moment_cue_id": null
+          },
+          {
+            "bar": 14,
+            "beat": 1,
+            "pattern": "pulse",
+            "moment_cue_id": null
+          },
+          {
+            "bar": 17,
+            "beat": 1,
+            "pattern": "open",
+            "moment_cue_id": null
+          }
+        ],
+        "gobo_events": [
+          {
+            "bar": 1,
+            "beat": 1,
+            "pattern": "open",
+            "moment_cue_id": null
+          }
+        ],
+        "moment_cues": []
+      },
+      {
+        "section_name": "verse_2",
+        "start_bar": 30,
+        "end_bar": 58,
+        "section_role": "verse",
+        "energy_level": 50,
+        "template_id": "split_lr_sweep_counter",
+        "preset_id": null,
+        "modifiers": [],
+        "reasoning": "This section steps back to leave headroom for the break. split_lr_sweep_counter introduces the light_trails motif with smooth counter-sweeps, so the left and right halves mirror each other while acting as one lead group (COMPLEMENTARY). It also differs clearly from verse_1's pulsing fan. Short shutter pulses at bars 34 and 46 land on the 0.8 transients at about 26.8s and 36.6s, giving bright/dim contrast over the sweep base without sustained full-intensity holds. Colors stay traditional PRIMARY, and SMOOTH intensity keeps the motion fluid.",
+        "segments": null,
+        "transition_in": {
+          "mode": "crossfade",
+          "duration_bars": 1.0,
+          "curve": "ease_in_out_sine",
+          "fade_out_ratio": 0.5,
+          "per_channel_overrides": null
+        },
+        "transition_out": null,
+        "intensity": "SMOOTH",
+        "color_intent": {
+          "selection": {
+            "kind": "PALETTE_ROLE",
+            "palette_role": "PRIMARY",
+            "explicit_color": null
+          }
+        },
+        "shutter_events": [
+          {
+            "bar": 34,
+            "beat": 1,
+            "pattern": "pulse",
+            "moment_cue_id": null
+          },
+          {
+            "bar": 37,
+            "beat": 1,
+            "pattern": "open",
+            "moment_cue_id": null
+          },
+          {
+            "bar": 46,
+            "beat": 1,
+            "pattern": "pulse",
+            "moment_cue_id": null
+          },
+          {
+            "bar": 49,
+            "beat": 1,
+            "pattern": "open",
+            "moment_cue_id": null
+          }
+        ],
+        "gobo_events": [],
+        "moment_cues": []
+      },
+      {
+        "section_name": "break",
+        "start_bar": 59,
+        "end_bar": 87,
+        "section_role": "build",
+        "energy_level": 90,
+        "template_id": null,
+        "preset_id": null,
+        "modifiers": [],
+        "reasoning": "Despite its label, the break holds the song's first real peak, and the section has three distinct musical phases, so it is segmented.\n- Segment A spirals over the X-cross while energy sags toward the deepest valley at about 56.9s (bar 71).\n- Segment B is the 6.7s ramp (0.528 to 0.719), which peaks at bar 79.\n- Segment C releases to a mid-level groove instead of blacking out.\nThe palette cuts hard to ice neon (COOL). A prism gobo varies the radial_rays fan into multiplied rays for the spiral passage, then opens on the release. A single brief medium strobe at bar 79 provides the sparkle hit at the peak without a full-house max look, which is reserved for the chorus.",
+        "segments": [
+          {
+            "segment_id": "spiral",
+            "start_bar": 59,
+            "end_bar": 70,
+            "template_id": "spiral_xross_blackout",
+            "preset_id": null,
+            "modifiers": [],
+            "reasoning": "Spiral rotation in an X-cross carries the spiral motif. Its blackout punctuation gives brief bursts rather than long holds as energy dips toward the bar-71 valley."
+          },
+          {
+            "segment_id": "build",
+            "start_bar": 71,
+            "end_bar": 79,
+            "template_id": "sweep_ud_chevron_swell",
+            "preset_id": null,
+            "modifiers": [],
+            "reasoning": "A chevron lift with a swelling dimmer turns the strongest sampled rise in the song into the first real build, cresting at bar 79."
+          },
+          {
+            "segment_id": "release",
+            "start_bar": 80,
+            "end_bar": 87,
+            "template_id": "cascade_pulse_lr",
+            "preset_id": null,
+            "modifiers": [],
+            "reasoning": "After the peak, energy settles around 0.34. A left-to-right pulse cascade holds a mid-level groove on the 2-beat grid instead of going dark."
+          }
+        ],
+        "transition_in": {
+          "mode": "snap",
+          "duration_bars": 0.0,
+          "curve": "linear",
+          "fade_out_ratio": 0.0,
+          "per_channel_overrides": null
+        },
+        "transition_out": null,
+        "intensity": "DRAMATIC",
+        "color_intent": {
+          "selection": {
+            "kind": "PALETTE_ROLE",
+            "palette_role": "COOL",
+            "explicit_color": null
+          }
+        },
+        "shutter_events": [
+          {
+            "bar": 59,
+            "beat": 1,
+            "pattern": "open",
+            "moment_cue_id": null
+          },
+          {
+            "bar": 79,
+            "beat": 1,
+            "pattern": "strobe_medium",
+            "moment_cue_id": null
+          },
+          {
+            "bar": 80,
+            "beat": 1,
+            "pattern": "open",
+            "moment_cue_id": null
+          }
+        ],
+        "gobo_events": [
+          {
+            "bar": 59,
+            "beat": 1,
+            "pattern": "prism",
+            "moment_cue_id": null
+          },
+          {
+            "bar": 80,
+            "beat": 1,
+            "pattern": "open",
+            "moment_cue_id": null
+          }
+        ],
+        "moment_cues": []
+      },
+      {
+        "section_name": "verse_3",
+        "start_bar": 88,
+        "end_bar": 116,
+        "section_role": "verse",
+        "energy_level": 55,
+        "template_id": null,
+        "preset_id": null,
+        "modifiers": [],
+        "reasoning": "This section restates the light_trails sweeps in ice neon (COOL) so the verses read as one family. It has three distinct phases, so it is segmented:\n- A steady phase-offset sweep chase covers the only extended stable plateau.\n- A minimal inner-only layer covers the sharp dip at about 83.7s (bar 104).\n- A tighter zigzag pulse rebuilds energy toward the chorus.\nThis follows the directive to tighten the motion at the end and set up the chorus. SMOOTH intensity keeps brightness moderate.",
+        "segments": [
+          {
+            "segment_id": "plateau",
+            "start_bar": 88,
+            "end_bar": 103,
+            "template_id": "sweep_lr_continuous_phase",
+            "preset_id": null,
+            "modifiers": [],
+            "reasoning": "A loop-safe continuous sweep with phase offsets gives a steady grid-locked trail chase across the 0.39-0.44 plateau."
+          },
+          {
+            "segment_id": "dip",
+            "start_bar": 104,
+            "end_bar": 107,
+            "template_id": "inner_pendulum_breathe",
+            "preset_id": null,
+            "modifiers": [],
+            "reasoning": "Inner fixtures run alone with a subtle pendulum and breathing dimmer, cutting to a minimal accent layer for about 3s at the energy dip."
+          },
+          {
+            "segment_id": "rebuild",
+            "start_bar": 108,
+            "end_bar": 116,
+            "template_id": "zigzag_alternating_pulse",
+            "preset_id": null,
+            "modifiers": [],
+            "reasoning": "Tighter zigzag motion with matched pulses rebuilds through 0.32, 0.42 and 0.46, winding up energy into the chorus."
+          }
+        ],
+        "transition_in": {
+          "mode": "crossfade",
+          "duration_bars": 2.0,
+          "curve": "ease_in_out_sine",
+          "fade_out_ratio": 0.5,
+          "per_channel_overrides": null
+        },
+        "transition_out": null,
+        "intensity": "SMOOTH",
+        "color_intent": {
+          "selection": {
+            "kind": "PALETTE_ROLE",
+            "palette_role": "COOL",
+            "explicit_color": null
+          }
+        },
+        "shutter_events": [],
+        "gobo_events": [],
+        "moment_cues": []
+      },
+      {
+        "section_name": "chorus",
+        "start_bar": 117,
+        "end_bar": 145,
+        "section_role": "chorus",
+        "energy_level": 85,
+        "template_id": null,
+        "preset_id": null,
+        "modifiers": [],
+        "reasoning": "This is the triumphant 'look at my house' showcase in warm gold, reached by a crossfade. The section is segmented into two waves with a pull-back around 103.8s (bar 129), matching the directive.\n- The song's single max hit is a brief fast strobe at bar 117, with the prism gobo resolving the radial_rays fan. It is used nowhere else.\n- A short fan_pulse pull-back restates the radial fan.\n- A rotating circle pulse carries the spiral motif through the second wave.\nA sparkle shutter pulse at bar 133 marks the rebound. Bursts stay short rather than holding maximum output.",
+        "segments": [
+          {
+            "segment_id": "wave1",
+            "start_bar": 117,
+            "end_bar": 128,
+            "template_id": "dual_sweep_audience_pulse",
+            "preset_id": null,
+            "modifiers": [],
+            "reasoning": "Symmetric counter-sweeping beams scan the street audience with rapid pulses. This is the confident first wave, opening on the single max hit."
+          },
+          {
+            "segment_id": "pullback",
+            "start_bar": 129,
+            "end_bar": 132,
+            "template_id": "fan_pulse",
+            "preset_id": null,
+            "modifiers": [],
+            "reasoning": "A static radial fan with pulsing dimmer creates a breath at the energy sag near 103.8s, restating the radial_rays motif."
+          },
+          {
+            "segment_id": "wave2",
+            "start_bar": 133,
+            "end_bar": 145,
+            "template_id": "circle_asym_right_pulse",
+            "preset_id": null,
+            "modifiers": [],
+            "reasoning": "Rotational circle motion with pulsing dimmer carries the spiral motif through the rebound to 0.51 and the finishing 0.517 push."
+          }
+        ],
+        "transition_in": {
+          "mode": "crossfade",
+          "duration_bars": 1.0,
+          "curve": "s_curve",
+          "fade_out_ratio": 0.5,
+          "per_channel_overrides": null
+        },
+        "transition_out": null,
+        "intensity": "DRAMATIC",
+        "color_intent": {
+          "selection": {
+            "kind": "PALETTE_ROLE",
+            "palette_role": "WARM",
+            "explicit_color": null
+          }
+        },
+        "shutter_events": [
+          {
+            "bar": 117,
+            "beat": 1,
+            "pattern": "strobe_fast",
+            "moment_cue_id": null
+          },
+          {
+            "bar": 118,
+            "beat": 1,
+            "pattern": "open",
+            "moment_cue_id": null
+          },
+          {
+            "bar": 133,
+            "beat": 1,
+            "pattern": "pulse",
+            "moment_cue_id": null
+          },
+          {
+            "bar": 135,
+            "beat": 1,
+            "pattern": "open",
+            "moment_cue_id": null
+          }
+        ],
+        "gobo_events": [
+          {
+            "bar": 117,
+            "beat": 1,
+            "pattern": "prism",
+            "moment_cue_id": null
+          },
+          {
+            "bar": 129,
+            "beat": 1,
+            "pattern": "open",
+            "moment_cue_id": null
+          },
+          {
+            "bar": 133,
+            "beat": 1,
+            "pattern": "prism",
+            "moment_cue_id": null
+          }
+        ],
+        "moment_cues": []
+      },
+      {
+        "section_name": "bridge",
+        "start_bar": 146,
+        "end_bar": 167,
+        "section_role": "bridge",
+        "energy_level": 30,
+        "template_id": null,
+        "preset_id": null,
+        "modifiers": [],
+        "reasoning": "The song effectively ends inside this section, so the light_trails motif resolves into slow, spacious sweeps that progressively dim. It is segmented into two parts:\n- The final showcase stretch runs to the last strong moment, around bar 157, marked by a small shutter-pulse flourish.\n- A fading vertical wave over a spotlight cluster sheds intensity down to near-dark.\nThe shutter closes at bar 167 to land the blackout. The outro listed at bar 175 lies beyond the authoritative 167-bar grid and is pure silence, so it is not planned. The blackout at the end of this section serves as the outro hold. Color uses the section's fire-and-ice palette via the PRIMARY role at SLOW intensity.",
+        "segments": [
+          {
+            "segment_id": "showcase",
+            "start_bar": 146,
+            "end_bar": 158,
+            "template_id": "pendulum_chevron_breathe",
+            "preset_id": null,
+            "modifiers": [],
+            "reasoning": "A smooth pendulum over a chevron with breathing dimmer gives slow trail sweeps that carry the last strong moments with restraint."
+          },
+          {
+            "segment_id": "winddown",
+            "start_bar": 159,
+            "end_bar": 167,
+            "template_id": "wave_vertical_spotlight_fade",
+            "preset_id": null,
+            "modifiers": [],
+            "reasoning": "A vertical wave converging to a spotlight cluster with fade-out handles the wind-down inside the bridge, leaving the heads nearly dark for blackout."
+          }
+        ],
+        "transition_in": {
+          "mode": "morph",
+          "duration_bars": 2.0,
+          "curve": "ease_out_sine",
+          "fade_out_ratio": 0.5,
+          "per_channel_overrides": null
+        },
+        "transition_out": null,
+        "intensity": "SLOW",
+        "color_intent": {
+          "selection": {
+            "kind": "PALETTE_ROLE",
+            "palette_role": "PRIMARY",
+            "explicit_color": null
+          }
+        },
+        "shutter_events": [
+          {
+            "bar": 157,
+            "beat": 1,
+            "pattern": "pulse",
+            "moment_cue_id": null
+          },
+          {
+            "bar": 159,
+            "beat": 1,
+            "pattern": "open",
+            "moment_cue_id": null
+          },
+          {
+            "bar": 167,
+            "beat": 1,
+            "pattern": "closed",
+            "moment_cue_id": null
+          }
+        ],
+        "gobo_events": [
+          {
+            "bar": 146,
+            "beat": 1,
+            "pattern": "open",
+            "moment_cue_id": null
+          }
+        ],
+        "moment_cues": []
+      }
+    ],
+    "overall_strategy": "Open fully lit with a pulsing radial fan, then alternate between peak sections (break in ice neon, chorus in warm gold) and flowing light-trail sweep sections (verse_2, verse_3, bridge), so the 2/4 grid-locked energy arc has two clear waves. The single max hit is reserved for the start of the chorus, and sparkle accents are sparse shutter bursts rather than dense strobing. The bridge sheds intensity into a closed-shutter blackout, which stands in for the silent outro beyond the 167-bar grid."
+  }
+}

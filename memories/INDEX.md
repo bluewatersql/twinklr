@@ -16,7 +16,7 @@ memory — those are machine-local supplemental caches (see the memory protocol 
 - **[learnings/](learnings/)** — non-obvious discoveries from previous work
   - [reactivation-review-2026-08.md](learnings/reactivation-review-2026-08.md) — historical `aa8d325` review conclusions (readiness, verified defect classes, external facts, strengths), with a pointer to current campaign truth
   - [known-test-failures.md](learnings/known-test-failures.md) — historical gate baseline at `aa8d325` (2026-08-13): 120 failures classified; superseded by the green integrated campaign gate
-  - [live-provider-run-lessons.md](learnings/live-provider-run-lessons.md) — post-refactor live run: reasoning models reject temperature, 300 s timeout, local config schema drift, degenerate-segment aborts, proxy TLS
+  - [live-provider-run-lessons.md](learnings/live-provider-run-lessons.md) — live provider lessons: reasoning models reject temperature, 300 s timeout, config schema drift, degenerate-segment aborts, Claude rejects planner schemas as too large to compile, Ollama Cloud ignores `response_format`, proxy TLS
   - [simplification-pass-2026-02.md](learnings/simplification-pass-2026-02.md) — stale auto-memory case study: a claimed simplification pass that never landed on `main`
 - **[constraints/](constraints/)** — limitations that repeatedly shape design
   - [Python 3.13 pin (former 3.12 constraint)](constraints/python-3.12-only.md)

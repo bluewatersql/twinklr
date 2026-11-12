@@ -107,6 +107,7 @@ _Source: `packages/twinklr/cli/main.py` (`build_run_pipeline`) and
 | Variable | Purpose |
 |---|---|
 | `OPENAI_API_KEY` | Required when `llm_provider` is `"openai"` |
+| `ANTHROPIC_API_KEY` | Required when `llm_provider` is `"anthropic"` (must start with `sk-ant-`) |
 | `GENIUS_ACCESS_TOKEN` | Genius lyrics lookup (set `enable_lyrics_lookup: true` in config) |
 | `ACOUSTID_API_KEY` | AcoustID audio fingerprinting (set `enable_acoustid: true` in config) |
 | `HF_TOKEN` | HuggingFace token for WhisperX model downloads |
@@ -153,7 +154,7 @@ Pydantic models; the registry accounts for all of them.
 | `logging.format` | timestamped text | Changes the installed CLI log formatter | `app.logging.format` |
 
 The `llm_api_key` field is populated from the `OPENAI_API_KEY` environment variable
-automatically. Ollama supplies the SDK's required-but-ignored local placeholder
+automatically, or from `ANTHROPIC_API_KEY` when `llm_provider` is `"anthropic"`. Ollama supplies the SDK's required-but-ignored local placeholder
 internally, so no key belongs in local configuration.
 
 Minimal example:
@@ -191,10 +192,16 @@ service, so no local model weights are downloaded or run (sign in once with
 }
 ```
 
-Local structured requests use `/v1/chat/completions` with a JSON-schema
-`response_format`; OpenAI cloud requests continue to use `/v1/responses`. Local mode is
-opt-in and limited to loopback URLs. Image/vision stages are not supported by this local
+Ollama structured requests use `/v1/chat/completions` with a JSON-schema
+`response_format`; OpenAI requests continue to use `/v1/responses`. Ollama mode is
+opt-in and limited to loopback URLs. Image/vision stages are not supported by this
 adapter.
+
+For Claude, set `"llm_provider": "anthropic"`, export `ANTHROPIC_API_KEY`, and set every
+role's `model` in `job_config.json` to a `claude-*` id (for example `claude-opus-5-5`).
+Each role's `reasoning_effort` becomes Claude's `effort`, and `temperature` is ignored
+because current Claude models reject sampling parameters. Image/vision stages are not
+supported by this adapter.
 
 #### Explicit local schema smoke
 

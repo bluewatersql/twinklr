@@ -1,7 +1,7 @@
 ---
 type: context
 area: overview
-updated: 2026-11-01
+updated: 2026-11-12
 ---
 
 # Twinklr — Current State
@@ -127,6 +127,22 @@ on 2026-11-01.
   failure classes (`$ref` siblings, temperature on reasoning models) have unit coverage
   only. See the change's
   [closeout](../changes/post-refactor-validation/plan.md#closeout--2026-11-01).
+
+## Claude provider live (2026-11-12)
+
+- **First Claude-backed live run passed.** Every role used `claude-opus-5-5`
+  (`llm_provider: anthropic`). The song was `Hey Come Look At My House`, on a 4-head
+  rig, at `f0ae0da`. 6/6 stages completed for about $0.95.
+- **Sophistication is on par with the MH baseline** on every qa-runbook §4 axis: 251
+  effects placed against 262, 741 value-curve channels against 622, the same 20 ms grid
+  and 2 layers. The comparison is indicative because the song differs.
+- **Human judgment is PENDING-OWNER.** See
+  [evaluation](../evaluations/2026-11-12-claude-baseline-live-run/README.md).
+- **Claude's structured outputs reject every planner schema** with `compiled grammar is
+  too large`. The judge, lyrics, enricher and vision schemas compile. The adapter resends
+  rejected requests once with a prompt-only schema and validates client-side, so planner
+  output on Claude has no server-side schema guarantee. See the
+  [evidence](../changes/twinklr-reactivation-review/evidence/2026-11-12-claude-provider-live/README.md).
 
 ## Active work and open boundaries
 

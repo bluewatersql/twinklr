@@ -1,0 +1,2312 @@
+{
+  "schema_version": "1.0.0",
+  "run": {
+    "run_id": "sess_28a1f0e95a5f4b1c",
+    "timestamp": "2026-11-12T14:40:40.115505+00:00",
+    "git_sha": "f0ae0da884a32baca1c86cf5c429d17a8ceb911b",
+    "engine_version": "0.2.0",
+    "checkpoint_path": "artifacts/baseline/hey-come-look-at-my-house/hey_come_look_at_my_house/checkpoints/plans/final.json"
+  },
+  "song": {
+    "bpm": 147.65625,
+    "time_signature": "2/4",
+    "bars_total": 167,
+    "bar_duration_ms": 806.1204819277109,
+    "song_structure": {
+      "sections": [
+        {
+          "section_id": 0,
+          "start_s": 0.0,
+          "end_s": 23.77723373983993,
+          "duration_s": 23.77723373983993,
+          "similarity": 0.17654633522033691,
+          "repeat_count": 0,
+          "energy_rank": 0.484,
+          "energy": 0.484,
+          "repetition": 0.077,
+          "confidence": 0.166,
+          "label": "verse",
+          "label_confidence": 0.262,
+          "boundary_strength_in": 0.5,
+          "boundary_strength_out": 0.5,
+          "vocal_density": 0.022,
+          "harmonic_complexity": 1.0
+        },
+        {
+          "section_id": 1,
+          "start_s": 23.77723373983993,
+          "end_s": 46.83464684103622,
+          "duration_s": 23.05741310119629,
+          "similarity": 0.44443660974502563,
+          "repeat_count": 0,
+          "energy_rank": 0.394,
+          "energy": 0.394,
+          "repetition": 0.679,
+          "confidence": 0.222,
+          "label": "verse",
+          "label_confidence": 0.275,
+          "boundary_strength_in": 0.5,
+          "boundary_strength_out": 0.5,
+          "vocal_density": 0.022,
+          "harmonic_complexity": 1.0
+        },
+        {
+          "section_id": 2,
+          "start_s": 46.83464684103622,
+          "end_s": 70.27519096945419,
+          "duration_s": 23.44054412841797,
+          "similarity": 0.39231938123703003,
+          "repeat_count": 0,
+          "energy_rank": 0.285,
+          "energy": 0.285,
+          "repetition": 0.574,
+          "confidence": 0.202,
+          "label": "break",
+          "label_confidence": 0.361,
+          "boundary_strength_in": 0.5,
+          "boundary_strength_out": 0.5,
+          "vocal_density": 0.265,
+          "harmonic_complexity": 1.0
+        },
+        {
+          "section_id": 3,
+          "start_s": 70.27519096945419,
+          "end_s": 93.72734703634872,
+          "duration_s": 23.45215606689453,
+          "similarity": 0.39231938123703003,
+          "repeat_count": 0,
+          "energy_rank": 0.829,
+          "energy": 0.829,
+          "repetition": 0.354,
+          "confidence": 0.225,
+          "label": "verse",
+          "label_confidence": 0.276,
+          "boundary_strength_in": 0.5,
+          "boundary_strength_out": 0.5,
+          "vocal_density": 0.089,
+          "harmonic_complexity": 1.0
+        },
+        {
+          "section_id": 4,
+          "start_s": 93.72734703634872,
+          "end_s": 117.17950310324325,
+          "duration_s": 23.45215606689453,
+          "similarity": 0.5390655398368835,
+          "repeat_count": 0,
+          "energy_rank": 0.516,
+          "energy": 0.516,
+          "repetition": 0.847,
+          "confidence": 0.25,
+          "label": "chorus",
+          "label_confidence": 0.469,
+          "boundary_strength_in": 0.5,
+          "boundary_strength_out": 0.5,
+          "vocal_density": 0.104,
+          "harmonic_complexity": 1.0
+        },
+        {
+          "section_id": 5,
+          "start_s": 117.17950310324325,
+          "end_s": 140.31818594104308,
+          "duration_s": 23.138682837799834,
+          "similarity": 0.5390655398368835,
+          "repeat_count": 0,
+          "energy_rank": 0.771,
+          "energy": 0.771,
+          "repetition": 0.426,
+          "confidence": 0.227,
+          "label": "bridge",
+          "label_confidence": 0.368,
+          "boundary_strength_in": 0.5,
+          "boundary_strength_out": 0.5,
+          "vocal_density": 0.564,
+          "harmonic_complexity": 0.9507887788694844
+        },
+        {
+          "section_id": 6,
+          "start_s": 140.31818594104308,
+          "end_s": 140.92931972789117,
+          "duration_s": 0.611133786848086,
+          "similarity": 0.0,
+          "repeat_count": 0,
+          "energy_rank": 0.5,
+          "energy": 0.5,
+          "repetition": 0.5,
+          "confidence": 0.212,
+          "label": "outro",
+          "label_confidence": 0.515,
+          "boundary_strength_in": 0.5,
+          "boundary_strength_out": 0.5,
+          "vocal_density": 0.988,
+          "harmonic_complexity": null
+        }
+      ],
+      "boundary_times_s": [
+        0.0,
+        23.77723373983993,
+        46.83464684103622,
+        70.27519096945419,
+        93.72734703634872,
+        117.17950310324325,
+        140.31818594104308,
+        140.92931972789117
+      ],
+      "meta": {
+        "method": "hybrid_foote_v3",
+        "genre": "default",
+        "preset_source": "genre_lookup",
+        "tempo_bpm": 147.65625880099884,
+        "num_beats": 334,
+        "hop_length": 512,
+        "min_section_s_input": 3.0,
+        "min_section_s_effective": 3.0,
+        "trim": {
+          "used": true,
+          "start_offset_s": 0.278639,
+          "duration_work_s": 140.039546,
+          "duration_orig_s": 140.92932
+        },
+        "preset": {
+          "min_sections": 8,
+          "max_sections": 14,
+          "min_len_beats": 22,
+          "novelty_l_beats": 14,
+          "peak_delta": 0.085,
+          "pre_avg": 12,
+          "post_avg": 12
+        },
+        "repeat_threshold_derived": 0.9,
+        "discrimination": 0.5
+      }
+    }
+  },
+  "summary": {
+    "sections": 13,
+    "total_warnings": 15,
+    "total_errors": 13,
+    "max_concurrent_layers": 0,
+    "templates_used": [
+      "bounce_fan_pulse",
+      "cascade_pulse_lr",
+      "circle_asym_right_pulse",
+      "dual_sweep_audience_pulse",
+      "fan_pulse",
+      "inner_pendulum_breathe",
+      "pendulum_chevron_breathe",
+      "spiral_xross_blackout",
+      "split_lr_sweep_counter",
+      "sweep_lr_continuous_phase",
+      "sweep_ud_chevron_swell",
+      "wave_vertical_spotlight_fade",
+      "zigzag_alternating_pulse"
+    ],
+    "roles_targeted": [
+      "INNER_LEFT",
+      "INNER_RIGHT",
+      "OUTER_LEFT",
+      "OUTER_RIGHT"
+    ],
+    "validation_errors": 0,
+    "physics_violations": 13,
+    "compliance_issues": 0,
+    "harsh_transitions": 0
+  },
+  "sections": [
+    {
+      "section_id": "verse_1",
+      "label": "Verse 1",
+      "bar_range": [
+        1.0,
+        29.0
+      ],
+      "time_range_ms": [
+        806,
+        23377
+      ],
+      "selected_template": {
+        "template_id": "bounce_fan_pulse",
+        "preset_id": null,
+        "modifiers": {},
+        "reasoning": "The song hits on frame 1, so the plan snaps in fully lit with no fade. bounce_fan_pulse sets up the radial_rays fan that announces the house, and its odd/even 2-beat pulse fits the 2/4 grid. Short shutter pulse bursts at bars 8 and 14 match the 0.8 peaks at about 6.1s and 11.0s, creating the 'hey, look' accent motif with sparse sparkle punctuation. The shutter reopens after each burst so the section settles into a steady groove. Color uses the traditional Christmas PRIMARY palette. FAST intensity gives a confident opening that stays below the break and chorus peaks.",
+        "steps": []
+      },
+      "segments": null,
+      "targets": {
+        "bindings": {},
+        "resolved_roles": [
+          "OUTER_LEFT",
+          "INNER_LEFT",
+          "INNER_RIGHT",
+          "OUTER_RIGHT"
+        ]
+      },
+      "curves": [
+        {
+          "role": "OUTER_LEFT",
+          "channel": "pan",
+          "space": "dmx",
+          "plot_path": "evaluations/2026-11-12-claude-baseline-live-run/plots/verse_1__OUTER_LEFT__pan.png",
+          "stats": {
+            "min": 0.19805675169774484,
+            "max": 0.7432515881866573,
+            "range": 0.5451948364889124,
+            "mean": 0.47637204929684007,
+            "std": 0.15822597406332772,
+            "clamp_pct": 0.0,
+            "energy": 0.014038315635874312
+          },
+          "continuity": {
+            "loop_delta": 0.06836023815567882,
+            "ok": false,
+            "threshold": 0.05
+          },
+          "curve_type": "movement_triangle",
+          "handler": "__default__",
+          "base_position": 0.1,
+          "static_dmx": null,
+          "physics_check": {
+            "speed_ok": true,
+            "acceleration_ok": false,
+            "max_speed_deg_per_sec": 134.1272060380298,
+            "max_accel_deg_per_sec2": 16447.241275557062,
+            "violations": [
+              "Acceleration 16447.2\u00b0/s\u00b2 exceeds limit 1000.0\u00b0/s\u00b2"
+            ]
+          }
+        },
+        {
+          "role": "OUTER_LEFT",
+          "channel": "tilt",
+          "space": "dmx",
+          "plot_path": "evaluations/2026-11-12-claude-baseline-live-run/plots/verse_1__OUTER_LEFT__tilt.png",
+          "stats": {
+            "min": 0.02130354627313706,
+            "max": 0.48861340612077625,
+            "range": 0.4673098598476392,
+            "mean": 0.2598595156437901,
+            "std": 0.13562226348285233,
+            "clamp_pct": 0.0,
+            "energy": 0.012032841973606552
+          },
+          "continuity": {
+            "loop_delta": 0.05859448984772464,
+            "ok": false,
+            "threshold": 0.05
+          },
+          "curve_type": "movement_triangle",
+          "handler": "__default__",
+          "base_position": 0.5,
+          "static_dmx": null,
+          "physics_check": {
+            "speed_ok": true,
+            "acceleration_ok": false,
+            "max_speed_deg_per_sec": 57.48308830201276,
+            "max_accel_deg_per_sec2": 7048.817689524455,
+            "violations": [
+              "Acceleration 7048.8\u00b0/s\u00b2 exceeds limit 1000.0\u00b0/s\u00b2"
+            ]
+          }
+        },
+        {
+          "role": "OUTER_LEFT",
+          "channel": "dimmer",
+          "space": "dmx",
+          "plot_path": "evaluations/2026-11-12-claude-baseline-live-run/plots/verse_1__OUTER_LEFT__dimmer.png",
+          "stats": {
+            "min": 0.6015686274509804,
+            "max": 1.0,
+            "range": 0.3984313725490196,
+            "mean": 0.7972351082950003,
+            "std": 0.18324159055915357,
+            "clamp_pct": 37.73725344250093,
+            "energy": 0.016465332223730894
+          },
+          "continuity": {
+            "loop_delta": 0.3984313725490196,
+            "ok": true,
+            "threshold": 0.05
+          },
+          "curve_type": "pulse",
+          "handler": "__default__",
+          "base_position": null,
+          "static_dmx": null,
+          "physics_check": null
+        }
+      ],
+      "flags": [
+        {
+          "level": "error",
+          "code": "PHYSICS_VIOLATION",
+          "message": "Acceleration 16447.2\u00b0/s\u00b2 exceeds limit 1000.0\u00b0/s\u00b2",
+          "details": {
+            "channel": "pan",
+            "max_speed": 134.1272060380298,
+            "max_accel": 16447.241275557062
+          }
+        },
+        {
+          "level": "warning",
+          "code": "LOOP_DISCONTINUITY",
+          "message": "Loop discontinuity: delta=0.068",
+          "details": {
+            "loop_delta": 0.06836023815567882
+          }
+        },
+        {
+          "level": "error",
+          "code": "PHYSICS_VIOLATION",
+          "message": "Acceleration 7048.8\u00b0/s\u00b2 exceeds limit 1000.0\u00b0/s\u00b2",
+          "details": {
+            "channel": "tilt",
+            "max_speed": 57.48308830201276,
+            "max_accel": 7048.817689524455
+          }
+        },
+        {
+          "level": "warning",
+          "code": "LOOP_DISCONTINUITY",
+          "message": "Loop discontinuity: delta=0.059",
+          "details": {
+            "loop_delta": 0.05859448984772464
+          }
+        }
+      ],
+      "template_compliance": {
+        "template_id": "bounce_fan_pulse",
+        "curve_type_correct": true,
+        "modifiers_compliant": [],
+        "geometry_correct": true,
+        "overall_compliant": true,
+        "issues": []
+      },
+      "transition_to_next": {
+        "from_section": "verse_1",
+        "to_section": "verse_2",
+        "position_delta_pan": 0.0011485090399130462,
+        "position_delta_tilt": 0.0008400074270065579,
+        "velocity_delta": 0.00020391439326958522,
+        "dimmer_snap": false,
+        "smooth": true,
+        "issues": []
+      },
+      "validation_issues": []
+    },
+    {
+      "section_id": "verse_2",
+      "label": "Verse 2",
+      "bar_range": [
+        30.0,
+        58.0
+      ],
+      "time_range_ms": [
+        24183,
+        46754
+      ],
+      "selected_template": {
+        "template_id": "split_lr_sweep_counter",
+        "preset_id": null,
+        "modifiers": {},
+        "reasoning": "This section steps back to leave headroom for the break. split_lr_sweep_counter introduces the light_trails motif with smooth counter-sweeps, so the left and right halves mirror each other while acting as one lead group (COMPLEMENTARY). It also differs clearly from verse_1's pulsing fan. Short shutter pulses at bars 34 and 46 land on the 0.8 transients at about 26.8s and 36.6s, giving bright/dim contrast over the sweep base without sustained full-intensity holds. Colors stay traditional PRIMARY, and SMOOTH intensity keeps the motion fluid.",
+        "steps": []
+      },
+      "segments": null,
+      "targets": {
+        "bindings": {},
+        "resolved_roles": [
+          "OUTER_LEFT",
+          "INNER_LEFT",
+          "INNER_RIGHT",
+          "OUTER_RIGHT"
+        ]
+      },
+      "curves": [
+        {
+          "role": "OUTER_LEFT",
+          "channel": "pan",
+          "space": "dmx",
+          "plot_path": "evaluations/2026-11-12-claude-baseline-live-run/plots/verse_2__OUTER_LEFT__pan.png",
+          "stats": {
+            "min": 0.19921995686701824,
+            "max": 0.5960215556948526,
+            "range": 0.3968015988278344,
+            "mean": 0.40152244675385784,
+            "std": 0.11377533047663106,
+            "clamp_pct": 0.0,
+            "energy": 0.002176936979425723
+          },
+          "continuity": {
+            "loop_delta": 0.30312079813750775,
+            "ok": false,
+            "threshold": 0.05
+          },
+          "curve_type": "movement_triangle",
+          "handler": "__default__",
+          "base_position": 0.275,
+          "static_dmx": null,
+          "physics_check": {
+            "speed_ok": true,
+            "acceleration_ok": false,
+            "max_speed_deg_per_sec": 99.88164339374404,
+            "max_accel_deg_per_sec2": 11981.769030764768,
+            "violations": [
+              "Acceleration 11981.8\u00b0/s\u00b2 exceeds limit 1000.0\u00b0/s\u00b2"
+            ]
+          }
+        },
+        {
+          "role": "OUTER_LEFT",
+          "channel": "tilt",
+          "space": "dmx",
+          "plot_path": "evaluations/2026-11-12-claude-baseline-live-run/plots/verse_2__OUTER_LEFT__tilt.png",
+          "stats": {
+            "min": 0.2901960784313725,
+            "max": 0.2901960784313725,
+            "range": 0.0,
+            "mean": 0.29019607843137246,
+            "std": 5.551115123125783e-17,
+            "clamp_pct": 0.0,
+            "energy": 0.0
+          },
+          "continuity": {
+            "loop_delta": 0.0,
+            "ok": true,
+            "threshold": 0.05
+          },
+          "curve_type": "movement_hold",
+          "handler": "__default__",
+          "base_position": 0.5414213562373096,
+          "static_dmx": null,
+          "physics_check": {
+            "speed_ok": true,
+            "acceleration_ok": true,
+            "max_speed_deg_per_sec": 0.0,
+            "max_accel_deg_per_sec2": 0.0,
+            "violations": []
+          }
+        },
+        {
+          "role": "OUTER_LEFT",
+          "channel": "dimmer",
+          "space": "dmx",
+          "plot_path": "evaluations/2026-11-12-claude-baseline-live-run/plots/verse_2__OUTER_LEFT__dimmer.png",
+          "stats": {
+            "min": 0.2,
+            "max": 0.6015686274509804,
+            "range": 0.4015686274509804,
+            "mean": 0.4071520567583822,
+            "std": 0.19949871631281502,
+            "clamp_pct": 0.0,
+            "energy": 0.00209306060473333
+          },
+          "continuity": {
+            "loop_delta": 0.0,
+            "ok": true,
+            "threshold": 0.05
+          },
+          "curve_type": "pulse",
+          "handler": "__default__",
+          "base_position": null,
+          "static_dmx": null,
+          "physics_check": null
+        }
+      ],
+      "flags": [
+        {
+          "level": "error",
+          "code": "PHYSICS_VIOLATION",
+          "message": "Acceleration 11981.8\u00b0/s\u00b2 exceeds limit 1000.0\u00b0/s\u00b2",
+          "details": {
+            "channel": "pan",
+            "max_speed": 99.88164339374404,
+            "max_accel": 11981.769030764768
+          }
+        },
+        {
+          "level": "warning",
+          "code": "LOOP_DISCONTINUITY",
+          "message": "Loop discontinuity: delta=0.303",
+          "details": {
+            "loop_delta": 0.30312079813750775
+          }
+        }
+      ],
+      "template_compliance": {
+        "template_id": "split_lr_sweep_counter",
+        "curve_type_correct": true,
+        "modifiers_compliant": [],
+        "geometry_correct": true,
+        "overall_compliant": true,
+        "issues": []
+      },
+      "transition_to_next": {
+        "from_section": "verse_2",
+        "to_section": "break|spiral",
+        "position_delta_pan": 0.0019815247087825545,
+        "position_delta_tilt": 0.0009233555931313939,
+        "velocity_delta": 2.5112207626900495e-05,
+        "dimmer_snap": false,
+        "smooth": true,
+        "issues": []
+      },
+      "validation_issues": []
+    },
+    {
+      "section_id": "break",
+      "label": "Break (Segment spiral)",
+      "bar_range": [
+        59.0,
+        70.0
+      ],
+      "time_range_ms": [
+        47561,
+        56428
+      ],
+      "selected_template": {
+        "template_id": "spiral_xross_blackout",
+        "preset_id": null,
+        "modifiers": {},
+        "reasoning": "Spiral rotation in an X-cross carries the spiral motif. Its blackout punctuation gives brief bursts rather than long holds as energy dips toward the bar-71 valley.",
+        "steps": []
+      },
+      "segments": null,
+      "targets": {
+        "bindings": {},
+        "resolved_roles": [
+          "OUTER_LEFT",
+          "INNER_LEFT",
+          "INNER_RIGHT",
+          "OUTER_RIGHT"
+        ]
+      },
+      "curves": [
+        {
+          "role": "OUTER_LEFT",
+          "channel": "pan",
+          "space": "dmx",
+          "plot_path": "evaluations/2026-11-12-claude-baseline-live-run/plots/break_segspiral__OUTER_LEFT__pan.png",
+          "stats": {
+            "min": 0.196309840885337,
+            "max": 0.7208568197204729,
+            "range": 0.5245469788351359,
+            "mean": 0.47970319252768256,
+            "std": 0.17898123194047214,
+            "clamp_pct": 0.0,
+            "energy": 0.005247307921903752
+          },
+          "continuity": {
+            "loop_delta": 0.4054882400543265,
+            "ok": false,
+            "threshold": 0.05
+          },
+          "curve_type": "lissajous",
+          "handler": "__default__",
+          "base_position": 0.4,
+          "static_dmx": null,
+          "physics_check": {
+            "speed_ok": true,
+            "acceleration_ok": false,
+            "max_speed_deg_per_sec": 59.84096067528531,
+            "max_accel_deg_per_sec2": 7113.158063804073,
+            "violations": [
+              "Acceleration 7113.2\u00b0/s\u00b2 exceeds limit 1000.0\u00b0/s\u00b2"
+            ]
+          }
+        },
+        {
+          "role": "OUTER_LEFT",
+          "channel": "tilt",
+          "space": "dmx",
+          "plot_path": "evaluations/2026-11-12-claude-baseline-live-run/plots/break_segspiral__OUTER_LEFT__tilt.png",
+          "stats": {
+            "min": 0.019815269031070448,
+            "max": 0.4899974349337133,
+            "range": 0.47018216590264283,
+            "mean": 0.273837320923369,
+            "std": 0.1604313563612075,
+            "clamp_pct": 0.0,
+            "energy": 0.0047034692857400575
+          },
+          "continuity": {
+            "loop_delta": 0.3634628482279677,
+            "ok": false,
+            "threshold": 0.05
+          },
+          "curve_type": "lissajous",
+          "handler": "__default__",
+          "base_position": 0.4666666666666667,
+          "static_dmx": null,
+          "physics_check": {
+            "speed_ok": true,
+            "acceleration_ok": false,
+            "max_speed_deg_per_sec": 26.81947817379734,
+            "max_accel_deg_per_sec2": 3187.970000584459,
+            "violations": [
+              "Acceleration 3188.0\u00b0/s\u00b2 exceeds limit 1000.0\u00b0/s\u00b2"
+            ]
+          }
+        },
+        {
+          "role": "OUTER_LEFT",
+          "channel": "dimmer",
+          "space": "dmx",
+          "plot_path": "evaluations/2026-11-12-claude-baseline-live-run/plots/break_segspiral__OUTER_LEFT__dimmer.png",
+          "stats": {
+            "min": 0.0,
+            "max": 0.0,
+            "range": 0.0,
+            "mean": 0.0,
+            "std": 0.0,
+            "clamp_pct": 100.0,
+            "energy": 0.0
+          },
+          "continuity": {
+            "loop_delta": 0.0,
+            "ok": true,
+            "threshold": 0.05
+          },
+          "curve_type": "hold",
+          "handler": "__default__",
+          "base_position": null,
+          "static_dmx": 0,
+          "physics_check": null
+        }
+      ],
+      "flags": [
+        {
+          "level": "error",
+          "code": "PHYSICS_VIOLATION",
+          "message": "Acceleration 7113.2\u00b0/s\u00b2 exceeds limit 1000.0\u00b0/s\u00b2",
+          "details": {
+            "channel": "pan",
+            "max_speed": 59.84096067528531,
+            "max_accel": 7113.158063804073
+          }
+        },
+        {
+          "level": "warning",
+          "code": "LOOP_DISCONTINUITY",
+          "message": "Loop discontinuity: delta=0.405",
+          "details": {
+            "loop_delta": 0.4054882400543265
+          }
+        },
+        {
+          "level": "error",
+          "code": "PHYSICS_VIOLATION",
+          "message": "Acceleration 3188.0\u00b0/s\u00b2 exceeds limit 1000.0\u00b0/s\u00b2",
+          "details": {
+            "channel": "tilt",
+            "max_speed": 26.81947817379734,
+            "max_accel": 3187.970000584459
+          }
+        },
+        {
+          "level": "warning",
+          "code": "LOOP_DISCONTINUITY",
+          "message": "Loop discontinuity: delta=0.363",
+          "details": {
+            "loop_delta": 0.3634628482279677
+          }
+        }
+      ],
+      "template_compliance": {
+        "template_id": "spiral_xross_blackout",
+        "curve_type_correct": true,
+        "modifiers_compliant": [],
+        "geometry_correct": true,
+        "overall_compliant": true,
+        "issues": []
+      },
+      "transition_to_next": {
+        "from_section": "break|spiral",
+        "to_section": "break|build",
+        "position_delta_pan": 0.0010049111528359171,
+        "position_delta_tilt": 0.0014018529862084056,
+        "velocity_delta": 2.8169180232351868e-05,
+        "dimmer_snap": false,
+        "smooth": true,
+        "issues": []
+      },
+      "validation_issues": []
+    },
+    {
+      "section_id": "break",
+      "label": "Break (Segment build)",
+      "bar_range": [
+        71.0,
+        79.0
+      ],
+      "time_range_ms": [
+        57234,
+        63683
+      ],
+      "selected_template": {
+        "template_id": "sweep_ud_chevron_swell",
+        "preset_id": null,
+        "modifiers": {},
+        "reasoning": "A chevron lift with a swelling dimmer turns the strongest sampled rise in the song into the first real build, cresting at bar 79.",
+        "steps": []
+      },
+      "segments": null,
+      "targets": {
+        "bindings": {},
+        "resolved_roles": [
+          "OUTER_LEFT",
+          "INNER_LEFT",
+          "INNER_RIGHT",
+          "OUTER_RIGHT"
+        ]
+      },
+      "curves": [
+        {
+          "role": "OUTER_LEFT",
+          "channel": "pan",
+          "space": "dmx",
+          "plot_path": "evaluations/2026-11-12-claude-baseline-live-run/plots/break_segbuild__OUTER_LEFT__pan.png",
+          "stats": {
+            "min": 0.47058823529411764,
+            "max": 0.47058823529411764,
+            "range": 0.0,
+            "mean": 0.4705882352941177,
+            "std": 5.551115123125783e-17,
+            "clamp_pct": 0.0,
+            "energy": 0.0
+          },
+          "continuity": {
+            "loop_delta": 0.0,
+            "ok": true,
+            "threshold": 0.05
+          },
+          "curve_type": "movement_hold",
+          "handler": "__default__",
+          "base_position": 0.3522875816993464,
+          "static_dmx": null,
+          "physics_check": {
+            "speed_ok": true,
+            "acceleration_ok": true,
+            "max_speed_deg_per_sec": 0.0,
+            "max_accel_deg_per_sec2": 0.0,
+            "violations": []
+          }
+        },
+        {
+          "role": "OUTER_LEFT",
+          "channel": "tilt",
+          "space": "dmx",
+          "plot_path": "evaluations/2026-11-12-claude-baseline-live-run/plots/break_segbuild__OUTER_LEFT__tilt.png",
+          "stats": {
+            "min": 0.022714692494644896,
+            "max": 0.48767131147792664,
+            "range": 0.4649566189832817,
+            "mean": 0.27908845774078855,
+            "std": 0.1356993016613313,
+            "clamp_pct": 0.0,
+            "energy": 0.0060488349698443284
+          },
+          "continuity": {
+            "loop_delta": 0.058960989691622834,
+            "ok": false,
+            "threshold": 0.05
+          },
+          "curve_type": "movement_triangle",
+          "handler": "__default__",
+          "base_position": 0.3803921568627451,
+          "static_dmx": null,
+          "physics_check": {
+            "speed_ok": true,
+            "acceleration_ok": false,
+            "max_speed_deg_per_sec": 29.849409115353623,
+            "max_accel_deg_per_sec2": 3689.1209693653423,
+            "violations": [
+              "Acceleration 3689.1\u00b0/s\u00b2 exceeds limit 1000.0\u00b0/s\u00b2"
+            ]
+          }
+        },
+        {
+          "role": "OUTER_LEFT",
+          "channel": "dimmer",
+          "space": "dmx",
+          "plot_path": "evaluations/2026-11-12-claude-baseline-live-run/plots/break_segbuild__OUTER_LEFT__dimmer.png",
+          "stats": {
+            "min": 0.4529411764705883,
+            "max": 1.0,
+            "range": 0.5470588235294117,
+            "mean": 0.750102714797209,
+            "std": 0.26419015526478556,
+            "clamp_pct": 49.86979166666667,
+            "energy": 0.008558938568908658
+          },
+          "continuity": {
+            "loop_delta": 0.0,
+            "ok": true,
+            "threshold": 0.05
+          },
+          "curve_type": "pulse",
+          "handler": "__default__",
+          "base_position": null,
+          "static_dmx": null,
+          "physics_check": null
+        }
+      ],
+      "flags": [
+        {
+          "level": "error",
+          "code": "PHYSICS_VIOLATION",
+          "message": "Acceleration 3689.1\u00b0/s\u00b2 exceeds limit 1000.0\u00b0/s\u00b2",
+          "details": {
+            "channel": "tilt",
+            "max_speed": 29.849409115353623,
+            "max_accel": 3689.1209693653423
+          }
+        },
+        {
+          "level": "warning",
+          "code": "LOOP_DISCONTINUITY",
+          "message": "Loop discontinuity: delta=0.059",
+          "details": {
+            "loop_delta": 0.058960989691622834
+          }
+        }
+      ],
+      "template_compliance": {
+        "template_id": "sweep_ud_chevron_swell",
+        "curve_type_correct": true,
+        "modifiers_compliant": [],
+        "geometry_correct": true,
+        "overall_compliant": true,
+        "issues": []
+      },
+      "transition_to_next": {
+        "from_section": "break|build",
+        "to_section": "break|release",
+        "position_delta_pan": 0.0,
+        "position_delta_tilt": 0.0008375571530215074,
+        "velocity_delta": 7.145167842497228e-05,
+        "dimmer_snap": false,
+        "smooth": true,
+        "issues": []
+      },
+      "validation_issues": []
+    },
+    {
+      "section_id": "break",
+      "label": "Break (Segment release)",
+      "bar_range": [
+        80.0,
+        87.0
+      ],
+      "time_range_ms": [
+        64489,
+        70132
+      ],
+      "selected_template": {
+        "template_id": "cascade_pulse_lr",
+        "preset_id": null,
+        "modifiers": {},
+        "reasoning": "After the peak, energy settles around 0.34. A left-to-right pulse cascade holds a mid-level groove on the 2-beat grid instead of going dark.",
+        "steps": []
+      },
+      "segments": null,
+      "targets": {
+        "bindings": {},
+        "resolved_roles": [
+          "OUTER_LEFT",
+          "INNER_LEFT",
+          "INNER_RIGHT",
+          "OUTER_RIGHT"
+        ]
+      },
+      "curves": [
+        {
+          "role": "OUTER_LEFT",
+          "channel": "pan",
+          "space": "dmx",
+          "plot_path": "evaluations/2026-11-12-claude-baseline-live-run/plots/break_segrelease__OUTER_LEFT__pan.png",
+          "stats": {
+            "min": 0.47058823529411764,
+            "max": 0.47058823529411764,
+            "range": 0.0,
+            "mean": 0.47058823529411764,
+            "std": 0.0,
+            "clamp_pct": 0.0,
+            "energy": 0.0
+          },
+          "continuity": {
+            "loop_delta": 0.0,
+            "ok": true,
+            "threshold": 0.05
+          },
+          "curve_type": "movement_hold",
+          "handler": "__default__",
+          "base_position": 0.1,
+          "static_dmx": null,
+          "physics_check": {
+            "speed_ok": true,
+            "acceleration_ok": true,
+            "max_speed_deg_per_sec": 0.0,
+            "max_accel_deg_per_sec2": 0.0,
+            "violations": []
+          }
+        },
+        {
+          "role": "OUTER_LEFT",
+          "channel": "tilt",
+          "space": "dmx",
+          "plot_path": "evaluations/2026-11-12-claude-baseline-live-run/plots/break_segrelease__OUTER_LEFT__tilt.png",
+          "stats": {
+            "min": 0.2549019607843137,
+            "max": 0.2549019607843137,
+            "range": 0.0,
+            "mean": 0.2549019607843137,
+            "std": 0.0,
+            "clamp_pct": 0.0,
+            "energy": 0.0
+          },
+          "continuity": {
+            "loop_delta": 0.0,
+            "ok": true,
+            "threshold": 0.05
+          },
+          "curve_type": "movement_hold",
+          "handler": "__default__",
+          "base_position": 0.5,
+          "static_dmx": null,
+          "physics_check": {
+            "speed_ok": true,
+            "acceleration_ok": true,
+            "max_speed_deg_per_sec": 0.0,
+            "max_accel_deg_per_sec2": 0.0,
+            "violations": []
+          }
+        },
+        {
+          "role": "OUTER_LEFT",
+          "channel": "dimmer",
+          "space": "dmx",
+          "plot_path": "evaluations/2026-11-12-claude-baseline-live-run/plots/break_segrelease__OUTER_LEFT__dimmer.png",
+          "stats": {
+            "min": 0.4529411764705883,
+            "max": 1.0,
+            "range": 0.5470588235294117,
+            "mean": 0.7265809787496725,
+            "std": 0.2643627843851539,
+            "clamp_pct": 45.089285714285715,
+            "energy": 0.00896817743490839
+          },
+          "continuity": {
+            "loop_delta": 0.5470588235294117,
+            "ok": true,
+            "threshold": 0.05
+          },
+          "curve_type": "pulse",
+          "handler": "__default__",
+          "base_position": null,
+          "static_dmx": null,
+          "physics_check": null
+        }
+      ],
+      "flags": [],
+      "template_compliance": {
+        "template_id": "cascade_pulse_lr",
+        "curve_type_correct": true,
+        "modifiers_compliant": [],
+        "geometry_correct": true,
+        "overall_compliant": true,
+        "issues": []
+      },
+      "transition_to_next": {
+        "from_section": "break|release",
+        "to_section": "verse_3|plateau",
+        "position_delta_pan": 0.0007419733769055234,
+        "position_delta_tilt": 0.00013840830449826994,
+        "velocity_delta": 4.109709354062488e-06,
+        "dimmer_snap": false,
+        "smooth": true,
+        "issues": []
+      },
+      "validation_issues": []
+    },
+    {
+      "section_id": "verse_3",
+      "label": "Verse 3 (Segment plateau)",
+      "bar_range": [
+        88.0,
+        103.0
+      ],
+      "time_range_ms": [
+        70938,
+        83030
+      ],
+      "selected_template": {
+        "template_id": "sweep_lr_continuous_phase",
+        "preset_id": null,
+        "modifiers": {},
+        "reasoning": "A loop-safe continuous sweep with phase offsets gives a steady grid-locked trail chase across the 0.39-0.44 plateau.",
+        "steps": []
+      },
+      "segments": null,
+      "targets": {
+        "bindings": {},
+        "resolved_roles": [
+          "OUTER_LEFT",
+          "INNER_LEFT",
+          "INNER_RIGHT",
+          "OUTER_RIGHT"
+        ]
+      },
+      "curves": [
+        {
+          "role": "OUTER_LEFT",
+          "channel": "pan",
+          "space": "dmx",
+          "plot_path": "evaluations/2026-11-12-claude-baseline-live-run/plots/verse_3_segplateau__OUTER_LEFT__pan.png",
+          "stats": {
+            "min": 0.19947459135354437,
+            "max": 0.5959098299352907,
+            "range": 0.39643523858174634,
+            "mean": 0.4048625605015602,
+            "std": 0.11069891074560978,
+            "clamp_pct": 0.0,
+            "energy": 0.0018554840292688808
+          },
+          "continuity": {
+            "loop_delta": 0.29357928413225715,
+            "ok": false,
+            "threshold": 0.05
+          },
+          "curve_type": "movement_triangle",
+          "handler": "__default__",
+          "base_position": 0.1,
+          "static_dmx": null,
+          "physics_check": {
+            "speed_ok": true,
+            "acceleration_ok": false,
+            "max_speed_deg_per_sec": 99.85131992271197,
+            "max_accel_deg_per_sec2": 11913.504225946235,
+            "violations": [
+              "Acceleration 11913.5\u00b0/s\u00b2 exceeds limit 1000.0\u00b0/s\u00b2"
+            ]
+          }
+        },
+        {
+          "role": "OUTER_LEFT",
+          "channel": "tilt",
+          "space": "dmx",
+          "plot_path": "evaluations/2026-11-12-claude-baseline-live-run/plots/verse_3_segplateau__OUTER_LEFT__tilt.png",
+          "stats": {
+            "min": 0.2901960784313725,
+            "max": 0.2901960784313725,
+            "range": 0.0,
+            "mean": 0.29019607843137246,
+            "std": 5.551115123125783e-17,
+            "clamp_pct": 0.0,
+            "energy": 0.0
+          },
+          "continuity": {
+            "loop_delta": 0.0,
+            "ok": true,
+            "threshold": 0.05
+          },
+          "curve_type": "movement_hold",
+          "handler": "__default__",
+          "base_position": 0.5,
+          "static_dmx": null,
+          "physics_check": {
+            "speed_ok": true,
+            "acceleration_ok": true,
+            "max_speed_deg_per_sec": 0.0,
+            "max_accel_deg_per_sec2": 0.0,
+            "violations": []
+          }
+        },
+        {
+          "role": "OUTER_LEFT",
+          "channel": "dimmer",
+          "space": "dmx",
+          "plot_path": "evaluations/2026-11-12-claude-baseline-live-run/plots/verse_3_segplateau__OUTER_LEFT__dimmer.png",
+          "stats": {
+            "min": 0.1,
+            "max": 0.5517647058823529,
+            "range": 0.45176470588235296,
+            "mean": 0.31526998791449673,
+            "std": 0.224362758926956,
+            "clamp_pct": 0.0,
+            "energy": 0.002197604545640355
+          },
+          "continuity": {
+            "loop_delta": 0.45176470588235296,
+            "ok": true,
+            "threshold": 0.05
+          },
+          "curve_type": "pulse",
+          "handler": "__default__",
+          "base_position": null,
+          "static_dmx": null,
+          "physics_check": null
+        }
+      ],
+      "flags": [
+        {
+          "level": "error",
+          "code": "PHYSICS_VIOLATION",
+          "message": "Acceleration 11913.5\u00b0/s\u00b2 exceeds limit 1000.0\u00b0/s\u00b2",
+          "details": {
+            "channel": "pan",
+            "max_speed": 99.85131992271197,
+            "max_accel": 11913.504225946235
+          }
+        },
+        {
+          "level": "warning",
+          "code": "LOOP_DISCONTINUITY",
+          "message": "Loop discontinuity: delta=0.294",
+          "details": {
+            "loop_delta": 0.29357928413225715
+          }
+        }
+      ],
+      "template_compliance": {
+        "template_id": "sweep_lr_continuous_phase",
+        "curve_type_correct": true,
+        "modifiers_compliant": [],
+        "geometry_correct": true,
+        "overall_compliant": true,
+        "issues": []
+      },
+      "transition_to_next": {
+        "from_section": "verse_3|plateau",
+        "to_section": "verse_3|dip",
+        "position_delta_pan": 0.0026371339832237054,
+        "position_delta_tilt": 0.0011380238369857747,
+        "velocity_delta": 4.050712304691663e-06,
+        "dimmer_snap": false,
+        "smooth": true,
+        "issues": []
+      },
+      "validation_issues": []
+    },
+    {
+      "section_id": "verse_3",
+      "label": "Verse 3 (Segment dip)",
+      "bar_range": [
+        104.0,
+        107.0
+      ],
+      "time_range_ms": [
+        83836,
+        86254
+      ],
+      "selected_template": {
+        "template_id": "inner_pendulum_breathe",
+        "preset_id": null,
+        "modifiers": {},
+        "reasoning": "Inner fixtures run alone with a subtle pendulum and breathing dimmer, cutting to a minimal accent layer for about 3s at the energy dip.",
+        "steps": []
+      },
+      "segments": null,
+      "targets": {
+        "bindings": {},
+        "resolved_roles": [
+          "OUTER_LEFT",
+          "INNER_LEFT",
+          "INNER_RIGHT",
+          "OUTER_RIGHT"
+        ]
+      },
+      "curves": [
+        {
+          "role": "INNER_LEFT",
+          "channel": "pan",
+          "space": "dmx",
+          "plot_path": "evaluations/2026-11-12-claude-baseline-live-run/plots/verse_3_segdip__INNER_LEFT__pan.png",
+          "stats": {
+            "min": 0.32352194662514444,
+            "max": 0.42107278407861276,
+            "range": 0.09755083745346832,
+            "mean": 0.3911797075413795,
+            "std": 0.02992508350814176,
+            "clamp_pct": 0.0,
+            "energy": 0.0003499106977569244
+          },
+          "continuity": {
+            "loop_delta": 0.09502721534845626,
+            "ok": false,
+            "threshold": 0.05
+          },
+          "curve_type": "movement_sine",
+          "handler": "__default__",
+          "base_position": 0.3,
+          "static_dmx": null,
+          "physics_check": {
+            "speed_ok": true,
+            "acceleration_ok": true,
+            "max_speed_deg_per_sec": 0.17122837024573667,
+            "max_accel_deg_per_sec2": 0.5730116395046119,
+            "violations": []
+          }
+        },
+        {
+          "role": "INNER_LEFT",
+          "channel": "tilt",
+          "space": "dmx",
+          "plot_path": "evaluations/2026-11-12-claude-baseline-live-run/plots/verse_3_segdip__INNER_LEFT__tilt.png",
+          "stats": {
+            "min": 0.34019607843137256,
+            "max": 0.34019607843137256,
+            "range": 0.0,
+            "mean": 0.3401960784313726,
+            "std": 5.551115123125783e-17,
+            "clamp_pct": 0.0,
+            "energy": 0.0
+          },
+          "continuity": {
+            "loop_delta": 0.0,
+            "ok": true,
+            "threshold": 0.05
+          },
+          "curve_type": "movement_hold",
+          "handler": "__default__",
+          "base_position": 0.5,
+          "static_dmx": null,
+          "physics_check": {
+            "speed_ok": true,
+            "acceleration_ok": true,
+            "max_speed_deg_per_sec": 0.0,
+            "max_accel_deg_per_sec2": 0.0,
+            "violations": []
+          }
+        },
+        {
+          "role": "INNER_LEFT",
+          "channel": "dimmer",
+          "space": "dmx",
+          "plot_path": "evaluations/2026-11-12-claude-baseline-live-run/plots/verse_3_segdip__INNER_LEFT__dimmer.png",
+          "stats": {
+            "min": 0.2,
+            "max": 0.6015686274509804,
+            "range": 0.4015686274509804,
+            "mean": 0.364131892720959,
+            "std": 0.19597783318719872,
+            "clamp_pct": 0.0,
+            "energy": 0.0014040861099684629
+          },
+          "continuity": {
+            "loop_delta": 0.4015686274509804,
+            "ok": true,
+            "threshold": 0.05
+          },
+          "curve_type": "pulse",
+          "handler": "__default__",
+          "base_position": null,
+          "static_dmx": null,
+          "physics_check": null
+        }
+      ],
+      "flags": [
+        {
+          "level": "info",
+          "code": "LIMITED_RANGE",
+          "message": "Curve has limited range: 0.098",
+          "details": {
+            "range": 0.09755083745346832
+          }
+        },
+        {
+          "level": "warning",
+          "code": "LOOP_DISCONTINUITY",
+          "message": "Loop discontinuity: delta=0.095",
+          "details": {
+            "loop_delta": 0.09502721534845626
+          }
+        }
+      ],
+      "template_compliance": {
+        "template_id": "inner_pendulum_breathe",
+        "curve_type_correct": true,
+        "modifiers_compliant": [],
+        "geometry_correct": true,
+        "overall_compliant": true,
+        "issues": []
+      },
+      "transition_to_next": {
+        "from_section": "verse_3|dip",
+        "to_section": "verse_3|rebuild",
+        "position_delta_pan": 0.0025590834351689722,
+        "position_delta_tilt": 0.001559467902681467,
+        "velocity_delta": 1.6476050404178945e-05,
+        "dimmer_snap": false,
+        "smooth": true,
+        "issues": []
+      },
+      "validation_issues": []
+    },
+    {
+      "section_id": "verse_3",
+      "label": "Verse 3 (Segment rebuild)",
+      "bar_range": [
+        108.0,
+        116.0
+      ],
+      "time_range_ms": [
+        87061,
+        93509
+      ],
+      "selected_template": {
+        "template_id": "zigzag_alternating_pulse",
+        "preset_id": null,
+        "modifiers": {},
+        "reasoning": "Tighter zigzag motion with matched pulses rebuilds through 0.32, 0.42 and 0.46, winding up energy into the chorus.",
+        "steps": []
+      },
+      "segments": null,
+      "targets": {
+        "bindings": {},
+        "resolved_roles": [
+          "OUTER_LEFT",
+          "INNER_LEFT",
+          "INNER_RIGHT",
+          "OUTER_RIGHT"
+        ]
+      },
+      "curves": [
+        {
+          "role": "OUTER_LEFT",
+          "channel": "pan",
+          "space": "dmx",
+          "plot_path": "evaluations/2026-11-12-claude-baseline-live-run/plots/verse_3_segrebuild__OUTER_LEFT__pan.png",
+          "stats": {
+            "min": 0.2252108103550064,
+            "max": 0.6240945045248529,
+            "range": 0.39888369416984654,
+            "mean": 0.42944167684429374,
+            "std": 0.1164216574016641,
+            "clamp_pct": 0.0,
+            "energy": 0.00524445390555393
+          },
+          "continuity": {
+            "loop_delta": 0.061895238649537276,
+            "ok": false,
+            "threshold": 0.05
+          },
+          "curve_type": "movement_triangle",
+          "handler": "__default__",
+          "base_position": 0.425,
+          "static_dmx": null,
+          "physics_check": {
+            "speed_ok": true,
+            "acceleration_ok": true,
+            "max_speed_deg_per_sec": 4.1621374876228305,
+            "max_accel_deg_per_sec2": 592.6391604533627,
+            "violations": []
+          }
+        },
+        {
+          "role": "OUTER_LEFT",
+          "channel": "tilt",
+          "space": "dmx",
+          "plot_path": "evaluations/2026-11-12-claude-baseline-live-run/plots/verse_3_segrebuild__OUTER_LEFT__tilt.png",
+          "stats": {
+            "min": 0.09040688878637894,
+            "max": 0.48929058295622546,
+            "range": 0.39888369416984654,
+            "mean": 0.29463775527566627,
+            "std": 0.11642165740166412,
+            "clamp_pct": 0.0,
+            "energy": 0.00524445390555393
+          },
+          "continuity": {
+            "loop_delta": 0.06189523864953733,
+            "ok": false,
+            "threshold": 0.05
+          },
+          "curve_type": "movement_triangle",
+          "handler": "__default__",
+          "base_position": 0.3,
+          "static_dmx": null,
+          "physics_check": {
+            "speed_ok": true,
+            "acceleration_ok": true,
+            "max_speed_deg_per_sec": 2.081068743811409,
+            "max_accel_deg_per_sec2": 296.3195802266759,
+            "violations": []
+          }
+        },
+        {
+          "role": "OUTER_LEFT",
+          "channel": "dimmer",
+          "space": "dmx",
+          "plot_path": "evaluations/2026-11-12-claude-baseline-live-run/plots/verse_3_segrebuild__OUTER_LEFT__dimmer.png",
+          "stats": {
+            "min": 0.15,
+            "max": 0.5766666666666667,
+            "range": 0.42666666666666664,
+            "mean": 0.36343797274609124,
+            "std": 0.21222834532938947,
+            "clamp_pct": 0.0,
+            "energy": 0.002228024369016536
+          },
+          "continuity": {
+            "loop_delta": 0.0,
+            "ok": true,
+            "threshold": 0.05
+          },
+          "curve_type": "pulse",
+          "handler": "__default__",
+          "base_position": null,
+          "static_dmx": null,
+          "physics_check": null
+        }
+      ],
+      "flags": [
+        {
+          "level": "warning",
+          "code": "LOOP_DISCONTINUITY",
+          "message": "Loop discontinuity: delta=0.062",
+          "details": {
+            "loop_delta": 0.061895238649537276
+          }
+        },
+        {
+          "level": "warning",
+          "code": "LOOP_DISCONTINUITY",
+          "message": "Loop discontinuity: delta=0.062",
+          "details": {
+            "loop_delta": 0.06189523864953733
+          }
+        }
+      ],
+      "template_compliance": {
+        "template_id": "zigzag_alternating_pulse",
+        "curve_type_correct": true,
+        "modifiers_compliant": [],
+        "geometry_correct": true,
+        "overall_compliant": true,
+        "issues": []
+      },
+      "transition_to_next": {
+        "from_section": "verse_3|rebuild",
+        "to_section": "chorus|wave1",
+        "position_delta_pan": 0.0005738417164488766,
+        "position_delta_tilt": 0.00011377829604797838,
+        "velocity_delta": 6.0028536266265974e-05,
+        "dimmer_snap": false,
+        "smooth": true,
+        "issues": []
+      },
+      "validation_issues": []
+    },
+    {
+      "section_id": "chorus",
+      "label": "Chorus (Segment wave1)",
+      "bar_range": [
+        117.0,
+        128.0
+      ],
+      "time_range_ms": [
+        94316,
+        103183
+      ],
+      "selected_template": {
+        "template_id": "dual_sweep_audience_pulse",
+        "preset_id": null,
+        "modifiers": {},
+        "reasoning": "Symmetric counter-sweeping beams scan the street audience with rapid pulses. This is the confident first wave, opening on the single max hit.",
+        "steps": []
+      },
+      "segments": null,
+      "targets": {
+        "bindings": {},
+        "resolved_roles": [
+          "OUTER_LEFT",
+          "INNER_LEFT",
+          "INNER_RIGHT",
+          "OUTER_RIGHT"
+        ]
+      },
+      "curves": [
+        {
+          "role": "OUTER_LEFT",
+          "channel": "pan",
+          "space": "dmx",
+          "plot_path": "evaluations/2026-11-12-claude-baseline-live-run/plots/chorus_segwave1__OUTER_LEFT__pan.png",
+          "stats": {
+            "min": 0.19620315178545505,
+            "max": 0.7449438671755887,
+            "range": 0.5487407153901336,
+            "mean": 0.4627654441939582,
+            "std": 0.1934459356581183,
+            "clamp_pct": 0.0,
+            "energy": 0.003139007561385184
+          },
+          "continuity": {
+            "loop_delta": 0.30676578046547165,
+            "ok": false,
+            "threshold": 0.05
+          },
+          "curve_type": "movement_sine",
+          "handler": "__default__",
+          "base_position": 0.2,
+          "static_dmx": null,
+          "physics_check": {
+            "speed_ok": true,
+            "acceleration_ok": false,
+            "max_speed_deg_per_sec": 20.33638679647419,
+            "max_accel_deg_per_sec2": 2558.7064884593415,
+            "violations": [
+              "Acceleration 2558.7\u00b0/s\u00b2 exceeds limit 1000.0\u00b0/s\u00b2"
+            ]
+          }
+        },
+        {
+          "role": "OUTER_LEFT",
+          "channel": "tilt",
+          "space": "dmx",
+          "plot_path": "evaluations/2026-11-12-claude-baseline-live-run/plots/chorus_segwave1__OUTER_LEFT__tilt.png",
+          "stats": {
+            "min": 0.019714746348317214,
+            "max": 0.49006393096843176,
+            "range": 0.47034918462011455,
+            "mean": 0.24819671126989135,
+            "std": 0.1658108019926728,
+            "clamp_pct": 0.0,
+            "energy": 0.002690577909758729
+          },
+          "continuity": {
+            "loop_delta": 0.26294209754183284,
+            "ok": false,
+            "threshold": 0.05
+          },
+          "curve_type": "movement_sine",
+          "handler": "__default__",
+          "base_position": 0.3,
+          "static_dmx": null,
+          "physics_check": {
+            "speed_ok": true,
+            "acceleration_ok": false,
+            "max_speed_deg_per_sec": 8.715594341346094,
+            "max_accel_deg_per_sec2": 1096.588495054006,
+            "violations": [
+              "Acceleration 1096.6\u00b0/s\u00b2 exceeds limit 1000.0\u00b0/s\u00b2"
+            ]
+          }
+        },
+        {
+          "role": "OUTER_LEFT",
+          "channel": "dimmer",
+          "space": "dmx",
+          "plot_path": "evaluations/2026-11-12-claude-baseline-live-run/plots/chorus_segwave1__OUTER_LEFT__dimmer.png",
+          "stats": {
+            "min": 0.4833333333333333,
+            "max": 1.0,
+            "range": 0.5166666666666667,
+            "mean": 0.7421315833576522,
+            "std": 0.250276382885611,
+            "clamp_pct": 45.687203791469194,
+            "energy": 0.007898597112972154
+          },
+          "continuity": {
+            "loop_delta": 0.05845469040598139,
+            "ok": true,
+            "threshold": 0.05
+          },
+          "curve_type": "pulse",
+          "handler": "__default__",
+          "base_position": null,
+          "static_dmx": null,
+          "physics_check": null
+        }
+      ],
+      "flags": [
+        {
+          "level": "error",
+          "code": "PHYSICS_VIOLATION",
+          "message": "Acceleration 2558.7\u00b0/s\u00b2 exceeds limit 1000.0\u00b0/s\u00b2",
+          "details": {
+            "channel": "pan",
+            "max_speed": 20.33638679647419,
+            "max_accel": 2558.7064884593415
+          }
+        },
+        {
+          "level": "warning",
+          "code": "LOOP_DISCONTINUITY",
+          "message": "Loop discontinuity: delta=0.307",
+          "details": {
+            "loop_delta": 0.30676578046547165
+          }
+        },
+        {
+          "level": "error",
+          "code": "PHYSICS_VIOLATION",
+          "message": "Acceleration 1096.6\u00b0/s\u00b2 exceeds limit 1000.0\u00b0/s\u00b2",
+          "details": {
+            "channel": "tilt",
+            "max_speed": 8.715594341346094,
+            "max_accel": 1096.588495054006
+          }
+        },
+        {
+          "level": "warning",
+          "code": "LOOP_DISCONTINUITY",
+          "message": "Loop discontinuity: delta=0.263",
+          "details": {
+            "loop_delta": 0.26294209754183284
+          }
+        }
+      ],
+      "template_compliance": {
+        "template_id": "dual_sweep_audience_pulse",
+        "curve_type_correct": true,
+        "modifiers_compliant": [],
+        "geometry_correct": true,
+        "overall_compliant": true,
+        "issues": []
+      },
+      "transition_to_next": {
+        "from_section": "chorus|wave1",
+        "to_section": "chorus|pullback",
+        "position_delta_pan": 0.0007950121090747038,
+        "position_delta_tilt": 0.0006814389506354602,
+        "velocity_delta": 1.8031607226907307e-05,
+        "dimmer_snap": false,
+        "smooth": true,
+        "issues": []
+      },
+      "validation_issues": []
+    },
+    {
+      "section_id": "chorus",
+      "label": "Chorus (Segment pullback)",
+      "bar_range": [
+        129.0,
+        132.0
+      ],
+      "time_range_ms": [
+        103989,
+        106407
+      ],
+      "selected_template": {
+        "template_id": "fan_pulse",
+        "preset_id": null,
+        "modifiers": {},
+        "reasoning": "A static radial fan with pulsing dimmer creates a breath at the energy sag near 103.8s, restating the radial_rays motif.",
+        "steps": []
+      },
+      "segments": null,
+      "targets": {
+        "bindings": {},
+        "resolved_roles": [
+          "OUTER_LEFT",
+          "INNER_LEFT",
+          "INNER_RIGHT",
+          "OUTER_RIGHT"
+        ]
+      },
+      "curves": [
+        {
+          "role": "OUTER_LEFT",
+          "channel": "pan",
+          "space": "dmx",
+          "plot_path": "evaluations/2026-11-12-claude-baseline-live-run/plots/chorus_segpullback__OUTER_LEFT__pan.png",
+          "stats": {
+            "min": 0.47058823529411764,
+            "max": 0.47058823529411764,
+            "range": 0.0,
+            "mean": 0.47058823529411764,
+            "std": 0.0,
+            "clamp_pct": 0.0,
+            "energy": 0.0
+          },
+          "continuity": {
+            "loop_delta": 0.0,
+            "ok": true,
+            "threshold": 0.05
+          },
+          "curve_type": "movement_hold",
+          "handler": "__default__",
+          "base_position": 0.275,
+          "static_dmx": null,
+          "physics_check": {
+            "speed_ok": true,
+            "acceleration_ok": true,
+            "max_speed_deg_per_sec": 0.0,
+            "max_accel_deg_per_sec2": 0.0,
+            "violations": []
+          }
+        },
+        {
+          "role": "OUTER_LEFT",
+          "channel": "tilt",
+          "space": "dmx",
+          "plot_path": "evaluations/2026-11-12-claude-baseline-live-run/plots/chorus_segpullback__OUTER_LEFT__tilt.png",
+          "stats": {
+            "min": 0.2549019607843137,
+            "max": 0.2549019607843137,
+            "range": 0.0,
+            "mean": 0.2549019607843137,
+            "std": 0.0,
+            "clamp_pct": 0.0,
+            "energy": 0.0
+          },
+          "continuity": {
+            "loop_delta": 0.0,
+            "ok": true,
+            "threshold": 0.05
+          },
+          "curve_type": "movement_hold",
+          "handler": "__default__",
+          "base_position": 0.35,
+          "static_dmx": null,
+          "physics_check": {
+            "speed_ok": true,
+            "acceleration_ok": true,
+            "max_speed_deg_per_sec": 0.0,
+            "max_accel_deg_per_sec2": 0.0,
+            "violations": []
+          }
+        },
+        {
+          "role": "OUTER_LEFT",
+          "channel": "dimmer",
+          "space": "dmx",
+          "plot_path": "evaluations/2026-11-12-claude-baseline-live-run/plots/chorus_segpullback__OUTER_LEFT__dimmer.png",
+          "stats": {
+            "min": 0.5137254901960784,
+            "max": 1.0,
+            "range": 0.4862745098039216,
+            "mean": 0.7151598444914933,
+            "std": 0.23259260253858577,
+            "clamp_pct": 36.933797909407666,
+            "energy": 0.006801042095159743
+          },
+          "continuity": {
+            "loop_delta": 0.0,
+            "ok": true,
+            "threshold": 0.05
+          },
+          "curve_type": "pulse",
+          "handler": "__default__",
+          "base_position": null,
+          "static_dmx": null,
+          "physics_check": null
+        }
+      ],
+      "flags": [],
+      "template_compliance": {
+        "template_id": "fan_pulse",
+        "curve_type_correct": true,
+        "modifiers_compliant": [],
+        "geometry_correct": true,
+        "overall_compliant": true,
+        "issues": []
+      },
+      "transition_to_next": {
+        "from_section": "chorus|pullback",
+        "to_section": "chorus|wave2",
+        "position_delta_pan": 0.0010420995802196801,
+        "position_delta_tilt": 0.0008629658700275586,
+        "velocity_delta": 2.57415711909139e-05,
+        "dimmer_snap": false,
+        "smooth": true,
+        "issues": []
+      },
+      "validation_issues": []
+    },
+    {
+      "section_id": "chorus",
+      "label": "Chorus (Segment wave2)",
+      "bar_range": [
+        133.0,
+        145.0
+      ],
+      "time_range_ms": [
+        107214,
+        116887
+      ],
+      "selected_template": {
+        "template_id": "circle_asym_right_pulse",
+        "preset_id": null,
+        "modifiers": {},
+        "reasoning": "Rotational circle motion with pulsing dimmer carries the spiral motif through the rebound to 0.51 and the finishing 0.517 push.",
+        "steps": []
+      },
+      "segments": null,
+      "targets": {
+        "bindings": {},
+        "resolved_roles": [
+          "OUTER_LEFT",
+          "INNER_LEFT",
+          "INNER_RIGHT",
+          "OUTER_RIGHT"
+        ]
+      },
+      "curves": [
+        {
+          "role": "OUTER_LEFT",
+          "channel": "pan",
+          "space": "dmx",
+          "plot_path": "evaluations/2026-11-12-claude-baseline-live-run/plots/chorus_segwave2__OUTER_LEFT__pan.png",
+          "stats": {
+            "min": 0.19609070582602917,
+            "max": 0.7449865183652632,
+            "range": 0.548895812539234,
+            "mean": 0.5087938685049752,
+            "std": 0.1843809895393592,
+            "clamp_pct": 0.0,
+            "energy": 0.005866809902632298
+          },
+          "continuity": {
+            "loop_delta": 0.250621207850987,
+            "ok": false,
+            "threshold": 0.05
+          },
+          "curve_type": "movement_sine",
+          "handler": "__default__",
+          "base_position": 0.16999999999999998,
+          "static_dmx": null,
+          "physics_check": {
+            "speed_ok": true,
+            "acceleration_ok": false,
+            "max_speed_deg_per_sec": 48.49745846344821,
+            "max_accel_deg_per_sec2": 5962.879097164277,
+            "violations": [
+              "Acceleration 5962.9\u00b0/s\u00b2 exceeds limit 1000.0\u00b0/s\u00b2"
+            ]
+          }
+        },
+        {
+          "role": "OUTER_LEFT",
+          "channel": "tilt",
+          "space": "dmx",
+          "plot_path": "evaluations/2026-11-12-claude-baseline-live-run/plots/chorus_segwave2__OUTER_LEFT__tilt.png",
+          "stats": {
+            "min": 0.019644785317574673,
+            "max": 0.49018907779680215,
+            "range": 0.47054429247922747,
+            "mean": 0.23306761198945136,
+            "std": 0.16936439495243694,
+            "clamp_pct": 0.0,
+            "energy": 0.005467950846742034
+          },
+          "continuity": {
+            "loop_delta": 0.2903432522984777,
+            "ok": false,
+            "threshold": 0.05
+          },
+          "curve_type": "movement_cosine",
+          "handler": "__default__",
+          "base_position": 0.3,
+          "static_dmx": null,
+          "physics_check": {
+            "speed_ok": true,
+            "acceleration_ok": false,
+            "max_speed_deg_per_sec": 55.966685596352015,
+            "max_accel_deg_per_sec2": 6686.391268057734,
+            "violations": [
+              "Acceleration 6686.4\u00b0/s\u00b2 exceeds limit 1000.0\u00b0/s\u00b2"
+            ]
+          }
+        },
+        {
+          "role": "OUTER_LEFT",
+          "channel": "dimmer",
+          "space": "dmx",
+          "plot_path": "evaluations/2026-11-12-claude-baseline-live-run/plots/chorus_segwave2__OUTER_LEFT__dimmer.png",
+          "stats": {
+            "min": 0.5137254901960784,
+            "max": 1.0,
+            "range": 0.4862745098039216,
+            "mean": 0.7747616698388093,
+            "std": 0.23501620858416644,
+            "clamp_pct": 49.17463075586447,
+            "energy": 0.007611253196930947
+          },
+          "continuity": {
+            "loop_delta": 0.0,
+            "ok": true,
+            "threshold": 0.05
+          },
+          "curve_type": "pulse",
+          "handler": "__default__",
+          "base_position": null,
+          "static_dmx": null,
+          "physics_check": null
+        }
+      ],
+      "flags": [
+        {
+          "level": "error",
+          "code": "PHYSICS_VIOLATION",
+          "message": "Acceleration 5962.9\u00b0/s\u00b2 exceeds limit 1000.0\u00b0/s\u00b2",
+          "details": {
+            "channel": "pan",
+            "max_speed": 48.49745846344821,
+            "max_accel": 5962.879097164277
+          }
+        },
+        {
+          "level": "warning",
+          "code": "LOOP_DISCONTINUITY",
+          "message": "Loop discontinuity: delta=0.251",
+          "details": {
+            "loop_delta": 0.250621207850987
+          }
+        },
+        {
+          "level": "error",
+          "code": "PHYSICS_VIOLATION",
+          "message": "Acceleration 6686.4\u00b0/s\u00b2 exceeds limit 1000.0\u00b0/s\u00b2",
+          "details": {
+            "channel": "tilt",
+            "max_speed": 55.966685596352015,
+            "max_accel": 6686.391268057734
+          }
+        },
+        {
+          "level": "warning",
+          "code": "LOOP_DISCONTINUITY",
+          "message": "Loop discontinuity: delta=0.290",
+          "details": {
+            "loop_delta": 0.2903432522984777
+          }
+        }
+      ],
+      "template_compliance": {
+        "template_id": "circle_asym_right_pulse",
+        "curve_type_correct": true,
+        "modifiers_compliant": [],
+        "geometry_correct": true,
+        "overall_compliant": true,
+        "issues": []
+      },
+      "transition_to_next": {
+        "from_section": "chorus|wave2",
+        "to_section": "bridge|showcase",
+        "position_delta_pan": 0.0010693691033521852,
+        "position_delta_tilt": 0.0012652153245738844,
+        "velocity_delta": 0.00010879333128194423,
+        "dimmer_snap": false,
+        "smooth": true,
+        "issues": []
+      },
+      "validation_issues": []
+    },
+    {
+      "section_id": "bridge",
+      "label": "Bridge (Segment showcase)",
+      "bar_range": [
+        146.0,
+        158.0
+      ],
+      "time_range_ms": [
+        117693,
+        127367
+      ],
+      "selected_template": {
+        "template_id": "pendulum_chevron_breathe",
+        "preset_id": null,
+        "modifiers": {},
+        "reasoning": "A smooth pendulum over a chevron with breathing dimmer gives slow trail sweeps that carry the last strong moments with restraint.",
+        "steps": []
+      },
+      "segments": null,
+      "targets": {
+        "bindings": {},
+        "resolved_roles": [
+          "OUTER_LEFT",
+          "INNER_LEFT",
+          "INNER_RIGHT",
+          "OUTER_RIGHT"
+        ]
+      },
+      "curves": [
+        {
+          "role": "OUTER_LEFT",
+          "channel": "pan",
+          "space": "dmx",
+          "plot_path": "evaluations/2026-11-12-claude-baseline-live-run/plots/bridge_segshowcase__OUTER_LEFT__pan.png",
+          "stats": {
+            "min": 0.31645493897579313,
+            "max": 0.38908139563729544,
+            "range": 0.0726264566615023,
+            "mean": 0.3566886107659113,
+            "std": 0.020496721904590055,
+            "clamp_pct": 0.0,
+            "energy": 0.00040766394736587504
+          },
+          "continuity": {
+            "loop_delta": 0.03457410863475702,
+            "ok": true,
+            "threshold": 0.05
+          },
+          "curve_type": "movement_sine",
+          "handler": "__default__",
+          "base_position": 0.3522875816993464,
+          "static_dmx": null,
+          "physics_check": {
+            "speed_ok": true,
+            "acceleration_ok": false,
+            "max_speed_deg_per_sec": 18.29753300310018,
+            "max_accel_deg_per_sec2": 2187.0226944511446,
+            "violations": [
+              "Acceleration 2187.0\u00b0/s\u00b2 exceeds limit 1000.0\u00b0/s\u00b2"
+            ]
+          }
+        },
+        {
+          "role": "OUTER_LEFT",
+          "channel": "tilt",
+          "space": "dmx",
+          "plot_path": "evaluations/2026-11-12-claude-baseline-live-run/plots/bridge_segshowcase__OUTER_LEFT__tilt.png",
+          "stats": {
+            "min": 0.3803921568627451,
+            "max": 0.3803921568627451,
+            "range": 0.0,
+            "mean": 0.3803921568627451,
+            "std": 0.0,
+            "clamp_pct": 0.0,
+            "energy": 0.0
+          },
+          "continuity": {
+            "loop_delta": 0.0,
+            "ok": true,
+            "threshold": 0.05
+          },
+          "curve_type": "movement_hold",
+          "handler": "__default__",
+          "base_position": 0.3803921568627451,
+          "static_dmx": null,
+          "physics_check": {
+            "speed_ok": true,
+            "acceleration_ok": true,
+            "max_speed_deg_per_sec": 0.0,
+            "max_accel_deg_per_sec2": 0.0,
+            "violations": []
+          }
+        },
+        {
+          "role": "OUTER_LEFT",
+          "channel": "dimmer",
+          "space": "dmx",
+          "plot_path": "evaluations/2026-11-12-claude-baseline-live-run/plots/bridge_segshowcase__OUTER_LEFT__dimmer.png",
+          "stats": {
+            "min": 0.2,
+            "max": 0.5137254901960784,
+            "range": 0.31372549019607837,
+            "mean": 0.35544449925243715,
+            "std": 0.15603708836182548,
+            "clamp_pct": 0.0,
+            "energy": 0.0016354065518474979
+          },
+          "continuity": {
+            "loop_delta": 0.0,
+            "ok": true,
+            "threshold": 0.05
+          },
+          "curve_type": "pulse",
+          "handler": "__default__",
+          "base_position": null,
+          "static_dmx": null,
+          "physics_check": null
+        }
+      ],
+      "flags": [
+        {
+          "level": "info",
+          "code": "LIMITED_RANGE",
+          "message": "Curve has limited range: 0.073",
+          "details": {
+            "range": 0.0726264566615023
+          }
+        },
+        {
+          "level": "error",
+          "code": "PHYSICS_VIOLATION",
+          "message": "Acceleration 2187.0\u00b0/s\u00b2 exceeds limit 1000.0\u00b0/s\u00b2",
+          "details": {
+            "channel": "pan",
+            "max_speed": 18.29753300310018,
+            "max_accel": 2187.0226944511446
+          }
+        }
+      ],
+      "template_compliance": {
+        "template_id": "pendulum_chevron_breathe",
+        "curve_type_correct": true,
+        "modifiers_compliant": [],
+        "geometry_correct": true,
+        "overall_compliant": true,
+        "issues": []
+      },
+      "transition_to_next": {
+        "from_section": "bridge|showcase",
+        "to_section": "bridge|winddown",
+        "position_delta_pan": 0.0006026261267050156,
+        "position_delta_tilt": 0.0004976637770096293,
+        "velocity_delta": 2.944712474000129e-06,
+        "dimmer_snap": false,
+        "smooth": true,
+        "issues": []
+      },
+      "validation_issues": []
+    },
+    {
+      "section_id": "bridge",
+      "label": "Bridge (Segment winddown)",
+      "bar_range": [
+        159.0,
+        167.0
+      ],
+      "time_range_ms": [
+        128173,
+        134622
+      ],
+      "selected_template": {
+        "template_id": "wave_vertical_spotlight_fade",
+        "preset_id": null,
+        "modifiers": {},
+        "reasoning": "A vertical wave converging to a spotlight cluster with fade-out handles the wind-down inside the bridge, leaving the heads nearly dark for blackout.",
+        "steps": []
+      },
+      "segments": null,
+      "targets": {
+        "bindings": {},
+        "resolved_roles": [
+          "OUTER_LEFT",
+          "INNER_LEFT",
+          "INNER_RIGHT",
+          "OUTER_RIGHT"
+        ]
+      },
+      "curves": [
+        {
+          "role": "OUTER_LEFT",
+          "channel": "pan",
+          "space": "dmx",
+          "plot_path": "evaluations/2026-11-12-claude-baseline-live-run/plots/bridge_segwinddown__OUTER_LEFT__pan.png",
+          "stats": {
+            "min": 0.47750000000000004,
+            "max": 0.47750000000000004,
+            "range": 0.0,
+            "mean": 0.47750000000000004,
+            "std": 0.0,
+            "clamp_pct": 0.0,
+            "energy": 0.0
+          },
+          "continuity": {
+            "loop_delta": 0.0,
+            "ok": true,
+            "threshold": 0.05
+          },
+          "curve_type": "movement_hold",
+          "handler": "__default__",
+          "base_position": 0.47750000000000004,
+          "static_dmx": null,
+          "physics_check": {
+            "speed_ok": true,
+            "acceleration_ok": true,
+            "max_speed_deg_per_sec": 0.0,
+            "max_accel_deg_per_sec2": 0.0,
+            "violations": []
+          }
+        },
+        {
+          "role": "OUTER_LEFT",
+          "channel": "tilt",
+          "space": "dmx",
+          "plot_path": "evaluations/2026-11-12-claude-baseline-live-run/plots/bridge_segwinddown__OUTER_LEFT__tilt.png",
+          "stats": {
+            "min": 0.27857816452612005,
+            "max": 0.36755119533964026,
+            "range": 0.0889730308135202,
+            "mean": 0.34344606356235136,
+            "std": 0.024752110876440973,
+            "clamp_pct": 0.0,
+            "energy": 0.0005324812444495597
+          },
+          "continuity": {
+            "loop_delta": 0.05357821308071542,
+            "ok": false,
+            "threshold": 0.05
+          },
+          "curve_type": "movement_sine",
+          "handler": "__default__",
+          "base_position": 0.3075,
+          "static_dmx": null,
+          "physics_check": {
+            "speed_ok": true,
+            "acceleration_ok": false,
+            "max_speed_deg_per_sec": 10.775826712011762,
+            "max_accel_deg_per_sec2": 1302.0048591592283,
+            "violations": [
+              "Acceleration 1302.0\u00b0/s\u00b2 exceeds limit 1000.0\u00b0/s\u00b2"
+            ]
+          }
+        },
+        {
+          "role": "OUTER_LEFT",
+          "channel": "dimmer",
+          "space": "dmx",
+          "plot_path": "evaluations/2026-11-12-claude-baseline-live-run/plots/bridge_segwinddown__OUTER_LEFT__dimmer.png",
+          "stats": {
+            "min": 0.1,
+            "max": 0.39317630108542284,
+            "range": 0.2931763010854228,
+            "mean": 0.21817813200897954,
+            "std": 0.08512322586382758,
+            "clamp_pct": 0.0,
+            "energy": 0.0017295405506638079
+          },
+          "continuity": {
+            "loop_delta": 0.15593969770667365,
+            "ok": true,
+            "threshold": 0.05
+          },
+          "curve_type": "linear",
+          "handler": "__default__",
+          "base_position": null,
+          "static_dmx": null,
+          "physics_check": null
+        }
+      ],
+      "flags": [
+        {
+          "level": "info",
+          "code": "LIMITED_RANGE",
+          "message": "Curve has limited range: 0.089",
+          "details": {
+            "range": 0.0889730308135202
+          }
+        },
+        {
+          "level": "error",
+          "code": "PHYSICS_VIOLATION",
+          "message": "Acceleration 1302.0\u00b0/s\u00b2 exceeds limit 1000.0\u00b0/s\u00b2",
+          "details": {
+            "channel": "tilt",
+            "max_speed": 10.775826712011762,
+            "max_accel": 1302.0048591592283
+          }
+        },
+        {
+          "level": "warning",
+          "code": "LOOP_DISCONTINUITY",
+          "message": "Loop discontinuity: delta=0.054",
+          "details": {
+            "loop_delta": 0.05357821308071542
+          }
+        }
+      ],
+      "template_compliance": {
+        "template_id": "wave_vertical_spotlight_fade",
+        "curve_type_correct": true,
+        "modifiers_compliant": [],
+        "geometry_correct": true,
+        "overall_compliant": true,
+        "issues": []
+      },
+      "transition_to_next": null,
+      "validation_issues": []
+    }
+  ]
+}

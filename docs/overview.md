@@ -133,8 +133,8 @@ Agent sub-packages:
 
 - `agents/audio/` — audio profiling and lyrics stages
 - `agents/sequencer/` — moving head planner, macro planner, group planner
-- `agents/providers/` — OpenAI and loopback Ollama structured-output adapters, plus the
-  legacy/direct Anthropic adapter
+- `agents/providers/` — OpenAI, Ollama cloud (loopback daemon) and Anthropic Claude
+  structured-output adapters
 - `agents/shared/` — judge, iteration controller, validation
 - `agents/logging/` — LLM call logging for observability
 
@@ -186,9 +186,10 @@ Created by the CLI with explicit configs, or via `TwinklrSession.from_directory(
 ## Constraints and Non-Goals
 
 - **xLights-only output** — Twinklr targets `.xsq` files for xLights. Other lighting control formats are not currently supported.
-- **Structured-output provider scope** — OpenAI is the verified cloud path. Ollama is an
-  opt-in loopback-only adapter whose real-schema smoke is still pending. Legacy/direct
-  Anthropic configuration is not equivalent for registered strict-output roles.
+- **Structured-output provider scope** — OpenAI is the verified strict path. Claude
+  passed its first live end-to-end run on 2026-11-12, but the planner schemas are too
+  large for Claude to enforce server-side, so planner output there is validated
+  client-side only. Ollama cloud's real-schema smoke awaits an owner decision.
 - **No live DMX control** — Twinklr generates sequence effects. Its guarded xLights workflow can inject/regenerate reserved layers in an open sequence, but it is not a real-time lighting controller.
 - **Empirical show acceptance remains open** — the combined `twinklr show` path is
   implemented, but xLights GUI, vision, and human-judgment gates remain deferred until a

@@ -127,7 +127,7 @@ twinklr/
 │   │   ├── agents/              # Multi-agent orchestration
 │   │   │   ├── audio/           # Audio & lyrics profiling agents
 │   │   │   ├── sequencer/       # Planner, group planner agents
-│   │   │   ├── providers/       # OpenAI/Ollama + legacy Anthropic adapters
+│   │   │   ├── providers/       # OpenAI, Ollama and Anthropic (Claude) adapters
 │   │   │   ├── shared/          # Judge, iteration controller
 │   │   │   └── logging/         # LLM call logging
 │   │   ├── audio/               # Audio analysis pipeline
