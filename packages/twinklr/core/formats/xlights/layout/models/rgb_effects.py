@@ -10,14 +10,14 @@ logger = get_logger(__name__)
 class Alias(BaseModel):
     """Alias for a model or modelGroup."""
 
-    model_config = ConfigDict(extra="forbid")  # Only accept known fields
+    model_config = ConfigDict(extra="ignore")
     name: str
 
 
 class AliasesContainer(BaseModel):
     """Container for model aliases."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="ignore")
     alias: list[Alias] | Alias = Field(default_factory=list)
 
 
@@ -136,7 +136,7 @@ class SubModel(BaseModel):
 class Models(BaseModel):
     """Container for all models in the layout."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="ignore")
 
     model: list[Model] = Field(default_factory=list)
     subModel: list[SubModel] = Field(default_factory=list)  # noqa: N815 — xLights XML attribute name
@@ -172,7 +172,7 @@ class ModelGroup(BaseModel):
 class ModelGroups(BaseModel):
     """Container for all model groups."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="ignore")
 
     modelGroup: list[ModelGroup] = Field(default_factory=list)  # noqa: N815 — xLights XML attribute name
 
@@ -219,7 +219,7 @@ class Camera(BaseModel):
 class Viewpoints(BaseModel):
     """Container for camera viewpoints."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="ignore")
 
     DefaultCamera2D: Camera | None = None
     DefaultCamera3D: Camera | None = None
@@ -231,7 +231,7 @@ class Layout(BaseModel):
     Only parses known sections. Unknown XML elements are ignored.
     """
 
-    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
 
     # Only parse what we have models for
     models: Models | None = None

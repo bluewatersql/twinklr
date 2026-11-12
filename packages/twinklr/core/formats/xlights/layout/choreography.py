@@ -55,6 +55,28 @@ def _active(model: Model) -> bool:
     return str((model.model_extra or {}).get("Active", "1")) != "0"
 
 
+def _dmx_model_names(models: list[Model]) -> set[str]:
+    """Names of models that drive DMX fixtures and must never take a pixel effect.
+
+    That is every `Dmx*` model (moving heads, foggers, snow machines) and every
+    "shadow" model whose start channel is chained to one, such as a single-line model
+    laid over a moving head's pan channel. A pixel effect on any of them writes
+    arbitrary values to a fixture channel.
+    """
+    dmx = {model.name for model in models if (model.DisplayAs or "").lower().startswith("dmx")}
+    changed = True
+    while changed:
+        changed = False
+        for model in models:
+            if model.name in dmx:
+                continue
+            start = model.StartChannel or ""
+            if start.startswith("@") and start[1:].rsplit(":", 1)[0] in dmx:
+                dmx.add(model.name)
+                changed = True
+    return dmx
+
+
 def _float(model: Model, name: str) -> float:
     raw = getattr(model, name, None)
     if raw is None or raw == "":
@@ -194,12 +216,18 @@ def layout_to_choreography(
     layout: Layout,
     *,
     graph_id: str = "xlights_layout",
+    fixture_groups: frozenset[str] = frozenset(),
 ) -> tuple[ChoreographyGraph, XLightsMapping]:
     """Create graph/mapping from explicit groups plus active ungrouped models.
 
     Group membership is resolved recursively and strictly: cycles and unknown names
     fail before planning. An active model claimed by any group is not duplicated as a
     standalone target.
+
+    DMX fixtures and the models laid over their channels are never display targets.
+    A layout group named in ``fixture_groups`` is the exception: it keeps its DMX
+    members and stays in the graph, so the combined show can hand it to the
+    moving-head renderer.
     """
     raw_models = layout.models.model if layout.models else []
     duplicate_model_names = sorted(
@@ -209,9 +237,19 @@ def layout_to_choreography(
         raise ValueError(
             f"xLights layout contains duplicate raw model names: {duplicate_model_names}"
         )
-    active_models = [model for model in raw_models if _active(model)]
-    inactive_model_names = {model.name for model in raw_models if not _active(model)}
+    dmx_model_names = _dmx_model_names(raw_models)
+    active_models = [
+        model for model in raw_models if _active(model) and model.name not in dmx_model_names
+    ]
+    inactive_model_names = {
+        model.name for model in raw_models if not _active(model) or model.name in dmx_model_names
+    }
     model_by_name = {model.name: model for model in active_models}
+    dmx_by_name = {
+        model.name: model
+        for model in raw_models
+        if _active(model) and model.name in dmx_model_names
+    }
     raw_groups = layout.modelGroups.modelGroup if layout.modelGroups else []
     group_by_name = {group.name: group for group in raw_groups}
     if len(group_by_name) != len(raw_groups):
@@ -235,6 +273,8 @@ def layout_to_choreography(
             base = member.split("/", 1)[0]
             if base in model_by_name:
                 candidates = [model_by_name[base]]
+            elif base in dmx_by_name and (stack or (name,))[0] in fixture_groups:
+                candidates = [dmx_by_name[base]]
             elif base in inactive_model_names:
                 candidates = []
             elif base in group_by_name:
@@ -263,10 +303,11 @@ def layout_to_choreography(
     if not resolved_groups:
         raise ValueError("xLights layout contains no targetable models")
 
+    placed_models = [model for _, members, _ in resolved_groups for model in members]
     axis_bounds = tuple(
         (
-            min(_float(model, axis) for model in active_models),
-            max(_float(model, axis) for model in active_models),
+            min(_float(model, axis) for model in placed_models),
+            max(_float(model, axis) for model in placed_models),
         )
         for axis in ("WorldPosX", "WorldPosY", "WorldPosZ")
     )
@@ -314,6 +355,43 @@ def layout_to_choreography(
                 choreo_id=group_id,
                 group_name=group_name,
                 model_names=[] if group_name is not None else [members[0].name],
+            )
+        )
+
+    # A plan may target a whole zone ("ROOF", "YARD"). Map each zone to the layout
+    # group that covers it: a group named for the zone if there is one, else one of
+    # the zone's own groups, in both cases the widest. Without an entry the zone id
+    # itself was written into the sequence as an element name that exists in no layout.
+    entry_by_id = {entry.choreo_id: entry for entry in mapping_entries}
+    group_by_id = {graph_group.id: graph_group for graph_group in graph_groups}
+    zone_ids = sorted({tag.value for graph_group in graph_groups for tag in graph_group.tags})
+    for zone_id in zone_ids:
+        if zone_id in entry_by_id:
+            continue
+        named = [
+            group_by_id[entry.choreo_id]
+            for entry in mapping_entries
+            if zone_id.lower() in (entry.group_name or "").lower()
+        ]
+        tagged = [
+            graph_group
+            for graph_group in graph_groups
+            if any(tag.value == zone_id for tag in graph_group.tags)
+        ]
+        candidates = named or tagged
+        most = max(item.fixture_count for item in candidates)
+        # Among the groups that cover nearly the whole zone, the plainest name wins,
+        # so "02 - ALL House" is chosen over "02z - ALL House (Background)".
+        widest = min(
+            (item for item in candidates if item.fixture_count >= 0.9 * most),
+            key=lambda item: (len(entry_by_id[item.id].group_name or item.id), item.id),
+        )
+        source = entry_by_id[widest.id]
+        mapping_entries.append(
+            XLightsGroupMapping(
+                choreo_id=zone_id,
+                group_name=source.group_name,
+                model_names=list(source.model_names),
             )
         )
 

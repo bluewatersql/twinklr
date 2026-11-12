@@ -107,3 +107,29 @@ class TestAudioAnalyzerReturnsSongBundle:
         assert result.lyrics.stage_status == StageStatus.SKIPPED
         # Phonemes not yet implemented
         assert result.phonemes is None
+
+
+@pytest.mark.asyncio
+async def test_cached_bundle_reports_the_path_of_this_run(
+    app_config, job_config, mock_process_audio
+) -> None:
+    """The cache is keyed by content. A bundle stored for the same audio at another
+    path used to keep that path, so the emitted sequence named audio xLights could
+    not open."""
+    analyzer = AudioAnalyzer(app_config, job_config)
+    with (
+        patch.object(analyzer, "_process_audio", return_value=mock_process_audio),
+        patch("twinklr.core.audio.analyzer.load_audio_features_async", return_value=None),
+        patch("twinklr.core.audio.analyzer.save_audio_features_async"),
+    ):
+        stored = await analyzer.analyze("first/place/song.mp3")
+    assert stored.audio_path == "first/place/song.mp3"
+
+    with (
+        patch("twinklr.core.audio.analyzer.load_audio_features_async", return_value=stored),
+        patch("twinklr.core.audio.analyzer.stem_result_matches_config", return_value=True),
+    ):
+        reused = await analyzer.analyze("show/folder/song.mp3")
+
+    assert reused.audio_path == "show/folder/song.mp3"
+    assert reused.features == stored.features

@@ -143,7 +143,11 @@ def prepare_combined_show_pipeline(
 
     layout = load_layout(layout_path)
     validate_fixture_ownership(layout, fixture_group)
-    graph, mapping = layout_to_choreography(layout, graph_id=f"{song_name}_show")
+    graph, mapping = layout_to_choreography(
+        layout,
+        graph_id=f"{song_name}_show",
+        fixture_groups=frozenset({fixture_group.xlights_group or ""}),
+    )
     matching = [
         entry for entry in mapping.entries if entry.group_name == fixture_group.xlights_group
     ]

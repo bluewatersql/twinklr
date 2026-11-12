@@ -221,6 +221,11 @@ class AudioAnalyzer:
                     )
 
                 logger.debug("Using cached SongBundle")
+                # The cache is keyed by content, so the bundle may have been stored
+                # for the same audio at another path. Report the path of this run:
+                # the emitted sequence names its media by it.
+                if cached_bundle.audio_path != audio_path:
+                    cached_bundle = cached_bundle.model_copy(update={"audio_path": audio_path})
                 return cached_bundle
 
         start_time_ms = time.perf_counter() * 1000

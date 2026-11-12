@@ -184,3 +184,102 @@ def test_model_and_group_raw_name_intersection_is_rejected() -> None:
     )
     with pytest.raises(ValueError, match="used by both a model and model group"):
         layout_to_choreography(layout)
+
+
+def test_layout_written_by_xlights_2026_loads(tmp_path: Path) -> None:
+    """xLights 2026 stamps `type="rgb_effects"` on the `models` and `modelGroups`
+    containers. Rejecting unknown container attributes made every layout saved by a
+    current xLights unloadable, so `twinklr display` could not start."""
+    layout_file = tmp_path / "xlights_rgbeffects.xml"
+    layout_file.write_text(
+        """<?xml version="1.0" encoding="UTF-8"?>
+<xrgb>
+  <models type="rgb_effects">
+    <model name="Arch 1" DisplayAs="Arches" parm1="1" parm2="50" WorldPosX="0" WorldPosY="0"/>
+    <model name="Arch 2" DisplayAs="Arches" parm1="1" parm2="50" WorldPosX="50" WorldPosY="0"/>
+  </models>
+  <modelGroups type="rgb_effects">
+    <modelGroup name="61 - Arches" models="Arch 1,Arch 2" LayoutGroup="Default"/>
+  </modelGroups>
+</xrgb>
+""",
+        encoding="utf-8",
+    )
+
+    layout = load_layout(layout_file)
+
+    assert layout.models is not None
+    assert [model.name for model in layout.models.model] == ["Arch 1", "Arch 2"]
+    assert layout.modelGroups is not None
+    assert layout.modelGroups.modelGroup[0].get_model_list() == ["Arch 1", "Arch 2"]
+
+
+def _model(name: str, display_as: str = "Single Line", **extra: str) -> Model:
+    return Model.model_validate({"name": name, "DisplayAs": display_as, **extra})
+
+
+def test_dmx_fixtures_and_their_shadow_models_are_not_display_targets() -> None:
+    """A pixel effect on a moving head, a fogger, or a model laid over a fixture's
+    channels writes arbitrary values to that fixture."""
+    layout = Layout(
+        models=Models(
+            model=[
+                _model("Arch 1", "Arches"),
+                _model("Dmx MH1", "DmxMovingHeadAdv"),
+                _model("Dmx Fogger", "DmxGeneral"),
+                _model("DMX MH Pan", StartChannel="@Dmx MH1:11"),
+            ]
+        ),
+        modelGroups=ModelGroups(
+            modelGroup=[
+                ModelGroup(name="90 - Moving Heads", models="Dmx MH1"),
+                ModelGroup(name="Everything", models="Arch 1,Dmx MH1,Dmx Fogger"),
+            ]
+        ),
+    )
+
+    graph, mapping = layout_to_choreography(layout)
+
+    assert [group.id for group in graph.groups] == ["EVERYTHING"]
+    assert graph.groups[0].fixture_count == 1
+    assert not mapping.has_entry("DMX_MH_PAN")
+
+
+def test_zone_targets_resolve_to_a_real_layout_group() -> None:
+    """A plan that targets the YARD zone used to emit an element literally named
+    "YARD", which no layout contains."""
+    layout = Layout(
+        models=Models(
+            model=[_model("Arch 1", "Arches"), _model("Arch 2", "Arches"), _model("Stake 1")]
+        ),
+        modelGroups=ModelGroups(
+            modelGroup=[
+                ModelGroup(name="61 - Arches", models="Arch 1,Arch 2"),
+                ModelGroup(name="14 - ALL Yard", models="Arch 1,Arch 2,Stake 1"),
+                ModelGroup(name="14z - ALL Yard (Background)", models="Arch 1,Arch 2,Stake 1"),
+            ]
+        ),
+    )
+
+    _, mapping = layout_to_choreography(layout)
+
+    assert mapping.resolve("YARD") == ["14 - ALL Yard"]
+
+
+def test_a_named_fixture_group_keeps_its_dmx_members() -> None:
+    """The combined show hands the dedicated moving-head group to the moving-head
+    renderer, so that one group stays in the graph."""
+    layout = Layout(
+        models=Models(model=[_model("Arch 1", "Arches"), _model("Dmx MH1", "DmxMovingHeadAdv")]),
+        modelGroups=ModelGroups(
+            modelGroup=[
+                ModelGroup(name="90 - Moving Heads", models="Dmx MH1"),
+                ModelGroup(name="90b - Moving Heads Left", models="Dmx MH1"),
+            ]
+        ),
+    )
+
+    graph, mapping = layout_to_choreography(layout, fixture_groups=frozenset({"90 - Moving Heads"}))
+
+    assert [group.id for group in graph.groups] == ["GROUP_90_MOVING_HEADS", "ARCH_1"]
+    assert mapping.resolve("GROUP_90_MOVING_HEADS") == ["90 - Moving Heads"]
