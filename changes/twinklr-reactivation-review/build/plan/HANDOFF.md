@@ -73,6 +73,15 @@ older entries remain as dated audit history.
     - The strict loader now names the overlay, counts every missing file and lists the
       first 10.
   - **P4-T2 Ollama cloud:** live cloud requests are approved until the path works.
+    **Working as of 2026-11-12.** A full `twinklr run` with every role on
+    `glm-5.3:cloud` passed 6/6 stages at `9766a84`.
+    - The macro and moving-head plans passed on their second iteration; the judges
+      approved at 7.4 and 8.2. There were 0 schema repairs.
+    - Metrics are on par with the baseline: 256 effects placed against 262, and 651
+      value-curve channels against 622.
+    - [Evidence](../../evidence/2026-11-12-p4-t2-ollama-cloud-pipeline/README.md).
+    - The bare one-request smoke (no prompt pack, no repair) was not rerun. Whether this
+      runner-level pass closes the P4-T2 exit is the owner's call.
   - **Evidence logs:** stay gitignored. No `.gitignore` exception.
   - Review item m5 is done: the docs and context no longer call Anthropic legacy.
 
