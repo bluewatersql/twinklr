@@ -12,11 +12,15 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from twinklr.core.agents.issues import Issue, IssueCategory
 
 logger = logging.getLogger(__name__)
+
+# Issue fields retired by P2P-T1's strict plan schema v2 (7bf495a). Records stored
+# before then still carry them; judge responses never may.
+_RETIRED_ISSUE_FIELDS = ("estimated_effort", "scope", "suggested_action")
 
 
 class IssueRecord(BaseModel):
@@ -43,6 +47,17 @@ class IssueRecord(BaseModel):
     resolved: bool = Field(default=False, description="Resolved in next iteration")
 
     model_config = ConfigDict(frozen=True)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _upgrade_pre_v2_issue(cls, value: object) -> object:
+        """Drop retired issue fields so history stored before schema v2 still loads."""
+        if not isinstance(value, dict) or not isinstance(value.get("issue"), dict):
+            return value
+        issue = {
+            key: field for key, field in value["issue"].items() if key not in _RETIRED_ISSUE_FIELDS
+        }
+        return {**value, "issue": issue}
 
 
 class IssueRepository:

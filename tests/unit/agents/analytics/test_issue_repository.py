@@ -433,3 +433,47 @@ def test_empty_issues_list(repository):
 
     # No file should be created
     assert not (repository.storage_dir / "test_judge_issues.jsonl").exists()
+
+
+def _stored_record(issue: Issue, **issue_extras: str) -> str:
+    record = IssueRecord(
+        issue=issue,
+        agent_name="macro_judge",
+        job_id="job",
+        iteration=0,
+        verdict_score=6.0,
+        timestamp=time.time(),
+    ).model_dump(mode="json")
+    record["issue"].update(issue_extras)
+    return json.dumps(record)
+
+
+def test_records_written_before_schema_v2_are_still_read(repository, sample_issue, temp_storage):
+    """P2P-T1 retired three issue fields; stored history must keep loading."""
+    (temp_storage / "macro_judge_issues.jsonl").write_text(
+        _stored_record(
+            sample_issue, estimated_effort="MEDIUM", scope="GLOBAL", suggested_action="RETRY"
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    top = repository.get_top_issues("macro_judge")
+
+    assert [(category, count) for category, count, _ in top] == [(IssueCategory.VARIETY, 1)]
+
+
+def test_unknown_issue_fields_in_stored_records_are_still_rejected(
+    repository, sample_issue, temp_storage
+):
+    (temp_storage / "macro_judge_issues.jsonl").write_text(
+        _stored_record(sample_issue, invented_field="x") + "\n", encoding="utf-8"
+    )
+
+    assert repository.get_top_issues("macro_judge") == []
+
+
+def test_live_issues_still_reject_retired_fields(sample_issue):
+    """Judge responses stay strict; only stored records are upgraded."""
+    with pytest.raises(ValueError):
+        Issue.model_validate({**sample_issue.model_dump(), "scope": "GLOBAL"})
