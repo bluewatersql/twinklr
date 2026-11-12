@@ -742,3 +742,129 @@ def test_factory_rejects_non_anthropic_key_for_anthropic_provider() -> None:
     with pytest.raises(ValueError, match="sk-ant"):
         validate_llm_provider_config(AppConfig(llm_provider="anthropic", llm_api_key="sk-openai"))
     validate_llm_provider_config(AppConfig(llm_provider="anthropic", llm_api_key="sk-ant-x"))
+
+
+def _grammar_rejection(
+    message: str = "The compiled grammar is too large, which would cause performance issues.",
+) -> Exception:
+    import anthropic
+    import httpx
+
+    request = httpx.Request("POST", "https://api.anthropic.com/v1/messages")
+    return anthropic.BadRequestError(
+        message,
+        response=httpx.Response(400, request=request),
+        body={"type": "error", "error": {"type": "invalid_request_error", "message": message}},
+    )
+
+
+def _structured_result_model() -> type:
+    from pydantic import BaseModel, ConfigDict
+
+    class Result(BaseModel):
+        model_config = ConfigDict(extra="forbid")
+
+        result: str
+
+    return Result
+
+
+@pytest.mark.asyncio
+async def test_schema_too_complex_is_resent_prompt_only_and_remembered(
+    mock_anthropic_clients: dict,
+) -> None:
+    """A grammar-size 400 resends once without the schema; later calls skip the 400."""
+    provider = _make_provider(mock_anthropic_clients)
+    stream = mock_anthropic_clients["async_client"].messages.stream
+    stream.side_effect = [_grammar_rejection(), stream.return_value, stream.return_value]
+    mock_anthropic_clients["async_msg"].content[0].text = '```json\n{"result": "ok"}\n```'
+    model = _structured_result_model()
+    call = {
+        "messages": [{"role": "user", "content": "test"}],
+        "model": "claude-opus-5-5",
+        "response_model": model,
+        "reasoning_effort": "high",
+    }
+
+    first = await provider.generate_json_async(**call)
+
+    assert stream.call_count == 2
+    assert "format" in stream.call_args_list[0].kwargs["output_config"]
+    assert stream.call_args_list[1].kwargs["output_config"] == {"effort": "high"}
+    assert first.content == {"result": "ok"}
+    assert first.metadata.structured_output_mode == "prompt_schema"
+    assert first.metadata.structured_output_fallback_reason == "schema_too_complex"
+
+    second = await provider.generate_json_async(**call)
+
+    assert stream.call_count == 3
+    assert stream.call_args_list[2].kwargs["output_config"] == {"effort": "high"}
+    assert second.metadata.structured_output_mode == "prompt_schema"
+
+
+def test_schema_too_complex_fallback_on_sync_path(mock_anthropic_clients: dict) -> None:
+    provider = _make_provider(mock_anthropic_clients)
+    stream = mock_anthropic_clients["sync_client"].messages.stream
+    stream.side_effect = [
+        _grammar_rejection("Schema is too complex for compilation."),
+        stream.return_value,
+    ]
+
+    response = provider.generate_json(
+        messages=[{"role": "user", "content": "test"}],
+        model="claude-opus-5-5",
+        response_model=_structured_result_model(),
+    )
+
+    assert stream.call_count == 2
+    assert "output_config" not in stream.call_args_list[1].kwargs
+    assert response.metadata.structured_output_mode == "prompt_schema"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("error", "allow_fallback"),
+    [
+        (_grammar_rejection(), False),
+        (_grammar_rejection("messages: roles must alternate"), True),
+    ],
+    ids=("fallback-disabled", "unrelated-400"),
+)
+async def test_other_rejections_are_not_resent(
+    mock_anthropic_clients: dict, error: Exception, allow_fallback: bool
+) -> None:
+    provider = _make_provider(mock_anthropic_clients)
+    stream = mock_anthropic_clients["async_client"].messages.stream
+    stream.side_effect = error
+
+    with pytest.raises(LLMProviderError, match="Provider error"):
+        await provider.generate_json_async(
+            messages=[{"role": "user", "content": "test"}],
+            model="claude-opus-5-5",
+            response_model=_structured_result_model(),
+            allow_json_object_fallback=allow_fallback,
+        )
+
+    assert stream.call_count == 1
+
+
+@pytest.mark.asyncio
+async def test_async_runner_forwards_fallback_switch_to_anthropic(
+    mock_anthropic_clients: dict, tmp_path: Path
+) -> None:
+    provider = _make_provider(mock_anthropic_clients)
+    stream = mock_anthropic_clients["async_client"].messages.stream
+    stream.side_effect = _grammar_rejection()
+    runner = AsyncAgentRunner(provider=provider, prompt_base_path=tmp_path)
+    spec = AgentSpec(
+        name="anthropic-test",
+        prompt_pack="unused",
+        response_model=_structured_result_model(),
+        model="claude-opus-5-5",
+        allow_json_object_fallback=False,
+    )
+
+    with pytest.raises(LLMProviderError):
+        await runner._call_oneshot_async(spec, [{"role": "user", "content": "test"}])
+
+    assert stream.call_count == 1

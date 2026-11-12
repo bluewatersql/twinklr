@@ -20,6 +20,7 @@ from twinklr.core.agents.providers.base import (
     ProviderType,
     ResponseMetadata,
     TokenUsage,
+    unwrap_whole_response_fence,
 )
 from twinklr.core.agents.providers.conversation import Conversation
 from twinklr.core.agents.providers.errors import LLMProviderError, RecoverableLLMProviderError
@@ -69,6 +70,15 @@ _SERVER_SIDE_FALLBACK_MODELS = frozenset(
     {"claude-fable-5-1", "claude-opus-5-5", "claude-opus-5", "claude-sonnet-5-5"}
 )
 _SERVER_SIDE_FALLBACK_BETA = "server-side-fallback-2026-07-01"
+
+# Claude compiles each output schema into a grammar and rejects one that is too
+# large with HTTP 400 before generating anything.  Every planner schema hits this
+# (live probe 2026-11-12), so such requests are resent with the schema carried
+# only by the prompt, which the runner validates and repairs like any response.
+_SCHEMA_COMPLEXITY_REJECTION_MARKERS = (
+    "compiled grammar is too large",
+    "schema is too complex",
+)
 
 
 def claude_json_schema(model: type[BaseModel]) -> dict[str, Any]:
@@ -156,6 +166,8 @@ class AnthropicProvider:
 
         # Conversation state
         self._conversations: dict[str, Conversation] = {}
+        # Hashes of schemas Claude refused to compile; later requests skip the 400.
+        self._prompt_only_schema_hashes: set[str] = set()
 
     async def aclose(self) -> None:
         """Close the underlying Anthropic HTTP clients and their connection pools."""
@@ -335,13 +347,19 @@ class AnthropicProvider:
         model: str,
         temperature: float | None,
         kwargs: dict[str, Any],
-    ) -> tuple[dict[str, Any], type[BaseModel] | None]:
-        """Translate Twinklr's portable request options into a Messages request."""
+    ) -> tuple[dict[str, Any], type[BaseModel] | None, bool]:
+        """Translate Twinklr's portable request options into a Messages request.
+
+        Returns the request, the response model, and whether a schema Claude
+        refuses to compile may be resent as a prompt-only request.
+        """
         response_model = kwargs.pop("response_model", None)
         if kwargs.pop("input_image_urls", None):
             raise LLMProviderError("Configured provider does not support vision image inputs")
-        # OpenAI-only transport switches; Claude has no json_object fallback mode.
-        kwargs.pop("allow_json_object_fallback", None)
+        allow_prompt_only_fallback = kwargs.pop("allow_json_object_fallback", True)
+        if not isinstance(allow_prompt_only_fallback, bool):
+            raise LLMProviderError("allow_json_object_fallback must be a boolean")
+        # OpenAI-only transport switch.
         kwargs.pop("provider_max_attempts", None)
         reasoning_effort = kwargs.pop("reasoning_effort", None)
         timeout_seconds = kwargs.pop("timeout_seconds", None)
@@ -374,10 +392,12 @@ class AnthropicProvider:
         if response_model is not None:
             if not hasattr(response_model, "model_json_schema"):
                 raise LLMProviderError("response_model must be a Pydantic model class")
-            output_config["format"] = {
-                "type": "json_schema",
-                "schema": claude_json_schema(cast("type[BaseModel]", response_model)),
-            }
+            schema_model = cast("type[BaseModel]", response_model)
+            if response_schema_hash(schema_model) not in self._prompt_only_schema_hashes:
+                output_config["format"] = {
+                    "type": "json_schema",
+                    "schema": claude_json_schema(schema_model),
+                }
         if output_config:
             request_params["output_config"] = output_config
         if timeout_seconds is not None:
@@ -385,10 +405,52 @@ class AnthropicProvider:
         if model in _SERVER_SIDE_FALLBACK_MODELS:
             request_params["extra_headers"] = {"anthropic-beta": _SERVER_SIDE_FALLBACK_BETA}
             request_params["extra_body"] = {"fallbacks": "default"}
-        return request_params, cast("type[BaseModel] | None", response_model)
+        return (
+            request_params,
+            cast("type[BaseModel] | None", response_model),
+            allow_prompt_only_fallback,
+        )
+
+    def _prompt_only_request(
+        self,
+        request_params: dict[str, Any],
+        response_model: type[BaseModel] | None,
+        allow_prompt_only_fallback: bool,
+        error: Exception,
+    ) -> dict[str, Any] | None:
+        """Return the request without a schema Claude refused to compile, if allowed."""
+        output_config = request_params.get("output_config", {})
+        if (
+            response_model is None
+            or not allow_prompt_only_fallback
+            or "format" not in output_config
+            or getattr(error, "status_code", None) != 400
+        ):
+            return None
+        text = str(error).lower()
+        if not any(marker in text for marker in _SCHEMA_COMPLEXITY_REJECTION_MARKERS):
+            return None
+        logger.warning(
+            "Claude rejected the %s schema as too complex to compile; "
+            "resending with the schema carried only by the prompt: %s",
+            response_model.__name__,
+            error,
+        )
+        self._prompt_only_schema_hashes.add(response_schema_hash(response_model))
+        retry_params = {
+            key: value for key, value in request_params.items() if key != "output_config"
+        }
+        retry_config = {key: value for key, value in output_config.items() if key != "format"}
+        if retry_config:
+            retry_params["output_config"] = retry_config
+        return retry_params
 
     def _parse_message(
-        self, response: Any, model: str, response_model: type[BaseModel] | None
+        self,
+        response: Any,
+        model: str,
+        response_model: type[BaseModel] | None,
+        request_params: dict[str, Any],
     ) -> LLMResponse:
         """Classify the stop reason, account usage, and parse the JSON text."""
         token_usage = self._extract_token_usage(response)
@@ -411,7 +473,8 @@ class AnthropicProvider:
                 token_usage=token_usage,
             )
 
-        text = self._response_text(response)
+        # A prompt-only response may arrive wrapped in a Markdown fence.
+        text = unwrap_whole_response_fence(self._response_text(response))
         if not text.strip():
             raise RecoverableLLMProviderError(
                 reason="empty_response",
@@ -438,12 +501,28 @@ class AnthropicProvider:
                 actual_model_present=isinstance(actual_model, str),
                 token_usage_is_explicit=getattr(response, "usage", None) is not None,
                 finish_reason=stop_reason if isinstance(stop_reason, str) else None,
-                structured_output_mode="json_schema" if response_model is not None else None,
+                structured_output_mode=self._structured_output_mode(request_params, response_model),
+                structured_output_fallback_reason=(
+                    "schema_too_complex"
+                    if response_model is not None
+                    and response_schema_hash(response_model) in self._prompt_only_schema_hashes
+                    else None
+                ),
                 response_schema_hash=(
                     response_schema_hash(response_model) if response_model is not None else None
                 ),
             ),
         )
+
+    @staticmethod
+    def _structured_output_mode(
+        request_params: dict[str, Any], response_model: type[BaseModel] | None
+    ) -> str | None:
+        if response_model is None:
+            return None
+        if "format" in request_params.get("output_config", {}):
+            return "json_schema"
+        return "prompt_schema"
 
     # =========================================================================
     # Sync Methods
@@ -474,19 +553,31 @@ class AnthropicProvider:
             LLMProviderError: On API errors or JSON parse failures.
         """
         try:
-            request_params, response_model = self._build_request(
+            request_params, response_model, allow_fallback = self._build_request(
                 messages, model, temperature, kwargs
             )
-            # Streaming keeps large max_tokens requests inside HTTP timeouts.
-            with self._sync_client.messages.stream(**request_params) as stream:
-                response = stream.get_final_message()
-            return self._parse_message(response, model, response_model)
+            try:
+                response = self._stream_sync(request_params)
+            except Exception as exc:
+                retry_params = self._prompt_only_request(
+                    request_params, response_model, allow_fallback, exc
+                )
+                if retry_params is None:
+                    raise
+                request_params = retry_params
+                response = self._stream_sync(request_params)
+            return self._parse_message(response, model, response_model, request_params)
 
         except LLMProviderError:
             raise
         except Exception as exc:
             logger.error("Anthropic provider error: %s", exc)
             raise LLMProviderError(f"Provider error: {exc}") from exc
+
+    def _stream_sync(self, request_params: dict[str, Any]) -> Any:
+        # Streaming keeps large max_tokens requests inside HTTP timeouts.
+        with self._sync_client.messages.stream(**request_params) as stream:
+            return stream.get_final_message()
 
     def generate_json_with_conversation(
         self,
@@ -576,24 +667,36 @@ class AnthropicProvider:
             LLMProviderError: On API errors or JSON parse failures.
         """
         try:
-            request_params, response_model = self._build_request(
+            request_params, response_model, allow_fallback = self._build_request(
                 messages, model, temperature, kwargs
             )
-            # Streaming keeps large max_tokens requests inside HTTP timeouts; the
-            # outer bound keeps timeout_seconds a limit on the whole call, since the
-            # HTTP timeout only bounds each read of a stream that keeps pinging.
-            async with (
-                asyncio.timeout(request_params.get("timeout")),
-                self._async_client.messages.stream(**request_params) as stream,
-            ):
-                response = await stream.get_final_message()
-            return self._parse_message(response, model, response_model)
+            try:
+                response = await self._stream_async(request_params)
+            except Exception as exc:
+                retry_params = self._prompt_only_request(
+                    request_params, response_model, allow_fallback, exc
+                )
+                if retry_params is None:
+                    raise
+                request_params = retry_params
+                response = await self._stream_async(request_params)
+            return self._parse_message(response, model, response_model, request_params)
 
         except LLMProviderError:
             raise
         except Exception as exc:
             logger.error("Async Anthropic provider error: %s", exc)
             raise LLMProviderError(f"Provider error: {exc}") from exc
+
+    async def _stream_async(self, request_params: dict[str, Any]) -> Any:
+        # Streaming keeps large max_tokens requests inside HTTP timeouts; the
+        # outer bound keeps timeout_seconds a limit on the whole call, since the
+        # HTTP timeout only bounds each read of a stream that keeps pinging.
+        async with (
+            asyncio.timeout(request_params.get("timeout")),
+            self._async_client.messages.stream(**request_params) as stream,
+        ):
+            return await stream.get_final_message()
 
     async def generate_json_with_conversation_async(
         self,

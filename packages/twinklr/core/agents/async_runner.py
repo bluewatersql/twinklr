@@ -685,6 +685,7 @@ class AsyncAgentRunner:
             if self.provider.provider_type == ProviderType.ANTHROPIC:
                 # Claude reads effort from output_config.effort; the provider maps it.
                 kwargs["reasoning_effort"] = spec.reasoning_effort
+                kwargs["allow_json_object_fallback"] = spec.allow_json_object_fallback
             if input_image_urls:
                 raise RunError("Configured provider does not support vision image inputs")
         return kwargs

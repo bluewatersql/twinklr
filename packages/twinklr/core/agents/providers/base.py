@@ -4,12 +4,26 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import StrEnum
+import re
 from typing import Any, Literal, Protocol
 
 ImageSize = Literal["auto", "1024x1024", "1024x1536", "1536x1024"]
 ImageQuality = Literal["low", "medium", "high"]
 ImageBackground = Literal["transparent", "opaque", "auto"]
 ImageOutputFormat = Literal["png", "jpeg", "webp"]
+
+# Models answering from a prompt-carried schema often wrap their JSON in a
+# Markdown fence.  Only a fence spanning the whole response is unwrapped;
+# anything else reaches the JSON parser unchanged.
+_WHOLE_RESPONSE_FENCE = re.compile(
+    r"\A\s*```[A-Za-z0-9_+-]*[ \t]*\r?\n(?P<body>.*?)\s*```\s*\Z", re.DOTALL
+)
+
+
+def unwrap_whole_response_fence(text: str) -> str:
+    """Return the body of a Markdown fence that spans the whole response."""
+    match = _WHOLE_RESPONSE_FENCE.match(text)
+    return match.group("body") if match else text
 
 
 class ProviderType(StrEnum):

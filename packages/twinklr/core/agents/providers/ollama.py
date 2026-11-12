@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import re
 from typing import TYPE_CHECKING, Any
 
 from openai import DefaultAsyncHttpxClient
@@ -12,18 +11,12 @@ from twinklr.core.agents.providers.base import (
     LLMResponse,
     ProviderCapabilities,
     ProviderType,
+    unwrap_whole_response_fence,
 )
 from twinklr.core.agents.providers.openai import OpenAIProvider
 
 if TYPE_CHECKING:
     import httpx
-
-# Ollama Cloud does not enforce response_format schemas, and cloud models such as
-# glm-5.3:cloud wrap their JSON in a Markdown fence.  Only a fence spanning the
-# whole response is unwrapped; anything else reaches the JSON parser unchanged.
-_WHOLE_RESPONSE_FENCE = re.compile(
-    r"\A\s*```[A-Za-z0-9_+-]*[ \t]*\r?\n(?P<body>.*?)\s*```\s*\Z", re.DOTALL
-)
 
 
 class OllamaProvider(OpenAIProvider):
@@ -91,8 +84,9 @@ class OllamaProvider(OpenAIProvider):
         content = OpenAIProvider._response_content(response)
         if content is None:
             return None
-        match = _WHOLE_RESPONSE_FENCE.match(content)
-        return match.group("body") if match else content
+        # Ollama Cloud does not enforce response_format schemas, and cloud models
+        # such as glm-5.3:cloud wrap their JSON in a Markdown fence.
+        return unwrap_whole_response_fence(content)
 
     def _window_messages(
         self,
