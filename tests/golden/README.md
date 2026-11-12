@@ -14,9 +14,9 @@ byte of `.xsq`, and the only end-to-end render test patched `compile_template` w
 | `test_xsq_round_trip.py` | `parse → export → parse` over the repo's first tracked `.xsq` |
 | `test_validator_on_golden_render.py` | The existing 587-LOC validator runs against a freshly rendered sequence, including its shutter/colour/gobo channel-map cross-check |
 | `test_blackout_is_black.py` (T2 → flipped in T5) | P4-M2 repaired: both blackout templates emit `E_SLIDER_DMX15=0` under all four presets. Was `test_blackout_full_brightness.py`, pinning the 255 inversion |
-| `test_dimmer_floor_honored.py` (T2 → flipped in T5) | P4-M1 repaired: no non-blackout dimmer curve dips below the template's declared 60-DMX floor; the blackout's exemption is explicit. Was `test_dimmer_floor_dropped.py` |
+| `test_dimmer_template_floor_not_applied.py` (T2 → T5 → reverted 2026-11-12) | P4-M1 reverted: the `breakdown` dimmer reaches its own `min_norm=0.05`, below the template's declared 60-DMX floor; the blackout section is black. Was `test_dimmer_floor_dropped.py`, then `test_dimmer_floor_honored.py` |
 | `test_8head_rig_renders.py` (T2 → flipped in T5) | P4-F26 repaired: the 8-head rig renders every plan section on all eight heads, roles are spatial, and a group the rig cannot fill raises `UnsupportedRigShapeError`. Was `test_8head_role_mismatch.py` |
-| `test_calibrated_movement_range.py` (P1P-T5) | P4-F9: every emitted pan/tilt value stays inside the rig's calibrated window, and a narrow window really does narrow the output |
+| `test_movement_ignores_calibrated_range.py` (P1P-T5 → reverted 2026-11-12) | P4-F9 reverted: the narrowly calibrated rig emits the same pan/tilt curves as the default rig, and its tilt leaves the calibrated window. Was `test_calibrated_movement_range.py` |
 | `test_delivery_artifacts.py` (P1P-T11) | What a real render hands the user: the fresh `.xsq` re-parses through `XSQParser` and names only Twinklr's models, the `.xtiming` markers equal the `.xsq` timing tracks, and the `.xmap` names what was emitted |
 | `test_xlights_acceptance.py` (P1P-T12, **LOCAL-ONLY**, `requires_xlights`) | Whether a real xLights 2026.15 accepts what Twinklr emits — import with/without `xlights_rgbeffects.xml`, version-stamp acceptance, `.xtiming` standalone import, shutter-open output on the >16-channel rig, and the `split_lr_sweep_counter` overlap-clamp probe. See "xLights acceptance (P1P-T12)" below |
 
@@ -39,6 +39,26 @@ The banner at the top of every golden file records both as repaired. When a futu
 Lane-R-shaped fix lands, its corresponding test fails by design: read the diff, confirm
 it is the intended behavioral change, flip the affected pin (rename the file if its name
 now describes the defect rather than the behavior), and regenerate.
+
+## Seven repairs reverted (2026-11-12)
+
+At the owner's request, to restore the look accepted in xLights before the August
+2026 clean-up, seven renderer repairs were reverted and the goldens regenerated:
+
+| Id | Restored behavior |
+|---|---|
+| P4-F9 | Pan/tilt are not squeezed into the rig's calibrated window |
+| P4-F1 | Movement renders SMOOTH unless the step's params set `intensity`; presets do not change movement |
+| P4-M6 | `center_curve` rescales movement curves to full range |
+| P4-M5 | Movement curves close on their start value at t=1.0 (`loop_mode="append"`; `"extend"` removed) |
+| P4-F14 | Phase shift wraps by modulo (reflection removed) |
+| P4-M1 | The template's declared `dimmer_floor_dmx` is not applied; only rig calibration bounds the dimmer |
+| P4-F8 | `DEFAULT_DIMMER_PARAMS` SLOW and FAST carry the SMOOTH values |
+
+Every effect line of every golden changed, because every section moves (P4-M6/P4-M5
+on the pan/tilt curves). `mh4_narrow_calibration` now matches `mh4_minimal` effect for
+effect (P4-F9); the `breakdown` dimmer dips to 0.05 again (P4-M1, P4-F8 under
+`chill`). The banner in every golden file lists the seven.
 
 ## Regenerating
 

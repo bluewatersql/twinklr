@@ -116,20 +116,39 @@ def test_narrative_templates_emit_a_fade_in_and_a_fade_out(template_id: str, bar
 
     FADE_IN rises across its step and FADE_OUT falls across its own; with only the
     middle step scheduled, neither curve existed anywhere in the output.
+
+    `build_drop_recover`'s `build` step chases left to right, so MH2-MH4 read the
+    FADE_IN phase-shifted. Phase shift wraps by modulo (P4-F14 reflection reverted
+    on 2026-11-12), so those heads reach the peak mid-step, drop back to the bottom
+    of the fade and climb again; only the chase lead (MH1, zero offset) rises start
+    to end. Every head still reaches the same peak.
     """
     effects = render_single_section(
         RIGS["mh4_minimal"], template_id=template_id, preset_id="moderate", bars=bars
     )
-    by_step = {effect.step_id: effect for effect in effects}
 
     entry_step = "build" if template_id == "build_drop_recover" else "intro"
     exit_step = "recover" if template_id == "build_drop_recover" else "outro"
 
-    entry = _curve_values(by_step[entry_step].settings, channel=15)
-    exit_ = _curve_values(by_step[exit_step].settings, channel=15)
+    entries = {
+        effect.fixture_id: _curve_values(effect.settings, channel=15)
+        for effect in effects
+        if effect.step_id == entry_step
+    }
+    exits = [
+        _curve_values(effect.settings, channel=15)
+        for effect in effects
+        if effect.step_id == exit_step
+    ]
+    assert entries and exits
 
-    assert entry[-1] > entry[0], "FADE_IN should end brighter than it starts"
-    assert exit_[-1] < exit_[0], "FADE_OUT should end darker than it starts"
+    lead = entries["MH1"]
+    assert lead[-1] > lead[0], "FADE_IN should end brighter than it starts"
+    assert {max(values) for values in entries.values()} == {lead[-1]}, (
+        "every head should reach the FADE_IN peak"
+    )
+    for exit_ in exits:
+        assert exit_[-1] < exit_[0], "FADE_OUT should end darker than it starts"
 
 
 def _curve_values(settings: str, *, channel: int) -> list[float]:

@@ -3,9 +3,11 @@
 P4-M2 is two composing bugs: `_resolve_static_dmx_value` multiplied a value that is
 already DMX by 255, and the missing-intensity fallback substituted the *library
 default's* params for the pattern's own. Together they turned `DimmerType.BLACKOUT`
-into full brightness under every preset but MODERATE. P4-M1 is the template's
-declared anti-flicker floor never reaching the handler at all, and P4-F8's renderer
-half is `DEFAULT_DIMMER_PARAMS` covering only three of the five intensities.
+into full brightness under every preset but MODERATE. P4-M1 applied the template's
+declared anti-flicker floor, and P4-F8's renderer half gave SLOW and FAST their own
+`DEFAULT_DIMMER_PARAMS` values. Both were reverted on 2026-11-12 at the owner's
+request: only the rig calibration bounds the dimmer, and SLOW and FAST carry the
+SMOOTH values.
 """
 
 from __future__ import annotations
@@ -45,9 +47,14 @@ def _generate(
 
 
 def test_default_dimmer_params_covers_all_intensities() -> None:
-    """P4-F8 renderer half: SLOW and FAST were missing, so CHILL and INTENSE plans
-    silently rendered the SMOOTH dimmer."""
+    """Every Intensity has an entry, so a missing key cannot fall back silently."""
     assert set(DEFAULT_DIMMER_PARAMS) == set(Intensity)
+
+
+@pytest.mark.parametrize("intensity", [Intensity.SLOW, Intensity.FAST])
+def test_slow_and_fast_carry_the_smooth_values(intensity: Intensity) -> None:
+    """P4-F8 reverted: SLOW and FAST render the SMOOTH dimmer, the accepted look."""
+    assert DEFAULT_DIMMER_PARAMS[intensity] == DEFAULT_DIMMER_PARAMS[Intensity.SMOOTH]
 
 
 def test_a_missing_library_entry_is_an_error_not_a_silent_substitution(
@@ -88,14 +95,13 @@ def test_blackout_ignores_the_anti_flicker_floor(
 ) -> None:
     """The floor's documented exception, exercised explicitly rather than by luck.
 
-    Every template declares a 60-DMX floor; a blackout that respected it would sit
-    at 60 instead of black.
+    A rig calibrated with a 60-DMX floor must still let a blackout reach black.
     """
     result = _generate(
         handler,
         DimmerType.BLACKOUT,
         intensity,
-        template_defaults={"dimmer_floor_dmx": 60, "dimmer_ceiling_dmx": 255},
+        calibration={"dimmer_floor_dmx": 60, "dimmer_ceiling_dmx": 255},
     )
 
     assert result.dimmer_static_dmx == 0
@@ -110,21 +116,20 @@ def test_hold_dimmer_still_full_at_smooth(handler: DefaultDimmerHandler) -> None
     assert result.dimmer_static_dmx == 255
 
 
-def test_template_floor_reaches_the_dimmer_clamp(handler: DefaultDimmerHandler) -> None:
-    """P4-M1: `Template.defaults` is read by the compile context and lands here."""
+def test_template_floor_does_not_lift_the_dimmer_clamp(handler: DefaultDimmerHandler) -> None:
+    """P4-M1 reverted: the template's declared floor and ceiling are not applied."""
     result = _generate(
         handler,
         DimmerType.PULSE,
         Intensity.SMOOTH,
-        template_defaults={"dimmer_floor_dmx": 60, "dimmer_ceiling_dmx": 255},
+        template_defaults={"dimmer_floor_dmx": 60, "dimmer_ceiling_dmx": 240},
     )
 
-    assert result.clamp_min_dmx == 60
-    assert result.clamp_max_dmx == 255
+    assert (result.clamp_min_dmx, result.clamp_max_dmx) == (0, 255)
 
 
-def test_rig_calibration_and_template_floor_compose(handler: DefaultDimmerHandler) -> None:
-    """Both are bounds: the tighter of each wins, rather than one overwriting the other."""
+def test_rig_calibration_alone_bounds_the_dimmer(handler: DefaultDimmerHandler) -> None:
+    """With both declared, the rig calibration decides and the template is ignored."""
     result = _generate(
         handler,
         DimmerType.PULSE,
@@ -133,7 +138,7 @@ def test_rig_calibration_and_template_floor_compose(handler: DefaultDimmerHandle
         calibration={"dimmer_floor_dmx": 20, "dimmer_ceiling_dmx": 200},
     )
 
-    assert (result.clamp_min_dmx, result.clamp_max_dmx) == (60, 200)
+    assert (result.clamp_min_dmx, result.clamp_max_dmx) == (20, 200)
 
 
 def test_missing_floor_leaves_the_full_range(handler: DefaultDimmerHandler) -> None:
@@ -160,8 +165,8 @@ def test_fade_out_descends_and_fade_in_rises() -> None:
 def test_pattern_without_its_own_table_uses_the_library_entry_for_that_intensity(
     handler: DefaultDimmerHandler, intensity: Intensity
 ) -> None:
-    """PULSE declares no categorical params, so every intensity now resolves to its
-    own library entry instead of collapsing onto SMOOTH."""
+    """PULSE declares no categorical params, so every intensity resolves to its own
+    library entry (for SLOW and FAST that entry carries the SMOOTH values)."""
     result = _generate(handler, DimmerType.PULSE, intensity)
 
     assert result.max_intensity == DEFAULT_DIMMER_PARAMS[intensity].max_intensity

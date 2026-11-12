@@ -178,19 +178,6 @@ def test_removed_config_path_is_absent_from_public_schema(config_path: str) -> N
             {
                 "group_id": "heads",
                 "base_config": {
-                    "dmx_mapping": {
-                        "pan_channel": {"channel": 1, "config": {"channel_min": 10}},
-                        "tilt_channel": 2,
-                        "dimmer_channel": 3,
-                    }
-                },
-            },
-            "config",
-        ),
-        (
-            {
-                "group_id": "heads",
-                "base_config": {
                     "orientation": {"tilt_up_dmx": 112},
                     "dmx_mapping": {"pan_channel": 1, "tilt_channel": 2, "dimmer_channel": 3},
                 },
@@ -199,10 +186,29 @@ def test_removed_config_path_is_absent_from_public_schema(config_path: str) -> N
         ),
     ),
 )
-def test_retired_fixture_config_fails_loudly_with_migration_message(
-    payload: dict[str, object], retired_key: str
+def test_retired_fixture_config_loads_with_a_warning(
+    payload: dict[str, object], retired_key: str, caplog: pytest.LogCaptureFixture
 ) -> None:
-    with pytest.raises(ValidationError, match=rf"{retired_key}.*removed|removed.*{retired_key}"):
+    """Rig files written before 2026-08 still load; the retired key is named, not fatal."""
+    with caplog.at_level("WARNING"):
+        group = FixtureGroup.model_validate(payload)
+
+    assert group.group_id == "heads"
+    assert retired_key in caplog.text
+
+
+def test_retired_channel_config_wrapper_still_fails_loudly() -> None:
+    payload = {
+        "group_id": "heads",
+        "base_config": {
+            "dmx_mapping": {
+                "pan_channel": {"channel": 1, "config": {"channel_min": 10}},
+                "tilt_channel": 2,
+                "dimmer_channel": 3,
+            }
+        },
+    }
+    with pytest.raises(ValidationError, match=r"config.*removed|removed.*config"):
         FixtureGroup.model_validate(payload)
 
 

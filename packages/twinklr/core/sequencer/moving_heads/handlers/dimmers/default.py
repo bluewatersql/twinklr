@@ -195,31 +195,24 @@ class DefaultDimmerHandler:
         return fallback
 
     def _resolve_dimmer_bounds(self, params: dict[str, Any], pattern: Any) -> tuple[int, int]:
-        """Combine the template's declared dimmer bounds with the rig's calibration.
+        """Resolve the dimmer floor and ceiling from the rig's calibration.
 
-        The template declares an anti-flicker floor (`defaults["dimmer_floor_dmx"]`,
-        60 on every shipped template) which nothing used to read; the rig declares a
-        physical floor/ceiling. Both are lower/upper bounds, so the effective floor
-        is the higher of the two and the effective ceiling the lower.
+        Templates also declare `defaults["dimmer_floor_dmx"]` (60 on every shipped
+        template). It is not applied: lifting every dimmer curve onto that floor
+        (P4-M1) brightened the dim end of most templates, so it was reverted on
+        2026-11-12 to restore the look the owner accepted in xLights.
 
         Args:
-            params: Handler params, carrying `calibration` and `template_defaults`.
+            params: Handler params, carrying `calibration`.
             pattern: The dimmer pattern (a blackout is exempt from the floor).
 
         Returns:
             (floor_dmx, ceiling_dmx).
         """
         calibration = params.get("calibration") or {}
-        template_defaults = params.get("template_defaults") or {}
 
-        floor = max(
-            int(calibration.get("dimmer_floor_dmx", 0) or 0),
-            int(template_defaults.get("dimmer_floor_dmx", 0) or 0),
-        )
-        ceiling = min(
-            int(calibration.get("dimmer_ceiling_dmx", 255) or 255),
-            int(template_defaults.get("dimmer_ceiling_dmx", 255) or 255),
-        )
+        floor = int(calibration.get("dimmer_floor_dmx", 0) or 0)
+        ceiling = int(calibration.get("dimmer_ceiling_dmx", 255) or 255)
 
         if pattern.bypasses_dimmer_floor:
             # A blackout is the one intent the floor must not lift off zero.

@@ -48,19 +48,14 @@ class DimmerPattern(BaseModel):
 
 
 DEFAULT_DIMMER_PARAMS = {
-    # One entry per Intensity member. SLOW and FAST used to be missing, and the
-    # handler substituted SMOOTH for anything absent, so a plan asking for CHILL
-    # (-> SLOW) or INTENSE (-> FAST) silently got the SMOOTH dimmer (P4-F8). The
-    # ladder runs slow/dim to fast/bright, matching DEFAULT_MOVEMENT_PARAMS.
-    # P2P-T2 decision: SLOW remains the dim end of the ladder, and a section shorter
-    # than its four-bar period intentionally reads as a sustained low light. Scaling
-    # the period to every short section would turn "slow" into a full fast-looking
-    # pulse and would rewrite established template output. A future vocabulary may
-    # add a separate short-section pulse intent if that look is wanted.
-    Intensity.SLOW: DimmerCategoricalParams(min_intensity=0, max_intensity=100, period=4.0),
+    # One entry per Intensity member. SLOW and FAST carry the SMOOTH values: they
+    # had no entry before 2026-08 and rendered as SMOOTH, which is the look the owner
+    # accepted in xLights. Giving them their own values (P4-F8) changed that look and
+    # was reverted on 2026-11-12.
+    Intensity.SLOW: DimmerCategoricalParams(min_intensity=0, max_intensity=128, period=4.0),
     Intensity.SMOOTH: DimmerCategoricalParams(min_intensity=0, max_intensity=128, period=4.0),
     Intensity.DRAMATIC: DimmerCategoricalParams(min_intensity=100, max_intensity=255, period=1.25),
-    Intensity.FAST: DimmerCategoricalParams(min_intensity=128, max_intensity=255, period=0.5),
+    Intensity.FAST: DimmerCategoricalParams(min_intensity=0, max_intensity=128, period=4.0),
     Intensity.INTENSE: DimmerCategoricalParams(min_intensity=150, max_intensity=255, period=0.25),
 }
 

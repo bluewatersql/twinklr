@@ -4,12 +4,11 @@ Tests that handlers correctly pass categorical parameters and adapter
 registry through to the curve generation pipeline.
 
 Every call here uses **production's call shape**: intensity is supplied only as
-the `generate` argument, exactly as `step_compiler.compile_step` does. The
-earlier version of this file passed intensity twice — once as the argument and
-once as a params-dict key — which is what let the suite stay green while
-`DefaultMovementHandler.generate` discarded the argument and read the key that
-production never sets (P4-F1/P4-M4). The key is deliberately absent below; a
-dedicated pin that the argument beats a conflicting key lives in
+the `generate` argument, exactly as `step_compiler.compile_step` does.
+`DefaultMovementHandler.generate` reads intensity from a `params["intensity"]` key,
+defaulting to SMOOTH, and production never sets that key. P1P-T3 made the argument
+authoritative (P4-F1); that was reverted on 2026-11-12 at the owner's request. The
+handler-level pins live in
 `tests/unit/sequencer/moving_heads/test_movement_intensity.py`.
 """
 
@@ -54,8 +53,8 @@ class TestMovementHandlerCategoricalParams:
         assert len(result.pan_curve) > 0
         assert result.tilt_curve is not None or result.tilt_static_dmx is not None
 
-    def test_handler_intensity_affects_curves(self):
-        """Rising intensity yields rising curve energy, along the whole ladder."""
+    def test_handler_intensity_argument_does_not_change_curves(self):
+        """P4-F1 reverted: in production's call shape every intensity renders alike."""
         handler = DefaultMovementHandler()
 
         # Use sweep_lr pattern which doesn't have custom categorical_params
@@ -69,7 +68,7 @@ class TestMovementHandlerCategoricalParams:
             Intensity.INTENSE,
         ]
 
-        energies = []
+        pan_curves = []
         for intensity in ladder:
             params = {
                 "movement_pattern": pattern,
@@ -82,16 +81,9 @@ class TestMovementHandlerCategoricalParams:
                 cycles=2.0,
                 intensity=intensity,
             )
+            pan_curves.append([p.v for p in result.pan_curve])
 
-            # Calculate energy (total variation)
-            pan_values = [p.v for p in result.pan_curve]
-            energies.append(
-                sum(abs(pan_values[i + 1] - pan_values[i]) for i in range(len(pan_values) - 1))
-            )
-
-        # Higher intensity should have more energy, and the ends must differ
-        assert energies == sorted(energies), energies
-        assert energies[0] < energies[-1], energies
+        assert all(curve == pan_curves[0] for curve in pan_curves[1:])
 
     def test_handler_with_dramatic_intensity(self):
         """Test handler with dramatic intensity produces significant movement."""

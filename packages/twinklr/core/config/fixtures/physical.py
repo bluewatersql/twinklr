@@ -5,9 +5,27 @@ Defines physical capabilities, ranges, limits, and calibration data for fixtures
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+logger = logging.getLogger(__name__)
+
+
+def drop_retired_fields(value: object, retired: frozenset[str], kind: str) -> object:
+    """Drop fixture-config fields that no longer affect output, with a warning.
+
+    Fixture files written before 2026-08 carry these fields. Rejecting them made a
+    rig description that had always loaded stop loading, so they are ignored instead.
+    """
+    if not isinstance(value, dict):
+        return value
+    found = sorted(retired & value.keys())
+    if not found:
+        return value
+    logger.warning("Ignoring retired %s fields %s: they do not affect output", kind, found)
+    return {key: item for key, item in value.items() if key not in retired}
 
 
 class PanTiltRange(BaseModel):
@@ -42,16 +60,12 @@ class Orientation(BaseModel):
 
     @model_validator(mode="before")
     @classmethod
-    def reject_removed_fields(cls, value: object) -> object:
-        if isinstance(value, dict):
-            removed = sorted(
-                {"tilt_up_dmx", "tilt_above_horizon_deg", "resting_position"} & value.keys()
-            )
-            if removed:
-                raise ValueError(
-                    f"orientation fields {removed} were removed because they never affected output"
-                )
-        return value
+    def drop_removed_fields(cls, value: object) -> object:
+        return drop_retired_fields(
+            value,
+            frozenset({"tilt_up_dmx", "tilt_above_horizon_deg", "resting_position"}),
+            "orientation",
+        )
 
 
 class MovementLimits(BaseModel):

@@ -352,10 +352,6 @@ _COMPILE_CASES: tuple[tuple[str, Mutation], ...] = (
         "template.template.steps.movement.movement_type",
         _set("template.steps.0.movement.movement_type", MovementType.HOLD),
     ),
-    (
-        "template.template.steps.movement.intensity",
-        _set("template.steps.0.movement.intensity", Intensity.INTENSE),
-    ),
     ("template.template.steps.movement.cycles", _set("template.steps.0.movement.cycles", 2.0)),
     (
         "template.template.steps.movement.params",
@@ -410,6 +406,19 @@ def test_template_compile_field_changes_emitted_snapshot(
     mutation(changed)
 
     assert _compile_snapshot(changed) != _compile_snapshot(baseline), config_path
+
+
+def test_template_movement_intensity_does_not_change_emitted_snapshot() -> None:
+    """P4-F1 reverted on 2026-11-12: the movement handler ignores this field.
+
+    It renders from `params.get("intensity", SMOOTH)`, so the step's declared
+    movement intensity leaves the compiled output unchanged.
+    """
+    baseline = _rich_doc()
+    changed = baseline.model_copy(deep=True)
+    _set("template.steps.0.movement.intensity", Intensity.INTENSE)(changed)
+
+    assert _compile_snapshot(changed) == _compile_snapshot(baseline)
 
 
 _PRESET_CASES: tuple[tuple[str, Mutation], ...] = (

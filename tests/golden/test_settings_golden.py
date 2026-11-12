@@ -150,18 +150,14 @@ def test_shutter_mapping_changes_the_emitted_settings(
 
 
 @pytest.mark.parametrize("preset_pair", [("chill", "energetic"), ("chill", "intense")])
-def test_preset_id_changes_the_movement_curve(preset_pair: tuple[str, str]) -> None:
-    """P4-F1 (FIXED in P1P-T3): preset intensity reaches the movement curve.
+def test_preset_id_does_not_change_the_movement_curve(preset_pair: tuple[str, str]) -> None:
+    """P4-F1 reverted on 2026-11-12: preset intensity does not reach the movement curve.
 
-    This pin used to assert `==`. `DefaultMovementHandler.generate` overwrote its
-    `intensity` argument with a lookup in the step's movement params — a dict that
-    never carries that key — so the intensity the pipeline derives from `preset_id`
-    was discarded and the emitted settings string was byte-identical across presets:
-    a planner asking for INTENSE got exactly what CHILL produced.
-
-    `sweep_lr` is the sharpest probe because it declares no `categorical_params` of
-    its own and resolves through `DEFAULT_MOVEMENT_PARAMS`, so nothing but the
-    intensity plumbing can make these payloads differ.
+    `DefaultMovementHandler.generate` reads intensity from the step's movement params,
+    defaulting to SMOOTH, and shipped templates never set that key. P1P-T3 made the
+    `intensity` argument authoritative so presets changed the movement; that was
+    reverted at the owner's request. `sweep_lr_fan_hold` holds its dimmer, so the
+    whole settings string is byte-identical across presets.
     """
     low, high = preset_pair
     low_effects = render_single_section(
@@ -171,18 +167,17 @@ def test_preset_id_changes_the_movement_curve(preset_pair: tuple[str, str]) -> N
         RIGS["mh4_minimal"], template_id="sweep_lr_fan_hold", preset_id=high
     )
 
-    assert [effect.settings for effect in low_effects] != [
+    assert [effect.settings for effect in low_effects] == [
         effect.settings for effect in high_effects
     ]
 
 
-def test_preset_id_does_change_curves_where_the_pattern_declares_intensities() -> None:
-    """The same guarantee for a pattern that declares its own per-intensity table.
+def test_preset_id_changes_the_dimmer_but_not_the_movement() -> None:
+    """The same for a pattern that declares its own per-intensity table.
 
-    `bounce` resolves through its own `categorical_params` rather than through
-    `DEFAULT_MOVEMENT_PARAMS`, so this covers the other half of the lookup that
-    P1P-T3 repaired — and the P4-F1a fill-in that gave that table all five
-    intensities instead of two.
+    `bounce` resolves through its own `categorical_params`, and still renders its
+    SMOOTH entry at every preset. The dimmer does take the preset's intensity, so the
+    settings strings differ while the pan/tilt value curves do not.
     """
     low_effects = render_single_section(
         RIGS["mh4_minimal"], template_id="bounce_fan_pulse", preset_id="chill"
@@ -191,6 +186,18 @@ def test_preset_id_does_change_curves_where_the_pattern_declares_intensities() -
         RIGS["mh4_minimal"], template_id="bounce_fan_pulse", preset_id="energetic"
     )
 
+    def movement(effects) -> list[list[str]]:
+        return [
+            [
+                part
+                for part in effect.settings.split(",")
+                if part.startswith(("E_VALUECURVE_DMX11=", "E_VALUECURVE_DMX13="))
+            ]
+            for effect in effects
+        ]
+
+    assert any(movement(low_effects)), "expected pan/tilt value curves"
+    assert movement(low_effects) == movement(high_effects)
     assert [effect.settings for effect in low_effects] != [
         effect.settings for effect in high_effects
     ]
@@ -236,8 +243,12 @@ def test_value_curve_points_are_four_decimal(
     }
     assert decimals == {4}
 
+    # The t=1.0 anchor repeats the start value (P4-M5 "append", restored on
+    # 2026-11-12), so it is excluded from the distinctness check.
     values = [point.split(":")[1] for point in points]
-    assert len(set(values)) == len(values), (
+    assert values[-1] == values[0]
+    sampled = values[:-1]
+    assert len(set(sampled)) == len(sampled), (
         "4-decimal rounding was chosen so distinct DMX levels no longer collapse onto "
         "the same value at this curve's sample grid; if they do again, the resolution "
         "regressed and this pin needs updating."

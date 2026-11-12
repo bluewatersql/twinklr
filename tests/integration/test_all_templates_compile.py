@@ -1,11 +1,10 @@
 """Every built-in template compiles, on both tracked rigs, at every energy preset.
 
 Closes review §12 runtime item 7. This is the end-to-end counterpart to the
-handler-level matrix in `tests/unit/sequencer/moving_heads/test_movement_intensity.py`:
-before P1P-T3 the movement handler pinned every step to `Intensity.SMOOTH`, so the
-non-SMOOTH entries of the movement library were never exercised by a render — and
-27 of the 29 patterns had no such entries to exercise. Any preset other than
-`moderate` would have raised `KeyError` the moment intensity was reconnected.
+handler-level matrix in `tests/unit/sequencer/moving_heads/test_movement_intensity.py`.
+The movement handler renders every step at `Intensity.SMOOTH` unless the step's
+movement params carry an `intensity` key: P1P-T3 reconnected the preset's intensity
+(P4-F1), and that was reverted on 2026-11-12 at the owner's request.
 
 Rigs and the deterministic single-section render come from the P1P-T1 golden
 harness, so this test and the goldens describe the same pipeline.
@@ -83,13 +82,13 @@ def test_all_templates_emit_effects_on_the_reference_rig(
     assert not silent, f"templates emitted nothing at preset '{preset_id}': {silent}"
 
 
-def test_energy_preset_reaches_the_emitted_movement() -> None:
-    """P4-F1 end to end: the plan's energy changes the DMX that leaves the exporter.
+def test_energy_preset_does_not_change_the_emitted_movement() -> None:
+    """P4-F1 reverted on 2026-11-12: movement renders the SMOOTH entry at every preset.
 
-    `sweep_lr` carries no `categorical_params` of its own, so it resolves through
-    `DEFAULT_MOVEMENT_PARAMS` — the path that used to be pinned to SMOOTH for every
-    preset alike. Four distinct payloads mean intensity survives from the plan to
-    the wire.
+    `sweep_lr_fan_hold` holds its dimmer, so the movement curve is the only thing a
+    preset could change. The handler reads intensity from the step's movement params,
+    which shipped templates never populate, so all four presets emit one payload --
+    the look the owner accepted in xLights.
     """
     payloads = {
         preset_id: tuple(
@@ -101,8 +100,7 @@ def test_energy_preset_reaches_the_emitted_movement() -> None:
         for preset_id in ENERGY_PRESETS
     }
 
-    assert len(set(payloads.values())) == len(ENERGY_PRESETS), (
-        f"{len(ENERGY_PRESETS)} energy presets collapsed to "
-        f"{len(set(payloads.values()))} distinct payloads — intensity is not "
-        "reaching the movement curve"
+    assert len(set(payloads.values())) == 1, (
+        f"{len(ENERGY_PRESETS)} energy presets produced "
+        f"{len(set(payloads.values()))} distinct payloads"
     )

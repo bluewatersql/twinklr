@@ -11,7 +11,12 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from twinklr.core.config.fixtures.dmx import ChannelInversions, DmxMapping
 from twinklr.core.config.fixtures.instances import FixtureConfig, FixtureInstance, FixturePosition
-from twinklr.core.config.fixtures.physical import MovementLimits, Orientation, PanTiltRange
+from twinklr.core.config.fixtures.physical import (
+    MovementLimits,
+    Orientation,
+    PanTiltRange,
+    drop_retired_fields,
+)
 
 
 class BaseFixtureConfig(BaseModel):
@@ -45,16 +50,12 @@ class BaseFixtureConfig(BaseModel):
 
     @model_validator(mode="before")
     @classmethod
-    def reject_removed_fields(cls, value: object) -> object:
-        if isinstance(value, dict):
-            removed = sorted(
-                {"dmx_universe", "channel_count", "capabilities", "movement_speed"} & value.keys()
-            )
-            if removed:
-                raise ValueError(
-                    f"fixture fields {removed} were removed because they never affected output"
-                )
-        return value
+    def drop_removed_fields(cls, value: object) -> object:
+        return drop_retired_fields(
+            value,
+            frozenset({"dmx_universe", "channel_count", "capabilities", "movement_speed"}),
+            "fixture",
+        )
 
 
 class SimplifiedFixtureInstance(BaseModel):
@@ -82,12 +83,8 @@ class SimplifiedFixtureInstance(BaseModel):
 
     @model_validator(mode="before")
     @classmethod
-    def reject_removed_fields(cls, value: object) -> object:
-        if isinstance(value, dict) and "dmx_start_address" in value:
-            raise ValueError(
-                "fixture field 'dmx_start_address' was removed because export uses relative channels"
-            )
-        return value
+    def drop_removed_fields(cls, value: object) -> object:
+        return drop_retired_fields(value, frozenset({"dmx_start_address"}), "fixture")
 
 
 class FixtureGroup(BaseModel):

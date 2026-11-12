@@ -2206,9 +2206,10 @@ CONFIG_EFFECTS: dict[str, ConfigDisposition] = {
         "public behavior discriminator",
     ),
     "template.template.steps.movement.intensity": ConfigDisposition(
-        ConfigDispositionKind.EFFECT_TEST,
-        "tests/unit/sequencer/moving_heads/templates/test_data_loader.py::test_data_template_registers_and_renders",
-        "public behavior discriminator",
+        ConfigDispositionKind.INVARIANT_TEST,
+        "tests/unit/config/test_template_effect_discriminators.py::"
+        "test_template_movement_intensity_does_not_change_emitted_snapshot",
+        "P4-F1 reverted on 2026-11-12: the movement handler ignores this field",
     ),
     "template.template.steps.movement.cycles": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,

@@ -177,10 +177,10 @@ def build_plan() -> ChoreographyPlan:
       happens to hit BLACKOUT's own SMOOTH entry and render correctly; `energetic` is
       chosen here specifically because it exposes the inversion.
     - `breakdown` uses `circle_asym_left_strobe`, whose dimmer declares
-      `min_norm=0.05` against the template's own `dimmer_floor_dmx=60` — the P4-M1
-      defect discards that floor, so the emitted curve dips to ~0.05 normalized
-      (~13 DMX) instead of being held at the declared floor (60 DMX, ~0.235
-      normalized).
+      `min_norm=0.05` against the template's own `dimmer_floor_dmx=60`. The floor
+      is not applied (P4-M1, repaired in P1P-T5 and reverted on 2026-11-12), so the
+      emitted curve dips to ~0.05 normalized (~13 DMX) instead of being held at the
+      declared floor (60 DMX, ~0.235 normalized).
 
     P1P-T5 adds three more so the scheduler's behavior is pinned rather than
     inferred:
@@ -470,9 +470,7 @@ _GOLDEN_BANNER = (
     "#          head of that cycle ('one_bar'), where it used to render nothing\n"
     "#   P4-F5  narrative templates play every step they declare ('phrase', 'arc'),\n"
     "#          so FADE_IN / FADE_OUT dimmer curves reach the output\n"
-    "#   P4-M1  the template's declared dimmer floor (60) bounds the emitted curve\n"
     "#   P4-M2  BLACKOUT emits DMX 0 under every preset ('drop')\n"
-    "#   P4-F9  emitted pan/tilt stay inside the rig's calibrated window\n"
     "#   transitions carry their blended value curves instead of an all-zero string\n"
     "# Repaired in P1P-T6 and pinned here as the corrected behavior:\n"
     "#   P4-F3  a channel the fixture maps but nothing wrote gets its declared\n"
@@ -480,6 +478,15 @@ _GOLDEN_BANNER = (
     "#          zero-fill; a channel the fixture does not map is omitted entirely;\n"
     "#          the emitted window is `get_max_channel`, not a floor-16 guess\n"
     "#   P4-F10 value-curve points are written at 4-decimal resolution\n"
+    "# Reverted on 2026-11-12 at the owner's request (the look accepted in xLights):\n"
+    "#   P4-F9  pan/tilt are not squeezed into the rig's calibrated window\n"
+    "#   P4-F1  movement renders SMOOTH unless params set `intensity`; presets\n"
+    "#          do not change movement\n"
+    "#   P4-M6  movement curves are rescaled to full range, not translated\n"
+    "#   P4-M5  movement curves close on their start value at t=1.0 ('append')\n"
+    "#   P4-F14 phase shift wraps by modulo, not by reflection\n"
+    "#   P4-M1  the template's declared dimmer floor (60) is not applied\n"
+    "#   P4-F8  SLOW and FAST dimmer params carry the SMOOTH values\n"
 )
 
 

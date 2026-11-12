@@ -13,26 +13,24 @@ from twinklr.core.curves.semantics import center_curve, ensure_loop_ready
 class TestCenterCurve:
     """Tests for center_curve function."""
 
-    def test_center_translates_midpoint_to_half(self) -> None:
-        """Shifts values so the midpoint sits at 0.5, leaving the span alone."""
+    def test_center_rescales_to_full_range(self) -> None:
+        """Rescales values onto [0, 1] from the curve's own min/max (P4-M6 reverted)."""
         points = [
             CurvePoint(t=0.0, v=0.2),
             CurvePoint(t=0.5, v=0.6),
             CurvePoint(t=1.0, v=1.0),
         ]
         result = center_curve(points)
-        # min=0.2, max=1.0, midpoint=0.6 -> shift by -0.1. The 0.8 span is preserved.
-        assert result[0].v == pytest.approx(0.1)
+        # min=0.2, max=1.0 -> (v - 0.2) / 0.8.
+        assert result[0].v == pytest.approx(0.0)
         assert result[1].v == pytest.approx(0.5)
-        assert result[2].v == pytest.approx(0.9)
+        assert result[2].v == pytest.approx(1.0)
 
-    def test_center_preserves_span_regardless_of_how_much_is_traversed(self) -> None:
-        """P4-M6: centering must not turn a narrow arc into a full-range swing.
+    def test_center_stretches_any_span_to_full_range(self) -> None:
+        """A narrow arc and a wide one both come out spanning [0, 1].
 
-        Rescaling to full range made physical excursion a function of frequency —
-        a window holding less than a full oscillation was stretched back out to
-        [0, 1], so lowering the frequency *widened* the movement and inverted the
-        SLOW/SMOOTH intent. Translation keeps excursion the amplitude's business.
+        P1P-T3 (P4-M6) replaced this rescale with a translation that preserved the
+        span; that was reverted on 2026-11-12 at the owner's request.
         """
         narrow = [CurvePoint(t=0.0, v=0.5), CurvePoint(t=0.5, v=0.6), CurvePoint(t=1.0, v=0.55)]
         wide = [CurvePoint(t=0.0, v=0.0), CurvePoint(t=0.5, v=1.0), CurvePoint(t=1.0, v=0.5)]
@@ -40,9 +38,8 @@ class TestCenterCurve:
         def span(points: list[CurvePoint]) -> float:
             return max(p.v for p in points) - min(p.v for p in points)
 
-        assert span(center_curve(narrow)) == pytest.approx(span(narrow))
-        assert span(center_curve(wide)) == pytest.approx(span(wide))
-        assert span(center_curve(narrow)) < span(center_curve(wide))
+        assert span(center_curve(narrow)) == pytest.approx(1.0)
+        assert span(center_curve(wide)) == pytest.approx(1.0)
 
     def test_center_constant_curve_maps_to_half(self) -> None:
         """Constant curve values all map to 0.5."""
@@ -94,13 +91,11 @@ class TestCenterCurve:
         assert len(result) == 3
         assert result[-1].v == pytest.approx(0.0)
 
-    def test_extend_continues_the_motion_instead_of_snapping_back(self) -> None:
-        """P4-M5: the t=1.0 anchor carries the curve on, not back to the start.
+    def test_append_closes_on_the_start_value_at_t_one(self) -> None:
+        """P4-M5 reverted: "append" anchors t=1.0 at the curve's start value.
 
-        Curves are sampled on [0, 1), so the last sample sits short of 1.0 and the
-        anchor decides what the final inter-sample step does. "append" writes the
-        start value there, which on a physical head is a full-excursion snap inside
-        the last 1/n of the segment.
+        P1P-T3 added an "extend" mode that continued the motion instead; it was
+        removed on 2026-11-12 at the owner's request.
         """
         points = [
             CurvePoint(t=0.0, v=0.2),
@@ -108,28 +103,8 @@ class TestCenterCurve:
             CurvePoint(t=0.5, v=0.6),
             CurvePoint(t=0.75, v=0.8),
         ]
-        snapped = ensure_loop_ready(points, mode="append")
-        extended = ensure_loop_ready(points, mode="extend")
+        result = ensure_loop_ready(points, mode="append")
 
-        assert snapped[-1].v == pytest.approx(0.2)  # the defect: jumps back
-        assert extended[-1].v == pytest.approx(1.0)  # carries on at the same slope
-        assert extended[-1].t == pytest.approx(1.0)  # anchor still present for chases
-        assert len(extended) == len(points) + 1
-
-    def test_extend_keeps_the_final_step_no_larger_than_the_others(self) -> None:
-        """The acceptance property behind P4-M5, stated directly."""
-        points = [CurvePoint(t=i / 8, v=0.5 + 0.4 * (i / 8)) for i in range(8)]
-        result = ensure_loop_ready(points, mode="extend")
-        deltas = [abs(result[i + 1].v - result[i].v) for i in range(len(result) - 1)]
-        assert deltas[-1] <= max(deltas[:-1]) + 1e-9
-
-    def test_extend_clamps_extrapolation_into_range(self) -> None:
-        """A steep final slope cannot push the anchor outside [0, 1]."""
-        points = [CurvePoint(t=0.0, v=0.0), CurvePoint(t=0.5, v=0.5), CurvePoint(t=0.75, v=0.99)]
-        result = ensure_loop_ready(points, mode="extend")
-        assert result[-1].v == pytest.approx(1.0)
-
-    def test_extend_adds_no_point_when_curve_already_reaches_one(self) -> None:
-        """Nothing to anchor when the last sample is already at t=1.0."""
-        points = [CurvePoint(t=0.0, v=0.2), CurvePoint(t=1.0, v=0.8)]
-        assert ensure_loop_ready(points, mode="extend") == points
+        assert result[-1].t == pytest.approx(1.0)
+        assert result[-1].v == pytest.approx(0.2)
+        assert len(result) == len(points) + 1

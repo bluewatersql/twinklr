@@ -8,7 +8,12 @@ from __future__ import annotations
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from twinklr.core.config.fixtures.dmx import ChannelInversions, DmxMapping
-from twinklr.core.config.fixtures.physical import MovementLimits, Orientation, PanTiltRange
+from twinklr.core.config.fixtures.physical import (
+    MovementLimits,
+    Orientation,
+    PanTiltRange,
+    drop_retired_fields,
+)
 from twinklr.core.config.poses import STANDARD_POSES, PoseLibrary
 
 
@@ -109,9 +114,10 @@ class FixtureConfig(BaseModel):
 
     @model_validator(mode="before")
     @classmethod
-    def reject_removed_fields(cls, value: object) -> object:
-        if isinstance(value, dict):
-            removed = sorted(
+    def drop_removed_fields(cls, value: object) -> object:
+        return drop_retired_fields(
+            value,
+            frozenset(
                 {
                     "dmx_universe",
                     "dmx_start_address",
@@ -119,13 +125,9 @@ class FixtureConfig(BaseModel):
                     "capabilities",
                     "movement_speed",
                 }
-                & value.keys()
-            )
-            if removed:
-                raise ValueError(
-                    f"fixture fields {removed} were removed because they never affected output"
-                )
-        return value
+            ),
+            "fixture",
+        )
 
     def get_standard_pose(self, pose_id: str) -> Pose:
         """Get a standard pose by ID.
