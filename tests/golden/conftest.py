@@ -6,6 +6,8 @@ available for whole-suite invocations as well.
 
 from __future__ import annotations
 
+import os
+
 import pytest
 
 from tests.golden.harness import RIGS, RenderResult, RigSpec, regen_requested, render_rig
@@ -25,7 +27,14 @@ _RENDER_CACHE: dict[str, RenderResult] = {}
 # or hanging. This is what keeps P1P-T12's suite out of CI without a separate
 # test-selection flag: the marker alone is the skip mechanism.
 
-_XLIGHTS_REACHABLE = probe_reachable(DEFAULT_BASE_URL)
+# The suite also needs an explicit opt-in. Its tests create a new sequence in whatever
+# xLights instance answers, so running them just because the owner happens to have
+# xLights open (for example during `make validate`) interrupts their session and, when
+# that instance is busy, fails the gate.
+XLIGHTS_ACCEPTANCE_ENV = "TWINKLR_XLIGHTS_ACCEPTANCE"
+_XLIGHTS_REACHABLE = os.environ.get(XLIGHTS_ACCEPTANCE_ENV) == "1" and probe_reachable(
+    DEFAULT_BASE_URL
+)
 
 
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
@@ -34,9 +43,9 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
         return
     skip_reason = pytest.mark.skip(
         reason=(
-            f"xLights automation API unreachable at {DEFAULT_BASE_URL} — LOCAL-ONLY "
-            "test (P1P-T12). Start xLights 2026.15, enable the HTTP automation API "
-            "in its preferences, and re-run to exercise this suite. Never runs in CI."
+            f"LOCAL-ONLY test (P1P-T12). Set {XLIGHTS_ACCEPTANCE_ENV}=1 and start xLights "
+            f"with its HTTP automation API answering at {DEFAULT_BASE_URL} to exercise "
+            "this suite. Never runs in CI."
         )
     )
     for item in items:

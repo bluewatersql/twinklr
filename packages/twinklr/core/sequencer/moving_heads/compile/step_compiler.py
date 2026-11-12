@@ -45,6 +45,8 @@ def compile_step(
     step: TemplateStep,
     context: StepCompileContext,
     phase_offset_norm: float = 0.0,
+    *,
+    one_shot_dimmer: bool = False,
 ) -> StepCompileResult:
     """Compile a template step to IR segments.
 
@@ -55,6 +57,10 @@ def compile_step(
         step: The template step to compile.
         context: Compilation context with fixture info and registries.
         phase_offset_norm: Optional phase offset [0, 1] to apply to curves.
+        one_shot_dimmer: The step is one phase of a multi-step template, so a dimmer
+            curve that does not close on its start value (a fade) is shifted without
+            wrapping. Wrapping it makes chased heads drop from the top of the fade
+            back to the bottom partway through the step.
 
     Returns:
         StepCompileResult with pan, tilt, and dimmer segments.
@@ -166,8 +172,12 @@ def compile_step(
                 tilt_points, phase_offset_norm, context.n_samples, wrap=True
             )
         if dimmer_points is not None:
+            dimmer_closes = abs(dimmer_points[-1].v - dimmer_points[0].v) <= 1e-6
             dimmer_points = apply_phase_shift_samples(
-                dimmer_points, phase_offset_norm, context.n_samples, wrap=True
+                dimmer_points,
+                phase_offset_norm,
+                context.n_samples,
+                wrap=dimmer_closes or not one_shot_dimmer,
             )
 
     segment = FixtureSegment(

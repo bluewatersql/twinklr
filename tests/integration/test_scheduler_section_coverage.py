@@ -9,6 +9,8 @@ no surfaced warning — the CLI reported a successful render of a dark show.
 
 from __future__ import annotations
 
+from itertools import pairwise
+
 import pytest
 
 from tests.golden.harness import RIGS, render_single_section
@@ -118,10 +120,8 @@ def test_narrative_templates_emit_a_fade_in_and_a_fade_out(template_id: str, bar
     middle step scheduled, neither curve existed anywhere in the output.
 
     `build_drop_recover`'s `build` step chases left to right, so MH2-MH4 read the
-    FADE_IN phase-shifted. Phase shift wraps by modulo (P4-F14 reflection reverted
-    on 2026-11-12), so those heads reach the peak mid-step, drop back to the bottom
-    of the fade and climb again; only the chase lead (MH1, zero offset) rises start
-    to end. Every head still reaches the same peak.
+    FADE_IN phase-shifted. A one-shot fade is shifted without wrapping: wrapping it
+    made those heads drop from the top of the fade back to the bottom mid-step.
     """
     effects = render_single_section(
         RIGS["mh4_minimal"], template_id=template_id, preset_id="moderate", bars=bars
@@ -144,9 +144,10 @@ def test_narrative_templates_emit_a_fade_in_and_a_fade_out(template_id: str, bar
 
     lead = entries["MH1"]
     assert lead[-1] > lead[0], "FADE_IN should end brighter than it starts"
-    assert {max(values) for values in entries.values()} == {lead[-1]}, (
-        "every head should reach the FADE_IN peak"
-    )
+    for fixture_id, values in entries.items():
+        assert values[-1] == lead[-1], f"{fixture_id} should end on the FADE_IN peak"
+        drops = [later - earlier for earlier, later in pairwise(values) if later < earlier]
+        assert not drops, f"{fixture_id} FADE_IN drops back mid-step: {min(drops):.3f}"
     for exit_ in exits:
         assert exit_[-1] < exit_[0], "FADE_OUT should end darker than it starts"
 

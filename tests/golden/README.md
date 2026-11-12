@@ -157,9 +157,9 @@ its unauthenticated HTTP automation API
 (`tests/golden/xlights_client.py`, default `http://127.0.0.1:49913`) to pin the
 answers to the four questions
 `changes/twinklr-reactivation-review/build/specs/phase-1p-render-truth/P1P-T12-xlights-acceptance-test.md` posed. It
-never runs in CI: `pytest_collection_modifyitems` probes the API once at collection
-time and skips every `requires_xlights` test with an explicit reason when nothing
-answers — exactly what happened on every run to date.
+never runs in CI, and never runs just because xLights happens to be open: every
+`requires_xlights` test is skipped with an explicit reason unless
+`TWINKLR_XLIGHTS_ACCEPTANCE=1` is set and the API answers a probe at collection time.
 
 ### Run record
 
@@ -187,6 +187,7 @@ suite against a live xLights, alongside the automated assertions.
 
 ### To actually run this suite
 
+0. Set `TWINKLR_XLIGHTS_ACCEPTANCE=1` in the environment of the `pytest` run.
 1. Launch xLights 2026.15, open (or create) a show directory, and enable the HTTP
    automation API in Tools → Preferences (local interface only). The suite itself
    calls `newSequence` before every test (an `autouse` fixture in the test module),

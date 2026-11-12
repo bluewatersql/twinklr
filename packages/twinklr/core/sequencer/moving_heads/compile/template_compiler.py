@@ -216,7 +216,12 @@ def compile_template(
             )
 
             # Compile the step
-            step_result = compile_step(step, step_context, phase_offset_norm)
+            step_result = compile_step(
+                step,
+                step_context,
+                phase_offset_norm,
+                one_shot_dimmer=len(working_template.steps) > 1,
+            )
 
             # Mark segment as non-groupable if template uses phase offsets
             if uses_phase_offsets:
