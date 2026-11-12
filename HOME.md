@@ -14,7 +14,9 @@ Human entry point for navigating the repository as an Obsidian vault. Agents sta
 - [[memories/INDEX|Memories index]] — decisions, learnings, constraints, patterns
 - [[prompts/INDEX|Prompts index]] — reusable agent workflows
 - [[changes/INDEX|Changes index]] — change-management conventions & history
-- [[templates/change|Templates]] — blank starters for change, handoff, decision, memory, context docs
+- [[changes/_templates/brief|Change templates]] — brief, implementation plan, review, handoff
+- [[templates/memory|Knowledge templates]] — blank starters for memory, decision, context docs
+- [[evaluations/INDEX|Evaluations]] — dated run records and human judgments
 
 ## Domains
 
@@ -23,6 +25,7 @@ Human entry point for navigating the repository as an Obsidian vault. Agents sta
 - [[context/architecture/multi-agent-planning|Multi-agent planning]]
 - [[context/engineering/conventions|Engineering conventions]]
 - [[context/glossary|Glossary]]
+- [[context/agents/operating-model|Multi-agent operating model]]
 
 ## Published docs (deep reference)
 

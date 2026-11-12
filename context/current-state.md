@@ -1,16 +1,15 @@
 ---
 type: context
+status: active
 area: overview
 updated: 2026-11-12
 ---
 
 # Twinklr — Current State
 
-_Repository evidence and active sequencing verified 2026-08-30. All eight Phase 3
-offline implementations and six of seven Phase 4 tasks are integrated. As of 2026-08-30 a
-bounded **live moving-head end-to-end show succeeded** under the post-refactor-validation
-change (see below); remaining reactivation-review empirical exits (xLights GUI acceptance,
-vision calibration, three-arm, real-data Phase 2K) stay open._
+A snapshot, not a history. Dated narrative, commit-by-commit records, and exact task
+contracts live in the active change
+([campaign handoff](../changes/twinklr-reactivation-review/build/plan/HANDOFF.md)).
 
 Twinklr is an AI-powered choreography engine: audio file in, xLights artifacts out — a
 fresh `.xsq`, standalone `.xtiming` timing tracks, and an `.xmap` mapping hint, which the
@@ -20,237 +19,125 @@ See [product/overview.md](product/overview.md).
 
 ## Implemented
 
-- **Audio analysis pipeline** — deterministic rhythm, energy, structure, harmonic,
-  lyrics, phoneme, and viseme analysis. Rhythm/structure production is behind explicit,
-  source-versioned adapters with a five-fixture offline A/B harness. The runtime default
-  remains custom DSP; the owner accepted P2P-T8's fixed-gate retention recommendation
-  on 2026-08-16 because the optional model arms did not produce complete admissible
-  evidence. Opt-in Demucs stems can add drum, bass, and
-  vocal-derived features with content/model-aware caching and explicit full-mix fallback.
+- **Audio analysis** — deterministic rhythm, energy, structure, harmonic, lyrics,
+  phoneme, and viseme analysis. Rhythm and structure sit behind source-versioned adapters;
+  custom DSP is the default
+  ([decision](../memories/decisions/keep-dsp-after-mir-ab.md)). Opt-in Demucs stems add
+  drum, bass, and vocal features with explicit full-mix fallback.
   `packages/twinklr/core/audio/`
-- **Audio profiling and lyrics agents** — musical interpretation, lyric MomentCues,
-  and typed creative context for planning. `packages/twinklr/core/agents/audio/`
-- **Multi-agent choreography planning** — macro planning plus iterative moving-head
-  planning, deterministic heuristic repair, and a judge whose prior verdicts feed the
-  next revision. Schema-v2 sections carry categorical intensity, color, shutter, gobo,
-  and lyric MomentCue intent. Registered OpenAI roles use validated strict structured
-  outputs, bounded failure handling, explicit model/reasoning configuration, and prompt-
-  and schema-aware cache identities. See
-  [architecture/multi-agent-planning.md](architecture/multi-agent-planning.md).
-- **Deterministic selector and experiment harness** — a metadata/energy/variety-aware
-  non-LLM selector plus a hash-, cache-, cost-, calibration-, and blind-review-bound
-  three-arm comparison harness. The harness is implemented; the owner experiment and D1
-  verdict have not run.
-  `packages/twinklr/core/agents/sequencer/moving_heads/deterministic_selector.py`,
-  `packages/twinklr/core/reporting/evaluation/`
-- **Rendering and compilation** — moving-head templates resolve schema-v2 intensity,
-  color, shutter, gobo, and moment-cue intent into exact fixture behavior. Python
-  factories and validated JSON `TemplateDoc` files coexist in one collision-safe
-  registry. The display sequencer renders RGB/pixel effects; its coordination expansion
-  now preserves local BeatGrid timing, sub-beat offsets, exact round-robin slots, and
-  gap-free overlap resolution. P3-T2 also applies lane blend intent
-  uniformly in the emitted sub-layer space, validates recipe effect types against the
-  exact runtime registry before event construction, and makes every retained effect
-  substitution visible in warnings, trace entries, and counts.
+- **Audio profiling and lyrics agents** — musical interpretation, lyric MomentCues, and
+  typed creative context for planning. `packages/twinklr/core/agents/audio/`
+- **Multi-agent planning** — macro planning plus iterative moving-head and display
+  planning, deterministic heuristic repair, and a judge whose verdicts feed the next
+  revision. Schema-v2 sections carry categorical intensity, color, shutter, gobo, and
+  lyric MomentCue intent.
+  [architecture/multi-agent-planning.md](architecture/multi-agent-planning.md)
+- **Providers** — OpenAI (default; Responses API strict structured outputs), Claude
+  (`llm_provider: anthropic`), and Ollama cloud (`glm-5.3:cloud` through the loopback
+  daemon; by owner policy no local model is used). All three have completed a live moving-head run; see
+  [Live evidence](#live-evidence).
+- **Rendering and compilation** — moving-head templates resolve schema-v2 intent into
+  exact fixture behavior; Python factories and validated JSON `TemplateDoc` files share
+  one collision-safe registry. The display sequencer renders RGB/pixel effects with
+  BeatGrid-exact coordination, and lane blend intent overrides recipe blend metadata
+  ([decision](../memories/decisions/lane-blend-mode-overrides-recipe.md)).
   `packages/twinklr/core/sequencer/`, `packages/twinklr/core/curves/`
-- **Evaluation tooling** — checkpoint/evaluation writing, deterministic beat/effect sync
-  metrics, ffmpeg frame/contact-sheet preparation, a strict four-category vision judge,
-  calibration contracts, and single-run/comparison schemas. Live vision calibration and
-  the real three-arm result remain owner-gated. `packages/twinklr/core/reporting/`
-- **Feature engineering, catalog, and curation tooling** — content-hash-stable corpus
-  identities, SQLite feature storage, tracked catalogs, layout-aware coverage reporting,
-  quality-distribution/threshold-review evidence, coverage-targeted recipe generation,
-  explicit human admission logs, per-style fingerprints, and propensity loading into
-  planner context. The tools are implemented; Phase 2K's real layout/corpus/curation/
-  style exit evidence is not. `packages/twinklr/core/feature_engineering/`,
-  `packages/twinklr/core/feature_store/`, `packages/twinklr/core/recipe_builder/`
-- **xLights delivery and iteration clients** — self-contained `.xsq`, standalone
-  `.xtiming`, and `.xmap` output; a pinned automation client for preview rendering; and
-  guarded `inject`/`regenerate` workflows that plan against the open layout and own only
-  reserved Twinklr layers. Display and moving-head output now share one renderer-neutral
-  emission core for positional registries, effect timing, layer translation, and trace
-  provenance. Live xLights acceptance remains an explicit local-only gate.
+- **xLights delivery and iteration** — self-contained `.xsq`, `.xtiming`, and `.xmap`
+  output; a pinned automation client for preview rendering; guarded `inject` and
+  `regenerate` workflows that own only reserved Twinklr layers. Display and moving-head
+  output share one emission core
+  ([decision](../memories/decisions/unified-xlights-emission-contract.md)).
   `packages/twinklr/core/formats/xlights/`, `packages/twinklr/core/api/xlights/`
-- **CLI** — `twinklr run` and `twinklr display` retain branch-only iteration, while
-  `twinklr show` runs one common planning prefix and emits coordinated MH + display
-  effects into one sequence after strict layout/fixture ownership reconciliation. Live
-  iteration, catalog coverage, and recipe-builder command surfaces expose the other
-  guarded workflows. `packages/twinklr/cli/`
+- **CLI** — `twinklr run` (moving heads) and `twinklr display` are branch-only;
+  `twinklr show` runs one planning prefix and emits coordinated MH + display effects into
+  one sequence ([decision](../memories/decisions/coordinated-show-contract.md)).
+  `packages/twinklr/cli/`
+- **Evaluation tooling** — checkpoint and `eval-report` writing, deterministic beat/effect
+  sync metrics, frame and contact-sheet preparation, a four-category vision judge,
+  calibration contracts, and a deterministic selector with a three-arm comparison harness.
+  The tools exist; their owner experiments have not run.
+  `packages/twinklr/core/reporting/`
+- **Feature engineering, catalog, and curation** — content-hash-stable corpus identities,
+  SQLite feature store, tracked catalogs, coverage reporting, targeted recipe generation,
+  human admission logs, per-style fingerprints, and propensity loading into planner
+  context. The tools exist; their real-data exits have not run.
+  `packages/twinklr/core/feature_engineering/`, `packages/twinklr/core/feature_store/`,
+  `packages/twinklr/core/recipe_builder/`
 
-## Quality-gate state
+## Quality gate
 
-The latest accepted integrated baseline is main `03b75e9`: exact-tip `make validate`
-left **1,361 files** unchanged, completed with **5,637 passed, 39 skipped** and 43
-resource warnings at **89% coverage**, clean Ruff lint, and mypy success across **721
-source files** after P2K-T2 offline-readiness integration.
-The skips cover explicit optional/local-only boundaries rather than accepted
-implementation regressions. As of 2026-08-30, after the post-refactor-validation work
-below, `make validate` is green at **5,658 passed, 39 skipped** with 89% coverage, ruff and
-mypy clean. Exact task contracts and durable verification evidence are
-owned by the [P4-T1](../changes/twinklr-reactivation-review/build/specs/phase-4-compounding/P4-T1-ml-chain-python-bump.md),
-[P4-T2](../changes/twinklr-reactivation-review/build/specs/phase-4-compounding/P4-T2-local-provider-option.md),
-[P4-T3](../changes/twinklr-reactivation-review/build/specs/phase-4-compounding/P4-T3-dead-tail-retirement-wave-1.md),
-[P4-T4](../changes/twinklr-reactivation-review/build/specs/phase-4-compounding/P4-T4-duplication-collapse.md),
-[P4-T5](../changes/twinklr-reactivation-review/build/specs/phase-4-compounding/P4-T5-dead-config-final-sweep.md),
-and [P4-T6](../changes/twinklr-reactivation-review/build/specs/phase-4-compounding/P4-T6-documentation-truth-pass.md)
-specs.
+This page owns the rolling gate snapshot. Latest recorded full gate: `9766a84`
+(2026-11-12), `make validate` green
+([record](../changes/twinklr-reactivation-review/evidence/2026-11-12-p4-t2-ollama-cloud-pipeline/README.md)).
+Latest recorded counts: 5,701 passed, 39 skipped at `f0ae0da` (2026-11-12); the skips are
+optional or local-only boundaries. Last recorded coverage: 89% at `03b75e9` (2026-08-30).
+There are no accepted failures. The gate includes an offline regression harness (`tests/regression/`):
+moving-head replay-render parity and a hermetic display replay.
 
-The review baseline at `aa8d325` did fail its own gates. That is historical evidence,
-not the current state; its fully classified record is preserved in
-[known-test-failures.md](../memories/learnings/known-test-failures.md).
+## Live evidence
 
-## Post-refactor validation (2026-08-30; closed 2026-11-01)
+| Date | Run | Result | Record |
+|---|---|---|---|
+| 2026-08-29 | OpenAI, `Need A Favor`, owner 4-head rig | Valid `.xsq`; meets or exceeds the pre-refactor baseline (396 effects vs 262) | [run notes](../changes/post-refactor-validation/notes/live-run-prereqs.md), [QA runbook](../docs/qa-runbook.md) |
+| 2026-11-12 | Claude `claude-opus-5-5`, every role | 6/6 stages, about $0.95; on par with the baseline (251 effects vs 262; indicative, different song); human judgment PENDING-OWNER | [evaluation](../evaluations/2026-11-12-claude-baseline-live-run/README.md) |
+| 2026-11-12 | Ollama cloud `glm-5.3:cloud`, every role | 6/6 stages, 0 schema repairs; on par with the baseline (256 effects vs 262; indicative, different song) | [evidence](../changes/twinklr-reactivation-review/evidence/2026-11-12-p4-t2-ollama-cloud-pipeline/README.md) |
 
-The [post-refactor-validation change](../changes/post-refactor-validation/spec.md) proved
-the refactored engine still works end to end and locked a regression baseline. It closed
-on 2026-11-01.
+Provider behavior learned from these runs is in
+[live-provider-run-lessons.md](../memories/learnings/live-provider-run-lessons.md). The
+points that shape current behavior:
 
-- **Live moving-head E2E succeeded** on `11 - Need A Favor` (public OpenAI, the owner's
-  real 4-MH rig): a valid `.xsq` was emitted whose sophistication **meets or exceeds** the
-  pre-refactor baseline (placed effects 396 vs 262; distinct DMX settings 365 vs 262;
-  value-curve channels 1306 vs 622; same 20 ms grid and base+transition layering). Live
-  spend ≈ $1–2 of the $25 budget.
-- **Offline regression harness** wired into `make validate`: MH replay-render parity and a
-  hermetic display replay (resolvable subset of the `02_rudolph` plan, reproducing 10 of
-  the baseline's 11 effect types and its 5-layer depth). `tests/regression/`.
-- **Four blockers fixed en route** (all TDD): the temperature strip now covers the whole
-  `gpt-5` reasoning line (`9bd9461`); zero-duration transitions are dropped upstream
-  (`a8ce12b`); the default agent timeout is 300 s for reasoning latency (`d15ee03`); and
-  zero-duration emission segments are skipped defensively (`08ce6d5`). Environment/config
-  findings (proxy TLS CA, stale `fixture_config.json`/`job_config.json` schema drift,
-  retired display recipes) are recorded in
-  [live-run-prereqs.md](../changes/post-refactor-validation/notes/live-run-prereqs.md).
-- **QA runbook** for human-QA readiness: [docs/qa-runbook.md](../docs/qa-runbook.md).
-- **Known gap carried forward.** There is no CI end-to-end test that replays recorded
-  provider responses through the live planning path; plan items P2-1 to P2-4 were not
-  built. Regression coverage stops at render-replay parity. The two P3-T4 provider-contract
-  failure classes (`$ref` siblings, temperature on reasoning models) have unit coverage
-  only. See the change's
-  [closeout](../changes/post-refactor-validation/plan.md#closeout--2026-11-01).
+- Claude refuses to compile the five planner schemas (`compiled grammar is too large`).
+  The adapter resends those requests once with the schema in the prompt only and validates
+  client-side, so planner output on Claude has no server-side schema guarantee. The owner
+  kept this fallback and deferred a schema redesign.
+- Ollama Cloud does not enforce `response_format`; the schema travels in the prompt.
+- On OpenAI, strict mode passes for 7 of 8 roles; `audio_profile` shows runaway output.
 
-## Claude provider live (2026-11-12)
+## Active work
 
-- **First Claude-backed live run passed.** Every role used `claude-opus-5-5`
-  (`llm_provider: anthropic`). The song was `Hey Come Look At My House`, on a 4-head
-  rig, at `f0ae0da`. 6/6 stages completed for about $0.95.
-- **Sophistication is on par with the MH baseline** on every qa-runbook §4 axis: 251
-  effects placed against 262, 741 value-curve channels against 622, the same 20 ms grid
-  and 2 layers. The comparison is indicative because the song differs.
-- **Human judgment is PENDING-OWNER.** See
-  [evaluation](../evaluations/2026-11-12-claude-baseline-live-run/README.md).
-- **Claude's structured outputs reject every planner schema** with `compiled grammar is
-  too large`. The judge, lyrics, enricher and vision schemas compile. The adapter resends
-  rejected requests once with a prompt-only schema and validates client-side, so planner
-  output on Claude has no server-side schema guarantee. See the
-  [evidence](../changes/twinklr-reactivation-review/evidence/2026-11-12-claude-provider-live/README.md).
+One change is active: the
+[twinklr-reactivation-review build campaign](../changes/ACTIVE.md). Its code and tooling
+are merged and independently verified. What remains is empirical evidence and owner
+decisions, not implementation.
 
-## Active work and open boundaries
+| Phase | Implementation | Exit still needs |
+|---|---|---|
+| 0 Foundation, 1K Knowledge edges | Complete | — |
+| 1P Render truth | 12/12 merged | Human judgment on the golden fixture; xLights import acceptance |
+| 2P Creative quality | 13/13 merged | Vision-judge calibration (T6); three-arm experiment and D1 verdict (T13); preview and injection checks against a real xLights (T5, T12); owner decision on the T10 live-smoke gap; T11 strict mode for `audio_profile` |
+| 2K Catalog growth | 4/4 merged | Real layout coverage, owner-corpus mining with eight threshold decisions (T2), curation sessions, style fingerprints |
+| 3 Show convergence | 8/8 merged | xLights GUI acceptance (T6); combined-show preview, live judge, human review, calibration, and a real completed record (T8) |
+| 4 Compounding | 6/7 merged | Owner call on whether the Ollama cloud run closes T2; T7 is optional and NO-GO until 2K-T2 evidence and a private MH corpus manifest are accepted |
 
-The [twinklr-reactivation-review build campaign](../changes/ACTIVE.md) remains active.
-Phases 0 and 1K are complete. Phase 1P's implementation tasks, Phase 2P's 13 offline
-implementations, and Phase 2K's four tooling implementations are merged and independently
-verified, but their owner/live exit criteria are not complete. On 2026-08-16 the owner
-accepted the P2P-T1/T8/T9 recommendations and authorized P3-T1, P3-T2, and P3-T3 before
-the outstanding empirical exits. P3-T1 is merged and independently verified at
-`5eebcb2`; P3-T2 is merged and independently verified at `5365f70`; P3-T3 is merged at
-`33cce57` after independent verification and owner acceptance of the canonical
-`twinklr display` command and offline file-only layout input. The owner accepted P3-T4's
-exact contract/invariants and AC2 amendment and authorized only its capped macro probe.
-The audited harness made one live request on 2026-08-16; OpenAI rejected the schema
-because `ThemeRef.scope` combined `$ref` with sibling `description`. No retry/fallback
-occurred, usage was unavailable, and the conservative `$1.66` commitment leaves only
-`$0.09`, insufficient for another audited attempt. The general schema remediation is
-integrated and offline-verified at `558153c`, but live acceptance remains open and no
-further P3-T4 live attempt was then authorized. On 2026-08-26 the owner approved exactly
-one second audited request: authorization
-`p3-t4-second-attempt-owner-approved-2026-08-26`, exact `$1.660000` additional
-preauthorization, `$3.32` cumulative hard cap, and two-attempt lifetime cap. After
-independent audit, attempt 2 made exactly one request and received HTTP 400 because
-`temperature` is unsupported by `gpt-5.6-sol`; no retry, fallback, logical request,
-schema repair, or usage metadata occurred. The ledger therefore commits both
-`$1.660000` reservations (`$3.320000` total). The lifetime cap is exhausted, no third
-attempt is authorized, and live acceptance remains open. Offline remediation now makes
-temperature optional and uses one explicit OpenAI capability normalization for actual
-provider parameters, runner dispatch, serialized request evidence, and probe identity:
-`gpt-5.6-sol` omits temperature while retaining reasoning effort, while known
-temperature-supporting models retain it. This remediation made no provider call and
-does not reopen the attempt cap. The owner accepted all nine P3-T5 decisions,
-and P3-T5 was integrated at `f006468`. On 2026-08-26 the owner accepted P3-T6's offline
-unified-emission contract. Formal first review rejected the initial snapshot; standards,
-specification, and adversarial review then approved the remediation offline/in code, and
-it was integrated at `c9620db`. P3-T8's independently approved offline implementation
-was integrated at `82438cf`. P3-T7's final corrected freeze
-`2caf726b505fb6fc3e17f56165b4884ce0f33a1525f9768d6a880621e16e9192` is independently
-approved offline/in code and included in the current integration, bringing Phase 3 to
-eight of eight offline task implementations integrated. P3-T6
-empirical xLights GUI acceptance remains open. The owner authorized P3-T7+ and
-task-bounded live/paid work on 2026-08-26. P3-T7's audited empirical proof passed with
-one `gpt-image-2` request, no retry, a valid 1024×1024 PNG, and a scoped cache replay
-that made zero additional provider calls. Complete usage priced to `$0.00622`; the
-sealed owner-local ledger is terminal and forbids another attempt. xLights GUI dates/checks remain deferred until
-a meaningful end-to-end show is fully working; the empirical gates remain open. These
-integrations and authorizations do not waive the earlier exits. **On 2026-11-12 the owner
-closed P3-T4 live acceptance** as superseded by the later live runs (2026-08-29 OpenAI,
-2026-11-12 Claude); the sealed ledger is unchanged and no third attempt is made
-([decision](../memories/decisions/p3-t4-live-acceptance-superseded.md)). P3-T8's first offline candidate was formally rejected; its remediated
-implementation now independently verifies file-backed provenance, rebuilds deterministic
-reports, shares provider request limits, and handles contact-sheet grounding. It is
-independently approved offline, but supplies no xLights evidence, visual-judge output,
-human judgment, calibration, real completed record, or empirical acceptance outcome.
-Phase 4 has six of seven tasks integrated. P4-T1 landed at `56d9aa0` after independent
-approval and clean-main verification; it coordinates the Python 3.13/ML-chain
-modernization and removes the orphaned diarization and unused dependency surfaces. P4-T2
-is integrated through implementation `3765bd9` and redirect-hardening remediation
-`40e8e55`; its offline provider path is verified, but real Ollama schema validity remains
-unclaimed pending the explicit opt-in smoke. On 2026-11-01 the owner amended that smoke
-to use the Ollama cloud model `glm-5.3:cloud` through the loopback daemon instead of a
-local model, so a pass no longer proves offline operation
-([runbook](../changes/twinklr-reactivation-review/runbooks/01-ollama-cloud-smoke.md)). P4-T3's independently verified
-dead-tail retirement is integrated at `bf6bba5`, with migration/unwiring sequencing and
-live-caller retentions preserved. P4-T4's independently verified duplication collapse is
-integrated at `3e7f679`; it consolidates provider transport retry ownership, closes HTTP
-and cache lifecycles, wires logging and surviving HTTP configuration, and preserves the
-separate generic pipeline replay controls. P4-T5's independently verified configuration
-accountability sweep is integrated at `05f24d0`; its generated registry accounts for
-every external App, Job, FixtureGroup, and TemplateDoc path with an exact effect test,
-invariant test, or removal disposition. P4-T6's independently verified documentation
-truth pass is integrated at `da8f19d`. P4-T7's independently approved repository-only
-preflight is integrated at `c79566e`; it corrects the unsupported vendor-history premise
-and records the exact corpus-gated re-entry contract and isolated offline plan. P4-T7
-full execution remains a current **NO-GO** and is deferred: its P2K-T2 dependency still
-lacks the owner-corpus empirical run, unchanged-corpus idempotent rerun evidence,
-non-empty distributions, and exactly eight owner threshold decisions, and no accepted,
-sufficient private moving-head corpus manifest exists to ground the optional spike.
-P2K-T2's independently Standards- and Spec-approved offline-readiness hardening is
-integrated at `03b75e9`; it supplies strict evidence and combined P2K/MH re-entry
-contracts, not those empirical outcomes. The
-integrated preflight is not P4-T7 completion and makes no feasibility verdict. Phase 4
-therefore remains six of seven tasks integrated. Under the owner override, optional
-WhisperX/TorchCodec runtime execution remains deferred and unavailable against the
-current default FFmpeg 9.
-Exact contracts and verification evidence live in the [P4-T1](../changes/twinklr-reactivation-review/build/specs/phase-4-compounding/P4-T1-ml-chain-python-bump.md),
-[P4-T2](../changes/twinklr-reactivation-review/build/specs/phase-4-compounding/P4-T2-local-provider-option.md),
-[P4-T3](../changes/twinklr-reactivation-review/build/specs/phase-4-compounding/P4-T3-dead-tail-retirement-wave-1.md),
-[P4-T4](../changes/twinklr-reactivation-review/build/specs/phase-4-compounding/P4-T4-duplication-collapse.md),
-[P4-T5](../changes/twinklr-reactivation-review/build/specs/phase-4-compounding/P4-T5-dead-config-final-sweep.md),
-[P4-T6](../changes/twinklr-reactivation-review/build/specs/phase-4-compounding/P4-T6-documentation-truth-pass.md),
-and [P4-T7](../changes/twinklr-reactivation-review/build/specs/phase-4-compounding/P4-T7-mh-idiom-mining-exploration.md)
-task specs.
+Commands for every remaining exit:
+[owner runbooks](../changes/twinklr-reactivation-review/runbooks/README.md). Do not infer
+any of these outcomes from offline fixtures, merged tooling, or implementation tests.
 
-The authoritative current task/gate list is the campaign
-[HANDOFF.md](../changes/twinklr-reactivation-review/build/plan/HANDOFF.md). Most notably,
-there is no Phase 1P human/xLights exit evidence, owner-accepted vision calibration,
-real three-arm comparison, D1 verdict, or real-data Phase 2K exit evidence yet. Do not
-infer those outcomes from offline fixtures or
-implementation tests.
+## Known gaps
+
+- No CI end-to-end test replays recorded provider responses through the live planning
+  path; regression coverage stops at render-replay parity.
+- End-to-end authoring-time savings have not been measured.
+- Moving-head templates and display recipes share a catalog home but not a schema.
+
+## Permanent boundaries
+
+- **P3-T4 live macro probe** — the two-attempt ledger is sealed and exhausted; no third
+  attempt. Live acceptance was closed by owner decision on 2026-11-12
+  ([decision](../memories/decisions/p3-t4-live-acceptance-superseded.md)).
+- **P3-T7 image proof** — passed once; its sealed ledger forbids another run.
+- **WhisperX/TorchCodec** — optional runtime execution is owner-deferred and unavailable
+  against the current default FFmpeg 9. Do not claim runtime readiness.
+- **Owner-gated actions** — paid or live provider calls, owner-local audio, layout, and
+  corpus data, xLights mutation, and human judgment follow
+  [AGENTS.md → Owner-gated actions](../AGENTS.md#owner-gated-actions) and the protocols in
+  the active change.
 
 ## Key constraints
 
-- Python **3.13 only** (3.14+ unsupported) —
-  [python-3.12-only.md](../memories/constraints/python-3.12-only.md)
-- Pipeline failure policy is **fail-fast** with cache-based restartability — see
-  [architecture/pipeline.md](architecture/pipeline.md).
-- Quality gates: `make validate` must pass —
+- Python **3.13 only** —
+  [constraint](../memories/constraints/python-3.12-only.md)
+- Pipeline failure policy is **fail-fast** with cache-based restartability —
+  [architecture/pipeline.md](architecture/pipeline.md)
+- `make validate` must pass before any completion claim —
   [engineering/conventions.md](engineering/conventions.md)
-- Paid/live provider calls, owner-local audio/layout/corpus data, xLights mutation, and
-  human taste judgments require the explicit owner protocols in the active change.

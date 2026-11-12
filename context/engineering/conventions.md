@@ -1,7 +1,7 @@
 ---
 type: context
 area: engineering
-updated: 2026-08-26
+updated: 2026-11-12
 ---
 
 # Engineering Conventions
@@ -30,10 +30,12 @@ make env-check    # verify uv / Python / .env setup
 
 ## Quality gates
 
-All commits must pass: ruff (0 issues), mypy (0 errors on new code), pytest (0 new
-failures, coverage ≥ 65%). The previously documented `aa8d325` failure set is a
-historical baseline, not a current waiver; see
-[memories/learnings/known-test-failures.md](../../memories/learnings/known-test-failures.md).
+All commits must pass: ruff (0 issues), mypy (0 errors), pytest (0 failures, coverage
+≥ 65%). `main` is green and there are no accepted failures. The `aa8d325` failure set in
+[memories/learnings/known-test-failures.md](../../memories/learnings/known-test-failures.md)
+is a historical baseline, not a waiver. CI (`.github/workflows/ci.yml`) runs a format
+check, lint, mypy, the tests not marked `local_only` (without coverage), and
+`make version-check`.
 
 ## Style
 
@@ -54,24 +56,10 @@ historical baseline, not a current waiver; see
 
 ## Documentation conventions
 
-Knowledge documents use a small YAML frontmatter schema (Obsidian-compatible, plain
-Markdown otherwise). Blank starters live in `templates/` (`change.md`, `handoff.md`,
-`decision.md`, `memory.md`, `context.md`) — distinct from the product's *choreography*
-templates and its runtime prompt packs.
-
-- **`type`** (primary classification): `context` · `change` · `handoff` · `decision` ·
-  `learning` · `constraint` · `pattern`
-- **`status`**: `active` · `accepted` · `historical` · `closed`
-- **`area`** (context and change docs): `overview` · `product` · `architecture` ·
-  `engineering` · `reference` — for change docs, use the domain the change touches
-- **`created`** / **`updated`**: `updated` means *last substantive knowledge
-  review* — don't bump it for formatting-only edits
-- **`confidence`** (memories only): `confirmed` (verified against `main` with citations) ·
-  `reported` (plausible, unverified provenance) · `refuted-on-main`
-- Index/navigation files (`INDEX.md`, `ACTIVE.md`, `HOME.md`) carry no frontmatter.
-
-Prefer folders + properties + links over tags; use `tags` only for cross-cutting labels
-no property or link expresses.
+Frontmatter schema and where each kind of knowledge goes:
+[context/INDEX.md](../INDEX.md#metadata-convention). Change-document templates live in
+`changes/_templates/`; memory and context starters in `templates/`. Both are distinct from
+the product's *choreography* templates and its runtime prompt packs.
 
 Deep reference: [docs/developer-guide.md](../../docs/developer-guide.md),
 [docs/user-guide.md](../../docs/user-guide.md).

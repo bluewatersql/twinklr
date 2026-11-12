@@ -34,7 +34,7 @@ moved on — check its recorded commit SHA before relying on it.
   `ComparisonReport`. A multi-run result may be committed only after the owning protocol
   validates its source artifacts, costs, calibration, blind ranking, and human evidence.
 - Durable decisions, learnings, or constraints about the evaluation *harness itself* — those
-  belong in `memories/` per `AGENTS.md`'s knowledge-placement table, with a link back to
+  belong in `memories/` per `AGENTS.md`'s knowledge-model section, with a link back to
   the run that surfaced them.
 - Gitignored artifacts (`data/`, `artifacts/`) — those are local/generated and never
   committed. Everything under `evaluations/` is intentionally durable and reviewable.

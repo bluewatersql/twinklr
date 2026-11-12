@@ -319,10 +319,10 @@ Stop immediately if any of these occur:
 ## Part D — Recording the verdict
 
 Write one decision memo in one of the two canonical homes (spec "Deliverable"; choose per
-`AGENTS.md` knowledge placement):
+`AGENTS.md` knowledge model):
 
 - recommended: `changes/mh-idiom-mining-feasibility/memo.md` (short-lived change dir;
-  start from [templates/change.md](../../../templates/change.md) and add the dir to
+  start from [changes/_templates/brief.md](../../_templates/brief.md) and add the dir to
   [changes/ACTIVE.md](../../ACTIVE.md) while open), **or**
 - `memories/decisions/mh-idiom-mining-<verdict>.md` (start from
   [templates/memory.md](../../../templates/memory.md); update

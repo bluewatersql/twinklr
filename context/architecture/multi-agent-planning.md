@@ -67,8 +67,10 @@ pending; implementation fixtures are not decision evidence.
 - Agent orchestration: `packages/twinklr/core/agents/` (audio/lyrics profiling,
   sequencer planners, shared judge/iteration controller, provider adapters)
 - OpenAI is the verified cloud strict-output path. Ollama means Ollama cloud
-  (`glm-5.3:cloud`) through the loopback daemon, routed via `/v1/chat/completions`; its
-  real `MacroPlan` validity awaits an owner decision on the P4-T2 cloud smoke. Claude
+  (`glm-5.3:cloud`) through the loopback daemon, routed via `/v1/chat/completions`; a
+  full `twinklr run` with every role on that model passed on 2026-11-12
+  ([evidence](../../changes/twinklr-reactivation-review/evidence/2026-11-12-p4-t2-ollama-cloud-pipeline/README.md)).
+  Ollama Cloud does not enforce `response_format`, so the schema travels in the prompt. Claude
   (`llm_provider: anthropic`, default `claude-opus-5-5`) uses `output_config.format`
   structured outputs. Claude refuses to compile the planner schemas ("compiled grammar
   is too large"), so those requests are resent with the schema carried only by the

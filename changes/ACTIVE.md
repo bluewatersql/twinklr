@@ -1,108 +1,28 @@
 # Active Changes
 
-_Last updated: 2026-11-01._
+_Last updated: 2026-11-12._
 
-- **twinklr-reactivation-review** — **ACTIVE: implementation phase (build campaign).**
-  The review completed 2026-08-13 (all 8 stages, adversarially verified, verdict
-  REQUIRES_STABILIZATION); the owner then authorized execution of the
-  [reactivation proposal](twinklr-reactivation-review/reviews/reactivation-proposal.md)
-  as a multi-agent build campaign living in
-  [`twinklr-reactivation-review/build/`](twinklr-reactivation-review/build/plan/00-overview.md)
-  (plan + 56 per-task specs). **Status: Phases 0 and 1K are complete. All Phase 1P
-  implementation tasks, all 13 Phase 2P offline implementations, and all four Phase 2K
-  tooling implementations are merged and independently verified at `6b2b34a`, but
-  Phases 1P, 2P, and 2K still have owner-gated exit evidence.** Phase 1P needs its
-  recorded human judgment and empirical xLights acceptance; Phase 2P needs its remaining
-  live calibration and three-arm evidence (the owner accepted T1/T8/T9 on 2026-08-16);
-  Phase 2K needs real-layout, real-corpus, human-curation, and preferred-style evidence.
-  The owner explicitly authorized P3-T1, P3-T2, and P3-T3 before those empirical exits
-  on 2026-08-16. P3-T1 is merged and independently verified at `5eebcb2`; P3-T2 is
-  merged and independently verified at `5365f70`; P3-T3 is merged at `33cce57` after
-  independent verification and owner acceptance of its canonical `twinklr display`
-  command and offline file-only layout source. On 2026-08-16 the owner accepted the
-  exact four-field contract, its invariants, and the AC2 amendment that treats P3-T4's
-  recursive typed/by-name readers as the task boundary while reserving emitted behavior
-  for P3-T5. P3-T4 was independently approved offline and in code review, then integrated
-  at `558153c`. The owner also authorized only the capped P3-T4 live macro probe (at most
-  three attempts, subject to one cumulative `$1.75` cap). The dedicated fail-closed
-  harness passed audit. Its first live attempt made one request and was safely rejected
-  by OpenAI with HTTP 400 `invalid_json_schema` because `ThemeRef.scope` had a `$ref`
-  sibling `description`; no retry or fallback occurred. Usage was unavailable, so the
-  full `$1.66` reservation remains committed and the remaining `$0.09` cannot fund a
-  second attempt. The general `$ref` normalization fix is integrated and offline-verified.
-  On 2026-08-26 the owner authorized exactly one second audited request under
-  authorization `p3-t4-second-attempt-owner-approved-2026-08-26`, with exact additional
-  `$1.660000` preauthorization, a `$3.32` cumulative hard cap, and a two-attempt lifetime
-  cap. After independent audit and clean-commit preflight, attempt 2 made exactly one
-  provider request on 2026-08-26. OpenAI returned HTTP 400 because `temperature` is not
-  supported by `gpt-5.6-sol`; there was no retry, fallback, logical request, schema
-  repair, or usage metadata. Both `$1.660000` reservations are therefore committed
-  (`$3.320000` total), the two-attempt lifetime cap is exhausted, no third attempt is
-  authorized, and live acceptance remained open until the owner closed it on 2026-11-12
-  as superseded by later live runs
-  ([decision](../memories/decisions/p3-t4-live-acceptance-superseded.md)). An offline remediation now normalizes
-  request parameters through an explicit model-capability policy so `gpt-5.6-sol`
-  omits temperature while retaining reasoning effort; it does not create live
-  acceptance or another attempt. The
-  owner subsequently accepted all nine P3-T5 decisions, and P3-T5 was integrated at
-  `f006468`. P3-T6's remediated candidate then received independent standards,
-  specification, and adversarial approval offline/in code and was integrated at
-  `c9620db`. P3-T8's independently approved offline implementation was integrated at
-  `82438cf`. P3-T7's final corrected freeze
-  (`2caf726b505fb6fc3e17f56165b4884ce0f33a1525f9768d6a880621e16e9192`) is
-  independently approved offline/in code and is included in the current integration.
-  Phase 3 now has all eight offline task implementations integrated. These integrations do not
-  waive the outstanding Phase 1P/2P/2K exits or authorize
-  P3-T5 live work or any paid/local empirical action. On 2026-08-26 the owner accepted
-  P3-T6's amended offline unified-emission contract. Its empirical xLights GUI
-  acceptance remains open. The owner authorized P3-T7+ and task-bounded live/paid work
-  on 2026-08-26. P3-T7's audited live proof then passed with exactly one
-  `gpt-image-2` request, no retry, a zero-call scoped cache replay, and measured cost
-  `$0.00622`; the sealed owner-local ledger permanently blocks another attempt. The xLights
-  GUI checks were deferred until a meaningful end-to-end show existed. The
-  post-refactor-validation live MH run (2026-08-30) can now serve for the MH-path checks,
-  pending owner confirmation; see runbook 04. Their empirical gates and all earlier
-  empirical exits remain open.
-  Phase 4 has six of seven tasks integrated. P4-T1 landed at `56d9aa0`; P4-T2's
-  implementation and redirect hardening are integrated through `3765bd9`/`40e8e55`;
-  P4-T3 is integrated at `bf6bba5`; P4-T4 is integrated at `3e7f679`; P4-T5 is
-  integrated at `05f24d0`; and P4-T6 is integrated at `da8f19d`, each after independent
-  verification. P4-T2's real Ollama schema smoke remains unclaimed pending explicit
-  local opt-in. P4-T7's independently approved repository-only preflight is integrated
-  at `c79566e`; it corrects the unsupported vendor-history premise and records the exact
-  corpus-gated re-entry and isolated-offline boundaries. P4-T7 full execution remains
-  NO-GO/deferred. P2K-T2's independently Standards- and Spec-approved offline-readiness
-  hardening is integrated at `03b75e9`, but its real owner-corpus run, unchanged-corpus
-  idempotent rerun evidence, non-empty distributions, and exactly eight owner decisions
-  remain open; no accepted, sufficient private moving-head corpus manifest exists. The
-  integrated preflight is not P4-T7 completion and makes no feasibility verdict; Phase
-  4 remains six of seven tasks integrated and no Phase 4 completion is claimed.
-  Optional WhisperX runtime audio execution remains owner-deferred against the current
-  default FFmpeg 9; see the
-  [active task spec](twinklr-reactivation-review/build/specs/phase-4-compounding/P4-T1-ml-chain-python-bump.md).
-  The overall change
-  therefore remains active.
-  **Owner runbooks (2026-11-01):** step-by-step commands for every remaining empirical
-  exit live in
-  [`twinklr-reactivation-review/runbooks/`](twinklr-reactivation-review/runbooks/README.md).
-  On 2026-11-01 the owner amended the Phase 4 Ollama exit to use Ollama cloud
-  (`glm-5.3:cloud`) through the loopback daemon, with no local model.
-  Live execution state, process rules, and pending owner actions:
-  **[build/plan/HANDOFF.md](twinklr-reactivation-review/build/plan/HANDOFF.md)**.
-  Review artifacts:
-  [Findings](twinklr-reactivation-review/reviews/findings.md) ·
-  [Verification record](twinklr-reactivation-review/reviews/verification.md).
-  Durable truths promoted to `context/current-state.md` and
-  `memories/learnings/reactivation-review-2026-08.md`.
+One row per workstream. Keep rows short: status, where the work lives, and the next
+action. Detail and history belong in the change folder.
+
+## Active
+
+| Change | Status | Branch / owner | Next action | Start here |
+|---|---|---|---|---|
+| [`twinklr-reactivation-review/`](twinklr-reactivation-review/spec.md) | **Build campaign: code complete, empirical exits open.** Phases 0 and 1K are complete. Phases 1P, 2P, 2K, and 3 have every implementation task merged and independently verified, but their owner, live, xLights, and real-data exits are not met. Phase 4 has 6 of 7 tasks merged; P4-T7 is optional and NO-GO. | `main`; integrator is the orchestrating session | Owner actions, in [runbook order](twinklr-reactivation-review/runbooks/README.md): decide whether the 2026-11-12 Ollama cloud pipeline pass closes P4-T2; watch `rendered.xsq` and record the Claude-baseline judgment; xLights GUI acceptance (runbook 04); P2K-T2 owner-corpus run (runbook 02). | [build/plan/HANDOFF.md](twinklr-reactivation-review/build/plan/HANDOFF.md) |
+| [`2026_11_12_knowledge_optimization/`](2026_11_12_knowledge_optimization/brief.md) | Restructure of the agent router, context, memories, and prompts for multi-agent, multi-workstream use, aligned to the OnDeck layout. Documentation only. | `chore/knowledge-optimization` | Owner review, then merge and close. | [handoff.md](2026_11_12_knowledge_optimization/handoff.md) |
+
+Standing boundaries for the campaign (sealed P3-T4 and P3-T7 ledgers, owner-gated live
+work) are in [context/current-state.md](../context/current-state.md#permanent-boundaries).
+The per-phase table is in
+[context/current-state.md](../context/current-state.md#active-work); the dated record of
+every attempt, authorization, and commit is in the campaign handoff.
 
 ## Recently closed
 
-- **post-refactor-validation**: closed 2026-11-01. It proved the refactored engine works
-  end to end with a live MH show that meets or exceeds the pre-refactor baseline, and it
-  locked offline regression baselines. Unfinished items and where each went are listed in
-  [plan.md § Closeout](post-refactor-validation/plan.md#closeout--2026-11-01). Current
-  truth: [context/current-state.md](../context/current-state.md).
+| Change | Outcome |
+|---|---|
+| [`post-refactor-validation/`](post-refactor-validation/spec.md) | Closed 2026-11-01. Proved the refactored engine works end to end with a live moving-head show that meets or exceeds the pre-refactor baseline, and locked offline regression baselines. Unfinished items and where each went: [plan.md § Closeout](post-refactor-validation/plan.md#closeout--2026-11-01). |
 
-When starting a new change, create `changes/<slug>/` per the conventions in
-[INDEX.md](INDEX.md) and list it here with: name, status, one-line purpose, and links to
-its spec / current plan / latest handoff.
+To start a change, follow
+[../prompts/planning/start-a-change.md](../prompts/planning/start-a-change.md).

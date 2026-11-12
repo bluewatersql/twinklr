@@ -28,6 +28,12 @@ pause or phase boundary._
 Start here. This section supersedes older status prose below when the two disagree;
 older entries remain as dated audit history.
 
+> **2026-11-12 note.** The current status snapshot (per-phase table, live evidence,
+> permanent boundaries) is [context/current-state.md](../../../../context/current-state.md).
+> Where dated entries below disagree with the 2026-11-12 entries, the 2026-11-12 entries
+> win: P3-T4 live acceptance is closed, and the Phase 4 Ollama exit uses Ollama cloud
+> (no local model pull), with closure of that exit awaiting the owner's call.
+
 ### Live validation — 2026-11-12 (Claude)
 
 - **Inputs restored.** `data/` is back with 9 songs. The "Blocked on inputs" bullet

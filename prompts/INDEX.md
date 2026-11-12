@@ -1,22 +1,32 @@
 # Prompts — Reusable Agent Workflows
 
-Reusable procedures for agents working on this repository. Check here before inventing a
-substantial workflow; avoid near-duplicate variants of the same procedure.
+`prompts/` holds the procedures agents follow to perform work in this repository: the
+**how**, kept separate from what is true (`context/`), what is changing (`changes/`), and
+what we learned (`memories/`).
 
-> **Not to be confused with** `packages/twinklr/core/**/prompts/` — those are Twinklr's
-> *runtime* LLM prompt packs (Jinja2 application source), part of the product itself.
+Check this index before inventing a substantial workflow. Prompts reference authoritative
+context instead of restating it; when a prompt disagrees with `AGENTS.md` or `context/`,
+the canonical source wins and the prompt is fixed.
 
 ## Workflows
 
-- **[implementation/implement-and-validate.md](implementation/implement-and-validate.md)**
-  — standard workflow for making a code change and proving it with the quality gates.
-- **[handoff/session-closeout.md](handoff/session-closeout.md)**
-  — end-of-session review: promote durable knowledge to `memories/`/`context/`, write
-  handoffs, update indexes. Use after any substantial work.
+| Prompt | Use when |
+|---|---|
+| [planning/start-a-change.md](planning/start-a-change.md) | Beginning any substantive task; creates or locates the `changes/` record |
+| [planning/subagent-task-brief.md](planning/subagent-task-brief.md) | Delegating a task to a subagent, especially several in parallel |
+| [implementation/implement-a-change.md](implementation/implement-a-change.md) | Executing against an active change |
+| [review/review-a-change.md](review/review-a-change.md) | Independent review of a diff against its acceptance criteria |
+| [handoff/complete-a-handoff.md](handoff/complete-a-handoff.md) | Ending a work session on an active change |
+| [handoff/session-closeout.md](handoff/session-closeout.md) | Closing a change or significant session: promote knowledge, update indexes |
+| [research/recover-failed-agent-run.md](research/recover-failed-agent-run.md) | Resuming after another agent's run failed or was interrupted |
 
 ## Conventions
 
-- Prompts describe *procedure*; they link to `context/` for facts rather than restating
-  them.
-- Organize by activity (`implementation/`, `handoff/`, and add `planning/`, `review/`,
-  `testing/`, `research/`, … as real workflows accumulate). Don't create empty scaffolding.
+- One prompt per file, with a stable descriptive name. No `-v2` or `-final` variants;
+  extend the existing prompt.
+- Templates for change documents live in [../changes/_templates/](../changes/_templates/);
+  prompts link to them rather than embedding copies.
+- New prompt files are added to this index.
+
+These are **agent workflow prompts**. The product's runtime LLM prompt packs live in
+`packages/twinklr/core/**/prompts/` and are application source code.
