@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from dataclasses import replace
+from dataclasses import dataclass, replace
 import json
 import logging
 import threading
@@ -79,6 +79,23 @@ _SCHEMA_COMPLEXITY_REJECTION_MARKERS = (
     "compiled grammar is too large",
     "schema is too complex",
 )
+
+
+@dataclass(frozen=True)
+class _ClaudeRequest:
+    """One Messages request plus the context needed to resend and parse it."""
+
+    params: dict[str, Any]
+    response_model: type[BaseModel] | None
+    schema_hash: str | None
+    allow_prompt_only_fallback: bool
+
+    @property
+    def prompt_only(self) -> bool:
+        """Whether a structured request carries its schema only in the prompt."""
+        return self.response_model is not None and "format" not in self.params.get(
+            "output_config", {}
+        )
 
 
 def claude_json_schema(model: type[BaseModel]) -> dict[str, Any]:
@@ -166,8 +183,8 @@ class AnthropicProvider:
 
         # Conversation state
         self._conversations: dict[str, Conversation] = {}
-        # Hashes of schemas Claude refused to compile; later requests skip the 400.
-        self._prompt_only_schema_hashes: set[str] = set()
+        # (model, schema hash) pairs Claude refused to compile; later requests skip the 400.
+        self._prompt_only_schemas: set[tuple[str, str]] = set()
 
     async def aclose(self) -> None:
         """Close the underlying Anthropic HTTP clients and their connection pools."""
@@ -347,12 +364,8 @@ class AnthropicProvider:
         model: str,
         temperature: float | None,
         kwargs: dict[str, Any],
-    ) -> tuple[dict[str, Any], type[BaseModel] | None, bool]:
-        """Translate Twinklr's portable request options into a Messages request.
-
-        Returns the request, the response model, and whether a schema Claude
-        refuses to compile may be resent as a prompt-only request.
-        """
+    ) -> _ClaudeRequest:
+        """Translate Twinklr's portable request options into a Messages request."""
         response_model = kwargs.pop("response_model", None)
         if kwargs.pop("input_image_urls", None):
             raise LLMProviderError("Configured provider does not support vision image inputs")
@@ -389,11 +402,13 @@ class AnthropicProvider:
         output_config: dict[str, Any] = {}
         if reasoning_effort is not None:
             output_config["effort"] = reasoning_effort
+        schema_hash: str | None = None
         if response_model is not None:
             if not hasattr(response_model, "model_json_schema"):
                 raise LLMProviderError("response_model must be a Pydantic model class")
             schema_model = cast("type[BaseModel]", response_model)
-            if response_schema_hash(schema_model) not in self._prompt_only_schema_hashes:
+            schema_hash = response_schema_hash(schema_model)
+            if (model, schema_hash) not in self._prompt_only_schemas:
                 output_config["format"] = {
                     "type": "json_schema",
                     "schema": claude_json_schema(schema_model),
@@ -405,53 +420,61 @@ class AnthropicProvider:
         if model in _SERVER_SIDE_FALLBACK_MODELS:
             request_params["extra_headers"] = {"anthropic-beta": _SERVER_SIDE_FALLBACK_BETA}
             request_params["extra_body"] = {"fallbacks": "default"}
-        return (
-            request_params,
-            cast("type[BaseModel] | None", response_model),
-            allow_prompt_only_fallback,
+        return _ClaudeRequest(
+            params=request_params,
+            response_model=cast("type[BaseModel] | None", response_model),
+            schema_hash=schema_hash,
+            allow_prompt_only_fallback=allow_prompt_only_fallback,
         )
 
     def _prompt_only_request(
-        self,
-        request_params: dict[str, Any],
-        response_model: type[BaseModel] | None,
-        allow_prompt_only_fallback: bool,
-        error: Exception,
-    ) -> dict[str, Any] | None:
+        self, request: _ClaudeRequest, error: Exception
+    ) -> _ClaudeRequest | None:
         """Return the request without a schema Claude refused to compile, if allowed."""
-        output_config = request_params.get("output_config", {})
         if (
-            response_model is None
-            or not allow_prompt_only_fallback
-            or "format" not in output_config
+            request.response_model is None
+            or request.schema_hash is None
+            or request.prompt_only
+            or not request.allow_prompt_only_fallback
             or getattr(error, "status_code", None) != 400
         ):
             return None
-        text = str(error).lower()
+        body = getattr(error, "body", None)
+        detail = body.get("error") if isinstance(body, dict) else None
+        message = detail.get("message") if isinstance(detail, dict) else None
+        text = (message if isinstance(message, str) else str(error)).lower()
         if not any(marker in text for marker in _SCHEMA_COMPLEXITY_REJECTION_MARKERS):
             return None
         logger.warning(
             "Claude rejected the %s schema as too complex to compile; "
             "resending with the schema carried only by the prompt: %s",
-            response_model.__name__,
+            request.response_model.__name__,
             error,
         )
-        self._prompt_only_schema_hashes.add(response_schema_hash(response_model))
+        model = request.params["model"]
+        self._prompt_only_schemas.add((model, request.schema_hash))
         retry_params = {
-            key: value for key, value in request_params.items() if key != "output_config"
+            key: value for key, value in request.params.items() if key != "output_config"
         }
-        retry_config = {key: value for key, value in output_config.items() if key != "format"}
+        retry_config = {
+            key: value
+            for key, value in request.params.get("output_config", {}).items()
+            if key != "format"
+        }
         if retry_config:
             retry_params["output_config"] = retry_config
-        return retry_params
+        return replace(request, params=retry_params)
 
-    def _parse_message(
-        self,
-        response: Any,
-        model: str,
-        response_model: type[BaseModel] | None,
-        request_params: dict[str, Any],
-    ) -> LLMResponse:
+    @staticmethod
+    def _decode_prompt_only_json(text: str) -> Any:
+        """Decode the first JSON object in a reply that wraps it in prose or a fence."""
+        start = text.find("{")
+        if start < 0:
+            raise json.JSONDecodeError("No JSON object in response", text, 0)
+        value, _ = json.JSONDecoder().raw_decode(text, start)
+        return value
+
+    def _parse_message(self, response: Any, model: str, request: _ClaudeRequest) -> LLMResponse:
         """Classify the stop reason, account usage, and parse the JSON text."""
         token_usage = self._extract_token_usage(response)
         self._update_token_usage(
@@ -482,7 +505,14 @@ class AnthropicProvider:
                 token_usage=token_usage,
             )
         try:
-            response_data = json.loads(text)
+            try:
+                response_data = json.loads(text)
+            except json.JSONDecodeError:
+                # Without constrained decoding Claude may add a preamble or a
+                # trailing note around the object; strict mode never does.
+                if not request.prompt_only:
+                    raise
+                response_data = self._decode_prompt_only_json(text)
         except json.JSONDecodeError as exc:
             logger.error("Failed to parse Anthropic JSON response: %s", exc)
             raise RecoverableLLMProviderError(
@@ -501,28 +531,20 @@ class AnthropicProvider:
                 actual_model_present=isinstance(actual_model, str),
                 token_usage_is_explicit=getattr(response, "usage", None) is not None,
                 finish_reason=stop_reason if isinstance(stop_reason, str) else None,
-                structured_output_mode=self._structured_output_mode(request_params, response_model),
+                structured_output_mode=(
+                    None
+                    if request.response_model is None
+                    else "prompt_schema"
+                    if request.prompt_only
+                    else "json_schema"
+                ),
+                # A structured request only drops its schema after a complexity rejection.
                 structured_output_fallback_reason=(
-                    "schema_too_complex"
-                    if response_model is not None
-                    and response_schema_hash(response_model) in self._prompt_only_schema_hashes
-                    else None
+                    "schema_too_complex" if request.prompt_only else None
                 ),
-                response_schema_hash=(
-                    response_schema_hash(response_model) if response_model is not None else None
-                ),
+                response_schema_hash=request.schema_hash,
             ),
         )
-
-    @staticmethod
-    def _structured_output_mode(
-        request_params: dict[str, Any], response_model: type[BaseModel] | None
-    ) -> str | None:
-        if response_model is None:
-            return None
-        if "format" in request_params.get("output_config", {}):
-            return "json_schema"
-        return "prompt_schema"
 
     # =========================================================================
     # Sync Methods
@@ -553,20 +575,16 @@ class AnthropicProvider:
             LLMProviderError: On API errors or JSON parse failures.
         """
         try:
-            request_params, response_model, allow_fallback = self._build_request(
-                messages, model, temperature, kwargs
-            )
+            request = self._build_request(messages, model, temperature, kwargs)
             try:
-                response = self._stream_sync(request_params)
+                response = self._stream_sync(request.params)
             except Exception as exc:
-                retry_params = self._prompt_only_request(
-                    request_params, response_model, allow_fallback, exc
-                )
-                if retry_params is None:
+                retry = self._prompt_only_request(request, exc)
+                if retry is None:
                     raise
-                request_params = retry_params
-                response = self._stream_sync(request_params)
-            return self._parse_message(response, model, response_model, request_params)
+                request = retry
+                response = self._stream_sync(request.params)
+            return self._parse_message(response, model, request)
 
         except LLMProviderError:
             raise
@@ -667,20 +685,20 @@ class AnthropicProvider:
             LLMProviderError: On API errors or JSON parse failures.
         """
         try:
-            request_params, response_model, allow_fallback = self._build_request(
-                messages, model, temperature, kwargs
-            )
-            try:
-                response = await self._stream_async(request_params)
-            except Exception as exc:
-                retry_params = self._prompt_only_request(
-                    request_params, response_model, allow_fallback, exc
-                )
-                if retry_params is None:
-                    raise
-                request_params = retry_params
-                response = await self._stream_async(request_params)
-            return self._parse_message(response, model, response_model, request_params)
+            request = self._build_request(messages, model, temperature, kwargs)
+            # The outer bound keeps timeout_seconds a limit on the whole call,
+            # prompt-only resend included, since the HTTP timeout only bounds each
+            # read of a stream that keeps pinging.
+            async with asyncio.timeout(request.params.get("timeout")):
+                try:
+                    response = await self._stream_async(request.params)
+                except Exception as exc:
+                    retry = self._prompt_only_request(request, exc)
+                    if retry is None:
+                        raise
+                    request = retry
+                    response = await self._stream_async(request.params)
+            return self._parse_message(response, model, request)
 
         except LLMProviderError:
             raise
@@ -689,13 +707,8 @@ class AnthropicProvider:
             raise LLMProviderError(f"Provider error: {exc}") from exc
 
     async def _stream_async(self, request_params: dict[str, Any]) -> Any:
-        # Streaming keeps large max_tokens requests inside HTTP timeouts; the
-        # outer bound keeps timeout_seconds a limit on the whole call, since the
-        # HTTP timeout only bounds each read of a stream that keeps pinging.
-        async with (
-            asyncio.timeout(request_params.get("timeout")),
-            self._async_client.messages.stream(**request_params) as stream,
-        ):
+        # Streaming keeps large max_tokens requests inside HTTP timeouts.
+        async with self._async_client.messages.stream(**request_params) as stream:
             return await stream.get_final_message()
 
     async def generate_json_with_conversation_async(
