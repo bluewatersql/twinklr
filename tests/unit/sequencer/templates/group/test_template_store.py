@@ -347,3 +347,60 @@ def test_from_catalog_with_local_extensions_none_overlay_is_noop(store_dir: Path
     """A None local extensions dir is silently ignored."""
     store = TemplateStore.from_catalog_with_local_extensions(store_dir, None)
     assert set(store.all_recipe_ids()) == {"gtpl_base_wash_slow", "gtpl_rhythm_pulse_fast"}
+
+
+def _write_index(directory: Path, files: list[str]) -> None:
+    entries = [
+        {
+            "recipe_id": Path(file).stem,
+            "name": Path(file).stem,
+            "template_type": "BASE",
+            "visual_intent": "ABSTRACT",
+            "tags": [],
+            "source": "builtin",
+            "file": file,
+        }
+        for file in files
+    ]
+    (directory / "index.json").write_text(
+        json.dumps(
+            {"schema_version": "template-index.v1", "total": len(entries), "entries": entries}
+        ),
+        encoding="utf-8",
+    )
+
+
+def test_strict_load_reports_every_missing_recipe_file(tmp_path: Path) -> None:
+    """A stale index names how many files are missing, not just the first one."""
+    _write_index(tmp_path, ["builtins/gtpl_a.json", "builtins/gtpl_b.json", "builtins/gtpl_c.json"])
+
+    with pytest.raises(ValueError) as caught:
+        TemplateStore.from_directory(tmp_path).load_all_strict()
+
+    message = str(caught.value)
+    assert "3 of 3 recipe catalog entries reference missing files" in message
+    assert all(name in message for name in ("gtpl_a", "gtpl_b", "gtpl_c"))
+
+
+def test_strict_overlay_failure_names_the_local_overlay(store_dir: Path, tmp_path: Path) -> None:
+    """A broken overlay says it is the local overlay and how to recover."""
+    overlay = tmp_path / "overlay"
+    overlay.mkdir()
+    _write_index(overlay, ["builtins/gtpl_gone.json"])
+
+    with pytest.raises(ValueError) as caught:
+        TemplateStore.from_catalog_with_local_extensions_strict(store_dir, overlay)
+
+    message = str(caught.value)
+    assert f"Local template overlay {overlay}" in message
+    assert "remove or rebuild" in message
+    assert "gtpl_gone" in message
+
+
+def test_strict_tracked_catalog_failure_is_not_blamed_on_the_overlay(tmp_path: Path) -> None:
+    _write_index(tmp_path, ["builtins/gtpl_gone.json"])
+
+    with pytest.raises(ValueError) as caught:
+        TemplateStore.from_catalog_with_local_extensions_strict(tmp_path, None)
+
+    assert "Local template overlay" not in str(caught.value)

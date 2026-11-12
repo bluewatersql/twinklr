@@ -38,7 +38,7 @@ older entries remain as dated audit history.
     planner schema with HTTP 400 `compiled grammar is too large`. A per-schema probe
     showed the 5 planner schemas rejected and the 8 judge, lyrics, enricher and vision
     schemas accepted.
-  - Fixed at `f0ae0da` (branch `fix/claude-schema-complexity-fallback`, not yet merged):
+  - Fixed at `f0ae0da` with review follow-ups `5b6e2d9` and `eb5fdb8` (on `main`, pushed):
     a prompt-only resend on that rejection.
   - [Evidence](../../evidence/2026-11-12-claude-provider-live/README.md).
 - **Baseline live run (runbook 05 §2): PASS on Claude.**
@@ -48,11 +48,31 @@ older entries remain as dated audit history.
   - The reference song `Need A Favor` is missing, so the comparison is indicative.
   - The human judgment is PENDING-OWNER.
   - [Evaluation](../../../../evaluations/2026-11-12-claude-baseline-live-run/README.md).
-- **Open:**
+- **Owner decisions, 2026-11-12:**
+  - **Planner schemas on Claude:** keep the prompt-only fallback with client-side
+    validation, and track repair rates over more Claude runs.
+    **TODO (deferred by the owner):** redesign or split the five planner schemas
+    (audio_profile, macro, group, holistic corrector, moving-head) so Claude can compile
+    them for server-side enforcement. Revisit if Claude runs show repairs or failures.
+  - **P3-T4:** accepted as superseded by the 2026-08 OpenAI and 2026-11-12 Claude live
+    runs. The item is closed, the sealed ledger is untouched, and no third attempt is
+    made. See the [decision](../../../../memories/decisions/p3-t4-live-acceptance-superseded.md).
+  - **Stale `data/templates` overlay:** removed and rebuilt.
+    - The stale copy (111 of 132 index entries missing their files) is moved to
+      `data/templates.stale-2026-11-12`.
+    - The builtin recipe files were never in git. They were rebuilt from the owner's
+      Feb-2026 backup (`~/work/github/projects_archives/twinklr/template_bak/templates`)
+      by replaying `scripts/enrich_builtin_templates.py` and then
+      `scripts/cleanup_display_templates.py` on a scratch copy.
+    - The replay reproduced 20 of the 21 surviving files exactly. The 21st,
+      `gtpl_base_pinwheel_wash`, came from a later addition and the surviving copy is kept.
+    - The result is 131 of 132 recipes; only `gtpl_rhythm_pinwheel_twinkle` is lost.
+    - Merged with the tracked catalog this gives 132 recipes, all strictly valid, and the
+      planner/renderer catalogs match.
+    - The strict loader now names the overlay and lists every missing file.
+  - **P4-T2 Ollama cloud:** live cloud requests are approved until the path works.
+  - **Evidence logs:** stay gitignored. No `.gitignore` exception.
   - Review item m5 is done: the docs and context no longer call Anthropic legacy.
-  - Planner schemas have no server-side guarantee on Claude; making them compile is an
-    owner design decision.
-  - The owner decisions from 2026-11-11 below remain open.
 
 ### Live validation — 2026-11-11
 
@@ -581,8 +601,10 @@ The remaining empirical checks are also pending:
 
 ## Continuation order
 
-1. Preserve P3-T4's sealed two-attempt ledger and permanent no-third-attempt boundary;
-   do not infer live acceptance from the offline provider-capability fix.
+1. Preserve P3-T4's sealed two-attempt ledger and permanent no-third-attempt boundary.
+   As of 2026-11-12, its live acceptance is closed by owner decision on the later live
+   runs ([decision](../../../../memories/decisions/p3-t4-live-acceptance-superseded.md)),
+   not by the offline fix.
 2. Preserve P3-T7's terminal sealed one-shot ledger and accepted proof evidence; never
    rerun the image proof. Continue only through later tasks' separately audited caps.
 3. Continue non-GUI end-to-end work toward one meaningful fully working show. Defer all

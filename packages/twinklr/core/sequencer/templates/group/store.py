@@ -181,7 +181,13 @@ class TemplateStore:
             and (local_extensions_dir / "index.json").exists()
         ):
             local_store = cls.from_directory(local_extensions_dir)
-            local_store.load_all_strict()
+            try:
+                local_store.load_all_strict()
+            except ValueError as error:
+                raise ValueError(
+                    f"Local template overlay {local_extensions_dir} overrides the tracked "
+                    f"catalog {catalog_dir} but is invalid; remove or rebuild it: {error}"
+                ) from error
             store = store.merge(local_store)
         return store
 
@@ -247,14 +253,23 @@ class TemplateStore:
 
     def load_all_strict(self) -> list[EffectRecipe]:
         """Eagerly validate every indexed recipe without silently dropping entries."""
+        missing = [
+            (recipe_id, entry.file)
+            for recipe_id, entry in self._entries_by_id.items()
+            if not (self._entry_dirs.get(recipe_id, self._base_dir) / entry.file).is_file()
+        ]
+        if missing:
+            # A stale index usually loses many files at once; name them all.
+            shown = ", ".join(f"{recipe_id!r} ({file})" for recipe_id, file in missing[:10])
+            more = f" and {len(missing) - 10} more" if len(missing) > 10 else ""
+            raise ValueError(
+                f"{len(missing)} of {len(self._entries_by_id)} recipe catalog entries "
+                f"reference missing files under {self._base_dir}: {shown}{more}"
+            )
         recipes: list[EffectRecipe] = []
         for recipe_id, entry in self._entries_by_id.items():
             base_dir = self._entry_dirs.get(recipe_id, self._base_dir)
             file_path = base_dir / entry.file
-            if not file_path.is_file():
-                raise ValueError(
-                    f"Recipe catalog entry {recipe_id!r} references missing file {file_path}"
-                )
             try:
                 data = json.loads(file_path.read_text(encoding="utf-8"))
                 recipe = EffectRecipe.model_validate(data)
