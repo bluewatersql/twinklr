@@ -8,9 +8,9 @@ updated: 2026-11-12
 
 # Handoff — Knowledge Optimization
 
-Status: written and reviewed; uncommitted, awaiting owner review
+Status: committed and pushed on the branch; awaiting owner review and merge
 Branch / worktree: `chore/knowledge-optimization` (from `main` `790b52b`)
-Commit: none yet
+Commit: `6f2a9f6`
 PR: none
 Implementing agent / model: Claude Code orchestrating session
 Reviewing agent / model: independent critic subagent (read-only)
@@ -29,7 +29,7 @@ Scope, non-goals, and two decisions for the owner to confirm are in [brief.md](b
 | `current-state.md` and `ACTIVE.md` agree with the campaign handoff | Met after review fixes | Review confirmed counts, boundaries, and run metrics; three accuracy findings fixed |
 | Relative links resolve | Met | Ad-hoc link and anchor check: no broken link in changed files; 7 pre-existing broken links in historical files are unchanged |
 | Independent review, findings addressed | Met with exceptions below | Verdict was "changes requested"; all major and minor findings 1–7 and 9–11 fixed |
-| `make validate` passes | Not run | It refuses a dirty tree; see Validation |
+| `make validate` passes | Met | 5718 passed, 39 skipped at `6f2a9f6` |
 
 ## Files Changed
 
@@ -65,9 +65,9 @@ Scope, non-goals, and two decisions for the owner to confirm are in [brief.md](b
 | `uv run --frozen pytest tests/ -q --no-cov` | 1 failed, 5717 passed, 39 skipped (the failure was the pinned phrase above) |
 | `uv run --frozen pytest tests/unit/config/test_documented_config.py -q --no-cov` (after the fix) | 6 passed |
 
-Failed or skipped validation: `make validate` was not run because it requires a clean
-tree and nothing is committed. The full test suite was not rerun after the review fixes,
-which touched Markdown only.
+| `make validate` at `6f2a9f6` (clean tree) | All validation checks passed: 5718 passed, 39 skipped |
+
+Failed or skipped validation: none.
 
 ## Open Items
 
@@ -83,9 +83,8 @@ which touched Markdown only.
 
 ## Next Action
 
-1. Owner reviews the diff.
-2. Commit on `chore/knowledge-optimization`, run `make validate`, record the result here.
-3. Merge to `main`, then move this change's row in `changes/ACTIVE.md` to "Recently closed".
+1. Owner reviews the branch.
+2. Merge to `main`, then move this change's row in `changes/ACTIVE.md` to "Recently closed".
 
 ## Knowledge Promotion
 

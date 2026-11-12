@@ -66,10 +66,9 @@ See [product/overview.md](product/overview.md).
 
 ## Quality gate
 
-This page owns the rolling gate snapshot. Latest recorded full gate: `9766a84`
-(2026-11-12), `make validate` green
-([record](../changes/twinklr-reactivation-review/evidence/2026-11-12-p4-t2-ollama-cloud-pipeline/README.md)).
-Latest recorded counts: 5,701 passed, 39 skipped at `f0ae0da` (2026-11-12); the skips are
+This page owns the rolling gate snapshot. Latest recorded full gate: `6f2a9f6`
+(2026-11-12), `make validate` green with 5,718 passed, 39 skipped
+([record](../changes/2026_11_12_knowledge_optimization/handoff.md)); the skips are
 optional or local-only boundaries. Last recorded coverage: 89% at `03b75e9` (2026-08-30).
 There are no accepted failures. The gate includes an offline regression harness (`tests/regression/`):
 moving-head replay-render parity and a hermetic display replay.

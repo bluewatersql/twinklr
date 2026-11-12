@@ -72,9 +72,9 @@ Problems found in the previous state:
       owner-gated actions, validation, and done criteria once each.
 - [x] `current-state.md` and `ACTIVE.md` agree with the campaign handoff's 2026-11-12
       state and contain no chronological narrative.
-- [ ] Every relative Markdown link in the changed files resolves.
-- [ ] Independent review of the diff, findings addressed.
-- [ ] `make validate` passes (needs a clean tree, so it runs after the commit).
+- [x] Every relative Markdown link in the changed files resolves.
+- [x] Independent review of the diff, findings addressed (one exception, in the handoff).
+- [x] `make validate` passes (5718 passed, 39 skipped at `6f2a9f6`).
 
 ## Constraints
 
