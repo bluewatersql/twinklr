@@ -52,16 +52,27 @@ Anything that renders a real song passes the real audio path instead.
 def resolve_media_file(audio_path: str | Path | None) -> str:
     """Return a non-empty `mediaFile` value for `audio_path`.
 
+    An audio file that exists is named by its absolute path, so xLights opens the
+    sequence with its audio when the file sits in the show or media folder. A bare
+    file name is only resolved against the show folder root; xLights otherwise stops
+    to ask where the audio is and cannot export a preview.
+
     Args:
         audio_path: Audio file the sequence is choreographed against, if known.
 
     Returns:
-        The audio file name, or `PLACEHOLDER_MEDIA_FILE` when there is nothing to name.
+        The absolute path of an existing audio file, else its file name, or
+        `PLACEHOLDER_MEDIA_FILE` when there is nothing to name.
     """
     if audio_path is None:
         return PLACEHOLDER_MEDIA_FILE
-    name = Path(str(audio_path)).name.strip()
-    return name or PLACEHOLDER_MEDIA_FILE
+    path = Path(str(audio_path).strip()).expanduser()
+    name = path.name.strip()
+    if not name:
+        return PLACEHOLDER_MEDIA_FILE
+    if path.is_file():
+        return str(path.resolve())
+    return name
 
 
 def build_fresh_sequence(

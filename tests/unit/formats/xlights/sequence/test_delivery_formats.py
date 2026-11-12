@@ -160,6 +160,16 @@ def test_resolve_media_file_never_returns_empty() -> None:
     assert resolve_media_file("   ") == PLACEHOLDER_MEDIA_FILE
 
 
+def test_resolve_media_file_names_an_existing_file_by_absolute_path(tmp_path: Path) -> None:
+    """xLights resolves a bare name only against the show folder root, so audio in a
+    subfolder opened with a missing-media prompt and no preview export."""
+    audio = tmp_path / "Music" / "My Song.mp3"
+    audio.parent.mkdir()
+    audio.write_bytes(b"")
+
+    assert resolve_media_file(audio) == str(audio.resolve())
+
+
 def test_fresh_xsq_has_current_version_stamp(tmp_path: Path) -> None:
     """P5-F17: the stamp is the version the project targets, not an inherited 2024.x."""
     sequence = build_fresh_sequence(media_file="song.mp3", duration_ms=4000)
