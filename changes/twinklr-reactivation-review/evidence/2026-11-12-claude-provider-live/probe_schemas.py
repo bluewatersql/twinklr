@@ -1,4 +1,5 @@
 """Probe which registered response schemas Claude's structured outputs compile."""
+
 import time
 
 import anthropic
@@ -17,11 +18,18 @@ for spec in _registered_specs():
             messages=[{"role": "user", "content": "Reply with the smallest valid object."}],
             output_config={
                 "effort": "low",
-                "format": {"type": "json_schema", "schema": claude_json_schema(spec.response_model)},
+                "format": {
+                    "type": "json_schema",
+                    "schema": claude_json_schema(spec.response_model),
+                },
             },
         )
         u = message.usage
-        print(f"{spec.name:24} ACCEPTED stop={message.stop_reason} in={u.input_tokens} out={u.output_tokens} {time.time()-started:.1f}s")
+        print(
+            f"{spec.name:24} ACCEPTED stop={message.stop_reason} in={u.input_tokens} out={u.output_tokens} {time.time() - started:.1f}s"
+        )
     except anthropic.APIStatusError as error:
-        print(f"{spec.name:24} REJECTED {error.status_code} {error.body} {time.time()-started:.1f}s")
+        print(
+            f"{spec.name:24} REJECTED {error.status_code} {error.body} {time.time() - started:.1f}s"
+        )
 print("utc_end", time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()))
