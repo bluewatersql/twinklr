@@ -996,3 +996,36 @@ async def test_conversation_path_uses_prompt_only_fallback(mock_anthropic_client
     assert stream.call_count == 2
     assert response.metadata.structured_output_mode == "prompt_schema"
     assert response.metadata.conversation_id == "conv-fallback"
+
+
+@pytest.mark.asyncio
+async def test_one_deadline_bounds_the_attempt_and_the_resend(
+    mock_anthropic_clients: dict,
+) -> None:
+    """timeout_seconds limits the whole call, so the resend cannot double it."""
+    import asyncio
+
+    provider = _make_provider(mock_anthropic_clients)
+    stream = mock_anthropic_clients["async_client"].messages.stream
+    calls = 0
+
+    async def slow_enter() -> object:
+        nonlocal calls
+        calls += 1
+        await asyncio.sleep(0.3)
+        if calls == 1:
+            raise _grammar_rejection()
+        return MagicMock()
+
+    stream.return_value.__aenter__ = AsyncMock(side_effect=slow_enter)
+
+    with pytest.raises(LLMProviderError, match=r"timeout_seconds=0\.5") as caught:
+        await provider.generate_json_async(
+            messages=[{"role": "user", "content": "test"}],
+            model="claude-opus-5-5",
+            response_model=_structured_result_model(),
+            timeout_seconds=0.5,
+        )
+
+    assert isinstance(caught.value.__cause__, TimeoutError)
+    assert calls == 2

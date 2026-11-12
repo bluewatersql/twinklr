@@ -702,6 +702,10 @@ class AnthropicProvider:
 
         except LLMProviderError:
             raise
+        except TimeoutError as exc:
+            message = f"request exceeded timeout_seconds={request.params.get('timeout')}"
+            logger.error("Async Anthropic provider error: %s", message)
+            raise LLMProviderError(f"Provider error: {message}") from exc
         except Exception as exc:
             logger.error("Async Anthropic provider error: %s", exc)
             raise LLMProviderError(f"Provider error: {exc}") from exc
