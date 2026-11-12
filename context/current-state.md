@@ -41,6 +41,9 @@ See [product/overview.md](product/overview.md).
   one collision-safe registry. The display sequencer renders RGB/pixel effects with
   BeatGrid-exact coordination, and lane blend intent overrides recipe blend metadata
   ([decision](../memories/decisions/lane-blend-mode-overrides-recipe.md)).
+  Moving-head pan, tilt and dimmer output is held to the look the owner accepted before
+  the 2026-08 clean-up; seven clean-up render changes were reverted on 2026-11-12
+  ([decision](../memories/decisions/mh-render-matches-pre-cleanup-look.md)).
   `packages/twinklr/core/sequencer/`, `packages/twinklr/core/curves/`
 - **xLights delivery and iteration** — self-contained `.xsq`, `.xtiming`, and `.xmap`
   output; a pinned automation client for preview rendering; guarded `inject` and
