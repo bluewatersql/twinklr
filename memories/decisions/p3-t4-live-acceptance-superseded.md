@@ -11,14 +11,15 @@ tags: [macro-planner, live-run, acceptance, p3-t4]
 
 _Accepted by the owner on 2026-11-12, choosing option 1 ("Accept") of
 [runbook 05 §7](../../changes/twinklr-reactivation-review/runbooks/05-phase-2p-and-3-live-evidence.md).
-No new spend was involved._
+The 2026-11-12 Claude baseline run, made under runbook 05 §2 and not as P3-T4 work, is
+cited as additional corroborating evidence. The decision itself involved no new spend._
 
 ## Decision
 
 The P3-T4 live macro-contract acceptance item is **closed**. Two later live end-to-end runs
 supersede it as the evidence; both exercised the macro planner with a real song:
 
-- **2026-08-30, public OpenAI.** The post-refactor-validation live moving-head run on
+- **2026-08-29, public OpenAI.** The post-refactor-validation live moving-head run on
   `11 - Need A Favor` passed, with sophistication at or above the pinned baseline
   ([live-run-prereqs.md](../../changes/post-refactor-validation/notes/live-run-prereqs.md)).
 - **2026-11-12, Claude `claude-opus-5-5`.** Run on `Hey Come Look At My House`.

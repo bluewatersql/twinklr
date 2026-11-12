@@ -38,7 +38,9 @@ _Last updated: 2026-11-01._
   supported by `gpt-5.6-sol`; there was no retry, fallback, logical request, schema
   repair, or usage metadata. Both `$1.660000` reservations are therefore committed
   (`$3.320000` total), the two-attempt lifetime cap is exhausted, no third attempt is
-  authorized, and live acceptance remains open. An offline remediation now normalizes
+  authorized, and live acceptance remained open until the owner closed it on 2026-11-12
+  as superseded by later live runs
+  ([decision](../memories/decisions/p3-t4-live-acceptance-superseded.md)). An offline remediation now normalizes
   request parameters through an explicit model-capability policy so `gpt-5.6-sol`
   omits temperature while retaining reasoning effort; it does not create live
   acceptance or another attempt. The
@@ -50,7 +52,7 @@ _Last updated: 2026-11-01._
   (`2caf726b505fb6fc3e17f56165b4884ce0f33a1525f9768d6a880621e16e9192`) is
   independently approved offline/in code and is included in the current integration.
   Phase 3 now has all eight offline task implementations integrated. These integrations do not
-  waive the outstanding Phase 1P/2P/2K exits, close P3-T4 live acceptance, or authorize
+  waive the outstanding Phase 1P/2P/2K exits or authorize
   P3-T5 live work or any paid/local empirical action. On 2026-08-26 the owner accepted
   P3-T6's amended offline unified-emission contract. Its empirical xLights GUI
   acceptance remains open. The owner authorized P3-T7+ and task-bounded live/paid work

@@ -180,10 +180,10 @@ class TemplateStore:
             and local_extensions_dir != catalog_dir
             and (local_extensions_dir / "index.json").exists()
         ):
-            local_store = cls.from_directory(local_extensions_dir)
             try:
+                local_store = cls.from_directory(local_extensions_dir)
                 local_store.load_all_strict()
-            except ValueError as error:
+            except (ValueError, KeyError) as error:
                 raise ValueError(
                     f"Local template overlay {local_extensions_dir} overrides the tracked "
                     f"catalog {catalog_dir} but is invalid; remove or rebuild it: {error}"
@@ -254,17 +254,22 @@ class TemplateStore:
     def load_all_strict(self) -> list[EffectRecipe]:
         """Eagerly validate every indexed recipe without silently dropping entries."""
         missing = [
-            (recipe_id, entry.file)
+            (recipe_id, file_path)
             for recipe_id, entry in self._entries_by_id.items()
-            if not (self._entry_dirs.get(recipe_id, self._base_dir) / entry.file).is_file()
+            if not (
+                file_path := self._entry_dirs.get(recipe_id, self._base_dir) / entry.file
+            ).is_file()
         ]
         if missing:
-            # A stale index usually loses many files at once; name them all.
-            shown = ", ".join(f"{recipe_id!r} ({file})" for recipe_id, file in missing[:10])
+            # A stale index usually loses many files at once; count them all and
+            # show the first few rather than stopping at the first.
+            shown = ", ".join(
+                f"{recipe_id!r} ({file_path})" for recipe_id, file_path in missing[:10]
+            )
             more = f" and {len(missing) - 10} more" if len(missing) > 10 else ""
             raise ValueError(
                 f"{len(missing)} of {len(self._entries_by_id)} recipe catalog entries "
-                f"reference missing files under {self._base_dir}: {shown}{more}"
+                f"reference missing files: {shown}{more}"
             )
         recipes: list[EffectRecipe] = []
         for recipe_id, entry in self._entries_by_id.items():

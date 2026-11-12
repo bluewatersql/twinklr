@@ -763,13 +763,16 @@ LLM macro/planning stage. It is not the P3-T4 macro probe, and no live `twinklr 
 
 Until the owner chooses, the item stays open. Do not infer acceptance from the offline fix.
 
+**Decided 2026-11-12:** option 1, accepted. See the
+[decision record](../../../memories/decisions/p3-t4-live-acceptance-superseded.md).
+
 ---
 
 ## 8. Final evidence checklist
 
 Tick only when the file exists and is linked from the owning spec or change handoff.
 
-- [ ] §2 baseline: metrics output, console tail, token and spend, commit SHA, config hashes
+- [x] §2 baseline: metrics output, console tail, token and spend, commit SHA, config hashes
       in `evaluations/<date>-baseline-live-run/`
 - [ ] §3.1 owner review of rubric, criteria, cost budget recorded
 - [ ] §3.2 T6 one-song `vision_evaluation.json` (cost <= $0.20, 1 request) committed
@@ -785,7 +788,7 @@ Tick only when the file exists and is linked from the owning spec or change hand
 - [ ] §5 T7: wall time, device, fallback warning (seen or not), versions
 - [ ] §6.1 T10 live-smoke gap resolved (accepted as covered by §6.2, or test commissioned)
 - [ ] §6.2 T11: probe answer, 8 per-role outcomes, request counts
-- [ ] §7 P3-T4 owner decision (accept superseding evidence, or authorize new work)
+- [x] §7 P3-T4 owner decision (accept superseding evidence, or authorize new work)
 - [ ] `changes/ACTIVE.md`, `evaluations/INDEX.md` and affected `memories/INDEX.md` updated
 - [ ] `make validate` green on the commit used for all runs (fresh output)
 

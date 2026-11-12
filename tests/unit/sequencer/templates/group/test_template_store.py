@@ -370,7 +370,7 @@ def _write_index(directory: Path, files: list[str]) -> None:
     )
 
 
-def test_strict_load_reports_every_missing_recipe_file(tmp_path: Path) -> None:
+def test_strict_load_counts_every_missing_recipe_file(tmp_path: Path) -> None:
     """A stale index names how many files are missing, not just the first one."""
     _write_index(tmp_path, ["builtins/gtpl_a.json", "builtins/gtpl_b.json", "builtins/gtpl_c.json"])
 
@@ -404,3 +404,32 @@ def test_strict_tracked_catalog_failure_is_not_blamed_on_the_overlay(tmp_path: P
         TemplateStore.from_catalog_with_local_extensions_strict(tmp_path, None)
 
     assert "Local template overlay" not in str(caught.value)
+
+
+def test_strict_load_shows_ten_missing_entries_and_counts_the_rest(tmp_path: Path) -> None:
+    _write_index(tmp_path, [f"builtins/gtpl_{index:02d}.json" for index in range(12)])
+
+    with pytest.raises(ValueError) as caught:
+        TemplateStore.from_directory(tmp_path).load_all_strict()
+
+    message = str(caught.value)
+    assert "12 of 12 recipe catalog entries reference missing files" in message
+    assert message.endswith("and 2 more")
+    assert "gtpl_09" in message
+    assert "gtpl_10" not in message
+
+
+@pytest.mark.parametrize("broken", ["corrupt_recipe", "unreadable_index"])
+def test_strict_overlay_wraps_every_overlay_failure(
+    store_dir: Path, tmp_path: Path, broken: str
+) -> None:
+    overlay = tmp_path / "overlay"
+    (overlay / "builtins").mkdir(parents=True)
+    _write_index(overlay, ["builtins/gtpl_bad.json"])
+    if broken == "corrupt_recipe":
+        (overlay / "builtins" / "gtpl_bad.json").write_text("{not json", encoding="utf-8")
+    else:
+        (overlay / "index.json").write_text("", encoding="utf-8")
+
+    with pytest.raises(ValueError, match=f"Local template overlay {overlay}"):
+        TemplateStore.from_catalog_with_local_extensions_strict(store_dir, overlay)

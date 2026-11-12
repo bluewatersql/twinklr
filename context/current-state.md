@@ -189,8 +189,10 @@ one `gpt-image-2` request, no retry, a valid 1024×1024 PNG, and a scoped cache 
 that made zero additional provider calls. Complete usage priced to `$0.00622`; the
 sealed owner-local ledger is terminal and forbids another attempt. xLights GUI dates/checks remain deferred until
 a meaningful end-to-end show is fully working; the empirical gates remain open. These
-integrations and authorizations do not waive the earlier exits or close P3-T4 live
-acceptance. P3-T8's first offline candidate was formally rejected; its remediated
+integrations and authorizations do not waive the earlier exits. **On 2026-11-12 the owner
+closed P3-T4 live acceptance** as superseded by the later live runs (2026-08-29 OpenAI,
+2026-11-12 Claude); the sealed ledger is unchanged and no third attempt is made
+([decision](../memories/decisions/p3-t4-live-acceptance-superseded.md)). P3-T8's first offline candidate was formally rejected; its remediated
 implementation now independently verifies file-backed provenance, rebuilds deterministic
 reports, shares provider request limits, and handles contact-sheet grounding. It is
 independently approved offline, but supplies no xLights evidence, visual-judge output,

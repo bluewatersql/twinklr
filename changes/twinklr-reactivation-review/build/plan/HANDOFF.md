@@ -12,8 +12,9 @@ working.
 P3-T4's two live attempts both failed safely: attempt 1 at the provider schema boundary,
 and attempt 2 with HTTP 400 because `temperature` is unsupported by `gpt-5.6-sol`.
 Exactly one provider request and no retry/fallback/schema repair occurred in each;
-`$3.320000` is committed, the two-attempt cap is exhausted, no third attempt is
-authorized, and live acceptance remains open. P3-T7+ and
+`$3.320000` is committed, the two-attempt cap is exhausted, and no third attempt is
+authorized. On 2026-11-12 the owner closed P3-T4 live acceptance as superseded by later
+live runs ([decision](../../../../memories/decisions/p3-t4-live-acceptance-superseded.md)). P3-T7+ and
 task-bounded live/paid work are authorized. P3-T7 is independently approved offline/in
 code and integrated at `70b3305`. Its one-shot live proof passed with one request, no
 retry, a valid 1024×1024 PNG, a zero-call scoped cache replay, and measured cost
@@ -69,7 +70,8 @@ older entries remain as dated audit history.
     - The result is 131 of 132 recipes; only `gtpl_rhythm_pinwheel_twinkle` is lost.
     - Merged with the tracked catalog this gives 132 recipes, all strictly valid, and the
       planner/renderer catalogs match.
-    - The strict loader now names the overlay and lists every missing file.
+    - The strict loader now names the overlay, counts every missing file and lists the
+      first 10.
   - **P4-T2 Ollama cloud:** live cloud requests are approved until the path works.
   - **Evidence logs:** stay gitignored. No `.gitignore` exception.
   - Review item m5 is done: the docs and context no longer call Anthropic legacy.
@@ -602,7 +604,7 @@ The remaining empirical checks are also pending:
 ## Continuation order
 
 1. Preserve P3-T4's sealed two-attempt ledger and permanent no-third-attempt boundary.
-   As of 2026-11-12, its live acceptance is closed by owner decision on the later live
+   Its live acceptance was closed on 2026-11-12 by owner decision on the later live
    runs ([decision](../../../../memories/decisions/p3-t4-live-acceptance-superseded.md)),
    not by the offline fix.
 2. Preserve P3-T7's terminal sealed one-shot ledger and accepted proof evidence; never
