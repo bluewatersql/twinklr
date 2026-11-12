@@ -5,7 +5,11 @@ Defines DMX channel assignments, configurations, and mappings for moving head fi
 
 from __future__ import annotations
 
+import logging
+
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+logger = logging.getLogger(__name__)
 
 
 class ShutterMap(BaseModel):
@@ -29,12 +33,10 @@ class ChannelWithConfig(BaseModel):
 
     @model_validator(mode="before")
     @classmethod
-    def reject_removed_channel_config(cls, value: object) -> object:
+    def drop_removed_channel_config(cls, value: object) -> object:
         if isinstance(value, dict) and "config" in value:
-            raise ValueError(
-                "fixture channel 'config' was removed because it never affected output; "
-                "keep only the relative 'channel' number"
-            )
+            logger.warning("Ignoring retired fixture channel 'config': it does not affect output")
+            return {key: item for key, item in value.items() if key != "config"}
         return value
 
 

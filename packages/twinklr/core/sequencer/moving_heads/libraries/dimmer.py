@@ -99,8 +99,7 @@ class DimmerLibrary:
                     min_intensity=0, max_intensity=0, period=1.0
                 ),
             },
-            # The one pattern the anti-flicker floor must not lift off zero. Every
-            # other pattern is held at or above the template's declared floor.
+            # The one pattern a rig calibration floor must not lift off zero.
             bypasses_dimmer_floor=True,
         ),
         DimmerType.HOLD: DimmerPattern(

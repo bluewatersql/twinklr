@@ -69,6 +69,17 @@ dimmer partway through it.
 - Colour, shutter and gobo emission are clean-up-era additions and remain. They depend on
   the fixture config's wheel maps matching the real fixture.
 
+## Open items for the owner
+
+- **Movement limits are not a safety clamp.** `MovementLimits` in the fixture config
+  describes a safe window, but emitted pan/tilt can leave it, as it could before the
+  clean-up. If a rig needs a hard clamp, it has to be added as an explicit opt-in.
+- **Movement intensity is accepted and ignored.** Preset and plan intensity values, and
+  the per-pattern intensity tables in `libraries/movement.py`, do not reach movement
+  output.
+- **Template `defaults` no longer reach the output.** They are recorded in segment
+  metadata only.
+
 ## How to repeat the comparison
 
 Render one plan with both trees, render each `.xsq` with

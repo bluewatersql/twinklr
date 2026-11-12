@@ -83,7 +83,7 @@ class DefaultMovementHandler:
         # motion the owner tuned and accepted in xLights. Making the `intensity`
         # argument authoritative (P4-F1) changed the speed and reach of most
         # templates; it was reverted on 2026-11-12 to restore the accepted look.
-        intensity = params.get("intensity", Intensity.SMOOTH)
+        intensity = Intensity(params.get("intensity", Intensity.SMOOTH))
         categorical_params_set = pattern.categorical_params or DEFAULT_MOVEMENT_PARAMS
         categorical_params = categorical_params_set[intensity]
 

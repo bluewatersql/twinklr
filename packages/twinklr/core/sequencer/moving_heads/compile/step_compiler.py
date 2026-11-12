@@ -241,9 +241,8 @@ def compile_step(
         renderer_log.debug(f"Dimmer Static DMX: {dimmer_result.dimmer_static_dmx}")
 
     # The dimmer curve carries no absolute DMX of its own: the exporter maps it onto
-    # [clamp_min, clamp_max]. Passing the handler's resolved bounds is what makes the
-    # template's declared anti-flicker floor visible in the emitted DMX (P4-M1) --
-    # left at the 0/255 defaults, the mapping is the identity and the floor is lost.
+    # [clamp_min, clamp_max]. The handler's bounds come from the rig calibration,
+    # which the production pipeline builds as 0/255, so the mapping is the identity.
     segment.add_channel(
         channel=ChannelName.DIMMER,
         curve=PointsCurve(points=dimmer_points) if dimmer_points is not None else None,

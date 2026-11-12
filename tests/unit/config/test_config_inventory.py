@@ -197,7 +197,9 @@ def test_retired_fixture_config_loads_with_a_warning(
     assert retired_key in caplog.text
 
 
-def test_retired_channel_config_wrapper_still_fails_loudly() -> None:
+def test_retired_channel_config_wrapper_loads_with_a_warning(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
     payload = {
         "group_id": "heads",
         "base_config": {
@@ -208,8 +210,12 @@ def test_retired_channel_config_wrapper_still_fails_loudly() -> None:
             }
         },
     }
-    with pytest.raises(ValidationError, match=r"config.*removed|removed.*config"):
-        FixtureGroup.model_validate(payload)
+    with caplog.at_level("WARNING"):
+        group = FixtureGroup.model_validate(payload)
+
+    assert group.base_config is not None
+    assert group.base_config.dmx_mapping.pan == 1
+    assert "config" in caplog.text
 
 
 @pytest.mark.parametrize(
