@@ -8,6 +8,10 @@ updated: 2026-11-11
 
 # P2P-T7 real Demucs separation on Apple Silicon — 2026-11-11
 
+> Raw `*.log` files named here sit beside this README in the owner's checkout but are
+> gitignored by the repository's no-logs rule. The tables in this README reproduce their
+> results.
+
 Run per [runbook 05 §5](../../runbooks/05-phase-2p-and-3-live-evidence.md). Authority:
 [P2P-T7 spec](../../build/specs/phase-2p-creative-quality/P2P-T7-stems-stage.md). No paid API.
 
@@ -23,7 +27,7 @@ Run per [runbook 05 §5](../../runbooks/05-phase-2p-and-3-live-evidence.md). Aut
 | Wall time | **19.19 s** (the `--durations=1` call time). The spec expectation was about 1–2 min on MPS and the test limit is 1,200 s. |
 | Device | Demucs chose its own device: CUDA, then MPS, then CPU. **The MPS→CPU fallback warning (`retrying once on CPU`) did not appear**, so separation ran on its first-choice device (MPS on this host) without falling back. |
 
-Log: [pytest.log](pytest.log).
+Log: `pytest.log`.
 
 The forced-failure path for the MPS→CPU fallback has no live command in the spec. It is
 covered only by stubbed unit tests, as runbook 05 §5 step 4 notes.

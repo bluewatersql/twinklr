@@ -12,7 +12,7 @@ agent role. The owner approved live requests and asked for Claude on 2026-11-11.
 | Window (UTC) | 2026-11-12T14:35:41Z – 14:39:45Z (242.2 s pipeline time) |
 | Commit | `f0ae0da884a32baca1c86cf5c429d17a8ceb911b` (clean tree; `make validate` passed: 5701 passed, 39 skipped) |
 | Audio | `data/music/Hey Come Look At My House.mp3`, 140.9 s, owner-local and not committed (sha256 prefix `a96c6dba9a6c4830`) |
-| Rig | [`fixture_config.json`](fixture_config.json), 4 moving heads (sha256 prefix `f3c2d084448469de`) |
+| Rig | 4 moving heads `MH1`–`MH4` (xLights models `Dmx MH1`–`Dmx MH4`, group `90 - MH`), from the owner-local `fixture_config.valid.json` (gitignored; sha256 prefix `f3c2d084448469de`) |
 | Provider | Anthropic, `claude-opus-5-5` for every role. Server-side refusal fallback is on. |
 | Effort | plan `high`, judge `low`, refinement / profile / lyrics `medium`, asset enricher `low` |
 | Job config | `max_iterations` 2, `success_threshold` 70, `timeout_seconds` 900 (sha256 prefix `da32fcd44a1ce553`) |

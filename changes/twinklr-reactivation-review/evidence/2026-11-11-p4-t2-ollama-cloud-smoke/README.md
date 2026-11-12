@@ -8,6 +8,10 @@ updated: 2026-11-11
 
 # P4-T2 Ollama cloud schema smoke — 2026-11-11
 
+> Raw `*.log` files named here sit beside this README in the owner's checkout but are
+> gitignored by the repository's no-logs rule. The tables in this README reproduce their
+> results.
+
 Run per [runbook 01](../../runbooks/01-ollama-cloud-smoke.md). Authority:
 [P4-T2 spec](../../build/specs/phase-4-compounding/P4-T2-local-provider-option.md),
 *Owner amendment — 2026-11-01*.
@@ -19,7 +23,7 @@ Run per [runbook 01](../../runbooks/01-ollama-cloud-smoke.md). Authority:
 | Model | `glm-5.3:cloud` (`glm_dsa_moe`, FP8; capabilities completion/thinking/tools) |
 | Git SHA | `88b855ff34ac8fa89d322c064bec7ce401495cef` |
 | Requests | 3 in total (attempt 1 here, plus two corrected attempts below), each with `provider_max_attempts=1` and `allow_json_object_fallback=False` |
-| Result | Attempt 1 **FAILED** with `json_decode` ([pytest.log](pytest.log)). Attempt 3 parsed but failed one semantic rule; see *Corrected attempts* |
+| Result | Attempt 1 **FAILED** with `json_decode` (`pytest.log`). Attempt 3 parsed but failed one semantic rule; see *Corrected attempts* |
 
 ## Scope
 
@@ -53,9 +57,9 @@ within that rule.
 
 | # | Git SHA | Change | Result |
 |---|---|---|---|
-| 1 | `88b855f` | none: bare prompt, schema sent only as `response_format` | Prose: the model never saw a schema ([pytest.log](pytest.log)) |
-| 2 | `d860f68` | Smoke prompt now carries the MacroPlan schema, exactly as `AsyncAgentRunner` injects `response_schema` for every real agent call | A correctly shaped MacroPlan, but wrapped in a ```` ```json ```` fence, so `json.loads` failed ([log](pytest-attempt2.log)) |
-| 3 | `83068d6` | `OllamaProvider` unwraps a fence that spans the whole response. Prose still fails parsing. | JSON parsed and matched the schema shape, then failed one cross-field model rule: `MacroSection.theme.scope must be ThemeScope.SECTION` ([log](pytest-attempt3.log)) |
+| 1 | `88b855f` | none: bare prompt, schema sent only as `response_format` | Prose: the model never saw a schema (`pytest.log`) |
+| 2 | `d860f68` | Smoke prompt now carries the MacroPlan schema, exactly as `AsyncAgentRunner` injects `response_schema` for every real agent call | A correctly shaped MacroPlan, but wrapped in a ```` ```json ```` fence, so `json.loads` failed (log: `pytest-attempt2.log`) |
+| 3 | `83068d6` | `OllamaProvider` unwraps a fence that spans the whole response. Prose still fails parsing. | JSON parsed and matched the schema shape, then failed one cross-field model rule: `MacroSection.theme.scope must be ThemeScope.SECTION` (log: `pytest-attempt3.log`) |
 
 There were three requests in total, each with `provider_max_attempts=1` and no fallback.
 I stopped spending at attempt 3: tuning the smoke prompt until it passes would be

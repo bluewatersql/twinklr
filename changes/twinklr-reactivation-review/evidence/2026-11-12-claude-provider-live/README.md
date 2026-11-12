@@ -8,6 +8,10 @@ updated: 2026-11-12
 
 # Claude provider — first live requests (2026-11-12)
 
+> Raw `*.log` files named here sit beside this README in the owner's checkout but are
+> gitignored by the repository's no-logs rule. The tables in this README reproduce their
+> results.
+
 This records the first live use of the Claude provider (`claude-opus-5-5`). The owner
 approved live requests and asked for Claude on 2026-11-11. The successful pipeline run is
 recorded in
@@ -21,7 +25,7 @@ recorded in
 | Commit | `2be39df` |
 | Command | runbook 05 §2 `twinklr run` on `Hey Come Look At My House.mp3`, Claude job config |
 | Result | **FAIL**, 1/6 stages. `audio_profile`'s only request got HTTP 400 `The compiled grammar is too large, which would cause performance issues.` (`req_011CgyC6xQUr4xbnb9CMbfHT`). No tokens were generated. |
-| Log | [attempt1-console-excerpt.log](attempt1-console-excerpt.log) |
+| Log | `attempt1-console-excerpt.log` |
 
 The schema stayed within Anthropic's documented explicit limits (7 union parameters, 0
 optional). The rejection comes from the internal grammar-size limit, which the
@@ -32,7 +36,7 @@ structured-outputs documentation describes but does not quantify.
 [`probe_schemas.py`](probe_schemas.py) (run with `PYTHONPATH=.` from the repository root
 and `ANTHROPIC_API_KEY` set) sends each registered response schema once. Each request used
 `effort: low`, `max_tokens: 16` and a one-line prompt. Window: 14:31:03Z – 14:31:30Z.
-Log: [schema-probe.log](schema-probe.log).
+Log: `schema-probe.log`.
 
 | Accepted (8) | Rejected with `compiled grammar is too large` (5) |
 |---|---|

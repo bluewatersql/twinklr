@@ -8,6 +8,10 @@ updated: 2026-11-11
 
 # P2P-T11 live probe and strict-mode suite — 2026-11-11
 
+> Raw `*.log` files named here sit beside this README in the owner's checkout but are
+> gitignored by the repository's no-logs rule. The tables in this README reproduce their
+> results.
+
 Run per [runbook 05 §6.2](../../runbooks/05-phase-2p-and-3-live-evidence.md). Authority:
 [P2P-T11 spec](../../build/specs/phase-2p-creative-quality/P2P-T11-structured-outputs.md).
 
@@ -18,7 +22,7 @@ Run per [runbook 05 §6.2](../../runbooks/05-phase-2p-and-3-live-evidence.md). A
 | Key | public OpenAI; free `/v1/models` check returned 200 and listed `gpt-5.6-sol`, `gpt-5.6-terra`, `gpt-5.6-luna` |
 | Requests | 9 HTTP requests in total: probe 1, strict suite 8. Provider retries and fallback are disabled, so there were no extra requests. |
 | Spend | No ledger in this harness. All calls ran at `reasoning_effort=low` with `max_output_tokens` ≤ 4,000, which is well inside the $2.00 T11 cap. Take exact figures from the OpenAI usage dashboard for the window above. |
-| Logs | [probe.log](probe.log), [strict-suite.log](strict-suite.log) |
+| Logs | `probe.log`, `strict-suite.log` |
 
 ## Probe: does `gpt-5.6-sol` accept `json_object`?
 
@@ -66,9 +70,9 @@ Fix (branch `fix/strict-schema-live-findings`):
 
 | Rerun | Git SHA | Requests | Result |
 |---|---|---|---|
-| lyrics, after the schema fix | `722c58d` | 1 | **PASS** in 3.8 s. The server accepted the tuple-normalized schema and the response validated ([log](lyrics-recheck.log)) |
-| group_planner, cap raised to 16,000 (`TWINKLR_LIVE_STRICT_MAX_TOKENS`, `aef9139`) | `aef9139` | 1 | **PASS** in 2.9 s ([log](truncated-roles-rerun.log)) |
-| audio_profile, cap raised to 16,000 | `aef9139` | 1 | **FAIL: runaway output.** Truncated again at `max_output_tokens` after 104 s ([log](truncated-roles-rerun.log)) |
+| lyrics, after the schema fix | `722c58d` | 1 | **PASS** in 3.8 s. The server accepted the tuple-normalized schema and the response validated (log: `lyrics-recheck.log`) |
+| group_planner, cap raised to 16,000 (`TWINKLR_LIVE_STRICT_MAX_TOKENS`, `aef9139`) | `aef9139` | 1 | **PASS** in 2.9 s (log: `truncated-roles-rerun.log`) |
+| audio_profile, cap raised to 16,000 | `aef9139` | 1 | **FAIL: runaway output.** Truncated again at `max_output_tokens` after 104 s (log: `truncated-roles-rerun.log`) |
 
 Total live requests for T11 so far: 12 (probe 1, suite 8, reruns 3), each at
 `reasoning_effort=low`.
