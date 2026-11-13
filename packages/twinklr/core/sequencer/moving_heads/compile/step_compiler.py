@@ -64,7 +64,15 @@ def compile_step(
 
     Returns:
         StepCompileResult with pan, tilt, and dimmer segments.
+
+    Raises:
+        ValueError: If the step carries physical data, which only physical_v2 renders.
     """
+    if step.has_physical_data:
+        raise ValueError(
+            f"step {step.step_id!r} carries physical data; it compiles only under physical_v2"
+        )
+
     # Calculate timing
     t0_ms = context.start_ms
     t1_ms = context.start_ms + context.duration_ms

@@ -2684,6 +2684,51 @@ for _template_path, _template_disposition in tuple(CONFIG_EFFECTS.items()):
         "exact path changes a shipped registry, planner, preset, or compiled-output seam",
     )
 
+# P1.2 physical template fields. They feed only the opt-in physical compile, so by
+# design they cannot change the legacy snapshot above; registered after that loop,
+# each exact path mutates its field and must either change `compile_physical_step`'s
+# result or be rejected by physical validation/compile. `shape` is coupled to `mode`,
+# extents and period, so no single-field alternative is valid; its evidence is the
+# kernel test, which fails if the compiler ignored it.
+_PHYSICAL_TEMPLATE_REJECTED = (
+    "exact path's alternative is rejected by physical validation or compile"
+)
+_PHYSICAL_TEMPLATE_COMPILED = "exact path changes the physical compile result"
+for _field, _note in {
+    "movement.physical": _PHYSICAL_TEMPLATE_REJECTED,
+    "movement.physical.mode": _PHYSICAL_TEMPLATE_REJECTED,
+    "movement.physical.start_pan_deg": _PHYSICAL_TEMPLATE_COMPILED,
+    "movement.physical.start_tilt_deg": _PHYSICAL_TEMPLATE_COMPILED,
+    "movement.physical.pan_extent_deg": _PHYSICAL_TEMPLATE_COMPILED,
+    "movement.physical.tilt_extent_deg": _PHYSICAL_TEMPLATE_COMPILED,
+    "movement.physical.period_beats": _PHYSICAL_TEMPLATE_COMPILED,
+    "dimmer.physical": _PHYSICAL_TEMPLATE_COMPILED,
+    "dimmer.physical.period_beats": _PHYSICAL_TEMPLATE_COMPILED,
+    "dimmer.physical.duty_cycle": _PHYSICAL_TEMPLATE_COMPILED,
+    "dimmer.physical.phase_cycles": _PHYSICAL_TEMPLATE_COMPILED,
+    "dimmer.physical.low": _PHYSICAL_TEMPLATE_COMPILED,
+    "dimmer.physical.high": _PHYSICAL_TEMPLATE_COMPILED,
+    "physical_shutter": _PHYSICAL_TEMPLATE_COMPILED,
+    "physical_shutter.period_beats": _PHYSICAL_TEMPLATE_COMPILED,
+    "physical_shutter.duty_cycle": _PHYSICAL_TEMPLATE_COMPILED,
+    "physical_shutter.phase_cycles": _PHYSICAL_TEMPLATE_COMPILED,
+    "physical_shutter.low_state": _PHYSICAL_TEMPLATE_COMPILED,
+    "physical_shutter.high_state": _PHYSICAL_TEMPLATE_COMPILED,
+}.items():
+    _physical_template_path = f"template.template.steps.{_field}"
+    CONFIG_EFFECTS[_physical_template_path] = ConfigDisposition(
+        ConfigDispositionKind.EFFECT_TEST,
+        "tests/unit/sequencer/moving_heads/compile/test_physical.py::"
+        f"test_physical_template_field_changes_compile[{_physical_template_path}]",
+        _note,
+    )
+CONFIG_EFFECTS["template.template.steps.movement.physical.shape"] = ConfigDisposition(
+    ConfigDispositionKind.EFFECT_TEST,
+    "tests/unit/sequencer/moving_heads/compile/test_physical.py::"
+    "test_each_kernel_shapes_the_compiled_path[sine_tilt]",
+    "each kernel shapes the compiled path",
+)
+
 # Exact App/Job discriminators. These overrides prevent stale generic smoke-test
 # pointers from re-entering the accountable ledger.
 for _root_path in ("app.project_root", "app.cache_dir"):

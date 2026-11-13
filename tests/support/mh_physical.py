@@ -76,3 +76,40 @@ def initial_state_payload() -> dict[str, Any]:
         "settled": True,
         "dark": True,
     }
+
+
+def motion_profile_payload() -> dict[str, Any]:
+    """`profile_payload` with configured pan/tilt travel speeds and settled shutter states."""
+    payload = profile_payload()
+    for axis in ("pan", "tilt"):
+        payload["axes"][axis]["travel_speed_per_s"] = 720.0
+    for state in payload["discrete"]["shutter"]["states"].values():
+        state["settle_ms"] = 0
+    return payload
+
+
+def physical_step_payload() -> dict[str, Any]:
+    """A physical-only template step: finite linear pan/tilt plus dimmer and shutter pulses."""
+    return {
+        "step_id": "main",
+        "timing": {"base_timing": {"start_offset_bars": 0, "duration_bars": 0.5}},
+        "geometry": {},
+        "movement": {
+            "physical": {
+                "shape": "linear",
+                "mode": "finite",
+                "start_pan_deg": 10.0,
+                "start_tilt_deg": 20.0,
+                "pan_extent_deg": 30.0,
+                "tilt_extent_deg": 10.0,
+                "period_beats": 1.0,
+            }
+        },
+        "dimmer": {"physical": {"period_beats": 1.0, "duty_cycle": 0.5, "low": 0.0, "high": 1.0}},
+        "physical_shutter": {
+            "period_beats": 2.0,
+            "duty_cycle": 0.5,
+            "low_state": "closed",
+            "high_state": "open",
+        },
+    }

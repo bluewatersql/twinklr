@@ -15,6 +15,7 @@ from twinklr.core.sequencer.moving_heads.handlers.registry import (
 )
 from twinklr.core.sequencer.moving_heads.libraries.color import ColorPreset
 from twinklr.core.sequencer.timing.beat_grid import BeatGrid
+from twinklr.core.sequencer.timing.musical_phase import MusicalPhaseMap
 
 
 def _default_color_registry() -> ColorRegistry:
@@ -94,6 +95,8 @@ class StepCompileContext(BaseModel):
         geometry_registry: Registry of geometry handlers.
         movement_registry: Registry of movement handlers.
         dimmer_registry: Registry of dimmer handlers.
+        physical_profile: The fixture's physical profile; physical compile only.
+        phase_map: The song's musical phase map; physical compile only.
     """
 
     model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
@@ -119,6 +122,8 @@ class StepCompileContext(BaseModel):
     color_registry: ColorRegistry = Field(default_factory=_default_color_registry)
     shutter_registry: ShutterRegistry = Field(default_factory=_default_shutter_registry)
     gobo_registry: GoboRegistry = Field(default_factory=_default_gobo_registry)
+    physical_profile: FixtureCapabilities | None = None
+    phase_map: MusicalPhaseMap | None = None
 
 
 class TemplateCompileContext(BaseModel):

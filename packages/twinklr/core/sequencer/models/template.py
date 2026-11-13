@@ -3,6 +3,8 @@
 This module defines all template-related models:
 - Timing models: BaseTiming, PhaseOffset, RepeatContract
 - Step components: Geometry, Movement, Dimmer, StepTiming, TemplateStep
+- Physical renderer step data: PhysicalMovementSpec, PhysicalPulseSpec and its
+  dimmer and shutter forms
 - Template structure: Template, TemplatePreset, TemplateDoc
 
 These models define how choreography is structured and executed.
@@ -163,6 +165,78 @@ class Geometry(BaseModel):
     aim_zone: AimZone = AimZone.HORIZON
 
 
+MIN_PHYSICAL_PERIOD_BEATS = 1 / 64
+"""Shortest physical period: 1/64 beat is under 8 ms at 120 BPM, already far below one
+20 ms frame, so anything shorter is an authoring error rather than a pulse."""
+
+
+class PhysicalMovementSpec(BaseModel):
+    """Physical motion of a step for the physical renderer, in fixture-local degrees.
+
+    Template-owned renderer data, never an LLM control. Reach (`*_extent_deg`) and
+    rate (`period_beats`) are independent. Kernels: `hold` keeps the start pose;
+    `sine_pan`/`sine_tilt` add the selected extent times sin(2*pi*phase) and are
+    periodic; `linear` moves from start to start plus extent over one period, then
+    holds, and is finite.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    shape: Literal["hold", "sine_pan", "sine_tilt", "linear"]
+    mode: Literal["periodic", "finite"]
+    start_pan_deg: float = Field(allow_inf_nan=False)
+    start_tilt_deg: float = Field(allow_inf_nan=False)
+    pan_extent_deg: float = Field(default=0.0, allow_inf_nan=False)
+    tilt_extent_deg: float = Field(default=0.0, allow_inf_nan=False)
+    period_beats: float | None = Field(
+        default=None,
+        ge=MIN_PHYSICAL_PERIOD_BEATS,
+        allow_inf_nan=False,
+        description="Required unless shape is hold",
+    )
+
+    @model_validator(mode="after")
+    def _validate_kernel(self) -> "PhysicalMovementSpec":
+        if self.shape == "linear" and self.mode != "finite":
+            raise ValueError("linear motion is finite; periodic linear is not supported")
+        if self.shape in ("sine_pan", "sine_tilt") and self.mode != "periodic":
+            raise ValueError(f"{self.shape} is periodic; finite sine is not supported")
+        if self.shape == "hold":
+            if self.pan_extent_deg or self.tilt_extent_deg or self.period_beats is not None:
+                raise ValueError("hold takes no extent or period")
+            return self
+        if self.period_beats is None:
+            raise ValueError(f"{self.shape} needs period_beats")
+        unused = {"sine_pan": self.tilt_extent_deg, "sine_tilt": self.pan_extent_deg}
+        if unused.get(self.shape):
+            raise ValueError(f"{self.shape} moves one axis; the other extent must be zero")
+        return self
+
+
+class PhysicalPulseSpec(BaseModel):
+    """A musical-phase pulse: high while the fractional phase is in `[0, duty_cycle)`."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    period_beats: float = Field(ge=MIN_PHYSICAL_PERIOD_BEATS, allow_inf_nan=False)
+    duty_cycle: float = Field(gt=0, le=1)
+    phase_cycles: float = Field(default=0.0, allow_inf_nan=False)
+
+
+class PhysicalDimmerPulse(PhysicalPulseSpec):
+    """A dimmer pulse between explicit normalized levels; duty 1 holds `high`."""
+
+    low: float = Field(ge=0, le=1)
+    high: float = Field(ge=0, le=1)
+
+
+class PhysicalShutterPulse(PhysicalPulseSpec):
+    """A shutter pulse between named profile states."""
+
+    low_state: str = Field(min_length=1)
+    high_state: str = Field(min_length=1)
+
+
 class Movement(BaseModel):
     """Movement specification for a template step.
 
@@ -182,6 +256,11 @@ class Movement(BaseModel):
     intensity: Intensity = Intensity.SMOOTH
     cycles: float = 1.0
     params: dict[str, Any] = Field(default_factory=dict)
+    # Physical renderer only. Left out of dumps when absent so legacy template
+    # fingerprints are unchanged.
+    physical: PhysicalMovementSpec | None = Field(
+        default=None, exclude_if=lambda value: value is None
+    )
 
     @model_validator(mode="before")
     @classmethod
@@ -219,6 +298,10 @@ class Dimmer(BaseModel):
     min_norm: float = 0.0
     max_norm: float = 1.0
     params: dict[str, Any] = Field(default_factory=dict)
+    # Physical renderer only; left out of dumps when absent.
+    physical: PhysicalDimmerPulse | None = Field(
+        default=None, exclude_if=lambda value: value is None
+    )
 
     @model_validator(mode="before")
     @classmethod
@@ -328,6 +411,20 @@ class TemplateStep(BaseModel):
     color: Color | None = None
     shutter: Shutter | None = None
     gobo: Gobo | None = None
+    # Physical renderer only; left out of dumps when absent. Step-level because
+    # `Shutter` requires a legacy pattern, which a physical step must not carry.
+    physical_shutter: PhysicalShutterPulse | None = Field(
+        default=None, exclude_if=lambda value: value is None
+    )
+
+    @property
+    def has_physical_data(self) -> bool:
+        """Whether any component carries data for the physical renderer."""
+        return (
+            self.movement.physical is not None
+            or self.dimmer.physical is not None
+            or self.physical_shutter is not None
+        )
 
     @model_validator(mode="before")
     @classmethod
