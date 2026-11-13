@@ -6,7 +6,10 @@ including resolving xLights model names and managing EffectDB entries.
 
 from __future__ import annotations
 
+from bisect import bisect_left
 from collections import defaultdict
+from collections.abc import Mapping, Sequence
+from itertools import accumulate
 import logging
 from typing import TYPE_CHECKING
 
@@ -14,6 +17,7 @@ from twinklr.core.formats.xlights.sequence.emission import (
     EmissionRequest,
     EmissionSession,
 )
+from twinklr.core.formats.xlights.sequence.fresh import EFFECT_GRID_MS
 from twinklr.core.formats.xlights.sequence.models.effect_placement import EffectPlacement
 from twinklr.core.formats.xlights.sequence.trace import (
     MovingHeadEmissionTrace,
@@ -22,6 +26,7 @@ from twinklr.core.formats.xlights.sequence.trace import (
 from twinklr.core.sequencer.moving_heads.export.dmx_settings_builder import (
     DmxSettingsBuilder,
 )
+from twinklr.core.sequencer.moving_heads.export.frame_encoder import segment_frame_span
 from twinklr.core.utils.fixtures import build_semantic_groups
 
 if TYPE_CHECKING:
@@ -29,8 +34,97 @@ if TYPE_CHECKING:
     from twinklr.core.config.fixtures.instances import FixtureInstance
     from twinklr.core.formats.xlights.sequence.models.xsq import XSequence
     from twinklr.core.sequencer.moving_heads.channels.state import FixtureSegment
+    from twinklr.core.sequencer.moving_heads.export.frame_encoder import FrameRun
 
 logger = logging.getLogger(__name__)
+
+
+def physical_run_requests(
+    runs: Sequence[FrameRun],
+    segments: Sequence[FixtureSegment],
+    targets: Mapping[str, str],
+    *,
+    logical_layer: int = 0,
+) -> tuple[EmissionRequest, ...]:
+    """Convert physical frame runs into one constant DMX effect request each.
+
+    Separate from the legacy `XsqAdapter` path. Every run targets its own fixture's
+    model; physical output is never grouped. Runs are already frame-aligned, so the
+    emission session's quantization leaves them unchanged; a misaligned run is refused
+    rather than shifted a second time. A run's trace sources are the segments whose
+    frame span overlaps it, earliest first; the earliest represents the run.
+
+    Args:
+        runs: Coalesced frame runs.
+        segments: The physical segments the runs were encoded from.
+        targets: Fixture id to xLights model name.
+        logical_layer: Logical layer for every request.
+
+    Raises:
+        ValueError: If a run is not frame-aligned or its fixture has no model.
+    """
+    # Per fixture: spans ordered by start, and the furthest end reached by each prefix,
+    # so a run's overlapping segments are found by bisection, not by a full scan.
+    spans: dict[str, list[tuple[int, int, FixtureSegment]]] = defaultdict(list)
+    for segment in segments:
+        spans[segment.fixture_id].append((*segment_frame_span(segment), segment))
+    starts: dict[str, list[int]] = {}
+    reach: dict[str, list[int]] = {}
+    for fixture_id, fixture_spans in spans.items():
+        fixture_spans.sort(key=lambda item: (item[0], item[2].segment_id, item[2].step_id))
+        starts[fixture_id] = [start for start, _, _ in fixture_spans]
+        reach[fixture_id] = list(accumulate((end for _, end, _ in fixture_spans), max))
+
+    requests: list[EmissionRequest] = []
+    for run in runs:
+        fixture_id, start_ms, end_ms = run.frame.fixture_id, run.start_ms, run.end_ms
+        if start_ms % EFFECT_GRID_MS or end_ms % EFFECT_GRID_MS or end_ms <= start_ms:
+            raise ValueError(
+                f"{fixture_id} run {start_ms}-{end_ms} ms is not frame-aligned to the "
+                f"{EFFECT_GRID_MS} ms grid"
+            )
+        target = targets.get(fixture_id)
+        if not target:
+            raise ValueError(f"no xLights model for fixture {fixture_id}")
+        sources: list[FixtureSegment] = []
+        candidate = bisect_left(starts.get(fixture_id, []), end_ms) - 1
+        while candidate >= 0 and reach[fixture_id][candidate] > start_ms:
+            _, span_end, segment = spans[fixture_id][candidate]
+            if span_end > start_ms:
+                sources.append(segment)
+            candidate -= 1
+        sources.reverse()
+        representative = sources[0] if sources else None
+        trace: MovingHeadEmissionTrace = {
+            "backend": "moving_head",
+            "event_id": f"mh:{target}:{start_ms}:{end_ms}:{logical_layer}",
+            "section_id": representative.section_id if representative else "",
+            "lane": "TRANSITION" if logical_layer else "BASE",
+            "group_id": target,
+            "template_id": representative.template_id if representative else "",
+            "sources": [
+                {
+                    "fixture_id": item.fixture_id,
+                    "segment_id": item.segment_id,
+                    "step_id": item.step_id,
+                }
+                for item in sources
+            ],
+        }
+        requests.append(
+            EmissionRequest(
+                target=target,
+                effect="DMX",
+                settings=DmxSettingsBuilder.build_frame_settings(run.frame),
+                palette=None,
+                start_ms=start_ms,
+                end_ms=end_ms,
+                logical_layer=logical_layer,
+                label=representative.metatag if representative else None,
+                trace=trace,
+            )
+        )
+    return tuple(requests)
 
 
 class XsqAdapter:

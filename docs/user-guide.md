@@ -258,6 +258,8 @@ The same registry-backed subset policy applies here.
 | `timeline_tracks.sections` | `true` | Includes or omits section timing markers | `job.timeline_tracks.sections` |
 | `moving_heads.mode` | `"legacy_v1"` | Selects the moving-head renderer. `"physical_v2"` needs schema `"3.1"` and is rejected when the job is loaded, before any analysis or provider request, until the physical renderer ships | `job.moving_heads.mode` |
 | `moving_heads.initial_states` | `{}` | Run-supplied time-zero state per fixture id (unwrapped `pan_deg`/`tilt_deg`, `dimmer`, `discrete_states`, and explicit `settled`/`dark` evidence) for the physical renderer. A fixture without an entry has an unknown initial state. Enters render identity; nothing renders from it until `physical_v2` ships | `job.moving_heads.initial_states` |
+| `moving_heads.max_effects` | `1000000` | Applies only to physical (`physical_v2`) output, never to legacy output: the most DMX effects one render may emit after identical adjacent 20 ms frames are merged. More fails the render with `output_budget_exceeded`; frames are never dropped to fit. Must be positive; a non-default value enters render identity | `job.moving_heads.max_effects` |
+| `moving_heads.max_xsq_bytes` | `134217728` (128 MiB) | Applies only to physical (`physical_v2`) output, never to legacy output: the largest serialized `.xsq`, in UTF-8 bytes, one render may write. Larger fails the render with `output_budget_exceeded`; frames are never dropped to fit. Must be positive; a non-default value enters render identity | `job.moving_heads.max_xsq_bytes` |
 
 The planner schema may describe up to four narrative assets (`maxItems=4`), but the
 enabled live path authorizes only one image-provider request and reports the rest as

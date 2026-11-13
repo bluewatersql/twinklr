@@ -85,27 +85,62 @@ class AxisCapability(BaseModel):
         high = self.physical_max if self.allowed_max is None else self.allowed_max
         return low, high
 
-    def admits(self, value: float) -> bool:
+    @property
+    def full_word(self) -> int:
+        """The largest DMX word: 65535 with a fine channel, else 255."""
+        return 65535 if self.fine_offset is not None else 255
+
+    def admits(self, value: float | Fraction) -> bool:
         low, high = self.operable_range
         return low <= value <= high
 
-    def dmx_word(self, value: float) -> int:
+    def dmx_word(self, value: float | Fraction) -> int:
         """Encode an admitted physical value as an integer DMX word.
 
         Maps over the full calibrated range, never the allowed window, to 0..255 or,
         with a fine channel, 0..65535; rounds half up in exact arithmetic, then applies
-        inversion once.
+        inversion once. A `Fraction` is mapped exactly, with no float rounding first.
 
         Raises:
             ValueError: If the value is outside the operable range.
         """
         if not self.admits(value):
             raise ValueError(f"{value} is outside the operable range {self.operable_range}")
-        full = 65535 if self.fine_offset is not None else 255
+        word = self._uninverted_word(Fraction(value))
+        return self.full_word - word if self.inverted else word
+
+    def _uninverted_word(self, value: Fraction) -> int:
         low = Fraction(self.physical_min)
-        scaled = (Fraction(value) - low) * full / (Fraction(self.physical_max) - low)
-        word = (2 * scaled.numerator + scaled.denominator) // (2 * scaled.denominator)
-        return full - word if self.inverted else word
+        scaled = (value - low) * self.full_word / (Fraction(self.physical_max) - low)
+        return (2 * scaled.numerator + scaled.denominator) // (2 * scaled.denominator)
+
+    def check_default_word(self, name: str, defaults: dict[int, int]) -> None:
+        """Reject default bytes whose word no admitted value encodes to.
+
+        Inversion is undone first; with a fine channel the word is coarse << 8 | fine.
+
+        Raises:
+            ValueError: Naming the axis, its offsets, the word and its decoded value.
+        """
+        offsets = [self.coarse_offset]
+        if self.fine_offset is not None:
+            offsets.append(self.fine_offset)
+        word = 0
+        for offset in offsets:
+            word = word << 8 | defaults[offset]
+        uninverted = self.full_word - word if self.inverted else word
+        low, high = self.operable_range
+        if (
+            not self._uninverted_word(Fraction(low))
+            <= uninverted
+            <= self._uninverted_word(Fraction(high))
+        ):
+            span = Fraction(self.physical_max) - Fraction(self.physical_min)
+            decoded = float(self.physical_min + span * uninverted / self.full_word)
+            raise ValueError(
+                f"{name} default word {word} at offsets {'/'.join(map(str, offsets))} "
+                f"decodes to {decoded:g}, outside the allowed window [{low:g}, {high:g}]"
+            )
 
 
 class DiscreteState(BaseModel):
@@ -217,6 +252,17 @@ class FixtureCapabilities(BaseModel):
                 raise ValueError(f"{name} axis unit must be {_AXIS_UNITS[name]!r}")
 
         self._validate_visibility()
+
+        # The default byte state must be one the profile itself could command.
+        for wheel_name, wheel in self.discrete.items():
+            selected = wheel.states[wheel.default_state].value
+            if self.defaults[wheel.offset] != selected:
+                raise ValueError(
+                    f"{wheel_name} offset {wheel.offset} default byte {self.defaults[wheel.offset]} "
+                    f"is not its default state: {wheel.default_state!r} selects {selected}"
+                )
+        for name, axis in self.axes.items():
+            axis.check_default_word(name, self.defaults)
         return self
 
     def _validate_visibility(self) -> None:

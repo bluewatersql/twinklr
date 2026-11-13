@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 import copy
+from fractions import Fraction
 from functools import cache
 from pathlib import Path
 import tomllib
@@ -20,7 +21,7 @@ import pytest
 
 from tests.config_effects_registry import CONFIG_EFFECTS, ConfigDispositionKind
 from tests.golden.harness import RIGS, build_beat_grid, build_fixture_group, build_plan
-from tests.support.mh_physical import initial_state_payload, profile_payload
+from tests.support.mh_physical import initial_state_payload, physical_segment, profile_payload
 from twinklr.core.config.fixtures import (
     AxisCapability,
     FixtureCapabilities,
@@ -30,6 +31,17 @@ from twinklr.core.config.fixtures import (
     SimplifiedFixtureInstance,
 )
 from twinklr.core.config.models import JobConfig, MHRenderPolicy, TransitionConfig
+from twinklr.core.sequencer.models.enum import ChannelName
+from twinklr.core.sequencer.models.moving_heads.physical import (
+    ContinuousTrajectory,
+    DiscreteTrajectory,
+    PhysicalChannelError,
+)
+from twinklr.core.sequencer.moving_heads.channels.state import FixtureSegment
+from twinklr.core.sequencer.moving_heads.export.frame_encoder import (
+    EncodedFixtureFrame,
+    encode_fixture_frames,
+)
 from twinklr.core.sequencer.moving_heads.identity import (
     LEGACY_BACKEND_ID,
     LEGACY_RENDERER_REVISION,
@@ -63,6 +75,7 @@ def _wide_payload(*, footprint: int, dimmer_offset: int) -> dict[str, Any]:
     payload = profile_payload()
     payload["footprint"] = footprint
     payload["defaults"] = dict.fromkeys(range(1, footprint + 1), 0)
+    payload["defaults"][17] = 64  # the shutter's closed default state
     payload["discrete"]["shutter"]["offset"] = 17
     payload["axes"]["dimmer"]["coarse_offset"] = dimmer_offset
     return payload
@@ -168,6 +181,63 @@ def test_allowed_window_does_not_rescale_calibrated_axis() -> None:
 )
 def test_dmx_word_rounds_half_up_exactly(value: float, word: int) -> None:
     assert _profile().axes["pan"].dmx_word(value) == word
+
+
+def test_dmx_word_takes_an_exact_fraction() -> None:
+    """-270 + 90/4369 degrees scales to exactly 2.5; no float holds that value."""
+    pan = _profile().axes["pan"]
+    exact = Fraction(-270) + Fraction(90, 4369)
+
+    assert pan.dmx_word(exact) == 3
+    assert pan.dmx_word(float(exact)) == 2
+    with pytest.raises(ValueError, match="outside"):
+        pan.dmx_word(Fraction(271))
+
+
+def test_discrete_default_byte_must_select_its_default_state() -> None:
+    payload = profile_payload()
+    payload["defaults"][6] = 8  # the open byte; the shutter's default state is closed (64)
+
+    with pytest.raises(ValidationError, match=r"offset 6 default byte 8 .* 'closed' selects 64"):
+        _profile(payload)
+
+
+@pytest.mark.parametrize(
+    ("inverted", "accepted"),
+    [(False, True), (True, False)],
+    ids=["direct-270-inside", "inverted--270-outside"],
+)
+def test_axis_default_word_must_lie_in_the_allowed_window(inverted: bool, accepted: bool) -> None:
+    """Bytes 255/255 are word 65535: 270 degrees direct, -270 once inversion is undone."""
+    payload = profile_payload()
+    payload["axes"]["pan"].update(allowed_min=0.0, allowed_max=270.0, inverted=inverted)
+    payload["defaults"].update({1: 255, 2: 255})
+
+    if accepted:
+        assert _profile(payload).defaults[1] == 255
+    else:
+        with pytest.raises(ValidationError, match=r"pan default word 65535 at offsets 1/2"):
+            _profile(payload)
+
+
+def test_axis_default_word_outside_a_narrowed_window_is_rejected() -> None:
+    payload = profile_payload()
+    payload["axes"]["tilt"].update(allowed_min=-90.0, allowed_max=90.0)
+    payload["defaults"].update({3: 0, 4: 0})
+
+    with pytest.raises(ValidationError, match=r"tilt default word 0 .* -135"):
+        _profile(payload)
+
+
+def test_inverted_dimmer_dark_default_is_byte_255() -> None:
+    payload = profile_payload()
+    payload["axes"]["dimmer"]["inverted"] = True
+    payload["defaults"][5] = 255
+
+    profile = _profile(payload)
+
+    assert profile.visibility.dimmer_zero_extinguishes
+    assert profile.axes["dimmer"].dmx_word(0.0) == profile.defaults[5] == 255
 
 
 @pytest.mark.parametrize(
@@ -499,11 +569,12 @@ def test_other_invalid_fixture_config_keeps_its_legacy_behavior() -> None:
 
 # --- Registry evidence for physical-only config paths -----------------------------------
 
-Component = Literal["rejected", "words", "check", "fingerprint"]
+Component = Literal["rejected", "words", "frames", "check", "fingerprint"]
 
 _COMPONENT_NOTES: dict[Component, str] = {
     "rejected": "exact path's alternative values are rejected by validation",
     "words": "exact path changes the encoded DMX word",
+    "frames": "exact path changes the encoded fixture frames",
     "check": "exact path changes the initial-state check",
     "fingerprint": "identity only; consumer lands in P1.3–P1.5",
 }
@@ -528,8 +599,8 @@ _PROFILE_MUTATIONS: dict[str, Mutation] = {
     "schema_version": ("rejected", lambda p: _set(p, ("schema_version",), "2")),
     "profile_id": ("fingerprint", lambda p: _set(p, ("profile_id",), "other_spot")),
     "provenance": ("fingerprint", lambda p: _set(p, ("provenance",), "measured")),
-    "footprint": ("fingerprint", _add_spare_default),
-    "defaults": ("fingerprint", lambda p: _set(p, ("defaults", 8), 255)),
+    "footprint": ("frames", _add_spare_default),
+    "defaults": ("frames", lambda p: _set(p, ("defaults", 8), 255)),
     "axes": ("words", lambda p: p["axes"].pop("tilt")),
     "axes.unit": ("rejected", lambda p: _set(p, ("axes", "pan", "unit"), "normalized")),
     "axes.physical_min": ("words", lambda p: _set(p, ("axes", "pan", "physical_min"), -180.0)),
@@ -537,7 +608,7 @@ _PROFILE_MUTATIONS: dict[str, Mutation] = {
     "axes.allowed_min": ("words", lambda p: _set(p, ("axes", "pan", "allowed_min"), -90.0)),
     "axes.allowed_max": ("words", lambda p: _set(p, ("axes", "pan", "allowed_max"), 90.0)),
     "axes.coarse_offset": (
-        "fingerprint",
+        "frames",
         lambda p: _set(p, ("axes", "dimmer", "coarse_offset"), 8),
     ),
     "axes.fine_offset": ("words", lambda p: _set(p, ("axes", "pan", "fine_offset"), None)),
@@ -549,7 +620,7 @@ _PROFILE_MUTATIONS: dict[str, Mutation] = {
     "axes.latency_ms": ("fingerprint", lambda p: _set(p, ("axes", "pan", "latency_ms"), 10)),
     "axes.settle_ms": ("fingerprint", lambda p: _set(p, ("axes", "pan", "settle_ms"), 40)),
     "discrete": ("check", lambda p: p["discrete"].pop("color")),
-    "discrete.offset": ("fingerprint", lambda p: _set(p, ("discrete", "color", "offset"), 8)),
+    "discrete.offset": ("frames", lambda p: _set(p, ("discrete", "color", "offset"), 8)),
     "discrete.states": ("check", lambda p: p["discrete"]["color"]["states"].pop("red")),
     "discrete.states.range_min": (
         "fingerprint",
@@ -560,7 +631,7 @@ _PROFILE_MUTATIONS: dict[str, Mutation] = {
         lambda p: _set(p, ("discrete", "color", "states", "red", "range_max"), 15),
     ),
     "discrete.states.value": (
-        "fingerprint",
+        "frames",
         lambda p: _set(p, ("discrete", "color", "states", "red", "value"), 10),
     ),
     "discrete.states.settle_ms": (
@@ -569,7 +640,10 @@ _PROFILE_MUTATIONS: dict[str, Mutation] = {
     ),
     "discrete.default_state": (
         "fingerprint",
-        lambda p: _set(p, ("discrete", "color", "default_state"), "red"),
+        lambda p: (
+            _set(p, ("discrete", "color", "default_state"), "red"),
+            _set(p, ("defaults", 7), 14),  # the default byte must select the default state
+        ),
     ),
     "discrete.closed_state": (
         "fingerprint",
@@ -649,13 +723,37 @@ def _identity_inputs() -> dict[str, Any]:
     }
 
 
+def _probe_segment() -> FixtureSegment:
+    def hold(unit: str, value: float) -> ContinuousTrajectory:
+        return ContinuousTrajectory.model_validate(
+            {"unit": unit, "points": [{"t_ms": 0, "value": value}], "interpolation": "hold"}
+        )
+
+    def state(name: str) -> DiscreteTrajectory:
+        return DiscreteTrajectory.model_validate({"events": [{"t_ms": 0, "state": name}]})
+
+    return physical_segment(
+        {
+            ChannelName.PAN: hold("degree", 10.0),
+            ChannelName.TILT: hold("degree", -20.0),
+            ChannelName.DIMMER: hold("normalized", 0.75),
+            ChannelName.SHUTTER: state("open"),
+            ChannelName.COLOR: state("red"),
+        },
+        t0_ms=0,
+        t1_ms=40,
+    )
+
+
 def _contract_snapshot(
     prefix: str, profile: dict[str, Any] | None, initial_states: dict[str, Any]
 ) -> dict[Component, Any]:
     """What the physical contract makes of MH1's profile and the run's initial states.
 
     The validation error locations, the encoded DMX word at probe values on every
-    declared axis, MH1's initial-state check, and the render fingerprint.
+    declared axis, the frames encoded from a probe segment that writes every attribute
+    but leaves channel 8 to its default, MH1's initial-state check, and the render
+    fingerprint.
     """
     try:
         group = FixtureGroup.model_validate(
@@ -666,6 +764,7 @@ def _contract_snapshot(
         return {"rejected": tuple(sorted(str(e["loc"]) for e in error.errors()))}
     capabilities = group.expand_fixtures()[0].config.physical_profile
     words: dict[str, tuple[int | str, ...]] = {}
+    frames: tuple[Any, ...] = ()
     check: tuple[str, ...] = ()
     if capabilities is not None:
         for name, axis in capabilities.axes.items():
@@ -673,9 +772,16 @@ def _contract_snapshot(
             words[name] = tuple(
                 axis.dmx_word(value) if axis.admits(value) else "rejected" for value in probes
             )
+        try:
+            frames = encode_fixture_frames(
+                [_probe_segment()], capabilities, frame_times_ms=(0, 20, 40)
+            )
+        except (PhysicalChannelError, ValueError) as error:
+            frames = ("unencodable", str(error))
         check = capabilities.check_initial_state(policy.initial_states.get("MH1"))
     return {
         "words": words,
+        "frames": frames,
         "check": check,
         "fingerprint": render_fingerprint(fixtures=group, policy=policy, **_identity_inputs()),
     }
@@ -704,6 +810,12 @@ def _assert_component_changed(
     assert "rejected" not in base
     if component == "rejected":
         assert "rejected" in changed
+    elif component == "frames":
+        # Both sides must be frames actually encoded, never an error standing in for them.
+        for side in (base, changed):
+            assert "rejected" not in side and side["frames"], side
+            assert all(isinstance(frame, EncodedFixtureFrame) for frame in side["frames"])
+        assert changed["frames"] != base["frames"]
     else:
         assert "rejected" not in changed, changed
         assert changed[component] != base[component]
