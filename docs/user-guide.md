@@ -37,7 +37,7 @@ cd twinklr
 make install
 ```
 
-This runs `uv sync --extra dev --all-packages`, installing both workspace packages (`twinklr-core` and `twinklr-cli`) and development tools (pytest, ruff, mypy).
+This runs `uv sync --extra dev --extra anthropic --all-packages`, installing both workspace packages (`twinklr-core` and `twinklr-cli`), development tools (pytest, ruff, mypy), and the optional Claude provider SDK that the test suite imports.
 
 _Source: `Makefile` target `install`_
 

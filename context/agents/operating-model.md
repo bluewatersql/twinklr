@@ -43,7 +43,7 @@ A workstream is one change folder with one owner at a time.
 The virtual environment is an editable install bound to the checkout that created it, so
 tools run from another checkout's environment can import and validate the wrong tree.
 Give each worktree its own environment: run `make install` (equivalent to
-`uv sync --extra dev --all-packages`) inside the worktree, then run the gate there. A bare
+`uv sync --extra dev --extra anthropic --all-packages`) inside the worktree, then run the gate there. A bare
 `uv sync` drops the dev tools.
 
 When an exact lint count matters, run Ruff with `--no-cache`. Golden files change only

@@ -38,7 +38,7 @@ release is human-QA-ready only after §1–§4 pass and a person completes §5�
 
 ```bash
 # Toolchain + deps (uv-managed venv)
-uv sync --extra dev --all-packages
+uv sync --extra dev --extra anthropic --all-packages
 
 # Secrets/config: a local .env supplies provider + service tokens (never committed)
 #   OPENAI_API_KEY=...            # required for live runs

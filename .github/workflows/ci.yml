@@ -28,7 +28,7 @@ jobs:
           python-version: "3.13"
 
       - name: Sync workspace
-        run: uv sync --extra dev --all-packages
+        run: uv sync --extra dev --extra anthropic --all-packages
 
       - name: Format check
         run: uv run ruff format --check .

@@ -36,7 +36,7 @@ install: ## Install project for development (first time setup)
 	@echo "$(GREEN)Installing Twinklr for development...$(NC)"
 	@command -v uv >/dev/null 2>&1 || { echo "$(RED)Error: uv is not installed. Install from https://github.com/astral-sh/uv$(NC)"; exit 1; }
 	@echo "$(BLUE)→ Syncing workspace and installing all packages with dependencies...$(NC)"
-	uv sync --extra dev --all-packages
+	uv sync --extra dev --extra anthropic --all-packages
 	@echo "$(BLUE)→ Verifying installation...$(NC)"
 	@$(MAKE) verify-install
 	@echo "$(GREEN)✓ Installation complete!$(NC)"
@@ -46,7 +46,7 @@ install-dev: ## Install everything including ML dependencies (WhisperX, PyTorch,
 	@command -v uv >/dev/null 2>&1 || { echo "$(RED)Error: uv is not installed. Install from https://github.com/astral-sh/uv$(NC)"; exit 1; }
 	@echo "$(YELLOW)⚠ This will download ~2GB+ of ML dependencies (WhisperX, PyTorch)$(NC)"
 	@echo "$(BLUE)→ Syncing workspace with dev + ML dependencies...$(NC)"
-	uv sync --extra dev --extra ml --all-packages
+	uv sync --extra dev --extra anthropic --extra ml --all-packages
 	@echo "$(BLUE)→ Verifying installation...$(NC)"
 	@$(MAKE) verify-install
 	@echo "$(BLUE)→ Checking ML packages...$(NC)"
@@ -56,7 +56,7 @@ install-dev: ## Install everything including ML dependencies (WhisperX, PyTorch,
 
 sync: ## Sync dependencies (update after pyproject.toml changes)
 	@echo "$(BLUE)→ Syncing all dependencies (including dev)...$(NC)"
-	uv sync --extra dev --all-packages
+	uv sync --extra dev --extra anthropic --all-packages
 	@echo "$(GREEN)✓ Dependencies synced$(NC)"
 
 #############################################################################
@@ -373,7 +373,7 @@ git-clean: ## Remove untracked files (interactive)
 
 update-deps: ## Update all dependencies to latest versions
 	@echo "$(BLUE)→ Updating dependencies (including dev)...$(NC)"
-	uv sync --upgrade --extra dev
+	uv sync --upgrade --extra dev --extra anthropic
 	@echo "$(GREEN)✓ Dependencies updated$(NC)"
 
 lock: ## Update lock file without installing
