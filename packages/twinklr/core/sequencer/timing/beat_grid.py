@@ -177,10 +177,17 @@ class BeatGrid(BaseModel):
         while beats[-1] + step <= self.duration_ms:
             beats.append(beats[-1] + step)
 
-        bar_step = step * self.beats_per_bar
+        # Appended downbeats sit on appended beats, one bar of beats apart, counted
+        # from the detected beat nearest the last detected downbeat.
+        detected = self.beat_boundaries
+        last_bar = self.bar_boundaries[-1]
+        downbeat_index = min(range(len(detected)), key=lambda i: abs(detected[i] - last_bar))
         bars = list(self.bar_boundaries)
-        while bars[-1] + bar_step <= self.duration_ms:
-            bars.append(bars[-1] + bar_step)
+        bars.extend(
+            beats[i]
+            for i in range(downbeat_index + self.beats_per_bar, len(beats), self.beats_per_bar)
+            if i >= len(detected)
+        )
 
         if len(beats) == len(self.beat_boundaries) and len(bars) == len(self.bar_boundaries):
             return self

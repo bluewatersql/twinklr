@@ -89,6 +89,10 @@ def build_section_bar_map(
 
         start_ms = beat_grid.bar_boundaries[start_bar]
         end_ms = beat_grid.bar_boundaries[end_bar]
+        # A section that runs past the last bar boundary ends where it says it does
+        # (within the song), so the final partial bar is not left unlit.
+        if raw_end_ms > end_ms and end_bar == last_bar:
+            end_ms = max(end_ms, min(float(raw_end_ms), beat_grid.duration_ms))
 
         result[section_id] = SectionBarRange(
             section_id=section_id,

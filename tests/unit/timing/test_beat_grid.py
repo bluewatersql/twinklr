@@ -288,11 +288,28 @@ class TestExtendedToDuration:
         assert extended.bar_boundaries[:5] == grid.bar_boundaries
         assert extended.duration_ms == grid.duration_ms
 
-    def test_bar_downbeats_stay_on_beat_indices(self) -> None:
-        extended = self._grid(duration_ms=12_300.0).extended_to_duration()
+    def test_appended_downbeats_sit_on_appended_beats_when_the_grid_is_offset(self) -> None:
+        """Real grids start mid-bar and drift; appended bars must still land on beats."""
+        beats = [137.0 + i * 503.0 + (7.0 if i % 3 == 0 else -4.0) for i in range(18)]
+        detected_bars = [beats[i] for i in range(1, 18, 4)]  # downbeat phase 1
+        grid = BeatGrid(
+            bar_boundaries=detected_bars,
+            beat_boundaries=beats,
+            eighth_boundaries=BeatGrid._calculate_eighth_boundaries(beats),
+            sixteenth_boundaries=BeatGrid._calculate_sixteenth_boundaries(beats),
+            tempo_bpm=119.3,
+            beats_per_bar=4,
+            duration_ms=16_000.0,
+        )
 
-        for bar_index, bar_ms in enumerate(extended.bar_boundaries):
-            assert extended.beat_boundaries[bar_index * extended.beats_per_bar] == bar_ms
+        extended = grid.extended_to_duration()
+        appended_bars = extended.bar_boundaries[len(detected_bars) :]
+
+        assert len(appended_bars) >= 2
+        for bar_ms in appended_bars:
+            index = extended.beat_boundaries.index(bar_ms)
+            assert index >= len(beats)
+            assert index % 4 == 1  # same downbeat phase as the detected bars
 
     def test_subdivisions_follow_the_extended_beats(self) -> None:
         extended = self._grid(duration_ms=12_300.0).extended_to_duration()

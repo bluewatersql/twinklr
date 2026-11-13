@@ -196,8 +196,12 @@ class DisplayRenderer:
 
         # Stage 1: Composition
         composition_config = self._config.composition
+        # Beat detection stops where the music fades; compose against a grid that
+        # continues to the end of the audio so the last sections do not go dark.
+        # Show coordination below keeps the detected grid, which the moving-head
+        # part slices against too.
         engine = CompositionEngine(
-            beat_grid=self._beat_grid,
+            beat_grid=self._beat_grid.extended_to_duration(),
             choreo_graph=self._choreo_graph,
             palette_resolver=self._palette_resolver,
             section_boundaries=section_boundaries,

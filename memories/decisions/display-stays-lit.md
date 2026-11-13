@@ -21,16 +21,21 @@ never expressed by leaving most of the display unlit. Three mechanisms enforce t
   `display/brightness.py`: intensity 0.0 is 35% brightness and the range above it is
   linear to 100%. Intensity still drives effect energy and density unchanged. The same
   mapping sets the `On` effect level.
-- **The beat grid reaches the end of the song.** `BeatGrid.extended_to_duration()`
-  continues beats and bars at the average beat duration past the last detected beat. The
-  display render stage applies it. The moving-head path does not, so moving-head output
-  is unchanged.
+- **Display composition reaches the end of the song.** `BeatGrid.extended_to_duration()`
+  continues beats and bars at the average beat duration past the last detected beat, and
+  a section that runs past the last bar ends at its own end time. `DisplayRenderer` uses
+  the extended grid for composition only. Show coordination and the moving-head path keep
+  the detected grid, so moving-head output is unchanged and both parts of a combined show
+  slice against the same schedule.
 - **Foundation coverage rule.** The section plan validator rejects a plan whose BASE lane
-  has no section-long, full-coverage placement on a target holding at least 40% of the
-  display's pixels (`FOUNDATION_TOO_NARROW`, `FOUNDATION_TOO_SPARSE`). Twinkle, snow,
-  meteor and similar particle effects do not count as full coverage. Rule 12 of the
-  planner system prompt states the same requirement. The rule is skipped when the layout
-  reports no pixel fractions and for a section shorter than one bar.
+  has no full-coverage placement that starts on the section's first beat, lasts the whole
+  section, and targets a group holding at least 40% of the display's pixels
+  (`FOUNDATION_TOO_NARROW`, `FOUNDATION_TOO_SPARSE`). Twinkle, snow, meteor and similar
+  particle effects do not count as full coverage. Zone targets, split targets and
+  coordination windows do not count, because the validator cannot see which group they
+  light or for how long. Rule 12 of the planner system prompt states the same requirement.
+  The rule is skipped when no group in the layout reaches 40% and for a section shorter
+  than one bar.
 
 ## What was found
 
@@ -60,6 +65,14 @@ for the whole section) were replaced by abstract wording in `7bf495a` (2026-08-1
   about three times as bright. Whether to lower the floor or the top end is a taste call.
 - The 40% threshold and the list of sparse effects were chosen from this one song and
   layout.
+- In a combined show, a resting group is scaled to 15% intensity. With the floor that
+  now renders at about 43% brightness against about 87% for the lead, so resting groups
+  stand out less than before (about 2:1, was about 7:1).
+- A palette's own intensity scaler still multiplies the result, so a dimmed palette can
+  take an event below the 35% floor.
+- Section-relative bar and beat references assume the first detected beat is a downbeat.
+  Real grids can start mid-bar, which places effects up to three beats early. This
+  predates the change and is not fixed here.
 - Extending the grid for the moving-head path would let moving-head sections past the
   last detected beat render. It was left out to keep moving-head output unchanged
   ([decision](mh-render-matches-pre-cleanup-look.md)).

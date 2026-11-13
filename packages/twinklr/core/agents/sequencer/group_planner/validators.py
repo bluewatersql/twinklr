@@ -32,8 +32,9 @@ from twinklr.core.sequencer.vocabulary import (
 )
 from twinklr.core.sequencer.vocabulary.choreography import ChoreoTag
 
-# Smallest share of the display's pixels a section's foundation must keep lit.
-_MIN_FOUNDATION_PIXEL_FRACTION = 0.4
+# Smallest share of the display's pixels (whole percent) a section's foundation
+# group must hold.
+_MIN_FOUNDATION_PIXEL_PERCENT = 40
 
 # xLights effects that light only scattered pixels of the model they run on.
 _SPARSE_EFFECT_TYPES = frozenset(
@@ -387,18 +388,13 @@ class SectionPlanValidator:
             )
         return errors
 
-    def _target_pixel_fraction(self, target: PlanTarget) -> float:
-        """Share of the display's pixels a target lights (0.0 when unknown)."""
-        if target.type == TargetType.GROUP:
-            return self._pixel_fraction_by_group.get(target.id, 0.0)
-        if target.type == TargetType.ZONE:
-            # A zone renders on the widest group carrying its tag.
-            return max(
-                (g.pixel_fraction for g in self.choreo_graph.groups if target.id in g.tags),
-                default=0.0,
-            )
-        # A split partitions the whole display.
-        return 1.0
+    def _is_wide(self, fraction: float) -> bool:
+        """Whether a pixel share meets the foundation minimum.
+
+        Compared as the whole percentage the planner prompt displays, so a group
+        listed as "40% of display" is never rejected for being 39.6%.
+        """
+        return round(fraction * 100) >= _MIN_FOUNDATION_PIXEL_PERCENT
 
     def _check_foundation_coverage(
         self,
@@ -406,15 +402,26 @@ class SectionPlanValidator:
         section_start_ms: int | None,
         section_end_ms: int | None,
     ) -> list[ValidationIssue]:
-        """Require a section-long, full-coverage BASE target wide enough to keep the display lit.
+        """Require a section-long, full-coverage BASE placement on a wide group.
 
         A quiet section lowers intensity and motion; it must not shrink the
         foundation to a few small props or to a sparse particle texture, either of
-        which reads as a blackout on a real display. Skipped when the layout reports no pixel fractions and for
-        sections shorter than one bar.
+        which reads as a blackout on a real display.
+
+        Only a placement on a group that starts on the section's first beat with
+        SECTION duration counts. Zone and split targets do not count because the
+        group they render on is chosen by the layout mapping, and a coordination
+        window lights each target only during its own step.
+
+        Skipped when no group in the layout is wide enough and for sections shorter
+        than one bar.
         """
-        widest_available = max(self._pixel_fraction_by_group.values(), default=0.0)
-        if widest_available < _MIN_FOUNDATION_PIXEL_FRACTION:
+        wide_groups = sorted(
+            group_id
+            for group_id, fraction in self._pixel_fraction_by_group.items()
+            if self._is_wide(fraction)
+        )
+        if not wide_groups:
             return []
 
         if section_start_ms is not None and section_end_ms is not None:
@@ -424,38 +431,27 @@ class SectionPlanValidator:
             if first_bar is not None and section_end_ms - section_start_ms < first_bar.duration_ms:
                 return []
 
-        coverage = 0.0
-        solid_coverage = 0.0
+        has_wide = False
         for lane_plan in plan.lane_plans:
             if lane_plan.lane != LaneKind.BASE:
                 continue
             for coord_plan in lane_plan.coordination_plans:
-                # (target, template) pairs that stay lit for the whole section.
-                section_long: list[tuple[PlanTarget, str]] = []
-                if coord_plan.window is not None:
-                    section_long.extend(
-                        (target, coord_plan.window.template_id) for target in coord_plan.targets
-                    )
-                section_long.extend(
-                    (placement.target, placement.template_id)
-                    for placement in coord_plan.placements
-                    if placement.duration == EffectDuration.SECTION
-                )
-                for target, template_id in section_long:
-                    fraction = self._target_pixel_fraction(target)
-                    coverage = max(coverage, fraction)
-                    if not self._is_sparse_template(template_id):
-                        solid_coverage = max(solid_coverage, fraction)
+                for placement in coord_plan.placements:
+                    if (
+                        placement.target.type != TargetType.GROUP
+                        or placement.duration != EffectDuration.SECTION
+                        or placement.start.bar != 1
+                        or placement.start.beat != 1
+                    ):
+                        continue
+                    fraction = self._pixel_fraction_by_group.get(placement.target.id, 0.0)
+                    if not self._is_wide(fraction):
+                        continue
+                    if not self._is_sparse_template(placement.template_id):
+                        return []
+                    has_wide = True
 
-        if solid_coverage >= _MIN_FOUNDATION_PIXEL_FRACTION:
-            return []
-
-        wide_groups = sorted(
-            group_id
-            for group_id, fraction in self._pixel_fraction_by_group.items()
-            if fraction >= _MIN_FOUNDATION_PIXEL_FRACTION
-        )
-        if coverage >= _MIN_FOUNDATION_PIXEL_FRACTION:
+        if has_wide:
             solid_templates = (
                 sorted(
                     recipe.recipe_id
@@ -470,17 +466,15 @@ class SectionPlanValidator:
                     severity=ValidationSeverity.ERROR,
                     code="FOUNDATION_TOO_SPARSE",
                     message=(
-                        "The BASE lane's wide section-long targets use only sparse particle "
-                        "textures (twinkle, snow, meteors), which light a small share of "
-                        "their pixels and read as dark."
+                        "The BASE lane's wide section-long placements use only sparse particle "
+                        "textures (twinkle, snow, meteors), which light a small share of their "
+                        "pixels and read as dark. Put a full-coverage BASE template on a wide "
+                        f"group for the whole section, for example one of: {solid_templates[:12]}. "
+                        "Keep the particle texture as a second BASE placement on a different "
+                        "target."
                     ),
                     field_path="lane_plans[BASE]",
-                    fix_hint=(
-                        "Put a full-coverage BASE template with SECTION duration on a "
-                        f"display-wide or house-wide group, for example one of: "
-                        f"{solid_templates[:12]}. Keep the particle texture as a second "
-                        "foundation placement on a different target."
-                    ),
+                    fix_hint="Use a full-coverage BASE template on the wide foundation group",
                 )
             ]
         return [
@@ -488,16 +482,15 @@ class SectionPlanValidator:
                 severity=ValidationSeverity.ERROR,
                 code="FOUNDATION_TOO_NARROW",
                 message=(
-                    f"The BASE lane's widest section-long target lights {coverage:.0%} of the "
-                    f"display; at least {_MIN_FOUNDATION_PIXEL_FRACTION:.0%} is required so the "
-                    "display never reads as dark."
+                    "The BASE lane has no placement that keeps the display lit for the whole "
+                    f"section. Add a BASE placement on a group holding at least "
+                    f"{_MIN_FOUNDATION_PIXEL_PERCENT}% of the display, starting at bar 1 beat 1 "
+                    f"with SECTION duration, for example on one of: {wide_groups[:8]}. Zone and "
+                    "split targets and coordination windows do not count. Keep the section "
+                    "quiet with intensity and template choice, not by removing coverage."
                 ),
                 field_path="lane_plans[BASE]",
-                fix_hint=(
-                    "Add a BASE placement with SECTION duration on a display-wide or "
-                    f"house-wide group, for example one of: {wide_groups[:8]}. Keep the "
-                    "section quiet with intensity and template choice, not by removing coverage."
-                ),
+                fix_hint="Add a section-long BASE placement on a display-wide or house-wide group",
             )
         ]
 

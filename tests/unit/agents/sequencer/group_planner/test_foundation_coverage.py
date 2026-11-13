@@ -15,7 +15,11 @@ from twinklr.core.sequencer.templates.group.models.choreography import (
     ChoreographyGraph,
     ChoreoGroup,
 )
-from twinklr.core.sequencer.templates.group.models.coordination import PlanTarget
+from twinklr.core.sequencer.templates.group.models.coordination import (
+    CoordinationConfig,
+    PlacementWindow,
+    PlanTarget,
+)
 from twinklr.core.sequencer.templates.group.recipe_catalog import RecipeCatalog
 from twinklr.core.sequencer.timing import TimeRef
 from twinklr.core.sequencer.vocabulary import (
@@ -25,6 +29,7 @@ from twinklr.core.sequencer.vocabulary import (
     GroupVisualIntent,
     LaneKind,
     PlanningTimeRef,
+    StepUnit,
 )
 from twinklr.core.sequencer.vocabulary.choreography import ChoreoTag, TargetType
 from twinklr.core.sequencer.vocabulary.timing import TimeRefKind
@@ -90,6 +95,7 @@ def _base_plan(
     target: PlanTarget,
     duration: EffectDuration = EffectDuration.SECTION,
     template_id: str = "gtpl_base_glow",
+    start: PlanningTimeRef | None = None,
 ) -> SectionCoordinationPlan:
     return SectionCoordinationPlan(
         section_id="verse_1",
@@ -107,7 +113,7 @@ def _base_plan(
                                 placement_id="p1",
                                 target=target,
                                 template_id=template_id,
-                                start=PlanningTimeRef(bar=1, beat=1),
+                                start=start or PlanningTimeRef(bar=1, beat=1),
                                 duration=duration,
                             ),
                         ],
@@ -147,20 +153,88 @@ def test_wide_target_must_last_the_whole_section() -> None:
     assert _CODE in _codes(plan)
 
 
-def test_zone_target_counts_as_its_widest_group() -> None:
-    plan = _base_plan(PlanTarget(type=TargetType.ZONE, id="HOUSE"))
-    assert _CODE not in _codes(plan)
+def test_zone_and_split_targets_do_not_count() -> None:
+    """The group a zone or split renders on is chosen by the layout mapping."""
+    assert _CODE in _codes(_base_plan(PlanTarget(type=TargetType.ZONE, id="HOUSE")))
+    assert _CODE in _codes(_base_plan(PlanTarget(type=TargetType.SPLIT, id="HALVES_LEFT")))
 
 
-def test_fix_hint_names_the_wide_groups() -> None:
+def test_wide_placement_must_start_on_the_first_beat() -> None:
+    plan = _base_plan(
+        PlanTarget(type=TargetType.GROUP, id="ALL_HOUSE"), start=PlanningTimeRef(bar=2, beat=3)
+    )
+    assert _CODE in _codes(plan)
+
+
+def test_coordination_window_does_not_count() -> None:
+    """A window lights each target only during its own step."""
+    targets = [
+        PlanTarget(type=TargetType.GROUP, id="ALL_HOUSE"),
+        PlanTarget(type=TargetType.GROUP, id="SNOWFLAKES"),
+    ]
+    plan = SectionCoordinationPlan(
+        section_id="verse_1",
+        theme=DEFAULT_THEME,
+        lane_plans=[
+            LanePlan(
+                lane=LaneKind.BASE,
+                target_roles=["BACKGROUND"],
+                coordination_plans=[
+                    CoordinationPlan(
+                        coordination_mode=CoordinationMode.CALL_RESPONSE,
+                        targets=targets,
+                        window=PlacementWindow(
+                            start=PlanningTimeRef(bar=1, beat=1),
+                            end=PlanningTimeRef(bar=3, beat=1),
+                            template_id="gtpl_base_glow",
+                        ),
+                        config=CoordinationConfig(
+                            group_order=["ALL_HOUSE", "SNOWFLAKES"],
+                            step_unit=StepUnit.BAR,
+                            step_duration=1,
+                        ),
+                    ),
+                ],
+            ),
+        ],
+    )
+    assert _CODE in _codes(plan)
+
+
+def test_threshold_uses_the_percentage_the_prompt_shows() -> None:
+    """A group the prompt lists as "40% of display" is accepted at 39.6%."""
+    graph = ChoreographyGraph(
+        graph_id="test_display",
+        groups=[
+            ChoreoGroup(id="ALL_HOUSE", role="HOUSE", pixel_fraction=0.396),
+            ChoreoGroup(id="SNOWFLAKES", role="SNOWFLAKES", pixel_fraction=0.17),
+        ],
+    )
+    plan = _base_plan(PlanTarget(type=TargetType.GROUP, id="ALL_HOUSE"))
+    assert _CODE not in _codes(plan, graph=graph)
+
+
+def test_skipped_when_no_group_is_wide_enough() -> None:
+    graph = ChoreographyGraph(
+        graph_id="test_display",
+        groups=[
+            ChoreoGroup(id="ALL_HOUSE", role="HOUSE", pixel_fraction=0.3),
+            ChoreoGroup(id="SNOWFLAKES", role="SNOWFLAKES", pixel_fraction=0.17),
+        ],
+    )
+    plan = _base_plan(PlanTarget(type=TargetType.GROUP, id="SNOWFLAKES"))
+    assert _CODE not in _codes(plan, graph=graph)
+
+
+def test_message_names_the_wide_groups() -> None:
     plan = _base_plan(PlanTarget(type=TargetType.GROUP, id="FLOODS"))
     validator = SectionPlanValidator(
         choreo_graph=_graph(), template_catalog=_catalog(), timing_context=_timing()
     )
     issue = next(i for i in validator.validate(plan).errors if i.code == _CODE)
-    assert issue.fix_hint is not None
-    assert "ALL_HOUSE" in issue.fix_hint
-    assert "SNOWFLAKES" not in issue.fix_hint
+    # The planner is shown only the message, so the candidates must be in it.
+    assert "ALL_HOUSE" in issue.message
+    assert "SNOWFLAKES" not in issue.message
 
 
 def _recipes() -> RecipeCatalog:
@@ -204,7 +278,7 @@ def test_full_coverage_template_on_a_wide_target_passes() -> None:
     assert _CODE not in codes
 
 
-def test_sparse_fix_hint_names_only_full_coverage_templates() -> None:
+def test_sparse_message_names_only_full_coverage_templates() -> None:
     plan = _base_plan(
         PlanTarget(type=TargetType.GROUP, id="ALL_HOUSE"), template_id="gtpl_base_shimmer"
     )
@@ -215,9 +289,8 @@ def test_sparse_fix_hint_names_only_full_coverage_templates() -> None:
         recipe_catalog=_recipes(),
     )
     issue = next(i for i in validator.validate(plan).errors if i.code == "FOUNDATION_TOO_SPARSE")
-    assert issue.fix_hint is not None
-    assert "gtpl_base_glow" in issue.fix_hint
-    assert "gtpl_base_shimmer" not in issue.fix_hint
+    assert "gtpl_base_glow" in issue.message
+    assert "gtpl_base_shimmer" not in issue.message
 
 
 def test_skipped_when_the_layout_reports_no_pixel_fractions() -> None:
