@@ -188,6 +188,20 @@ class DiscreteCapability(BaseModel):
                 )
         return self
 
+    def resolve(self, state: str) -> int:
+        """Return the byte declared to select a named state.
+
+        Only the state's declared `value`: never a range bound, a byte between two
+        states, or the open, closed or default state in place of an unknown one.
+
+        Raises:
+            ValueError: If `state` is not declared.
+        """
+        declared = self.states.get(state)
+        if declared is None:
+            raise ValueError(f"state {state!r} is not one of {sorted(self.states)}")
+        return declared.value
+
 
 class VisibilityCapability(BaseModel):
     """What extinguishes the fixture's output. Defaults claim no darkness guarantee."""

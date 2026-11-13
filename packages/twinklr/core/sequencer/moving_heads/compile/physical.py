@@ -20,22 +20,20 @@ at the step end, so the end state is the kernel's, not the last frame's.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections import defaultdict
+from collections.abc import Mapping, Sequence
 from fractions import Fraction
 from itertools import pairwise
 import math
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from twinklr.core.config.fixtures.capabilities import (
-    DiscreteCapability,
-    DiscreteName,
-    FixtureCapabilities,
-)
+from twinklr.core.config.fixtures.capabilities import DiscreteCapability, FixtureCapabilities
 from twinklr.core.formats.xlights.sequence.fresh import EFFECT_GRID_MS
 from twinklr.core.sequencer.models.context import StepCompileContext
 from twinklr.core.sequencer.models.enum import ChannelName
 from twinklr.core.sequencer.models.moving_heads.physical import (
+    DISCRETE_KEYS,
     ContinuousTrajectory,
     DiscretePoint,
     DiscreteTrajectory,
@@ -73,20 +71,39 @@ class PhysicalCompileError(Exception):
         super().__init__(diagnostic.message)
 
 
-class WheelChange(BaseModel):
-    """A color or gobo wheel selection the transaction pass must mask and let settle."""
+class OffGridTimeError(ValueError):
+    """A step bound or sample time off the effect frame grid.
+
+    The frame grid is the single source of sample times: the caller quantizes step
+    bounds with the encoder's `quantize_cue` before compiling.
+    """
+
+    def __init__(self, name: str, time_ms: int) -> None:
+        self.name = name
+        self.time_ms = time_ms
+        super().__init__(
+            f"{name} {time_ms} ms is not on the {EFFECT_GRID_MS} ms frame grid; quantize "
+            "step bounds with quantize_cue before compiling"
+        )
+
+
+class DiscreteChange(BaseModel):
+    """A discrete state selection the transaction pass must schedule around.
+
+    A wheel selection is masked and given its settle time; a shutter selection takes
+    the visibility latency it crosses. This records the selection, not a schedule.
+    """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     fixture_id: str
     channel: ChannelName
     t_ms: int
-    from_state: str | None = Field(description="State in force before; None when unknown")
+    from_state: str | None = Field(
+        description="State in force before; None only before the fixture's first state"
+    )
     to_state: str
     settle_ms: int | None = Field(description="Declared settle of `to_state`; None when unknown")
-
-
-_WHEELS: dict[ChannelName, DiscreteName] = {ChannelName.COLOR: "color", ChannelName.GOBO: "gobo"}
 
 
 def compile_physical_step(
@@ -99,8 +116,10 @@ def compile_physical_step(
         context: Step identity, timing, the fixture's physical profile and the
             song's musical phase map. Phase is measured from `context.start_ms`.
         sample_times_ms: The encoder's frame starts in the step's half-open span:
-            strictly increasing, starting at its start, at most one frame apart and
-            ending within one frame of the step end.
+            every frame from its start to the last before its end. The step's start
+            and end (`context`) must already be frame-grid times: the caller quantizes
+            musical bounds with the encoder's `quantize_cue`. Phase is evaluated at
+            these frame times against the exact musical phase map.
 
     Returns:
         A segment over the step with PAN and TILT (sampled, plus a terminal point at
@@ -113,6 +132,7 @@ def compile_physical_step(
             fixture without a physical profile.
         PhysicalChannelError: For a value, rate or state change the profile cannot honor,
             including a state or wheel the profile does not declare.
+        OffGridTimeError: For a step bound or sample time off the frame grid.
         ValueError: For invalid sample times or a context without a phase map.
     """
     t0_ms = context.start_ms
@@ -191,66 +211,120 @@ def compile_physical_step(
 def resolve_discrete_state(capability: DiscreteCapability, state: str) -> int:
     """Return the byte the profile declares to select a named state.
 
-    Only the state's declared `value`: never a range bound, a byte between two states,
-    or the open, closed or default state in place of an unknown one.
+    The one resolver the encoder also uses (`DiscreteCapability.resolve`): only the
+    state's declared `value`, never a range bound, a byte between two states, or the
+    open, closed or default state in place of an unknown one.
 
     Raises:
         ValueError: If the capability does not declare `state`.
     """
-    declared = capability.states.get(state)
-    if declared is None:
-        raise ValueError(f"state {state!r} is not one of {sorted(capability.states)}")
-    return declared.value
+    return capability.resolve(state)
 
 
 def wheel_changes(
-    segments: Sequence[FixtureSegment], profile: FixtureCapabilities
-) -> tuple[WheelChange, ...]:
-    """List the color and gobo wheel selections across one fixture's ordered segments.
+    segments: Sequence[FixtureSegment], profiles: Mapping[str, FixtureCapabilities]
+) -> tuple[DiscreteChange, ...]:
+    """List every color and gobo wheel selection the encoded frames make.
 
-    A selection is reported where a wheel event names a state other than the one in
-    force before it, with the selected state's settle time. `from_state` is None where
-    the preceding state is not known here: before the first segment (the run's initial
-    state) and after a segment that does not author the wheel (the encoder emits the
-    declared default byte there, not a named state). Masking and settle are scheduled
-    by the transaction pass, never by the legacy channel blender.
+    See `_discrete_changes`. Masking and settle are scheduled by the transaction pass,
+    never by the legacy channel blender.
+    """
+    return _discrete_changes(segments, profiles, (ChannelName.COLOR, ChannelName.GOBO))
+
+
+def shutter_changes(
+    segments: Sequence[FixtureSegment], profiles: Mapping[str, FixtureCapabilities]
+) -> tuple[DiscreteChange, ...]:
+    """List every shutter selection the encoded frames make, within and across steps.
+
+    See `_discrete_changes`. A step checks only the changes inside it; the change into
+    its first state is the transaction pass's to time against close/open latency.
+    """
+    return _discrete_changes(segments, profiles, (ChannelName.SHUTTER,))
+
+
+def _discrete_changes(
+    segments: Sequence[FixtureSegment],
+    profiles: Mapping[str, FixtureCapabilities],
+    channels: tuple[ChannelName, ...],
+) -> tuple[DiscreteChange, ...]:
+    """Each fixture's selections on `channels`, as the encoder's frames carry them.
+
+    Segments may come in any order and from any fixtures; each fixture uses its own
+    profile. Where no segment authors a channel (before, between or after the
+    segments that do) the encoder writes the default byte, which selects the
+    profile's `default_state`, so that span holds the default state from time zero.
+    A selection is reported where the state differs from the one before it, with the
+    selected state's declared settle time; `from_state` is None only for a fixture's
+    first state, whose predecessor is the run's initial state. Results are ordered by
+    fixture, time and channel.
 
     Raises:
-        ValueError: If the segments are not one fixture's, in order without overlap, or
-            a wheel channel is not a discrete physical value.
-        PhysicalChannelError: If the profile does not declare a wheel or state.
+        ValueError: If a fixture has no profile, a channel is not a discrete physical
+            value, or two of a fixture's segments overlap while both author a channel.
+        PhysicalChannelError: If the profile does not declare an authored channel or
+            state.
     """
-    if len({segment.fixture_id for segment in segments}) > 1:
-        raise ValueError("wheel changes are listed for one fixture at a time")
-    if any(later.t0_ms < earlier.t1_ms for earlier, later in pairwise(segments)):
-        raise ValueError("segments must be in time order without overlap")
-
-    changes: list[WheelChange] = []
-    current: dict[ChannelName, str | None] = dict.fromkeys(_WHEELS)
+    by_fixture: dict[str, list[FixtureSegment]] = defaultdict(list)
     for segment in segments:
-        for channel, key in _WHEELS.items():
-            value = segment.channels.get(channel)
-            if value is None:
-                current[channel] = None
+        by_fixture[segment.fixture_id].append(segment)
+
+    changes: list[DiscreteChange] = []
+    for fixture_id, fixture_segments in sorted(by_fixture.items()):
+        profile = profiles.get(fixture_id)
+        if profile is None:
+            raise ValueError(f"fixture {fixture_id!r} has no physical profile")
+        ordered = sorted(fixture_segments, key=lambda segment: (segment.t0_ms, segment.t1_ms))
+        for channel in channels:
+            authored: list[tuple[FixtureSegment, DiscreteTrajectory]] = []
+            for segment in ordered:
+                value = segment.channels.get(channel)
+                if value is None:
+                    continue
+                if not isinstance(value.physical, DiscreteTrajectory):
+                    raise ValueError(f"{channel.value} is not a discrete physical value")
+                check_physical_value(fixture_id, channel, value.physical, profile)
+                authored.append((segment, value.physical))
+            capability = profile.discrete.get(DISCRETE_KEYS[channel])
+            if capability is None:
                 continue
-            if not isinstance(value.physical, DiscreteTrajectory):
-                raise ValueError(f"{channel.value} is not a discrete physical value")
-            check_physical_value(segment.fixture_id, channel, value.physical, profile)
-            for event in value.physical.events:
-                if event.state == current[channel]:
+
+            timeline: list[tuple[int, str]] = []
+            end_ms = 0
+            for index, (segment, trajectory) in enumerate(authored):
+                if segment.t0_ms < end_ms:
+                    raise ValueError(
+                        f"segments {authored[index - 1][0].segment_id!r} and "
+                        f"{segment.segment_id!r} of {fixture_id} overlap and both author "
+                        f"{channel.value}"
+                    )
+                if segment.t0_ms > end_ms:
+                    timeline.append((end_ms, capability.default_state))
+                timeline.extend((event.t_ms, event.state) for event in trajectory.events)
+                end_ms = segment.t1_ms
+            timeline.append((end_ms, capability.default_state))
+
+            previous: str | None = None
+            for t_ms, state in timeline:
+                if state == previous:
                     continue
                 changes.append(
-                    WheelChange(
-                        fixture_id=segment.fixture_id,
+                    DiscreteChange(
+                        fixture_id=fixture_id,
                         channel=channel,
-                        t_ms=event.t_ms,
-                        from_state=current[channel],
-                        to_state=event.state,
-                        settle_ms=profile.discrete[key].states[event.state].settle_ms,
+                        t_ms=t_ms,
+                        from_state=previous,
+                        to_state=state,
+                        settle_ms=capability.states[state].settle_ms,
                     )
                 )
-                current[channel] = event.state
-    return tuple(sorted(changes, key=lambda change: change.t_ms))
+                previous = state
+    return tuple(
+        sorted(
+            changes,
+            key=lambda change: (change.fixture_id, change.t_ms, channels.index(change.channel)),
+        )
+    )
 
 
 def slice_physical_segment(segment: FixtureSegment, start_ms: int, end_ms: int) -> FixtureSegment:
@@ -342,6 +416,10 @@ def _non_default_fields(prefix: str, component: BaseModel, *, keep: str = "") ->
 def _check_sample_times(times: Sequence[int], t0_ms: int, t1_ms: int) -> tuple[int, ...]:
     if not times:
         raise ValueError("physical compile needs at least one sample time")
+    grid_times = (("step start", t0_ms), ("step end", t1_ms), *(("sample time", t) for t in times))
+    for name, time_ms in grid_times:
+        if time_ms % EFFECT_GRID_MS:
+            raise OffGridTimeError(name, time_ms)
     if times[0] != t0_ms:
         raise ValueError(f"sample times must start at the step start {t0_ms} ms")
     if any(later <= earlier for earlier, later in pairwise(times)):

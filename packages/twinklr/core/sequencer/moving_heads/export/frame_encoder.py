@@ -377,7 +377,7 @@ def _encode(
         raise fail("sampled before its first point; its value there is unknown")
     if isinstance(sample, str):
         wheel = capabilities.discrete[DISCRETE_KEYS[channel]]
-        return {wheel.offset: wheel.states[sample].value}
+        return {wheel.offset: wheel.resolve(sample)}
     axis = capabilities.axes[AXIS_KEYS[channel]]
     try:
         word = axis.dmx_word(sample)

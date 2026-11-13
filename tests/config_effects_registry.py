@@ -2576,6 +2576,7 @@ _PHYSICAL_WORDS = "exact path changes the encoded DMX word"
 _PHYSICAL_CHECK = "exact path changes the initial-state check"
 _PHYSICAL_IDENTITY_ONLY = "identity only; consumer lands in P1.3–P1.5"
 _PHYSICAL_FRAMES = "exact path changes the encoded fixture frames"
+_PHYSICAL_CHANGES = "exact path changes the listed wheel state changes"
 _PHYSICAL_PROFILE_FIELDS = {
     "": _PHYSICAL_WORDS,
     "schema_version": _PHYSICAL_REJECTED,
@@ -2601,8 +2602,8 @@ _PHYSICAL_PROFILE_FIELDS = {
     "discrete.states.range_min": _PHYSICAL_IDENTITY_ONLY,
     "discrete.states.range_max": _PHYSICAL_IDENTITY_ONLY,
     "discrete.states.value": _PHYSICAL_FRAMES,
-    "discrete.states.settle_ms": _PHYSICAL_IDENTITY_ONLY,
-    "discrete.default_state": _PHYSICAL_IDENTITY_ONLY,
+    "discrete.states.settle_ms": _PHYSICAL_CHANGES,
+    "discrete.default_state": _PHYSICAL_CHANGES,
     "discrete.closed_state": _PHYSICAL_IDENTITY_ONLY,
     "discrete.open_state": _PHYSICAL_IDENTITY_ONLY,
     "visibility": _PHYSICAL_IDENTITY_ONLY,

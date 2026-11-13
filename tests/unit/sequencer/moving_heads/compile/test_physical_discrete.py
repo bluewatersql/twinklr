@@ -15,7 +15,7 @@ from tests.support.mh_physical import (
     discrete_step_payload,
     physical_step_payload,
 )
-from twinklr.core.config.fixtures import FixtureCapabilities
+from twinklr.core.config.fixtures import DiscreteCapability, FixtureCapabilities
 from twinklr.core.curves.registry import CurveRegistry
 from twinklr.core.sequencer.models.context import StepCompileContext
 from twinklr.core.sequencer.models.enum import ChannelName
@@ -26,10 +26,11 @@ from twinklr.core.sequencer.models.moving_heads.physical import (
 from twinklr.core.sequencer.models.template import TemplateStep
 from twinklr.core.sequencer.moving_heads.channels.state import FixtureSegment
 from twinklr.core.sequencer.moving_heads.compile.physical import (
+    DiscreteChange,
     PhysicalCompileError,
-    WheelChange,
     compile_physical_step,
     resolve_discrete_state,
+    shutter_changes,
     slice_physical_segment,
     wheel_changes,
 )
@@ -83,8 +84,14 @@ def _events(segment: FixtureSegment, channel: ChannelName) -> list[tuple[int, st
     return [(event.t_ms, event.state) for event in physical.events]
 
 
-def _profile() -> FixtureCapabilities:
-    return FixtureCapabilities.model_validate(discrete_profile_payload())
+def _profile(payload: dict[str, Any] | None = None) -> FixtureCapabilities:
+    return FixtureCapabilities.model_validate(payload or discrete_profile_payload())
+
+
+def _changes(
+    changes: tuple[DiscreteChange, ...], channel: ChannelName
+) -> list[tuple[int, str | None, str]]:
+    return [(c.t_ms, c.from_state, c.to_state) for c in changes if c.channel is channel]
 
 
 # --- Semantic resolution --------------------------------------------------------------
@@ -137,56 +144,133 @@ def test_wheel_change_never_sweeps_intermediate_modes() -> None:
         (1500, "blue")
     ]
 
-    # What the transaction pass needs to mask and settle the change.
-    assert wheel_changes([first, second], profile) == (
-        WheelChange(
+    # What the transaction pass needs to mask and settle each selection, including
+    # the return to the declared default after the last authored state.
+    def change(channel: ChannelName, t_ms: int, before: str | None, after: str, settle: int):
+        return DiscreteChange(
             fixture_id="MH1",
-            channel=ChannelName.COLOR,
-            t_ms=0,
-            from_state=None,
-            to_state="white",
-            settle_ms=120,
-        ),
-        WheelChange(
-            fixture_id="MH1",
-            channel=ChannelName.GOBO,
-            t_ms=0,
-            from_state=None,
-            to_state="open",
-            settle_ms=150,
-        ),
-        WheelChange(
-            fixture_id="MH1",
-            channel=ChannelName.COLOR,
-            t_ms=1000,
-            from_state="white",
-            to_state="blue",
-            settle_ms=140,
-        ),
-        WheelChange(
-            fixture_id="MH1",
-            channel=ChannelName.GOBO,
-            t_ms=1000,
-            from_state="open",
-            to_state="star",
-            settle_ms=160,
-        ),
+            channel=channel,
+            t_ms=t_ms,
+            from_state=before,
+            to_state=after,
+            settle_ms=settle,
+        )
+
+    assert wheel_changes([second, first], {"MH1": profile}) == (
+        change(ChannelName.COLOR, 0, None, "white", 120),
+        change(ChannelName.GOBO, 0, None, "open", 150),
+        change(ChannelName.COLOR, 1000, "white", "blue", 140),
+        change(ChannelName.GOBO, 1000, "open", "star", 160),
+        change(ChannelName.COLOR, 2000, "blue", "white", 120),
+        change(ChannelName.GOBO, 2000, "star", "open", 150),
     )
 
 
-def test_unchanged_wheel_state_is_not_a_change() -> None:
-    first = _compile(physical_color="red", physical_gobo=None)
-    second = _compile(1000, physical_color="red", physical_gobo=None)
+def test_unauthored_spans_and_gaps_hold_the_default_state() -> None:
+    red = [_compile(start, physical_color="red", physical_gobo=None) for start in (0, 1000, 3000)]
     unauthored = _compile(2000, physical_color=None, physical_gobo=None)
-    third = _compile(3000, physical_color="red", physical_gobo=None)
-
-    changes = wheel_changes([first, second, unauthored, third], _profile())
-
-    # The unauthored segment emits the declared default byte, not a named state, so
-    # the state before the next selection is unknown here.
-    assert [(c.t_ms, c.from_state, c.to_state) for c in changes] == [
+    expected = [
         (0, None, "red"),
-        (3000, None, "red"),
+        (2000, "red", "white"),
+        (3000, "white", "red"),
+        (4000, "red", "white"),
+    ]
+
+    # An unchanged state across steps is not a change; an unauthored segment and a
+    # gap both emit the default byte, which selects the declared default state.
+    with_segment = wheel_changes([*red, unauthored], {"MH1": _profile()})
+    assert _changes(with_segment, ChannelName.COLOR) == expected
+    with_gap = wheel_changes(red, {"MH1": _profile()})
+    assert _changes(with_gap, ChannelName.COLOR) == expected
+    # Never authored: the default holds from the first frame.
+    assert _changes(with_gap, ChannelName.GOBO) == [(0, None, "open")]
+
+    # The default state is the profile's, not a guess at the first or zero-byte state.
+    blue_default = discrete_profile_payload()
+    blue_default["discrete"]["color"]["default_state"] = "blue"
+    blue_default["defaults"][7] = 26
+    late = _compile(1000, profile=blue_default, physical_color="red", physical_gobo=None)
+    assert _changes(wheel_changes([late], {"MH1": _profile(blue_default)}), ChannelName.COLOR) == [
+        (0, None, "blue"),
+        (1000, "blue", "red"),
+        (2000, "red", "blue"),
+    ]
+
+
+def test_changes_use_each_fixtures_own_profile_in_any_order() -> None:
+    slow = discrete_profile_payload()
+    slow["discrete"]["color"]["states"]["red"]["settle_ms"] = 400
+    mh1 = _compile(physical_color="red", physical_gobo=None)
+    mh2 = mh1.model_copy(update={"fixture_id": "MH2"})
+    mh2_later = _compile(1000, physical_color="blue", physical_gobo=None).model_copy(
+        update={"fixture_id": "MH2"}
+    )
+
+    changes = wheel_changes([mh2_later, mh1, mh2], {"MH1": _profile(), "MH2": _profile(slow)})
+
+    color = [
+        (c.fixture_id, c.t_ms, c.to_state, c.settle_ms)
+        for c in changes
+        if c.channel is ChannelName.COLOR
+    ]
+    assert color == [
+        ("MH1", 0, "red", 120),
+        ("MH1", 1000, "white", 120),
+        ("MH2", 0, "red", 400),
+        ("MH2", 1000, "blue", 140),
+        ("MH2", 2000, "white", 120),
+    ]
+    with pytest.raises(ValueError, match="MH2"):
+        wheel_changes([mh1, mh2], {"MH1": _profile()})
+
+
+def test_overlapping_segments_authoring_one_channel_are_rejected() -> None:
+    first = _compile(physical_color="red", physical_gobo=None)
+    overlap = _compile(500, physical_color="blue", physical_gobo=None)
+
+    with pytest.raises(ValueError, match="overlap"):
+        wheel_changes([first, overlap], {"MH1": _profile()})
+
+    # Overlap on a channel only one segment authors is not ambiguous.
+    no_color = _compile(500, physical_color=None, physical_gobo=None)
+    assert _changes(wheel_changes([first, no_color], {"MH1": _profile()}), ChannelName.COLOR) == [
+        (0, None, "red"),
+        (1000, "red", "white"),
+    ]
+
+
+def test_shutter_changes_cross_step_boundaries() -> None:
+    closed = _compile(physical_shutter_state="closed", physical_gobo=None)
+    opened = _compile(1000, physical_shutter_state="open", physical_gobo=None)
+    profiles = {"MH1": _profile()}
+
+    changes = shutter_changes([closed, opened], profiles)
+
+    assert _changes(changes, ChannelName.SHUTTER) == [
+        (0, None, "closed"),
+        (1000, "closed", "open"),
+        (2000, "open", "closed"),
+    ]
+    assert {c.channel for c in changes} == {ChannelName.SHUTTER}
+    assert {c.channel for c in wheel_changes([closed, opened], profiles)} == {
+        ChannelName.COLOR,
+        ChannelName.GOBO,
+    }
+
+    pulse = _compile(
+        physical_shutter_state=None,
+        physical_shutter={
+            "period_beats": 1.0,
+            "duty_cycle": 0.5,
+            "low_state": "closed",
+            "high_state": "open",
+        },
+    )
+    assert _changes(shutter_changes([pulse], profiles), ChannelName.SHUTTER) == [
+        (0, None, "open"),
+        (260, "open", "closed"),  # the first frame of the closed half beat
+        (500, "closed", "open"),
+        (760, "open", "closed"),
     ]
 
 
@@ -207,6 +291,15 @@ def test_unknown_state_has_no_open_fallback() -> None:
     assert "open" in str(raised.value)  # names the declared states, selects none
     with pytest.raises(ValueError, match="'Open'"):
         resolve_discrete_state(profile.discrete["gobo"], "Open")
+    with pytest.raises(ValueError, match="'strobe'"):
+        profile.discrete["shutter"].resolve("strobe")
+
+
+def test_one_resolver_selects_the_declared_byte() -> None:
+    shutter = _profile().discrete["shutter"]
+
+    assert isinstance(shutter, DiscreteCapability)
+    assert shutter.resolve("closed") == resolve_discrete_state(shutter, "closed") == 64
 
 
 def test_absent_required_capability_is_an_error() -> None:
@@ -239,10 +332,28 @@ def test_static_and_pulsed_shutter_are_exclusive() -> None:
         TemplateStep.model_validate(payload)
 
 
-@pytest.mark.parametrize("field", ["physical_shutter_state", "physical_color", "physical_gobo"])
-def test_discrete_state_names_are_not_empty(field: str) -> None:
-    with pytest.raises(ValidationError, match=rf"{field}\n  String should have at least 1"):
-        TemplateStep.model_validate({**discrete_step_payload(), field: ""})
+@pytest.mark.parametrize("name", ["", " ", "\t "])
+@pytest.mark.parametrize(
+    "field",
+    [
+        "physical_shutter_state",
+        "physical_color",
+        "physical_gobo",
+        "physical_shutter.low_state",
+        "physical_shutter.high_state",
+    ],
+)
+def test_blank_state_names_are_rejected_by_the_model(field: str, name: str) -> None:
+    payload = discrete_step_payload()
+    if field.startswith("physical_shutter."):
+        payload.pop("physical_shutter_state")
+        payload["physical_shutter"] = {**physical_step_payload()["physical_shutter"]}
+        payload["physical_shutter"][field.removeprefix("physical_shutter.")] = name
+    else:
+        payload[field] = name
+
+    with pytest.raises(ValidationError, match=rf"{field}\n  String should match pattern"):
+        TemplateStep.model_validate(payload)
 
 
 @pytest.mark.parametrize("field", ["physical_shutter_state", "physical_color", "physical_gobo"])

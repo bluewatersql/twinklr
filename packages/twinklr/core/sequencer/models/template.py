@@ -11,7 +11,7 @@ These models define how choreography is structured and executed.
 """
 
 from enum import StrEnum
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -170,6 +170,10 @@ MIN_PHYSICAL_PERIOD_BEATS = 1 / 64
 20 ms frame, so anything shorter is an authoring error rather than a pulse."""
 
 
+StateName = Annotated[str, Field(pattern=r"\S")]
+"""A profile state name: not empty and not only whitespace."""
+
+
 class PhysicalMovementSpec(BaseModel):
     """Physical motion of a step for the physical renderer, in fixture-local degrees.
 
@@ -233,8 +237,8 @@ class PhysicalDimmerPulse(PhysicalPulseSpec):
 class PhysicalShutterPulse(PhysicalPulseSpec):
     """A shutter pulse between named profile states."""
 
-    low_state: str = Field(min_length=1)
-    high_state: str = Field(min_length=1)
+    low_state: StateName
+    high_state: StateName
 
 
 class Movement(BaseModel):
@@ -418,15 +422,11 @@ class TemplateStep(BaseModel):
     )
     # Physical renderer only; left out of dumps when absent. Named profile states held
     # for the whole step, never a byte. A static shutter excludes the pulse form.
-    physical_shutter_state: str | None = Field(
-        default=None, min_length=1, exclude_if=lambda value: value is None
+    physical_shutter_state: StateName | None = Field(
+        default=None, exclude_if=lambda value: value is None
     )
-    physical_color: str | None = Field(
-        default=None, min_length=1, exclude_if=lambda value: value is None
-    )
-    physical_gobo: str | None = Field(
-        default=None, min_length=1, exclude_if=lambda value: value is None
-    )
+    physical_color: StateName | None = Field(default=None, exclude_if=lambda value: value is None)
+    physical_gobo: StateName | None = Field(default=None, exclude_if=lambda value: value is None)
 
     @property
     def has_physical_data(self) -> bool:

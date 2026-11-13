@@ -24,6 +24,7 @@ from twinklr.core.sequencer.models.moving_heads.physical import (
 from twinklr.core.sequencer.models.template import PhysicalMovementSpec, TemplateStep
 from twinklr.core.sequencer.moving_heads.channels.state import FixtureSegment
 from twinklr.core.sequencer.moving_heads.compile.physical import (
+    OffGridTimeError,
     PhysicalCompileError,
     compile_physical_step,
     slice_physical_segment,
@@ -34,6 +35,8 @@ from twinklr.core.sequencer.timing.beat_grid import BeatGrid
 from twinklr.core.sequencer.timing.musical_phase import build_musical_phase_map
 
 _TEMPO_GRID = BeatGrid.from_tempo(tempo_bpm=120, total_bars=2)
+_FAST_GRID = BeatGrid.from_tempo(tempo_bpm=150, total_bars=2)
+"""A 400 ms beat, so quarter periods fall on 20 ms frames."""
 _VARIABLE_GRID = BeatGrid(
     bar_boundaries=[0.0],
     beat_boundaries=[0.0, 500.0, 1000.0, 2000.0],
@@ -198,9 +201,11 @@ def test_each_kernel_shapes_the_compiled_path(shape: str) -> None:
             "period_beats": 1,
         },
     }[shape]
-    times = (0, 125, 250, 375, 500)
+    times = (0, 100, 200, 300, 400)
     segment = compile_physical_step(
-        _step(movement__physical=movement), _context(), sample_times_ms=_frames(1000, *times)
+        _step(movement__physical=movement),
+        _context(grid=_FAST_GRID),
+        sample_times_ms=_FRAMES,
     )
     pan = [_values(segment, ChannelName.PAN)[t] for t in times]
     tilt = [_values(segment, ChannelName.TILT)[t] for t in times]
@@ -216,12 +221,12 @@ def test_each_kernel_shapes_the_compiled_path(shape: str) -> None:
 
 
 def test_reach_and_rate_are_independent() -> None:
-    times = (0, 125, 250, 375, 500, 625, 750, 875)
-    context = _context()
+    times = (0, 100, 200, 300, 400, 500, 600, 700)
+    context = _context(grid=_FAST_GRID)
 
     def pan(**values: float) -> list[float]:
         step = _step(movement__physical=_sine("sine_pan", **values))
-        segment = compile_physical_step(step, context, sample_times_ms=_frames(1000, *times))
+        segment = compile_physical_step(step, context, sample_times_ms=_FRAMES)
         return [_values(segment, ChannelName.PAN)[t] for t in times]
 
     base = pan(pan_extent_deg=20)
@@ -407,10 +412,31 @@ def test_sample_times_must_cover_the_step_from_its_start(
         compile_physical_step(_step(), _context(), sample_times_ms=times)
 
 
+@pytest.mark.parametrize(
+    ("start_ms", "duration_ms", "extra", "name", "value"),
+    [
+        (15, 1000, (), "step start", 15),
+        (0, 1005, (), "step end", 1005),
+        (0, 1000, (250,), "sample time", 250),
+    ],
+)
+def test_off_grid_step_bounds_and_samples_are_rejected(
+    start_ms: int, duration_ms: int, extra: tuple[int, ...], name: str, value: int
+) -> None:
+    """The frame grid is the only source of sample times; callers quantize bounds first."""
+    context = _context(duration_ms=duration_ms).model_copy(update={"start_ms": start_ms})
+    times = tuple(sorted({*range(start_ms, start_ms + duration_ms, 20), *extra}))
+
+    with pytest.raises(OffGridTimeError, match=f"{name} {value} ms") as error:
+        compile_physical_step(_step(), context, sample_times_ms=times)
+    assert (error.value.name, error.value.time_ms) == (name, value)
+
+
 # --- Pulses on variable tempo ----------------------------------------------------------
 
 
-_BEAT_TIMES = (0, 250, 500, 750, 1000, 1499, 1500)
+_BEAT_TIMES = (0, 240, 260, 500, 740, 760, 1000, 1260, 1480, 1500)
+"""Frames around each half beat (250, 750 and the long third beat's 1500)."""
 
 
 def test_variable_tempo_dimmer_pulse_follows_musical_phase() -> None:
@@ -418,19 +444,36 @@ def test_variable_tempo_dimmer_pulse_follows_musical_phase() -> None:
     step = _step(movement__physical=hold, physical_shutter=_DELETE)
     context = _context(duration_ms=2000, grid=_VARIABLE_GRID)
 
-    segment = compile_physical_step(step, context, sample_times_ms=_frames(2000, *_BEAT_TIMES))
+    segment = compile_physical_step(step, context, sample_times_ms=_frames(2000))
     dimmer = {t: _values(segment, ChannelName.DIMMER)[t] for t in _BEAT_TIMES}
 
-    # High at each beat onset, low from the exact half beat; the third beat is 1000 ms
-    # long, so its half falls at 1500 ms, not at 1250 ms as an average tempo would say.
-    assert dimmer == {0: 1.0, 250: 0.0, 500: 1.0, 750: 0.0, 1000: 1.0, 1499: 1.0, 1500: 0.0}
+    # High at each beat onset, low from the first frame of each half beat; the third
+    # beat is 1000 ms long, so its half falls exactly at 1500 ms, not at 1250 ms as an
+    # average tempo would say.
+    assert dimmer == {
+        0: 1.0,
+        240: 1.0,
+        260: 0.0,
+        500: 1.0,
+        740: 1.0,
+        760: 0.0,
+        1000: 1.0,
+        1260: 1.0,
+        1480: 1.0,
+        1500: 0.0,
+    }
     assert segment.channels[ChannelName.DIMMER].physical.interpolation == "hold"  # type: ignore[union-attr]
 
-    denser = _frames(2000, *_BEAT_TIMES, *range(0, 2000, 5))
-    resampled = _values(
-        compile_physical_step(step, context, sample_times_ms=denser), ChannelName.DIMMER
+    # Each value depends only on its time: a shorter step from the same origin agrees.
+    shorter = _values(
+        compile_physical_step(
+            step, _context(duration_ms=1000, grid=_VARIABLE_GRID), sample_times_ms=_FRAMES
+        ),
+        ChannelName.DIMMER,
     )
-    assert {t: resampled[t] for t in _BEAT_TIMES} == dimmer
+    assert {t: shorter[t] for t in _BEAT_TIMES if t < 1000} == {
+        t: v for t, v in dimmer.items() if t < 1000
+    }
 
 
 def test_variable_tempo_shutter_pulse_follows_musical_phase() -> None:
@@ -447,21 +490,26 @@ def test_variable_tempo_shutter_pulse_follows_musical_phase() -> None:
     )
     context = _context(duration_ms=2000, grid=_VARIABLE_GRID)
 
-    segment = compile_physical_step(step, context, sample_times_ms=_frames(2000, *_BEAT_TIMES))
+    segment = compile_physical_step(step, context, sample_times_ms=_frames(2000))
     states = _states(segment, _BEAT_TIMES)
     assert states == {
         0: "open",
-        250: "closed",
+        240: "open",
+        260: "closed",
         500: "open",
-        750: "closed",
+        740: "open",
+        760: "closed",
         1000: "open",
-        1499: "open",
+        1260: "open",
+        1480: "open",
         1500: "closed",
     }
 
-    denser = _frames(2000, *_BEAT_TIMES, *range(0, 2000, 5))
-    resampled = compile_physical_step(step, context, sample_times_ms=denser)
-    assert _states(resampled, _BEAT_TIMES) == states
+    shorter = compile_physical_step(
+        step, _context(duration_ms=1000, grid=_VARIABLE_GRID), sample_times_ms=_FRAMES
+    )
+    early = tuple(t for t in _BEAT_TIMES if t < 1000)
+    assert _states(shorter, early) == {t: states[t] for t in early}
 
 
 _HOLD = {"shape": "hold", "mode": "periodic", "start_pan_deg": 0, "start_tilt_deg": 0}
@@ -503,10 +551,11 @@ def test_narrow_low_interval_is_rejected_and_truncated_ends_are_exempt() -> None
     with pytest.raises(PhysicalChannelError, match=r"15 ms"):
         compile_physical_step(dimmer(duty_cycle=0.97), _context(), sample_times_ms=_FRAMES)
 
-    # The step opens 5 ms before the end of a high interval and closes 5 ms into one.
-    shifted = dimmer(duty_cycle=0.5, phase_cycles=0.49)
+    # The step opens 10 ms before the end of a high interval and closes 10 ms into a
+    # low one; both truncated intervals are shorter than a frame.
+    shifted = dimmer(duty_cycle=0.5, phase_cycles=0.48)
     segment = compile_physical_step(
-        shifted, _context(duration_ms=1010), sample_times_ms=_frames(1010)
+        shifted, _context(duration_ms=1020), sample_times_ms=_frames(1020)
     )
     assert _values(segment, ChannelName.DIMMER)[0] == 1.0
 
@@ -529,23 +578,26 @@ def test_absurdly_short_periods_are_rejected_by_the_model(period: float) -> None
 
 
 def test_pulse_decision_is_exact_at_a_shifted_half_beat() -> None:
-    """Phase 0.7 at 350 ms shifted by -0.2 is exactly 1/2, so a 0.5 duty is low."""
+    """Phase 0.84 at 420 ms shifted by -0.34 is exactly 1/2, so a 0.5 duty is low.
+
+    In floats the sum is 0.49999999999999994, which would read as high.
+    """
     step = _step(
         movement__physical=_HOLD,
         physical_shutter=_DELETE,
         dimmer__physical={
             "period_beats": 1.0,
             "duty_cycle": 0.5,
-            "phase_cycles": -0.2,
+            "phase_cycles": -0.34,
             "low": 0.0,
             "high": 1.0,
         },
     )
     context = _context(duration_ms=2000, grid=_VARIABLE_GRID)
 
-    segment = compile_physical_step(step, context, sample_times_ms=_frames(2000, 350))
+    segment = compile_physical_step(step, context, sample_times_ms=_frames(2000))
     dimmer = _values(segment, ChannelName.DIMMER)
-    assert (dimmer[340], dimmer[350], dimmer[600]) == (1.0, 0.0, 1.0)
+    assert (dimmer[400], dimmer[420], dimmer[700]) == (1.0, 0.0, 1.0)
 
 
 def test_unresolved_shutter_latency_rejects_a_pulse_schedule() -> None:

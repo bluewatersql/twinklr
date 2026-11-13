@@ -38,6 +38,7 @@ from twinklr.core.sequencer.models.moving_heads.physical import (
     PhysicalChannelError,
 )
 from twinklr.core.sequencer.moving_heads.channels.state import FixtureSegment
+from twinklr.core.sequencer.moving_heads.compile.physical import DiscreteChange, wheel_changes
 from twinklr.core.sequencer.moving_heads.export.frame_encoder import (
     EncodedFixtureFrame,
     encode_fixture_frames,
@@ -569,12 +570,13 @@ def test_other_invalid_fixture_config_keeps_its_legacy_behavior() -> None:
 
 # --- Registry evidence for physical-only config paths -----------------------------------
 
-Component = Literal["rejected", "words", "frames", "check", "fingerprint"]
+Component = Literal["rejected", "words", "frames", "changes", "check", "fingerprint"]
 
 _COMPONENT_NOTES: dict[Component, str] = {
     "rejected": "exact path's alternative values are rejected by validation",
     "words": "exact path changes the encoded DMX word",
     "frames": "exact path changes the encoded fixture frames",
+    "changes": "exact path changes the listed wheel state changes",
     "check": "exact path changes the initial-state check",
     "fingerprint": "identity only; consumer lands in P1.3–P1.5",
 }
@@ -635,11 +637,11 @@ _PROFILE_MUTATIONS: dict[str, Mutation] = {
         lambda p: _set(p, ("discrete", "color", "states", "red", "value"), 10),
     ),
     "discrete.states.settle_ms": (
-        "fingerprint",
+        "changes",
         lambda p: _set(p, ("discrete", "color", "states", "red", "settle_ms"), 120),
     ),
     "discrete.default_state": (
-        "fingerprint",
+        "changes",
         lambda p: (
             _set(p, ("discrete", "color", "default_state"), "red"),
             _set(p, ("defaults", 7), 14),  # the default byte must select the default state
@@ -745,6 +747,15 @@ def _probe_segment() -> FixtureSegment:
     )
 
 
+def _probe_wheel_segments() -> list[FixtureSegment]:
+    """Red, an unauthored gap that holds the default state, then red again."""
+    red = DiscreteTrajectory.model_validate({"events": [{"t_ms": 80, "state": "red"}]})
+    return [
+        _probe_segment(),
+        physical_segment({ChannelName.COLOR: red}, t0_ms=80, t1_ms=120, segment_id="later"),
+    ]
+
+
 def _contract_snapshot(
     prefix: str, profile: dict[str, Any] | None, initial_states: dict[str, Any]
 ) -> dict[Component, Any]:
@@ -752,8 +763,8 @@ def _contract_snapshot(
 
     The validation error locations, the encoded DMX word at probe values on every
     declared axis, the frames encoded from a probe segment that writes every attribute
-    but leaves channel 8 to its default, MH1's initial-state check, and the render
-    fingerprint.
+    but leaves channel 8 to its default, the wheel changes across probe segments with
+    an unauthored gap, MH1's initial-state check, and the render fingerprint.
     """
     try:
         group = FixtureGroup.model_validate(
@@ -765,6 +776,7 @@ def _contract_snapshot(
     capabilities = group.expand_fixtures()[0].config.physical_profile
     words: dict[str, tuple[int | str, ...]] = {}
     frames: tuple[Any, ...] = ()
+    changes: tuple[Any, ...] = ()
     check: tuple[str, ...] = ()
     if capabilities is not None:
         for name, axis in capabilities.axes.items():
@@ -778,10 +790,15 @@ def _contract_snapshot(
             )
         except (PhysicalChannelError, ValueError) as error:
             frames = ("unencodable", str(error))
+        try:
+            changes = wheel_changes(_probe_wheel_segments(), {"MH1": capabilities})
+        except (PhysicalChannelError, ValueError) as error:
+            changes = ("unlisted", str(error))
         check = capabilities.check_initial_state(policy.initial_states.get("MH1"))
     return {
         "words": words,
         "frames": frames,
+        "changes": changes,
         "check": check,
         "fingerprint": render_fingerprint(fixtures=group, policy=policy, **_identity_inputs()),
     }
@@ -816,6 +833,11 @@ def _assert_component_changed(
             assert "rejected" not in side and side["frames"], side
             assert all(isinstance(frame, EncodedFixtureFrame) for frame in side["frames"])
         assert changed["frames"] != base["frames"]
+    elif component == "changes":
+        for side in (base, changed):
+            assert "rejected" not in side and side["changes"], side
+            assert all(isinstance(change, DiscreteChange) for change in side["changes"])
+        assert changed["changes"] != base["changes"]
     else:
         assert "rejected" not in changed, changed
         assert changed[component] != base[component]
