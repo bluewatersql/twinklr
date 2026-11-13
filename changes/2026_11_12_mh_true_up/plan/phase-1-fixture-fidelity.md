@@ -330,6 +330,43 @@ one fix round and a re-review):
   from the grid instead of persisting and comparing maps; cue timing records
   (`quantized_cues`) into the trace.
 
+P1.5, 2026-11-13 (reviewed separately from its author over five rounds; the reviewer's
+last gate run: 6292 passed, 39 skipped):
+
+- **Interface.** `plan_prepositions(segments, capabilities, *, initial_states, locks,
+  frame_ms, sequence_end_ms, failure_mode="error")` in `compile/preposition.py`.
+  `sequence_end_ms` was added to the planned signature: the head parks dark at the last
+  cue's aim through the sequence end, because the song can outlast the last cue.
+- **Every gap is dark.** The planner authors every frame between cues; it never leaves
+  a gap to default bytes.
+- **Head-follow model.** Arrival is `max(prior arrival, command + latency) + word
+  distance / speed`, then settle, timed on encoded words and accumulated across
+  commands, so a previous cue's unfinished motion is waited out. Acceleration and
+  overshoot are not modelled. The model is unverified against hardware: PENDING-OWNER.
+- **Darkness is per mechanism.** Initial darkness is credited only to the mechanism the
+  initial state evidences (dimmer zero, or its own extinguishing shutter state) and
+  only while that mechanism is held; otherwise the close latency (plus the shutter
+  state's settle) applies, and an unknown latency never establishes darkness. This
+  settles the P1.1 carry: `dark=True` alone proves nothing about a mechanism.
+- **Wheels.** A wheel change needs at least one dark frame even when its settle is
+  zero, and never lands on the reveal frame.
+- **Continuation.** A cue with no gap may continue its predecessor only if that cue was
+  played as authored. After a `preserve_aim` substitution, a pose or wheel change at
+  the boundary is a substitutable error.
+- **Fallbacks.** `preserve_aim` and `drop_accent` are opt-in per cue through
+  `metadata["preposition_fallback"]` and apply to substitutable causes only.
+- **Regression guard.** The in-repo fuzz has four arms with asserted feasible-fraction
+  floors. Seven deliberate planner mutations each fail the default run.
+- **Identity-only registry paths still without a consumer:** `profile_id`,
+  `discrete.states.range_min`/`range_max`, `discrete.open_state`.
+- **Open, low.** A lit cue at time zero that needs a move fails closed with the
+  non-substitutable "darkness is never established" although dropping it would be
+  safe. A cue with an unauthored dimmer whose default byte is dark is treated as lit.
+- **Lightly tested.** Multi-fixture interaction through shared locks; locks on channels
+  a profile does not declare; mid-cue wheel changes (the compile never emits them);
+  planner time on very long dense sequences (0.13 s measured early, not re-measured).
+  P1.6's integration test covers the two-head case.
+
 ## Phase exit
 
 All task tests and `make validate` pass; 16-bit frames reconstruct correctly across carries; supported offsets are 1–48; v2 limits/discrete values/phase/initial state work as declared; insufficient or unknown travel never reports feasible; optical darkness covers travel and settle; legacy regression output is unchanged. Source/offline proof and authorized xLights proof are recorded separately. Hardware accuracy and aesthetic acceptance remain pending until observed, not inferred from the profile's provenance.
