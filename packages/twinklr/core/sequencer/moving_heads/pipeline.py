@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from twinklr.core.sequencer.models.context import FixtureContext
+    from twinklr.core.sequencer.models.template import TemplateDoc, TemplatePreset
 
 from twinklr.core.agents.sequencer.moving_heads import ChoreographyPlan
 from twinklr.core.agents.sequencer.moving_heads.models import PlanSection, flatten_plan_segment
@@ -38,8 +39,14 @@ from twinklr.core.sequencer.moving_heads.compile.transition_segment_compiler imp
     TransitionSegmentCompiler,
 )
 from twinklr.core.sequencer.moving_heads.delivery import DeliveryArtifacts, export_delivery
+from twinklr.core.sequencer.moving_heads.diagnostics import MHDiagnostic, audit_legacy_controls
 from twinklr.core.sequencer.moving_heads.fixture_builder import build_fixture_contexts
 from twinklr.core.sequencer.moving_heads.handlers.defaults import create_default_registries
+from twinklr.core.sequencer.moving_heads.identity import (
+    LEGACY_BACKEND_ID,
+    LEGACY_RENDERER_REVISION,
+    render_fingerprint,
+)
 from twinklr.core.sequencer.moving_heads.libraries.color import ColorPreset
 from twinklr.core.sequencer.moving_heads.templates import (
     get_template,
@@ -77,6 +84,62 @@ palette role, including PRIMARY, remains an actionable renderer request.
 def _log_applied_preset_name(name: str) -> None:
     """Emit the selected preset's user-facing name through the shipped renderer logger."""
     logger.debug("Applying preset: %s", name)
+
+
+def resolve_section_preset(
+    section: PlanSection, template_doc: TemplateDoc
+) -> TemplatePreset | None:
+    """Resolve the preset a section applies to its template.
+
+    A preset the document declares wins. Otherwise a preset id naming an energy
+    level becomes a preset patching every step's movement and dimmer intensity.
+    Any other id, or none, applies no preset. `RenderingPipeline.render` and the
+    control audit both resolve presets here.
+
+    Args:
+        section: The (flattened) plan section.
+        template_doc: The section's template document.
+
+    Returns:
+        The preset to apply, or None.
+    """
+    template = template_doc.template
+    preset = None
+    if section.preset_id:
+        try:
+            preset = next(p for p in template_doc.presets if p.preset_id == section.preset_id)
+            _log_applied_preset_name(preset.name)
+        except StopIteration:
+            # Preset not found - try to infer intensity from preset_id
+            from twinklr.core.sequencer.models.template import StepPatch, TemplatePreset
+
+            preset_id_upper = section.preset_id.upper()
+            if preset_id_upper in ENERGY_TO_INTENSITY:
+                # Auto-create preset with inferred intensity
+                intensity = ENERGY_TO_INTENSITY[preset_id_upper]
+                step_patches = {
+                    step.step_id: StepPatch(
+                        movement={"intensity": intensity.value},
+                        dimmer={"intensity": intensity.value},
+                    )
+                    for step in template.steps
+                }
+                preset = TemplatePreset(
+                    preset_id=section.preset_id,
+                    name=section.preset_id.title(),
+                    defaults={},
+                    step_patches=step_patches,
+                )
+                logger.debug(
+                    f"Auto-generated preset '{section.preset_id}' "
+                    f"with intensity {intensity.value} for template '{section.template_id}'"
+                )
+            else:
+                logger.warning(
+                    f"Preset '{section.preset_id}' not found for template "
+                    f"'{section.template_id}' and couldn't infer intensity, using base template"
+                )
+    return preset
 
 
 def _compute_section_duration_ms(start_bar: int, end_bar: int, beat_grid: BeatGrid) -> int:
@@ -241,43 +304,7 @@ class RenderingPipeline:
                 raise ValueError(f"Template not found: {section.template_id}") from e
 
             # Apply preset if available
-            preset = None
-            if section.preset_id:
-                try:
-                    preset = next(
-                        p for p in template_doc.presets if p.preset_id == section.preset_id
-                    )
-                    _log_applied_preset_name(preset.name)
-                except StopIteration:
-                    # Preset not found - try to infer intensity from preset_id
-                    from twinklr.core.sequencer.models.template import StepPatch, TemplatePreset
-
-                    preset_id_upper = section.preset_id.upper()
-                    if preset_id_upper in ENERGY_TO_INTENSITY:
-                        # Auto-create preset with inferred intensity
-                        intensity = ENERGY_TO_INTENSITY[preset_id_upper]
-                        step_patches = {
-                            step.step_id: StepPatch(
-                                movement={"intensity": intensity.value},
-                                dimmer={"intensity": intensity.value},
-                            )
-                            for step in template.steps
-                        }
-                        preset = TemplatePreset(
-                            preset_id=section.preset_id,
-                            name=section.preset_id.title(),
-                            defaults={},
-                            step_patches=step_patches,
-                        )
-                        logger.debug(
-                            f"Auto-generated preset '{section.preset_id}' "
-                            f"with intensity {intensity.value} for template '{section.template_id}'"
-                        )
-                    else:
-                        logger.warning(
-                            f"Preset '{section.preset_id}' not found for template "
-                            f"'{section.template_id}' and couldn't infer intensity, using base template"
-                        )
+            preset = resolve_section_preset(section, template_doc)
 
             # Build fixture contexts
             fixture_contexts = self._build_fixture_contexts()
@@ -347,6 +374,43 @@ class RenderingPipeline:
             self._export_delivery(all_segments, time_markers)
 
         return all_segments
+
+    @property
+    def diagnostics(self) -> tuple[MHDiagnostic, ...]:
+        """Requested controls this legacy render ignores, for the plan's templates.
+
+        Computed on access; `render()` never runs it. Resolving each section's
+        preset logs the same lines `render()` does.
+        """
+        return audit_legacy_controls(
+            self.choreography_plan, self.fixture_group, self._plan_templates()
+        )
+
+    def fingerprint(self) -> str:
+        """Functional identity of this legacy render; the output path is not part of it."""
+        return render_fingerprint(
+            plan=self.choreography_plan,
+            beat_grid=self.beat_grid,
+            fixtures=self.fixture_group,
+            templates=self._plan_templates(),
+            policy=self.job_config.moving_heads,
+            transitions=self.job_config.transitions,
+            backend_id=LEGACY_BACKEND_ID,
+            renderer_revision=LEGACY_RENDERER_REVISION,
+        )
+
+    def _plan_templates(self) -> list[TemplateDoc]:
+        """The template documents the plan's sections name, once each.
+
+        Sections may spell a template any way the registry resolves (case, separators,
+        display name, alias); documents are deduplicated on the canonical id.
+        """
+        docs: dict[str, TemplateDoc] = {}
+        for section in self.iterate_plan_sections(self.choreography_plan):
+            if section.template_id:
+                doc = get_template(section.template_id)
+                docs.setdefault(doc.template.template_id, doc)
+        return [docs[template_id] for template_id in sorted(docs)]
 
     def _resolve_section_intent(self, section: PlanSection) -> SectionRenderIntent:
         """Translate the approved planner schema into renderer-owned categories."""
