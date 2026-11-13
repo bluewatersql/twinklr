@@ -54,6 +54,16 @@ _ROLE_SCALE = {
     FocalRoleKind.SUPPORT: 0.65,
     FocalRoleKind.REST: 0.15,
 }
+# Lowest scale budget normalisation may give a role: halfway to the role below it.
+# A busy group is dimmed toward the next role down and never reaches it, so at any
+# moment LEAD > SUPPORT > REST and a lead is never taken near-dark by a brief resting
+# event.  REST is bounded by the export's own resting floor.
+_ROLE_SCALE_FLOOR = {
+    FocalRoleKind.LEAD: (_ROLE_SCALE[FocalRoleKind.LEAD] + _ROLE_SCALE[FocalRoleKind.SUPPORT]) / 2,
+    FocalRoleKind.SUPPORT: (_ROLE_SCALE[FocalRoleKind.SUPPORT] + _ROLE_SCALE[FocalRoleKind.REST])
+    / 2,
+    FocalRoleKind.REST: 0.0,
+}
 _ROLE_MH_INTENSITY = {
     FocalRoleKind.LEAD: Intensity.INTENSE,
     FocalRoleKind.SUPPORT: Intensity.SMOOTH,
@@ -359,6 +369,8 @@ def _normalize_display_role_budgets(
     The scale is recorded as ``brightness_scale`` and leaves ``intensity`` alone, so
     the export applies it to the lit brightness instead of having the visible-brightness
     floor flatten it.
+    A target is never scaled below ``_ROLE_SCALE_FLOOR`` for its role, so the budget
+    ratios are exact only while no target reaches that bound.
     """
 
     expander = TargetExpander(graph)
@@ -403,7 +415,12 @@ def _normalize_display_role_budgets(
                     multiplier = 1.0
                 events.append(
                     event.model_copy(
-                        update={"brightness_scale": min(1.0, event.brightness_scale * multiplier)},
+                        update={
+                            "brightness_scale": min(
+                                1.0,
+                                max(_ROLE_SCALE_FLOOR[role], event.brightness_scale * multiplier),
+                            )
+                        },
                         deep=True,
                     )
                 )

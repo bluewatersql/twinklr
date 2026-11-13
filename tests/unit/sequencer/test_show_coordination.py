@@ -8,7 +8,7 @@ import pytest
 
 from twinklr.core.agents.audio.profile.models import SongSectionRef
 from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan, PlanSection
-from twinklr.core.sequencer.display.brightness import intensity_to_brightness
+from twinklr.core.sequencer.display.brightness import event_brightness_percent
 from twinklr.core.sequencer.display.models.palette import ResolvedPalette
 from twinklr.core.sequencer.display.models.render_event import RenderEvent, RenderEventSource
 from twinklr.core.sequencer.display.models.render_plan import (
@@ -243,15 +243,26 @@ def _ranges(plan: RenderPlan, group_id: str) -> list[tuple[int, int]]:
 
 
 def _activation(plan: RenderPlan) -> dict[str, float]:
-    """Rendered brightness x duration per group, as the export will write it."""
+    """Exported brightness x duration per group, floors included."""
     return {
         group.element_name: sum(
-            intensity_to_brightness(event.intensity)
-            * event.brightness_scale
+            event_brightness_percent(event.intensity, scale=event.brightness_scale)
             * (event.end_ms - event.start_ms)
             for layer in group.layers
             for event in layer.events
         )
+        for group in plan.groups
+    }
+
+
+def _levels(plan: RenderPlan) -> dict[str, set[int]]:
+    """Exported brightness percent of every event, per group."""
+    return {
+        group.element_name: {
+            event_brightness_percent(event.intensity, scale=event.brightness_scale)
+            for layer in group.layers
+            for event in layer.events
+        }
         for group in plan.groups
     }
 
@@ -290,7 +301,8 @@ def test_focal_roles_dim_brightness_and_leave_intensity_alone() -> None:
     assert any(event.brightness_scale < 1.0 for event in events)
 
 
-def test_focal_role_budgets_dominate_with_unequal_event_counts() -> None:
+def test_focal_roles_hold_at_every_moment_with_unequal_event_counts() -> None:
+    """A busy resting group is dimmer than the lead whenever both are lit."""
     coordinated = coordinate_display_render_plan(
         _render_plan_with_counts({"MEGA_TREE": 1, "ARCH_LEFT": 3, "ARCH_RIGHT": 10}),
         _macro(),
@@ -298,8 +310,32 @@ def test_focal_role_budgets_dominate_with_unequal_event_counts() -> None:
         _graph(),
         moving_head_target_ids={"MOVING_HEADS"},
     )
-    activation = _activation(coordinated)
-    assert activation["MEGA_TREE"] > activation["ARCH_LEFT"] > activation["ARCH_RIGHT"]
+    levels = _levels(coordinated)
+    assert min(levels["MEGA_TREE"]) > max(levels["ARCH_LEFT"])
+    assert min(levels["ARCH_LEFT"]) > max(levels["ARCH_RIGHT"])
+
+
+def test_brief_resting_event_does_not_darken_the_lead() -> None:
+    """Budget normalisation dims a lead no further than the support weight."""
+    plan = _render_plan("MEGA_TREE", "ARCH_LEFT", "ARCH_RIGHT")
+    groups = []
+    for group in plan.groups:
+        if group.element_name != "ARCH_RIGHT":
+            groups.append(group)
+            continue
+        brief = group.layers[0].events[0].model_copy(update={"end_ms": 200}, deep=True)
+        layer = group.layers[0].model_copy(update={"events": [brief]}, deep=True)
+        groups.append(group.model_copy(update={"layers": [layer]}, deep=True))
+    coordinated = coordinate_display_render_plan(
+        plan.model_copy(update={"groups": groups}, deep=True),
+        _macro(),
+        _grid(),
+        _graph(),
+        moving_head_target_ids={"MOVING_HEADS"},
+    )
+    levels = _levels(coordinated)
+    assert min(levels["MEGA_TREE"]) >= event_brightness_percent(0.7, scale=0.825)
+    assert min(levels["MEGA_TREE"]) > max(levels["ARCH_LEFT"]) > max(levels["ARCH_RIGHT"])
 
 
 @pytest.mark.parametrize("support_event_count", [2, 7, 100])
@@ -340,14 +376,13 @@ def test_focal_role_budget_is_per_concrete_target_with_unequal_support_counts(
         _graph(),
         moving_head_target_ids={"MOVING_HEADS"},
     )
-    activation = _activation(coordinated)
+    levels = _levels(coordinated)
 
-    assert activation["MEGA_TREE"] > activation["ARCH_LEFT"]
-    assert activation["MEGA_TREE"] > activation["WINDOWS"]
-    assert activation["ARCH_LEFT"] == pytest.approx(activation["WINDOWS"])
-    assert activation["ARCH_LEFT"] > activation["ARCH_RIGHT"]
-    assert activation["MEGA_TREE"] / activation["ARCH_LEFT"] == pytest.approx(1.0 / 0.65)
-    assert activation["ARCH_LEFT"] / activation["ARCH_RIGHT"] == pytest.approx(0.65 / 0.15)
+    # However many events a target carries, it stays inside its own role's band.
+    assert min(levels["MEGA_TREE"]) > max(levels["ARCH_LEFT"] | levels["WINDOWS"])
+    assert min(levels["ARCH_LEFT"] | levels["WINDOWS"]) > max(levels["ARCH_RIGHT"])
+    # The busier support target is never brighter than the quieter one.
+    assert max(levels["WINDOWS"]) <= min(levels["ARCH_LEFT"])
     assert (
         coordinate_display_render_plan(
             coordinated,
@@ -358,6 +393,27 @@ def test_focal_role_budget_is_per_concrete_target_with_unequal_support_counts(
         )
         == coordinated
     )
+
+
+def test_equal_activity_keeps_the_declared_role_ratios() -> None:
+    coordinated = coordinate_display_render_plan(
+        _render_plan("MEGA_TREE", "ARCH_LEFT", "ARCH_RIGHT"),
+        _macro(),
+        _grid(),
+        _graph(),
+        moving_head_target_ids={"MOVING_HEADS"},
+    )
+    activation = _activation(coordinated)
+    scales = {
+        group.element_name: [
+            event.brightness_scale for layer in group.layers for event in layer.events
+        ]
+        for group in coordinated.groups
+    }
+    assert scales["MEGA_TREE"] == pytest.approx([1.0])
+    assert scales["ARCH_LEFT"] == pytest.approx([0.65])
+    assert scales["ARCH_RIGHT"] == pytest.approx([0.15])
+    assert activation["MEGA_TREE"] > activation["ARCH_LEFT"] > activation["ARCH_RIGHT"]
 
 
 def test_sparse_focal_roles_preserve_unmentioned_display_and_mh_as_support() -> None:

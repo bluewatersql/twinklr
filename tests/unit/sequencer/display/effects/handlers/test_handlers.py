@@ -84,6 +84,21 @@ class TestOnHandler:
         settings = h.build_settings(event, _ctx())
         assert "E_TEXTCTRL_Eff_On_End=13" in settings.settings_string
 
+    def test_palette_brightness_is_folded_into_the_on_level(self) -> None:
+        h = OnHandler()
+        base = _event("On", intensity=0.2)
+        dim = base.model_copy(
+            update={"palette": base.palette.model_copy(update={"brightness": 80})}
+        )
+        assert "E_TEXTCTRL_Eff_On_End=38" in h.build_settings(dim, _ctx()).settings_string
+        dark = base.model_copy(
+            update={
+                "intensity": 0.0,
+                "palette": base.palette.model_copy(update={"brightness": 20}),
+            }
+        )
+        assert "E_TEXTCTRL_Eff_On_End=35" in h.build_settings(dark, _ctx()).settings_string
+
     def test_includes_buffer_style(self) -> None:
         h = OnHandler()
         settings = h.build_settings(_event("On"), _ctx())

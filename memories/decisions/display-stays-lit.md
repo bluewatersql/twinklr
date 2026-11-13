@@ -27,6 +27,11 @@ never expressed by leaving most of the display unlit. Three mechanisms enforce t
   `RenderEvent.brightness_scale` and leaves `intensity` alone. The export multiplies the
   lit brightness by it, down to a 10% floor. A resting group is dim on purpose, so the
   lead keeps its declared contrast (about 87% against 13% at a strong intensity).
+  Where one group carries far more activity than its role allows, coordination dims it
+  further, but only halfway toward the next role down (LEAD no lower than 0.825,
+  SUPPORT no lower than 0.40). At every moment LEAD is brighter than SUPPORT, which is
+  brighter than REST, and a brief resting event cannot darken the lead. The summed
+  brightness-over-time ratios are exact only while no group reaches that bound.
 - **Display composition reaches the end of the song.** `BeatGrid.extended_to_duration()`
   continues beats and bars at the average beat duration past the last detected beat, and
   a section that runs past the last bar ends at its own end time. `DisplayRenderer` uses
@@ -82,7 +87,11 @@ for the whole section) were replaced by abstract wording in `7bf495a` (2026-08-1
   about three times as bright. Whether to lower the floor or the top end is a taste call.
 - The 40% threshold and the list of sparse effects were chosen from this one song and
   layout.
-- The 10% floor for a resting group is a first value, not a calibrated one.
+- The 10% floor for a resting group and the halfway bounds on role dimming are first
+  values, not calibrated ones. No combined show has been rendered on the real layout.
+- Bar 1 beat 1 of a section resolves to the beat nearest the bar start, while the
+  section's own start is the exact bar boundary. If detected downbeats sit off the
+  beats, the two can differ by a few milliseconds. Not reproduced.
 - Extending the grid for the moving-head path would let moving-head sections past the
   last detected beat render. It was left out to keep moving-head output unchanged
   ([decision](mh-render-matches-pre-cleanup-look.md)).
