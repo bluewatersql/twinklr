@@ -89,9 +89,15 @@ an explicit unsupported-mode exception before rendering, never silently falling 
 The rejection lives at the top of `RenderingPipeline.__init__`, before any template
 load or output path is touched, and raises a new `UnsupportedRenderModeError(ValueError)`
 defined in `pipeline.py` beside the existing pattern of
-`UnsupportedRigShapeError(ValueError)` in the template compiler. All three constructors
-of the pipeline (`rendering_stage.py`, `pipeline/show_stages.py`,
-`reporting/evaluation/rerender.py`) pass `job_config`, so one check covers them.
+`UnsupportedRigShapeError(ValueError)` in the template compiler. The two
+production render paths (`rendering_stage.py`, `pipeline/show_stages.py`) pass the
+job's own config, so one check covers them. The third constructor,
+`reporting/evaluation/rerender.py`, builds a fresh default `JobConfig` and is therefore
+always `legacy_v1`; P0 leaves it alone, and
+[P1](phase-1-fixture-fidelity.md#documentation-registry-and-existing-test-updates)
+owns making it honor or reject the job's render policy. A `physical_v2` job passes
+config validation and is rejected at render, after planning; that ordering is as
+designed for P0 and is recorded in the handoff for the owner.
 `MovingHeadRenderingStage` wraps render failures in a broad `except Exception`; T1
 adds `test_unsupported_render_mode_fails_the_stage` to the existing
 `test_rendering_stage.py`, asserting the stage reports a failure that names the mode

@@ -266,9 +266,19 @@ CONFIG_EFFECTS: dict[str, ConfigDisposition] = {
         "public behavior discriminator",
     ),
     "job.schema_version": ConfigDisposition(
-        ConfigDispositionKind.INVARIANT_TEST,
-        "tests/unit/config/test_config_inventory.py::test_fixed_policy_config_paths_are_invariant",
-        "public behavior discriminator",
+        ConfigDispositionKind.EFFECT_TEST,
+        "tests/unit/config/test_mh_render_policy.py::test_physical_mode_requires_schema_31",
+        "declared schema version decides whether physical render mode is admissible",
+    ),
+    "job.moving_heads": ConfigDisposition(
+        ConfigDispositionKind.EFFECT_TEST,
+        "tests/unit/config/test_mh_render_policy.py::test_unimplemented_physical_mode_is_rejected",
+        "selected render policy is rejected by the pipeline before any output",
+    ),
+    "job.moving_heads.mode": ConfigDisposition(
+        ConfigDispositionKind.EFFECT_TEST,
+        "tests/unit/config/test_mh_render_policy.py::test_unimplemented_physical_mode_is_rejected",
+        "selected render mode is rejected by the pipeline before any output",
     ),
     "job.fixture_config_path": ConfigDisposition(
         ConfigDispositionKind.EFFECT_TEST,

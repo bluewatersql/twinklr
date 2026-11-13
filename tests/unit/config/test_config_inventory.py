@@ -310,7 +310,11 @@ def test_unrelated_future_app_and_job_keys_remain_forward_compatible() -> None:
 
 
 def test_fixed_policy_config_paths_are_invariant() -> None:
-    """Fixed cost/schema policies reject every alternate value exposed by their types."""
+    """Fixed cost/timing policies reject every alternate value exposed by their types.
+
+    The job schema version accepts only its declared versions, so an undeclared one
+    still fails validation.
+    """
     with pytest.raises(ValidationError):
         JobConfig(schema_version="future")
 

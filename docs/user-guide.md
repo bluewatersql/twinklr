@@ -225,13 +225,13 @@ model; it is not a choreography-quality benchmark. Step-by-step:
 
 ### `job_config.json` (Job Config)
 
-Job-specific settings. Loaded by `JobConfig` in `packages/twinklr/core/config/models.py`. Schema version 3.0.
+Job-specific settings. Loaded by `JobConfig` in `packages/twinklr/core/config/models.py`. Schema version 3.0 is the default; 3.1 is also accepted.
 
 The same registry-backed subset policy applies here.
 
 | JSON field | Default | Observable effect | Ledger path |
 |---|---|---|---|
-| `schema_version` | `"3.0"` | Fixed schema identity; other values fail validation | `job.schema_version` |
+| `schema_version` | `"3.0"` | Declares the job schema; `"3.0"` and `"3.1"` are accepted, other values fail validation. `"3.1"` is required to select `moving_heads.mode` `"physical_v2"` | `job.schema_version` |
 | `fixture_config_path` | `"fixture_config.json"` | Selects the fixture definition loaded for planning/rendering | `job.fixture_config_path` |
 | `agent.max_iterations` | `3` | Sets planner/judge cycles; `0` plans once, runs heuristics, and skips the judge | `job.agent.max_iterations` |
 | `agent.success_threshold` | `70` | Sets the accepted judge score on the single 0-100 configured scale | `job.agent.success_threshold` |
@@ -256,6 +256,7 @@ The same registry-backed subset policy applies here.
 | `transitions.enabled` | `true` | Enables section transition planning | `job.transitions.enabled` |
 | `transitions.default_duration_bars` | `0.5` | Sets the fallback transition length | `job.transitions.default_duration_bars` |
 | `timeline_tracks.sections` | `true` | Includes or omits section timing markers | `job.timeline_tracks.sections` |
+| `moving_heads.mode` | `"legacy_v1"` | Selects the moving-head renderer. `"physical_v2"` needs schema `"3.1"` and is rejected before rendering until the physical renderer ships | `job.moving_heads.mode` |
 
 The planner schema may describe up to four narrative assets (`maxItems=4`), but the
 enabled live path authorizes only one image-provider request and reports the rest as
