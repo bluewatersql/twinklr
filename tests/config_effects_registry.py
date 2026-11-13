@@ -2575,31 +2575,32 @@ _PHYSICAL_REJECTED = "exact path's alternative values are rejected by validation
 _PHYSICAL_WORDS = "exact path changes the encoded DMX word"
 _PHYSICAL_CHECK = "exact path changes the initial-state check"
 _PHYSICAL_IDENTITY_ONLY = "identity only; consumer lands in P1.3–P1.5"
+_PHYSICAL_FRAMES = "exact path changes the encoded fixture frames"
 _PHYSICAL_PROFILE_FIELDS = {
     "": _PHYSICAL_WORDS,
     "schema_version": _PHYSICAL_REJECTED,
     "profile_id": _PHYSICAL_IDENTITY_ONLY,
     "provenance": _PHYSICAL_IDENTITY_ONLY,
-    "footprint": _PHYSICAL_IDENTITY_ONLY,
-    "defaults": _PHYSICAL_IDENTITY_ONLY,
+    "footprint": _PHYSICAL_FRAMES,
+    "defaults": _PHYSICAL_FRAMES,
     "axes": _PHYSICAL_WORDS,
     "axes.unit": _PHYSICAL_REJECTED,
     "axes.physical_min": _PHYSICAL_WORDS,
     "axes.physical_max": _PHYSICAL_WORDS,
     "axes.allowed_min": _PHYSICAL_WORDS,
     "axes.allowed_max": _PHYSICAL_WORDS,
-    "axes.coarse_offset": _PHYSICAL_IDENTITY_ONLY,
+    "axes.coarse_offset": _PHYSICAL_FRAMES,
     "axes.fine_offset": _PHYSICAL_WORDS,
     "axes.inverted": _PHYSICAL_WORDS,
     "axes.travel_speed_per_s": _PHYSICAL_IDENTITY_ONLY,
     "axes.latency_ms": _PHYSICAL_IDENTITY_ONLY,
     "axes.settle_ms": _PHYSICAL_IDENTITY_ONLY,
     "discrete": _PHYSICAL_CHECK,
-    "discrete.offset": _PHYSICAL_IDENTITY_ONLY,
+    "discrete.offset": _PHYSICAL_FRAMES,
     "discrete.states": _PHYSICAL_CHECK,
     "discrete.states.range_min": _PHYSICAL_IDENTITY_ONLY,
     "discrete.states.range_max": _PHYSICAL_IDENTITY_ONLY,
-    "discrete.states.value": _PHYSICAL_IDENTITY_ONLY,
+    "discrete.states.value": _PHYSICAL_FRAMES,
     "discrete.states.settle_ms": _PHYSICAL_IDENTITY_ONLY,
     "discrete.default_state": _PHYSICAL_IDENTITY_ONLY,
     "discrete.closed_state": _PHYSICAL_IDENTITY_ONLY,
@@ -2637,6 +2638,17 @@ for _field, _note in {
         "tests/unit/config/test_mh_capabilities.py::"
         f"test_initial_state_field_changes_contract[{_initial_state_path}]",
         _note,
+    )
+
+# P1.3 physical output budgets. They bound only physical output, so each exact path is
+# evidenced by a fixed physical render that its limit accepts at the measured size and
+# rejects one below it.
+for _budget_path in ("job.moving_heads.max_effects", "job.moving_heads.max_xsq_bytes"):
+    CONFIG_EFFECTS[_budget_path] = ConfigDisposition(
+        ConfigDispositionKind.EFFECT_TEST,
+        "tests/unit/sequencer/moving_heads/export/test_frame_encoder.py::"
+        f"test_budget_field_changes_accept_reject[{_budget_path}]",
+        "exact path changes whether a fixed physical output is accepted or rejected",
     )
 
 _TEMPLATE_REGISTRATION_PATHS = {

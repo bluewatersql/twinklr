@@ -637,6 +637,14 @@ class TransitionConfig(BaseModel):
     )
 
 
+DEFAULT_MAX_EFFECTS = 1_000_000
+"""Default physical effect budget. Eight heads in four minutes of continuous 16-bit
+motion emit about 95,000 effects, so the byte budget is the one that binds."""
+
+DEFAULT_MAX_XSQ_BYTES = 134_217_728
+"""Default physical `.xsq` size budget: 128 MiB."""
+
+
 class MHRenderPolicy(BaseModel):
     """Versioned moving-head render policy.
 
@@ -661,6 +669,28 @@ class MHRenderPolicy(BaseModel):
         description=(
             "Run-supplied time-zero state per fixture id for the physical renderer. A "
             "fixture without an entry has an unknown initial state."
+        ),
+    )
+    # Left out of dumps at their defaults so legacy render fingerprints are unchanged.
+    # A non-default budget is dumped and so enters render identity.
+    max_effects: int = Field(
+        default=DEFAULT_MAX_EFFECTS,
+        gt=0,
+        exclude_if=lambda value: value == DEFAULT_MAX_EFFECTS,
+        description=(
+            "Most coalesced DMX effects one physical render may emit; more fails with "
+            "output_budget_exceeded instead of dropping frames. Physical output only. "
+            "A non-default value is part of render identity."
+        ),
+    )
+    max_xsq_bytes: int = Field(
+        default=DEFAULT_MAX_XSQ_BYTES,
+        gt=0,
+        exclude_if=lambda value: value == DEFAULT_MAX_XSQ_BYTES,
+        description=(
+            "Largest serialized .xsq, in UTF-8 bytes, one physical render may write; "
+            "larger fails with output_budget_exceeded instead of dropping frames. "
+            "Physical output only. A non-default value is part of render identity."
         ),
     )
 

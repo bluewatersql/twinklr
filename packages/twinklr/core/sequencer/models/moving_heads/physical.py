@@ -73,16 +73,19 @@ CONTINUOUS_UNITS: dict[ChannelName, str] = {
 }
 """Continuous channels and their unit; every other channel takes discrete states."""
 
-_AXIS_KEYS: dict[ChannelName, AxisName] = {
+AXIS_KEYS: dict[ChannelName, AxisName] = {
     ChannelName.PAN: "pan",
     ChannelName.TILT: "tilt",
     ChannelName.DIMMER: "dimmer",
 }
-_DISCRETE_KEYS: dict[ChannelName, DiscreteName] = {
+"""Each continuous channel's key in `FixtureCapabilities.axes`."""
+
+DISCRETE_KEYS: dict[ChannelName, DiscreteName] = {
     ChannelName.SHUTTER: "shutter",
     ChannelName.COLOR: "color",
     ChannelName.GOBO: "gobo",
 }
+"""Each discrete channel's key in `FixtureCapabilities.discrete`."""
 
 
 class RenderLock(BaseModel):
@@ -134,7 +137,7 @@ def check_physical_value(
         )
 
     if isinstance(value, ContinuousTrajectory):
-        axis_key = _AXIS_KEYS.get(channel)
+        axis_key = AXIS_KEYS.get(channel)
         axis = capabilities.axes.get(axis_key) if axis_key is not None else None
         if axis is None:
             raise fail(f"profile {capabilities.profile_id!r} declares no {channel.value} axis")
@@ -148,7 +151,7 @@ def check_physical_value(
                 )
         return
 
-    wheel_key = _DISCRETE_KEYS.get(channel)
+    wheel_key = DISCRETE_KEYS.get(channel)
     wheel = capabilities.discrete.get(wheel_key) if wheel_key is not None else None
     if wheel is None:
         raise fail(f"profile {capabilities.profile_id!r} declares no {channel.value} channel")

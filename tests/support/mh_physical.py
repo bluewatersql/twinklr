@@ -1,4 +1,5 @@
-"""Synthetic physical-renderer inputs: a fixture profile and a known initial state.
+"""Synthetic physical-renderer inputs: a fixture profile, a known initial state and
+physical fixture segments.
 
 In-memory payloads only; no owner profile or measured data.
 """
@@ -7,6 +8,33 @@ from __future__ import annotations
 
 from typing import Any
 
+from twinklr.core.sequencer.models.enum import ChannelName
+from twinklr.core.sequencer.models.moving_heads.physical import PhysicalValue
+from twinklr.core.sequencer.moving_heads.channels.state import ChannelValue, FixtureSegment
+
+
+def physical_segment(
+    channels: dict[ChannelName, PhysicalValue],
+    *,
+    t0_ms: int,
+    t1_ms: int,
+    fixture_id: str = "MH1",
+    segment_id: str = "seg",
+) -> FixtureSegment:
+    """A fixture segment whose channels hold only typed physical values."""
+    return FixtureSegment(
+        section_id="section",
+        segment_id=segment_id,
+        step_id="step",
+        template_id="template",
+        fixture_id=fixture_id,
+        t0_ms=t0_ms,
+        t1_ms=t1_ms,
+        channels={
+            name: ChannelValue(channel=name, physical=value) for name, value in channels.items()
+        },
+    )
+
 
 def profile_payload() -> dict[str, Any]:
     """A synthetic 8-channel spot: 16-bit pan/tilt, dimmer, shutter, color and a spare."""
@@ -14,7 +42,7 @@ def profile_payload() -> dict[str, Any]:
         "profile_id": "synthetic_spot",
         "provenance": "synthetic",
         "footprint": 8,
-        "defaults": {1: 128, 2: 0, 3: 22, 4: 0, 5: 0, 6: 64, 7: 0, 8: 0},
+        "defaults": {1: 128, 2: 0, 3: 128, 4: 0, 5: 0, 6: 64, 7: 0, 8: 0},
         "axes": {
             "pan": {
                 "unit": "degree",
