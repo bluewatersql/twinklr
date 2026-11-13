@@ -280,6 +280,56 @@ P1.0 and P1.1, 2026-11-13 (each reviewed separately from its author; gate on `87
 - **Open, low.** The `rejected` evidence cases assert only that validation fails, not
   that it fails on the mutated field. Frozen capability models hold mutable dicts.
 
+P1.2, P1.3 and P1.4, 2026-11-13 (each reviewed separately from its author, each with
+one fix round and a re-review):
+
+- **The frame grid is the only source of sample times.** P1.2 sampled the raw step and
+  P1.3 the grid-rounded span, so cues at off-grid step bounds were rejected when the two
+  were joined. Decision: `compile_physical_step` refuses a step start, step end or
+  sample time that is not a multiple of 20 ms (`OffGridTimeError`); the caller quantizes
+  step bounds with the encoder's `quantize_cue` first. **P1.6 does that quantization
+  and records the requested start in the trace**, because phase is now measured from
+  the quantized start (up to 10 ms from the beat) and `phase_origin_ms` no longer holds
+  the requested time.
+- **Terminal point.** Every compiled pan/tilt trajectory ends with an explicit point at
+  the step end, so a finite move finishes at its target. The encoder samples frame
+  starts in `[start, end)` and uses that point only to interpolate.
+- **Sub-frame content is rejected, not dropped.** A pulse whose high or low interval is
+  shorter than one frame, a sample gap wider than one frame, a cue at or after its
+  segment's end frame, and two cues on one frame all raise.
+- **Effect budget default raised to 1,000,000** (integrator's call, flagged to the
+  owner). Measured: 8 heads × 4 min of continuous 16-bit motion is about 95,000 effects
+  and 9.5 MiB, so the planned 100,000 would reject ordinary shows while the 128 MiB
+  byte limit sat far from binding. How xLights handles a sequence that size is
+  unverified and belongs to the owner-authorized xLights test.
+- **Profile defaults must agree with the profile.** A discrete channel's default byte
+  must be its default state's byte; an axis default must be a word an allowed value
+  encodes to. `wheel_changes` and `shutter_changes` rely on this: unauthored spans and
+  gaps are the default state, exactly what the encoder emits there.
+- **One state-to-byte lookup**, `DiscreteCapability.resolve`, used by the compile and
+  the encoder.
+- **Placement of physical template fields.** `Movement.physical`, `Dimmer.physical`,
+  and step-level `physical_shutter` (pulse), `physical_shutter_state`, `physical_color`,
+  `physical_gobo`, because the legacy shutter, color and gobo models require legacy
+  values. A physical step rejects any non-default legacy knob.
+- **Not implemented, by decision.** The optional qualitative reach/rate override table
+  and any plan-intensity mapping: nothing passes planner intent to the physical compile
+  in Phase 1. Owner: the phase that binds planner intent (P2/P3). A declared-optional
+  alternative for a missing capability: always fails instead. Portable state names
+  across profiles: templates name a profile's states directly; Phase 2.
+- **Carried to P1.5.** Timing of a step's first shutter state and of shutter changes
+  across steps (use `shutter_changes`); replacement segments must be on the frame grid
+  (the change lists use times as given); state must be authored without gaps, because
+  an unauthored channel returns to its default byte; never infer darkness from default
+  bytes (an inverted dimmer's default 0 is full on and is valid); the last shutter
+  state of a step must currently fit latency plus settle inside the step.
+- **Carried to P1.6.** Layout-aware model check (`DisplayAs`/`StringType` in the
+  xLights layout) so an RGB-node model is not sent through this mapping; serialization
+  time measurement; a segment running past the last requested frame is truncated
+  without error; a phase map reloaded from JSON loses its exact edge values, so rebuild
+  from the grid instead of persisting and comparing maps; cue timing records
+  (`quantized_cues`) into the trace.
+
 ## Phase exit
 
 All task tests and `make validate` pass; 16-bit frames reconstruct correctly across carries; supported offsets are 1–48; v2 limits/discrete values/phase/initial state work as declared; insufficient or unknown travel never reports feasible; optical darkness covers travel and settle; legacy regression output is unchanged. Source/offline proof and authorized xLights proof are recorded separately. Hardware accuracy and aesthetic acceptance remain pending until observed, not inferred from the profile's provenance.
