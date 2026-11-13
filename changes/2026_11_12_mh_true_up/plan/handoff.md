@@ -124,3 +124,68 @@ with provenance in these proposed designs; promoting architecture to `context/` 
 durable decisions to `memories/` waits for acceptance and the repository closeout
 workflow. The parent report remains the research synthesis; this subfolder owns the
 new technical designs and implementation steps.
+
+## Kickoff preparation — 2026-11-13
+
+The owner asked for the plan to be updated with documentation and test obligations and
+for any other gap to be closed before kickoff, and stated that the change will start
+from `main` in a clean worktree once the display fixes on
+`fix/display-brightness-floor` are complete. Plan documents only; no project code,
+test, schema or published documentation was changed. Edits were made in worktree
+`twinklr-mh-true-up-prep` on branch `docs/mh-true-up-kickoff-prep`, cut from `main` at
+`f067a56`.
+
+Source drift: between the plan's pin `9c55c2e` and `f067a56`, no file under
+`packages/twinklr/core/config/models.py`, `sequencer/moving_heads/` or
+`agents/sequencer/moving_heads/` changed. The display-fix branch was not inspected;
+the kickoff checklist in the [implementation brief](../implementation-brief.md) repeats
+the diff against the real starting commit.
+
+What changed:
+
+- New [implementation brief](../implementation-brief.md): scope, Phase 0 acceptance
+  criteria, approvals still pending, and the kickoff checklist. Added a row to
+  `changes/ACTIVE.md`.
+- [README](README.md#documentation-registry-and-test-surfaces): a shared rule and a
+  table of the repository guards that bind code to documentation and to the
+  config-field inventory.
+- [P0](phase-0-foundation.md):
+  - T1 now owns the inventory-registry records for `job.schema_version` and the new
+    `job.moving_heads` paths, the reworded fixed-policy test, and corrections to
+    `docs/user-guide.md`, `docs/overview.md` and `docs/pipeline_guide.md`, which state
+    the schema version as fixed at 3.0. It names the rejection site, the exception
+    type and a stage-level failure test.
+  - T2 adds a `control` discriminator to `MHDiagnostic` (all five P0 diagnostics share
+    one code), maps each control to its source and the existing test that pins it,
+    names where the grid and version-stamp constants come from, puts the plan's
+    non-serialized but functional omitted-intent flag into the identity, and states
+    how the pipeline exposes both results without touching sidecars.
+  - T3 records which cases run through the legacy pipeline and which are input-only,
+    how input-only data is held without P1 types, and that a legacy
+    `UnsupportedRigShapeError` for a head count is a baseline outcome.
+  - T4 gives the reference arm a complete resolution order and builds sections
+    through the selector's existing private builder, so the selector file is not edited.
+  - A file-ownership table, and an exit that names the evidence record's path and
+    contents.
+- P1–P5: a closing section each, listing the registry, guard-test and documentation
+  surfaces known today. Two are design gaps rather than bookkeeping: P1.1 must decide
+  how physical-only fixture/template fields are evidenced in the inventory, and P2.4
+  must define how `physical_v2/` catalog documents are admitted without reaching the
+  legacy planner, selector or registry-count tests.
+
+Independent review of these amendments (separate agent, read-only, given the diff and
+acceptance criteria): changes requested, then all thirteen findings applied. Five were
+factual or coverage errors: the fine-channel control row misdescribed what the builder
+emits, the omitted-intent flag was left open though the source shows it is functional,
+the 8-head golden was misdescribed, `docs/pipeline_guide.md` was missing from T1, and
+the `fine_carry` case could not be built from the harness rig type. The rest tightened
+predicates, the reference arm's resolution order, a run command, and the P2 and P5
+notes. The reviewer verified the remaining repository claims against source and ran
+no tests. The corrections were not re-reviewed.
+
+Checks run on the amended documents: local links and anchors resolve, code fences
+balance, 31 task headings remain, `git diff --check` is clean. No test suite or
+`make validate` was run; nothing outside `changes/` was edited.
+
+Decision left with the owner: the brief keeps `identity.py` in Phase 0 because the
+Phase 0 evidence record consumes it. The go-ahead to begin Phase 0 is still pending.

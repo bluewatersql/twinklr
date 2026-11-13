@@ -116,3 +116,21 @@ Define frozen types in `packages/twinklr/core/agents/sequencer/moving_heads/capa
 - [ ] Implement V3/physical ordering, pass motif provenance into existing segment metadata and display event source metadata, and add backward-compatible optional trace fields. Final P1 feasibility validation sees final visibility.
 - [ ] Run `uv run pytest tests/unit/sequencer/test_motif_schedule.py tests/unit/sequencer/test_show_coordination.py tests/integration/test_combined_show_pipeline.py tests/golden/test_combined_show_golden.py -q`; require green. Integrator runs full clean-tree `make validate` after committing and records actual output.
 - [ ] Integrator commits `feat: coordinate motif visibility across moving heads and pixels`; independent phase review. Owner taste exits remain pending until authorized comparisons establish recurrence, contrast and focal clarity.
+
+## Documentation, registry and existing-test updates
+
+Added 2026-11-13 from a recheck at `f067a56`; see the
+[shared rule](README.md#documentation-registry-and-test-surfaces). Recheck at
+P3 kickoff.
+
+- **Config inventory.** P3-T1 registers `job.moving_heads.planner_contract`; P3-T3
+  registers `job.moving_heads.arrangement` and each of its fields, with collecting
+  evidence tests.
+- **Prompt and spec guards.** P3-T1 and P3-T3 change the planner response model and
+  prompt packs. `tests/unit/agents/sequencer/moving_heads/test_prompts.py` and
+  `test_specs.py` are existing guards on those; run them with each task and update
+  them only where the legacy contract itself is unchanged and the new contract adds
+  cases.
+- **Documents.** `docs/user-guide.md`: job-config rows for the two new settings.
+  At phase closeout, `context/architecture/multi-agent-planning.md` gains the V3
+  planner contract once it is accepted behavior.

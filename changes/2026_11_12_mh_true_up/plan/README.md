@@ -5,6 +5,13 @@ against Twinklr `9c55c2e72c4bfea30a5ab7ae197579e4feb74485`. This continues the
 [research report](../report.md) under the owner's instruction to develop technical
 design and implementation plans only. All current-session deliverables live here.
 
+Kickoff preparation, November 13, 2026: the plans were rechecked against `f067a56`
+and amended for documentation, inventory-registry and existing-test obligations, plus
+the P0 contract gaps found in that recheck. The owner's direction is that this change
+starts from `main` in a clean worktree once the in-flight display fixes are complete.
+The [implementation brief](../implementation-brief.md) holds scope, acceptance
+criteria, the kickoff checklist and the approvals still needed.
+
 ## Read order
 
 1. [Shared architecture and contracts](architecture.md): compatibility, data flow,
@@ -90,8 +97,34 @@ P1/P2 integration, with shared-schema changes merged sequentially.
   are under `packages/twinklr/core/agents/sequencer/moving_heads/`. Explicit test and
   catalog paths start at the repository root. Each new file is marked Create/new.
 
+## Documentation, registry and test surfaces
+
+Several repository tests bind code to published documentation and to an inventory of
+every external configuration field. A task that touches one of these surfaces updates
+it in the same commit, and its file list says so. Checked at `f067a56`:
+
+| Surface | Guard | Triggered by |
+|---|---|---|
+| `tests/config_effects_registry.py` (`CONFIG_EFFECTS`) | `tests/unit/config/test_config_inventory.py::test_every_external_config_path_has_an_accountable_disposition` fails on any unregistered field reachable from `AppConfig`, `JobConfig`, `FixtureGroup` or `TemplateDoc`; each record names a test node that must collect | Every new or retyped field on those four roots, including each field of a nested model |
+| Fixture- and template-path effect records | The registry repoints every `fixture.*` effect record at `tests/unit/config/test_effect_discriminators.py::test_fixture_field_changes_shipped_behavior_snapshot[<path>]`, and `template.*` records at `tests/unit/config/test_template_effect_discriminators.py`, unless the path is listed in `PROTECTED_EXACT_EFFECT_PATHS`. Those parameterized tests require the field to change shipped legacy behavior | New fixture or template fields that affect only the opt-in physical path |
+| `docs/user-guide.md` config tables | `tests/unit/config/test_documented_config.py` requires every ledger row to have a live registry record with an evidence node | Any published config row added or changed |
+| `docs/overview.md` template statements | `tests/unit/sequencer/moving_heads/test_documented_channel_scope.py` pins the "37 Python builtins" sentences and the builtin source counts | Adding or changing a Python builtin template |
+| Template counts | `tests/unit/sequencer/moving_heads/templates/test_data_loader.py` and `test_repeat_contract_validation.py` assert 37 entries in the shared registry | Anything that registers a template in the process-wide `REGISTRY` |
+| Legacy look | `tests/golden/` and `tests/regression/` | Any change reaching the default render path |
+
+Beyond those guards, a task that adds a CLI command, a config field a user sets, or a
+fixture/template schema field updates `docs/user-guide.md` (and `docs/overview.md`
+where it states the same fact) in the same commit. Each phase plan ends with the
+surfaces already known for that phase. Those lists were written before the phase's
+interfaces exist, so the phase kickoff rechecks them against the then-current tree.
+
+Promotion of accepted behavior into `context/` and of lessons into `memories/` happens
+at each phase closeout through
+[session-closeout](../../../prompts/handoff/session-closeout.md), not per task.
+
 ## Review and handoff
 
 See [independent design review](review.md) and [planning handoff](handoff.md) for actual
-review/check outcomes, limitations, and the next implementable task. Research and
+review/check outcomes, limitations, and the next implementable task. The handoff's
+last section records the November 13 kickoff preparation. Research and
 planning completion is distinct from architecture acceptance or implementation approval.

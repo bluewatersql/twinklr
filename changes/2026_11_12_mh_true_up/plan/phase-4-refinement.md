@@ -143,3 +143,21 @@ Define `PhysicalIsolationEvidence(sequence_identity, patch_hash, full_effect_inv
 - [ ] Replay captured P1 frames offline, compare expected pan/tilt orientation and visibility at named timestamps, and record limitations. No network playback to hardware, physical accuracy or taste claim follows.
 - [ ] Independent reviewer records whether the experiment resolves its question; keep it optional regardless of outcome.
 - [ ] Integrator runs full clean-tree `make validate` after committing implementation, records real output, and obtains independent phase review. Core exit requires exact lock preservation, verified dependency closure, accurate diff/application recovery and measured refinement effort in later owner trials; importer/native/Blender decisions remain separate, explicit records.
+
+## Documentation, registry and existing-test updates
+
+Added 2026-11-13 from a recheck at `f067a56`; see the
+[shared rule](README.md#documentation-registry-and-test-surfaces). Recheck at P4 kickoff.
+
+- **Config inventory.** P4-T6 registers `job.moving_heads.export_backend` with a
+  collecting evidence test.
+- **CLI documentation.** P4-T3 adds `twinklr refine prepare` and `twinklr refine apply`.
+  Document them in `docs/user-guide.md` beside the existing "Live injection and section
+  regeneration (LOCAL-ONLY)" section, including that `apply` without `--apply` is a
+  read-only preflight and that application is not transactional.
+- **Existing guards.** `tests/unit/cli/test_live_injection_command.py` and
+  `tests/unit/api/xlights/test_injection.py` pin the legacy injection path P4-T3 must
+  leave unchanged; run both with that task.
+- **Documents for the optional pilots.** A GDTF import or native backend that reaches
+  GO is documented in `docs/user-guide.md` as opt-in and experimental; a NO-GO is
+  recorded in this change's evidence only.

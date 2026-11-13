@@ -146,6 +146,40 @@ The test template uses P1's finite linear kernel, a 90° pan delta over two beat
 
 Legacy input defaults to `legacy_v1` and retains its old serialization/output. Physical input requires explicit profiles and physical template fields; provide diagnostics and a reviewed migration document, not an auto-converter from normalized DMX. New optional fields change generated schemas only where those models are exposed; preserve old version parsing and test explicit rejection of v2-only payload under legacy policy. Roll back by selecting `legacy_v1` and the previous templates/checkpoint; refuse physical-only templates there. Retain physical artifacts under their identity for evidence rather than overwriting the accepted baseline.
 
+## Documentation, registry and existing-test updates
+
+Added 2026-11-13 from a recheck at `f067a56`; see the
+[shared rule](README.md#documentation-registry-and-test-surfaces). Recheck at P1 kickoff.
+
+- **Config inventory.** Each task registers the fields it adds, with a collecting
+  evidence test: P1.1 everything under `FixtureConfig.physical_profile` and
+  `job.moving_heads.initial_states`; P1.2 `Movement.physical` and the pulse spec under
+  the template root; P1.3 `job.moving_heads.max_effects` and `max_xsq_bytes`.
+  `FixtureCapabilities` is a deep model and every nested field is its own inventory
+  path, so P1.1's registry work is sized by that model, not by one line.
+- **Physical-only fixture and template fields.** The registry's default evidence for
+  `fixture.*` and `template.*` effect records is a parameterized test that requires the
+  field to change shipped legacy output. Physical-profile and physical-movement fields
+  do not, by design. P1.1 decides and records how these paths are evidenced: listed in
+  `PROTECTED_EXACT_EFFECT_PATHS` with their own physical-path test nodes, or covered
+  by an equivalent physical discriminator.
+- **P0's rejection test.** P1.6 replaces P0-T1's unconditional
+  `UnsupportedRenderModeError` with real dispatch. Update
+  `test_unimplemented_physical_mode_is_rejected` deliberately to the new behavior
+  (physical mode without the required profiles fails with diagnostics) and repoint the
+  `job.moving_heads.mode` registry record in the same commit.
+- **Test-template isolation (P1.6).** The pipeline resolves templates through the
+  process-wide `REGISTRY`, `DeterministicSelector` reads every entry in it, and several
+  tests assert it holds exactly 37. The fixture that loads `p1_linear_reveal.json`
+  must remove it again (or the test must run against an isolated registry), and a test
+  asserts the shared registry is back to 37 afterward.
+- **Documents.** `docs/user-guide.md`: job-config rows for the new `moving_heads`
+  fields and a `physical_profile` description in the fixture-config section.
+  `docs/overview.md`: its moving-head support paragraph describes the legacy channel
+  set only and does not mention the legacy 1–16 shutter-intent ceiling. Add the opt-in
+  physical path and its 1–48 model-relative range there, keeping verbatim the two
+  sentences `test_documented_channel_scope.py` pins.
+
 ## Phase exit
 
 All task tests and `make validate` pass; 16-bit frames reconstruct correctly across carries; supported offsets are 1–48; v2 limits/discrete values/phase/initial state work as declared; insufficient or unknown travel never reports feasible; optical darkness covers travel and settle; legacy regression output is unchanged. Source/offline proof and authorized xLights proof are recorded separately. Hardware accuracy and aesthetic acceptance remain pending until observed, not inferred from the profile's provenance.

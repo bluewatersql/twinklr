@@ -295,6 +295,24 @@ feature acceptance; JSON exposes each gate's `pass|fail|pending|unavailable` sta
   retain opt-in, ship as supported, or revise. A default change requires its own
   migration/rollback decision; do not change defaults in this evaluation task.
 
+## Documentation, registry and existing-test updates
+
+Added 2026-11-13 from a recheck at `f067a56`; see the
+[shared rule](README.md#documentation-registry-and-test-surfaces). Recheck at P5 kickoff.
+
+- **No config inventory change is planned.** P5's models are study and evidence
+  records, not fields on the four inventoried config roots. If a task adds one anyway,
+  the shared rule applies.
+- **Existing guards.** `tests/unit/api/xlights/test_fseq_compare.py` and
+  `tests/unit/reporting/evaluation/test_three_arm_experiment.py` pin the whole-file
+  comparator and the frozen experiment; P5-T1 and P5-T2 run them unchanged.
+- **Documents.** P5-T4's own rule stands: accepted context and docs change only after
+  owner adoption. Until then the report command is documented by its `--help` and this
+  change's records. On adoption it is added to `docs/user-guide.md` beside the
+  existing FSEQ comparison section, stating that exit 0 means the report was written,
+  not that a feature was accepted. Executed studies with human judgment are recorded
+  under `evaluations/` per its README, not only in this change folder.
+
 ## Exit, limitations and rollback
 
 The harness can complete on synthetic/offline evidence while fixture and taste

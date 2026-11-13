@@ -107,6 +107,37 @@ Fly-out lights center-to-edge travel and returns dark; fly-in lights edge-to-cen
 
 P2 adds typed optional fields and an explicit finite repeat enum; keep existing `TemplateDoc` parsing and builtins valid. Reject physical-only fields under legacy render policy. Content-hash the resolved preset values, full topology, distribution, path, envelope and template version as dependencies of P0/P1 render identity; editing a preset invalidates only dependent render output, not unrelated planning. A planner exposed to a changed template catalog must include the changed catalog identity in its context/cache key; existing `agents/sequencer/moving_heads/orchestrator.py:get_cache_key` already hashes available IDs/descriptions, so extend only when additional exposed family metadata is introduced, with a targeted `tests/unit/agents/sequencer/moving_heads/test_orchestrator.py` cache test. Do not rewrite checkpoints or silently replace same-ID builtin documents; new physical families have distinct IDs and provenance. Rollback selects legacy policy/previous template versions and ignores the opt-in physical catalog; no accepted artifact is overwritten.
 
+## Documentation, registry and existing-test updates
+
+Added 2026-11-13 from a recheck at `f067a56`; see the
+[shared rule](README.md#documentation-registry-and-test-surfaces). Recheck at P2 kickoff.
+
+- **Catalog admission is unspecified above and must be settled in P2.4 before any
+  document is added.** Three facts at `f067a56`: the render pipeline and the planner
+  load Python builtins only and never call the data loader;
+  `discover_template_documents` walks `catalog/templates/moving_heads` recursively, so
+  `twinklr template-validate --template-dir catalog/templates/moving_heads` would pick
+  up a new `physical_v2/` subdirectory; and the existing three documents there are
+  required to stay model-equal and render-identical to their Python builtins. P2.4
+  therefore names the one loader call that admits `physical_v2/` documents, makes it
+  run only under `physical_v2`, and adds tests that the legacy planner context, the
+  deterministic selector's candidate set and the 37-entry registry assertions are
+  unchanged when the physical catalog exists on disk.
+  `test_data_loader.py::test_tracked_data_proofs_load_alongside_all_python_builtins_only_with_override`
+  loads that directory recursively and asserts exactly three IDs, so it fails the
+  moment a `physical_v2/` document is added there; P2.4 either places the physical
+  catalog outside that root or changes that test deliberately. Update
+  `catalog/templates/moving_heads/README.md` to describe the subdirectory.
+- **Config inventory.** Register every new field with collecting evidence in the task
+  that adds it: P2.1 `FixtureGroup.presets` and `TemplateStep.component_refs`; P2.2 the
+  topology on the fixture group and `PhaseDistribution`; P2.3 `PathTransform`,
+  `PhysicalEvent` and the new repeat mode; P2.4 `VisibilityEnvelope` and the overlay;
+  P2.5 the zoom capability. The physical-only evidence approach chosen in P1.1 applies.
+- **Documents.** `docs/user-guide.md`: the data-form template section and the
+  fixture-config section for presets and topology. `docs/overview.md`: the "37 Python
+  builtins" sentences stay true because the new families are data documents; add the
+  physical families as a separate statement rather than changing that count.
+
 ## Phase exit
 
 Six core families compile deterministically on the synthetic rig matrix; independent phase domains work; missing heads preserve canonical ranks; preset overrides have explicit scope; finite events retain meaningful terminal states; fly-in/out lit directions and dark returns are frame-proven; flicks settle while dark and resume the current base. The zoom pilot is source/synthetic proven with any real-profile acceptance explicitly pending. Legacy regression and clean-tree `make validate` pass. Owner visual acceptance is a separate record, not a consequence of a new effect name or passing bytes.
