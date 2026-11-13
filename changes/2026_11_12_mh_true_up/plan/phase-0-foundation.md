@@ -225,10 +225,20 @@ column. Input-only data is held as plain typed values (ints, floats, strings, tu
 in a `physical_inputs` mapping; P0 imports no P1 type, and P1 converts these values
 into its own models when it adopts a case.
 
+As implemented (reviewed 2026-11-13): the case holds `fixture_groups`, a tuple, because
+`counts` needs one rig per head count and every other case has exactly one; `plan` is
+`None` for the input-only `state` and `locks` cases, because a plan section cannot
+exist without a template and naming one for a case that never renders would be a
+placeholder; and the recorded legacy outcome per rig is stored on the case as
+`legacy_outcomes`, which the pipeline test checks against real output.
+
 Build coarse-only fixtures with the harness's `RigSpec` and `build_fixture_group`.
 `RigSpec` has no fine-channel or 16-bit field and the harness is not edited, so
-`fine_carry` and the channel 48/49 inputs construct `FixtureGroup` and `DmxMapping`
-directly in `mh_true_up.py`. Build the
+`fine_carry` constructs `FixtureGroup` and `DmxMapping` directly in `mh_true_up.py`.
+Channels 48 and 49 are input-only, so they are plain integers in `physical_inputs`
+under keys naming the control (`shutter_channel_supported_max`,
+`shutter_channel_unsupported`), not mappings that would reach the legacy pipeline.
+Build the
 nonuniform `tempo` grid the way `build_uneven_beat_grid` does (explicit bar and beat
 boundaries, eighth/sixteenth boundaries derived from the beats). Each legacy-runnable
 case is a single-section plan naming one builtin template, recorded in the case
