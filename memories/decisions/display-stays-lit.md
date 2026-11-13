@@ -29,9 +29,12 @@ never expressed by leaving most of the display unlit. Three mechanisms enforce t
   lead keeps its declared contrast (about 87% against 13% at a strong intensity).
   Where one group carries far more activity than its role allows, coordination dims it
   further, but only halfway toward the next role down (LEAD no lower than 0.825,
-  SUPPORT no lower than 0.40). At every moment LEAD is brighter than SUPPORT, which is
-  brighter than REST, and a brief resting event cannot darken the lead. The summed
-  brightness-over-time ratios are exact only while no group reaches that bound.
+  SUPPORT no lower than 0.40). Between events planned at the same intensity LEAD is
+  always brighter than SUPPORT, which is brighter than REST, and a brief resting event
+  cannot darken the lead. The summed brightness-over-time ratios are exact only while
+  no group reaches that bound. The scale is relative to what the planner asked for: a
+  lead planned at a quiet level can still render dimmer than a support planned at a
+  loud one, as it could before.
 - **Display composition reaches the end of the song.** `BeatGrid.extended_to_duration()`
   continues beats and bars at the average beat duration past the last detected beat, and
   a section that runs past the last bar ends at its own end time. `DisplayRenderer` uses

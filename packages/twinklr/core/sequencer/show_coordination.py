@@ -55,9 +55,11 @@ _ROLE_SCALE = {
     FocalRoleKind.REST: 0.15,
 }
 # Lowest scale budget normalisation may give a role: halfway to the role below it.
-# A busy group is dimmed toward the next role down and never reaches it, so at any
-# moment LEAD > SUPPORT > REST and a lead is never taken near-dark by a brief resting
-# event.  REST is bounded by the export's own resting floor.
+# A busy group is dimmed toward the next role down and never reaches it, and a lead is
+# never taken near-dark by a brief resting event.  The scale multiplies each event's
+# own planned brightness, so LEAD > SUPPORT > REST holds between events planned at the
+# same intensity; a lead planned quieter than its support can still render dimmer.
+# REST is bounded by the export's own resting floor.
 _ROLE_SCALE_FLOOR = {
     FocalRoleKind.LEAD: (_ROLE_SCALE[FocalRoleKind.LEAD] + _ROLE_SCALE[FocalRoleKind.SUPPORT]) / 2,
     FocalRoleKind.SUPPORT: (_ROLE_SCALE[FocalRoleKind.SUPPORT] + _ROLE_SCALE[FocalRoleKind.REST])
@@ -370,7 +372,9 @@ def _normalize_display_role_budgets(
     the export applies it to the lit brightness instead of having the visible-brightness
     floor flatten it.
     A target is never scaled below ``_ROLE_SCALE_FLOOR`` for its role, so the budget
-    ratios are exact only while no target reaches that bound.
+    ratios are exact only while no target reaches that bound.  The scale is relative
+    to each event's planned intensity; it orders roles planned at the same intensity
+    and does not reorder a lead the planner made quieter than its support.
     """
 
     expander = TargetExpander(graph)

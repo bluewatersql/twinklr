@@ -315,6 +315,68 @@ def test_focal_roles_hold_at_every_moment_with_unequal_event_counts() -> None:
     assert min(levels["ARCH_LEFT"]) > max(levels["ARCH_RIGHT"])
 
 
+def _with_event(plan: RenderPlan, group_id: str, **update: object) -> RenderPlan:
+    """Replace fields on one group's only event."""
+    groups = []
+    for group in plan.groups:
+        if group.element_name != group_id:
+            groups.append(group)
+            continue
+        event = group.layers[0].events[0].model_copy(update=update, deep=True)
+        layer = group.layers[0].model_copy(update={"events": [event]}, deep=True)
+        groups.append(group.model_copy(update={"layers": [layer]}, deep=True))
+    return plan.model_copy(update={"groups": groups}, deep=True)
+
+
+def test_budget_dims_busier_roles_in_exact_ratio_inside_the_bounds() -> None:
+    """A lead lit for less of the section pulls the others down in proportion."""
+    plan = _with_event(
+        _render_plan("MEGA_TREE", "ARCH_LEFT", "ARCH_RIGHT"), "MEGA_TREE", end_ms=4_000
+    )
+    coordinated = coordinate_display_render_plan(
+        plan,
+        _macro(),
+        _grid(),
+        _graph(),
+        moving_head_target_ids={"MOVING_HEADS"},
+    )
+    budget = {
+        group.element_name: sum(
+            event.brightness_scale * (event.end_ms - event.start_ms)
+            for layer in group.layers
+            for event in layer.events
+        )
+        for group in coordinated.groups
+    }
+    scales = {
+        group.element_name: [
+            event.brightness_scale for layer in group.layers for event in layer.events
+        ]
+        for group in coordinated.groups
+    }
+    assert max(scales["ARCH_LEFT"]) < 0.65  # normalisation ran, bound not reached
+    assert min(scales["ARCH_LEFT"]) > 0.40
+    assert budget["MEGA_TREE"] / budget["ARCH_LEFT"] == pytest.approx(1.0 / 0.65)
+    assert budget["ARCH_LEFT"] / budget["ARCH_RIGHT"] == pytest.approx(0.65 / 0.15)
+
+
+def test_role_scale_is_relative_to_planned_intensity() -> None:
+    """A lead planned quieter than its support keeps its own visible level."""
+    plan = _with_event(
+        _render_plan("MEGA_TREE", "ARCH_LEFT", "ARCH_RIGHT"), "MEGA_TREE", intensity=0.0
+    )
+    coordinated = coordinate_display_render_plan(
+        plan,
+        _macro(),
+        _grid(),
+        _graph(),
+        moving_head_target_ids={"MOVING_HEADS"},
+    )
+    levels = _levels(coordinated)
+    assert levels["MEGA_TREE"] == {35}
+    assert min(levels["ARCH_LEFT"]) > max(levels["ARCH_RIGHT"])
+
+
 def test_brief_resting_event_does_not_darken_the_lead() -> None:
     """Budget normalisation dims a lead no further than the support weight."""
     plan = _render_plan("MEGA_TREE", "ARCH_LEFT", "ARCH_RIGHT")
