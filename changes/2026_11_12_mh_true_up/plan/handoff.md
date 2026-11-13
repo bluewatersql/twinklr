@@ -189,3 +189,59 @@ balance, 31 task headings remain, `git diff --check` is clean. No test suite or
 
 Decision left with the owner: the brief keeps `identity.py` in Phase 0 because the
 Phase 0 evidence record consumes it. The go-ahead to begin Phase 0 is still pending.
+
+## Phase 0 implementation — 2026-11-13
+
+Status: **Phase 0 complete on `feat/mh-true-up-p0`; not merged to `main`.** Worktree
+`twinklr-mh-true-up`, cut from `main` at `b498ed9`. The owner's go-ahead covered Phase 0
+only; Phase 1 needs its own.
+
+Delivered, each implemented test-first by one agent and reviewed by a separate one:
+
+| Task | Commit | Result |
+|---|---|---|
+| P0-T1 render policy | `4c608ac` | `JobConfig.moving_heads.mode`, schema `3.0 \| 3.1`, `physical_v2` rejected before any output; inventory records and three documents updated |
+| P0-T2 diagnostics and identity | `1631679` | `audit_legacy_controls`, `render_fingerprint`, lazy pipeline accessors |
+| P0-T3 synthetic cases | `afbe160` | Eight in-memory cases under `tests/support/` |
+| P0-T4 reference arm | `2617525` | `build_reference_plan`; the frozen selector file is untouched |
+
+Validation: `make validate` on `1631679` passed, 5882 passed and 39 skipped, tree clean
+before and after; no golden or regression file changed. Evidence:
+[evidence/2026-11-13-p0-baseline](../evidence/2026-11-13-p0-baseline/README.md). The
+handoff and evidence documents were committed after that gate run and are
+documentation only.
+
+Changes to the plan made during implementation, all recorded in
+[phase-0-foundation.md](phase-0-foundation.md):
+
+- The fingerprint takes transition settings as a required input and ignores
+  template-id spelling. Review showed transitions change emitted segments and were
+  missing from the specified signature.
+- Control predicates corrected against source: movement intensity can be requested by
+  the template itself and exempts hold-only steps; calibrated limits are reported per
+  fixture; the dimmer-floor diagnostic states a range, not a reached value; the shutter
+  diagnostic covers only targeted fixtures.
+- `render()` resolves a section's preset through `resolve_section_preset`, a verbatim
+  move shared with the audit. This is the only edit to the default render path.
+- Channels 48 and 49 are plain integers in the synthetic cases.
+
+Open items:
+
+- **Owner: merge `feat/mh-true-up-p0` to `main`.** Not done; no instruction to merge.
+- **Owner: merge `fix/install-anthropic-extra` (`6e9a8cb`).** `make install` and CI
+  omit the `anthropic` extra, so the gate fails at collection in a fresh environment.
+  The fix passed `make validate` in its own worktree (5763 passed, 39 skipped).
+- **Owner decision:** a `physical_v2` job passes config validation and is rejected at
+  render, after planning has run. Rejecting at job load until Phase 1 would avoid the
+  wasted provider spend.
+- **Phase 1:** `reporting/evaluation/rerender.py` always renders `legacy_v1`; the
+  P1.2 phase map must not build from `BeatGrid.extended_to_duration()`. Both are in the
+  P1 plan.
+- Low review notes left as is: `render_fingerprint` requires the plan's templates to be
+  registered; the audit calls one private dimmer-handler method; test-support typing
+  is loose.
+
+Knowledge promotion: checked. Phase 0 changes no accepted behavior beyond the three
+documents T1 corrected, so nothing is promoted to `context/` or `memories/`.
+
+Next action: owner go-ahead for Phase 1, then its kickoff recheck.
