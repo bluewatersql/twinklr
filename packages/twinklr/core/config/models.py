@@ -269,6 +269,8 @@ class ConfigBase(BaseModel):
         Raises:
             FileNotFoundError: If config file doesn't exist
             ValidationError: If config is invalid
+            UnsupportedRenderModeError: If a job selects a render mode the installed
+                renderer cannot honor
         """
         # AppConfig needs environment variable loading for API keys
         if cls.__name__ == "AppConfig":
@@ -277,10 +279,15 @@ class ConfigBase(BaseModel):
             return load_app_config(path)  # type: ignore[return-value]
 
         # Other config types use simple loader
-        from twinklr.core.config.loader import load_config
+        from twinklr.core.config.loader import load_config, load_job_config
 
         if path is None:
             path = cls.default_path()
+
+        # A job loaded from a path is being loaded for execution
+        if cls.__name__ == "JobConfig":
+            return load_job_config(path)  # type: ignore[return-value]
+
         raw = load_config(path)
         return cls.model_validate(raw)
 
@@ -643,7 +650,8 @@ class MHRenderPolicy(BaseModel):
         default="legacy_v1",
         description=(
             "Moving-head renderer. `physical_v2` requires schema_version 3.1 and is "
-            "rejected until the physical renderer ships."
+            "rejected when the job is loaded for execution until the physical "
+            "renderer ships."
         ),
     )
     # Left out of dumps when empty so legacy render fingerprints are unchanged.

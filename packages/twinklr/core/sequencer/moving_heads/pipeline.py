@@ -13,6 +13,10 @@ from twinklr.core.agents.sequencer.moving_heads import ChoreographyPlan
 from twinklr.core.agents.sequencer.moving_heads.models import PlanSection, flatten_plan_segment
 from twinklr.core.config.fixtures import FixtureGroup
 from twinklr.core.config.models import JobConfig
+from twinklr.core.config.render_policy import (  # noqa: F401 - re-exported
+    UnsupportedRenderModeError,
+    preflight_render_policy,
+)
 from twinklr.core.curves.generator import CurveGenerator
 from twinklr.core.curves.registry import CurveRegistry
 from twinklr.core.formats.xlights.sequence.fresh import resolve_media_file
@@ -159,14 +163,6 @@ def _compute_section_duration_ms(start_bar: int, end_bar: int, beat_grid: BeatGr
     return int(beat_grid.get_bar_start_ms(end_bar) - beat_grid.get_bar_start_ms(start_bar - 1))
 
 
-class UnsupportedRenderModeError(ValueError):
-    """The job selects a moving-head render mode this renderer does not implement.
-
-    Raised before any template load or output write, instead of falling back to the
-    legacy renderer in silence.
-    """
-
-
 class RenderingPipeline:
     """Rendering pipeline for moving heads."""
 
@@ -202,12 +198,7 @@ class RenderingPipeline:
             UnsupportedRenderModeError: The job selects a render mode other than
                 `legacy_v1`, which is the only one implemented.
         """
-        mode = job_config.moving_heads.mode
-        if mode != "legacy_v1":
-            raise UnsupportedRenderModeError(
-                f"moving_heads.mode {mode!r} is not implemented yet; "
-                "set it to 'legacy_v1' or omit it"
-            )
+        preflight_render_policy(job_config, fixture_group)
 
         self.choreography_plan = choreography_plan
         self.fixture_group = fixture_group

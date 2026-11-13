@@ -69,6 +69,14 @@ the backend cannot address (footprint or offset above 48), or an unsupported mod
 mode. Missing initial state stays a render-time diagnostic because a cue at time zero
 is what makes it an error. The message names each failing fixture and field.
 
+Found in the P1.0 review, for P1.6: the load-time call runs inside `load_job_config`,
+before fixtures are read, and the CLI commands load the job and the fixtures
+separately. No load-time caller holds a fixture group, so P1.6's fixture-dependent
+refusals need a new call site (after `load_fixture_group` in `load_full_config`, and in
+the CLI commands and `TwinklrSession` where fixtures are resolved). Also for P1.6:
+`twinklr display` loads the same job file and so refuses `physical_v2` too; decide
+there whether a display-only run should.
+
 - [ ] Write `test_loading_physical_job_is_rejected_before_execution` (a `3.1`
   `physical_v2` file fails in `load_job_config` and `load_full_config` with
   `UnsupportedRenderModeError` naming the mode and the remedy),
