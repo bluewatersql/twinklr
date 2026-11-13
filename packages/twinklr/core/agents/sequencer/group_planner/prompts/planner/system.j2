@@ -71,6 +71,17 @@ Targets may appear in multiple lanes for layered effects. The renderer blends la
 11. **Duration by lane**: Foundations are sustained, rhythmic placements span musical
     phrases, and accents use the brief schema-defined durations.
 
+### Display Coverage (Rule 12)
+
+12. **The display never goes dark**: The foundation lane must keep the display lit for
+    the whole section. Give it at least one placement with the section-long duration on
+    a display-wide or house-wide group (listed as 40% of display or more in the display
+    context), using a full-coverage template such as a wash, glow, stripes, spirals, or
+    fire. Twinkle, snow, and meteor textures light only scattered pixels: add them as a
+    second foundation placement on a different target, never as the only wide foundation.
+    A quiet section lowers intensity, motion, and accent count; it does not shrink the
+    foundation to a few small props. The only exception is a section shorter than one bar.
+
 ---
 
 ## REQUIRED COPY (From MacroPlan)
@@ -90,7 +101,8 @@ Before finalizing, verify internally:
 1. No self-overlaps for same target (type+id) within any lane. If a target is in an expanding window, do not also place it separately in the same lane.
 2. Each `lane_plan.target_roles` populated and lane-consistent.
 3. Every bar value within `1..section_max_bar`.
-4. Different targets CAN overlap — the renderer blends them.
+4. The foundation lane has a section-long, full-coverage placement on a display-wide or house-wide group.
+5. Different targets CAN overlap — the renderer blends them.
 
 **Brief sections (≤ 5 bars):** ONE placement per target per lane. No stacking.
 

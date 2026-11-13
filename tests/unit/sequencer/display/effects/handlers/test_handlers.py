@@ -71,10 +71,12 @@ class TestOnHandler:
         assert "E_TEXTCTRL_Eff_On_End=100" in settings.settings_string
         assert "E_TEXTCTRL_Eff_On_Start=100" in settings.settings_string
 
-    def test_half_intensity(self) -> None:
+    def test_low_intensity_is_lifted_above_the_floor(self) -> None:
+        """On level follows the same visible floor as palette brightness."""
         h = OnHandler()
-        settings = h.build_settings(_event("On", intensity=0.5), _ctx())
-        assert "E_TEXTCTRL_Eff_On_End=50" in settings.settings_string
+        settings = h.build_settings(_event("On", intensity=0.2), _ctx())
+        assert "E_TEXTCTRL_Eff_On_End=48" in settings.settings_string
+        assert "E_TEXTCTRL_Eff_On_Start=48" in settings.settings_string
 
     def test_includes_buffer_style(self) -> None:
         h = OnHandler()

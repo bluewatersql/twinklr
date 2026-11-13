@@ -154,6 +154,46 @@ class BeatGrid(BaseModel):
 
         return cls.from_resolver(resolver, duration_ms=duration_ms or 0.0)
 
+    def extended_to_duration(self) -> BeatGrid:
+        """Return a grid whose beats and bars continue to the end of the song.
+
+        Beat detection stops where the music fades, often several seconds before
+        the audio ends. Timing resolved against the detected grid alone clamps to
+        the last detected boundary, which leaves that tail dark. The continuation
+        uses the average beat duration and keeps every detected boundary verbatim.
+
+        Returns:
+            This grid when it already reaches ``duration_ms``, otherwise a copy
+            with boundaries appended up to ``duration_ms``.
+        """
+        if len(self.beat_boundaries) < 2 or not self.bar_boundaries:
+            return self
+
+        step = self.ms_per_beat
+        if step <= 0.0:
+            return self
+
+        beats = list(self.beat_boundaries)
+        while beats[-1] + step <= self.duration_ms:
+            beats.append(beats[-1] + step)
+
+        bar_step = step * self.beats_per_bar
+        bars = list(self.bar_boundaries)
+        while bars[-1] + bar_step <= self.duration_ms:
+            bars.append(bars[-1] + bar_step)
+
+        if len(beats) == len(self.beat_boundaries) and len(bars) == len(self.bar_boundaries):
+            return self
+
+        return self.model_copy(
+            update={
+                "beat_boundaries": beats,
+                "bar_boundaries": bars,
+                "eighth_boundaries": self._calculate_eighth_boundaries(beats),
+                "sixteenth_boundaries": self._calculate_sixteenth_boundaries(beats),
+            }
+        )
+
     @property
     def total_bars(self) -> int:
         """Get total number of bars in the song.

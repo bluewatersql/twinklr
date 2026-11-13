@@ -21,6 +21,7 @@ from twinklr.core.formats.xlights.sequence.trace import (
     DisplayEmissionTrace,
     EmissionTraceEntry,
 )
+from twinklr.core.sequencer.display.brightness import intensity_to_brightness
 from twinklr.core.sequencer.display.effects.protocol import (
     RenderContext,
 )
@@ -310,8 +311,8 @@ class XSQWriter:
     ) -> ResolvedPalette:
         """Map event intensity to xLights palette brightness.
 
-        Applies intensity (0.0-1.0) as ``C_SLIDER_Brightness`` (0-100)
-        on the palette.  This is a cross-cutting concern — like
+        Applies intensity (0.0-1.0) as ``C_SLIDER_Brightness`` on the
+        palette, lifted to a visible floor by ``intensity_to_brightness``.  This is a cross-cutting concern — like
         transitions — applied universally for all non-On effects.
 
         **On** effects are skipped because they handle intensity
@@ -340,7 +341,7 @@ class XSQWriter:
 
         # Compose with any existing brightness
         base_brightness = palette.brightness if palette.brightness is not None else 100
-        effective = max(0, min(100, int(base_brightness * intensity)))
+        effective = max(0, min(100, round(base_brightness * intensity_to_brightness(intensity))))
         return palette.model_copy(update={"brightness": effective})
 
 

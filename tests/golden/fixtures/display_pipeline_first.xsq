@@ -19,7 +19,7 @@
   <nextid>1</nextid>
   <Jukebox />
   <ColorPalettes>
-    <ColorPalette>C_BUTTON_Palette1=#E53935,C_BUTTON_Palette2=#43A047,C_BUTTON_Palette3=#F5F1E8,C_BUTTON_Palette4=#FFFFFF,C_BUTTON_Palette5=#000000,C_BUTTON_Palette6=#000000,C_BUTTON_Palette7=#000000,C_BUTTON_Palette8=#000000,C_CHECKBOX_Palette1=1,C_CHECKBOX_Palette2=1,C_CHECKBOX_Palette3=1,C_CHECKBOX_Palette4=1,C_SLIDER_Brightness=50</ColorPalette>
+    <ColorPalette>C_BUTTON_Palette1=#E53935,C_BUTTON_Palette2=#43A047,C_BUTTON_Palette3=#F5F1E8,C_BUTTON_Palette4=#FFFFFF,C_BUTTON_Palette5=#000000,C_BUTTON_Palette6=#000000,C_BUTTON_Palette7=#000000,C_BUTTON_Palette8=#000000,C_CHECKBOX_Palette1=1,C_CHECKBOX_Palette2=1,C_CHECKBOX_Palette3=1,C_CHECKBOX_Palette4=1,C_SLIDER_Brightness=68</ColorPalette>
   </ColorPalettes>
   <EffectDB>
     <Effect />

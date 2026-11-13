@@ -243,9 +243,9 @@ class TestAugmentSettings:
 class TestApplyIntensityBrightness:
     """Tests for XSQWriter._apply_intensity_brightness.
 
-    Intensity (0.0-1.0) is mapped to xLights C_SLIDER_Brightness
-    (0-100) on the palette, providing universal brightness control
-    for all non-On effects.
+    Intensity (0.0-1.0) is mapped to xLights C_SLIDER_Brightness on
+    the palette for all non-On effects. The mapping starts at a visible
+    floor (35) so the quietest level never renders as dark.
     """
 
     def test_full_intensity_unchanged(self) -> None:
@@ -256,27 +256,33 @@ class TestApplyIntensityBrightness:
         )
         assert result.brightness is None  # No brightness override
 
-    def test_half_intensity_sets_brightness_50(self) -> None:
-        """intensity=0.5 sets brightness to 50."""
+    def test_low_intensity_is_lifted_above_the_floor(self) -> None:
+        """intensity=0.2 sets brightness to 35 + 65 * 0.2 = 48."""
         palette = _DEFAULT_PALETTE
         result = XSQWriter._apply_intensity_brightness(
-            palette, intensity=0.5, effect_name="Spirals"
+            palette, intensity=0.2, effect_name="Spirals"
         )
-        assert result.brightness == 50
+        assert result.brightness == 48
 
-    def test_zero_intensity_sets_brightness_0(self) -> None:
-        """intensity=0.0 sets brightness to 0 (blackout)."""
+    def test_zero_intensity_sets_the_visible_floor(self) -> None:
+        """intensity=0.0 sets brightness to the floor, never a blackout."""
         palette = _DEFAULT_PALETTE
         result = XSQWriter._apply_intensity_brightness(
             palette, intensity=0.0, effect_name="Twinkle"
         )
-        assert result.brightness == 0
+        assert result.brightness == 35
 
-    def test_quarter_intensity(self) -> None:
-        """intensity=0.25 sets brightness to 25."""
+    def test_brightness_rises_with_intensity(self) -> None:
+        """A higher intensity never renders dimmer than a lower one."""
         palette = _DEFAULT_PALETTE
-        result = XSQWriter._apply_intensity_brightness(palette, intensity=0.25, effect_name="Fan")
-        assert result.brightness == 25
+        levels = [
+            XSQWriter._apply_intensity_brightness(
+                palette, intensity=i, effect_name="Fan"
+            ).brightness
+            for i in (0.0, 0.15, 0.3, 0.5, 0.7, 0.85, 0.95)
+        ]
+        assert levels == sorted(levels)
+        assert len(set(levels)) == len(levels)
 
     def test_on_effect_skipped(self) -> None:
         """On effects are skipped — they handle intensity via E_ keys."""
@@ -292,10 +298,10 @@ class TestApplyIntensityBrightness:
             brightness=80,  # Already reduced
         )
         result = XSQWriter._apply_intensity_brightness(
-            palette, intensity=0.5, effect_name="Color Wash"
+            palette, intensity=0.2, effect_name="Color Wash"
         )
-        # 80 * 0.5 = 40
-        assert result.brightness == 40
+        # 80 * 0.48 = 38.4
+        assert result.brightness == 38
 
     def test_preserves_other_palette_fields(self) -> None:
         """Non-brightness palette fields are preserved."""
@@ -306,9 +312,9 @@ class TestApplyIntensityBrightness:
             music_sparkles=True,
         )
         result = XSQWriter._apply_intensity_brightness(
-            palette, intensity=0.5, effect_name="Color Wash"
+            palette, intensity=0.2, effect_name="Color Wash"
         )
-        assert result.brightness == 50
+        assert result.brightness == 48
         assert result.sparkle_frequency == 50
         assert result.music_sparkles is True
         assert result.colors == ["#FF0000", "#00FF00"]
@@ -332,9 +338,9 @@ class TestIntensityCoverage:
             "Pictures",
         ]:
             result = XSQWriter._apply_intensity_brightness(
-                palette, intensity=0.5, effect_name=effect_name
+                palette, intensity=0.2, effect_name=effect_name
             )
-            assert result.brightness == 50, f"Failed for {effect_name}"
+            assert result.brightness == 48, f"Failed for {effect_name}"
 
 
 def test_append_preserves_existing_effectdb_and_palette_references() -> None:

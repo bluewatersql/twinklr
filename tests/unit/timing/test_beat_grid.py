@@ -255,3 +255,52 @@ def test_beatgrid_empty_song():
 
     assert beat_grid.total_bars == 1
     assert beat_grid.total_beats == 1
+
+
+class TestExtendedToDuration:
+    """The grid continues past the last detected beat to the end of the song."""
+
+    @staticmethod
+    def _grid(duration_ms: float) -> BeatGrid:
+        beats = [i * 500.0 for i in range(17)]  # 0..8000ms, 4 bars of 4/4 at 120 BPM
+        return BeatGrid(
+            bar_boundaries=[i * 2000.0 for i in range(5)],
+            beat_boundaries=beats,
+            eighth_boundaries=BeatGrid._calculate_eighth_boundaries(beats),
+            sixteenth_boundaries=BeatGrid._calculate_sixteenth_boundaries(beats),
+            tempo_bpm=120.0,
+            beats_per_bar=4,
+            duration_ms=duration_ms,
+        )
+
+    def test_tail_is_filled_at_the_average_beat_duration(self) -> None:
+        extended = self._grid(duration_ms=12_300.0).extended_to_duration()
+
+        assert extended.beat_boundaries[-1] == 12_000.0
+        assert extended.bar_boundaries[-1] == 12_000.0
+        assert extended.beat_boundaries[17:20] == [8500.0, 9000.0, 9500.0]
+
+    def test_detected_boundaries_are_kept_verbatim(self) -> None:
+        grid = self._grid(duration_ms=12_300.0)
+        extended = grid.extended_to_duration()
+
+        assert extended.beat_boundaries[:17] == grid.beat_boundaries
+        assert extended.bar_boundaries[:5] == grid.bar_boundaries
+        assert extended.duration_ms == grid.duration_ms
+
+    def test_bar_downbeats_stay_on_beat_indices(self) -> None:
+        extended = self._grid(duration_ms=12_300.0).extended_to_duration()
+
+        for bar_index, bar_ms in enumerate(extended.bar_boundaries):
+            assert extended.beat_boundaries[bar_index * extended.beats_per_bar] == bar_ms
+
+    def test_subdivisions_follow_the_extended_beats(self) -> None:
+        extended = self._grid(duration_ms=12_300.0).extended_to_duration()
+
+        assert extended.eighth_boundaries[-1] >= 12_000.0
+        assert extended.sixteenth_boundaries[-1] >= 12_000.0
+
+    def test_grid_that_already_reaches_the_end_is_returned_unchanged(self) -> None:
+        grid = self._grid(duration_ms=8_200.0)
+
+        assert grid.extended_to_duration() is grid

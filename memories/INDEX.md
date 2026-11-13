@@ -22,6 +22,7 @@ in `context/`; memories explain why, and what we learned.
 - [coordinated-show-contract.md](decisions/coordinated-show-contract.md) — accepted P3-T5 decisions: one combined command/graph/BeatGrid, concrete-target focal budgets, strict ownership and call/response policy, shared palette projection, safe registry preservation, and the retained P3-T3 catalog edge
 - [unified-xlights-emission-contract.md](decisions/unified-xlights-emission-contract.md) — confirmed P3-T6 decision: display and moving heads share one renderer-neutral xLights emission core; exact rules remain in its specification
 - [p3-t4-live-acceptance-superseded.md](decisions/p3-t4-live-acceptance-superseded.md) — owner decision 2026-11-12: P3-T4 live macro acceptance is closed by the 2026-08 OpenAI and 2026-11-12 Claude live runs; the sealed ledger stays untouched
+- [display-stays-lit.md](decisions/display-stays-lit.md) — owner direction 2026-11-12: every section keeps the display lit; brightness floor, beat grid extended to song end, and a foundation-coverage rule in the group planner
 - [mh-render-matches-pre-cleanup-look.md](decisions/mh-render-matches-pre-cleanup-look.md) — owner direction 2026-11-12: the pre-clean-up moving-head look is the reference; seven clean-up render changes reverted after an old-vs-new comparison in xLights
 
 ## Learnings

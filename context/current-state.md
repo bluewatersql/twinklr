@@ -44,6 +44,9 @@ See [product/overview.md](product/overview.md).
   Moving-head pan, tilt and dimmer output is held to the look the owner accepted before
   the 2026-08 clean-up; seven clean-up render changes were reverted on 2026-11-12
   ([decision](../memories/decisions/mh-render-matches-pre-cleanup-look.md)).
+  Display output keeps every section lit: a brightness floor, a beat grid extended to the
+  end of the song, and a foundation-coverage rule in the group planner
+  ([decision](../memories/decisions/display-stays-lit.md)).
   `packages/twinklr/core/sequencer/`, `packages/twinklr/core/curves/`
 - **xLights delivery and iteration** — self-contained `.xsq`, `.xtiming`, and `.xmap`
   output; a pinned automation client for preview rendering; guarded `inject` and

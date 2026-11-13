@@ -229,6 +229,9 @@ class DisplayRenderStage:
                     "choreo_graph is required (via input, constructor, or context state)",
                     stage_name=self.name,
                 )
+            # Beat detection stops where the music fades; continue the grid so the
+            # last sections render to the end of the audio instead of going dark.
+            beat_grid = beat_grid.extended_to_duration()
             context.add_metric("beat_grid_beats_per_bar", beat_grid.beats_per_bar)
 
             # Build catalog index for overlay rendering
