@@ -2,12 +2,15 @@
 
 `compile_physical_step` turns a template step's explicit physical data into a
 `FixtureSegment` whose channels hold typed trajectories: pan/tilt in degrees, the
-dimmer as a normalized level, the shutter as named states. Motion and pulses are
-evaluated on musical phase from the step start, never on sample-index parity or an
-average tempo. Nothing is clamped: an out-of-range value, a travel rate above the
-configured speed, motion at an unknown speed, a pulse interval shorter than one frame,
-or a shutter change faster than its known latency and settle time is rejected. A
-legacy step is never reinterpreted.
+dimmer as a normalized level, the shutter and color and gobo wheels as named states.
+A named state selects only the byte the profile declares for it
+(`resolve_discrete_state`); a wheel change is one event, never a sweep through the
+states between, and an undeclared state or wheel is rejected, never replaced by open
+or zero. Motion and pulses are evaluated on musical phase from the step start, never
+on sample-index parity or an average tempo. Nothing is clamped: an out-of-range
+value, a travel rate above the configured speed, motion at an unknown speed, a pulse
+interval shorter than one frame, or a shutter change faster than its known latency
+and settle time is rejected. A legacy step is never reinterpreted.
 
 The caller supplies the sample times: the encoder's frame starts, at most one frame
 apart, so the checked values are exactly the commanded ones. The value at each sample
@@ -21,9 +24,14 @@ from collections.abc import Sequence
 from fractions import Fraction
 from itertools import pairwise
 import math
-from typing import TYPE_CHECKING
 
-from twinklr.core.config.fixtures.capabilities import FixtureCapabilities
+from pydantic import BaseModel, ConfigDict, Field
+
+from twinklr.core.config.fixtures.capabilities import (
+    DiscreteCapability,
+    DiscreteName,
+    FixtureCapabilities,
+)
 from twinklr.core.formats.xlights.sequence.fresh import EFFECT_GRID_MS
 from twinklr.core.sequencer.models.context import StepCompileContext
 from twinklr.core.sequencer.models.enum import ChannelName
@@ -53,9 +61,6 @@ from twinklr.core.sequencer.timing.musical_phase import (
     musical_time_at,
 )
 
-if TYPE_CHECKING:
-    from pydantic import BaseModel
-
 _RATE_TOLERANCE = 1e-9
 """Relative slack so float noise on a path exactly at the configured speed passes."""
 
@@ -66,6 +71,22 @@ class PhysicalCompileError(Exception):
     def __init__(self, diagnostic: MHDiagnostic) -> None:
         self.diagnostic = diagnostic
         super().__init__(diagnostic.message)
+
+
+class WheelChange(BaseModel):
+    """A color or gobo wheel selection the transaction pass must mask and let settle."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    fixture_id: str
+    channel: ChannelName
+    t_ms: int
+    from_state: str | None = Field(description="State in force before; None when unknown")
+    to_state: str
+    settle_ms: int | None = Field(description="Declared settle of `to_state`; None when unknown")
+
+
+_WHEELS: dict[ChannelName, DiscreteName] = {ChannelName.COLOR: "color", ChannelName.GOBO: "gobo"}
 
 
 def compile_physical_step(
@@ -83,12 +104,15 @@ def compile_physical_step(
 
     Returns:
         A segment over the step with PAN and TILT (sampled, plus a terminal point at
-        the step end), and DIMMER and SHUTTER when the step declares their pulses. `metadata["phase_origin_ms"]` records the origin.
+        the step end), DIMMER and SHUTTER when the step declares their pulses, and
+        SHUTTER, COLOR and GOBO as one held event when it declares a static state.
+        `metadata["phase_origin_ms"]` records the origin.
 
     Raises:
         PhysicalCompileError: For a legacy step, legacy data on a physical step, or a
             fixture without a physical profile.
-        PhysicalChannelError: For a value, rate or state change the profile cannot honor.
+        PhysicalChannelError: For a value, rate or state change the profile cannot honor,
+            including a state or wheel the profile does not declare.
         ValueError: For invalid sample times or a context without a phase map.
     """
     t0_ms = context.start_ms
@@ -150,7 +174,83 @@ def compile_physical_step(
         _add(segment, ChannelName.SHUTTER, states, profile)
         _check_shutter_timing(context.fixture_id, states, t1_ms, profile)
 
+    # Static named states hold for the whole step. Entering one from the preceding
+    # state (wheel masking and settle) is the transaction pass's work.
+    for channel, state in (
+        (ChannelName.SHUTTER, step.physical_shutter_state),
+        (ChannelName.COLOR, step.physical_color),
+        (ChannelName.GOBO, step.physical_gobo),
+    ):
+        if state is not None:
+            held = DiscreteTrajectory(events=(DiscretePoint(t_ms=t0_ms, state=state),))
+            _add(segment, channel, held, profile)
+
     return segment
+
+
+def resolve_discrete_state(capability: DiscreteCapability, state: str) -> int:
+    """Return the byte the profile declares to select a named state.
+
+    Only the state's declared `value`: never a range bound, a byte between two states,
+    or the open, closed or default state in place of an unknown one.
+
+    Raises:
+        ValueError: If the capability does not declare `state`.
+    """
+    declared = capability.states.get(state)
+    if declared is None:
+        raise ValueError(f"state {state!r} is not one of {sorted(capability.states)}")
+    return declared.value
+
+
+def wheel_changes(
+    segments: Sequence[FixtureSegment], profile: FixtureCapabilities
+) -> tuple[WheelChange, ...]:
+    """List the color and gobo wheel selections across one fixture's ordered segments.
+
+    A selection is reported where a wheel event names a state other than the one in
+    force before it, with the selected state's settle time. `from_state` is None where
+    the preceding state is not known here: before the first segment (the run's initial
+    state) and after a segment that does not author the wheel (the encoder emits the
+    declared default byte there, not a named state). Masking and settle are scheduled
+    by the transaction pass, never by the legacy channel blender.
+
+    Raises:
+        ValueError: If the segments are not one fixture's, in order without overlap, or
+            a wheel channel is not a discrete physical value.
+        PhysicalChannelError: If the profile does not declare a wheel or state.
+    """
+    if len({segment.fixture_id for segment in segments}) > 1:
+        raise ValueError("wheel changes are listed for one fixture at a time")
+    if any(later.t0_ms < earlier.t1_ms for earlier, later in pairwise(segments)):
+        raise ValueError("segments must be in time order without overlap")
+
+    changes: list[WheelChange] = []
+    current: dict[ChannelName, str | None] = dict.fromkeys(_WHEELS)
+    for segment in segments:
+        for channel, key in _WHEELS.items():
+            value = segment.channels.get(channel)
+            if value is None:
+                current[channel] = None
+                continue
+            if not isinstance(value.physical, DiscreteTrajectory):
+                raise ValueError(f"{channel.value} is not a discrete physical value")
+            check_physical_value(segment.fixture_id, channel, value.physical, profile)
+            for event in value.physical.events:
+                if event.state == current[channel]:
+                    continue
+                changes.append(
+                    WheelChange(
+                        fixture_id=segment.fixture_id,
+                        channel=channel,
+                        t_ms=event.t_ms,
+                        from_state=current[channel],
+                        to_state=event.state,
+                        settle_ms=profile.discrete[key].states[event.state].settle_ms,
+                    )
+                )
+                current[channel] = event.state
+    return tuple(sorted(changes, key=lambda change: change.t_ms))
 
 
 def slice_physical_segment(segment: FixtureSegment, start_ms: int, end_ms: int) -> FixtureSegment:

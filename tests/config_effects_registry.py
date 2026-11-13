@@ -2729,6 +2729,19 @@ CONFIG_EFFECTS["template.template.steps.movement.physical.shape"] = ConfigDispos
     "each kernel shapes the compiled path",
 )
 
+# P1.4 physical discrete template fields: named shutter, color and gobo states held
+# for a step. Like P1.2's, they feed only the opt-in physical compile; each exact
+# path selects another declared state and must change `compile_physical_step`'s
+# result, so a compile that ignored the field fails its case.
+for _field in ("physical_shutter_state", "physical_color", "physical_gobo"):
+    _physical_template_path = f"template.template.steps.{_field}"
+    CONFIG_EFFECTS[_physical_template_path] = ConfigDisposition(
+        ConfigDispositionKind.EFFECT_TEST,
+        "tests/unit/sequencer/moving_heads/compile/test_physical_discrete.py::"
+        f"test_physical_discrete_field_changes_compile[{_physical_template_path}]",
+        _PHYSICAL_TEMPLATE_COMPILED,
+    )
+
 # Exact App/Job discriminators. These overrides prevent stale generic smoke-test
 # pointers from re-entering the accountable ledger.
 for _root_path in ("app.project_root", "app.cache_dir"):

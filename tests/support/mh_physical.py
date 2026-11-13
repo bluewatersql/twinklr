@@ -88,6 +88,65 @@ def motion_profile_payload() -> dict[str, Any]:
     return payload
 
 
+def discrete_profile_payload() -> dict[str, Any]:
+    """`motion_profile_payload` with the shutter on channel 17 and color and gobo wheels.
+
+    Closed is byte 64 and open byte 8, inside ranges whose bounds are not the selected
+    bytes; each wheel has a state between its first and last selected bytes.
+    """
+    payload = motion_profile_payload()
+    payload["footprint"] = 18
+    payload["defaults"] = {
+        **payload["defaults"],
+        **dict.fromkeys(range(9, 17), 0),
+        17: 64,
+        18: 0,
+    }
+    payload["discrete"]["shutter"].update(
+        offset=17,
+        states={
+            "closed": {"range_min": 60, "range_max": 95, "value": 64, "settle_ms": 0},
+            "open": {"range_min": 0, "range_max": 31, "value": 8, "settle_ms": 0},
+        },
+    )
+    payload["discrete"]["color"]["states"] = {
+        "white": {"range_min": 0, "range_max": 9, "value": 0, "settle_ms": 120},
+        "red": {"range_min": 10, "range_max": 19, "value": 14, "settle_ms": 120},
+        "blue": {"range_min": 20, "range_max": 29, "value": 26, "settle_ms": 140},
+    }
+    payload["discrete"]["gobo"] = {
+        "offset": 18,
+        "states": {
+            "open": {"range_min": 0, "range_max": 7, "value": 0, "settle_ms": 150},
+            "dots": {"range_min": 8, "range_max": 15, "value": 10, "settle_ms": 150},
+            "star": {"range_min": 16, "range_max": 23, "value": 20, "settle_ms": 160},
+        },
+        "default_state": "open",
+    }
+    return payload
+
+
+def discrete_step_payload() -> dict[str, Any]:
+    """A physical step holding its pose with static shutter, color and gobo states."""
+    return {
+        "step_id": "look",
+        "timing": {"base_timing": {"start_offset_bars": 0, "duration_bars": 0.5}},
+        "geometry": {},
+        "movement": {
+            "physical": {
+                "shape": "hold",
+                "mode": "periodic",
+                "start_pan_deg": 0.0,
+                "start_tilt_deg": 0.0,
+            }
+        },
+        "dimmer": {},
+        "physical_shutter_state": "open",
+        "physical_color": "white",
+        "physical_gobo": "open",
+    }
+
+
 def physical_step_payload() -> dict[str, Any]:
     """A physical-only template step: finite linear pan/tilt plus dimmer and shutter pulses."""
     return {

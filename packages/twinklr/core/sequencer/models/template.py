@@ -4,7 +4,7 @@ This module defines all template-related models:
 - Timing models: BaseTiming, PhaseOffset, RepeatContract
 - Step components: Geometry, Movement, Dimmer, StepTiming, TemplateStep
 - Physical renderer step data: PhysicalMovementSpec, PhysicalPulseSpec and its
-  dimmer and shutter forms
+  dimmer and shutter forms, and named shutter, color and gobo states
 - Template structure: Template, TemplatePreset, TemplateDoc
 
 These models define how choreography is structured and executed.
@@ -416,6 +416,17 @@ class TemplateStep(BaseModel):
     physical_shutter: PhysicalShutterPulse | None = Field(
         default=None, exclude_if=lambda value: value is None
     )
+    # Physical renderer only; left out of dumps when absent. Named profile states held
+    # for the whole step, never a byte. A static shutter excludes the pulse form.
+    physical_shutter_state: str | None = Field(
+        default=None, min_length=1, exclude_if=lambda value: value is None
+    )
+    physical_color: str | None = Field(
+        default=None, min_length=1, exclude_if=lambda value: value is None
+    )
+    physical_gobo: str | None = Field(
+        default=None, min_length=1, exclude_if=lambda value: value is None
+    )
 
     @property
     def has_physical_data(self) -> bool:
@@ -424,7 +435,16 @@ class TemplateStep(BaseModel):
             self.movement.physical is not None
             or self.dimmer.physical is not None
             or self.physical_shutter is not None
+            or self.physical_shutter_state is not None
+            or self.physical_color is not None
+            or self.physical_gobo is not None
         )
+
+    @model_validator(mode="after")
+    def _validate_physical_shutter(self) -> "TemplateStep":
+        if self.physical_shutter is not None and self.physical_shutter_state is not None:
+            raise ValueError("set physical_shutter_state or physical_shutter, not both")
+        return self
 
     @model_validator(mode="before")
     @classmethod
