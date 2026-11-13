@@ -39,6 +39,50 @@ Pinned xLights [`DMXEffect.h`](https://github.com/xLightsSequencer/xLights/blob/
 
 The implementing workstream owns the files listed in these tasks; shared changes to `config/models.py`, `models/template.py`, `models/context.py`, `pipeline.py`, and export adapters are serialized by the integrator. No parallel edit ownership is implied.
 
+### P1.0 — Reject an unrenderable physical job at job load
+
+Added 2026-11-13 by owner direction at Phase 1 kickoff ("Add physical_v2 at job load
+to phase 1 work"). After Phase 0 a `physical_v2` job validates and is refused only when
+`RenderingPipeline` is constructed, after audio analysis and planning have already
+spent provider calls.
+
+**Files:** Modify `packages/twinklr/core/config/loader.py`, `config/models.py` and
+`sequencer/moving_heads/pipeline.py`; modify whichever entry points build a `JobConfig`
+without the loader, as found by the task. Test `tests/unit/config/test_mh_render_policy.py`
+(extend) and the loader's existing test module.
+
+**Interfaces:** `preflight_render_policy(job_config: JobConfig, fixture_group: FixtureGroup | None = None) -> None`
+in the `config` package raises `UnsupportedRenderModeError` when the job selects a mode
+the installed renderer cannot honor. `UnsupportedRenderModeError` moves to the `config`
+package (it must not import the sequencer) and stays importable from
+`sequencer.moving_heads.pipeline`. `load_job_config` and `load_full_config` call the
+preflight, so every CLI path that loads a job fails before audio analysis or any
+provider request. `JobConfig` itself still validates a `3.1`/`physical_v2` document:
+construction in tests and tools stays possible; the refusal belongs to loading a job
+for execution. The pipeline constructor keeps its own check as the last line of defense
+for callers that build a `JobConfig` in code.
+
+P1.6 does not delete this preflight when real dispatch lands; it narrows it. From P1.6
+on, `physical_v2` at load is refused when a prerequisite the renderer needs is absent
+and knowable from configuration alone: a fixture without `physical_profile`, a profile
+the backend cannot address (footprint or offset above 48), or an unsupported model
+mode. Missing initial state stays a render-time diagnostic because a cue at time zero
+is what makes it an error. The message names each failing fixture and field.
+
+- [ ] Write `test_loading_physical_job_is_rejected_before_execution` (a `3.1`
+  `physical_v2` file fails in `load_job_config` and `load_full_config` with
+  `UnsupportedRenderModeError` naming the mode and the remedy),
+  `test_physical_job_model_still_validates` and
+  `test_legacy_and_omitted_policy_load_unchanged`. Add one test per entry point found
+  that builds a job without the loader.
+- [ ] Run `uv run pytest tests/unit/config -q`; expect the new tests to fail.
+- [ ] Implement; repoint the `job.moving_heads.mode` registry record if its evidence
+  node moves; correct the `mode` field description and the `docs/user-guide.md` row
+  that says where the rejection happens.
+- [ ] Rerun `uv run pytest tests/unit/config tests/unit/agents/sequencer/moving_heads/test_rendering_stage.py -q`.
+
+- [ ] After independent task review, integrator commits `feat(mh): reject an unrenderable physical job at load, before planning`.
+
 ### P1.1 — Capability and typed physical-value contracts
 
 **Files:** Create `packages/twinklr/core/config/fixtures/capabilities.py` and `packages/twinklr/core/sequencer/models/moving_heads/physical.py`. Modify `config/models.py`, `config/fixtures/instances.py`, `sequencer/moving_heads/channels/state.py`, `sequencer/models/context.py`, `sequencer/moving_heads/fixture_builder.py`. Test `tests/unit/config/test_mh_capabilities.py` and `tests/unit/sequencer/moving_heads/test_physical_values.py` (new).
