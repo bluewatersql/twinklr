@@ -11,6 +11,7 @@ from urllib.parse import urlsplit
 
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator, model_validator
 
+from twinklr.core.config.fixtures.capabilities import InitialFixtureState
 from twinklr.core.curves.library import CurveLibrary
 from twinklr.core.formats.xlights.sequence.timeline import TimelineTracksConfig
 from twinklr.core.sequencer.models.enum import TransitionMode
@@ -643,6 +644,15 @@ class MHRenderPolicy(BaseModel):
         description=(
             "Moving-head renderer. `physical_v2` requires schema_version 3.1 and is "
             "rejected until the physical renderer ships."
+        ),
+    )
+    # Left out of dumps when empty so legacy render fingerprints are unchanged.
+    initial_states: dict[str, InitialFixtureState] = Field(
+        default_factory=dict,
+        exclude_if=lambda value: not value,
+        description=(
+            "Run-supplied time-zero state per fixture id for the physical renderer. A "
+            "fixture without an entry has an unknown initial state."
         ),
     )
 

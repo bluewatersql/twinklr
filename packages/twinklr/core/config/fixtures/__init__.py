@@ -15,10 +15,20 @@ This package is organized into focused modules:
 - physical: Physical movement and orientation
 - instances: Fixture instances, configurations, and poses
 - groups: Fixture grouping and batch configuration
+- capabilities: Explicit physical-renderer profiles and run initial state
 """
 
 from __future__ import annotations
 
+# Capabilities module exports
+from twinklr.core.config.fixtures.capabilities import (
+    AxisCapability,
+    DiscreteCapability,
+    DiscreteState,
+    FixtureCapabilities,
+    InitialFixtureState,
+    VisibilityCapability,
+)
 from twinklr.core.config.fixtures.dmx import (
     ChannelInversions,
     ChannelWithConfig,
@@ -50,18 +60,24 @@ from twinklr.core.config.fixtures.physical import (
 )
 
 __all__ = [
+    # Capabilities
+    "AxisCapability",
     # Groups
     "BaseFixtureConfig",
     # DMX
     "ChannelInversions",
     "ChannelWithConfig",
+    "DiscreteCapability",
+    "DiscreteState",
     "DmxMapping",
+    "FixtureCapabilities",
     # Instances
     "FixtureConfig",
     "FixtureGroup",
     "FixtureGroupBuilder",
     "FixtureInstance",
     "FixturePosition",
+    "InitialFixtureState",
     # Physical
     "MovementLimits",
     "Orientation",
@@ -69,4 +85,5 @@ __all__ = [
     "Pose",
     "ShutterMap",
     "SimplifiedFixtureInstance",
+    "VisibilityCapability",
 ]

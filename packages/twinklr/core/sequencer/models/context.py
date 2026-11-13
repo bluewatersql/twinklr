@@ -2,6 +2,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from twinklr.core.config.fixtures.capabilities import FixtureCapabilities
 from twinklr.core.curves.registry import CurveRegistry
 from twinklr.core.sequencer.models.enum import Intensity
 from twinklr.core.sequencer.moving_heads.handlers.registry import (
@@ -63,6 +64,7 @@ class FixtureContext(BaseModel):
         fixture_id: Unique identifier for the fixture.
         role: Role assigned to this fixture (e.g., "FRONT_LEFT").
         calibration: Fixture calibration data.
+        physical_profile: Explicit capabilities for the physical renderer, if declared.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -70,6 +72,7 @@ class FixtureContext(BaseModel):
     fixture_id: str
     role: str
     calibration: dict[str, Any] = Field(default_factory=dict)
+    physical_profile: FixtureCapabilities | None = None
 
 
 class StepCompileContext(BaseModel):

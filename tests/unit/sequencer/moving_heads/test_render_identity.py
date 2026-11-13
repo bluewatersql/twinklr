@@ -13,6 +13,7 @@ from pydantic import BaseModel
 import pytest
 
 from tests.golden.harness import RIGS, build_beat_grid, build_fixture_group, build_plan
+from tests.support.mh_physical import initial_state_payload, profile_payload
 from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan, PlanSection
 from twinklr.core.config.fixtures import FixtureGroup
 from twinklr.core.config.models import JobConfig, MHRenderPolicy, TransitionConfig
@@ -139,6 +140,22 @@ def test_fixture_order_changes_the_hash() -> None:
 
 def test_policy_changes_the_hash() -> None:
     assert _fingerprint(policy=MHRenderPolicy(mode="physical_v2")) != _fingerprint()
+
+
+def test_physical_profile_and_initial_states_change_the_hash() -> None:
+    """Explicit physical inputs are functional; their absence leaves legacy dumps as-is."""
+    fixtures = build_fixture_group(RIGS["mh4_minimal"])
+    policy = MHRenderPolicy()
+    assert "physical_profile" not in fixtures.model_dump(mode="json")["fixtures"][0]["config"]
+    assert "initial_states" not in policy.model_dump(mode="json")
+
+    payload = fixtures.model_dump(mode="python")
+    payload["fixtures"][0]["config"]["physical_profile"] = profile_payload()
+    profiled = FixtureGroup.model_validate(payload)
+    started = MHRenderPolicy.model_validate({"initial_states": {"MH1": initial_state_payload()}})
+
+    assert _fingerprint(fixtures=profiled) != _fingerprint()
+    assert _fingerprint(policy=started) != _fingerprint()
 
 
 def test_beat_grid_changes_the_hash() -> None:

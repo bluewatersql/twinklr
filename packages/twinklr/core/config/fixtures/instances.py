@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from twinklr.core.config.fixtures.capabilities import FixtureCapabilities
 from twinklr.core.config.fixtures.dmx import ChannelInversions, DmxMapping
 from twinklr.core.config.fixtures.physical import (
     MovementLimits,
@@ -110,6 +111,17 @@ class FixtureConfig(BaseModel):
     # Position (optional - for fixtures with physical offsets)
     position: FixturePosition | None = Field(
         default=None, description="Physical mounting position and offsets"
+    )
+
+    # Physical renderer profile (optional). Left out of dumps when absent so legacy
+    # render fingerprints are unchanged.
+    physical_profile: FixtureCapabilities | None = Field(
+        default=None,
+        exclude_if=lambda value: value is None,
+        description=(
+            "Explicit capabilities for the physical_v2 renderer; nothing renders from it "
+            "until that renderer ships"
+        ),
     )
 
     @model_validator(mode="before")

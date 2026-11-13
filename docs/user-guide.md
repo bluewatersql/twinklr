@@ -257,6 +257,7 @@ The same registry-backed subset policy applies here.
 | `transitions.default_duration_bars` | `0.5` | Sets the fallback transition length | `job.transitions.default_duration_bars` |
 | `timeline_tracks.sections` | `true` | Includes or omits section timing markers | `job.timeline_tracks.sections` |
 | `moving_heads.mode` | `"legacy_v1"` | Selects the moving-head renderer. `"physical_v2"` needs schema `"3.1"` and is rejected before rendering until the physical renderer ships | `job.moving_heads.mode` |
+| `moving_heads.initial_states` | `{}` | Run-supplied time-zero state per fixture id (unwrapped `pan_deg`/`tilt_deg`, `dimmer`, `discrete_states`, and explicit `settled`/`dark` evidence) for the physical renderer. A fixture without an entry has an unknown initial state. Enters render identity; nothing renders from it until `physical_v2` ships | `job.moving_heads.initial_states` |
 
 The planner schema may describe up to four narrative assets (`maxItems=4`), but the
 enabled live path authorizes only one image-provider request and reports the rest as
@@ -310,8 +311,11 @@ Defines the physical moving head fixtures — names, DMX channels, and positions
 
 Each fixture's `dmx_mapping` also declares the value the render exports for that channel when the choreography never writes to it: `shutter_default` (0-255, defaults to `255` — open), and `color_map`/`gobo_map`'s `"open"` entry for color and gobo. A channel the mapping does not declare at all (e.g. `shutter_channel: null`) is omitted from the exported settings string rather than defaulted.
 
-_Source: `packages/twinklr/cli/main.py` (`_resolve_fixture_config_path`) and
-`packages/twinklr/core/config/fixtures/dmx.py` (`DmxMapping`)_
+A fixture's `config` may also carry an optional `physical_profile` for the opt-in `physical_v2` renderer; in the `base_config` form, `base_config.physical_profile` applies to every fixture and a fixture's `config_overrides.physical_profile` replaces it for that fixture. An invalid profile fails when the fixture file loads, naming the fixture. **Nothing renders from it until `physical_v2` ships**; the legacy renderer ignores it and refuses a physical channel value rather than exporting nothing. It declares the fixture explicitly rather than inferring anything from the legacy fields above: `profile_id`, `provenance` (`synthetic`, `manufacturer` or `measured`), the model-relative channel `footprint` (at most 48, the xLights DMX effect's limit) with a default byte for every channel `1..footprint`, continuous `axes` (`pan`/`tilt` in degrees, `dimmer` normalized) with calibrated `physical_min`/`physical_max`, an optional narrower `allowed_min`/`allowed_max` operating window that does not rescale the mapping, coarse/fine offsets and inversion, `discrete` shutter/color/gobo channels whose named states each select one explicit byte inside a declared, non-overlapping range, and `visibility` (what extinguishes output, and close/open latency). A profile cannot claim darkness it cannot produce: the shutter's `open_state` cannot extinguish, and `dimmer_zero_extinguishes` needs a dimmer axis calibrated from `0` whose operating window admits `0`. Normalized axes lie within `0..1`. Unknown speed, latency and settle times stay `null`; they are never filled in. A profile does not say where a fixture is now; that is `moving_heads.initial_states` in the job config. The retired `capabilities` and `movement_speed` keys stay ignored.
+
+_Source: `packages/twinklr/cli/main.py` (`_resolve_fixture_config_path`),
+`packages/twinklr/core/config/fixtures/dmx.py` (`DmxMapping`) and
+`packages/twinklr/core/config/fixtures/capabilities.py` (`FixtureCapabilities`)_
 
 ---
 

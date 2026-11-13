@@ -2566,6 +2566,79 @@ for _fixture_path, _fixture_disposition in tuple(CONFIG_EFFECTS.items()):
             "exact path changes expansion, rig, conversion, wheel-handler, or DMX export behavior",
         )
 
+# Physical-profile and run initial-state fields feed only the opt-in physical renderer,
+# so by design they cannot change the legacy-output snapshot above. Registered after
+# that loop, each exact path mutates its field and must change the one component of
+# the physical contract its note names. "Identity only" paths have no consumer yet
+# beyond the render fingerprint; the task that adds one repoints them.
+_PHYSICAL_REJECTED = "exact path's alternative values are rejected by validation"
+_PHYSICAL_WORDS = "exact path changes the encoded DMX word"
+_PHYSICAL_CHECK = "exact path changes the initial-state check"
+_PHYSICAL_IDENTITY_ONLY = "identity only; consumer lands in P1.3–P1.5"
+_PHYSICAL_PROFILE_FIELDS = {
+    "": _PHYSICAL_WORDS,
+    "schema_version": _PHYSICAL_REJECTED,
+    "profile_id": _PHYSICAL_IDENTITY_ONLY,
+    "provenance": _PHYSICAL_IDENTITY_ONLY,
+    "footprint": _PHYSICAL_IDENTITY_ONLY,
+    "defaults": _PHYSICAL_IDENTITY_ONLY,
+    "axes": _PHYSICAL_WORDS,
+    "axes.unit": _PHYSICAL_REJECTED,
+    "axes.physical_min": _PHYSICAL_WORDS,
+    "axes.physical_max": _PHYSICAL_WORDS,
+    "axes.allowed_min": _PHYSICAL_WORDS,
+    "axes.allowed_max": _PHYSICAL_WORDS,
+    "axes.coarse_offset": _PHYSICAL_IDENTITY_ONLY,
+    "axes.fine_offset": _PHYSICAL_WORDS,
+    "axes.inverted": _PHYSICAL_WORDS,
+    "axes.travel_speed_per_s": _PHYSICAL_IDENTITY_ONLY,
+    "axes.latency_ms": _PHYSICAL_IDENTITY_ONLY,
+    "axes.settle_ms": _PHYSICAL_IDENTITY_ONLY,
+    "discrete": _PHYSICAL_CHECK,
+    "discrete.offset": _PHYSICAL_IDENTITY_ONLY,
+    "discrete.states": _PHYSICAL_CHECK,
+    "discrete.states.range_min": _PHYSICAL_IDENTITY_ONLY,
+    "discrete.states.range_max": _PHYSICAL_IDENTITY_ONLY,
+    "discrete.states.value": _PHYSICAL_IDENTITY_ONLY,
+    "discrete.states.settle_ms": _PHYSICAL_IDENTITY_ONLY,
+    "discrete.default_state": _PHYSICAL_IDENTITY_ONLY,
+    "discrete.closed_state": _PHYSICAL_IDENTITY_ONLY,
+    "discrete.open_state": _PHYSICAL_IDENTITY_ONLY,
+    "visibility": _PHYSICAL_IDENTITY_ONLY,
+    "visibility.dimmer_zero_extinguishes": _PHYSICAL_IDENTITY_ONLY,
+    "visibility.extinguishing_shutter_states": _PHYSICAL_IDENTITY_ONLY,
+    "visibility.close_latency_ms": _PHYSICAL_IDENTITY_ONLY,
+    "visibility.open_latency_ms": _PHYSICAL_IDENTITY_ONLY,
+}
+for _profile_root in (
+    "fixture.fixtures[FixtureInstance].config.physical_profile",
+    "fixture.base_config.physical_profile",
+):
+    for _field, _note in _PHYSICAL_PROFILE_FIELDS.items():
+        _physical_path = f"{_profile_root}.{_field}" if _field else _profile_root
+        CONFIG_EFFECTS[_physical_path] = ConfigDisposition(
+            ConfigDispositionKind.EFFECT_TEST,
+            "tests/unit/config/test_mh_capabilities.py::"
+            f"test_physical_profile_field_changes_contract[{_physical_path}]",
+            _note,
+        )
+for _field, _note in {
+    "": _PHYSICAL_CHECK,
+    "pan_deg": _PHYSICAL_CHECK,
+    "tilt_deg": _PHYSICAL_CHECK,
+    "dimmer": _PHYSICAL_CHECK,
+    "discrete_states": _PHYSICAL_CHECK,
+    "settled": _PHYSICAL_IDENTITY_ONLY,
+    "dark": _PHYSICAL_IDENTITY_ONLY,
+}.items():
+    _initial_state_path = "job.moving_heads.initial_states" + (f".{_field}" if _field else "")
+    CONFIG_EFFECTS[_initial_state_path] = ConfigDisposition(
+        ConfigDispositionKind.EFFECT_TEST,
+        "tests/unit/config/test_mh_capabilities.py::"
+        f"test_initial_state_field_changes_contract[{_initial_state_path}]",
+        _note,
+    )
+
 _TEMPLATE_REGISTRATION_PATHS = {
     "template.enabled",
     "template.template",

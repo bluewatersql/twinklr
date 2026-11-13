@@ -16,6 +16,7 @@ if TYPE_CHECKING:
 from twinklr.core.config.adapter import get_max_channel
 from twinklr.core.curves.models import CurvePoint
 from twinklr.core.sequencer.models.enum import ChannelName
+from twinklr.core.sequencer.models.moving_heads.physical import PhysicalChannelError
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +55,13 @@ class DmxSettingsBuilder:
         channel_curves: dict[int, list[CurvePoint]] = {}
 
         for channel_name, channel_value in segment.channels.items():
+            if channel_value.physical is not None:
+                raise PhysicalChannelError(
+                    fixture_id=segment.fixture_id,
+                    channel=channel_name,
+                    time_ms=segment.t0_ms,
+                    reason="the legacy DMX exporter cannot encode a physical value",
+                )
             self._extract_channel_data(channel_name, channel_value, channel_values, channel_curves)
 
         # Determine the emitted window from the fixture's real channel count, not from
