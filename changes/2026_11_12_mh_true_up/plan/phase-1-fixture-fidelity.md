@@ -243,6 +243,43 @@ Added 2026-11-13 from a recheck at `f067a56`; see the
   physical path and its 1–48 model-relative range there, keeping verbatim the two
   sentences `test_documented_channel_scope.py` pins.
 
+## Decisions and carry-forwards recorded during execution
+
+P1.0 and P1.1, 2026-11-13 (each reviewed separately from its author; gate on `879097f`:
+6023 passed, 39 skipped):
+
+- **How physical-only fields are evidenced (P1.1's decision).** Not added to
+  `PROTECTED_EXACT_EFFECT_PATHS`, which is pinned exactly. Each path is an
+  `EFFECT_TEST` record pointing at a parameterized case in
+  `tests/unit/config/test_mh_capabilities.py` that names the one component its change
+  must alter: `rejected`, `words` (the encoded DMX word), `check` (the initial-state
+  check) or `fingerprint`. Paths nothing consumes yet carry the note "identity only;
+  consumer lands in P1.3–P1.5". **Each later task repoints the identity-only paths it
+  starts consuming** to a test of that consumption.
+- **Profile placement.** `physical_profile` is accepted on a fixture's `config` and on a
+  group's `base_config` (propagated to every expanded fixture; a
+  `config_overrides.physical_profile` wins and is typed). An invalid profile fails at
+  group validation naming the fixture.
+- **Stricter than the plan text.** Overlapping discrete-state ranges are rejected;
+  contradictory darkness claims are rejected (open state listed as extinguishing,
+  dimmer-zero darkness without a dimmer calibrated from 0, a normalized axis outside
+  0..1); a physical `ChannelValue` rejects a non-default blend mode; the legacy
+  exporter and transition compiler raise on a physical value instead of dropping it.
+- **Exact encoding.** `AxisCapability.dmx_word()` computes in exact rational arithmetic
+  and rounds half up. P1.3 reuses it and does not reimplement the mapping.
+- **Dependency floor.** `pydantic>=2.12`: the new fields use `exclude_if` to stay out
+  of legacy dumps, and older versions ignore it, which would change every legacy
+  fingerprint.
+- **Unknowns.** Axis `latency_ms`/`settle_ms` and visibility latencies are `None` when
+  unknown, never zero. `InitialFixtureState` needs a full pose; a fixture with a
+  partly known state is left out of `initial_states` and is therefore unknown.
+- **Carried to P1.5.** An initial state that declares `dark=True` alongside a nonzero
+  dimmer or an open shutter is accepted today; P1.5 decides and tests it.
+- **Carried to P1.6.** `docs/overview.md` update; fixture-aware load-time preflight
+  call site; whether `twinklr display` should refuse a physical job.
+- **Open, low.** The `rejected` evidence cases assert only that validation fails, not
+  that it fails on the mutated field. Frozen capability models hold mutable dicts.
+
 ## Phase exit
 
 All task tests and `make validate` pass; 16-bit frames reconstruct correctly across carries; supported offsets are 1–48; v2 limits/discrete values/phase/initial state work as declared; insufficient or unknown travel never reports feasible; optical darkness covers travel and settle; legacy regression output is unchanged. Source/offline proof and authorized xLights proof are recorded separately. Hardware accuracy and aesthetic acceptance remain pending until observed, not inferred from the profile's provenance.
