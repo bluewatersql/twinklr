@@ -1,6 +1,6 @@
 ---
 type: plan
-status: proposed
+status: complete
 area: engineering
 created: 2026-11-12
 updated: 2026-11-13
@@ -89,9 +89,15 @@ an explicit unsupported-mode exception before rendering, never silently falling 
 The rejection lives at the top of `RenderingPipeline.__init__`, before any template
 load or output path is touched, and raises a new `UnsupportedRenderModeError(ValueError)`
 defined in `pipeline.py` beside the existing pattern of
-`UnsupportedRigShapeError(ValueError)` in the template compiler. All three constructors
-of the pipeline (`rendering_stage.py`, `pipeline/show_stages.py`,
-`reporting/evaluation/rerender.py`) pass `job_config`, so one check covers them.
+`UnsupportedRigShapeError(ValueError)` in the template compiler. The two
+production render paths (`rendering_stage.py`, `pipeline/show_stages.py`) pass the
+job's own config, so one check covers them. The third constructor,
+`reporting/evaluation/rerender.py`, builds a fresh default `JobConfig` and is therefore
+always `legacy_v1`; P0 leaves it alone, and
+[P1](phase-1-fixture-fidelity.md#documentation-registry-and-existing-test-updates)
+owns making it honor or reject the job's render policy. A `physical_v2` job passes
+config validation and is rejected at render, after planning; that ordering is as
+designed for P0 and is recorded in the handoff for the owner.
 `MovingHeadRenderingStage` wraps render failures in a broad `except Exception`; T1
 adds `test_unsupported_render_mode_fails_the_stage` to the existing
 `test_rendering_stage.py`, asserting the stage reports a failure that names the mode
@@ -145,11 +151,11 @@ the same commit if they disagree.
 
 | `control` | Starting predicate | Source | Pinned today by |
 |---|---|---|---|
-| `pan_tilt_fine` | A fixture's `DmxMapping` sets `use_16bit_pan_tilt` with a fine channel mapped | `export/dmx_settings_builder.py` emits the fine channel's inversion flag but no fine-channel values | The flag's effect on emitted settings is pinned by `test_dmx_settings_builder.py::test_inversions_and_16bit_flag_change_emitted_settings`. Nothing pins the absence of fine values; T2's test is the first to do so |
-| `movement_intensity` | A section or preset resolves a movement intensity other than `SMOOTH` and the template step's movement params carry no `intensity` key | `handlers/movement/default.py` replaces the argument with `params.get("intensity", SMOOTH)` | `tests/unit/sequencer/moving_heads/test_movement_intensity.py::test_intensity_argument_does_not_change_the_movement` |
-| `movement_limits` | A fixture's `MovementLimits` differ from the model defaults and the section's template has dynamic movement | Dynamic excursion is bounded to normalized 0–1, not the window | `tests/golden/test_movement_ignores_calibrated_range.py` |
-| `template_dimmer_floor` | A selected template declares a dimmer floor above the minimum its own dimmer steps reach | The floor survives as metadata only | `tests/golden/test_dimmer_template_floor_not_applied.py` |
-| `shutter_channel_scope` | The plan or template carries shutter intent and the fixture maps shutter above channel 16 | Intent is dropped with a trace; the declared default is still emitted | `tests/golden/test_shutter_channel_emission.py::test_shutter_channel_17_emits_its_declared_default` |
+| `pan_tilt_fine` | A fixture's `DmxMapping` sets `use_16bit_pan_tilt` with a fine channel mapped | `export/dmx_settings_builder.py` emits the fine channel's inversion flag but no fine-channel values | The flag's effect on emitted settings is pinned by `test_dmx_settings_builder.py::test_inversions_and_16bit_flag_change_emitted_settings`; the absence of fine values by T2's `test_control_diagnostics.py::TestPanTiltFine::test_legacy_output_carries_no_fine_channel_value` |
+| `movement_intensity` | A resolved template step's movement intensity (from the template itself, its preset, an energy-named preset id, or section intent) differs from the step's `params["intensity"]`, which is `SMOOTH` when the key is absent. A step whose pattern holds both axes is exempt: it renders the same curve at every intensity | `handlers/movement/default.py` replaces the argument with `params.get("intensity", SMOOTH)` | `tests/unit/sequencer/moving_heads/test_movement_intensity.py::test_intensity_argument_does_not_change_the_movement` |
+| `movement_limits` | A fixture's pan/tilt window (`pan_min`, `pan_max`, `tilt_min`, `tilt_max`) differs from the `MovementLimits` defaults; reported once per fixture, with no section condition | Excursion is bounded to normalized 0–1, not the window. Hold-only movement leaves the window too: most geometry handlers ignore the calibration (only chevron and scattered clamp their base pose, and the excursion around it is still unbounded) | `tests/golden/test_movement_ignores_calibrated_range.py`; the hold-only case by T2's `test_control_diagnostics.py::TestMovementLimits::test_static_movement_also_leaves_the_window` |
+| `template_dimmer_floor` | A selected template, after its preset and section intensity are applied, declares a dimmer floor above the lower bound of its own dimmer steps' range (non-blackout steps, by the dimmer handler's own arithmetic). Whether a render reaches that bound depends on the curve and its length, so the diagnostic states the range and that the floor is not applied, never a reached value | The floor survives as metadata only | `tests/golden/test_dimmer_template_floor_not_applied.py` |
+| `shutter_channel_scope` | The section carries shutter events (unless its legacy intent is omitted) or a resolved template step has a shutter axis, the fixture is one those steps target (resolved as the template compiler resolves step targets), and it maps shutter above channel 16 | Intent is dropped with a trace; the declared default is still emitted | `tests/golden/test_shutter_channel_emission.py::test_shutter_channel_17_emits_its_declared_default` |
 
 For `shutter_channel_scope` the diagnostic distinguishes the two facts the golden
 pins: shutter *intent* above 16 is ignored, while the channel's declared *default*
@@ -163,13 +169,16 @@ produces none.
 
 `identity.py` owns `render_fingerprint(*, plan: BaseModel, beat_grid: BeatGrid,
 fixtures: FixtureGroup, templates: Sequence[TemplateDoc], policy: MHRenderPolicy,
-backend_id: str, renderer_revision: str, seed: int | None=None,
-phase_map: BaseModel | None=None) -> str`. The optional phase map is P1's typed boundary
+transitions: TransitionConfig, backend_id: str, renderer_revision: str,
+seed: int | None=None, phase_map: BaseModel | None=None) -> str`. The optional phase map is P1's typed boundary
 map; P0 accepts a BaseModel to avoid depending on a future implementation. Hash canonical JSON of functional
 inputs, including template content, not just IDs. Include the 20 ms grid and emitted
 version stamp, read from `EFFECT_GRID_MS` and `XLIGHTS_VERSION_STAMP` in
 `formats/xlights/sequence/fresh.py` rather than restated. Treat diagnostic wording/output paths as nonfunctional; motion/profile,
-ordering, seed and preset changes are functional. Legacy artifacts need no new cache
+ordering, seed and preset changes are functional. Transition settings are functional
+because they change the emitted segments. A plan's spelling of a template id is not:
+the registry resolves case, separators, display names and aliases to one template, so
+the payload carries the canonical id. Legacy artifacts need no new cache
 read path; record the fingerprint in the new research/physical manifests first.
 
 `identity.py` also defines the two legacy constants callers pass for the current
@@ -219,10 +228,20 @@ column. Input-only data is held as plain typed values (ints, floats, strings, tu
 in a `physical_inputs` mapping; P0 imports no P1 type, and P1 converts these values
 into its own models when it adopts a case.
 
+As implemented (reviewed 2026-11-13): the case holds `fixture_groups`, a tuple, because
+`counts` needs one rig per head count and every other case has exactly one; `plan` is
+`None` for the input-only `state` and `locks` cases, because a plan section cannot
+exist without a template and naming one for a case that never renders would be a
+placeholder; and the recorded legacy outcome per rig is stored on the case as
+`legacy_outcomes`, which the pipeline test checks against real output.
+
 Build coarse-only fixtures with the harness's `RigSpec` and `build_fixture_group`.
 `RigSpec` has no fine-channel or 16-bit field and the harness is not edited, so
-`fine_carry` and the channel 48/49 inputs construct `FixtureGroup` and `DmxMapping`
-directly in `mh_true_up.py`. Build the
+`fine_carry` constructs `FixtureGroup` and `DmxMapping` directly in `mh_true_up.py`.
+Channels 48 and 49 are input-only, so they are plain integers in `physical_inputs`
+under keys naming the control (`shutter_channel_supported_max`,
+`shutter_channel_unsupported`), not mappings that would reach the legacy pipeline.
+Build the
 nonuniform `tempo` grid the way `build_uneven_beat_grid` does (explicit bar and beat
 boundaries, eighth/sixteenth boundaries derived from the beats). Each legacy-runnable
 case is a single-section plan naming one builtin template, recorded in the case

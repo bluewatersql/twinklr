@@ -166,7 +166,7 @@ Pydantic V2 models with a `ConfigBase` class providing `load_or_default()` for f
 | `AppConfig` | `config.json` | App-level settings: LLM provider, API key, cache dirs, audio processing, logging |
 | `JobConfig` | `job_config.json` | Job-specific: agent orchestration, fixture config path, asset policy, transitions, timing tracks, and final-plan checkpoint writing |
 
-Schema version is 3.0 (`JobConfig.schema_version`). Config files are not committed to the repo — create them from the documented field defaults in `packages/twinklr/core/config/models.py`.
+Schema version 3.0 is the default and 3.1 is also accepted (`JobConfig.schema_version`); 3.1 is required to select the not-yet-shipped `physical_v2` moving-head render mode, which is rejected before rendering. Config files are not committed to the repo — create them from the documented field defaults in `packages/twinklr/core/config/models.py`.
 
 ### Session Coordinator
 

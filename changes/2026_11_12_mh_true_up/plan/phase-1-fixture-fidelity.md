@@ -151,6 +151,17 @@ Legacy input defaults to `legacy_v1` and retains its old serialization/output. P
 Added 2026-11-13 from a recheck at `f067a56`; see the
 [shared rule](README.md#documentation-registry-and-test-surfaces). Recheck at P1 kickoff.
 
+- **Grid extension (added at Phase 0 kickoff, `b498ed9`).** The display fixes added
+  `BeatGrid.extended_to_duration()`, which appends beats to the song end at the
+  average beat duration. Only the display renderer calls it. P1.2's phase map forbids
+  average-tempo inference and labels boundary provenance, so it must build from the
+  detected grid, not an extended one, where appended beats are indistinguishable from
+  observed ones.
+- **Evaluation re-render (found in the P0-T1 review).** `rerender_plan` in
+  `reporting/evaluation/rerender.py` builds a default `JobConfig`, so `twinklr eval-report`
+  re-renders any checkpointed plan as `legacy_v1` whatever the job selected. Before a
+  physical render can exist, P1.6 makes it take the job's render policy or reject a
+  mismatch, with a test; otherwise it is the silent fallback the architecture forbids.
 - **Config inventory.** Each task registers the fields it adds, with a collecting
   evidence test: P1.1 everything under `FixtureConfig.physical_profile` and
   `job.moving_heads.initial_states`; P1.2 `Movement.physical` and the pulse spec under

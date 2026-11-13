@@ -7,8 +7,10 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from tests.golden.harness import RIGS, build_beat_grid, build_fixture_group, build_plan
 from twinklr.core.agents.sequencer.moving_heads.rendering_stage import MovingHeadRenderingStage
 from twinklr.core.audio.models.metadata import EmbeddedMetadata, MetadataBundle
+from twinklr.core.config.models import JobConfig
 from twinklr.core.pipeline.context import PipelineContext
 from twinklr.core.sequencer.moving_heads.compile.template_compiler import UnsupportedRigShapeError
 
@@ -98,3 +100,24 @@ async def test_unsupported_rig_shape_is_reported_as_an_actionable_message(tmp_pa
     assert result.error is not None
     assert "split_lr_sweep_counter" in result.error
     assert "rig config" in result.error
+
+
+@pytest.mark.asyncio
+async def test_unsupported_render_mode_fails_the_stage(tmp_path: Path) -> None:
+    """A job selecting the unbuilt physical renderer fails the stage and delivers nothing."""
+    stage = MovingHeadRenderingStage(xsq_output_path=tmp_path / "out.xsq")
+    context = _context_with_fixture_path("fixture_config.json")
+    context.session.job_config = JobConfig.model_validate(
+        {"schema_version": "3.1", "moving_heads": {"mode": "physical_v2"}}
+    )
+    context.set_state("beat_grid", build_beat_grid())
+    fixture_group = build_fixture_group(RIGS["mh4_minimal"])
+
+    with patch.object(MovingHeadRenderingStage, "_load_fixture_config", return_value=fixture_group):
+        result = await stage.execute({"moving_heads": build_plan()}, context)
+
+    assert not result.success
+    assert result.error is not None
+    assert "physical_v2" in result.error
+    assert list(tmp_path.iterdir()) == []
+    assert context.get_state("delivery_artifacts") is None

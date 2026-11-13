@@ -629,6 +629,24 @@ class TransitionConfig(BaseModel):
     )
 
 
+class MHRenderPolicy(BaseModel):
+    """Versioned moving-head render policy.
+
+    Forbids unknown fields so a job written for a newer renderer is rejected rather
+    than silently rendered with legacy behavior.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    mode: Literal["legacy_v1", "physical_v2"] = Field(
+        default="legacy_v1",
+        description=(
+            "Moving-head renderer. `physical_v2` requires schema_version 3.1 and is "
+            "rejected until the physical renderer ships."
+        ),
+    )
+
+
 class JobConfig(ConfigBase):
     """Job/task-specific configuration.
 
@@ -660,7 +678,7 @@ class JobConfig(ConfigBase):
                 )
         return value
 
-    schema_version: Literal["3.0"] = "3.0"
+    schema_version: Literal["3.0", "3.1"] = "3.0"
 
     fixture_config_path: str = "fixture_config.json"
 
@@ -687,6 +705,17 @@ class JobConfig(ConfigBase):
             "Each track appears as a named timing layer in xLights."
         ),
     )
+
+    moving_heads: MHRenderPolicy = Field(
+        default_factory=MHRenderPolicy,
+        description="Moving-head render policy; omitted jobs keep the legacy renderer",
+    )
+
+    @model_validator(mode="after")
+    def require_schema_for_render_mode(self) -> Self:
+        if self.moving_heads.mode == "physical_v2" and self.schema_version != "3.1":
+            raise ValueError("moving_heads.mode 'physical_v2' requires schema_version '3.1'")
+        return self
 
     @classmethod
     def default_path(cls) -> Path:
