@@ -6,6 +6,7 @@ to concrete start_ms/end_ms values using the BeatGrid.
 
 from __future__ import annotations
 
+import bisect
 import logging
 import math
 
@@ -28,6 +29,41 @@ class TimingResolver:
 
     def __init__(self, beat_grid: BeatGrid) -> None:
         self._beat_grid = beat_grid
+        self._bar_start_beats = self._index_bar_start_beats(beat_grid)
+
+    @staticmethod
+    def _index_bar_start_beats(beat_grid: BeatGrid) -> list[int]:
+        """Beat index of every detected bar start.
+
+        Beat detection can begin mid-bar, so bar ``n`` does not start at beat
+        ``n * beats_per_bar``.  Each bar start is matched to its nearest beat.
+        """
+        beats = beat_grid.beat_boundaries
+        if not beats:
+            return []
+        indices: list[int] = []
+        for bar_ms in beat_grid.bar_boundaries:
+            right = bisect.bisect_left(beats, bar_ms)
+            if right == 0:
+                indices.append(0)
+            elif right == len(beats):
+                indices.append(len(beats) - 1)
+            else:
+                left = right - 1
+                indices.append(left if bar_ms - beats[left] <= beats[right] - bar_ms else right)
+        return indices
+
+    def _bar_start_beat(self, song_bar: int) -> int:
+        """Absolute beat index where a 0-indexed song bar starts.
+
+        Bars outside the detected range continue at ``beats_per_bar`` per bar from
+        the nearest detected bar.
+        """
+        beats_per_bar = self._beat_grid.beats_per_bar
+        if not self._bar_start_beats:
+            return song_bar * beats_per_bar
+        anchor = min(max(song_bar, 0), len(self._bar_start_beats) - 1)
+        return self._bar_start_beats[anchor] + (song_bar - anchor) * beats_per_bar
 
     def resolve_start_ms(
         self,
@@ -73,7 +109,7 @@ class TimingResolver:
         """Convert a planning reference to a clamped absolute beat coordinate."""
         song_bar_0 = (time_ref.bar - 1) + section_start_bar
         beat_within_bar = time_ref.beat - 1
-        absolute_beat = float(song_bar_0 * self._beat_grid.beats_per_bar + beat_within_bar)
+        absolute_beat = float(self._bar_start_beat(song_bar_0) + beat_within_bar)
         max_beat = max(len(self._beat_grid.beat_boundaries) - 1, 0)
         return min(max(absolute_beat, 0.0), float(max_beat))
 

@@ -19,6 +19,7 @@ from twinklr.core.agents.sequencer.moving_heads.models import (
     ColorIntentKind,
     ExplicitColorIntent,
 )
+from twinklr.core.sequencer.display.brightness import intensity_to_brightness
 from twinklr.core.sequencer.display.models.palette import ResolvedPalette
 from twinklr.core.sequencer.display.models.render_event import RenderEvent
 from twinklr.core.sequencer.display.models.render_plan import RenderPlan
@@ -337,6 +338,11 @@ def _macro_sections_for_emitted_id(
     return tuple(resolved)
 
 
+def _event_brightness(event: RenderEvent) -> float:
+    """Brightness fraction an event renders at, before role dimming floors apply."""
+    return intensity_to_brightness(event.intensity) * event.brightness_scale
+
+
 def _normalize_display_role_budgets(
     render_plan: RenderPlan,
     macro_plan: MacroPlan,
@@ -344,10 +350,15 @@ def _normalize_display_role_budgets(
 ) -> RenderPlan:
     """Make every concrete target obey LEAD > SUPPORT > REST despite event counts.
 
-    Raw activation is ``sum(intensity * duration_ms)`` per section/target.  A common
+    Raw activation is ``sum(brightness * duration_ms)`` per section/target, where
+    brightness is the lit brightness the event's intensity maps to.  A common
     per-section base is the minimum ``raw / role_weight`` across emitted targets, and
     each target is scaled down to ``base * role_weight``.  This preserves the declared
     1.0/0.65/0.15 category semantics without increasing or clipping provider output.
+
+    The scale is recorded as ``brightness_scale`` and leaves ``intensity`` alone, so
+    the export applies it to the lit brightness instead of having the visible-brightness
+    floor flatten it.
     """
 
     expander = TargetExpander(graph)
@@ -362,7 +373,7 @@ def _normalize_display_role_budgets(
                 )
                 key = (event.source.section_id, event.source.group_id, role)
                 duration = max(0, event.end_ms - event.start_ms)
-                totals[key] = totals.get(key, 0.0) + event.intensity * duration
+                totals[key] = totals.get(key, 0.0) + _event_brightness(event) * duration
 
     multipliers: dict[tuple[str, str, FocalRoleKind], float] = {}
     for section_id in sections:
@@ -392,7 +403,7 @@ def _normalize_display_role_budgets(
                     multiplier = 1.0
                 events.append(
                     event.model_copy(
-                        update={"intensity": min(1.0, event.intensity * multiplier)},
+                        update={"brightness_scale": min(1.0, event.brightness_scale * multiplier)},
                         deep=True,
                     )
                 )
@@ -454,7 +465,7 @@ def coordinate_display_render_plan(
                 role = roles.get(target_id, FocalRoleKind.SUPPORT)
                 normalized = event.model_copy(
                     update={
-                        "intensity": min(1.0, event.intensity * _ROLE_SCALE[role]),
+                        "brightness_scale": _ROLE_SCALE[role],
                         "palette": _resolved_palette(macro_plan, event.source.section_id),
                     },
                     deep=True,

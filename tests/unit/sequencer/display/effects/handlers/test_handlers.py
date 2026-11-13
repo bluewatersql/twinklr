@@ -78,6 +78,12 @@ class TestOnHandler:
         assert "E_TEXTCTRL_Eff_On_End=48" in settings.settings_string
         assert "E_TEXTCTRL_Eff_On_Start=48" in settings.settings_string
 
+    def test_role_scale_dims_the_on_level(self) -> None:
+        h = OnHandler()
+        event = _event("On", intensity=0.8).model_copy(update={"brightness_scale": 0.15})
+        settings = h.build_settings(event, _ctx())
+        assert "E_TEXTCTRL_Eff_On_End=13" in settings.settings_string
+
     def test_includes_buffer_style(self) -> None:
         h = OnHandler()
         settings = h.build_settings(_event("On"), _ctx())

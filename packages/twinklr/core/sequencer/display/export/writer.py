@@ -21,7 +21,7 @@ from twinklr.core.formats.xlights.sequence.trace import (
     DisplayEmissionTrace,
     EmissionTraceEntry,
 )
-from twinklr.core.sequencer.display.brightness import intensity_to_brightness
+from twinklr.core.sequencer.display.brightness import event_brightness_percent
 from twinklr.core.sequencer.display.effects.protocol import (
     RenderContext,
 )
@@ -212,7 +212,10 @@ class XSQWriter:
 
         # 3. Build palette (with intensity-based brightness)
         palette = self._apply_intensity_brightness(
-            event.palette, event.intensity, settings.effect_name
+            event.palette,
+            event.intensity,
+            settings.effect_name,
+            brightness_scale=event.brightness_scale,
         )
         palette_string = build_palette_string(palette)
         trace: DisplayEmissionTrace = {
@@ -308,40 +311,42 @@ class XSQWriter:
         palette: ResolvedPalette,
         intensity: float,
         effect_name: str,
+        *,
+        brightness_scale: float = 1.0,
     ) -> ResolvedPalette:
         """Map event intensity to xLights palette brightness.
 
-        Applies intensity (0.0-1.0) as ``C_SLIDER_Brightness`` on the
-        palette, lifted to a visible floor by ``intensity_to_brightness``.  This is a cross-cutting concern — like
-        transitions — applied universally for all non-On effects.
+        Writes ``C_SLIDER_Brightness`` from ``event_brightness_percent``:
+        intensity lifted to a visible floor, composed with any brightness
+        already on the palette, then dimmed by the focal-role scale.  This
+        is a cross-cutting concern — like transitions — applied universally
+        for all non-On effects.
 
-        **On** effects are skipped because they handle intensity
-        through their own ``E_TEXTCTRL_Eff_On_Start/End`` keys;
-        applying palette brightness as well would double-attenuate.
-
-        If the palette already carries a brightness value, intensity
-        is composed (multiplied) with it.
+        **On** effects carry the same value in their own
+        ``E_TEXTCTRL_Eff_On_Start/End`` keys, so the palette brightness is
+        removed for them; leaving it would attenuate twice.
 
         Args:
             palette: Resolved color palette.
             intensity: Event intensity (0.0-1.0).
             effect_name: xLights effect type name.
+            brightness_scale: Focal-role dimming (1.0 = none).
 
         Returns:
             Palette with brightness applied, or the original palette
             if no adjustment is needed.
         """
-        # On effects handle intensity via their own E_ parameters
         if effect_name == "On":
-            return palette
+            if palette.brightness is None:
+                return palette
+            return palette.model_copy(update={"brightness": None})
 
-        # Full intensity needs no brightness override
-        if intensity >= 1.0:
+        effective = event_brightness_percent(
+            intensity, palette_brightness=palette.brightness, scale=brightness_scale
+        )
+        # Full brightness needs no override
+        if effective >= 100 and palette.brightness is None:
             return palette
-
-        # Compose with any existing brightness
-        base_brightness = palette.brightness if palette.brightness is not None else 100
-        effective = max(0, min(100, round(base_brightness * intensity_to_brightness(intensity))))
         return palette.model_copy(update={"brightness": effective})
 
 

@@ -8,6 +8,7 @@ import pytest
 
 from twinklr.core.agents.audio.profile.models import SongSectionRef
 from twinklr.core.agents.sequencer.moving_heads.models import ChoreographyPlan, PlanSection
+from twinklr.core.sequencer.display.brightness import intensity_to_brightness
 from twinklr.core.sequencer.display.models.palette import ResolvedPalette
 from twinklr.core.sequencer.display.models.render_event import RenderEvent, RenderEventSource
 from twinklr.core.sequencer.display.models.render_plan import (
@@ -241,6 +242,20 @@ def _ranges(plan: RenderPlan, group_id: str) -> list[tuple[int, int]]:
     return [(event.start_ms, event.end_ms) for layer in group.layers for event in layer.events]
 
 
+def _activation(plan: RenderPlan) -> dict[str, float]:
+    """Rendered brightness x duration per group, as the export will write it."""
+    return {
+        group.element_name: sum(
+            intensity_to_brightness(event.intensity)
+            * event.brightness_scale
+            * (event.end_ms - event.start_ms)
+            for layer in group.layers
+            for event in layer.events
+        )
+        for group in plan.groups
+    }
+
+
 def test_focal_roles_change_emitted_display_intensity() -> None:
     coordinated = coordinate_display_render_plan(
         _render_plan("MEGA_TREE", "ARCH_LEFT", "ARCH_RIGHT"),
@@ -249,11 +264,30 @@ def test_focal_roles_change_emitted_display_intensity() -> None:
         _graph(),
         moving_head_target_ids={"MOVING_HEADS"},
     )
-    intensity = {
-        group.element_name: sum(event.intensity for layer in group.layers for event in layer.events)
-        for group in coordinated.groups
+    brightness = _activation(coordinated)
+    assert brightness["MEGA_TREE"] > brightness["ARCH_LEFT"] > brightness["ARCH_RIGHT"]
+
+
+def test_focal_roles_dim_brightness_and_leave_intensity_alone() -> None:
+    source = _render_plan("MEGA_TREE", "ARCH_LEFT", "ARCH_RIGHT")
+    coordinated = coordinate_display_render_plan(
+        source,
+        _macro(),
+        _grid(),
+        _graph(),
+        moving_head_target_ids={"MOVING_HEADS"},
+    )
+    source_intensity = {
+        event.intensity
+        for group in source.groups
+        for layer in group.layers
+        for event in layer.events
     }
-    assert intensity["MEGA_TREE"] > intensity["ARCH_LEFT"] > intensity["ARCH_RIGHT"]
+    events = [
+        event for group in coordinated.groups for layer in group.layers for event in layer.events
+    ]
+    assert {event.intensity for event in events} == source_intensity
+    assert any(event.brightness_scale < 1.0 for event in events)
 
 
 def test_focal_role_budgets_dominate_with_unequal_event_counts() -> None:
@@ -264,14 +298,7 @@ def test_focal_role_budgets_dominate_with_unequal_event_counts() -> None:
         _graph(),
         moving_head_target_ids={"MOVING_HEADS"},
     )
-    activation = {
-        group.element_name: sum(
-            event.intensity * (event.end_ms - event.start_ms)
-            for layer in group.layers
-            for event in layer.events
-        )
-        for group in coordinated.groups
-    }
+    activation = _activation(coordinated)
     assert activation["MEGA_TREE"] > activation["ARCH_LEFT"] > activation["ARCH_RIGHT"]
 
 
@@ -313,14 +340,7 @@ def test_focal_role_budget_is_per_concrete_target_with_unequal_support_counts(
         _graph(),
         moving_head_target_ids={"MOVING_HEADS"},
     )
-    activation = {
-        group.element_name: sum(
-            event.intensity * (event.end_ms - event.start_ms)
-            for layer in group.layers
-            for event in layer.events
-        )
-        for group in coordinated.groups
-    }
+    activation = _activation(coordinated)
 
     assert activation["MEGA_TREE"] > activation["ARCH_LEFT"]
     assert activation["MEGA_TREE"] > activation["WINDOWS"]

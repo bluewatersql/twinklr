@@ -65,6 +65,7 @@ class RenderEvent(BaseModel):
         buffer_transform: Optional buffer transform (e.g., 'Rotate CC 90').
         palette: Resolved color palette for this event.
         intensity: Normalized intensity (0.0-1.0).
+        brightness_scale: Focal-role dimming from show coordination (1.0 = none).
         transition_in: Optional incoming transition.
         transition_out: Optional outgoing transition.
         effect_substitution: Structured provenance when effect_type was substituted.
@@ -95,6 +96,12 @@ class RenderEvent(BaseModel):
         ge=0.0,
         le=1.0,
         description="Normalized intensity (0.0-1.0)",
+    )
+    brightness_scale: float = Field(
+        default=1.0,
+        ge=0.0,
+        le=1.0,
+        description="Focal-role dimming applied to the lit brightness (1.0 = none)",
     )
     transition_in: TransitionSpec | None = Field(
         default=None,

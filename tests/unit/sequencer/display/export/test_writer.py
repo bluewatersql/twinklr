@@ -290,6 +290,29 @@ class TestApplyIntensityBrightness:
         result = XSQWriter._apply_intensity_brightness(palette, intensity=0.3, effect_name="On")
         assert result.brightness is None  # Unchanged
 
+    def test_on_effect_drops_palette_brightness(self) -> None:
+        """The On level already carries the palette's brightness."""
+        palette = ResolvedPalette(colors=["#FF0000"], active_slots=[1], brightness=50)
+        result = XSQWriter._apply_intensity_brightness(palette, intensity=0.3, effect_name="On")
+        assert result.brightness is None
+
+    def test_dim_palette_stays_at_the_visible_floor(self) -> None:
+        """A palette scaler cannot take an event below the floor."""
+        palette = ResolvedPalette(colors=["#FF0000"], active_slots=[1], brightness=20)
+        for intensity in (0.0, 0.5, 1.0):
+            result = XSQWriter._apply_intensity_brightness(
+                palette, intensity=intensity, effect_name="Color Wash"
+            )
+            assert result.brightness == 35
+
+    def test_role_scale_dims_below_the_visible_floor(self) -> None:
+        """A resting group is dimmed on purpose, down to its own floor."""
+        palette = _DEFAULT_PALETTE
+        result = XSQWriter._apply_intensity_brightness(
+            palette, intensity=0.8, effect_name="Color Wash", brightness_scale=0.15
+        )
+        assert result.brightness == 13
+
     def test_composes_with_existing_brightness(self) -> None:
         """If palette already has brightness, intensity multiplies it."""
         palette = ResolvedPalette(

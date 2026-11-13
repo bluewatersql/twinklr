@@ -2,7 +2,7 @@
 type: decision
 status: accepted
 created: 2026-11-12
-updated: 2026-11-12
+updated: 2026-11-13
 confidence: confirmed
 tags: [display, rendering, group-planner, brightness, xlights, owner-acceptance]
 ---
@@ -20,7 +20,13 @@ never expressed by leaving most of the display unlit. Three mechanisms enforce t
 - **Visible brightness floor.** Event intensity maps to xLights brightness through
   `display/brightness.py`: intensity 0.0 is 35% brightness and the range above it is
   linear to 100%. Intensity still drives effect energy and density unchanged. The same
-  mapping sets the `On` effect level.
+  mapping sets the `On` effect level. A palette's own intensity scaler composes with
+  it but cannot take an event below 35%.
+- **Focal-role dimming is separate from the floor.** In a combined show, show
+  coordination records the LEAD / SUPPORT / REST scale (1.0 / 0.65 / 0.15) as
+  `RenderEvent.brightness_scale` and leaves `intensity` alone. The export multiplies the
+  lit brightness by it, down to a 10% floor. A resting group is dim on purpose, so the
+  lead keeps its declared contrast (about 87% against 13% at a strong intensity).
 - **Display composition reaches the end of the song.** `BeatGrid.extended_to_duration()`
   continues beats and bars at the average beat duration past the last detected beat, and
   a section that runs past the last bar ends at its own end time. `DisplayRenderer` uses
@@ -59,20 +65,24 @@ The concrete per-energy lane recipes in the planner prompt (BASE on outlines and
 for the whole section) were replaced by abstract wording in `7bf495a` (2026-08-14). Rule
 12 restores the coverage part of that guidance.
 
+## Follow-up fixes (2026-11-13)
+
+- Section-relative bar and beat references now resolve from the detected downbeats.
+  `TimingResolver` matches each bar start to its nearest beat, so a grid whose first
+  beat is not a downbeat no longer places effects up to a bar early. `Hey Come Look At
+  My House` starts on a downbeat (167 of 167 bars already aligned), so this is covered by
+  unit tests only.
+- A fresh live Claude plan with the final Rule 12 wording: 7 sections, all planned in
+  one iteration, six approved at 7.4–7.8 (the 0.6 s outro has no verdict), 735,296
+  tokens. Rendered by xLights: mean 49.9, darkest 2 s window 13.0.
+
 ## Open items for the owner
 
 - The result is now brighter overall than the owner's own sequence, and the chorus is
   about three times as bright. Whether to lower the floor or the top end is a taste call.
 - The 40% threshold and the list of sparse effects were chosen from this one song and
   layout.
-- In a combined show, a resting group is scaled to 15% intensity. With the floor that
-  now renders at about 43% brightness against about 87% for the lead, so resting groups
-  stand out less than before (about 2:1, was about 7:1).
-- A palette's own intensity scaler still multiplies the result, so a dimmed palette can
-  take an event below the 35% floor.
-- Section-relative bar and beat references assume the first detected beat is a downbeat.
-  Real grids can start mid-bar, which places effects up to three beats early. This
-  predates the change and is not fixed here.
+- The 10% floor for a resting group is a first value, not a calibrated one.
 - Extending the grid for the moving-head path would let moving-head sections past the
   last detected beat render. It was left out to keep moving-head output unchanged
   ([decision](mh-render-matches-pre-cleanup-look.md)).

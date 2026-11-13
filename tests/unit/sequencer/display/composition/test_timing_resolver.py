@@ -193,3 +193,45 @@ class TestTimingResolverSectionOffset:
             section_end_ms=16000,
         )
         assert end_ms == 16000
+
+
+def _make_mid_bar_grid(pickup_beats: int = 3) -> BeatGrid:
+    """A 120 BPM grid whose first detected beat is not a downbeat."""
+    beat_boundaries = [i * 500.0 for i in range(40)]
+    bar_boundaries = [(pickup_beats + 4 * i) * 500.0 for i in range(9)]
+    return BeatGrid(
+        bar_boundaries=bar_boundaries,
+        beat_boundaries=beat_boundaries,
+        eighth_boundaries=[i * 250.0 for i in range(79)],
+        sixteenth_boundaries=[i * 125.0 for i in range(157)],
+        tempo_bpm=120.0,
+        beats_per_bar=4,
+        duration_ms=20_000.0,
+    )
+
+
+class TestGridStartingMidBar:
+    """Bar/beat references follow detected downbeats, not the first beat."""
+
+    def test_bar_one_beat_one_is_the_first_downbeat(self) -> None:
+        grid = _make_mid_bar_grid()
+        resolver = TimingResolver(grid)
+        assert resolver.resolve_start_ms(PlanningTimeRef(bar=1, beat=1)) == 1500
+
+    def test_section_bar_lands_on_its_downbeat(self) -> None:
+        grid = _make_mid_bar_grid()
+        resolver = TimingResolver(grid)
+        start = resolver.resolve_start_ms(PlanningTimeRef(bar=1, beat=1), section_start_bar=2)
+        assert start == int(grid.bar_boundaries[2])
+
+    def test_beat_within_bar_counts_from_the_downbeat(self) -> None:
+        grid = _make_mid_bar_grid()
+        resolver = TimingResolver(grid)
+        start = resolver.resolve_start_ms(PlanningTimeRef(bar=2, beat=3), section_start_bar=1)
+        assert start == int(grid.bar_boundaries[2]) + 1000
+
+    def test_bar_past_the_detected_bars_continues_in_whole_bars(self) -> None:
+        grid = _make_mid_bar_grid()
+        resolver = TimingResolver(grid)
+        # Bar index 8 is the last detected bar (beat 35); index 9 would be beat 39.
+        assert resolver.resolve_beat_position(PlanningTimeRef(bar=10, beat=1)) == 39.0

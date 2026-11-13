@@ -6,7 +6,7 @@ flashes, bells, and as the fallback for unmapped templates.
 
 from __future__ import annotations
 
-from twinklr.core.sequencer.display.brightness import intensity_to_brightness
+from twinklr.core.sequencer.display.brightness import event_brightness_percent
 from twinklr.core.sequencer.display.effects.protocol import (
     EffectSettings,
     RenderContext,
@@ -53,7 +53,11 @@ class OnHandler:
             EffectSettings with the On effect settings string.
         """
         params = event.parameters
-        intensity_pct = round(intensity_to_brightness(event.intensity) * 100)
+        intensity_pct = event_brightness_percent(
+            event.intensity,
+            palette_brightness=event.palette.brightness,
+            scale=event.brightness_scale,
+        )
         shimmer = params.get("shimmer", False)
 
         builder = SettingsStringBuilder()
