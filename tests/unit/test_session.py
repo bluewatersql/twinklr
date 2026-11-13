@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from unittest.mock import patch
 
@@ -10,6 +11,7 @@ import pytest
 
 from twinklr.core.agents.providers.factory import create_llm_provider
 from twinklr.core.config.models import AppConfig, JobConfig
+from twinklr.core.config.render_policy import UnsupportedRenderModeError
 from twinklr.core.session import TwinklrSession
 
 
@@ -120,3 +122,45 @@ def test_session_id_strategy_random_default(tmp_path: Path) -> None:
     session = TwinklrSession(app_config=app_config_path, job_config=job_config_path)
 
     assert session.session_id
+
+
+def _write_job_dir(directory: Path, job: dict) -> None:
+    (directory / "job_config.json").write_text(json.dumps(job), encoding="utf-8")
+    (directory / "config.json").write_text(
+        json.dumps({"llm_provider": "openai", "llm_api_key": "test-key"}), encoding="utf-8"
+    )
+
+
+_PHYSICAL_JOB = {"schema_version": "3.1", "moving_heads": {"mode": "physical_v2"}}
+
+
+def test_session_rejects_physical_job_file_at_load(tmp_path: Path) -> None:
+    """A physical job path fails when the session resolves it, before any analysis."""
+    _write_job_dir(tmp_path, _PHYSICAL_JOB)
+
+    with pytest.raises(UnsupportedRenderModeError, match="physical_v2"):
+        TwinklrSession.from_directory(tmp_path)
+    with pytest.raises(UnsupportedRenderModeError, match="physical_v2"):
+        TwinklrSession(app_config=_make_app_config(), job_config=tmp_path / "job_config.json")
+
+
+def test_session_default_job_path_rejects_physical_job(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The implicit ./job_config.json goes through the same preflight."""
+    _write_job_dir(tmp_path, _PHYSICAL_JOB)
+    monkeypatch.chdir(tmp_path)
+
+    with pytest.raises(UnsupportedRenderModeError, match="physical_v2"):
+        TwinklrSession(app_config=_make_app_config(), job_config=None)
+
+
+def test_session_loads_legacy_job_file_and_accepts_instances(tmp_path: Path) -> None:
+    """Legacy files load unchanged; a physical JobConfig instance passed in code is not refused."""
+    _write_job_dir(tmp_path, {"schema_version": "3.1", "moving_heads": {"mode": "legacy_v1"}})
+    session = TwinklrSession.from_directory(tmp_path)
+    assert session.job_config.moving_heads.mode == "legacy_v1"
+
+    physical = JobConfig.model_validate(_PHYSICAL_JOB)
+    session = TwinklrSession(app_config=_make_app_config(), job_config=physical)
+    assert session.job_config is physical

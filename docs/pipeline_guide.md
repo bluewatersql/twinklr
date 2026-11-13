@@ -800,8 +800,8 @@ Structured local calls use `/v1/chat/completions`; cloud OpenAI retains
 ### Job Config (`job_config.json`)
 
 The live schema defaults to version 3.0 and also accepts 3.1, which is required to
-select the not-yet-shipped `physical_v2` moving-head render mode (rejected before
-rendering). Do not reuse the removed version-2 examples from this guide's history.
+select the not-yet-shipped `physical_v2` moving-head render mode (rejected when the
+job is loaded). Do not reuse the removed version-2 examples from this guide's history.
 
 ### FE Pipeline Options
 

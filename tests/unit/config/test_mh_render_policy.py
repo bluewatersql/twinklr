@@ -6,9 +6,12 @@ from pathlib import Path
 
 from pydantic import ValidationError
 import pytest
+import yaml
 
 from tests.golden.harness import RIGS, build_beat_grid, build_fixture_group, build_plan
+from twinklr.core.config.loader import load_full_config, load_job_config
 from twinklr.core.config.models import JobConfig
+from twinklr.core.config.render_policy import preflight_render_policy
 from twinklr.core.sequencer.moving_heads.pipeline import (
     RenderingPipeline,
     UnsupportedRenderModeError,
@@ -57,3 +60,39 @@ def test_unimplemented_physical_mode_is_rejected(tmp_path: Path) -> None:
         )
 
     assert list(tmp_path.iterdir()) == []
+
+
+def _write_job(tmp_path: Path, document: dict) -> Path:
+    path = tmp_path / "job_config.yaml"
+    path.write_text(yaml.safe_dump(document), encoding="utf-8")
+    return path
+
+
+_PHYSICAL_JOB = {"schema_version": "3.1", "moving_heads": {"mode": "physical_v2"}}
+
+
+def test_loading_physical_job_is_rejected_before_execution(tmp_path: Path) -> None:
+    """A physical job fails at load, naming the mode and the remedy, before any planning."""
+    path = _write_job(tmp_path, _PHYSICAL_JOB)
+
+    with pytest.raises(UnsupportedRenderModeError, match=r"physical_v2.*legacy_v1"):
+        load_job_config(path)
+    with pytest.raises(UnsupportedRenderModeError, match=r"physical_v2.*legacy_v1"):
+        load_full_config(path)
+
+
+def test_physical_job_model_still_validates() -> None:
+    """The model accepts a physical job in code; only loading it for execution refuses."""
+    job = JobConfig.model_validate(_PHYSICAL_JOB)
+    assert job.moving_heads.mode == "physical_v2"
+    with pytest.raises(UnsupportedRenderModeError, match="physical_v2"):
+        preflight_render_policy(job)
+
+
+def test_legacy_and_omitted_policy_load_unchanged(tmp_path: Path) -> None:
+    """Legacy and policy-omitted jobs load exactly as the model validates them."""
+    omitted = {"schema_version": "3.0"}
+    legacy = {"schema_version": "3.1", "moving_heads": {"mode": "legacy_v1"}}
+    for document in (omitted, legacy):
+        path = _write_job(tmp_path, document)
+        assert load_job_config(path) == JobConfig.model_validate(document)

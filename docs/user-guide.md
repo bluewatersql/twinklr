@@ -256,7 +256,7 @@ The same registry-backed subset policy applies here.
 | `transitions.enabled` | `true` | Enables section transition planning | `job.transitions.enabled` |
 | `transitions.default_duration_bars` | `0.5` | Sets the fallback transition length | `job.transitions.default_duration_bars` |
 | `timeline_tracks.sections` | `true` | Includes or omits section timing markers | `job.timeline_tracks.sections` |
-| `moving_heads.mode` | `"legacy_v1"` | Selects the moving-head renderer. `"physical_v2"` needs schema `"3.1"` and is rejected before rendering until the physical renderer ships | `job.moving_heads.mode` |
+| `moving_heads.mode` | `"legacy_v1"` | Selects the moving-head renderer. `"physical_v2"` needs schema `"3.1"` and is rejected when the job is loaded, before any analysis or provider request, until the physical renderer ships | `job.moving_heads.mode` |
 
 The planner schema may describe up to four narrative assets (`maxItems=4`), but the
 enabled live path authorizes only one image-provider request and reports the rest as
